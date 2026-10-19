@@ -199,7 +199,7 @@ test('Andere Liste gewaehlt: list_id reist mit den uebrigen Feldern, der Artikel
   const [alt, neu] = shopping.state.lists;
   assert.deepEqual([alt.item_total, alt.item_checked], [1, 1]);
   assert.deepEqual([neu.item_total, neu.item_checked], [5, 0]);
-  assert.deepEqual(geschlossen, [{ force: true }], 'ohne Verwerfen-Rueckfrage');
+  assert.deepEqual(geschlossen, [{ force: true, context: 'test-modal-context' }], 'ohne Verwerfen-Rueckfrage');
   // Der Loader-Stub von t() haengt die Parameter an den Schluessel: gemessen
   // wird, WAS die Meldung nennt - den Artikel und die Zielliste, unmaskiert
   // (der Toast setzt textContent).

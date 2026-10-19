@@ -2077,8 +2077,8 @@ function renderCategoryBars(byCategory) {
               aria-pressed="${selected ? 'true' : 'false'}"
               >
               <span class="budget-bar-row__label" title="${label}">${label}</span>
-              <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}"${kind === 'expenses' && categoryTexture(colors, r.category) ? ` data-texture="${categoryTexture(colors, r.category)}"` : ''} data-bar-key="${kind}:${esc(String(r.category))}"></span>
+              <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}">
+                <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"${kind === 'expenses' && categoryTexture(colors, r.category) ? ` data-texture="${categoryTexture(colors, r.category)}"` : ''} data-bar-key="${kind}:${esc(String(r.category))}"></span>
               </span>
               <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
@@ -2142,9 +2142,9 @@ function subcategoryRows(category, entries) {
               data-subcategory-filter="${esc(row.key)}"
               aria-pressed="${selected ? 'true' : 'false'}">
         <span class="budget-bar-row__label">${esc(row.label)}</span>
-        <span class="budget-bar-row__track">
+        <span class="budget-bar-row__track"${parentFill ? ` style="--bar-fill:${parentFill}"` : ''}>
           <span class="budget-bar-row__fill budget-bar-row__fill--${kind}"
-                style="--bar-scale:${scale}${parentFill ? `;--bar-fill:${parentFill}` : ''}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
+                style="--bar-scale:${scale}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
           ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}

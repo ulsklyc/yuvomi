@@ -334,6 +334,7 @@ function renderCatBars() {
         : '');
       // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
       // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
+      // Die Farbe steht am Track, damit der Stummel sie mitliest (#2084).
       const color = kind === 'expenses' ? categoryColor(colors, r.category) : null;
       const fillColor = color ? `;--bar-fill:${color}` : '';
       const texture = kind === 'expenses' ? categoryTexture(colors, r.category) : null;
@@ -343,8 +344,8 @@ function renderCatBars() {
       return `
         <div class="budget-bar-row budget-bar-row--compare">
           <div class="budget-bar-row__label" title="${catLabel}">${catLabel}</div>
-          <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}">
-            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}${fillColor}"${texture ? ` data-texture="${texture}"` : ''} data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
+          <div class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}${fillColor}">
+            <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"${texture ? ` data-texture="${texture}"` : ''} data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
             ${targetMarker}
           </div>
           <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>

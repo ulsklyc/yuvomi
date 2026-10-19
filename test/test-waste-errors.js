@@ -796,7 +796,7 @@ for (const [name, antwort, satz] of [
     const d = await urlDialog();
     const { closed } = await mit({ post: async () => antwort }, () => d.klick('#wurl-save'));
     assert.deepEqual(toasts, [[satz, 'danger']]);
-    assert.deepEqual(closed, [{ force: true }]);
+    assert.deepEqual(closed, [{ force: true, context: 'test-modal-context' }]);
   });
 }
 
@@ -905,4 +905,128 @@ test('Woechentlich ohne Tag: die Meldung steht an der Tagesgruppe, der Fokus auf
   assert.match(src, /err\?\.data\?\.reason === 'waste_schedule_weekdays_required' && kindValue === 'weekly'\) \{\s*reportWeekdaysMissing\(panel\);/,
     'dieselbe Absage vom Server geht ebenfalls ans Feld');
   assert.match(src, /<div class="form-group form-field" id="wsm-weekly-fields"/, 'die Gruppe traegt den Feldfehler');
+});
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Erfolgsweg der Seite reicht den VOR der
+// Anfrage (bei einer Rueckfrage: vor der Rueckfrage) gemerkten Kontext hinein.
+// Gefahren wird je Weg der echte Handler; die Antwort auf die schreibende
+// Anfrage wechselt den Kontext, wie es ein inzwischen geoeffneter Dialog tut.
+
+/** Der Dialog der Erinnerungen, mit einer geaenderten Zeile; liefert seinen Speichern-Handler. */
+async function erinnerungsDialog() {
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  globalThis.__apiStub = { get: async () => ({ data: [{ type_id: 1, type_name: 'Restmuell', enabled: false, offset_days: 1, delivery_time: '08:00' }] }) };
+  try { await waste.openReminderSettingsModal(); } finally { delete globalThis.__openModal; delete globalThis.__apiStub; }
+  const row = {
+    dataset: { typeId: '1' },
+    querySelector: (sel) => ({
+      '[data-role="reminder-enabled"]': { checked: true },
+      '[data-role="reminder-offset"]': { value: '2' },
+      '[data-role="reminder-time"]': { value: '08:00' },
+    })[sel],
+  };
+  const handlers = {};
+  const knopf = { addEventListener(type, fn) { handlers[type] = fn; }, disabled: false, classList: { add() {}, remove() {} }, setAttribute() {}, removeAttribute() {} };
+  opts.onSave({
+    querySelector: (sel) => (sel === '#rem-save' ? knopf : { addEventListener() {} }),
+    querySelectorAll: (sel) => (sel === '.waste-reminder-setting-row' ? [row] : []),
+    addEventListener() {},
+  });
+  return () => handlers.click();
+}
+
+/** Der Dialog des Zuordnungsprofils nach der Vorschau; liefert sein "Anwenden". */
+async function profilDialog() {
+  const wechsel = await profilWaehlen('{"mappings":[]}');
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    await mit({ post: async () => ({ data: { applicable_count: 1, entries: [], profile_digest: 'p1' } }) }, wechsel);
+  } finally {
+    delete globalThis.__openModal;
+  }
+  let anwenden = null;
+  opts.onSave({
+    querySelector: (selector) => ({
+      disabled: false, classList: { add() {}, remove() {} }, setAttribute() {}, removeAttribute() {},
+      addEventListener(_type, fn) { if (selector === '#wmp-apply') anwenden = fn; },
+    }),
+  });
+  return () => anwenden();
+}
+
+const PICKUP = () => ({ id: 55, type_id: 1, date: '2026-03-01', note: null });
+const pickupWerte = { werte: { '#wpm-type': { value: '1' }, '#wpm-date': { value: '2026-03-01' } } };
+
+/** [Name, Vorbereitung (liefert den Ausloeser)]: jeder Weg, der nach seiner Anfrage schliesst. */
+const WASTE_ERFOLGSWEGE = [
+  ['Abfallart archivieren', async () => { const d = await dialog(() => waste.openTypeModal(TYPE())); return () => d.klick('#wtm-archive'); }],
+  ['Abfallart loeschen', async () => { const d = await dialog(() => waste.openTypeModal(TYPE())); return () => d.klick('#wtm-delete'); }],
+  ['Abfallart speichern', async () => {
+    const d = await dialog(() => waste.openTypeModal(TYPE()), { werte: { '#wtm-name': { value: 'Restmuell' }, '.waste-color-swatch--active': null } });
+    return () => d.klick('#wtm-save');
+  }],
+  ['Termin loeschen', async () => { const d = await terminDialog(); return () => d.klick('#wsm-delete'); }],
+  ['Termin speichern', async () => { const d = await terminDialog(); return () => d.klick('#wsm-save'); }],
+  ['Abholung loeschen', async () => { const d = await dialog(() => waste.openPickupModal(PICKUP()), pickupWerte); return () => d.klick('#wpm-delete'); }],
+  ['Abholung speichern', async () => { const d = await dialog(() => waste.openPickupModal(PICKUP()), pickupWerte); return () => d.klick('#wpm-save'); }],
+  ['Import-Vorschau: der Kalender ist unveraendert', async () => {
+    const d = await assistent(SOURCE());
+    return () => d.klick('#wiz-preview');
+  }],
+  ['Import uebernehmen', async () => {
+    const { d } = await assistentMitVorschau([['bio', '1'], ['papier', '2']]);
+    return () => d.klick('#wiz-commit');
+  }],
+  ['Zuordnungsprofil anwenden', profilDialog],
+  ['Quelle loeschen', async () => { const d = await dialog(() => waste.openSourceModal(SOURCE())); return () => d.klick('#wsrc-delete'); }],
+  ['Quelle speichern', async () => {
+    const row = { dataset: { mappingId: '30' }, querySelector: () => ({ value: '2' }) };
+    const d = await dialog(() => waste.openSourceModal(SOURCE()), {
+      werte: { '#wsrc-name': { value: 'Kalender neu' } }, listen: { '.waste-source-mapping-row': [row] },
+    });
+    return () => d.klick('#wsrc-save');
+  }],
+  ['Quelle mit Adresse anlegen', async () => { const d = await urlDialog(); return () => d.klick('#wurl-save'); }],
+  ['Erinnerungen speichern', erinnerungsDialog],
+  ['Abholung verschieben', async () => {
+    const d = await dialog(() => waste.moveOccurrence('1:2026-01-12'), { werte: { '#wmm-date': { value: '2026-01-13' } } });
+    return () => d.klick('#wmm-save');
+  }],
+];
+
+test('Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  for (const [name, vorbereiten] of WASTE_ERFOLGSWEGE) {
+    zustand();
+    const ausloesen = await vorbereiten();
+    toasts.length = 0;
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    const wechsel = (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
+    try {
+      const { calls, closed } = await mit({
+        quelle: SOURCE(),
+        post: async () => wechsel({ data: { unchanged: true, diff: { added: 1, changed: 0, removed: 0 }, outcome: 'committed' } }),
+        put: async () => wechsel({ data: {} }),
+        delete: async () => wechsel({}),
+      }, ausloesen);
+      assert.ok(calls.some(([verb]) => verb !== 'GET'), `${name}: der Weg schreibt (${JSON.stringify(calls)})`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(closed)})`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
 });

@@ -6598,8 +6598,9 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   budgetUi.state.meta = { ...vorherMeta, expenseCategories: [{ key: 'housing', name: 'Housing' }, { key: 'food', name: 'Food' }] };
   let bars;
   try { bars = budgetUi.renderCategoryBars(summe.byCategory); } finally { budgetUi.state.meta = vorherMeta; }
-  assert.match(bars, /style="--bar-scale:[\d.]+;--bar-fill:var\(--chart-series-1\)" data-bar-key="expenses:housing"/, 'Wohnen: Serie 1');
-  assert.match(bars, /style="--bar-scale:[\d.]+;--bar-fill:var\(--chart-series-2\)" data-bar-key="expenses:food"/, 'Ernaehrung: Serie 2');
+  // Die Farbe steht am Track (#2084), das Fuell-Element erbt sie.
+  assert.match(bars, /;--bar-fill:var\(--chart-series-1\)">\s*<span class="budget-bar-row__fill[^>]*data-bar-key="expenses:housing"/, 'Wohnen: Serie 1');
+  assert.match(bars, /;--bar-fill:var\(--chart-series-2\)">\s*<span class="budget-bar-row__fill[^>]*data-bar-key="expenses:food"/, 'Ernaehrung: Serie 2');
   // Plan: der Balken traegt die Kategoriefarbe, nicht den Zustand.
   const plans = read('../public/pages/budget-plans.js');
   assert.match(plans, /const fill = view\.ctx\.categoryColor\?\.\(p\.category\);/);
@@ -6802,4 +6803,68 @@ test('Budget einspaltig: jeder Reiter endet an der Kante des Kopfs', () => {
   assert.ok(rule, 'die einspaltige Regel fehlt');
   assert.ok(rule.selector.split(',').map((x) => x.trim()).includes('.budget-tab-panel'));
   assert.match(rule.body, /--page-measure:\s*100%/);
+});
+
+// #2084: der Mindest-Stummel am Bahnanfang (::after am Track) stand immer im
+// Modulton, die Kategoriefarbe sass nur am Fuell-Element - jeder Ausgabenbalken
+// begann mit einem andersfarbigen 2px-Strich. Die Farbe gehoert an den TRACK:
+// das Fuell-Element erbt sie, und der Stummel liest dieselbe Eigenschaft.
+const expenseBarStyles = (html) => [...html.matchAll(
+  /class="budget-bar-row__track"(?: style="([^"]*)")?>\s*<(?:span|div) class="budget-bar-row__fill budget-bar-row__fill--expenses"\s+style="([^"]*)"/g,
+)].map(([, track = '', fill]) => ({ track, fill }));
+
+test('#2084: der Stummel am Bahnanfang traegt die Farbe der Kategorie', async () => {
+  const stub = [...eachRule(budgetCss)].find((r) => r.selector === '.budget-chart-block .budget-bar-row__track::after');
+  assert.ok(stub, 'Stummel-Regel fehlt');
+  assert.match(stub.body, /background-color:\s*var\(--bar-fill,\s*var\(--bar-stub-color\)\)/,
+    'der Stummel liest die Kategoriefarbe, der Blockton ist nur der Rueckfall');
+
+  const state = budgetUi.state;
+  const previous = { ...state };
+  let subHtml;
+  try {
+    Object.assign(state, {
+      currency: 'EUR', categoryFilter: 'housing', subcategoryFilter: null, responsibleFilterId: null,
+      meta: {
+        expenseCategories: [{ key: 'housing', name: 'Wohnen' }], incomeCategories: [],
+        subcategories: { housing: [{ key: 'rent_mortgage' }, { key: 'utilities' }] },
+      },
+      entries: [
+        { category: 'housing', subcategory: 'utilities', amount: -100 },
+        { category: 'housing', subcategory: 'rent_mortgage', amount: -700 },
+      ],
+      summary: { byCategory: [{ category: 'housing', income: 0, expenses: -800, total: -800 }] },
+    });
+    subHtml = budgetUi.renderSubcategoryBreakdowns();
+  } finally {
+    Object.assign(state, previous);
+  }
+  const statsHtml = await renderCatBarsWith({
+    byCategory: [{ category: 'food', expenses: -1200 }, { category: 'rent', expenses: -600 }],
+  });
+
+  for (const [where, html] of [
+    ['Uebersicht', budgetUi.renderCategoryBars(kategorien())],
+    ['Unterkategorien', subHtml],
+    ['Statistik', statsHtml],
+  ]) {
+    const rows = expenseBarStyles(html);
+    assert.ok(rows.length >= 2, `${where}: keine Ausgabenbalken gefunden`);
+    for (const { track, fill } of rows) {
+      assert.match(track, /--bar-fill:/, `${where}: die Kategoriefarbe steht am Track, wo der Stummel sie liest`);
+      assert.doesNotMatch(fill, /--bar-fill:/, `${where}: das Fuell-Element erbt sie, statt sie allein zu tragen`);
+    }
+  }
+});
+
+// #2084: die Schraffur der Serien 6/7 stand im Balken fast senkrecht. Ein
+// fester Winkel (135deg) bleibt in der um 1/Skala verbreiterten Kachel 45 Grad
+// und wird vom scaleX in die Senkrechte gestaucht. Das Eckwort `to bottom right`
+// legt die Linien auf die Diagonale der KACHEL - nach dem Stauchen ist die
+// Kachel quadratisch und die Diagonale 45 Grad.
+test('#2084: die Balkenschraffur folgt der Kacheldiagonale, nicht einem festen Winkel', () => {
+  const fill = [...eachRule(budgetCss)].find((r) => r.selector.split(',').map((x) => x.trim()).includes('.budget-bar-row__fill[data-texture="hatch"]') && /background-image:/.test(r.body));
+  assert.ok(fill, 'Schraffur-Regel fehlt');
+  assert.match(fill.body, /linear-gradient\(\s*to bottom right,/);
+  assert.doesNotMatch(fill.body, /linear-gradient\(\s*-?[\d.]+(deg|turn|rad)/);
 });

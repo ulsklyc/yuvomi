@@ -304,7 +304,7 @@ test('Ist die aktive Liste weg, faellt die Seite auf die erste verbliebene - und
   assert.equal(shopping.state.activeListId, 2);
   assert.deepEqual(shopping.state.items.map((i) => i.id), [20]);
   assert.deepEqual(shopping.state.lists.map((l) => l.id), [2]);
-  assert.deepEqual(geschlossen, [{ force: true }]);
+  assert.deepEqual(geschlossen, [{ force: true, context: 'test-modal-context' }]);
 });
 
 test('Ist die letzte Liste weg, zeigt die Seite den Leerzustand', async () => {
@@ -332,7 +332,7 @@ test('Dialog zu einem Artikel, den es nicht mehr gibt: er geht zu', async () => 
   const geschlossen = await mit(stub, () => dialog().submit());
 
   assert.deepEqual(toasts, [['shopping.errorItemGone', 'danger']]);
-  assert.deepEqual(geschlossen, [{ force: true }]);
+  assert.deepEqual(geschlossen, [{ force: true, context: 'test-modal-context' }]);
 });
 
 test('Dialog, dessen Artikel noch da ist (der Laden ist weg): er bleibt mit den Eingaben offen', async () => {
@@ -888,4 +888,135 @@ for (const v of VERWALTER) {
       assert.deepEqual(ergebnis.ereignisse, gemeldet ? [null] : [], 'kein "delete" an die Seite');
     });
   }
+}
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Antwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Weg der Seite, der nach einer Anfrage
+// schliesst, reicht den VOR der Anfrage gemerkten Kontext hinein. Gefahren wird
+// je Weg der echte Handler; die Antwort wechselt den Kontext, wie es ein
+// inzwischen geoeffneter Dialog tut.
+
+/** Ein Dialog ueber den Modal-Stub: `felder` belegt querySelector, liefert die Zuhoerer. */
+async function stubDialog(oeffne, felder = {}, stub = {}) {
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  globalThis.__apiStub = stub;
+  try {
+    await oeffne();
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__apiStub;
+  }
+  assert.ok(opts, 'der Dialog wurde geoeffnet');
+  const handlers = {};
+  const element = (selector) => {
+    felder[selector] ??= {};
+    return Object.assign(felder[selector], {
+      addEventListener(type, fn) { handlers[`${selector}:${type}`] = fn; },
+    });
+  };
+  const panel = { querySelector: element, querySelectorAll: () => [] };
+  opts.onSave(panel);
+  return (selector, type = 'click') => handlers[`${selector}:${type}`]({ preventDefault() {}, currentTarget: element(selector) });
+}
+
+const SHOPPING_ERFOLGSWEGE = [
+  ['Artikel speichern', () => dialog().submit, { patch: () => ({ data: item({ name: 'Hafermilch' }) }) }],
+  ['Artikel speichern, er zieht in eine andere Liste', () => dialog(10, { '#item-details-list': { value: '2' } }).submit,
+    { patch: () => ({ data: item({ list_id: 2 }) }) }],
+  ['Artikel speichern, er ist inzwischen nicht mehr geladen', () => dialog().submit, {
+    patch: () => {
+      shopping.state.items = shopping.state.items.filter((i) => i.id !== 10);
+      return { data: item({ name: 'Hafermilch' }) };
+    },
+  }],
+  ['Liste senden', async () => {
+    const klick = await stubDialog(() => shopping.openSendListDialog(nullContainer()),
+      { '#send-list-recipient': { value: '7' } },
+      { get: async () => ({ data: [{ id: 7, display_name: 'Mia' }] }) });
+    return () => klick('#send-list-confirm');
+  }, { post: () => ({ data: {} }) }],
+  ['Liste duplizieren', async () => {
+    const klick = await stubDialog(() => shopping.openDuplicateListDialog(nullContainer()), {
+      '#duplicate-list-name': { value: 'Kopie' }, '#duplicate-reset-checked': { checked: true },
+      '#duplicate-keep-quantities': { checked: true }, '#duplicate-keep-notes': { checked: true },
+    });
+    return () => klick('#duplicate-list-confirm');
+  }, { post: () => ({ data: { id: 2, name: 'Kopie' } }) }],
+  ['In den Vorrat uebernehmen', async () => {
+    shopping.state.items = [item({ is_checked: 1 })];
+    const klick = await stubDialog(() => shopping.openPantryTransfer(nullContainer()),
+      { '#pantry-transfer-clear': { checked: false } },
+      { get: async () => ({ data: [] }) });
+    return () => klick('#pantry-transfer-confirm');
+  }, { post: () => ({ data: { added: 1, merged: 0 } }) }],
+  ['Aus dem Essensplan uebernehmen', async () => {
+    const klick = await stubDialog(() => shopping.openMealPlanImport(nullContainer()), {
+      '#shopping-import-from': { value: '2026-01-05' }, '#shopping-import-to': { value: '2026-01-11' },
+    }, { post: async () => ({ data: { transferred: 2, meals: 1 } }) });
+    return () => klick('#shopping-import-meals-form', 'submit');
+  }, { post: (_path, body) => (body?.preview ? { data: { transferred: 2, meals: 1 } } : { data: { transferred: 2 } }) }],
+];
+
+test('Erfolg nach Dialogwechsel - jeder Weg schliesst nur mit dem Kontext von VOR der Anfrage (#1997)', async () => {
+  for (const [name, vorbereiten, schreiben] of SHOPPING_ERFOLGSWEGE) {
+    zustand();
+    const ausloesen = await vorbereiten();
+    toasts.length = 0;
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    const { stub } = server();
+    let geschrieben = 0;
+    for (const [verb, antwort] of Object.entries(schreiben)) {
+      stub[verb] = async (path, body) => {
+        const ergebnis = antwort(path, body);
+        if (!body?.preview) { geschrieben += 1; kontext = 'ein-anderer-dialog'; }
+        return ergebnis;
+      };
+    }
+    try {
+      const geschlossen = await mit(stub, ausloesen);
+      assert.equal(geschrieben, 1, `${name}: der Weg schreibt`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+      assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+      assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+      assert.equal(geschlossen[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});
+
+for (const [name, serverStand] of [
+  ['der Artikel ist weg', {}],
+  ['die aktive Liste ist weg', { lists: LISTEN().filter((l) => l.id !== 1) }],
+]) {
+  test(`Nachladen nach "gibt es nicht mehr" schliesst den Dialog von damals, nicht einen inzwischen geoeffneten (#1997) - ${name}`, async () => {
+    zustand();
+    let kontext = 'eigener-dialog';
+    globalThis.__modalContextId = () => kontext;
+    try {
+      const d = dialog();
+      const { stub } = server(serverStand);
+      const lese = stub.get;
+      // Waehrend die Seite nachlaedt, oeffnet der Nutzer einen anderen Dialog.
+      stub.get = async (path) => { kontext = 'ein-anderer-dialog'; return lese(path); };
+      stub.patch = async () => { throw fehler(404, 'shopping_item_not_found'); };
+
+      const geschlossen = await mit(stub, () => d.submit());
+
+      assert.equal(kontext, 'ein-anderer-dialog', 'der Wechsel kam waehrend des Nachladens');
+      assert.deepEqual(geschlossen, [{ force: true, context: 'eigener-dialog' }]);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  });
 }

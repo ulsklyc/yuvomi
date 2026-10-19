@@ -12,7 +12,7 @@ import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
-import { promptModal, openModal, closeModal, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { promptModal, openModal, closeModal, captureModalContext, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
@@ -1099,10 +1099,11 @@ async function openSendListDialog(container) {
         const select = panel.querySelector('#send-list-recipient');
         const userId = Number(select.value);
         const name = members.find((m) => m.id === userId)?.display_name ?? '';
+        const modalContext = captureModalContext();
         btn.disabled = true;
         try {
           await api.post(`/shopping/${listId}/send`, { userId });
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           // BEWUSST KEIN success-Toast. Die Erfolgsmeldungen der App zeigen
           // nach 50 Bestaetigungen keine Flaeche mehr (`TOAST_SUCCESS_MAX` in
           // utils/toast-show.js; angesagt werden sie weiter) - richtig fuer
@@ -1191,6 +1192,7 @@ async function openDuplicateListDialog(container) {
         const keepQuantities = panel.querySelector('#duplicate-keep-quantities').checked;
         const keepNotes      = panel.querySelector('#duplicate-keep-notes').checked;
 
+        const modalContext = captureModalContext();
         btn.disabled = true;
         try {
           const data = await api.post(`/shopping/${source.id}/duplicate`, {
@@ -1199,7 +1201,7 @@ async function openDuplicateListDialog(container) {
           const itemTotal   = state.items.length;
           const itemChecked = resetChecked ? 0 : state.items.filter(checkedOf).length;
           state.lists.push({ ...data.data, item_total: itemTotal, item_checked: itemChecked });
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           await switchList(data.data.id, container);
           refocusAfterRender();
         } catch (err) {
@@ -2772,7 +2774,9 @@ function openItemDetails(itemId, container) {
     // Der Dialog meldet sich ab, wenn er zugeht (siehe `reloadAfterGone`).
     onClose: () => { if (_itemDialog?.id === item.id) _itemDialog = null; },
     onSave: (panel) => {
-      _itemDialog = { id: item.id, panel };
+      // `context`: das Nachladen nach "gibt es nicht mehr" schliesst genau
+      // diesen Dialog, nicht einen, der inzwischen offen ist (#1997).
+      _itemDialog = { id: item.id, panel, context: captureModalContext() };
       const form    = panel.querySelector('#item-details-form');
       const nameEl  = panel.querySelector('#item-details-name');
       const qtyEl   = panel.querySelector('#item-details-qty');
@@ -2821,6 +2825,7 @@ function openItemDetails(itemId, container) {
           reportFieldError(priceEl, t('budget.validAmountRequired'));
           return;
         }
+        const modalContext = captureModalContext();
         try {
           // Der Laden kommt als Name herein, die Zeile speichert eine ID. Ein
           // Name, den es noch nicht gibt, entsteht hier - der Server gibt bei
@@ -2855,7 +2860,7 @@ function openItemDetails(itemId, container) {
           acknowledgeOwnChange(data);
           // Umgezogen ist er, wenn die Antwort die erbetene Liste traegt.
           if (payload.list_id !== undefined && data.data.list_id === payload.list_id) {
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             itemMovedAway(container, data.data, fromListId);
             return;
           }
@@ -2870,7 +2875,7 @@ function openItemDetails(itemId, container) {
           // Neuaufbau aus dem Bestand.
           const aktuell = state.items.find((i) => i.id === item.id);
           if (!aktuell) {
-            closeModal({ force: true });
+            closeModal({ force: true, context: modalContext });
             updateItemsList(container);
             return;
           }
@@ -2879,7 +2884,7 @@ function openItemDetails(itemId, container) {
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
           // sähe die gerade gespeicherten Felder als ungespeicherte Änderungen.
           // Ohne das fragte Speichern „Änderungen verwerfen?" (Issue #625).
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           // Ein Kategoriewechsel verschiebt die Zeile in eine andere Gruppe - das
           // kann keine Zeilen-Auffrischung leisten, dafür muss die Liste neu
           // gruppiert werden. Sonst genügt der schonende Weg, der die
@@ -3091,6 +3096,7 @@ async function openPantryTransfer(container) {
           location_id: locationId,
         }));
 
+        const modalContext = captureModalContext();
         btn.disabled = true;
         try {
           const res = await api.post('/pantry/import-shopping', { list_id: listId, items });
@@ -3108,7 +3114,7 @@ async function openPantryTransfer(container) {
             renderTabs(container);
           }
 
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           // Der Vorrat ist ein einziges Ziel, der Toast nennt ihn also schon. Was er
           // NICHT nennt, ist der Lagerort - und der ist die Wahl, die der Nutzer im
           // Dialog gerade getroffen hat.
@@ -3458,6 +3464,7 @@ function openMealPlanImport(container) {
         const to = panel.querySelector('#shopping-import-to')?.value || '';
         if (!from || !to) return;
         if (!mayImportMealPlan(state.activeListId)) return;
+        const modalContext = captureModalContext();
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to });
           if (!data.data?.transferred) {
@@ -3470,7 +3477,7 @@ function openMealPlanImport(container) {
           wireListContentEvents(container);
           // force: siehe openItemDetails - ein geänderter Zeitraum ist nach dem
           // Import nichts, was noch zu verwerfen wäre.
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           const count = Number(data.data.transferred) || 0;
           window.yuvomi.showToast(t('meals.transferSuccess', { count }), 'success');
         } catch (err) {
@@ -3911,7 +3918,7 @@ function reportError(err, container, fallbackKey) {
 /** Laeuft gerade ein Nachladen, und wurde waehrenddessen ein weiteres erbeten? */
 let _goneReloadRunning = null;
 let _goneReloadWanted = false;
-/** Der offene Bearbeiten-Dialog eines Artikels: { id, panel } - oder nichts. */
+/** Der offene Bearbeiten-Dialog eines Artikels: { id, panel, context } - oder nichts. */
 let _itemDialog = null;
 const NEVER_ABORTED = Object.freeze({ aborted: false });
 
@@ -3953,6 +3960,10 @@ function reloadAfterGone(container) {
 async function reloadAfterGoneOnce(container) {
   const signal = _liveController?.signal ?? NEVER_ABORTED;
   const listBefore = state.activeListId;
+  // Der Dialog, der offen war, als das Nachladen begann: nur ihn darf es am
+  // Ende schliessen, nicht einen, den der Nutzer waehrenddessen geoeffnet hat
+  // (#1997).
+  const modalContext = captureModalContext();
   await Promise.all([
     loadCategories({ keepOnError: true }),
     loadStores({ keepOnError: true }),
@@ -3975,7 +3986,7 @@ async function reloadAfterGoneOnce(container) {
     && !state.items.some((i) => i.id === dialog.id);
   if (listGone || itemGone) {
     _itemDialog = null;
-    await closeModal({ force: true });
+    await closeModal({ force: true, context: itemGone ? dialog.context : modalContext });
   } else if (dialog) {
     refreshItemDialogChoices(dialog.panel);
   }
