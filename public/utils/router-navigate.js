@@ -44,7 +44,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
   'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
-  'armScreensaver', 'showSessionUnreachable',
+  'armScreensaver', 'showSessionUnreachable', 'forgetSessionState',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
   'syncWallMode', 'applyModuleAccentForRoute', 'updateThemeColorForRoute', 'updateBranding',
@@ -197,7 +197,7 @@ export function createNavigate(state, deps) {
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
     auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
-    armScreensaver, showSessionUnreachable,
+    armScreensaver, showSessionUnreachable, forgetSessionState,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
     focusMainContentAfterNavigation, showToast, t,
@@ -672,12 +672,52 @@ export function createNavigate(state, deps) {
         state._pendingLoginRedirect = false;
         queued?.resolve();
         queued = null;
-        navigate('/login');
+        toSignIn();
       } else if (handOver) {
         startQueued();
       }
     }
   }
+
+  /**
+   * Nach einem Sitzungsende zur Anmeldung - es sei denn, die Seite, die steht,
+   * braucht gar keine Sitzung (#1945).
+   *
+   * DIE EINE STELLE, DIE DAS ENTSCHEIDET, fuer beide Wege: sofort aus
+   * `auth:expired` und nachgeholt im finally einer laufenden Navigation. Bis
+   * hierher fuehrten beide bedingungslos auf `/login`, und navigate() kennt
+   * keinen Ausstieg fuer dieselbe Adresse: es zeichnete die Anmeldeseite neu -
+   * ein halb getippter Name samt Passwort war weg (im Browser gemessen). Waehrend
+   * die Einrichtung aussteht, leitet `/login` auf `/setup` um und zeichnete diese
+   * Seite neu. Dasselbe gilt fuer jede oeffentliche Seite (`/join`, `/pair`,
+   * Passwort vergessen/zuruecksetzen): ohne Sitzung gibt es dort nichts, was
+   * eine Sitzung braeuchte, und das Formular bleibt stehen. Unbekannt (Kaltstart,
+   * noch keine Seite) heisst: zur Anmeldung, wie bisher.
+   *
+   * `currentPath` ist das ZIEL, nicht das Gezeichnete (Review #2070): laedt das
+   * Modul einer oeffentlichen Seite nicht, zeichnet renderPage() nur den Fehler
+   * in den Inhalt, und die Shell der Sitzung steht weiter. Ob sie steht, sagt
+   * `.nav-bottom` - dasselbe Zeichen, an dem renderPage() und navigate() sie
+   * erkennen. Steht sie, geht es zur Anmeldung, die sie abraeumt.
+   */
+  function toSignIn() {
+    const standing = allRoutes().find((r) => r.path === state.currentPath);
+    if (standing && !standing.requiresAuth && !document.querySelector('.nav-bottom')) return;
+    navigate('/login');
+  }
+
+  // Sitzung abgelaufen (api.js feuert das Ereignis vor dem Wurf eines 401).
+  // Der Listener steht HIER und nicht in router.js, damit der Test genau ihn
+  // ausloest und nicht eine Nachbildung (test/router-navigate-harness.js).
+  window.addEventListener('auth:expired', () => {
+    forgetSessionState();
+    if (state.isNavigating) {
+      // Waehrend einer Navigation nicht sofort: ihr finally holt es nach.
+      state._pendingLoginRedirect = true;
+    } else {
+      toSignIn();
+    }
+  });
 
   return navigate;
 }

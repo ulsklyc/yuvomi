@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
   **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
   (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+- **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
+  When a request found the session gone, the app drew the sign-in page again even when it was
+  already showing, so a half-typed user name and password were cleared; with setup still pending
+  the same happened to the setup page. A session that ends on a page that needs no sign-in (sign-in,
+  setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
+  page it still leads to the sign-in page.
 
 - **A new medication is saved together with its intake plan, or not at all.** If saving one of
   the plan's times failed, the medication itself was already stored. Cancelling the dialog then
