@@ -389,9 +389,11 @@ function offsetMinutesAt(utcMs, tzid) {
  * also nicht eindeutig.
  *
  * ZWEI FASSUNGEN, NICHT EINE GEAENDERTE: `localToUTC()` bleibt, wie es ist -
- * ICS-Parser, Expansion und Outbound verlassen sich auf sein exaktes
+ * ICS-Parser und Outbound verlassen sich auf sein exaktes
  * Ein-Durchgang-Verhalten, und eine Umstellung dort waere eine andere Frage mit
- * anderen Tests. Wer die tatsaechliche Minute braucht (eine Erinnerung, die eine
+ * anderen Tests. Die Serien-Expansion rechnet die Zeitpunkte ihrer Vorkommen
+ * seit #2034 ueber `localToUTCOccurrence()` (unten); nur ihr Tagesschluessel
+ * bleibt bis zur Umstellung des Schluesselformats auf `localToUTC()`. Wer die tatsaechliche Minute braucht (eine Erinnerung, die eine
  * Stunde zu frueh oder spaet feuert, ist keine Erinnerung mehr), nimmt diese
  * hier: der Schichtplan-Sync (#786) und der Erinnerungspfad des Kalenders
  * (#1300).
@@ -448,6 +450,51 @@ export function localToUTCPrecise(localStr, tzid) {
   // spaetere - das Addieren schiebt dann um eine volle Stunde zu weit.
   // Gemessen fuer 2026-03-08T02:30 in America/New_York: 04:30 EDT statt 03:30.
   return new Date(Math.max(guessA, guessB)).toISOString().replace('.000Z', 'Z');
+}
+
+/**
+ * Wanduhr einer Serie -> Zeitpunkt eines Vorkommens, nach RFC 5545 (#2034).
+ *
+ * Die Serien-Expansion (`expandRecurringEvents`, `expandRRULE`) schreibt eine
+ * Wanduhrzeit Tag fuer Tag fort und braucht je Vorkommen den Zeitpunkt. Mit
+ * `localToUTC()` stand ein Vorkommen am Umstellungstag eine Stunde daneben:
+ * Europe/Berlin 01:30 am 25.03.2035 kam als 23:30Z des Vortags heraus statt
+ * 00:30Z (der Offset wird an der falschen Stelle gelesen, siehe oben). Hier
+ * gilt EINE Uhr mit zwei festgenagelten Regeln fuer die Stellen, an denen es
+ * die Wanduhrzeit nicht genau einmal gibt (RFC 5545, 3.3.5):
+ *
+ * - LUECKE (Fruehjahr, die Wanduhrzeit gibt es nicht): um die Lueckenbreite
+ *   nach vorn. Berlin 02:30 am 25.03.2035 -> 03:30 CEST = 01:30Z. Das liefert
+ *   `localToUTCPrecise()` schon, fuer beide Vorzeichen des Offsets.
+ * - DOPPELSTUNDE (Herbst, die Wanduhrzeit gibt es zweimal): das ERSTE
+ *   Auftreten. Berlin 02:30 am 28.10.2035 -> 02:30 CEST = 00:30Z.
+ *   `localToUTCPrecise()` waehlt hier je nach Vorzeichen des Offsets: oestlich
+ *   von UTC die spaetere Lage (01:30Z), westlich die fruehere. Deshalb wird
+ *   hier nachgefragt, ob es eine fruehere Lage mit derselben Wanduhr gibt.
+ *
+ * `localToUTCPrecise()` selbst bleibt, wie es ist: seine anderen Aufrufer
+ * (Erinnerungen, Schichtplan, Haushalt) sind eine eigene Frage.
+ *
+ * @param {string} localStr  'YYYY-MM-DDTHH:mm:ss[.sss]' ohne Offset
+ * @param {string} tzid      IANA-Zone
+ * @returns {string} UTC-ISO mit 'Z' (oder localStr bei ungueltiger Eingabe)
+ */
+export function localToUTCOccurrence(localStr, tzid) {
+  const precise = localToUTCPrecise(localStr, tzid);
+  const ms = Date.parse(precise);
+  const naiveMs = Date.parse(`${localStr}Z`);
+  if (!hasExplicitZone(precise) || Number.isNaN(ms) || Number.isNaN(naiveMs)) return precise;
+  const offsetHere = offsetMinutesAt(ms, tzid);
+  // Liegt die Wanduhr in einer Doppelstunde, gab es kurz vor `ms` einen
+  // groesseren Offset. Drei Stunden decken jede heutige Umstellung ab.
+  const offsetBefore = offsetMinutesAt(ms - 3 * 3600000, tzid);
+  if (offsetHere == null || offsetBefore == null || offsetBefore <= offsetHere) return precise;
+  const earlier = naiveMs - offsetBefore * 60000;
+  // Rundlauf: die fruehere Lage zaehlt nur, wenn dort wirklich dieser Offset galt.
+  if (earlier < ms && offsetMinutesAt(earlier, tzid) === offsetBefore) {
+    return new Date(earlier).toISOString().replace('.000Z', 'Z');
+  }
+  return precise;
 }
 
 /**

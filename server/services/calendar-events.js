@@ -6,7 +6,7 @@
 
 import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
 import {
-  hasExplicitZone, householdTimeZone, localToUTC, storedToInstantIso, utcToWall,
+  hasExplicitZone, householdTimeZone, localToUTC, localToUTCOccurrence, storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 
@@ -214,12 +214,25 @@ export function expandRecurringEvents(
     const seriesStartUtc = startText.slice(0, 10);
     const seriesStart = lokalRechnen ? wall.date : seriesStartUtc;
 
-    /** Der UTC-Zeitpunkt eines Vorkommens - im lokalen Modus zurueckgerechnet. */
-    const instantFuer = (tag) => (lokalRechnen
-      ? localToUTC(`${tag}T${wall.time}`, event.tzid)
-      : (tzAware ? localToUTC(`${tag}T${wall.time}`, event.tzid) : tag + timeSuffix));
-    /** Der UTC-TAG eines Vorkommens - fuer Fenster, EXDATE und Ausgabe. */
-    const utcTagFuer = (tag) => (lokalRechnen ? String(instantFuer(tag)).slice(0, 10) : tag);
+    /** Der UTC-Zeitpunkt eines Vorkommens - im lokalen Modus zurueckgerechnet.
+     *  EINE Uhr fuer Expansion und Abo-Pfad (#2034): `localToUTCOccurrence`
+     *  rechnet am Umstellungstag richtig und legt Luecke und Doppelstunde fest. */
+    const instantFuer = (tag) => ((lokalRechnen || tzAware)
+      ? localToUTCOccurrence(`${tag}T${wall.time}`, event.tzid)
+      : tag + timeSuffix);
+    /** Der UTC-TAG eines Vorkommens - fuer Fenster, EXDATE und Ausgabe.
+     *
+     *  DER SCHLUESSEL BLEIBT BEWUSST AUF DER ALTEN UHR (`localToUTC`), bis das
+     *  Schluesselformat selbst umgestellt wird (#2034, Schritt 4). Mit der neuen
+     *  Uhr wanderte er an genau den Umstellungstagen um einen Tag (gemessen:
+     *  Europe/Berlin 01:30, Start im Sommer: 2035-10-28 -> 2035-10-27 und
+     *  2035-03-24 -> 2035-03-25), und eine dort schon abgelegte Ausnahme,
+     *  ein verknuepftes Einzelvorkommen oder ein importiertes EXDATE (das der
+     *  Parser mit derselben alten Uhr auf den Tag bringt) traefe ihr Vorkommen
+     *  nicht mehr. Der Zeitpunkt stimmt jetzt, die Identitaet ist die von main. */
+    const utcTagFuer = (tag) => (lokalRechnen
+      ? String(localToUTC(`${tag}T${wall.time}`, event.tzid)).slice(0, 10)
+      : tag);
 
     let currentDate = seriesStart; // YYYY-MM-DD, lokal oder UTC je nach Modus
     let iterations  = 0;
@@ -231,7 +244,7 @@ export function expandRecurringEvents(
     const maxCount   = parsedRule?.count ?? null;
     // UNTIL ALS ZEITPUNKT, WO ES EINER IST (#1269). Null heisst "nur als Tag
     // genannt" - dann bleibt es beim groben Tagesgatter in `nextOccurrence`.
-    const untilMs    = untilInstantMs(parsedRule, { tzid: event.tzid, toUTC: localToUTC });
+    const untilMs    = untilInstantMs(parsedRule, { tzid: event.tzid, toUTC: localToUTCOccurrence });
     let   occurrence = 0;
     let accepted = 0;
 
@@ -321,7 +334,7 @@ export function expandRecurringEvents(
              * Gefragt wird `newStart`, nicht `timeSuffix`: der Suffix beschreibt
              * den Start des MASTERS, `newStart` ist der dieses Vorkommens - und
              * die beiden haben nicht dieselbe Form. Bei bekannter TZID baut
-             * `instantFuer()` den Start ueber `localToUTC()`, also mit `Z`,
+             * `instantFuer()` den Start ueber `localToUTCOccurrence()`, also mit `Z`,
              * waehrend der Master seinen urspruenglichen Offset traegt
              * (`T15:25:00-04:00` aus Google). Die alte Frage traf auf beides
              * nicht zu und schickte das Ende in den Wanduhr-Zweig darunter, der
