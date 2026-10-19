@@ -1273,6 +1273,71 @@ test('der Katalog beschreibt den Rumpf der Kopplung', async () => {
 });
 
 // --------------------------------------------------------
+// Wand-Parität (#1903): Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr, Vorrat
+// --------------------------------------------------------
+test('das Display-Dashboard liefert Mahlzeiten fuer die Wand, ohne sensible Felder (#1903)', async () => {
+  // Frisches Display: der geteilte displayToken ist nach dem Widerruf oben ungueltig.
+  const d = await admin('POST', '/displays', { display_name: 'WandParitaetMeals' });
+  const code = (await admin('POST', `/displays/${d.body.data.id}/pairing-code`, {})).body.data.code;
+  const wall = asDisplay((await pair(code)).token);
+
+  // Ohne Mahlzeit kann der Test nur belegen, dass das Gate oeffnet (leere Liste
+  // statt undefined). Mit einer Mahlzeit prueft er zusaetzlich, dass `notes` und
+  // `created_by` nicht durchkommen.
+  // UTC stellen: neue Date().toISOString().slice(0,10) und todayLocalKey muessen uebereinstimmen.
+  db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'UTC')").run();
+  const today = new Date().toISOString().slice(0, 10);
+  const meal = await admin('POST', '/meals', { date: today, meal_type: 'lunch', title: 'Testgericht', notes: 'Geheimes Rezept' });
+  assert.ok([200, 201].includes(meal.status), `Mahlzeit anlegen: ${meal.status} ${JSON.stringify(meal.body)}`);
+
+  const res = await wall('GET', '/dashboard?audience=household');
+  assert.equal(res.status, 200);
+  const meals = res.body.todayMeals;
+  assert.ok(Array.isArray(meals), 'todayMeals muss ein Array sein, nicht undefined');
+  assert.ok(meals.length > 0, 'die eben angelegte Mahlzeit muss erscheinen');
+  for (const m of meals) {
+    assert.ok(!('notes' in m), `notes darf kein Display erreichen (Mahlzeit ${m.id})`);
+    assert.ok(!('created_by' in m), `created_by darf kein Display erreichen (Mahlzeit ${m.id})`);
+    assert.ok('title' in m, 'title muss vorhanden sein');
+    assert.ok('meal_type' in m, 'meal_type muss vorhanden sein');
+  }
+});
+
+test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat fuer die Wand (#1903)', async () => {
+  // Frisches Display: der geteilte displayToken ist nach dem Widerruf oben ungueltig.
+  const d = await admin('POST', '/displays', { display_name: 'WandParitaetData' });
+  const code = (await admin('POST', `/displays/${d.body.data.id}/pairing-code`, {})).body.data.code;
+  const wall = asDisplay((await pair(code)).token);
+
+  // EINKAUF: der Zaehler muss eine Zahl sein, nicht undefined.
+  const shopping = await admin('POST', '/shopping', { name: 'Wandliste' });
+  assert.ok([200, 201].includes(shopping.status), `Liste anlegen: ${shopping.status}`);
+  const listId = shopping.body.data?.id ?? shopping.body.id;
+  const item = await admin('POST', `/shopping/${listId}/items`, { name: 'Milch' });
+  assert.ok([200, 201].includes(item.status), `Artikel anlegen: ${item.status}`);
+
+  const res = await wall('GET', '/dashboard?audience=household');
+  assert.equal(res.status, 200);
+
+  assert.equal(typeof res.body.shoppingOpenCount, 'number', 'shoppingOpenCount muss eine Zahl sein');
+  assert.ok(res.body.shoppingOpenCount >= 1, 'mindestens ein offener Artikel');
+
+  // HAUSHALTSHILFE: alle Schluessel bleiben - householdAudienceAnswer nullt die
+  // Kennzahlen, entfernt sie aber nicht. Das haelt die Form der Antwort stabil.
+  assert.ok('housekeeping' in res.body, 'housekeeping muss vorhanden sein');
+  assert.equal(res.body.housekeeping.unpaidAmount, 0, 'unpaidAmount ist 0 (nullt, nicht fehlt)');
+  assert.equal(res.body.housekeeping.visitsThisMonth, 0, 'visitsThisMonth ist 0 (nullt, nicht fehlt)');
+  assert.ok('configured' in res.body.housekeeping, 'configured muss vorhanden sein');
+  assert.ok('present' in res.body.housekeeping, 'present muss vorhanden sein');
+
+  // ABFUHR: die Liste muss vorhanden sein (auch wenn sie heute leer ist).
+  assert.ok(Array.isArray(res.body.wastePickups), 'wastePickups muss ein Array sein');
+
+  // VORRAT: muss vorhanden sein (null oder Objekt, nie undefined).
+  assert.ok('pantryExpiring' in res.body, 'pantryExpiring muss vorhanden sein');
+});
+
+// --------------------------------------------------------
 // Der Limiter - absichtlich zuletzt, weil er das Budget aufbraucht
 // --------------------------------------------------------
 test('geratene Kopplungscodes laufen in die Versuchsgrenze', async () => {

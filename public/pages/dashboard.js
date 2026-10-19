@@ -3830,7 +3830,7 @@ function groupOverdueRows(rows) {
  *            shopping: object|null, coda: string|null}}
  */
 /** Der Blatt-Kontext - Cockpit, Wand und Kennzahlreihe fragen denselben. */
-function todaySheetContextFor(cfg, now, existing = []) {
+function todaySheetContextFor(cfg, now, existing = [], { isDisplay = false } = {}) {
   const todayKey = zonedDateKey(now);
   return todaySheetContext({
     todayKey,
@@ -3839,6 +3839,7 @@ function todaySheetContextFor(cfg, now, existing = []) {
     cfg,
     isModuleDisabled: (module) => Boolean(window.yuvomi?.isModuleDisabled(module)),
     existing,
+    isDisplay,
   });
 }
 
@@ -3851,6 +3852,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   cap = onPhoneStage() ? PROGRAM_ROW_CAP_PHONE : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
+  isDisplay = false,
   viewer = dashboardViewer,
 } = {}) {
   // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
@@ -3871,7 +3873,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   // in utils/today-sheet.js - mit denselben drei Riegeln wie oben
   // (Modulschalter, Recht, Kein-Echo) und derselben Zeilenform. Cockpit und
   // Wand fragen beide hier; die Wand reicht nur keine Kachel-Konfiguration mit.
-  const sheetContext = todaySheetContextFor(cfg, now, program.rows);
+  const sheetContext = todaySheetContextFor(cfg, now, program.rows, { isDisplay });
   const contributed = collectSourceRows(data, sheetContext);
   const programRows = groupOverdue ? groupOverdueRows(program.rows) : program.rows;
   const sheet = composeTodaySheet([...programRows, ...contributed.rows], { cap });
@@ -6182,12 +6184,12 @@ function createWallFit(win, signal) {
  * Einpassen stand zuerst als lose Zeile in `rebuildDashboard`, und kein Test
  * merkte, wenn sie fehlte.
  */
-function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit, screensaverEnabled = false }) {
+function rebuildWall(container, shell, { data, weather, failed, updatedAt, rerender, signal, fit, screensaverEnabled = false, isDisplay = false }) {
   // Der stille Neuaufbau (Minutentakt, Timer) nimmt den Fokus mit, statt ihn
   // auf <body> fallen zu lassen - dasselbe Paar wie in rebuildDashboard.
   const doc = globalThis.document;
   const { key: keepFocus } = captureRebuildFocus(shell, doc?.activeElement, doc?.body);
-  setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt, screensaverEnabled }));
+  setHtml(shell, renderWallSurface(data, weather, { failed, updatedAt, screensaverEnabled, isDisplay }));
   if (globalThis.window?.lucide) globalThis.window.lucide.createIcons({ el: shell });
   wireWallSurface(container, rerender, signal);
   restoreFocusAfterRebuild(container, [keepFocus, takeWallFocusIntent('enter') ? '#wall-surface' : null]);
@@ -6268,7 +6270,7 @@ function renderWallError() {
  * sollte, keinen Timer startet, weckt der erste Zeiger auf eine schlafende
  * Wand dort nur (wall-timer.js).
  */
-function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date(), screensaverEnabled = false } = {}) {
+function renderWallSurface(data, weather, { failed = false, loading = false, updatedAt = null, now = new Date(), screensaverEnabled = false, isDisplay = false } = {}) {
   // Der Kuechentimer (#844). Er wird auch im Lade- und Fehlerzustand gebaut: er
   // haengt an nichts, was geladen werden koennte, und ein laufender Timer, der
   // beim naechsten Netzfehler verschwaende, waere schlimmer als gar keiner.
@@ -6280,7 +6282,7 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
   // weniger, und „+N weitere" zaehlt sie mit. Der Start und das Ende rufen
   // ohnehin `rerender()` (wall-timer.js), der Deckel folgt also von selbst.
   const cap = timer.display ? WALL_ROW_CAP - 1 : WALL_ROW_CAP;
-  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap, now, groupOverdue: false });
+  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap, now, groupOverdue: false, isDisplay });
 
   let main;
   if (failed) {
@@ -7704,6 +7706,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (wallMode) {
       rebuildWall(container, shell, {
         data, weather, failed: loadFailed, updatedAt: lastLoadedAt, rerender, signal, fit: wallFit, screensaverEnabled,
+        isDisplay: user?.access_scope === 'display',
       });
       return;
     }

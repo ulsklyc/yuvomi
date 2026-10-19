@@ -752,7 +752,7 @@ test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt al
 test('R14 P2: die Sammelzeile ist verdrahtet, und der Wand-Aufruf sammelt nicht', () => {
   assert.equal(typeof __test.wireTodayOverdue, 'function');
   assert.match(dashboardSource, /function wireLinks\([^)]*\) \{[\s\S]{0,200}wireTodayOverdue\(container\)/);
-  assert.match(dashboardSource, /buildTodayCockpitModel\(data, \[\], \{ cap, now, groupOverdue: false \}\)/,
+  assert.match(dashboardSource, /buildTodayCockpitModel\(data, \[\], \{ cap, now, groupOverdue: false(?:, [^}]*)?\}\)/,
     'die Wand ist eine Anzeige ohne Bedienung - dort klappt nichts auf');
 });
 
