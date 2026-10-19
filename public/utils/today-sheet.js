@@ -380,6 +380,11 @@ export function sourceSpeaks(source, ctx) {
   return source.allowed ? Boolean(source.allowed(ctx)) : true;
 }
 
+/** Module, die ein Display auf der Wand zeigen darf, obwohl sein Credential
+ *  `none`-Zugang hat: der Server liefert sie nur fuer `audience=household`,
+ *  und die Wand braucht sie im Programm (#1903). */
+const WALL_DISPLAY_MODULES = new Set(['meals', 'shopping', 'housekeeping', 'waste', 'pantry']);
+
 /**
  * Der Kontext, den jede Quelle liest. Die Riegel kommen von aussen, damit
  * Cockpit (mit Widget-Konfiguration) und Wand (ohne) dieselben Quellen fragen.
@@ -389,12 +394,21 @@ export function todaySheetContext({
   isModuleDisabled = () => false,
   canSeeWidget = canSeeWidgetDefault,
   existing = [],
+  isDisplay = false,
 } = {}) {
   const widgetShown = (id) => Array.isArray(cfg) && cfg.some((w) => w.id === id && w.visible);
   // Zwei Achsen, wie ueberall (#467): der Haushaltsschalter des Moduls und das
   // Modulrecht des Betrachters. Der Server liefert gesperrte Module ohnehin
   // leer - der Riegel hier haelt auch einen alten Stand im Speicher stumm.
-  const moduleOff = (module) => Boolean(isModuleDisabled(module)) || moduleAccess(module) === 'none';
+  // Displays auf der Wand (isDisplay) kommen ohne Modulrecht, aber der Server
+  // schickt die fuenf Wand-Quellen trotzdem. Nur der `moduleAccess`-Riegel
+  // weicht - der Haushaltsschalter (`isModuleDisabled`) bleibt stets aktiv:
+  // ein haushaltsweit abgeschaltetes Modul schweigt auch an der Wand.
+  const moduleOff = (module) => {
+    if (isModuleDisabled(module)) return true;
+    if (isDisplay && WALL_DISPLAY_MODULES.has(module)) return false;
+    return moduleAccess(module) === 'none';
+  };
   return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget, widgetShown, existing };
 }
 

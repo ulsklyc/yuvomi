@@ -491,6 +491,18 @@ router.get('/', (req, res) => {
   // nicht die Module darin. Eine Kachel, deren Modul das Token nicht lesen darf,
   // kommt in derselben leeren Fassung wie bei einer Rollensperre.
   const denied = hiddenModulesFor(req, Object.keys(DENIED_PAYLOAD));
+  // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
+  // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
+  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
+  // `modulesLeftOut` aus `denied` entfernt, NICHT danach aus `leftOut` - so
+  // wirkt der Haushaltsschalter weiter: hat ein Haushalt Mahlzeiten abgeschaltet,
+  // fuegt `modulesLeftOut` sie aus `householdDisabledModules` wieder hinzu.
+  const isDisplay = req.authMethod === 'display';
+  if (isDisplay && householdAudience) {
+    for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
+      denied.delete(key);
+    }
+  }
   // UND DER HAUSHALTSSCHALTER (#1660, docs/DECISIONS.md 11). Bis dahin fragte
   // diese Stelle nur nach Rechten und Scopes: ein haushaltsweit abgeschaltetes
   // Modul lieferte seine Termine, Aufgaben, Buchungen und Medikamente weiter
@@ -739,6 +751,17 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('todayMeals error:', err.message);
     result.todayMeals = [];
+  }
+  // Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
+  // `notes` und `created_by` bleiben zurueck (#1903).
+  if (isDisplay && householdAudience && Array.isArray(result.todayMeals)) {
+    result.todayMeals = result.todayMeals.map(({
+      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
+      recipe_has_image, recipe_has_own_image,
+    }) => ({
+      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
+      recipe_has_image: recipe_has_image ?? null, recipe_has_own_image: recipe_has_own_image ?? null,
+    }));
   }
 
   // Neueste Notizen (gepinnte zuerst, dann aktuellste)
@@ -1277,7 +1300,6 @@ router.get('/', (req, res) => {
     log.error('housekeeping error:', err.message);
     result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
   }
-
   // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
   // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
   // (`getOccurrences`, invariant #3: nie doppelt), nur das Zwei-Tage-Fenster
@@ -1335,6 +1357,14 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('pantryExpiring error:', err.message);
     result.pantryExpiring = null;
+  }
+  // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
+  // Kennzahlen und gehoeren nicht an die Wand (#1903).
+  if (isDisplay && householdAudience && Array.isArray(result.pantryExpiring?.todayItems)) {
+    result.pantryExpiring = {
+      ...result.pantryExpiring,
+      todayItems: result.pantryExpiring.todayItems.map(({ name }) => ({ name })),
+    };
   }
 
   // „Heute dran"-Karte: pro Mitglied die Zahl der heute fälligen oder über-
