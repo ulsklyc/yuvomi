@@ -134,13 +134,18 @@ export function resolveProjectedEventRows(database, rows, { lightweight = false 
 export function expandAndResolveEventRows(database, rows, from, to, options = {}) {
   const recurringIds = rows.filter((event) => event.recurrence_rule).map((event) => event.id);
   const exceptions = loadEventExceptions(database, recurringIds);
+  const zone = householdTimeZone(database);
   const expanded = expandRecurringEvents(
     rows,
     from,
     to,
     exceptions,
     // Die Zone kommt von hier, die Expansion kennt keine Datenbank (#1993).
-    { householdZone: householdTimeZone(database), ...options.expansion, includeRecurrenceIdentity: true },
+    // Dieselbe Zone fuer das Fenster: jeder Leser hier bildet [from, to] aus
+    // Haushaltstagen (#1999).
+    {
+      householdZone: zone, windowZone: zone, ...options.expansion, includeRecurrenceIdentity: true,
+    },
   );
   return resolveProjectedEventRows(database, expanded, options)
     .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));

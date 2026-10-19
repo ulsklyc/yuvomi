@@ -15,7 +15,7 @@ import {
 } from './calendar-events.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notBirthdayEventSql } from './household-modules.js';
-import { shiftDateKey, todayKey } from '../utils/timezone.js';
+import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
 
 export const SEARCH_LIMIT = 5;
 // Wie viele Termin-Treffer AUFGELOEST werden, bevor die fuenf fruehesten
@@ -329,6 +329,9 @@ export function resolveEventSearchRows(database, rows, from = null, to = null, o
   // Einmal je Aufruf, nicht je Treffer - und nur, wenn ein Treffer sie braucht
   // (zonenlose Ziffern neben einer `tzid`, #1993).
   const householdZone = rows.reduce((zone, row) => zone ?? seriesReadingZone(database, row), null);
+  // Das Fenster ist ein Haushaltsfenster (`eventSearchWindow`, ab `todayKey()`):
+  // eine Serie mit eigener Zone wird an ihrem Haushaltstag gemessen (#1999).
+  const windowZone = from && to ? householdTimeZone(database) : null;
   const displayRows = rows.map((row) => {
     if (!row.recurrence_rule || !from || !to) return row;
     return expandRecurringEvents(
@@ -336,7 +339,7 @@ export function resolveEventSearchRows(database, rows, from = null, to = null, o
       from,
       to,
       exceptions,
-      { includeRecurrenceIdentity: true, householdZone },
+      { includeRecurrenceIdentity: true, householdZone, windowZone },
     )[0] || row;
   });
   return resolveProjectedEventRows(database, displayRows, options)

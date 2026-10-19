@@ -49,6 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Search shows the right next date for a calendar series in another time zone (#1999).** A
+  series kept in its own time zone, such as an imported one from a calendar in Los Angeles, was
+  checked against your household's today on its own calendar day. Near midnight that is a
+  different day: at 23:30 in Los Angeles it is already the next morning in Berlin. Search then
+  skipped an occurrence that happens today and showed the one a week later, or showed one from
+  yesterday as the next date. Search and the calendar now place every occurrence on your
+  household's day before comparing.
 - **Budget category bars are one color again, and their stripes stand at 45 degrees (#2084).**
   Every expense bar in the Overview and in Statistics started with a short stroke in the module
   color instead of the category color, which was most visible on short bars. The two striped

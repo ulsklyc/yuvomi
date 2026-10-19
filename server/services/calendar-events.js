@@ -6,7 +6,8 @@
 
 import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
 import {
-  hasExplicitZone, householdTimeZone, localToUTC, localToUTCOccurrence, storedToInstantIso, utcToWall,
+  hasExplicitZone, householdTimeZone, localToUTC, localToUTCOccurrence, shiftDateKey,
+  storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 
@@ -107,12 +108,18 @@ export function seriesReadingZone(database, event) {
  *        Instanz-Daten (YYYY-MM-DD); diese Vorkommen werden übersprungen (EXDATE, #489)
  * @param {{includeRecurrenceIdentity?: boolean, maxIterations?: number,
  *   maxOccurrencesPerSeries?: number, occurrenceFilter?: function,
- *   householdZone?: string}} [options]
+ *   householdZone?: string, windowZone?: string}} [options]
  *        householdZone: Zone des Haushalts (`householdTimeZone(db)`), in der
  *        zonenlose Start-Ziffern neben einer `tzid` gelesen werden (#1993).
  *        Der Aufrufer reicht sie herein, die Expansion kennt keine Datenbank;
  *        Pflicht fuer eine solche Zeile: fehlt sie, wirft die Expansion
  *        (`storedToInstantIso`), statt still in der Prozesszone zu lesen.
+ *        windowZone: die Zone, in der [from, to] gemeint sind - bei jedem
+ *        LESER die Haushaltszone (#1999). Dann zaehlt fuer eine Serie mit
+ *        eigener Zone der Haushaltstag ihres Vorkommens, nicht ihr eigener.
+ *        Ohne sie bleibt das Fenster in Schleifentagen; so fragt die
+ *        Identitaetssuche der Einzelvorkommen, deren Fenster in
+ *        Schluesseltagen steht.
  * @returns {object[]}  Expandiertes, sortiertes Array
  */
 export function expandRecurringEvents(
@@ -123,7 +130,7 @@ export function expandRecurringEvents(
   {
     includeRecurrenceIdentity = false, maxIterations = DEFAULT_EXPANSION_ITERATIONS,
     maxOccurrencesPerSeries = null, occurrenceFilter = null,
-    householdZone = null,
+    householdZone = null, windowZone = null,
   } = {},
 ) {
   const result = [];
@@ -234,6 +241,28 @@ export function expandRecurringEvents(
       ? String(localToUTC(`${tag}T${wall.time}`, event.tzid)).slice(0, 10)
       : tag);
 
+    /* DAS FENSTER IST IN HAUSHALTSTAGEN GEMEINT, DIE SCHLEIFE NICHT (#1999).
+     *
+     * Bei einer Serie mit eigener Zone laeuft `currentDate` auf dem Tag dieser
+     * Zone (oben), die Leser bilden [from, to] aber aus der Haushaltszone
+     * (`todayKey()`, Anzeigetage). Verglichen wurden die beiden direkt: Haushalt
+     * Berlin, Serie Los Angeles 23:30 - das Vorkommen vom LA-11.06. ist in
+     * Berlin der 12.06. 08:30, fiel aber aus einem Fenster ab dem 12.06., und
+     * die Suche nannte den Termin eine Woche spaeter. Andersherum (Tokio 01:00)
+     * stand ein Vorkommen von gestern als naechster Termin da.
+     *
+     * Nennt der Leser die Zone seines Fensters, fragt das Fenster deshalb nach
+     * dem Haushaltstag des Vorkommens - nur dort, wo das Vorkommen einen
+     * Zeitpunkt hat (`instantFuer` rechnet ueber die Serienzone). Zonenlose und
+     * ganztaegige Serien laufen schon auf dem Tag, den das Fenster meint.
+     *
+     * Die Schleife laeuft dafuer zwei Tage ueber `to` hinaus: weiter als zwei
+     * Kalendertage koennen zwei Zonen nicht auseinanderliegen (-12 bis +14).
+     * Das Fenster selbst bleibt exakt. NUR das Fenster: Schluessel, EXDATE und
+     * Ausgabe bleiben, wie sie sind (`utcTagFuer`, #2034 Schritt 4). */
+    const fensterZone = windowZone && (lokalRechnen || tzAware) ? windowZone : null;
+    const schleifenEnde = fensterZone ? shiftDateKey(to, 2) : to;
+
     let currentDate = seriesStart; // YYYY-MM-DD, lokal oder UTC je nach Modus
     let iterations  = 0;
     const exceptions = exceptionsByEvent?.get(event.id) ?? null; // ausgenommene Instanz-Daten (#489)
@@ -248,7 +277,7 @@ export function expandRecurringEvents(
     let   occurrence = 0;
     let accepted = 0;
 
-    while (currentDate <= to && iterations < iterationLimit) {
+    while (currentDate <= schleifenEnde && iterations < iterationLimit) {
       iterations++;
 
       // BYDAY-FILTER VOR DEM ZAEHLEN, EXDATE DANACH - die beiden sehen gleich
@@ -310,15 +339,24 @@ export function expandRecurringEvents(
         continue;
       }
 
+      // Der Tag, an dem das Fenster dieses Vorkommen sieht (#1999, oben).
+      let fensterTag = currentDate;
+      if (fensterZone) {
+        occStart = occStart ?? instantFuer(currentDate);
+        fensterTag = utcToWall(occStart, fensterZone)?.date ?? currentDate;
+        // Die Vorkommen sind aufsteigend: hinter `to` kommt keins mehr hinein.
+        if (fensterTag > to) break;
+      }
+
       // For multi-day events, check if the instance end reaches into [from, to]
-      let instanceEnd = currentDate;
+      let instanceEnd = fensterTag;
       if (isAllDay && durationDays > 0) {
         const d = new Date(currentDate + 'T00:00:00');
         d.setDate(d.getDate() + durationDays);
         instanceEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
 
-      if (currentDate >= from || instanceEnd >= from) {
+      if (fensterTag >= from || instanceEnd >= from) {
         const newStart = occStart ?? instantFuer(currentDate);
         let newEnd = event.end_datetime;
         if (durationMs !== null) {
