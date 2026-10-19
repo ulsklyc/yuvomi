@@ -1670,7 +1670,9 @@ function buildContactForm({ mode, contact = null }) {
             const idx = state.contacts.findIndex((c) => c.id === contact.id);
             if (idx !== -1) state.contacts[idx] = res.data;
           }
-          closeModal({ force: true });
+          // Nur dieser Dialog, nicht einer, der waehrend der Anfrage
+          // aufgegangen ist (#1997).
+          closeModal({ force: true, context: dialog });
           renderList({ motion: true });
           // In der Spalte: das Gespeicherte steht rechts - das Bearbeitete neu
           // gezeichnet, das Neue ausgewaehlt (wie in Apples Kontakten), sofern
@@ -2001,11 +2003,14 @@ function openImportSelectionModal(named, skipped) {
       submitBtn.addEventListener('click', async () => {
         const chosen = selectedIndices().map((i) => named[i]);
         if (chosen.length === 0) return;
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend des
+        // Imports aufgegangen ist (#1997).
+        const dialog = captureModalContext();
         submitBtn.disabled = true;
         toggleBtn.disabled = true;
         submitBtn.textContent = t('contacts.importImporting');
         await importParsedContacts(chosen);
-        closeModal({ force: true });
+        closeModal({ force: true, context: dialog });
       });
     },
   });
@@ -2158,5 +2163,7 @@ export const __test = {
   filterCategoryKeys,
   // #1909: Speichern und Loeschen eines Kontakts, den es nicht mehr gibt.
   openContactModal, deleteContact, deleteSelected,
+  // #1997: der vCard-Import schliesst nur seinen eigenen Dialog.
+  openImportSelectionModal,
   setContainerForTest(container) { _container = container; },
 };

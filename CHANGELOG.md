@@ -75,6 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   editing a household member, the prevention types in the Health settings and the recipe provider
   accounts in the Kitchen settings. If you had closed the dialog and opened another one before the
   answer arrived, the other one stays open with what you typed in it.
+- **Saving a task, contact, birthday, inventory item, quick link or sync account no longer closes a
+  dialog you opened in the meantime (#1997).** Adding and editing a task, a contact, a birthday or an
+  inventory item, setting a tag on several selected tasks, the vCard import, taking birthdays over
+  from contacts, marking an inventory deadline as done and adding or editing a quick link now close
+  only the dialog the save came from. The same holds for adding a CalDAV account, adding and editing
+  a CardDAV account and editing a calendar subscription in the settings. If you had closed the dialog
+  and opened another one before the answer arrived, the other one stays open with what you typed in it.
 - **Inventory, notes, contacts and birthdays: an error message is in your language and names the
   cause** (#1909). These pages showed the server's own text when something could not be saved,
   pinned, completed or deleted, whatever the app language, in English or in German - for example

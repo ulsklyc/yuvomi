@@ -4541,3 +4541,109 @@ test('#1997: Rezeptquellen - Konto anlegen und Link aendern schliessen nur mit d
     globalThis.window = vorher.window;
   }
 });
+
+// Dieselbe Regel fuer die Konten der Synchronisation, die Kalender-Abos und
+// die Schnellzugriffe der Uebersicht (#1997). Gefahren wird je Weg der echte
+// Submit- oder Klick-Handler an einem Attrappen-Panel, in dem jedes Element
+// jeden Aufruf schluckt; die schreibende Anfrage wechselt den Kontext.
+test('#1997: Synchronisation, Kalender-Abo und Schnellzugriff schliessen nur mit dem Kontext von VOR der Anfrage', async () => {
+  const { __test: syncCalendar } = await import('../public/settings/pages/sync-calendar.js');
+  const { __test: syncContacts } = await import('../public/settings/pages/sync-contacts.js');
+  const { __test: icsSubs } = await import('../public/settings/pages/personal-calendar-subscriptions.js');
+  const { __test: quickLinks } = await import('../public/components/quick-links-manager.js');
+  const vorher = { window: globalThis.window, document: globalThis.document };
+  const toasts = [];
+  globalThis.window = { ...(vorher.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+  const { installMiniDom } = await import('./mini-dom.js');
+  const deinstalliere = installMiniDom();
+
+  /** Ein Element, das jeden Aufruf schluckt und seine Handler merkt. */
+  const element = (handlers, sel, werte) => {
+    const el = {
+      value: '', checked: false, hidden: false, disabled: false, textContent: '', dataset: {}, style: { setProperty() {} }, options: [],
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      addEventListener(type, fn) { handlers[`${sel}:${type}`] = fn; },
+      querySelector: () => null, querySelectorAll: () => [],
+      ...werte[sel],
+    };
+    return new Proxy(el, {
+      get: (target, prop) => (prop in target || typeof prop === 'symbol' || prop === 'then' ? target[prop] : () => {}),
+    });
+  };
+  /** Oeffnet den Dialog ueber den Modal-Stub; liefert das Ausloesen von `ziel` (`selektor:typ`). */
+  const dialog = async (oeffne, ziel, werte = {}) => {
+    let opts = null;
+    globalThis.__openModal = (o) => { opts = o; };
+    try { await oeffne(); } finally { delete globalThis.__openModal; }
+    assert.ok(opts, 'der Dialog wurde geoeffnet');
+    const handlers = {};
+    const els = {};
+    const el = (sel) => { els[sel] ??= element(handlers, sel, werte); return els[sel]; };
+    opts.onSave({ querySelector: el, querySelectorAll: () => [], addEventListener() {} });
+    return () => {
+      const fn = handlers[ziel];
+      assert.equal(typeof fn, 'function', `${ziel} ist verdrahtet`);
+      return fn({ preventDefault() {}, target: el(ziel.split(':')[0]) });
+    };
+  };
+  const klicks = {};
+  const container = {
+    querySelector: (sel) => (sel === '#caldav-add-account-btn' ? { addEventListener(type, fn) { klicks[type] = fn; } } : null),
+    querySelectorAll: () => [], replaceChildren() {}, insertAdjacentHTML() {}, appendChild() {},
+  };
+  const KONTO = { id: 3, name: 'Nextcloud', cardav_url: 'https://dav.example', username: 'ada' };
+  const CARDDAV = {
+    '#cardav-name': { value: 'Nextcloud' }, '#cardav-url': { value: 'https://dav.example' },
+    '#cardav-username': { value: 'ada' }, '#cardav-password': { value: 'test-passwort' },
+  };
+  const LINK = { id: 9, name: 'Wiki', url: 'https://wiki.example', color: null, visibility: 'all' };
+  const QUICK = { '#quick-link-name': { value: 'Wiki' }, '#quick-link-url': { value: 'https://wiki.example' }, '#quick-link-visibility': { value: 'all' } };
+  const ABO = { id: 4, name: 'Feiertage', color: '#123456', shared: 0, default_assignee_user_id: null };
+  const WEGE = [
+    ['CalDAV-Konto anlegen', () => dialog(() => { syncCalendar.bindCalDAVAddButton(container, { role: 'admin' }); klicks.click(); }, '#caldav-add-form:submit', {
+      '#caldav-name': { value: 'Kalender' }, '#caldav-url': { value: 'https://dav.example' },
+      '#caldav-username': { value: 'ada' }, '#caldav-password': { value: 'test-passwort' },
+    })],
+    ['CardDAV-Konto anlegen', () => dialog(() => syncContacts.openAccountModal(null, async () => {}), '#cardav-account-form:submit', CARDDAV)],
+    ['CardDAV-Konto aendern', () => dialog(() => syncContacts.openAccountModal(KONTO, async () => {}), '#cardav-account-form:submit', CARDDAV)],
+    ['Kalender-Abo aendern', () => dialog(() => icsSubs.openIcsEditModal(container, ABO, [ABO], { id: 1 }), '#ics-edit-form:submit', {
+      '#ics-edit-name': { value: 'Feiertage' }, '#ics-edit-color': { value: '#123456' },
+    })],
+    ['Schnellzugriff anlegen', () => dialog(() => quickLinks.openQuickLinkForm(null, async () => {}), '#quick-link-save:click', QUICK)],
+    ['Schnellzugriff aendern', () => dialog(() => quickLinks.openQuickLinkForm(LINK, async () => {}), '#quick-link-save:click', QUICK)],
+  ];
+  try {
+    for (const [name, vorbereiten] of WEGE) {
+      globalThis.__apiStub = { get: async () => ({ data: [] }) };
+      const ausloesen = await vorbereiten();
+      toasts.length = 0;
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      const geschrieben = [];
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__closeModal = (opts) => { geschlossen.push(opts); };
+      const schreibe = (verb) => async (path) => { geschrieben.push(`${verb} ${path}`); kontext = 'ein-anderer-dialog'; return { data: { ...ABO } }; };
+      globalThis.__apiStub = {
+        get: async () => ({ data: [] }), post: schreibe('POST'), put: schreibe('PUT'), patch: schreibe('PATCH'),
+      };
+      try {
+        await ausloesen();
+        for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(geschrieben.length, 1, `${name}: der Weg schreibt (${JSON.stringify(geschrieben)})`);
+        assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+        assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+        assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+        assert.equal(geschlossen[0].context, 'eigener-dialog',
+          `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      } finally {
+        delete globalThis.__modalContextId;
+        delete globalThis.__closeModal;
+        delete globalThis.__apiStub;
+      }
+    }
+  } finally {
+    deinstalliere();
+    globalThis.window = vorher.window;
+    globalThis.document = vorher.document;
+  }
+});

@@ -1102,7 +1102,9 @@ function openBirthdayModal({ mode, birthday = null }) {
           }
           await reloadAfterSave(() => loadData());
           renderList({ repaint: true, motion: true });
-          closeModal({ force: true });
+          // Nur dieser Dialog, nicht einer, der waehrend der Anfrage
+          // aufgegangen ist (#1997).
+          closeModal({ force: true, context: dialog });
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
           saveBtn.disabled = false;
@@ -1208,13 +1210,16 @@ async function openImportModal() {
           window.yuvomi?.showToast(t('birthdays.importNothingSelected'), 'warning');
           return;
         }
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const dialog = captureModalContext();
         submitBtn.disabled = true;
         try {
           const res = await api.post('/birthdays/import', { contact_ids: ids });
           window.yuvomi?.showToast(t('birthdays.importSuccess', { count: res.data.imported }), 'success');
           await reloadAfterSave(() => loadData());
           renderList({ repaint: true, motion: true });
-          closeModal({ force: true });
+          closeModal({ force: true, context: dialog });
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
           submitBtn.disabled = false;

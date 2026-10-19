@@ -24,7 +24,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
+import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
@@ -322,6 +322,9 @@ function openIcsEditModal(container, sub, subs, user) {
         const shared = panel.querySelector('#ics-edit-shared').checked ? 1 : 0;
         const assignee = assigneePatch(panel.querySelector('#ics-edit-assignee'), sub.default_assignee_user_id);
         errEl.hidden = true;
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const modalContext = captureModalContext();
         submitBtn.disabled = true;
         try {
           const res = await api.patch(`/calendar/subscriptions/${sub.id}`, { name, color, shared, ...assignee });
@@ -329,7 +332,7 @@ function openIcsEditModal(container, sub, subs, user) {
           if (idx >= 0) subs[idx] = res.data;
           renderIcsList(container, subs, user);
           showToast(t('settings.ics.updatedToast'), 'success');
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
         } catch (err) {
           errEl.textContent = err.message || t('common.errorGeneric');
           errEl.hidden = false;
@@ -538,7 +541,7 @@ function assigneePatch(select, stored) {
   return { default_assignee_user_id: value ? Number(value) : null };
 }
 
-export const __test = { assigneePatch };
+export const __test = { assigneePatch, openIcsEditModal };
 
 export async function render(container, { user } = {}) {
   renderPage(container);

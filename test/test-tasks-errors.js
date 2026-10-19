@@ -330,3 +330,72 @@ test('Formular: eine verschwundene Aufgabe schliesst das Formular und laedt die 
   assert.equal(created.closed.length, 0);
   assert.equal(created.errorLine, 'tasks.errorTaskGone');
 });
+
+// --- #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog -----
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: Speichern im Formular und Schlagwoerter der
+// Mehrfachauswahl reichen den Kontext von VOR der Anfrage hinein. Gefahren
+// wird je Weg der echte Handler; die schreibende Anfrage wechselt den Kontext.
+test('#1997: Erfolg nach Dialogwechsel - Aufgabe speichern und Schlagwort setzen schliessen nur mit dem Kontext von VOR der Anfrage', async () => {
+  const realDocument = globalThis.document;
+  const formularAbsenden = (taskId) => async () => {
+    const nodes = {
+      'task-form-error': { hidden: true, textContent: '' },
+      'task-submit-btn': { disabled: false, textContent: '', classList: { add() {}, remove() {} } },
+      'task-id': feld(taskId),
+    };
+    const form = { querySelector: () => null };
+    for (const [name, value] of Object.entries({
+      title: 'Blumen giessen', description: '', priority: 'none', category: 'household',
+      start_date: '', due_date: '2030-06-15', due_time: '', points: '0',
+    })) form[name] = feld(value);
+    globalThis.__rruleValues = { is_recurring: 0, valid_until: true };
+    globalThis.document = { getElementById: (id) => nodes[id] ?? null, documentElement: realDocument.documentElement, addEventListener() {} };
+    try {
+      await tasks.handleFormSubmit({ preventDefault() {}, target: form }, { container: null, onChanged: async () => {} });
+    } finally {
+      globalThis.document = realDocument;
+      delete globalThis.__rruleValues;
+    }
+  };
+  const schlagwort = async () => {
+    let opts = null;
+    globalThis.__openModal = (o) => { opts = o; };
+    try { tasks.openBulkTagDialog([7, 8], 'add', container()); } finally { delete globalThis.__openModal; }
+    assert.ok(opts, 'der Dialog wurde geoeffnet');
+    const handlers = {};
+    const form = { elements: { tag: feld('garten') }, addEventListener(type, fn) { handlers[type] = fn; } };
+    opts.onSave({ querySelector: (sel) => (sel === '#bulk-tag-form' ? form : null), querySelectorAll: () => [] });
+    await handlers.submit({ preventDefault() {} });
+  };
+  const WEGE = [
+    ['Aufgabe aendern', formularAbsenden('7')],
+    ['Aufgabe anlegen', formularAbsenden('')],
+    ['Schlagwort setzen (Mehrfachauswahl)', schlagwort],
+  ];
+  for (const [name, lauf] of WEGE) {
+    let kontext = 'eigener-dialog';
+    const geschrieben = [];
+    const schreibe = (verb) => (path) => {
+      geschrieben.push(`${verb} ${path}`);
+      kontext = 'ein-anderer-dialog';
+      return { data: { id: 7, title: 'Blumen giessen', tags: [], updated: 2, skipped: 0 } };
+    };
+    globalThis.__modalContextId = () => kontext;
+    try {
+      const { closed } = await mit({ post: schreibe('POST'), put: schreibe('PUT') }, lauf);
+      assert.equal(geschrieben.length, 1, `${name}: der Weg schreibt (${JSON.stringify(geschrieben)})`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(messages())})`);
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(closed)})`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});

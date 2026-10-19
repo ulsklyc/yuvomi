@@ -23,7 +23,7 @@ import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openModal, closeModal, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { makeSortable } from '/utils/sortable.js';
@@ -375,12 +375,15 @@ function openQuickLinkForm(link, onDone) {
         };
 
         const label = saveBtn.textContent;
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const modalContext = captureModalContext();
         saveBtn.disabled = true;
         saveBtn.textContent = '…';
         try {
           if (isEdit) await api.put(`/quick-links/${link.id}`, body);
           else await api.post('/quick-links', body);
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           window.yuvomi?.showToast(isEdit ? t('quickLinks.saved') : t('quickLinks.added'), 'success');
           await onDone();
           refocusAfterRender();
@@ -517,3 +520,6 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
     },
   });
 }
+
+// #1997: das Formular einer Kachel, bis in seinen Speichern-Weg.
+export const __test = { openQuickLinkForm };

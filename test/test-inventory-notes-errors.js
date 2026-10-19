@@ -742,3 +742,82 @@ test('Inventar: Orts- und Kategorie-Verwalter sagen den Satz der App und nehmen 
     assert.equal(options.alreadyDeletedReason, reason);
   }
 });
+
+// --- #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog ----
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Erfolgsweg reicht den Kontext von VOR der
+// Anfrage hinein. Gefahren wird je Weg der echte Handler; die schreibende
+// Anfrage wechselt den Kontext.
+test('#1997: Erfolg nach Dialogwechsel - Inventar, Kontakte und Geburtstage schliessen nur mit dem Kontext von VOR der Anfrage', async () => {
+  const ankreuzen = (value) => Object.assign(feld(String(value)), { checked: true });
+  const mitListe = (panel, boxen) => Object.assign(panel, { querySelectorAll: () => boxen });
+  const WEGE = [
+    ['Inventar: Gegenstand anlegen', mitInventar, () => inventory.saveItem(formular({ '#inv-name': 'Bohrer', '#inv-location': '1' }), 'create', null, null, null, null)],
+    ['Inventar: Gegenstand aendern', mitInventar, () => inventory.saveItem(formular({ '#inv-name': 'Bohrer', '#inv-location': '1' }), 'edit', gegenstand(), null, null, null)],
+    ['Inventar: Frist erledigen', mitInventar, async () => {
+      const panel = formular({ '#inv-complete-date': '2026-10-01' });
+      await oeffne(panel, () => { inventory.openCompletionSheet(gegenstand(), { id: 3, label: 'TUeV' }); });
+      await panel.querySelector('#inv-complete-save').handlers.click();
+    }],
+    ['Kontakte: anlegen', mitKontakten, async () => {
+      const panel = formular({ '#cm-first-name': 'Ada', '#cm-last-name': 'Lovelace', '#cm-category': 'misc' });
+      contacts.buildContactForm({ mode: 'create' }).wire(panel);
+      await panel.querySelector('#cm-save').handlers.click();
+    }],
+    ['Kontakte: aendern', mitKontakten, async () => {
+      const panel = formular({ '#cm-first-name': 'Ada', '#cm-last-name': 'Lovelace' });
+      contacts.buildContactForm({ mode: 'edit', contact: contacts.state.contacts[0] }).wire(panel);
+      await panel.querySelector('#cm-save').handlers.click();
+    }],
+    ['Kontakte: vCard-Import', mitKontakten, async () => {
+      const panel = mitListe(formular(), [ankreuzen(0)]);
+      await oeffne(panel, () => contacts.openImportSelectionModal([{ name: 'Cleo' }], 0));
+      await panel.querySelector('#vcard-import-submit').handlers.click();
+    }],
+    ['Geburtstage: anlegen', mitGeburtstagen, async () => {
+      const panel = formular({ '#bd-name': 'Cleo', '#bd-birth-date': '1992-02-02' });
+      await oeffne(panel, () => birthdays.openBirthdayModal({ mode: 'create' }));
+      await panel.querySelector('#bd-save').handlers.click();
+    }],
+    ['Geburtstage: aendern', mitGeburtstagen, async () => {
+      const panel = formular({ '#bd-name': 'Ada', '#bd-birth-date': '1990-01-01' });
+      await oeffne(panel, () => birthdays.openBirthdayModal({ mode: 'edit', birthday: birthdays.state.birthdays[0] }));
+      await panel.querySelector('#bd-save').handlers.click();
+    }],
+    ['Geburtstage: aus Kontakten uebernehmen', mitGeburtstagen, async () => {
+      const panel = mitListe(formular(), [ankreuzen(11)]);
+      await oeffne(panel, () => birthdays.openImportModal());
+      await panel.querySelector('#bd-import-submit').handlers.click();
+    }],
+  ];
+  for (const [name, umgebung, lauf] of WEGE) {
+    let kontext = 'eigener-dialog';
+    const geschrieben = [];
+    const schreibe = (verb) => (path) => {
+      geschrieben.push(`${verb} ${path}`);
+      kontext = 'ein-anderer-dialog';
+      return { data: { id: 7, name: 'Cleo', imported: 1 } };
+    };
+    globalThis.__modalContextId = () => kontext;
+    try {
+      const { closed } = await umgebung(() => mit({
+        post: schreibe('POST'), put: schreibe('PUT'),
+        get: (path) => (path === '/birthdays/import/candidates'
+          ? { data: { withBirthday: [{ id: 11, name: 'Cleo', birthday: '1992-02-02' }], withoutBirthday: [] } }
+          : { data: [] }),
+      }, lauf));
+      assert.equal(geschrieben.length, 1, `${name}: der Weg schreibt (${JSON.stringify(geschrieben)})`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(closed)})`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});

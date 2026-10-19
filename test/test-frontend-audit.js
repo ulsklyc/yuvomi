@@ -306,29 +306,29 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
 // SINKEN - wer eine Stelle umstellt, senkt sie hier mit; eine neue Datei steht
 // bei 0.
 const LATE_MODAL_CLOSE_BESTAND = {
-  'components/quick-links-manager.js': 1,
-  'pages/birthdays.js': 2,
+  'components/quick-links-manager.js': 0,
+  'pages/birthdays.js': 0,
   'pages/budget-plans.js': 0,
   'pages/budget.js': 0,
   'pages/calendar.js': 2,
-  'pages/contacts.js': 2,
+  'pages/contacts.js': 0,
   'pages/health.js': 0,
   'pages/housekeeping.js': 0,
-  'pages/inventory.js': 2,
+  'pages/inventory.js': 0,
   'pages/meals.js': 4,
   'pages/pantry.js': 1,
   'pages/rewards.js': 0,
   'pages/schedule.js': 0,
   'pages/shopping.js': 0,
   'pages/split-expenses.js': 6,
-  'pages/tasks.js': 2,
+  'pages/tasks.js': 0,
   'pages/waste.js': 0,
   'settings/pages/admin-family.js': 0,
   'settings/pages/modules-health.js': 0,
   'settings/pages/modules-kitchen.js': 0,
-  'settings/pages/personal-calendar-subscriptions.js': 1,
-  'settings/pages/sync-calendar.js': 1,
-  'settings/pages/sync-contacts.js': 1,
+  'settings/pages/personal-calendar-subscriptions.js': 0,
+  'settings/pages/sync-calendar.js': 0,
+  'settings/pages/sync-contacts.js': 0,
 };
 
 test('kein neues closeModal() nach einem await ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
