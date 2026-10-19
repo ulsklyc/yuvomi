@@ -29,7 +29,9 @@ export function familyPaths() {
           + 'with an API token keep receiving the data URL in these fields, since an image request does not carry '
           + 'the bearer token; the address is what the app itself (session cookie, wall display) gets. Sessions and wall displays '
           + 'may read it; an API token with scopes may not (it has the data URL already), nor may split-expense guests. The response '
-          + 'carries an `ETag` and `Cache-Control: private, max-age=31536000, immutable`, since a new picture gets a new key. '
+          + 'carries `Cache-Control: private, no-cache` and an `ETag` derived from the picture key, so a client revalidates on every use '
+          + '(through authentication and the access checks, also after a sign-out in the same browser) and `If-None-Match` answers `304`. '
+          + 'Errors stay `no-store`. '
           + 'Without the matching key the answer is `404`, the same as for a person without a picture.',
         responses: {
           200: {
@@ -40,7 +42,7 @@ export function familyPaths() {
               'image/webp': { schema: { type: 'string', format: 'binary' } },
             },
           },
-          304: { description: 'Unchanged since the given ETag' },
+          304: { description: 'Unchanged since the given ETag; no image bytes' },
           400: apiError('Invalid person ID'),
           401: { $ref: '#/components/responses/Unauthorized' },
           403: apiError('Split-expense guest'),
