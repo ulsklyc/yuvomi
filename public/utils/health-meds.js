@@ -351,6 +351,9 @@ export function doseOutcomeUnknown(err) {
   return status === 0 || status === 408 || status === 429 || (typeof status === 'number' && status >= 500);
 }
 
+/** So lange gilt ein Tipp nach offenem Ausgang als Wiederholung derselben Dosis. */
+export const DOSE_RETRY_WINDOW_MS = 2 * 60 * 1000;
+
 /**
  * Gedaechtnis fuer Dosis-Buchungen, deren Ausgang offen ist.
  *
@@ -362,24 +365,60 @@ export function doseOutcomeUnknown(err) {
  * statt ein zweites Mal zu buchen. Nach Erfolg oder eindeutiger Absage ist der
  * Vorgang vorbei, und der naechste Tipp ist eine neue Dosis.
  *
- * @param {() => string} [newKey]
+ * NUR FUER DEN UNMITTELBAREN WIEDERHOLVERSUCH. Eine Bedarfsdosis hat kein
+ * Vorkommen, das sie von der naechsten unterscheidet - ihr Schluessel ist nur
+ * das Medikament. Bliebe ein offener Versuch liegen, schickte eine SPAETERE,
+ * gewollte zweite Dosis den alten Schluessel, der Server spielte die alte
+ * Antwort zurueck (24 h lang), und die neue Dosis fehlte still. Deshalb endet
+ * ein offener Versuch auf zwei Wegen:
+ *   - nach DOSE_RETRY_WINDOW_MS: wer spaeter tippt, meint eine neue Dosis;
+ *   - mit dem ersten Laden der Dosis-Daten, das NACH dem Fehlschlag begann
+ *     (`confirmedBy`): ab dann zeigt die Seite den echten Stand - gebucht oder
+ *     nicht -, und ein weiterer Tipp ist eine bewusste neue Aktion. Ein Laden,
+ *     das schon vorher lief, kann den Stand vor der Buchung zeigen und zaehlt
+ *     nicht.
+ * Ein Versuch, dessen Anfrage noch laeuft, bleibt in beiden Faellen stehen.
+ *
+ * @param {{ newKey?: () => string, now?: () => number, retryWindowMs?: number }} [options]
  */
-export function createDoseAttempts(newKey = randomIdempotencyKey) {
+export function createDoseAttempts({
+  newKey = randomIdempotencyKey, now = () => Date.now(), retryWindowMs = DOSE_RETRY_WINDOW_MS,
+} = {}) {
   const pending = new Map();
+  const expired = (entry) => entry.failedAt !== null && now() - entry.failedAt > retryWindowMs;
   return {
     /** Schluessel und Rumpf fuer diese Aktion - beim Wiederholversuch die alten. */
-    attempt(actionKey, buildBody) {
+    attempt(actionKey, buildBody, medId = null) {
       let entry = pending.get(actionKey);
-      if (!entry) {
-        entry = { key: newKey(), body: buildBody() };
+      if (!entry || expired(entry)) {
+        entry = { key: newKey(), body: buildBody(), failedAt: null, medId };
         pending.set(actionKey, entry);
       }
+      entry.failedAt = null; // laeuft wieder
       return entry;
     },
     /** Nach der Antwort: vergessen, ausser der Ausgang ist offen. */
     settle(actionKey, err = null) {
+      const entry = pending.get(actionKey);
+      if (!entry) return;
       if (!err || !doseOutcomeUnknown(err)) pending.delete(actionKey);
+      else entry.failedAt = now();
     },
-    has: (actionKey) => pending.has(actionKey),
+    /**
+     * Ein Laden der Dosis-Daten ist durch, das zum Zeitpunkt `startedAt` begann
+     * und die Medikamente `medIds` zeigt: jeder offene Versuch fuer eines davon,
+     * der davor scheiterte, ist damit geklaert. Die Ansicht einer anderen Person
+     * klaert nichts an diesen Medikamenten.
+     */
+    confirmedBy(startedAt, medIds) {
+      const shown = new Set(medIds);
+      for (const [actionKey, entry] of pending) {
+        if (entry.failedAt !== null && entry.failedAt <= startedAt && shown.has(entry.medId)) pending.delete(actionKey);
+      }
+    },
+    has: (actionKey) => {
+      const entry = pending.get(actionKey);
+      return Boolean(entry) && !expired(entry);
+    },
   };
 }

@@ -765,7 +765,7 @@ test('#2054: ein neues Medikament und sein Plan gehen in einem Request, ein Fehl
 
 test('createDoseAttempts: ein Wiederholversuch nach offenem Ausgang behaelt Schluessel und Rumpf', () => {
   let n = 0;
-  const attempts = createDoseAttempts(() => `k${++n}`);
+  const attempts = createDoseAttempts({ newKey: () => `k${++n}` });
   let built = 0;
   const body = () => ({ taken_at: `T${++built}` });
   const first = attempts.attempt('prn:1', body);
@@ -785,6 +785,45 @@ test('createDoseAttempts: ein Wiederholversuch nach offenem Ausgang behaelt Schl
   assert.equal(attempts.attempt('prn:1', body).key, 'k3');
   // Verschiedene Aktionen teilen sich keinen Schluessel.
   assert.notEqual(attempts.attempt('dose:1:2:2026-06-04T08:00:take', body).key, 'k3');
+});
+
+test('createDoseAttempts: eine spaetere Bedarfsdosis bekommt einen frischen Schluessel (#2069, Codex)', () => {
+  // Der offene Versuch gilt nur fuer den unmittelbaren Wiederholversuch.
+  // Bliebe er liegen, schickte eine gewollte zweite Dosis den alten Schluessel,
+  // der Server spielte die alte Antwort zurueck, und die neue Dosis fehlte still.
+  let n = 0;
+  let clock = 1_000_000;
+  const attempts = createDoseAttempts({ newKey: () => `k${++n}`, now: () => clock, retryWindowMs: 120_000 });
+  const body = () => ({ taken_at: `T${clock}` });
+
+  // 1. Nach dem Wiederholfenster ist ein Tipp eine neue Dosis.
+  attempts.attempt('prn:7', body, 7);
+  attempts.settle('prn:7', { status: 0 });
+  clock += 60_000;
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k1', 'innerhalb des Fensters: Wiederholung');
+  attempts.settle('prn:7', { status: 0 });
+  clock += 120_001;
+  assert.equal(attempts.has('prn:7'), false);
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k2', 'nach dem Fenster: neue Dosis');
+  attempts.settle('prn:7');
+
+  // 2. Ein Laden, das NACH dem Fehlschlag begann, klaert den Versuch.
+  attempts.attempt('prn:7', body, 7);
+  const loadBefore = clock - 1;      // lief schon vor dem Fehlschlag
+  clock += 1000;
+  attempts.settle('prn:7', { status: 503 });
+  attempts.confirmedBy(loadBefore, [7]);
+  assert.equal(attempts.has('prn:7'), true, 'ein Laden von vorher kann den Stand vor der Buchung zeigen');
+  attempts.confirmedBy(clock, [8]);
+  assert.equal(attempts.has('prn:7'), true, 'die Ansicht eines anderen Medikaments klaert nichts');
+  clock += 1000;
+  attempts.confirmedBy(clock, [7, 8]);
+  assert.equal(attempts.has('prn:7'), false, 'der Stand ist da: der naechste Tipp ist eine neue Dosis');
+  assert.equal(attempts.attempt('prn:7', body, 7).key, 'k4');
+
+  // 3. Eine laufende Anfrage klaert kein Laden weg.
+  attempts.confirmedBy(clock + 5000, [7]);
+  assert.equal(attempts.has('prn:7'), true);
 });
 
 test('doseOutcomeUnknown: nur Netz, Zeitueberschreitung, Bremse und Serverfehler lassen den Ausgang offen', () => {

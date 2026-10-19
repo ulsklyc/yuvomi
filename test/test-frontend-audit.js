@@ -423,7 +423,7 @@ test('jede Dosis-Buchung traegt einen Idempotency-Key, den ein Wiederholversuch 
     return src.slice(at, src.indexOf('\n}\n', at));
   };
   assert.match(fn('postDose'), /api\.post\(path, body, \{ headers: \{ 'Idempotency-Key': key \} \}\)/);
-  assert.match(fn('postDose'), /doseAttempts\.attempt\(actionKey, buildBody\)/);
+  assert.match(fn('postDose'), /doseAttempts\.attempt\(actionKey, buildBody, medId\)/);
   // Kein Dosis-Endpunkt wird an postDose vorbei angesprochen.
   assert.doesNotMatch(src, /api\.post\(`\/health\/medications\/\$\{medId\}\/logs`/, 'Dosis-Log nur ueber postDose()');
   assert.doesNotMatch(src, /api\.post\(`\/health\/logs\/\$\{logId\}/, 'take/skip nur ueber postDose()');
@@ -432,6 +432,14 @@ test('jede Dosis-Buchung traegt einen Idempotency-Key, den ein Wiederholversuch 
   assert.match(fn('handleDose'), /await sendScheduledDose\(/);
   assert.match(fn('handleOverviewDose'), /await sendScheduledDose\(/);
   assert.equal((fn('sendScheduledDose').match(/return postDose\(/g) ?? []).length, 2);
+  // Der offene Versuch gilt nur bis zum naechsten Stand (Codex an #2073): beide
+  // Ladewege der Dosis-Daten merken ihren Start und klaeren danach die Versuche
+  // ihrer Medikamente - sonst spielte eine spaetere Bedarfsdosis die alte Antwort ab.
+  for (const loader of ['loadMeds', 'loadOverview']) {
+    const body = fn(loader);
+    assert.match(body, /^async function \w+\(\) \{\n\s*const startedAt = Date\.now\(\);/, `${loader}: Start vor dem ersten Abruf`);
+    assert.match(body, /doseAttempts\.confirmedBy\(startedAt, \w+\.(?:list|meds)\.map\(\(m\) => m\.id\)\);\s*$/, `${loader}: klaert am Ende`);
+  }
 });
 
 test('der Nachlade-Scanner erkennt das Muster, das er meldet (#2069)', () => {

@@ -2814,6 +2814,7 @@ async function mountMeds() {
 }
 
 async function loadMeds() {
+  const startedAt = Date.now();
   const query = meds.personId ? `?user_id=${encodeURIComponent(meds.personId)}` : '';
   const res = await api.get(`/health/medications${query}`);
   meds.list = res.data || [];
@@ -2830,6 +2831,8 @@ async function loadMeds() {
     meds.schedulesByMed[m.id] = sRes.data || [];
     meds.logsByMed[m.id] = lRes.data || [];
   }));
+  // Der Stand ist da: offene Dosis-Versuche fuer diese Medikamente sind geklaert (#2069).
+  doseAttempts.confirmedBy(startedAt, meds.list.map((m) => m.id));
 }
 
 /**
@@ -3209,7 +3212,10 @@ async function handlePrnDose(btn) {
   try {
     // Eine Bedarfsdosis hat kein Vorkommen, an dem der Server eine Wiederholung
     // erkennen koennte - nur ihr Schluessel (postDose) haelt einen zweiten Tipp
-    // nach verlorener Antwort davon ab, doppelt zu buchen und abzuziehen.
+    // nach verlorener Antwort davon ab, doppelt zu buchen und abzuziehen. Er
+    // gilt nur fuer den unmittelbaren Wiederholversuch: nach dem Wiederhol-
+    // fenster oder dem naechsten Laden der Dosis-Daten ist ein Tipp eine neue
+    // Dosis mit neuem Schluessel (createDoseAttempts, utils/health-meds.js).
     await postDose(`prn:${medId}`, `/health/medications/${medId}/logs`, () => ({
       status: 'taken',
       // Wanduhrzeit, keine ISO-Zone: die Route kuerzt den Wert auf Minuten und
@@ -3220,7 +3226,7 @@ async function handlePrnDose(btn) {
       // bucht Dosis und Abzug in einer Transaktion und rechnet vom gespeicherten
       // Bestand aus. Ohne erfassten Bestand bleibt dort alles beim Alten.
       ...(dose != null && Number.isFinite(dose) ? { dose_qty: dose, stock_deduct: dose } : {}),
-    }));
+    }), medId);
   } catch (err) {
     console.error('[Health] prn dose error:', err);
     setDoseBusy(medId, false);
@@ -3626,8 +3632,8 @@ const doseAttempts = createDoseAttempts();
  * Rumpf: kam der erste an, gibt der Server dessen Antwort zurueck, statt eine
  * zweite Dosis zu buchen und den Bestand ein zweites Mal abzuziehen.
  */
-async function postDose(actionKey, path, buildBody) {
-  const { key, body } = doseAttempts.attempt(actionKey, buildBody);
+async function postDose(actionKey, path, buildBody, medId) {
+  const { key, body } = doseAttempts.attempt(actionKey, buildBody, medId);
   try {
     const res = await api.post(path, body, { headers: { 'Idempotency-Key': key } });
     doseAttempts.settle(actionKey);
@@ -3649,7 +3655,7 @@ async function postDose(actionKey, path, buildBody) {
 function sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action }) {
   const deduct = action === 'take' && dose != null && Number.isFinite(dose) ? { stock_deduct: dose } : {};
   if (logId) {
-    return postDose(`log:${logId}:${action}`, `/health/logs/${logId}/${action}`, () => deduct);
+    return postDose(`log:${logId}:${action}`, `/health/logs/${logId}/${action}`, () => deduct, medId);
   }
   return postDose(`dose:${medId}:${scheduleId ?? ''}:${scheduledAt ?? ''}:${action}`, `/health/medications/${medId}/logs`, () => {
     const body = { status: action === 'take' ? 'taken' : 'skipped' };
@@ -3662,7 +3668,7 @@ function sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action
     // rechnet auch der Countdown daraus - und zwar zwei Stunden daneben.
     if (action === 'take') body.taken_at = toLocalStamp();
     return { ...body, ...deduct };
-  });
+  }, medId);
 }
 
 async function handleDose(btn, action) {
@@ -6359,6 +6365,7 @@ async function mountOverview() {
 }
 
 async function loadOverview() {
+  const startedAt = Date.now();
   const query = overview.personId ? `?user_id=${encodeURIComponent(overview.personId)}` : '';
 
   // Nur laden, wenn der Zyklus-Tab fuer DIESEN Betrachter ueberhaupt
@@ -6404,6 +6411,7 @@ async function loadOverview() {
     overview.schedulesByMed[m.id] = sRes.data || [];
     overview.logsByMed[m.id] = lRes.data || [];
   }));
+  doseAttempts.confirmedBy(startedAt, overview.meds.map((m) => m.id));
 }
 
 function overviewAllSchedules() {
