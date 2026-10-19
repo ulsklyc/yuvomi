@@ -26,7 +26,7 @@ import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
-import { outboundEvent } from './outbound-dtstart.js';
+import { outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsSnapshot } from './outbound-echo.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
@@ -206,8 +206,10 @@ export function icsFieldsForEvent(event, householdZone = null) {
     SUMMARY:     event.title,
     DESCRIPTION: event.description || null,
     LOCATION:    event.location || null,
-    // Reines Datum als UNTIL neben getimtem DTSTART -> Ende des Ortstags (#1974).
-    RRULE:       event.recurrence_rule ? rruleForDtstart(event.recurrence_rule, when) : null,
+    // Reines Datum als UNTIL neben getimtem DTSTART -> Ende des Ortstags (#1974);
+    // ein UNTIL aus dem alten Formular an einer eigenen Serie ohne Zone zuvor
+    // zum Datum (#1992).
+    RRULE:       event.recurrence_rule ? rruleForDtstart(outboundRecurrenceRule(event), when) : null,
     DTSTART:     when.dtstart,
     DTEND:       when.dtend,
   };

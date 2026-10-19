@@ -230,6 +230,55 @@ export function outboundEvent(event, options) {
   return { ...event, ...outboundDateRange(event, options) };
 }
 
+/**
+ * Die Regel, wie sie nach draussen gehoert: ein UNTIL mit Uhrzeit an einer
+ * eigenen Serie ohne Zone als das Datum, das Yuvomi davon liest (#1992).
+ *
+ * DAS PROBLEM. Bis #1989 schrieb das Formular das Serienende als
+ * `UNTIL=<datum>T235959Z`, das Ende des UTC-Tags, und Zeilen von damals tragen
+ * es noch. An einer Serie ohne `tzid` mit zonenloser Wanduhr (oder ganztaegig)
+ * hat ein Vorkommen keinen Zeitpunkt, also liest die Expansion von UNTIL nur
+ * das Datum (`untilInstantMs` greift nicht, es bleibt beim Tagesgatter in
+ * `nextOccurrence`): das letzte Vorkommen ist das an diesem Tag. Die Empfaenger
+ * lesen den UTC-Zeitpunkt, und westlich von UTC fehlte dort das letzte
+ * Vorkommen (Chicago 20:00 ist 01:00Z am Folgetag), oestlich kam eines dazu
+ * (Berlin 00:30 am Folgetag ist 22:30Z davor).
+ *
+ * DIE ANTWORT. Hinaus geht das Datum - dieselbe kanonische Form, die das
+ * Formular seit #1974 schreibt -, und jeder Weg rechnet es danach wie jedes
+ * andere Datum in das Ende des Ortstags in seiner Zone um (`timedSeriesUntil`,
+ * `rruleForDtstart`, `normalizeRecurrenceUntil`). Gespeichert wird nichts: die
+ * Zeile behaelt ihren Wortlaut, und Bestandszeilen gehen beim naechsten Push
+ * richtig hinaus, ohne Nachtrag.
+ *
+ * NUR FUER EIGENE REGELN (`series_authored`, #1935). Eine eingelesene Regel
+ * geht Wort fuer Wort zurueck (#756). Eine Serie mit `tzid` oder mit einem
+ * Start, der seine Zone selbst traegt, ist nicht betroffen: dort lesen Yuvomi
+ * und Empfaenger beide den Zeitpunkt.
+ *
+ * Alles andere bleibt Zeichen fuer Zeichen stehen, auch das `RRULE:`-Praefix.
+ *
+ * @param {object} event  Zeile aus `calendar_events` (recurrence_rule, tzid,
+ *   all_day, start_datetime, series_authored)
+ * @returns {string|null|undefined} `event.recurrence_rule`, wenn nichts
+ *   umzuschreiben ist
+ */
+export function outboundRecurrenceRule(event) {
+  const rule = event?.recurrence_rule;
+  if (!rule || !istEigen(event) || event.tzid) return rule;
+  if (!event.all_day && hasExplicitZone(event.start_datetime)) return rule;
+  const text = String(rule);
+  const prefix = /^RRULE:/i.exec(text)?.[0] ?? '';
+  let changed = false;
+  const parts = text.slice(prefix.length).split(';').map((segment) => {
+    const m = /^(\s*UNTIL\s*=\s*)(\d{8})T\d{6}Z?\s*$/i.exec(segment);
+    if (!m) return segment;
+    changed = true;
+    return `${m[1]}${m[2]}`;
+  });
+  return changed ? `${prefix}${parts.join(';')}` : rule;
+}
+
 
 // --------------------------------------------------------
 // Die Marke `series_authored` (#1935): wer sie setzt, wer sie nimmt

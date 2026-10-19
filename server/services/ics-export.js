@@ -13,7 +13,7 @@ import {
   householdTimeZone, isValidTimeZone, localToUTC, shiftDateKey, storedToInstantIso, utcToWall,
 } from '../utils/timezone.js';
 import { formatWall, vtimezoneFor } from '../utils/vtimezone.js';
-import { outboundDateRange } from './outbound-dtstart.js';
+import { outboundDateRange, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { rruleLine } from './recurrence.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { activeAccountSql } from './account-state.js';
@@ -275,10 +275,12 @@ function buildVEvent(
   // Ein reines Datum als UNTIL ist neben einem getimten DTSTART ungueltig und
   // wird zum Ende des Ortstags in der Zone, in der DTSTART oben steht (#1974,
   // utils/rrule-until.js): TZID der Serie, sonst die Feed-Zone fuer naive
-  // Werte, sonst UTC.
+  // Werte, sonst UTC. Ein UNTIL mit Uhrzeit aus dem alten Formular geht an einer
+  // eigenen Serie ohne Zone zuvor als Datum hinaus (#1992, outboundRecurrenceRule).
   if (ev.recurrence_rule && !recurrenceMaster) {
     const untilZone = usesTzid(ev) ? ev.tzid : (hasExplicitOffset(dtstart) ? null : feedZone);
-    lines.push(rruleLine(ev.all_day ? ev.recurrence_rule : timedSeriesUntil(ev.recurrence_rule, untilZone)));
+    const rule = outboundRecurrenceRule(ev);
+    lines.push(rruleLine(ev.all_day ? rule : timedSeriesUntil(rule, untilZone)));
   }
   // Einzeln ausgenommene Vorkommen (EXDATE, #489). Zeit-Teil = Master-Startzeit,
   // damit die EXDATE-Instanz exakt auf ein RRULE-Vorkommen trifft.

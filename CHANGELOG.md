@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Older series ends now reach Google, CalDAV, iCloud and the calendar feed on the same last day Yuvomi shows (#1992).**
+  Before #1989 the repeat form saved a series end as the end of the UTC day, and series saved that
+  way still carry it. For a series without its own time zone Yuvomi ends it on that date, while
+  other calendars read the UTC moment: west of UTC (for example Chicago, 8 pm) they dropped the last
+  occurrence, east of UTC (Berlin, 0:30) they showed one more. Such a series now goes out with the
+  end of that day in the household's time zone, so both sides end on the same occurrence. Nothing
+  stored is rewritten: the calendar feed shows the corrected end right away, Google, CalDAV and
+  iCloud receive it with the next change sent for that series, and reading it back counts as
+  Yuvomi's own change rather than an edit in the other calendar. Series imported from other
+  calendars still go back word for word.
 - **Reconnecting or disconnecting Google Calendar now stops a sync that is still running (#2035).**
   A sync that was waiting on Google while you reconnected, perhaps with another account, or
   disconnected used to carry on with the old connection: it could still send queued changes to the

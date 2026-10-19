@@ -40,28 +40,37 @@
  * Werte zurueckliefert.
  *
  * ZUSCHNITT. Geschrieben wird der Schnappschuss nur, wenn das Ausrichten den
- * Start verschoben hat; sonst steht NULL in der Spalte, und der Abruf schreibt
- * wie bisher. Sein einziger Leser ist der Abruf (Google, CalDAV, iCloud).
+ * Start verschoben hat oder die Regel mit einem anderen UNTIL hinausgeht als
+ * gespeichert (#1992, `alignmentMoved`); sonst steht NULL in der Spalte, und
+ * der Abruf schreibt wie bisher. Sein einziger Leser ist der Abruf (Google, CalDAV, iCloud).
  * Wer die Zeile sonst anfasst (Bearbeitung, Serienschnitt, MCP, ein
  * aufgegebener Push), muss die Spalte nicht kennen: aendert sich eines der
  * fuenf Felder, passt (a) nicht mehr, und der Schnappschuss gilt nicht.
  */
 
-import { outboundDateRange, ruleKey } from './outbound-dtstart.js';
+import { outboundDateRange, outboundRecurrenceRule, ruleKey } from './outbound-dtstart.js';
 import { normalizeRecurrenceOverrides, parseICS } from './ics-parser.js';
 import { hasExplicitZone, localToUTCPrecise } from '../utils/timezone.js';
 
 const VERSION = 1;
 
 /**
- * Hat das Ausrichten den Start dieser Zeile verschoben? Mit denselben Optionen,
- * mit denen der ausgehende Weg sie ausrichtet (`zone` nur bei Google).
+ * Hat das Ausrichten den Start dieser Zeile verschoben - oder geht ihre Regel
+ * mit einem anderen UNTIL hinaus, als sie traegt? Mit denselben Optionen, mit
+ * denen der ausgehende Weg sie ausrichtet (`zone` nur bei Google).
+ *
+ * DIE REGEL ZAEHLT MIT (#1992). Ein UNTIL aus dem alten Formular
+ * (`T235959Z`) geht an einer eigenen Serie ohne Zone als Ende des Ortstags
+ * hinaus (`outboundRecurrenceRule`). Ohne Schnappschuss laese der Abruf diese
+ * Form als Aenderung beim Anbieter, schriebe sie in die Zeile und naehme die
+ * Marke - fuer einen Push, den Yuvomi selbst so gebaut hat.
  *
  * @param {object} row
  * @param {{ zone?: string|null, householdZone?: string|null }} [options]
  */
 export function alignmentMoved(row, options) {
   if (!row?.start_datetime) return false;
+  if (outboundRecurrenceRule(row) !== row.recurrence_rule) return true;
   return outboundDateRange(row, options).start_datetime !== row.start_datetime;
 }
 
