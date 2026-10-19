@@ -6,7 +6,7 @@ import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -2649,6 +2649,10 @@ async function saveCreatedSchedule(event) {
   const form = event.currentTarget;
   const data = formData(form);
   if (reportReversedRange(form, data)) return;
+  // Der Dialog, aus dem gesendet wird - VOR der ersten Rueckfrage und Anfrage
+  // festgehalten: geschlossen wird am Ende nur er, nicht einer, der waehrend
+  // der Anfrage aufgegangen ist (#1997).
+  const modalContext = captureModalContext();
   try {
     if (form.dataset.form === 'shift-create') await api.post('/schedule/shift-types', data);
     if (form.dataset.form === 'pattern-create') {
@@ -2783,7 +2787,7 @@ async function saveCreatedSchedule(event) {
     }
     await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
-    await closeModal({ force: true });
+    await closeModal({ force: true, context: modalContext });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
@@ -2811,12 +2815,13 @@ function openCustomFieldModal(field = null) {
 async function saveCustomField(event, fieldId) {
   event.preventDefault();
   const data = formData(event.currentTarget);
+  const modalContext = captureModalContext();
   try {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
     else await api.post('/schedule/custom-fields', data);
     await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
-    await closeModal({ force: true });
+    await closeModal({ force: true, context: modalContext });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
@@ -2979,6 +2984,7 @@ async function saveShiftTypeEdit(event) {
   // Felder. Scheitert der zweite (ein gewaehltes Feld wurde inzwischen
   // geloescht), ist der erste schon geschrieben.
   let typeSaved = false;
+  const modalContext = captureModalContext();
   try {
     await api.put(`/schedule/shift-types/${id}`, formData(form));
     typeSaved = true;
@@ -2987,7 +2993,7 @@ async function saveShiftTypeEdit(event) {
     // Geschrieben ist: erst schliessen, dann neu bauen. Die Zeile mit dem
     // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
     // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
-    await closeModal({ force: true });
+    await closeModal({ force: true, context: modalContext });
     await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     refocusAfterRender();
@@ -3083,6 +3089,9 @@ async function savePatternEdit(event) {
     reportFieldError(form.querySelector('[name="cycle_length"]'), t('schedule.cycleLengthTooShort', conflict));
     return;
   }
+  // VOR der Rueckfrage: confirmOverModal parkt diesen Dialog, und geschlossen
+  // wird am Ende nur er (#1997).
+  const modalContext = captureModalContext();
   try {
     // S-05: ein Umschalten von aus -> an kann denselben stillen
     // Ueberlappungs-Sieg ausloesen wie ein neu angelegter aktiver Plan.
@@ -3106,7 +3115,7 @@ async function savePatternEdit(event) {
     // Geschrieben ist: erst schliessen, dann neu bauen. Die Zeile mit dem
     // ausloesenden "Bearbeiten" entsteht dabei neu - refocusAfterRender()
     // zieht den Fokus dorthin nach statt ihn auf <body> fallen zu lassen.
-    await closeModal({ force: true });
+    await closeModal({ force: true, context: modalContext });
     await reloadAfterSave(() => reloadAfterWrite());
     renderPage();
     refocusAfterRender();
@@ -3583,4 +3592,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

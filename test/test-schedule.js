@@ -3370,3 +3370,112 @@ test('R20: eine Vorlage aus einer anderen Sprache gilt als vorhanden (Symbol und
   const handler = src.slice(src.indexOf("button.dataset.action === 'quick-start-shifts'"), src.indexOf("if (button.dataset.action === 'pick-shift-icon'"));
   assert.match(handler, /presetAlreadyThere\(preset, existing\)/, 'der Schnellstart fragt genau diese Regel');
 });
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Weg, der nach einer Anfrage schliesst,
+// reicht den Kontext von VOR der Anfrage hinein - und von vor einer Rueckfrage
+// (confirmOverModal), die den Dialog parkt. Gefahren wird je Weg der echte
+// Submit-Handler; Rueckfrage und schreibende Anfrage wechseln den Kontext.
+test('#1997: Erfolg nach Dialogwechsel - jeder Speichern-Weg schliesst nur mit dem Kontext von VOR Rueckfrage und Anfrage', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const saved = {
+    FormData: globalThis.FormData, api: globalThis.__apiStub, confirm: globalThis.__confirmOverModal,
+    close: globalThis.__closeModal, context: globalThis.__modalContextId, window: globalThis.window,
+  };
+  globalThis.FormData = class {
+    constructor(form) { this.form = form; }
+    * [Symbol.iterator]() { for (const field of this.form.fields) yield [field.name, field.value]; }
+  };
+  const toasts = [];
+  globalThis.window = {
+    ...(saved.window ?? {}), location: { pathname: '/schedule', search: '', hash: '' },
+    yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) },
+  };
+  // Nach dem Speichern zeichnet die Seite neu - dafuer genuegt das Mini-DOM.
+  const { installMiniDom } = await import('./mini-dom.js');
+  const deinstalliere = installMiniDom();
+  // renderPage() zeichnet in die Wurzel der Seite.
+  // Das Mini-DOM kennt keine Selektoren: die Wurzel reicht den Inhaltsbereich
+  // selbst heraus, alles andere fehlt. Eine Reiterleiste aus einem frueheren
+  // Test der Suite faellt dabei mit weg.
+  const inhalt = document.createElement('div');
+  __test.setRootForTest({
+    isConnected: true, querySelector: (selector) => (selector === '.schedule-body' ? inhalt : null),
+    querySelectorAll: () => [], addEventListener() {},
+  });
+  const field = (name, value) => rangeFieldStub(name, value);
+  const form = (kind, fields, extra = {}) => rangeFormStub(fields, {
+    dataset: { form: kind, ...(extra.dataset ?? {}) },
+    elements: { reminder_enabled: { checked: false }, is_active: { checked: true } },
+  });
+  // [Name, Handler, Formular, ob eine Rueckfrage kommt]
+  const WEGE = [
+    ['Schichtart anlegen', __test.saveCreatedSchedule,
+      () => form('shift-create', [field('name', 'Frueh'), field('start_time', '06:00'), field('end_time', '14:00')]), false],
+    ['Ausnahme ueber mehrere Tage bearbeiten (mit Rueckfrage)', __test.saveCreatedSchedule,
+      () => form('override-edit', [
+        field('user_id', '7'), field('shift_type_id', ''), field('note', ''),
+        field('original_from', '2026-10-01'), field('original_to', '2026-10-03'), field('from', '2026-10-01'), field('to', '2026-10-03'),
+      ]), true],
+    ['Eigenes Feld speichern', (event) => __test.saveCustomField(event, null),
+      () => form('custom-field', [field('name', 'Station')]), false],
+    ['Schichtart bearbeiten', __test.saveShiftTypeEdit,
+      () => form('shift-update', [field('name', 'Frueh')], { dataset: { id: '4' } }), false],
+    ['Plan bearbeiten und aktiv schalten (mit Rueckfrage)', __test.savePatternEdit,
+      () => form('pattern-update', [field('name', 'Woche'), field('cycle_length', '7'), field('valid_from', ''), field('valid_until', '')],
+        { dataset: { id: '5' } }), true],
+  ];
+  try {
+    for (const [name, handler, baue, mitRueckfrage] of WEGE) {
+      assert.equal(typeof handler, 'function', `${name}: der Handler ist fuer den Test nicht erreichbar`);
+      __test.setOwnerContext({
+        users: [{ id: 7, display_name: 'Ada' }], me: 7, mayManageOthers: true,
+        patterns: [
+          { id: 5, user_id: 7, name: 'Woche', is_active: 0, cycle_length: 7, valid_from: null, valid_until: null },
+          { id: 6, user_id: 7, name: 'Alt', is_active: 1, cycle_length: 7, valid_from: null, valid_until: null },
+        ],
+      });
+      toasts.length = 0;
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      const geschrieben = [];
+      let gefragt = 0;
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__closeModal = async (opts) => { geschlossen.push(opts); return true; };
+      globalThis.__confirmOverModal = async () => { gefragt += 1; kontext = 'die-rueckfrage'; return true; };
+      const schreibe = (verb) => async (path) => {
+        geschrieben.push(`${verb} ${path}`);
+        kontext = 'ein-anderer-dialog';
+        return { data: {} };
+      };
+      globalThis.__apiStub = {
+        get: async () => ({ data: [] }), post: schreibe('POST'), put: schreibe('PUT'), delete: schreibe('DELETE'),
+      };
+      await handler({ preventDefault() {}, currentTarget: baue() });
+      assert.equal(gefragt, mitRueckfrage ? 1 : 0, `${name}: die Rueckfrage kam ${gefragt}-mal`);
+      assert.ok(geschrieben.length > 0, `${name}: der Weg schreibt`);
+      assert.equal(toasts.some(([, kind]) => kind === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+      assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+      assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+      assert.equal(geschlossen[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird mit ${JSON.stringify(geschlossen[0].context)} statt mit dem Kontext von vor Rueckfrage und Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    }
+  } finally {
+    deinstalliere();
+    __test.setRootForTest(undefined);
+    __test.setOwnerContext({});
+    globalThis.FormData = saved.FormData;
+    globalThis.__apiStub = saved.api;
+    globalThis.__confirmOverModal = saved.confirm;
+    globalThis.__closeModal = saved.close;
+    globalThis.__modalContextId = saved.context;
+    globalThis.window = saved.window;
+  }
+});

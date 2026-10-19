@@ -1777,3 +1777,88 @@ test('R20: genau auf Plan ist kein "knapp" - kurz davor schon, darueber rot', ()
   assert.equal(plans.toneForRatio(0.5, false), 'under');
   assert.equal(plans.toneForRatio(1.2, true), 'over');
 });
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: Setzen und Loeschen eines Plans reichen den
+// Kontext von VOR der Anfrage hinein. Gefahren wird je Weg der echte
+// Klick-Handler an einem Attrappen-Panel; die Anfrage wechselt den Kontext.
+test('#1997: Plan setzen und loeschen schliessen nur mit dem Kontext von VOR der Anfrage', async () => {
+  const { view } = plans;
+  const vorher = { data: view.data, ctx: view.ctx, root: view.root, month: view.month, window: globalThis.window };
+  const toasts = [];
+  globalThis.window = { ...(vorher.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+  const knoten = () => ({
+    replaceChildren() {}, insertAdjacentHTML() {}, appendChild() {}, querySelector: () => null, querySelectorAll: () => [],
+    addEventListener() {}, setAttribute() {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, style: {},
+  });
+  const planKontext = () => {
+    view.month = '2026-10';
+    view.data = { plans: [{ category: 'food', planned: 400, actual: 0, ratio: 0, over: false, remaining: 400 }], savings: null };
+    view.ctx = {
+      currency: 'EUR', esc: (s) => String(s), categoryLabel: (c) => `Kat:${c?.key ?? c}`,
+      formatAmount: (v) => `${v} EUR`, expenseCategories: [{ key: 'food' }], budgetMode: 'shared',
+    };
+    const body = knoten();
+    view.root = { ...knoten(), querySelector: (sel) => (sel === '#budget-plan-body' ? body : null) };
+  };
+  /** Oeffnet den Editor ueber den Modal-Stub; liefert den Klick auf `selector`. */
+  const editor = (selector) => {
+    let opts = null;
+    globalThis.__openModal = (o) => { opts = o; };
+    try { withAccess({ budget: 'write' }, () => plans.openPlanEditor({ category: 'food' })); } finally { delete globalThis.__openModal; }
+    assert.ok(opts, 'der Dialog wurde geoeffnet');
+    const handlers = {};
+    const els = {};
+    const el = (sel) => {
+      els[sel] ??= {
+        value: sel === '#plan-amount' ? '450' : '', disabled: false, focus() {}, select() {},
+        addEventListener(type, fn) { handlers[`${sel}:${type}`] = fn; },
+      };
+      return els[sel];
+    };
+    opts.onSave({ querySelector: el, querySelectorAll: () => [], addEventListener() {} });
+    return () => withAccess({ budget: 'write' }, () => handlers[`${selector}:click`]({ currentTarget: el(selector) }));
+  };
+  const WEGE = [['Plan setzen', '#plan-save'], ['Plan loeschen', '#plan-delete']];
+  try {
+    for (const [name, selector] of WEGE) {
+      planKontext();
+      const klick = editor(selector);
+      toasts.length = 0;
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      const geschrieben = [];
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__closeModal = (opts) => { geschlossen.push(opts); };
+      const schreibe = (verb) => async (path) => { geschrieben.push(`${verb} ${path}`); kontext = 'ein-anderer-dialog'; return { data: {} }; };
+      globalThis.__apiStub = {
+        get: async () => ({ data: { plans: [], savings: null } }), put: schreibe('PUT'), delete: schreibe('DELETE'),
+      };
+      try {
+        await klick();
+        // Das Loeschen haengt am Klick ohne zurueckgegebenes Versprechen.
+        for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(geschrieben.length, 1, `${name}: der Weg schreibt`);
+        assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+        assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+        assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+        assert.equal(geschlossen[0].context, 'eigener-dialog',
+          `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      } finally {
+        delete globalThis.__modalContextId;
+        delete globalThis.__closeModal;
+        delete globalThis.__apiStub;
+      }
+    }
+  } finally {
+    Object.assign(view, { data: vorher.data, ctx: vorher.ctx, root: vorher.root, month: vorher.month });
+    globalThis.window = vorher.window;
+  }
+});

@@ -308,7 +308,7 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
 const LATE_MODAL_CLOSE_BESTAND = {
   'components/quick-links-manager.js': 1,
   'pages/birthdays.js': 2,
-  'pages/budget-plans.js': 2,
+  'pages/budget-plans.js': 0,
   'pages/budget.js': 7,
   'pages/calendar.js': 2,
   'pages/contacts.js': 2,
@@ -318,14 +318,14 @@ const LATE_MODAL_CLOSE_BESTAND = {
   'pages/meals.js': 4,
   'pages/pantry.js': 1,
   'pages/rewards.js': 0,
-  'pages/schedule.js': 4,
+  'pages/schedule.js': 0,
   'pages/shopping.js': 0,
   'pages/split-expenses.js': 6,
   'pages/tasks.js': 2,
   'pages/waste.js': 0,
-  'settings/pages/admin-family.js': 2,
-  'settings/pages/modules-health.js': 2,
-  'settings/pages/modules-kitchen.js': 2,
+  'settings/pages/admin-family.js': 0,
+  'settings/pages/modules-health.js': 0,
+  'settings/pages/modules-kitchen.js': 0,
   'settings/pages/personal-calendar-subscriptions.js': 1,
   'settings/pages/sync-calendar.js': 1,
   'settings/pages/sync-contacts.js': 1,
@@ -20476,7 +20476,7 @@ test('Familie: Mitglied und Einladung oeffnen einen Dialog, der Knopf bleibt Fok
   assert.match(src, /addMemberBtn\.addEventListener\('click', \(\) => openAddMemberModal\(/);
   assert.doesNotMatch(src, /addMemberBtn\.hidden = true|addBtn\.hidden = true/, 'der Knopf verschwindet nicht - er ist das Ziel der Fokus-Rueckgabe');
   const submit = src.slice(src.indexOf('function openAddMemberModal('), src.indexOf('function bindEvents('));
-  assert.match(submit, /closeModal\(\{ force: true \}\)/, 'nach dem Anlegen schliesst der Dialog und gibt den Fokus zurueck');
+  assert.match(submit, /closeModal\(\{ force: true, context: modalContext \}\)/, 'nach dem Anlegen schliesst der Dialog und gibt den Fokus zurueck');
 });
 
 /* Lucide ersetzt `<i data-lucide>` durch ein `<svg>` - eine Regel auf `… i`
