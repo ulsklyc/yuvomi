@@ -207,10 +207,13 @@ async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [] }) 
   const overview = { personId, meId, vitals: null, meds: null, cyclePeriods: null, cycleLogs: null, cycleSettings: undefined };
   const AsyncFunction = (async () => {}).constructor;
   const run = new AsyncFunction(
-    'overview', 'api', 'cycleEnabled', 'todayKey', 'addLocalDays', 'medLogWindowDays', 'OVERVIEW_ADHERENCE_DAYS',
+    'overview', 'api', 'cycleEnabled', 'todayKey', 'addLocalDays', 'medLogWindowDays', 'OVERVIEW_ADHERENCE_DAYS', 'doseAttempts',
     `${body}\nreturn loadOverview();`,
   );
-  const done = run(overview, api, cycleEnabled, () => '2026-10-07', (key) => key, () => 30, 30);
+  // Seit #2069 klaert ein gelungenes Laden offene Dosis-Versuche; die Wellen
+  // betrifft das nicht, deshalb hier nur ein Stellvertreter.
+  const doseAttempts = { confirmedBy() {} };
+  const done = run(overview, api, cycleEnabled, () => '2026-10-07', (key) => key, () => 30, 30, doseAttempts);
   // Eine Welle = alles, was offen ist, sobald der Code nicht mehr weiterkommt.
   const settle = () => new Promise((resolve) => setImmediate(resolve));
   const answer = (pick) => {

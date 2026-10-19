@@ -348,6 +348,9 @@ export function randomIdempotencyKey() {
  */
 export function doseOutcomeUnknown(err) {
   const status = err?.status;
+  // 409 "noch in Arbeit": die erste Anfrage mit diesem Schluessel laeuft noch,
+  // gebucht ist vielleicht schon. Jede andere 409 ist eindeutig.
+  if (status === 409) return err?.data?.reason === 'idempotency_in_progress';
   return status === 0 || status === 408 || status === 429 || (typeof status === 'number' && status >= 500);
 }
 

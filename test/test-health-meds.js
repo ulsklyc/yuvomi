@@ -830,6 +830,11 @@ test('doseOutcomeUnknown: nur Netz, Zeitueberschreitung, Bremse und Serverfehler
   for (const status of [0, 408, 429, 500, 502, 503]) assert.equal(doseOutcomeUnknown({ status }), true, String(status));
   for (const status of [400, 403, 404, 409, 422]) assert.equal(doseOutcomeUnknown({ status }), false, String(status));
   assert.equal(doseOutcomeUnknown(new Error('x')), false);
+  // Eine 409 "noch in Arbeit" heisst: die erste Anfrage laeuft noch, ihr Ausgang
+  // ist offen. Der Versuch muss bleiben, sonst bucht der naechste Tipp mit
+  // neuem Schluessel ein zweites Mal.
+  assert.equal(doseOutcomeUnknown({ status: 409, data: { reason: 'idempotency_in_progress' } }), true);
+  assert.equal(doseOutcomeUnknown({ status: 409, data: { reason: 'idempotency_key_reused' } }), false);
 });
 
 test('randomIdempotencyKey: 32 Hex-Zeichen, ohne randomUUID (plain HTTP im Heimnetz)', () => {
