@@ -31,27 +31,48 @@ function keyMatches(given, stored) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * DAS ETAG HAENGT AM SCHLUESSEL, NICHT AN DEN BYTES. `avatar_key` wechselt mit
+ * jedem neuen Bild (Trigger aus Migration 251), also benennt er die Fassung
+ * genauso gut - und die Nachfrage braucht weder Base64-Dekodieren noch einen
+ * Hash ueber das Bild.
+ *
+ * IMMER `private, no-cache`, NIE `max-age`/`immutable` (wie die Rezeptbilder,
+ * #2067). Ein `immutable` fuer ein Jahr liess das Bild nach dem Abmelden oder
+ * einem Kontowechsel im selben Browser aus dem HTTP-Cache kommen, ohne dass
+ * requireAuth oder die Gates liefen - das Abmelden leert nur den Cache des
+ * Service Workers. Mit `no-cache` fragt der Browser bei jeder Nutzung nach,
+ * die Nachfrage laeuft durch alle Gates, und die Antwort ist ein 304 ohne
+ * Bytes. Fehlerantworten behalten das globale `no-store` aus server/index.js.
+ */
 router.get('/:id/avatar', (req, res) => {
   try {
     if (!/^\d+$/.test(req.params.id)) {
       return res.status(400).json({ error: 'Invalid person ID.', code: 400 });
     }
-    const row = db.get().prepare('SELECT avatar_data, avatar_key FROM users WHERE id = ?').get(Number(req.params.id));
-    const image = parseAvatarDataUrl(row?.avatar_data);
+    const id = Number(req.params.id);
+    const row = db.get().prepare('SELECT avatar_data, avatar_key FROM users WHERE id = ?').get(id);
     // NUR MIT DEM SCHLUESSEL AUS DER ZEILE (`?v=`, Migration 251). Fehlt er
     // oder passt er nicht, heisst die Antwort dasselbe 404 wie "kein Bild":
     // wer ids durchzaehlt, erfaehrt nicht einmal, wer eines hat.
-    if (!image || !keyMatches(req.query.v, row?.avatar_key)) {
+    if (!row?.avatar_data || !keyMatches(req.query.v, row.avatar_key)) {
       return res.status(404).json({ error: 'No picture for this person.', code: 404 });
     }
 
-    const etag = `"${createHash('sha256').update(image.bytes).digest('hex').slice(0, 32)}"`;
-    // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort setzt.
-    // `immutable`, weil der Schluessel mit jedem neuen Bild wechselt: unter
-    // dieser Adresse steht nie ein anderes Bild.
-    res.set('Cache-Control', 'private, max-age=31536000, immutable');
+    const etag = `"${createHash('sha256').update(`${id}|${row.avatar_key}`).digest('hex').slice(0, 32)}"`;
+    if (req.get('If-None-Match') === etag) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.set('ETag', etag);
+      return res.status(304).end();
+    }
+
+    const image = parseAvatarDataUrl(row.avatar_data);
+    if (!image) return res.status(404).json({ error: 'No picture for this person.', code: 404 });
+    // Ueberschreibt das `no-store`, das server/index.js jeder API-Antwort
+    // setzt - erst hier, am Erfolgsweg. `private`: kein geteilter Cache
+    // dazwischen darf das Bild halten.
+    res.set('Cache-Control', 'private, no-cache');
     res.set('ETag', etag);
-    if (req.get('If-None-Match') === etag) return res.status(304).end();
     res.type(image.mime);
     res.set('Content-Length', String(image.bytes.length));
     return res.end(image.bytes);

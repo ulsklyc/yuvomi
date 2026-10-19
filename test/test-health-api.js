@@ -2004,3 +2004,73 @@ test('PRN: eine negative Bedarfsdosis wird abgewiesen', async () => {
   const patched = await call('PATCH', `/medications/${ok.body.data.id}`, { prn_dose_qty: -1 });
   assert.equal(patched.status, 400);
 });
+
+// #2054: das Formular legte ein neues Medikament und danach jedes Zeitfenster
+// einzeln an. Scheiterte ein Zeitfenster, stand das Medikament schon, und ein
+// Abbrechen liess es ohne Plan zurueck. POST /medications nimmt den Plan jetzt
+// mit und schreibt beides in einer Transaktion: alles oder nichts.
+function countMeds(name) {
+  return db.prepare('SELECT COUNT(*) AS n FROM medications WHERE name = ?').get(name).n;
+}
+
+test('#2054: POST /medications legt Medikament und Einnahmeplan in einem Request an', async () => {
+  asA();
+  const res = await call('POST', '/medications', {
+    name: 'Atomar', schedules: [
+      { time_of_day: '20:00', dose_qty: 2 },
+      { time_of_day: '08:00', days_mask: 5, dose_qty: 1 },
+    ],
+  });
+  assert.equal(res.status, 201);
+  const id = res.body.data.id;
+  assert.deepEqual(res.body.data.schedules?.map((s) => s.time_of_day), ['08:00', '20:00']);
+  const stored = db.prepare('SELECT time_of_day, days_mask, dose_qty, active FROM medication_schedules WHERE medication_id = ? ORDER BY time_of_day').all(id);
+  assert.deepEqual(stored.map((s) => ({ ...s })), [
+    { time_of_day: '08:00', days_mask: 5, dose_qty: 1, active: 1 },
+    { time_of_day: '20:00', days_mask: null, dose_qty: 2, active: 1 },
+  ]);
+  await call('DELETE', `/medications/${id}`);
+});
+
+test('#2054: ein ungueltiges Zeitfenster weist alles ab, es bleibt kein Medikament stehen', async () => {
+  asA();
+  const res = await call('POST', '/medications', {
+    name: 'Halbangelegt', schedules: [{ time_of_day: '08:00' }, { time_of_day: '09:00', days_mask: 200 }],
+  });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /schedules\[1\]/, 'die Meldung nennt das Zeitfenster');
+  assert.equal(countMeds('Halbangelegt'), 0);
+
+  for (const schedules of ['08:00', [null], [[]], Array.from({ length: 49 }, () => ({ time_of_day: '08:00' }))]) {
+    const bad = await call('POST', '/medications', { name: 'Halbangelegt', schedules });
+    assert.equal(bad.status, 400, `abgewiesen: ${JSON.stringify(schedules).slice(0, 40)}`);
+  }
+  assert.equal(countMeds('Halbangelegt'), 0);
+});
+
+test('#2054: scheitert ein Zeitfenster erst beim Schreiben, rollt auch das Medikament zurueck', async () => {
+  asA();
+  // Ein Fehler NACH der Pruefung (Platte, Constraint): nur die Transaktion
+  // haelt das Medikament dann vom Bestand fern.
+  db.exec(`CREATE TRIGGER t2054_fail BEFORE INSERT ON medication_schedules
+           WHEN NEW.time_of_day = '23:59' BEGIN SELECT RAISE(ABORT, 'boom'); END`);
+  try {
+    const res = await call('POST', '/medications', {
+      name: 'Rollback', schedules: [{ time_of_day: '08:00' }, { time_of_day: '23:59' }],
+    });
+    assert.equal(res.status, 500);
+    assert.equal(countMeds('Rollback'), 0, 'kein Medikament ohne Plan');
+    assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM medication_schedules
+      WHERE medication_id NOT IN (SELECT id FROM medications)`).get().n, 0);
+  } finally {
+    db.exec('DROP TRIGGER t2054_fail');
+  }
+});
+
+test('#2054: ohne schedules bleibt die Antwort die bisherige Zeile', async () => {
+  asA();
+  const res = await call('POST', '/medications', { name: 'Ohneplan' });
+  assert.equal(res.status, 201);
+  assert.equal('schedules' in res.body.data, false);
+  await call('DELETE', `/medications/${res.body.data.id}`);
+});
