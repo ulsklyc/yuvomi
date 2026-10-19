@@ -494,6 +494,7 @@
         "historyView": "Historik",
         "historyPersonFilter": "Filtrera efter person",
         "historyUnknownMember": "Inte längre i hushållet",
+        "historyViaSync": "Via synkronisering",
         "historyEmptyTitle": "Inget registrerat än",
         "historyEmptyPersonTitle": "Inget registrerat för den här personen",
         "historyEmptyDescription": "Här ser du vem som gjorde vilken uppgift och när.",

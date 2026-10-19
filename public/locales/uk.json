@@ -572,6 +572,7 @@
         "historyView": "Історія",
         "historyPersonFilter": "Фільтр за учасником",
         "historyUnknownMember": "Більше не в родині",
+        "historyViaSync": "Через синхронізацію",
         "historyEmptyTitle": "Поки нічого не записано",
         "historyEmptyPersonTitle": "Для цього учасника нічого не записано",
         "historyEmptyDescription": "Тут видно, хто і коли виконав яке завдання.",

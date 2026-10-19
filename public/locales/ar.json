@@ -611,6 +611,7 @@
         "historyView": "السجل",
         "historyPersonFilter": "تصفية حسب الشخص",
         "historyUnknownMember": "لم يعد ضمن المنزل",
+        "historyViaSync": "عبر المزامنة",
         "historyEmptyTitle": "لم يُسجَّل شيء بعد",
         "historyEmptyPersonTitle": "لا يوجد سجل لهذا الشخص",
         "historyEmptyDescription": "هنا ترى من أنجز أي مهمة ومتى.",

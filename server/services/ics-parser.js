@@ -281,6 +281,26 @@ function normalizeRecurrenceOverrides(events) {
   return out;
 }
 
+/**
+ * COMPLETED eines VTODO als ISO-Zeitpunkt (`YYYY-MM-DDTHH:MM:SSZ`), oder null.
+ *
+ * RFC 5545 schreibt für COMPLETED UTC vor (3.8.2.1). Nur diese Form wird
+ * übernommen: eine Wanduhrzeit ohne Zone wäre ein geratener Zeitpunkt, und für
+ * den Verlauf ist "beim Sync bemerkt" (null, der Aufrufer nimmt jetzt) die
+ * ehrlichere Antwort als ein um den Zonenversatz verschobener Haken (#1836).
+ */
+function completedInstant(raw) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/i.exec(String(raw || '').trim());
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`;
+  // Rundreise statt Date.parse allein: der 30. Februar oder Stunde 24 werden
+  // dort still zu einem anderen Tag, gespeichert waere aber der Rohtext - und
+  // den vergleicht SQL als Text (Verlauf, "heute erledigt").
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return null;
+  return new Date(at).toISOString().replace(/\.\d{3}Z$/, 'Z') === iso ? iso : null;
+}
+
 function parseVTODO(ics) {
   const unfolded = unfoldLines(ics);
   const todos    = [];
@@ -318,7 +338,10 @@ function parseVTODO(ics) {
     if (priority === 0 || Number.isNaN(priority)) priority = null;
     const tags = parseCategories(block);
     const { parentUid, childUids } = parseRelations(block);
-    todos.push({ uid, summary, description, completed, status, due, priority, tags, parentUid, childUids });
+    todos.push({
+      uid, summary, description, completed, completedAt: completedInstant(completedAt),
+      status, due, priority, tags, parentUid, childUids,
+    });
   }
   return todos;
 }

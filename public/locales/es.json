@@ -494,6 +494,7 @@
         "historyView": "Historial",
         "historyPersonFilter": "Filtrar por persona",
         "historyUnknownMember": "Ya no está en el hogar",
+        "historyViaSync": "Mediante sincronización",
         "historyEmptyTitle": "Aún no hay nada registrado",
         "historyEmptyPersonTitle": "Nada registrado para esta persona",
         "historyEmptyDescription": "Aquí verás quién hizo cada tarea y cuándo.",

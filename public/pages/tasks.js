@@ -3486,6 +3486,17 @@ function renderDoerPicker(task, isDone, archived) {
 }
 
 /**
+ * Wen eine Verlaufszeile nennt. Ein Eintrag ohne Person kommt aus zwei
+ * Richtungen: die Person hat den Haushalt verlassen, oder der CalDAV-Sync hat
+ * einen auf dem Telefon gesetzten Haken uebernommen und weiss nicht, von wem
+ * (#1836) - "Nicht mehr im Haushalt" waere fuer den zweiten Fall falsch.
+ */
+function historyPersonLabel(entry) {
+  if (entry.person_name) return entry.person_name;
+  return entry.source === 'caldav' ? t('tasks.historyViaSync') : t('tasks.historyUnknownMember');
+}
+
+/**
  * DER VERLAUF NENNT, WER ES GETAN HAT (#1205). `person_*` ist die benannte
  * erledigende Person und ohne Benennung die abhakende - der Server loest das in
  * EINEM Ausdruck auf, damit die Rueckfallregel nicht in jedem Renderer noch
@@ -3496,7 +3507,7 @@ function renderDoerPicker(task, isDone, archived) {
  * gesetzt hat.
  */
 function renderHistoryEntry(entry) {
-  const name = entry.person_name || t('tasks.historyUnknownMember');
+  const name = historyPersonLabel(entry);
   const tickedBy = entry.done_by_user_id && entry.done_by_user_id !== entry.user_id
     ? (entry.user_name || t('tasks.historyUnknownMember'))
     : null;

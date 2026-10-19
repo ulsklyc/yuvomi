@@ -519,6 +519,7 @@
         "historyView": "Előzmények",
         "historyPersonFilter": "Szűrés személy szerint",
         "historyUnknownMember": "Már nem tagja a háztartásnak",
+        "historyViaSync": "Szinkronizálással",
         "historyEmptyTitle": "Még nincs rögzítve semmi",
         "historyEmptyPersonTitle": "Ehhez a személyhez nincs rögzítve semmi",
         "historyEmptyDescription": "Itt látod, ki melyik feladatot végezte el, és mikor.",

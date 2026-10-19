@@ -503,6 +503,7 @@
         "historyView": "Histórico",
         "historyPersonFilter": "Filtrar por pessoa",
         "historyUnknownMember": "Já não pertence ao agregado",
+        "historyViaSync": "Via sincronização",
         "historyEmptyTitle": "Ainda nada registado",
         "historyEmptyPersonTitle": "Nada registado para esta pessoa",
         "historyEmptyDescription": "Aqui vês quem fez cada tarefa e quando.",

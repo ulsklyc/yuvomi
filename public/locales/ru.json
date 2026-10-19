@@ -572,6 +572,7 @@
         "historyView": "История",
         "historyPersonFilter": "Фильтр по участнику",
         "historyUnknownMember": "Больше не в семье",
+        "historyViaSync": "Через синхронизацию",
         "historyEmptyTitle": "Пока ничего не записано",
         "historyEmptyPersonTitle": "Для этого участника ничего не записано",
         "historyEmptyDescription": "Здесь видно, кто и когда выполнил какую задачу.",

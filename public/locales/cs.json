@@ -560,6 +560,7 @@
         "historyView": "Historie",
         "historyPersonFilter": "Filtrovat podle osoby",
         "historyUnknownMember": "Již není v domácnosti",
+        "historyViaSync": "Přes synchronizaci",
         "historyEmptyTitle": "Zatím nic zaznamenáno",
         "historyEmptyPersonTitle": "Pro tuto osobu nic zaznamenáno",
         "historyEmptyDescription": "Zde uvidíte, kdo kterou úlohu splnil a kdy.",

@@ -519,6 +519,7 @@
         "historyView": "Geschiedenis",
         "historyPersonFilter": "Filteren op persoon",
         "historyUnknownMember": "Niet meer in het huishouden",
+        "historyViaSync": "Via synchronisatie",
         "historyEmptyTitle": "Nog niets vastgelegd",
         "historyEmptyPersonTitle": "Niets vastgelegd voor deze persoon",
         "historyEmptyDescription": "Hier zie je wie welke taak heeft gedaan, en wanneer.",

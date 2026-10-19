@@ -1512,7 +1512,8 @@ function seriesHistoryNode(task) {
       // Zeile im Haushaltsverlauf "Lea - abgehakt von Mama" ist und hier bloss
       // "Lea": genau die Auskunft, die diese Aenderung neu aufbewahrt, ginge in
       // der einen der beiden Ansichten wieder verloren (Review Runde 1).
-      who.textContent = entry.person_name || t('tasks.historyUnknownMember');
+      who.textContent = entry.person_name
+        || (entry.source === 'caldav' ? t('tasks.historyViaSync') : t('tasks.historyUnknownMember'));
       row.append(when, who);
       if (entry.done_by_user_id && entry.done_by_user_id !== entry.user_id) {
         const by = document.createElement('span');

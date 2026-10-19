@@ -494,6 +494,7 @@
         "historyView": "Historique",
         "historyPersonFilter": "Filtrer par personne",
         "historyUnknownMember": "Ne fait plus partie du foyer",
+        "historyViaSync": "Via la synchronisation",
         "historyEmptyTitle": "Rien d’enregistré pour l’instant",
         "historyEmptyPersonTitle": "Rien d’enregistré pour cette personne",
         "historyEmptyDescription": "Ici, vous voyez qui a fait quelle tâche, et quand.",
