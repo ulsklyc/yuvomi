@@ -44,6 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clocks go forward (02:30 in Berlin), the occurrence moves forward by the skipped hour; where it
   exists twice when the clocks go back, the first one counts. Occurrences you deleted or changed keep
   their place.
+- **Older series ends now reach Google, CalDAV, iCloud and the calendar feed on the same last day Yuvomi shows (#1992).**
+  Before #1989 the repeat form saved a series end as the end of the UTC day, and series saved that
+  way still carry it. For a series without its own time zone Yuvomi ends it on that date, while
+  other calendars read the UTC moment: west of UTC (for example Chicago, 8 pm) they dropped the last
+  occurrence, east of UTC (Berlin, 0:30) they showed one more. Such a series now goes out with the
+  end of that day in the household's time zone, so both sides end on the same occurrence. Nothing
+  stored is rewritten: the calendar feed shows the corrected end right away, Google, CalDAV and
+  iCloud receive it with the next change sent for that series, and reading it back counts as
+  Yuvomi's own change rather than an edit in the other calendar. Series imported from other
+  calendars still go back word for word.
 - **Reconnecting or disconnecting Google Calendar now stops a sync that is still running (#2035).**
   A sync that was waiting on Google while you reconnected, perhaps with another account, or
   disconnected used to carry on with the old connection: it could still send queued changes to the
@@ -67,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
   **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
   (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+- **Moving a completed reminder into or out of a parent reminder now updates the task history (#2078).**
+  When the reminders app changed only which reminder a completed one belongs to, the history kept
+  its old state: a completed task moved under another one stayed in the history, although subtasks
+  never appear there, and a completed subtask moved out to stand on its own never showed up. Now
+  the first loses its entry, and the second gets one at the time it was completed on the phone. If
+  the reminder carries no completion time, it stays without an entry rather than claiming it was
+  done at the time of the sync.
 - **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
   reloaded their list in the same step as the save. When the save went through but the reload hit
   a network blip or a busy server, the dialog stayed open with a "could not save" message, and

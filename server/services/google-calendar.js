@@ -30,7 +30,7 @@ import {
   configuredHouseholdTimeZone, householdTimeZone, isValidTimeZone, localToUTCPrecise,
 } from '../utils/timezone.js';
 import { localDayEndUtc, utcStamp } from '../utils/rrule-until.js';
-import { authoredAfterInbound, outboundEvent } from './outbound-dtstart.js';
+import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { alignmentMoved, googleReading, isEcho, sentSnapshot } from './outbound-echo.js';
 import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
@@ -1719,8 +1719,11 @@ function googleBody(rawEvent, colorMap, timeZone) {
     gEvent.end   = { dateTime: endDt,   timeZone };
   }
 
+  // Ein UNTIL aus dem alten Formular geht an einer eigenen Serie ohne Zone als
+  // Datum in `normalizeRecurrenceUntil` (#1992, services/outbound-dtstart.js).
   if (event.recurrence_rule) {
-    gEvent.recurrence = [`RRULE:${normalizeRecurrenceUntil(rruleValue(event.recurrence_rule), allDay, timeZone, event.tzid)}`];
+    const rule = outboundRecurrenceRule(event);
+    gEvent.recurrence = [`RRULE:${normalizeRecurrenceUntil(rruleValue(rule), allDay, timeZone, event.tzid)}`];
   }
 
   return gEvent;
