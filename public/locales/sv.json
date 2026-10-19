@@ -3876,6 +3876,10 @@
         "deleted": "Snabblänk borttagen",
         "loadError": "Snabblänkarna kunde inte laddas.",
         "orderError": "Ordningen kunde inte sparas.",
+        "errorLinkGone": "Den här snabblänken finns inte längre.",
+        "errorLimitReached": "Översikten rymmer högst {{limit}} snabblänkar.",
+        "saveError": "Snabblänken kunde inte sparas.",
+        "deleteError": "Snabblänken kunde inte tas bort.",
         "iconSymbol": "Välj ikon",
         "iconChoose": "Välj ikon eller bild"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} kalenderpost saknade UID; en reservidentitet baserad på etikett och datum användes.",
         "importDiagnosticDuplicateInstance": "{{count}} dubblerade hämtningstillfällen (samma identitet) slogs samman till ett.",
         "importDiagnosticDuplicateInstance_one": "{{count}} dubblerat hämtningstillfälle (samma identitet) slogs samman till ett.",
+        "importDiagnosticOther": "En kalenderpost har inte det förväntade formatet.",
         "importUnresolvedBlockingError": "Åtgärda alla blockerande varningar först, eller hoppa uttryckligen över de berörda händelserna.",
         "importIgnoreLabel": "Ignorera",
         "importCreateNewType": "Skapa en ny avfallstyp",

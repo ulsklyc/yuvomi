@@ -3606,6 +3606,10 @@
         "deleted": "Đã xóa liên kết nhanh",
         "loadError": "Không tải được các liên kết nhanh.",
         "orderError": "Không lưu được thứ tự.",
+        "errorLinkGone": "Liên kết nhanh này không còn nữa.",
+        "errorLimitReached": "Trang tổng quan chỉ chứa tối đa {{limit}} liên kết nhanh.",
+        "saveError": "Không thể lưu liên kết nhanh.",
+        "deleteError": "Không thể xóa liên kết nhanh.",
         "iconSymbol": "Chọn biểu tượng",
         "iconChoose": "Chọn biểu tượng hoặc hình ảnh"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} mục lịch không có UID; đã dùng danh tính thay thế dựa trên nhãn và ngày.",
         "importDiagnosticDuplicateInstance": "Đã gộp {{count}} lượt thu gom trùng lặp (cùng danh tính) thành một.",
         "importDiagnosticDuplicateInstance_one": "Đã gộp {{count}} lượt thu gom trùng lặp (cùng danh tính) thành một.",
+        "importDiagnosticOther": "Một mục lịch không khớp với định dạng mong đợi.",
         "importUnresolvedBlockingError": "Hãy xử lý mọi cảnh báo chặn trước, hoặc bỏ qua rõ ràng các sự kiện bị ảnh hưởng.",
         "importIgnoreLabel": "Bỏ qua",
         "importCreateNewType": "Tạo loại rác mới",

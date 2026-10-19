@@ -27,6 +27,7 @@ import { openModal, closeModal, captureModalContext, confirmOverModal, reportFie
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { makeSortable } from '/utils/sortable.js';
+import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 /** Dieselben Werte wie in server/routes/quick-links.js. */
 const VISIBILITY_VALUES = ['all', 'private'];
@@ -139,6 +140,20 @@ async function readIconAsDataUrl(file) {
       dataTooLarge: 'quickLinks.iconTooLarge',
     },
   });
+}
+
+/* DER SATZ DER APP, NIE DER DES SERVERS (#1909). Bis dahin zeigte ein
+ * gescheitertes Speichern oder Loeschen hier `err.data.error` - den Text des
+ * Servers ("Schnellzugriff nicht gefunden", "At most 24 quick links ...") in
+ * jeder Sprache. Jetzt nennt der Server den Fall (`reason`), und der Satz
+ * kommt aus utils/friendly-error.js. */
+/** Loeschen, das schon erledigt ist, ist kein Fehler. */
+async function deleteUnlessGone(path) {
+  try {
+    await api.delete(path);
+  } catch (err) {
+    if (!isAlreadyDeleted(err, 'quick_links_link_not_found')) throw err;
+  }
 }
 
 // --------------------------------------------------------
@@ -289,7 +304,9 @@ function openQuickLinkForm(link, onDone) {
           state.iconName = null;
           repaintFace();
         } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
+          // Die Pruefung des Bildes sagt ihren eigenen Satz (ImageProblem);
+          // jeder andere Wurf den allgemeinen, nie seinen eigenen Text (#1909).
+          window.yuvomi?.showToast(err?.name === 'ImageProblem' && err.sentence ? err.sentence : t('common.errorGeneric'), 'danger');
         }
       });
 
@@ -345,12 +362,13 @@ function openQuickLinkForm(link, onDone) {
         const ok = await confirmOverModal(t('quickLinks.deleteConfirm', { name: link.name }));
         if (!ok) return;
         try {
-          await api.delete(`/quick-links/${link.id}`);
+          // Schon geloescht (eine andere Person war schneller) ist erledigt (#1909).
+          await deleteUnlessGone(`/quick-links/${link.id}`);
           window.yuvomi?.showToast(t('quickLinks.deleted'), 'success');
           await onDone();
           refocusAfterRender();
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err, 'quickLinks.deleteError'), 'danger');
         }
       });
 
@@ -388,7 +406,15 @@ function openQuickLinkForm(link, onDone) {
           await onDone();
           refocusAfterRender();
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err, 'quickLinks.saveError'), 'danger');
+          // Die Kachel gibt es nicht mehr: der Dialog hat nichts mehr zu
+          // speichern, die Verwaltung kommt mit dem aktuellen Stand (#1909).
+          if (isGone(err)) {
+            closeModal({ force: true, context: modalContext });
+            await onDone();
+            refocusAfterRender();
+            return;
+          }
           btnError(saveBtn);
           saveBtn.disabled = false;
           saveBtn.textContent = label;

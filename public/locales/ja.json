@@ -3876,6 +3876,10 @@
         "deleted": "クイックリンクを削除しました",
         "loadError": "クイックリンクを読み込めませんでした。",
         "orderError": "並び順を保存できませんでした。",
+        "errorLinkGone": "このクイックリンクはもう存在しません。",
+        "errorLimitReached": "概要に置けるクイックリンクは{{limit}}件までです。",
+        "saveError": "クイックリンクを保存できませんでした。",
+        "deleteError": "クイックリンクを削除できませんでした。",
         "iconSymbol": "アイコンを選ぶ",
         "iconChoose": "アイコンまたは画像を選ぶ"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}}件の予定にUIDがなかったため、ラベルと日付に基づく代替識別子を使用しました。",
         "importDiagnosticDuplicateInstance": "重複した回収予定{{count}}件（同一の識別情報）を1件にまとめました。",
         "importDiagnosticDuplicateInstance_one": "重複した回収予定{{count}}件（同一の識別情報）を1件にまとめました。",
+        "importDiagnosticOther": "予定の1件が想定された形式と一致しません。",
         "importUnresolvedBlockingError": "先にブロック中のすべての警告を解決するか、該当する予定を明示的にスキップしてください。",
         "importIgnoreLabel": "無視",
         "importCreateNewType": "新しいごみの種類を作成",

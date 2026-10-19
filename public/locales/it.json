@@ -3876,6 +3876,10 @@
         "deleted": "Collegamento eliminato",
         "loadError": "Impossibile caricare i collegamenti rapidi.",
         "orderError": "Impossibile salvare l'ordine.",
+        "errorLinkGone": "Questo collegamento non esiste più.",
+        "errorLimitReached": "Nella panoramica stanno al massimo {{limit}} collegamenti.",
+        "saveError": "Impossibile salvare il collegamento.",
+        "deleteError": "Impossibile eliminare il collegamento.",
         "iconSymbol": "Scegli icona",
         "iconChoose": "Scegli icona o immagine"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} voce del calendario non aveva un UID; è stata usata un'identità di riserva basata su etichetta e data.",
         "importDiagnosticDuplicateInstance": "{{count}} occorrenze di ritiro duplicate (stessa identità) sono state unite in una sola.",
         "importDiagnosticDuplicateInstance_one": "{{count}} occorrenza di ritiro duplicata (stessa identità) è stata unita in una sola.",
+        "importDiagnosticOther": "Una voce del calendario non corrisponde al formato previsto.",
         "importUnresolvedBlockingError": "Risolvi prima ogni avviso bloccante, oppure salta esplicitamente gli eventi interessati.",
         "importIgnoreLabel": "Ignora",
         "importCreateNewType": "Crea un nuovo tipo di rifiuto",

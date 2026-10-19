@@ -3606,6 +3606,10 @@
         "deleted": "Hurtiglenke slettet",
         "loadError": "Hurtiglenkene kunne ikke lastes.",
         "orderError": "Ordren kunne ikke lagres.",
+        "errorLinkGone": "Denne hurtiglenken finnes ikke lenger.",
+        "errorLimitReached": "Oversikten har plass til høyst {{limit}} hurtiglenker.",
+        "saveError": "Hurtiglenken kunne ikke lagres.",
+        "deleteError": "Hurtiglenken kunne ikke slettes.",
         "iconSymbol": "Velg ikon",
         "iconChoose": "Velg ikon eller bilde"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} kalenderoppføring hadde ingen UID; en alternativ identitet basert på etikett og date ble brukt.",
         "importDiagnosticDuplicateInstance": "{{count}} duplikate hentinger (samme identitet) ble slått sammen til én.",
         "importDiagnosticDuplicateInstance_one": "{{count}} duplikate hentinger tilfeller (samme identitet) ble slått sammen til ett.",
+        "importDiagnosticOther": "En kalenderoppføring har ikke det forventede formatet.",
         "importUnresolvedBlockingError": "Løs alle blokkerende feilmeldinger først, eller hopp over de berørte hendelsene eksplisitt.",
         "importIgnoreLabel": "Ignorer",
         "importCreateNewType": "Opprett en ny avfallstype",

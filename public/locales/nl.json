@@ -3606,6 +3606,10 @@
         "deleted": "Snelkoppeling verwijderd",
         "loadError": "De snelkoppelingen konden niet worden geladen.",
         "orderError": "De volgorde kon niet worden opgeslagen.",
+        "errorLinkGone": "Deze snelkoppeling bestaat niet meer.",
+        "errorLimitReached": "Op het overzicht passen maximaal {{limit}} snelkoppelingen.",
+        "saveError": "De snelkoppeling kon niet worden opgeslagen.",
+        "deleteError": "De snelkoppeling kon niet worden verwijderd.",
         "iconSymbol": "Pictogram kiezen",
         "iconChoose": "Pictogram of afbeelding kiezen"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} agenda-item had geen UID; een vervangende identiteit op basis van label en datum is gebruikt.",
         "importDiagnosticDuplicateInstance": "{{count}} dubbele ophaalmomenten (dezelfde identiteit) zijn samengevoegd tot één.",
         "importDiagnosticDuplicateInstance_one": "{{count}} dubbel ophaalmoment (dezelfde identiteit) is samengevoegd tot één.",
+        "importDiagnosticOther": "Een agenda-item heeft niet de verwachte indeling.",
         "importUnresolvedBlockingError": "Los eerst elke blokkerende melding op, of sla de betreffende gebeurtenissen expliciet over.",
         "importIgnoreLabel": "Negeren",
         "importCreateNewType": "Nieuwe afvalsoort aanmaken",

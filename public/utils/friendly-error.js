@@ -292,6 +292,11 @@ export const CASE_MESSAGES = new Map([
   ['rewards_not_participating', 'rewards.errorNotParticipating'],
   ['rewards_money_account_not_found', 'rewards.errorMoneyAccountGone'],
   ['rewards_money_plan_not_found', 'rewards.errorMoneyPlanGone'],
+  // Schnellzugriffe (#1909). Die 404 heisst "geloescht" - oder privat fuer
+  // jemand anderen, was fuer diese Person dasselbe ist. Ein Loeschen mit diesem
+  // Grund ist deshalb ein Erfolg. Die Grenze traegt ihre Zahl (CASE_PARAMS).
+  ['quick_links_link_not_found', 'quickLinks.errorLinkGone'],
+  ['quick_links_limit_reached', 'quickLinks.errorLimitReached'],
 ]);
 
 /**
@@ -316,6 +321,7 @@ export const CASE_PARAMS = new Map([
   ['health_cycle_import_too_large', ['limit_kb']],
   ['health_cycle_import_too_many_rows', ['limit']],
   ['documents_folder_too_deep', ['limit']],
+  ['quick_links_limit_reached', ['limit']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -416,6 +422,7 @@ export const GONE_REASONS = new Set([
   'rewards_redemption_not_found',
   'rewards_money_account_not_found',
   'rewards_money_plan_not_found',
+  'quick_links_link_not_found',
 ]);
 
 /**

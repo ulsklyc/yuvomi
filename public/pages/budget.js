@@ -18,7 +18,7 @@ import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-st
 import { swapContent } from '/utils/content-swap.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { friendlyError } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { render as renderSplitExpenses, prefillSplitExpense, canAddSplitExpense, openNewSplitExpense } from '/pages/split-expenses.js';
 import { openSubscriptionModal, clearSubscriptionFilters, render as renderSubscriptions } from '/pages/subscriptions.js';
@@ -5282,7 +5282,7 @@ const LOAN_REFUSALS = new Map([
 /**
  * Was der Darlehens-Dialog zu einem fehlgeschlagenen Speichern sagt (#1656).
  * Nie der Satz des Servers: eine 400 bekommt den Satz ihres Grundes oder den
- * allgemeinen des Dialogs, alles andere den Satz der App (friendlyError).
+ * allgemeinen des Dialogs, alles andere den Satz der App (errorSentence).
  *
  * @param {unknown} err
  * @returns {{ fields: string|null, message: string }}
@@ -5325,11 +5325,13 @@ function refusalSentence(err, { refusals, statuses, fallback }) {
       ? { fields: entry[0], message: refusalText(entry, err.data?.max) }
       : { fields: null, message: t(fallback) };
   }
-  // friendlyError reicht bei einem Status ohne eigenen Satz den Text des Servers
-  // durch (Uebergang, #1909) - hier nur dort fragen, wo es einen eigenen hat,
-  // sonst gilt der Satz dieser Stelle.
-  const known = status === 0 || status === 403 || status === 404 || status >= 500 || !navigator.onLine;
-  return { fields: null, message: known ? friendlyError(err) : t(fallback) };
+  // Der Satz der App, nie der des Servers (#1909): offline und eine Absage
+  // (403) ueber errorSentence, "nicht gefunden", Serverfehler und kein Netz
+  // ueber dieselbe Zuordnung wie ein Ladefehler. Jeder andere Status (409 ohne
+  // Grund, 429, ein Wurf ohne Antwort) bekommt den Satz dieser Stelle.
+  if (status === 0 || status === 403) return { fields: null, message: errorSentence(err, fallback) };
+  const known = status === 404 || status >= 500 || !navigator.onLine;
+  return { fields: null, message: (known && loadErrorSentence(err)) || t(fallback) };
 }
 
 const BUDGET_FAILED = 'common.errorOccurred';

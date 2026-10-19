@@ -3876,6 +3876,10 @@
         "deleted": "Hızlı bağlantı silindi",
         "loadError": "Hızlı bağlantılar yüklenemedi.",
         "orderError": "Sıralama kaydedilemedi.",
+        "errorLinkGone": "Bu hızlı bağlantı artık yok.",
+        "errorLimitReached": "Genel bakışa en fazla {{limit}} hızlı bağlantı sığar.",
+        "saveError": "Hızlı bağlantı kaydedilemedi.",
+        "deleteError": "Hızlı bağlantı silinemedi.",
         "iconSymbol": "Simge seç",
         "iconChoose": "Simge ya da görsel seç"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} takvim girişinde UID yoktu; etiket ve tarihe dayalı bir yedek kimlik kullanıldı.",
         "importDiagnosticDuplicateInstance": "{{count}} yinelenen alım örneği (aynı kimlik) tek kayıtta birleştirildi.",
         "importDiagnosticDuplicateInstance_one": "{{count}} yinelenen alım örneği (aynı kimlik) tek kayıtta birleştirildi.",
+        "importDiagnosticOther": "Bir takvim girişi beklenen biçimle eşleşmiyor.",
         "importUnresolvedBlockingError": "Önce tüm engelleyici uyarıları çözün ya da etkilenen etkinlikleri açıkça atlayın.",
         "importIgnoreLabel": "Yok say",
         "importCreateNewType": "Yeni bir atık türü oluştur",

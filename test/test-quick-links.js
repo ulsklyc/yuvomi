@@ -198,6 +198,9 @@ test('die Anzahl ist gedeckelt, damit die Uebersichts-Antwort es bleibt', async 
   }
   const zuViel = await call('POST', '/', { name: 'einer zu viel', url: 'x.example' });
   assert.equal(zuViel.status, 400);
+  // #1909: der Fall hat einen Namen und seine Zahl - den Satz sagt die App.
+  assert.equal(zuViel.body.reason, 'quick_links_limit_reached');
+  assert.deepEqual(zuViel.body.params, { limit: MAX_QUICK_LINKS });
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM quick_links').get().n, MAX_QUICK_LINKS);
 
   // Der Deckel zaehlt den HAUSHALT, nicht die eigenen Kacheln: was die Antwort
@@ -274,8 +277,11 @@ test('eine fremde private Kachel antwortet mit 404 und nicht mit 403', async () 
 
   // 403 würde ihre Existenz bestätigen. Für Bob gibt es sie nicht.
   as(BOB);
-  assert.equal((await call('PUT', `/${priv.id}`, { name: 'x' })).status, 404);
-  assert.equal((await call('DELETE', `/${priv.id}`)).status, 404);
+  // #1909: fuer Bob ist sie weg - derselbe Fall wie eine geloeschte Kachel.
+  for (const res of [await call('PUT', `/${priv.id}`, { name: 'x' }), await call('DELETE', `/${priv.id}`)]) {
+    assert.equal(res.status, 404);
+    assert.equal(res.body.reason, 'quick_links_link_not_found');
+  }
 
   // Auch für den Admin nicht - sonst wäre "auf geteilt stellen" ein Leseweg.
   as(ADMIN, 'admin');

@@ -151,9 +151,13 @@ function renderProviderAccount(container, account, refresh) {
       // syncAccount() wirft nie bei einem fehlgeschlagenen Provider-Abruf (Netzwerk/
       // Auth) - der Fehler steckt dann in result.data.failed/error, HTTP bleibt 200.
       // Nur ein echter Request-Fehler (Server down, 500) landet im catch.
+      //
+      // Der Toast sagt den Satz der App, nie den Text des Abrufs (#1909): der
+      // ist der rohe Fehler des Adapters, englisch. Die Ursache steht nach dem
+      // Nachladen gleich darunter an der Karte des Kontos (`lastError`).
       const res = await recipeProviders.syncAccount(account.id);
       if (res.data?.failed) {
-        showToast(res.data.error || t('settings.recipeProviderSyncFailed'), 'danger');
+        showToast(t('settings.recipeProviderSyncFailed'), 'danger');
       } else {
         showToast(t('settings.recipeProviderSyncSuccess'), 'success');
       }

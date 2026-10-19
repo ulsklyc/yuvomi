@@ -231,7 +231,14 @@ router.post('/', (req, res) => {
     // die Übersichts-Antwort gross macht, sind alle zusammen.
     const { total } = db.get().prepare('SELECT COUNT(*) AS total FROM quick_links').get();
     if (total >= MAX_QUICK_LINKS) {
-      return res.status(400).json({ error: `At most ${MAX_QUICK_LINKS} quick links can be created.`, code: 400 });
+      return res.status(400).json({
+        error: `At most ${MAX_QUICK_LINKS} quick links can be created.`,
+        code: 400,
+        // #1909: der Fall hat einen Namen, die Zahl steht strukturiert daneben -
+        // den Satz dazu sagt die App in der Sprache der Oberflaeche.
+        reason: 'quick_links_limit_reached',
+        params: { limit: MAX_QUICK_LINKS },
+      });
     }
 
     // Neue Kacheln hängen sich hinten an - eine neue Kachel soll die gewohnte
@@ -296,7 +303,7 @@ router.put('/:id', (req, res) => {
     // Eine fremde private Kachel gibt es für diese Person nicht - 404 und nicht
     // 403, sonst verrät die Antwort ihre Existenz.
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
-      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404, reason: 'quick_links_link_not_found' });
     }
     if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
 
@@ -341,7 +348,7 @@ router.delete('/:id', (req, res) => {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
-      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404, reason: 'quick_links_link_not_found' });
     }
     if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
 

@@ -3876,6 +3876,10 @@
         "deleted": "Atalho eliminado",
         "loadError": "Não foi possível carregar os atalhos.",
         "orderError": "Não foi possível guardar a ordem.",
+        "errorLinkGone": "Este atalho já não existe.",
+        "errorLimitReached": "A vista geral comporta no máximo {{limit}} atalhos.",
+        "saveError": "Não foi possível guardar o atalho.",
+        "deleteError": "Não foi possível eliminar o atalho.",
         "iconSymbol": "Escolher ícone",
         "iconChoose": "Escolher ícone ou imagem"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} entrada de calendário não tinha UID; foi usada uma identidade alternativa baseada na etiqueta e na data.",
         "importDiagnosticDuplicateInstance": "{{count}} ocorrências de recolha duplicadas (mesma identidade) foram unidas numa só.",
         "importDiagnosticDuplicateInstance_one": "{{count}} ocorrência de recolha duplicada (mesma identidade) foi unida numa só.",
+        "importDiagnosticOther": "Uma entrada do calendário não tem o formato esperado.",
         "importUnresolvedBlockingError": "Resolva primeiro cada aviso bloqueante, ou ignore explicitamente os eventos afetados.",
         "importIgnoreLabel": "Ignorar",
         "importCreateNewType": "Criar um novo tipo de lixo",

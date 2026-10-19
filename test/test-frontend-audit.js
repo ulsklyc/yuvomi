@@ -21672,12 +21672,10 @@ const SERVER_TEXT_OWNERS = new Set([
 // in module.json fehlt) in einen uebersetzten Satz - eine Angabe zum Modul fuer
 // den, der es installiert, kein Satz an seiner Stelle (#1909).
 const SERVER_TEXT_OPEN = new Map([
-  ['components/quick-links-manager.js', 2],
   ['pages/calendar.js', 7],
   ['pages/meals.js', 5],
   ['pages/pantry.js', 6],
   ['settings/module-install-errors.js', 1],
-  ['settings/pages/modules-kitchen.js', 1],
 ]);
 
 test('der Leser fuer den Servertext sieht jede Schreibweise und keinen Kommentar (#1909)', () => {
@@ -21738,7 +21736,8 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
   for (const name of ['pages/shopping.js', 'pages/waste.js', 'pages/health.js', 'settings/pages/modules-health.js', 'utils/kitchen-transfer.js', 'components/category-manager.js',
     'pages/documents.js', 'utils/document-folder-delete.js', 'pages/recipes.js', 'pages/subscriptions.js',
     'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js',
-    'components/task-detail.js', 'components/modal.js', 'pages/schedule.js']) {
+    'components/task-detail.js', 'components/modal.js', 'pages/schedule.js',
+    'components/quick-links-manager.js', 'settings/pages/modules-kitchen.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
@@ -21775,6 +21774,10 @@ const ERROR_MESSAGE_CLEAN = [
   'settings/module-install-errors.js',
   'pages/housekeeping.js',
   'pages/rewards.js',
+  'pages/budget.js',
+  'pages/waste.js',
+  'pages/shopping.js',
+  'components/quick-links-manager.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {
@@ -21840,6 +21843,25 @@ test('die Abfuhr-Seite gibt den gespeicherten Fehlertext einer Quelle nie aus (#
     'pages/waste.js gibt `last_error` aus - den Satz aus last_error_reason/last_error_params bauen (lastFailureSentence)');
 });
 
+/* DER HINWEIS EINES IMPORTS (#1909). Eine Zeile unter der Vorschau traegt
+ * neben `code` den englischen Satz des Servers (`message`, z. B. "3 calendar
+ * entries were skipped ..."). Die Seite sagt fuer jeden Code ihren eigenen
+ * Satz, und fuer einen Code, den sie (noch) nicht kennt, den allgemeinen -
+ * `diag.message` liest sie nie. Und jeder Code, den der Import vergibt, hat
+ * auf der Seite seinen Satz, sonst stuende dort fuer einen bekannten Fall der
+ * allgemeine. */
+test('die Abfuhr-Seite sagt zu jedem Import-Hinweis ihren Satz, nie den des Servers (#1909)', () => {
+  const page = read('../public/pages/waste.js');
+  const code = withoutCommentsKeepingLines(page, { blankLiterals: true });
+  assert.equal([...code.matchAll(/\bdiag\s*(?:\?\.|\.)\s*message\b/g)].length, 0,
+    'pages/waste.js liest `diag.message` - den Satz aus IMPORT_DIAGNOSTIC_LABEL_KEYS nehmen, sonst waste.importDiagnosticOther');
+  const mapped = new Set([...page.match(/const IMPORT_DIAGNOSTIC_LABEL_KEYS = \{([^}]*)\}/)[1].matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]));
+  const server = read('../server/services/waste-import.js');
+  const codes = new Set([...server.matchAll(/\bcode:\s*'([a-z_]+)'/g)].map((m) => m[1]));
+  assert.ok(codes.size >= 6, `nur ${codes.size} Codes im Import gefunden - der Leser greift nicht mehr`);
+  for (const name of codes) assert.ok(mapped.has(name), `Import-Hinweis ${name} hat auf der Seite keinen Satz`);
+});
+
 /* WER NOCH UEBER friendlyError FRAGT, STEHT ALS ZAHL DA (#1909, Uebergang).
  *
  * `utils/friendly-error.js` ist oben ausgenommen, und `friendlyError()` reicht
@@ -21883,7 +21905,6 @@ function countFriendlyErrorCalls(source) {
 
 // Datei -> Zahl der Aufrufe von friendlyError. Nur senken.
 const FRIENDLY_ERROR_CALLERS = new Map([
-  ['pages/budget.js', 1],
   ['pages/contacts.js', 1],
   ['pages/housekeeping.js', 1],
   ['pages/meals.js', 3],
@@ -21949,6 +21970,9 @@ test('friendlyError hat keinen neuen Aufrufer, die verbliebenen stehen als Zahl 
     assert.equal(counts.has(name), false, `${name} ruft friendlyError() - der Einkauf zeigt nie den Text des Servers`);
     assert.equal(FRIENDLY_ERROR_CALLERS.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
+  // Das Budget ebenso (#1909): die Absagen ueber errorSentence, der Rest ueber loadErrorSentence.
+  assert.equal(counts.has('pages/budget.js'), false, 'pages/budget.js ruft friendlyError() - das Budget zeigt nie den Text des Servers');
+  assert.equal(FRIENDLY_ERROR_CALLERS.has('pages/budget.js'), false, 'pages/budget.js steht auf 0 und gehoert nicht in die Liste');
 });
 
 /* ────────────────────────────────────────────────────────────────────────────

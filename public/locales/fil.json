@@ -3617,6 +3617,10 @@
         "deleted": "Nabura ang mabilisang link",
         "loadError": "Hindi ma-load ang mga mabilisang link.",
         "orderError": "Hindi ma-save ang pagkakasunod-sunod.",
+        "errorLinkGone": "Wala na ang mabilisang link na ito.",
+        "errorLimitReached": "Hanggang {{limit}} mabilisang link lang ang kasya sa overview.",
+        "saveError": "Hindi ma-save ang mabilisang link.",
+        "deleteError": "Hindi mabura ang mabilisang link.",
         "iconSymbol": "Pumili ng icon",
         "iconChoose": "Pumili ng icon o larawan"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "Walang UID ang {{count}} entry sa kalendaryo; ginamit ang kapalit na pagkakakilanlan batay sa label at petsa.",
         "importDiagnosticDuplicateInstance": "{{count}} duplicadong pagkuha (parehong pagkakakilanlan) ang pinagsama sa isa.",
         "importDiagnosticDuplicateInstance_one": "{{count}} duplicadong pagkuha (parehong pagkakakilanlan) ang pinagsama sa isa.",
+        "importDiagnosticOther": "May entry sa kalendaryo na hindi tugma sa inaasahang format.",
         "importUnresolvedBlockingError": "Ayusin muna ang bawat blocking na babala, o tahasang laktawan ang mga apektadong event.",
         "importIgnoreLabel": "Balewalain",
         "importCreateNewType": "Gumawa ng bagong uri ng basura",

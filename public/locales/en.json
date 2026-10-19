@@ -3606,6 +3606,10 @@
         "deleted": "Quick link deleted",
         "loadError": "The quick links could not be loaded.",
         "orderError": "The order could not be saved.",
+        "errorLinkGone": "This quick link no longer exists.",
+        "errorLimitReached": "No more than {{limit}} quick links fit on the overview.",
+        "saveError": "The quick link could not be saved.",
+        "deleteError": "The quick link could not be deleted.",
         "iconSymbol": "Choose icon",
         "iconChoose": "Choose icon or image"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} calendar entry had no UID; a fallback identity based on label and date was used.",
         "importDiagnosticDuplicateInstance": "{{count}} duplicate pickup instances (same identity) were collapsed into one.",
         "importDiagnosticDuplicateInstance_one": "{{count}} duplicate pickup instance (same identity) was collapsed into one.",
+        "importDiagnosticOther": "A calendar entry does not match the expected format.",
         "importUnresolvedBlockingError": "Resolve every blocking diagnostic first, or explicitly skip the affected events.",
         "importIgnoreLabel": "Ignore",
         "importCreateNewType": "Create a new waste type",

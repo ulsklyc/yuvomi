@@ -3876,6 +3876,10 @@
         "deleted": "已删除快捷链接",
         "loadError": "无法加载快捷链接。",
         "orderError": "无法保存顺序。",
+        "errorLinkGone": "此快捷链接已不存在。",
+        "errorLimitReached": "概览最多只能放 {{limit}} 个快捷链接。",
+        "saveError": "无法保存快捷链接。",
+        "deleteError": "无法删除快捷链接。",
         "iconSymbol": "选择图标",
         "iconChoose": "选择图标或图片"
     },
@@ -5688,6 +5692,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} 个日历条目没有 UID；已使用基于标签和日期的备用标识。",
         "importDiagnosticDuplicateInstance": "已将 {{count}} 个重复的收运实例（相同标识）合并为一个。",
         "importDiagnosticDuplicateInstance_one": "已将 {{count}} 个重复的收运实例（相同标识）合并为一个。",
+        "importDiagnosticOther": "有一个日历条目不符合预期格式。",
         "importUnresolvedBlockingError": "请先解决所有阻断性提示，或明确跳过受影响的事件。",
         "importIgnoreLabel": "忽略",
         "importCreateNewType": "创建新的垃圾类型",
