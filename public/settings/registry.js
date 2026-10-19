@@ -69,8 +69,20 @@ export function settingsLeafLabel(leaf, translate) {
   return resolveExtensionLabel(module.id, { labelKey: module.settings.labelKey, fallback: moduleDisplayLabel(module) });
 }
 
-export function settingsLeafDescription(leaf, translate) {
-  return leaf?.extensionModule?.description || (leaf?.descriptionKey ? translate(leaf.descriptionKey) : '');
+/**
+ * Die Unterzeile eines Blatts. `ssoOnlyDescriptionKey` ersetzt sie fuer ein
+ * Konto ohne Passwort (#1703): "Konto" verspricht sonst ein Passwort, das das
+ * Blatt diesem Konto gar nicht mehr anbietet. Wie bei der Passwort-Karte nur
+ * auf ein ausdrueckliches `sso_only === true` aus GET /auth/me.
+ * @param {object} leaf
+ * @param {(key: string) => string} translate
+ * @param {{ sso_only?: boolean }|null} [user]
+ * @returns {string}
+ */
+export function settingsLeafDescription(leaf, translate, user = null) {
+  if (leaf?.extensionModule?.description) return leaf.extensionModule.description;
+  const key = (user?.sso_only === true && leaf?.ssoOnlyDescriptionKey) || leaf?.descriptionKey;
+  return key ? translate(key) : '';
 }
 
 function allSettingsLeaves() { return [...SETTINGS_LEAVES, ...extensionSettingsLeaves]; }
@@ -747,7 +759,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
  */
 export const SETTINGS_LEAVES = freezeEntries([
   // Konto
-  { id: 'personal-account', domainId: 'personal', path: '/settings/personal/account', labelKey: 'settings.pageAccount', descriptionKey: 'settings.pageAccountDescription', icon: 'circle-user' },
+  { id: 'personal-account', domainId: 'personal', path: '/settings/personal/account', labelKey: 'settings.pageAccount', descriptionKey: 'settings.pageAccountDescription', ssoOnlyDescriptionKey: 'settings.pageAccountDescriptionSsoOnly', icon: 'circle-user' },
   { id: 'personal-appearance', domainId: 'personal', path: '/settings/personal/appearance', labelKey: 'settings.pageAppearance', descriptionKey: 'settings.pageAppearanceDescription', icon: 'palette' },
   { id: 'personal-device', domainId: 'personal', path: '/settings/personal/device', labelKey: 'settings.pageDevice', descriptionKey: 'settings.pageDeviceDescription', icon: 'smartphone' },
   { id: 'personal-notifications', domainId: 'personal', path: '/settings/personal/notifications', labelKey: 'settings.pageNotifications', descriptionKey: 'settings.pageNotificationsDescription', icon: 'bell' },

@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An account that signs in only through single sign-on no longer sees a change-password form.**
   Such an account has no password, yet the account page asked it for the current one, so the form
   could never succeed. The card now only appears for accounts that have a password, linked to a
-  provider or not (#1703).
+  provider or not. For such an account the page subtitle no longer mentions a password, and the
+  single sign-on card now says to ask an administrator to set one instead of "Set a password first"
+  (#1703).
 - **A countdown to an evening event no longer names the next day.** With the server running in UTC
   (the default container) and a household east of UTC, an event at 23:30 counted down to the day
   after; west of UTC, an early-morning event could count down to the day before. The countdown now

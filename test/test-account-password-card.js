@@ -120,3 +120,46 @@ test('mit Passwort bleibt die Karte, samt Formular und aktuellem Passwort', () =
     assert.match(html, /id="current-password"/, JSON.stringify(user));
   }
 });
+
+// --------------------------------------------------------------------------
+// (3) Was die Seite sonst noch ueber das Passwort sagt.
+// --------------------------------------------------------------------------
+
+const { SETTINGS_LEAVES, settingsLeafDescription } = await import('../public/settings/registry.js');
+const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+
+test('die Unterzeile nennt fuer ein Konto ohne Passwort kein Passwort', () => {
+  const leaf = SETTINGS_LEAVES.find((l) => l.id === 'personal-account');
+  const key = (k) => k;
+  assert.equal(settingsLeafDescription(leaf, key, { sso_only: true }), 'settings.pageAccountDescriptionSsoOnly');
+  for (const user of [{ sso_only: false }, {}, null, undefined]) {
+    assert.equal(settingsLeafDescription(leaf, key, user), 'settings.pageAccountDescription', JSON.stringify(user));
+  }
+  // Ein anderes Blatt bleibt unberuehrt, auch fuer ein SSO-Konto.
+  const other = SETTINGS_LEAVES.find((l) => l.id === 'personal-appearance');
+  assert.equal(settingsLeafDescription(other, key, { sso_only: true }), other.descriptionKey);
+  assert.equal(typeof de.settings.pageAccountDescriptionSsoOnly, 'string');
+  assert.doesNotMatch(de.settings.pageAccountDescriptionSsoOnly, /Passwort/);
+  assert.match(de.settings.pageAccountDescription, /Passwort/);
+});
+
+test('Kopf und Uebersichtszeile der Einstellungen reichen das Konto an die Unterzeile weiter', () => {
+  // Die Regel kann stimmen, waehrend die Shell sie ohne Konto aufruft - dann
+  // stuende dort weiter die Fassung mit Passwort.
+  const shellSrc = readFileSync(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const calls = shellSrc.match(/settingsLeafDescription\([^)]*\)/g) ?? [];
+  assert.ok(calls.length >= 2);
+  for (const call of calls) assert.match(call, /, user\)$/, call);
+  assert.match(shellSrc, /createLeafHeader\(leaf, user\)/);
+  assert.match(shellSrc, /createOverviewRow\(entry, user\)/);
+});
+
+test('der Hinweis beim Loesen schickt ein Konto ohne Passwort zum Administrator', () => {
+  // Der Satz erscheint nur, wenn `can_unlink` falsch ist - und das ist er fuer
+  // ein verknuepftes Konto genau dann, wenn es kein Passwort hat. "Setze
+  // zuerst ein Passwort" zeigte auf ein Formular, das es fuer dieses Konto
+  // nicht mehr gibt.
+  const text = de.settings.oidcUnlinkNeedsPassword;
+  assert.match(text, /Administrator/);
+  assert.doesNotMatch(text, /^Setze zuerst/);
+});

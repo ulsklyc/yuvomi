@@ -392,7 +392,7 @@ function updateNavigationActiveState(navigation, activeLeaf) {
  * Liste, gescrollt auf den Abschnitt - am Desktop auf dem ersten Blatt des
  * Bereichs.
  */
-function createOverviewRow(entry) {
+function createOverviewRow(entry, user) {
   const link = createLink(entry.path, 'settings-overview__row');
   link.dataset.leafId = entry.id;
   link.appendChild(createLeafMark(entry, 'settings-overview__row-mark'));
@@ -406,7 +406,7 @@ function createOverviewRow(entry) {
 
   const description = document.createElement('span');
   description.className = 'settings-overview__row-description';
-  description.textContent = settingsLeafDescription(entry, t);
+  description.textContent = settingsLeafDescription(entry, t, user);
 
   copy.append(label, description);
   link.append(
@@ -455,7 +455,7 @@ function renderOverview(content, domains, user) {
 
     const list = document.createElement('div');
     list.className = 'settings-overview__list';
-    for (const entry of leaves) list.appendChild(createOverviewRow(entry));
+    for (const entry of leaves) list.appendChild(createOverviewRow(entry, user));
 
     section.append(heading, list);
     overview.appendChild(section);
@@ -672,7 +672,7 @@ function createBreadcrumb(domain, leaf) {
   return breadcrumb;
 }
 
-function createLeafHeader(leaf) {
+function createLeafHeader(leaf, user) {
   const header = document.createElement('header');
   header.className = 'settings-leaf-header';
 
@@ -682,7 +682,7 @@ function createLeafHeader(leaf) {
 
   header.appendChild(heading);
   // Extension sheets without a manifest description get no empty paragraph.
-  const text = settingsLeafDescription(leaf, t);
+  const text = settingsLeafDescription(leaf, t, user);
   if (text) {
     const description = document.createElement('p');
     description.className = 'settings-leaf-header__description';
@@ -997,7 +997,7 @@ async function renderLeafContent(content, leaf, domain, user, query) {
 
   // Der Leaf-Header wird zentral aus der Registry gerendert (Prio 5/B1): die
   // Abschnitte liefern nur noch Content.
-  const header = createLeafHeader(leaf);
+  const header = createLeafHeader(leaf, user);
   const heading = header.querySelector('.settings-leaf-header__title');
 
   const leafContainer = document.createElement('div');
