@@ -226,6 +226,45 @@ test('voller Lauf: im selben Lauf herausgeloest und abgehakt -> der Eintrag ents
   assert.equal(c.completed_at, '2026-10-17T08:15:00Z');
 });
 
+// Ein Lauf schreibt den Upsert jeder Liste sofort, den Uebergang aber erst
+// nach allen Listen (applySyncedCompletions). Bricht er dazwischen ab - der
+// Prozess endet, ein spaeterer Abruf wirft -, darf der Status nicht schon
+// geschrieben sein: der naechste Lauf saehe "unveraendert" und der Eintrag
+// fehlte fuer immer (Review zu #1836). Nachgestellt wird der Abbruch, indem der
+// Upsert mit der Warteschlange des Laufs laeuft und die Warteschlange verfaellt.
+test('voller Lauf: Abbruch nach dem Upsert, danach ein neuer Lauf -> Status und Eintrag passen zusammen', async () => {
+  dav.putObject(listUrl, 'crash.ics', davTodo('h-crash'));
+  await remindersSync.sync();
+  const id = mirroredId('h-crash');
+  assert.equal(taskOf(id).status, 'open');
+
+  const abandoned = [];
+  upsertTask(parseVTODO(davTodo('h-crash', { done: true }))[0], ACCOUNT, ADMIN, null, { completions: abandoned });
+  assert.equal(abandoned.length, 1, 'der Uebergang wartet auf den Abschluss des Laufs');
+  const midway = taskOf(id).status;
+  const midwayEntry = completionOf(id);
+  assert.ok(midway === 'open' ? midwayEntry === undefined : midwayEntry !== undefined,
+    `nach dem Abbruch: Status ${midway} und Eintrag ${midwayEntry ? 'da' : 'fehlt'} passen nicht zusammen`);
+
+  dav.putObject(listUrl, 'crash.ics', davTodo('h-crash', { done: true }));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).status, 'done');
+  const c = completionOf(id);
+  assert.ok(c, 'der naechste Lauf holt den Uebergang nach');
+  assert.equal(c.source, 'caldav');
+});
+
+test('voller Lauf: in Yuvomi bearbeitet, bevor der Lauf abschliesst -> der Status vom Server wartet', () => {
+  const id = Number(upsertTask(todoOf('h-dirty'), ACCOUNT, ADMIN));
+  const queued = [];
+  upsertTask(todoOf('h-dirty', { status: 'COMPLETED', completed: '20261017T081500Z' }), ACCOUNT, ADMIN, null, { completions: queued });
+  // Zwischen Upsert und Abschluss: lokale Bearbeitung, die auf ihren Push wartet.
+  db.prepare("UPDATE tasks SET status = 'in_progress', outbound_dirty = 1 WHERE id = ?").run(id);
+  remindersSync.applySyncedCompletions(db, queued);
+  assert.equal(taskOf(id).status, 'in_progress', 'die lokale Aenderung gewinnt bis zu ihrem Push');
+  assert.equal(completionOf(id), undefined);
+});
+
 // --------------------------------------------------------
 // Waechter: jede Anweisung, die `status` an `tasks` schreibt
 // --------------------------------------------------------

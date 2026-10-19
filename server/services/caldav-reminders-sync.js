@@ -245,10 +245,9 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
   const d = db.get();
   const { date, time } = splitDue(todo.due, householdTimeZone(d));
 
-  // EINE Transaktion für Zeile, Erledigungseintrag und Tags: zwischen dem
-  // Statuswechsel und seinem Eintrag darf kein anderer Schreiber stehen, und
-  // ein Abbruch dazwischen hinterliesse eine erledigte Aufgabe ohne Eintrag -
-  // genau den Zustand, den #1836 beseitigt.
+  // Zeile und Tags in einer Transaktion. Der STATUS einer schon gespiegelten
+  // Zeile gehört nicht dazu: er wird zusammen mit seinem Erledigungseintrag in
+  // applySyncedCompletions geschrieben (#1836, siehe unten).
   return d.transaction(() => {
     const existing = d.prepare(
       `SELECT id, priority, status FROM tasks WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
@@ -261,10 +260,10 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     if (existing) {
       d.prepare(`
         UPDATE tasks
-        SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, due_time = ?,
+        SET title = ?, description = ?, priority = ?, due_date = ?, due_time = ?,
             external_object_url = COALESCE(?, external_object_url)
         WHERE id = ?
-      `).run(todo.summary, todo.description, priority, status, date, time, objectUrl, existing.id);
+      `).run(todo.summary, todo.description, priority, date, time, objectUrl, existing.id);
       taskId = existing.id;
     } else {
       // category bleibt beim Spalten-Default 'misc' (v114) - VTODO kennt keine
@@ -288,11 +287,15 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     // Abruf einer Liste brächte sonst jede je abgehakte Erinnerung auf einmal in
     // den Verlauf - genau der Nachtrag, den #1836 ausschliesst.
     //
-    // IM LAUF ERST NACH DER HIERARCHIE (Review zu #1836). Ob die Zeile eine
-    // Teilaufgabe ist - und damit keinen Eintrag bekommt -, entscheidet erst
-    // applyTaskRelations nach allen Listen. Wer `completions` mitgibt (sync()),
-    // bekommt den Übergang dort hinein und spielt ihn mit
-    // applySyncedCompletions nach; ohne gilt er sofort.
+    // IM LAUF ERST NACH DER HIERARCHIE, UND MIT IHM DER STATUS (Review zu
+    // #1836). Ob die Zeile eine Teilaufgabe ist - und damit keinen Eintrag
+    // bekommt -, entscheidet erst applyTaskRelations nach allen Listen. Wer
+    // `completions` mitgibt (sync()), bekommt den Übergang dort hinein und
+    // spielt ihn mit applySyncedCompletions nach; ohne gilt er sofort. Der
+    // Status wartet mit, damit Status und Eintrag nur gemeinsam entstehen:
+    // stürbe der Lauf zwischen beiden, sähe der nächste "unverändert", und der
+    // Eintrag fehlte für immer. Bis zum Abschluss liest im Lauf nichts den
+    // neuen Status (Hierarchie, dann Übergänge, erst danach Prune und Push).
     if (existing && existing.status !== status) {
       const transition = {
         taskId: Number(taskId), oldStatus: existing.status, newStatus: status,
@@ -311,20 +314,25 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
 }
 
 /**
- * Die Statuswechsel eines Laufs in den Erledigungsverlauf übertragen (#1836),
- * nachdem die Hierarchie steht - recordCompletion fragt `parent_task_id`.
+ * Die Statuswechsel eines Laufs schreiben: Status UND Erledigungseintrag in
+ * einer Transaktion (#1836), nachdem die Hierarchie steht - recordCompletion
+ * fragt `parent_task_id`.
  *
- * Nur, wo die Zeile noch auf dem Status steht, den der Sync geschrieben hat:
- * zwischen dem Upsert und hier liegen die Abrufe der übrigen Listen, und wer
- * die Aufgabe in der Zeit in Yuvomi umgeschaltet hat, hat ihren Eintrag über
- * die Route schon richtig gestellt.
+ * Nur, wo die Zeile noch auf dem Status steht, den der Upsert gesehen hat, und
+ * keine lokale Bearbeitung auf ihren Push wartet: zwischen Upsert und hier
+ * liegen die Abrufe der übrigen Listen. Wer die Aufgabe in der Zeit in Yuvomi
+ * umgeschaltet oder bearbeitet hat, gewinnt wie sonst im Inbound (#617), und
+ * ihren Eintrag hat die Route schon richtig gestellt.
  */
 function applySyncedCompletions(d, transitions) {
   if (!transitions.length) return;
-  const current = d.prepare('SELECT status FROM tasks WHERE id = ?');
+  const write = d.prepare(`
+    UPDATE tasks SET status = ?
+     WHERE id = ? AND status = ? AND COALESCE(outbound_dirty, 0) = 0
+  `);
   d.transaction(() => {
     for (const { taskId, oldStatus, newStatus, completedAt } of transitions) {
-      if (current.get(taskId)?.status !== newStatus) continue;
+      if (write.run(newStatus, taskId, oldStatus).changes === 0) continue;
       syncTaskCompletion(d, taskId, oldStatus, newStatus, null, null, { source: 'caldav', completedAt });
     }
   })();
@@ -936,6 +944,7 @@ export {
   mapVtodoPriority,
   mapVtodoStatus,
   upsertTask,
+  applySyncedCompletions,
   splitDue,
   applyTaskRelations,
   getReminderLists,
