@@ -956,6 +956,8 @@
         "loadError": "일정을 불러오지 못했습니다.",
         "saveError": "저장 중 오류",
         "deleteError": "삭제 중 오류",
+        "occurrenceGoneError": "이 일정은 더 이상 반복 일정에 속하지 않습니다. 캘린더를 다시 불러온 뒤 다시 선택하세요.",
+        "occurrenceMalformedError": "반복 일정이 올바르게 지정되지 않았습니다. 캘린더를 다시 불러온 뒤 다시 선택하세요.",
         "titleRequired": "제목은 필수입니다",
         "monthJanuary": "1월",
         "monthFebruary": "2월",

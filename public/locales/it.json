@@ -930,6 +930,8 @@
         "loadError": "Impossibile caricare gli eventi.",
         "saveError": "Errore durante il salvataggio",
         "deleteError": "Errore durante l'eliminazione",
+        "occurrenceGoneError": "Questa ricorrenza non fa più parte della serie. Ricarica il calendario e selezionala di nuovo.",
+        "occurrenceMalformedError": "La ricorrenza della serie non è stata indicata correttamente. Ricarica il calendario e selezionala di nuovo.",
         "titleRequired": "Il titolo è obbligatorio",
         "monthJanuary": "Gennaio",
         "monthFebruary": "Febbraio",

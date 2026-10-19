@@ -956,6 +956,8 @@
         "loadError": "Acara tidak dapat dimuat.",
         "saveError": "Kesalahan saat menyimpan",
         "deleteError": "Kesalahan saat menghapus",
+        "occurrenceGoneError": "Kejadian ini bukan lagi bagian dari seri. Muat ulang kalender dan pilih lagi.",
+        "occurrenceMalformedError": "Kejadian seri tidak diberikan dengan benar. Muat ulang kalender dan pilih lagi.",
         "titleRequired": "Judul wajib diisi",
         "monthJanuary": "Januari",
         "monthFebruary": "Februari",

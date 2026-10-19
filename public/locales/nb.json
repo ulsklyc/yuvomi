@@ -930,6 +930,8 @@
         "loadError": "Kunne ikke laste inn hendelser.",
         "saveError": "Feil ved lagring",
         "deleteError": "Feil ved sletting",
+        "occurrenceGoneError": "Denne forekomsten er ikke lenger en del av serien. Last inn kalenderen på nytt og velg den igjen.",
+        "occurrenceMalformedError": "Forekomsten i serien ble ikke angitt riktig. Last inn kalenderen på nytt og velg den igjen.",
         "titleRequired": "Tittel er påkrevd",
         "monthJanuary": "Januar",
         "monthFebruary": "Februar",

@@ -956,6 +956,8 @@
         "loadError": "Hindi ma-load ang mga kaganapan.",
         "saveError": "Error sa pag-save",
         "deleteError": "Error sa pagtanggal",
+        "occurrenceGoneError": "Hindi na bahagi ng serye ang pangyayaring ito. I-reload ang kalendaryo at piliin itong muli.",
+        "occurrenceMalformedError": "Hindi tama ang pagkakabigay sa pangyayari ng serye. I-reload ang kalendaryo at piliin itong muli.",
         "titleRequired": "Kailangan ang pamagat",
         "monthJanuary": "Enero",
         "monthFebruary": "Pebrero",

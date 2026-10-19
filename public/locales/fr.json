@@ -930,6 +930,8 @@
         "loadError": "Les événements n'ont pas pu être chargés.",
         "saveError": "Erreur lors de l'enregistrement",
         "deleteError": "Erreur lors de la suppression",
+        "occurrenceGoneError": "Cette occurrence ne fait plus partie de la série. Rechargez le calendrier et sélectionnez-la à nouveau.",
+        "occurrenceMalformedError": "L'occurrence de la série n'a pas été indiquée correctement. Rechargez le calendrier et sélectionnez-la à nouveau.",
         "titleRequired": "Le titre est obligatoire",
         "monthJanuary": "Janvier",
         "monthFebruary": "Février",

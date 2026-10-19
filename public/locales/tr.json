@@ -930,6 +930,8 @@
         "loadError": "Etkinlikler yüklenemedi.",
         "saveError": "Kaydetme hatası",
         "deleteError": "Silme hatası",
+        "occurrenceGoneError": "Bu tekrar artık serinin parçası değil. Takvimi yeniden yükleyip tekrar seçin.",
+        "occurrenceMalformedError": "Serideki tekrar doğru belirtilmedi. Takvimi yeniden yükleyip tekrar seçin.",
         "titleRequired": "Başlık zorunludur",
         "monthJanuary": "Ocak",
         "monthFebruary": "Şubat",

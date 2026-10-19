@@ -930,6 +930,8 @@
         "loadError": "予定の読み込みに失敗しました。",
         "saveError": "保存に失敗しました",
         "deleteError": "削除に失敗しました",
+        "occurrenceGoneError": "この予定はもうシリーズに含まれていません。カレンダーを再読み込みして、もう一度選んでください。",
+        "occurrenceMalformedError": "シリーズの予定が正しく指定されていません。カレンダーを再読み込みして、もう一度選んでください。",
         "titleRequired": "タイトルは必須です",
         "monthJanuary": "1月",
         "monthFebruary": "2月",

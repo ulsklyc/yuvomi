@@ -956,6 +956,8 @@
         "loadError": "Termine konnten nicht geladen werden.",
         "saveError": "Fehler beim Speichern",
         "deleteError": "Fehler beim Löschen",
+        "occurrenceGoneError": "Diesen Termin gibt es in der Serie nicht mehr. Lade den Kalender neu und wähle ihn noch einmal aus.",
+        "occurrenceMalformedError": "Der Serientermin ist nicht richtig angegeben. Lade den Kalender neu und wähle ihn noch einmal aus.",
         "titleRequired": "Titel ist erforderlich",
         "monthJanuary": "Januar",
         "monthFebruary": "Februar",

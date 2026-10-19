@@ -930,6 +930,8 @@
         "loadError": "日程加载失败。",
         "saveError": "保存失败",
         "deleteError": "删除失败",
+        "occurrenceGoneError": "此次日程已不再属于该系列。请重新加载日历并再次选择。",
+        "occurrenceMalformedError": "系列日程未正确指定。请重新加载日历并再次选择。",
         "titleRequired": "标题为必填项",
         "monthJanuary": "一月",
         "monthFebruary": "二月",

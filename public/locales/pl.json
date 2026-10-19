@@ -1092,6 +1092,8 @@
         "loadError": "Nie udało się załadować wydarzeń.",
         "saveError": "Błąd podczas zapisywania",
         "deleteError": "Błąd podczas usuwania",
+        "occurrenceGoneError": "To wystąpienie nie należy już do serii. Odśwież kalendarz i wybierz je ponownie.",
+        "occurrenceMalformedError": "Wystąpienie serii nie zostało podane poprawnie. Odśwież kalendarz i wybierz je ponownie.",
         "titleRequired": "Tytuł jest wymagany",
         "monthJanuary": "Styczeń",
         "monthFebruary": "Luty",

@@ -998,6 +998,8 @@
         "loadError": "Události se nepodařilo načíst.",
         "saveError": "Chyba při ukládání",
         "deleteError": "Chyba při mazání",
+        "occurrenceGoneError": "Tento termín už do série nepatří. Znovu načtěte kalendář a vyberte ho znovu.",
+        "occurrenceMalformedError": "Termín série nebyl zadán správně. Znovu načtěte kalendář a vyberte ho znovu.",
         "titleRequired": "Název je povinný",
         "monthJanuary": "Leden",
         "monthFebruary": "Únor",

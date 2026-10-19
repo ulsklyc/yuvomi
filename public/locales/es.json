@@ -930,6 +930,8 @@
         "loadError": "No se pudieron cargar los eventos.",
         "saveError": "Error al guardar",
         "deleteError": "Error al eliminar",
+        "occurrenceGoneError": "Esta repetición ya no forma parte de la serie. Vuelve a cargar el calendario y selecciónala de nuevo.",
+        "occurrenceMalformedError": "La repetición de la serie no se indicó correctamente. Vuelve a cargar el calendario y selecciónala de nuevo.",
         "titleRequired": "El título es obligatorio",
         "monthJanuary": "Enero",
         "monthFebruary": "Febrero",

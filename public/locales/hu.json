@@ -930,6 +930,8 @@
         "loadError": "Az események betöltése sikertelen.",
         "saveError": "Hiba történt a mentés során",
         "deleteError": "Hiba történt a törlés során",
+        "occurrenceGoneError": "Ez az alkalom már nem része a sorozatnak. Töltsd újra a naptárat, és válaszd ki újra.",
+        "occurrenceMalformedError": "A sorozat alkalma nincs helyesen megadva. Töltsd újra a naptárat, és válaszd ki újra.",
         "titleRequired": "Cím megadása kötelező",
         "monthJanuary": "Január",
         "monthFebruary": "Február",

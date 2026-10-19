@@ -930,6 +930,8 @@
         "loadError": "Không thể tải các sự kiện.",
         "saveError": "Lỗi khi lưu",
         "deleteError": "Lỗi khi xóa",
+        "occurrenceGoneError": "Lần lặp này không còn thuộc chuỗi nữa. Hãy tải lại lịch và chọn lại.",
+        "occurrenceMalformedError": "Lần lặp của chuỗi không được chỉ định đúng. Hãy tải lại lịch và chọn lại.",
         "titleRequired": "Tiêu đề là bắt buộc",
         "monthJanuary": "Tháng Một",
         "monthFebruary": "Tháng Hai",

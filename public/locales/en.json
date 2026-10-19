@@ -930,6 +930,8 @@
         "loadError": "Events could not be loaded.",
         "saveError": "Error saving",
         "deleteError": "Error deleting",
+        "occurrenceGoneError": "This occurrence is no longer part of the series. Reload the calendar and pick it again.",
+        "occurrenceMalformedError": "The series occurrence was not given correctly. Reload the calendar and pick it again.",
         "titleRequired": "Title is required",
         "monthJanuary": "January",
         "monthFebruary": "February",

@@ -930,6 +930,8 @@
         "loadError": "Evenementen konden niet worden geladen.",
         "saveError": "Fout bij opslaan",
         "deleteError": "Fout bij verwijderen",
+        "occurrenceGoneError": "Deze afspraak hoort niet meer bij de reeks. Laad de agenda opnieuw en kies hem nog een keer.",
+        "occurrenceMalformedError": "De afspraak uit de reeks is niet goed opgegeven. Laad de agenda opnieuw en kies hem nog een keer.",
         "titleRequired": "Titel is verplicht",
         "monthJanuary": "Januari",
         "monthFebruary": "Februari",

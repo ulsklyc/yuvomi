@@ -930,6 +930,8 @@
         "loadError": "Falha ao carregar eventos.",
         "saveError": "Erro ao salvar",
         "deleteError": "Erro ao excluir",
+        "occurrenceGoneError": "Esta ocorrência já não faz parte da série. Recarregue o calendário e selecione-a novamente.",
+        "occurrenceMalformedError": "A ocorrência da série não foi indicada corretamente. Recarregue o calendário e selecione-a novamente.",
         "titleRequired": "Título é obrigatório",
         "monthJanuary": "Janeiro",
         "monthFebruary": "Fevereiro",

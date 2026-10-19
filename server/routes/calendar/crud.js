@@ -711,7 +711,8 @@ const CALENDAR_OCCURRENCE_ERRORS = {
   not_authorized: 'Du darfst diese Terminserie nicht bearbeiten.',
   ineligible_series: 'Einzelausnahmen sind nur für lokale Terminserien ohne aktive externe Synchronisierung verfügbar. Hat eine lokale Serie bereits verknüpfte Einzelausnahmen, deaktiviere zuerst ihren Outlook-Zielkalender. Danach kannst du sie wieder bearbeiten, ohne Ausnahmen zu löschen.',
   invalid_recurrence_id: 'Der ausgewählte Serientermin gehört nicht zu diesem Datum. Lade den Kalender erneut und wähle den Termin noch einmal aus.',
-  ambiguous_recurrence_id: 'An diesem Tag liegen zwei Termine der Serie (Zeitumstellung). Lade den Kalender erneut und wähle den Termin noch einmal aus.',
+  malformed_recurrence_id: 'Der Serientermin ist nicht richtig angegeben. Lade den Kalender erneut und wähle den Termin noch einmal aus.',
+  ambiguous_recurrence_id:'An diesem Tag liegen zwei Termine der Serie (Zeitumstellung). Lade den Kalender erneut und wähle den Termin noch einmal aus.',
   invalid_override_fields: 'Die Angaben zur Einzelausnahme sind ungültig. Prüfe die geänderten Felder.',
   invalid_occurrence_interval: 'Das Ende darf nicht vor dem Beginn liegen. Prüfe Datum und Uhrzeit der Einzelausnahme.',
   calendar_override_orphans: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
@@ -1827,10 +1828,17 @@ router.post('/:id/exceptions', (req, res) => {
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
     const requested = req.body?.recurrence_id ?? req.body?.date;
-    if (req.body?.recurrence_id === undefined && !DATE_RE.test(requested || ''))
-      return res.status(400).json({ error: 'date muss YYYY-MM-DD sein.', code: 400 });
-    if (req.body?.recurrence_id !== undefined && !isOccurrenceKey(requested))
-      return res.status(400).json({ error: 'recurrence_id ist kein Vorkommens-Schluessel.', code: 400 });
+    // Beide Formfehler tragen einen Grund (#1909-Muster): der Browser sagt dazu
+    // einen eigenen Satz statt des Servertexts.
+    const malformed = req.body?.recurrence_id === undefined
+      ? !DATE_RE.test(requested || '')
+      : !isOccurrenceKey(requested);
+    if (malformed) {
+      return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+        'recurrence_id (or date) is not an occurrence key.',
+        { status: 400, code: 'malformed_recurrence_id' },
+      ));
+    }
 
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });

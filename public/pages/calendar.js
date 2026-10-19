@@ -8781,7 +8781,20 @@ function calendarSaveErrorMessage(err) {
   const reason = err?.data?.reason;
   if (reason === 'ATTACHMENT_CHANGE_REFUSED') return t('calendar.attachmentChangeRefused');
   if (reason === 'ATTACHMENT_UPLOAD_REFUSED') return t('calendar.attachmentUploadRefused');
-  return err?.data?.error ?? t('calendar.saveError');
+  return occurrenceErrorMessage(err) ?? err?.data?.error ?? t('calendar.saveError');
+}
+
+/**
+ * Der Satz fuer die Gruende, mit denen der Server ein Vorkommen ablehnt
+ * (#2034, #1909-Muster) - oder nichts, dann gilt der bisherige Text. Erreicht
+ * wird er, wenn der Kalender veraltet ist: das gewaehlte Vorkommen gibt es
+ * nicht mehr, oder sein Schluessel kam nicht lesbar an.
+ */
+function occurrenceErrorMessage(err) {
+  const reason = err?.data?.reason;
+  if (reason === 'invalid_recurrence_id') return t('calendar.occurrenceGoneError');
+  if (reason === 'malformed_recurrence_id') return t('calendar.occurrenceMalformedError');
+  return null;
 }
 
 /**
@@ -9403,7 +9416,7 @@ async function deleteThisAndFollowing(event) {
     keepFocus: renderKeepingFocus,
     refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
-      err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
     render: renderView,
@@ -9433,7 +9446,7 @@ async function deleteSingleOccurrence(event) {
     keepFocus: renderKeepingFocus,
     refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
-      err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
     render: renderView,

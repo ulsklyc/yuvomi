@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path). The occurrence routes and `POST /api/v1/calendar/{id}/exceptions` still accept the old
   `YYYY-MM-DD` form; where it matches two occurrences they answer `409` with reason
   `ambiguous_recurrence_id`. The exceptions route takes the new field `recurrence_id` next to
-  `date`, stores the exact key and answers `400` for a key that names no occurrence.
+  `date` and stores the exact key. It answers `400` with reason `invalid_recurrence_id` for a key
+  that names no occurrence of the series and with reason `malformed_recurrence_id` for a value that
+  is no occurrence key at all; until now any well-formed date was stored unchecked.
 - **Task, calendar and Overview lists load much faster in households with profile pictures.**
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
   picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed

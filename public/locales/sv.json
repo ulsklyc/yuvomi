@@ -930,6 +930,8 @@
         "loadError": "Händelser kunde inte laddas.",
         "saveError": "Det gick inte att spara",
         "deleteError": "Fel vid borttagning",
+        "occurrenceGoneError": "Den här förekomsten ingår inte längre i serien. Ladda om kalendern och välj den igen.",
+        "occurrenceMalformedError": "Förekomsten i serien angavs inte korrekt. Ladda om kalendern och välj den igen.",
         "titleRequired": "Titel krävs",
         "monthJanuary": "Januari",
         "monthFebruary": "Februari",

@@ -1134,6 +1134,8 @@
         "loadError": "فشل تحميل الأحداث.",
         "saveError": "فشل الحفظ",
         "deleteError": "فشل الحذف",
+        "occurrenceGoneError": "لم يعد هذا الموعد جزءًا من السلسلة. أعد تحميل التقويم واختره مرة أخرى.",
+        "occurrenceMalformedError": "لم يُحدَّد موعد السلسلة بشكل صحيح. أعد تحميل التقويم واختره مرة أخرى.",
         "titleRequired": "العنوان مطلوب",
         "monthJanuary": "يناير",
         "monthFebruary": "فبراير",
