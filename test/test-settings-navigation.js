@@ -2210,7 +2210,9 @@ test('der Sitzungs-Teardown vergisst jeden per-Nutzer-Zustand, den die Navigatio
   assert.equal(/_disabledModules\s*=/.test(body), false,
     '_disabledModules ist haushaltweit - es zurueckzusetzen oeffnet die Route, die der Haushalt abgeschaltet hat');
 
-  assert.match(source, /auth:expired[\s\S]{0,200}forgetSessionState\(\)/,
+  // Der Listener auf `auth:expired` steht seit #1945 in utils/router-navigate.js
+  // und ruft die Funktion, die ihm der Router mitgibt (test:session-expiry misst ihn).
+  assert.match(source, /createNavigate\(routerState, \{[^}]*\bforgetSessionState\b[^}]*\}\)/,
     'der Sitzungsablauf raeumt nicht auf');
   assert.match(source, /clearSession: \(\) => \{\s*forgetSessionState\(\)/,
     'der bewusste Logout raeumt nicht ueber dieselbe Funktion auf');
