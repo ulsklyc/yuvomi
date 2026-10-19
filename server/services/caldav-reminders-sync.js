@@ -241,7 +241,7 @@ function updateReminderSelection(accountId, listUrl, { enabled, targetModule } =
 // ein gespiegelter Eintrag für spätere Änderungen und Löschungen unerreichbar
 // (#617). COALESCE, weil ein Abruf ohne URL den gespeicherten Wert nicht
 // entwerten darf.
-function upsertTask(todo, accountId, createdBy, objectUrl = null) {
+function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions = null } = {}) {
   const d = db.get();
   const { date, time } = splitDue(todo.due, householdTimeZone(d));
 
@@ -287,11 +287,19 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null) {
     // erledigte Aufgabe ist kein Übergang, den hier jemand erlebt hat: der erste
     // Abruf einer Liste brächte sonst jede je abgehakte Erinnerung auf einmal in
     // den Verlauf - genau der Nachtrag, den #1836 ausschliesst.
-    if (existing) {
-      syncTaskCompletion(d, Number(taskId), existing.status, status, null, null, {
-        source: 'caldav',
+    //
+    // IM LAUF ERST NACH DER HIERARCHIE (Review zu #1836). Ob die Zeile eine
+    // Teilaufgabe ist - und damit keinen Eintrag bekommt -, entscheidet erst
+    // applyTaskRelations nach allen Listen. Wer `completions` mitgibt (sync()),
+    // bekommt den Übergang dort hinein und spielt ihn mit
+    // applySyncedCompletions nach; ohne gilt er sofort.
+    if (existing && existing.status !== status) {
+      const transition = {
+        taskId: Number(taskId), oldStatus: existing.status, newStatus: status,
         completedAt: pastOrNull(todo.completedAt),
-      });
+      };
+      if (completions) completions.push(transition);
+      else applySyncedCompletions(d, [transition]);
     }
 
     // CATEGORIES → Tags (#586). Der Server führt sie, also gewinnt er auch: eine
@@ -299,6 +307,26 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null) {
     // Aufrufer überspringt dirty markierte Einträge (#617).
     setTags(d, taskId, todo.tags);
     return taskId;
+  })();
+}
+
+/**
+ * Die Statuswechsel eines Laufs in den Erledigungsverlauf übertragen (#1836),
+ * nachdem die Hierarchie steht - recordCompletion fragt `parent_task_id`.
+ *
+ * Nur, wo die Zeile noch auf dem Status steht, den der Sync geschrieben hat:
+ * zwischen dem Upsert und hier liegen die Abrufe der übrigen Listen, und wer
+ * die Aufgabe in der Zeit in Yuvomi umgeschaltet hat, hat ihren Eintrag über
+ * die Route schon richtig gestellt.
+ */
+function applySyncedCompletions(d, transitions) {
+  if (!transitions.length) return;
+  const current = d.prepare('SELECT status FROM tasks WHERE id = ?');
+  d.transaction(() => {
+    for (const { taskId, oldStatus, newStatus, completedAt } of transitions) {
+      if (current.get(taskId)?.status !== newStatus) continue;
+      syncTaskCompletion(d, taskId, oldStatus, newStatus, null, null, { source: 'caldav', completedAt });
+    }
   })();
 }
 
@@ -595,6 +623,9 @@ async function runSync({ createClient: makeClient } = {}) {
       // UID → lokale Aufgabe dieses Laufs, für die Hierarchie-Auflösung nach
       // allen Listen (#671). Nur Aufgaben: der Einkauf kennt keine Unterposten.
       const taskRelations = new Map();
+      // Statuswechsel dieses Laufs für den Erledigungsverlauf (#1836), erst
+      // nach der Hierarchie übertragen (applySyncedCompletions).
+      const completionTransitions = [];
 
       for (const sel of enabledLists) {
         const module = sel.target_module === 'shopping' ? 'shopping' : 'tasks';
@@ -687,7 +718,7 @@ async function runSync({ createClient: makeClient } = {}) {
               if (module === 'shopping') {
                 upsertShoppingItem(sel, todo, account.id, obj.url || null);
               } else {
-                const taskId = upsertTask(todo, account.id, createdBy, obj.url || null);
+                const taskId = upsertTask(todo, account.id, createdBy, obj.url || null, { completions: completionTransitions });
                 taskRelations.set(todo.uid, {
                   taskId,
                   parentUid: todo.parentUid || null,
@@ -710,6 +741,11 @@ async function runSync({ createClient: makeClient } = {}) {
         } catch (err) {
           log.error(`Failed to apply VTODO relations for account ${account.id}:`, err.message);
         }
+      }
+      try {
+        applySyncedCompletions(db.get(), completionTransitions);
+      } catch (err) {
+        log.error(`Failed to record synced task completions for account ${account.id}:`, err.message);
       }
 
       // Prune locally-stored caldav items that vanished remotely.

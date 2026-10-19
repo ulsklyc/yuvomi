@@ -77,6 +77,16 @@ test('Parser: COMPLETED ohne Zone oder ganz ohne Wert ergibt keinen Zeitpunkt', 
   assert.equal(todoOf('p4').completedAt, null);
 });
 
+test('Parser: ein unmoegliches COMPLETED wird nicht per Ueberlauf zu einem anderen Tag (Review)', () => {
+  // Date.parse rechnet den 30. Februar in den 2. Maerz um; gespeichert wuerde
+  // aber der Rohtext, und SQL sortiert ihn vor den 1. Maerz.
+  for (const raw of ['20260230T080000Z', '20261332T080000Z', '20261017T240000Z', '20261017T086000Z']) {
+    assert.equal(todoOf(`o-${raw}`, { status: 'COMPLETED', completed: raw }).completedAt, null, raw);
+  }
+  assert.equal(todoOf('o-leap', { status: 'COMPLETED', completed: '20280229T120000Z' }).completedAt,
+    '2028-02-29T12:00:00Z', 'ein echter Schalttag bleibt');
+});
+
 // --------------------------------------------------------
 // CalDAV-Sync
 // --------------------------------------------------------
@@ -153,6 +163,70 @@ test('Verlauf: ein Eintrag aus dem Sync traegt seine Quelle aus', () => {
 });
 
 // --------------------------------------------------------
+// Voller Lauf: die Hierarchie steht, bevor der Eintrag entsteht (Review)
+// --------------------------------------------------------
+// Ein Lauf kann STATUS und RELATED-TO zugleich aendern. Teilaufgaben bekommen
+// keinen Eintrag (task-completions.js), und ob eine Zeile eine ist, entscheidet
+// erst applyTaskRelations nach allen Listen. Ueber den echten sync() gegen den
+// Fake-Server, weil nur er die Reihenfolge zeigt, in der der Lauf schreibt.
+const { startFakeDavServer } = await import('./caldav-fake-server.js');
+const remindersSync = await import('../server/services/caldav-reminders-sync.js');
+const dav = await startFakeDavServer();
+test.after(() => dav.close());
+
+function davTodo(uid, { done = false, parent = null } = {}) {
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Example//EN',
+    'BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20260101T090000Z', `SUMMARY:${uid}`,
+    `STATUS:${done ? 'COMPLETED' : 'NEEDS-ACTION'}`,
+    ...(done ? ['COMPLETED:20261017T081500Z'] : []),
+    ...(parent ? [`RELATED-TO:${parent}`] : []),
+    'END:VTODO', 'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+const mirroredId = (uid) => db.prepare(
+  "SELECT id FROM tasks WHERE external_uid = ? AND external_source = 'caldav'",
+).get(uid)?.id;
+
+let listUrl;
+test('voller Lauf: Vorbereitung gegen den Fake-Server', async () => {
+  db.prepare('UPDATE caldav_accounts SET caldav_url = ? WHERE id = ?').run(dav.url, ACCOUNT);
+  listUrl = dav.addCollection('todo', { name: 'Erinnerungen', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Erinnerungen', 'tasks', 1)
+  `).run(ACCOUNT, listUrl);
+  dav.putObject(listUrl, 'parent.ics', davTodo('h-parent'));
+  dav.putObject(listUrl, 'child.ics', davTodo('h-child'));
+  dav.putObject(listUrl, 'sub.ics', davTodo('h-sub', { parent: 'h-parent' }));
+  await remindersSync.sync();
+  assert.ok(mirroredId('h-parent') && mirroredId('h-child') && mirroredId('h-sub'), 'alle drei gespiegelt');
+  assert.equal(taskOf(mirroredId('h-sub')).parent_task_id, mirroredId('h-parent'));
+  assert.equal(taskOf(mirroredId('h-child')).parent_task_id, null);
+});
+
+test('voller Lauf: im selben Lauf untergeordnet und abgehakt -> kein Eintrag fuer die Teilaufgabe', async () => {
+  dav.putObject(listUrl, 'child.ics', davTodo('h-child', { done: true, parent: 'h-parent' }));
+  await remindersSync.sync();
+  const id = mirroredId('h-child');
+  assert.equal(taskOf(id).parent_task_id, mirroredId('h-parent'), 'jetzt eine Teilaufgabe');
+  assert.equal(taskOf(id).status, 'done');
+  assert.equal(completionOf(id), undefined, 'Teilaufgaben stehen nie im Verlauf');
+});
+
+test('voller Lauf: im selben Lauf herausgeloest und abgehakt -> der Eintrag entsteht', async () => {
+  dav.putObject(listUrl, 'sub.ics', davTodo('h-sub', { done: true }));
+  await remindersSync.sync();
+  const id = mirroredId('h-sub');
+  assert.equal(taskOf(id).parent_task_id, null, 'jetzt eine eigene Aufgabe');
+  const c = completionOf(id);
+  assert.ok(c, 'eine eigene, erledigte Aufgabe gehoert in den Verlauf');
+  assert.equal(c.source, 'caldav');
+  assert.equal(c.completed_at, '2026-10-17T08:15:00Z');
+});
+
+// --------------------------------------------------------
 // Waechter: jede Anweisung, die `status` an `tasks` schreibt
 // --------------------------------------------------------
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -199,6 +273,12 @@ function statusWriters(source) {
 // Nachbarfunktion nicht fuer eine fremde Anweisung buergt.
 const WINDOW = 50;
 
+// Wer den Aufruf buendelt, zaehlt mit - solange er selbst syncTaskCompletion
+// ruft (letzter Test). applySyncedCompletions schiebt die Uebergaenge des Syncs
+// hinter die Hierarchie (Review zu #1836).
+const WRAPPERS = { applySyncedCompletions: 'server/services/caldav-reminders-sync.js' };
+const COMPLETION_CALL = new RegExp(`\\b(?:syncTaskCompletion|${Object.keys(WRAPPERS).join('|')})\\s*\\(`);
+
 test('Waechter: der Detektor erkennt Schreiber und laesst Leser in Ruhe', () => {
   const sample = [
     "db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('done', id);",
@@ -224,11 +304,21 @@ test('Waechter: jede Anweisung, die tasks.status schreibt, laeuft ueber syncTask
     for (const hit of statusWriters(source)) {
       found++;
       const after = lines.slice(hit.line - 1, hit.line - 1 + WINDOW + hit.sql.split('\n').length).join('\n');
-      if (!/\bsyncTaskCompletion\s*\(/.test(after)) bypass.push(`${relative(ROOT, file)}:${hit.line}`);
+      if (!COMPLETION_CALL.test(after)) bypass.push(`${relative(ROOT, file)}:${hit.line}`);
     }
   }
   // Ein Waechter, der nichts findet, beweist nichts: die bekannten Schreiber
   // (Routen POST/PUT/PATCH, /pay, /unpay, Sync UPDATE + INSERT) muessen da sein.
   assert.ok(found >= 7, `erwartet mindestens 7 Schreiber, gefunden ${found}`);
   assert.deepEqual(bypass, [], `Diese Stellen setzen tasks.status ohne syncTaskCompletion:\n${bypass.join('\n')}`);
+});
+
+test('Waechter: jeder Buendler ruft selbst syncTaskCompletion', () => {
+  for (const [name, file] of Object.entries(WRAPPERS)) {
+    const source = readFileSync(join(ROOT, file), 'utf8');
+    const start = source.indexOf(`function ${name}(`);
+    assert.ok(start >= 0, `${name} fehlt in ${file}`);
+    const body = source.slice(start, source.indexOf('\n}\n', start));
+    assert.match(body, /\bsyncTaskCompletion\s*\(/, `${name} muss syncTaskCompletion rufen`);
+  }
 });
