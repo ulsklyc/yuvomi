@@ -23,6 +23,7 @@ import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { reminderOffsetOptions } from '/utils/schedule-reminder-offset.js';
 import { scheduleViewFromPath, scheduleRouteForView } from '/utils/schedule-tabs.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { errorSentence, isAlreadyDeleted, isGone } from '/utils/friendly-error.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -280,37 +281,40 @@ const clockLabel = (shiftType) => {
   return `${shiftType.start_time}-${shiftType.end_time}${crossesDay ? ' +1' : ''}${fullDay ? ' · 24 h' : ''}`;
 };
 
-// S-02: der Server antwortet mit technischen Validierungs-/Konflikttexten
-// ("shift_type_id must be a positive number.", "cycle_length cannot exclude
-// existing pattern days.", "Shift type is in use.") - bisher landeten die
-// unveraendert im Toast. Kein bestehendes Modul im Repo bildet dafuer schon
-// eine Rohtext-zu-Uebersetzung ab (recherchiert: router.js' und documents.js'
-// gleichnamige friendlyError() ordnen nur nach HTTP-Status/Fehlername, nie
-// nach dem WORTLAUT der Meldung) - diese Zuordnung hier ist die erste ihrer
-// Art. Ein unbekannter Text faellt unveraendert durch (der Rohtext bleibt
-// lesbarer als der generische Fehler, falls der Server je einen neuen Text
-// ausgibt, den diese Liste noch nicht kennt). Die API-Vertragstexte selbst
-// (server/routes/schedule.js) bleiben unangetastet - das hier ist rein
-// clientseitige Uebersetzung, kein Vertragswechsel.
-const SCHEDULE_SERVER_ERROR_MESSAGES = {
-  'shift_type_id must be a positive number.': () => t('schedule.shiftTypeRequiredError'),
-  'cycle_length cannot exclude existing pattern days.': () => t('schedule.cycleLengthConflictGeneric'),
-  'Shift type is in use.': () => t('schedule.typeInUse'),
-};
-
-// Wo der Server einen `reason` mitgibt, zaehlt der und nicht der Wortlaut
-// (wie die Budget-Routen seit #1693/#1694): ein Satz mit mehreren Fehlern
-// ("from must be before to. user_id does not exist.") trifft keinen Eintrag
-// der Liste oben, sein reason schon.
-const SCHEDULE_SERVER_REASON_MESSAGES = {
-  range_reversed: () => t('schedule.rangeOrderError'),
-};
-
+// DER SATZ DER APP, NIE DER DES SERVERS (#1909). Bis dahin ordnete diese
+// Seite drei Texte des Servers an ihrem WORTLAUT einem Satz zu (S-02) und
+// zeigte jeden anderen unveraendert - englisch, in jeder Sprache. Jetzt nennt
+// der Server den Fall (`reason`, server/routes/schedule.js), und
+// utils/friendly-error.js (CASE_MESSAGES) haelt den Satz dazu: "Von nach Bis"
+// (#1777), Schichtart noch in Benutzung, Zyklus zu kurz, keine Schichtart
+// gewaehlt, und was es inzwischen nicht mehr gibt. Alles andere bekommt den
+// allgemeinen Satz.
 function scheduleErrorMessage(error) {
-  const byReason = SCHEDULE_SERVER_REASON_MESSAGES[error?.data?.reason]?.();
-  if (byReason) return byReason;
-  const raw = error?.data?.error ?? error?.message;
-  return (raw && SCHEDULE_SERVER_ERROR_MESSAGES[raw]?.()) ?? raw ?? t('common.errorGeneric');
+  return errorSentence(error);
+}
+
+/**
+ * Ein Schreibvorgang ist gescheitert: der Satz, und wenn sein Ziel inzwischen
+ * verschwunden ist (ein anderes Haushaltsmitglied hat es geloescht), kommt
+ * die Seite frisch - sonst stuende es weiter da und scheiterte beim naechsten
+ * Versuch genauso.
+ */
+async function reportScheduleError(error) {
+  window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+  if (!isGone(error)) return;
+  try { await reloadAfterWrite(); renderPage(); } catch { /* der Toast oben nennt den Fehler */ }
+}
+
+/**
+ * Loeschen, das schon erledigt ist (jemand anderes war schneller), ist kein
+ * Fehler: `reason` nennt, was hier geloescht werden sollte.
+ */
+async function deleteUnlessGone(path, reason) {
+  try {
+    await api.delete(path);
+  } catch (error) {
+    if (!isAlreadyDeleted(error, reason)) throw error;
+  }
 }
 
 /* VON UND BIS EINES ZEITRAUMS (#1777).
@@ -2790,6 +2794,7 @@ async function saveCreatedSchedule(event) {
     await closeModal({ force: true, context: modalContext });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
+    // Der Dialog bleibt offen mit der Eingabe; nur der Satz.
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
@@ -2824,6 +2829,7 @@ async function saveCustomField(event, fieldId) {
     await closeModal({ force: true, context: modalContext });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
+    // Der Dialog bleibt offen mit der Eingabe; nur der Satz.
     window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
@@ -3341,7 +3347,7 @@ async function action(event) {
       );
       if (!confirmed) return;
       gefragt = true;
-      await api.delete(`/schedule/shift-types/${button.dataset.id}`);
+      await deleteUnlessGone(`/schedule/shift-types/${button.dataset.id}`, 'schedule_shift_type_not_found');
     }
     if (button.dataset.action === 'open-create-custom-field') {
       openCustomFieldModal();
@@ -3366,7 +3372,7 @@ async function action(event) {
       );
       if (!confirmed) return;
       gefragt = true;
-      await api.delete(`/schedule/custom-fields/${button.dataset.id}`);
+      await deleteUnlessGone(`/schedule/custom-fields/${button.dataset.id}`, 'schedule_custom_field_not_found');
     }
     // Ein Muster loeschen nimmt seine Zyklustage mit (ON DELETE CASCADE): eine
     // Achttage-Rotation ist mit einem Fingertipp weg, und es gibt keinen Weg
@@ -3384,7 +3390,7 @@ async function action(event) {
       );
       if (!confirmed) return;
       gefragt = true;
-      await api.delete(`/schedule/patterns/${button.dataset.id}`);
+      await deleteUnlessGone(`/schedule/patterns/${button.dataset.id}`, 'schedule_pattern_not_found');
     }
     // Ein Bereich kann viele Tage tragen, darum fragt das Loeschen hier nach,
     // anders als ein Einzeltag frueher (der jetzt selbst eine Gruppe der
@@ -3426,7 +3432,7 @@ async function action(event) {
       gefragt = true;
       try {
         for (const id of button.dataset.ids.split(',')) {
-          await api.delete(`/schedule/extras/${id}`);
+          await deleteUnlessGone(`/schedule/extras/${id}`, 'schedule_extra_shift_not_found');
         }
       } catch (error) {
         // Extras haben kein Range-Delete-Endpoint - die Schleife loescht Zeile
@@ -3445,7 +3451,7 @@ async function action(event) {
     if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
+    await reportScheduleError(error);
   }
 }
 

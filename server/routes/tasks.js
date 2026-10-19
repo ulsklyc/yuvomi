@@ -1194,8 +1194,10 @@ router.post('/', (req, res) => {
         .get(parent_task_id);
       // Unsichtbar heisst hier dasselbe wie nicht vorhanden: sonst verriete 201
       // gegen 404 die Kennung, und der Punkt stuende in einer fremden Checkliste.
+      // Der Grund (#1909): die Aufgabe, an die der Teilschritt sollte, wurde
+      // inzwischen geloescht oder privat gestellt - die Leseansicht sagt das.
       if (!parent || !mayAccessTask(parent, req.authUserId || req.session.userId))
-        return res.status(404).json({ error: 'Parent task not found.', code: 404 });
+        return res.status(404).json({ error: 'Parent task not found.', code: 404, reason: 'tasks_parent_not_found' });
       if (parent.parent_task_id)
         return res.status(400).json({ error: 'Maximal 2 Verschachtelungsebenen erlaubt.', code: 400 });
       // Einen Punkt an eine gesperrte Checkliste zu haengen aendert, was die
@@ -2376,20 +2378,28 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
 }
 
 /** Ein Kommentar samt Aufgabe, wenn die Person ihn ändern bzw. entfernen darf. */
+// Die Absagen beim Aendern und Loeschen eines Kommentars. Beide 404 tragen
+// denselben Text wie bisher, der Grund unterscheidet (#1909): die Aufgabe ist
+// weg (geloescht oder privat gestellt), oder nur der Kommentar (sein Autor oder
+// ein Admin hat ihn inzwischen geloescht).
+const COMMENT_TASK_GONE = { error: 'Comment not found.', code: 404, reason: 'tasks_task_not_found' };
+const COMMENT_GONE = { error: 'Comment not found.', code: 404, reason: 'tasks_comment_not_found' };
+const COMMENT_NOT_YOURS = { error: 'Not authorized.', code: 403 };
+
 function commentForWrite(req, { allowAdmin = false } = {}) {
   const me = req.authUserId || req.session.userId;
   const found = findVisibleTask(req.params.id, me);
-  if (!found) return { error: 404 };
+  if (!found) return { refusal: COMMENT_TASK_GONE };
   // Mit Titel, weil eine Erwaehnung beim Nachbessern dieselbe Meldung schickt
   // wie beim Schreiben - und die nennt die Aufgabe.
   const task = db.get().prepare('SELECT id, title FROM tasks WHERE id = ?').get(found.id);
 
   const row = db.get().prepare('SELECT * FROM task_comments WHERE id = ? AND task_id = ?')
     .get(req.params.commentId, task.id);
-  if (!row) return { error: 404 };
+  if (!row) return { refusal: COMMENT_GONE };
 
   const mayWrite = row.user_id === me || (allowAdmin && isAdminRequest(req));
-  if (!mayWrite) return { error: 403 };
+  if (!mayWrite) return { refusal: COMMENT_NOT_YOURS };
   return { task, row, me };
 }
 
@@ -2442,11 +2452,7 @@ router.post('/:id/comments', (req, res) => {
 router.patch('/:id/comments/:commentId', (req, res) => {
   try {
     const found = commentForWrite(req);
-    if (found.error) {
-      return res.status(found.error).json({
-        error: found.error === 403 ? 'Not authorized.' : 'Comment not found.', code: found.error,
-      });
-    }
+    if (found.refusal) return res.status(found.refusal.code).json(found.refusal);
 
     const comment = v.str(req.body.comment, 'comment', { max: v.MAX_TEXT, required: true });
     if (comment.error) return res.status(400).json({ error: comment.error, code: 400 });
@@ -2477,11 +2483,7 @@ router.patch('/:id/comments/:commentId', (req, res) => {
 router.delete('/:id/comments/:commentId', (req, res) => {
   try {
     const found = commentForWrite(req, { allowAdmin: true });
-    if (found.error) {
-      return res.status(found.error).json({
-        error: found.error === 403 ? 'Not authorized.' : 'Comment not found.', code: found.error,
-      });
-    }
+    if (found.refusal) return res.status(found.refusal.code).json(found.refusal);
     db.get().prepare('DELETE FROM task_comments WHERE id = ?').run(found.row.id);
     res.json({ data: { id: found.row.id } });
   } catch (err) {

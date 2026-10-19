@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "完了をすべてアーカイブ",
         "kanbanArchiveDoneConfirm": "この列の完了したタスクをすべてアーカイブしますか？",
         "kanbanArchiveDoneAction": "アーカイブ",
-        "errorTaskGone": "このタスクはもう存在しません。"
+        "errorTaskGone": "このタスクはもう存在しません。",
+        "errorParentGone": "このサブタスクの親タスクはもう存在しません。",
+        "errorCommentGone": "このコメントはもう存在しません。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",
@@ -6428,7 +6430,13 @@
             "seminar": "ゼ",
             "lab": "実"
         },
-        "typesWithTime": "時間あり"
+        "typesWithTime": "時間あり",
+        "errorShiftTypeGone": "このシフトの種類はもう存在しません。",
+        "errorSelectedShiftTypeGone": "選択したシフトの種類はもう存在しません。",
+        "errorCustomFieldGone": "この項目はもう存在しません。",
+        "errorSelectedCustomFieldGone": "選択した項目の一つはもう存在しません。",
+        "errorPatternGone": "このシフトパターンはもう存在しません。",
+        "errorEntryGone": "この項目はもう存在しません。"
     },
     "pairDisplay": {
         "title": "タブレットをペアリング",

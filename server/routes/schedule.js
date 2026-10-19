@@ -29,10 +29,31 @@ const actorId = (req) => req.authUserId || req.session?.userId;
 // ihr zusammengefuegter Satz - beides kennt `includes`. Eine 403-Absage
 // bekommt ihn nicht: dort ist das fehlende Recht die Auskunft.
 export const RANGE_REVERSED_MESSAGE = 'from must be before to.';
+export const SHIFT_TYPE_GONE_MESSAGE = 'shift_type_id does not exist.';
+export const SHIFT_TYPE_REQUIRED_MESSAGE = 'shift_type_id must be a positive number.';
+const CUSTOM_FIELD_GONE_MESSAGE = 'custom_field_id does not exist.';
+const CYCLE_LENGTH_CONFLICT_MESSAGE = 'cycle_length cannot exclude existing pattern days.';
+// Weitere Faelle, die ein Nutzer erreicht (#1909), nach demselben Muster: der
+// Satz bleibt Teil der Antwort, die Oberflaeche liest den Grund. Die
+// Reihenfolge entscheidet, wenn ein Satz mehrere Fehler traegt - der erste
+// Treffer gewinnt, "Von nach Bis" wie bisher vorn.
+const CASE_REASONS = [
+  { message: RANGE_REVERSED_MESSAGE, answer: { reason: 'range_reversed' } },
+  // Die im Dialog GEWAEHLTE Schichtart (oder ein gewaehltes Feld) wurde
+  // inzwischen geloescht.
+  { message: SHIFT_TYPE_GONE_MESSAGE, answer: { reason: 'schedule_selected_shift_type_not_found' } },
+  { message: CUSTOM_FIELD_GONE_MESSAGE, answer: { reason: 'schedule_selected_custom_field_not_found' } },
+  { message: SHIFT_TYPE_REQUIRED_MESSAGE, answer: { reason: 'schedule_shift_type_required' } },
+  { message: CYCLE_LENGTH_CONFLICT_MESSAGE, answer: { reason: 'schedule_cycle_length_conflict' } },
+];
 export const rangeReason = (errors) => (
-  errors.includes(RANGE_REVERSED_MESSAGE) && !errors.includes('Forbidden.') ? { reason: 'range_reversed' } : {}
+  errors.includes('Forbidden.') ? {} : (CASE_REASONS.find(({ message }) => errors.includes(message))?.answer ?? {})
 );
-const fail = (res, code, error) => res.status(code).json({ error, code, ...(code === 400 ? rangeReason(String(error)) : {}) });
+// `extra` traegt den Grund einer 404/409 (was es nicht mehr gibt, was noch
+// benutzt wird) - als Literal an der Stelle, die ihn kennt.
+const fail = (res, code, error, extra = {}) => res.status(code).json({
+  error, code, ...(code === 400 ? rangeReason(String(error)) : {}), ...extra,
+});
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 /**
  * Ein NEUER Dienstplan-Besitzer muss Haushaltsmitglied sein (#1207). Wer schon
@@ -237,7 +258,7 @@ router.delete('/shift-types/:id', (req, res) => {
   const shiftType = id(req.params.id, 'id');
   if (shiftType.error) return fail(res, 400, shiftType.error);
   const existing = db.get().prepare('SELECT id, created_by FROM schedule_shift_types WHERE id = ?').get(shiftType.value);
-  if (!existing) return fail(res, 404, 'Shift type not found.');
+  if (!existing) return fail(res, 404, 'Shift type not found.', { reason: 'schedule_shift_type_not_found' });
   if (!ownTypeOrAdmin(req, existing)) return fail(res, 403, 'Forbidden.');
   try {
     db.get().prepare('DELETE FROM schedule_shift_types WHERE id = ?').run(existing.id);
@@ -246,7 +267,7 @@ router.delete('/shift-types/:id', (req, res) => {
     // Nur der Fremdschluessel wird als "in Benutzung" gedeutet. Vorher fing der
     // Zweig JEDEN Fehler und nannte denselben Grund - ein Schreibfehler im SQL
     // haette dem Aufrufer erzaehlt, der Typ sei noch im Einsatz.
-    if (isStillReferenced(err)) return fail(res, 409, 'Shift type is in use.');
+    if (isStillReferenced(err)) return fail(res, 409, 'Shift type is in use.', { reason: 'schedule_shift_type_in_use' });
     log.error('Error deleting shift type:', err.message);
     return fail(res, 500, 'Internal error.');
   }
@@ -267,7 +288,7 @@ router.post('/custom-fields', (req, res) => {
 router.put('/custom-fields/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(key.value);
-  if (!old) return fail(res, 404, 'Custom field not found.');
+  if (!old) return fail(res, 404, 'Custom field not found.', { reason: 'schedule_custom_field_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
   const name = req.body?.name === undefined ? { value: old.name, error: null } : str(req.body.name, 'name', { max: 100 });
   if (name.error) return fail(res, 400, name.error);
@@ -277,7 +298,7 @@ router.put('/custom-fields/:id', (req, res) => {
 router.delete('/custom-fields/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT id, created_by FROM schedule_custom_fields WHERE id = ?').get(key.value);
-  if (!old) return fail(res, 404, 'Custom field not found.');
+  if (!old) return fail(res, 404, 'Custom field not found.', { reason: 'schedule_custom_field_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
   // Kaskadiert ueber schedule_shift_type_fields/schedule_custom_field_values (ON DELETE CASCADE) -
   // anders als ein Schichttyp (der `isStillReferenced`-409-Schutz) ist ein geloeschtes Feld eine
@@ -299,15 +320,15 @@ router.post('/patterns', (req, res) => {
   const active = req.body?.is_active === undefined ? { value: true, error: null } : bool(req.body.is_active, 'is_active');
   const errors = collectErrors([user, name, anchor, length, from, until, active]); if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.'); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   const result = db.get().prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user.value, name.value, anchor.value, length.value, from.value, until.value, Number(active.value));
   res.status(201).json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(result.lastInsertRowid) });
 });
 router.put('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
-  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
+  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   // Upsert und replaceFieldValues() in EINER Transaktion: ohne sie stand der
   // Override schon geschrieben, bevor replaceFieldValues() ueberhaupt lief -
   // ein Wurf dazwischen (z.B. eine spaeter doch noch durchrutschende doppelte
@@ -328,7 +349,7 @@ router.put('/overrides/:dateKey', (req, res) => {
 router.put('/shift-types/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(key.value);
-  if (!old) return fail(res, 404, 'Shift type not found.');
+  if (!old) return fail(res, 404, 'Shift type not found.', { reason: 'schedule_shift_type_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
   const name = req.body?.name === undefined ? { value: old.name } : str(req.body.name, 'name');
   const shortCode = req.body?.short_code === undefined ? { value: old.short_code } : str(req.body.short_code, 'short_code', { required: false, max: 12 });
@@ -354,7 +375,7 @@ router.put('/shift-types/:id', (req, res) => {
 router.put('/shift-types/:id/fields', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT id, created_by FROM schedule_shift_types WHERE id = ?').get(key.value);
-  if (!old) return fail(res, 404, 'Shift type not found.');
+  if (!old) return fail(res, 404, 'Shift type not found.', { reason: 'schedule_shift_type_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
   if (!Array.isArray(req.body?.fields)) return fail(res, 400, 'fields must be an array.');
   const seen = new Set();
@@ -364,7 +385,7 @@ router.put('/shift-types/:id/fields', (req, res) => {
     const position = num(row?.position, 'position', { required: true });
     const showInOverlay = row?.show_in_overlay === undefined ? { value: false, error: null } : bool(row.show_in_overlay, 'show_in_overlay');
     if (fieldId.error || position.error || !Number.isInteger(position.value) || position.value < 0 || showInOverlay.error) return fail(res, 400, 'Invalid field entry.');
-    if (!customFieldExists(fieldId.value)) return fail(res, 400, 'custom_field_id does not exist.');
+    if (!customFieldExists(fieldId.value)) return fail(res, 400, CUSTOM_FIELD_GONE_MESSAGE);
     if (seen.has(fieldId.value)) return fail(res, 400, 'custom_field_id must not repeat.');
     seen.add(fieldId.value);
     rows.push([fieldId.value, position.value, Number(showInOverlay.value)]);
@@ -379,7 +400,7 @@ router.put('/shift-types/:id/fields', (req, res) => {
 router.put('/patterns/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
-  if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
+  if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   const name = req.body?.name === undefined ? { value: old.name } : str(req.body.name, 'name');
   const anchor = req.body?.anchor_date === undefined ? { value: old.anchor_date } : date(req.body.anchor_date, 'anchor_date', true);
   const length = req.body?.cycle_length === undefined ? { value: old.cycle_length } : num(req.body.cycle_length, 'cycle_length', { required: true });
@@ -389,7 +410,7 @@ router.put('/patterns/:id', (req, res) => {
   const errors = collectErrors([name, anchor, length, from, until, active]);
   if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.');
   if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
-  if (db.get().prepare('SELECT 1 FROM schedule_pattern_days WHERE pattern_id=? AND position>=?').get(old.id, length.value)) errors.push('cycle_length cannot exclude existing pattern days.');
+  if (db.get().prepare('SELECT 1 FROM schedule_pattern_days WHERE pattern_id=? AND position>=?').get(old.id, length.value)) errors.push(CYCLE_LENGTH_CONFLICT_MESSAGE);
   if (errors.length) return fail(res, 400, errors.join(' '));
   db.get().prepare('UPDATE schedule_patterns SET name=?,anchor_date=?,cycle_length=?,valid_from=?,valid_until=?,is_active=? WHERE id=?').run(name.value, anchor.value, length.value, from.value, until.value, Number(active.value), old.id);
   return res.json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(old.id) });
@@ -397,7 +418,7 @@ router.put('/patterns/:id', (req, res) => {
 router.delete('/patterns/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
-  if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
+  if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   // Die Zyklustage kaskadieren mit dem Muster weg (FK CASCADE), ihre
   // schedule_custom_field_values-Zeilen nicht (polymorph, kein echter
   // Fremdschluessel, siehe Migration 189) - deshalb hier dieselbe Reihenfolge
@@ -412,7 +433,7 @@ router.delete('/patterns/:id', (req, res) => {
 });
 router.get('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
-  if (!db.get().prepare('SELECT 1 FROM schedule_patterns WHERE id=?').get(key.value)) return fail(res, 404, 'Pattern not found.');
+  if (!db.get().prepare('SELECT 1 FROM schedule_patterns WHERE id=?').get(key.value)) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' });
   const rows = db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position, id').all(key.value);
   const values = fieldValuesFor('pattern_day', rows.map((row) => row.id));
   return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
@@ -430,14 +451,14 @@ router.get('/patterns/:id/days', (req, res) => {
 router.put('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
-  if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
+  if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   if (!Array.isArray(req.body?.days)) return fail(res, 400, 'days must be an array.');
   if (req.body.days.length > MAX_PATTERN_DAY_ROWS) return fail(res, 400, `days must not exceed ${MAX_PATTERN_DAY_ROWS} rows.`);
   const days = [];
   for (const row of req.body.days) {
     const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
     if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error) return fail(res, 400, 'Invalid pattern day.');
-    if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, 'shift_type_id does not exist.');
+    if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, SHIFT_TYPE_GONE_MESSAGE);
     const fields = validateFieldValues(row?.field_values, shiftType?.value ?? null);
     if (fields.error) return fail(res, 400, fields.error);
     days.push({ position: position.value, shiftTypeId: shiftType?.value ?? null, fieldValues: fields.values });
@@ -490,7 +511,7 @@ router.post('/overrides/fill', (req, res) => {
   if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
-  if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
+  if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
@@ -562,7 +583,7 @@ router.delete('/overrides/:dateKey', (req, res) => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?)`).run(user.value, key.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);
   })();
-  if (!result.changes) return fail(res, 404, 'Override not found.');
+  if (!result.changes) return fail(res, 404, 'Override not found.', { reason: 'schedule_override_not_found' });
   try { syncScheduleRemindersForUser(db.get(), user.value); }
   catch (err) { log.error('Error resyncing schedule reminders after override delete:', err.message); }
   return res.status(204).end();

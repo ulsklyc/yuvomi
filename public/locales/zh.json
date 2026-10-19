@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "归档全部已完成",
         "kanbanArchiveDoneConfirm": "要归档此列中所有已完成的任务吗？",
         "kanbanArchiveDoneAction": "归档",
-        "errorTaskGone": "此任务已不存在。"
+        "errorTaskGone": "此任务已不存在。",
+        "errorParentGone": "此子任务所属的任务已不存在。",
+        "errorCommentGone": "此评论已不存在。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",
@@ -6428,7 +6430,13 @@
             "seminar": "研",
             "lab": "实"
         },
-        "typesWithTime": "有时间"
+        "typesWithTime": "有时间",
+        "errorShiftTypeGone": "此班次类型已不存在。",
+        "errorSelectedShiftTypeGone": "所选的班次类型已不存在。",
+        "errorCustomFieldGone": "此字段已不存在。",
+        "errorSelectedCustomFieldGone": "所选字段中有一个已不存在。",
+        "errorPatternGone": "此排班周期已不存在。",
+        "errorEntryGone": "此条目已不存在。"
     },
     "pairDisplay": {
         "title": "配对平板",

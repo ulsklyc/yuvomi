@@ -746,7 +746,9 @@
         "kanbanArchiveDone": "Zarchiwizuj wszystkie ukończone",
         "kanbanArchiveDoneConfirm": "Zarchiwizować wszystkie ukończone zadania w tej kolumnie?",
         "kanbanArchiveDoneAction": "Zarchiwizuj",
-        "errorTaskGone": "To zadanie już nie istnieje."
+        "errorTaskGone": "To zadanie już nie istnieje.",
+        "errorParentGone": "Zadanie nadrzędne tego podzadania już nie istnieje.",
+        "errorCommentGone": "Ten komentarz już nie istnieje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -6742,7 +6744,13 @@
             "seminar": "S",
             "lab": "L"
         },
-        "typesWithTime": "Z godzinami"
+        "typesWithTime": "Z godzinami",
+        "errorShiftTypeGone": "Ten rodzaj zmiany już nie istnieje.",
+        "errorSelectedShiftTypeGone": "Wybrany rodzaj zmiany już nie istnieje.",
+        "errorCustomFieldGone": "To pole już nie istnieje.",
+        "errorSelectedCustomFieldGone": "Jedno z wybranych pól już nie istnieje.",
+        "errorPatternGone": "Ten cykl zmian już nie istnieje.",
+        "errorEntryGone": "Ten wpis już nie istnieje."
     },
     "pairDisplay": {
         "title": "Sparuj tablet",

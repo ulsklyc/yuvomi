@@ -780,7 +780,9 @@
         "kanbanArchiveDone": "أرشفة كل المهام المنجزة",
         "kanbanArchiveDoneConfirm": "أرشفة جميع المهام المنجزة في هذا العمود؟",
         "kanbanArchiveDoneAction": "أرشفة",
-        "errorTaskGone": "هذه المهمة لم تعد موجودة."
+        "errorTaskGone": "هذه المهمة لم تعد موجودة.",
+        "errorParentGone": "المهمة التي تنتمي إليها هذه المهمة الفرعية لم تعد موجودة.",
+        "errorCommentGone": "هذا التعليق لم يعد موجودًا."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -6900,7 +6902,13 @@
             "seminar": "ند",
             "lab": "مع"
         },
-        "typesWithTime": "بمواعيد"
+        "typesWithTime": "بمواعيد",
+        "errorShiftTypeGone": "نوع المناوبة هذا لم يعد موجودًا.",
+        "errorSelectedShiftTypeGone": "نوع المناوبة المختار لم يعد موجودًا.",
+        "errorCustomFieldGone": "هذا الحقل لم يعد موجودًا.",
+        "errorSelectedCustomFieldGone": "أحد الحقول المختارة لم يعد موجودًا.",
+        "errorPatternGone": "دورة المناوبات هذه لم تعد موجودة.",
+        "errorEntryGone": "هذا الإدخال لم يعد موجودًا."
     },
     "pairDisplay": {
         "title": "اقتران الجهاز اللوحي",

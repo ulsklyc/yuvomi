@@ -220,7 +220,64 @@ test('#1777: a reversed range of extras is refused with reason range_reversed', 
   assert.equal('reason' in foreign.body, false);
   const other = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2033-10-07', to: '2033-10-08', shift_type_id: 999999 } });
   assert.equal(other.status, 400);
-  assert.equal('reason' in other.body, false);
+  // A chosen shift type that is gone names its own case (#1909), not this one.
+  assert.equal(other.body.reason, 'schedule_selected_shift_type_not_found');
+  const plain = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2033-10-07', to: 'not-a-date', shift_type_id: typeId } });
+  assert.equal(plain.status, 400);
+  assert.equal('reason' in plain.body, false);
   const stored = database.prepare("SELECT COUNT(*) AS n FROM schedule_extra_shifts WHERE date_key IN ('2033-10-07', '2033-10-08')").get();
   assert.equal(stored.n, 0, 'none of the refused requests wrote a row');
+});
+
+// #1909: every case a user can reach names itself with a `reason` next to the
+// English `error`, and the status stays what it was. The page says the
+// sentence from CASE_MESSAGES (utils/friendly-error.js) instead of the text -
+// test:schedule measures that side.
+test('#1909: the cases a user reaches carry a reason, the status and text stay', async () => {
+  const GONE = 999999;
+  const expect = async (method, path, body, status, reason, error) => {
+    const r = await call(method, path, { as: ADMIN, body });
+    const label = `${method} ${path}: ${JSON.stringify(r.body)}`;
+    assert.equal(r.status, status, label);
+    assert.equal(r.body?.reason, reason, label);
+    if (error) assert.equal(r.body?.error, error, label);
+  };
+  // Was es nicht mehr gibt.
+  await expect('PUT', `/shift-types/${GONE}`, { name: 'x' }, 404, 'schedule_shift_type_not_found', 'Shift type not found.');
+  await expect('DELETE', `/shift-types/${GONE}`, undefined, 404, 'schedule_shift_type_not_found', 'Shift type not found.');
+  await expect('PUT', `/shift-types/${GONE}/fields`, { fields: [] }, 404, 'schedule_shift_type_not_found');
+  await expect('PUT', `/custom-fields/${GONE}`, { name: 'x' }, 404, 'schedule_custom_field_not_found', 'Custom field not found.');
+  await expect('DELETE', `/custom-fields/${GONE}`, undefined, 404, 'schedule_custom_field_not_found');
+  await expect('PUT', `/patterns/${GONE}`, { name: 'x' }, 404, 'schedule_pattern_not_found', 'Pattern not found.');
+  await expect('DELETE', `/patterns/${GONE}`, undefined, 404, 'schedule_pattern_not_found');
+  await expect('GET', `/patterns/${GONE}/days`, undefined, 404, 'schedule_pattern_not_found');
+  await expect('PUT', `/patterns/${GONE}/days`, { days: [] }, 404, 'schedule_pattern_not_found');
+  await expect('DELETE', `/overrides/2034-01-01?user_id=${ADMIN.id}`, undefined, 404, 'schedule_override_not_found', 'Override not found.');
+  await expect('PUT', `/extras/${GONE}`, { note: 'x' }, 404, 'schedule_extra_shift_not_found', 'Extra shift not found.');
+  await expect('DELETE', `/extras/${GONE}`, undefined, 404, 'schedule_extra_shift_not_found');
+  // Die im Dialog gewaehlte Schichtart (oder ein Feld) gibt es nicht mehr.
+  await expect('PUT', '/overrides/2034-01-02', { user_id: ADMIN.id, shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found', 'shift_type_id does not exist.');
+  await expect('POST', '/overrides/fill', { user_id: ADMIN.id, from: '2034-01-03', to: '2034-01-04', shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found');
+  await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-05', shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found');
+  await expect('PUT', `/shift-types/${typeId}/fields`, { fields: [{ custom_field_id: GONE, position: 0 }] }, 400, 'schedule_selected_custom_field_not_found', 'custom_field_id does not exist.');
+  // Keine Schichtart gewaehlt (Zusatzschicht).
+  await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-06' }, 400, 'schedule_shift_type_required', 'shift_type_id must be a positive number.');
+  await expect('POST', '/extras/fill', { user_id: ADMIN.id, from: '2034-01-06', to: '2034-01-07' }, 400, 'schedule_shift_type_required');
+  // Noch in Benutzung, und ein Zyklus, der gesetzte Tage abschneiden wuerde.
+  const used = await call('POST', '/shift-types', { as: ADMIN, body: { name: 'Used', start_time: '08:00', end_time: '16:00' } });
+  const pattern = await call('POST', '/patterns', { as: ADMIN, body: { user_id: ADMIN.id, name: 'Rota', anchor_date: '2034-02-01', cycle_length: 4 } });
+  assert.equal(pattern.status, 201, JSON.stringify(pattern.body));
+  const days = await call('PUT', `/patterns/${pattern.body.data.id}/days`, { as: ADMIN, body: { days: [{ position: 3, shift_type_id: used.body.data.id }] } });
+  assert.equal(days.status, 200, JSON.stringify(days.body));
+  await expect('DELETE', `/shift-types/${used.body.data.id}`, undefined, 409, 'schedule_shift_type_in_use', 'Shift type is in use.');
+  await expect('PUT', `/patterns/${pattern.body.data.id}`, { cycle_length: 2 }, 400, 'schedule_cycle_length_conflict', 'cycle_length cannot exclude existing pattern days.');
+
+  // Gegenproben: eine fremde Absage (403) traegt keinen Grund, auch wenn der
+  // Satz einen Fall enthaelt; eine andere 400 ebenso nicht.
+  const foreign = await call('POST', '/extras', { as: ALICE, body: { user_id: BOB.id, date_key: '2034-01-08', shift_type_id: GONE } });
+  assert.equal(foreign.status, 403);
+  assert.equal('reason' in foreign.body, false);
+  const other = await call('POST', '/patterns', { as: ADMIN, body: { user_id: ADMIN.id, name: 'x', anchor_date: '2034-02-01', cycle_length: 999 } });
+  assert.equal(other.status, 400);
+  assert.equal('reason' in other.body, false);
 });

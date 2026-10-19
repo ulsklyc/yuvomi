@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Lưu trữ tất cả đã xong",
         "kanbanArchiveDoneConfirm": "Lưu trữ mọi công việc đã xong trong cột này?",
         "kanbanArchiveDoneAction": "Lưu trữ",
-        "errorTaskGone": "Công việc này không còn tồn tại."
+        "errorTaskGone": "Công việc này không còn tồn tại.",
+        "errorParentGone": "Công việc chứa nhiệm vụ phụ này không còn tồn tại.",
+        "errorCommentGone": "Bình luận này không còn tồn tại."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",
@@ -6428,7 +6430,13 @@
             "seminar": "HT",
             "lab": "TH"
         },
-        "typesWithTime": "Có giờ"
+        "typesWithTime": "Có giờ",
+        "errorShiftTypeGone": "Loại ca này không còn tồn tại.",
+        "errorSelectedShiftTypeGone": "Loại ca đã chọn không còn tồn tại.",
+        "errorCustomFieldGone": "Trường này không còn tồn tại.",
+        "errorSelectedCustomFieldGone": "Một trong các trường đã chọn không còn tồn tại.",
+        "errorPatternGone": "Chu kỳ ca này không còn tồn tại.",
+        "errorEntryGone": "Mục này không còn tồn tại."
     },
     "pairDisplay": {
         "title": "Ghép nối máy tính bảng",

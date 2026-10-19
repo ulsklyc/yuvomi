@@ -730,7 +730,9 @@
         "kanbanArchiveDone": "Архивировать все выполненные",
         "kanbanArchiveDoneConfirm": "Архивировать все выполненные задачи в этом столбце?",
         "kanbanArchiveDoneAction": "Архивировать",
-        "errorTaskGone": "Этой задачи больше нет."
+        "errorTaskGone": "Этой задачи больше нет.",
+        "errorParentGone": "Родительской задачи этой подзадачи больше нет.",
+        "errorCommentGone": "Этого комментария больше нет."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",
@@ -6742,7 +6744,13 @@
             "seminar": "С",
             "lab": "ЛР"
         },
-        "typesWithTime": "Со временем"
+        "typesWithTime": "Со временем",
+        "errorShiftTypeGone": "Этого типа смены больше нет.",
+        "errorSelectedShiftTypeGone": "Выбранного типа смены больше нет.",
+        "errorCustomFieldGone": "Этого поля больше нет.",
+        "errorSelectedCustomFieldGone": "Одного из выбранных полей больше нет.",
+        "errorPatternGone": "Этого цикла смен больше нет.",
+        "errorEntryGone": "Этой записи больше нет."
     },
     "pairDisplay": {
         "title": "Подключение планшета",

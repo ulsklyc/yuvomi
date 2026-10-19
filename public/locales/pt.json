@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Arquivar todas as concluídas",
         "kanbanArchiveDoneConfirm": "Arquivar todas as tarefas concluídas desta coluna?",
         "kanbanArchiveDoneAction": "Arquivar",
-        "errorTaskGone": "Esta tarefa já não existe."
+        "errorTaskGone": "Esta tarefa já não existe.",
+        "errorParentGone": "A tarefa a que esta subtarefa pertence já não existe.",
+        "errorCommentGone": "Este comentário já não existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Com horário"
+        "typesWithTime": "Com horário",
+        "errorShiftTypeGone": "Este tipo de turno já não existe.",
+        "errorSelectedShiftTypeGone": "O tipo de turno escolhido já não existe.",
+        "errorCustomFieldGone": "Este campo já não existe.",
+        "errorSelectedCustomFieldGone": "Um dos campos escolhidos já não existe.",
+        "errorPatternGone": "Esta escala já não existe.",
+        "errorEntryGone": "Esta entrada já não existe."
     },
     "pairDisplay": {
         "title": "Emparelhar tablet",

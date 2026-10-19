@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Arkivera allt klart",
         "kanbanArchiveDoneConfirm": "Arkivera alla klara uppgifter i den här kolumnen?",
         "kanbanArchiveDoneAction": "Arkivera",
-        "errorTaskGone": "Den här uppgiften finns inte längre."
+        "errorTaskGone": "Den här uppgiften finns inte längre.",
+        "errorParentGone": "Uppgiften som den här deluppgiften hör till finns inte längre.",
+        "errorCommentGone": "Den här kommentaren finns inte längre."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",
@@ -6428,7 +6430,13 @@
             "seminar": "SEM",
             "lab": "LAB"
         },
-        "typesWithTime": "Med tider"
+        "typesWithTime": "Med tider",
+        "errorShiftTypeGone": "Den här skifttypen finns inte längre.",
+        "errorSelectedShiftTypeGone": "Den valda skifttypen finns inte längre.",
+        "errorCustomFieldGone": "Det här fältet finns inte längre.",
+        "errorSelectedCustomFieldGone": "Ett av de valda fälten finns inte längre.",
+        "errorPatternGone": "Den här skiftcykeln finns inte längre.",
+        "errorEntryGone": "Den här posten finns inte längre."
     },
     "pairDisplay": {
         "title": "Parkoppla platta",

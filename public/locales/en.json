@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Archive all done",
         "kanbanArchiveDoneConfirm": "Archive every done task in this column?",
         "kanbanArchiveDoneAction": "Archive",
-        "errorTaskGone": "This task no longer exists."
+        "errorTaskGone": "This task no longer exists.",
+        "errorParentGone": "The task this subtask belongs to no longer exists.",
+        "errorCommentGone": "This comment no longer exists."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "With times"
+        "typesWithTime": "With times",
+        "errorShiftTypeGone": "This shift type no longer exists.",
+        "errorSelectedShiftTypeGone": "The chosen shift type no longer exists.",
+        "errorCustomFieldGone": "This field no longer exists.",
+        "errorSelectedCustomFieldGone": "One of the chosen fields no longer exists.",
+        "errorPatternGone": "This schedule plan no longer exists.",
+        "errorEntryGone": "This entry no longer exists."
     },
     "pairDisplay": {
         "title": "Pair tablet",

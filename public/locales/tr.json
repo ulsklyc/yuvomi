@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Tamamlananların hepsini arşivle",
         "kanbanArchiveDoneConfirm": "Bu sütundaki tüm tamamlanan görevler arşivlensin mi?",
         "kanbanArchiveDoneAction": "Arşivle",
-        "errorTaskGone": "Bu görev artık yok."
+        "errorTaskGone": "Bu görev artık yok.",
+        "errorParentGone": "Bu alt görevin ait olduğu görev artık yok.",
+        "errorCommentGone": "Bu yorum artık yok."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Saatli"
+        "typesWithTime": "Saatli",
+        "errorShiftTypeGone": "Bu vardiya türü artık yok.",
+        "errorSelectedShiftTypeGone": "Seçilen vardiya türü artık yok.",
+        "errorCustomFieldGone": "Bu alan artık yok.",
+        "errorSelectedCustomFieldGone": "Seçilen alanlardan biri artık yok.",
+        "errorPatternGone": "Bu vardiya düzeni artık yok.",
+        "errorEntryGone": "Bu kayıt artık yok."
     },
     "pairDisplay": {
         "title": "Tableti eşleştir",

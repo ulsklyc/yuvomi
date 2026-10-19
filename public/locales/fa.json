@@ -646,7 +646,9 @@
         "kanbanArchiveDone": "بایگانی همه کارهای انجام‌شده",
         "kanbanArchiveDoneConfirm": "همه کارهای انجام‌شده در این ستون بایگانی شوند؟",
         "kanbanArchiveDoneAction": "بایگانی",
-        "errorTaskGone": "این کار دیگر وجود ندارد."
+        "errorTaskGone": "این کار دیگر وجود ندارد.",
+        "errorParentGone": "کاری که این زیرکار به آن تعلق دارد دیگر وجود ندارد.",
+        "errorCommentGone": "این دیدگاه دیگر وجود ندارد."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",
@@ -6428,7 +6430,13 @@
             "seminar": "سم",
             "lab": "آز"
         },
-        "typesWithTime": "با ساعت"
+        "typesWithTime": "با ساعت",
+        "errorShiftTypeGone": "این نوع شیفت دیگر وجود ندارد.",
+        "errorSelectedShiftTypeGone": "نوع شیفت انتخاب‌شده دیگر وجود ندارد.",
+        "errorCustomFieldGone": "این فیلد دیگر وجود ندارد.",
+        "errorSelectedCustomFieldGone": "یکی از فیلدهای انتخاب‌شده دیگر وجود ندارد.",
+        "errorPatternGone": "این چرخه شیفت دیگر وجود ندارد.",
+        "errorEntryGone": "این مورد دیگر وجود ندارد."
     },
     "pairDisplay": {
         "title": "جفت‌سازی تبلت",

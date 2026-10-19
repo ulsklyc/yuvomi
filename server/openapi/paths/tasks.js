@@ -144,7 +144,10 @@ export function tasksPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
 const TASK_GONE = '`tasks_task_not_found` (404, the task does not exist or is not visible to you - deleted, or made private)';
+const PARENT_GONE = '`tasks_parent_not_found` (404, `parent_task_id` names a task that does not exist or is not visible to you)';
+const COMMENT_GONE = `${TASK_GONE}, \`tasks_comment_not_found\` (404, the task is there, the comment is not - deleted in the meantime)`;
 const CASE_REASONS = {
+  '/api/v1/tasks': { post: PARENT_GONE },
   '/api/v1/tasks/reorder': { patch: TASK_GONE },
   '/api/v1/tasks/reorder/reset': { post: TASK_GONE },
   '/api/v1/tasks/{id}': { get: TASK_GONE, put: TASK_GONE, delete: TASK_GONE },
@@ -154,6 +157,7 @@ const CASE_REASONS = {
   '/api/v1/tasks/{id}/documents': { get: TASK_GONE, put: TASK_GONE },
   '/api/v1/tasks/{id}/completions': { get: TASK_GONE },
   '/api/v1/tasks/{id}/comments': { get: TASK_GONE, post: TASK_GONE },
+  '/api/v1/tasks/{id}/comments/{commentId}': { patch: COMMENT_GONE, delete: COMMENT_GONE },
 };
 
 function withCaseReasons(paths) {

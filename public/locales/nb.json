@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Arkiver alle fullførte",
         "kanbanArchiveDoneConfirm": "Arkivere alle fullførte oppgaver i denne kolonnen?",
         "kanbanArchiveDoneAction": "Arkiver",
-        "errorTaskGone": "Denne oppgaven finnes ikke lenger."
+        "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
+        "errorParentGone": "Oppgaven denne underoppgaven hører til finnes ikke lenger.",
+        "errorCommentGone": "Denne kommentaren finnes ikke lenger."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Med klokkeslett"
+        "typesWithTime": "Med klokkeslett",
+        "errorShiftTypeGone": "Denne vakttypen finnes ikke lenger.",
+        "errorSelectedShiftTypeGone": "Den valgte vakttypen finnes ikke lenger.",
+        "errorCustomFieldGone": "Dette feltet finnes ikke lenger.",
+        "errorSelectedCustomFieldGone": "Ett av de valgte feltene finnes ikke lenger.",
+        "errorPatternGone": "Denne planen finnes ikke lenger.",
+        "errorEntryGone": "Denne oppføringen finnes ikke lenger."
     },
     "pairDisplay": {
         "title": "Par nettbrett",

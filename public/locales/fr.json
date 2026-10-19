@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Archiver tout ce qui est terminé",
         "kanbanArchiveDoneConfirm": "Archiver toutes les tâches terminées de cette colonne ?",
         "kanbanArchiveDoneAction": "Archiver",
-        "errorTaskGone": "Cette tâche n’existe plus."
+        "errorTaskGone": "Cette tâche n’existe plus.",
+        "errorParentGone": "La tâche dont dépend cette sous-tâche n’existe plus.",
+        "errorCommentGone": "Ce commentaire n’existe plus."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",
@@ -6428,7 +6430,13 @@
             "seminar": "SÉ",
             "lab": "TP"
         },
-        "typesWithTime": "Avec horaires"
+        "typesWithTime": "Avec horaires",
+        "errorShiftTypeGone": "Ce type de poste n’existe plus.",
+        "errorSelectedShiftTypeGone": "Le type de poste choisi n’existe plus.",
+        "errorCustomFieldGone": "Ce champ n’existe plus.",
+        "errorSelectedCustomFieldGone": "L’un des champs choisis n’existe plus.",
+        "errorPatternGone": "Ce roulement n’existe plus.",
+        "errorEntryGone": "Cette entrée n’existe plus."
     },
     "pairDisplay": {
         "title": "Appairer la tablette",
