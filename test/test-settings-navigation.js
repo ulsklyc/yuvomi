@@ -4164,7 +4164,8 @@ test('Eigenes Modul hinzufuegen: adminOnly, am Ende, Fehler je reason lokalisier
     assert.equal(deleteErrorText({ status: 400, data: { reason, error: 'English' } }),
       installErrorText({ status: 400, data: { reason, error: 'English' } }), `${reason}: sonst dieselbe Abbildung`);
   }
-  assert.equal(deleteErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'Server says');
+  // Ein unbekannter Grund: der allgemeine Satz, nie der Text des Servers (#1909).
+  assert.equal(deleteErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'settings.installModuleErrorGeneric');
   // Der Loeschen-Toast in Aktive Module nutzt die Loeschen-Abbildung, der
   // Schalter-Toast die Install-Abbildung (PATCH enabled:true kann 409 busy und
   // 503 not_writable nennen, Review Runde 4).
@@ -4172,9 +4173,18 @@ test('Eigenes Modul hinzufuegen: adminOnly, am Ende, Fehler je reason lokalisier
   assert.match(activeSrc, /import \{ deleteErrorText, installErrorText \} from '\/settings\/module-install-errors\.js'/);
   assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? deleteErrorText\(error\)/, 'Loeschen-Toast');
   assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? installErrorText\(error\)/, 'Schalter-Toast');
-  assert.equal(installErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' } }), 'Server says',
-    'ein unbekannter reason faellt auf den Servertext zurueck');
+  assert.equal(installErrorText({ status: 400, data: { reason: 'new_thing', error: 'Server says' }, message: 'Server says' }),
+    'settings.installModuleErrorGeneric', 'ein unbekannter reason bekommt den allgemeinen Satz, nie den Text des Servers (#1909)');
+  assert.equal(installErrorText(Object.assign(new Error('Failed to fetch'), { status: 0 })), 'common.errorOfflineMutation',
+    'ohne Netz der Satz dafuer, nicht der des Browsers');
+  assert.equal(installErrorText({ status: 403, data: { error: 'Forbidden.' } }), 'common.errorNoPermission');
   assert.equal(installErrorText({}), 'settings.installModuleErrorGeneric');
+  // `bad_manifest` behaelt die Angabe des Loaders - eingesetzt in den eigenen Satz.
+  assert.match(installErrorText({ status: 400, data: { reason: 'bad_manifest', error: 'module.json is not a valid JSON object.' } }),
+    /^settings\.installModuleErrorBadManifest\{"detail":"module\.json is not a valid JSON object\."\}$/);
+  // Aktive Module: ohne reason der Satz der App statt `error.message`.
+  assert.doesNotMatch(activeSrc, /showToast\(error\?\.data\?\.reason \? (?:install|delete)ErrorText\(error\) : \(error\?\.message/);
+  assert.match(activeSrc, /showToast\(error\?\.data\?\.reason \? deleteErrorText\(error\) : errorSentence\(error\)/);
 
   assert.equal(zipFileProblem({ name: 'm.ZIP', size: 1024 }, 20), null);
   assert.equal(zipFileProblem({ name: 'm.tar.gz', size: 1024 }, 20), 'settings.installModuleFileNotZip');

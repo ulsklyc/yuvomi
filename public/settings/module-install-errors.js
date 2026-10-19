@@ -9,6 +9,7 @@
  */
 
 import { formatTime, t } from '/i18n.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Stabile `reason`-Codes des Servers -> Meldung in der UI-Sprache. Literale
@@ -92,7 +93,11 @@ function errorText(error, keys) {
   // Ein 429 ohne bekannten reason (ein Proxy davor, ein aelterer Server) ist
   // trotzdem "zu oft" - nicht "fehlgeschlagen".
   if (error?.status === 429) return t('settings.installModuleErrorTooManyAttempts');
-  return serverText || error?.message || t('settings.installModuleErrorGeneric');
+  // Ein Grund ohne eigenen Satz (ein neuer am Server) oder gar keiner: der Satz
+  // der App - offline, keine Berechtigung, sonst der allgemeine dieser Stelle.
+  // Nie der Text des Servers oder des Browsers (#1909); den kennt nur
+  // `bad_manifest` oben, als Angabe zum Modul, nicht als Satz.
+  return errorSentence(error, 'settings.installModuleErrorGeneric');
 }
 
 /**
@@ -100,8 +105,8 @@ function errorText(error, keys) {
  * "Aktive Module": PATCH enabled:true kann `busy` und `not_writable` nennen,
  * dieselben Saetze wie beim Installieren). Bekannte `reason` lokalisiert;
  * `bad_manifest` nennt dazu den Grund des Loaders (englisch, aber konkret:
- * welches Feld fehlt). Unbekanntes faellt auf den Servertext zurueck, dann auf
- * den allgemeinen Satz. Exportiert fuer die Tests und fuer modules-active.js.
+ * welches Feld fehlt). Unbekanntes bekommt den Satz der App (#1909), nie den
+ * Text des Servers. Exportiert fuer die Tests und fuer modules-active.js.
  */
 export function installErrorText(error) {
   return errorText(error, REASON_KEYS);

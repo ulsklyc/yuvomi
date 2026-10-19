@@ -1891,18 +1891,25 @@ test('saving a pattern from its edit dialog prechecks cycle_length against the d
   assert.doesNotMatch(branch.slice(0, branch.indexOf('return;', branch.indexOf('if (conflict)'))), /api\.put\(/, 'no PUT may fire before the precheck has passed');
 });
 
-test('scheduleErrorMessage() maps the three known raw server strings to humanized keys, and passes through anything unknown', async () => {
+test('scheduleErrorMessage() says the sentence of the case the server names, never the server text (#1909)', async () => {
   const { __test } = await import('../public/pages/schedule.js');
-  // Der Test-Loader stubt t() als Identitaet (siehe test-browser-loader.mjs)
-  // - hier zaehlt nur, dass ein bekannter Rohtext ueberhaupt auf EINEN
-  // uebersetzten Schluessel abgebildet wird (echte Uebersetzungstexte prueft
-  // bereits test:i18n/-translated), nicht dass er 1:1 durchgereicht wird.
-  assert.equal(__test.scheduleErrorMessage({ data: { error: 'shift_type_id must be a positive number.' } }), 'schedule.shiftTypeRequiredError');
-  assert.equal(__test.scheduleErrorMessage({ data: { error: 'cycle_length cannot exclude existing pattern days.' } }), 'schedule.cycleLengthConflictGeneric');
-  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Shift type is in use.' } }), 'schedule.typeInUse');
-  // Ein unbekannter Rohtext faellt unveraendert durch statt auf den generischen Fehler.
-  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Something else entirely.' } }), 'Something else entirely.');
-  // Weder data.error noch message -> der generische Fallback.
+  // Der Test-Loader stubt t() als Identitaet (siehe test-browser-loader.mjs).
+  // Die drei Faelle, die die Seite bis #1909 am Wortlaut erkannte, kommen jetzt
+  // ueber ihren reason; der Wortlaut allein traegt nichts mehr.
+  for (const [reason, key] of [
+    ['schedule_shift_type_required', 'schedule.shiftTypeRequiredError'],
+    ['schedule_cycle_length_conflict', 'schedule.cycleLengthConflictGeneric'],
+    ['schedule_shift_type_in_use', 'schedule.typeInUse'],
+    ['schedule_shift_type_not_found', 'schedule.errorShiftTypeGone'],
+    ['schedule_selected_shift_type_not_found', 'schedule.errorSelectedShiftTypeGone'],
+    ['schedule_extra_shift_not_found', 'schedule.errorEntryGone'],
+  ]) {
+    assert.equal(__test.scheduleErrorMessage({ status: 400, data: { error: 'Server sentence.', reason } }), key, reason);
+  }
+  // Ein Text ohne reason - auch einer, den die Seite frueher kannte - und ein
+  // unbekannter: der allgemeine Satz, nie der Text des Servers.
+  assert.equal(__test.scheduleErrorMessage({ status: 409, data: { error: 'Shift type is in use.' }, message: 'Shift type is in use.' }), 'common.errorGeneric');
+  assert.equal(__test.scheduleErrorMessage({ status: 400, data: { error: 'Something else entirely.' }, message: 'Something else entirely.' }), 'common.errorGeneric');
   assert.equal(__test.scheduleErrorMessage({}), 'common.errorGeneric');
 });
 
@@ -1916,8 +1923,11 @@ test('delete-shift now confirms before deleting, naming the type, like the other
   assert.match(branch, /danger:\s*true/);
   assert.match(branch, /detail:\s*t\('schedule\.deleteShiftTypeDetail'/);
   assert.match(branch, /if \(!confirmed\) return;/);
-  // Die api.delete() darf erst NACH der Rueckfrage stehen.
-  assert.ok(branch.indexOf('if (!confirmed) return;') < branch.indexOf('await api.delete(`/schedule/shift-types/'));
+  // Das Loeschen darf erst NACH der Rueckfrage stehen (seit #1909 ueber
+  // deleteUnlessGone: schon geloescht zaehlt als geloescht).
+  const deleting = branch.indexOf('await deleteUnlessGone(`/schedule/shift-types/');
+  assert.ok(deleting > -1, 'der Loeschaufruf steht nicht mehr da');
+  assert.ok(branch.indexOf('if (!confirmed) return;') < deleting);
 });
 
 test('a mode-only switch in the Add-entry modal is excluded from the dirty comparison (S-14)', () => {

@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Arquivar todas as concluídas",
         "kanbanArchiveDoneConfirm": "Arquivar todas as tarefas concluídas desta coluna?",
         "kanbanArchiveDoneAction": "Arquivar",
-        "errorTaskGone": "Esta tarefa não existe mais."
+        "errorTaskGone": "Esta tarefa não existe mais.",
+        "errorParentGone": "A tarefa à qual esta subtarefa pertence não existe mais.",
+        "errorCommentGone": "Este comentário não existe mais."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -6209,7 +6211,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Com horário"
+        "typesWithTime": "Com horário",
+        "errorShiftTypeGone": "Este tipo de turno não existe mais.",
+        "errorSelectedShiftTypeGone": "O tipo de turno escolhido não existe mais.",
+        "errorCustomFieldGone": "Este campo não existe mais.",
+        "errorSelectedCustomFieldGone": "Um dos campos escolhidos não existe mais.",
+        "errorPatternGone": "Esta escala não existe mais.",
+        "errorEntryGone": "Esta entrada não existe mais."
     },
     "waste": {
         "title": "Coleta de lixo",

@@ -22,15 +22,19 @@ import { isAdminRequest } from '../middleware/require-admin.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner, RANGE_REVERSED_MESSAGE, rangeReason } from './schedule.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner, RANGE_REVERSED_MESSAGE, SHIFT_TYPE_GONE_MESSAGE, rangeReason } from './schedule.js';
 import { nonMemberMessage } from '../services/household-members.js';
 import { createLogger } from '../logger.js';
 
 const router = express.Router();
 const log = createLogger('Schedule');
 const actorId = (req) => req.authUserId || req.session?.userId;
-// `reason` fuer "Von liegt nach Bis": siehe rangeReason() in routes/schedule.js (#1777).
-const fail = (res, code, error) => res.status(code).json({ error, code, ...(code === 400 ? rangeReason(String(error)) : {}) });
+// `reason` fuer "Von liegt nach Bis" und die anderen Faelle eines Satzes: siehe
+// rangeReason() in routes/schedule.js (#1777, #1909). Bei einer 404 nennt ihn
+// der Aufrufer.
+const fail = (res, code, error, extra = {}) => res.status(code).json({
+  error, code, ...(code === 400 ? rangeReason(String(error)) : {}), ...extra,
+});
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === userId;
@@ -72,7 +76,7 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const key = date(req.body?.date_key, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = id(req.body?.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 }); const offset = reminderOffset(req.body?.reminder_offset_minutes);
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
-  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   // Anlegen und replaceFieldValues() in EINER Transaktion: sonst stand die
   // Zeile schon committed, bevor ihre Werte geschrieben waren, und ein Wurf
   // dazwischen liess einen 500er auf eine bereits vorhandene Zeile antworten -
@@ -104,7 +108,7 @@ router.post('/fill', (req, res) => {
   if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
-  if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
+  if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
   if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
   if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
@@ -126,7 +130,7 @@ router.post('/fill', (req, res) => {
 router.put('/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(key.value);
-  if (!old) return fail(res, 404, 'Extra shift not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
+  if (!old) return fail(res, 404, 'Extra shift not found.', { reason: 'schedule_extra_shift_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   const dateKey = req.body?.date_key === undefined ? { value: old.date_key } : date(req.body.date_key, 'date_key', true);
   const typeId = req.body?.shift_type_id === undefined ? { value: old.shift_type_id } : id(req.body.shift_type_id, 'shift_type_id');
   const note = req.body?.note === undefined ? { value: old.note } : str(req.body.note, 'note', { required: false, max: 5000 });
@@ -137,7 +141,7 @@ router.put('/:id', (req, res) => {
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
   const errors = collectErrors([dateKey, typeId, note, offset]);
   if (fields.error) errors.push(fields.error);
-  if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
+  if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
   if (errors.length) return fail(res, 400, errors.join(' '));
   db.get().prepare('UPDATE schedule_extra_shifts SET date_key=?, shift_type_id=?, note=?, reminder_offset_minutes=? WHERE id=?').run(dateKey.value, typeId.value, note.value, offset.value, old.id);
   if (req.body?.field_values !== undefined) replaceFieldValues('extra_shift', old.id, fields.values);
@@ -149,7 +153,7 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(key.value);
-  if (!old) return fail(res, 404, 'Extra shift not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
+  if (!old) return fail(res, 404, 'Extra shift not found.', { reason: 'schedule_extra_shift_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   db.get().transaction(() => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?`).run(old.id);
     db.get().prepare('DELETE FROM schedule_extra_shifts WHERE id=?').run(old.id);

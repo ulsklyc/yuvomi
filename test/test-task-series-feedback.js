@@ -148,7 +148,8 @@ test('Detailansicht: scheitert das Erledigen, steht nur der Fehler da', async ()
   globalThis.__apiStub = { patch: async () => { throw new Error('Serverfehler'); } };
   openTaskDetail({ task: { ...BASIS, status: 'open' }, currentUserId: 2, categories: [{ key: 'household' }] });
   await options.actions.find((a) => a.id === 'task-detail-finish').onClick({ button: {}, close: async () => {} });
-  assert.deepEqual(toasts.map((x) => [x.message, x.type]), [['Serverfehler', 'danger']]);
+  // Der Satz der App, nie der Text des Fehlers (#1909).
+  assert.deepEqual(toasts.map((x) => [x.message, x.type]), [['common.errorGeneric', 'danger']]);
 });
 
 test('Detailansicht, Personenwahl: genau EIN Toast - mit Serie der kombinierte, ohne der bisherige', async () => {

@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Archivar todo lo hecho",
         "kanbanArchiveDoneConfirm": "¿Archivar todas las tareas hechas de esta columna?",
         "kanbanArchiveDoneAction": "Archivar",
-        "errorTaskGone": "Esta tarea ya no existe."
+        "errorTaskGone": "Esta tarea ya no existe.",
+        "errorParentGone": "La tarea a la que pertenece esta subtarea ya no existe.",
+        "errorCommentGone": "Este comentario ya no existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artículo eliminado.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Con horario"
+        "typesWithTime": "Con horario",
+        "errorShiftTypeGone": "Este tipo de turno ya no existe.",
+        "errorSelectedShiftTypeGone": "El tipo de turno elegido ya no existe.",
+        "errorCustomFieldGone": "Este campo ya no existe.",
+        "errorSelectedCustomFieldGone": "Uno de los campos elegidos ya no existe.",
+        "errorPatternGone": "Esta rotación ya no existe.",
+        "errorEntryGone": "Esta entrada ya no existe."
     },
     "pairDisplay": {
         "title": "Vincular tableta",

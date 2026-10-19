@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "सभी पूर्ण कार्य संग्रहित करें",
         "kanbanArchiveDoneConfirm": "इस कॉलम के सभी पूर्ण कार्य संग्रहित करें?",
         "kanbanArchiveDoneAction": "संग्रहित करें",
-        "errorTaskGone": "यह कार्य अब मौजूद नहीं है।"
+        "errorTaskGone": "यह कार्य अब मौजूद नहीं है।",
+        "errorParentGone": "जिस कार्य का यह उपकार्य है वह अब मौजूद नहीं है।",
+        "errorCommentGone": "यह टिप्पणी अब मौजूद नहीं है।"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",
@@ -6428,7 +6430,13 @@
             "seminar": "सं",
             "lab": "प्र"
         },
-        "typesWithTime": "समय के साथ"
+        "typesWithTime": "समय के साथ",
+        "errorShiftTypeGone": "यह शिफ़्ट प्रकार अब मौजूद नहीं है।",
+        "errorSelectedShiftTypeGone": "चुना गया शिफ़्ट प्रकार अब मौजूद नहीं है।",
+        "errorCustomFieldGone": "यह फ़ील्ड अब मौजूद नहीं है।",
+        "errorSelectedCustomFieldGone": "चुने गए फ़ील्ड में से एक अब मौजूद नहीं है।",
+        "errorPatternGone": "यह शिफ़्ट चक्र अब मौजूद नहीं है।",
+        "errorEntryGone": "यह प्रविष्टि अब मौजूद नहीं है।"
     },
     "pairDisplay": {
         "title": "टैबलेट जोड़ें",

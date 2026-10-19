@@ -21666,14 +21666,16 @@ const SERVER_TEXT_OWNERS = new Set([
 // deshalb stieg hier die Zahl (pages/calendar.js 5 -> 7, components/modal.js
 // 0 -> 1) statt dass die Stellen blind umgestellt wurden. Die Kalender-Scheibe
 // von #1909 raeumt sie mit eigenen Gruenden und Saetzen ab.
+//
+// `settings/module-install-errors.js` liest den Text nur noch an EINER Stelle,
+// und bewusst: `bad_manifest` setzt die Angabe des Modul-Laders (welches Feld
+// in module.json fehlt) in einen uebersetzten Satz - eine Angabe zum Modul fuer
+// den, der es installiert, kein Satz an seiner Stelle (#1909).
 const SERVER_TEXT_OPEN = new Map([
-  ['components/modal.js', 1],
   ['components/quick-links-manager.js', 2],
-  ['components/task-detail.js', 1],
   ['pages/calendar.js', 7],
   ['pages/meals.js', 5],
   ['pages/pantry.js', 6],
-  ['pages/schedule.js', 1],
   ['settings/module-install-errors.js', 1],
   ['settings/pages/modules-kitchen.js', 1],
 ]);
@@ -21735,7 +21737,8 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
     + '(bei 0 den Eintrag streichen), sonst darf die Zahl unbemerkt wieder steigen.');
   for (const name of ['pages/shopping.js', 'pages/waste.js', 'pages/health.js', 'settings/pages/modules-health.js', 'utils/kitchen-transfer.js', 'components/category-manager.js',
     'pages/documents.js', 'utils/document-folder-delete.js', 'pages/recipes.js', 'pages/subscriptions.js',
-    'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js']) {
+    'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js',
+    'components/task-detail.js', 'components/modal.js', 'pages/schedule.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
@@ -21766,6 +21769,10 @@ const ERROR_MESSAGE_CLEAN = [
   'pages/contacts.js',
   'pages/birthdays.js',
   'pages/tasks.js',
+  'components/task-detail.js',
+  'components/modal.js',
+  'pages/schedule.js',
+  'settings/module-install-errors.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

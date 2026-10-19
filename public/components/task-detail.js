@@ -38,6 +38,7 @@ import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing } from '/utils
 import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
+import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
@@ -113,14 +114,20 @@ export async function deleteTaskWithUndo(id, { container = null, onChanged = () 
       // `tasks: write` + `calendar: read` in ein verschlucktes 403, und selbst
       // wenn er ankam, loeschte er nur die EIGENEN Zeilen: die Erinnerung, die
       // sich jemand anderes auf dieselbe Aufgabe gesetzt hatte, blieb stehen.
-      await api.delete(`/tasks/${id}`, { keepalive });
+      try {
+        await api.delete(`/tasks/${id}`, { keepalive });
+      } catch (err) {
+        // Schon geloescht (oder privat gestellt) ist, was gewollt war (#1909):
+        // kein Fehler, die Zeile kommt nicht zurueck.
+        if (!isAlreadyDeleted(err, 'tasks_task_not_found')) throw err;
+      }
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await onChanged();
     },
     restore: (err) => {
       for (const el of rows) el.style.display = '';
-      if (err) window.yuvomi.showToast(err.message ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -145,7 +152,10 @@ export async function addSubtask(parentId, title, { onChanged = () => {} } = {})
     await onChanged();
     return res.data ?? null;
   } catch (err) {
-    window.yuvomi.showToast(err.message, 'danger');
+    // Der Satz der App, nie der des Servers (#1909). Ist die Aufgabe selbst
+    // inzwischen weg, kommt die Umgebung frisch - sie zeigt sie dann nicht mehr.
+    window.yuvomi.showToast(errorSentence(err), 'danger');
+    if (isAlreadyDeleted(err, 'tasks_parent_not_found')) await Promise.resolve(onChanged()).catch(() => {});
     return null;
   }
 }
@@ -309,8 +319,16 @@ function subtaskListNode(task, ctx) {
         // Elternkarte - die Liste, das Widget, der Kalendertag.
         await ctx.onChanged();
       } catch (err) {
+        window.yuvomi.showToast(errorSentence(err), 'danger');
+        if (isAlreadyDeleted(err, 'tasks_task_not_found')) {
+          // Den Teilschritt gibt es nicht mehr: die Zeile geht, die Umgebung
+          // (Fortschritt der Elternkarte) kommt frisch.
+          row.remove();
+          task.subtasks = (task.subtasks ?? []).filter((sub) => sub.id !== s.id);
+          await Promise.resolve(ctx.onChanged()).catch(() => {});
+          return;
+        }
         paint(row, previous, s.title);
-        window.yuvomi.showToast(err.message, 'danger');
       } finally {
         row.disabled = false;
       }
@@ -606,13 +624,18 @@ function commentRowNode(comment, { onChanged, ctx }) {
       scheduleUndoableDelete({
         message: t('tasks.commentDeletedToast'),
         commit: async ({ keepalive }) => {
-          await api.delete(`/tasks/${comment.task_id}/comments/${comment.id}`, { keepalive });
+          try {
+            await api.delete(`/tasks/${comment.task_id}/comments/${comment.id}`, { keepalive });
+          } catch (err) {
+            // Schon geloescht ist, was gewollt war (#1909).
+            if (!isAlreadyDeleted(err, 'tasks_comment_not_found')) throw err;
+          }
           if (keepalive) return; // Seite verschwindet - kein Nachladen mehr
           await onChanged();
         },
         restore: (err) => {
           row.hidden = false;
-          if (err) window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+          if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
         },
       });
     });
@@ -665,7 +688,11 @@ function startCommentEdit(row, comment, { onChanged, ctx }) {
       await onChanged();
     } catch (err) {
       save.disabled = false;
-      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi.showToast(errorSentence(err), 'danger');
+      // Kommentar oder Aufgabe sind inzwischen weg: die Liste kommt frisch.
+      if (isAlreadyDeleted(err, 'tasks_comment_not_found') || isAlreadyDeleted(err, 'tasks_task_not_found')) {
+        await Promise.resolve(onChanged()).catch(() => {});
+      }
     }
   });
 
@@ -850,7 +877,7 @@ function commentsNode(task, ctx) {
       field.value = '';
       await reloadAfterSave(() => load());
     } catch (err) {
-      window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi.showToast(errorSentence(err), 'danger');
     } finally {
       submit.disabled = false;
     }
@@ -1025,7 +1052,7 @@ async function toggleDescriptionCheck(task, box) {
   } catch (err) {
     paint(!checked);
     window.yuvomi?.showToast(
-      err.status === 409 ? t('tasks.checkConflict') : (err.data?.error ?? t('common.unknownError')),
+      err.status === 409 ? t('tasks.checkConflict') : errorSentence(err, 'common.unknownError'),
       'danger',
     );
   }
@@ -1338,7 +1365,7 @@ async function completeFor(task, person, button, ctx, close) {
   } catch (err) {
     stop();
     siblings.forEach((el) => { el.disabled = false; });
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    await sayWriteFailed(err, ctx, close);
     return;
   }
   task.status = 'done';
@@ -1401,7 +1428,7 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
     siblings.forEach((el) => { el.disabled = false; });
     // Gescheitert ist ein Schreibvorgang, kein Laden - tasks.loadError („Aufgabe
     // konnte nicht geladen werden") beschriebe den falschen Vorgang.
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    await sayWriteFailed(err, ctx, close);
     return;
   }
   task.status = status;
@@ -1412,6 +1439,17 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
   const seriesText = status === 'done' ? seriesDoneText(response) : null;
   if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
   await afterConfirmedWrite(ctx, close);
+}
+
+/**
+ * Ein Schreibvorgang aus der Ansicht ist gescheitert: der Satz der App, nie der
+ * des Servers (#1909). Gibt es die Aufgabe nicht mehr (geloescht oder privat
+ * gestellt), hat die Ansicht nichts mehr zu zeigen - sie geht zu, und die
+ * Umgebung kommt frisch, wie nach einem Erfolg.
+ */
+async function sayWriteFailed(err, ctx, close) {
+  window.yuvomi.showToast(errorSentence(err), 'danger');
+  if (isAlreadyDeleted(err, 'tasks_task_not_found')) await afterConfirmedWrite(ctx, close);
 }
 
 /**
@@ -1457,7 +1495,7 @@ async function toggleTaskArchive(task, button, ctx, close = closeDetailView) {
     await setTaskArchived(task.id, !archived);
   } catch (err) {
     stop();
-    window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+    await sayWriteFailed(err, ctx, close);
     return;
   }
   task.archived_at = archived ? null : new Date().toISOString();
@@ -1539,4 +1577,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit };

@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Archivia tutte le completate",
         "kanbanArchiveDoneConfirm": "Archiviare tutte le attività completate di questa colonna?",
         "kanbanArchiveDoneAction": "Archivia",
-        "errorTaskGone": "Questa attività non esiste più."
+        "errorTaskGone": "Questa attività non esiste più.",
+        "errorParentGone": "L’attività a cui appartiene questo sotto-compito non esiste più.",
+        "errorCommentGone": "Questo commento non esiste più."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} articolo eliminato.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Con orario"
+        "typesWithTime": "Con orario",
+        "errorShiftTypeGone": "Questo tipo di turno non esiste più.",
+        "errorSelectedShiftTypeGone": "Il tipo di turno scelto non esiste più.",
+        "errorCustomFieldGone": "Questo campo non esiste più.",
+        "errorSelectedCustomFieldGone": "Uno dei campi scelti non esiste più.",
+        "errorPatternGone": "Questa rotazione non esiste più.",
+        "errorEntryGone": "Questa voce non esiste più."
     },
     "pairDisplay": {
         "title": "Associa tablet",

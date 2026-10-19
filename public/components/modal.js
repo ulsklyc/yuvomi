@@ -30,6 +30,7 @@ import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { expandIn, durationToken, easingToken, isImeComposing } from '/utils/ux.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 let activeOverlay = null;
 let previouslyFocused = null;
@@ -2394,7 +2395,8 @@ function wireConfirmation(panel, finish, onConfirm) {
       finish(true);
     } catch (err) {
       if (error) {
-        error.textContent = err?.data?.error ?? err?.message ?? t('common.errorGeneric');
+        // Der Satz der App, nie der des Servers oder des Browsers (#1909).
+        error.textContent = errorSentence(err);
         error.hidden = false;
       }
     } finally {

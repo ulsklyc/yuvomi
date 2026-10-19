@@ -646,7 +646,9 @@
         "kanbanArchiveDone": "Arsipkan semua yang selesai",
         "kanbanArchiveDoneConfirm": "Arsipkan semua tugas selesai di kolom ini?",
         "kanbanArchiveDoneAction": "Arsipkan",
-        "errorTaskGone": "Tugas ini sudah tidak ada."
+        "errorTaskGone": "Tugas ini sudah tidak ada.",
+        "errorParentGone": "Tugas induk subtugas ini sudah tidak ada.",
+        "errorCommentGone": "Komentar ini sudah tidak ada."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "Dengan jam"
+        "typesWithTime": "Dengan jam",
+        "errorShiftTypeGone": "Jenis shift ini sudah tidak ada.",
+        "errorSelectedShiftTypeGone": "Jenis shift yang dipilih sudah tidak ada.",
+        "errorCustomFieldGone": "Bidang ini sudah tidak ada.",
+        "errorSelectedCustomFieldGone": "Salah satu bidang yang dipilih sudah tidak ada.",
+        "errorPatternGone": "Pola shift ini sudah tidak ada.",
+        "errorEntryGone": "Entri ini sudah tidak ada."
     },
     "pairDisplay": {
         "title": "Pasangkan tablet",

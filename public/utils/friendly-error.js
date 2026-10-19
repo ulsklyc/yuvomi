@@ -245,6 +245,29 @@ export const CASE_MESSAGES = new Map([
   // (privat gestellt) - fuer diese Person ist die Aufgabe in beiden Faellen
   // weg, ein Loeschen mit diesem Grund ist deshalb ein Erfolg.
   ['tasks_task_not_found', 'tasks.errorTaskGone'],
+  // Die Aufgabe, an die eine neue Teilaufgabe sollte, ist inzwischen weg; ein
+  // Kommentar, der geaendert oder geloescht werden sollte, ebenso (#1909).
+  ['tasks_parent_not_found', 'tasks.errorParentGone'],
+  ['tasks_comment_not_found', 'tasks.errorCommentGone'],
+  // Dienstplan (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS;
+  // die Seite laedt dann nach, ein Loeschen mit einem davon ist ein Erfolg.
+  // Abweichung und Zusatzschicht sind fuer den Nutzer beide "ein Eintrag".
+  ['schedule_shift_type_not_found', 'schedule.errorShiftTypeGone'],
+  ['schedule_custom_field_not_found', 'schedule.errorCustomFieldGone'],
+  ['schedule_pattern_not_found', 'schedule.errorPatternGone'],
+  ['schedule_override_not_found', 'schedule.errorEntryGone'],
+  ['schedule_extra_shift_not_found', 'schedule.errorEntryGone'],
+  // Die im Dialog GEWAEHLTE Schichtart oder ein gewaehltes Feld fehlt: der
+  // Dialog bleibt offen, die Seite dahinter kommt frisch.
+  ['schedule_selected_shift_type_not_found', 'schedule.errorSelectedShiftTypeGone'],
+  ['schedule_selected_custom_field_not_found', 'schedule.errorSelectedCustomFieldGone'],
+  // Bis #1909 ordnete die Seite diese drei am WORTLAUT des Servers zu.
+  ['schedule_shift_type_in_use', 'schedule.typeInUse'],
+  ['schedule_cycle_length_conflict', 'schedule.cycleLengthConflictGeneric'],
+  ['schedule_shift_type_required', 'schedule.shiftTypeRequiredError'],
+  // Aelter als die Regel (#1777) und schon Teil der API: nur der Dienstplan
+  // schickt ihn.
+  ['range_reversed', 'schedule.rangeOrderError'],
 ]);
 
 /**
@@ -352,6 +375,15 @@ export const GONE_REASONS = new Set([
   'inventory_location_not_found',
   'inventory_category_not_found',
   'tasks_task_not_found',
+  'tasks_parent_not_found',
+  'tasks_comment_not_found',
+  'schedule_shift_type_not_found',
+  'schedule_custom_field_not_found',
+  'schedule_pattern_not_found',
+  'schedule_override_not_found',
+  'schedule_extra_shift_not_found',
+  'schedule_selected_shift_type_not_found',
+  'schedule_selected_custom_field_not_found',
 ]);
 
 /**

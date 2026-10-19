@@ -646,7 +646,9 @@
         "kanbanArchiveDone": "I-archive lahat ng tapos na",
         "kanbanArchiveDoneConfirm": "I-archive ang lahat ng tapos na gawain sa column na ito?",
         "kanbanArchiveDoneAction": "I-archive",
-        "errorTaskGone": "Wala na ang gawaing ito."
+        "errorTaskGone": "Wala na ang gawaing ito.",
+        "errorParentGone": "Wala na ang gawaing kinabibilangan ng subtask na ito.",
+        "errorCommentGone": "Wala na ang komentong ito."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "LAB"
         },
-        "typesWithTime": "May oras"
+        "typesWithTime": "May oras",
+        "errorShiftTypeGone": "Wala na ang uri ng shift na ito.",
+        "errorSelectedShiftTypeGone": "Wala na ang napiling uri ng shift.",
+        "errorCustomFieldGone": "Wala na ang field na ito.",
+        "errorSelectedCustomFieldGone": "Wala na ang isa sa mga napiling field.",
+        "errorPatternGone": "Wala na ang pattern ng shift na ito.",
+        "errorEntryGone": "Wala na ang entry na ito."
     },
     "pairDisplay": {
         "title": "Ipares ang tablet",

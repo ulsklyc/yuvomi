@@ -9,7 +9,7 @@ import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
  * einen Eintrag je Tag und Mitglied.
  */
 export function schedulePaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/schedule/entries': {
       get: op({
         summary: 'Resolve schedule entries for a date range',
@@ -148,5 +148,49 @@ export function schedulePaths() {
         requestBody: jsonBody(null),
       }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const TYPE_GONE = '`schedule_shift_type_not_found` (404, the shift type was deleted)';
+const FIELD_GONE = '`schedule_custom_field_not_found` (404, the custom field was deleted)';
+const PATTERN_GONE = '`schedule_pattern_not_found` (404, the pattern was deleted)';
+const EXTRA_GONE = '`schedule_extra_shift_not_found` (404, the extra shift was deleted)';
+const SELECTED_TYPE_GONE = '`schedule_selected_shift_type_not_found` (400, the chosen `shift_type_id` was deleted)';
+const TYPE_REQUIRED = '`schedule_shift_type_required` (400, `shift_type_id` is missing or not a positive number)';
+const CASE_REASONS = {
+  '/api/v1/schedule/shift-types/{id}': {
+    put: TYPE_GONE,
+    delete: `${TYPE_GONE}, \`schedule_shift_type_in_use\` (409, a pattern, override or extra shift still uses it)`,
+  },
+  '/api/v1/schedule/shift-types/{id}/fields': {
+    put: `${TYPE_GONE}, \`schedule_selected_custom_field_not_found\` (400, a chosen \`custom_field_id\` was deleted)`,
+  },
+  '/api/v1/schedule/custom-fields/{id}': { put: FIELD_GONE, delete: FIELD_GONE },
+  '/api/v1/schedule/patterns/{id}': {
+    put: `${PATTERN_GONE}, \`schedule_cycle_length_conflict\` (400, the new \`cycle_length\` would cut off cycle days that are set)`,
+    delete: PATTERN_GONE,
+  },
+  '/api/v1/schedule/patterns/{id}/days': { get: PATTERN_GONE, put: `${PATTERN_GONE}, ${SELECTED_TYPE_GONE}` },
+  '/api/v1/schedule/overrides/fill': { post: SELECTED_TYPE_GONE },
+  '/api/v1/schedule/overrides/{dateKey}': {
+    put: SELECTED_TYPE_GONE,
+    delete: '`schedule_override_not_found` (404, there is no override on that day)',
+  },
+  '/api/v1/schedule/extras': { post: `${SELECTED_TYPE_GONE}, ${TYPE_REQUIRED}` },
+  '/api/v1/schedule/extras/fill': { post: `${SELECTED_TYPE_GONE}, ${TYPE_REQUIRED}` },
+  '/api/v1/schedule/extras/{id}': { put: `${EXTRA_GONE}, ${SELECTED_TYPE_GONE}, ${TYPE_REQUIRED}`, delete: EXTRA_GONE },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi schedule: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

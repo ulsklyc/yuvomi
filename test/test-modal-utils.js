@@ -184,13 +184,23 @@ test('failed confirmation actions keep the dialog open and allow retry', async (
   const panel = confirmationPanel();
   const finished = [];
   let fail = true;
+  let thrown = Object.assign(new Error('Calendar not found.'), {
+    name: 'ApiError', status: 404, data: { error: 'Calendar not found.', code: 404 },
+  });
   modalTest.wireConfirmation(panel, value => finished.push(value), async () => {
-    if (fail) throw new Error('Could not disable export');
+    if (fail) throw thrown;
   });
   await panel.listeners.get('ok')();
   assert.deepEqual(finished, []);
   assert.equal(panel.error.hidden, false);
-  assert.equal(panel.error.textContent, 'Could not disable export');
+  // Der Satz der App, nie der des Servers (#1909) - auch nicht der des Browsers.
+  assert.equal(panel.error.textContent, 'common.errorGeneric');
+  thrown = new Error('Could not disable export');
+  await panel.listeners.get('ok')();
+  assert.equal(panel.error.textContent, 'common.errorGeneric');
+  thrown = Object.assign(new Error('x'), { status: 403, data: { error: 'Forbidden.', reason: 'module_read_only' } });
+  await panel.listeners.get('ok')();
+  assert.equal(panel.error.textContent, 'settings.permReadOnlyBanner', 'eine Absage mit Grund sagt ihren Satz');
   assert.equal(panel.ok.disabled, false);
   assert.equal(panel.cancel.disabled, false);
   fail = false;

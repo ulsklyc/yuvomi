@@ -646,7 +646,9 @@
         "kanbanArchiveDone": "Alles Erledigte archivieren",
         "kanbanArchiveDoneConfirm": "Alle erledigten Aufgaben in dieser Spalte archivieren?",
         "kanbanArchiveDoneAction": "Archivieren",
-        "errorTaskGone": "Diese Aufgabe gibt es nicht mehr."
+        "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
+        "errorParentGone": "Die Aufgabe zu dieser Teilaufgabe gibt es nicht mehr.",
+        "errorCommentGone": "Diesen Kommentar gibt es nicht mehr."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -6428,7 +6430,13 @@
             "seminar": "SE",
             "lab": "PK"
         },
-        "typesWithTime": "Mit Uhrzeit"
+        "typesWithTime": "Mit Uhrzeit",
+        "errorShiftTypeGone": "Diese Schichtart gibt es nicht mehr.",
+        "errorSelectedShiftTypeGone": "Die gewählte Schichtart gibt es nicht mehr.",
+        "errorCustomFieldGone": "Dieses Feld gibt es nicht mehr.",
+        "errorSelectedCustomFieldGone": "Ein gewähltes Feld gibt es nicht mehr.",
+        "errorPatternGone": "Diesen Schichtplan gibt es nicht mehr.",
+        "errorEntryGone": "Diesen Eintrag gibt es nicht mehr."
     },
     "pairDisplay": {
         "title": "Tablet koppeln",

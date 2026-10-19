@@ -117,6 +117,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`tasks_task_not_found`, `inventory_location_exists`, `inventory_location_not_found`,
   `inventory_category_not_found`, `category_exists` for inventory categories,
   `contacts_selected_category_not_found`), and the status codes are unchanged.
+- **Task view, shift schedule, confirm dialogs and module install: error messages in your language**
+  (#1909). The open task showed the server's or the browser's own text when finishing, starting,
+  archiving, adding a subtask, ticking a line or writing, editing or deleting a comment failed, for
+  example "Parent task not found." It now says the sentence of the app. A task that somebody else
+  deleted or made private in the meantime closes the view and reloads what is behind it, and
+  deleting a task or comment that is already gone counts as done. The shift schedule no longer shows
+  the server's English text: a shift type, field, plan or entry that was deleted in the meantime is
+  named as such and the page reloads, deleting one that is already gone counts as done, and the
+  messages for "shift type still in use", "cycle too short" and "choose a shift type" now come from
+  the case, not from matching the server's wording. The error line of a confirm dialog and the
+  messages of the module installer in the settings say the app's sentence instead of the server's
+  text when there is no known cause. For API clients: those answers carry a `reason` next to
+  `error` (`tasks_parent_not_found`, `tasks_comment_not_found`, `schedule_shift_type_not_found`,
+  `schedule_custom_field_not_found`, `schedule_pattern_not_found`, `schedule_override_not_found`,
+  `schedule_extra_shift_not_found`, `schedule_selected_shift_type_not_found`,
+  `schedule_selected_custom_field_not_found`, `schedule_shift_type_in_use`,
+  `schedule_cycle_length_conflict`, `schedule_shift_type_required`), and the status codes and
+  texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

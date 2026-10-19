@@ -630,7 +630,9 @@
         "kanbanArchiveDone": "Minden kész archiválása",
         "kanbanArchiveDoneConfirm": "Archiválod az oszlop összes kész feladatát?",
         "kanbanArchiveDoneAction": "Archiválás",
-        "errorTaskGone": "Ez a feladat már nem létezik."
+        "errorTaskGone": "Ez a feladat már nem létezik.",
+        "errorParentGone": "Ennek az alfeladatnak a szülőfeladata már nem létezik.",
+        "errorCommentGone": "Ez a hozzászólás már nem létezik."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -6428,7 +6430,13 @@
             "seminar": "SZE",
             "lab": "L"
         },
-        "typesWithTime": "Időponttal"
+        "typesWithTime": "Időponttal",
+        "errorShiftTypeGone": "Ez a műszaktípus már nem létezik.",
+        "errorSelectedShiftTypeGone": "A kiválasztott műszaktípus már nem létezik.",
+        "errorCustomFieldGone": "Ez a mező már nem létezik.",
+        "errorSelectedCustomFieldGone": "Az egyik kiválasztott mező már nem létezik.",
+        "errorPatternGone": "Ez a műszakciklus már nem létezik.",
+        "errorEntryGone": "Ez a bejegyzés már nem létezik."
     },
     "pairDisplay": {
         "title": "Táblagép párosítása",
