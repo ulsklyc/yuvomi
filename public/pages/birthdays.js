@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext } from '/components/modal.js';
+import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatDate, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
@@ -968,15 +969,22 @@ function openBirthdayModal({ mode, birthday = null }) {
         // stehen, feuert `change` beim nächsten Griff zu DERSELBEN Datei nicht
         // mehr, und „nochmal anders zuschneiden" täte gar nichts.
         e.target.value = '';
+        let ImageProblemType = null;
         try {
-          const { pickCroppedImage } = await import('/utils/avatar-crop.js');
+          const { pickCroppedImage, ImageProblem } = await import('/utils/avatar-crop.js');
+          ImageProblemType = ImageProblem;
           const cropped = await pickCroppedImage(file);
           // Abgebrochener Zuschnitt: das bisherige Bild bleibt stehen.
           if (cropped === undefined) return;
           photoData = cropped;
           renderPreview();
         } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
+          // Die Pruefung des Bildes sagt ihren Satz; jeder andere Wurf den
+          // allgemeinen, nie seinen eigenen, unuebersetzten Text (#1909).
+          window.yuvomi?.showToast(
+            ImageProblemType && err instanceof ImageProblemType ? err.sentence : t('common.errorGeneric'),
+            'danger',
+          );
         }
       });
       removePhoto.addEventListener('click', () => {
@@ -1082,6 +1090,8 @@ function openBirthdayModal({ mode, birthday = null }) {
         }
 
         saveBtn.disabled = true;
+        const owner = _container;
+        const dialog = captureModalContext();
         try {
           if (isEdit) {
             await api.put(`/birthdays/${birthday.id}`, body);
@@ -1094,8 +1104,16 @@ function openBirthdayModal({ mode, birthday = null }) {
           renderList({ repaint: true, motion: true });
           closeModal({ force: true });
         } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
           saveBtn.disabled = false;
+          // Den Geburtstag gibt es nicht mehr (#1909): das Formular geht zu,
+          // solange es das offene ist, und der Eintrag faellt aus der Liste.
+          if (isEdit && isAlreadyDeleted(err, 'birthdays_birthday_not_found')) {
+            closeModal({ force: true, context: dialog });
+            state.birthdays = state.birthdays.filter((b) => b.id !== birthday.id);
+            updateBirthdayBadge();
+            if (_container === owner) renderList({ repaint: true });
+          }
         }
       });
     },
@@ -1127,7 +1145,7 @@ async function openImportModal() {
     const res = await api.get('/birthdays/import/candidates');
     candidates = res.data;
   } catch (err) {
-    window.yuvomi?.showToast(err.message, 'danger');
+    window.yuvomi?.showToast(loadErrorSentence(err) ?? t('common.errorGeneric'), 'danger');
     return;
   }
 
@@ -1198,7 +1216,7 @@ async function openImportModal() {
           renderList({ repaint: true, motion: true });
           closeModal({ force: true });
         } catch (err) {
-          window.yuvomi?.showToast(err.message, 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
           submitBtn.disabled = false;
         }
       });
@@ -1232,7 +1250,16 @@ function deleteBirthday(id) {
 
   scheduleUndoableDelete({
     message: t('birthdays.deletedToast'),
-    commit: ({ keepalive }) => api.delete(`/birthdays/${id}`, { keepalive }),
+    commit: async ({ keepalive }) => {
+      try {
+        await api.delete(`/birthdays/${id}`, { keepalive });
+      } catch (err) {
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
+        // war schneller. Geburtstage haben keine Sichtbarkeit - die 404 heisst
+        // nur "gibt es nicht mehr". Kein Toast, die Zeile kommt nicht zurueck.
+        if (!isAlreadyDeleted(err, 'birthdays_birthday_not_found')) throw err;
+      }
+    },
     restore: (err) => {
       state.birthdays = [
         ...state.birthdays.slice(0, index),
@@ -1241,7 +1268,7 @@ function deleteBirthday(id) {
       ];
       updateBirthdayBadge();
       if (_container === owner) renderList({ motion: true });
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -1504,4 +1531,7 @@ export const __test = {
   birthdayPaneSections, birthdayDetailHead, renderBirthdayPane,
   // #1821: `?open=` unter der Spaltenschwelle.
   openBirthdayFromQueryNarrow,
+  // #1909: Speichern, Loeschen und Import, wenn der Server ablehnt.
+  deleteBirthday, openImportModal,
+  setContainerForTest(container) { _container = container; },
 };

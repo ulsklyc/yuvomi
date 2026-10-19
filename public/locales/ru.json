@@ -1384,7 +1384,9 @@
         "checkConflict": "Заметка была изменена. Она будет загружена заново.",
         "pinnedState": "Закреплена",
         "checklistDone": "Выполнено",
-        "checklistOpen": "Открыто"
+        "checklistOpen": "Открыто",
+        "errorNoteGone": "Этой заметки больше нет.",
+        "errorSelectedCategoryGone": "Одной из выбранных категорий больше нет."
     },
     "markdown": {
         "bold": "Жирный (Ctrl+B)",
@@ -1508,7 +1510,8 @@
         "bulkDeleteConfirm_one": "Удалить {{count}} контакт?",
         "bulkDeleteConfirm_few": "Удалить {{count}} контакта?",
         "bulkDeleteConfirm_many": "Удалить {{count}} контактов?",
-        "bulkDeletedToast": "Удалено контактов: {{count}}"
+        "bulkDeletedToast": "Удалено контактов: {{count}}",
+        "errorContactGone": "Этого контакта больше нет."
     },
     "budget": {
         "title": "Бюджет",
@@ -3686,7 +3689,8 @@
         "importSubmit": "Добавить {{count}}",
         "importSuccess": "Добавлено дней рождения: {{count}}.",
         "importNothingSelected": "Выберите хотя бы один контакт.",
-        "importSelected": "Выбрано контактов: {{count}}"
+        "importSelected": "Выбрано контактов: {{count}}",
+        "errorBirthdayGone": "Этого дня рождения больше нет."
     },
     "reminders": {
         "sectionTitle": "Напоминание",
@@ -6454,7 +6458,12 @@
         "detailPaneLabel": "Сведения о предмете",
         "pickOne": "Выберите предмет",
         "pickOneHint": "Здесь появятся данные, сроки и история.",
-        "moreDetailsHint": "Покупка, гарантия, фото, документы"
+        "moreDetailsHint": "Покупка, гарантия, фото, документы",
+        "errorItemGone": "Этого предмета больше нет.",
+        "errorTrackedDateGone": "Этого срока больше нет.",
+        "errorSelectedLocationGone": "Выбранного места больше нет.",
+        "errorBookingGone": "Этой операции больше нет.",
+        "errorBookingAlreadyLinked": "Эта операция уже связана."
     },
     "documentAttach": {
         "label": "Вложения",

@@ -1238,7 +1238,9 @@
         "checkConflict": "Η σημείωση άλλαξε στο μεταξύ. Θα φορτωθεί ξανά.",
         "pinnedState": "Καρφιτσωμένη",
         "checklistDone": "Ολοκληρώθηκε",
-        "checklistOpen": "Ανοιχτό"
+        "checklistOpen": "Ανοιχτό",
+        "errorNoteGone": "Αυτή η σημείωση δεν υπάρχει πια.",
+        "errorSelectedCategoryGone": "Μια επιλεγμένη κατηγορία δεν υπάρχει πλέον."
     },
     "markdown": {
         "bold": "Έντονο (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Επιλογή {{name}}",
         "bulkDeleteConfirm": "Διαγραφή {{count}} επαφών;",
         "bulkDeleteConfirm_one": "Διαγραφή {{count}} επαφής;",
-        "bulkDeletedToast": "Διαγράφηκαν {{count}} επαφές"
+        "bulkDeletedToast": "Διαγράφηκαν {{count}} επαφές",
+        "errorContactGone": "Αυτή η επαφή δεν υπάρχει πια."
     },
     "budget": {
         "title": "Προϋπολογισμός",
@@ -3476,7 +3479,8 @@
         "importSubmit": "Προσθήκη {{count}}",
         "importSuccess": "Προστέθηκαν {{count}} γενέθλια.",
         "importNothingSelected": "Επιλέξτε τουλάχιστον μία επαφή.",
-        "importSelected": "Επιλέχθηκαν {{count}} επαφές"
+        "importSelected": "Επιλέχθηκαν {{count}} επαφές",
+        "errorBirthdayGone": "Αυτά τα γενέθλια δεν υπάρχουν πια."
     },
     "reminders": {
         "sectionTitle": "Υπενθύμιση",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Λεπτομέρειες αντικειμένου",
         "pickOne": "Επίλεξε ένα αντικείμενο",
         "pickOneHint": "Τα στοιχεία, οι προθεσμίες και το ιστορικό εμφανίζονται εδώ.",
-        "moreDetailsHint": "Αγορά, εγγύηση, φωτογραφία, έγγραφα"
+        "moreDetailsHint": "Αγορά, εγγύηση, φωτογραφία, έγγραφα",
+        "errorItemGone": "Αυτό το αντικείμενο δεν υπάρχει πια.",
+        "errorTrackedDateGone": "Αυτή η προθεσμία δεν υπάρχει πια.",
+        "errorSelectedLocationGone": "Η επιλεγμένη τοποθεσία δεν υπάρχει πλέον.",
+        "errorBookingGone": "Αυτή η κίνηση δεν υπάρχει πια.",
+        "errorBookingAlreadyLinked": "Αυτή η κίνηση είναι ήδη συνδεδεμένη."
     },
     "documentAttach": {
         "label": "Συνημμένα",

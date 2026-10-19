@@ -49,6 +49,7 @@ import {
   setTaskArchived, toggleSubtaskStatus,
 } from '/components/task-detail.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 
 // --------------------------------------------------------
 // Die geteilten Regeln, mit dem Blickwinkel DIESER Seite
@@ -2539,7 +2540,8 @@ function openTaskCategoryManager(container) {
       // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
       // einziger, warum die Seite den alten Stand behaelt.
       console.error('[Tasks] Auffrischen nach Kategorie-Aenderung fehlgeschlagen:', err);
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      // Ein Ladefehler: sein Satz, nie der Text des Servers (#1909).
+      window.yuvomi?.showToast(loadErrorSentence(err) ?? t('common.errorGeneric'), 'danger');
     }
   };
   openSharedModal({

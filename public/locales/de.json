@@ -1254,7 +1254,9 @@
         "checkConflict": "Die Notiz wurde inzwischen geändert. Sie wird neu geladen.",
         "pinnedState": "Angepinnt",
         "checklistDone": "Erledigt",
-        "checklistOpen": "Offen"
+        "checklistOpen": "Offen",
+        "errorNoteGone": "Diese Notiz gibt es nicht mehr.",
+        "errorSelectedCategoryGone": "Eine gewählte Kategorie gibt es nicht mehr."
     },
     "markdown": {
         "bold": "Fett (Strg+B)",
@@ -1376,7 +1378,8 @@
         "selectNamed": "{{name}} auswählen",
         "bulkDeleteConfirm": "{{count}} Kontakte löschen?",
         "bulkDeleteConfirm_one": "{{count}} Kontakt löschen?",
-        "bulkDeletedToast": "{{count}} Kontakte gelöscht"
+        "bulkDeletedToast": "{{count}} Kontakte gelöscht",
+        "errorContactGone": "Diesen Kontakt gibt es nicht mehr."
     },
     "budget": {
         "title": "Budget",
@@ -3453,7 +3456,8 @@
         "importSubmit": "{{count}} übernehmen",
         "importSuccess": "{{count}} Geburtstage übernommen.",
         "importNothingSelected": "Bitte mindestens einen Kontakt auswählen.",
-        "importSelected": "{{count}} Kontakte ausgewählt"
+        "importSelected": "{{count}} Kontakte ausgewählt",
+        "errorBirthdayGone": "Diesen Geburtstag gibt es nicht mehr."
     },
     "recipes": {
         "mealTypeNone": "Keine Mahlzeit",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Gegenstandsdetails",
         "pickOne": "Wähle einen Gegenstand",
         "pickOneHint": "Angaben, Fristen und Verlauf erscheinen hier.",
-        "moreDetailsHint": "Kauf, Garantie, Foto, Dokumente"
+        "moreDetailsHint": "Kauf, Garantie, Foto, Dokumente",
+        "errorItemGone": "Diesen Gegenstand gibt es nicht mehr.",
+        "errorTrackedDateGone": "Diese Frist gibt es nicht mehr.",
+        "errorSelectedLocationGone": "Den gewählten Ort gibt es nicht mehr.",
+        "errorBookingGone": "Diese Buchung gibt es nicht mehr.",
+        "errorBookingAlreadyLinked": "Diese Buchung ist bereits verknüpft."
     },
     "documentAttach": {
         "label": "Anhänge",

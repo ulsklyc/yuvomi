@@ -206,6 +206,31 @@ export const CASE_MESSAGES = new Map([
   ['subscriptions_logo_content_mismatch', 'subscriptions.errorLogoContentMismatch'],
   // Die Logo-Suche hat geantwortet, aber nichts Brauchbares gefunden.
   ['subscriptions_no_logo_found', 'subscriptions.logoSearchEmpty'],
+  // Inventar (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS.
+  // Gegenstaende haben keine Sichtbarkeit: die 404 heisst "geloescht". Ein
+  // Loeschen mit diesem Grund ist deshalb ein Erfolg (isAlreadyDeleted).
+  ['inventory_item_not_found', 'inventory.errorItemGone'],
+  // Die Frist, die als erledigt markiert werden sollte, steht nicht mehr am
+  // Gegenstand (beim Bearbeiten entfernt).
+  ['inventory_tracked_date_not_found', 'inventory.errorTrackedDateGone'],
+  // Der im Formular GEWAEHLTE Ort fehlt: das Formular bleibt offen und bietet
+  // die aktuellen Orte an.
+  ['inventory_selected_location_not_found', 'inventory.errorSelectedLocationGone'],
+  // Die Buchung, die verknuepft, vorbelegt oder geloest werden sollte, gibt es
+  // nicht mehr (geloescht, oder fuer diese Person nicht mehr sichtbar).
+  ['inventory_booking_not_found', 'inventory.errorBookingGone'],
+  ['inventory_booking_already_linked', 'inventory.errorBookingAlreadyLinked'],
+  // Notizen (#1909). Notizen haben keine Sichtbarkeit: die 404 heisst
+  // "geloescht", ein Loeschen mit diesem Grund ist ein Erfolg.
+  ['notes_note_not_found', 'notes.errorNoteGone'],
+  // Eine im Editor GEWAEHLTE Kategorie gibt es nicht mehr: der Editor bleibt
+  // offen und bietet die aktuellen Kategorien an.
+  ['notes_selected_category_not_found', 'notes.errorSelectedCategoryGone'],
+  // Kontakte (#1909). Die 404 heisst "geloescht", ein Loeschen mit diesem
+  // Grund ist ein Erfolg.
+  ['contacts_contact_not_found', 'contacts.errorContactGone'],
+  // Geburtstage (#1909), ebenso.
+  ['birthdays_birthday_not_found', 'birthdays.errorBirthdayGone'],
 ]);
 
 /**
@@ -301,6 +326,14 @@ export const GONE_REASONS = new Set([
   'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found',
   'subscriptions_selected_payment_method_not_found',
+  'inventory_item_not_found',
+  'inventory_tracked_date_not_found',
+  'inventory_selected_location_not_found',
+  'inventory_booking_not_found',
+  'notes_note_not_found',
+  'notes_selected_category_not_found',
+  'contacts_contact_not_found',
+  'birthdays_birthday_not_found',
 ]);
 
 /**

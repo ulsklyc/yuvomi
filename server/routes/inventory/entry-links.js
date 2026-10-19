@@ -92,18 +92,20 @@ export function entryHasLinks(entryId) {
 
 /**
  * Verknuepft eine Buchung mit einem Gegenstand.
- * @returns {{ok:true}|{error:string, code:number}}
+ * @returns {{ok:true}|{error:string, code:number, reason?:string}}
  */
 export function linkEntry({ itemId, entryId, role, amountShare, viewer }) {
   const entry = visibleEntry(entryId, viewer);
-  if (!entry) return { error: 'Booking not found.', code: 404 };
+  // Der Grund nennt den Fall (#1909): die Buchung gibt es
+  // nicht mehr (geloescht, oder fuer diese Person nicht mehr sichtbar).
+  if (!entry) return { error: 'Booking not found.', code: 404, reason: 'inventory_booking_not_found' };
   const linkError = linkabilityError(entry);
   if (linkError) return linkError;
 
   const existing = db.get().prepare(`
     SELECT id FROM inventory_item_entries WHERE item_id = ? AND entry_id = ? AND role = ?
   `).get(itemId, entryId, role);
-  if (existing) return { error: 'This booking is already linked with this role.', code: 409 };
+  if (existing) return { error: 'This booking is already linked with this role.', code: 409, reason: 'inventory_booking_already_linked' };
 
   db.get().prepare(`
     INSERT INTO inventory_item_entries (item_id, entry_id, role, amount_share, created_by)
@@ -115,11 +117,11 @@ export function linkEntry({ itemId, entryId, role, amountShare, viewer }) {
 /**
  * Entfernt alle Verknuepfungen zwischen einem Gegenstand und einer Buchung
  * (rollenunabhaengig - der Pfad hat kein Rollen-Segment).
- * @returns {{ok:true}|{error:string, code:number}}
+ * @returns {{ok:true}|{error:string, code:number, reason?:string}}
  */
 export function unlinkEntry({ itemId, entryId, viewer }) {
   const entry = visibleEntry(entryId, viewer);
-  if (!entry) return { error: 'Booking not found.', code: 404 };
+  if (!entry) return { error: 'Booking not found.', code: 404, reason: 'inventory_booking_not_found' };
   db.get().prepare('DELETE FROM inventory_item_entries WHERE item_id = ? AND entry_id = ?').run(itemId, entryId);
   return { ok: true };
 }

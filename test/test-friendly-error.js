@@ -290,7 +290,15 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
   // Die Abos ebenso; dass eine ECHTE Antwort sie traegt, misst
   // test:subscriptions-errors.
   const subscriptionsServer = read('../server/routes/subscriptions.js');
-  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Inventar, Notizen, Kontakte und Geburtstage ebenso (dazu die Dienste, die
+  // den Grund an ihre Route zurueckgeben); dass eine ECHTE Antwort ihn traegt,
+  // misst test:inventory-notes-errors.
+  const restServer = [
+    ...readdirSync(new URL('../server/routes/inventory/', import.meta.url)).map((name) => `../server/routes/inventory/${name}`),
+    '../server/routes/notes.js', '../server/services/note-categories.js',
+    '../server/routes/contacts.js', '../server/routes/birthdays.js',
+  ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
@@ -323,6 +331,9 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'meals_selected_recipe_not_found',
     'subscriptions_subscription_not_found', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
     'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
+    'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
+    'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
+    'contacts_contact_not_found', 'birthdays_birthday_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

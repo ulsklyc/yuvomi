@@ -1238,7 +1238,9 @@
         "checkConflict": "De notitie is intussen gewijzigd. Deze wordt opnieuw geladen.",
         "pinnedState": "Vastgezet",
         "checklistDone": "Klaar",
-        "checklistOpen": "Open"
+        "checklistOpen": "Open",
+        "errorNoteGone": "Deze notitie bestaat niet meer.",
+        "errorSelectedCategoryGone": "Een gekozen categorie bestaat niet meer."
     },
     "markdown": {
         "bold": "Vet (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "{{name}} selecteren",
         "bulkDeleteConfirm": "{{count}} contacten verwijderen?",
         "bulkDeleteConfirm_one": "{{count}} contact verwijderen?",
-        "bulkDeletedToast": "{{count}} contacten verwijderd"
+        "bulkDeletedToast": "{{count}} contacten verwijderd",
+        "errorContactGone": "Dit contact bestaat niet meer."
     },
     "budget": {
         "title": "Budget",
@@ -3437,7 +3440,8 @@
         "importSubmit": "{{count}} toevoegen",
         "importSuccess": "{{count}} verjaardagen toegevoegd.",
         "importNothingSelected": "Selecteer minstens één contact.",
-        "importSelected": "{{count}} contacten geselecteerd"
+        "importSelected": "{{count}} contacten geselecteerd",
+        "errorBirthdayGone": "Deze verjaardag bestaat niet meer."
     },
     "recipes": {
         "mealTypeNone": "Geen maaltijd",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Voorwerpdetails",
         "pickOne": "Kies een voorwerp",
         "pickOneHint": "Gegevens, termijnen en geschiedenis verschijnen hier.",
-        "moreDetailsHint": "Aankoop, garantie, foto, documenten"
+        "moreDetailsHint": "Aankoop, garantie, foto, documenten",
+        "errorItemGone": "Dit voorwerp bestaat niet meer.",
+        "errorTrackedDateGone": "Deze termijn bestaat niet meer.",
+        "errorSelectedLocationGone": "De gekozen locatie bestaat niet meer.",
+        "errorBookingGone": "Deze boeking bestaat niet meer.",
+        "errorBookingAlreadyLinked": "Deze boeking is al gekoppeld."
     },
     "documentAttach": {
         "label": "Bijlagen",

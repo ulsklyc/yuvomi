@@ -1238,7 +1238,9 @@
         "checkConflict": "The note has changed in the meantime. It will be reloaded.",
         "pinnedState": "Pinned",
         "checklistDone": "Done",
-        "checklistOpen": "Open"
+        "checklistOpen": "Open",
+        "errorNoteGone": "This note no longer exists.",
+        "errorSelectedCategoryGone": "A selected category no longer exists."
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Select {{name}}",
         "bulkDeleteConfirm": "Delete {{count}} contacts?",
         "bulkDeleteConfirm_one": "Delete {{count}} contact?",
-        "bulkDeletedToast": "{{count}} contacts deleted"
+        "bulkDeletedToast": "{{count}} contacts deleted",
+        "errorContactGone": "This contact no longer exists."
     },
     "budget": {
         "title": "Budget",
@@ -3437,7 +3440,8 @@
         "importSubmit": "Add {{count}}",
         "importSuccess": "{{count}} birthdays added.",
         "importNothingSelected": "Please select at least one contact.",
-        "importSelected": "{{count}} contacts selected"
+        "importSelected": "{{count}} contacts selected",
+        "errorBirthdayGone": "This birthday no longer exists."
     },
     "recipes": {
         "mealTypeNone": "No meal",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Item details",
         "pickOne": "Choose an item",
         "pickOneHint": "Details, deadlines and history appear here.",
-        "moreDetailsHint": "Purchase, warranty, photo, documents"
+        "moreDetailsHint": "Purchase, warranty, photo, documents",
+        "errorItemGone": "This item no longer exists.",
+        "errorTrackedDateGone": "This deadline no longer exists.",
+        "errorSelectedLocationGone": "The selected location no longer exists.",
+        "errorBookingGone": "This booking no longer exists.",
+        "errorBookingAlreadyLinked": "This booking is already linked."
     },
     "documentAttach": {
         "label": "Attachments",

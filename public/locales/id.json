@@ -1254,7 +1254,9 @@
         "checkConflict": "Catatan telah berubah sementara itu. Catatan akan dimuat ulang.",
         "pinnedState": "Disematkan",
         "checklistDone": "Selesai",
-        "checklistOpen": "Terbuka"
+        "checklistOpen": "Terbuka",
+        "errorNoteGone": "Catatan ini sudah tidak ada.",
+        "errorSelectedCategoryGone": "Salah satu kategori yang dipilih sudah tidak ada."
     },
     "markdown": {
         "bold": "Tebal (Ctrl+B)",
@@ -1376,7 +1378,8 @@
         "selectNamed": "Pilih {{name}}",
         "bulkDeleteConfirm": "Hapus {{count}} kontak?",
         "bulkDeleteConfirm_one": "Hapus {{count}} kontak?",
-        "bulkDeletedToast": "{{count}} kontak dihapus"
+        "bulkDeletedToast": "{{count}} kontak dihapus",
+        "errorContactGone": "Kontak ini sudah tidak ada."
     },
     "budget": {
         "title": "Anggaran",
@@ -3453,7 +3456,8 @@
         "importSubmit": "Tambahkan {{count}}",
         "importSuccess": "{{count}} ulang tahun ditambahkan.",
         "importNothingSelected": "Pilih setidaknya satu kontak.",
-        "importSelected": "{{count}} kontak dipilih"
+        "importSelected": "{{count}} kontak dipilih",
+        "errorBirthdayGone": "Ulang tahun ini sudah tidak ada."
     },
     "recipes": {
         "mealTypeNone": "Tanpa waktu makan",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Detail barang",
         "pickOne": "Pilih barang",
         "pickOneHint": "Detail, tenggat, dan riwayat muncul di sini.",
-        "moreDetailsHint": "Pembelian, garansi, foto, dokumen"
+        "moreDetailsHint": "Pembelian, garansi, foto, dokumen",
+        "errorItemGone": "Barang ini sudah tidak ada.",
+        "errorTrackedDateGone": "Tanggal ini sudah tidak ada.",
+        "errorSelectedLocationGone": "Lokasi yang dipilih sudah tidak ada.",
+        "errorBookingGone": "Transaksi ini sudah tidak ada.",
+        "errorBookingAlreadyLinked": "Transaksi ini sudah ditautkan."
     },
     "documentAttach": {
         "label": "Lampiran",

@@ -1400,7 +1400,9 @@
         "checkConflict": "Notatka została w międzyczasie zmieniona. Zostanie ponownie wczytana.",
         "pinnedState": "Przypięta",
         "checklistDone": "Zrobione",
-        "checklistOpen": "Otwarte"
+        "checklistOpen": "Otwarte",
+        "errorNoteGone": "Ta notatka już nie istnieje.",
+        "errorSelectedCategoryGone": "Jedna z wybranych kategorii już nie istnieje."
     },
     "markdown": {
         "bold": "Pogrubienie (Ctrl+B)",
@@ -1524,7 +1526,8 @@
         "bulkDeleteConfirm_one": "Usunąć {{count}} kontakt?",
         "bulkDeleteConfirm_few": "Usunąć {{count}} kontakty?",
         "bulkDeleteConfirm_many": "Usunąć {{count}} kontaktów?",
-        "bulkDeletedToast": "Usunięto {{count}} kontaktów"
+        "bulkDeletedToast": "Usunięto {{count}} kontaktów",
+        "errorContactGone": "Ten kontakt już nie istnieje."
     },
     "budget": {
         "title": "Budżet",
@@ -3659,7 +3662,8 @@
         "importSubmit": "Dodaj {{count}}",
         "importSuccess": "Dodano urodziny: {{count}}.",
         "importNothingSelected": "Wybierz co najmniej jeden kontakt.",
-        "importSelected": "Wybrano kontakty: {{count}}"
+        "importSelected": "Wybrano kontakty: {{count}}",
+        "errorBirthdayGone": "Te urodziny już nie istnieją."
     },
     "recipes": {
         "mealTypeNone": "Brak posiłku",
@@ -6454,7 +6458,12 @@
         "detailPaneLabel": "Szczegóły przedmiotu",
         "pickOne": "Wybierz przedmiot",
         "pickOneHint": "Tutaj pojawią się szczegóły, terminy i historia.",
-        "moreDetailsHint": "Zakup, gwarancja, zdjęcie, dokumenty"
+        "moreDetailsHint": "Zakup, gwarancja, zdjęcie, dokumenty",
+        "errorItemGone": "Ten przedmiot już nie istnieje.",
+        "errorTrackedDateGone": "Ten termin już nie istnieje.",
+        "errorSelectedLocationGone": "Wybrane miejsce już nie istnieje.",
+        "errorBookingGone": "Ta transakcja już nie istnieje.",
+        "errorBookingAlreadyLinked": "Ta transakcja jest już powiązana."
     },
     "documentAttach": {
         "label": "Załączniki",

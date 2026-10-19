@@ -884,6 +884,13 @@ const REASONS_PASSED_THROUGH = new Map([
   // problemBody (#1909): der Grund einer Abo-Pruefung, nur bei genau einem Befund.
   ['routes/subscriptions.js: items[0].reason', { sites: 1, at403: [], why: 'problemBody: feste 400' }],
   ['routes/tasks.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // Inventar (#1909): linkEntry/unlinkEntry/completeTrackedDate geben ihren
+  // Grund an 404/409/400 zurueck, der gewaehlte Ort reist an einer festen 400.
+  ['routes/inventory/items.js: result.reason', { sites: 3, at403: [], why: 'entry-links.js/service-log.js: 404, 409 oder 400' }],
+  ['routes/inventory/items.js: reason (Kurzform)', { sites: 2, at403: [], why: 'validateItemFields: feste 400' }],
+  // Notizen (#1909): NoteCategoryInputError traegt den Grund einer gewaehlten
+  // Kategorie; jeder Wurf dort ist eine 400.
+  ['routes/notes.js: error.reason', { sites: 1, at403: [], why: 'categoryErrorResponse: NoteCategoryInputError, immer 400' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
   // wasteErrorResponse (#1795, #1909): der Grund eines getypten Abfuhr-Fehlers
   // haengt an seinem Zweig - 400 (WasteValidationError), 409 (WasteConflictError:

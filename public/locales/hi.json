@@ -1238,7 +1238,9 @@
         "checkConflict": "नोट इस बीच बदल गया है। इसे फिर से लोड किया जाएगा।",
         "pinnedState": "पिन किया गया",
         "checklistDone": "पूर्ण",
-        "checklistOpen": "खुला"
+        "checklistOpen": "खुला",
+        "errorNoteGone": "यह नोट अब मौजूद नहीं है।",
+        "errorSelectedCategoryGone": "चुनी गई एक श्रेणी अब मौजूद नहीं है।"
     },
     "markdown": {
         "bold": "बोल्ड (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "{{name}} चुनें",
         "bulkDeleteConfirm": "{{count}} संपर्क हटाएँ?",
         "bulkDeleteConfirm_one": "{{count}} संपर्क हटाएँ?",
-        "bulkDeletedToast": "{{count}} संपर्क हटाए गए"
+        "bulkDeletedToast": "{{count}} संपर्क हटाए गए",
+        "errorContactGone": "यह संपर्क अब मौजूद नहीं है।"
     },
     "budget": {
         "title": "बजट",
@@ -3476,7 +3479,8 @@
         "importSubmit": "{{count}} जोड़ें",
         "importSuccess": "{{count}} जन्मदिन जोड़े गए।",
         "importNothingSelected": "कृपया कम से कम एक संपर्क चुनें।",
-        "importSelected": "{{count}} संपर्क चुने गए"
+        "importSelected": "{{count}} संपर्क चुने गए",
+        "errorBirthdayGone": "यह जन्मदिन अब मौजूद नहीं है।"
     },
     "reminders": {
         "sectionTitle": "अनुस्मारक",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "वस्तु का विवरण",
         "pickOne": "कोई वस्तु चुनें",
         "pickOneHint": "विवरण, समय-सीमाएँ और इतिहास यहाँ दिखेंगे।",
-        "moreDetailsHint": "खरीद, वारंटी, फ़ोटो, दस्तावेज़"
+        "moreDetailsHint": "खरीद, वारंटी, फ़ोटो, दस्तावेज़",
+        "errorItemGone": "यह चीज़ अब मौजूद नहीं है।",
+        "errorTrackedDateGone": "यह समय-सीमा अब मौजूद नहीं है।",
+        "errorSelectedLocationGone": "चुना गया स्थान अब मौजूद नहीं है।",
+        "errorBookingGone": "यह लेन-देन अब मौजूद नहीं है।",
+        "errorBookingAlreadyLinked": "यह लेन-देन पहले से जुड़ा हुआ है।"
     },
     "documentAttach": {
         "label": "अनुलग्नक",

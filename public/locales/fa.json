@@ -1254,7 +1254,9 @@
         "checkConflict": "یادداشت در این میان تغییر کرده است. دوباره بارگذاری می‌شود.",
         "pinnedState": "سنجاق‌شده",
         "checklistDone": "انجام‌شده",
-        "checklistOpen": "باز"
+        "checklistOpen": "باز",
+        "errorNoteGone": "این یادداشت دیگر وجود ندارد.",
+        "errorSelectedCategoryGone": "یکی از دسته‌های انتخاب‌شده دیگر وجود ندارد."
     },
     "markdown": {
         "bold": "توپر (Ctrl+B)",
@@ -1376,7 +1378,8 @@
         "selectNamed": "انتخاب {{name}}",
         "bulkDeleteConfirm": "حذف {{count}} مخاطب؟",
         "bulkDeleteConfirm_one": "حذف {{count}} مخاطب؟",
-        "bulkDeletedToast": "{{count}} مخاطب حذف شد"
+        "bulkDeletedToast": "{{count}} مخاطب حذف شد",
+        "errorContactGone": "این مخاطب دیگر وجود ندارد."
     },
     "budget": {
         "title": "بودجه",
@@ -3453,7 +3456,8 @@
         "importSubmit": "افزودن {{count}}",
         "importSuccess": "{{count}} تولد افزوده شد.",
         "importNothingSelected": "لطفاً حداقل یک مخاطب انتخاب کنید.",
-        "importSelected": "{{count}} مخاطب انتخاب شد"
+        "importSelected": "{{count}} مخاطب انتخاب شد",
+        "errorBirthdayGone": "این تولد دیگر وجود ندارد."
     },
     "recipes": {
         "mealTypeNone": "بدون وعده",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "جزئیات وسیله",
         "pickOne": "یک وسیله انتخاب کنید",
         "pickOneHint": "جزئیات، مهلت‌ها و سابقه اینجا نمایش داده می‌شوند.",
-        "moreDetailsHint": "خرید، ضمانت، عکس، اسناد"
+        "moreDetailsHint": "خرید، ضمانت، عکس، اسناد",
+        "errorItemGone": "این وسیله دیگر وجود ندارد.",
+        "errorTrackedDateGone": "این مهلت دیگر وجود ندارد.",
+        "errorSelectedLocationGone": "محل انتخاب‌شده دیگر وجود ندارد.",
+        "errorBookingGone": "این تراکنش دیگر وجود ندارد.",
+        "errorBookingAlreadyLinked": "این تراکنش قبلاً مرتبط شده است."
     },
     "documentAttach": {
         "label": "پیوست‌ها",

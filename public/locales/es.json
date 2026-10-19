@@ -1238,7 +1238,9 @@
         "checkConflict": "La nota ha cambiado mientras tanto. Se volverá a cargar.",
         "pinnedState": "Fijada",
         "checklistDone": "Completado",
-        "checklistOpen": "Abierto"
+        "checklistOpen": "Abierto",
+        "errorNoteGone": "Esta nota ya no existe.",
+        "errorSelectedCategoryGone": "Una categoría seleccionada ya no existe."
     },
     "markdown": {
         "bold": "Negrita (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Seleccionar a {{name}}",
         "bulkDeleteConfirm": "¿Eliminar {{count}} contactos?",
         "bulkDeleteConfirm_one": "¿Eliminar {{count}} contacto?",
-        "bulkDeletedToast": "{{count}} contactos eliminados"
+        "bulkDeletedToast": "{{count}} contactos eliminados",
+        "errorContactGone": "Este contacto ya no existe."
     },
     "budget": {
         "title": "Presupuesto",
@@ -3476,7 +3479,8 @@
         "importSubmit": "Añadir {{count}}",
         "importSuccess": "{{count}} cumpleaños añadidos.",
         "importNothingSelected": "Selecciona al menos un contacto.",
-        "importSelected": "{{count}} contactos seleccionados"
+        "importSelected": "{{count}} contactos seleccionados",
+        "errorBirthdayGone": "Este cumpleaños ya no existe."
     },
     "reminders": {
         "sectionTitle": "Recordatorio",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Detalles del objeto",
         "pickOne": "Elige un objeto",
         "pickOneHint": "Aquí aparecen los datos, los plazos y el historial.",
-        "moreDetailsHint": "Compra, garantía, foto, documentos"
+        "moreDetailsHint": "Compra, garantía, foto, documentos",
+        "errorItemGone": "Este objeto ya no existe.",
+        "errorTrackedDateGone": "Esta fecha ya no existe.",
+        "errorSelectedLocationGone": "La ubicación seleccionada ya no existe.",
+        "errorBookingGone": "Este movimiento ya no existe.",
+        "errorBookingAlreadyLinked": "Este movimiento ya está vinculado."
     },
     "documentAttach": {
         "label": "Adjuntos",

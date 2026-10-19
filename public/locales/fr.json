@@ -1238,7 +1238,9 @@
         "checkConflict": "La note a été modifiée entre-temps. Elle va être rechargée.",
         "pinnedState": "Épinglée",
         "checklistDone": "Terminé",
-        "checklistOpen": "Ouvert"
+        "checklistOpen": "Ouvert",
+        "errorNoteGone": "Cette note n’existe plus.",
+        "errorSelectedCategoryGone": "Une catégorie choisie n’existe plus."
     },
     "markdown": {
         "bold": "Gras (Ctrl+B)",
@@ -1360,7 +1362,8 @@
         "selectNamed": "Sélectionner {{name}}",
         "bulkDeleteConfirm": "Supprimer {{count}} contacts ?",
         "bulkDeleteConfirm_one": "Supprimer {{count}} contact ?",
-        "bulkDeletedToast": "{{count}} contacts supprimés"
+        "bulkDeletedToast": "{{count}} contacts supprimés",
+        "errorContactGone": "Ce contact n’existe plus."
     },
     "budget": {
         "title": "Budget",
@@ -3476,7 +3479,8 @@
         "importSubmit": "Ajouter {{count}}",
         "importSuccess": "{{count}} anniversaires ajoutés.",
         "importNothingSelected": "Sélectionnez au moins un contact.",
-        "importSelected": "{{count}} contacts sélectionnés"
+        "importSelected": "{{count}} contacts sélectionnés",
+        "errorBirthdayGone": "Cet anniversaire n’existe plus."
     },
     "reminders": {
         "sectionTitle": "Rappel",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "Détails de l'objet",
         "pickOne": "Choisissez un objet",
         "pickOneHint": "Les détails, échéances et l’historique s’affichent ici.",
-        "moreDetailsHint": "Achat, garantie, photo, documents"
+        "moreDetailsHint": "Achat, garantie, photo, documents",
+        "errorItemGone": "Cet objet n’existe plus.",
+        "errorTrackedDateGone": "Cette échéance n’existe plus.",
+        "errorSelectedLocationGone": "L’emplacement choisi n’existe plus.",
+        "errorBookingGone": "Cette écriture n’existe plus.",
+        "errorBookingAlreadyLinked": "Cette écriture est déjà liée."
     },
     "documentAttach": {
         "label": "Pièces jointes",

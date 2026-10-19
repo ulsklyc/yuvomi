@@ -551,7 +551,7 @@ router.put('/:id', (req, res) => {
   try {
     const id      = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
+    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
     // Namensteile (#535): sobald welche mitkommen, ersetzen sie die gespeicherten
     // und der Anzeigename wird neu daraus abgeleitet.
@@ -746,7 +746,7 @@ router.delete('/:id', (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
+    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
     
     if (contact.family_user_id) {
       return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403, reason: 'family_member_contact' });
@@ -754,7 +754,7 @@ router.delete('/:id', (req, res) => {
 
     const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);
     if (result.changes === 0)
-      return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
     res.status(204).end();
   } catch (err) {
     log.error('', err);
@@ -790,7 +790,7 @@ router.get('/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const contact = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
-    if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
+    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
     // Load multi-value fields
     const multiValueFields = loadMultiValueFields(id);
@@ -816,7 +816,7 @@ router.get('/:id/vcard', (req, res) => {
   try {
     const id      = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Kontakt nicht gefunden', code: 404 });
+    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
     const esc = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
 

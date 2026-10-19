@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
@@ -36,6 +36,7 @@ import {
 } from '/utils/note-category-picker.js';
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '/utils/note-category-name.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -219,9 +220,24 @@ async function toggleCheck(noteId, box) {
     if (err.status === 409) {
       await handleCheckConflict();
     } else {
-      window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
+      dropGoneNote(err, noteId);
     }
   }
+}
+
+/**
+ * "GIBT ES NICHT MEHR" (#1909): ein anderes Haushaltsmitglied hat die Notiz
+ * geloescht. Sie faellt aus dem Stand, ohne die Pinnwand neu zu holen - und
+ * zwar nur bei genau diesem Grund. Notizen haben keine Sichtbarkeit, die 404
+ * heisst nur "geloescht". Gibt true zurueck, wenn sie gefallen ist.
+ */
+function dropGoneNote(err, noteId) {
+  if (!isAlreadyDeleted(err, 'notes_note_not_found')) return false;
+  const before = state.notes.length;
+  state.notes = state.notes.filter((n) => n.id !== noteId);
+  if (state.notes.length !== before && _container) renderNotesAndFilters();
+  return true;
 }
 
 async function handleCheckConflict() {
@@ -1377,7 +1393,7 @@ function openNoteModal({ mode, note = null }) {
           renderFilters();
         } catch (err) {
           if (editorIsCurrent()) {
-            window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+            window.yuvomi?.showToast(errorSentence(err), 'danger');
           }
         } finally {
           if (pendingCategoryCreate === createRequest) pendingCategoryCreate = null;
@@ -1387,6 +1403,24 @@ function openNoteModal({ mode, note = null }) {
           }
         }
       });
+
+      async function offerCurrentCategories() {
+        try {
+          const res = await api.get('/notes/categories');
+          state.categories = res.data ?? [];
+          state.canManageHousehold = !!res.meta?.can_manage_household;
+        } catch {
+          return;
+        }
+        if (!editorIsCurrent()) return;
+        const known = new Set(state.categories.map((category) => Number(category.id)));
+        for (const chip of [...categoryChoices.querySelectorAll('[data-selected-category-id]')]) {
+          if (!known.has(Number(chip.dataset.selectedCategoryId))) chip.remove();
+        }
+        renderCategorySuggestions({ open: false });
+        renderFilters();
+        categorySearch.focus();
+      }
 
       panel.querySelector('#note-modal-cancel').addEventListener('click', closeModal);
 
@@ -1407,6 +1441,7 @@ function openNoteModal({ mode, note = null }) {
         }
 
         noteSavePending = true;
+        const dialog = captureModalContext();
         categoryCreateButton.disabled = true;
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
@@ -1425,7 +1460,19 @@ function openNoteModal({ mode, note = null }) {
           renderNotesAndFilters({ motion: true });
           window.yuvomi?.showToast(mode === 'create' ? t('notes.createdToast') : t('notes.savedToast'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
+          // Die Notiz gibt es nicht mehr (#1909): nichts mehr zu speichern -
+          // der Editor geht zu, solange er der offene ist.
+          if (isEdit && dropGoneNote(err, note.id)) {
+            noteSavePending = false;
+            if (editorIsCurrent()) closeModal({ force: true, context: dialog });
+            return;
+          }
+          if (!editorIsCurrent()) return;
+          // Eine gewaehlte Kategorie ist inzwischen weg: der Editor bleibt
+          // offen, die Kategorien kommen frisch, und was es nicht mehr gibt,
+          // faellt aus der Auswahl.
+          if (err?.data?.reason === 'notes_selected_category_not_found') await offerCurrentCategories();
           if (!editorIsCurrent()) return;
           btnError(saveBtn);
           noteSavePending = false;
@@ -1517,7 +1564,8 @@ async function togglePin(id) {
     state.notes.sort((a, b) => b.pinned - a.pinned);
     renderGrid({ motion: true });
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+    dropGoneNote(err, id);
   }
 }
 
@@ -1548,13 +1596,21 @@ async function deleteNote(id) {
 
   scheduleUndoableDelete({
     message: t('notes.deletedToast'),
-    commit: ({ keepalive }) => api.delete(`/notes/${id}`, { keepalive }),
+    commit: async ({ keepalive }) => {
+      try {
+        await api.delete(`/notes/${id}`, { keepalive });
+      } catch (err) {
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
+        // war schneller. Kein Toast, die Notiz kommt nicht zurueck.
+        if (!isAlreadyDeleted(err, 'notes_note_not_found')) throw err;
+      }
+    },
     restore: (err) => {
       if (note) {
         state.notes = [...state.notes, note].sort((a, b) => b.pinned - a.pinned);
         renderNotesAndFilters({ motion: true });
       }
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -1575,4 +1631,7 @@ export const __test = {
   openNoteModal,
   // #1821: der Tiefenlink `?open=<id>` wird am Programm gemessen.
   openNoteFromQuery,
+  // #1909: Anpinnen und Loeschen einer Notiz, die es nicht mehr gibt.
+  togglePin, deleteNote,
+  setContainerForTest(container) { _container = container; },
 };

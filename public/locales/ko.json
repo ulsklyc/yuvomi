@@ -1254,7 +1254,9 @@
         "checkConflict": "그 사이에 메모가 변경되었습니다. 다시 불러옵니다.",
         "pinnedState": "고정됨",
         "checklistDone": "완료",
-        "checklistOpen": "미완료"
+        "checklistOpen": "미완료",
+        "errorNoteGone": "이 메모는 더 이상 없습니다.",
+        "errorSelectedCategoryGone": "선택한 카테고리 중 하나가 더 이상 존재하지 않습니다."
     },
     "markdown": {
         "bold": "굵게 (Ctrl+B)",
@@ -1376,7 +1378,8 @@
         "selectNamed": "{{name}} 선택",
         "bulkDeleteConfirm": "연락처 {{count}}개를 삭제할까요?",
         "bulkDeleteConfirm_one": "연락처 {{count}}개를 삭제할까요?",
-        "bulkDeletedToast": "연락처 {{count}}개 삭제됨"
+        "bulkDeletedToast": "연락처 {{count}}개 삭제됨",
+        "errorContactGone": "이 연락처는 더 이상 없습니다."
     },
     "budget": {
         "title": "예산",
@@ -3453,7 +3456,8 @@
         "importSubmit": "{{count}}개 추가",
         "importSuccess": "생일 {{count}}개를 추가했습니다.",
         "importNothingSelected": "연락처를 하나 이상 선택하세요.",
-        "importSelected": "연락처 {{count}}개 선택됨"
+        "importSelected": "연락처 {{count}}개 선택됨",
+        "errorBirthdayGone": "이 생일은 더 이상 없습니다."
     },
     "recipes": {
         "mealTypeNone": "식사 없음",
@@ -6150,7 +6154,12 @@
         "detailPaneLabel": "물품 세부 정보",
         "pickOne": "물품을 선택하세요",
         "pickOneHint": "세부 정보, 기한, 기록이 여기에 표시됩니다.",
-        "moreDetailsHint": "구매, 보증, 사진, 문서"
+        "moreDetailsHint": "구매, 보증, 사진, 문서",
+        "errorItemGone": "이 물건은 더 이상 없습니다.",
+        "errorTrackedDateGone": "이 기한은 더 이상 없습니다.",
+        "errorSelectedLocationGone": "선택한 위치가 더 이상 존재하지 않습니다.",
+        "errorBookingGone": "이 거래는 더 이상 없습니다.",
+        "errorBookingAlreadyLinked": "이 거래는 이미 연결되어 있습니다."
     },
     "documentAttach": {
         "label": "첨부",

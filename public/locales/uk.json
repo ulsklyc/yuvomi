@@ -1384,7 +1384,9 @@
         "checkConflict": "Нотатку тим часом змінено. Її буде завантажено знову.",
         "pinnedState": "Закріплена",
         "checklistDone": "Виконано",
-        "checklistOpen": "Відкрито"
+        "checklistOpen": "Відкрито",
+        "errorNoteGone": "Цієї нотатки більше немає.",
+        "errorSelectedCategoryGone": "Однієї з вибраних категорій більше немає."
     },
     "markdown": {
         "bold": "Жирний (Ctrl+B)",
@@ -1508,7 +1510,8 @@
         "bulkDeleteConfirm_one": "Видалити {{count}} контакт?",
         "bulkDeleteConfirm_few": "Видалити {{count}} контакти?",
         "bulkDeleteConfirm_many": "Видалити {{count}} контактів?",
-        "bulkDeletedToast": "Видалено контактів: {{count}}"
+        "bulkDeletedToast": "Видалено контактів: {{count}}",
+        "errorContactGone": "Цього контакту більше немає."
     },
     "budget": {
         "title": "Бюджет",
@@ -3727,7 +3730,8 @@
         "importSubmit": "Додати {{count}}",
         "importSuccess": "Додано днів народження: {{count}}.",
         "importNothingSelected": "Виберіть принаймні один контакт.",
-        "importSelected": "Вибрано контактів: {{count}}"
+        "importSelected": "Вибрано контактів: {{count}}",
+        "errorBirthdayGone": "Цього дня народження більше немає."
     },
     "onboarding": {
         "step1Title": "Ласкаво просимо до {{name}}",
@@ -6454,7 +6458,12 @@
         "detailPaneLabel": "Відомості про предмет",
         "pickOne": "Виберіть предмет",
         "pickOneHint": "Тут з’являться дані, терміни та історія.",
-        "moreDetailsHint": "Купівля, гарантія, фото, документи"
+        "moreDetailsHint": "Купівля, гарантія, фото, документи",
+        "errorItemGone": "Цього предмета більше немає.",
+        "errorTrackedDateGone": "Цього терміну більше немає.",
+        "errorSelectedLocationGone": "Вибраного місця більше немає.",
+        "errorBookingGone": "Цієї операції більше немає.",
+        "errorBookingAlreadyLinked": "Ця операція вже пов'язана."
     },
     "documentAttach": {
         "label": "Вкладення",
