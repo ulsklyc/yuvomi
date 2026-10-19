@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saving in a Health dialog no longer closes a dialog you opened in the meantime (#1997).**
+  Measurements, medications and dose entries, lab reports, activities, prevention records,
+  nutrition entries and targets, periods, cycle days, the cycle history import and the cycle
+  settings now close only the dialog the save came from. If you had closed it and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed
