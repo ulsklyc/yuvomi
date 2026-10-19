@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Only someone who may see housekeeping amounts can mark a payment.",
         "notHereToday": "Not here yet today",
         "tabVisits": "Visits",
-        "tabChores": "Chores"
+        "tabChores": "Chores",
+        "errorWorkerGone": "This housekeeper no longer exists.",
+        "errorVisitGone": "This visit no longer exists.",
+        "errorTaskGone": "This task no longer exists.",
+        "errorAlreadyCheckedOut": "This housekeeper is already checked out.",
+        "errorAlreadyCheckedIn": "This housekeeper is already checked in."
     },
     "userMultiSelect": {
         "moreUsers": "more",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Close account",
             "confirmCloseAccount": "Close the account of {{name}}?",
             "closeAccountDetail": "The history is kept. An account opened again starts in the currency the household uses then.",
-            "accountNotEmpty": "The account can only be closed once it has no balance, no plan and no open request."
-        }
+            "accountNotEmpty": "The account can only be closed once it has no balance, no plan and no open request.",
+            "errorAccountDeactivated": "This account is deactivated and can only be paid out.",
+            "errorBalanceTooLarge": "The balance would become too large. The request stays open.",
+            "errorAccountExists": "This person already has a pocket money account.",
+            "errorNoAccount": "This person has no pocket money account.",
+            "errorCurrencyChanged": "The currency of this account has changed."
+        },
+        "errorRewardGone": "This reward is no longer available.",
+        "errorRequestGone": "This request no longer exists.",
+        "errorRequestDecided": "This request has already been decided.",
+        "errorNotEnoughPoints": "There are not enough points for this.",
+        "errorNotParticipating": "This person does not collect points.",
+        "errorMoneyAccountGone": "This account no longer exists.",
+        "errorMoneyPlanGone": "This plan no longer exists."
     },
     "datepicker": {
         "openCalendar": "Open calendar",

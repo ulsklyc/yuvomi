@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Solo puede marcar un pago quien puede ver los importes de la ayuda doméstica.",
         "notHereToday": "Hoy aún no ha llegado",
         "tabVisits": "Visitas",
-        "tabChores": "Labores"
+        "tabChores": "Labores",
+        "errorWorkerGone": "Esta persona de limpieza ya no existe.",
+        "errorVisitGone": "Este servicio ya no existe.",
+        "errorTaskGone": "Esta tarea ya no existe.",
+        "errorAlreadyCheckedOut": "Esta persona de limpieza ya registró su salida.",
+        "errorAlreadyCheckedIn": "Esta persona de limpieza ya registró su entrada."
     },
     "userMultiSelect": {
         "moreUsers": "más",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Cerrar cuenta",
             "confirmCloseAccount": "¿Cerrar la cuenta de {{name}}?",
             "closeAccountDetail": "El historial se conserva. Una cuenta abierta de nuevo empieza en la moneda que el hogar use entonces.",
-            "accountNotEmpty": "La cuenta solo se puede cerrar cuando no tenga saldo, plan ni solicitudes abiertas."
-        }
+            "accountNotEmpty": "La cuenta solo se puede cerrar cuando no tenga saldo, plan ni solicitudes abiertas.",
+            "errorAccountDeactivated": "Esta cuenta está desactivada y solo se puede liquidar.",
+            "errorBalanceTooLarge": "El saldo sería demasiado alto. La solicitud sigue abierta.",
+            "errorAccountExists": "Esta persona ya tiene una cuenta de paga.",
+            "errorNoAccount": "Esta persona no tiene cuenta de paga.",
+            "errorCurrencyChanged": "La moneda de esta cuenta ha cambiado."
+        },
+        "errorRewardGone": "Este premio ya no está disponible.",
+        "errorRequestGone": "Esta solicitud ya no existe.",
+        "errorRequestDecided": "Esta solicitud ya se ha decidido.",
+        "errorNotEnoughPoints": "No hay puntos suficientes para esto.",
+        "errorNotParticipating": "Esta persona no acumula puntos.",
+        "errorMoneyAccountGone": "Esta cuenta ya no existe.",
+        "errorMoneyPlanGone": "Este plan ya no existe."
     },
     "datepicker": {
         "openCalendar": "Abrir calendario",

@@ -4284,7 +4284,12 @@
         "errorAmountsHidden": "Отметить оплату может только тот, кому видны суммы помощницы по дому.",
         "notHereToday": "Сегодня ещё не пришла",
         "tabVisits": "Визиты",
-        "tabChores": "Дела по дому"
+        "tabChores": "Дела по дому",
+        "errorWorkerGone": "Этого помощника больше нет.",
+        "errorVisitGone": "Этого визита больше нет.",
+        "errorTaskGone": "Этой задачи больше нет.",
+        "errorAlreadyCheckedOut": "Уход этого помощника уже отмечен.",
+        "errorAlreadyCheckedIn": "Приход этого помощника уже отмечен."
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -6190,8 +6195,20 @@
             "closeAccount": "Закрыть счёт",
             "confirmCloseAccount": "Закрыть счёт для {{name}}?",
             "closeAccountDetail": "История сохраняется. Заново открытый счёт начинается в валюте, которую семья использует на тот момент.",
-            "accountNotEmpty": "Счёт можно закрыть только тогда, когда на нём нет остатка, плана и открытых запросов."
-        }
+            "accountNotEmpty": "Счёт можно закрыть только тогда, когда на нём нет остатка, плана и открытых запросов.",
+            "errorAccountDeactivated": "Этот счёт деактивирован и может быть только выплачен.",
+            "errorBalanceTooLarge": "Остаток стал бы слишком большим. Запрос остаётся открытым.",
+            "errorAccountExists": "У этого человека уже есть счёт карманных денег.",
+            "errorNoAccount": "У этого человека нет счёта карманных денег.",
+            "errorCurrencyChanged": "Валюта этого счёта изменилась."
+        },
+        "errorRewardGone": "Эта награда больше недоступна.",
+        "errorRequestGone": "Этого запроса больше нет.",
+        "errorRequestDecided": "По этому запросу уже принято решение.",
+        "errorNotEnoughPoints": "Баллов на это не хватает.",
+        "errorNotParticipating": "Этот человек не копит баллы.",
+        "errorMoneyAccountGone": "Этого счёта больше нет.",
+        "errorMoneyPlanGone": "Этого плана больше нет."
     },
     "datepicker": {
         "openCalendar": "Открыть календарь",

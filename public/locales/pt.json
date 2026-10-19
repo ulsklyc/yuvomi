@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Só quem pode ver os valores da ajuda doméstica pode marcar um pagamento.",
         "notHereToday": "Ainda não chegou hoje",
         "tabVisits": "Visitas",
-        "tabChores": "Afazeres"
+        "tabChores": "Afazeres",
+        "errorWorkerGone": "Esta faxineira já não existe.",
+        "errorVisitGone": "Esta visita já não existe.",
+        "errorTaskGone": "Esta tarefa já não existe.",
+        "errorAlreadyCheckedOut": "Esta faxineira já registou a saída.",
+        "errorAlreadyCheckedIn": "Esta faxineira já registou a entrada."
     },
     "userMultiSelect": {
         "moreUsers": "mais",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Fechar conta",
             "confirmCloseAccount": "Fechar a conta de {{name}}?",
             "closeAccountDetail": "O histórico mantém-se. Uma conta aberta de novo começa na moeda que o agregado usar nessa altura.",
-            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto."
-        }
+            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto.",
+            "errorAccountDeactivated": "Esta conta está desativada e só pode ser liquidada.",
+            "errorBalanceTooLarge": "O saldo ficaria demasiado alto. O pedido continua aberto.",
+            "errorAccountExists": "Esta pessoa já tem uma conta de mesada.",
+            "errorNoAccount": "Esta pessoa não tem conta de mesada.",
+            "errorCurrencyChanged": "A moeda desta conta mudou."
+        },
+        "errorRewardGone": "Este prémio já não está disponível.",
+        "errorRequestGone": "Este pedido já não existe.",
+        "errorRequestDecided": "Este pedido já foi decidido.",
+        "errorNotEnoughPoints": "Os pontos não chegam para isto.",
+        "errorNotParticipating": "Esta pessoa não acumula pontos.",
+        "errorMoneyAccountGone": "Esta conta já não existe.",
+        "errorMoneyPlanGone": "Este plano já não existe."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

@@ -4060,7 +4060,12 @@
         "errorAmountsHidden": "Ang may pahintulot lang na makita ang halaga para sa kasambahay ang makakapagmarka ng bayad.",
         "notHereToday": "Wala pa ngayong araw",
         "tabVisits": "Mga pagbisita",
-        "tabChores": "Gawaing-bahay"
+        "tabChores": "Gawaing-bahay",
+        "errorWorkerGone": "Wala na ang katulong na ito.",
+        "errorVisitGone": "Wala na ang pagbisitang ito.",
+        "errorTaskGone": "Wala na ang gawaing ito.",
+        "errorAlreadyCheckedOut": "Naka-check out na ang katulong na ito.",
+        "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito."
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Isara ang account",
             "confirmCloseAccount": "Isara ang account ni {{name}}?",
             "closeAccountDetail": "Mananatili ang kasaysayan. Ang account na muling bubuksan ay magsisimula sa currency na gamit ng sambahayan sa panahong iyon.",
-            "accountNotEmpty": "Maisasara lang ang account kapag wala na itong balanse, plano, o bukas na kahilingan."
-        }
+            "accountNotEmpty": "Maisasara lang ang account kapag wala na itong balanse, plano, o bukas na kahilingan.",
+            "errorAccountDeactivated": "Naka-deactivate ang account na ito at maibabayad na lang ang laman nito.",
+            "errorBalanceTooLarge": "Magiging masyadong malaki ang balanse. Nananatiling bukas ang kahilingan.",
+            "errorAccountExists": "May baon account na ang taong ito.",
+            "errorNoAccount": "Walang baon account ang taong ito.",
+            "errorCurrencyChanged": "Nagbago ang currency ng account na ito."
+        },
+        "errorRewardGone": "Hindi na available ang gantimpalang ito.",
+        "errorRequestGone": "Wala na ang kahilingang ito.",
+        "errorRequestDecided": "Napagpasyahan na ang kahilingang ito.",
+        "errorNotEnoughPoints": "Hindi sapat ang mga puntos para dito.",
+        "errorNotParticipating": "Hindi nangongolekta ng puntos ang taong ito.",
+        "errorMoneyAccountGone": "Wala na ang account na ito.",
+        "errorMoneyPlanGone": "Wala na ang planong ito."
     },
     "datepicker": {
         "openCalendar": "Buksan ang kalendaryo",

@@ -3691,7 +3691,12 @@
         "errorAmountsHidden": "Platbu může označit jen ten, kdo smí vidět částky za pomoc v domácnosti.",
         "notHereToday": "Dnes ještě nedorazila",
         "tabVisits": "Návštěvy",
-        "tabChores": "Práce"
+        "tabChores": "Práce",
+        "errorWorkerGone": "Tento pracovník už neexistuje.",
+        "errorVisitGone": "Tato návštěva už neexistuje.",
+        "errorTaskGone": "Tento úkol už neexistuje.",
+        "errorAlreadyCheckedOut": "Tento pracovník je už odhlášen.",
+        "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen."
     },
     "splitExpenses": {
         "title": "Společné výdaje",
@@ -6056,8 +6061,20 @@
             "closeAccount": "Zavřít účet",
             "confirmCloseAccount": "Zavřít účet uživatele {{name}}?",
             "closeAccountDetail": "Historie zůstane. Znovu otevřený účet začne v měně, kterou domácnost v tu chvíli používá.",
-            "accountNotEmpty": "Účet lze zavřít až tehdy, když na něm není zůstatek, plán ani otevřená žádost."
-        }
+            "accountNotEmpty": "Účet lze zavřít až tehdy, když na něm není zůstatek, plán ani otevřená žádost.",
+            "errorAccountDeactivated": "Tento účet je deaktivovaný a lze ho už jen vyplatit.",
+            "errorBalanceTooLarge": "Zůstatek by byl příliš vysoký. Žádost zůstává otevřená.",
+            "errorAccountExists": "Tato osoba už má účet s kapesným.",
+            "errorNoAccount": "Tato osoba nemá účet s kapesným.",
+            "errorCurrencyChanged": "Měna tohoto účtu se změnila."
+        },
+        "errorRewardGone": "Tato odměna už není k dispozici.",
+        "errorRequestGone": "Tato žádost už neexistuje.",
+        "errorRequestDecided": "O této žádosti už bylo rozhodnuto.",
+        "errorNotEnoughPoints": "Na to nestačí body.",
+        "errorNotParticipating": "Tato osoba nesbírá body.",
+        "errorMoneyAccountGone": "Tento účet už neexistuje.",
+        "errorMoneyPlanGone": "Tento plán už neexistuje."
     },
     "datepicker": {
         "openCalendar": "Otevřít kalendář",

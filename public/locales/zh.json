@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "只有可以查看家政金额的人才能标记付款。",
         "notHereToday": "今天还没到",
         "tabVisits": "上门",
-        "tabChores": "家务"
+        "tabChores": "家务",
+        "errorWorkerGone": "该家政人员已不存在。",
+        "errorVisitGone": "该上门记录已不存在。",
+        "errorTaskGone": "该任务已不存在。",
+        "errorAlreadyCheckedOut": "该家政人员已签退。",
+        "errorAlreadyCheckedIn": "该家政人员已签到。"
     },
     "userMultiSelect": {
         "moreUsers": "更多",
@@ -5920,8 +5925,20 @@
             "closeAccount": "关闭账户",
             "confirmCloseAccount": "关闭 {{name}} 的账户？",
             "closeAccountDetail": "记录会保留。重新开设的账户会以家庭当时使用的货币开始。",
-            "accountNotEmpty": "只有在没有余额、计划和待处理请求时才能关闭账户。"
-        }
+            "accountNotEmpty": "只有在没有余额、计划和待处理请求时才能关闭账户。",
+            "errorAccountDeactivated": "该账户已停用，只能结清余额。",
+            "errorBalanceTooLarge": "余额将过大。请求保持待处理。",
+            "errorAccountExists": "此人已有零花钱账户。",
+            "errorNoAccount": "此人没有零花钱账户。",
+            "errorCurrencyChanged": "该账户的币种已更改。"
+        },
+        "errorRewardGone": "该奖品已不可用。",
+        "errorRequestGone": "该请求已不存在。",
+        "errorRequestDecided": "该请求已有决定。",
+        "errorNotEnoughPoints": "积分不足。",
+        "errorNotParticipating": "此人不积累积分。",
+        "errorMoneyAccountGone": "该账户已不存在。",
+        "errorMoneyPlanGone": "该计划已不存在。"
     },
     "datepicker": {
         "openCalendar": "打开日历",

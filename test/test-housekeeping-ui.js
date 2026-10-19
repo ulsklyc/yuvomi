@@ -304,10 +304,18 @@ test('ein Fehler setzt den Monat zurueck und meldet ihn', async () => {
   const content = await freshReports();
   toasts.length = 0;
   installApi({ onMonth: () => { throw new Error('offline'); } });
-  await hk.stepReportMonth(content, -1);
+  // Der Browser haelt sich fuer online: der Wurf hat keine bekannte Ursache.
+  const before = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
+  try {
+    await hk.stepReportMonth(content, -1);
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', before);
+  }
   assert.equal(hk.state().reportMonth, null);
   assert.equal(hk.state().visitReport.month, '2026-09');
-  assert.deepEqual(toasts.at(-1), ['offline', 'danger']);
+  // #1909: der Ladesatz der Seite, nie der Text des Wurfs (bis dahin 'offline').
+  assert.deepEqual(toasts.at(-1), ['housekeeping.loadError', 'danger']);
 });
 
 test('scheitert der zweite von zwei schnellen Schritten, gilt wieder der angezeigte Monat', async () => {

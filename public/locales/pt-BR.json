@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Só quem pode ver os valores da ajuda doméstica pode marcar um pagamento.",
         "notHereToday": "Ainda não chegou hoje",
         "tabVisits": "Visitas",
-        "tabChores": "Afazeres"
+        "tabChores": "Afazeres",
+        "errorWorkerGone": "Esta faxineira não existe mais.",
+        "errorVisitGone": "Esta visita não existe mais.",
+        "errorTaskGone": "Esta tarefa não existe mais.",
+        "errorAlreadyCheckedOut": "Esta faxineira já registrou a saída.",
+        "errorAlreadyCheckedIn": "Esta faxineira já registrou a entrada."
     },
     "userMultiSelect": {
         "moreUsers": "mais",
@@ -6027,8 +6032,20 @@
             "closeAccount": "Fechar conta",
             "confirmCloseAccount": "Fechar a conta de {{name}}?",
             "closeAccountDetail": "O histórico é mantido. Uma conta aberta de novo começa na moeda que a casa usar nesse momento.",
-            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto."
-        }
+            "accountNotEmpty": "A conta só pode ser fechada quando não tiver saldo, plano nem pedidos em aberto.",
+            "errorAccountDeactivated": "Esta conta está desativada e só pode ser paga.",
+            "errorBalanceTooLarge": "O saldo ficaria grande demais. O pedido continua aberto.",
+            "errorAccountExists": "Esta pessoa já tem uma conta de mesada.",
+            "errorNoAccount": "Esta pessoa não tem conta de mesada.",
+            "errorCurrencyChanged": "A moeda desta conta mudou."
+        },
+        "errorRewardGone": "Este prêmio não está mais disponível.",
+        "errorRequestGone": "Este pedido não existe mais.",
+        "errorRequestDecided": "Este pedido já foi decidido.",
+        "errorNotEnoughPoints": "Os pontos não são suficientes para isso.",
+        "errorNotParticipating": "Esta pessoa não acumula pontos.",
+        "errorMoneyAccountGone": "Esta conta não existe mais.",
+        "errorMoneyPlanGone": "Este plano não existe mais."
     },
     "schedule": {
         "title": "Turnos",

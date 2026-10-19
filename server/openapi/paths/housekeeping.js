@@ -43,7 +43,7 @@ const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is r
   + 'kept, and a value without offset was read in the time zone of the server.';
 
 export function housekeepingPaths() {
-  return {
+  return withCaseReasons({
     '/api/v1/housekeeping/dashboard': {
       get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
@@ -137,5 +137,40 @@ export function housekeepingPaths() {
       get: op({ summary: 'List housekeeping maintenance log entries', tag: 'Housekeeping' }),
       post: op({ summary: 'Create housekeeping maintenance log entry', tag: 'Housekeeping', stateChanging: true, requestBody: jsonBody(null) }),
     },
-  };
+  });
+}
+
+// #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
+// englischen `error` - je Operation der Satz, der sie nennt.
+const WORKER_GONE = '`housekeeping_worker_not_found` (404, the housekeeper was deleted)';
+const VISIT_GONE = '`housekeeping_visit_not_found` (404, the visit was deleted)';
+const TASK_GONE = '`housekeeping_task_not_found` (404, the task was deleted)';
+const CASE_REASONS = {
+  '/api/v1/housekeeping/worker': {
+    post: `${WORKER_GONE}, \`housekeeping_username_invalid\` (400, the username breaks the naming rule), `
+      + '`housekeeping_username_taken` (409, another account uses the username)',
+  },
+  '/api/v1/housekeeping/work-sessions/check-in': {
+    post: `${WORKER_GONE}, \`housekeeping_already_checked_in\` (409, the housekeeper has an open session)`,
+  },
+  '/api/v1/housekeeping/work-sessions/check-out': {
+    post: '`housekeeping_open_session_not_found` (404, there is no open session; somebody checked out already)',
+  },
+  '/api/v1/housekeeping/visits/{id}': { get: VISIT_GONE, put: VISIT_GONE, delete: VISIT_GONE },
+  '/api/v1/housekeeping/visits/{id}/pay': { post: VISIT_GONE },
+  '/api/v1/housekeeping/visits/{id}/unpay': { post: VISIT_GONE },
+  '/api/v1/housekeeping/decay-tasks/{taskId}': { patch: TASK_GONE, delete: TASK_GONE },
+  '/api/v1/housekeeping/decay-tasks/{taskId}/complete': { post: TASK_GONE },
+};
+
+function withCaseReasons(paths) {
+  for (const [path, operations] of Object.entries(CASE_REASONS)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi housekeeping: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
 }

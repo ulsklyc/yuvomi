@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Chỉ người được xem số tiền của người giúp việc mới có thể đánh dấu thanh toán.",
         "notHereToday": "Hôm nay chưa đến",
         "tabVisits": "Lượt đến",
-        "tabChores": "Việc nhà"
+        "tabChores": "Việc nhà",
+        "errorWorkerGone": "Người dọn dẹp này không còn nữa.",
+        "errorVisitGone": "Lượt đến này không còn nữa.",
+        "errorTaskGone": "Nhiệm vụ này không còn nữa.",
+        "errorAlreadyCheckedOut": "Người dọn dẹp này đã trả ca.",
+        "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca."
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Đóng tài khoản",
             "confirmCloseAccount": "Đóng tài khoản của {{name}}?",
             "closeAccountDetail": "Lịch sử được giữ lại. Tài khoản mở lại sẽ bắt đầu bằng loại tiền mà gia đình dùng lúc đó.",
-            "accountNotEmpty": "Chỉ có thể đóng tài khoản khi không còn số dư, kế hoạch hay yêu cầu đang mở."
-        }
+            "accountNotEmpty": "Chỉ có thể đóng tài khoản khi không còn số dư, kế hoạch hay yêu cầu đang mở.",
+            "errorAccountDeactivated": "Tài khoản này đã bị vô hiệu hóa và chỉ có thể chi trả số dư.",
+            "errorBalanceTooLarge": "Số dư sẽ trở nên quá lớn. Yêu cầu vẫn đang mở.",
+            "errorAccountExists": "Người này đã có tài khoản tiền tiêu vặt.",
+            "errorNoAccount": "Người này không có tài khoản tiền tiêu vặt.",
+            "errorCurrencyChanged": "Đơn vị tiền tệ của tài khoản này đã thay đổi."
+        },
+        "errorRewardGone": "Phần thưởng này không còn khả dụng.",
+        "errorRequestGone": "Yêu cầu này không còn nữa.",
+        "errorRequestDecided": "Yêu cầu này đã được quyết định.",
+        "errorNotEnoughPoints": "Không đủ điểm cho việc này.",
+        "errorNotParticipating": "Người này không tích điểm.",
+        "errorMoneyAccountGone": "Tài khoản này không còn nữa.",
+        "errorMoneyPlanGone": "Kế hoạch này không còn nữa."
     },
     "datepicker": {
         "openCalendar": "Mở lịch",

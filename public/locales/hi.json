@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "भुगतान वही दर्ज कर सकता है जिसे घरेलू सहायक की राशि देखने की अनुमति है।",
         "notHereToday": "आज अभी तक नहीं आईं",
         "tabVisits": "विज़िट",
-        "tabChores": "घर के काम"
+        "tabChores": "घर के काम",
+        "errorWorkerGone": "यह सहायक अब मौजूद नहीं है।",
+        "errorVisitGone": "यह विज़िट अब मौजूद नहीं है।",
+        "errorTaskGone": "यह कार्य अब मौजूद नहीं है।",
+        "errorAlreadyCheckedOut": "यह सहायक पहले ही चेक-आउट कर चुका है।",
+        "errorAlreadyCheckedIn": "यह सहायक पहले ही चेक-इन कर चुका है।"
     },
     "userMultiSelect": {
         "moreUsers": "और",
@@ -5920,8 +5925,20 @@
             "closeAccount": "खाता बंद करें",
             "confirmCloseAccount": "{{name}} का खाता बंद करें?",
             "closeAccountDetail": "इतिहास बना रहता है। दोबारा खोला गया खाता उस मुद्रा में शुरू होता है जो घर उस समय इस्तेमाल करता है।",
-            "accountNotEmpty": "खाता तभी बंद हो सकता है जब उसमें कोई शेष, योजना या खुला अनुरोध न हो।"
-        }
+            "accountNotEmpty": "खाता तभी बंद हो सकता है जब उसमें कोई शेष, योजना या खुला अनुरोध न हो।",
+            "errorAccountDeactivated": "यह खाता निष्क्रिय है और इसका शेष केवल भुगतान किया जा सकता है।",
+            "errorBalanceTooLarge": "शेष बहुत अधिक हो जाएगा। अनुरोध खुला रहता है।",
+            "errorAccountExists": "इस व्यक्ति का जेब खर्च खाता पहले से है।",
+            "errorNoAccount": "इस व्यक्ति का कोई जेब खर्च खाता नहीं है।",
+            "errorCurrencyChanged": "इस खाते की मुद्रा बदल गई है।"
+        },
+        "errorRewardGone": "यह इनाम अब उपलब्ध नहीं है।",
+        "errorRequestGone": "यह अनुरोध अब मौजूद नहीं है।",
+        "errorRequestDecided": "इस अनुरोध पर पहले ही निर्णय हो चुका है।",
+        "errorNotEnoughPoints": "इसके लिए अंक पर्याप्त नहीं हैं।",
+        "errorNotParticipating": "यह व्यक्ति अंक जमा नहीं करता।",
+        "errorMoneyAccountGone": "यह खाता अब मौजूद नहीं है।",
+        "errorMoneyPlanGone": "यह योजना अब मौजूद नहीं है।"
     },
     "datepicker": {
         "openCalendar": "कैलेंडर खोलें",

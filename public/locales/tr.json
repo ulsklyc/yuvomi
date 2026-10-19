@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Ödemeyi yalnızca ev yardımcısı tutarlarını görebilen kişi işaretleyebilir.",
         "notHereToday": "Bugün henüz gelmedi",
         "tabVisits": "Ziyaretler",
-        "tabChores": "Ev işleri"
+        "tabChores": "Ev işleri",
+        "errorWorkerGone": "Bu yardımcı artık yok.",
+        "errorVisitGone": "Bu ziyaret artık yok.",
+        "errorTaskGone": "Bu görev artık yok.",
+        "errorAlreadyCheckedOut": "Bu yardımcının çıkışı zaten yapıldı.",
+        "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı."
     },
     "userMultiSelect": {
         "moreUsers": "daha",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Hesabı kapat",
             "confirmCloseAccount": "{{name}} için hesap kapatılsın mı?",
             "closeAccountDetail": "Geçmiş korunur. Yeniden açılan hesap, evin o sırada kullandığı para biriminde başlar.",
-            "accountNotEmpty": "Hesap ancak bakiyesi, planı ve açık isteği kalmadığında kapatılabilir."
-        }
+            "accountNotEmpty": "Hesap ancak bakiyesi, planı ve açık isteği kalmadığında kapatılabilir.",
+            "errorAccountDeactivated": "Bu hesap devre dışı ve yalnızca ödenerek kapatılabilir.",
+            "errorBalanceTooLarge": "Bakiye çok büyük olurdu. İstek açık kalıyor.",
+            "errorAccountExists": "Bu kişinin zaten bir harçlık hesabı var.",
+            "errorNoAccount": "Bu kişinin harçlık hesabı yok.",
+            "errorCurrencyChanged": "Bu hesabın para birimi değişti."
+        },
+        "errorRewardGone": "Bu ödül artık mevcut değil.",
+        "errorRequestGone": "Bu istek artık yok.",
+        "errorRequestDecided": "Bu istek hakkında zaten karar verildi.",
+        "errorNotEnoughPoints": "Bunun için puan yetmiyor.",
+        "errorNotParticipating": "Bu kişi puan toplamıyor.",
+        "errorMoneyAccountGone": "Bu hesap artık yok.",
+        "errorMoneyPlanGone": "Bu plan artık yok."
     },
     "datepicker": {
         "openCalendar": "Takvimi aç",

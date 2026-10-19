@@ -4060,7 +4060,12 @@
         "errorAmountsHidden": "Bezahlen kann nur, wer die Beträge der Haushaltshilfe sehen darf.",
         "notHereToday": "Heute noch nicht da",
         "tabVisits": "Besuche",
-        "tabChores": "Arbeiten"
+        "tabChores": "Arbeiten",
+        "errorWorkerGone": "Diese Haushaltshilfe gibt es nicht mehr.",
+        "errorVisitGone": "Diesen Einsatz gibt es nicht mehr.",
+        "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
+        "errorAlreadyCheckedOut": "Diese Haushaltshilfe ist schon ausgecheckt.",
+        "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt."
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Konto schließen",
             "confirmCloseAccount": "Konto von {{name}} schließen?",
             "closeAccountDetail": "Der Verlauf bleibt erhalten. Ein neu eröffnetes Konto beginnt in der Währung, die der Haushalt dann führt.",
-            "accountNotEmpty": "Das Konto lässt sich erst schließen, wenn kein Guthaben, kein Plan und keine offene Anfrage mehr daran hängen."
-        }
+            "accountNotEmpty": "Das Konto lässt sich erst schließen, wenn kein Guthaben, kein Plan und keine offene Anfrage mehr daran hängen.",
+            "errorAccountDeactivated": "Dieses Konto ist deaktiviert und wird nur noch ausgezahlt.",
+            "errorBalanceTooLarge": "Das Guthaben würde zu groß. Die Anfrage bleibt offen.",
+            "errorAccountExists": "Diese Person hat schon ein Taschengeldkonto.",
+            "errorNoAccount": "Diese Person hat kein Taschengeldkonto.",
+            "errorCurrencyChanged": "Die Währung dieses Kontos hat sich geändert."
+        },
+        "errorRewardGone": "Diese Prämie ist nicht mehr verfügbar.",
+        "errorRequestGone": "Diese Anfrage gibt es nicht mehr.",
+        "errorRequestDecided": "Über diese Anfrage wurde schon entschieden.",
+        "errorNotEnoughPoints": "Dafür reichen die Punkte nicht.",
+        "errorNotParticipating": "Diese Person sammelt keine Punkte.",
+        "errorMoneyAccountGone": "Dieses Konto gibt es nicht mehr.",
+        "errorMoneyPlanGone": "Diesen Plan gibt es nicht mehr."
     },
     "datepicker": {
         "openCalendar": "Kalender öffnen",

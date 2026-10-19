@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Seule une personne autorisée à voir les montants de l’aide ménagère peut marquer un paiement.",
         "notHereToday": "Pas encore là aujourd’hui",
         "tabVisits": "Visites",
-        "tabChores": "Travaux"
+        "tabChores": "Travaux",
+        "errorWorkerGone": "Cette aide ménagère n’existe plus.",
+        "errorVisitGone": "Cette intervention n’existe plus.",
+        "errorTaskGone": "Cette tâche n’existe plus.",
+        "errorAlreadyCheckedOut": "Le départ de cette aide ménagère est déjà enregistré.",
+        "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée."
     },
     "userMultiSelect": {
         "moreUsers": "autres",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Fermer le compte",
             "confirmCloseAccount": "Fermer le compte de {{name}} ?",
             "closeAccountDetail": "L'historique est conservé. Un compte rouvert démarre dans la devise que le foyer utilise à ce moment-là.",
-            "accountNotEmpty": "Le compte ne peut être fermé que s'il n'a plus de solde, de plan ni de demande en attente."
-        }
+            "accountNotEmpty": "Le compte ne peut être fermé que s'il n'a plus de solde, de plan ni de demande en attente.",
+            "errorAccountDeactivated": "Ce compte est désactivé et ne peut plus qu’être soldé.",
+            "errorBalanceTooLarge": "Le solde deviendrait trop élevé. La demande reste ouverte.",
+            "errorAccountExists": "Cette personne a déjà un compte d’argent de poche.",
+            "errorNoAccount": "Cette personne n’a pas de compte d’argent de poche.",
+            "errorCurrencyChanged": "La devise de ce compte a changé."
+        },
+        "errorRewardGone": "Cette récompense n’est plus disponible.",
+        "errorRequestGone": "Cette demande n’existe plus.",
+        "errorRequestDecided": "Cette demande a déjà été tranchée.",
+        "errorNotEnoughPoints": "Les points ne suffisent pas pour cela.",
+        "errorNotParticipating": "Cette personne ne cumule pas de points.",
+        "errorMoneyAccountGone": "Ce compte n’existe plus.",
+        "errorMoneyPlanGone": "Ce plan n’existe plus."
     },
     "datepicker": {
         "openCalendar": "Ouvrir le calendrier",

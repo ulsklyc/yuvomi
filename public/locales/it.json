@@ -4056,7 +4056,12 @@
         "errorAmountsHidden": "Solo chi può vedere gli importi dell’aiuto domestico può segnare un pagamento.",
         "notHereToday": "Oggi non è ancora arrivata",
         "tabVisits": "Visite",
-        "tabChores": "Faccende"
+        "tabChores": "Faccende",
+        "errorWorkerGone": "Questo collaboratore domestico non esiste più.",
+        "errorVisitGone": "Questa visita non esiste più.",
+        "errorTaskGone": "Questa attività non esiste più.",
+        "errorAlreadyCheckedOut": "Questo collaboratore domestico ha già registrato l’uscita.",
+        "errorAlreadyCheckedIn": "Questo collaboratore domestico ha già registrato l’entrata."
     },
     "userMultiSelect": {
         "moreUsers": "altri",
@@ -5920,8 +5925,20 @@
             "closeAccount": "Chiudi conto",
             "confirmCloseAccount": "Chiudere il conto di {{name}}?",
             "closeAccountDetail": "La cronologia resta. Un conto riaperto parte nella valuta che la famiglia usa in quel momento.",
-            "accountNotEmpty": "Il conto si può chiudere solo quando non ha più saldo, piano né richieste aperte."
-        }
+            "accountNotEmpty": "Il conto si può chiudere solo quando non ha più saldo, piano né richieste aperte.",
+            "errorAccountDeactivated": "Questo conto è disattivato e può solo essere liquidato.",
+            "errorBalanceTooLarge": "Il saldo diventerebbe troppo alto. La richiesta resta aperta.",
+            "errorAccountExists": "Questa persona ha già un conto per la paghetta.",
+            "errorNoAccount": "Questa persona non ha un conto per la paghetta.",
+            "errorCurrencyChanged": "La valuta di questo conto è cambiata."
+        },
+        "errorRewardGone": "Questo premio non è più disponibile.",
+        "errorRequestGone": "Questa richiesta non esiste più.",
+        "errorRequestDecided": "Su questa richiesta è già stato deciso.",
+        "errorNotEnoughPoints": "I punti non bastano per questo.",
+        "errorNotParticipating": "Questa persona non accumula punti.",
+        "errorMoneyAccountGone": "Questo conto non esiste più.",
+        "errorMoneyPlanGone": "Questo piano non esiste più."
     },
     "datepicker": {
         "openCalendar": "Apri calendario",

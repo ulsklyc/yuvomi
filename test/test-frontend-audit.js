@@ -21773,6 +21773,8 @@ const ERROR_MESSAGE_CLEAN = [
   'components/modal.js',
   'pages/schedule.js',
   'settings/module-install-errors.js',
+  'pages/housekeeping.js',
+  'pages/rewards.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

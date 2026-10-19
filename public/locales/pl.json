@@ -4288,7 +4288,12 @@
         "errorAmountsHidden": "Płatność może oznaczyć tylko osoba, która widzi kwoty pomocy domowej.",
         "notHereToday": "Dziś jeszcze jej nie ma",
         "tabVisits": "Wizyty",
-        "tabChores": "Prace domowe"
+        "tabChores": "Prace domowe",
+        "errorWorkerGone": "Ta pomoc domowa już nie istnieje.",
+        "errorVisitGone": "Ta wizyta już nie istnieje.",
+        "errorTaskGone": "To zadanie już nie istnieje.",
+        "errorAlreadyCheckedOut": "Ta pomoc domowa jest już wymeldowana.",
+        "errorAlreadyCheckedIn": "Ta pomoc domowa jest już zameldowana."
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
@@ -6190,8 +6195,20 @@
             "closeAccount": "Zamknij konto",
             "confirmCloseAccount": "Zamknąć konto {{name}}?",
             "closeAccountDetail": "Historia pozostaje. Konto otwarte ponownie zaczyna w walucie, której dom będzie wtedy używać.",
-            "accountNotEmpty": "Konto można zamknąć dopiero wtedy, gdy nie ma na nim salda, planu ani otwartych próśb."
-        }
+            "accountNotEmpty": "Konto można zamknąć dopiero wtedy, gdy nie ma na nim salda, planu ani otwartych próśb.",
+            "errorAccountDeactivated": "To konto jest dezaktywowane i można je już tylko wypłacić.",
+            "errorBalanceTooLarge": "Saldo byłoby za duże. Prośba pozostaje otwarta.",
+            "errorAccountExists": "Ta osoba ma już konto kieszonkowego.",
+            "errorNoAccount": "Ta osoba nie ma konta kieszonkowego.",
+            "errorCurrencyChanged": "Waluta tego konta się zmieniła."
+        },
+        "errorRewardGone": "Ta nagroda nie jest już dostępna.",
+        "errorRequestGone": "Ta prośba już nie istnieje.",
+        "errorRequestDecided": "O tej prośbie już zdecydowano.",
+        "errorNotEnoughPoints": "Na to nie wystarczy punktów.",
+        "errorNotParticipating": "Ta osoba nie zbiera punktów.",
+        "errorMoneyAccountGone": "To konto już nie istnieje.",
+        "errorMoneyPlanGone": "Ten plan już nie istnieje."
     },
     "datepicker": {
         "openCalendar": "Otwórz kalendarz",
