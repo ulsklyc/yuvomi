@@ -6,6 +6,17 @@ const apiError = (description) => ({
 });
 
 /**
+ * Das Vorkommen im Pfad (#2034): Format A, die alte Tagesform wird weiter
+ * angenommen. Eine Beschreibung fuer alle vier Routen.
+ */
+const RECURRENCE_ID_PARAM = 'Original occurrence, as the calendar reads return it in `recurrence_id`: '
+  + '`YYYY-MM-DD` (all-day), `YYYY-MM-DDTHH:MM:SSZ` (original start in UTC) or `YYYY-MM-DDTHH:MM:SS` '
+  + '(floating wall time), URL-encoded. The former date-only form `YYYY-MM-DD` is still accepted for a timed '
+  + 'series with its earlier meaning; when it matches two occurrences (the night of a clock change) the answer '
+  + 'is 409 with reason `ambiguous_recurrence_id`.';
+const AMBIGUOUS_RECURRENCE_ID = apiError('A date-only recurrence_id matches two occurrences (reason `ambiguous_recurrence_id`); send the exact recurrence_id');
+
+/**
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
  * umgerechnet statt abgeschnitten, und PUT speichert den geprueften Wert.
  */
@@ -270,7 +281,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [
           idParam('seriesId', 'Recurring series ID'),
-          stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
+          stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
         description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.' + ATTACHMENT_RIGHTS,
@@ -284,6 +295,7 @@ export function calendarPaths() {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
+          409: AMBIGUOUS_RECURRENCE_ID,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -292,7 +304,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [
           idParam('seriesId', 'Recurring series ID'),
-          stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
+          stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
         description: 'Deletes a linked replacement when present and keeps an EXDATE on the master so the original slot remains suppressed.',
@@ -302,6 +314,7 @@ export function calendarPaths() {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
+          409: AMBIGUOUS_RECURRENCE_ID,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -312,7 +325,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [
           idParam('seriesId', 'Recurring series ID'),
-          stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
+          stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
         description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.' + ATTACHMENT_RIGHTS,
@@ -331,7 +344,7 @@ export function calendarPaths() {
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
           409: {
-            description: 'Linked occurrence replacements require exact-count orphan confirmation',
+            description: 'Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason `ambiguous_recurrence_id`)',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
           },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -342,7 +355,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [
           idParam('seriesId', 'Recurring series ID'),
-          stringPathParam('recurrenceId', 'Original occurrence date in YYYY-MM-DD format'),
+          stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
         description: 'Truncates immediately before the selected original slot, removes later linked replacements, and preserves later exclusions. Selecting the first slot deletes the whole series.',
@@ -352,6 +365,7 @@ export function calendarPaths() {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
+          409: AMBIGUOUS_RECURRENCE_ID,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -406,7 +420,7 @@ export function calendarPaths() {
       post: op({ summary: 'Reset external calendar event to source state', tag: 'Calendar', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/{id}/exceptions': {
-      post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { recurrence_id } - the occurrence as the calendar reads return it (see the `recurrenceId` path parameter of the occurrence routes for the three forms). The former body { date: `YYYY-MM-DD` } is still accepted with its earlier meaning. The exact key of the matched occurrence is stored and returned as `exception_date` and `recurrence_id`. A key that names no occurrence of the series answers 400 with reason `invalid_recurrence_id`; a date that matches two occurrences (the night of a clock change) answers 409 with reason `ambiguous_recurrence_id`. Up to v2.78.0 any well-formed date was stored unchecked.' }),
     },
     '/api/v1/calendar/external-calendars': {
       patch: op({ summary: 'Set the default assignee of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { source, external_id, default_assignee_user_id }. Events arriving from that calendar are assigned to this member. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),

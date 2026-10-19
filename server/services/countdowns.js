@@ -39,11 +39,11 @@
 import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
 import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
-import { loadEventExceptions } from './calendar-events.js';
+import { exceptionsInclude, loadEventExceptions, occurrenceClock } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { householdTimeZone, storedDayDiffersFromSeriesDay, storedToWall } from '../utils/timezone.js';
+import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -181,26 +181,58 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
   // diesem Fall aus (`zonenUnsicher`); hier gilt dieselbe Ruecknahme, sonst
   // beantworten zwei Stellen dieselbe Frage verschieden.
   //
-  // Zonenlose Ziffern liest `storedDayDiffersFromSeriesDay` in der
-  // Haushaltszone, nicht ueber `new Date()` in der des Prozesses (#1998).
-  const zonenUnsicher = storedDayDiffersFromSeriesDay(event.start_datetime, event.tzid, tz);
+  //
+  // DIE KACHEL ZAEHLT AUF DER UHR DER EXPANSION (#1998, #2034). Bis hierher
+  // lief sie auf Haushaltstagen, die Expansion aber auf Schleifentagen der
+  // Serienzone, und die Ausnahmen trugen deren Schluessel: eine Serie aus Los
+  // Angeles um 23:30 in einem Berliner Haushalt sprang die Regel auf den
+  // falschen Tagen weiter, und eine abgesagte Instanz blieb als Countdown
+  // stehen, waehrend der Kalender sie ausblendete. Jetzt laeuft die Regel auf
+  // denselben Schleifentagen wie in `expandRecurringEvents` (`occurrenceClock`),
+  // eine Ausnahme trifft ueber beide Schluesselformen, und erst das Ergebnis
+  // wird zum Haushaltstag seines Starts. Zonenlose Ziffern liest die Uhr in der
+  // Haushaltszone, nicht in der des Prozesses (#1993).
+  let clock;
+  try {
+    clock = occurrenceClock(event, tz);
+  } catch {
+    return null;
+  }
+  const rule = event.recurrence_rule;
+  const seriesStart = clock.seriesStart;
+  const byday = { utcDiffersFromLocal: clock.utcDiffersFromLocal };
+  /** Der Haushaltstag eines Vorkommens. */
+  const householdDayOf = (tag) => {
+    const start = String(clock.instantFor(tag));
+    return hasExplicitZone(start) ? (utcToWall(start, tz)?.date ?? tag) : tag;
+  };
+  const excluded = (tag) => exceptionsInclude(exceptions, clock.keyFor(tag), clock.legacyKeyFor(tag));
 
-  if (!hasAnyOccurrence(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher })) return null;
-  const ersterTreffer = seriesStartFor(startKey, event.recurrence_rule, { utcDiffersFromLocal: zonenUnsicher });
-  let candidate = ersterTreffer >= todayKey
+  if (!hasAnyOccurrence(seriesStart, rule, byday)) return null;
+  const ersterTreffer = seriesStartFor(seriesStart, rule, byday);
+  // Zwei Zonen liegen hoechstens gut zwei Kalendertage auseinander (-12 bis
+  // +14): drei Schleifentage vor heute decken jedes Vorkommen ab, das im
+  // Haushalt heute oder spaeter liegt. Was davor faellt, ueberspringt die
+  // Schleife unten, ohne es als Ausnahme zu zaehlen.
+  const floor = shiftKey(todayKey, -3) ?? todayKey;
+  let candidate = ersterTreffer >= floor
     ? ersterTreffer
-    : nextOccurrenceAfter(ersterTreffer, event.recurrence_rule, todayKey, { seriesStart: startKey });
+    : nextOccurrenceAfter(ersterTreffer, rule, floor, { seriesStart });
 
   let skips = 0;
-  while (candidate && exceptions?.has(candidate) && skips++ < MAX_EXCEPTION_SKIPS) {
-    candidate = nextOccurrenceAfter(candidate, event.recurrence_rule, candidate, { seriesStart: startKey });
+  while (candidate && (householdDayOf(candidate) < todayKey || excluded(candidate))) {
+    if (excluded(candidate) && skips++ >= MAX_EXCEPTION_SKIPS) break;
+    const next = nextOccurrenceAfter(candidate, rule, candidate, { seriesStart });
+    if (!next || next <= candidate) { candidate = null; break; }
+    candidate = next;
   }
   // Ein Datum in der Vergangenheit ist kein Countdown, sondern ein falscher -
   // lieber nichts zeigen. Der haeufigste Weg hierher war frueher die
   // Schleifengrenze beim Aufholen (eine taegliche Serie ab 2023 gab auf);
   // seit #877 springt das Aufholen, statt zu zaehlen.
-  if (!candidate || candidate < todayKey) return null;
-  return candidate;
+  if (!candidate || excluded(candidate)) return null;
+  const day = householdDayOf(candidate);
+  return day >= todayKey ? day : null;
 }
 
 /**

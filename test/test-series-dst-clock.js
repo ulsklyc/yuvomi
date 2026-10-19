@@ -14,11 +14,11 @@
  * Erwartete Zeitpunkte sind von Hand nachgerechnet und werden zusaetzlich
  * gegen eine eigene `Intl`-Uhr geprueft (nicht gegen den Code unter Test).
  *
- * DER TAGESSCHLUESSEL BLEIBT DER VON MAIN. `recurrence_identity` und der
- * EXDATE-Abgleich laufen in diesem Schritt unveraendert auf der alten Uhr:
- * mit der neuen wanderte der Schluessel an den Umstellungstagen um einen Tag,
- * und eine dort abgelegte Ausnahme (lokal oder importiert) liefe ins Leere.
- * Das pinnt der letzte Block; die Umstellung des Schluessels ist Schritt 4.
+ * DER ALTE TAGESSCHLUESSEL BEHAELT SEINE BEDEUTUNG. Seit Schritt 4 ist
+ * `recurrence_identity` der Originalstart in Format A; eine Ausnahme in der
+ * alten Form (lokal oder importiert) wird weiter ueber die alte Uhr gelesen
+ * (legacy-occurrence-key.js) und trifft, was sie auf main traf. Das pinnt
+ * der letzte Block.
  *
  * Das Skript faehrt die Datei unter TZ=UTC und America/Chicago. Die Tage
  * liegen 2035.
@@ -163,7 +163,7 @@ test('UNTIL als Ortszeit der Serie: dieselbe Uhr wie die Vorkommen', () => {
   assert.equal(expandRRULE(vevent, '2035-10-01', '2035-11-30').at(-1).dtstart, '2035-10-28T00:30:00Z');
 });
 
-test('Tagesschluessel und Ausnahmen bleiben die von main (Schritt 4 stellt um)', () => {
+test('Schluessel ab Schritt 4 eindeutig, alte Ausnahmen und Importe wie auf main', () => {
   // Berlin 01:30, Start im Sommer: die einzige Lage, in der die neue Uhr den
   // UTC-Tag eines Vorkommens verschieben wuerde (gemessen an einem Sweep ueber
   // 14 Zonen, halbstuendlich: Berlin 01:xx, Helsinki/Jerusalem 02:xx).
@@ -171,11 +171,12 @@ test('Tagesschluessel und Ausnahmen bleiben die von main (Schritt 4 stellt um)',
   const opts = { includeRecurrenceIdentity: true, maxIterations: 5000 };
   const rows = expandRecurringEvents([ev], '2035-03-20', '2035-11-02', null, opts);
   const idOn = (localDay) => startsOn(rows, 'Europe/Berlin', localDay).map((r) => r.recurrence_identity);
-  // Der Schluessel von main: Fruehjahr kollidiert er mit dem Vortag (#2034, dort behoben).
-  assert.deepEqual(idOn('2035-03-24'), ['2035-03-24']);
-  assert.deepEqual(idOn('2035-03-25'), ['2035-03-24']);
-  assert.deepEqual(idOn('2035-10-28'), ['2035-10-28']);
-  assert.deepEqual(idOn('2035-10-27'), ['2035-10-26']);
+  // Seit Schritt 4 (#2034) ist die Identitaet der Originalstart in UTC: die
+  // Kollision von main (24. und 25.03. teilten `2035-03-24`) ist weg.
+  assert.deepEqual(idOn('2035-03-24'), ['2035-03-24T00:30:00Z']);
+  assert.deepEqual(idOn('2035-03-25'), ['2035-03-25T00:30:00Z']);
+  assert.deepEqual(idOn('2035-10-28'), ['2035-10-27T23:30:00Z']);
+  assert.deepEqual(idOn('2035-10-27'), ['2035-10-26T23:30:00Z']);
 
   // Eine lokal abgelegte Ausnahme mit dem Schluessel, den der Kalender gezeigt
   // hat, nimmt weiter genau das Vorkommen heraus, das sie auf main herausnahm.

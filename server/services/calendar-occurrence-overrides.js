@@ -8,7 +8,7 @@
 import { endsBeforeStart, hasAnyOccurrence, parseRRule } from './recurrence.js';
 import {
   ASSIGNED_USERS_SQL, expandRecurringEvents, isOccurrenceKey, MAX_EXPANSION_ITERATIONS,
-  occurrenceSlotOf, seriesReadingZone,
+  occurrenceClock, occurrenceSlotOf, seriesReadingZone,
 } from './calendar-events.js';
 import {
   dropInheritedEventReminders, eventAuthorId, fanOutEventReminders,
@@ -130,13 +130,25 @@ export function seriesIdFor(row) {
   return isLinkedOccurrence(row) ? Number(row.recurrence_parent_id) : row?.id ?? null;
 }
 
-export function recurrenceIdFor(row) {
+/**
+ * Der Schluessel, unter dem eine Zeile ihr Vorkommen nennt. Eine nicht
+ * expandierte Serienzeile nennt den ihres ersten Schleifentags, in Format A
+ * (#2034); `householdZone` braucht nur eine Zeile mit zonenlosem Start neben
+ * einer `tzid` (#1993) - fehlt sie dort, bleibt es beim Datum.
+ */
+export function recurrenceIdFor(row, householdZone = null) {
   if (isLinkedOccurrence(row)) return row.recurrence_id;
   if (!row?.recurrence_rule) return null;
   if (typeof row.recurrence_identity === 'string' && row.recurrence_identity.trim() !== '') {
     return row.recurrence_identity;
   }
-  return typeof row.start_datetime === 'string' ? row.start_datetime.slice(0, 10) : null;
+  if (typeof row.start_datetime !== 'string') return null;
+  try {
+    const clock = occurrenceClock(row, householdZone);
+    return clock.keyFor(clock.seriesStart);
+  } catch {
+    return row.start_datetime.slice(0, 10);
+  }
 }
 
 function exactLookupIterationLimit(master, recurrenceId) {
@@ -214,18 +226,66 @@ export function baseOccurrenceFor(master, recurrenceId, householdZone = null, { 
   return matches[0];
 }
 
-function assertOccurrenceSlotCanBeMutated(database, seriesId, recurrenceId) {
-  const state = database.prepare(`
-    SELECT
-      EXISTS(
-        SELECT 1 FROM calendar_event_exceptions
-        WHERE event_id = ? AND exception_date = ?
-      ) AS excluded,
-      EXISTS(
-        SELECT 1 FROM calendar_events
-        WHERE recurrence_parent_id = ? AND recurrence_id = ?
-      ) AS has_linked_child
-  `).get(seriesId, recurrenceId, seriesId, recurrenceId);
+/**
+ * Die beiden Schluessel eines aufgeloesten Slots - und welche Altzeilen ihm
+ * gehoeren (#2034).
+ *
+ * Geschrieben wird immer `key` (Format A). Gelesen werden beide Formen, weil
+ * Ausnahmen und Einzelvorkommen von vor Schritt 4 die alte tragen:
+ *   - `legacyClaims`: ein altes Einzelvorkommen gehoert diesem Slot. Teilen
+ *     sich zwei Slots einen alten Schluessel (Umstellungsnacht), loest es wie
+ *     auf main auf den ERSTEN auf - nur der darf es also als seins behandeln.
+ *   - `legacyExclusive`: der alte Schluessel trifft nur diesen Slot. Eine alte
+ *     Ausnahme darf nur dann durch die exakte ersetzt werden; sonst blendet sie
+ *     weiter auch den Nachbarn aus, wie auf main.
+ */
+function slotKeyForms(master, slot, householdZone) {
+  const placed = occurrenceSlotOf(slot);
+  const key = placed?.key;
+  const legacyKey = placed?.legacyKey ?? key;
+  if (!key || legacyKey === key) {
+    return { key, legacyKey: key, legacyClaims: true, legacyExclusive: true, day: placed?.day ?? null };
+  }
+  const sharing = occurrencesForKey(master, legacyKey, householdZone);
+  return {
+    key,
+    legacyKey,
+    legacyClaims: sharing.length === 0 || occurrenceSlotOf(sharing[0])?.day === placed.day,
+    legacyExclusive: sharing.length <= 1,
+    day: placed.day,
+  };
+}
+
+/** Das verknuepfte Einzelvorkommen eines Slots, in exakter oder alter Form. */
+function findSlotChild(database, seriesId, forms) {
+  const byKey = database.prepare(`
+    SELECT * FROM calendar_events
+    WHERE recurrence_parent_id = ? AND recurrence_id = ?
+  `);
+  return byKey.get(seriesId, forms.key)
+    ?? (forms.legacyClaims && forms.legacyKey !== forms.key
+      ? byKey.get(seriesId, forms.legacyKey)
+      : undefined);
+}
+
+/**
+ * Das verknuepfte Einzelvorkommen hinter `recurrenceId`, gleich in welcher
+ * Form es gespeichert ist (#2034) - fuer die Routen, die vor dem Schreiben den
+ * gespeicherten Stand eines Vorkommens lesen (Zuweisungen, Anhang).
+ */
+export function linkedOccurrenceChild(database, master, recurrenceId, householdZone) {
+  const slot = baseOccurrenceFor(master, recurrenceId, householdZone, { ambiguous: 'reject' });
+  return findSlotChild(database, master.id, slotKeyForms(master, slot, householdZone)) ?? null;
+}
+
+function assertOccurrenceSlotCanBeMutated(database, seriesId, forms) {
+  const state = {
+    excluded: !!database.prepare(`
+      SELECT 1 FROM calendar_event_exceptions
+      WHERE event_id = ? AND exception_date IN (?, ?)
+    `).get(seriesId, forms.key, forms.legacyKey),
+    has_linked_child: !!findSlotChild(database, seriesId, forms),
+  };
   if (state.excluded && !state.has_linked_child) {
     throw invalidRecurrenceIdentity(
       'recurrence_id identifies an excluded slot without a linked occurrence.',
@@ -1132,12 +1192,28 @@ export function upsertOccurrenceOverride(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    const base = baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
-    assertOccurrenceSlotCanBeMutated(database, master.id, recurrenceId);
-    const existing = database.prepare(`
-      SELECT * FROM calendar_events
-      WHERE recurrence_parent_id = ? AND recurrence_id = ?
-    `).get(master.id, recurrenceId);
+    const slotZone = householdTimeZone(database);
+    const base = baseOccurrenceFor(master, recurrenceId, slotZone, { ambiguous: 'reject' });
+    // Geschrieben wird der exakte Schluessel (#2034); ein Einzelvorkommen in
+    // alter Form wird beim Speichern auf ihn umgeschrieben.
+    const forms = slotKeyForms(master, base, slotZone);
+    assertOccurrenceSlotCanBeMutated(database, master.id, forms);
+    const existing = findSlotChild(database, master.id, forms);
+    const dropSlotExceptions = () => {
+      database.prepare(`
+        DELETE FROM calendar_event_exceptions
+        WHERE event_id = ? AND exception_date = ?
+      `).run(master.id, forms.key);
+      // Die alte Ausnahme nur, wenn sie allein diesem Slot gehoerte - sonst
+      // blendete sie wie auf main auch den Nachbarn aus der Umstellungsnacht aus.
+      if (forms.legacyKey !== forms.key
+          && (forms.legacyExclusive || existing?.recurrence_id === forms.legacyKey)) {
+        database.prepare(`
+          DELETE FROM calendar_event_exceptions
+          WHERE event_id = ? AND exception_date = ?
+        `).run(master.id, forms.legacyKey);
+      }
+    };
     const current = existing ? resolveOccurrence(database, existing, master) : base;
     const existingFields = existing ? parseOverrideFields(existing.overridden_fields) : [];
     const materialized = { ...current };
@@ -1198,10 +1274,7 @@ export function upsertOccurrenceOverride(database, {
       if (existing) {
         deleteEventReminders(database, [existing.id]);
         database.prepare('DELETE FROM calendar_events WHERE id = ?').run(existing.id);
-        database.prepare(`
-          DELETE FROM calendar_event_exceptions
-          WHERE event_id = ? AND exception_date = ?
-        `).run(master.id, recurrenceId);
+        dropSlotExceptions();
       }
       return { event: base, restored: true };
     }
@@ -1236,7 +1309,7 @@ export function upsertOccurrenceOverride(database, {
         effectiveAttachment.attachment_data,
         effectiveAttachment.attachment_document_id,
         master.id,
-        recurrenceId,
+        forms.key,
         overriddenFields,
         master.local_calendar_id ?? null,
         existing.id,
@@ -1270,7 +1343,7 @@ export function upsertOccurrenceOverride(database, {
         effectiveAttachment.attachment_data,
         effectiveAttachment.attachment_document_id,
         master.id,
-        recurrenceId,
+        forms.key,
         overriddenFields,
         master.local_calendar_id ?? null,
       ).lastInsertRowid;
@@ -1320,12 +1393,7 @@ export function upsertOccurrenceOverride(database, {
       fields = fields.filter((field) => field !== 'reminders');
       if (fields.length === 0) {
         database.prepare('DELETE FROM calendar_events WHERE id = ?').run(childId);
-        if (existing) {
-          database.prepare(`
-            DELETE FROM calendar_event_exceptions
-            WHERE event_id = ? AND exception_date = ?
-          `).run(master.id, recurrenceId);
-        }
+        if (existing) dropSlotExceptions();
         return { event: base, restored: true };
       }
       database.prepare('UPDATE calendar_events SET overridden_fields = ? WHERE id = ?')
@@ -1335,7 +1403,13 @@ export function upsertOccurrenceOverride(database, {
     database.prepare(`
       INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date)
       VALUES (?, ?)
-    `).run(master.id, recurrenceId);
+    `).run(master.id, forms.key);
+    if (forms.legacyKey !== forms.key && forms.legacyExclusive) {
+      database.prepare(`
+        DELETE FROM calendar_event_exceptions
+        WHERE event_id = ? AND exception_date = ?
+      `).run(master.id, forms.legacyKey);
+    }
     const child = loadProjectedEvent(database, childId);
     if (attachmentDiffers) {
       syncOwnedAttachmentAccess(
@@ -1390,21 +1464,34 @@ export function assertSuccessorHasOccurrence(source, householdZone) {
   }
 }
 
-function remainingCountRule(master, recurrenceId, householdZone = null) {
+/**
+ * COUNT des Nachfolgers: die Vorkommen ab dem gewaehlten Slot.
+ *
+ * Gezaehlt wird auf Schleifentagen bis zum Schleifentag des Slots, verglichen
+ * wird sein exakter Schluessel (#2034). Vorher lief das Fenster bis zum
+ * Schluessel selbst - einem UTC-Tag -, und oestlich von UTC liegt der
+ * Schleifentag einen Tag DAHINTER: das gewaehlte Vorkommen fiel aus dem
+ * Fenster, und "dieser und folgende" scheiterte (Codex-Review zu #2031).
+ * Das Fenster beginnt am ersten Schleifentag, nicht am gespeicherten Datum:
+ * westlich von UTC liegt der vor dem UTC-Datum des Starts.
+ */
+function remainingCountRule(master, selected, householdZone = null) {
   const count = parseRRule(master.recurrence_rule)?.count ?? null;
   if (count === null) return master.recurrence_rule;
+  const placed = occurrenceSlotOf(selected);
+  const clock = occurrenceClock(master, householdZone);
   const occurrences = expandRecurringEvents(
     [master],
-    master.start_datetime.slice(0, 10),
-    recurrenceId,
+    shiftDateKey(clock.seriesStart, -1),
+    placed.day,
     new Map(),
     {
       includeRecurrenceIdentity: true,
-      maxIterations: exactLookupIterationLimit(master, recurrenceId),
+      maxIterations: exactLookupIterationLimit(master, shiftDateKey(placed.day, 1)),
       householdZone,
     },
   );
-  const selectedIndex = occurrences.findIndex((row) => row.recurrence_identity === recurrenceId);
+  const selectedIndex = occurrences.findIndex((row) => occurrenceSlotOf(row)?.key === placed.key);
   if (selectedIndex < 0) {
     throw invalidRecurrenceIdentity(
       'The validated recurrence_id could not be indexed within the bounded series reach.',
@@ -1413,27 +1500,42 @@ function remainingCountRule(master, recurrenceId, householdZone = null) {
   return String(master.recurrence_rule).replace(/COUNT=\d+/i, `COUNT=${count - selectedIndex}`);
 }
 
-function truncateRuleBefore(rule, recurrenceId) {
+/**
+ * Kuerzt eine Regel so, dass sie vor dem SCHLEIFENTAG `seriesDay` endet -
+ * dem Tag, an dem die Regel das gewaehlte Vorkommen zaehlt (#2034). Der
+ * Schluessel selbst taugt dafuer nicht: fuer Los Angeles 23:30 nennt er den
+ * UTC-Folgetag, und ein UNTIL auf dessen Vortag liess das gewaehlte Vorkommen
+ * in der alten Serie stehen, waehrend die neue es noch einmal zeigte.
+ */
+function truncateRuleBefore(rule, seriesDay) {
   const raw = String(rule ?? '').replace(/^RRULE:/, '');
   const kept = raw.split(';').filter((segment) =>
     !/^UNTIL=/i.test(segment) && !/^COUNT=/i.test(segment)
   );
-  return [...kept, `UNTIL=${previousDateKey(recurrenceId).replaceAll('-', '')}`].join(';');
+  return [...kept, `UNTIL=${previousDateKey(seriesDay).replaceAll('-', '')}`].join(';');
 }
 
-function linkedChildren(database, seriesId, fromRecurrenceId = null) {
-  if (fromRecurrenceId) {
-    return database.prepare(`
-      SELECT * FROM calendar_events
-      WHERE recurrence_parent_id = ? AND recurrence_id >= ?
-      ORDER BY recurrence_id, id
-    `).all(seriesId, fromRecurrenceId);
-  }
-  return database.prepare(`
+/**
+ * Die verknuepften Einzelvorkommen einer Serie, geordnet nach ihrer Lage.
+ *
+ * `fromDay`: nur die ab diesem Schleifentag. Verglichen wird ueber
+ * `orderOf` (`occurrenceClock().keyOrder`), nicht als Text: seit Schritt 4
+ * von #2034 tragen die Zeilen einer Serie zwei Schluesselformen nebeneinander,
+ * und `recurrence_id >= ?` ordnete `2035-03-24T23:30:00Z` vor `2035-03-25`.
+ */
+function linkedChildren(database, seriesId, fromDay = null, orderOf = null) {
+  const rows = database.prepare(`
     SELECT * FROM calendar_events
     WHERE recurrence_parent_id = ?
     ORDER BY recurrence_id, id
   `).all(seriesId);
+  if (!fromDay) return rows;
+  const order = orderOf ?? ((key) => String(key ?? '').slice(0, 10));
+  return rows
+    .map((row) => ({ row, at: order(row.recurrence_id) }))
+    .filter(({ at }) => at >= fromDay)
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : Number(a.row.id) - Number(b.row.id)))
+    .map(({ row }) => row);
 }
 
 /** Deletes one original slot while leaving the master's EXDATE in place. */
@@ -1445,20 +1547,21 @@ export function deleteOccurrence(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
-    const child = database.prepare(`
-      SELECT id FROM calendar_events
-      WHERE recurrence_parent_id = ? AND recurrence_id = ?
-    `).get(master.id, recurrenceId);
+    const zone = householdTimeZone(database);
+    const slot = baseOccurrenceFor(master, recurrenceId, zone, { ambiguous: 'reject' });
+    const forms = slotKeyForms(master, slot, zone);
+    const child = findSlotChild(database, master.id, forms);
     if (child) {
       deleteEventReminders(database, [child.id]);
       database.prepare('DELETE FROM calendar_events WHERE id = ?').run(child.id);
     }
+    // Die Ausnahme in exakter Form: sie blendet genau dieses Vorkommen aus,
+    // auch in der Umstellungsnacht (#2034).
     database.prepare(`
       INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date)
       VALUES (?, ?)
-    `).run(master.id, recurrenceId);
-    return { eventId: Number(master.id), recurrenceId };
+    `).run(master.id, forms.key);
+    return { eventId: Number(master.id), recurrenceId: forms.key };
   });
 }
 
@@ -1471,8 +1574,12 @@ export function truncateSeries(database, {
 }) {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
-    const selected = baseOccurrenceFor(master, recurrenceId, householdTimeZone(database));
-    const futureChildren = linkedChildren(database, master.id, recurrenceId);
+    const zone = householdTimeZone(database);
+    const selected = baseOccurrenceFor(master, recurrenceId, zone, { ambiguous: 'reject' });
+    const seriesDay = occurrenceSlotOf(selected).day;
+    const futureChildren = linkedChildren(
+      database, master.id, seriesDay, occurrenceClock(master, zone).keyOrder,
+    );
     if (selected.is_series_start) {
       const allChildren = linkedChildren(database, master.id);
       deleteEventReminders(database, [master.id, ...allChildren.map((row) => row.id)]);
@@ -1481,11 +1588,9 @@ export function truncateSeries(database, {
     }
 
     deleteEventReminders(database, futureChildren.map((row) => row.id));
-    database.prepare(`
-      DELETE FROM calendar_events
-      WHERE recurrence_parent_id = ? AND recurrence_id >= ?
-    `).run(master.id, recurrenceId);
-    const recurrenceRule = truncateRuleBefore(master.recurrence_rule, recurrenceId);
+    const deleteChild = database.prepare('DELETE FROM calendar_events WHERE id = ?');
+    for (const child of futureChildren) deleteChild.run(child.id);
+    const recurrenceRule = truncateRuleBefore(master.recurrence_rule, seriesDay);
     database.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?')
       .run(recurrenceRule, master.id);
     return { wholeSeries: false, eventId: Number(master.id), recurrenceRule };
@@ -1657,8 +1762,9 @@ export function splitSeries(database, {
   return runTransaction(database, () => {
     const master = loadSeriesForMutation(database, seriesId, actorId, isAdmin);
     const seriesZone = householdTimeZone(database);
-    const selectedBase = baseOccurrenceFor(master, recurrenceId, seriesZone);
-    assertOccurrenceSlotCanBeMutated(database, master.id, recurrenceId);
+    const selectedBase = baseOccurrenceFor(master, recurrenceId, seriesZone, { ambiguous: 'reject' });
+    const forms = slotKeyForms(master, selectedBase, seriesZone);
+    assertOccurrenceSlotCanBeMutated(database, master.id, forms);
     if (selectedBase.is_series_start) {
       const normalizedChanges = firstSlotSeriesChanges(master, selectedBase, changes);
       assertValidEffectiveInterval({ ...master, ...normalizedChanges });
@@ -1678,12 +1784,18 @@ export function splitSeries(database, {
       return { series: result.series, wholeSeries: true };
     }
 
-    const children = linkedChildren(database, master.id, recurrenceId);
+    // Ab dem Schleifentag des gewaehlten Slots, nach Lage statt nach Text
+    // (#2034: zwei Schluesselformen in einer Serie).
+    const masterClock = occurrenceClock(master, seriesZone);
+    const children = linkedChildren(database, master.id, forms.day, masterClock.keyOrder);
     const resolvedById = new Map(children.map((row) => [
       Number(row.id),
       resolveOccurrence(database, row, master),
     ]));
-    const selectedChild = children.find((row) => row.recurrence_id === recurrenceId);
+    const selectedRow = findSlotChild(database, master.id, forms);
+    const selectedChild = selectedRow
+      ? children.find((row) => Number(row.id) === Number(selectedRow.id))
+      : undefined;
     const selectedResolved = selectedChild
       ? resolvedById.get(Number(selectedChild.id))
       : selectedBase;
@@ -1704,7 +1816,7 @@ export function splitSeries(database, {
     successorValues.recurrence_rule = Object.hasOwn(changes, 'recurrence_rule')
       && changes.recurrence_rule !== master.recurrence_rule
       ? changes.recurrence_rule
-      : remainingCountRule(master, recurrenceId, seriesZone);
+      : remainingCountRule(master, selectedBase, seriesZone);
     successorValues.recurrence_parent_id = null;
     successorValues.recurrence_id = null;
     successorValues.overridden_fields = null;
@@ -1728,12 +1840,17 @@ export function splitSeries(database, {
     assertSuccessorHasOccurrence(successorValues, seriesZone);
     const futureChildren = children.filter((child) =>
       !selectedChild || Number(child.id) !== Number(selectedChild.id));
+    // Die Folgeserie hat ihre eigene Uhr (ihr Start ist der des gewaehlten
+    // Vorkommens, ggf. geaendert): Einzelvorkommen und Ausnahmen, die zu ihr
+    // wandern, werden in DERSELBEN Transaktion auf sie umgeschluesselt (#2034).
+    const proposedRekey = slotRekeyer(master, successorValues, seriesZone);
     const orphans = classifyOrphans(
       futureChildren,
       successorValues,
       hasOutboundTarget(successorValues)
         || hasConfiguredOutlookAutoSyncTarget(database, successorValues, successorAssignments),
       seriesZone,
+      (child) => proposedRekey(child.recurrence_id) ?? child.recurrence_id,
     );
     const confirmationSupplied = confirmedOrphanCount !== undefined;
     if ((orphans.length > 0 || confirmationSupplied)
@@ -1743,11 +1860,13 @@ export function splitSeries(database, {
     const orphanIds = new Set(orphans.map((child) => Number(child.id)));
     const futureExceptions = database.prepare(`
       SELECT exception_date FROM calendar_event_exceptions
-      WHERE event_id = ? AND exception_date >= ?
+      WHERE event_id = ?
       ORDER BY exception_date
-    `).all(master.id, recurrenceId);
+    `).all(master.id)
+      .filter((exception) => masterClock.keyOrder(exception.exception_date) >= forms.day);
     const transferableExceptions = futureExceptions.filter((exception) =>
-      exception.exception_date !== recurrenceId);
+      exception.exception_date !== forms.key
+      && !(exception.exception_date === forms.legacyKey && forms.legacyExclusive));
 
     const inheritedDocumentId = !selectedFields.includes('attachment')
       ? Number(master.attachment_document_id)
@@ -1805,8 +1924,11 @@ export function splitSeries(database, {
       });
     }
     database.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?')
-      .run(truncateRuleBefore(master.recurrence_rule, recurrenceId), master.id);
+      .run(truncateRuleBefore(master.recurrence_rule, forms.day), master.id);
     const successorId = insertSeriesRow(database, successorValues);
+    const successorRow = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(successorId);
+    const rekey = slotRekeyer(master, successorRow, seriesZone);
+    const successorKey = (key) => rekey(key) ?? key;
     replaceAssignments(database, successorId, successorAssignments);
     const reminderSource = selectedFields.includes('reminders') ? selectedChild : master;
     copyResolvedReminderState(database, {
@@ -1834,16 +1956,19 @@ export function splitSeries(database, {
       VALUES (?, ?)
     `);
     for (const exception of transferableExceptions) {
-      insertException.run(successorId, exception.exception_date);
+      insertException.run(successorId, successorKey(exception.exception_date));
     }
-    database.prepare(`
+    const removeException = database.prepare(`
       DELETE FROM calendar_event_exceptions
-      WHERE event_id = ? AND exception_date >= ?
-    `).run(master.id, recurrenceId);
-    database.prepare(`
-      UPDATE calendar_events SET recurrence_parent_id = ?
-      WHERE recurrence_parent_id = ? AND recurrence_id >= ?
-    `).run(successorId, master.id, recurrenceId);
+      WHERE event_id = ? AND exception_date = ?
+    `);
+    for (const exception of futureExceptions) removeException.run(master.id, exception.exception_date);
+    const reparent = database.prepare('UPDATE calendar_events SET recurrence_parent_id = ? WHERE id = ?');
+    const moving = children.filter((child) => !orphanIds.has(Number(child.id)));
+    for (const child of moving) reparent.run(successorId, child.id);
+    rekeyChildren(database, moving.map((child) => ({
+      id: child.id, from: child.recurrence_id, to: rekey(child.recurrence_id),
+    })));
 
     const successor = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(successorId);
     syncOwnedAttachmentAccess(
@@ -1870,12 +1995,12 @@ export function splitSeries(database, {
         database.prepare(`
           DELETE FROM calendar_event_exceptions
           WHERE event_id = ? AND exception_date = ?
-        `).run(successorId, recurrenceId);
+        `).run(successorId, successorKey(forms.key));
         continue;
       }
       refreshReparentedChild(
         database,
-        { ...child, recurrence_parent_id: successorId },
+        { ...child, recurrence_parent_id: successorId, recurrence_id: successorKey(child.recurrence_id) },
         resolvedById.get(Number(child.id)),
         successor,
         successorAssignments,
@@ -1922,16 +2047,130 @@ function orphanConflict(count) {
   );
 }
 
-function classifyOrphans(children, proposed, detachAll, householdZone = null) {
+function classifyOrphans(children, proposed, detachAll, householdZone = null, keyOf = (child) => child.recurrence_id) {
   if (detachAll) return children;
   return children.filter((child) => {
     try {
-      baseOccurrenceFor(proposed, child.recurrence_id, householdZone);
+      baseOccurrenceFor(proposed, keyOf(child), householdZone);
       return false;
     } catch {
       return true;
     }
   });
+}
+
+// --------------------------------------------------------
+// UMSCHLUESSELN (#2034, Auflage 2 und F5).
+//
+// Der Schluessel in Format A traegt die Uhrzeit des Originalstarts. Aendert
+// sich die Uhr einer Serie - Start, Ganztaegigkeit, `tzid`, oder bei einer
+// Zeile mit zonenlosem Start neben `tzid` die Haushaltszone (#1993) -, nennen
+// ihre gespeicherten Ausnahmen und Einzelvorkommen Zeitpunkte, die es nicht
+// mehr gibt. Sie werden deshalb in DERSELBEN Transaktion auf die neue Uhr
+// umgeschrieben: ein Schluessel bleibt an seinem SCHLEIFENTAG, so wie der
+// alte Tagesschluessel an seinem Tag blieb. Ein alter Schluessel wird dabei
+// nach der Lesart von main aufgeloest und exakt geschrieben; trifft er zwei
+// Vorkommen (Umstellungsnacht) oder keines, bleibt er, wie er ist.
+// --------------------------------------------------------
+
+/** Aendert sich zwischen zwei Fassungen einer Serie die Uhr ihrer Vorkommen? */
+function seriesClockChanged(before, after, beforeZone, afterZone = beforeZone) {
+  if (!before?.recurrence_rule && !after?.recurrence_rule) return false;
+  return String(before.start_datetime ?? '') !== String(after.start_datetime ?? '')
+    || Boolean(before.all_day) !== Boolean(after.all_day)
+    || (before.tzid ?? null) !== (after.tzid ?? null)
+    || (beforeZone !== afterZone && (seriesReadsHouseholdZone(before) || seriesReadsHouseholdZone(after)));
+}
+
+/** Liest die Uhr dieser Zeile die Haushaltszone (#1993)? */
+function seriesReadsHouseholdZone(row) {
+  return !!row?.tzid && !row.all_day && !hasExplicitZone(row.start_datetime);
+}
+
+/**
+ * Bildet einen Schluessel der alten Fassung auf den der neuen ab, ueber den
+ * Schleifentag. `null` heisst: bleibt, wie er ist.
+ */
+function slotRekeyer(fromSeries, toSeries, fromZone, toZone = fromZone) {
+  const from = occurrenceClock(fromSeries, fromZone);
+  const to = occurrenceClock(toSeries, toZone);
+  return (key) => {
+    if (!isOccurrenceKey(key)) return null;
+    let days = from.dayCandidatesOfKey(key);
+    if (from.isLegacyKey(key) && days.length > 1) {
+      // Nur Tage, an denen die Regel wirklich ein Vorkommen hat.
+      days = occurrencesForKey(fromSeries, key, fromZone).map((row) => occurrenceSlotOf(row).day);
+    }
+    if (days.length !== 1) return null;
+    const next = to.keyFor(days[0]);
+    return next === key ? null : next;
+  };
+}
+
+/** Schreibt die Ausnahmen einer Serie um (`rekey` aus `slotRekeyer`). */
+function rekeySeriesExceptions(database, seriesId, rekey) {
+  const moves = database.prepare(`
+    SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ?
+  `).all(seriesId)
+    .map((row) => [row.exception_date, rekey(row.exception_date)])
+    .filter(([, next]) => next);
+  const remove = database.prepare(`
+    DELETE FROM calendar_event_exceptions WHERE event_id = ? AND exception_date = ?
+  `);
+  const insert = database.prepare(`
+    INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)
+  `);
+  for (const [old] of moves) remove.run(seriesId, old);
+  for (const [, next] of moves) insert.run(seriesId, next);
+  return moves.length;
+}
+
+/**
+ * Schreibt die Schluessel verknuepfter Einzelvorkommen um, zweiphasig: der
+ * Unique-Index (recurrence_parent_id, recurrence_id) darf auch zwischendurch
+ * keine Doppelung sehen.
+ */
+function rekeyChildren(database, moves) {
+  const pending = moves.filter(({ from, to }) => to && to !== from);
+  const update = database.prepare('UPDATE calendar_events SET recurrence_id = ? WHERE id = ?');
+  for (const { id } of pending) update.run(`~rekey~${id}`, id);
+  for (const { id, to } of pending) update.run(to, id);
+}
+
+/**
+ * Wechsel der Haushaltszone (F5 zu #2034): Zeilen mit `tzid` und zonenlosem
+ * Start (#1993) lesen ihren Start in der Haushaltszone, ihre Vorkommen
+ * wandern also mit. Ihre Ausnahmen und Einzelvorkommen werden in derselben
+ * Transaktion wie der Wechsel umgeschluesselt. Der Aufrufer haelt die
+ * Transaktion.
+ * @returns {number} Anzahl umgeschriebener Schluessel
+ */
+export function rekeyForHouseholdZoneChange(database, fromZone, toZone) {
+  if (!fromZone || !toZone || fromZone === toZone) return 0;
+  const series = database.prepare(`
+    SELECT * FROM calendar_events
+    WHERE recurrence_rule IS NOT NULL AND tzid IS NOT NULL AND COALESCE(all_day, 0) = 0
+  `).all().filter(seriesReadsHouseholdZone);
+  let moved = 0;
+  for (const row of series) {
+    const rekey = slotRekeyer(row, row, fromZone, toZone);
+    moved += rekeySeriesExceptions(database, row.id, rekey);
+    const children = linkedChildren(database, row.id)
+      .map((child) => ({ id: child.id, from: child.recurrence_id, to: rekey(child.recurrence_id) }));
+    rekeyChildren(database, children);
+    moved += children.filter(({ to }) => to).length;
+  }
+  return moved;
+}
+
+/**
+ * Umschluesseln nach einer Aenderung an einer Serie, die NICHT ueber
+ * `updateSeriesWithOverrides` laeuft (PUT /calendar/:id ohne Einzelvorkommen):
+ * nur ihre Ausnahmen. Der Aufrufer haelt die Transaktion.
+ */
+export function rekeySeriesAfterUpdate(database, before, after, householdZone) {
+  if (!seriesClockChanged(before, after, householdZone)) return 0;
+  return rekeySeriesExceptions(database, before.id, slotRekeyer(before, after, householdZone));
 }
 
 /**
@@ -2270,7 +2509,17 @@ export function updateSeriesWithOverrides(database, {
     const detachAll = (!hasOutboundTarget(current) && hasOutboundTarget(proposed))
       || (!hasConfiguredOutlookAutoSyncTarget(database, current, currentAssignments)
         && hasConfiguredOutlookAutoSyncTarget(database, proposed, proposedAssignments));
-    const orphans = classifyOrphans(children, proposed, detachAll, householdTimeZone(database));
+    // Aendert sich die Uhr der Serie, wandern die Schluessel ihrer
+    // Einzelvorkommen mit (#2034, Auflage 2) - verwaist ist nur, was auch am
+    // umgeschluesselten Schleifentag kein Vorkommen mehr hat.
+    const seriesZone = householdTimeZone(database);
+    const proposedRekey = seriesClockChanged(current, proposed, seriesZone)
+      ? slotRekeyer(current, proposed, seriesZone)
+      : () => null;
+    const orphans = classifyOrphans(
+      children, proposed, detachAll, seriesZone,
+      (child) => proposedRekey(child.recurrence_id) ?? child.recurrence_id,
+    );
     const confirmationSupplied = confirmedOrphanCount !== undefined;
     if ((orphans.length > 0 || confirmationSupplied)
         && confirmedOrphanCount !== orphans.length) {
@@ -2357,11 +2606,27 @@ export function updateSeriesWithOverrides(database, {
       );
     }
     const orphanIds = new Set(orphans.map((child) => Number(child.id)));
+    // Umschluesseln gegen die GESPEICHERTE neue Fassung, nicht gegen den
+    // Vorschlag: PUT schreibt den Start in Speicherform (Wanduhr), und die
+    // Schluessel muessen zu dem passen, was die Expansion ab jetzt liest.
+    const rekey = seriesClockChanged(current, updated, seriesZone)
+      ? slotRekeyer(current, updated, seriesZone)
+      : null;
+    const keyed = new Map(children.map((child) => [
+      Number(child.id),
+      rekey?.(child.recurrence_id) ?? child.recurrence_id,
+    ]));
+    if (rekey) {
+      rekeySeriesExceptions(database, master.id, rekey);
+      rekeyChildren(database, children
+        .filter((child) => !orphanIds.has(Number(child.id)))
+        .map((child) => ({ id: child.id, from: child.recurrence_id, to: keyed.get(Number(child.id)) })));
+    }
     for (const child of children) {
       if (!orphanIds.has(Number(child.id))) {
         refreshInheritedChild(
           database,
-          child,
+          { ...child, recurrence_id: keyed.get(Number(child.id)) },
           resolvedById.get(Number(child.id)),
           updated,
           reminderZone,

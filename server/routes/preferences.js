@@ -21,6 +21,7 @@ import { listVisibleCategories } from '../services/note-categories.js';
 import { syncPreventionRemindersForSubject } from '../services/prevention-reminders.js';
 import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 import { isScreensaverEnabled } from './screensaver.js';
+import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-overrides.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -861,8 +862,16 @@ router.put('/', (req, res) => {
           error: 'Ungültige Zeitzone. Erwartet wird eine IANA-Zone wie "Europe/Berlin".', code: 400,
         });
       }
-      if (timezone === null || timezone === '') cfgDelete('household_timezone');
-      else cfgSet('household_timezone', timezone);
+      // Mit der Zone wandert jede Serie, die zonenlose Ziffern neben einer
+      // `tzid` traegt (#1993): ihr Start ist Wanduhr DES HAUSHALTS. Ihre
+      // Ausnahmen und Einzelvorkommen nennen den Originalstart (#2034, Format
+      // A) und werden in derselben Transaktion umgeschluesselt (F5).
+      db.get().transaction(() => {
+        const zoneBefore = householdTimeZone(db.get());
+        if (timezone === null || timezone === '') cfgDelete('household_timezone');
+        else cfgSet('household_timezone', timezone);
+        rekeyForHouseholdZoneChange(db.get(), zoneBefore, householdTimeZone(db.get()));
+      })();
       // Wer die Zone schreibt, hat entschieden - auch mit "Automatisch". Ohne
       // den Merker saehe ein bewusstes Zurueckstellen aus wie "nie gesetzt",
       // und der Hinweis kaeme fuer alle Admins wieder.

@@ -49,7 +49,11 @@ const birthdayInputProperties = {
 
 const calendarOccurrenceProperties = {
   series_id: { type: 'integer', minimum: 1 },
-  recurrence_id: { type: 'string', format: 'date' },
+  recurrence_id: {
+    type: 'string',
+    pattern: '^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z?)?$',
+    description: 'The original occurrence, as RFC 5545 RECURRENCE-ID (#2034): `YYYY-MM-DD` for an all-day series, `YYYY-MM-DDTHH:MM:SSZ` (the original start in UTC) for a series with a time zone, `YYYY-MM-DDTHH:MM:SS` (floating wall time) for a local series without one. Up to v2.78.0 a timed occurrence was named by a `YYYY-MM-DD` day; linked occurrences stored before the change may still carry that form.',
+  },
   is_occurrence_override: { type: 'boolean' },
   is_local_recurring_series: { type: 'boolean' },
   can_override_occurrence: { type: 'boolean' },

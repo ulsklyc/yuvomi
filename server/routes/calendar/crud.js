@@ -21,7 +21,9 @@ import {
   stageDocumentUpload,
 } from '../../services/document-storage.js';
 import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../services/calendar-outbound.js';
-import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
+import {
+  isOccurrenceKey, occurrenceSlotOf, SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
+} from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
@@ -38,7 +40,9 @@ import {
   deleteOccurrence,
   isEligibleLocalSeries,
   isLocallyOwnedSeries,
+  linkedOccurrenceChild,
   parseOverrideFields,
+  rekeySeriesAfterUpdate,
   splitSeries,
   truncateSeries,
   upsertOccurrenceOverride,
@@ -228,13 +232,11 @@ function validateOccurrenceAssignments(database, value) {
  * gelten dessen, sonst die der Serie. Wer das Vorkommen schon entfernt hat,
  * steht damit nicht mehr auf der Bestandsliste.
  */
-function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
-  const existing = database.prepare(`
-    SELECT id, overridden_fields FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = ?
-  `).get(seriesId, recurrenceId);
+function storedOccurrenceAssignees(database, master, recurrenceId) {
+  // In exakter oder alter Schluesselform gespeichert (#2034).
+  const existing = linkedOccurrenceChild(database, master, recurrenceId, householdTimeZone(database));
   const ownsAssignments = existing && parseOverrideFields(existing.overridden_fields).includes('assignments');
-  return storedEventAssignees(database, ownsAssignments ? existing.id : seriesId);
+  return storedEventAssignees(database, ownsAssignments ? existing.id : master.id);
 }
 
 /**
@@ -242,10 +244,7 @@ function storedOccurrenceAssignees(database, seriesId, recurrenceId) {
  * Ausnahme, wenn sie den Anhang selbst fuehrt, sonst das der Serie.
  */
 function storedOccurrenceAttachmentDocument(database, master, recurrenceId) {
-  const existing = database.prepare(`
-    SELECT attachment_document_id, overridden_fields FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = ?
-  `).get(master.id, recurrenceId);
+  const existing = linkedOccurrenceChild(database, master, recurrenceId, householdTimeZone(database));
   const ownsAttachment = existing && parseOverrideFields(existing.overridden_fields).includes('attachment');
   return ownsAttachment ? existing.attachment_document_id : master.attachment_document_id;
 }
@@ -712,6 +711,7 @@ const CALENDAR_OCCURRENCE_ERRORS = {
   not_authorized: 'Du darfst diese Terminserie nicht bearbeiten.',
   ineligible_series: 'Einzelausnahmen sind nur für lokale Terminserien ohne aktive externe Synchronisierung verfügbar. Hat eine lokale Serie bereits verknüpfte Einzelausnahmen, deaktiviere zuerst ihren Outlook-Zielkalender. Danach kannst du sie wieder bearbeiten, ohne Ausnahmen zu löschen.',
   invalid_recurrence_id: 'Der ausgewählte Serientermin gehört nicht zu diesem Datum. Lade den Kalender erneut und wähle den Termin noch einmal aus.',
+  ambiguous_recurrence_id: 'An diesem Tag liegen zwei Termine der Serie (Zeitumstellung). Lade den Kalender erneut und wähle den Termin noch einmal aus.',
   invalid_override_fields: 'Die Angaben zur Einzelausnahme sind ungültig. Prüfe die geänderten Felder.',
   invalid_occurrence_interval: 'Das Ende darf nicht vor dem Beginn liegen. Prüfe Datum und Uhrzeit der Einzelausnahme.',
   calendar_override_orphans: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
@@ -1249,7 +1249,15 @@ router.put('/:id', async (req, res) => {
         { mayClone: rights.mayCloneAttachment },
       );
     } else {
-      db.get().transaction(applyUpdate)();
+      db.get().transaction(() => {
+        applyUpdate();
+        // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
+        // die Uhr der Serie, wandern sie in derselben Transaktion mit.
+        if (event.recurrence_rule) {
+          const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+          rekeySeriesAfterUpdate(db.get(), event, after, householdTimeZone(db.get()));
+        }
+      })();
     }
     stagedUpload = null;
 
@@ -1367,7 +1375,8 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         { status: unauthorized ? 403 : 400, code: eligibility.reason },
       ));
     }
-    baseOccurrenceFor(master, req.params.recurrenceId, householdTimeZone(db.get()));
+    // Beide Schluesselformen (#2034); trifft die alte zwei Vorkommen, 409.
+    baseOccurrenceFor(master, req.params.recurrenceId, householdTimeZone(db.get()), { ambiguous: 'reject' });
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { master });
     const { values: validated, errors } = mutation;
@@ -1430,7 +1439,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if (vIcon !== undefined) changes.icon = vIcon;
 
-    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
+    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
     // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
     assertAttachmentStillChangeable(req, db.get(),
       storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
@@ -1528,7 +1537,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       ));
     }
     const seriesZone = householdTimeZone(db.get());
-    const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId, seriesZone);
+    const selectedBase = baseOccurrenceFor(master, req.params.recurrenceId, seriesZone, { ambiguous: 'reject' });
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { following: true, master });
     const { values: validated } = mutation;
@@ -1668,7 +1677,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       db.get(),
       stagedClones,
       (cloneOptions) => {
-        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesId, req.params.recurrenceId));
+        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
         // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
         assertAttachmentStillChangeable(req, db.get(),
           storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
@@ -1804,7 +1813,11 @@ router.post('/:id/reset', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/calendar/:id/exceptions
 // Nimmt ein einzelnes Vorkommen einer lokalen Serie aus (EXDATE, #489).
-// Body: { date: 'YYYY-MM-DD' } — Start-Datum der auszunehmenden Instanz.
+// Body: { recurrence_id } - das Vorkommen, wie GET /calendar es nennt (#2034,
+// Format A: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ` oder `YYYY-MM-DDTHH:MM:SS`).
+// Weiter angenommen: { date: 'YYYY-MM-DD' } in der alten Lesart; trifft sie
+// zwei Vorkommen (Umstellungsnacht), 409 `ambiguous_recurrence_id`.
+// Gespeichert wird immer der exakte Schluessel des getroffenen Vorkommens.
 // Nur lokale (nicht extern synchronisierte) wiederkehrende Termine.
 // Response: 201 { data: { event_id, exception_date } }
 // --------------------------------------------------------
@@ -1813,9 +1826,11 @@ router.post('/:id/exceptions', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
 
-    const date = req.body?.date;
-    if (!DATE_RE.test(date || ''))
+    const requested = req.body?.recurrence_id ?? req.body?.date;
+    if (req.body?.recurrence_id === undefined && !DATE_RE.test(requested || ''))
       return res.status(400).json({ error: 'date muss YYYY-MM-DD sein.', code: 400 });
+    if (req.body?.recurrence_id !== undefined && !isOccurrenceKey(requested))
+      return res.status(400).json({ error: 'recurrence_id ist kein Vorkommens-Schluessel.', code: 400 });
 
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
@@ -1831,12 +1846,19 @@ router.post('/:id/exceptions', (req, res) => {
       });
     }
 
+    // Das Vorkommen aufloesen und seinen exakten Schluessel speichern: eine
+    // Ausnahme in Format A blendet genau dieses aus, auch in der
+    // Umstellungsnacht (#2034). Kein Vorkommen: 400; alte Form mit zwei
+    // Treffern: 409.
+    const slot = baseOccurrenceFor(event, requested, householdTimeZone(db.get()), { ambiguous: 'reject' });
+    const exceptionKey = occurrenceSlotOf(slot)?.key ?? requested;
     db.get().prepare(
       'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
-    ).run(id, date);
+    ).run(id, exceptionKey);
 
-    res.status(201).json({ data: { event_id: id, exception_date: date } });
+    res.status(201).json({ data: { event_id: id, exception_date: exceptionKey, recurrence_id: exceptionKey } });
   } catch (err) {
+    if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }

@@ -22,6 +22,7 @@ import {
   parseOverrideFields, recurrenceIdFor, seriesIdFor,
 } from '../../services/calendar-occurrence-overrides.js';
 import { personAvatarUrlSql } from '../../services/person-avatar.js';
+import { seriesReadingZone } from '../../services/calendar-events.js';
 
 export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
@@ -489,7 +490,12 @@ function recurrenceMetadata(event, context) {
 
   return {
     series_id: seriesId,
-    recurrence_id: event.recurrence_id ?? recurrenceIdFor(event),
+    // Format A (#2034); eine nicht expandierte Serienzeile nennt ihr erstes
+    // Vorkommen, mit der Haushaltszone nur fuer eine #1993-Zeile.
+    recurrence_id: event.recurrence_id ?? recurrenceIdFor(
+      event,
+      context?.database ? seriesReadingZone(context.database, event) : null,
+    ),
     is_occurrence_override: linked,
     is_local_recurring_series: isLocalRecurringSeries,
     can_override_occurrence: canOverride,

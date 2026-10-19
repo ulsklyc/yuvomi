@@ -1538,7 +1538,8 @@ test('create response immediately satisfies browser occurrence edit and delete c
   assert.equal(created.status, 201);
   const event = created.body.data;
   assert.equal(event.series_id, event.id);
-  assert.equal(event.recurrence_id, '2040-03-15');
+  // Format A (#2034): eine lokale Serie ohne Zone nennt ihr Vorkommen schwebend.
+  assert.equal(event.recurrence_id, '2040-03-15T09:00:00');
   assert.equal(event.is_local_recurring_series, true);
   assert.equal(event.can_override_occurrence, true);
   assert.equal(event.assignment_owner_id, event.id);
@@ -1547,7 +1548,7 @@ test('create response immediately satisfies browser occurrence edit and delete c
   const editTarget = calendarOccurrenceMutationTarget(event, 'this');
   assert.deepEqual(editTarget, {
     method: 'put',
-    path: `/calendar/${event.id}/occurrences/2040-03-15`,
+    path: `/calendar/${event.id}/occurrences/${encodeURIComponent('2040-03-15T09:00:00')}`,
     carriesReminderOffsets: true,
   });
   const edited = await call('PUT', editTarget.path.replace('/calendar', ''), {
@@ -1556,12 +1557,12 @@ test('create response immediately satisfies browser occurrence edit and delete c
   });
   assert.equal(edited.status, 200);
   assert.equal(edited.body.data.series_id, event.id);
-  assert.equal(edited.body.data.recurrence_id, '2040-03-15');
+  assert.equal(edited.body.data.recurrence_id, '2040-03-15T09:00:00');
 
   const deleteTarget = calendarOccurrenceDeleteTarget(event, 'this');
   assert.deepEqual(deleteTarget, {
     method: 'delete',
-    path: `/calendar/${event.id}/occurrences/2040-03-15`,
+    path: `/calendar/${event.id}/occurrences/${encodeURIComponent('2040-03-15T09:00:00')}`,
   });
   const deleted = await call('DELETE', deleteTarget.path.replace('/calendar', ''), { actor: ADMIN });
   assert.equal(deleted.status, 204);
@@ -2033,9 +2034,26 @@ test('POST /:id/exceptions — sichtbare Nicht-Eigentümer dürfen wie bei der g
   const serie = insertEvent({ title: 'EXC-OK', start_datetime: '2042-03-01T09:00', recurrence_rule: 'FREQ=DAILY', created_by: MARIA.id });
   const ok = await call('POST', `/${serie}/exceptions`, { actor: TOM, body: { date: '2042-03-05' } });
   assert.equal(ok.status, 201);
-  assert.equal(ok.body.data.exception_date, '2042-03-05');
-  const row = db.prepare('SELECT COUNT(*) AS n FROM calendar_event_exceptions WHERE event_id=? AND exception_date=?').get(serie, '2042-03-05');
+  // Die alte Form als Eingabe, gespeichert der exakte Schluessel (#2034).
+  assert.equal(ok.body.data.exception_date, '2042-03-05T09:00:00');
+  assert.equal(ok.body.data.recurrence_id, '2042-03-05T09:00:00');
+  const row = db.prepare('SELECT COUNT(*) AS n FROM calendar_event_exceptions WHERE event_id=? AND exception_date=?').get(serie, '2042-03-05T09:00:00');
   assert.equal(row.n, 1);
+});
+
+test('POST /:id/exceptions - recurrence_id in Format A, kein Vorkommen 400 (#2034)', async () => {
+  const serie = insertEvent({ title: 'EXC-A', start_datetime: '2042-03-01T09:00', recurrence_rule: 'FREQ=DAILY', created_by: MARIA.id });
+  const exact = await call('POST', `/${serie}/exceptions`, { actor: TOM, body: { recurrence_id: '2042-03-06T09:00:00' } });
+  assert.equal(exact.status, 201);
+  assert.equal(exact.body.data.recurrence_id, '2042-03-06T09:00:00');
+  const offRule = await call('POST', `/${serie}/exceptions`, { actor: TOM, body: { recurrence_id: '2042-03-06T10:00:00' } });
+  assert.equal(offRule.status, 400);
+  assert.equal(offRule.body.reason, 'invalid_recurrence_id');
+  const malformed = await call('POST', `/${serie}/exceptions`, { actor: TOM, body: { recurrence_id: '06.03.2042' } });
+  assert.equal(malformed.status, 400);
+  assert.deepEqual(db.prepare(
+    'SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ? ORDER BY exception_date'
+  ).all(serie).map((r) => r.exception_date), ['2042-03-06T09:00:00']);
 });
 
 test('POST /:id/exceptions — fremde private Serie bleibt auch für Admin unsichtbar', async () => {
@@ -2077,7 +2095,7 @@ test('PUT /:seriesId/occurrences/:recurrenceId uses whole-series visibility righ
   });
   assert.equal(creator.status, 200);
   assert.equal(creator.body.data.series_id, seriesId);
-  assert.equal(creator.body.data.recurrence_id, '2046-01-02');
+  assert.equal(creator.body.data.recurrence_id, '2046-01-02T09:00:00');
 
   const visibleMember = await call('PUT', `/${seriesId}/occurrences/2046-01-02`, {
     actor: TOM,
@@ -2130,12 +2148,12 @@ test('generic child-id PUT and DELETE cannot bypass occurrence routing or metada
       `).get(childId) }, {
         title: 'Owned occurrence title',
         recurrence_parent_id: seriesId,
-        recurrence_id: '2046-01-11',
+        recurrence_id: '2046-01-11T09:00:00',
         overridden_fields: '["title"]',
       });
       assert.equal(db.prepare(`
         SELECT COUNT(*) AS count FROM calendar_event_exceptions
-        WHERE event_id = ? AND exception_date = '2046-01-11'
+        WHERE event_id = ? AND exception_date = '2046-01-11T09:00:00'
       `).get(seriesId).count, 1);
     }
   }
@@ -3321,7 +3339,7 @@ test('a partial occurrence move cannot persist an inverted interval or disappear
 
   const range = await call('GET', '/?from=2046-07-02&to=2046-07-02');
   assert.ok(range.body.data.some((event) => Number(event.series_id) === seriesId
-    && event.recurrence_id === '2046-07-02'));
+    && event.recurrence_id === '2046-07-02T09:00:00'));
 });
 
 test('DELETE occurrence scopes keep only-this suppression and truncate following state', async () => {
@@ -3338,7 +3356,7 @@ test('DELETE occurrence scopes keep only-this suppression and truncate following
   ).get(onlyId).count, 0);
   assert.equal(db.prepare(`
     SELECT COUNT(*) AS count FROM calendar_event_exceptions
-    WHERE event_id = ? AND exception_date = '2046-05-02'
+    WHERE event_id = ? AND exception_date = '2046-05-02T09:00:00'
   `).get(onlyId).count, 1);
 
   const followingId = insertEvent({
@@ -3358,7 +3376,7 @@ test('DELETE occurrence scopes keep only-this suppression and truncate following
   assert.deepEqual(db.prepare(`
     SELECT recurrence_id FROM calendar_events
     WHERE recurrence_parent_id = ? ORDER BY recurrence_id
-  `).all(followingId).map((row) => row.recurrence_id), ['2046-06-02']);
+  `).all(followingId).map((row) => row.recurrence_id), ['2046-06-02T09:00:00']);
 });
 
 test('following delete from the first slot and whole-series delete cascade linked state', async () => {
@@ -3413,11 +3431,11 @@ test('PUT occurrence following creates a successor and reparents future replacem
   assert.equal(db.prepare('SELECT recurrence_rule FROM calendar_events WHERE id = ?')
     .get(seriesId).recurrence_rule, 'FREQ=DAILY;UNTIL=20460901');
   assert.equal(db.prepare(`
-    SELECT recurrence_parent_id FROM calendar_events WHERE recurrence_id = '2046-09-03'
+    SELECT recurrence_parent_id FROM calendar_events WHERE recurrence_id = '2046-09-03T09:00:00'
   `).get().recurrence_parent_id, successorId);
   assert.equal(db.prepare(`
     SELECT COUNT(*) AS count FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = '2046-09-02'
+    WHERE recurrence_parent_id = ? AND recurrence_id = '2046-09-02T09:00:00'
   `).get(successorId).count, 0);
 });
 
@@ -3477,9 +3495,9 @@ test('whole-series rule update requires the exact orphan count and detaches conf
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
   `).all(seriesId).map((row) => row.exception_date), [
-    '2046-10-02',
+    '2046-10-02T09:00:00',
     '2046-10-04',
-    '2046-10-08',
+    '2046-10-08T09:00:00',
   ]);
 });
 
@@ -3512,7 +3530,7 @@ test('visible non-owner keeps generic whole-series edit and delete authorization
   assert.equal(afterChild.status, 200);
   assert.equal(afterChild.body.data.title, 'Shared non-owner after child');
   assert.equal(afterChild.body.data.series_id, seriesId);
-  assert.equal(afterChild.body.data.recurrence_id, '2046-10-12');
+  assert.equal(afterChild.body.data.recurrence_id, '2046-10-12T09:00:00');
   assert.equal(afterChild.body.data.is_local_recurring_series, true);
   assert.equal(afterChild.body.data.can_override_occurrence, true);
   assert.equal(db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(childId).title,

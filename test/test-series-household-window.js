@@ -125,5 +125,6 @@ test('Gegenfaelle wie auf main: ohne tzid, ganztaegig, ohne windowZone', () => {
   // Fenster in Schleifentagen: das LA-Vorkommen vom 11.06. liegt darin.
   const raw = expandRecurringEvents([la], '2035-06-11', '2035-06-11', null, { includeRecurrenceIdentity: true });
   assert.deepEqual(raw.map((row) => [row.start_datetime, row.recurrence_identity]),
-    [['2035-06-12T06:30:00Z', '2035-06-12']]);
+    // Seit #2034 Schritt 4 ist die Identitaet der Originalstart (Format A).
+    [['2035-06-12T06:30:00Z', '2035-06-12T06:30:00Z']]);
 });

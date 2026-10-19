@@ -615,10 +615,14 @@ export function expandRecurringEvents(
           // oben ebenfalls im UTC-Raum nachgeschlagen
           // (`exceptionsInclude(...)`).
           //
-          // Schritt 4a von #2034 laesst die ausgegebene Identitaet noch alt; den
-          // Platz in beiden Formen traegt das Vorkommen als Symbol mit
-          // (`OCCURRENCE_SLOT`), damit Leser und Schreiber ihn nicht nachrechnen.
-          ...(includeRecurrenceIdentity ? { recurrence_identity: slotLegacyKey } : {}),
+          // SEIT SCHRITT 4 VON #2034 IST DIE IDENTITAET DER SCHLUESSEL IN FORMAT A:
+          // der Originalstart nach RFC 5545 (Datum, UTC-Zeitpunkt oder schwebende
+          // Wanduhr). Der UTC-Tag oben war nicht eindeutig - in der
+          // Umstellungsnacht trugen zwei Vorkommen denselben Tag, und eine
+          // Ausnahme blendete beide aus. Den Platz in beiden Formen traegt das
+          // Vorkommen als Symbol mit (`OCCURRENCE_SLOT`), damit Leser und
+          // Schreiber ihn nicht nachrechnen.
+          ...(includeRecurrenceIdentity ? { recurrence_identity: slotKey } : {}),
           [OCCURRENCE_SLOT]: { day: currentDate, key: slotKey, legacyKey: slotLegacyKey },
           is_recurring_instance: slotLegacyKey !== seriesStartUtc ? 1 : 0,
           // "IST DAS DER ERSTE TERMIN DER SERIE?" IST NICHT "WEICHT ER VOM

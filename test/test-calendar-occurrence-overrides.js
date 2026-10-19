@@ -381,7 +381,7 @@ test('linked occurrence helpers preserve the original series and expansion ident
   assert.equal(recurrenceIdFor(linked), '2026-10-31');
   assert.equal(seriesIdFor({ id: 7, recurrence_rule: 'FREQ=DAILY' }), 7);
   assert.equal(recurrenceIdFor({ recurrence_rule: 'FREQ=DAILY', recurrence_identity: '2026-11-05', start_datetime: '2026-11-04T09:00:00' }), '2026-11-05');
-  assert.equal(recurrenceIdFor({ recurrence_rule: 'FREQ=DAILY', start_datetime: '2026-11-04T09:00:00' }), '2026-11-04');
+  assert.equal(recurrenceIdFor({ recurrence_rule: 'FREQ=DAILY', start_datetime: '2026-11-04T09:00:00' }), '2026-11-04T09:00:00');
   assert.equal(recurrenceIdFor({ start_datetime: '2026-11-04T09:00:00' }), null);
   assert.equal(isLinkedOccurrence({ ...linked, overridden_fields: null }), false);
   assert.equal(isLinkedOccurrence({ ...linked, recurrence_id: null }), false);
@@ -581,7 +581,7 @@ test('visibility and assignment changes keep linked overrides when Outlook targe
 test('daily recurrence identity resolves the exact timed occurrence', () => {
   const base = baseOccurrenceFor(series(), '2026-10-04');
 
-  assert.equal(base.recurrence_identity, '2026-10-04');
+  assert.equal(base.recurrence_identity, '2026-10-04T09:00:00');
   assert.equal(base.start_datetime, '2026-10-04T09:00');
   assert.equal(base.end_datetime, '2026-10-04T10:00');
 });
@@ -594,7 +594,7 @@ test('daily recurrence identity reaches a valid slot after one thousand occurren
   assert.equal(expandRecurringEvents([master], '2028-09-28', '2028-09-28').length, 0);
   const base = baseOccurrenceFor(master, '2028-09-28');
 
-  assert.equal(base.recurrence_identity, '2028-09-28');
+  assert.equal(base.recurrence_identity, '2028-09-28T09:00:00');
   assert.equal(base.start_datetime, '2028-09-28T09:00');
   assert.equal(base.end_datetime, '2028-09-28T10:00');
 });
@@ -607,7 +607,7 @@ test('weekly BYDAY interval identity reaches a bounded long-running slot', () =>
   });
   const base = baseOccurrenceFor(master, '2039-12-12');
 
-  assert.equal(base.recurrence_identity, '2039-12-12');
+  assert.equal(base.recurrence_identity, '2039-12-12T09:00:00');
   assert.equal(base.start_datetime, '2039-12-12T09:00');
   assert.equal(base.end_datetime, '2039-12-12T10:00');
 });
@@ -1032,7 +1032,7 @@ test('serializeEvent exposes visibility-equivalent capability without changing l
     reminder_anchor_start: serializedMaster.reminder_anchor_start,
   }, {
     series_id: masterId,
-    recurrence_id: '2026-10-31',
+    recurrence_id: '2026-10-31T09:00:00',
     is_occurrence_override: false,
     is_local_recurring_series: true,
     can_override_occurrence: true,
@@ -1119,7 +1119,8 @@ test('occurrence upsert is idempotent and stores one child with one EXDATE', () 
   };
 
   upsertOccurrenceOverride(database, options);
-  upsertOccurrenceOverride(database, options);
+  // Dasselbe Vorkommen in exakter Form (#2034) trifft dieselbe Zeile.
+  upsertOccurrenceOverride(database, { ...options, recurrenceId: '2026-10-02T09:00:00' });
 
   const children = database.prepare(`
     SELECT recurrence_id, overridden_fields, title
@@ -1127,14 +1128,14 @@ test('occurrence upsert is idempotent and stores one child with one EXDATE', () 
     WHERE recurrence_parent_id = ?
   `).all(seriesId).map((row) => ({ ...row }));
   assert.deepEqual(children, [{
-    recurrence_id: '2026-10-02',
+    recurrence_id: '2026-10-02T09:00:00',
     overridden_fields: '["title"]',
     title: 'Delayed standup',
   }]);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_event_exceptions
     WHERE event_id = ? AND exception_date = ?
-  `).get(seriesId, '2026-10-02').count, 1);
+  `).get(seriesId, '2026-10-02T09:00:00').count, 1);
 });
 
 test('node:sqlite transaction fallback nests through a savepoint', () => {
@@ -1244,11 +1245,11 @@ test('only-this update rejects a slot excluded without a linked replacement', ()
     && error.code === 'invalid_recurrence_id');
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_event_exceptions
-    WHERE event_id = ? AND exception_date = '2026-10-07'
+    WHERE event_id = ? AND exception_date = '2026-10-07T09:00:00'
   `).get(seriesId).count, 1);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-07'
+    WHERE recurrence_parent_id = ? AND recurrence_id IN ('2026-10-07', '2026-10-07T09:00:00')
   `).get(seriesId).count, 0);
 });
 
@@ -1296,11 +1297,11 @@ test('only-this updates reject a slot owned by a detached replacement', () => {
   }
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_event_exceptions
-    WHERE event_id = ? AND exception_date = '2026-10-07'
+    WHERE event_id = ? AND exception_date = '2026-10-07T09:00:00'
   `).get(seriesId).count, 1);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-07'
+    WHERE recurrence_parent_id = ? AND recurrence_id IN ('2026-10-07', '2026-10-07T09:00:00')
   `).get(seriesId).count, 0);
 
   const rows = database.prepare('SELECT * FROM calendar_events').all();
@@ -1613,7 +1614,7 @@ test('an occurrence reminder lead survives the DST boundary its zone offset woul
     const child = database.prepare(`
       SELECT id, overridden_fields FROM calendar_events
       WHERE recurrence_parent_id = ? AND recurrence_id = ?
-    `).get(seriesId, '2026-11-02');
+    `).get(seriesId, '2026-11-02T09:00:00');
     return {
       label: fixture.label,
       restored: result.restored === true,
@@ -1625,7 +1626,7 @@ test('an occurrence reminder lead survives the DST boundary its zone offset woul
       exceptionRows: database.prepare(`
         SELECT COUNT(*) AS count FROM calendar_event_exceptions
         WHERE event_id = ? AND exception_date = ?
-      `).get(seriesId, '2026-11-02').count,
+      `).get(seriesId, '2026-11-02T09:00:00').count,
       // Die Erinnerung der Serie bleibt in beiden Lagen unangetastet.
       seriesReminders: database.prepare(`
         SELECT remind_at FROM reminders WHERE entity_type = 'event' AND entity_id = ?
@@ -2140,11 +2141,11 @@ test('only-this deletion removes a replacement but preserves its EXDATE', () => 
   assert.deepEqual(database.prepare(`
     SELECT recurrence_id FROM calendar_events
     WHERE recurrence_parent_id = ? ORDER BY recurrence_id
-  `).all(seriesId).map((row) => row.recurrence_id), ['2026-10-03']);
+  `).all(seriesId).map((row) => row.recurrence_id), ['2026-10-03T09:00:00']);
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
-  `).all(seriesId).map((row) => row.exception_date), ['2026-10-02', '2026-10-03']);
+  `).all(seriesId).map((row) => row.exception_date), ['2026-10-02T09:00:00', '2026-10-03T09:00:00']);
 });
 
 test('following deletion truncates later state and delegates the first slot to whole deletion', () => {
@@ -2177,13 +2178,13 @@ test('following deletion truncates later state and delegates the first slot to w
   assert.deepEqual(database.prepare(`
     SELECT recurrence_id FROM calendar_events
     WHERE recurrence_parent_id = ? ORDER BY recurrence_id
-  `).all(seriesId).map((row) => row.recurrence_id), ['2026-10-02']);
+  `).all(seriesId).map((row) => row.recurrence_id), ['2026-10-02T09:00:00']);
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
   `).all(seriesId).map((row) => row.exception_date), [
-    '2026-10-02',
-    '2026-10-03',
+    '2026-10-02T09:00:00',
+    '2026-10-03T09:00:00',
     '2026-10-04',
   ]);
 
@@ -2244,7 +2245,7 @@ test('following deletion keeps detached and deleted slots suppressed after rule 
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
-  `).all(seriesId).map((row) => row.exception_date), ['2026-10-06', '2026-10-07']);
+  `).all(seriesId).map((row) => row.exception_date), ['2026-10-06T09:00:00', '2026-10-07T09:00:00']);
 
   updateSeriesWithOverrides(database, {
     seriesId,
@@ -2303,11 +2304,11 @@ test('following edit splits, reparents and recomputes replacement markers', () =
     .get(seriesId).recurrence_rule, 'FREQ=DAILY;UNTIL=20261001');
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_events
-    WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-02'
+    WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-02T09:00:00'
   `).get(successorId).count, 0, 'the selected replacement became successor defaults');
   const future = database.prepare(`
     SELECT title, description, overridden_fields, recurrence_parent_id
-    FROM calendar_events WHERE recurrence_id = '2026-10-03'
+    FROM calendar_events WHERE recurrence_id = '2026-10-03T09:00:00'
   `).get();
   assert.equal(Number(future.recurrence_parent_id), successorId);
   assert.equal(future.title, 'New title');
@@ -2321,7 +2322,8 @@ test('following edit splits, reparents and recomputes replacement markers', () =
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
-  `).all(successorId).map((row) => row.exception_date), ['2026-10-03', '2026-10-04']);
+  `).all(successorId).map((row) => row.exception_date), ['2026-10-03T09:00:00', '2026-10-04T09:00:00'],
+  'die alte Ausnahme wandert umgeschluesselt mit (#2034)');
 });
 
 test('following update rejects excluded first and later slots without linked replacements', () => {
@@ -2333,6 +2335,7 @@ test('following update rejects excluded first and later slots without linked rep
       recurrence_rule: 'FREQ=DAILY',
     }));
     deleteOccurrence(database, { seriesId, recurrenceId, actorId: 1 });
+    const storedKey = `${recurrenceId}T09:00:00`;
 
     assert.throws(() => splitSeries(database, {
       seriesId,
@@ -2346,7 +2349,7 @@ test('following update rejects excluded first and later slots without linked rep
     assert.equal(database.prepare(`
       SELECT COUNT(*) AS count FROM calendar_event_exceptions
       WHERE event_id = ? AND exception_date = ?
-    `).get(seriesId, recurrenceId).count, 1);
+    `).get(seriesId, storedKey).count, 1);
     assert.equal(database.prepare(`
       SELECT COUNT(*) AS count FROM calendar_events
       WHERE id != ? AND recurrence_rule IS NOT NULL
@@ -2375,7 +2378,7 @@ test('following update revalidates an excluded slot inside its write transaction
       injectedDelete = true;
       database.prepare(`
         DELETE FROM calendar_events
-        WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-07'
+        WHERE recurrence_parent_id = ? AND recurrence_id = '2026-10-07T09:00:00'
       `).run(seriesId);
     }
     return originalExec(sql);
@@ -2391,7 +2394,7 @@ test('following update revalidates an excluded slot inside its write transaction
   assert.equal(injectedDelete, true);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_event_exceptions
-    WHERE event_id = ? AND exception_date = '2026-10-07'
+    WHERE event_id = ? AND exception_date = '2026-10-07T09:00:00'
   `).get(seriesId).count, 1);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM calendar_events
@@ -2870,7 +2873,7 @@ test('confirmed following detachment rolls back orphan materialization and EXDAT
     .get(child.id).overridden_fields, '["title","reminders"]');
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ?
-  `).all(seriesId).map((row) => row.exception_date), ['2026-10-03']);
+  `).all(seriesId).map((row) => row.exception_date), ['2026-10-03T09:00:00']);
   assert.equal(database.prepare(`
     SELECT COUNT(*) AS count FROM reminders WHERE entity_type = 'event' AND entity_id = ?
   `).get(child.id).count, 1);
@@ -3006,7 +3009,7 @@ test('following edit retains unreachable deletion-only exceptions on the success
   });
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ?
-  `).all(result.series.id).map((row) => row.exception_date), ['2026-10-03']);
+  `).all(result.series.id).map((row) => row.exception_date), ['2026-10-03T09:00:00']);
 });
 
 test('following edit with an outbound target suppresses every detached replacement slot', () => {
@@ -3033,7 +3036,7 @@ test('following edit with an outbound target suppresses every detached replaceme
   const successorId = Number(result.series.id);
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ?
-  `).all(successorId).map((row) => row.exception_date), ['2026-10-04']);
+  `).all(successorId).map((row) => row.exception_date), ['2026-10-04T09:00:00']);
 
   const rows = database.prepare('SELECT * FROM calendar_events').all();
   const expanded = expandAndResolveEventRows(database, rows, '2026-10-04', '2026-10-04');
@@ -3070,7 +3073,7 @@ test('following rule split keeps orphan and deletion slots suppressed after a ro
   assert.deepEqual(database.prepare(`
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
-  `).all(successorId).map((row) => row.exception_date), ['2026-10-03', '2026-10-05']);
+  `).all(successorId).map((row) => row.exception_date), ['2026-10-03T09:00:00', '2026-10-05T09:00:00']);
 
   updateSeriesWithOverrides(database, {
     seriesId: successorId,
@@ -3666,9 +3669,9 @@ test('rule changes detach confirmed orphans but retain deleted slots across a ro
     SELECT exception_date FROM calendar_event_exceptions
     WHERE event_id = ? ORDER BY exception_date
   `).all(seriesId).map((row) => row.exception_date), [
-    '2026-10-02',
+    '2026-10-02T09:00:00',
     '2026-10-04',
-    '2026-10-08',
+    '2026-10-08T09:00:00',
   ]);
   updateSeriesWithOverrides(database, {
     seriesId, actorId: 1, changes: { recurrence_rule: 'FREQ=DAILY' },

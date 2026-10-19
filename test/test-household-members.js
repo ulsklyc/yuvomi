@@ -691,7 +691,7 @@ test('calendar: an occurrence that owns its attendees is the stored state, not t
   const seriesId = addSeries('Einkauf', '2030-08-01T09:00:00', [CLARA]);
   const removed = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
   assert.equal(removed.status, 200, JSON.stringify(removed.body));
-  const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03');
+  const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03T09:00:00');
   assert.match(String(child?.overridden_fields), /assignments/, 'Vorbedingung: das Vorkommen besitzt seine Zuweisungen');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN]);
 

@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A single occurrence of a calendar series is now named by its original start time (#2034).**
+  Until now an occurrence was named by a day, and around a clock change two occurrences could share
+  that day - deleting one of them could hide both. An occurrence is now named exactly as calendar
+  apps do it (RFC 5545 RECURRENCE-ID): a date for an all-day series, the original start in UTC for
+  a series with a time zone, the wall time for a local series without one. Exceptions and edited
+  occurrences saved before keep working exactly as they did; when you change the start time of a
+  series, or the household time zone, its exceptions move along with it.
+  **API:** `recurrence_id` in calendar reads, search, countdowns and MCP now takes one of three
+  forms: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ` or `YYYY-MM-DDTHH:MM:SS` (URL-encode it in a
+  path). The occurrence routes and `POST /api/v1/calendar/{id}/exceptions` still accept the old
+  `YYYY-MM-DD` form; where it matches two occurrences they answer `409` with reason
+  `ambiguous_recurrence_id`. The exceptions route takes the new field `recurrence_id` next to
+  `date`, stores the exact key and answers `400` for a key that names no occurrence.
 - **Task, calendar and Overview lists load much faster in households with profile pictures.**
   Every task, event, note, housekeeping visit and money ledger row used to carry the full profile
   picture of its person, and a task twice. With 200 tasks and five pictures the task list weighed
@@ -49,6 +62,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Deleting or editing one occurrence of a series affects only that one, also on the night of a
+  clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
+  removed the day before. "This and following" on a series in another time zone - say Los Angeles
+  at 23:30 - left the chosen occurrence in the old series and showed it again in the new one, and
+  for a series that ends after a number of times east of UTC it failed with an error.
+- **The countdown tile skips a cancelled occurrence of a series in another time zone (#1998).**
+  A series from Los Angeles in a Berlin household counted down to an occurrence the calendar had
+  already hidden, and could name the wrong day. The tile now counts on the same occurrences as the
+  calendar and shows the day it falls on in your household.
 - **Search shows the right next date for a calendar series in another time zone (#1999).** A
   series kept in its own time zone, such as an imported one from a calendar in Los Angeles, was
   checked against your household's today on its own calendar day. Near midnight that is a
