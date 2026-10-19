@@ -616,6 +616,48 @@ function bindSetupForm(card, reload) {
   });
 }
 
+/**
+ * Die Karte "Passwort aendern" - nur fuer ein Konto, das ein Passwort HAT
+ * (#1703). Ein per Single Sign-on angelegtes Konto traegt nur den Platzhalter;
+ * das Formular verlangte von ihm das aktuelle Passwort, das es nicht gibt, und
+ * konnte nie gelingen. Woran es haengt, sagt GET /auth/me (`sso_only`).
+ *
+ * Fehlt die Angabe (Antwort aus dem Speicher, /me nicht erreichbar), bleibt
+ * die Karte stehen wie bisher: weggelassen wird sie nur auf ein
+ * ausdrueckliches `true`. Ein Konto mit Passwort behaelt sie, verknuepft oder
+ * nicht.
+ * @param {{ sso_only?: boolean }|null|undefined} user
+ * @returns {string}
+ */
+function passwordCardHtml(user) {
+  if (user?.sso_only === true) return '';
+  return `
+    <div class="settings-card">
+      <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
+      <form id="password-form" class="settings-form" novalidate>
+        <div class="row-carrier settings-group">
+          ${settingRowHtml({
+            label: t('settings.currentPasswordLabel'), labelFor: 'current-password', labelExtra: REQUIRED_MARK, field: true,
+            control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
+          })}
+          ${settingRowHtml({
+            label: t('settings.newPasswordLabel'), labelFor: 'new-password', labelExtra: REQUIRED_MARK, field: true,
+            control: '<input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
+          })}
+          ${settingRowHtml({
+            label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password', labelExtra: REQUIRED_MARK, field: true,
+            control: '<input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
+          })}
+        </div>
+        <div id="password-error" class="form-error" role="alert" hidden></div>
+        <div class="settings-form-actions">
+          <button type="submit" class="btn btn--primary">${t('settings.savePassword')}</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
 function renderPage(container, user, refreshFailed, accessNotice, oidcState, oidcNotice, twoFactorState, gravatarAvailable = false) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -696,29 +738,7 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
         </form>
       </div>
 
-      <div class="settings-card">
-        <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
-        <form id="password-form" class="settings-form" novalidate>
-          <div class="row-carrier settings-group">
-            ${settingRowHtml({
-              label: t('settings.currentPasswordLabel'), labelFor: 'current-password', labelExtra: REQUIRED_MARK, field: true,
-              control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
-            })}
-            ${settingRowHtml({
-              label: t('settings.newPasswordLabel'), labelFor: 'new-password', labelExtra: REQUIRED_MARK, field: true,
-              control: '<input class="form-input" type="password" id="new-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
-            })}
-            ${settingRowHtml({
-              label: t('settings.confirmPasswordLabel'), labelFor: 'confirm-password', labelExtra: REQUIRED_MARK, field: true,
-              control: '<input class="form-input" type="password" id="confirm-password" autocomplete="new-password" minlength="8" aria-describedby="password-error" required>',
-            })}
-          </div>
-          <div id="password-error" class="form-error" role="alert" hidden></div>
-          <div class="settings-form-actions">
-            <button type="submit" class="btn btn--primary">${t('settings.savePassword')}</button>
-          </div>
-        </form>
-      </div>
+      ${passwordCardHtml(user)}
 
       ${twoFactorCardHtml(twoFactorState)}
 
@@ -1073,4 +1093,4 @@ export async function render(container, { user }) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint, passwordProblems, passwordRefusalKey, isEmailAddress };
+export const __test = { avatarHtml, passwordCardHtml, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint, passwordProblems, passwordRefusalKey, isEmailAddress };

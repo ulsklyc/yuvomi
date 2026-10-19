@@ -649,9 +649,10 @@ function publicUser(row) {
     // Nur wenn die Query das Flag mitselektiert (GET /users); andere
     // publicUser-Pfade behalten ihre bisherige Feldmenge.
     ...(row.is_worker !== undefined && { is_worker: Boolean(row.is_worker) }),
-    // Ebenso bedingt, und zusaetzlich nur fuer Administratoren (#847): "dieses
-    // Konto hat ein Passwort" ist dieselbe Sorte Angabe wie die
+    // Ebenso bedingt, und ueber FREMDE Konten nur fuer Administratoren (#847):
+    // "dieses Konto hat ein Passwort" ist dieselbe Sorte Angabe wie die
     // 2FA-Uebersicht, die aus demselben Grund nicht an /auth/users haengt.
+    // Ueber sich selbst erfaehrt es jedes Konto aus GET /me (#1703).
     ...(row.sso_only !== undefined && { sso_only: Boolean(row.sso_only) }),
   };
 }
@@ -2683,9 +2684,13 @@ router.post('/setup', loginLimiter, async (req, res) => {
  */
 router.get('/me', requireAuth, (req, res) => {
   try {
+    // `sso_only` sagt dem EIGENEN Konto, ob es ohne Passwort gefuehrt wird
+    // (#1703): das Konto-Blatt laesst dann die Karte "Passwort aendern" weg,
+    // deren Pflichtfeld "Aktuelles Passwort" es fuer dieses Konto nicht gibt.
+    // Eine Zeile fuer beide Zweige darunter, Session und API-Token.
     const user = db.get()
-      .prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`)
-      .get(req.authUserId);
+      .prepare(`SELECT ${USER_PUBLIC_COLUMNS}, (password_hash = ?) AS sso_only FROM users WHERE id = ?`)
+      .get(OIDC_PASSWORD_SENTINEL, req.authUserId);
 
     if (!user) {
       if (req.authMethod === 'session' && typeof req.session.destroy === 'function') {
