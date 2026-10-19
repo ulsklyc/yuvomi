@@ -164,6 +164,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rewards_redemption_not_found`, `rewards_redemption_decided`, `rewards_insufficient_points`,
   `rewards_not_participating`, `rewards_money_account_not_found`, `rewards_money_plan_not_found`),
   and the status codes and texts are unchanged.
+- **Quick links, budget, waste import and recipe sources: error messages in your language**
+  (#1909). Saving or deleting a quick link showed the server's own text, for example "At most 24
+  quick links can be created." in every language, and picking an unsuitable picture for a tile
+  showed the browser's text. The budget page passed the server's text through for some failed
+  saves, a waste calendar import printed the server's English note for an entry it did not know,
+  and "Sync now" for a recipe source showed the raw error of the fetch. All of them now say the
+  sentence of the app; the recipe source card keeps naming the cause of the last failure. A quick
+  link that somebody else deleted in the meantime is named as such and the list reloads; deleting
+  one that is already gone counts as done. For API clients: those answers carry a `reason` next to
+  `error` (`quick_links_link_not_found`, and `quick_links_limit_reached` with `params.limit`), and
+  the status codes and texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

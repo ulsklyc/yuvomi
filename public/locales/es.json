@@ -3874,6 +3874,10 @@
         "deleted": "Acceso rápido eliminado",
         "loadError": "No se han podido cargar los accesos rápidos.",
         "orderError": "No se ha podido guardar el orden.",
+        "errorLinkGone": "Este acceso rápido ya no existe.",
+        "errorLimitReached": "En el resumen caben como máximo {{limit}} accesos rápidos.",
+        "saveError": "No se pudo guardar el acceso rápido.",
+        "deleteError": "No se pudo eliminar el acceso rápido.",
         "iconSymbol": "Elegir icono",
         "iconChoose": "Elegir icono o imagen"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} entrada del calendario no tenía UID; se usó una identidad alternativa basada en la etiqueta y la fecha.",
         "importDiagnosticDuplicateInstance": "{{count}} instancias de recogida duplicadas (misma identidad) se combinaron en una.",
         "importDiagnosticDuplicateInstance_one": "{{count}} instancia de recogida duplicada (misma identidad) se combinó en una.",
+        "importDiagnosticOther": "Una entrada del calendario no tiene el formato esperado.",
         "importUnresolvedBlockingError": "Resuelve primero todos los avisos bloqueantes, u omite explícitamente los eventos afectados.",
         "importIgnoreLabel": "Ignorar",
         "importCreateNewType": "Crear un nuevo tipo de residuo",

@@ -3615,6 +3615,10 @@
         "deleted": "Tautan cepat dihapus",
         "loadError": "Tautan cepat tidak dapat dimuat.",
         "orderError": "Urutan tidak dapat disimpan.",
+        "errorLinkGone": "Tautan cepat ini sudah tidak ada.",
+        "errorLimitReached": "Ringkasan hanya memuat paling banyak {{limit}} tautan cepat.",
+        "saveError": "Tautan cepat tidak dapat disimpan.",
+        "deleteError": "Tautan cepat tidak dapat dihapus.",
         "iconSymbol": "Pilih ikon",
         "iconChoose": "Pilih ikon atau gambar"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} entri kalender tidak memiliki UID; identitas cadangan berdasarkan label dan tanggal digunakan.",
         "importDiagnosticDuplicateInstance": "{{count}} kejadian penjemputan duplikat (identitas sama) digabung menjadi satu.",
         "importDiagnosticDuplicateInstance_one": "{{count}} kejadian penjemputan duplikat (identitas sama) digabung menjadi satu.",
+        "importDiagnosticOther": "Satu entri kalender tidak sesuai dengan format yang diharapkan.",
         "importUnresolvedBlockingError": "Selesaikan dahulu setiap peringatan yang memblokir, atau lewati acara yang terpengaruh secara eksplisit.",
         "importIgnoreLabel": "Abaikan",
         "importCreateNewType": "Buat jenis sampah baru",

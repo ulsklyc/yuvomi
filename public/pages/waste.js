@@ -1684,10 +1684,10 @@ const IMPORT_DIAGNOSTIC_LABEL_KEYS = {
   duplicate_instance: 'waste.importDiagnosticDuplicateInstance',
 };
 
-/** `diag.message` is the fallback for a code this client doesn't (yet) know - never a blank row. */
+/** A code this client doesn't (yet) know gets the app's general sentence - never a blank row, and never the server's English `message` (#1909). */
 function importDiagnosticText(diag) {
-  const key = IMPORT_DIAGNOSTIC_LABEL_KEYS[diag.code];
-  if (!key) return diag.message;
+  const key = Object.hasOwn(IMPORT_DIAGNOSTIC_LABEL_KEYS, diag.code) ? IMPORT_DIAGNOSTIC_LABEL_KEYS[diag.code] : null;
+  if (!key) return t('waste.importDiagnosticOther');
   return t(key, { name: diag.name ?? '', count: diag.count ?? 0 });
 }
 

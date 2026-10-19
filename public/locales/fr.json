@@ -3874,6 +3874,10 @@
         "deleted": "Accès rapide supprimé",
         "loadError": "Impossible de charger les accès rapides.",
         "orderError": "Impossible d'enregistrer l'ordre.",
+        "errorLinkGone": "Cet accès rapide n’existe plus.",
+        "errorLimitReached": "La vue d’ensemble ne peut pas contenir plus de {{limit}} accès rapides.",
+        "saveError": "Impossible d’enregistrer l’accès rapide.",
+        "deleteError": "Impossible de supprimer l’accès rapide.",
         "iconSymbol": "Choisir une icône",
         "iconChoose": "Choisir une icône ou une image"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} entrée de calendrier n'avait pas d'UID ; une identité de secours basée sur le libellé et la date a été utilisée.",
         "importDiagnosticDuplicateInstance": "{{count}} occurrences de collecte en double (même identité) ont été fusionnées en une seule.",
         "importDiagnosticDuplicateInstance_one": "{{count}} occurrence de collecte en double (même identité) a été fusionnée en une seule.",
+        "importDiagnosticOther": "Une entrée du calendrier ne correspond pas au format attendu.",
         "importUnresolvedBlockingError": "Résolvez d'abord chaque alerte bloquante, ou ignorez explicitement les événements concernés.",
         "importIgnoreLabel": "Ignorer",
         "importCreateNewType": "Créer un nouveau type de déchet",

@@ -3874,6 +3874,10 @@
         "deleted": "त्वरित लिंक हटाया गया",
         "loadError": "त्वरित लिंक लोड नहीं हो सके।",
         "orderError": "क्रम सहेजा नहीं जा सका।",
+        "errorLinkGone": "यह त्वरित लिंक अब मौजूद नहीं है।",
+        "errorLimitReached": "अवलोकन पर {{limit}} से अधिक त्वरित लिंक नहीं आ सकते।",
+        "saveError": "त्वरित लिंक सहेजा नहीं जा सका।",
+        "deleteError": "त्वरित लिंक हटाया नहीं जा सका।",
         "iconSymbol": "आइकन चुनें",
         "iconChoose": "आइकन या छवि चुनें"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} कैलेंडर प्रविष्टि में UID नहीं था; लेबल और तिथि के आधार पर एक वैकल्पिक पहचान का उपयोग किया गया।",
         "importDiagnosticDuplicateInstance": "{{count}} डुप्लिकेट पिकअप घटनाएँ (समान पहचान) एक में विलय कर दी गईं।",
         "importDiagnosticDuplicateInstance_one": "{{count}} डुप्लिकेट पिकअप घटना (समान पहचान) एक में विलय कर दी गई।",
+        "importDiagnosticOther": "एक कैलेंडर प्रविष्टि अपेक्षित प्रारूप से मेल नहीं खाती।",
         "importUnresolvedBlockingError": "कृपया पहले हर अवरोधक चेतावनी हल करें, या प्रभावित इवेंट को स्पष्ट रूप से छोड़ें।",
         "importIgnoreLabel": "अनदेखा करें",
         "importCreateNewType": "नया कचरा प्रकार बनाएं",

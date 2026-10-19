@@ -3615,6 +3615,10 @@
         "deleted": "바로가기를 삭제했습니다",
         "loadError": "바로가기를 불러오지 못했습니다.",
         "orderError": "순서를 저장하지 못했습니다.",
+        "errorLinkGone": "이 바로가기는 더 이상 없습니다.",
+        "errorLimitReached": "개요에는 바로가기를 최대 {{limit}}개까지 둘 수 있습니다.",
+        "saveError": "바로가기를 저장하지 못했습니다.",
+        "deleteError": "바로가기를 삭제하지 못했습니다.",
         "iconSymbol": "아이콘 선택",
         "iconChoose": "아이콘 또는 이미지 선택"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}}개의 일정 항목에 UID가 없어 라벨과 날짜 기반의 대체 식별자를 사용했습니다.",
         "importDiagnosticDuplicateInstance": "중복된 수거 항목 {{count}}개(동일 식별자)를 하나로 병합했습니다.",
         "importDiagnosticDuplicateInstance_one": "중복된 수거 항목 {{count}}개(동일 식별자)를 하나로 병합했습니다.",
+        "importDiagnosticOther": "일정 항목 하나가 예상한 형식과 맞지 않습니다.",
         "importUnresolvedBlockingError": "먼저 차단 진단을 모두 해결하거나, 해당 이벤트를 명시적으로 건너뛰세요.",
         "importIgnoreLabel": "무시",
         "importCreateNewType": "새 쓰레기 종류 만들기",

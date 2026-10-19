@@ -3615,6 +3615,10 @@
         "deleted": "پیوند سریع حذف شد",
         "loadError": "پیوندهای سریع بارگیری نشد.",
         "orderError": "ترتیب ذخیره نشد.",
+        "errorLinkGone": "این پیوند سریع دیگر وجود ندارد.",
+        "errorLimitReached": "در نمای کلی بیش از {{limit}} پیوند سریع جا نمی‌شود.",
+        "saveError": "پیوند سریع ذخیره نشد.",
+        "deleteError": "پیوند سریع حذف نشد.",
         "iconSymbol": "انتخاب آیکون",
         "iconChoose": "انتخاب آیکون یا تصویر"
     },
@@ -5686,6 +5690,7 @@
         "importDiagnosticMissingUidFallback_one": "{{count}} مورد از رویدادهای تقویم UID نداشتند؛ از یک شناسه جایگزین بر اساس برچسب و تاریخ استفاده شد.",
         "importDiagnosticDuplicateInstance": "{{count}} مورد تکراری از زمان‌های جمع‌آوری (با شناسه یکسان) در یک مورد ادغام شد.",
         "importDiagnosticDuplicateInstance_one": "{{count}} مورد تکراری از زمان‌های جمع‌آوری (با شناسه یکسان) در یک مورد ادغام شد.",
+        "importDiagnosticOther": "یکی از رویدادهای تقویم با قالب مورد انتظار مطابقت ندارد.",
         "importUnresolvedBlockingError": "ابتدا همه هشدارهای مسدودکننده را برطرف کنید، یا رویدادهای مربوطه را به‌صراحت رد کنید.",
         "importIgnoreLabel": "نادیده گرفتن",
         "importCreateNewType": "ایجاد نوع جدید زباله",

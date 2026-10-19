@@ -305,6 +305,8 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Haushaltshilfe und Belohnungen (#1909); die echte Antwort messen
     // test:housekeeping-routes und test:rewards-routes.
     '../server/routes/housekeeping.js', '../server/routes/rewards.js',
+    // Schnellzugriffe (#1909); die echte Antwort misst test:quick-links.
+    '../server/routes/quick-links.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -351,6 +353,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'housekeeping_open_session_not_found',
     'rewards_reward_not_found', 'rewards_redemption_not_found',
     'rewards_money_account_not_found', 'rewards_money_plan_not_found',
+    'quick_links_link_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

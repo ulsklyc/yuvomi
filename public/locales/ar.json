@@ -4217,6 +4217,10 @@
         "deleted": "تم حذف الرابط السريع",
         "loadError": "تعذّر تحميل الروابط السريعة.",
         "orderError": "تعذّر حفظ الترتيب.",
+        "errorLinkGone": "هذا الرابط السريع لم يعد موجودًا.",
+        "errorLimitReached": "لا تتسع النظرة العامة لأكثر من {{limit}} رابطًا سريعًا.",
+        "saveError": "تعذّر حفظ الرابط السريع.",
+        "deleteError": "تعذّر حذف الرابط السريع.",
         "iconSymbol": "اختيار أيقونة",
         "iconChoose": "اختيار أيقونة أو صورة"
     },
@@ -6086,6 +6090,7 @@
         "importDiagnosticMissingUidFallback_many": "لم يكن لدى {{count}} من إدخالات التقويم معرّف UID؛ تم استخدام هوية بديلة بناءً على التسمية والتاريخ.",
         "importDiagnosticDuplicateInstance": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
         "importDiagnosticDuplicateInstance_one": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
+        "importDiagnosticOther": "أحد إدخالات التقويم لا يطابق التنسيق المتوقع.",
         "importDiagnosticDuplicateInstance_few": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
         "importDiagnosticDuplicateInstance_two": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
         "importDiagnosticDuplicateInstance_many": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",

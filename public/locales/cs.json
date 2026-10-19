@@ -3474,6 +3474,10 @@
         "deleted": "Rychlý odkaz smazán",
         "loadError": "Rychlé odkazy se nepodařilo načíst.",
         "orderError": "Pořadí se nepodařilo uložit.",
+        "errorLinkGone": "Tento rychlý odkaz už neexistuje.",
+        "errorLimitReached": "Na přehled se nevejde více než {{limit}} rychlých odkazů.",
+        "saveError": "Rychlý odkaz se nepodařilo uložit.",
+        "deleteError": "Rychlý odkaz se nepodařilo smazat.",
         "iconSymbol": "Vybrat ikonu",
         "iconChoose": "Vybrat ikonu nebo obrázek"
     },
@@ -5820,6 +5824,7 @@
         "importDiagnosticMissingUidFallback_few": "{{count}} položky kalendáře neměly UID; byla použita náhradní identita na základě štítku a data.",
         "importDiagnosticDuplicateInstance": "{{count}} duplicitních termínů svozu (stejná identita) bylo sloučeno do jednoho.",
         "importDiagnosticDuplicateInstance_one": "{{count}} duplicitní termín svozu (stejná identita) byl sloučen do jednoho.",
+        "importDiagnosticOther": "Jedna položka kalendáře neodpovídá očekávanému formátu.",
         "importDiagnosticDuplicateInstance_few": "{{count}} duplicitní termíny svozu (stejná identita) byly sloučeny do jednoho.",
         "importUnresolvedBlockingError": "Nejprve vyřešte všechna blokující upozornění, nebo explicitně přeskočte dotčené události.",
         "importIgnoreLabel": "Ignorovat",
