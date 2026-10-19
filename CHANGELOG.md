@@ -70,6 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stay without an entry, and points are still only booked when a task is ticked off in Yuvomi.
   **API:** entries of `GET /api/v1/tasks/completions` and the series history carry `source`
   (`null` for a completion in Yuvomi, `"caldav"` for one taken over by the sync).
+- **Moving a completed reminder into or out of a parent reminder now updates the task history (#2078).**
+  When the reminders app changed only which reminder a completed one belongs to, the history kept
+  its old state: a completed task moved under another one stayed in the history, although subtasks
+  never appear there, and a completed subtask moved out to stand on its own never showed up. Now
+  the first loses its entry, and the second gets one at the time it was completed on the phone. If
+  the reminder carries no completion time, it stays without an entry rather than claiming it was
+  done at the time of the sync.
 - **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
   reloaded their list in the same step as the save. When the save went through but the reload hit
   a network blip or a busy server, the dialog stayed open with a "could not save" message, and

@@ -15,6 +15,9 @@
  *            Eintrag (kein Nachtrag, #1836 "Not part of this");
  *            (die Wand, #1825, liest "heute erledigt" aus genau diesem Eintrag);
  *          - der Verlauf traegt die Quelle aus;
+ *          - aendert ein Lauf nur RELATED-TO, folgt der Eintrag der Regel
+ *            "Teilaufgaben nie im Verlauf": untergeordnet -> weg,
+ *            herausgeloest -> mit COMPLETED, ohne COMPLETED keiner (#2078);
  *          - ein Waechter findet JEDE Anweisung, die `status` an `tasks`
  *            schreibt, und schlaegt fehl, wenn eine davon nicht ueber
  *            syncTaskCompletion laeuft.
@@ -174,12 +177,12 @@ const remindersSync = await import('../server/services/caldav-reminders-sync.js'
 const dav = await startFakeDavServer();
 test.after(() => dav.close());
 
-function davTodo(uid, { done = false, parent = null } = {}) {
+function davTodo(uid, { done = false, parent = null, completed = '20261017T081500Z' } = {}) {
   return [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Example//EN',
     'BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20260101T090000Z', `SUMMARY:${uid}`,
     `STATUS:${done ? 'COMPLETED' : 'NEEDS-ACTION'}`,
-    ...(done ? ['COMPLETED:20261017T081500Z'] : []),
+    ...(done && completed ? [`COMPLETED:${completed}`] : []),
     ...(parent ? [`RELATED-TO:${parent}`] : []),
     'END:VTODO', 'END:VCALENDAR',
   ].join('\r\n');
@@ -224,6 +227,76 @@ test('voller Lauf: im selben Lauf herausgeloest und abgehakt -> der Eintrag ents
   assert.ok(c, 'eine eigene, erledigte Aufgabe gehoert in den Verlauf');
   assert.equal(c.source, 'caldav');
   assert.equal(c.completed_at, '2026-10-17T08:15:00Z');
+});
+
+// Ein Lauf, der NUR RELATED-TO aendert, ist kein Statuswechsel - und doch
+// aendert er, ob die Aufgabe in den Verlauf gehoert (#2078). Die Regel aus
+// task-completions.js gilt durchgehend: Teilaufgaben stehen nie im Verlauf,
+// eine herausgeloeste erledigte Aufgabe bekommt ihren Eintrag mit dem COMPLETED
+// der Erinnerung, ohne COMPLETED keinen (kein Nachtrag mit der Laufzeit, #1836).
+test('voller Lauf: eine erledigte Aufgabe wird nur untergeordnet -> ihr Eintrag geht (#2078)', async () => {
+  dav.putObject(listUrl, 'top.ics', davTodo('r-top'));
+  await remindersSync.sync();
+  dav.putObject(listUrl, 'top.ics', davTodo('r-top', { done: true }));
+  await remindersSync.sync();
+  const id = mirroredId('r-top');
+  assert.ok(completionOf(id), 'als eigene Aufgabe abgehakt: im Verlauf');
+
+  dav.putObject(listUrl, 'top.ics', davTodo('r-top', { done: true, parent: 'h-parent' }));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).parent_task_id, mirroredId('h-parent'), 'jetzt eine Teilaufgabe');
+  assert.equal(taskOf(id).status, 'done');
+  assert.equal(completionOf(id), undefined, 'Teilaufgaben stehen nie im Verlauf');
+});
+
+test('voller Lauf: eine erledigte Teilaufgabe wird nur herausgeloest -> Eintrag mit ihrem COMPLETED (#2078)', async () => {
+  dav.putObject(listUrl, 'low.ics', davTodo('r-low', { parent: 'h-parent' }));
+  await remindersSync.sync();
+  dav.putObject(listUrl, 'low.ics', davTodo('r-low', { done: true, parent: 'h-parent', completed: '20261016T070000Z' }));
+  await remindersSync.sync();
+  const id = mirroredId('r-low');
+  assert.equal(taskOf(id).status, 'done');
+  assert.equal(completionOf(id), undefined, 'als Teilaufgabe abgehakt: kein Eintrag');
+
+  dav.putObject(listUrl, 'low.ics', davTodo('r-low', { done: true, completed: '20261017T081500Z' }));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).parent_task_id, null, 'jetzt eine eigene Aufgabe');
+  const c = completionOf(id);
+  assert.ok(c, 'eine eigene, erledigte Aufgabe gehoert in den Verlauf');
+  assert.equal(c.completed_at, '2026-10-17T08:15:00Z', 'Zeitpunkt aus dem COMPLETED der Erinnerung');
+  assert.equal(c.source, 'caldav');
+  assert.equal(c.user_id, null);
+  assert.equal(c.done_by_user_id, null);
+
+  // Ein weiterer Lauf mit demselben Stand aendert nichts mehr.
+  await remindersSync.sync();
+  assert.equal(completionOf(id).id, c.id);
+});
+
+test('voller Lauf: herausgeloest ohne COMPLETED -> kein Eintrag (#2078)', async () => {
+  dav.putObject(listUrl, 'bare.ics', davTodo('r-bare', { parent: 'h-parent' }));
+  await remindersSync.sync();
+  dav.putObject(listUrl, 'bare.ics', davTodo('r-bare', { done: true, parent: 'h-parent', completed: null }));
+  await remindersSync.sync();
+  const id = mirroredId('r-bare');
+  dav.putObject(listUrl, 'bare.ics', davTodo('r-bare', { done: true, completed: null }));
+  await remindersSync.sync();
+  assert.equal(taskOf(id).parent_task_id, null);
+  assert.equal(taskOf(id).status, 'done');
+  assert.equal(completionOf(id), undefined, 'ohne COMPLETED waere der Zeitpunkt geraten');
+});
+
+test('voller Lauf: herausgeloest, aber in Yuvomi bearbeitet -> der Sync traegt nichts ein (#2078)', async () => {
+  dav.putObject(listUrl, 'busy.ics', davTodo('r-busy', { done: true, parent: 'h-parent' }));
+  await remindersSync.sync();
+  const id = mirroredId('r-busy');
+  const queued = new Map();
+  upsertTask(parseVTODO(davTodo('r-busy', { done: true }))[0], ACCOUNT, ADMIN, null, { completions: queued });
+  db.prepare('UPDATE tasks SET parent_task_id = NULL WHERE id = ?').run(id);
+  db.prepare("UPDATE tasks SET status = 'open', outbound_dirty = 1 WHERE id = ?").run(id);
+  remindersSync.applySyncedCompletions(db, queued, new Set([id]));
+  assert.equal(completionOf(id), undefined, 'die lokale Aenderung gewinnt bis zu ihrem Push');
+  db.prepare("UPDATE tasks SET status = 'done', outbound_dirty = 0 WHERE id = ?").run(id);
 });
 
 // Ein Lauf schreibt den Upsert jeder Liste sofort, den Uebergang aber erst
