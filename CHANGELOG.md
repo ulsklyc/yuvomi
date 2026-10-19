@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
   accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
   updates the existing entry (200) instead of adding another one.
+- **A session that ends while the sign-in page is open no longer wipes what you typed** (#1945).
+  When a request found the session gone, the app drew the sign-in page again even when it was
+  already showing, so a half-typed user name and password were cleared; with setup still pending
+  the same happened to the setup page. A session that ends on a page that needs no sign-in (sign-in,
+  setup, invitation, display pairing, password reset) now leaves that page as it is. On every other
+  page it still leads to the sign-in page.
+
 - **A new medication is saved together with its intake plan, or not at all.** If saving one of
   the plan's times failed, the medication itself was already stored. Cancelling the dialog then
   left it behind without its plan and without showing it in the list, so it was easy to add it a
