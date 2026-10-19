@@ -97,6 +97,16 @@ function validContactCategoryKeys() {
   return loadContactCategories().map((c) => c.key);
 }
 
+/**
+ * Die im Formular GEWAEHLTE Kategorie gibt es nicht mehr (#1909): jemand hat sie
+ * geloescht, waehrend das Formular offen war. Der Grund nennt den Fall nur, wenn
+ * er der EINZIGE Befund ist - die Seite haelt das Formular dann offen und bietet
+ * die aktuellen Kategorien an. Fehlt die Kategorie im Rumpf, ist nichts gewaehlt.
+ */
+function selectedCategoryGone(vCat, errors) {
+  return vCat?.error && errors.length === 1 ? { reason: 'contacts_selected_category_not_found' } : {};
+}
+
 /** Anzahl Kontakte, die eine Kategorie referenzieren (Guard vor dem Löschen). */
 function contactCategoryInUseCount(key) {
   return db.get().prepare('SELECT COUNT(*) AS n FROM contacts WHERE category = ?').get(key).n;
@@ -428,7 +438,7 @@ router.post('/', (req, res) => {
     // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
     const nameParts = readNameParts(req.body);
     const vName    = str(nameParts.displayName ?? req.body.name, 'Name', { max: MAX_TITLE });
-    const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Kategorie');
+    const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Category');
     const vPhone   = str(req.body.phone,   'Telefon', { max: MAX_SHORT, required: false });
     const vEmail   = str(req.body.email,   'E-Mail',  { max: MAX_TITLE, required: false });
     const vAddress = str(req.body.address, 'Adresse', { max: MAX_TEXT,  required: false });
@@ -438,7 +448,7 @@ router.post('/', (req, res) => {
     const vBirthday = date(req.body.birthday, 'Geburtstag', false);
     const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes, vBirthday,
                                     ...namePartChecks(nameParts.parts)]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
 
     // Validate multi-value fields if provided
     if (req.body.phones !== undefined) {
@@ -561,14 +571,15 @@ router.put('/:id', (req, res) => {
     const checks = [];
     if (nameParts.provided)              checks.push(...namePartChecks(nameParts.parts));
     if (req.body.name     !== undefined) checks.push(str(req.body.name,     'Name',    { max: MAX_TITLE, required: false }));
-    if (req.body.category !== undefined) checks.push(oneOf(req.body.category, validContactCategoryKeys(), 'Kategorie'));
+    const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'Category') : null;
+    if (vCat) checks.push(vCat);
     if (req.body.phone    !== undefined) checks.push(str(req.body.phone,    'Telefon', { max: MAX_SHORT, required: false }));
     if (req.body.email    !== undefined) checks.push(str(req.body.email,    'E-Mail',  { max: MAX_TITLE, required: false }));
     if (req.body.address  !== undefined) checks.push(str(req.body.address,  'Adresse', { max: MAX_TEXT,  required: false }));
     if (req.body.notes    !== undefined) checks.push(str(req.body.notes,    'Notizen', { max: MAX_TEXT,  required: false }));
     if (req.body.birthday !== undefined) checks.push(date(req.body.birthday, 'Geburtstag', false));
     const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
 
     // Validate multi-value fields if provided
     if (req.body.phones !== undefined) {

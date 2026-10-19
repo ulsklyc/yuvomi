@@ -629,7 +629,8 @@
         "kanbanColExpand": "列を開く",
         "kanbanArchiveDone": "完了をすべてアーカイブ",
         "kanbanArchiveDoneConfirm": "この列の完了したタスクをすべてアーカイブしますか？",
-        "kanbanArchiveDoneAction": "アーカイブ"
+        "kanbanArchiveDoneAction": "アーカイブ",
+        "errorTaskGone": "このタスクはもう存在しません。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "{{count}} 件の連絡先を削除しますか?",
         "bulkDeleteConfirm_one": "{{count}} 件の連絡先を削除しますか?",
         "bulkDeletedToast": "連絡先 {{count}} 件を削除しました",
-        "errorContactGone": "この連絡先はもうありません。"
+        "errorContactGone": "この連絡先はもうありません。",
+        "errorSelectedCategoryGone": "選択したカテゴリーはもう存在しません。"
     },
     "budget": {
         "title": "家計",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "この期限はもうありません。",
         "errorSelectedLocationGone": "選択した場所はもう存在しません。",
         "errorBookingGone": "この取引はもうありません。",
-        "errorBookingAlreadyLinked": "この取引はすでに関連付けられています。"
+        "errorBookingAlreadyLinked": "この取引はすでに関連付けられています。",
+        "errorLocationExists": "この場所はすでにここにあります。別の名前を選んでください。",
+        "errorLocationGone": "この場所はもう存在しません。",
+        "errorCategoryGone": "このカテゴリーはもう存在しません。"
     },
     "documentAttach": {
         "label": "添付",

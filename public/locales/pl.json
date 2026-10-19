@@ -745,7 +745,8 @@
         "kanbanColExpand": "Rozwiń kolumnę",
         "kanbanArchiveDone": "Zarchiwizuj wszystkie ukończone",
         "kanbanArchiveDoneConfirm": "Zarchiwizować wszystkie ukończone zadania w tej kolumnie?",
-        "kanbanArchiveDoneAction": "Zarchiwizuj"
+        "kanbanArchiveDoneAction": "Zarchiwizuj",
+        "errorTaskGone": "To zadanie już nie istnieje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -1527,7 +1528,8 @@
         "bulkDeleteConfirm_few": "Usunąć {{count}} kontakty?",
         "bulkDeleteConfirm_many": "Usunąć {{count}} kontaktów?",
         "bulkDeletedToast": "Usunięto {{count}} kontaktów",
-        "errorContactGone": "Ten kontakt już nie istnieje."
+        "errorContactGone": "Ten kontakt już nie istnieje.",
+        "errorSelectedCategoryGone": "Wybrana kategoria już nie istnieje."
     },
     "budget": {
         "title": "Budżet",
@@ -6463,7 +6465,10 @@
         "errorTrackedDateGone": "Ten termin już nie istnieje.",
         "errorSelectedLocationGone": "Wybrane miejsce już nie istnieje.",
         "errorBookingGone": "Ta transakcja już nie istnieje.",
-        "errorBookingAlreadyLinked": "Ta transakcja jest już powiązana."
+        "errorBookingAlreadyLinked": "Ta transakcja jest już powiązana.",
+        "errorLocationExists": "To miejsce już tu istnieje. Wybierz inną nazwę.",
+        "errorLocationGone": "To miejsce już nie istnieje.",
+        "errorCategoryGone": "Ta kategoria już nie istnieje."
     },
     "documentAttach": {
         "label": "Załączniki",

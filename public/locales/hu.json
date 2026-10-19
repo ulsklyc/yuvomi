@@ -629,7 +629,8 @@
         "kanbanColExpand": "Oszlop kibővítése",
         "kanbanArchiveDone": "Minden kész archiválása",
         "kanbanArchiveDoneConfirm": "Archiválod az oszlop összes kész feladatát?",
-        "kanbanArchiveDoneAction": "Archiválás"
+        "kanbanArchiveDoneAction": "Archiválás",
+        "errorTaskGone": "Ez a feladat már nem létezik."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Töröl {{count}} névjegyet?",
         "bulkDeleteConfirm_one": "Töröl {{count}} névjegyet?",
         "bulkDeletedToast": "{{count}} névjegy törölve",
-        "errorContactGone": "Ez a kapcsolat már nem létezik."
+        "errorContactGone": "Ez a kapcsolat már nem létezik.",
+        "errorSelectedCategoryGone": "A kiválasztott kategória már nem létezik."
     },
     "budget": {
         "title": "Költségvetés",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Ez a határidő már nem létezik.",
         "errorSelectedLocationGone": "A kiválasztott hely már nem létezik.",
         "errorBookingGone": "Ez a tétel már nem létezik.",
-        "errorBookingAlreadyLinked": "Ez a tétel már kapcsolva van."
+        "errorBookingAlreadyLinked": "Ez a tétel már kapcsolva van.",
+        "errorLocationExists": "Ez a hely már létezik itt. Válassz másik nevet.",
+        "errorLocationGone": "Ez a hely már nem létezik.",
+        "errorCategoryGone": "Ez a kategória már nem létezik."
     },
     "documentAttach": {
         "label": "Mellékletek",

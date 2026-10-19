@@ -645,7 +645,8 @@
         "kanbanColExpand": "باز کردن ستون",
         "kanbanArchiveDone": "بایگانی همه کارهای انجام‌شده",
         "kanbanArchiveDoneConfirm": "همه کارهای انجام‌شده در این ستون بایگانی شوند؟",
-        "kanbanArchiveDoneAction": "بایگانی"
+        "kanbanArchiveDoneAction": "بایگانی",
+        "errorTaskGone": "این کار دیگر وجود ندارد."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",
@@ -1379,7 +1380,8 @@
         "bulkDeleteConfirm": "حذف {{count}} مخاطب؟",
         "bulkDeleteConfirm_one": "حذف {{count}} مخاطب؟",
         "bulkDeletedToast": "{{count}} مخاطب حذف شد",
-        "errorContactGone": "این مخاطب دیگر وجود ندارد."
+        "errorContactGone": "این مخاطب دیگر وجود ندارد.",
+        "errorSelectedCategoryGone": "دستهٔ انتخاب‌شده دیگر وجود ندارد."
     },
     "budget": {
         "title": "بودجه",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "این مهلت دیگر وجود ندارد.",
         "errorSelectedLocationGone": "محل انتخاب‌شده دیگر وجود ندارد.",
         "errorBookingGone": "این تراکنش دیگر وجود ندارد.",
-        "errorBookingAlreadyLinked": "این تراکنش قبلاً مرتبط شده است."
+        "errorBookingAlreadyLinked": "این تراکنش قبلاً مرتبط شده است.",
+        "errorLocationExists": "این محل از قبل اینجا وجود دارد. نام دیگری انتخاب کنید.",
+        "errorLocationGone": "این محل دیگر وجود ندارد.",
+        "errorCategoryGone": "این دسته دیگر وجود ندارد."
     },
     "documentAttach": {
         "label": "پیوست‌ها",

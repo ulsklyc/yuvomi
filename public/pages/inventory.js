@@ -148,6 +148,11 @@ async function openLocationManager() {
         addPlaceholderKey: 'inventory.addLocation',
         deleteDetailKey: 'inventory.locationDeleteConfirmDetail',
         subDeleteDetailKey: 'inventory.locationDeleteConfirmDetail',
+        // Die Orte nennen ihre Faelle (#1909): den Namen gibt es schon, den Ort
+        // gibt es nicht mehr. Alles andere sagt den allgemeinen Satz, nie den
+        // des Servers; ein Loeschen, dem jemand zuvorkam, ist ein Erfolg.
+        errorFallbackKey: 'common.errorGeneric',
+        alreadyDeletedReason: 'inventory_location_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
@@ -196,6 +201,10 @@ async function openCategoryManager() {
         hintKey: 'inventory.manageCategoriesHint',
         addPlaceholderKey: 'inventory.addCategory',
         deleteDetailKey: 'inventory.categoryDeleteConfirmDetail',
+        // Wie bei den Orten (#1909): `category_exists` sagt der Verwalter
+        // selbst, die verschwundene Kategorie ihr eigener Satz.
+        errorFallbackKey: 'common.errorGeneric',
+        alreadyDeletedReason: 'inventory_category_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

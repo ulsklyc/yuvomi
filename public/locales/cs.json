@@ -679,7 +679,8 @@
         "kanbanColExpand": "Rozbalit sloupec",
         "kanbanArchiveDone": "Archivovat vše hotové",
         "kanbanArchiveDoneConfirm": "Archivovat všechny hotové úkoly v tomto sloupci?",
-        "kanbanArchiveDoneAction": "Archivovat"
+        "kanbanArchiveDoneAction": "Archivovat",
+        "errorTaskGone": "Tento úkol už neexistuje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
@@ -1437,7 +1438,8 @@
         "bulkDeleteConfirm_one": "Smazat {{count}} kontakt?",
         "bulkDeleteConfirm_few": "Smazat {{count}} kontakty?",
         "bulkDeletedToast": "Smazáno {{count}} kontaktů",
-        "errorContactGone": "Tento kontakt už neexistuje."
+        "errorContactGone": "Tento kontakt už neexistuje.",
+        "errorSelectedCategoryGone": "Vybraná kategorie už neexistuje."
     },
     "budget": {
         "title": "Rozpočet",
@@ -6316,7 +6318,10 @@
         "errorTrackedDateGone": "Tato lhůta už neexistuje.",
         "errorSelectedLocationGone": "Vybrané místo už neexistuje.",
         "errorBookingGone": "Tato transakce už neexistuje.",
-        "errorBookingAlreadyLinked": "Tato transakce už je propojená."
+        "errorBookingAlreadyLinked": "Tato transakce už je propojená.",
+        "errorLocationExists": "Toto místo tu již existuje. Zvolte jiný název.",
+        "errorLocationGone": "Toto místo už neexistuje.",
+        "errorCategoryGone": "Tato kategorie už neexistuje."
     },
     "documentAttach": {
         "label": "Přílohy",

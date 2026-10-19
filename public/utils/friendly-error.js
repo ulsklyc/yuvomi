@@ -231,6 +231,20 @@ export const CASE_MESSAGES = new Map([
   ['contacts_contact_not_found', 'contacts.errorContactGone'],
   // Geburtstage (#1909), ebenso.
   ['birthdays_birthday_not_found', 'birthdays.errorBirthdayGone'],
+  // Die im Kontaktformular GEWAEHLTE Kategorie gibt es nicht mehr: das
+  // Formular bleibt offen und bietet die aktuellen Kategorien an.
+  ['contacts_selected_category_not_found', 'contacts.errorSelectedCategoryGone'],
+  // Orte und Kategorien des Inventars (#1909). Den Namen gibt es auf dieser
+  // Ebene schon (`category_exists` deckt die Kategorien, oben); ein Ort oder
+  // eine Kategorie, die inzwischen geloescht wurde, ist ein "gibt es nicht
+  // mehr" - der Verwalter laedt nach, ein Loeschen ist ein Erfolg.
+  ['inventory_location_exists', 'inventory.errorLocationExists'],
+  ['inventory_location_not_found', 'inventory.errorLocationGone'],
+  ['inventory_category_not_found', 'inventory.errorCategoryGone'],
+  // Aufgaben (#1909). Die 404 heisst "geloescht oder nicht mehr sichtbar"
+  // (privat gestellt) - fuer diese Person ist die Aufgabe in beiden Faellen
+  // weg, ein Loeschen mit diesem Grund ist deshalb ein Erfolg.
+  ['tasks_task_not_found', 'tasks.errorTaskGone'],
 ]);
 
 /**
@@ -334,6 +348,10 @@ export const GONE_REASONS = new Set([
   'notes_selected_category_not_found',
   'contacts_contact_not_found',
   'birthdays_birthday_not_found',
+  'contacts_selected_category_not_found',
+  'inventory_location_not_found',
+  'inventory_category_not_found',
+  'tasks_task_not_found',
 ]);
 
 /**

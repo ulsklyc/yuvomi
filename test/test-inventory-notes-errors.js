@@ -209,11 +209,60 @@ test('Server/Kontakte und Geburtstage: was es nicht mehr gibt, nennt seinen Grun
   }
 });
 
+test('Server/Inventar: Orte und Kategorien nennen "gibt es schon" und "gibt es nicht mehr", englisch', async () => {
+  const keller = await call('POST', '/inventory/locations', { name: 'Keller' });
+  assert.equal(keller.status, 201, JSON.stringify(keller.body));
+  const id = keller.body.data.id;
+  const sub = await call('POST', `/inventory/locations/${id}/subcategories`, { name: 'Regal' });
+  assert.equal(sub.status, 201, JSON.stringify(sub.body));
+  for (const [method, path, body] of [
+    ['POST', '/inventory/locations', { name: 'keller' }],
+    ['POST', `/inventory/locations/${id}/subcategories`, { name: 'Regal' }],
+  ]) {
+    expectCase(await call(method, path, body), 409, 'inventory_location_exists', `${method} ${path}`);
+  }
+  for (const [method, path, body] of [
+    ['PUT', `/inventory/locations/${GONE}`, { name: 'x' }],
+    ['DELETE', `/inventory/locations/${GONE}`, null],
+    ['POST', `/inventory/locations/${GONE}/subcategories`, { name: 'x' }],
+    ['PUT', `/inventory/locations/${id}/subcategories/${GONE}`, { name: 'x' }],
+    ['DELETE', `/inventory/locations/${id}/subcategories/${GONE}`, null],
+  ]) {
+    expectCase(await call(method, path, body), 404, 'inventory_location_not_found', `${method} ${path}`);
+  }
+  const werkzeug = await call('POST', '/inventory/categories', { name: 'Werkzeug' });
+  assert.equal(werkzeug.status, 201, JSON.stringify(werkzeug.body));
+  expectCase(await call('POST', '/inventory/categories', { name: 'Werkzeug' }), 409, 'category_exists', 'POST /inventory/categories');
+  for (const [method, path, body] of [
+    ['PUT', '/inventory/categories/weg', { name: 'x' }],
+    ['DELETE', '/inventory/categories/weg', null],
+  ]) {
+    expectCase(await call(method, path, body), 404, 'inventory_category_not_found', `${method} ${path}`);
+  }
+});
+
+test('Server/Kontakte: die gewaehlte Kategorie ist weg - ein Grund nur, wenn sie der einzige Befund ist', async () => {
+  const r = await call('POST', '/contacts', { name: 'Ada', category: 'weg' });
+  expectCase(r, 400, 'contacts_selected_category_not_found', 'POST /contacts');
+  assert.doesNotMatch(r.body.error, /Kategorie/, 'deutscher Feldname');
+  // Zwei Befunde: der Grund wuerde einen davon verschweigen.
+  const zwei = await call('POST', '/contacts', { name: '', category: 'weg' });
+  assert.equal(zwei.status, 400);
+  assert.equal(zwei.body.reason, undefined);
+  const bea = await call('POST', '/contacts', { name: 'Bea' });
+  assert.equal(bea.status, 201, JSON.stringify(bea.body));
+  expectCase(await call('PUT', `/contacts/${bea.body.data.id}`, { category: 'weg' }), 400, 'contacts_selected_category_not_found', 'PUT /contacts/:id');
+  // Ohne Kategorie im Rumpf ist nichts gewaehlt - und nichts verschwunden.
+  const ok = await call('PUT', `/contacts/${bea.body.data.id}`, { notes: 'x' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+});
+
 const SERVER_REASONS = [
   'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
   'inventory_booking_not_found', 'inventory_booking_already_linked',
+  'inventory_location_exists', 'inventory_location_not_found', 'inventory_category_not_found',
   'notes_note_not_found', 'notes_selected_category_not_found',
-  'contacts_contact_not_found', 'birthdays_birthday_not_found',
+  'contacts_contact_not_found', 'contacts_selected_category_not_found', 'birthdays_birthday_not_found',
 ];
 
 test('jeder Grund dieser Module hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {
@@ -647,5 +696,49 @@ test('Geburtstage: speichern - ein verschwundener Geburtstag schliesst das Formu
       assert.equal(closed.length, gone ? 1 : 0, `${label}: geschlossen`);
       assert.deepEqual(birthdays.state.birthdays.map((b) => b.id), gone ? [6] : [5, 6], `${label}: Stand`);
     });
+  }
+});
+
+test('Kontakte: speichern - eine verschwundene Kategorie laesst das Formular offen und bietet die aktuellen an', async () => {
+  await mitKontakten(async () => {
+    const zuvor = contacts.state.categories;
+    contacts.state.categories = [{ key: 'misc', name: 'Sonstiges' }, { key: 'weg', name: 'Weg' }];
+    try {
+      const panel = formular({ '#cm-first-name': 'Ada', '#cm-last-name': 'Lovelace', '#cm-category': 'weg' });
+      const { closed, calls } = await mit({
+        put: async () => { throw fehler(400, 'contacts_selected_category_not_found'); },
+        get: (path) => (path === '/contacts/categories' ? { data: [{ key: 'misc', name: 'Sonstiges' }] } : { data: [] }),
+      }, async () => {
+        contacts.buildContactForm({ mode: 'edit', contact: contacts.state.contacts[0] }).wire(panel);
+        await panel.querySelector('#cm-save').handlers.click();
+      });
+      assert.deepEqual(toasts, [['contacts.errorSelectedCategoryGone', 'danger']]);
+      assertNoServerText();
+      assert.equal(closed.length, 0, 'das Formular bleibt offen');
+      assert.ok(calls.some(([verb, path]) => verb === 'GET' && path === '/contacts/categories'), 'die Kategorien kommen frisch');
+      assert.deepEqual(contacts.state.categories.map((c) => c.key), ['misc']);
+      const select = panel.querySelector('#cm-category');
+      assert.equal(select.value, 'misc', 'die Auswahl faellt auf eine, die es gibt');
+      assert.match(select.html, /value="misc"/);
+      assert.doesNotMatch(select.html, /value="weg"/, 'die verschwundene steht nicht mehr zur Wahl');
+      assert.deepEqual(contacts.state.contacts.map((c) => c.id), [5, 6], 'der Kontakt bleibt');
+    } finally {
+      contacts.state.categories = zuvor;
+    }
+  });
+});
+
+test('Inventar: Orts- und Kategorie-Verwalter sagen den Satz der App und nehmen "schon geloescht" als Erfolg', async () => {
+  for (const [open, reason] of [
+    [inventory.openLocationManager, 'inventory_location_not_found'],
+    [inventory.openCategoryManager, 'inventory_category_not_found'],
+  ]) {
+    let options = null;
+    const manager = { addEventListener() {}, configure(o) { options = o; } };
+    const panel = { querySelector: (sel) => (sel === 'yuvomi-category-manager' ? manager : null) };
+    await oeffne(panel, () => open());
+    assert.ok(options, `${reason}: der Verwalter wurde nicht eingerichtet`);
+    assert.equal(options.errorFallbackKey, 'common.errorGeneric', `${reason}: ohne Rueckfall zeigt der Verwalter den Text des Servers`);
+    assert.equal(options.alreadyDeletedReason, reason);
   }
 });

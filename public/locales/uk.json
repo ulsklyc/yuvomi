@@ -729,7 +729,8 @@
         "kanbanColExpand": "Розгорнути стовпець",
         "kanbanArchiveDone": "Архівувати всі виконані",
         "kanbanArchiveDoneConfirm": "Архівувати всі виконані завдання в цьому стовпці?",
-        "kanbanArchiveDoneAction": "Архівувати"
+        "kanbanArchiveDoneAction": "Архівувати",
+        "errorTaskGone": "Цього завдання більше немає."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",
@@ -1511,7 +1512,8 @@
         "bulkDeleteConfirm_few": "Видалити {{count}} контакти?",
         "bulkDeleteConfirm_many": "Видалити {{count}} контактів?",
         "bulkDeletedToast": "Видалено контактів: {{count}}",
-        "errorContactGone": "Цього контакту більше немає."
+        "errorContactGone": "Цього контакту більше немає.",
+        "errorSelectedCategoryGone": "Вибраної категорії більше немає."
     },
     "budget": {
         "title": "Бюджет",
@@ -6463,7 +6465,10 @@
         "errorTrackedDateGone": "Цього терміну більше немає.",
         "errorSelectedLocationGone": "Вибраного місця більше немає.",
         "errorBookingGone": "Цієї операції більше немає.",
-        "errorBookingAlreadyLinked": "Ця операція вже пов'язана."
+        "errorBookingAlreadyLinked": "Ця операція вже пов'язана.",
+        "errorLocationExists": "Таке місце тут уже є. Виберіть іншу назву.",
+        "errorLocationGone": "Цього місця більше немає.",
+        "errorCategoryGone": "Цієї категорії більше немає."
     },
     "documentAttach": {
         "label": "Вкладення",

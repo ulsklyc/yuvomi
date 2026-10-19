@@ -1562,6 +1562,32 @@ function buildContactForm({ mode, contact = null }) {
         if (window.lucide) lucide.createIcons({ el: catIcon });
       });
 
+      // Die gewaehlte Kategorie wurde inzwischen geloescht (#1909): das
+      // Formular bleibt offen, die Kategorien kommen frisch, und die Auswahl
+      // faellt auf eine, die es gibt - die Eingaben bleiben stehen.
+      async function offerCurrentCategories(owner) {
+        try {
+          const res = await api.get('/contacts/categories');
+          state.categories = res.data ?? [];
+        } catch {
+          return;
+        }
+        if (_container === owner) renderCategoryFilters();
+        if (!catSel?.isConnected) return;
+        const chosen = catSel.value;
+        const known = new Set(state.categories.map((c) => c.key));
+        catSel.replaceChildren();
+        catSel.insertAdjacentHTML('beforeend', [
+          ...(orphanCat ? [`<option value="${esc(orphanCat)}">${esc(orphanCat)}</option>`] : []),
+          ...state.categories.map((c) => `<option value="${esc(c.key)}">${esc(catLabel(c.key))}</option>`),
+        ].join(''));
+        catSel.value = known.has(chosen) || chosen === orphanCat ? chosen
+          : known.has(FALLBACK_CATEGORY) ? FALLBACK_CATEGORY
+            : (state.categories[0]?.key ?? '');
+        catSel.dispatchEvent(new Event('change'));
+        catSel.focus();
+      }
+
       panel.querySelector('#cm-delete')?.addEventListener('click', async () => {
         closeModal({ force: true });
         await deleteContact(contact.id);
@@ -1666,6 +1692,8 @@ function buildContactForm({ mode, contact = null }) {
           if (isEdit && isAlreadyDeleted(err, 'contacts_contact_not_found')) {
             closeModal({ force: true, context: dialog });
             dropGoneContacts([contact.id], owner);
+          } else if (err?.data?.reason === 'contacts_selected_category_not_found') {
+            await offerCurrentCategories(owner);
           }
         }
       });

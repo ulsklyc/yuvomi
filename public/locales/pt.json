@@ -629,7 +629,8 @@
         "kanbanColExpand": "Expandir coluna",
         "kanbanArchiveDone": "Arquivar todas as concluídas",
         "kanbanArchiveDoneConfirm": "Arquivar todas as tarefas concluídas desta coluna?",
-        "kanbanArchiveDoneAction": "Arquivar"
+        "kanbanArchiveDoneAction": "Arquivar",
+        "errorTaskGone": "Esta tarefa já não existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Eliminar {{count}} contactos?",
         "bulkDeleteConfirm_one": "Eliminar {{count}} contacto?",
         "bulkDeletedToast": "{{count}} contatos excluídos",
-        "errorContactGone": "Este contacto já não existe."
+        "errorContactGone": "Este contacto já não existe.",
+        "errorSelectedCategoryGone": "A categoria escolhida já não existe."
     },
     "budget": {
         "title": "Orçamento",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Este prazo já não existe.",
         "errorSelectedLocationGone": "A localização escolhida já não existe.",
         "errorBookingGone": "Este movimento já não existe.",
-        "errorBookingAlreadyLinked": "Este movimento já está associado."
+        "errorBookingAlreadyLinked": "Este movimento já está associado.",
+        "errorLocationExists": "Esta localização já existe aqui. Escolha outro nome.",
+        "errorLocationGone": "Esta localização já não existe.",
+        "errorCategoryGone": "Esta categoria já não existe."
     },
     "documentAttach": {
         "label": "Anexos",

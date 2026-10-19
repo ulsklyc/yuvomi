@@ -645,7 +645,8 @@
         "kanbanColExpand": "Spalte ausklappen",
         "kanbanArchiveDone": "Alles Erledigte archivieren",
         "kanbanArchiveDoneConfirm": "Alle erledigten Aufgaben in dieser Spalte archivieren?",
-        "kanbanArchiveDoneAction": "Archivieren"
+        "kanbanArchiveDoneAction": "Archivieren",
+        "errorTaskGone": "Diese Aufgabe gibt es nicht mehr."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -1379,7 +1380,8 @@
         "bulkDeleteConfirm": "{{count}} Kontakte löschen?",
         "bulkDeleteConfirm_one": "{{count}} Kontakt löschen?",
         "bulkDeletedToast": "{{count}} Kontakte gelöscht",
-        "errorContactGone": "Diesen Kontakt gibt es nicht mehr."
+        "errorContactGone": "Diesen Kontakt gibt es nicht mehr.",
+        "errorSelectedCategoryGone": "Die gewählte Kategorie gibt es nicht mehr."
     },
     "budget": {
         "title": "Budget",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Diese Frist gibt es nicht mehr.",
         "errorSelectedLocationGone": "Den gewählten Ort gibt es nicht mehr.",
         "errorBookingGone": "Diese Buchung gibt es nicht mehr.",
-        "errorBookingAlreadyLinked": "Diese Buchung ist bereits verknüpft."
+        "errorBookingAlreadyLinked": "Diese Buchung ist bereits verknüpft.",
+        "errorLocationExists": "Diesen Ort gibt es hier schon. Wähle einen anderen Namen.",
+        "errorLocationGone": "Diesen Ort gibt es nicht mehr.",
+        "errorCategoryGone": "Diese Kategorie gibt es nicht mehr."
     },
     "documentAttach": {
         "label": "Anhänge",

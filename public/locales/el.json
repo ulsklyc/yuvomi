@@ -629,7 +629,8 @@
         "kanbanColExpand": "Επέκταση στήλης",
         "kanbanArchiveDone": "Αρχειοθέτηση όλων των ολοκληρωμένων",
         "kanbanArchiveDoneConfirm": "Αρχειοθέτηση όλων των ολοκληρωμένων εργασιών αυτής της στήλης;",
-        "kanbanArchiveDoneAction": "Αρχειοθέτηση"
+        "kanbanArchiveDoneAction": "Αρχειοθέτηση",
+        "errorTaskGone": "Αυτή η εργασία δεν υπάρχει πια."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} είδος διαγράφηκε.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Διαγραφή {{count}} επαφών;",
         "bulkDeleteConfirm_one": "Διαγραφή {{count}} επαφής;",
         "bulkDeletedToast": "Διαγράφηκαν {{count}} επαφές",
-        "errorContactGone": "Αυτή η επαφή δεν υπάρχει πια."
+        "errorContactGone": "Αυτή η επαφή δεν υπάρχει πια.",
+        "errorSelectedCategoryGone": "Η επιλεγμένη κατηγορία δεν υπάρχει πλέον."
     },
     "budget": {
         "title": "Προϋπολογισμός",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Αυτή η προθεσμία δεν υπάρχει πια.",
         "errorSelectedLocationGone": "Η επιλεγμένη τοποθεσία δεν υπάρχει πλέον.",
         "errorBookingGone": "Αυτή η κίνηση δεν υπάρχει πια.",
-        "errorBookingAlreadyLinked": "Αυτή η κίνηση είναι ήδη συνδεδεμένη."
+        "errorBookingAlreadyLinked": "Αυτή η κίνηση είναι ήδη συνδεδεμένη.",
+        "errorLocationExists": "Αυτή η τοποθεσία υπάρχει ήδη εδώ. Επιλέξτε άλλο όνομα.",
+        "errorLocationGone": "Αυτή η τοποθεσία δεν υπάρχει πια.",
+        "errorCategoryGone": "Αυτή η κατηγορία δεν υπάρχει πια."
     },
     "documentAttach": {
         "label": "Συνημμένα",

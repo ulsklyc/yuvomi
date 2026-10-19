@@ -46,7 +46,7 @@ router.post('/', (req, res) => {
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const conflict = db.get().prepare('SELECT id FROM inventory_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE').get(vName.value);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     const vIcon = str(req.body.icon, 'Icon', { max: MAX_SHORT, required: false });
     if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
@@ -71,7 +71,7 @@ router.post('/', (req, res) => {
 router.put('/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM inventory_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'inventory_category_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -81,7 +81,7 @@ router.put('/:key', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT id FROM inventory_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE AND key != ?
     `).get(vName.value, cat.key);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
     // Umbenennen macht eine Seed-Kategorie effektiv custom: label_key faellt weg,
     // sonst ueberschriebe der naechste Sprachwechsel den getippten Namen wieder
@@ -107,7 +107,7 @@ router.delete('/:key', (req, res) => {
       return res.status(400).json({ error: "The 'other' category cannot be deleted.", code: 400 });
     }
     const cat = db.get().prepare('SELECT * FROM inventory_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'inventory_category_not_found' });
 
     const result = db.get().transaction(() => {
       const reassigned = db.get()

@@ -629,7 +629,8 @@
         "kanbanColExpand": "Expandir coluna",
         "kanbanArchiveDone": "Arquivar todas as concluídas",
         "kanbanArchiveDoneConfirm": "Arquivar todas as tarefas concluídas desta coluna?",
-        "kanbanArchiveDoneAction": "Arquivar"
+        "kanbanArchiveDoneAction": "Arquivar",
+        "errorTaskGone": "Esta tarefa não existe mais."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm_one": "Eliminar {{count}} contato?",
         "bulkDeletedToast": "{{count}} contatos excluídos",
         "emailLockedHint": "Estes endereços pertencem à conta deste membro. Apenas o próprio membro ou um administrador pode alterá-los.",
-        "errorContactGone": "Este contato não existe mais."
+        "errorContactGone": "Este contato não existe mais.",
+        "errorSelectedCategoryGone": "A categoria selecionada não existe mais."
     },
     "budget": {
         "title": "Orçamento",
@@ -5730,7 +5732,10 @@
         "errorTrackedDateGone": "Este prazo não existe mais.",
         "errorSelectedLocationGone": "A localização selecionada não existe mais.",
         "errorBookingGone": "Esta transação não existe mais.",
-        "errorBookingAlreadyLinked": "Esta transação já está vinculada."
+        "errorBookingAlreadyLinked": "Esta transação já está vinculada.",
+        "errorLocationExists": "Este local já existe aqui. Escolha outro nome.",
+        "errorLocationGone": "Este local não existe mais.",
+        "errorCategoryGone": "Esta categoria não existe mais."
     },
     "join": {
         "title": "Configure sua conta",

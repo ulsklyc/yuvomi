@@ -629,7 +629,8 @@
         "kanbanColExpand": "展开该列",
         "kanbanArchiveDone": "归档全部已完成",
         "kanbanArchiveDoneConfirm": "要归档此列中所有已完成的任务吗？",
-        "kanbanArchiveDoneAction": "归档"
+        "kanbanArchiveDoneAction": "归档",
+        "errorTaskGone": "此任务已不存在。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "删除 {{count}} 个联系人?",
         "bulkDeleteConfirm_one": "删除 {{count}} 个联系人?",
         "bulkDeletedToast": "已删除 {{count}} 个联系人",
-        "errorContactGone": "这个联系人已不存在。"
+        "errorContactGone": "这个联系人已不存在。",
+        "errorSelectedCategoryGone": "所选类别已不存在。"
     },
     "budget": {
         "title": "预算",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "这个到期日已不存在。",
         "errorSelectedLocationGone": "所选位置已不存在。",
         "errorBookingGone": "这笔账目已不存在。",
-        "errorBookingAlreadyLinked": "这笔账目已关联。"
+        "errorBookingAlreadyLinked": "这笔账目已关联。",
+        "errorLocationExists": "此处已有同名位置。请换一个名称。",
+        "errorLocationGone": "这个位置已不存在。",
+        "errorCategoryGone": "这个类别已不存在。"
     },
     "documentAttach": {
         "label": "附件",

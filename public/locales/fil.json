@@ -645,7 +645,8 @@
         "kanbanColExpand": "Ilabas ang column",
         "kanbanArchiveDone": "I-archive lahat ng tapos na",
         "kanbanArchiveDoneConfirm": "I-archive ang lahat ng tapos na gawain sa column na ito?",
-        "kanbanArchiveDoneAction": "I-archive"
+        "kanbanArchiveDoneAction": "I-archive",
+        "errorTaskGone": "Wala na ang gawaing ito."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -1379,7 +1380,8 @@
         "bulkDeleteConfirm": "Burahin ang {{count}} kontak?",
         "bulkDeleteConfirm_one": "Burahin ang {{count}} kontak?",
         "bulkDeletedToast": "{{count}} kontak ang natanggal",
-        "errorContactGone": "Wala na ang kontak na ito."
+        "errorContactGone": "Wala na ang kontak na ito.",
+        "errorSelectedCategoryGone": "Wala na ang napiling kategorya."
     },
     "budget": {
         "title": "Badyet",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Wala na ang petsang ito.",
         "errorSelectedLocationGone": "Wala na ang napiling lokasyon.",
         "errorBookingGone": "Wala na ang transaksyong ito.",
-        "errorBookingAlreadyLinked": "Naka-link na ang transaksyong ito."
+        "errorBookingAlreadyLinked": "Naka-link na ang transaksyong ito.",
+        "errorLocationExists": "Umiiral na ang lokasyong ito rito. Pumili ng ibang pangalan.",
+        "errorLocationGone": "Wala na ang lokasyong ito.",
+        "errorCategoryGone": "Wala na ang kategoryang ito."
     },
     "documentAttach": {
         "label": "Mga kalakip",

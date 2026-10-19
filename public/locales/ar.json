@@ -779,7 +779,8 @@
         "kanbanColExpand": "توسيع العمود",
         "kanbanArchiveDone": "أرشفة كل المهام المنجزة",
         "kanbanArchiveDoneConfirm": "أرشفة جميع المهام المنجزة في هذا العمود؟",
-        "kanbanArchiveDoneAction": "أرشفة"
+        "kanbanArchiveDoneAction": "أرشفة",
+        "errorTaskGone": "هذه المهمة لم تعد موجودة."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -1586,7 +1587,8 @@
         "bulkDeleteConfirm_two": "حذف جهتي اتصال؟",
         "bulkDeleteConfirm_many": "حذف {{count}} جهة اتصال؟",
         "bulkDeletedToast": "تم حذف {{count}} جهة اتصال",
-        "errorContactGone": "جهة الاتصال هذه لم تعد موجودة."
+        "errorContactGone": "جهة الاتصال هذه لم تعد موجودة.",
+        "errorSelectedCategoryGone": "الفئة المحددة لم تعد موجودة."
     },
     "budget": {
         "title": "الميزانية",
@@ -6616,7 +6618,10 @@
         "errorTrackedDateGone": "هذا الموعد لم يعد موجودًا.",
         "errorSelectedLocationGone": "لم يعد الموقع المحدد موجودًا.",
         "errorBookingGone": "هذه المعاملة لم تعد موجودة.",
-        "errorBookingAlreadyLinked": "هذه المعاملة مرتبطة بالفعل."
+        "errorBookingAlreadyLinked": "هذه المعاملة مرتبطة بالفعل.",
+        "errorLocationExists": "هذا الموقع موجود هنا بالفعل. اختر اسمًا آخر.",
+        "errorLocationGone": "هذا الموقع لم يعد موجودًا.",
+        "errorCategoryGone": "هذه الفئة لم تعد موجودة."
     },
     "documentAttach": {
         "label": "المرفقات",

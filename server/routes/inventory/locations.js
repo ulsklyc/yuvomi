@@ -61,7 +61,7 @@ router.post('/', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT id FROM inventory_locations WHERE parent_id IS NULL AND name = ? COLLATE NOCASE
     `).get(vName.value);
-    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409, reason: 'inventory_location_exists' });
 
     const vIcon = str(req.body.icon, 'Icon', { max: MAX_SHORT, required: false });
     if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
@@ -89,7 +89,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ?').get(req.params.id);
-    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -100,7 +100,7 @@ router.put('/:id', (req, res) => {
       SELECT id FROM inventory_locations
       WHERE (parent_id IS ?) AND name = ? COLLATE NOCASE AND id != ?
     `).get(loc.parent_id, vName.value, loc.id);
-    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409, reason: 'inventory_location_exists' });
 
     db.get().prepare('UPDATE inventory_locations SET name = ?, icon = ? WHERE id = ?')
       .run(vName.value, vIcon.value ?? loc.icon, loc.id);
@@ -119,7 +119,7 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ?').get(req.params.id);
-    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
     const orphanedItems = db.get().prepare('SELECT COUNT(*) AS c FROM inventory_items WHERE location_id = ?').get(loc.id).c;
     const orphanedChildren = db.get().prepare('SELECT COUNT(*) AS c FROM inventory_locations WHERE parent_id = ?').get(loc.id).c;
@@ -156,7 +156,7 @@ router.patch('/reorder', (req, res) => {
 router.post('/:parentId/subcategories', (req, res) => {
   try {
     const parent = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id IS NULL').get(req.params.parentId);
-    if (!parent) return res.status(404).json({ error: 'Location not found.', code: 404 });
+    if (!parent) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -164,7 +164,7 @@ router.post('/:parentId/subcategories', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT id FROM inventory_locations WHERE parent_id = ? AND name = ? COLLATE NOCASE
     `).get(parent.id, vName.value);
-    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409, reason: 'inventory_location_exists' });
 
     const vIcon = str(req.body.icon, 'Icon', { max: MAX_SHORT, required: false });
     if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
@@ -193,7 +193,7 @@ router.put('/:parentId/subcategories/:id', (req, res) => {
   try {
     const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id = ?')
       .get(req.params.id, req.params.parentId);
-    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -203,7 +203,7 @@ router.put('/:parentId/subcategories/:id', (req, res) => {
     const conflict = db.get().prepare(`
       SELECT id FROM inventory_locations WHERE parent_id = ? AND name = ? COLLATE NOCASE AND id != ?
     `).get(loc.parent_id, vName.value, loc.id);
-    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Location already exists.', code: 409, reason: 'inventory_location_exists' });
 
     db.get().prepare('UPDATE inventory_locations SET name = ?, icon = ? WHERE id = ?')
       .run(vName.value, vIcon.value ?? loc.icon, loc.id);
@@ -222,7 +222,7 @@ router.delete('/:parentId/subcategories/:id', (req, res) => {
   try {
     const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id = ?')
       .get(req.params.id, req.params.parentId);
-    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
     const orphanedItems = db.get().prepare('SELECT COUNT(*) AS c FROM inventory_items WHERE location_id = ?').get(loc.id).c;
     db.get().prepare('DELETE FROM inventory_locations WHERE id = ?').run(loc.id);

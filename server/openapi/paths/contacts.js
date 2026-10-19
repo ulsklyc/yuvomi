@@ -75,8 +75,10 @@ export function contactsPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
 const CONTACT_GONE = '`contacts_contact_not_found` (404, the contact does not exist - deleted)';
+const CATEGORY_GONE = '`contacts_selected_category_not_found` (400, the chosen `category` does not exist - deleted; only when it is the sole finding)';
 const CASE_REASONS = {
-  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: CONTACT_GONE, delete: CONTACT_GONE },
+  '/api/v1/contacts': { post: CATEGORY_GONE },
+  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}`, delete: CONTACT_GONE },
 };
 
 function withCaseReasons(paths) {

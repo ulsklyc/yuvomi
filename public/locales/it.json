@@ -629,7 +629,8 @@
         "kanbanColExpand": "Espandi colonna",
         "kanbanArchiveDone": "Archivia tutte le completate",
         "kanbanArchiveDoneConfirm": "Archiviare tutte le attività completate di questa colonna?",
-        "kanbanArchiveDoneAction": "Archivia"
+        "kanbanArchiveDoneAction": "Archivia",
+        "errorTaskGone": "Questa attività non esiste più."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} articolo eliminato.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Eliminare {{count}} contatti?",
         "bulkDeleteConfirm_one": "Eliminare {{count}} contatto?",
         "bulkDeletedToast": "{{count}} contatti eliminati",
-        "errorContactGone": "Questo contatto non esiste più."
+        "errorContactGone": "Questo contatto non esiste più.",
+        "errorSelectedCategoryGone": "La categoria selezionata non esiste più."
     },
     "budget": {
         "title": "Bilancio",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Questa scadenza non esiste più.",
         "errorSelectedLocationGone": "La posizione selezionata non esiste più.",
         "errorBookingGone": "Questo movimento non esiste più.",
-        "errorBookingAlreadyLinked": "Questo movimento è già collegato."
+        "errorBookingAlreadyLinked": "Questo movimento è già collegato.",
+        "errorLocationExists": "Questa posizione esiste già qui. Scegli un altro nome.",
+        "errorLocationGone": "Questa posizione non esiste più.",
+        "errorCategoryGone": "Questa categoria non esiste più."
     },
     "documentAttach": {
         "label": "Allegati",

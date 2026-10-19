@@ -130,7 +130,17 @@ export function inventoryPaths() {
 const ITEM_GONE = '`inventory_item_not_found` (404, the item does not exist - deleted)';
 const BOOKING_GONE = '`inventory_booking_not_found` (404, the booking does not exist or is not visible to you)';
 const LOCATION_GONE = '`inventory_selected_location_not_found` (400, the chosen `location_id` does not exist; only when it is the sole finding)';
+const LOC_EXISTS = '`inventory_location_exists` (409, a location with this name already exists at this level)';
+const LOC_GONE = '`inventory_location_not_found` (404, the location does not exist - deleted)';
+const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
+const CAT_GONE = '`inventory_category_not_found` (404, the category does not exist - deleted)';
 const CASE_REASONS = {
+  '/api/v1/inventory/locations': { post: LOC_EXISTS },
+  '/api/v1/inventory/locations/{id}': { put: `${LOC_GONE}, ${LOC_EXISTS}`, delete: LOC_GONE },
+  '/api/v1/inventory/locations/{parentId}/subcategories': { post: `${LOC_GONE} (the parent location), ${LOC_EXISTS}` },
+  '/api/v1/inventory/locations/{parentId}/subcategories/{id}': { put: `${LOC_GONE}, ${LOC_EXISTS}`, delete: LOC_GONE },
+  '/api/v1/inventory/categories': { post: CAT_EXISTS },
+  '/api/v1/inventory/categories/{key}': { put: `${CAT_GONE}, ${CAT_EXISTS}`, delete: CAT_GONE },
   '/api/v1/inventory/items': { post: `${LOCATION_GONE}, ${BOOKING_GONE}` },
   '/api/v1/inventory/items/{id}': { get: ITEM_GONE, put: `${ITEM_GONE}, ${LOCATION_GONE}`, delete: ITEM_GONE },
   '/api/v1/inventory/items/{id}/entries': {

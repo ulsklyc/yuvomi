@@ -629,7 +629,8 @@
         "kanbanColExpand": "Agrandir la colonne",
         "kanbanArchiveDone": "Archiver tout ce qui est terminé",
         "kanbanArchiveDoneConfirm": "Archiver toutes les tâches terminées de cette colonne ?",
-        "kanbanArchiveDoneAction": "Archiver"
+        "kanbanArchiveDoneAction": "Archiver",
+        "errorTaskGone": "Cette tâche n’existe plus."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Supprimer {{count}} contacts ?",
         "bulkDeleteConfirm_one": "Supprimer {{count}} contact ?",
         "bulkDeletedToast": "{{count}} contacts supprimés",
-        "errorContactGone": "Ce contact n’existe plus."
+        "errorContactGone": "Ce contact n’existe plus.",
+        "errorSelectedCategoryGone": "La catégorie choisie n’existe plus."
     },
     "budget": {
         "title": "Budget",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Cette échéance n’existe plus.",
         "errorSelectedLocationGone": "L’emplacement choisi n’existe plus.",
         "errorBookingGone": "Cette écriture n’existe plus.",
-        "errorBookingAlreadyLinked": "Cette écriture est déjà liée."
+        "errorBookingAlreadyLinked": "Cette écriture est déjà liée.",
+        "errorLocationExists": "Cet emplacement existe déjà ici. Choisissez un autre nom.",
+        "errorLocationGone": "Cet emplacement n’existe plus.",
+        "errorCategoryGone": "Cette catégorie n’existe plus."
     },
     "documentAttach": {
         "label": "Pièces jointes",

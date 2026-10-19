@@ -597,7 +597,7 @@ test('without alreadyDeletedReason nothing changes for the other modules', async
   }
 });
 
-test('only shopping names an alreadyDeletedReason, once per manager', async () => {
+test('only shopping and inventory name an alreadyDeletedReason, once per manager', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const { withoutCommentsKeepingLines } = await import('./source-text.js');
   const dir = new URL('../public/pages/', import.meta.url);
@@ -607,6 +607,9 @@ test('only shopping names an alreadyDeletedReason, once per manager', async () =
     for (const m of page.matchAll(/alreadyDeletedReason:\s*'([^']+)'/g)) found.push(`${file}: ${m[1]}`);
   }
   assert.deepEqual(found.sort(), [
+    // #1909: die Orte und Kategorien des Inventars nennen ihr "gibt es nicht mehr".
+    'inventory.js: inventory_category_not_found',
+    'inventory.js: inventory_location_not_found',
     'shopping.js: shopping_category_not_found',
     'shopping.js: shopping_store_not_found',
   ]);

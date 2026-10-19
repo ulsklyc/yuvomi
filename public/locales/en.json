@@ -629,7 +629,8 @@
         "kanbanColExpand": "Expand column",
         "kanbanArchiveDone": "Archive all done",
         "kanbanArchiveDoneConfirm": "Archive every done task in this column?",
-        "kanbanArchiveDoneAction": "Archive"
+        "kanbanArchiveDoneAction": "Archive",
+        "errorTaskGone": "This task no longer exists."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Delete {{count}} contacts?",
         "bulkDeleteConfirm_one": "Delete {{count}} contact?",
         "bulkDeletedToast": "{{count}} contacts deleted",
-        "errorContactGone": "This contact no longer exists."
+        "errorContactGone": "This contact no longer exists.",
+        "errorSelectedCategoryGone": "The selected category no longer exists."
     },
     "budget": {
         "title": "Budget",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "This deadline no longer exists.",
         "errorSelectedLocationGone": "The selected location no longer exists.",
         "errorBookingGone": "This booking no longer exists.",
-        "errorBookingAlreadyLinked": "This booking is already linked."
+        "errorBookingAlreadyLinked": "This booking is already linked.",
+        "errorLocationExists": "This location already exists here. Choose a different name.",
+        "errorLocationGone": "This location no longer exists.",
+        "errorCategoryGone": "This category no longer exists."
     },
     "documentAttach": {
         "label": "Attachments",

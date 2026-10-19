@@ -629,7 +629,8 @@
         "kanbanColExpand": "Kolom uitklappen",
         "kanbanArchiveDone": "Alles wat klaar is archiveren",
         "kanbanArchiveDoneConfirm": "Alle afgeronde taken in deze kolom archiveren?",
-        "kanbanArchiveDoneAction": "Archiveren"
+        "kanbanArchiveDoneAction": "Archiveren",
+        "errorTaskGone": "Deze taak bestaat niet meer."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "{{count}} contacten verwijderen?",
         "bulkDeleteConfirm_one": "{{count}} contact verwijderen?",
         "bulkDeletedToast": "{{count}} contacten verwijderd",
-        "errorContactGone": "Dit contact bestaat niet meer."
+        "errorContactGone": "Dit contact bestaat niet meer.",
+        "errorSelectedCategoryGone": "De gekozen categorie bestaat niet meer."
     },
     "budget": {
         "title": "Budget",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Deze termijn bestaat niet meer.",
         "errorSelectedLocationGone": "De gekozen locatie bestaat niet meer.",
         "errorBookingGone": "Deze boeking bestaat niet meer.",
-        "errorBookingAlreadyLinked": "Deze boeking is al gekoppeld."
+        "errorBookingAlreadyLinked": "Deze boeking is al gekoppeld.",
+        "errorLocationExists": "Deze locatie bestaat hier al. Kies een andere naam.",
+        "errorLocationGone": "Deze locatie bestaat niet meer.",
+        "errorCategoryGone": "Deze categorie bestaat niet meer."
     },
     "documentAttach": {
         "label": "Bijlagen",

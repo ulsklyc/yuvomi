@@ -21765,6 +21765,7 @@ const ERROR_MESSAGE_CLEAN = [
   'pages/notes.js',
   'pages/contacts.js',
   'pages/birthdays.js',
+  'pages/tasks.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

@@ -629,7 +629,8 @@
         "kanbanColExpand": "Vis kolonne",
         "kanbanArchiveDone": "Arkiver alle fullførte",
         "kanbanArchiveDoneConfirm": "Arkivere alle fullførte oppgaver i denne kolonnen?",
-        "kanbanArchiveDoneAction": "Arkiver"
+        "kanbanArchiveDoneAction": "Arkiver",
+        "errorTaskGone": "Denne oppgaven finnes ikke lenger."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Slett {{count}} kontakter?",
         "bulkDeleteConfirm_one": "Slett {{count}} kontakt?",
         "bulkDeletedToast": "{{count}} kontakter slettet",
-        "errorContactGone": "Denne kontakten finnes ikke lenger."
+        "errorContactGone": "Denne kontakten finnes ikke lenger.",
+        "errorSelectedCategoryGone": "Den valgte kategorien finnes ikke lenger."
     },
     "budget": {
         "title": "Budsjett",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Denne datoen finnes ikke lenger.",
         "errorSelectedLocationGone": "Det valgte stedet finnes ikke lenger.",
         "errorBookingGone": "Denne bestillingen finnes ikke lenger.",
-        "errorBookingAlreadyLinked": "Denne bestillingen er allerede koblet."
+        "errorBookingAlreadyLinked": "Denne bestillingen er allerede koblet.",
+        "errorLocationExists": "Denne lokasjonen finnes allerede her. Velg et annet navn.",
+        "errorLocationGone": "Denne lokasjonen finnes ikke lenger.",
+        "errorCategoryGone": "Denne kategorien finnes ikke lenger."
     },
     "documentAttach": {
         "label": "Vedlegg",

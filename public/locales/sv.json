@@ -629,7 +629,8 @@
         "kanbanColExpand": "Fäll ut kolumnen",
         "kanbanArchiveDone": "Arkivera allt klart",
         "kanbanArchiveDoneConfirm": "Arkivera alla klara uppgifter i den här kolumnen?",
-        "kanbanArchiveDoneAction": "Arkivera"
+        "kanbanArchiveDoneAction": "Arkivera",
+        "errorTaskGone": "Den här uppgiften finns inte längre."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Radera {{count}} kontakter?",
         "bulkDeleteConfirm_one": "Radera {{count}} kontakt?",
         "bulkDeletedToast": "{{count}} kontakter raderade",
-        "errorContactGone": "Den här kontakten finns inte längre."
+        "errorContactGone": "Den här kontakten finns inte längre.",
+        "errorSelectedCategoryGone": "Den valda kategorin finns inte längre."
     },
     "budget": {
         "title": "Budget",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Det här datumet finns inte längre.",
         "errorSelectedLocationGone": "Den valda platsen finns inte längre.",
         "errorBookingGone": "Den här transaktionen finns inte längre.",
-        "errorBookingAlreadyLinked": "Den här transaktionen är redan kopplad."
+        "errorBookingAlreadyLinked": "Den här transaktionen är redan kopplad.",
+        "errorLocationExists": "Den här platsen finns redan här. Välj ett annat namn.",
+        "errorLocationGone": "Den här platsen finns inte längre.",
+        "errorCategoryGone": "Den här kategorin finns inte längre."
     },
     "documentAttach": {
         "label": "Bilagor",

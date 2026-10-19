@@ -629,7 +629,8 @@
         "kanbanColExpand": "Sütunu genişlet",
         "kanbanArchiveDone": "Tamamlananların hepsini arşivle",
         "kanbanArchiveDoneConfirm": "Bu sütundaki tüm tamamlanan görevler arşivlensin mi?",
-        "kanbanArchiveDoneAction": "Arşivle"
+        "kanbanArchiveDoneAction": "Arşivle",
+        "errorTaskGone": "Bu görev artık yok."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "{{count}} kişi silinsin mi?",
         "bulkDeleteConfirm_one": "{{count}} kişi silinsin mi?",
         "bulkDeletedToast": "{{count}} kişi silindi",
-        "errorContactGone": "Bu kişi artık yok."
+        "errorContactGone": "Bu kişi artık yok.",
+        "errorSelectedCategoryGone": "Seçilen kategori artık mevcut değil."
     },
     "budget": {
         "title": "Bütçe",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Bu tarih artık yok.",
         "errorSelectedLocationGone": "Seçilen konum artık mevcut değil.",
         "errorBookingGone": "Bu işlem artık yok.",
-        "errorBookingAlreadyLinked": "Bu işlem zaten bağlı."
+        "errorBookingAlreadyLinked": "Bu işlem zaten bağlı.",
+        "errorLocationExists": "Bu konum burada zaten var. Başka bir ad seçin.",
+        "errorLocationGone": "Bu konum artık yok.",
+        "errorCategoryGone": "Bu kategori artık yok."
     },
     "documentAttach": {
         "label": "Ekler",

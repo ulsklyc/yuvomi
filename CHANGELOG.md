@@ -91,6 +91,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `notes_selected_category_not_found`, `category_exists`, `contacts_contact_not_found`,
   `birthdays_birthday_not_found`), the German texts of those answers are now English, and the
   status codes are unchanged.
+- **Tasks, inventory locations and categories, contact form: an error message is in your language**
+  (#1909). The tasks page showed the server's or the browser's own text when ticking off, moving,
+  archiving, sorting, tagging, saving or deleting a task failed, for example "Task not found." in a
+  German session. It now says the sentence of the app; a task that somebody else deleted or made
+  private in the meantime is named as such, the list is reloaded, an open edit form for it closes,
+  and deleting a task that is already gone counts as done, also when you delete several at once.
+  The managers for inventory locations and categories now say "this location already exists here"
+  and "this location (or category) no longer exists" in your language instead of the server's
+  English text, and deleting one somebody else already removed counts as done. In the contact form,
+  a chosen category that was deleted in the meantime keeps the form open with your input and offers
+  the current categories. For API clients: those answers carry a `reason` next to `error`
+  (`tasks_task_not_found`, `inventory_location_exists`, `inventory_location_not_found`,
+  `inventory_category_not_found`, `category_exists` for inventory categories,
+  `contacts_selected_category_not_found`), and the status codes are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

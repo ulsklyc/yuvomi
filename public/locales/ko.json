@@ -645,7 +645,8 @@
         "kanbanColExpand": "열 펼치기",
         "kanbanArchiveDone": "완료된 항목 모두 보관",
         "kanbanArchiveDoneConfirm": "이 열의 완료된 할 일을 모두 보관할까요?",
-        "kanbanArchiveDoneAction": "보관"
+        "kanbanArchiveDoneAction": "보관",
+        "errorTaskGone": "이 작업은 더 이상 존재하지 않습니다."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}}개 항목이 삭제되었습니다.",
@@ -1379,7 +1380,8 @@
         "bulkDeleteConfirm": "연락처 {{count}}개를 삭제할까요?",
         "bulkDeleteConfirm_one": "연락처 {{count}}개를 삭제할까요?",
         "bulkDeletedToast": "연락처 {{count}}개 삭제됨",
-        "errorContactGone": "이 연락처는 더 이상 없습니다."
+        "errorContactGone": "이 연락처는 더 이상 없습니다.",
+        "errorSelectedCategoryGone": "선택한 카테고리가 더 이상 존재하지 않습니다."
     },
     "budget": {
         "title": "예산",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "이 기한은 더 이상 없습니다.",
         "errorSelectedLocationGone": "선택한 위치가 더 이상 존재하지 않습니다.",
         "errorBookingGone": "이 거래는 더 이상 없습니다.",
-        "errorBookingAlreadyLinked": "이 거래는 이미 연결되어 있습니다."
+        "errorBookingAlreadyLinked": "이 거래는 이미 연결되어 있습니다.",
+        "errorLocationExists": "이 위치는 여기에 이미 있습니다. 다른 이름을 선택하세요.",
+        "errorLocationGone": "이 위치는 더 이상 존재하지 않습니다.",
+        "errorCategoryGone": "이 카테고리는 더 이상 존재하지 않습니다."
     },
     "documentAttach": {
         "label": "첨부",

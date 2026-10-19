@@ -629,7 +629,8 @@
         "kanbanColExpand": "Expandir columna",
         "kanbanArchiveDone": "Archivar todo lo hecho",
         "kanbanArchiveDoneConfirm": "¿Archivar todas las tareas hechas de esta columna?",
-        "kanbanArchiveDoneAction": "Archivar"
+        "kanbanArchiveDoneAction": "Archivar",
+        "errorTaskGone": "Esta tarea ya no existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artículo eliminado.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "¿Eliminar {{count}} contactos?",
         "bulkDeleteConfirm_one": "¿Eliminar {{count}} contacto?",
         "bulkDeletedToast": "{{count}} contactos eliminados",
-        "errorContactGone": "Este contacto ya no existe."
+        "errorContactGone": "Este contacto ya no existe.",
+        "errorSelectedCategoryGone": "La categoría seleccionada ya no existe."
     },
     "budget": {
         "title": "Presupuesto",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Esta fecha ya no existe.",
         "errorSelectedLocationGone": "La ubicación seleccionada ya no existe.",
         "errorBookingGone": "Este movimiento ya no existe.",
-        "errorBookingAlreadyLinked": "Este movimiento ya está vinculado."
+        "errorBookingAlreadyLinked": "Este movimiento ya está vinculado.",
+        "errorLocationExists": "Esta ubicación ya existe aquí. Elige otro nombre.",
+        "errorLocationGone": "Esta ubicación ya no existe.",
+        "errorCategoryGone": "Esta categoría ya no existe."
     },
     "documentAttach": {
         "label": "Adjuntos",

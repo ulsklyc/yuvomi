@@ -629,7 +629,8 @@
         "kanbanColExpand": "Mở rộng cột",
         "kanbanArchiveDone": "Lưu trữ tất cả đã xong",
         "kanbanArchiveDoneConfirm": "Lưu trữ mọi công việc đã xong trong cột này?",
-        "kanbanArchiveDoneAction": "Lưu trữ"
+        "kanbanArchiveDoneAction": "Lưu trữ",
+        "errorTaskGone": "Công việc này không còn tồn tại."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",
@@ -1363,7 +1364,8 @@
         "bulkDeleteConfirm": "Xóa {{count}} liên hệ?",
         "bulkDeleteConfirm_one": "Xóa {{count}} liên hệ?",
         "bulkDeletedToast": "Đã xóa {{count}} liên hệ",
-        "errorContactGone": "Liên hệ này không còn nữa."
+        "errorContactGone": "Liên hệ này không còn nữa.",
+        "errorSelectedCategoryGone": "Danh mục đã chọn không còn tồn tại."
     },
     "budget": {
         "title": "Ngân sách",
@@ -6159,7 +6161,10 @@
         "errorTrackedDateGone": "Thời hạn này không còn nữa.",
         "errorSelectedLocationGone": "Vị trí đã chọn không còn tồn tại.",
         "errorBookingGone": "Giao dịch này không còn nữa.",
-        "errorBookingAlreadyLinked": "Giao dịch này đã được liên kết."
+        "errorBookingAlreadyLinked": "Giao dịch này đã được liên kết.",
+        "errorLocationExists": "Vị trí này đã có ở đây. Hãy chọn tên khác.",
+        "errorLocationGone": "Vị trí này không còn tồn tại.",
+        "errorCategoryGone": "Danh mục này không còn tồn tại."
     },
     "documentAttach": {
         "label": "Tệp đính kèm",

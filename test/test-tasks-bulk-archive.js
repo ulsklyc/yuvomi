@@ -135,13 +135,16 @@ test('Mehrfachauswahl: uebersprungene gesperrte Aufgaben stehen im Toast', async
 });
 
 test('Mehrfachauswahl: nach einem Fehler wird trotzdem neu geladen', async () => {
-  const calls = recordApi(() => { throw new Error('Too many requests'); });
+  const calls = recordApi(() => {
+    throw Object.assign(new Error('Too many requests'), { status: 429, data: { error: 'Too many requests', code: 429 } });
+  });
   const { click } = fakeContainer();
   select([31, 32]);
 
   await click('archive');
 
-  assert.deepEqual(toasts, [{ msg: 'Too many requests', type: 'danger' }]);
+  // Der Satz der App, nie der Text des Servers (#1909).
+  assert.deepEqual(toasts, [{ msg: 'common.errorRateLimited', type: 'danger' }]);
   assert.ok(calls.some(([m]) => m === 'get'), 'die Liste darf nicht stehen bleiben, was schon abgelegt ist');
 });
 
