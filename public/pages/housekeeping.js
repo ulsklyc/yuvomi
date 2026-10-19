@@ -12,7 +12,7 @@ import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -947,9 +947,12 @@ function openTaskCreateModal(content) {
         // Doppeltipp auf eine Vorlage legte sie zweimal an.
         if (busy || readOnly()) return;
         busy = true;
+        // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
+        // Anfrage aufgegangen ist (#1997).
+        const modalContext = captureModalContext();
         const ok = await createTask(payload, content);
         busy = false;
-        if (ok) closeModal({ force: true });
+        if (ok) closeModal({ force: true, context: modalContext });
       };
       panel.querySelectorAll('[data-template-index]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -2005,6 +2008,7 @@ function openTaskEditModal(task, content) {
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
+        const modalContext = captureModalContext();
         try {
           await api.patch(`/housekeeping/decay-tasks/${task.id}`, {
             name: fields.name.value.trim(),
@@ -2013,7 +2017,7 @@ function openTaskEditModal(task, content) {
           });
           window.yuvomi?.showToast(t('housekeeping.taskUpdatedToast'), 'success');
           await reloadAfterSave(() => loadData());
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           renderTasks(content);
         } catch (err) {
           window.yuvomi?.showToast(err.message, 'danger');
@@ -2153,6 +2157,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           return;
         }
         let receiptDocumentId = visit.receipt_document_id || null;
+        const modalContext = captureModalContext();
         try {
           // Der zweite Riegel fuer den Beleg: ohne Schreibrecht auf die
           // Dokumente wird nichts hochgeladen, auch wenn ein Feld aus einem
@@ -2199,7 +2204,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           await reloadAfterSave(() => loadData());
           state.staffLogMonth = dateValue.slice(0, 7);
           await reloadAfterSave(() => loadStaffVisits());
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           (onDone || renderStaff)(content);
         } catch (err) {
           window.yuvomi?.showToast(err.message, 'danger');
@@ -2410,6 +2415,7 @@ function openStaffModal(worker, content, options = {}) {
           rateField?.focus();
           return;
         }
+        const modalContext = captureModalContext();
         try {
           await api.post('/housekeeping/worker', {
             id: fields.id.value || null,
@@ -2431,7 +2437,7 @@ function openStaffModal(worker, content, options = {}) {
           await auth.me().catch(() => {});
           window.yuvomi?.showToast(t('housekeeping.workerSavedToast'), 'success');
           await reloadAfterSave(() => loadData());
-          closeModal({ force: true });
+          closeModal({ force: true, context: modalContext });
           if (typeof options.afterSave === 'function') options.afterSave();
           else renderStaff(content);
         } catch (err) {

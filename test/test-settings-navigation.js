@@ -4446,3 +4446,88 @@ test('R19: das Kuechenblatt spricht den Zeilen-Dialekt der Einstellungen', async
   assert.doesNotMatch(meals, /class="settings-card"|class="form-field"|class="form-label"/, 'keine Karte und kein gestapeltes Feld mehr');
   assert.match(meals, /settings-group__footer">\$\{t\('settings\.mealTypesHint'\)\}/, 'der Hinweis als Gruppenfuss');
 });
+
+// -------------------------------------------------------------------------
+// #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog
+// -------------------------------------------------------------------------
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: beide Dialoge der Rezeptquellen reichen den
+// Kontext von VOR der Anfrage hinein. Gefahren wird je Weg der echte
+// Submit-Handler an einem Attrappen-Panel; die Anfrage wechselt den Kontext.
+test('#1997: Rezeptquellen - Konto anlegen und Link aendern schliessen nur mit dem Kontext von VOR der Anfrage', async () => {
+  const { __test: kitchen } = await import('../public/settings/pages/modules-kitchen.js');
+  const { recipeProviders } = await import('/api.js');
+  const vorher = { createAccount: recipeProviders.createAccount, updateAccount: recipeProviders.updateAccount, window: globalThis.window };
+  const toasts = [];
+  globalThis.window = { ...(vorher.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+
+  /** Oeffnet den Dialog ueber den Modal-Stub; liefert den Submit von `formSel`. */
+  const dialog = async (oeffne, formSel, werte) => {
+    let opts = null;
+    globalThis.__openModal = (o) => { opts = o; };
+    try { await oeffne(); } finally { delete globalThis.__openModal; }
+    assert.ok(opts, 'der Dialog wurde geoeffnet');
+    const handlers = {};
+    const els = {};
+    const el = (sel) => {
+      els[sel] ??= {
+        value: '', hidden: false, textContent: '',
+        addEventListener(type, fn) { handlers[`${sel}:${type}`] = fn; },
+        ...werte[sel],
+      };
+      return els[sel];
+    };
+    opts.onSave({ querySelector: el, querySelectorAll: () => [], addEventListener() {} });
+    return () => handlers[`${formSel}:submit`]({ preventDefault() {} });
+  };
+  const klicks = {};
+  const container = {
+    querySelector: (sel) => (sel === '#recipe-provider-add-account-btn'
+      ? { addEventListener(type, fn) { klicks[type] = fn; } }
+      : null),
+    querySelectorAll: () => [],
+  };
+  const WEGE = [
+    ['Konto anlegen', () => dialog(() => { kitchen.bindProviderAddButton(container); klicks.click(); }, '#recipe-provider-add-form', {
+      '#recipe-provider-select': { value: 'mealie' }, '#recipe-provider-name': { value: 'Kueche' },
+      '#recipe-provider-url': { value: 'https://mealie.example' }, '#recipe-provider-external-url': { value: '' },
+      '#recipe-provider-token': { value: 'test-token' },
+    })],
+    ['Link aendern', () => dialog(() => kitchen.openProviderLinkModal({ id: 4, provider: 'mealie', externalUrl: '' }, async () => {}),
+      '#recipe-provider-link-form', { '#recipe-provider-link-external-url': { value: 'https://cook.example' } })],
+  ];
+  try {
+    for (const [name, vorbereiten] of WEGE) {
+      const ausloesen = await vorbereiten();
+      toasts.length = 0;
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      const geschrieben = [];
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__closeModal = (opts) => { geschlossen.push(opts); };
+      const schreibe = (verb) => async () => { geschrieben.push(verb); kontext = 'ein-anderer-dialog'; return { data: {} }; };
+      recipeProviders.createAccount = schreibe('createAccount');
+      recipeProviders.updateAccount = schreibe('updateAccount');
+      try {
+        await ausloesen();
+        assert.equal(geschrieben.length, 1, `${name}: der Weg schreibt`);
+        assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+        assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+        assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+        assert.equal(geschlossen[0].context, 'eigener-dialog',
+          `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      } finally {
+        delete globalThis.__modalContextId;
+        delete globalThis.__closeModal;
+      }
+    }
+  } finally {
+    recipeProviders.createAccount = vorher.createAccount;
+    recipeProviders.updateAccount = vorher.updateAccount;
+    globalThis.window = vorher.window;
+  }
+});

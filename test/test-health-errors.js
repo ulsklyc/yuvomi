@@ -242,6 +242,11 @@ async function dialog(oeffne, werte = {}) {
       assert.equal(typeof fn, 'function', `${selector} hat einen Submit-Handler`);
       return fn({ preventDefault() {} });
     },
+    klicken: (selector) => {
+      const fn = handlers.get(`${selector}:click`);
+      assert.equal(typeof fn, 'function', `${selector} hat einen Klick-Handler`);
+      return fn({ preventDefault() {}, currentTarget: element(selector) });
+    },
   };
 }
 
@@ -551,5 +556,52 @@ test('Seite: Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem 
   } finally {
     page.setViewStateForTest('meds', { list: [], logsByMed: {} });
     page.setViewStateForTest('prevention', { types: [], records: [] });
+  }
+});
+
+// #1997, Einstellungen: dieselbe Regel fuer das Register der Vorsorgearten.
+// Das Loeschen fragt vorher ueber confirmOverModal nach, die den Dialog parkt:
+// der Kontext wird VOR der Rueckfrage festgehalten, sonst gehoerte er ihr.
+test('Einstellungen: Erfolg nach Dialogwechsel - Vorsorgeart anlegen, aendern, loeschen schliessen nur mit dem Kontext von VOR Rueckfrage und Anfrage (#1997)', async () => {
+  const FELDER = {
+    '#hpt-name': { value: 'Tetanus' }, '#hpt-kind': { value: 'vaccination' }, '#hpt-interval': { value: '' },
+    '#hpt-interval-unit': { value: 'months' }, '#hpt-icon': { value: 'syringe' },
+  };
+  const ART = { id: 12, name: 'Tetanus', kind: 'vaccination', icon: 'syringe' };
+  // Die Seite einmal an einen Attrappen-Container haengen: das Loeschen laedt
+  // danach die Liste neu und zeichnet dorthin.
+  const healthSettings = await import('../public/settings/pages/modules-health.js');
+  globalThis.__apiStub = { get: async () => ({ data: [] }) };
+  try {
+    await healthSettings.render({ replaceChildren() {}, insertAdjacentHTML() {}, querySelector: () => null, querySelectorAll: () => [] });
+  } finally {
+    delete globalThis.__apiStub;
+  }
+  const wege = [
+    ['Vorsorgeart anlegen', false, async () => (await dialog(() => settings.openTypeModal(null), FELDER)).absenden('#health-prevention-type-form')],
+    ['Vorsorgeart aendern', false, async () => (await dialog(() => settings.openTypeModal(ART), FELDER)).absenden('#health-prevention-type-form')],
+    ['Vorsorgeart loeschen (mit Rueckfrage)', true, async () => (await dialog(() => settings.openTypeModal(ART), FELDER)).klicken('[data-action="delete"]')],
+  ];
+  for (const [name, mitRueckfrage, lauf] of wege) {
+    let kontext = 'eigener-dialog';
+    let gefragt = 0;
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__confirmOverModal = async () => { gefragt += 1; kontext = 'die-rueckfrage'; return true; };
+    const wechsel = (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
+    try {
+      const { closed, calls } = await mit({
+        post: () => wechsel({ data: { id: 13 } }), patch: () => wechsel({ data: {} }), delete: () => wechsel({}),
+      }, lauf);
+      assert.equal(gefragt, mitRueckfrage ? 1 : 0, `${name}: die Rueckfrage kam ${gefragt}-mal`);
+      assert.ok(calls.some(([verb]) => verb !== 'GET'), `${name}: der Weg schreibt`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+      assert.equal(closed.length, 1, `${name}: genau ein Schliessen`);
+      assert.equal(closed[0].force, true, `${name}: force wie bisher`);
+      assert.equal(closed[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird mit ${JSON.stringify(closed[0].context)} statt mit dem Kontext von vor Rueckfrage und Anfrage`);
+    } finally {
+      delete globalThis.__modalContextId;
+      delete globalThis.__confirmOverModal;
+    }
   }
 });

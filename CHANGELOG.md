@@ -68,6 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the pantry and taking ingredients from the meal plan, and for the reload after something was deleted
   elsewhere. If you had closed the dialog and opened another one before the answer arrived, the other
   one stays open with what you typed in it.
+- **Saving in a Schedule, budget plan or family settings dialog no longer closes a dialog you opened
+  in the meantime (#1997).** In Schedule, adding and editing shift types, patterns, exceptions and
+  extra shifts and saving a custom field now close only the dialog the save came from, also after
+  the overlap or range question. The same holds for setting and removing a budget plan, adding and
+  editing a household member, the prevention types in the Health settings and the recipe provider
+  accounts in the Kitchen settings. If you had closed the dialog and opened another one before the
+  answer arrived, the other one stays open with what you typed in it.
 - **Inventory, notes, contacts and birthdays: an error message is in your language and names the
   cause** (#1909). These pages showed the server's own text when something could not be saved,
   pinned, completed or deleted, whatever the app language, in English or in German - for example
@@ -91,6 +98,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `notes_selected_category_not_found`, `category_exists`, `contacts_contact_not_found`,
   `birthdays_birthday_not_found`), the German texts of those answers are now English, and the
   status codes are unchanged.
+- **Saving in a Budget or Housekeeping dialog no longer closes a dialog you opened in the meantime (#1997).**
+  In Budget, entries, loans, accounts (save and archive) and confirming a planned entry now close only
+  the dialog the save came from. In Housekeeping, the same holds for adding and editing a task,
+  editing a visit and saving a staff member. If you had closed the dialog and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
 - **Tasks, inventory locations and categories, contact form: an error message is in your language**
   (#1909). The tasks page showed the server's or the browser's own text when ticking off, moving,
   archiving, sorting, tagging, saving or deleting a task failed, for example "Task not found." in a
