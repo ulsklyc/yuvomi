@@ -49,6 +49,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Budget category bars are one color again, and their stripes stand at 45 degrees (#2084).**
+  Every expense bar in the Overview and in Statistics started with a short stroke in the module
+  color instead of the category color, which was most visible on short bars. The two striped
+  categories (the sixth and seventh color, striped so they stay apart with color vision
+  deficiencies) showed their stripes almost upright on short bars instead of diagonal, which read
+  as a rendering error. Both now follow the category: the stroke takes its color, and the stripes
+  keep their angle at any bar length.
+- **Saving in a Health dialog no longer closes a dialog you opened in the meantime (#1997).**
+  Measurements, medications and dose entries, lab reports, activities, prevention records,
+  nutrition entries and targets, periods, cycle days, the cycle history import and the cycle
+  settings now close only the dialog the save came from. If you had closed it and opened another one
+  before the answer arrived, the other one stays open with what you typed in it.
 - **Saving in a Waste or Shopping dialog no longer closes a dialog you opened in the meantime (#1997).**
   In Waste, waste types, collection schedules, one-off pickups, moved pickups, sources, the calendar
   import, mapping profiles and reminder settings now close only the dialog the save or delete came
