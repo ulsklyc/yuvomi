@@ -144,6 +144,7 @@ test('derselbe Schlüssel mit anderer Nutzlast ist ein Konflikt', async () => {
 
   assert.equal(clash.status, 409);
   assert.match(clash.body.error, /different request/i);
+  assert.equal(clash.body.reason, 'idempotency_key_reused');
   assert.equal(countTasks('Zweite'), 0, 'die abweichende Anfrage darf nicht durchlaufen');
 });
 
@@ -246,6 +247,7 @@ test('ein laufender Vorgang weist die Wiederholung ab', async () => {
   const r = await call('POST', '/tasks/', { as: { id: ALICE, role: 'admin' }, body, key });
   assert.equal(r.status, 409);
   assert.match(r.body.error, /in progress/i);
+  assert.equal(r.body.reason, 'idempotency_in_progress');
   assert.equal(countTasks('Parallel'), 0);
 });
 

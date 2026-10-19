@@ -45,6 +45,7 @@ import {
   pantryFilterFromSearch,
   pantryItemStatus,
 } from '/utils/pantry-status.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 let _container = null;
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
@@ -1568,7 +1569,7 @@ async function saveItem(panel, mode, item) {
     // location_name/location_icon kommen aus dem JOIN der Liste, nicht aus der
     // Einzel-Antwort - deshalb nach dem Speichern einmal frisch laden, damit
     // Gruppierung und Meta-Zeile stimmen.
-    await loadPantry();
+    await reloadAfterSave(() => loadPantry());
     closeSharedModal({ force: true });
     renderFilters();
     renderList({ motion: true });

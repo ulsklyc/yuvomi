@@ -11,6 +11,7 @@ import { fastingHelpHtml } from '/components/fasting-help.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 export function fastingError(error) {
   if (error?.message === 'FASTING_OFFLINE') return t('health.fasting.offline');
@@ -200,7 +201,7 @@ export async function finishFasting(row, refresh, isCurrent = () => true) {
         requireFastingWrite();
         await api.patch(`/health/fasting/${data.id}`, { end_at: null, expected_revision: data.revision });
         if (isModalContextCurrent({ ...context, pageRoot: null })) await closeModal({ force: true });
-        await refresh(); refocusAfterRender();
+        await reloadAfterSave(() => refresh()); refocusAfterRender();
       } catch (error) { window.yuvomi?.showToast(fastingError(error), 'danger'); }
     },
   });
@@ -313,7 +314,7 @@ export function openFastingEditor(row, refresh, finished = false) {
           if (creating) await api.post('/health/fasting', { ...payload, acknowledge_safety: row.acknowledge_safety });
           else await api.patch(`/health/fasting/${row.id}`, payload);
           if (panel.isConnected && isModalContextCurrent({ ...context, pageRoot: null })) {
-            await closeModal({ force: true }); await refresh(); refocusAfterRender();
+            await closeModal({ force: true }); await reloadAfterSave(() => refresh()); refocusAfterRender();
           }
         } catch (error) { form.querySelector('[data-fasting-edit-error]').textContent = fastingError(error); }
         finally { saving = false; submit.disabled = false; }

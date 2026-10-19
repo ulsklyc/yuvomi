@@ -13,6 +13,7 @@ import { openModal, closeModal, confirmOverModal, refocusAfterRender } from '/co
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 const KINDS = ['vaccination', 'checkup'];
 const MAX_INTERVAL_MONTHS = 600;
@@ -239,7 +240,7 @@ function openTypeModal(type) {
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('settings.healthPreventionTypeSaved'), 'success');
-          await reload();
+          await reloadAfterSave(() => reload());
           refocusAfterRender();
         } catch (err) {
           submitBtn.disabled = false;

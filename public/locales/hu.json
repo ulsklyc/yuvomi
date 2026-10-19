@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Semmi sem felel meg a keresésnek.",
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
         "searchReset": "Keresés visszaállítása",
-        "passwordMinLength": "Legalább 8 karakter."
+        "passwordMinLength": "Legalább 8 karakter.",
+        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "Rögzíted az adagot a minimális időköz letelte előtt?",
                 "earlyDetail": "A következő adag csak {{time}} után esedékes ({{remaining}}).",
                 "earlyConfirmAction": "Rögzítés mégis"
-            },
-            "stockUpdateFailed": "Az adag rögzítve, de a készletet nem sikerült frissíteni."
+            }
         },
         "prevention": {
             "title": "Megelőzés és védőoltások",

@@ -16,6 +16,7 @@ import {
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
 } from './dialog-grammar.js';
 import { lateModalCloses } from './late-modal-close.js';
+import { reloadsAfterWrite } from './reload-after-write.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
 
@@ -364,6 +365,104 @@ test('der Spaet-Schliessen-Scanner erkennt das Muster, das er zaehlt', () => {
   assert.deepEqual(zaehle('async function s() { if (x) return; await closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('function s() { const f = async () => { await api.put(1); }; closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('async function s() { await api.put(1); // closeModal({ force: true })\n}'), []);
+});
+
+// #2069: ist das Schreiben angekommen, gilt der Eintrag als gespeichert. Ein
+// Nachladen, das im selben try wie das Schreiben wartet, macht aus einem
+// Netzwackler beim Nachladen ein "nicht gespeichert" - der Dialog bleibt offen,
+// und das zweite Speichern legt den Eintrag doppelt an. Das Nachladen laeuft
+// deshalb ueber reloadAfterSave() (utils/reload-after-save.js), das seinen
+// Fehler selbst faengt und als Aktualisierungsproblem meldet. Scanner und
+// Grenzen: reload-after-write.js.
+//
+// Eine Ausnahme braucht hier einen Eintrag `'datei:Aufruf': 'Grund'`, und der
+// Grund muss sagen, warum das Nachladen dort nie im catch des Speicherns landet.
+const RELOAD_AFTER_WRITE_ERLAUBT = {
+  'pages/health.js:reloadVitalsAfterSave':
+    'faengt den Fehler von loadVitals() selbst und zeichnet den Ladefehler in die Vitalwerte-Flaeche; es wirft nie',
+};
+
+test('kein Nachladen im selben try wie das Speichern, dessen catch einen Fehler meldet (#2069)', () => {
+  const offen = [];
+  for (const path of walkJsFiles('../public/')) {
+    if (path.includes('/vendor/') || path.endsWith('/utils/reload-after-save.js')) continue;
+    const file = path.slice('../public/'.length);
+    for (const hit of reloadsAfterWrite(read(path))) {
+      if (RELOAD_AFTER_WRITE_ERLAUBT[`${file}:${hit.call}`]) continue;
+      offen.push(`${file}:${hit.line} ${hit.call}`);
+    }
+  }
+  assert.deepEqual(offen, [],
+    'Nachladen nach dem Schreiben im selben try - ein Fehler dort gaelte als "nicht gespeichert", '
+    + 'und ein zweites Speichern legte doppelt an. Als `await reloadAfterSave(() => ...)` schreiben:\n  '
+    + offen.join('\n  '));
+  for (const key of Object.keys(RELOAD_AFTER_WRITE_ERLAUBT)) {
+    assert.ok(String(RELOAD_AFTER_WRITE_ERLAUBT[key]).trim().length > 20, `${key}: die Ausnahme braucht einen Grund`);
+  }
+});
+
+test('eine Dosis bucht ihren Bestandsabzug in derselben Anfrage, nicht als zweites PATCH (#2069)', () => {
+  // Zwei Anfragen fuer eine Aktion: scheiterte das PATCH stock_qty, stand die
+  // Dosis gebucht und der Bestand nicht gezaehlt. Der Server bucht beides in
+  // einer Transaktion (routes/health/medications.js, stock_deduct).
+  const src = withoutCommentsKeepingLines(read('../public/pages/health.js'));
+  assert.doesNotMatch(src, /api\.patch\([^)]*\{\s*stock_qty\s*:\s*next/, 'kein selbst gerechneter Rest per PATCH nach einer Dosis');
+  // Bedarfsdosis und der gemeinsame Weg der geplanten Dosis schicken den Abzug mit.
+  assert.equal((src.match(/stock_deduct\s*:\s*dose/g) ?? []).length, 2, 'Bedarfsdosis + sendScheduledDose schicken stock_deduct');
+});
+
+test('jede Dosis-Buchung traegt einen Idempotency-Key, den ein Wiederholversuch behaelt (#2069)', () => {
+  // Seit die Dosis den Bestand in derselben Anfrage abzieht, kostet eine
+  // verlorene Antwort mit erneutem Tipp nicht nur einen doppelten Log, sondern
+  // einen doppelten Abzug. Der Schluessel laesst die Idempotenz-Middleware die
+  // erste Antwort wiedergeben (Regeln: utils/health-meds.js createDoseAttempts).
+  const src = withoutCommentsKeepingLines(read('../public/pages/health.js'));
+  const fn = (name) => {
+    const at = src.search(new RegExp(`(?:async )?function ${name}\\(`));
+    assert.ok(at >= 0, `${name}() fehlt`);
+    return src.slice(at, src.indexOf('\n}\n', at));
+  };
+  assert.match(fn('postDose'), /api\.post\(path, body, \{ headers: \{ 'Idempotency-Key': key \} \}\)/);
+  assert.match(fn('postDose'), /doseAttempts\.attempt\(actionKey, buildBody, medId\)/);
+  // Kein Dosis-Endpunkt wird an postDose vorbei angesprochen.
+  assert.doesNotMatch(src, /api\.post\(`\/health\/medications\/\$\{medId\}\/logs`/, 'Dosis-Log nur ueber postDose()');
+  assert.doesNotMatch(src, /api\.post\(`\/health\/logs\/\$\{logId\}/, 'take/skip nur ueber postDose()');
+  // Alle drei Wege: Bedarfsdosis direkt, Medikamente-Tab und Uebersicht ueber sendScheduledDose.
+  assert.match(src, /postDose\(`prn:\$\{medId\}`/);
+  assert.match(fn('handleDose'), /await sendScheduledDose\(/);
+  assert.match(fn('handleOverviewDose'), /await sendScheduledDose\(/);
+  assert.equal((fn('sendScheduledDose').match(/return postDose\(/g) ?? []).length, 2);
+  // Der offene Versuch gilt nur bis zum naechsten Stand (Codex an #2073): beide
+  // Ladewege der Dosis-Daten merken ihren Start und klaeren danach die Versuche
+  // ihrer Medikamente - sonst spielte eine spaetere Bedarfsdosis die alte Antwort ab.
+  for (const loader of ['loadMeds', 'loadOverview']) {
+    const body = fn(loader);
+    assert.match(body, /^async function \w+\(\) \{\n\s*const startedAt = Date\.now\(\);/, `${loader}: Start vor dem ersten Abruf`);
+    assert.match(body, /doseAttempts\.confirmedBy\(startedAt, \w+\.(?:list|meds)\.map\(\(m\) => m\.id\)\);\s*$/, `${loader}: klaert am Ende`);
+  }
+});
+
+test('der Nachlade-Scanner erkennt das Muster, das er meldet (#2069)', () => {
+  const calls = (src) => reloadsAfterWrite(src).map((hit) => hit.call);
+  const toast = 'window.yuvomi.showToast(err.message, "danger");';
+  // Gemeldet: Schreiben, dann Nachladen im selben try, catch meldet.
+  assert.deepEqual(calls(`async function s() { try { const r = await api.post('/p', b); await loadPantry(); close(); } catch (err) { ${toast} } }`), ['loadPantry']);
+  assert.deepEqual(calls(`async function s() { try { await api.put(\`/x/\${id}\`, b); if (await reload(o, { owner })) f(); } catch (err) { showError(err); } }`), ['reload']);
+  assert.deepEqual(calls(`async function s() { try { if (a) { await api.patch('/x', b); } await Promise.all([loadA(), loadB()]); } catch (err) { ${toast} } }`), ['Promise.all(loadA)']);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); await this.refreshList(); } catch (err) { ${toast} } }`), ['this.refreshList']);
+  // Nicht gemeldet: ueber den Helfer, Nachladen VOR dem Schreiben, nur in einer
+  // verschachtelten Funktion, in einem eigenen try oder im Fehlerpfad eines
+  // verschachtelten catch, leerer catch, try ohne catch, ein Kommentar.
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); await reloadAfterSave(() => loadPantry()); } catch (err) { ${toast} } }`), []);
+  assert.deepEqual(calls(`async function s() { try { await loadPantry(); await api.post('/x', b); } catch (err) { ${toast} } }`), []);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); later(async () => { await loadPantry(); }); } catch (err) { ${toast} } }`), []);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); try { await loadPantry(); } catch {} } catch (err) { ${toast} } }`), []);
+  assert.deepEqual(calls(`async function s() { try { try { await api.delete('/x'); await api.post('/y'); } catch (e) { await loadPantry(); return; } } catch (err) { ${toast} } }`), []);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); await loadPantry(); } catch {} }`), []);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); await loadPantry(); } finally { done(); } }`), []);
+  assert.deepEqual(calls(`async function s() { try { await api.post('/x', b); // await loadPantry();\n } catch (err) { ${toast} } }`), []);
+  // Lesen ist kein Schreiben: ein GET davor macht das Nachladen nicht verdaechtig.
+  assert.deepEqual(calls(`async function s() { try { await api.get('/x'); await loadPantry(); } catch (err) { ${toast} } }`), []);
 });
 
 test('kein __test-Export listet denselben Namen zweimal', () => {

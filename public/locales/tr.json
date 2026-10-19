@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Aramanızla eşleşen bir şey yok.",
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
         "searchReset": "Aramayı sıfırla",
-        "passwordMinLength": "En az 8 karakter."
+        "passwordMinLength": "En az 8 karakter.",
+        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "Doz, en kısa aralık dolmadan kaydedilsin mi?",
                 "earlyDetail": "Sonraki doz ancak {{time}} itibarıyla öngörülüyor ({{remaining}}).",
                 "earlyConfirmAction": "Yine de kaydet"
-            },
-            "stockUpdateFailed": "Doz kaydedildi, ancak stok güncellenemedi."
+            }
         },
         "prevention": {
             "title": "Önleyici bakım ve aşılar",

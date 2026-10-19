@@ -31,6 +31,7 @@ import { redrawList } from '/utils/list-motion.js';
 import { daysBetweenDateKeys, countdownPhrase } from '/utils/countdown.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 const UPCOMING_WINDOW_DAYS = 90;
 const WEEKDAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -685,7 +686,7 @@ async function createPresetType(key, button) {
   if (button) button.disabled = true;
   try {
     await api.post('/waste/types', { name: presetLabel(preset), icon: preset.icon, color: preset.color });
-    await reloadAndRender();
+    await reloadAfterSave(() => reloadAndRender());
     window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
   } catch (err) {
     if (button) button.disabled = false;
@@ -990,7 +991,7 @@ async function moveType(id, direction) {
   try {
     await api.put(`/waste/types/${a.id}`, { sort_order: b.sort_order });
     await api.put(`/waste/types/${b.id}`, { sort_order: a.sort_order });
-    await reloadAndRender();
+    await reloadAfterSave(() => reloadAndRender());
   } catch (err) {
     reportError(err);
   }
@@ -1236,7 +1237,7 @@ function openTypeModal(type = null) {
         try {
           await api.put(`/waste/types/${type.id}`, { archived: !type.archived });
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(type.archived ? t('waste.typeRestoredToast') : t('waste.typeArchivedToast'), 'success');
         } catch (err) {
@@ -1273,7 +1274,7 @@ function openTypeModal(type = null) {
           if (isEdit) await api.put(`/waste/types/${type.id}`, body);
           else await api.post('/waste/types', body);
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
         } catch (err) {
@@ -1528,7 +1529,7 @@ function openScheduleModal(type, schedule = null) {
           if (isEdit) await api.put(`/waste/schedules/${schedule.id}`, body);
           else await api.post('/waste/schedules', body);
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
@@ -1610,7 +1611,7 @@ function openPickupModal(pickup = null) {
           if (isEdit) await api.put(`/waste/pickups/${pickup.id}`, body);
           else await api.post('/waste/pickups', body);
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.pickupSavedToast'), 'success');
         } catch (err) {
@@ -1876,7 +1877,7 @@ function openImportWizard(source = null) {
           const endpoint = isReimport ? `/waste/sources/${source.id}/reimport/commit` : '/waste/import/commit';
           const res = await api.post(endpoint, body);
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           const { added, changed, removed } = res.data.diff;
           window.yuvomi?.showToast(t('waste.importCommittedToast', { added, changed, removed }), 'success');
@@ -2001,7 +2002,7 @@ function openMappingProfileImportModal(source) {
               profile, profile_digest: preview.profile_digest,
             });
             closeModal({ force: true });
-            await loadSourceAndOpen(source.id);
+            await reloadAfterSave(() => loadSourceAndOpen(source.id));
             refocusAfterRender();
             window.yuvomi?.showToast(t('waste.mappingProfileAppliedToast'), 'success');
           } catch (err) {
@@ -2099,7 +2100,7 @@ function openSourceModal(source) {
             await api.put(`/waste/sources/${source.id}/mappings/${mappingId}`, { type_id: typeId, ignored });
           }
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.sourceSavedToast'), 'success');
         } catch (err) {
@@ -2186,7 +2187,7 @@ async function loadSourceAndOpen(id) {
 async function triggerManualRefresh(id) {
   try {
     const res = await api.post(`/waste/sources/${id}/refresh`, {});
-    await reloadAndRender();
+    await reloadAfterSave(() => reloadAndRender());
     if (res.data.outcome === 'committed') {
       const { added, changed, removed } = res.data.diff;
       window.yuvomi?.showToast(t('waste.importCommittedToast', { added, changed, removed }), 'success');
@@ -2260,7 +2261,7 @@ function openUrlSourceWizard() {
         try {
           const res = await api.post('/waste/sources', { name, url, refresh_interval_minutes: refreshIntervalMinutes });
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           if (res.data.outcome === 'committed') {
             const { added, changed, removed } = res.data.diff;
@@ -2399,7 +2400,7 @@ async function moveOccurrence(occurrenceKey) {
         try {
           await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: newDate });
           closeModal({ force: true });
-          await reloadAndRender();
+          await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
         } catch (err) {
@@ -2417,7 +2418,7 @@ async function skipOccurrence(occurrenceKey) {
   if (!ok) return;
   try {
     await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: null });
-    await reloadAndRender();
+    await reloadAfterSave(() => reloadAndRender());
     refocusAfterRender();
     window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
   } catch (err) {

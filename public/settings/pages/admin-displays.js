@@ -16,6 +16,7 @@ import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSeen(value) {
   if (!value) return null;
@@ -272,7 +273,7 @@ function bindEvents(container) {
       // demselben Grund nach (admin-permissions.js).
       await auth.me().catch(() => {});
       input.value = '';
-      await reload(container);
+      await reloadAfterSave(() => reload(container));
     } catch (err) {
       showError(errorEl, err.message);
     } finally {
@@ -330,7 +331,7 @@ function bindEvents(container) {
       clearError(errorEl);
       try {
         await api.post(`/displays/${revoke.dataset.displayRevoke}/devices/${revoke.dataset.device}/revoke`, {});
-        await reload(container);
+        await reloadAfterSave(() => reload(container));
         // Der Dialog hat den Fokus gehalten, und `reload()` ersetzt die Liste
         // darunter - ohne das hier landet der Fokus nach dem Schliessen am
         // Dokumentanfang statt an der Stelle, an der gerade gearbeitet wurde.

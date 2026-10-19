@@ -31,6 +31,7 @@ import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { renderPageColumns } from '/utils/page-layout.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 
 
@@ -524,7 +525,7 @@ async function toggleSession(container, workerId) {
       });
       window.yuvomi?.showToast(t('housekeeping.checkedInToast'), 'success');
     }
-    await loadData();
+    await reloadAfterSave(() => loadData());
     // Nur den Tab neu zeichnen, nicht die Schale: ein neuer Kopf verloere den
     // FAB, den der Router einmal nach dem Rendern aus der Seite in die Shell
     // (bzw. am Desktop in den Kopf) gehoben hat - der neu angelegte bliebe im
@@ -791,7 +792,7 @@ async function createTask(payload, content) {
   try {
     await api.post('/housekeeping/decay-tasks', payload);
     window.yuvomi?.showToast(t('housekeeping.taskCreatedToast'), 'success');
-    await loadData();
+    await reloadAfterSave(() => loadData());
     if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
     return true;
   } catch (err) {
@@ -1004,7 +1005,7 @@ async function completeTask(task, content, button = null) {
     await api.post(`/housekeeping/decay-tasks/${task.id}/complete`, {});
     window.yuvomi?.showToast(t('housekeeping.taskDoneToast'), 'success', 5000, () => undoCompleteTask(task.id, previous, content));
     await settled;
-    await loadData();
+    await reloadAfterSave(() => loadData());
     if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
   } catch (err) {
     button?.classList.remove('housekeeping-task__check--done');
@@ -1018,7 +1019,7 @@ async function undoCompleteTask(taskId, previous, content) {
   try {
     await api.patch(`/housekeeping/decay-tasks/${taskId}`, { last_completed: previous });
     window.yuvomi?.showToast(t('housekeeping.taskUndoneToast'), 'success');
-    await loadData();
+    await reloadAfterSave(() => loadData());
     if (content?.isConnected && state.tab === 'tasks') renderTasks(content);
   } catch (err) {
     window.yuvomi?.showToast(err.message, 'danger');
@@ -2011,7 +2012,7 @@ function openTaskEditModal(task, content) {
             frequency_days: frequencyDays,
           });
           window.yuvomi?.showToast(t('housekeeping.taskUpdatedToast'), 'success');
-          await loadData();
+          await reloadAfterSave(() => loadData());
           closeModal({ force: true });
           renderTasks(content);
         } catch (err) {
@@ -2195,9 +2196,9 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             ...visitTextPayload(worker, dateValue, dailyRate ?? visit.daily_rate, extras),
           });
           window.yuvomi?.showToast(t('housekeeping.visitSavedToast'), 'success');
-          await loadData();
+          await reloadAfterSave(() => loadData());
           state.staffLogMonth = dateValue.slice(0, 7);
-          await loadStaffVisits();
+          await reloadAfterSave(() => loadStaffVisits());
           closeModal({ force: true });
           (onDone || renderStaff)(content);
         } catch (err) {
@@ -2429,7 +2430,7 @@ function openStaffModal(worker, content, options = {}) {
           // Eine neue Kraft kann ein Modul mitlesen: `othersCanRead` neu holen.
           await auth.me().catch(() => {});
           window.yuvomi?.showToast(t('housekeeping.workerSavedToast'), 'success');
-          await loadData();
+          await reloadAfterSave(() => loadData());
           closeModal({ force: true });
           if (typeof options.afterSave === 'function') options.afterSave();
           else renderStaff(content);

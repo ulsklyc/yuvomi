@@ -43,6 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provider or not. For such an account the page subtitle no longer mentions a password, and the
   single sign-on card now says to ask an administrator to set one instead of "Set a password first"
   (#1703).
+- **Saving no longer counts as failed when only the refresh afterwards fails.** Many dialogs
+  reloaded their list in the same step as the save. When the save went through but the reload hit
+  a network blip or a busy server, the dialog stayed open with a "could not save" message, and
+  saving again created the entry a second time. Now the dialog closes once the save went through,
+  and a failed refresh says so in its own notice. This covers pantry, budget, inventory, meals,
+  tasks, health, housekeeping, waste, rewards, documents, schedule, calendar and several settings
+  pages.
+- **Logging a dose counts down the stock in the same step.** Taking a planned or as-needed dose
+  used to log it and then update the stock in a second request; when the second one failed, the
+  dose was logged but the stock stayed where it was. The server now does both together, from the
+  stored stock. Tapping the dose again after a dropped connection no longer logs it twice or
+  counts the stock down twice: the app repeats the same request, and the server answers it once.
+  **API:** `POST /api/v1/health/medications/{id}/logs` and `POST /api/v1/health/logs/{id}/take`
+  accept `stock_deduct`. A second `POST .../logs` for the same `schedule_id` and `scheduled_at`
+  updates the existing entry (200) instead of adding another one.
 - **A countdown to an evening event no longer names the next day.** With the server running in UTC
   (the default container) and a household east of UTC, an event at 23:30 counted down to the day
   after; west of UTC, an early-morning event could count down to the day before. The countdown now

@@ -17,6 +17,7 @@ const {
   _setTestDatabase,
 } = await import('../server/db.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
+const { default: idempotencyMiddleware } = await import('../server/middleware/idempotency.js');
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -55,15 +56,18 @@ app.use((req, _res, next) => {
   req.session = { userId: session.userId, role: session.role };
   next();
 });
+// Wie in server/index.js: die Idempotenz-Middleware vor den Routen. Ohne
+// `Idempotency-Key` ist sie folgenlos (#822), mit ihm haelt sie #2069.
+app.use('/api/v1', idempotencyMiddleware);
 app.use('/api/v1/health', healthRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/health`;
 
-async function call(method, path, body) {
+async function call(method, path, body, headers = {}) {
   const res = await fetch(`${base}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -2003,6 +2007,117 @@ test('PRN: eine negative Bedarfsdosis wird abgewiesen', async () => {
   assert.equal(ok.status, 201);
   const patched = await call('PATCH', `/medications/${ok.body.data.id}`, { prn_dose_qty: -1 });
   assert.equal(patched.status, 400);
+});
+
+// --------------------------------------------------------
+// Dosis und Bestandsabzug als EINE Anfrage (#2069)
+//
+// Bis #2069 buchte der Client die Dosis und schickte danach ein zweites
+// PATCH stock_qty mit einem selbst gerechneten Rest. Scheiterte das zweite,
+// stand die Dosis gebucht und der Bestand nicht gezaehlt. `stock_deduct`
+// faehrt jetzt mit dem Log, und der Server bucht beides in einer Transaktion.
+// --------------------------------------------------------
+
+const stockOf = (id) => db.prepare('SELECT stock_qty FROM medications WHERE id = ?').get(id).stock_qty;
+
+test('Logs: POST taken mit stock_deduct zieht den Bestand in derselben Anfrage ab (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Bestandsprobe', stock_qty: 10 });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, {
+    status: 'taken', taken_at: '2026-06-04T08:05', dose_qty: 2, stock_deduct: 2,
+  });
+  assert.equal(res.status, 201);
+  assert.equal(stockOf(id), 8);
+  // Nur eine genommene Dosis zieht ab.
+  await call('POST', `/medications/${id}/logs`, { status: 'skipped', dose_qty: 2, stock_deduct: 2 });
+  await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-05T08:00', stock_deduct: 2 });
+  assert.equal(stockOf(id), 8);
+  // Nie unter 0.
+  await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 50 });
+  assert.equal(stockOf(id), 0);
+});
+
+test('Logs: ein ungueltiger stock_deduct bucht weder Dosis noch Abzug (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Negativprobe', stock_qty: 5 });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: -2 });
+  assert.equal(res.status, 400);
+  assert.equal(stockOf(id), 5);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 0);
+});
+
+test('Logs: ohne erfassten Bestand bleibt stock_qty leer (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Ohne Bestand' });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 1 });
+  assert.equal(res.status, 201);
+  assert.equal(stockOf(id), null);
+});
+
+test('Logs: /take mit stock_deduct zieht einmal ab, ein wiederholtes /take nicht noch einmal (#2069)', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Planprobe', stock_qty: 6 });
+  const id = med.body.data.id;
+  const pending = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-04T08:00' });
+  const lid = pending.body.data.id;
+  const first = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.data.status, 'taken');
+  assert.equal(stockOf(id), 4);
+  const again = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
+  assert.equal(again.status, 200);
+  assert.equal(stockOf(id), 4, 'ein schon genommener Eintrag zieht nicht ein zweites Mal ab');
+  const bad = await call('POST', `/logs/${lid}/take`, { stock_deduct: 'viel' });
+  assert.equal(bad.status, 400);
+});
+
+test('Logs: derselbe Idempotency-Key bucht eine verlorene Dosis nur einmal und zieht nur einmal ab (#2069)', async () => {
+  // Der Fall aus dem Review: POST kommt an, die Antwort geht verloren, der
+  // zweite Tipp schickt dieselbe Anfrage. Ohne Schluessel waeren das zwei Logs
+  // und zwei Abzuege; die Bedarfsdosis hat kein Vorkommen, an dem der Server
+  // die Wiederholung sonst erkennen koennte.
+  asA();
+  const med = await call('POST', '/medications', { name: 'Wiederholprobe', prn: true, stock_qty: 10 });
+  const id = med.body.data.id;
+  const body = { status: 'taken', taken_at: '2026-06-04T08:05', dose_qty: 2, stock_deduct: 2 };
+  const key = { 'Idempotency-Key': `dose-${id}-retry` };
+  const first = await call('POST', `/medications/${id}/logs`, body, key);
+  const again = await call('POST', `/medications/${id}/logs`, body, key);
+  assert.equal(first.status, 201);
+  assert.equal(again.status, 201);
+  assert.equal(again.body.data.id, first.body.data.id, 'die Wiederholung bekommt die erste Antwort');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 1);
+  assert.equal(stockOf(id), 8);
+});
+
+test('Logs: ein zweiter POST fuer dasselbe geplante Vorkommen legt keinen zweiten Log an und zieht nicht noch einmal ab (#2069)', async () => {
+  // Auch ohne Schluessel (API-Clients, ein Tipp nach Ablauf des Schluessels):
+  // je schedule_id + scheduled_at gibt es EINEN Eintrag, wie der Scheduler ihn
+  // anlegt.
+  asA();
+  const med = await call('POST', '/medications', { name: 'Vorkommensprobe', stock_qty: 9 });
+  const id = med.body.data.id;
+  const sched = await call('POST', `/medications/${id}/schedules`, { time_of_day: '08:00', dose_qty: 3 });
+  const body = { status: 'taken', scheduled_at: '2026-06-04T08:00', schedule_id: sched.body.data.id, dose_qty: 3, stock_deduct: 3 };
+  const first = await call('POST', `/medications/${id}/logs`, body);
+  const again = await call('POST', `/medications/${id}/logs`, { ...body, taken_at: '2026-06-04T08:20' });
+  assert.equal(first.status, 201);
+  assert.equal(again.status, 200);
+  assert.equal(again.body.data.id, first.body.data.id);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 1);
+  assert.equal(stockOf(id), 6, 'genau ein Abzug');
+  // Ein vorhandener ausstehender Eintrag (Scheduler) wird abgehakt, mit Abzug.
+  const pendingAt = '2026-06-05T08:00';
+  db.prepare("INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, dose_qty) VALUES (?, ?, ?, 'pending', 3)")
+    .run(id, sched.body.data.id, pendingAt);
+  const take = await call('POST', `/medications/${id}/logs`, { ...body, scheduled_at: pendingAt });
+  assert.equal(take.status, 200);
+  assert.equal(take.body.data.status, 'taken');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 2);
+  assert.equal(stockOf(id), 3);
 });
 
 // #2054: das Formular legte ein neues Medikament und danach jedes Zeitfenster

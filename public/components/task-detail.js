@@ -51,6 +51,7 @@ import {
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
   docMime, docHref, docIcon, formatDueDate, seriesDoneText,
 } from '/utils/task-fields.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // --------------------------------------------------------
 // Schreibwege, die die Ansicht selbst geht
@@ -847,7 +848,7 @@ function commentsNode(task, ctx) {
     try {
       await api.post(`/tasks/${task.id}/comments`, { comment: value });
       field.value = '';
-      await load();
+      await reloadAfterSave(() => load());
     } catch (err) {
       window.yuvomi.showToast(err.message ?? t('common.errorGeneric'), 'danger');
     } finally {

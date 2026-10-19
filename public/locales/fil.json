@@ -97,7 +97,8 @@
         "searchNoResultsDescription": "Walang tumutugma sa iyong paghahanap.",
         "searchNoResultsFilteredDescription": "Walang tumutugma sa iyong paghahanap at mga filter.",
         "searchReset": "I-reset ang paghahanap",
-        "passwordMinLength": "Hindi bababa sa 8 character."
+        "passwordMinLength": "Hindi bababa sa 8 character.",
+        "savedReloadFailed": "Na-save ang pagbabago, pero hindi ma-refresh ang view. I-reload ang page kung may kulang."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -4916,8 +4917,7 @@
                 "earlyConfirm": "Itala ang dosis bago matapos ang pinakamaikling agwat?",
                 "earlyDetail": "Ang susunod na dosis ay sa {{time}} pa ({{remaining}}).",
                 "earlyConfirmAction": "Itala pa rin"
-            },
-            "stockUpdateFailed": "Naitala ang dosis, pero hindi na-update ang stock."
+            }
         },
         "prevention": {
             "title": "Pag-iwas at bakuna",

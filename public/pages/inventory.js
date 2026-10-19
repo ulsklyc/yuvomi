@@ -38,6 +38,7 @@ import { attachOverlay, whenHistorySettled } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { setNavBadge } from '/utils/nav-badges.js';
 import { CHART, chartScales, chartY, chartGridMarkup, niceDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 let _container = null;
 let _search = null;
@@ -2049,7 +2050,7 @@ function buildItemForm({ mode, item = null }) {
           });
           item = res.data;
           renderLinkedEntries(panel, item);
-          await loadItems();
+          await reloadAfterSave(() => loadItems());
           renderList({ repaint: true });
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
@@ -2167,7 +2168,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     if (pickedBooking) payload.entry_id = pickedBooking.entry.id;
     if (mode === 'create') await api.post('/inventory/items', payload);
     else await api.put(`/inventory/items/${item.id}`, payload);
-    await loadItems();
+    await reloadAfterSave(() => loadItems());
     closeSharedModal({ force: true });
     renderList({ repaint: true, motion: true });
     updateAttentionBadge();

@@ -32,6 +32,7 @@ import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 // Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
 // (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
@@ -1852,7 +1853,7 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     // Nur DIESEN Dialog: einen inzwischen geoeffneten anderen laesst die
     // spaete Antwort stehen (#1997).
     await closeModal({ force: true, context: dialog });
-    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+    if (await reloadAfterSave(() => reload(undefined, { motion: true, owner }))) refocusAfterRender();
     window.yuvomi?.showToast(t(existing ? 'subscriptions.savedToast' : 'subscriptions.addedToast'), 'success');
   } catch (err) {
     const goneSelect = selectedMetaGone(err);
@@ -1990,7 +1991,7 @@ async function renewSubscription(subscription) {
   const owner = pageOwner();
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
-    if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+    if (await reloadAfterSave(() => reload(undefined, { motion: true, owner }))) refocusAfterRender();
     const completed = response.data?.status === 'completed';
     window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
   } catch (err) {
@@ -2097,7 +2098,7 @@ async function openSettingsModal() {
             base_currency: baseCurrency,
           });
           await closeModal({ force: true, context: dialog });
-          if (await reload({ refreshRates: true }, { owner })) refocusAfterRender();
+          if (await reloadAfterSave(() => reload({ refreshRates: true }, { owner }))) refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.settingsSaved'), 'success');
         } catch (err) {
           reportError(err, { owner });
