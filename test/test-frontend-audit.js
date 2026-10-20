@@ -15,7 +15,7 @@ import {
   dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
 } from './dialog-grammar.js';
-import { lateModalCloses } from './late-modal-close.js';
+import { lateModalCalls } from './late-modal-close.js';
 import { reloadsAfterWrite } from './reload-after-write.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r/g, '');
@@ -299,72 +299,137 @@ test('kein HTML-Kommentar im Markup enthält ein Backtick', () => {
   );
 });
 
-// #1997: eine spaete Antwort schliesst nur ihren EIGENEN Dialog. Die Regel steht
-// in components/modal.js (`closeModal({ force, context })`); hier zaehlt der
-// Bestand der Stellen, die nach einem `await` noch ohne Kontext schliessen
-// (Scanner und seine Grenzen: late-modal-close.js). Die Zahl je Datei darf nur
-// SINKEN - wer eine Stelle umstellt, senkt sie hier mit; eine neue Datei steht
-// bei 0.
-const LATE_MODAL_CLOSE_BESTAND = {
-  'components/quick-links-manager.js': 0,
-  'pages/birthdays.js': 0,
-  'pages/budget-plans.js': 0,
-  'pages/budget.js': 0,
-  'pages/calendar.js': 0,
-  'pages/contacts.js': 0,
-  'pages/health.js': 0,
-  'pages/housekeeping.js': 0,
-  'pages/inventory.js': 0,
-  'pages/meals.js': 0,
-  'pages/pantry.js': 0,
-  'pages/rewards.js': 0,
-  'pages/schedule.js': 0,
-  'pages/shopping.js': 0,
-  'pages/split-expenses.js': 0,
-  'pages/tasks.js': 0,
-  'pages/waste.js': 0,
-  'settings/pages/admin-family.js': 0,
-  'settings/pages/modules-health.js': 0,
-  'settings/pages/modules-kitchen.js': 0,
-  'settings/pages/personal-calendar-subscriptions.js': 0,
-  'settings/pages/sync-calendar.js': 0,
-  'settings/pages/sync-contacts.js': 0,
+// #1997: eine spaete Antwort trifft nur ihren EIGENEN Dialog. Die Regel steht
+// in components/modal.js (`closeModal({ force, context })`, fuer das Oeffnen
+// `isModalContextCurrent(context)`); hier zaehlt der Bestand der Stellen, die
+// erst mit einer Antwort schliessen oder oeffnen - hinter einem `await` oder in
+// einem `.then()` - und dabei nicht pruefen, ob der Dialog von vorher noch der
+// offene ist (Scanner und seine Grenzen: late-modal-close.js). Die Zahl je
+// Datei und Art darf nur SINKEN - wer eine Stelle umstellt, senkt sie hier
+// mit; eine neue Datei steht bei 0.
+const LATE_MODAL_BESTAND = {
+  close: {
+    'components/quick-links-manager.js': 0,
+    'pages/birthdays.js': 0,
+    'pages/budget-plans.js': 0,
+    'pages/budget.js': 0,
+    'pages/calendar.js': 0,
+    'pages/contacts.js': 0,
+    'pages/health.js': 0,
+    'pages/housekeeping.js': 0,
+    'pages/inventory.js': 0,
+    'pages/meals.js': 0,
+    'pages/pantry.js': 0,
+    'pages/rewards.js': 0,
+    'pages/schedule.js': 0,
+    'pages/shopping.js': 0,
+    'pages/split-expenses.js': 0,
+    'pages/tasks.js': 0,
+    'pages/waste.js': 0,
+    'settings/pages/admin-family.js': 0,
+    'settings/pages/modules-health.js': 0,
+    'settings/pages/modules-kitchen.js': 0,
+    'settings/pages/personal-calendar-subscriptions.js': 0,
+    'settings/pages/sync-calendar.js': 0,
+    'settings/pages/sync-contacts.js': 0,
+  },
+  open: {
+    'components/budget-transfer-dialog.js': 1,
+    'components/quick-links-manager.js': 1,
+    'pages/birthdays.js': 1,
+    'pages/calendar.js': 1,
+    'pages/contacts.js': 1,
+    'pages/inventory.js': 2,
+    'pages/pantry.js': 1,
+    'pages/recipes.js': 2,
+    'pages/rewards.js': 3,
+    'pages/shopping.js': 3,
+    'pages/split-expenses.js': 2,
+    'pages/waste.js': 2,
+    'settings/pages/admin-family.js': 1,
+  },
 };
 
-test('kein neues closeModal() nach einem await ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
-  const ist = {};
+const LATE_MODAL_RAT = {
+  close: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben',
+  open: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und nach der Antwort '
+    + '`if (!isModalContextCurrent(context)) return;` vor openModal()',
+};
+
+test('kein neues closeModal()/openModal() mit einer Antwort ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
+  const ist = { close: {}, open: {} };
+  let gescannt = 0;
   for (const path of walkJsFiles('../public/')) {
     if (path.includes('/vendor/') || path.endsWith('/components/modal.js')) continue;
-    const offen = lateModalCloses(read(path)).filter((call) => !call.guarded);
-    if (offen.length) ist[path.slice('../public/'.length)] = offen.map((call) => call.line);
+    gescannt += 1;
+    for (const call of lateModalCalls(read(path))) {
+      if (call.guarded) continue;
+      (ist[call.kind][path.slice('../public/'.length)] ??= []).push(call.line);
+    }
   }
-  const files = new Set([...Object.keys(ist), ...Object.keys(LATE_MODAL_CLOSE_BESTAND)]);
-  for (const file of [...files].sort()) {
-    const lines = ist[file] ?? [];
-    const erlaubt = LATE_MODAL_CLOSE_BESTAND[file] ?? 0;
-    assert.ok(lines.length <= erlaubt,
-      `${file}: ${lines.length} closeModal() nach einem await ohne context (erlaubt ${erlaubt}), Zeilen ${lines.join(', ')} - `
-      + 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben');
-    assert.equal(lines.length, erlaubt,
-      `${file}: nur noch ${lines.length} statt ${erlaubt} - die Zahl in LATE_MODAL_CLOSE_BESTAND mitsenken`);
+  assert.ok(gescannt >= 100, `nur ${gescannt} Frontend-Dateien gescannt - der Scan greift nicht mehr`);
+  for (const kind of ['close', 'open']) {
+    const name = kind === 'close' ? 'closeModal()' : 'openModal()';
+    const files = new Set([...Object.keys(ist[kind]), ...Object.keys(LATE_MODAL_BESTAND[kind])]);
+    for (const file of [...files].sort()) {
+      const lines = ist[kind][file] ?? [];
+      const erlaubt = LATE_MODAL_BESTAND[kind][file] ?? 0;
+      assert.ok(lines.length <= erlaubt,
+        `${file}: ${lines.length} ${name} mit einer Antwort ohne Kontext (erlaubt ${erlaubt}), Zeilen ${lines.join(', ')} - `
+        + LATE_MODAL_RAT[kind]);
+      assert.equal(lines.length, erlaubt,
+        `${file}: nur noch ${lines.length} statt ${erlaubt} ${name} - die Zahl in LATE_MODAL_BESTAND.${kind} mitsenken`);
+    }
   }
 });
 
-test('der Spaet-Schliessen-Scanner erkennt das Muster, das er zaehlt', () => {
-  const zaehle = (src) => lateModalCloses(src).map((call) => call.guarded);
+test('der Spaet-Dialog-Scanner erkennt das Muster, das er zaehlt', () => {
+  const zaehle = (src) => lateModalCalls(src).map((call) => `${call.kind}/${call.via}/${call.guarded ? 'geschuetzt' : 'offen'}`);
   // Ungeschuetzt: Speichern, dann schliessen.
-  assert.deepEqual(zaehle('async function s() { await api.put(1); closeModal({ force: true }); }'), [false]);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); closeModal({ force: true }); }'), ['close/await/offen']);
   // Alias aus dem Import, Pfeilfunktion als Handler, await in einem try-Block davor.
   assert.deepEqual(zaehle(`import { closeModal as closeSharedModal } from '/components/modal.js';
-    btn.addEventListener('click', async () => { try { await api.post(2); closeSharedModal({ force: true }); } catch {} });`), [false]);
+    btn.addEventListener('click', async () => { try { await api.post(2); closeSharedModal({ force: true }); } catch {} });`), ['close/await/offen']);
   // Geschuetzt: mit Kontext, oder hinter isModalContextCurrent seit dem letzten await.
-  assert.deepEqual(zaehle('async function s() { const d = captureModalContext(); await api.put(1); closeModal({ force: true, context: d }); }'), [true]);
-  assert.deepEqual(zaehle('async function s() { await api.put(1); if (isModalContextCurrent(d)) await closeModal({ force: true }); }'), [true]);
+  assert.deepEqual(zaehle('async function s() { const d = captureModalContext(); await api.put(1); closeModal({ force: true, context: d }); }'), ['close/await/geschuetzt']);
+  assert.deepEqual(zaehle('async function s() { await api.put(1); if (isModalContextCurrent(d)) await closeModal({ force: true }); }'), ['close/await/geschuetzt']);
   // Nicht spaet: kein await davor, das await auf das Schliessen selbst, ein
   // await nur in einer verschachtelten Funktion, ein Kommentar.
   assert.deepEqual(zaehle('async function s() { if (x) return; await closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('function s() { const f = async () => { await api.put(1); }; closeModal({ force: true }); }'), []);
   assert.deepEqual(zaehle('async function s() { await api.put(1); // closeModal({ force: true })\n}'), []);
+
+  // Form 1: der Rueckruf eines Versprechens laeuft immer erst mit der Antwort -
+  // als Ausdruck, als Block, als function, als blosser Name, als zweites
+  // Argument, in .catch und .finally.
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => closeModal({ force: true })); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(async (r) => { closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(function () { closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(closeModal); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(ok, () => closeModal()); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).catch((e) => { report(e); closeModal({ force: true }); }); }'), ['close/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).finally(() => closeModal({ force: true, context: d })); }'), ['close/then/geschuetzt']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => openModal({})); }'), ['open/then/offen']);
+  assert.deepEqual(zaehle('function s() { api.put(1).then(() => { if (isModalContextCurrent(d)) openModal({}); }); }'), ['open/then/geschuetzt']);
+  // Kein Rueckruf: das Schliessen selbst startet die Kette, ein Klick-Handler.
+  assert.deepEqual(zaehle('function s() { closeModal({ force: true }).then(() => reload()); }'), []);
+  assert.deepEqual(zaehle("function s() { btn.addEventListener('click', () => closeModal()); }"), []);
+
+  // Form 2: ein Dialog, der erst nach dem Laden aufgeht, ersetzt den, der
+  // inzwischen offen ist. Geschuetzt nur hinter isModalContextCurrent - das
+  // Oeffnen nimmt keinen Kontext.
+  assert.deepEqual(zaehle('async function s() { const r = await api.get(1); openModal({ content: r }); }'), ['open/await/offen']);
+  assert.deepEqual(zaehle(`import { openModal as openSharedModal } from '/components/modal.js';
+    async function s() { await api.get(1); openSharedModal({}); }`), ['open/await/offen']);
+  assert.deepEqual(zaehle('async function s() { if (x) { await api.get(1); } openModal({}); }'), ['open/await/offen']);
+  assert.deepEqual(zaehle(`async function s() { const d = captureModalContext(); const r = await api.get(1);
+    if (!isModalContextCurrent(d)) return; openModal({ content: r }); }`), ['open/await/geschuetzt']);
+  assert.deepEqual(zaehle('async function s() { await api.get(1); openModal({ onSave() { const context = 1; } }); }'), ['open/await/offen'],
+    'ein `context` in den Optionen des Oeffnens ist kein Schutz');
+  // Ein await, das nie zum Aufruf fuehrt: der Block davor endet mit return.
+  assert.deepEqual(zaehle('async function s() { if (!x) { await confirmModal("a"); return; } openModal({}); }'), []);
+  assert.deepEqual(zaehle('async function s() { try { r = await api.get(1); } catch (e) { await confirmModal("a"); return; } openModal({}); }'),
+    ['open/await/offen'], 'das await im try fuehrt weiter, nur das im catch nicht');
 });
 
 // #2069: ist das Schreiben angekommen, gilt der Eintrag als gespeichert. Ein
