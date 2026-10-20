@@ -105,13 +105,13 @@ function unter(locale, fn) {
  * Oeffnet einen Dialog, verdrahtet ihn mit `panel` und schickt das Formular ab.
  * Liefert, was gesendet und was am Feld gemeldet wurde.
  */
-async function speichern(oeffnen, panel, { currency = 'EUR' } = {}) {
+async function speichern(oeffnen, panel, { currency = 'EUR', beimSchreiben = () => {} } = {}) {
   const vorherState = { ...split.state };
   Object.assign(split.state, {
     activeGroupId: 2, groups: [{ id: 2, name: 'Reise', default_currency: currency }],
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
     balances: { simplified_debts: [] }, user: { id: 1 },
-    meta: { currencies: ['EUR', 'KRW', 'JPY'], default_currency: currency },
+    meta: { currencies: ['EUR', 'KRW', 'JPY'], default_currency: currency, group_types: ['trip'] },
   });
   const gesendet = [];
   const gemeldet = [];
@@ -120,13 +120,14 @@ async function speichern(oeffnen, panel, { currency = 'EUR' } = {}) {
   globalThis.__reportFieldError = (input, text) => { gemeldet.push({ input, text }); };
   // Nur das Schreiben zaehlt; das Nachladen danach darf ins Leere laufen.
   globalThis.__apiStub = {
-    post: async (pfad, daten) => { gesendet.push({ pfad, daten }); return { data: {} }; },
-    put: async (pfad, daten) => { gesendet.push({ pfad, daten }); return { data: {} }; },
+    post: async (pfad, daten) => { gesendet.push({ pfad, daten }); beimSchreiben(); return { data: {} }; },
+    put: async (pfad, daten) => { gesendet.push({ pfad, daten }); beimSchreiben(); return { data: {} }; },
+    patch: async (pfad, daten) => { gesendet.push({ pfad, daten }); beimSchreiben(); return { data: {} }; },
     get: async () => ({ data: [] }),
   };
   setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
   try {
-    oeffnen();
+    await oeffnen();
     assert.ok(optionen, 'der Dialog geht auf');
     optionen.onSave(panel);
     try { await panel.feuere('submit'); } catch { /* Neuzeichnen ohne Seitencontainer */ }
@@ -513,5 +514,57 @@ test('Hin- und Rueckweg am Rand des Zahlenraums: unveraendert speichern zieht ke
       assert.deepEqual(gemeldet, [], `${locale}: "${feld}"`);
       assert.equal(gesendet[0]?.daten.amount, '90071992547409.91', `${locale}: "${feld}"`);
     });
+  }
+});
+
+// --- #1997: eine spaete Erfolgsantwort schliesst nur ihren EIGENEN Dialog -----
+
+// Kommt die Antwort erst, nachdem der Nutzer den Dialog geschlossen und einen
+// anderen geoeffnet hat, darf das force-Schliessen nur den eigenen treffen. Ob
+// der Slot noch denselben Dialog haelt, entscheidet closeModal({ context }) in
+// components/modal.js (am echten Modul gemessen in test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: jeder Speicherweg der Seite reicht den Kontext
+// von VOR der Anfrage hinein, und den Fokus traegt er nur zurueck, wenn es sein
+// Dialog war, der zuging. Gefahren wird je Weg der echte submit-Lauscher; die
+// schreibende Anfrage wechselt den Kontext.
+test('#1997: Erfolg nach Dialogwechsel - jeder Speicherweg schliesst nur mit dem Kontext von VOR der Anfrage', async () => {
+  const WEGE = [
+    ['Gruppe anlegen', () => split.openGroupModal(null), '#split-group-form'],
+    ['Ausgabe anlegen', neueAusgabe, '#split-expense-form', { amount: '12,50' }],
+    ['Zahlung erfassen', split.openSettlementModal, '#split-settlement-form', { amount: '12,50' }],
+    ['Mitglied hinzufuegen', split.openMemberModal, '#split-member-form'],
+    ['Gast anlegen', split.openGuestModal, '#split-guest-form'],
+  ];
+  for (const [name, oeffnen, formId, felder = {}] of WEGE) {
+    for (const eigenerOffen of [true, false]) {
+      let kontext = 'eigener-dialog';
+      const geschlossen = [];
+      let fokus = 0;
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__isOwnModalOpen = (ctx) => eigenerOffen && ctx === 'eigener-dialog';
+      globalThis.__closeModal = (opts) => { geschlossen.push(opts ?? {}); return true; };
+      globalThis.__refocusAfterRender = () => { fokus += 1; };
+      // Der Seitentraeger, in den nach dem Speichern gezeichnet wird.
+      split.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [], isConnected: true });
+      try {
+        const { gesendet } = await speichern(oeffnen, formular({ formId, ...felder }).panel, {
+          beimSchreiben: () => { if (!eigenerOffen) kontext = 'ein-anderer-dialog'; },
+        });
+        const label = `${name}${eigenerOffen ? '' : ', inzwischen ein anderer Dialog offen'}`;
+        assert.equal(gesendet.length, 1, `${label}: der Weg schreibt (${JSON.stringify(gesendet)})`);
+        assert.equal(geschlossen.length, 1, `${label}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+        assert.equal(geschlossen[0].force, true, `${label}: force wie bisher`);
+        assert.equal(geschlossen[0].context, 'eigener-dialog',
+          `${label}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+        assert.equal(fokus, eigenerOffen ? 1 : 0,
+          `${label}: den Fokus traegt nur zurueck, wessen Dialog eben zuging - sonst gehoert er dem anderen Dialog`);
+      } finally {
+        split.setContainerForTest(null);
+        delete globalThis.__modalContextId;
+        delete globalThis.__isOwnModalOpen;
+        delete globalThis.__closeModal;
+        delete globalThis.__refocusAfterRender;
+      }
+    }
   }
 });

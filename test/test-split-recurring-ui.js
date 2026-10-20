@@ -869,3 +869,50 @@ test('Der Klick im Verlauf holt die Zeile der Serie in den Blick und gibt ihr de
     assert.deepEqual([zeile.geholt, zeile.fokus], [1, 1]);
   });
 });
+
+// #1997: kommt die Antwort erst, nachdem der Nutzer den Seriendialog geschlossen
+// und einen anderen geoeffnet hat, schliesst sie nur den eigenen (Kontext von
+// VOR der Anfrage) und traegt den Fokus nicht aus dem anderen Dialog heraus.
+test('#1997: Serie anlegen und aendern - eine spaete Antwort schliesst nur den eigenen Dialog', async () => {
+  for (const [name, r, aendere] of [
+    ['anlegen', null, (f) => { f.setze('title', 'Internet'); f.setze('amount', '30,00'); }],
+    ['aendern', MIETE, (f) => f.setze('title', 'Miete neu')],
+  ]) {
+    for (const eigenerOffen of [true, false]) {
+      await buehne({}, async (spur) => {
+        let kontext = 'eigener-dialog';
+        const geschlossen = [];
+        let fokus = 0;
+        globalThis.__modalContextId = () => kontext;
+        globalThis.__isOwnModalOpen = (ctx) => eigenerOffen && ctx === 'eigener-dialog';
+        globalThis.__closeModal = (opts) => { geschlossen.push(opts ?? {}); return true; };
+        globalThis.__refocusAfterRender = () => { fokus += 1; };
+        const schreibe = globalThis.__apiStub;
+        for (const verb of ['post', 'put']) {
+          const echt = schreibe[verb];
+          schreibe[verb] = async (...args) => {
+            const antwort = await echt(...args);
+            if (!eigenerOffen) kontext = 'ein-anderer-dialog';
+            return antwort;
+          };
+        }
+        try {
+          const f = offenerDialog(spur, r);
+          aendere(f);
+          await f.panel.feuere('submit');
+          const label = `${name}${eigenerOffen ? '' : ', inzwischen ein anderer Dialog offen'}`;
+          assert.equal(spur.gesendet.length, 1, `${label}: der Weg schreibt (${JSON.stringify(spur.gesendet)})`);
+          assert.equal(geschlossen.length, 1, `${label}: genau ein Schliessen`);
+          assert.equal(geschlossen[0].force, true, `${label}: force wie bisher`);
+          assert.equal(geschlossen[0].context, 'eigener-dialog',
+            `${label}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+          assert.equal(fokus, eigenerOffen ? 1 : 0, `${label}: Fokus nur zurueck, wenn der eigene Dialog zuging`);
+        } finally {
+          delete globalThis.__modalContextId;
+          delete globalThis.__isOwnModalOpen;
+          delete globalThis.__refocusAfterRender;
+        }
+      });
+    }
+  }
+});

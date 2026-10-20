@@ -1025,3 +1025,82 @@ test('Seite: Zuordnen-Erfolg - gezeichnet nur auf der Seite, die noch steht; Fok
     delete globalThis.__refocusAfterRender;
   }
 });
+
+// --- #1997: Essensplan - eine spaete Erfolgsantwort schliesst nur ihren Dialog --
+
+// Dasselbe fuer den Essensplan: Mahlzeit anlegen und aendern (einzeln und als
+// Serie) und "Woche zufaellig fuellen" reichen den Kontext von VOR der Anfrage
+// an closeModal. Dazu der Seitenstand: der Mahlzeit-Dialog haelt seine Absicht
+// in `state.modal`, und ein inzwischen geoeffneter zweiter Mahlzeit-Dialog
+// schreibt dort seine eigene hinein. Raeumte die spaete Antwort `state.modal`
+// trotzdem ab, stuende der zweite Dialog ohne Absicht da - sein Speichern liefe
+// in einen Fehler, mit allem, was darin getippt ist.
+test('Essensplan: Erfolg nach Dialogwechsel - schliesst nur mit dem Kontext von VOR der Anfrage und laesst den Stand des anderen Dialogs stehen (#1997)', async () => {
+  const mahlzeitFormular = () => {
+    const felder = {
+      '#modal-save': { disabled: false, textContent: '' },
+      '#modal-date': { value: '20.10.2026' }, '#modal-type': { value: 'dinner' }, '#modal-title': { value: 'Curry' },
+      '#modal-notes': { value: '' }, '#modal-recipe-url': { value: '' }, '#modal-recipe-id': { value: '' },
+      '#modal-edit-scope': null,
+    };
+    return { querySelector: (sel) => felder[sel] ?? null, querySelectorAll: () => [] };
+  };
+  const serienFormular = () => {
+    const form = mahlzeitFormular();
+    const lies = form.querySelector;
+    return { ...form, querySelector: (sel) => (sel === '#modal-edit-scope' ? { value: 'series' } : lies(sel)) };
+  };
+  const WEGE = [
+    ['Mahlzeit anlegen', { mode: 'create' }, () => meals.saveModal(mahlzeitFormular())],
+    ['Mahlzeit aendern', { mode: 'edit', meal: { id: 9, ingredients: [] } }, () => meals.saveModal(mahlzeitFormular())],
+    ['Serie aendern', { mode: 'edit', meal: { id: 9, ingredients: [] } }, () => meals.saveModal(serienFormular())],
+    ['Woche zufaellig fuellen', null, () => {
+      const knopf = { disabled: false };
+      const panel = { querySelector: (sel) => (sel === '#meal-randomize-run' ? knopf : sel === '#meal-randomize-replace' ? { checked: false } : null) };
+      return meals.runRandomize(panel);
+    }],
+  ];
+  const ANDERER = { mode: 'edit', meal: { id: 77, ingredients: [] } };
+  for (const [name, absicht, lauf] of WEGE) {
+    for (const eigenerOffen of [true, false]) {
+      let kontext = 'eigener-dialog';
+      globalThis.__modalContextId = () => kontext;
+      globalThis.__isOwnModalOpen = (ctx) => eigenerOffen && ctx === 'eigener-dialog';
+      const zuvor = { ...meals.state };
+      Object.assign(meals.state, {
+        currentWeek: '2026-10-19', visibleMealTypes: ['dinner'], meals: [],
+        recipes: [{ id: 5, title: 'Suppe', meal_types: ['dinner'], ingredients: [] }],
+        modal: absicht,
+      });
+      meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+      // Waehrend die Anfrage laeuft, schliesst der Nutzer den Dialog und oeffnet
+      // einen anderen Mahlzeit-Dialog: der Kontext wechselt, state.modal ist dessen.
+      const wechsel = (antwort) => {
+        if (!eigenerOffen) { kontext = 'ein-anderer-dialog'; meals.state.modal = ANDERER; }
+        return antwort;
+      };
+      const label = `${name}${eigenerOffen ? '' : ', inzwischen ein anderer Dialog offen'}`;
+      try {
+        const { calls, closed } = await mit({
+          post: () => wechsel({ data: { id: 9, date: '2026-10-20', meal_type: 'dinner', title: 'Curry', ingredients: [] } }),
+          put: () => wechsel({ data: {} }),
+        }, lauf);
+        assert.ok(calls.some(([verb]) => verb === 'POST' || verb === 'PUT'), `${label}: Vorbedingung: geschrieben (${JSON.stringify(calls)})`);
+        assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${label}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+        assert.equal(closed.length, 1, `${label}: genau ein Schliessen (${JSON.stringify(closed)})`);
+        assert.equal(closed[0].force, true, `${label}: force wie bisher`);
+        assert.equal(closed[0].context, 'eigener-dialog',
+          `${label}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+        if (absicht) {
+          assert.equal(meals.state.modal, eigenerOffen ? null : ANDERER,
+            `${label}: ${eigenerOffen ? 'der eigene Dialog ist zu, seine Absicht faellt weg' : 'die Absicht des anderen Dialogs bleibt stehen'}`);
+        }
+      } finally {
+        delete globalThis.__modalContextId;
+        delete globalThis.__isOwnModalOpen;
+        meals.setContainerForTest(null);
+        Object.assign(meals.state, zuvor);
+      }
+    }
+  }
+});

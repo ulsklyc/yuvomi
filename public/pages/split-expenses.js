@@ -2740,4 +2740,8 @@ export const __test = {
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
   ownGroupBalance, groupToolsTriggerHtml,
+  // #1997: Mitglied und Gast speichern schliessen nur ihren eigenen Dialog
+  // (test-split-amount-input.js).
+  openMemberModal, openGuestModal,
+  setContainerForTest(container) { _container = container; },
 };

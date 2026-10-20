@@ -678,3 +678,53 @@ test('Vorrat: die Stepper-Zeichen haben Knopfmass (--icon-md), keine Inline-Mark
   assert.match(src, /data-lucide="plus" class="icon-md"/);
   assert.doesNotMatch(src, /data-lucide="(minus|plus)" class="icon-sm"/);
 });
+
+// #1997: kommt die Antwort auf "Speichern" erst, nachdem der Nutzer den Dialog
+// geschlossen und einen anderen geoeffnet hat, darf das force-Schliessen nur
+// den eigenen treffen. Ob der Slot noch denselben Dialog haelt, entscheidet
+// closeModal({ context }) in components/modal.js (test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: der echte Klick auf Speichern reicht den
+// Kontext von VOR der Anfrage hinein - beim Anlegen wie beim Aendern.
+test('#1997: Artikel speichern - eine spaete Antwort schliesst nur mit dem Kontext von VOR der Anfrage', async () => {
+  for (const [name, mode, item] of [['anlegen', 'create', null], ['aendern', 'edit', rice(2)]]) {
+    resetPantry();
+    __test.state.items = item ? [item] : [];
+    __test.setContainerForTest(makeNode());
+    let kontext = 'eigener-dialog';
+    const geschlossen = [];
+    const toasts = [];
+    const klicks = {};
+    const felder = {};
+    const panel = {
+      querySelector: (sel) => {
+        felder[sel] ??= { value: '', addEventListener(typ, fn) { klicks[sel] = fn; } };
+        return felder[sel];
+      },
+      querySelectorAll: () => [],
+    };
+    let optionen = null;
+    globalThis.__openModal = (opts) => { optionen = opts; };
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__closeModal = (opts) => { geschlossen.push(opts ?? {}); return true; };
+    global.window.yuvomi.showToast = (msg, art) => toasts.push([msg, art]);
+    const schreibe = async () => { kontext = 'ein-anderer-dialog'; return { data: rice(3, { name: 'Reis' }) }; };
+    globalThis.__apiStub = { post: schreibe, put: schreibe, get: async () => ({ data: [rice(3)], locations: [], categories: [] }) };
+    try {
+      __test.openItemModal(mode, item);
+      optionen.onSave(panel);
+      felder['#pantry-name'].value = 'Reis';
+      await klicks['#pantry-save']();
+      assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+      assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+      assert.equal(geschlossen[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+      assert.equal(toasts.some(([, art]) => art === 'danger'), false, `${name}: der Erfolg ist kein Fehler (${JSON.stringify(toasts)})`);
+    } finally {
+      delete globalThis.__openModal;
+      delete globalThis.__modalContextId;
+      delete globalThis.__closeModal;
+      delete global.window.yuvomi.showToast;
+      resetPantry();
+    }
+  }
+});

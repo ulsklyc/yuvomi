@@ -189,7 +189,7 @@ function userSets(el, value, type = 'change') {
  * Faehrt `saveEvent` unter der Browserzone; jede Kalenderanfrage geht unter der
  * Serverzone an die echte Route. Erinnerungen bleiben aussen vor.
  */
-async function save(panel, event, mode = 'edit') {
+async function save(panel, event, mode = 'edit', { closeModal = () => {}, beimSchreiben = () => {} } = {}) {
   const requests = [];
   const forward = (method) => async (path, body) => {
     if (!path.startsWith('/calendar')) return { data: null };
@@ -202,10 +202,11 @@ async function save(panel, event, mode = 'edit') {
       });
       const json = await res.json();
       assert.equal(res.status < 400, true, `${method} ${path}: ${res.status} ${JSON.stringify(json)}`);
+      if (method !== 'get') beimSchreiben();
       return json;
     });
   };
-  globalThis.__closeModal = () => {};
+  globalThis.__closeModal = closeModal;
   globalThis.__apiStub = {
     get: forward('get'), post: forward('post'), put: forward('put'),
     patch: forward('patch'), delete: forward('delete'),
@@ -385,3 +386,43 @@ for (const browserZone of BROWSER_ZONES) {
     });
   });
 }
+
+// #1997: kommt die Antwort auf "Speichern" erst, nachdem der Nutzer den Dialog
+// geschlossen und einen anderen geoeffnet hat, darf das force-Schliessen nur
+// den eigenen treffen. Ob der Slot noch denselben Dialog haelt, entscheidet
+// closeModal({ context }) in components/modal.js (test-modal-dead-time.js);
+// hier zaehlt die Verdrahtung: saveEvent reicht den Kontext von VOR der Anfrage
+// hinein - beim Anlegen wie beim Aendern, gefahren gegen die echte Route.
+test('#1997: Termin speichern - eine spaete Antwort schliesst nur mit dem Kontext von VOR der Anfrage', async () => {
+  const id = insertEvent({ title: 'Spaet', start: '2026-10-14T14:00:00Z', end: '2026-10-14T15:00:00Z' });
+  for (const [name, lauf] of [
+    ['anlegen', (opts) => {
+      const panel = openDialog(null, { date: '2026-10-15', time: '09:00' });
+      userSets(panel.querySelector('#modal-title'), 'Spaet angelegt', 'input');
+      return save(panel, null, 'create', opts);
+    }],
+    ['aendern', (opts) => {
+      const before = asEvent(row(id));
+      const panel = openDialog(before);
+      userSets(panel.querySelector('#modal-title'), 'Spaet geaendert', 'input');
+      return save(panel, before, 'edit', opts);
+    }],
+  ]) {
+    let kontext = 'eigener-dialog';
+    const geschlossen = [];
+    globalThis.__modalContextId = () => kontext;
+    try {
+      const requests = await lauf({
+        closeModal: (opts) => { geschlossen.push(opts ?? {}); return true; },
+        beimSchreiben: () => { kontext = 'ein-anderer-dialog'; },
+      });
+      assert.ok(requests.some((r) => r.method !== 'get'), `${name}: Vorbedingung: geschrieben`);
+      assert.equal(geschlossen.length, 1, `${name}: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+      assert.equal(geschlossen[0].force, true, `${name}: force wie bisher`);
+      assert.equal(geschlossen[0].context, 'eigener-dialog',
+        `${name}: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist`);
+    } finally {
+      delete globalThis.__modalContextId;
+    }
+  }
+});
