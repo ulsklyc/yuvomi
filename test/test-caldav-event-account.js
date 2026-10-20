@@ -468,8 +468,16 @@ test('die Host-Sperre prüft bei jeder Methode die Adresse, an die gesendet wird
   const bases = ['https://a.example/dav/', 'https://a.example/cal/family/', 'https://a.example/cal/work/'];
   const sent = [];
   const stub = {
-    // genau wie tsdav 2.3.4: der Dateiname wird gegen die Collection aufgelöst.
-    createCalendarObject: async ({ calendar, filename }) => { sent.push(new URL(String(filename), String(calendar.url)).href); return { ok: true }; },
+    // genau wie tsdav 2.5.0 (`getObjectUrl`): der Dateiname ist ein Pfadsegment
+    // der Collection; einen Namen mit `/`, `.` oder `..` lehnt tsdav ab.
+    createCalendarObject: async ({ calendar, filename }) => {
+      const name = String(filename);
+      if (!name || name.includes('/') || /^(?:\.|%2e){1,2}$/i.test(name)) throw new Error(`Invalid object filename "${name}"`);
+      const segment = name.replace(/%(?![\da-f]{2})|[?#\\\x00-\x20\x7f]/gi,
+        (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+      sent.push(new URL(`./${segment}`, String(calendar.url).replace(/\/?$/, '/')).href);
+      return { ok: true };
+    },
     updateCalendarObject: async ({ calendarObject }) => { sent.push(calendarObject.url); return { ok: true }; },
     deleteCalendarObject: async ({ calendarObject }) => { sent.push(calendarObject.url); return { ok: true }; },
     fetchCalendarObjects: async ({ calendar }) => { sent.push(calendar.url); return []; },
@@ -486,10 +494,15 @@ test('die Host-Sperre prüft bei jeder Methode die Adresse, an die gesendet wird
     assert.deepEqual(sent, [expected], label);
   };
 
-  // createCalendarObject: ein Dateiname, der zu einer Adresse ausserhalb des
-  // Servers aufloest, wird abgewiesen - der Name allein sagt noch nichts.
-  await refused('create: Name loest off-host auf',
-    () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'http:elsewhere.example.ics', iCalString: 'x' }));
+  // createCalendarObject: geprueft wird die Adresse, die tsdav aus dem Namen
+  // macht. Seit tsdav 2.5.0 bleibt ein Name mit Doppelpunkt ein Pfadsegment im
+  // Kalender; die Sperre darf ihn nicht als eigene URL lesen und abweisen.
+  await allowed('create: Name mit Doppelpunkt bleibt im Kalender',
+    () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'urn:uuid:1.ics', iCalString: 'x' }),
+    'https://a.example/cal/work/urn:uuid:1.ics');
+  await allowed('create: ein Schema-Praefix im Namen fuehrt nicht vom Server weg',
+    () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'http:elsewhere.example.ics', iCalString: 'x' }),
+    'https://a.example/cal/work/http:elsewhere.example.ics');
   await allowed('create: gewoehnlicher Name im eigenen Kalender',
     () => client.createCalendarObject({ calendar: { url: 'https://a.example/cal/work/' }, filename: 'uid.ics', iCalString: 'x' }),
     'https://a.example/cal/work/uid.ics');

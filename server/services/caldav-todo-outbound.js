@@ -1869,8 +1869,10 @@ async function carryShoppingItem(client, accountId, collection, rowId, clientFor
     collectionUrl: collection.url, uid: sent.external_uid, objectUrl,
   });
   try {
-    // `./`: ein Name mit Doppelpunkt würde sonst als eigene URL gelesen.
-    await client.createCalendarObject({ calendar: collection, filename: `./${name}`, iCalString: data });
+    // Der Name geht als ein Pfadsegment hinaus: tsdav (ab 2.5.0) setzt das
+    // `./` selbst davor, damit ein Name mit Doppelpunkt nicht als eigene URL
+    // gelesen wird, und lehnt einen Namen mit `/` ab.
+    await client.createCalendarObject({ calendar: collection, filename: name, iCalString: data });
   } catch (err) {
     if (err?.status !== 412) throw err;
     const there = await findObjectWithUid(client, collection.url, objectUrl, sent.external_uid);

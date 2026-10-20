@@ -101,16 +101,22 @@ export function withAccountOrigin(client, accountUrls) {
   };
   // Geprüft wird die Adresse, an die tsdav wirklich sendet, nicht die im
   // Aufruf genannte Collection: `createCalendarObject` löst den Dateinamen
-  // gegen die Collection auf (tsdav 2.3.4:
-  // `new URL(filename, ensureTrailingSlash(calendar.url)).href`), und das
-  // Ergebnis muss nicht in der Collection liegen. Verglichen wird wie überall
+  // gegen die Collection auf (tsdav 2.5.0, `getObjectUrl`: der Name ist ein
+  // Pfadsegment, `?`, `#`, `\`, ein loses `%` und Leer-/Steuerzeichen werden
+  // kodiert, dann `new URL(`./${segment}`, ensureTrailingSlash(calendar.url))`;
+  // einen Namen mit `/`, `.` oder `..` lehnt tsdav ab). Verglichen wird wie überall
   // hier nach Schema, Host und Port. `fetchCalendarObjects` sendet nur an
   // `calendar.url`; die `objectUrls` stehen als Pfade in der Anfrage und werden
   // mitgeprüft.
   const resolvedCreateUrl = (p) => {
     const base = p?.calendar?.url;
     if (p?.filename == null) return base;
-    try { return new URL(String(p.filename), String(base).replace(/\/?$/, '/')).href; } catch { return String(p.filename); }
+    const name = String(p.filename);
+    // Einen solchen Namen lehnt tsdav selbst ab, bevor etwas hinausgeht.
+    if (!name || name.includes('/') || /^(?:\.|%2e){1,2}$/i.test(name)) return name;
+    const segment = name.replace(/%(?![\da-f]{2})|[?#\\\x00-\x20\x7f]/gi,
+      (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+    try { return new URL(`./${segment}`, String(base).replace(/\/?$/, '/')).href; } catch { return name; }
   };
   const overrides = {
     createCalendarObject: guard('createCalendarObject', (p) => [resolvedCreateUrl(p)]),
