@@ -573,11 +573,14 @@ button.split-expense:hover {
 /* "Mehr laden" unter dem Verlauf (#1309). Die Liste ist Fokusziel, wenn der
  * Knopf mit der letzten Seite verschwindet - sichtbar ohne Ring, denn sie ist
  * kein Bedienelement, nur der Ort, an dem es weitergeht. */
-.split-activity-list:focus {
+.split-activity-list:focus,
+.split-expense-rows:focus {
   outline: none;
 }
 
+/* Derselbe Knopf unter den Ausgaben (#2108). */
 .split-activity-more,
+.split-expenses-more,
 .split-recurring-add {
   display: flex;
   margin: var(--space-2) auto 0;

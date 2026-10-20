@@ -35,6 +35,12 @@ let state = {
   memberCandidates: [],
   activeGroupId: null,
   expenses: [],
+  // Ausgabenliste seitenweise (#2108), wie der Verlauf: ob der Server eine
+  // weitere Seite meldet, und zu welcher Frage (Gruppe + Kategorie) die
+  // geladene Liste gehoert - nur bei DERSELBEN bleibt ihre Tiefe beim Neuladen.
+  expensesHasMore: false,
+  expensesKey: null,
+  expensesLoadingMore: false,
   // Wiederkehrende Ausgaben der aktiven Gruppe (#1647), wie der Server sie
   // dieser Anfrage zeigt: samt `can_edit`, `blocked_reason` und - pausiert -
   // `missed_count` / `resume_date`.
@@ -300,6 +306,7 @@ const ACTIVITY_MAX_PAGE = 100;
 // Zaehlt jedes Laden der Gruppendaten. Eine Antwort, die zu einem aelteren
 // Stand gehoert (Gruppenwechsel, Neuladen nach einem Storno), wird verworfen
 // statt angehaengt - sonst landeten Eintraege der alten Gruppe unter der neuen.
+// Gilt fuer beide Listen mit "Mehr laden": Verlauf und Ausgaben (#2108).
 let _activityGeneration = 0;
 
 function activityPath(groupId, limit, cursor = null) {
@@ -341,11 +348,60 @@ async function fetchActivity(groupId, { depth = ACTIVITY_PAGE, tail = null } = {
   return { items, cursor };
 }
 
+// Seitengroesse der Ausgabenliste (#2108): der Default der Route. Beim
+// Nachholen einer schon geladenen Tiefe fragt fetchExpenses bis zu 100 auf einmal.
+const EXPENSE_PAGE = 30;
+const EXPENSE_MAX_PAGE = 100;
+
+function expensesPath(groupId, category, limit, offset = 0) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (offset) params.set('offset', String(offset));
+  if (category) params.set('category', category);
+  return `/split-expenses/groups/${groupId}/expenses?${params}`;
+}
+
+/** Die Frage, zu der eine geladene Ausgabenliste gehoert: Gruppe und Kategoriefilter. */
+const expensesKeyOf = (groupId, category) => `${groupId}|${category || ''}`;
+
+/** Liegt `item` in der Reihenfolge der Route (Datum, Anlage, id - je absteigend) bei oder hinter `tail`? */
+function expenseAtOrPast(item, tail) {
+  if (item.expense_date !== tail.expense_date) return item.expense_date < tail.expense_date;
+  if (item.created_at !== tail.created_at) return item.created_at < tail.created_at;
+  return item.id <= tail.id;
+}
+
+/**
+ * Laedt die Ausgaben von vorn, wie fetchActivity den Verlauf: mit `tail` (der
+ * bisher letzten geladenen Ausgabe) wird weitergeblaettert, bis ihre Stelle
+ * wieder erreicht ist. So faellt die Liste nach Bearbeiten oder Loeschen weit
+ * unten nicht auf die ersten 30 zurueck. Doppelte IDs fallen heraus, falls sich
+ * zwischen zwei Seiten etwas verschoben hat.
+ */
+async function fetchExpenses(groupId, category, { depth = EXPENSE_PAGE, tail = null } = {}) {
+  const first = await api.get(expensesPath(groupId, category, Math.min(Math.max(depth, EXPENSE_PAGE), EXPENSE_MAX_PAGE)));
+  const items = [...(first.data || [])];
+  let offset = items.length;
+  let hasMore = Boolean(first.pagination?.has_more);
+  while (tail && hasMore && !(items.length && expenseAtOrPast(items[items.length - 1], tail))) {
+    // eslint-disable-next-line no-await-in-loop
+    const more = await api.get(expensesPath(groupId, category, EXPENSE_MAX_PAGE, offset));
+    const rows = more.data || [];
+    const seen = new Set(items.map((item) => item.id));
+    items.push(...rows.filter((item) => !seen.has(item.id)));
+    offset += rows.length;
+    hasMore = Boolean(more.pagination?.has_more) && rows.length > 0;
+  }
+  return { items, hasMore };
+}
+
 async function loadGroupData() {
   const generation = ++_activityGeneration;
   state.activityLoadingMore = false;
+  state.expensesLoadingMore = false;
   if (!state.activeGroupId) {
     state.expenses = [];
+    state.expensesHasMore = false;
+    state.expensesKey = null;
     state.recurring = [];
     state.balances = { balances: [], simplified_debts: [] };
     state.activity = [];
@@ -359,10 +415,15 @@ async function loadGroupData() {
   const activityRequest = sameGroup
     ? { depth: state.activity.length + 1, tail: state.activity[state.activity.length - 1] }
     : {};
-  const params = new URLSearchParams();
-  if (state.category) params.set('category', state.category);
+  // Ausgaben ebenso (#2108) - aber nur bei derselben Gruppe UND demselben
+  // Kategoriefilter; ein Wechsel stellt eine neue Frage und beginnt bei Seite 1.
+  const category = state.category;
+  const expensesKey = expensesKeyOf(groupId, category);
+  const expensesRequest = state.expensesKey === expensesKey && state.expenses.length > 0
+    ? { depth: state.expenses.length + 1, tail: state.expenses[state.expenses.length - 1] }
+    : {};
   const [expenses, balances, activity, groupMembers, recurring] = await Promise.all([
-    api.get(`/split-expenses/groups/${groupId}/expenses?${params.toString()}`),
+    fetchExpenses(groupId, category, expensesRequest),
     api.get(`/split-expenses/groups/${groupId}/balances`),
     fetchActivity(groupId, activityRequest),
     api.get(`/split-expenses/groups/${groupId}/members`),
@@ -370,7 +431,9 @@ async function loadGroupData() {
   ]);
   // Ein spaeteres Laden hat inzwischen begonnen: dessen Stand gilt, nicht dieser.
   if (generation !== _activityGeneration) return;
-  state.expenses = expenses.data || [];
+  state.expenses = expenses.items;
+  state.expensesHasMore = expenses.hasMore;
+  state.expensesKey = expensesKey;
   state.balances = balances.data || { balances: [], simplified_debts: [] };
   state.activity = activity.items;
   state.activityCursor = activity.cursor;
@@ -414,6 +477,41 @@ async function loadMoreActivity() {
   state.activity = [...state.activity, ...(res?.data || []).filter((item) => !seen.has(item.id))];
   state.activityCursor = nextActivityCursor(res);
   renderActivityBox({ keepFocus: hadFocus });
+}
+
+/**
+ * "Mehr laden" unter den Ausgaben (#2108), dasselbe Verhalten wie im Verlauf:
+ * die naechste Seite hinter dem Geladenen, ein zweiter Klick waehrend der
+ * Ladung tut nichts, eine Antwort nach Gruppenwechsel oder Neuladen wird
+ * verworfen. Lesen ist keine Handlung - der Knopf steht bei jedem Recht und
+ * im Archiv.
+ */
+async function loadMoreExpenses() {
+  const groupId = state.activeGroupId;
+  const key = state.expensesKey;
+  if (!state.expensesHasMore || !groupId || state.expensesLoadingMore || key !== expensesKeyOf(groupId, state.category)) return;
+  const generation = _activityGeneration;
+  state.expensesLoadingMore = true;
+  const hadFocus = typeof document !== 'undefined'
+    && document.activeElement?.matches?.('[data-expenses-more]');
+  renderExpenseBox({ keepFocus: hadFocus });
+  let res;
+  try {
+    res = await api.get(expensesPath(groupId, state.category, EXPENSE_PAGE, state.expenses.length));
+  } catch (err) {
+    if (generation === _activityGeneration) {
+      state.expensesLoadingMore = false;
+      renderExpenseBox({ keepFocus: hadFocus });
+    }
+    throw err;
+  }
+  if (generation !== _activityGeneration || key !== state.expensesKey) return;
+  state.expensesLoadingMore = false;
+  const rows = res?.data || [];
+  const seen = new Set(state.expenses.map((item) => item.id));
+  state.expenses = [...state.expenses, ...rows.filter((item) => !seen.has(item.id))];
+  state.expensesHasMore = Boolean(res?.pagination?.has_more) && rows.length > 0;
+  renderExpenseBox({ keepFocus: hadFocus });
 }
 
 async function loadMemberCandidates() {
@@ -847,19 +945,27 @@ function drawMain(main) {
   if (settleButton) settleButton.disabled = state.expenses.length === 0;
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
   main.querySelector('.split-activity')?.addEventListener('click', onActivityClick);
-  main.querySelector('#split-expense-list')?.addEventListener('click', (e) => {
-    // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
-    // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
-    // `read` gar nicht - und fragt openExpenseModal() trotzdem, verzweigt es
-    // selbst in die Leseansicht.
-    const btn = e.target.closest('[data-expense-view], [data-expense-id]');
-    if (!btn) return;
-    const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseView ?? btn.dataset.expenseId));
-    if (!expense) return;
-    if (btn.dataset.expenseView) openExpenseReadView(expense);
-    else openExpenseModal(expense);
-  });
+  main.querySelector('#split-expense-list')?.addEventListener('click', onExpenseListClick);
   main.querySelector('#split-recurring-list')?.addEventListener('click', onRecurringClick);
+}
+
+/**
+ * Delegierter Klick in der Ausgabenliste: "Mehr laden" liest (#2108), eine
+ * Zeile oeffnet ihre Ausgabe.
+ */
+function onExpenseListClick(e) {
+  if (e.target.closest('[data-expenses-more]')) return loadMoreExpenses();
+  // Zwei Wege, je nach Markup: `data-expense-view` liest (Archiv und
+  // `budget: read`), `data-expense-id` bearbeitet. Den zweiten gibt es bei
+  // `read` gar nicht - und fragt openExpenseModal() trotzdem, verzweigt es
+  // selbst in die Leseansicht.
+  const btn = e.target.closest('[data-expense-view], [data-expense-id]');
+  if (!btn) return undefined;
+  const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseView ?? btn.dataset.expenseId));
+  if (!expense) return undefined;
+  if (btn.dataset.expenseView) openExpenseReadView(expense);
+  else openExpenseModal(expense);
+  return undefined;
 }
 
 // So viele Namen stehen in der Kopfzeile einer Gruppe, der Rest als „+N".
@@ -940,7 +1046,15 @@ function renderBalances() {
 // Aufrufer odert Archiv und Modulrecht hinein (renderMain).
 function renderExpenses(asList = false) {
   if (!state.expenses.length) return `<div class="split-muted">${t('splitExpenses.noExpenses')}</div>`;
-  return `<div class="row-carrier">${state.expenses.map((expense) => {
+  // "Mehr laden" (#2108) ist derselbe Knopf wie im Verlauf (#1309), mit
+  // demselben Text: Lesen, keine Handlung, also bei jedem Recht und im Archiv.
+  // Waehrend eine Seite unterwegs ist `aria-disabled` statt `disabled`, damit
+  // der Fokus bleibt; den zweiten Klick faengt loadMoreExpenses() ab.
+  const busy = state.expensesLoadingMore;
+  const more = state.expensesHasMore
+    ? `<button type="button" class="btn btn--secondary split-expenses-more" data-expenses-more${busy ? ' aria-disabled="true" aria-busy="true"' : ''}>${esc(t('splitExpenses.loadMoreActivity'))}</button>`
+    : '';
+  return `<div class="row-carrier split-expense-rows" tabindex="-1">${state.expenses.map((expense) => {
     // Beleg-Marke (#583): dass ein Nachweis vorliegt, ist die Information -
     // wie viele es sind, beantwortet keine Frage vor dem Öffnen.
     const receiptCount = expense.attachments?.length ?? 0;
@@ -976,7 +1090,21 @@ function renderExpenses(asList = false) {
         <span class="sr-only"> - ${esc(t('splitExpenses.editExpense'))}</span>
       </button>
     `;
-  }).join('')}</div>`;
+  }).join('')}</div>${more}`;
+}
+
+/**
+ * Zeichnet nur die Ausgabenliste neu (nach "Mehr laden"), wie
+ * renderActivityBox den Verlauf. Hatte der Knopf den Fokus, bekommt ihn der
+ * neue - oder, ist alles geladen, die Liste.
+ */
+function renderExpenseBox({ keepFocus = false } = {}) {
+  const box = _container?.querySelector('#split-expense-list');
+  if (!box) return;
+  setHtml(box, renderExpenses(isArchivedView() || readOnly()));
+  if (typeof window !== 'undefined' && window.lucide) lucide.createIcons({ el: box });
+  if (!keepFocus) return;
+  (box.querySelector('[data-expenses-more]') || box.querySelector('.split-expense-rows'))?.focus?.();
 }
 
 /** Der Rhythmus einer Serie in Worten - die Intervall-Namen des Budgets. */
@@ -2590,6 +2718,8 @@ function openGuestModal() {
 export const __test = {
   readOnly, canAddSplitExpense, groupToolsMenuHtml, renderExpenses, state, expenseReadSections, openExpenseModal, groupMetaHtml, openGroupModal,
   renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
+  // Ausgabenliste seitenweise (#2108, test-split-activity-ui.js).
+  onExpenseListClick, loadMoreExpenses,
   // Betragseingabe (#1607): Formularpruefung und die beiden Speicherwege
   // (test-split-amount-input.js).
   validateSplitForm, updateGroupDefaults, openSettlementModal,

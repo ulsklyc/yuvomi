@@ -1050,11 +1050,16 @@ router.get('/groups/:id/expenses', (req, res) => {
         AND (@search = '' OR e.title LIKE '%' || @search || '%' OR e.description LIKE '%' || @search || '%')
         AND (@category IS NULL OR e.category = @category)
         AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
-      ORDER BY e.expense_date DESC, e.created_at DESC
-      LIMIT @limit OFFSET @offset
-    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, limit, offset });
-    const serialized = serializeExpenseList(rows, documentViewer(req));
-    res.json({ data: serialized, pagination: { limit, offset, has_more: serialized.length === limit } });
+      ORDER BY e.expense_date DESC, e.created_at DESC, e.id DESC
+      LIMIT @fetch OFFSET @offset
+    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset });
+    // `created_at` ist sekundengenau: Ausgaben derselben Sekunde (eine Serie,
+    // die nachholt) haetten ohne `id` keine feste Reihenfolge, und Offset-Seiten
+    // koennten eine doppeln oder auslassen (#2108). Eine Zeile mehr gelesen
+    // macht `has_more` genau - bei genau `limit` Ausgaben keine leere Extraseite.
+    const hasMore = rows.length > limit;
+    const serialized = serializeExpenseList(hasMore ? rows.slice(0, limit) : rows, documentViewer(req));
+    res.json({ data: serialized, pagination: { limit, offset, has_more: hasMore } });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

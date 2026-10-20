@@ -71,6 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Shared expenses: a group now shows all its expenses, not just the 30 most recent (#2108).**
+  Older expenses could not be opened, edited or deleted. "Load more" under the expense list now
+  loads the next page, like the history below it, and after you edit or delete an expense the
+  list keeps everything you had loaded. Switching to another group starts at the top again.
+  Balances were always complete and are unchanged. **API:** expenses of a group are now ordered by
+  `id` as a last key, so expenses written in the same second keep their place across `limit` and
+  `offset` pages, and `pagination.has_more` is false when exactly `limit` expenses remain.
+
 - **Deleting or editing one occurrence of a series affects only that one, also on the night of a
   clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
   removed the day before. "This and following" on a series in another time zone - say Los Angeles

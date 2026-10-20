@@ -154,7 +154,19 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create a guest user and add them to a group', description: 'An `email` that already belongs to another account (split-expense guests excluded) is refused with 409 and `reason: "email_in_use"` unless the caller is an admin; a guest is never linked to SSO through its address.', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/expenses': {
-      get: op({ summary: 'List group expenses', description: `Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`, tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({
+        summary: 'List group expenses',
+        description: `Active expenses, newest first: \`expense_date\`, then \`created_at\`, then \`id\`, each descending - expenses written in the same second keep a fixed order, so \`limit\`/\`offset\` pages neither repeat nor skip one. \`pagination.has_more\` is exact: false when the page holds the last expense, also when exactly \`limit\` remain. Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
+        tag: 'SplitExpenses',
+        params: [
+          idParam(),
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 30 }, description: 'Page size. Values above 100 are capped at 100.' },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 }, description: 'Number of expenses to skip; pass the number already loaded to get the next page.' },
+          { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Matches title or description.' },
+          { name: 'category', in: 'query', required: false, schema: { type: 'string' }, description: 'Only expenses of this category; an unknown category is ignored.' },
+          { name: 'recurring', in: 'query', required: false, schema: { type: 'string', enum: ['1'] }, description: '`1` lists only expenses booked from a recurring expense.' },
+        ],
+      }),
       post: op({ summary: 'Create expense in group (optional `attachment_document_ids`: receipts from the documents module, filtered by document visibility)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/balances': {

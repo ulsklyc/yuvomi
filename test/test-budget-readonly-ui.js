@@ -791,8 +791,10 @@ test('Regel 6: `renderExpenses` traegt nicht mehr den Namen des Modulrechts', ()
   assert.match(SPLIT_CODE, /function renderExpenses\(asList = false\)/);
   assert.match(fn(SPLIT_CODE, 'drawMain'), /renderExpenses\(archived \|\| ro\)/);
   // Der Listen-Handler liest `data-expense-view` in die Leseansicht und nur
-  // `data-expense-id` ins Bearbeiten.
-  assert.match(fn(SPLIT_CODE, 'drawMain'), /if \(btn\.dataset\.expenseView\) openExpenseReadView\(expense\);\n\s*else openExpenseModal\(expense\);/);
+  // `data-expense-id` ins Bearbeiten. Seit #2108 ist er benannt
+  // (`onExpenseListClick`, dort steht auch "Mehr laden"); drawMain haengt ihn an.
+  assert.match(fn(SPLIT_CODE, 'drawMain'), /querySelector\('#split-expense-list'\)\?\.addEventListener\('click', onExpenseListClick\)/);
+  assert.match(fn(SPLIT_CODE, 'onExpenseListClick'), /if \(btn\.dataset\.expenseView\) openExpenseReadView\(expense\);\n\s*else openExpenseModal\(expense\);/);
 });
 
 test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe" geht', () => {

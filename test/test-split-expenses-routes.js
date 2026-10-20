@@ -410,6 +410,60 @@ test('GET /groups/:id/expenses: category-Filter + limit/offset-Pagination', asyn
   assert.equal(rec.body.data.length, 0, 'keine Ausgabe hat eine Wiederholungsregel');
 });
 
+// #2108: Offset-Seiten ueber Ausgaben DERSELBEN Sekunde. `created_at` ist
+// sekundengenau; ohne `id` als letzten Schluessel ist die Reihenfolge dort
+// unbestimmt, und eine Seite kann eine Ausgabe doppeln oder auslassen. Die
+// Zeitstempel werden per SQL gleichgezogen - so schreibt eine nachholende
+// Serie oder ein Import.
+test('GET /groups/:id/expenses: Seiten ueber dieselbe Sekunde ohne Doppel und Luecke, Reihenfolge id absteigend', async () => {
+  const owner = { id: OWNER, role: 'member' };
+  const created = await call('POST', '/groups', { actor: owner, body: { name: 'Seiten-Kasse', type: 'household', default_currency: 'EUR' } });
+  const gid = created.body.data.id;
+  const ids = [];
+  for (let i = 0; i < 7; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const e = await call('POST', `/groups/${gid}/expenses`, {
+      actor: owner,
+      body: { title: `Gleiche Sekunde ${i}`, amount: '5.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-02' },
+    });
+    assert.equal(e.status, 201, JSON.stringify(e.body));
+    ids.push(e.body.data.id);
+  }
+  db.prepare("UPDATE expenses SET created_at = '2026-04-02 08:00:00' WHERE group_id = ?").run(gid);
+
+  const seiten = [];
+  for (let offset = 0; offset < 7; offset += 3) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await call('GET', `/groups/${gid}/expenses?limit=3&offset=${offset}`, { actor: owner });
+    assert.equal(r.status, 200);
+    seiten.push(r.body);
+  }
+  const gesehen = seiten.flatMap((seite) => seite.data.map((e) => e.id));
+  assert.equal(new Set(gesehen).size, gesehen.length, 'keine Ausgabe auf zwei Seiten');
+  assert.deepEqual(gesehen, [...ids].sort((a, b) => b - a), 'alle sieben, innerhalb der Sekunde die juengste id zuerst');
+  assert.deepEqual(seiten.map((seite) => seite.pagination.has_more), [true, true, false]);
+});
+
+test('GET /groups/:id/expenses: has_more ist bei genau `limit` Ausgaben false (keine leere Extraseite)', async () => {
+  const owner = { id: OWNER, role: 'member' };
+  const created = await call('POST', '/groups', { actor: owner, body: { name: 'Genau-Kasse', type: 'household', default_currency: 'EUR' } });
+  const gid = created.body.data.id;
+  for (let i = 0; i < 3; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const e = await call('POST', `/groups/${gid}/expenses`, {
+      actor: owner,
+      body: { title: `Genau ${i}`, amount: '1.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-03' },
+    });
+    assert.equal(e.status, 201);
+  }
+  const genau = await call('GET', `/groups/${gid}/expenses?limit=3`, { actor: owner });
+  assert.equal(genau.body.data.length, 3);
+  assert.equal(genau.body.pagination.has_more, false, 'drei von drei: nichts mehr dahinter');
+  const knapp = await call('GET', `/groups/${gid}/expenses?limit=2`, { actor: owner });
+  assert.equal(knapp.body.data.length, 2, 'die Zusatzzeile fuer has_more geht nicht mit in die Antwort');
+  assert.equal(knapp.body.pagination.has_more, true);
+});
+
 test('member-candidates: Owner 200, Gast 403, Aussenstehender 404', async () => {
   const ok = await call('GET', `/groups/${OPS}/member-candidates`, { actor: { id: OWNER, role: 'member' } });
   assert.equal(ok.status, 200);

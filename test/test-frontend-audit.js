@@ -20694,7 +20694,7 @@ test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen lieg
   assert.equal((split.match(/class="split-section-title u-section-title"/g) ?? []).length, 4);
   assert.match(split, /return `<div class="row-carrier">\$\{rows\}<\/div>\$\{add\}`;/, 'Serien im Traeger');
   assert.match(split, /return `<div class="row-carrier">\$\{debts\.map/, 'Salden im Traeger');
-  assert.match(split, /return `<div class="row-carrier">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
+  assert.match(split, /return `<div class="row-carrier split-expense-rows" tabindex="-1">\$\{state\.expenses\.map/, 'Ausgaben im Traeger');
   assert.match(split, /class="split-activity-list row-carrier"/, 'Verlauf im Traeger');
   const splitCss = rulesOf(read('../public/styles/split-expenses.css'));
   const sektion = splitCss.filter((rule) => selectorsOf(rule).some((sel) => /^\.split-section(?:-head)?$/.test(sel)) && /background(?:-color)?:|box-shadow:/.test(rule.body));
