@@ -224,6 +224,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payment, a recurring expense, a member or a guest now close only the dialog the save came from. If
   you had closed the dialog and opened another one before the answer arrived, the other one stays
   open with what you typed in it, and focus stays where you are.
+- **A dialog that is still loading no longer replaces one you opened in the meantime (#1997).**
+  Dialogs that load something first now open only if you are still where you asked for them:
+  editing a contact, a budget transfer, a calendar event from its details or a family member;
+  managing quick links, calendars, inventory locations and categories, pantry locations or reward
+  participants; importing birthdays; matching ingredients to the pantry; a member's points or pocket
+  money history; sending a shopping list or moving checked items to the pantry; editing a shared
+  expense group or inviting a member; waste reminders and the mapping profile preview. If you had
+  opened another dialog or left the page while it loaded, the other dialog stays open with what you
+  typed in it. After deleting a subscription category or payment method, the management dialog no
+  longer reopens over another dialog, and saving a prevention type that no longer exists closes only
+  its own dialog.
 - **Inventory, notes, contacts and birthdays: an error message is in your language and names the
   cause** (#1909). These pages showed the server's own text when something could not be saved,
   pinned, completed or deleted, whatever the app language, in English or in German - for example

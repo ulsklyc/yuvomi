@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus, captureModalContext } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
@@ -5924,7 +5924,11 @@ async function moveLocalCalendar(id, direction) {
 
 async function openLocalCalendarsModal() {
   if (moduleAccess('calendar') !== 'write') return;
+  // Laden die Kalender erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureModalContext();
   await loadLocalCalendars();
+  if (!isModalContextCurrent(context)) return;
   openSharedModal({
     title: t('calendar.manageCalendars'),
     content: renderLocalCalendarsContent(),
@@ -7159,7 +7163,11 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
       },
       // Am Desktop bleibt der gewohnte Weg: Popover zu, Formular auf.
       standalone: async () => {
+        // Wer waehrend des Wartens einen anderen Dialog oeffnet oder die
+        // Seite verlaesst, bekommt das Formular nicht darueber gelegt (#1997).
+        const context = captureModalContext();
         await remindersReady;
+        if (!isModalContextCurrent(context)) return;
         openEventModal({ mode: 'edit', event: ev, reminder: reminders });
       },
     },

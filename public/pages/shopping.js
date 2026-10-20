@@ -12,7 +12,7 @@ import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
-import { promptModal, openModal, closeModal, captureModalContext, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { promptModal, openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
@@ -1048,6 +1048,9 @@ async function openSendListDialog(container) {
     return;
   }
 
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureModalContext();
   let members = [];
   try {
     // Nicht `/family/members`: der zeigt dieselben Haushaltsmitglieder, prueft
@@ -1072,6 +1075,7 @@ async function openSendListDialog(container) {
   // Bildschirm die neue steht. Bei etwas, das sich nicht zuruecknehmen laesst,
   // ist das der teuerste Fehler dieser Funktion.
   if (state.activeListId !== listId) return;
+  if (!isModalContextCurrent(context)) return;
 
   if (!members.length) {
     window.yuvomi.showToast(t('shopping.sendListNoRecipients'), 'warning');
@@ -3018,6 +3022,9 @@ async function openPantryTransfer(container) {
   const checked = state.items.filter((i) => checkedOf(i));
   if (!checked.length) return;
 
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureModalContext();
   let locations = [];
   try {
     const res = await api.get('/pantry/locations');
@@ -3029,6 +3036,7 @@ async function openPantryTransfer(container) {
 
   const { PANTRY_UNITS } = await import('/utils/pantry-units.js');
   const { locationLabel } = await import('/utils/pantry-locations.js');
+  if (!isModalContextCurrent(context)) return;
 
   const unitOptions = (selected) => PANTRY_UNITS
     .map((u) => `<option value="${esc(u)}" ${u === selected ? 'selected' : ''}>${esc(t(`pantry.units.${u}`))}</option>`)
@@ -4387,7 +4395,9 @@ function openStoreManager(container) {
 async function openCategoryManager(container, { fromDeepLink = false } = {}) {
   // Regel 7: der Aufrufer versteckt den Ausloeser, die Komponente fragt nicht.
   if (readOnly()) return;
-  const { openModal } = await import('/components/modal.js');
+  // Kein `await import('/components/modal.js')` mehr: das Modul ist oben schon
+  // geladen, und das Warten darauf war nur ein Fenster, in dem der Nutzer einen
+  // anderen Dialog oeffnen konnte, den dieser dann verdraengte (#1997).
 
   // Die geteilte Komponente (Audit F-15) dispatcht ohne Detail — der lokale
   // State wird nach jeder Mutation frisch vom Server geladen.

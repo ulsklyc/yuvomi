@@ -844,6 +844,41 @@ test('Seite: im Verwalten-Dialog loeschen - schon geloescht ist ein Erfolg und l
   }
 });
 
+// #1997: Oeffnet der Nutzer WAEHREND des Loeschens einen anderen Dialog, baut
+// die Antwort die Verwaltung nicht darueber neu auf - openMetadataModal()
+// schloesse ihn sonst mit force. Das gilt fuer den Erfolg (samt "schon
+// geloescht") wie fuer den Fehler, nach dem die Verwaltung sonst wieder aufgeht.
+test('Seite: im Verwalten-Dialog loeschen - kommt die Antwort, nachdem ein anderer Dialog aufging, geht die Verwaltung nicht wieder auf (#1997)', async () => {
+  for (const [kind, loesche, expected] of [
+    ['categories', async () => ({ data: null }), ['subscriptions.metaDeletedToast', 'success']],
+    ['methods', async () => { throw fehler(404, 'subscriptions_payment_method_not_found'); }, ['subscriptions.metaDeletedToast', 'success']],
+    ['methods', async () => { throw fehler(500); }, ['common.unknownError', 'danger']],
+  ]) {
+    const rowId = kind === 'categories' ? 6 : 8;
+    const { knopf } = zeile(kind, rowId, 'Musik');
+    const panel = verwalten({}, { '[data-act="delete"]': [knopf] });
+    let opened = 0;
+    let kontext = 'verwaltung';
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__openModal = (opts) => { opened += 1; if (opened === 1) opts.onSave(panel); };
+    try {
+      await mitSeite(() => mit({
+        get: serverDanach([rowId]),
+        delete: async (...args) => { kontext = 'ein-anderer-dialog'; return loesche(...args); },
+      }, async () => {
+        page.openMetadataModal();
+        await knopf.handlers.click();
+      }));
+      const label = `${kind} ${expected[0]}`;
+      assert.deepEqual(toasts, [expected], label);
+      assert.equal(opened, 1, `${label}: die Verwaltung geht ueber dem anderen Dialog wieder auf und verdraengt ihn`);
+    } finally {
+      delete globalThis.__openModal;
+      delete globalThis.__modalContextId;
+    }
+  }
+});
+
 // --- Nachladen: Besitzer und Reihenfolge ------------------------------------
 
 test('Seite: nach "gibt es nicht mehr" wird gezeichnet und der Fokus kommt zurueck', async () => {

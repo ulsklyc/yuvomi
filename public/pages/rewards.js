@@ -11,7 +11,7 @@ import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
@@ -1336,6 +1336,9 @@ function openRewardModal(item) {
 
 async function openParticipantsModal() {
   if (readOnly()) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureModalContext();
   let members = [];
   try {
     const res = await api.get('/rewards/participants');
@@ -1344,6 +1347,7 @@ async function openParticipantsModal() {
     await confirmModal(rewardsErrorSentence(err, 'rewards.loadError'), { confirmLabel: t('rewards.gotIt') });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
   openModal({
     title: t('rewards.manageParticipants'),
     // Ein ANSICHTSBLATT: jeder Haken speichert sofort (PUT je Person), es gibt
@@ -1394,11 +1398,15 @@ async function openParticipantsModal() {
 async function openMemberDetail(memberId) {
   const member = balances().find((b) => b.id === memberId);
   if (!member) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureModalContext();
   let ledger = [];
   try {
     const res = await api.get(`/rewards/ledger?user_id=${memberId}&limit=12`);
     ledger = res.data || [];
   } catch { /* Historie optional */ }
+  if (!isModalContextCurrent(context)) return;
   const hint = nextRewardHint(member.balance);
   const rows = ledger.length ? ledger.map((row) => {
     const positive = row.delta > 0;
@@ -2036,10 +2044,14 @@ function moneyLedgerRowHtml(row) {
 async function openMoneyDetail(memberId) {
   const account = moneyAccount(memberId);
   if (!account) return;
+  // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
+  const context = captureModalContext();
   let ledger = [];
   try {
     ledger = (await api.get(`/rewards/money/ledger?user_id=${memberId}&limit=20`)).data || [];
   } catch { /* Historie optional */ }
+  if (!isModalContextCurrent(context)) return;
   const rows = ledger.length
     ? ledger.map(moneyLedgerRowHtml).join('')
     : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerTitle'))}</p></li>`;
@@ -2083,6 +2095,8 @@ export const __test = {
   renderMoneySection, renderMoneyRow, moneyLedgerRowHtml, moneyRowKind, moneyPlanLine, fmtMoney,
   minorToAmountInput, moneyAmountProblem, decimalToMinor, removeMoneyPlan, decideRedemption, openMoneyPlanModal, openMoneyBookModal,
   openMoneyAccountModal, closeMoneyAccount,
+  // #1997: Dialoge, die erst nach dem Laden aufgehen (test-late-modal-open.js).
+  openParticipantsModal, openMemberDetail, openMoneyDetail,
 };
 
 export async function render(container, { user } = {}) {

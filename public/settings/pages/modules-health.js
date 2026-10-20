@@ -117,11 +117,15 @@ async function reload() {
  * Fehler-Toast der Seite (#1909): der Satz der App, nie der des Servers. Gibt
  * es die bearbeitete Art nicht mehr, geht der Dialog zu und die Liste kommt
  * frisch vom Server.
+ *
+ * Geschlossen wird nur der Dialog, aus dem die Anfrage kam (`modalContext`
+ * von VOR der Anfrage): kommt die Antwort, nachdem der Nutzer einen anderen
+ * geoeffnet hat, bleibt der stehen (#1997).
  */
-function reportError(err) {
+function reportError(err, modalContext) {
   window.yuvomi?.showToast(errorSentence(err), 'danger');
   if (!isGone(err)) return;
-  closeModal({ force: true }).then(() => reload()).then(() => refocusAfterRender()).catch(() => {});
+  closeModal({ force: true, context: modalContext }).then(() => reload()).then(() => refocusAfterRender()).catch(() => {});
 }
 
 function openTypeModal(type) {
@@ -209,7 +213,7 @@ function openTypeModal(type) {
           await reload();
           refocusAfterRender();
         } catch (err) {
-          reportError(err);
+          reportError(err, modalContext);
         }
       });
 
@@ -248,7 +252,7 @@ function openTypeModal(type) {
           refocusAfterRender();
         } catch (err) {
           submitBtn.disabled = false;
-          reportError(err);
+          reportError(err, modalContext);
         }
       });
     },

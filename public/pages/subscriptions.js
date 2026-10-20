@@ -2335,6 +2335,10 @@ function openMetadataModal() {
           );
           if (!confirmed) return;
           const owner = pageOwner();
+          // Die Verwaltung ist jetzt zu. Was der Nutzer waehrend des Loeschens
+          // und Ladens oeffnet, gehoert ihm: openMetadataModal() schloesse es
+          // ebenso wie ein closeModal() ohne Kontext (#1997).
+          const afterConfirm = captureModalContext();
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
           } catch (err) {
@@ -2342,7 +2346,7 @@ function openMetadataModal() {
             // Zahlungsarten haben keine Sichtbarkeit, die 404 heisst nur das.
             if (!isAlreadyDeleted(err, isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found')) {
               window.yuvomi?.showToast(errorText(err), 'danger');
-              if (isCurrentOwner(owner)) openMetadataModal();
+              if (isCurrentOwner(owner) && isModalContextCurrent(afterConfirm)) openMetadataModal();
               return;
             }
           }
@@ -2350,8 +2354,9 @@ function openMetadataModal() {
           // Ein Filter auf die geloeschte geht vor dem Laden auf "alle".
           resetGoneFilter(isCat ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', id);
           if (!await reload(undefined, { owner })) return;
-          refocusAfterRender();
           window.yuvomi?.showToast(t('subscriptions.metaDeletedToast'), 'success');
+          if (!isModalContextCurrent(afterConfirm)) return;
+          refocusAfterRender();
           openMetadataModal();
         });
       });

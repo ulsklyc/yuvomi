@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
@@ -1159,6 +1159,9 @@ function importCandidateRowHtml(c) {
 
 async function openImportModal() {
   if (readOnly()) return;
+  // Kommen die Kandidaten erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht der Import nicht mehr auf (#1997).
+  const context = captureModalContext();
   let candidates;
   try {
     const res = await api.get('/birthdays/import/candidates');
@@ -1167,6 +1170,7 @@ async function openImportModal() {
     window.yuvomi?.showToast(loadErrorSentence(err) ?? t('common.errorGeneric'), 'danger');
     return;
   }
+  if (!isModalContextCurrent(context)) return;
 
   const withBirthday = candidates.withBirthday ?? [];
   const withoutBirthday = candidates.withoutBirthday ?? [];

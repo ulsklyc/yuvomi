@@ -15,6 +15,7 @@ import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
   captureModalContext,
+  isModalContextCurrent,
   advancedSection,
   wireBlurValidation,
   reportFieldError,
@@ -1629,7 +1630,11 @@ async function removeItem(item) {
 async function openLocationManager() {
   // Zweite Linie hinter dem fehlenden Knopf im Kopf (Regel 7).
   if (readOnly()) return;
+  // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureModalContext();
   await import('/components/category-manager.js');
+  if (!isModalContextCurrent(context)) return;
 
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft

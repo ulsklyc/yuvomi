@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -1368,7 +1368,11 @@ async function fetchFullContact(contact) {
 
 async function openContactModal({ mode, contact = null }) {
   if (readOnly()) return;
+  // Kommt der volle Kontakt erst, nachdem der Nutzer einen anderen Dialog
+  // geoeffnet oder die Seite verlassen hat, geht das Formular nicht mehr auf (#1997).
+  const context = captureModalContext();
   if (mode === 'edit') contact = await fetchFullContact(contact);
+  if (!isModalContextCurrent(context)) return;
   const form = buildContactForm({ mode, contact });
   openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire });
 }

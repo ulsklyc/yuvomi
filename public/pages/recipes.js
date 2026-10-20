@@ -1480,6 +1480,9 @@ async function openPantryMatchModal(recipe, ingredientName) {
 
   let items = [];
   const owner = _container;
+  // Kommt der Vorrat erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
+  const context = captureModalContext();
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
@@ -1487,6 +1490,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
     reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
 
   openSharedModal({
     title: t('recipes.ingredientMatchTitle', { name: ingredientName }),
@@ -1586,6 +1590,9 @@ async function openPantryBulkMatchModal(recipe) {
 
   let items = [];
   const owner = _container;
+  // Kommt der Vorrat erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
+  const context = captureModalContext();
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
@@ -1593,6 +1600,7 @@ async function openPantryBulkMatchModal(recipe) {
     reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
   const fields = open.map((ing, i) => `
         <div class="form-group">
           <label class="form-label" for="pantry-bulk-match-${i}">${esc(ing.quantity ? `${ing.quantity} · ${ing.name}` : ing.name)}</label>

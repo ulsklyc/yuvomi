@@ -267,6 +267,32 @@ test('Woche: Bearbeiten oeffnet das Formular mit dem Tag des angetippten Chips',
   });
 });
 
+// #1997: das Formular wartet auf die Erinnerungen. Oeffnet der Nutzer in dieser
+// Zeit einen anderen Dialog (oder verlaesst die Seite), legt es sich nicht
+// darueber - openModal() schloesse den anderen mit force.
+test('Woche: Bearbeiten - geht inzwischen ein anderer Dialog auf, bleibt das Formular zu (#1997)', async () => {
+  await withState({ view: 'week', events: DAYS.map((d) => occurrence(d)) }, async () => {
+    const view = mount((c) => calendar.renderWeekView(c));
+    const chip = chipsOf(view.html(), 'week-event').find((c) => c.column === '2026-06-17');
+    const opened = open(view, '#week-cols', 'click', chip.el);
+    const forms = [];
+    let kontext = 'detail';
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__openModal = (options) => forms.push(options);
+    globalThis.__apiStub = { get: async () => ({ data: [] }) };
+    try {
+      const lauf = opened.edit.standalone();
+      kontext = 'ein-anderer-dialog';
+      await settles(lauf, 'Bearbeiten');
+    } finally {
+      delete globalThis.__modalContextId;
+      delete globalThis.__openModal;
+      delete globalThis.__apiStub;
+    }
+    assert.equal(forms.length, 0, 'das Formular legt sich ueber den Dialog, der waehrend des Wartens aufging');
+  });
+});
+
 test('ein Chip ohne passendes Vorkommen oeffnet NICHTS statt eines anderen Vorkommens', () => {
   const events = DAYS.map((d) => occurrence(d));
   assert.equal(calendar.eventForChip({ dataset: { id: String(SERIES_ID), occurrence: '2026-07-01T09:00' } }, events), null);

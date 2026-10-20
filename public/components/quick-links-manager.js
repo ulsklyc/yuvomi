@@ -23,7 +23,7 @@ import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openModal, closeModal, captureModalContext, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { makeSortable } from '/utils/sortable.js';
@@ -475,6 +475,9 @@ function listRowHtml(s, canEdit) {
  * @param {Function} opts.onChange  nach jeder Änderung (Übersicht neu laden)
  */
 export async function openQuickLinksManager({ onChange = () => {} } = {}) {
+  // Kommt die Liste erst, nachdem der Nutzer einen anderen Dialog geoeffnet
+  // oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
+  const context = captureModalContext();
   let items = [];
   try {
     items = (await api.get('/quick-links'))?.data ?? [];
@@ -482,6 +485,7 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
     window.yuvomi?.showToast(t('quickLinks.loadError'), 'danger');
     return;
   }
+  if (!isModalContextCurrent(context)) return;
 
   // Nach einer Änderung zeigt die Verwaltung wieder den neuen Stand - sonst
   // stünde die Liste, aus der man gerade gelöscht hat, unverändert da.
