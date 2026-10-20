@@ -528,6 +528,7 @@ test('Hin- und Rueckweg am Rand des Zahlenraums: unveraendert speichern zieht ke
 // Dialog war, der zuging. Gefahren wird je Weg der echte submit-Lauscher; die
 // schreibende Anfrage wechselt den Kontext.
 test('#1997: Erfolg nach Dialogwechsel - jeder Speicherweg schliesst nur mit dem Kontext von VOR der Anfrage', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
   const WEGE = [
     ['Gruppe anlegen', () => split.openGroupModal(null), '#split-group-form'],
     ['Ausgabe anlegen', neueAusgabe, '#split-expense-form', { amount: '12,50' }],
@@ -544,8 +545,15 @@ test('#1997: Erfolg nach Dialogwechsel - jeder Speicherweg schliesst nur mit dem
       globalThis.__isOwnModalOpen = (ctx) => eigenerOffen && ctx === 'eigener-dialog';
       globalThis.__closeModal = (opts) => { geschlossen.push(opts ?? {}); return true; };
       globalThis.__refocusAfterRender = () => { fokus += 1; };
-      // Der Seitentraeger, in den nach dem Speichern gezeichnet wird.
-      split.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [], isConnected: true });
+      // Der Seitentraeger, in den nach dem Speichern gezeichnet wird: jede
+      // Stelle ein leerer Knoten, damit das Neuzeichnen bis zum Fokus durchlaeuft.
+      const leer = {
+        hidden: false, removeAttribute() {}, setAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {},
+        querySelector: () => null, querySelectorAll: () => [], addEventListener() {},
+      };
+      split.setContainerForTest({ querySelector: () => leer, querySelectorAll: () => [], isConnected: true });
+      // Das Neuzeichnen sucht den FAB im Dokument und baut Leerzustaende als Knoten.
+      const miniDomAbraeumen = installMiniDom();
       try {
         const { gesendet } = await speichern(oeffnen, formular({ formId, ...felder }).panel, {
           beimSchreiben: () => { if (!eigenerOffen) kontext = 'ein-anderer-dialog'; },
@@ -559,6 +567,7 @@ test('#1997: Erfolg nach Dialogwechsel - jeder Speicherweg schliesst nur mit dem
         assert.equal(fokus, eigenerOffen ? 1 : 0,
           `${label}: den Fokus traegt nur zurueck, wessen Dialog eben zuging - sonst gehoert er dem anderen Dialog`);
       } finally {
+        miniDomAbraeumen();
         split.setContainerForTest(null);
         delete globalThis.__modalContextId;
         delete globalThis.__isOwnModalOpen;

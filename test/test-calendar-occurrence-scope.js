@@ -455,7 +455,8 @@ test('nichts geaendert: keine Frage, keine Anfrage - das Speichern schliesst nur
   const { calls, log, dialogs } = await clickSave(panel, OCCURRENCE, { answer: 'this' });
   assert.equal(dialogs.length, 0, 'keine Frage');
   assert.deepEqual(calls, [], 'und kein Einzeltermin, der nur den Stand der Serie kopiert');
-  assert.deepEqual(log, [['close', { force: true }]], 'das Formular geht zu');
+  // context: nur DIESER Dialog geht zu, festgehalten vor der Rueckfrage (#1997).
+  assert.deepEqual(log, [['close', { force: true, context: 'test-modal-context' }]], 'das Formular geht zu');
 });
 
 test('geaendert und zurueckgestellt ist nicht geaendert', async () => {

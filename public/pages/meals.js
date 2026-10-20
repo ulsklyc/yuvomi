@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
@@ -1604,10 +1604,13 @@ async function runRandomize(panel) {
   }
 
   runBtn.disabled = true;
+  // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+  // aufgegangen ist (#1997).
+  const dialog = captureModalContext();
   try {
     await api.post('/meals/apply-plan', { assignments: plan.assignments.map((assignment) => assignment.payload), replace_existing: replaceExisting });
     await reloadAfterSave(() => loadWeek(state.currentWeek));
-    closeModal({ force: true });
+    closeModal({ force: true, context: dialog });
     renderWeekGrid();
     window.yuvomi?.showToast(t('meals.randomizeSuccess', { count: plan.assignments.length }), 'success');
   } catch (err) {
@@ -2191,11 +2194,13 @@ function openMealModal(opts) {
         if (!mayTransferMealToShopping(state.modal.meal.id)) return;
         const btn = panel.querySelector('#transfer-btn');
         btn.disabled = true;
+        const dialog = captureModalContext();
         try {
           const res = await api.post(`/meals/${state.modal.meal.id}/to-shopping-list`, { listId });
           if (res.data.transferred > 0) {
             await reloadAfterSave(() => loadWeek(state.currentWeek));
-            closeModal({ force: true });
+            // Nur diesen Dialog (#1997).
+            closeModal({ force: true, context: dialog });
             renderWeekGrid();
             // Dieselbe Meldung, Standzeit und Rücknahme wie am Slot-Knopf: es ist
             // derselbe Transfer, nur ein anderer Auslöser.
@@ -2250,12 +2255,14 @@ function openMealModal(opts) {
        * ungespeicherte Aenderungen waren weg. Die Frage steht jetzt ueber dem
        * geparkten Editor; zu geht er erst, wenn wirklich geloescht wird. */
       panel.querySelector('#modal-delete')?.addEventListener('click', async () => {
+        // Die Frage parkt den Editor und gibt ihn zurueck: derselbe Dialog (#1997).
+        const dialog = captureModalContext();
         let scope;
         if (meal.recurrence_template_id) {
           scope = await askOverModal(() => selectModal(...mealDeleteScopeQuestion()));
           if (scope === null || scope === undefined) return;
         }
-        closeModal({ force: true });
+        closeModal({ force: true, context: dialog });
         deleteMeal(meal.id, { scope });
       });
       panel.querySelector('#modal-save').addEventListener('click', () => saveModal(panel));
@@ -2646,9 +2653,16 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
     </div>`;
 }
 
-function closeModal({ force = false } = {}) {
-  closeSharedModal({ force });
-  state.modal = null;
+/**
+ * `context` (aus captureModalContext() VOR der Anfrage): nur DIESEN Dialog
+ * schliessen (#1997). Ist inzwischen ein anderer offen, bleibt er stehen - und
+ * mit ihm `state.modal`, das dann schon seine Absicht traegt: ein zweiter
+ * Mahlzeit-Dialog stuende sonst ohne sie da, und sein Speichern liefe ins Leere.
+ */
+function closeModal({ force = false, context = null } = {}) {
+  const own = !context || isOwnModalOpen(context);
+  closeSharedModal({ force, context });
+  if (own) state.modal = null;
 }
 
 async function saveModal(overlay) {
@@ -2693,6 +2707,9 @@ async function saveModal(overlay) {
 
   saveBtn.disabled    = true;
   saveBtn.textContent = '…';
+  // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+  // aufgegangen ist (#1997).
+  const dialog = captureModalContext();
 
   try {
     const { mode, meal } = state.modal;
@@ -2733,7 +2750,7 @@ async function saveModal(overlay) {
       await reloadAfterSave(() => loadWeek(state.currentWeek));
     }
 
-    closeModal({ force: true });
+    closeModal({ force: true, context: dialog });
     renderWeekGrid();
     // Das Ergebnis, nicht der Dialogtitel: „Mahlzeit hinzufügen" als
     // Erfolgsmeldung liest sich wie eine Aufforderung (R16).

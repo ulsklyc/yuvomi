@@ -733,7 +733,8 @@ test('nichts angefasst: keine Frage, nichts gesendet - auch nicht an den Erinner
   const { calls, dialogs, closes } = await save(panel, { event: SERIES_OCCURRENCE, reminders, scope: 'this' });
   assert.equal(dialogs.length, 0);
   assert.deepEqual(calls, []);
-  assert.deepEqual(closes, [{ force: true }], 'das Formular geht einfach zu');
+  // context: nur DIESER Dialog geht zu (#1997).
+  assert.deepEqual(closes, [{ force: true, context: 'test-modal-context' }], 'das Formular geht einfach zu');
 });
 
 test('nur dieser, die Zeile nach dem Beginn selbst umgestellt: normale Vorlaeufe', async () => {

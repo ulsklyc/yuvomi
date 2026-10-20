@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, promptModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, renderKeepingFocus, captureModalContext } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
@@ -8823,6 +8823,11 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
   // Rechte wechselten.
   if (readOnly()) return;
+  // Geschlossen wird nur DIESER Dialog: kommt die Antwort erst, nachdem der
+  // Nutzer ihn zugemacht und einen anderen geoeffnet hat, bleibt der andere
+  // samt seinen Eingaben offen (#1997). Festgehalten vor jedem await - eine
+  // Rueckfrage ueber dem Formular gibt denselben Dialog zurueck.
+  const dialog = captureModalContext();
   const eventId = event?.id;
   const saveBtn = overlay.querySelector('#modal-save');
   const title   = overlay.querySelector('#modal-title').value.trim();
@@ -8914,7 +8919,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   let occurrenceScope = 'series';
   if (mode === 'edit' && isLocalRecurringSeries(event) && canEditCalendarOccurrence(event)) {
     if (!eventFormChanged(overlay, attachmentState)) {
-      closeModal({ force: true });
+      closeModal({ force: true, context: dialog });
       return;
     }
     const localSelect = overlay.querySelector('#event-local-calendar');
@@ -9146,7 +9151,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       }
     }
 
-    closeModal({ force: true });
+    closeModal({ force: true, context: dialog });
     renderView();
     window.yuvomi?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
   } catch (err) {

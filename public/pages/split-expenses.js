@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -2017,17 +2017,21 @@ async function openGroupModal(group = null) {
         const form = panel.querySelector('#split-group-form');
         const data = Object.fromEntries(new FormData(form));
         collectGroupDefaults(form, data);
+        const dialog = captureModalContext();
         if (isEdit) await api.patch(`/split-expenses/groups/${group.id}`, data);
         else await api.post('/split-expenses/groups', data);
         if (isEdit) await syncEditedGroupMembers(group, form);
         // Neue Gruppen sind aktiv - aus dem Archiv heraus angelegt bliebe die
         // Liste sonst leer, obwohl die Gruppe existiert.
         if (!isEdit) state.groupStatus = 'active';
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2194,16 +2198,20 @@ function openExpenseModal(expense = null, prefill = null) {
           { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
         const { participants, splits } = collectSplitPayload(form);
         const payload = { ...data, participants, splits };
+        const dialog = captureModalContext();
         // commit() lädt wartende Dateien erst jetzt hoch: ein abgebrochenes
         // Formular hinterlässt keine verwaiste Datei im Dokumente-Modul.
         if (receipts) payload.attachment_document_ids = await receipts.commit();
         if (isEdit) await api.put(`/split-expenses/expenses/${expense.id}`, payload);
         else await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, payload);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await refreshDashboard();
         await loadGroupData();
         renderAll({ motion: true });
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2446,6 +2454,7 @@ function openRecurringModal(recurring = null) {
           return;
         }
         const payload = isEdit ? changedRecurringFields(shown, now, recurring) : now;
+        const dialog = captureModalContext();
         busy = true;
         try {
           // Nichts geaendert: kein Aufruf, kein Verlaufseintrag "bearbeitet".
@@ -2465,10 +2474,13 @@ function openRecurringModal(recurring = null) {
         } finally {
           busy = false;
         }
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroupData();
         renderAll({ motion: true });
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2614,14 +2626,18 @@ function openSettlementModal() {
         if (rejectSplitAmount(form.querySelector('[name="amount"]'),
           form.querySelector('[name="currency"]')?.value || group.default_currency,
           { original: debt?.amount ?? null, originalCurrency: debt?.currency ?? null, required: true })) return;
+        const dialog = captureModalContext();
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
         await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await refreshDashboard();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2656,12 +2672,16 @@ async function openMemberModal() {
         delete data.member_ref;
         if (source === 'contact') data.contact_id = Number(id);
         else data.user_id = Number(id);
+        const dialog = captureModalContext();
         await api.post(`/split-expenses/groups/${state.activeGroupId}/members`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });
@@ -2702,8 +2722,12 @@ function openGuestModal() {
         if (!isDateInputValid(birthDateRaw)) return;
         const data = Object.fromEntries(new FormData(form));
         data.birth_date = parseDateInput(birthDateRaw) || null;
+        const dialog = captureModalContext();
         await api.post(`/split-expenses/groups/${state.activeGroupId}/guests`, data);
-        closeModal({ force: true });
+        // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+        // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
+        const ownDialog = isOwnModalOpen(dialog);
+        closeModal({ force: true, context: dialog });
         const [members, groupMembers] = await Promise.all([
           api.get('/family/members'),
           api.get(`/split-expenses/groups/${state.activeGroupId}/members`),
@@ -2713,7 +2737,7 @@ function openGuestModal() {
         await loadGroups();
         await loadGroupData();
         renderAll();
-        refocusAfterRender();
+        if (ownDialog) refocusAfterRender();
       });
     },
   });

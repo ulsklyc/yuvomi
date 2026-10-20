@@ -14,6 +14,7 @@ import { readRowHtml, readRowHintEl } from '/utils/read-row.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
+  captureModalContext,
   advancedSection,
   wireBlurValidation,
   reportFieldError,
@@ -1558,6 +1559,9 @@ async function saveItem(panel, mode, item) {
 
   saveBtn.disabled = true;
   try {
+    // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
+    // aufgegangen ist (#1997).
+    const dialog = captureModalContext();
     if (mode === 'create') {
       const res = await api.post('/pantry', payload);
       state.items.push(res.data);
@@ -1570,7 +1574,7 @@ async function saveItem(panel, mode, item) {
     // Einzel-Antwort - deshalb nach dem Speichern einmal frisch laden, damit
     // Gruppierung und Meta-Zeile stimmen.
     await reloadAfterSave(() => loadPantry());
-    closeSharedModal({ force: true });
+    closeSharedModal({ force: true, context: dialog });
     renderFilters();
     renderList({ motion: true });
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');

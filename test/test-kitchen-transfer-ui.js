@@ -420,6 +420,67 @@ test('Serien-Mahlzeit: Loeschen im Fuss fragt den Umfang UEBER dem Editor - ein 
   }
 });
 
+// #1997: Transfer und Loeschen im Mahlzeit-Dialog schliessen nur den Dialog,
+// aus dem sie kamen. Kommt die Antwort des Transfers erst, nachdem der Nutzer
+// den Dialog zugemacht und einen anderen geoeffnet hat, geht der Kontext von
+// VOR der Anfrage an closeModal (die Regel selbst: components/modal.js,
+// test-modal-dead-time.js) - und `state.modal`, das dann dem anderen
+// Mahlzeit-Dialog gehoert, bleibt stehen. Beim Loeschen parkt die Umfangsfrage
+// den Editor und gibt ihn zurueck: geschlossen wird mit dem Kontext von davor.
+test('#1997: Mahlzeit-Dialog - Transfer und Loeschen schliessen nur mit dem Kontext ihres eigenen Dialogs', async () => {
+  const serie = { ...mahlzeit(), recurrence_template_id: 7 };
+  const ANDERER = { mode: 'edit', meal: { id: 77 } };
+  const zuvor = { meals: meals.state.meals, lists: meals.state.lists, close: globalThis.__closeModal,
+    ask: globalThis.__askOverModal, api: globalThis.__apiStub };
+  let kontext = 'eigener-dialog';
+  const geschlossen = [];
+  meals.state.meals = [serie];
+  meals.state.lists = [LISTE];
+  globalThis.__modalContextId = () => kontext;
+  globalThis.__isOwnModalOpen = (ctx) => ctx === kontext;
+  globalThis.__closeModal = (opts) => { geschlossen.push(opts ?? {}); return true; };
+  globalThis.__askOverModal = async () => 'series';
+  globalThis.__apiStub = {
+    get: async () => ({ data: [] }),
+    delete: async () => ({ data: {} }),
+    post: async () => {
+      // Waehrend der Transfer laeuft: Dialog zu, ein anderer Mahlzeit-Dialog auf.
+      kontext = 'ein-anderer-dialog';
+      meals.state.modal = ANDERER;
+      return { data: { transferred: 1, skipped: 0, added_ids: [3] } };
+    },
+  };
+  try {
+    const panel = await withAccess(BEIDE, () => oeffne(
+      () => meals.openMealModal({ mode: 'edit', date: serie.date, mealType: serie.meal_type, meal: serie }),
+      { '#transfer-list-select': String(LISTE.id) },
+    ));
+    await withAccess(BEIDE, () => panel.element('#transfer-btn').listeners.click());
+    assert.equal(geschlossen.length, 1, `Transfer: genau ein Schliessen (${JSON.stringify(geschlossen)})`);
+    assert.equal(geschlossen[0].force, true, 'Transfer: force wie bisher');
+    assert.equal(geschlossen[0].context, 'eigener-dialog',
+      'Transfer: geschlossen wird ohne den Kontext von vor der Anfrage - die spaete Antwort traefe den Dialog, der jetzt offen ist');
+    assert.equal(meals.state.modal, ANDERER, 'Transfer: die Absicht des anderen Mahlzeit-Dialogs bleibt stehen');
+
+    kontext = 'eigener-dialog';
+    geschlossen.length = 0;
+    // Das Nachladen nach dem Transfer hat die Woche geleert; die Mahlzeit steht wieder da.
+    meals.state.meals = [serie];
+    await withAccess(BEIDE, () => panel.element('#modal-delete').listeners.click());
+    assert.equal(geschlossen.length, 1, 'Loeschen: genau ein Schliessen');
+    assert.equal(geschlossen[0].context, 'eigener-dialog', 'Loeschen: mit dem Kontext von vor der Umfangsfrage');
+  } finally {
+    meals.state.meals = zuvor.meals;
+    meals.state.lists = zuvor.lists;
+    meals.state.modal = null;
+    globalThis.__closeModal = zuvor.close;
+    globalThis.__askOverModal = zuvor.ask;
+    globalThis.__apiStub = zuvor.api;
+    delete globalThis.__modalContextId;
+    delete globalThis.__isOwnModalOpen;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Eigene Rezepte zeigen ihr Bild (Critique 2026-10-05, R16)
 // ---------------------------------------------------------------------------

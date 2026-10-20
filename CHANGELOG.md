@@ -192,6 +192,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the dialog the save came from. The same holds for adding a CalDAV account, adding and editing
   a CardDAV account and editing a calendar subscription in the settings. If you had closed the dialog
   and opened another one before the answer arrived, the other one stays open with what you typed in it.
+- **Saving an event, a meal, a pantry item or a shared expense no longer closes a dialog you opened
+  in the meantime (#1997).** Adding and editing a calendar event, adding and editing a meal (also as
+  a series), filling the week at random, sending a meal's ingredients to the shopping list, deleting
+  a meal, adding and editing a pantry item, and in Shared expenses adding a group, an expense, a
+  payment, a recurring expense, a member or a guest now close only the dialog the save came from. If
+  you had closed the dialog and opened another one before the answer arrived, the other one stays
+  open with what you typed in it, and focus stays where you are.
 - **Inventory, notes, contacts and birthdays: an error message is in your language and names the
   cause** (#1909). These pages showed the server's own text when something could not be saved,
   pinned, completed or deleted, whatever the app language, in English or in German - for example
