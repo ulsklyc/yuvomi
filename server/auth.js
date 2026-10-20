@@ -743,6 +743,12 @@ function syncFamilyMemberArtifacts(database, userId, {
           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(name, birthDate ?? null, photo ?? null, birthday.id);
+    // Ein Geburtstag ohne Jahr (#2095) bekommt hier nur dann ein Jahr, wenn
+    // wirklich ein anderes Datum kommt: das Profil schickt sonst das
+    // Platzhalterjahr unveraendert zurueck, und das waere kein Geburtsjahr.
+    if (birthday.year_unknown === 1 && birthDate && birthDate !== birthday.birth_date) {
+      database.prepare('UPDATE birthdays SET year_unknown = 0 WHERE id = ?').run(birthday.id);
+    }
     const updated = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(birthday.id);
     syncBirthdayArtifacts(database, updated);
     return;

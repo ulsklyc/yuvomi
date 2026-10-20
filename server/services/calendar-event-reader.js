@@ -267,7 +267,7 @@ export function getUpcomingEvents(d, {
            ${localCalendarColorSql()} AS local_calendar_color,
            ${SOURCE_CALENDAR_COLUMNS},
            COALESCE(bd.name, nd.name) AS birthday_name,
-           bd.birth_date AS birthday_date,
+           CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
            nd.name_day   AS name_day,
            CASE WHEN nd.id IS NOT NULL THEN 'name_day'
                 WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
@@ -441,7 +441,7 @@ export function getEventsOverlappingDays(d, {
            COALESCE(ec.color, isub.color) AS cal_color,
            ${SOURCE_CALENDAR_COLUMNS},
            COALESCE(bd.name, nd.name) AS birthday_name,
-           bd.birth_date AS birthday_date,
+           CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
            nd.name_day   AS name_day,
            CASE WHEN nd.id IS NOT NULL THEN 'name_day'
                 WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,

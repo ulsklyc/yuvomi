@@ -310,13 +310,15 @@ function userFromContact(database, contactId, actorId, groupId, passwordHash, { 
       phone: contact.phone,
       email: contact.email,
       birthDate: contact.birthday,
+      // Kennt der Kontakt nur Tag und Monat, gilt das auch fuer den Geburtstag (#2095).
+      birthYearUnknown: contact.birthday_year_unknown === 1,
       actorUserId: actorId,
     });
   }
   return created.lastInsertRowid;
 }
 
-function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, actorUserId }) {
+function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, birthYearUnknown = false, actorUserId }) {
   const contact = database.prepare('SELECT id, name FROM contacts WHERE family_user_id = ?').get(userId);
   if (contact) {
     database.prepare(`
@@ -350,12 +352,22 @@ function syncGuestArtifacts(database, userId, { displayName, phone, email, birth
       SET name = ?, birth_date = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(displayName, birthDate, existing.id);
+    // "Jahr unbekannt" (#2095) folgt dem Datum: ein anderes Datum mit Jahr nimmt
+    // die Marke ab, dasselbe zurueckgeschickte Platzhalterdatum laesst sie stehen.
+    if (birthYearUnknown) {
+      database.prepare('UPDATE birthdays SET year_unknown = 1 WHERE id = ?').run(existing.id);
+    } else if (existing.year_unknown === 1 && birthDate !== existing.birth_date) {
+      database.prepare('UPDATE birthdays SET year_unknown = 0 WHERE id = ?').run(existing.id);
+    }
     birthday = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(existing.id);
   } else {
     const created = database.prepare(`
       INSERT INTO birthdays (name, birth_date, created_by, family_user_id)
       VALUES (?, ?, ?, ?)
     `).run(displayName, birthDate, actorUserId, userId);
+    if (birthYearUnknown) {
+      database.prepare('UPDATE birthdays SET year_unknown = 1 WHERE id = ?').run(created.lastInsertRowid);
+    }
     birthday = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(created.lastInsertRowid);
   }
   syncBirthdayArtifacts(database, birthday);

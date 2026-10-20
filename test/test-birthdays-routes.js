@@ -671,3 +671,87 @@ test('eine verworfene Geburtstagserinnerung bleibt verworfen, bis sich ihr Termi
     db.prepare('DELETE FROM birthdays WHERE id = ?').run(rowId);
   }
 });
+
+// --------------------------------------------------------------------------
+// Geburtstag ohne Jahr (#2095): iCloud speicherte "Jahr unbekannt" als 1604,
+// Yuvomi zeigte es als echtes Jahr und "wird 422". Die Marke `year_unknown`
+// haelt Tag und Monat, das Datum traegt das Platzhalterjahr 2000.
+// --------------------------------------------------------------------------
+test('ohne Jahr: kein Alter aus dem Platzhalterjahr (#2095)', () => {
+  assert.equal(nextBirthdayAge('2000-03-15', '2026-10-20', true), null);
+  assert.equal(nextBirthdayAge('2000-03-15', '2026-10-20'), 27, 'mit Jahr bleibt das Alter');
+  const row = { id: 1, name: 'X', birth_date: '2000-03-15', year_unknown: 1, name_day: null };
+  const hydrated = hydrateBirthday(db, row, new Date('2026-10-20T12:00:00Z'));
+  assert.equal(hydrated.next_age, null);
+  assert.equal(hydrated.next_birthday, '2027-03-15', 'der naechste Geburtstag zaehlt weiter');
+});
+
+test('POST /: year_unknown speichert Tag und Monat mit Platzhalterjahr, ohne Alter (#2095)', async () => {
+  // 1987 hat keinen 29.02. - ohne Jahr zaehlt nur Tag und Monat.
+  const r = await call('POST', '/', { name: 'Ohne Jahr', birth_date: '1987-02-29', year_unknown: true });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const bd = r.body.data;
+  assert.equal(bd.birth_date, '2000-02-29');
+  assert.equal(bd.year_unknown, 1);
+  assert.equal(bd.next_age, null);
+  assert.ok(['02-28', '02-29'].includes(bd.next_birthday.slice(5)), bd.next_birthday);
+  assert.equal(bd.days_until, daysUntilBirthday('2000-02-29'));
+
+  const ev = db.prepare(`
+    SELECT e.start_datetime, e.description FROM calendar_events e
+    JOIN birthdays b ON b.calendar_event_id = e.id WHERE b.id = ?
+  `).get(bd.id);
+  assert.equal(ev.start_datetime, '2000-02-29', 'die Serie beginnt nicht im Jahr 1604');
+  assert.doesNotMatch(ev.description, /2000|29/, 'die Beschreibung nennt kein Platzhalterdatum');
+});
+
+test('POST /: year_unknown nimmt 0/1 und lehnt anderes ab (#2095)', async () => {
+  const one = await call('POST', '/', { name: 'Eins', birth_date: '1990-04-01', year_unknown: 1 });
+  assert.equal(one.status, 201);
+  assert.equal(one.body.data.birth_date, '2000-04-01');
+  const zero = await call('POST', '/', { name: 'Null', birth_date: '1990-04-01', year_unknown: 0 });
+  assert.equal(zero.status, 201);
+  assert.equal(zero.body.data.birth_date, '1990-04-01');
+  assert.equal(zero.body.data.year_unknown, 0);
+  const bad = await call('POST', '/', { name: 'Falsch', birth_date: '1990-04-01', year_unknown: 'yes' });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /year_unknown/);
+});
+
+test('PUT /:id: Jahr unbekannt setzen und mit echtem Jahr wieder abnehmen (#2095)', async () => {
+  const created = await call('POST', '/', { name: 'Wechsel', birth_date: '1975-11-03' });
+  const id = created.body.data.id;
+
+  const yearless = await call('PUT', `/${id}`, { year_unknown: true });
+  assert.equal(yearless.status, 200);
+  assert.equal(yearless.body.data.birth_date, '2000-11-03', 'das alte Jahr weicht dem Platzhalter');
+  assert.equal(yearless.body.data.next_age, null);
+
+  // Ein Namenswechsel ohne die Marke laesst sie stehen.
+  const renamed = await call('PUT', `/${id}`, { name: 'Wechsel neu', birth_date: '2000-11-03' });
+  assert.equal(renamed.body.data.year_unknown, 1);
+
+  // Abnehmen ohne Jahr hiesse: 2000 waere still das Geburtsjahr.
+  const noYear = await call('PUT', `/${id}`, { year_unknown: false });
+  assert.equal(noYear.status, 400);
+  assert.equal(db.prepare('SELECT year_unknown FROM birthdays WHERE id = ?').get(id).year_unknown, 1);
+
+  const withYear = await call('PUT', `/${id}`, { year_unknown: false, birth_date: '1975-11-03' });
+  assert.equal(withYear.status, 200);
+  assert.equal(withYear.body.data.birth_date, '1975-11-03');
+  assert.equal(withYear.body.data.year_unknown, 0);
+  assert.equal(withYear.body.data.next_age, nextBirthdayAge('1975-11-03'));
+});
+
+test('OpenAPI beschreibt year_unknown an Geburtstag und Kontakt (#2095)', async () => {
+  const { schemas } = await import('../server/openapi/schemas.js');
+  for (const name of ['BirthdayCreateInput', 'BirthdayUpdateInput']) {
+    const prop = schemas[name].properties.year_unknown;
+    assert.ok(prop, `${name} nennt year_unknown`);
+    assert.deepEqual(prop.oneOf.map((o) => o.type), ['boolean', 'integer'], 'true/false und 0/1 wie die Route');
+  }
+  const { contactsPaths } = await import('../server/openapi/paths/contacts.js');
+  const paths = contactsPaths();
+  assert.match(paths['/api/v1/contacts'].post.description, /birthday_year_unknown/);
+  assert.match(paths['/api/v1/contacts/{id}'].put.description, /birthday_year_unknown/);
+});

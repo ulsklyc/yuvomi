@@ -11175,6 +11175,36 @@ const MIGRATIONS = [
       log.info(`Grouped ${rows.length} pantry batch(es) into ${groups.size} product(s).`);
     },
   },
+  {
+    version: 256,
+    description: 'Birthdays and contacts: a birthday without a year (#2095)',
+    // 254 AND 255 ARE TAKEN BY OPEN PULL REQUESTS, this entry starts at 256 on
+    // purpose; migrate() applies by version and does not need a gap-free list.
+    //
+    // A BIRTHDAY CAN BE A DAY AND A MONTH. iCloud stores one without a year with
+    // the placeholder year 1604 and marks it, `BDAY;X-APPLE-OMIT-YEAR=1604:
+    // 1604-03-15`; vCard 4 writes `--0315`. The parsers read only the value, so
+    // 1604 landed as a real year in contacts and in the birthdays imported from
+    // them, with an age of over 400. The flag says "the year is unknown";
+    // birth_date and contacts.birthday stay full dates and carry the leap year
+    // 2000 as placeholder (29 February stays a valid day, like the name day's
+    // `2000-MM-DD` event), so sorting, the next birthday and the reminders keep
+    // reading the same column. A reader that shows a year or an age asks the
+    // flag first.
+    //
+    // THE EXISTING 1604 ROWS ARE REPAIRED HERE. 1604 is never a real birth year
+    // of a household contact; it is Apple's placeholder. The generated calendar
+    // events follow on the next birthday sync, which rewrites their start and
+    // description from the row.
+    up: `
+      ALTER TABLE birthdays ADD COLUMN year_unknown INTEGER NOT NULL DEFAULT 0 CHECK(year_unknown IN (0, 1));
+      ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0 CHECK(birthday_year_unknown IN (0, 1));
+      UPDATE birthdays SET birth_date = '2000' || substr(birth_date, 5), year_unknown = 1
+        WHERE substr(birth_date, 1, 5) = '1604-';
+      UPDATE contacts SET birthday = '2000' || substr(birthday, 5), birthday_year_unknown = 1
+        WHERE substr(birthday, 1, 5) = '1604-';
+    `,
+  },
 ];
 
 /**
@@ -11219,6 +11249,22 @@ function backfillAvatarKey(database) {
       WHERE avatar_data IS NOT NULL AND avatar_data <> '' AND avatar_key IS NULL
   `);
   createAvatarKeyTriggers(database);
+}
+
+/** Der Nachtrag aus Migration 256, derselbe Wortlaut; die Migration bleibt eingefroren. */
+function backfillBirthdayYearUnknown(database) {
+  database.exec(`
+    UPDATE birthdays SET birth_date = '2000' || substr(birth_date, 5), year_unknown = 1
+      WHERE substr(birth_date, 1, 5) = '1604-'
+  `);
+}
+
+/** Der Nachtrag aus Migration 256 fuer Kontakte, derselbe Wortlaut. */
+function backfillContactBirthdayYearUnknown(database) {
+  database.exec(`
+    UPDATE contacts SET birthday = '2000' || substr(birthday, 5), birthday_year_unknown = 1
+      WHERE substr(birthday, 1, 5) = '1604-'
+  `);
 }
 
 function backfillSeriesAuthored(database) {
@@ -11495,6 +11541,16 @@ const CRITICAL_COLUMNS = [
   // Aufgabenaenderung rollt mit zurueck) und jeder Verlauf (er liest sie). Kein
   // Nachtrag: NULL heisst "in Yuvomi abgehakt".
   { table: 'task_completions', column: 'source', type: 'TEXT' },
+  // #2095: v256 traegt "Jahr unbekannt" an Geburtstag und Kontakt nach; ohne die
+  // Spalten scheitern Kalender, Uebersicht und Geburtstagsliste (sie lesen sie,
+  // um Jahr und Alter wegzulassen). MIT NACHTRAG: Apples Platzhalterjahr 1604
+  // wird mit der Spalte umgestellt, wie in der Migration.
+  { table: 'birthdays', column: 'year_unknown',
+    type: 'INTEGER NOT NULL DEFAULT 0 CHECK(year_unknown IN (0, 1))',
+    backfill: backfillBirthdayYearUnknown },
+  { table: 'contacts', column: 'birthday_year_unknown',
+    type: 'INTEGER NOT NULL DEFAULT 0 CHECK(birthday_year_unknown IN (0, 1))',
+    backfill: backfillContactBirthdayYearUnknown },
 ];
 
 /**

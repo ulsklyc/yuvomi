@@ -29,7 +29,7 @@ export function birthdaysPaths() {
     '/api/v1/birthdays/upcoming': {
       get: op({
         summary: 'List upcoming birthdays',
-        description: 'Ordered by distance to each person’s next birthday; optional name-day fields do not affect ordering.',
+        description: 'Ordered by distance to each person’s next birthday; optional name-day fields do not affect ordering. A birthday with `year_unknown` sorts by day and month like any other and carries `next_age: null`.',
         tag: 'Birthdays',
       }),
     },
@@ -50,7 +50,7 @@ export function birthdaysPaths() {
       get: op({
         summary: 'List contacts eligible for birthday import',
         tag: 'Birthdays',
-        description: 'Reads the contact book, so it requires read access to the `contacts` module in addition to `calendar` - a credential scoped to the calendar alone is refused with 403.',
+        description: 'Reads the contact book, so it requires read access to the `contacts` module in addition to `calendar` - a credential scoped to the calendar alone is refused with 403. Each candidate with a birthday carries `birthday_year_unknown` (boolean); the import takes it over as `year_unknown`.',
         responses: {
           200: { description: 'Successful response' },
           401: { $ref: '#/components/responses/Unauthorized' },

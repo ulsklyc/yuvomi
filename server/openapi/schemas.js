@@ -19,7 +19,14 @@ const BIRTHDAY_REMINDER_MAX_MINUTES = 999 * 10080;
 
 const birthdayInputProperties = {
   name: { type: 'string', maxLength: 200 },
-  birth_date: { type: 'string', format: 'date' },
+  birth_date: { type: 'string', format: 'date', description: 'The birth date. With `year_unknown` its year is a placeholder: the server stores 2000 (a leap year, so 29 February stays valid) whatever year is sent.' },
+  year_unknown: {
+    description: 'The year of birth is unknown (#2095): only day and month of `birth_date` count, and `next_age` is null. Responses carry it as 0 or 1. Omitted on update, the stored value stays; turning it off needs a `birth_date` with its real year in the same request.',
+    oneOf: [
+      { type: 'boolean' },
+      { type: 'integer', enum: [0, 1] },
+    ],
+  },
   name_day: { type: ['string', 'null'], pattern: '^\\d{2}-\\d{2}$', description: 'Month and day (`MM-DD`), or null to clear it.' },
   notes: { type: ['string', 'null'], maxLength: 5000 },
   photo_data: { type: ['string', 'null'], description: 'A base64 image data URL (png, jpeg, webp, gif), or null to remove it.' },

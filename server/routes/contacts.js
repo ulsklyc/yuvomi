@@ -11,6 +11,7 @@ import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from 
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
+import { birthDateInput, placeholderBirthDate, validateYearUnknown } from '../services/birthdays.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -445,8 +446,11 @@ router.post('/', (req, res) => {
     const vNotes   = str(req.body.notes,   'Notizen', { max: MAX_TEXT,  required: false });
     // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
     // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
-    const vBirthday = date(req.body.birthday, 'Geburtstag', false);
-    const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes, vBirthday,
+    // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
+    // Platzhalter, die Anzeige laesst es weg.
+    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+    const vBirthday = date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'Geburtstag', false);
+    const errors   = collectErrors([vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
                                     ...namePartChecks(nameParts.parts)]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
 
@@ -475,11 +479,11 @@ router.post('/', (req, res) => {
     // Insert contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO contacts (name, category, phone, email, address, notes, birthday,
+        INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
                               first_name, last_name, middle_name, name_prefix, name_suffix)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
-             vAddress.value, vNotes.value, vBirthday.value,
+             vAddress.value, vNotes.value, vBirthday.value, vBirthday.value && vYearUnknown.value ? 1 : 0,
              nameParts.parts.firstName, nameParts.parts.lastName, nameParts.parts.middleName,
              nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
 
@@ -577,7 +581,22 @@ router.put('/:id', (req, res) => {
     if (req.body.email    !== undefined) checks.push(str(req.body.email,    'E-Mail',  { max: MAX_TITLE, required: false }));
     if (req.body.address  !== undefined) checks.push(str(req.body.address,  'Adresse', { max: MAX_TEXT,  required: false }));
     if (req.body.notes    !== undefined) checks.push(str(req.body.notes,    'Notizen', { max: MAX_TEXT,  required: false }));
-    if (req.body.birthday !== undefined) checks.push(date(req.body.birthday, 'Geburtstag', false));
+    // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
+    // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
+    // echten Geburtsjahr.
+    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+    checks.push(vYearUnknown);
+    const yearUnknown = vYearUnknown.value ?? contact.birthday_year_unknown === 1;
+    let birthday = contact.birthday;
+    if (req.body.birthday !== undefined) {
+      const vBirthday = date(birthDateInput(req.body.birthday, yearUnknown), 'Geburtstag', false);
+      checks.push(vBirthday);
+      birthday = vBirthday.value;
+    } else if (yearUnknown && contact.birthday_year_unknown !== 1 && contact.birthday) {
+      birthday = placeholderBirthDate(contact.birthday);
+    } else if (vYearUnknown.value === false && contact.birthday_year_unknown === 1 && contact.birthday) {
+      checks.push({ value: null, error: 'Birthday with its year is required when birthday_year_unknown is turned off.' });
+    }
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...selectedCategoryGone(vCat, errors) });
 
@@ -656,6 +675,7 @@ router.put('/:id', (req, res) => {
             address     = ?,
             notes       = ?,
             birthday    = ?,
+            birthday_year_unknown = ?,
             first_name  = ?,
             last_name   = ?,
             middle_name = ?,
@@ -669,7 +689,8 @@ router.put('/:id', (req, res) => {
         req.body.email   !== undefined ? (req.body.email?.trim()   || null) : contact.email,
         req.body.address !== undefined ? (req.body.address?.trim() || null) : contact.address,
         req.body.notes   !== undefined ? (req.body.notes?.trim()   || null) : contact.notes,
-        req.body.birthday !== undefined ? (req.body.birthday || null) : contact.birthday,
+        birthday || null,
+        birthday && yearUnknown ? 1 : 0,
         nameParts.provided ? nameParts.parts.firstName  : contact.first_name,
         nameParts.provided ? nameParts.parts.lastName   : contact.last_name,
         nameParts.provided ? nameParts.parts.middleName : contact.middle_name,
@@ -845,7 +866,15 @@ router.get('/:id/vcard', (req, res) => {
     if (contact.email)   lines.push(`EMAIL:${esc(contact.email)}`);
     if (contact.address) lines.push(`ADR;TYPE=HOME:;;${esc(contact.address)};;;;`);
     if (contact.notes)   lines.push(`NOTE:${esc(contact.notes)}`);
-    if (contact.birthday) lines.push(`BDAY:${esc(contact.birthday)}`);
+    // Ohne Jahr in Apples Form (#2095): vCard 3.0 kennt kein `--MMDD`, und
+    // sabre/vobject (Nextcloud, Baikal) schreibt jahrlose Geburtstage in 3.0
+    // genau so. Apple liest die Marke und zeigt kein Jahr; der eigene Import
+    // (Sync und .vcf) erkennt sie ebenfalls.
+    if (contact.birthday && contact.birthday_year_unknown === 1) {
+      lines.push(`BDAY;X-APPLE-OMIT-YEAR=1604:1604${esc(contact.birthday).slice(4, 10)}`);
+    } else if (contact.birthday) {
+      lines.push(`BDAY:${esc(contact.birthday)}`);
+    }
     if (contact.category) lines.push(`CATEGORIES:${esc(contact.category)}`);
     lines.push('END:VCARD');
 

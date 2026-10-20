@@ -212,3 +212,24 @@ test('birthday token lookup rejects mismatches and unequal byte lengths and excl
     assert.equal(feed.findUserIdByFeedToken(db, first), ids[0]);
   } finally { db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(ids[1]); }
 });
+
+// #2095: ein Geburtstag ohne Jahr. Der Geburtstags-Feed traegt ohnehin kein
+// Jahr (Anker 2000) und bleibt, wie er ist; im allgemeinen Kalender-Feed
+// beginnt die Serie im Platzhalterjahr statt 1604, und die Beschreibung nennt
+// kein Datum mit erfundenem Jahr.
+test('a birthday without a year exports on its day, without 1604 or an invented date', async () => {
+  actor = ids[0];
+  const created = await call('POST', '/birthdays', { name: 'Yearless', birth_date: '1604-03-15', year_unknown: true });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.data.id;
+
+  const birthdayEvent = feed.buildBirthdayFeed(db).split('BEGIN:VEVENT\r\n')
+    .find(block => block.startsWith('UID:birthday-' + id + '@yuvomi\r\n'));
+  assert.match(birthdayEvent, /DTSTART;VALUE=DATE:20000315/);
+
+  const calendar = calendarFeed.buildFeed(db, actor);
+  const block = calendar.split('BEGIN:VEVENT').find(b => b.includes('Yearless'));
+  assert.ok(block, 'the generated event is in the calendar feed');
+  assert.match(block, /DTSTART;VALUE=DATE:20000315/);
+  assert.doesNotMatch(block, /1604|15\.03\.2000|2000-03-15/);
+});
