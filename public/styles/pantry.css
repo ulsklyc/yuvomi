@@ -531,6 +531,15 @@
   display: none;
 }
 
+/* The cart of a product row (#1448, step 3) stands beside the toggle, not
+ * inside it. Without a cart (the product is neither low nor out) the empty
+ * actions zone takes no room, unless it carries the more button of a product
+ * without batches: without a minimum that row has no cart (#2118) but must
+ * keep its delete. */
+.pantry-product__actions:not(:has(.pantry-row__cart, .row-action--more)) {
+  display: none;
+}
+
 .pantry-product__toggle .list-group__chevron {
   color: var(--color-text-tertiary);
   margin-inline-end: var(--space-2);

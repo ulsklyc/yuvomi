@@ -60,6 +60,24 @@ const EMPTY_PANTRY = Object.freeze({ attention: 0, expired: 0, low: 0, out: 0 })
  * Teilzahlen kommen mit, damit die Leiste später verfeinert werden kann, ohne die
  * Route zu ändern - sie summieren sich bewusst NICHT auf `attention`, weil ein
  * Artikel abgelaufen UND fast leer sein kann.
+ *
+ * WHAT IS COUNTED, SINCE THE MINIMUM IS THE PRODUCT'S (#1448, step 3). The two
+ * facts live in different places: expiry is a property of a batch, low and out
+ * of a product (the sum of its batches against the product's minimum; a
+ * product without batches is out only when it has a minimum). So:
+ *
+ * - `expired` counts batches, as the "Expired" chip does.
+ * - `low` and `out` count products, as the "Running low" chip does.
+ * - `attention` counts PRODUCTS, each one once: a product needs attention when
+ *   it is out, running low, or has at least one expired batch. A product that
+ *   is low and has an expired batch is one item needing attention, not two
+ *   (the maintainer's rule on #1448), and so is a product with two expired
+ *   batches: the badge says how many things in the stock need you, and the
+ *   page lists products, the expired chip then names the batches.
+ *
+ * A batch without a product (written by an older version under
+ * DB_ALLOW_NEWER_SCHEMA, until the next start adopts it) stands for itself,
+ * with its own minimum, as the client treats it.
  */
 router.get('/summary', (req, res) => {
   try {
@@ -84,20 +102,44 @@ router.get('/summary', (req, res) => {
       'SELECT COUNT(*) AS c FROM shopping_items WHERE is_checked = 0'
     ).get().c;
 
-    // Die drei Bedingungen spiegeln pantryItemStatus() in
+    // Die drei Bedingungen spiegeln pantryStockStatus() und pantryItemStatus() in
     // public/utils/pantry-status.js. Bleiben sie hier und dort nicht gleich, zeigt
     // die Leiste eine andere Zahl als die Filter-Chips daneben - ein Guard in
     // test/test-frontend-audit.js hält die Definitionen zusammen.
+    //
+    // One row per product (`stock`): its total rounded like the client's
+    // (normalizePantryQuantity, two decimals), its minimum, and how many of its
+    // batches have expired. Every count below reads that row, so a product is
+    // counted once however many batches it has. A product without batches is
+    // out only when it has a minimum above 0 (hasPantryMinimum() in the
+    // client, #2118): without one it tells nobody that something is missing.
     const pantry = denied.has('pantry') ? null : db.get().prepare(`
+      WITH stock AS (
+        SELECT p.min_quantity AS min_quantity,
+               COUNT(pi.id) AS batches,
+               ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS quantity,
+               SUM(CASE WHEN pi.expires_on IS NOT NULL AND pi.expires_on < ? THEN 1 ELSE 0 END) AS expired
+        FROM pantry_products p
+        LEFT JOIN pantry_items pi ON pi.product_id = p.id
+        GROUP BY p.id
+        UNION ALL
+        SELECT min_quantity, 1, quantity,
+               CASE WHEN expires_on IS NOT NULL AND expires_on < ? THEN 1 ELSE 0 END
+        FROM pantry_items WHERE product_id IS NULL
+      )
+      , status AS (
+        SELECT expired,
+               CASE WHEN batches > 0 THEN quantity <= 0 ELSE COALESCE(min_quantity > 0, 0) END AS is_out,
+               CASE WHEN batches > 0 AND quantity > 0 AND min_quantity IS NOT NULL AND quantity <= min_quantity
+                    THEN 1 ELSE 0 END AS is_low
+        FROM stock
+      )
       SELECT
-        SUM(CASE WHEN expires_on IS NOT NULL AND expires_on < ? THEN 1 ELSE 0 END) AS expired,
-        SUM(CASE WHEN quantity <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
-        SUM(CASE WHEN quantity > 0 AND min_quantity IS NOT NULL AND quantity <= min_quantity THEN 1 ELSE 0 END) AS low,
-        SUM(CASE WHEN (expires_on IS NOT NULL AND expires_on < ?)
-                   OR quantity <= 0
-                   OR (min_quantity IS NOT NULL AND quantity <= min_quantity)
-                 THEN 1 ELSE 0 END) AS attention
-      FROM pantry_items
+        SUM(expired) AS expired,
+        SUM(is_out) AS out_of_stock,
+        SUM(is_low) AS low,
+        SUM(CASE WHEN expired > 0 OR is_out OR is_low THEN 1 ELSE 0 END) AS attention
+      FROM status
     `).get(today, today);
 
     res.json({

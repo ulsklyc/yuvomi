@@ -50,6 +50,8 @@ import {
   pantryFilterCounts,
   pantryFilterFromSearch,
   pantryItemStatus,
+  pantryProductStock,
+  pantryStockStatus,
 } from '/utils/pantry-status.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -194,11 +196,26 @@ function expiryBadge(item) {
   };
 }
 
-function stockBadge(item) {
-  const { out, low } = pantryItemStatus(item, state.todayKey);
-  if (out) return { tone: 'danger', text: t('pantry.badgeOut') };
-  if (low) return { tone: 'warning', text: t('pantry.badgeLow') };
+/**
+ * "Out of stock" / "Running low" from a product's stock ({ out, low }, see
+ * pantryProductStock). Low and out belong to the product (#1448, step 3): the
+ * badge stands on the row that stands for the product, never on a batch row
+ * under it.
+ */
+function stockBadge(stock) {
+  if (!stock) return null;
+  if (stock.out) return { tone: 'danger', text: t('pantry.badgeOut') };
+  if (stock.low) return { tone: 'warning', text: t('pantry.badgeLow') };
   return null;
+}
+
+/**
+ * The stock of every product as the rows show it: with the intent of a step
+ * still in its debounce window, and without a batch in its undo window.
+ */
+function productStock() {
+  const shown = state.items.filter((i) => !pendingDeletes.has(i.id)).map(withIntent);
+  return pantryProductStock(shown, state.products);
 }
 
 // --------------------------------------------------------
@@ -256,9 +273,10 @@ function visibleItems() {
   const place = placeFilterId();
   // Gefiltert wird nach dem, was die Zeile ZEIGT - sonst faellt ein Artikel aus
   // „Fast leer", waehrend die Zeile ihn noch dort zeigt.
+  const stock = state.filter === 'low' ? productStock() : null;
   return state.items.map(withIntent).filter((item) => {
     // A place chip (#1448) asks "what is in the freezer?": the batches there.
-    if (place != null ? item.location_id !== place : !matchesPantryFilter(item, state.filter, state.todayKey)) return false;
+    if (place != null ? item.location_id !== place : !matchesPantryFilter(item, state.filter, state.todayKey, stock)) return false;
     if (!q) return true;
     return item.name?.toLowerCase().includes(q)
       || item.notes?.toLowerCase().includes(q)
@@ -267,9 +285,10 @@ function visibleItems() {
 }
 
 /**
- * Mit einem Filter eine flache, nach Dringlichkeit sortierte Chargenliste: die
- * Chips fragen „welche Packung", und die Antwort ist eine Charge. Der Ort steht
- * in der Meta-Zeile, bei mehreren Chargen eines Produkts auch dessen Summe.
+ * Mit einem Ablauf-Filter eine flache, nach Dringlichkeit sortierte
+ * Chargenliste: die Chips fragen „welche Packung", und die Antwort ist eine
+ * Charge. Der Ort steht in der Meta-Zeile, bei mehreren Chargen eines Produkts
+ * auch dessen Summe. "Running low" lists products instead (lowProducts).
  */
 function flatItems(items) {
   const flat = [...items];
@@ -325,8 +344,7 @@ function productWhereText(batches) {
 /**
  * The most urgent expiry among a product's batches, as the batch row says it
  * ("Expired yesterday", "3 days left"): the earliest best-before date that is
- * expired or soon, so expired beats soon. Only the expiry: low and out over
- * the product come with the minimum on the product (#1448, step 3).
+ * expired or soon, so expired beats soon.
  */
 function productExpiryBadge(batches) {
   const urgent = batches
@@ -335,15 +353,19 @@ function productExpiryBadge(batches) {
   return urgent.length ? expiryBadge(urgent[0]) : null;
 }
 
-/** Fills the badge slot of a product row (empty when nothing is urgent). */
-function fillProductBadge(slot, batches) {
+/**
+ * Fills the badge slot of a product row (empty when nothing is urgent): the
+ * most urgent expiry of its batches and the product's own "Running low" or
+ * "Out of stock", the same pair a single row carries.
+ */
+function fillProductBadge(slot, batches, stock) {
   slot.replaceChildren();
-  const badge = productExpiryBadge(batches);
-  if (!badge) return;
-  const el = document.createElement('span');
-  el.className = `pantry-badge pantry-badge--${badge.tone}`;
-  el.textContent = badge.text;
-  slot.appendChild(el);
+  for (const badge of [productExpiryBadge(batches), stockBadge(stock)].filter(Boolean)) {
+    const el = document.createElement('span');
+    el.className = `pantry-badge pantry-badge--${badge.tone}`;
+    el.textContent = badge.text;
+    slot.appendChild(el);
+  }
 }
 
 /**
@@ -364,39 +386,7 @@ function fillProductBadge(slot, batches) {
  * @returns {Array<{ key: string, label: string, products: object[] }>}
  */
 function productSections(matching) {
-  const byProduct = batchesByProduct();
-  const known = new Map(state.products.map((p) => [`p${p.id}`, p]));
-  const q = state.query.toLowerCase();
-  const keys = new Set(matching.map(productKeyOf));
-  for (const p of state.products) {
-    if (pendingProductDeletes.has(p.id)) continue;
-    if (!byProduct.has(`p${p.id}`) && (!q || p.name?.toLowerCase().includes(q))) keys.add(`p${p.id}`);
-  }
-
-  const placeOrder = new Map(state.locations.map((loc, idx) => [loc.id, idx]));
-  const last = state.locations.length;
-  const placeRank = (item) => (item.location_id == null ? last + 1 : (placeOrder.get(item.location_id) ?? last));
-  // Best-before ascending, a batch without a date after the dated ones.
-  const dateRank = (a, b) => (a.expires_on ? 0 : 1) - (b.expires_on ? 0 : 1)
-    || String(a.expires_on ?? '').localeCompare(String(b.expires_on ?? ''));
-  const byBatchOrder = (a, b) => (placeRank(a) - placeRank(b)) || dateRank(a, b) || (a.id - b.id);
-
-  const products = [...keys].map((key) => {
-    const batches = [...(byProduct.get(key) ?? [])].sort(byBatchOrder);
-    const product = known.get(key);
-    const first = batches[0];
-    return {
-      key,
-      id: product?.id ?? null,
-      name: product?.name ?? first?.name ?? '',
-      unit: product?.unit ?? first?.unit,
-      category: product?.category || first?.category || DEFAULT_CATEGORY_NAME,
-      batches,
-      // Matched through a batch only (a place, a note): open it, so the hit is
-      // visible. The remembered state stays as it is.
-      openForSearch: Boolean(q) && batches.length > 1 && !(product?.name ?? first?.name ?? '').toLowerCase().includes(q),
-    };
-  });
+  const products = productEntries(matching);
 
   const catOrder = new Map(state.categories.map((c, idx) => [c.name, idx]));
   const sections = new Map();
@@ -413,6 +403,74 @@ function productSections(matching) {
       label: categoryLabel(category),
       products: list.sort((a, b) => nameOrder(a.name, b.name) || ((a.id ?? 0) - (b.id ?? 0))),
     }));
+}
+
+/**
+ * The "Running low" chip lists PRODUCTS (#1448, step 3): it answers "what do I
+ * need to buy", and low and out are the product's. Out first, then the
+ * lowest share of the minimum (total / minimum, so 1 l of 5 l comes before
+ * 2 of 3 cans: units do not compare), then by name; each one in the shape of the unfiltered list
+ * (one batch: its row, several: the product row with its batches, none: the
+ * empty product). The search narrows it like the unfiltered list.
+ */
+function lowProducts() {
+  const q = state.query.toLowerCase();
+  const matching = state.items.map(withIntent).filter((item) => !q
+    || item.name?.toLowerCase().includes(q)
+    || item.notes?.toLowerCase().includes(q)
+    || (item.location_name && locationLabel(item.location_name).toLowerCase().includes(q)));
+  const nameOrder = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  // A low product has a minimum above 0 (out wins at 0), so the share is defined.
+  const share = (p) => (p.stock.out ? 0 : p.stock.total / Number(p.stock.min));
+  return productEntries(matching)
+    .filter((product) => product.stock.low || product.stock.out)
+    .sort((a, b) => (Number(b.stock.out) - Number(a.stock.out))
+      || (share(a) - share(b))
+      || nameOrder(a.name, b.name));
+}
+
+/**
+ * The products the matching batches belong to, and the products without
+ * batches whose name matches the search; each with its batches in display
+ * order and its stock (pantryProductStock).
+ */
+function productEntries(matching) {
+  const byProduct = batchesByProduct();
+  const stock = productStock();
+  const known = new Map(state.products.map((p) => [`p${p.id}`, p]));
+  const q = state.query.toLowerCase();
+  const keys = new Set(matching.map(productKeyOf));
+  for (const p of state.products) {
+    if (pendingProductDeletes.has(p.id)) continue;
+    if (!byProduct.has(`p${p.id}`) && (!q || p.name?.toLowerCase().includes(q))) keys.add(`p${p.id}`);
+  }
+
+  const placeOrder = new Map(state.locations.map((loc, idx) => [loc.id, idx]));
+  const last = state.locations.length;
+  const placeRank = (item) => (item.location_id == null ? last + 1 : (placeOrder.get(item.location_id) ?? last));
+  // Best-before ascending, a batch without a date after the dated ones.
+  const dateRank = (a, b) => (a.expires_on ? 0 : 1) - (b.expires_on ? 0 : 1)
+    || String(a.expires_on ?? '').localeCompare(String(b.expires_on ?? ''));
+  const byBatchOrder = (a, b) => (placeRank(a) - placeRank(b)) || dateRank(a, b) || (a.id - b.id);
+
+  return [...keys].map((key) => {
+    const batches = [...(byProduct.get(key) ?? [])].sort(byBatchOrder);
+    const product = known.get(key);
+    const first = batches[0];
+    return {
+      key,
+      id: product?.id ?? null,
+      name: product?.name ?? first?.name ?? '',
+      unit: product?.unit ?? first?.unit,
+      category: product?.category || first?.category || DEFAULT_CATEGORY_NAME,
+      minQuantity: product ? (product.min_quantity ?? null) : (first?.min_quantity ?? null),
+      batches,
+      stock: stock.get(key) ?? pantryStockStatus(0, null),
+      // Matched through a batch only (a place, a note): open it, so the hit is
+      // visible. The remembered state stays as it is.
+      openForSearch: Boolean(q) && batches.length > 1 && !(product?.name ?? first?.name ?? '').toLowerCase().includes(q),
+    };
+  });
 }
 
 // --------------------------------------------------------
@@ -643,7 +701,7 @@ function renderFilters() {
   }
 
   const shown = state.items.map(withIntent);
-  const counts = pantryFilterCounts(shown, state.todayKey);
+  const counts = filterCounts();
   const active = PANTRY_FILTERS.filter((key) => counts[key] > 0);
   const places = placeChips(shown);
   const ids = [...active, ...places.map((chip) => chip.id)];
@@ -658,7 +716,7 @@ function renderFilters() {
   const hadFocus = bar.contains(document.activeElement);
 
   bar.replaceChildren();
-  if (!ids.length || !state.items.length) {
+  if (!ids.length || (!state.items.length && !state.products.length)) {
     bar.hidden = true;
     return { wasReset };
   }
@@ -723,6 +781,15 @@ function placeChips(items) {
 }
 
 /**
+ * The counts of the chips, as the rows show them: expired and soon per batch,
+ * "Running low" per product, a product without batches included when it has a
+ * minimum (#1448, step 3; #2118).
+ */
+function filterCounts() {
+  return pantryFilterCounts(state.items.filter((i) => !pendingDeletes.has(i.id)).map(withIntent), state.todayKey, state.products);
+}
+
+/**
  * Sammelaktion des „Fast leer"-Filters, seit Etappe 5 als Pille in der unteren
  * Shell-Zone (utils/bulk-pill.js) statt als Block über der Liste. Sie lag davor
  * schon zweimal falsch: zuerst als letztes Element der Chip-Leiste (hinter dem
@@ -753,19 +820,24 @@ function placeChips(items) {
  * gefilterte UND gesuchte Satz, und `sendToShopping` bekommt genau ihn.
  */
 function renderBulkBar() {
-  const items = visibleItems();
+  const products = state.filter === 'low' ? lowProducts() : [];
   // Die Pille traegt genau EINE Aktion, und die schreibt in den EINKAUF
   // (#1265): ohne Schreibrecht dort endete sie im 403 - also keine Pille.
-  if (state.filter !== 'low' || !state.items.length || !items.length || !mayTransferPantryToShopping()) {
+  if (!products.length || !mayTransferPantryToShopping()) {
     clearBulkPill();
     return;
   }
+  // One entry per PRODUCT with the product's shortfall (#1448, step 3): milk
+  // in two places goes over once, as "3 l", not twice.
   setBulkPill({
-    label: t('pantry.bulkPillLabel', { count: items.length }),
+    label: t('pantry.bulkPillLabel', { count: products.length }),
     actions: [{
       label: t('pantry.toShoppingAll'),
-      count: items.length,
-      onClick: (btn) => sendToShopping(visibleItems(), btn),
+      count: products.length,
+      onClick: (btn) => {
+        const now = lowProducts();
+        sendToShopping(now, btn, now.map(shoppingEntry));
+      },
     }],
   });
 }
@@ -834,8 +906,11 @@ function drawList(list) {
     return;
   }
 
-  const items = visibleItems();
-  const sections = state.filter === 'all' ? productSections(items) : null;
+  const items = state.filter === 'low' ? [] : visibleItems();
+  // "Running low" lists products, as one flat group without a heading.
+  const sections = state.filter === 'all'
+    ? productSections(items)
+    : (state.filter === 'low' ? [{ key: 'flat', label: null, products: lowProducts() }] : null);
   const shown = sections ? sections.reduce((n, s) => n + s.products.length, 0) : items.length;
   // Filtern und Suchen ändern die Liste, ohne dass sich der Fokus bewegt -
   // ohne Ansage bleibt die neue Trefferzahl für Screenreader unsichtbar.
@@ -880,8 +955,10 @@ function drawList(list) {
     if (group.products) {
       for (const product of group.products) rows.appendChild(productEl(product));
     } else {
+      // Both maps once per render, not once per row (#2118).
       const byProduct = batchesByProduct();
-      for (const item of group.items) rows.appendChild(rowEl(withIntent(item), rowOptions(item, byProduct)));
+      const stock = productStock();
+      for (const item of group.items) rows.appendChild(rowEl(withIntent(item), rowOptions(item, byProduct, stock)));
     }
     section.appendChild(rows);
     list.appendChild(section);
@@ -1045,19 +1122,26 @@ function placeText(item) {
 /**
  * How a batch row is drawn, from the state alone, so a row rebuilt after a step
  * (refreshRowQuantity) reads like the one it replaces. `batch`: the row stands
- * under its product (several batches, no filter). `byDate`: all batches of the
- * product share one place, which the product row already names; the batch is
- * then titled by its best-before date, otherwise by its place. `total`: the
- * product's total, when it has several batches.
+ * under its product (several batches, no filter or "Running low", which both
+ * list products). `byDate`: all batches of the product share one place, which
+ * the product row already names; the batch is then titled by its best-before
+ * date, otherwise by its place. `total`: the product's total, when it has
+ * several batches. `stock`: the product's low and out, only when the row
+ * stands for the product (its only batch); a batch of a product with several
+ * carries no "Running low" and no cart, those are on the product row.
+ * `byProduct` and `stock` are passed in by a list render, which builds them
+ * once (as productEl() gets `product.stock`); a single row rebuilt after a
+ * step builds them itself.
  */
-function rowOptions(item, byProduct = batchesByProduct()) {
+function rowOptions(item, byProduct = batchesByProduct(), stock = productStock()) {
   const siblings = byProduct.get(productKeyOf(item)) ?? [item];
   const several = siblings.length > 1;
-  const batch = several && state.filter === 'all';
+  const batch = several && (state.filter === 'all' || state.filter === 'low');
   return {
     batch,
     byDate: batch && new Set(siblings.map((b) => b.location_id ?? 'none')).size === 1,
     total: several ? productTotal(siblings) : null,
+    stock: several ? null : (stock.get(productKeyOf(item)) ?? pantryStockStatus(item.quantity, item.min_quantity)),
   };
 }
 
@@ -1071,7 +1155,7 @@ function batchTitle(item, opts) {
 
 /** Eine Vorratszeile (eine Charge). */
 function rowEl(item, opts = rowOptions(item)) {
-  const status = pantryItemStatus(item, state.todayKey);
+  const stock = opts.stock ?? null;
   const place = placeText(item);
   // Under its product a batch is told apart by its place; the controls name
   // both, or "Increase: Milk" would be said for every batch alike.
@@ -1108,7 +1192,8 @@ function rowEl(item, opts = rowOptions(item)) {
   li.className = opts.batch ? 'list-row pantry-row pantry-row--batch' : 'list-row pantry-row';
   li.dataset.id = String(item.id);
   li.dataset.productKey = productKeyOf(item);
-  if (status.out) li.classList.add('pantry-row--out');
+  // An empty batch reads quieter, also under a product that still has stock.
+  if (Number(item.quantity) <= 0) li.classList.add('pantry-row--out');
 
   // Klickfläche: öffnet das Bearbeiten-Formular. Die Stepper-Buttons daneben
   // sind eigene Stops und dürfen nicht durchschlagen.
@@ -1150,7 +1235,7 @@ function rowEl(item, opts = rowOptions(item)) {
   // stand „Vollmilch" mit „Läuft heute ab" in Zeile zwei und „Fast leer" in
   // Zeile drei, also 109,5px gegen 86,3px derselben Liste mit zwei Badges
   // nebeneinander. Was zusammen gelesen wird, bricht zusammen um.
-  const badges = [expiryBadge(item), stockBadge(item)].filter(Boolean);
+  const badges = [expiryBadge(item), stockBadge(stock)].filter(Boolean);
   if (badges.length) {
     const wrap = document.createElement('span');
     wrap.className = 'pantry-row__badges';
@@ -1297,7 +1382,7 @@ function rowEl(item, opts = rowOptions(item)) {
   cartSlot.className = 'pantry-row__cart-slot';
   // Der Warenkorb schreibt in den EINKAUF, gefragt wird also dessen Recht
   // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
-  if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item, controlName));
+  if (stock && (stock.out || stock.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item, controlName));
   actions.appendChild(cartSlot);
 
   // Nur-lesen: KEIN Stepper (Regel 2). Die Menge steht als Zeichen in der
@@ -1367,17 +1452,22 @@ function rowEl(item, opts = rowOptions(item)) {
  *   row only opens and closes, the dashboard's overdue group is the pattern (a
  *   button with
  *   `aria-expanded`/`aria-controls`, the region switched in place by
- *   `toggleRegion`, the open state kept for the visit). Its one badge is the
+ *   `toggleRegion`, the open state kept for the visit). Its badges are the
  *   most urgent expiry of its batches, so a collapsed product still says that
- *   a batch has expired. No stepper, no cart, no swipe, no "Running low" on it
- *   yet: a step on a total has no batch to book, and low and out over the
- *   product come with the minimum on the product (step 3).
- * - NO BATCH: the product outlived its last batch. It reads as out of stock,
- *   with the cart that hands its name to Shopping (emptyProductEl).
+ *   a batch has expired, and the product's "Running low" or "Out of stock",
+ *   read over its total against its minimum (step 3), with the cart that puts
+ *   the shortfall on the shopping list. No stepper and no swipe: a step on a
+ *   total has no batch to book. Its batches carry their expiry but no
+ *   "Running low" of their own: low is a fact of the product.
+ * - NO BATCH: the product outlived its last batch. With a minimum it reads as
+ *   out of stock, with its minimum and the cart that hands it to Shopping;
+ *   without one it is listed plainly (emptyProductEl).
  */
 function productEl(product) {
   if (!product.batches.length) return emptyProductEl(product);
-  if (product.batches.length === 1) return rowEl(product.batches[0], { batch: false, total: null });
+  if (product.batches.length === 1) {
+    return rowEl(product.batches[0], { batch: false, total: null, stock: product.stock });
+  }
 
   const open = expandedProducts.has(product.key) || product.openForSearch;
   const regionId = `pantry-batches-${product.key}`;
@@ -1409,7 +1499,7 @@ function productEl(product) {
   name.textContent = product.name;
   const badges = document.createElement('span');
   badges.className = 'pantry-row__badges pantry-product__badges';
-  fillProductBadge(badges, product.batches);
+  fillProductBadge(badges, product.batches, product.stock);
   headline.append(name, badges);
   const meta = document.createElement('span');
   meta.className = 'list-row__meta';
@@ -1426,6 +1516,10 @@ function productEl(product) {
   toggle.insertAdjacentHTML('beforeend',
     `<i data-lucide="chevron-down" class="icon-sm list-group__chevron${open ? '' : ' list-group__chevron--collapsed'}" aria-hidden="true"></i>`);
   row.appendChild(toggle);
+  // The cart of the product, beside the toggle and not in it: a button inside
+  // a button is no button. The slot is there when the shopping list may be
+  // written, so the row keeps its width when the cart comes and goes.
+  if (mayTransferPantryToShopping()) row.appendChild(productCartActions(product));
 
   const batches = document.createElement('ul');
   batches.className = 'pantry-batches';
@@ -1438,10 +1532,12 @@ function productEl(product) {
 }
 
 /**
- * A product without batches: out of stock, with 0 in its unit. Nothing to step
- * and nothing to edit yet (editing a product is step 5); the cart hands its
- * name and category to Shopping without a quantity, like an empty batch without
- * a minimum. The minimum it will show comes in step 3.
+ * A product without batches: 0 in its unit and, when it has one, its minimum
+ * ("0 pcs · min. 3 pcs"): the minimum that says "you have 0" is seen here.
+ * It is out of stock, with the badge and the cart that hands it to Shopping
+ * with the shortfall, only when it has a minimum (#2118, point 3): without
+ * one it tells nobody that something is missing, so it is listed plainly.
+ * Nothing to step and nothing to edit yet (editing a product is step 5).
  *
  * It can be deleted (brought forward from step 5, only while it has no batch):
  * the same swipe to the row end as a batch on touch, and, since it has no
@@ -1466,8 +1562,10 @@ function emptyProductEl(product) {
     </div>`);
   }
 
+  // Out only with a minimum (pantryProductStock): the badge and the tint follow.
+  const out = Boolean(product.stock?.out);
   const row = document.createElement('div');
-  row.className = 'list-row pantry-row pantry-row--out';
+  row.className = out ? 'list-row pantry-row pantry-row--out' : 'list-row pantry-row';
 
   const main = document.createElement('div');
   main.className = 'list-row__main pantry-row__main';
@@ -1478,10 +1576,12 @@ function emptyProductEl(product) {
   name.textContent = product.name;
   const badges = document.createElement('span');
   badges.className = 'pantry-row__badges';
-  const badge = document.createElement('span');
-  badge.className = 'pantry-badge pantry-badge--danger';
-  badge.textContent = t('pantry.badgeOut');
-  badges.appendChild(badge);
+  if (out) {
+    const badge = document.createElement('span');
+    badge.className = 'pantry-badge pantry-badge--danger';
+    badge.textContent = t('pantry.badgeOut');
+    badges.appendChild(badge);
+  }
   headline.append(name, badges);
   const meta = document.createElement('span');
   meta.className = 'list-row__meta';
@@ -1489,23 +1589,20 @@ function emptyProductEl(product) {
   quantity.className = 'pantry-row__quantity';
   quantity.textContent = quantityText({ quantity: 0, unit: product.unit });
   meta.appendChild(quantity);
+  // Wie hasPantryMinimum(): erst ein Minimum ueber 0 sagt etwas.
+  if (Number(product.minQuantity) > 0) {
+    const min = document.createElement('span');
+    min.className = 'pantry-product__min';
+    min.textContent = ` · ${t('pantry.minimumShort', { quantity: quantityText({ quantity: product.minQuantity, unit: product.unit }) })}`;
+    meta.appendChild(min);
+  }
   main.append(headline, meta);
   row.appendChild(main);
 
   // Der Warenkorb schreibt in den EINKAUF: gefragt wird dessen Recht (#1265).
   const cartAllowed = product.id != null && mayTransferPantryToShopping();
   if (cartAllowed || deletable) {
-    const actions = document.createElement('div');
-    actions.className = 'list-row__actions';
-    const cartSlot = document.createElement('div');
-    cartSlot.className = 'pantry-row__cart-slot';
-    if (cartAllowed) {
-      const cart = cartEl(product);
-      cart.dataset.action = 'to-shopping-product';
-      cart.dataset.productId = String(product.id);
-      cartSlot.appendChild(cart);
-    }
-    actions.appendChild(cartSlot);
+    const actions = productCartActions(product, { cart: cartAllowed });
     if (deletable) {
       actions.insertAdjacentHTML('beforeend', rowMenuHtml({
         id: `pantry-product-menu-${product.id}`,
@@ -1518,6 +1615,40 @@ function emptyProductEl(product) {
 
   li.appendChild(row);
   return li;
+}
+
+/**
+ * The actions zone of a product row: the cart slot, with the cart when the
+ * product is low or out. The cart hands the PRODUCT over (`pantry_product_id`)
+ * with its shortfall over all batches. `cart: false` keeps the slot empty (no
+ * right to write Shopping), for a row that still needs the zone for its menu.
+ */
+function productCartActions(product, { cart: withCart = true } = {}) {
+  const actions = document.createElement('div');
+  actions.className = 'list-row__actions pantry-product__actions';
+  const cartSlot = document.createElement('div');
+  cartSlot.className = 'pantry-row__cart-slot';
+  if (withCart && product.id != null && (product.stock.out || product.stock.low)) {
+    const cart = cartEl(product);
+    cart.dataset.action = 'to-shopping-product';
+    cart.dataset.productId = String(product.id);
+    cartSlot.appendChild(cart);
+  }
+  actions.appendChild(cartSlot);
+  return actions;
+}
+
+/**
+ * What goes to Shopping for a product: the batch for a product with one (the
+ * row's own cart does the same), the product otherwise, each with the
+ * shortfall of the product's total to its minimum.
+ */
+function shoppingEntry(product) {
+  const quantity = shortfallText({ quantity: product.stock.total, min_quantity: product.minQuantity, unit: product.unit });
+  if (product.batches.length === 1 || product.id == null) {
+    return { pantry_item_id: product.batches[0].id, quantity };
+  }
+  return { pantry_product_id: product.id, quantity };
 }
 
 /** Opens or closes a product's batches in place; the button keeps the focus. */
@@ -1533,9 +1664,28 @@ function toggleProduct(btn) {
   toggleRegion(region, open);
 }
 
+/** A product as productEl draws it, found by its key (after a step). */
+function productEntryOf(key) {
+  const byProduct = batchesByProduct();
+  const batches = (byProduct.get(key) ?? []).filter((b) => !pendingDeletes.has(b.id));
+  const product = state.products.find((p) => `p${p.id}` === key);
+  const stock = productStock().get(key);
+  if (!stock) return null;
+  return {
+    key,
+    id: product?.id ?? null,
+    name: product?.name ?? batches[0]?.name ?? '',
+    unit: product?.unit ?? batches[0]?.unit,
+    minQuantity: stock.min,
+    batches,
+    stock,
+  };
+}
+
 /**
- * After a step the product's total follows: on the product row and, in the flat
- * filter list, on every batch row of that product that names it.
+ * After a step the product's total follows: on the product row (with its
+ * "Running low" and cart) and, in the flat filter list, on every batch row of
+ * that product that names it.
  */
 function refreshProductTotals(item, { speak = true } = {}) {
   const key = productKeyOf(item);
@@ -1546,7 +1696,11 @@ function refreshProductTotals(item, { speak = true } = {}) {
   const head = `.pantry-product[data-product-key="${key}"] > .pantry-product__row`;
   for (const el of _container.querySelectorAll(`${head} .pantry-product__total`)) el.textContent = text;
   for (const el of _container.querySelectorAll(`${head} .pantry-product__where`)) el.textContent = productWhereText(batches);
-  for (const el of _container.querySelectorAll(`${head} .pantry-product__badges`)) fillProductBadge(el, batches);
+  const entry = productEntryOf(key);
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__badges`)) fillProductBadge(el, batches, entry?.stock);
+  if (entry) {
+    for (const el of _container.querySelectorAll(`${head} .pantry-product__actions`)) el.replaceWith(productCartActions(entry));
+  }
   for (const el of _container.querySelectorAll(`.pantry-row[data-product-key="${key}"] .pantry-row__total`)) {
     el.textContent = ` · ${text}`;
   }
@@ -1611,8 +1765,8 @@ function onListClick(e) {
   // The product row and the cart of a product without batches carry no batch.
   if (btn.dataset.action === 'toggle-product') { toggleProduct(btn); return; }
   if (btn.dataset.action === 'to-shopping-product') {
-    const product = state.products.find((p) => p.id === Number(btn.dataset.productId));
-    if (product) sendToShopping([product], btn, [{ pantry_product_id: product.id }]);
+    const product = productEntryOf(`p${Number(btn.dataset.productId)}`);
+    if (product) sendToShopping([product], btn, [shoppingEntry(product)]);
     return;
   }
   if (btn.dataset.action === 'delete-product') {
@@ -1778,8 +1932,7 @@ function refreshRowQuantity(row, item) {
     minus.disabled = willDisable;
   }
 
-  const status = pantryItemStatus(item, state.todayKey);
-  row.classList.toggle('pantry-row--out', status.out);
+  row.classList.toggle('pantry-row--out', Number(item.quantity) <= 0);
 
   // Bestands-Badge und Einkaufs-Aktion hängen an der Menge und müssen mitgehen.
   // Der Warenkorb-Slot wird als GANZES getauscht, nicht der Knopf darin: der Slot
@@ -1802,6 +1955,7 @@ function refreshRowQuantity(row, item) {
 /**
  * Fehlmenge als Anzeigetext: bis zum Mindestbestand auffüllen. Ohne
  * Mindestbestand bleibt die Menge offen - im Laden entscheidet man selbst.
+ * Takes a batch, or a product's total as `{ quantity, min_quantity, unit }`.
  */
 function shortfallText(item) {
   if (item.min_quantity == null) return null;
@@ -1812,8 +1966,8 @@ function shortfallText(item) {
 }
 
 /**
- * `entries` overrides what goes over: a product without batches is handed over
- * by its product id (`pantry_product_id`), without a quantity.
+ * `entries` overrides what goes over: a product is handed over by its product
+ * id (`pantry_product_id`) with its shortfall (shoppingEntry).
  */
 async function sendToShopping(items, btn, entries = null) {
   if (!items.length) return;
@@ -1981,8 +2135,9 @@ function openItemModal(mode, item = null) {
       ${advancedSection(`
         <div class="form-group">
           <label class="form-label" for="pantry-min">${esc(t('pantry.minQuantityLabel'))}</label>
-          <input id="pantry-min" class="form-input" type="number" min="0" step="any" inputmode="decimal">
-          <p class="form-hint">${esc(t('pantry.minQuantityHint'))}</p>
+          <input id="pantry-min" class="form-input" type="number" min="0" step="any" inputmode="decimal"
+                 aria-describedby="pantry-min-hint">
+          <p class="form-hint" id="pantry-min-hint">${esc(t('pantry.minQuantityHint'))}</p>
         </div>
         <div class="form-group">
           <label class="form-label" for="pantry-notes">${esc(t('pantry.notesLabel'))}</label>
@@ -2003,7 +2158,11 @@ function openItemModal(mode, item = null) {
       panel.querySelector('#pantry-category').value = isEdit
         ? item.category
         : (categories.find((c) => c.name === DEFAULT_CATEGORY_NAME)?.name ?? categories[0]?.name ?? DEFAULT_CATEGORY_NAME);
-      panel.querySelector('#pantry-min').value = isEdit && item.min_quantity != null ? String(item.min_quantity) : '';
+      // The product's minimum (the API returns it on the batch). Remembered as
+      // shown, so a save sends it only when it was changed (saveItem).
+      const minInput = panel.querySelector('#pantry-min');
+      minInput.value = isEdit && item.min_quantity != null ? String(item.min_quantity) : '';
+      minInput.dataset.initial = minInput.value;
       panel.querySelector('#pantry-notes').value = isEdit && item.notes ? item.notes : '';
 
       panel.querySelector('#pantry-save').addEventListener('click', () => saveItem(panel, mode, item));
@@ -2031,7 +2190,8 @@ async function saveItem(panel, mode, item) {
     return;
   }
 
-  const minRaw = panel.querySelector('#pantry-min').value.trim();
+  const minInput = panel.querySelector('#pantry-min');
+  const minRaw = minInput.value.trim();
   const payload = {
     name,
     quantity: normalizePantryQuantity(panel.querySelector('#pantry-quantity').value, { fallback: 1 }),
@@ -2039,9 +2199,15 @@ async function saveItem(panel, mode, item) {
     location_id: panel.querySelector('#pantry-location').value || null,
     category: panel.querySelector('#pantry-category').value,
     expires_on: panel.querySelector('#pantry-expires').value || null,
-    min_quantity: minRaw === '' ? null : normalizePantryQuantity(minRaw, { fallback: 0 }),
     notes: panel.querySelector('#pantry-notes').value.trim() || null,
   };
+  // THE MINIMUM IS THE PRODUCT'S (#1448, step 3): sent only when the field was
+  // changed. A new batch of a product, or an edit that moves a batch to
+  // another product by its name, must not overwrite that product's minimum
+  // with what the field happened to show.
+  if (minRaw !== (minInput.dataset.initial ?? '').trim()) {
+    payload.min_quantity = minRaw === '' ? null : normalizePantryQuantity(minRaw, { fallback: 0 });
+  }
 
   saveBtn.disabled = true;
   try {
@@ -2254,6 +2420,11 @@ export const __test = {
   productSections,
   productEl,
   rowOptions,
+  // #1448 step 3: the minimum on the product, low and out over its total.
+  lowProducts,
+  shoppingEntry,
+  filterCounts,
+  saveItem,
   toggleProduct,
   expandedProducts,
   pendingDeletes,

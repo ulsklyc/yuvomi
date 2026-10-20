@@ -116,7 +116,7 @@ export function shoppingPaths() {
       post: op({
         summary: 'Add pantry items to a shopping list',
         description: 'Adds low or empty pantry items to the list. ' + 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). '
-          + 'An entry is `{ pantry_item_id, quantity? }` for a batch, or `{ pantry_product_id }` for a household product without batches, which goes over with its name and category and no quantity. '
+          + 'An entry is `{ pantry_item_id, quantity? }` for a batch, or `{ pantry_product_id, quantity? }` for a household product, which goes over with its name and category; `quantity` is display text, such as the shortfall to the minimum of the product. '
           + 'Reads the pantry, so it requires read access to the `pantry` module in addition to `shopping` - a credential without it is refused with 403.',
         tag: 'Shopping',
         params: [idParam('listId', 'List ID')],

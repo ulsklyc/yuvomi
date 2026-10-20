@@ -6,11 +6,20 @@
  * Bewusst im Client statt im Router: "abgelaufen" hängt am lokalen Kalendertag
  * des Nutzers. Der Server rechnet in UTC und läge westlich von UTC bis zu einen
  * Tag daneben - genau die Klasse Fehler, gegen die toLocalDateKey() existiert.
+ *
+ * EXPIRY BELONGS TO A BATCH, LOW AND OUT TO A PRODUCT (#1448, step 3). A
+ * product is out when the sum of its batches is 0 and running low when that
+ * sum is at or below the product's minimum (pantryStockStatus,
+ * pantryProductStock). A product without batches is out only when it has a
+ * minimum (hasPantryMinimum): without one it tells nobody that something is
+ * missing (#2118). The kitchen count in server/routes/kitchen.js reads the
+ * same rule in SQL.
  */
 
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
 import { addLocalDays, parseLocalDateKey, todayKey as householdToday } from '/utils/date.js';
+import { normalizePantryQuantity } from '/utils/pantry-units.js';
 
 /** Vorlauf in Tagen, ab dem ein Artikel als "läuft bald ab" gilt. */
 export const EXPIRY_SOON_DAYS = 7;
@@ -19,18 +28,87 @@ export const EXPIRY_SOON_DAYS = 7;
 export const PANTRY_FILTERS = Object.freeze(['expired', 'soon', 'low']);
 
 /**
- * @param {object} item - Vorratsartikel aus der API
- * @param {string} [todayKey] - lokaler Tagesschlüssel (YYYY-MM-DD)
- * @returns {{ out: boolean, low: boolean, expiry: 'expired'|'soon'|null }}
+ * Out and low for a stock quantity against a minimum: a product's total
+ * against the product's minimum (#1448, step 3).
+ * @param {number|string|null} total
+ * @param {number|string|null} minQuantity - null: no minimum, never low
+ * @returns {{ out: boolean, low: boolean }}
  */
-export function pantryItemStatus(item, todayKey = householdToday()) {
-  const quantity = Number(item?.quantity ?? 0);
-  const min = item?.min_quantity == null ? null : Number(item.min_quantity);
+export function pantryStockStatus(total, minQuantity) {
+  const quantity = Number(total ?? 0);
+  const min = minQuantity == null ? null : Number(minQuantity);
 
   const out = quantity <= 0;
   // "Fast leer" schließt "leer" aus: ein leerer Artikel ist kein Grenzfall mehr,
   // er hat eine eigene, deutlichere Darstellung.
   const low = !out && min !== null && Number.isFinite(min) && quantity <= min;
+  return { out, low };
+}
+
+/**
+ * Does a product have a minimum, as far as a product without batches is
+ * concerned? Not null and above 0. A minimum of 0 never makes a product with
+ * batches low or out (out at 0 does not need a minimum), so it says "no
+ * warning" and counts as none here too.
+ * @param {number|string|null} minQuantity
+ */
+export function hasPantryMinimum(minQuantity) {
+  if (minQuantity == null || minQuantity === '') return false;
+  const min = Number(minQuantity);
+  return Number.isFinite(min) && min > 0;
+}
+
+/** The key of a batch's product in pantryProductStock(): `p<id>`, or `b<batch id>` without one. */
+export function pantryStockKey(item) {
+  return item?.product_id != null ? `p${item.product_id}` : `b${item?.id}`;
+}
+
+/**
+ * The stock of every product, from the batches and the product list of
+ * `GET /pantry` (#1448, step 3): key -> { key, id, product, batches, total,
+ * min, out, low }. A batch without a product stands for itself, with its own
+ * minimum. A product without batches is in it with total 0; it is out only
+ * when it has a minimum (hasPantryMinimum), and never low. The total is
+ * rounded like a quantity (two decimals), as the kitchen count rounds its sum.
+ *
+ * @param {object[]} items - batches (as the rows show them)
+ * @param {object[]} [products] - `products` of GET /pantry
+ * @returns {Map<string, object>}
+ */
+export function pantryProductStock(items, products = []) {
+  const stock = new Map();
+  for (const product of products) {
+    const key = `p${product.id}`;
+    stock.set(key, { key, id: product.id, product, batches: [], min: product.min_quantity ?? null });
+  }
+  for (const item of items) {
+    const key = pantryStockKey(item);
+    if (!stock.has(key)) {
+      stock.set(key, { key, id: item.product_id ?? null, product: null, batches: [], min: item.min_quantity ?? null });
+    }
+    stock.get(key).batches.push(item);
+  }
+  for (const entry of stock.values()) {
+    const sum = entry.batches.reduce((acc, b) => acc + Number(b.quantity || 0), 0);
+    entry.total = normalizePantryQuantity(sum, { fallback: 0 });
+    Object.assign(entry, entry.batches.length
+      ? pantryStockStatus(entry.total, entry.min)
+      : { out: hasPantryMinimum(entry.min), low: false });
+  }
+  return stock;
+}
+
+/**
+ * @param {object} item - Vorratsartikel aus der API
+ * @param {string} [todayKey] - lokaler Tagesschlüssel (YYYY-MM-DD)
+ * @returns {{ out: boolean, low: boolean, expiry: 'expired'|'soon'|null }}
+ *
+ * `out` and `low` read the batch alone, against the minimum the API returns
+ * on it (its product's). That is the product's state only when the batch is
+ * its product's only one; the stock list reads pantryProductStock().
+ */
+export function pantryItemStatus(item, todayKey = householdToday()) {
+  const { out, low } = pantryStockStatus(item?.quantity ?? 0, item?.min_quantity);
 
   let expiry = null;
   const expiresOn = item?.expires_on || null;
@@ -56,24 +134,39 @@ export function daysUntil(dateKey, todayKey = householdToday()) {
  * Trifft der Artikel den aktiven Filter? `null`/'all' lässt alles durch.
  * "Fast leer" umfasst bewusst auch leere Artikel: wer die Liste nach Nachschub
  * durchsieht, will beides sehen.
+ *
+ * "Fast leer" is a product's state (#1448, step 3): with `stock` (from
+ * pantryProductStock) a batch matches when its product is low or out. Without
+ * it the batch is read alone.
  */
-export function matchesPantryFilter(item, filter, todayKey = householdToday()) {
+export function matchesPantryFilter(item, filter, todayKey = householdToday(), stock = null) {
   if (!filter || filter === 'all') return true;
   const status = pantryItemStatus(item, todayKey);
   if (filter === 'expired') return status.expiry === 'expired';
   if (filter === 'soon') return status.expiry === 'soon';
-  if (filter === 'low') return status.low || status.out;
+  if (filter === 'low') {
+    const product = stock?.get(pantryStockKey(item)) ?? status;
+    return product.low || product.out;
+  }
   return true;
 }
 
-/** Zählt je Filter, wie viele Artikel ihn treffen. */
-export function pantryFilterCounts(items, todayKey = householdToday()) {
+/**
+ * Zählt je Filter, wie viele Einträge ihn treffen. Expired and soon count
+ * BATCHES (expiry is a batch's); low counts PRODUCTS that are low or out over
+ * their total, a product without batches with a minimum included (#1448,
+ * step 3): the
+ * "Running low" chip answers "what do I need to buy", and that is a product.
+ */
+export function pantryFilterCounts(items, todayKey = householdToday(), products = []) {
   const counts = { expired: 0, soon: 0, low: 0 };
   for (const item of items) {
     const status = pantryItemStatus(item, todayKey);
     if (status.expiry === 'expired') counts.expired += 1;
     if (status.expiry === 'soon') counts.soon += 1;
-    if (status.low || status.out) counts.low += 1;
+  }
+  for (const entry of pantryProductStock(items, products).values()) {
+    if (entry.low || entry.out) counts.low += 1;
   }
   return counts;
 }

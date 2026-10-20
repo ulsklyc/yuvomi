@@ -1,8 +1,9 @@
 /**
- * Module: Household products above the stock batches (#1448, part 1)
+ * Module: Household products above the stock batches (#1448, parts 1 and 3)
  * Purpose: Which product a pantry batch belongs to, for every path that writes a
  *          batch, and the live grouping that puts batches without a product into
- *          products at the start of the server (migration 253 has a frozen copy).
+ *          products at the start of the server (migration 253 has a frozen copy),
+ *          and the minimum a batch write hands to its product (step 3).
  * Dependencies: public/utils/ingredient-match-key.js (isomorphic)
  *
  * IDENTITY IS THE HOUSEHOLD'S OWN WORDING (docs/DECISIONS.md, 7). A batch joins
@@ -44,6 +45,12 @@ export function productKey(name) {
  * - The batch stays in its product while key and unit still match.
  * - Otherwise it joins the product with that key and unit, which is created when
  *   there is none. The product it leaves stays, with or without batches.
+ * - A product CREATED by such a move takes over the minimum of the product the
+ *   batch came from (#2118, point 2): the dialog sends the minimum only when it
+ *   was changed, so a rename sends none, and before step 3 the minimum stayed
+ *   with the batch through a rename. A product the batch JOINS keeps its own
+ *   minimum. A write that names `min_quantity` sets it afterwards
+ *   (writeMinimumThrough), in the same transaction.
  * - The product's NAME is set when it is created and does not follow a batch:
  *   renaming one batch moves it to another product (#1448, point 5), a case or
  *   whitespace change keeps it where it is, and renaming the product with all
@@ -75,7 +82,8 @@ export function assignPantryProduct(database, itemId, { userId = null, syncCateg
   const key = productKey(item.name);
   let product = item.product_id == null
     ? null
-    : database.prepare('SELECT id, name, name_key, unit, category FROM pantry_products WHERE id = ?').get(item.product_id);
+    : database.prepare('SELECT id, name, name_key, unit, category, min_quantity FROM pantry_products WHERE id = ?').get(item.product_id);
+  const from = product;
 
   if (!product || product.unit !== item.unit || product.name_key !== key) {
     product = key === null
@@ -85,9 +93,9 @@ export function assignPantryProduct(database, itemId, { userId = null, syncCateg
       ).get(key, item.unit);
     if (!product) {
       const created = database.prepare(`
-        INSERT INTO pantry_products (name, name_key, unit, category, created_by)
-        VALUES (?, ?, ?, ?, (SELECT id FROM users WHERE id = ?))
-      `).run(item.name, key, item.unit, item.category, userId);
+        INSERT INTO pantry_products (name, name_key, unit, category, min_quantity, created_by)
+        VALUES (?, ?, ?, ?, ?, (SELECT id FROM users WHERE id = ?))
+      `).run(item.name, key, item.unit, item.category, from?.min_quantity ?? null, userId);
       product = { id: Number(created.lastInsertRowid), name: item.name, category: item.category };
     }
   }
@@ -114,8 +122,10 @@ export function assignPantryProduct(database, itemId, { userId = null, syncCateg
  *
  * A new product takes name and category from the most recently updated batch of
  * its group (the household's latest wording), `created_by` and `created_at` from
- * the oldest batch (the product existed since then). An existing product is
- * joined as it is.
+ * the oldest batch (the product existed since then), and the highest minimum
+ * its batches carry: an older version still writes the minimum on the batch,
+ * and the highest warns early rather than late (the rule of migration 269).
+ * An existing product is joined as it is, its minimum included.
  *
  * MIGRATION 253 DOES NOT CALL THIS FUNCTION. It carries its own frozen copy of
  * key and grouping (see the entry in server/db.js), so this function may change
@@ -137,6 +147,7 @@ export function groupBatchesIntoProducts(database, keyOf) {
   // built there (SQLite's lower() folds ASCII only).
   const orphans = database.prepare(`
     SELECT pi.id, pi.name, pi.unit, pi.category, pi.created_by, pi.created_at, pi.updated_at,
+           pi.min_quantity,
            pp.id AS product, pp.name_key AS product_key, pp.unit AS product_unit
     FROM pantry_items pi LEFT JOIN pantry_products pp ON pp.id = pi.product_id
     ORDER BY pi.id
@@ -156,8 +167,8 @@ export function groupBatchesIntoProducts(database, keyOf) {
 
   const findProduct = database.prepare('SELECT id FROM pantry_products WHERE name_key = ? AND unit = ?');
   const insertProduct = database.prepare(`
-    INSERT INTO pantry_products (name, name_key, unit, category, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, (SELECT id FROM users WHERE id = ?), ?, ?)
+    INSERT INTO pantry_products (name, name_key, unit, category, min_quantity, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, (SELECT id FROM users WHERE id = ?), ?, ?)
   `);
   const setProduct = database.prepare('UPDATE pantry_items SET product_id = ? WHERE id = ?');
 
@@ -179,7 +190,7 @@ export function groupBatchesIntoProducts(database, keyOf) {
         b.created_at < a.created_at || (b.created_at === a.created_at && b.id < a.id) ? b : a
       ));
       productId = Number(insertProduct.run(
-        latest.name, group.key, group.unit, latest.category,
+        latest.name, group.key, group.unit, latest.category, highestMinimum(group.rows),
         oldest.created_by, oldest.created_at, latest.updated_at
       ).lastInsertRowid);
       created += 1;
@@ -189,4 +200,42 @@ export function groupBatchesIntoProducts(database, keyOf) {
 
   for (const trigger of triggers) database.exec(trigger.sql);
   return { batches: orphans.length, created };
+}
+
+/**
+ * The highest minimum among batches, or null when none carries one (#1448,
+ * point 1: the highest warns early rather than late).
+ * @param {Array<{ min_quantity: number|null }>} rows
+ * @returns {number|null}
+ */
+function highestMinimum(rows) {
+  const mins = rows.map((row) => row.min_quantity).filter((value) => value != null);
+  return mins.length ? Math.max(...mins) : null;
+}
+
+/**
+ * Write a minimum given on a batch through to the batch's product (#1448,
+ * step 3).
+ *
+ * THE MINIMUM BELONGS TO THE PRODUCT: low and out are read over the sum of its
+ * batches. `/api/v1` still accepts `min_quantity` on a batch for the
+ * deprecation window and writes it here, so a client that worked yesterday
+ * keeps working. Call it after assignPantryProduct(), so a renamed batch sets
+ * the minimum of the product it now belongs to.
+ *
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {number|bigint} itemId
+ * @param {number|null} minQuantity the new minimum, null clears it
+ * @returns {boolean} whether the product's minimum changed
+ */
+export function writeMinimumThrough(database, itemId, minQuantity) {
+  const row = database.prepare(`
+    SELECT pp.id, pp.min_quantity FROM pantry_items pi
+    JOIN pantry_products pp ON pp.id = pi.product_id
+    WHERE pi.id = ?
+  `).get(itemId);
+  const next = minQuantity ?? null;
+  if (!row || row.min_quantity === next) return false;
+  database.prepare('UPDATE pantry_products SET min_quantity = ? WHERE id = ?').run(next, row.id);
+  return true;
 }
