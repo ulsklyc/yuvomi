@@ -86,6 +86,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Overview's New menu were drawn open on top of the page and caught the taps meant for what lay
   underneath. These menus now stay hidden there, and their buttons do nothing; everything else
   works as before. Log out is also under Settings > Account. Current browsers are unchanged.
+- **Birthdays without a year from iCloud no longer show the year 1604 and an age of over 400
+  (#2095).** iCloud stores a birthday without a year with the placeholder year 1604 and marks it;
+  the contact sync and the `.vcf` import read the date but not the mark. Both now recognise it, and
+  the `--MM-DD` form other apps write, as a birthday without a year. Birthdays and contacts can now
+  be saved as "Year unknown": the editor offers it as a checkbox under the date, which swaps the
+  date picker for month and day. Such a birthday shows day and month only and no age - in the list,
+  the detail view, the overview tile, the wall and the calendar - while sorting, the next birthday
+  and reminders work as before, 29 February included. Contacts and birthdays already stored with
+  1604 are converted on update, so you do not have to enter them again.
+  The same choice is in your profile and in the member editor under Settings, for a member whose
+  birthday has no year.
+  **API:** birthdays carry `year_unknown`, contacts `birthday_year_unknown` (0 or 1; true/false
+  accepted on create and update) and members `birth_year_unknown`. With it, the date carries the placeholder year 2000 and
+  `next_age` is `null`; calendar reads return `birthday_date: null` for such a birthday. The vCard
+  export writes it as `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`, the form Apple reads.
 - **Deleting or editing one occurrence of a series affects only that one, also on the night of a
   clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
   removed the day before. "This and following" on a series in another time zone - say Los Angeles

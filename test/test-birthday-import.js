@@ -195,3 +195,47 @@ test('POST /import: 400 bei zu vielen IDs (> 500)', async () => {
   const r = await call('POST', '/import', { contact_ids: ids });
   assert.equal(r.status, 400);
 });
+
+// --------------------------------------------------------------------------
+// Geburtstag ohne Jahr (#2095)
+// --------------------------------------------------------------------------
+test('Migration 254: Apples 1604 wird zu "Jahr unbekannt", an Kontakt und Geburtstag', async () => {
+  const { default: Database } = await import('better-sqlite3-multiple-ciphers');
+  const { join } = await import('node:path');
+  const { tempDir } = await import('./tmp-dir.js');
+  const { MIGRATIONS, migrate } = dbmod;
+  const fresh = new Database(join(tempDir('yuvomi-bday-yearless-'), 'db.sqlite'));
+  try {
+    migrate(fresh, MIGRATIONS.filter((m) => m.version <= 253));
+    const uid = fresh.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('m','M','x','member')`).run().lastInsertRowid;
+    const apple = fresh.prepare(`INSERT INTO contacts (name, category, birthday) VALUES ('Apple', 'misc', '1604-03-15')`).run().lastInsertRowid;
+    const leap = fresh.prepare(`INSERT INTO contacts (name, category, birthday) VALUES ('Leap', 'misc', '1604-02-29')`).run().lastInsertRowid;
+    const real = fresh.prepare(`INSERT INTO contacts (name, category, birthday) VALUES ('Real', 'misc', '1990-03-15')`).run().lastInsertRowid;
+    const bApple = fresh.prepare(`INSERT INTO birthdays (name, birth_date, created_by, contact_id) VALUES ('Apple', '1604-03-15', ?, ?)`).run(uid, apple).lastInsertRowid;
+    const bReal = fresh.prepare(`INSERT INTO birthdays (name, birth_date, created_by) VALUES ('Real', '1990-03-15', ?)`).run(uid).lastInsertRowid;
+
+    migrate(fresh, MIGRATIONS);
+
+    const contact = (id) => fresh.prepare('SELECT birthday, birthday_year_unknown FROM contacts WHERE id = ?').get(id);
+    const birthday = (id) => fresh.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE id = ?').get(id);
+    assert.deepEqual(contact(apple), { birthday: '2000-03-15', birthday_year_unknown: 1 });
+    assert.deepEqual(contact(leap), { birthday: '2000-02-29', birthday_year_unknown: 1 }, '29.02. bleibt gueltig');
+    assert.deepEqual(contact(real), { birthday: '1990-03-15', birthday_year_unknown: 0 });
+    assert.deepEqual(birthday(bApple), { birth_date: '2000-03-15', year_unknown: 1 });
+    assert.deepEqual(birthday(bReal), { birth_date: '1990-03-15', year_unknown: 0 });
+  } finally {
+    fresh.close();
+  }
+});
+
+test('Kandidaten und Import tragen "Jahr unbekannt" vom Kontakt zum Geburtstag', () => {
+  const cid = db.prepare(
+    "INSERT INTO contacts (name, category, birthday, birthday_year_unknown) VALUES ('Jahrlos Kandidat', 'Sonstiges', '2000-07-18', 1)",
+  ).run().lastInsertRowid;
+  const candidate = listBirthdayImportCandidates(db).withBirthday.find((c) => c.id === cid);
+  assert.equal(candidate.birthday_year_unknown, true);
+
+  importBirthdaysFromContacts(db, [cid], USER);
+  const row = db.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE contact_id = ?').get(cid);
+  assert.deepEqual(row, { birth_date: '2000-07-18', year_unknown: 1 });
+});

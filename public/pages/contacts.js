@@ -9,13 +9,14 @@ import { openModal as openSharedModal, closeModal, advancedSection, refocusAfter
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { parseVCards } from '/utils/vcard.js';
+import { birthDateText, birthDateFieldHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
@@ -1097,7 +1098,7 @@ function renderContactDetail(contact) {
     {
       icon: 'cake',
       label: t('contacts.birthdayLabel'),
-      value: contact.birthday ? formatDate(contact.birthday) : '',
+      value: birthDateText(contact.birthday, contact.birthday_year_unknown),
     },
     {
       icon: 'globe',
@@ -1481,11 +1482,13 @@ function buildContactForm({ mode, contact = null }) {
       <label class="form-label" for="cm-address">${t('contacts.addressLabel')}</label>
       <input type="text" class="form-input" id="cm-address" placeholder="${t('contacts.addressPlaceholder')}" value="${v('address')}" autocomplete="street-address">
     </div>
-    <div class="form-group">
-      <label class="form-label" for="cm-birthday">${t('contacts.birthdayLabel')}</label>
-      <yuvomi-datepicker id="cm-birthday" type="date" value="${v('birthday')}"></yuvomi-datepicker>
-      <p class="form-hint">${t('contacts.birthdayHint')}</p>
-    </div>
+    ${birthDateFieldHtml({
+      id: 'cm-birthday',
+      label: t('contacts.birthdayLabel'),
+      value: isEdit ? contact.birthday : '',
+      yearUnknown: isEdit ? contact.birthday_year_unknown : false,
+      hint: t('contacts.birthdayHint'),
+    })}
     <div class="form-group">
       <label class="form-label" for="cm-notes">${t('contacts.notesLabel')}</label>
       <textarea class="form-input" id="cm-notes" rows="2" placeholder="${t('contacts.notesPlaceholder')}">${v('notes')}</textarea>
@@ -1599,6 +1602,8 @@ function buildContactForm({ mode, contact = null }) {
       // Nutzer sie bestätigt hat - sonst bekäme "AutoHaus König" beim Ändern
       // einer Telefonnummer stillschweigend den Nachnamen "König" und würde in
       // der Liste umsortiert (#535).
+      const birthdayField = wireBirthDateField(panel, 'cm-birthday');
+
       let nameTouched = false;
       panel.querySelectorAll('#cm-first-name, #cm-last-name').forEach((input) => {
         input.addEventListener('input', () => { nameTouched = true; });
@@ -1629,8 +1634,14 @@ function buildContactForm({ mode, contact = null }) {
         const phone    = phoneEntries[0]?.value || null;
         const email    = emailEntries[0]?.value || null;
         const address  = panel.querySelector('#cm-address').value.trim() || null;
-        const birthday = panel.querySelector('#cm-birthday')?.value || null;
+        // Ohne Jahr kommen Monat und Tag mit dem Platzhalterjahr (#2095).
+        const birth    = birthdayField.read();
+        const birthday = birth.date;
         const notes    = panel.querySelector('#cm-notes').value.trim() || null;
+        if (birth.yearUnknown && !birth.complete) {
+          window.yuvomi?.showToast(t('birthdays.yearlessIncomplete'), 'warning');
+          return;
+        }
 
         if (!name) {
           window.yuvomi?.showToast(t('contacts.nameRequiredHint'), 'danger');
@@ -1645,7 +1656,8 @@ function buildContactForm({ mode, contact = null }) {
 
         try {
           // firstName/lastName sind führend; der Server leitet `name` daraus ab (#535).
-          const body = { name, category, phone, email, address, notes, birthday };
+          const body = { name, category, phone, email, address, notes, birthday,
+            birthday_year_unknown: !!birthday && birth.yearUnknown };
           // Replace-Set: das Formular hält alle Werte, Label-Pflicht des Servers
           // deckt 'other' als neutrales Default ab.
           body.phones = phoneEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
@@ -1942,7 +1954,7 @@ function importSelectionRowHtml(contact, index) {
       <span class="vcard-import-row__name">${esc(contact.name)}</span>
       ${detail ? `<span class="vcard-import-row__detail">${esc(detail)}</span>` : ''}
       ${contact.birthday
-        ? `<span class="vcard-import-row__bday" title="${esc(formatDate(contact.birthday))}"><i data-lucide="cake" aria-hidden="true"></i></span>`
+        ? `<span class="vcard-import-row__bday" title="${esc(birthDateText(contact.birthday, contact.birthdayYearUnknown))}"><i data-lucide="cake" aria-hidden="true"></i></span>`
         : ''}
       ${exists ? `<span class="vcard-import-row__badge">${t('contacts.importExistsBadge')}</span>` : ''}
     </label>`;
@@ -2065,7 +2077,9 @@ async function importParsedContacts(list) {
   const failedList = [];
   for (const contact of list) {
     try {
-      const res = await api.post('/contacts', contact);
+      // Der Parser spricht camelCase, die API `birthday_year_unknown` (#2095).
+      const { birthdayYearUnknown, ...fields } = contact;
+      const res = await api.post('/contacts', { ...fields, birthday_year_unknown: !!fields.birthday && birthdayYearUnknown });
       state.contacts.push(res.data);
       imported++;
       if (res.data.birthday) withBirthday++;

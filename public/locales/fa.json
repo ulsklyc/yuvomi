@@ -3469,7 +3469,13 @@
         "importSuccess": "{{count}} تولد افزوده شد.",
         "importNothingSelected": "لطفاً حداقل یک مخاطب انتخاب کنید.",
         "importSelected": "{{count}} مخاطب انتخاب شد",
-        "errorBirthdayGone": "این تولد دیگر وجود ندارد."
+        "errorBirthdayGone": "این تولد دیگر وجود ندارد.",
+        "yearUnknown": "سال نامشخص",
+        "yearlessMonthLabel": "ماه تولد",
+        "yearlessDayLabel": "روز تولد",
+        "yearlessMonthPlaceholder": "ماه",
+        "yearlessDayPlaceholder": "روز",
+        "yearlessIncomplete": "ماه و روزِ تولد را انتخاب کنید."
     },
     "recipes": {
         "mealTypeNone": "بدون وعده",

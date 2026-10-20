@@ -2022,6 +2022,7 @@ Primary key: `(note_id, category_id)`.
 | organization | TEXT | nullable |
 | job_title | TEXT | nullable |
 | birthday | TEXT | DATE, nullable |
+| birthday_year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v254, #2095) - only day and month of `birthday` are known; `birthday` then carries the placeholder year 2000 |
 | website | TEXT | nullable |
 | photo | TEXT | Base64 data URL, nullable |
 | nickname | TEXT | nullable |
@@ -2667,10 +2668,30 @@ that generated event and reminder. The dashboard expands one person into separat
 name-day occurrence rows ordered by proximity, while the Birthdays module itself remains one row per
 person. No country- or name-based lookup is performed.
 
+**A birthday without a year (#2095)** keeps `birth_date` a full date with the placeholder leap year
+2000 and sets `year_unknown`, so sorting, the next birthday, the calendar event and the reminder keep
+reading one column, and 29 February stays valid. Everything that would show a year or an age asks the
+flag first: `next_age` is `null`, the list, detail, overview tile and wall show no age, the birth date
+reads as day and month ("15 March"), the generated event description carries no date and calendar reads
+return `birthday_date: null`. The event series starts in 2000. The flag comes from the editor ("Year
+unknown" swaps the date picker for month and day selects), from the API (`year_unknown`, boolean or
+0/1; omitted on update the stored value stays, turning it off needs a `birth_date` with its year) and
+from contacts: `contacts.birthday_year_unknown` travels with the import (and to the birthday of a
+split-expense guest made from a contact). A member's linked birthday carries it as
+`birth_year_unknown` in the user and member reads; profile and member editor offer the same choice,
+and a profile save only drops the flag when a different date arrives. The contact parsers (CardDAV
+sync and `.vcf` import) read Apple's `BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15`, a bare year 1604 and
+vCard 4 `--0315`/`--03-15` as a birthday without a year. Migration 254 converted stored 1604 dates
+(Apple's placeholder, never a real birth year) on contacts and birthdays, and the sync corrects a
+contact still stored as 1604, or fills in a year the card has gained, even where the column is not
+empty; a year entered locally stays. The vCard export writes such a birthday in Apple's 3.0 form, as
+sabre/vobject does. The separate birthday feed is unchanged: it never carried a year.
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | name | TEXT | NOT NULL |
 | birth_date | TEXT | DATE (YYYY-MM-DD), NOT NULL |
+| year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v254, #2095) - the year of birth is unknown; `birth_date` then carries the placeholder year 2000 |
 | name_day | TEXT | Month and day (`MM-DD`), nullable |
 | notes | TEXT | nullable |
 | photo_data | TEXT | Base64 data URL (≤ 5 MB), nullable |
@@ -6114,9 +6135,9 @@ The shape stays stable in every case — a blocked module yields an empty list, 
 
 Personal birthday tracker with automatic calendar integration.
 
-- CRUD: name, birth_date (day/month/year or day/month only for age-unknown entries), notes, photo
+- CRUD: name, birth_date (day/month/year, or day and month only with "Year unknown", `year_unknown` - see the data model), notes, photo
 - Profile photo upload (PNG/JPEG/WebP, ≤ 5 MB source file; cropped in the shared dialog and stored as a 256 × 256 Base64 JPEG data URL - see Profile picture). The server still accepts GIF unchanged for API clients, but the UI does not offer it: the crop always returns a JPEG, and an animation would silently become a still
-- **Upcoming view:** people stay sorted by days until their next birthday; an optional name day adds metadata to that person but never changes the order. The birthday age is shown when the birth year is known. **Deep link (#1821):** `/birthdays?open=<id>` selects the person in the detail column, where the address is the selection and stays. Below the column threshold it opens the read sheet and the parameter leaves the address before the sheet opens, without a history entry - a reload or Back does not open it again. The overview row and global search use it.
+- **Upcoming view:** people stay sorted by days until their next birthday; an optional name day adds metadata to that person but never changes the order. The birthday age is shown when the birth year is known; without a year the row shows only the date of the next birthday. **Deep link (#1821):** `/birthdays?open=<id>` selects the person in the detail column, where the address is the selection and stays. Below the column threshold it opens the read sheet and the parameter leaves the address before the sheet opens, without a history entry - a reload or Back does not open it again. The overview row and global search use it.
 - **A linked household member shows that person, not a placeholder:** an entry with `family_user_id` displays the member's photo or their initials in that member's **own** avatar colour — the same rule Contacts follows, so one person carries one colour across the overview, the calendar, tasks, contacts and here (see the identity-colour rule in DESIGN.md). Entries that belong to nobody in the household stay deliberately neutral: they have no identity colour, and the disc says so. `GET /api/v1/birthdays`, `GET /api/v1/birthdays/upcoming` and the single-record responses all carry `family_display_name`, `family_avatar_color` and `family_avatar_data`, `NULL` on unlinked entries. Because the avatar colour is freely chosen, the initials take a computed readable ink rather than the fixed one used over curated tones
 - **Countdown chip:** three steps that look like three — today carries the module colour at full strength, "within the next seven days" steps forward into the primary text colour, everything further out stays secondary. No tinted field on any of them (the scale rule in DESIGN.md)
 - **Mobile action hierarchy:** phones expose creation through the persistent FAB only; the duplicate header action is hidden so the title retains the available width.

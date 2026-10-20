@@ -2006,7 +2006,9 @@ cdb.exec(`
     calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
     name_day TEXT,
     name_day_calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE
+    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    -- Migration 254 (#2095): ohne Jahr liefert der Join kein birthday_date.
+    year_unknown INTEGER NOT NULL DEFAULT 0
   );
 `);
 

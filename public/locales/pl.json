@@ -3675,7 +3675,13 @@
         "importSuccess": "Dodano urodziny: {{count}}.",
         "importNothingSelected": "Wybierz co najmniej jeden kontakt.",
         "importSelected": "Wybrano kontakty: {{count}}",
-        "errorBirthdayGone": "Te urodziny już nie istnieją."
+        "errorBirthdayGone": "Te urodziny już nie istnieją.",
+        "yearUnknown": "Rok nieznany",
+        "yearlessMonthLabel": "Miesiąc urodzin",
+        "yearlessDayLabel": "Dzień urodzin",
+        "yearlessMonthPlaceholder": "Miesiąc",
+        "yearlessDayPlaceholder": "Dzień",
+        "yearlessIncomplete": "Wybierz miesiąc i dzień urodzin."
     },
     "recipes": {
         "mealTypeNone": "Brak posiłku",

@@ -3492,7 +3492,13 @@
         "importSuccess": "{{count}} cumpleaños añadidos.",
         "importNothingSelected": "Selecciona al menos un contacto.",
         "importSelected": "{{count}} contactos seleccionados",
-        "errorBirthdayGone": "Este cumpleaños ya no existe."
+        "errorBirthdayGone": "Este cumpleaños ya no existe.",
+        "yearUnknown": "Año desconocido",
+        "yearlessMonthLabel": "Mes del cumpleaños",
+        "yearlessDayLabel": "Día del cumpleaños",
+        "yearlessMonthPlaceholder": "Mes",
+        "yearlessDayPlaceholder": "Día",
+        "yearlessIncomplete": "Selecciona el mes y el día del cumpleaños."
     },
     "reminders": {
         "sectionTitle": "Recordatorio",

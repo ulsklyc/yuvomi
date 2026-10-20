@@ -1561,6 +1561,10 @@ const MIGRATIONS_SQL = {
     CREATE UNIQUE INDEX idx_users_birthday_feed_token ON users(birthday_feed_token)
       WHERE birthday_feed_token IS NOT NULL;
   `,
+  254: `
+    ALTER TABLE birthdays ADD COLUMN year_unknown INTEGER NOT NULL DEFAULT 0 CHECK(year_unknown IN (0, 1));
+    ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0 CHECK(birthday_year_unknown IN (0, 1));
+  `,
 };
 
 export { MIGRATIONS_SQL };

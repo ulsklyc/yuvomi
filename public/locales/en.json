@@ -3453,7 +3453,13 @@
         "importSuccess": "{{count}} birthdays added.",
         "importNothingSelected": "Please select at least one contact.",
         "importSelected": "{{count}} contacts selected",
-        "errorBirthdayGone": "This birthday no longer exists."
+        "errorBirthdayGone": "This birthday no longer exists.",
+        "yearUnknown": "Year unknown",
+        "yearlessMonthLabel": "Birthday month",
+        "yearlessDayLabel": "Birthday day",
+        "yearlessMonthPlaceholder": "Month",
+        "yearlessDayPlaceholder": "Day",
+        "yearlessIncomplete": "Select both the month and day of the birthday."
     },
     "recipes": {
         "mealTypeNone": "No meal",

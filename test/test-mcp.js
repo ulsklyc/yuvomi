@@ -51,6 +51,7 @@ db.exec(`
 `);
 db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
 db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
+db.exec(MIGRATIONS_SQL[254]); // birthday without a year, read by the calendar join
 db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
 db.exec(MIGRATIONS_SQL[245]);
 // Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.

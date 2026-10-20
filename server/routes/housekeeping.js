@@ -10,6 +10,7 @@ import { createLogger } from '../logger.js';
 import { hashPassword } from '../utils/password.js';
 import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
+import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
@@ -239,6 +240,8 @@ function publicWorker(row, context = localDayContext(), receipts = MASKED_RECEIP
     phone: row.phone ?? null,
     email: row.email ?? null,
     birth_date: row.birth_date ?? null,
+    // Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+    birth_year_unknown: row.birth_year_unknown === 1,
     // Der Lohn ist eine Betragsangabe wie die am Besuch (R20, `amounts`).
     daily_rate: receipts.amounts === true ? Number(row.daily_rate || 0) : null,
     rate_type: row.rate_type || 'daily',
@@ -400,7 +403,8 @@ function loadWorkers() {
            u.avatar_data,
            c.phone,
            c.email,
-           b.birth_date
+           b.birth_date,
+           b.year_unknown AS birth_year_unknown
     FROM housekeeping_workers hw
     JOIN users u ON u.id = hw.user_id
     LEFT JOIN contacts c ON c.family_user_id = u.id
@@ -601,7 +605,8 @@ function loadWorkerById(workerId) {
            u.avatar_data,
            c.phone,
            c.email,
-           b.birth_date
+           b.birth_date,
+           b.year_unknown AS birth_year_unknown
     FROM housekeeping_workers hw
     JOIN users u ON u.id = hw.user_id
     LEFT JOIN contacts c ON c.family_user_id = u.id
@@ -952,14 +957,16 @@ router.post('/worker', async (req, res) => {
     const vUsername = str(req.body.username, 'username', { max: 64, required: false });
     const vPhone = str(req.body.phone, 'phone', { max: MAX_SHORT, required: false });
     const vEmail = str(req.body.email, 'email', { max: MAX_TITLE, required: false });
-    const vBirthDate = date(req.body.birth_date, 'birth_date');
+    // Ohne Jahr (#2095) weicht das Jahr dem Platzhalter, bevor geprueft wird.
+    const vYearUnknown = validateYearUnknown(req.body.birth_year_unknown, 'birth_year_unknown');
+    const vBirthDate = date(birthDateInput(req.body.birth_date, vYearUnknown.value === true), 'birth_date');
     const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
     const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
     const vCalendarColor = color(req.body.calendar_color || existing?.calendar_color || NEW_WORKER_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
     const vRateType = oneOf(req.body.rate_type || 'daily', ['daily', 'hourly'], 'rate_type');
     const vHourlyRate = num(req.body.hourly_rate, 'hourly_rate');
-    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vBirthDate, vDailyRate, vSchedule, vCalendarColor, vNotes, vRateType, vHourlyRate]);
+    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vYearUnknown, vBirthDate, vDailyRate, vSchedule, vCalendarColor, vNotes, vRateType, vHourlyRate]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (vUsername.value && !/^[a-zA-Z0-9._-]{3,64}$/.test(vUsername.value)) {
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'housekeeping_username_invalid' });
@@ -1015,6 +1022,7 @@ router.post('/worker', async (req, res) => {
         phone: vPhone.value,
         email: vEmail.value,
         birthDate: vBirthDate.value,
+        birthYearUnknown: vYearUnknown.value,
         avatarData: avatarData ?? null,
         actorUserId: actorId,
       });

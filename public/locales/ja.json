@@ -3492,7 +3492,13 @@
         "importSuccess": "{{count}} 件の誕生日を追加しました。",
         "importNothingSelected": "少なくとも 1 件の連絡先を選択してください。",
         "importSelected": "{{count}} 件の連絡先を選択",
-        "errorBirthdayGone": "この誕生日はもうありません。"
+        "errorBirthdayGone": "この誕生日はもうありません。",
+        "yearUnknown": "年は不明",
+        "yearlessMonthLabel": "誕生日の月",
+        "yearlessDayLabel": "誕生日の日",
+        "yearlessMonthPlaceholder": "月",
+        "yearlessDayPlaceholder": "日",
+        "yearlessIncomplete": "誕生日の月と日を選択してください。"
     },
     "reminders": {
         "sectionTitle": "リマインダー",

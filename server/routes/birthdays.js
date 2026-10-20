@@ -12,6 +12,9 @@ import {
   syncAllBirthdayReminders,
   listBirthdayImportCandidates,
   importBirthdaysFromContacts,
+  placeholderBirthDate,
+  birthDateInput,
+  validateYearUnknown,
 } from '../services/birthdays.js';
 
 const log = createLogger('Birthdays');
@@ -199,20 +202,22 @@ router.get('/upcoming', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
-    const vBirthDate = validateDate(req.body.birth_date, 'Birth date', true);
+    const vYearUnknown = validateYearUnknown(req.body.year_unknown, 'year_unknown');
+    const vBirthDate = validateDate(birthDateInput(req.body.birth_date, vYearUnknown.value === true), 'Birth date', true);
     const vNotes = str(req.body.notes, 'Notes', { max: MAX_TEXT, required: false });
     const vPhoto = validatePhotoData(req.body.photo_data);
     const vNameDay = validateNameDay(req.body.name_day);
     const vReminder = validateReminder(req.body);
-    const errors = collectErrors([vName, vBirthDate, vNotes, vPhoto, vNameDay, ...Object.values(vReminder)]);
+    const errors = collectErrors([vName, vYearUnknown, vBirthDate, vNotes, vPhoto, vNameDay, ...Object.values(vReminder)]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const result = db.get().prepare(`
-      INSERT INTO birthdays (name, birth_date, name_day, notes, photo_data, created_by, reminder_offset, reminder_custom_amount, reminder_custom_unit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO birthdays (name, birth_date, year_unknown, name_day, notes, photo_data, created_by, reminder_offset, reminder_custom_amount, reminder_custom_unit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       vName.value,
       vBirthDate.value,
+      vYearUnknown.value ? 1 : 0,
       vNameDay.value ?? null,
       vNotes.value,
       vPhoto.value ?? null,
@@ -299,9 +304,20 @@ router.put('/:id', (req, res) => {
     const existing = loadBirthday(id);
     if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
 
-    const checks = [];
+    // Fehlt `year_unknown`, bleibt die gespeicherte Marke. Wer sie abnimmt, muss
+    // das Jahr mitschicken: sonst wuerde das Platzhalterjahr 2000 still zum
+    // echten Geburtsjahr.
+    const vYearUnknown = validateYearUnknown(req.body.year_unknown, 'year_unknown');
+    const yearUnknown = vYearUnknown.value ?? existing.year_unknown === 1;
+    const birthDate = req.body.birth_date !== undefined
+      ? birthDateInput(req.body.birth_date, yearUnknown)
+      : (yearUnknown && existing.year_unknown !== 1 ? placeholderBirthDate(existing.birth_date) : undefined);
+    const checks = [vYearUnknown];
+    if (vYearUnknown.value === false && existing.year_unknown === 1 && req.body.birth_date === undefined) {
+      checks.push({ value: null, error: 'Birth date with its year is required when year_unknown is turned off.' });
+    }
     if (req.body.name !== undefined) checks.push(str(req.body.name, 'Name', { max: MAX_TITLE, required: false }));
-    if (req.body.birth_date !== undefined) checks.push(validateDate(req.body.birth_date, 'Birth date'));
+    if (birthDate !== undefined) checks.push(validateDate(birthDate, 'Birth date'));
     if (req.body.notes !== undefined) checks.push(str(req.body.notes, 'Notes', { max: MAX_TEXT, required: false }));
     if (req.body.photo_data !== undefined) checks.push(validatePhotoData(req.body.photo_data));
     if (req.body.name_day !== undefined) checks.push(validateNameDay(req.body.name_day));
@@ -317,6 +333,7 @@ router.put('/:id', (req, res) => {
       UPDATE birthdays
       SET name = COALESCE(?, name),
           birth_date = COALESCE(?, birth_date),
+          year_unknown = ?,
           name_day = ?,
           notes = ?,
           photo_data = ?,
@@ -327,7 +344,8 @@ router.put('/:id', (req, res) => {
       WHERE id = ?
     `).run(
       req.body.name?.trim() ?? null,
-      req.body.birth_date ?? null,
+      birthDate ?? null,
+      yearUnknown ? 1 : 0,
       req.body.name_day !== undefined ? vNameDay.value : existing.name_day,
       req.body.notes !== undefined ? (req.body.notes?.trim() || null) : existing.notes,
       req.body.photo_data !== undefined ? (vPhoto.value ?? null) : existing.photo_data,

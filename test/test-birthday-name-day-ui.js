@@ -236,3 +236,85 @@ test('R19: die Liste gruppiert nach Monat und hebt den naechsten hervor', async 
   const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
   assert.match(css, /\.birthday-item--next \.birthday-chip \{[^}]*--module-accent/, 'der Countdown des naechsten im Modulton');
 });
+
+// --------------------------------------------------------------------------
+// Geburtstag ohne Jahr (#2095): nie ein Jahr, nie ein Alter.
+// --------------------------------------------------------------------------
+const { birthDateText, birthDateShort, birthDateFieldHtml } = await import('../public/utils/birth-date.js');
+
+test('ohne Jahr nennt die Zeile nur den Tag, kein Alter', () => {
+  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null }), '2027-03-15');
+  assert.match(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: 41 }), /turnsAge/);
+  const html = birthdays.birthdayItemHtml({
+    id: 77, name: 'Ohne Jahr', birth_date: '2000-03-15', year_unknown: 1,
+    next_birthday: '2027-03-15', next_age: null, days_until: 146,
+  });
+  assert.doesNotMatch(html, /turnsAge|null/);
+});
+
+test('das Geburtsdatum ohne Jahr steht ausgeschrieben da, nie mit dem Platzhalter', () => {
+  globalThis.__locale = 'de';
+  try {
+    assert.equal(birthDateText('2000-03-15', 1), '15. März');
+    assert.equal(birthDateText('2000-02-29', true), '29. Februar');
+    assert.equal(birthDateText('1990-03-15', 0), '1990-03-15', 'mit Jahr wie bisher (formatDate)');
+    assert.equal(birthDateText(null, 1), '');
+    globalThis.__formatDayMonth = (d) => `TM(${d})`;
+    assert.equal(birthDateShort('2000-03-15', 1), 'TM(2000-03-15)', 'die knappe Form laesst das Jahr weg');
+    assert.equal(birthDateShort('1990-03-15', 0), '1990-03-15');
+  } finally {
+    delete globalThis.__locale;
+    delete globalThis.__formatDayMonth;
+  }
+});
+
+test('der Editor zeigt ohne Jahr Monat und Tag statt des Datumswaehlers', () => {
+  const yearless = birthDateFieldHtml({ id: 'bd-birth-date', label: 'L', value: '2000-02-29', yearUnknown: 1, max: '2026-10-20' });
+  assert.match(yearless, /<yuvomi-datepicker id="bd-birth-date"[^>]* value=""[^>]* hidden>/, 'der Datumswaehler weicht, ohne Platzhalterjahr');
+  assert.match(yearless, /class="birth-date-field__yearless" id="bd-birth-date-yearless" role="group"[^>]*>/);
+  assert.doesNotMatch(yearless, /class="birth-date-field__yearless"[^>]* hidden/);
+  assert.match(yearless, /value="02" selected/);
+  assert.match(yearless, /value="29" selected/, 'der 29.02. ist waehlbar');
+  assert.match(yearless, /id="bd-birth-date-year-unknown" checked/);
+
+  const known = birthDateFieldHtml({ id: 'bd-birth-date', label: 'L', value: '1990-03-15' });
+  assert.match(known, /value="1990-03-15"/);
+  assert.match(known, /class="birth-date-field__yearless"[^>]* hidden/);
+  assert.doesNotMatch(known, /year-unknown" checked/);
+});
+
+test('der Kalendertermin eines Geburtstags ohne Jahr bekommt die Beschreibung ohne Datum', () => {
+  const ev = localizeBirthdayEvent({ birthday_name: 'Ohne Jahr', birthday_date: null, title: 'x' });
+  assert.match(ev.description, /calendarEventDescriptionNoDate/);
+});
+
+// Codex-Befund auf #2111: ein Mitglied, dessen Geburtstag nur Tag und Monat
+// kennt (etwa ein Split-Gast aus einem jahrlosen Kontakt), zeigt in der
+// Mitgliederliste kein Platzhalterjahr, und Profil und Mitglieds-Editor bieten
+// dieselbe Wahl wie der Geburtstags-Editor.
+test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"', async () => {
+  const { __test: family } = await import('../public/settings/pages/admin-family.js');
+  globalThis.__locale = 'de';
+  try {
+    const row = family.memberHtml({ id: 5, username: 'gast', display_name: 'Gast', role: 'member', family_role: 'other',
+      birth_date: '2000-03-15', birth_year_unknown: true }, 1);
+    assert.match(row, /15\. März/);
+    assert.doesNotMatch(row, /2000/);
+  } finally {
+    delete globalThis.__locale;
+  }
+  const { birthDateControlHtml } = await import('../public/utils/birth-date.js');
+  const control = birthDateControlHtml({ id: 'profile-birth-date', value: '2000-03-15', yearUnknown: true, describedBy: 'profile-error' });
+  assert.match(control, /id="profile-birth-date-year-unknown" checked/);
+  assert.match(control, /aria-describedby="profile-error"/);
+  const { readFileSync } = await import('node:fs');
+  const hk = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.match(hk, /birthDateText\(worker\.birth_date, worker\.birth_year_unknown\)/, 'Hausprofil zeigt kein Platzhalterjahr');
+  assert.match(hk, /yearUnknown: item\.birth_year_unknown/);
+  assert.match(hk, /birth_year_unknown: workerBirth\.yearUnknown/);
+  for (const page of ['personal-account', 'admin-family']) {
+    const src = readFileSync(new URL(`../public/settings/pages/${page}.js`, import.meta.url), 'utf8');
+    assert.match(src, /birthDateControlHtml\(\{[\s\S]{0,200}yearUnknown: (user\?|member)\.birth_year_unknown/, `${page} reicht die Marke an den Editor`);
+    assert.match(src, /birth_year_unknown: birth\.yearUnknown/, `${page} schickt die Marke mit`);
+  }
+});

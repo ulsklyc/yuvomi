@@ -21,6 +21,42 @@ const BIRTHDAY_RRULE = 'FREQ=YEARLY;INTERVAL=1';
 // sie also nur eine weitere Quelle für Scheinänderungen.
 const AUTHORED_FIELDS = ['title', 'description', 'start_datetime'];
 
+/**
+ * DAS JAHR EINES GEBURTSTAGS OHNE JAHR (#2095). `birth_date` bleibt ein volles
+ * Datum, damit Sortierung, naechster Geburtstag und Erinnerung dieselbe Spalte
+ * lesen; `year_unknown` sagt, dass dieses Jahr nur Platzhalter ist. 2000 ist ein
+ * Schaltjahr, der 29.02. bleibt gueltig - wie beim Namenstag (`2000-MM-DD`).
+ * Spiegel im Browser: YEAR_UNKNOWN_PLACEHOLDER in public/utils/vcard.js.
+ */
+const YEAR_UNKNOWN_PLACEHOLDER = 2000;
+
+/** `YYYY-MM-DD` mit Platzhalterjahr; das Jahr des Eingangs zaehlt nicht. */
+function placeholderBirthDate(date) {
+  return `${YEAR_UNKNOWN_PLACEHOLDER}${String(date).slice(4, 10)}`;
+}
+
+/**
+ * "Jahr unbekannt" als Eingang (#2095): true/false und 0/1. Die Antworten
+ * liefern die Spalte als 0/1, und ein GET, ein Feld aendern, PUT soll nicht an
+ * ihr scheitern. null zaehlt als false.
+ */
+function validateYearUnknown(val, field) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === true || val === 1) return { value: true, error: null };
+  if (val === false || val === 0 || val === null) return { value: false, error: null };
+  return { value: null, error: `${field} must be a boolean.` };
+}
+
+/**
+ * Ohne Jahr zaehlen nur Tag und Monat: das Jahr des Eingangs weicht dem
+ * Platzhalter, BEVOR geprueft wird - so ist ein 29.02. gueltig, auch wenn der
+ * Client ein Jahr ohne ihn mitschickt.
+ */
+function birthDateInput(raw, yearUnknown) {
+  if (yearUnknown && typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return placeholderBirthDate(raw);
+  return raw;
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -60,7 +96,13 @@ function nextBirthdayDate(birthDate, today = todayKey(null)) {
   return thisYear >= today ? thisYear : normalizedMonthDay(birthDate, year + 1);
 }
 
-function nextBirthdayAge(birthDate, today = todayKey(null)) {
+/**
+ * Das Alter am naechsten Geburtstag - oder null, wenn das Jahr unbekannt ist:
+ * das Platzhalterjahr ist kein Geburtsjahr, und ein Alter daraus waere erfunden
+ * (#2095; aus Apples 1604 wurde "wird 422").
+ */
+function nextBirthdayAge(birthDate, today = todayKey(null), yearUnknown = false) {
+  if (yearUnknown) return null;
   const next = nextBirthdayDate(birthDate, today);
   return parseInt(next.slice(0, 4), 10) - parseInt(String(birthDate).slice(0, 4), 10);
 }
@@ -128,8 +170,10 @@ function eventTitle(name, locale) {
   return translate(locale, 'birthdays.calendarEventTitle', { name });
 }
 
-function eventDescription(name, birthDate, locale, dateFormat) {
-  return birthDate
+// Ohne Jahr steht kein Datum in der Beschreibung: das gespeicherte traegt das
+// Platzhalterjahr (#2095), und Tag und Monat nennt der Termin selbst.
+function eventDescription(name, birthDate, locale, dateFormat, yearUnknown = false) {
+  return birthDate && !yearUnknown
     ? translate(locale, 'birthdays.calendarEventDescription', {
         name,
         date: formatDateKey(birthDate, dateFormat),
@@ -189,7 +233,7 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
     title: isNameDay ? nameDayEventTitle(birthday.name, locale) : eventTitle(birthday.name, locale),
     description: isNameDay
       ? nameDayEventDescription(birthday.name, locale)
-      : eventDescription(birthday.name, birthday.birth_date, locale, dateFormat),
+      : eventDescription(birthday.name, birthday.birth_date, locale, dateFormat, birthday.year_unknown === 1),
     start_datetime: sourceDate,
     end_datetime: null,
     all_day: 1,
@@ -402,12 +446,12 @@ function deleteBirthdayArtifacts(database, birthday) {
 function retitleBirthdayEvents(database) {
   const { locale, dateFormat } = resolveHouseholdFormats(database);
   const rows = database.prepare(`
-    SELECT b.name, b.birth_date, 'birthday' AS event_kind,
+    SELECT b.name, b.birth_date, b.year_unknown, 'birthday' AS event_kind,
            e.id, e.title, e.description, e.external_source, e.external_calendar_id, e.caldav_account_id
     FROM birthdays b
     JOIN calendar_events e ON e.id = b.calendar_event_id
     UNION ALL
-    SELECT b.name, NULL AS birth_date, 'name_day' AS event_kind,
+    SELECT b.name, NULL AS birth_date, 0 AS year_unknown, 'name_day' AS event_kind,
            e.id, e.title, e.description, e.external_source, e.external_calendar_id, e.caldav_account_id
     FROM birthdays b
     JOIN calendar_events e ON e.id = b.name_day_calendar_event_id
@@ -424,7 +468,7 @@ function retitleBirthdayEvents(database) {
       : eventTitle(row.name, locale);
     const description = row.event_kind === 'name_day'
       ? nameDayEventDescription(row.name, locale)
-      : eventDescription(row.name, row.birth_date, locale, dateFormat);
+      : eventDescription(row.name, row.birth_date, locale, dateFormat, row.year_unknown === 1);
     if (title === row.title && description === (row.description ?? null)) continue;
 
     update.run(title, description, row.id);
@@ -450,7 +494,7 @@ function hydrateBirthday(database, row, from = new Date()) {
   return {
     ...row,
     next_birthday,
-    next_age: nextBirthdayAge(row.birth_date, today),
+    next_age: nextBirthdayAge(row.birth_date, today, row.year_unknown === 1),
     days_until: daysUntilBirthday(row.birth_date, today),
     next_name_day: row.name_day ? nextNameDayDate(row.name_day, today) : null,
     name_day_days_until: row.name_day ? daysUntilNameDay(row.name_day, today) : null,
@@ -526,11 +570,11 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
  * einen Geburtstag gekoppelt sind (haushaltsweit, nicht pro Nutzer).
  *
  * @param {object} database
- * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string}> }}
+ * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,birthday_year_unknown:boolean,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string}> }}
  */
 function listBirthdayImportCandidates(database) {
   const rows = database.prepare(`
-    SELECT c.id, c.name, c.birthday,
+    SELECT c.id, c.name, c.birthday, c.birthday_year_unknown,
            EXISTS(SELECT 1 FROM birthdays b WHERE b.contact_id = c.id) AS already_imported
     FROM contacts c
     WHERE NOT EXISTS (
@@ -547,6 +591,9 @@ function listBirthdayImportCandidates(database) {
         id: r.id,
         name: r.name,
         birthday: r.birthday,
+        // Der Kontakt kennt nur Tag und Monat (#2095): die Liste zeigt das Jahr
+        // nicht, der Import uebernimmt die Marke.
+        birthday_year_unknown: r.birthday_year_unknown === 1,
         already_imported: r.already_imported === 1,
       });
     } else {
@@ -577,11 +624,11 @@ function importBirthdaysFromContacts(database, contactIds, userId, from = new Da
   let imported = 0;
   let skipped = 0;
 
-  const getContact = database.prepare('SELECT id, name, birthday FROM contacts WHERE id = ?');
+  const getContact = database.prepare('SELECT id, name, birthday, birthday_year_unknown FROM contacts WHERE id = ?');
   const alreadyLinked = database.prepare('SELECT 1 FROM birthdays WHERE contact_id = ?');
   const insert = database.prepare(`
-    INSERT INTO birthdays (name, birth_date, created_by, contact_id, reminder_offset)
-    VALUES (?, ?, ?, ?, NULL)
+    INSERT INTO birthdays (name, birth_date, year_unknown, created_by, contact_id, reminder_offset)
+    VALUES (?, ?, ?, ?, ?, NULL)
   `);
   const load = database.prepare('SELECT * FROM birthdays WHERE id = ?');
 
@@ -593,7 +640,11 @@ function importBirthdaysFromContacts(database, contactIds, userId, from = new Da
     if (!contact || !contact.birthday || !String(contact.birthday).trim()) { skipped++; continue; }
     if (alreadyLinked.get(id)) { skipped++; continue; }
 
-    const newId = insert.run(contact.name, contact.birthday, userId, id).lastInsertRowid;
+    // "Jahr unbekannt" geht mit (#2095); das Datum traegt dann schon das
+    // Platzhalterjahr, aus einem alten 1604 wird es hier nachgezogen.
+    const yearUnknown = contact.birthday_year_unknown === 1;
+    const birthDate = yearUnknown ? placeholderBirthDate(contact.birthday) : contact.birthday;
+    const newId = insert.run(contact.name, birthDate, yearUnknown ? 1 : 0, userId, id).lastInsertRowid;
     syncBirthdayArtifacts(database, load.get(newId), from);
     imported++;
   }
@@ -604,6 +655,8 @@ function importBirthdaysFromContacts(database, contactIds, userId, from = new Da
 export {
   BIRTHDAY_COLOR,
   BIRTHDAY_RRULE,
+  YEAR_UNKNOWN_PLACEHOLDER,
+  birthDateInput,
   birthdayReminderAt,
   daysUntilBirthday,
   daysUntilNameDay,
@@ -618,7 +671,9 @@ export {
   nextBirthdayDate,
   nameDayEventTitle,
   nextNameDayDate,
+  placeholderBirthDate,
   retitleBirthdayEvents,
   syncAllBirthdayReminders,
   syncBirthdayArtifacts,
+  validateYearUnknown,
 };

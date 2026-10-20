@@ -3492,7 +3492,13 @@
         "importSuccess": "{{count}} födelsedagar tillagda.",
         "importNothingSelected": "Välj minst en kontakt.",
         "importSelected": "{{count}} kontakter valda",
-        "errorBirthdayGone": "Den här födelsedagen finns inte längre."
+        "errorBirthdayGone": "Den här födelsedagen finns inte längre.",
+        "yearUnknown": "Okänt år",
+        "yearlessMonthLabel": "Månad för födelsedagen",
+        "yearlessDayLabel": "Dag för födelsedagen",
+        "yearlessMonthPlaceholder": "Månad",
+        "yearlessDayPlaceholder": "Dag",
+        "yearlessIncomplete": "Välj månad och dag för födelsedagen."
     },
     "reminders": {
         "sectionTitle": "Påminnelse",

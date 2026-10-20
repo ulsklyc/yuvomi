@@ -3453,7 +3453,13 @@
         "importSuccess": "{{count}} verjaardagen toegevoegd.",
         "importNothingSelected": "Selecteer minstens één contact.",
         "importSelected": "{{count}} contacten geselecteerd",
-        "errorBirthdayGone": "Deze verjaardag bestaat niet meer."
+        "errorBirthdayGone": "Deze verjaardag bestaat niet meer.",
+        "yearUnknown": "Jaar onbekend",
+        "yearlessMonthLabel": "Maand van de verjaardag",
+        "yearlessDayLabel": "Dag van de verjaardag",
+        "yearlessMonthPlaceholder": "Maand",
+        "yearlessDayPlaceholder": "Dag",
+        "yearlessIncomplete": "Selecteer de maand en dag van de verjaardag."
     },
     "recipes": {
         "mealTypeNone": "Geen maaltijd",

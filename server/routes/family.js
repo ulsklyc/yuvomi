@@ -27,6 +27,8 @@ function listMembers() {
            c.phone,
            c.email,
            b.birth_date,
+           -- Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+           COALESCE(b.year_unknown, 0) AS birth_year_unknown,
            u.created_at,
            ${memberPositionSql('u')} AS sort_order
     FROM users u
@@ -34,7 +36,7 @@ function listMembers() {
     LEFT JOIN birthdays b ON b.family_user_id = u.id
     WHERE ${householdMemberSql('u')}
     ORDER BY ${memberOrderSql('u')}
-  `).all();
+  `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 }));
 }
 
 router.get('/members', (req, res) => {

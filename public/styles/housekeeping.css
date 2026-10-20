@@ -476,6 +476,19 @@
   background-position: left var(--space-3) center;
 }
 
+/* Der Haken "Jahr unbekannt" (utils/birth-date.js, #2095) ist kein Textfeld:
+ * die Feldregel oben machte ihn sonst zeilenbreit und 44px hoch. */
+.housekeeping-field .birth-date-field__toggle {
+  font-weight: var(--font-weight-regular);
+}
+
+.housekeeping-field .birth-date-field__toggle input[type="checkbox"] {
+  width: var(--space-5);
+  height: var(--space-5);
+  min-height: 0;
+  padding: 0;
+}
+
 .housekeeping-field textarea {
   min-height: 120px;
   padding: var(--space-3);

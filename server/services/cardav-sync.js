@@ -134,6 +134,7 @@ function parseVCard(vCardText) {
     jobTitle: null,
     website: null,
     birthday: null,
+    birthdayYearUnknown: false,
     photo: null,
     nickname: null,
     notes: null,
@@ -232,10 +233,14 @@ function parseVCard(vCardText) {
         if (!vcard.website) vcard.website = value;
         break;
 
-      case 'BDAY':
-        // Parse birthday to ISO format (YYYY-MM-DD)
-        vcard.birthday = parseBirthday(value);
+      case 'BDAY': {
+        // ISO (YYYY-MM-DD); ohne Jahr mit Platzhalterjahr und Marke (#2095).
+        // Die Parameter zaehlen mit: Apples Marke steht dort.
+        const parsed = parseBirthday(value, params);
+        vcard.birthday = parsed ? parsed.date : null;
+        vcard.birthdayYearUnknown = parsed ? parsed.yearUnknown : false;
         break;
+      }
 
       case 'PHOTO':
         // Handle base64 encoded photos
@@ -297,33 +302,66 @@ function extractType(params) {
   return foundType;
 }
 
+/** Platzhalterjahr eines Geburtstags ohne Jahr; Spiegel von server/services/birthdays.js. */
+const YEAR_UNKNOWN_PLACEHOLDER = 2000;
+
+/** Tag und Monat ohne Jahr, im Schaltjahr gueltig - sonst null. */
+function yearlessBirthday(month, day) {
+  const m = Number(month);
+  const d = Number(day);
+  const probe = new Date(Date.UTC(YEAR_UNKNOWN_PLACEHOLDER, m - 1, d));
+  if (probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return null;
+  return { date: `${YEAR_UNKNOWN_PLACEHOLDER}-${month}-${day}`, yearUnknown: true };
+}
+
 /**
- * Parse birthday from various vCard formats to ISO date
+ * Parse birthday from various vCard formats to ISO date.
+ *
+ * EIN GEBURTSTAG OHNE JAHR (#2095) kommt in zwei Formen: Apple schreibt ein
+ * Platzhalterjahr (1604) und markiert es im Parameter,
+ * `BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15`; vCard 4 (RFC 6350) schreibt
+ * `--0315` oder `--03-15`. Beide liefern Tag und Monat mit dem Platzhalterjahr
+ * 2000 und `yearUnknown: true`. Ein Jahr, das nicht dem Parameter entspricht,
+ * ist echt (so liest es auch sabre/vobject) - ausser 1604, siehe unten.
+ * Spiegel: public/utils/vcard.js#parseBirthdayValue.
  * @param {string} value - Birthday value from vCard
- * @returns {string|null} ISO date (YYYY-MM-DD) or null
+ * @param {Array<string>} [params] - Property parameters
+ * @returns {{ date: string, yearUnknown: boolean }|null} ISO date (YYYY-MM-DD) or null
  */
-function parseBirthday(value) {
+function parseBirthday(value, params = []) {
   if (!value) return null;
+
+  // vCard 4 ohne Jahr: --MMDD oder --MM-DD (vor der Bereinigung, die die
+  // fuehrenden Striche sonst stehen liesse und kein Muster traefe).
+  const yearless = /^--(\d{2})-?(\d{2})$/.exec(String(value).trim());
+  if (yearless) return yearlessBirthday(yearless[1], yearless[2]);
 
   // Remove any non-numeric characters except hyphens
   const cleaned = value.replace(/[^\d-]/g, '');
 
+  let date = null;
   // Try ISO format (YYYY-MM-DD)
   if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
-    return cleaned;
+    date = cleaned;
+  } else if (/^\d{8}$/.test(cleaned)) {
+    // Try compact format (YYYYMMDD)
+    date = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`;
+  } else if (/^\d{4}$/.test(cleaned)) {
+    // Try year only
+    date = `${cleaned}-01-01`;
   }
+  if (!date) return null;
 
-  // Try compact format (YYYYMMDD)
-  if (/^\d{8}$/.test(cleaned)) {
-    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`;
+  const omitYear = params
+    .map((p) => /^X-APPLE-OMIT-YEAR=(\d{4})$/i.exec(String(p).trim()))
+    .find(Boolean);
+  // 1604 allein zaehlt ebenso: ein Zwischenserver, der Parameter verliert,
+  // laesst Apples Platzhalter ohne Marke zurueck, und 1604 ist nie das echte
+  // Geburtsjahr eines Kontakts (dieselbe Regel wie Migration 254).
+  if ((omitYear && omitYear[1] === date.slice(0, 4)) || date.startsWith('1604-')) {
+    return yearlessBirthday(date.slice(5, 7), date.slice(8, 10));
   }
-
-  // Try year only
-  if (/^\d{4}$/.test(cleaned)) {
-    return `${cleaned}-01-01`;
-  }
-
-  return null;
+  return { date, yearUnknown: false };
 }
 
 /**
@@ -1155,11 +1193,11 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
     const result = db.get().prepare(`
       INSERT INTO contacts (
         name, first_name, last_name, middle_name, name_prefix, name_suffix,
-        category, phone, email, address, organization, job_title, birthday, website,
+        category, phone, email, address, organization, job_title, birthday, birthday_year_unknown, website,
         photo, nickname, notes,
         carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote')
     `).run(
       vcard.name,
       vcard.firstName,
@@ -1174,6 +1212,7 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
       vcard.organization,
       vcard.jobTitle,
       vcard.birthday,
+      vcard.birthday && vcard.birthdayYearUnknown ? 1 : 0,
       vcard.website,
       vcard.photo,
       vcard.nickname,
@@ -1306,6 +1345,25 @@ function updateContact(contactId, vcard, fillAll = false) {
   maybeUpdate('organization', 'organization', vcard.organization);
   maybeUpdate('jobTitle', 'job_title', vcard.jobTitle);
   maybeUpdate('birthday', 'birthday', vcard.birthday);
+  // Die Marke "Jahr unbekannt" folgt dem Datum, das hier geschrieben wird.
+  // ZUSAETZLICH wird Apples 1604 korrigiert, auch wenn die Spalte nicht leer ist
+  // (#2095): ein vor dem Fix gespeichertes `1604-MM-DD` ist kein lokal
+  // gemeint war. Ebenso fuellt ein Jahr, das die Karte inzwischen traegt, einen
+  // Geburtstag ohne Jahr: "unbekannt" ist eine Luecke wie NULL. Ein lokal
+  // eingetragenes echtes Jahr bleibt stehen.
+  if (vcard.birthday) {
+    const writesBirthday = updates.includes('birthday = ?');
+    const storedPlaceholder = (typeof contact.birthday === 'string' && contact.birthday.startsWith('1604-'))
+      || (contact.birthday_year_unknown === 1 && !vcard.birthdayYearUnknown);
+    if (!writesBirthday && storedPlaceholder) {
+      updates.push('birthday = ?');
+      values.push(vcard.birthday);
+    }
+    if (writesBirthday || storedPlaceholder) {
+      updates.push('birthday_year_unknown = ?');
+      values.push(vcard.birthdayYearUnknown ? 1 : 0);
+    }
+  }
   maybeUpdate('website', 'website', vcard.website);
   maybeUpdate('photo', 'photo', vcard.photo);
   maybeUpdate('nickname', 'nickname', vcard.nickname);

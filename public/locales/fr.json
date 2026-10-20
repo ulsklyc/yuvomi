@@ -3492,7 +3492,13 @@
         "importSuccess": "{{count}} anniversaires ajoutés.",
         "importNothingSelected": "Sélectionnez au moins un contact.",
         "importSelected": "{{count}} contacts sélectionnés",
-        "errorBirthdayGone": "Cet anniversaire n’existe plus."
+        "errorBirthdayGone": "Cet anniversaire n’existe plus.",
+        "yearUnknown": "Année inconnue",
+        "yearlessMonthLabel": "Mois de l’anniversaire",
+        "yearlessDayLabel": "Jour de l’anniversaire",
+        "yearlessMonthPlaceholder": "Mois",
+        "yearlessDayPlaceholder": "Jour",
+        "yearlessIncomplete": "Sélectionnez le mois et le jour de l’anniversaire."
     },
     "reminders": {
         "sectionTitle": "Rappel",

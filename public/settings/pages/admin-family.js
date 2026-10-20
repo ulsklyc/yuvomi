@@ -15,6 +15,7 @@ import { vibrate } from '/utils/ux.js';
 import { openModal, closeModal, captureModalContext, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
+import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
 } from '/components/user-multi-select.js';
@@ -182,7 +183,8 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
   const profileMeta = [
     u.phone ? t('settings.memberPhoneMeta', { value: u.phone }) : '',
     u.email || '',
-    u.birth_date ? t('settings.memberBirthdayMeta', { date: formatDate(u.birth_date) }) : '',
+    // Ohne Jahr (#2095) nur Tag und Monat - nie das Platzhalterjahr.
+    u.birth_date ? t('settings.memberBirthdayMeta', { date: birthDateText(u.birth_date, u.birth_year_unknown) }) : '',
   ].filter(Boolean).map(esc).join(' · ');
   // Row-Action-Grammatik statt dauerhaft rotem Outline-Button: Löschen wird
   // erst bei Hover/Fokus laut. Der eigene Account bekommt keine Lösch-Aktion
@@ -1015,9 +1017,14 @@ async function openEditMemberModal(member, currentUser, users, container) {
             control: `<input class="form-input" type="email" id="edit-member-email" value="${esc(member.email || '')}" autocomplete="email" />`,
           }),
           formRowHtml({
-            label: t('settings.memberBirthDateLabel'), labelFor: 'edit-member-birth-date',
+            label: t('settings.memberBirthDateLabel'), labelFor: 'edit-member-birth-date', labelId: 'edit-member-birth-date-label',
             description: t('settings.memberContactBirthdayHint'),
-            control: `<yuvomi-datepicker type="date" id="edit-member-birth-date" value="${esc(member.birth_date || '')}"></yuvomi-datepicker>`,
+            // Wie im Geburtstags-Editor (#2095).
+            control: birthDateControlHtml({
+              id: 'edit-member-birth-date',
+              value: member.birth_date || '',
+              yearUnknown: member.birth_year_unknown,
+            }),
           }),
           ssoAvailable ? switchRowHtml({
             id: 'edit-member-sso-only', label: t('settings.memberSsoOnlyLabel'),
@@ -1079,6 +1086,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
       });
 
       if (caregiverIds !== null) bindUserMultiSelect(panel, 'member_caregivers');
+      const memberBirthField = wireBirthDateField(panel, 'edit-member-birth-date');
 
       // Der Umschalter fuehrt das Passwortfeld in beide Richtungen (#847): an
       // versteckt es, aus macht es zur Pflicht - aber nur, wenn das Konto
@@ -1103,7 +1111,12 @@ async function openEditMemberModal(member, currentUser, users, container) {
         event.preventDefault();
         const submitBtn = panel.querySelector('[type=submit]');
         errorEl.hidden = true;
-        const birthDateRaw = panel.querySelector('#edit-member-birth-date')?.value || '';
+        const birth = memberBirthField.read();
+        if (birth.yearUnknown && !birth.complete) {
+          showError(errorEl, t('birthdays.yearlessIncomplete'));
+          return;
+        }
+        const birthDateRaw = birth.raw;
         if (!isDateInputValid(birthDateRaw)) {
           showError(errorEl, t('settings.memberBirthDateInvalid'));
           submitBtn.disabled = false;
@@ -1124,7 +1137,8 @@ async function openEditMemberModal(member, currentUser, users, container) {
             system_admin: panel.querySelector('#edit-member-system-admin').checked,
             phone: panel.querySelector('#edit-member-phone')?.value.trim() || null,
             email: panel.querySelector('#edit-member-email')?.value.trim() || null,
-            birth_date: parseDateInput(birthDateRaw) || null,
+            birth_date: (birth.yearUnknown ? birth.date : parseDateInput(birthDateRaw)) || null,
+            birth_year_unknown: birth.yearUnknown,
             ...(newPassword ? { password: newPassword } : {}),
             ...(ssoToggle ? { sso_only: ssoToggle.checked } : {}),
           });

@@ -310,13 +310,15 @@ function userFromContact(database, contactId, actorId, groupId, passwordHash, { 
       phone: contact.phone,
       email: contact.email,
       birthDate: contact.birthday,
+      // Kennt der Kontakt nur Tag und Monat, gilt das auch fuer den Geburtstag (#2095).
+      birthYearUnknown: contact.birthday_year_unknown === 1,
       actorUserId: actorId,
     });
   }
   return created.lastInsertRowid;
 }
 
-function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, actorUserId }) {
+function syncGuestArtifacts(database, userId, { displayName, phone, email, birthDate, birthYearUnknown = false, actorUserId }) {
   const contact = database.prepare('SELECT id, name FROM contacts WHERE family_user_id = ?').get(userId);
   if (contact) {
     database.prepare(`
@@ -350,12 +352,22 @@ function syncGuestArtifacts(database, userId, { displayName, phone, email, birth
       SET name = ?, birth_date = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(displayName, birthDate, existing.id);
+    // "Jahr unbekannt" (#2095) folgt dem Datum: ein anderes Datum mit Jahr nimmt
+    // die Marke ab, dasselbe zurueckgeschickte Platzhalterdatum laesst sie stehen.
+    if (birthYearUnknown) {
+      database.prepare('UPDATE birthdays SET year_unknown = 1 WHERE id = ?').run(existing.id);
+    } else if (existing.year_unknown === 1 && birthDate !== existing.birth_date) {
+      database.prepare('UPDATE birthdays SET year_unknown = 0 WHERE id = ?').run(existing.id);
+    }
     birthday = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(existing.id);
   } else {
     const created = database.prepare(`
       INSERT INTO birthdays (name, birth_date, created_by, family_user_id)
       VALUES (?, ?, ?, ?)
     `).run(displayName, birthDate, actorUserId, userId);
+    if (birthYearUnknown) {
+      database.prepare('UPDATE birthdays SET year_unknown = 1 WHERE id = ?').run(created.lastInsertRowid);
+    }
     birthday = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(created.lastInsertRowid);
   }
   syncBirthdayArtifacts(database, birthday);
@@ -779,7 +791,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
     const people = db.get().prepare(`
       SELECT * FROM (
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -790,7 +802,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       WHERE ${householdMemberSql('u')}
       UNION ALL
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -806,7 +818,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       -- sich so jemand nicht mehr, aber der Editor muss die Mitgliedschaft
       -- zeigen, damit sie sich beenden laesst.
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              1 AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -835,15 +847,18 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       phone: readsContacts ? row.phone : null,
       email: readsContacts ? row.email : null,
       birth_date: readsBirthdays ? row.birth_date : null,
+      // Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+      birth_year_unknown: readsBirthdays && row.birth_year_unknown === 1,
     }));
     const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
-             c.phone, c.email, c.birthday AS birth_date, 0 AS in_group, NULL AS group_role
+             c.phone, c.email, c.birthday AS birth_date, c.birthday_year_unknown AS birth_year_unknown,
+             0 AS in_group, NULL AS group_role
       FROM contacts c
       WHERE c.family_user_id IS NULL
       ORDER BY c.name COLLATE NOCASE ASC
-    `).all() : [];
+    `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 })) : [];
     res.json({ data: [...visiblePeople, ...contacts] });
   } catch (err) {
     log.error('GET /groups/:id/member-candidates error:', err);

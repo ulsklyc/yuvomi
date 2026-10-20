@@ -698,6 +698,36 @@ END:VCARD`;
       assert.strictEqual(result2.birthday, '1985-03-12');
     });
 
+    // #2095: iCloud schreibt "Jahr unbekannt" als Platzhalterjahr 1604 mit
+    // Marke im Parameter; vCard 4 schreibt --MMDD. Beide ergeben Tag und Monat
+    // mit dem Platzhalterjahr 2000 und der Marke - nie 1604 als echtes Jahr.
+    it('erkennt einen Geburtstag ohne Jahr (Apple 1604, vCard 4 --MMDD)', () => {
+      const card = (bday) => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u\r\nFN:X\r\n${bday}\r\nEND:VCARD`;
+      const apple = parseVCard(card('BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15'));
+      assert.strictEqual(apple.birthday, '2000-03-15');
+      assert.strictEqual(apple.birthdayYearUnknown, true);
+
+      const appleValueDate = parseVCard(card('BDAY;VALUE=date;X-APPLE-OMIT-YEAR=1604:1604-02-29'));
+      assert.strictEqual(appleValueDate.birthday, '2000-02-29', '29.02. bleibt gueltig');
+      assert.strictEqual(appleValueDate.birthdayYearUnknown, true);
+
+      const bare1604 = parseVCard(card('BDAY:1604-12-24'));
+      assert.strictEqual(bare1604.birthday, '2000-12-24', 'ein Zwischenserver ohne Parameter');
+      assert.strictEqual(bare1604.birthdayYearUnknown, true);
+
+      for (const value of ['--0315', '--03-15']) {
+        const v4 = parseVCard(card(`BDAY:${value}`));
+        assert.strictEqual(v4.birthday, '2000-03-15', value);
+        assert.strictEqual(v4.birthdayYearUnknown, true, value);
+      }
+
+      // Ein Jahr, das nicht dem Parameter entspricht, ist echt (sabre/vobject).
+      const real = parseVCard(card('BDAY;X-APPLE-OMIT-YEAR=1604:1990-03-15'));
+      assert.strictEqual(real.birthday, '1990-03-15');
+      assert.strictEqual(real.birthdayYearUnknown, false);
+      assert.strictEqual(parseVCard(card('BDAY:--0230')).birthday, null, 'kein 30. Februar');
+    });
+
     it('should parse URL, NICKNAME, NOTE, CATEGORIES', () => {
       const vCardText = `BEGIN:VCARD
 VERSION:3.0
@@ -2404,6 +2434,10 @@ describe('Contacts API - Multi-Value Fields', () => {
     // Contacts-Routen-Schreibpfade (POST/PUT phones) die Spalte finden.
     const migration95ApiDb = MIGRATIONS.find(m => m.version === 95);
     if (migration95ApiDb) contactsApiDb.exec(migration95ApiDb.up);
+    // "Jahr unbekannt" (Migration 254, #2095): POST und PUT schreiben die
+    // Marke. Nur die Kontaktspalte - Migration 254 fasst auch birthdays an,
+    // die dieses Fixture nicht hat.
+    contactsApiDb.exec('ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0');
 
     // Override db.get() to use our test database
     const dbModule = await import('../server/db.js');
@@ -3415,5 +3449,55 @@ describe('CardDAV: No-op-Sync bleibt im Standard-Log-Level still', () => {
       _resetTestDatabase();
       d.close();
     }
+  });
+});
+
+describe('Geburtstag ohne Jahr im Sync (#2095)', () => {
+  let database;
+  let parseAndMergeContact;
+  let accountId;
+  const abUrl = 'https://dav.example.com/yearless/';
+  const vcf = (uid, ...lines) =>
+    ['BEGIN:VCARD', 'VERSION:3.0', `UID:${uid}`, ...lines, 'END:VCARD'].join('\r\n');
+
+  before(async () => {
+    const dbModule = await import('../server/db.js');
+    dbModule.init();
+    database = dbModule.get();
+    ({ parseAndMergeContact } = await import('../server/services/cardav-sync.js'));
+    accountId = database.prepare(
+      "INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('y', 'https://yearless.example.com', 'u', 'p')"
+    ).run().lastInsertRowid;
+  });
+
+  const linked = (uid, birthday, yearUnknown = 0) => database.prepare(`
+    INSERT INTO contacts (name, birthday, birthday_year_unknown, carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin)
+    VALUES (?, ?, ?, ?, ?, ?, 'remote')
+  `).run(uid, birthday, yearUnknown, accountId, uid, abUrl).lastInsertRowid;
+  const read = (id) => database.prepare('SELECT birthday, birthday_year_unknown FROM contacts WHERE id = ?').get(id);
+
+  it('legt einen neuen Kontakt mit Marke an', async () => {
+    const id = await parseAndMergeContact(
+      vcf('yl-new', 'FN:Neu', 'BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15'), accountId, abUrl
+    );
+    assert.deepStrictEqual({ ...read(id) }, { birthday: '2000-03-15', birthday_year_unknown: 1 });
+  });
+
+  it('korrigiert ein gespeichertes 1604, obwohl die Spalte nicht leer ist', async () => {
+    const id = linked('yl-old', '1604-03-15');
+    await parseAndMergeContact(vcf('yl-old', 'FN:yl-old', 'BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15'), accountId, abUrl);
+    assert.deepStrictEqual({ ...read(id) }, { birthday: '2000-03-15', birthday_year_unknown: 1 });
+  });
+
+  it('fuellt ein Jahr nach, das die Karte inzwischen traegt', async () => {
+    const id = linked('yl-fill', '2000-03-15', 1);
+    await parseAndMergeContact(vcf('yl-fill', 'FN:yl-fill', 'BDAY:1990-03-15'), accountId, abUrl);
+    assert.deepStrictEqual({ ...read(id) }, { birthday: '1990-03-15', birthday_year_unknown: 0 });
+  });
+
+  it('laesst ein lokal gepflegtes echtes Jahr stehen', async () => {
+    const id = linked('yl-keep', '1985-03-15');
+    await parseAndMergeContact(vcf('yl-keep', 'FN:yl-keep', 'BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15'), accountId, abUrl);
+    assert.deepStrictEqual({ ...read(id) }, { birthday: '1985-03-15', birthday_year_unknown: 0 });
   });
 });

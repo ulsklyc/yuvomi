@@ -5095,6 +5095,34 @@ html.fab-steady .page-fab {
 }
 
 /* --------------------------------------------------------
+ * Geburtsdatum mit oder ohne Jahr (#2095, utils/birth-date.js)
+ *
+ * Geteilt von Geburtstagen und Kontakten, deshalb hier und nicht im
+ * Seiten-Stylesheet: der Router laedt je Route genau eines. "Jahr unbekannt"
+ * tauscht den Datumswaehler gegen Monat und Tag - dieselbe Aufteilung wie der
+ * Namenstag (`.birthday-name-day__controls`). `[hidden]` steht ausdruecklich
+ * da: `yuvomi-datepicker { display: block }` schlaegt das UA-`[hidden]`.
+ * -------------------------------------------------------- */
+.birth-date-field yuvomi-datepicker[hidden],
+.birth-date-field__yearless[hidden] {
+  display: none;
+}
+
+.birth-date-field__yearless {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, 0.55fr);
+  gap: var(--space-2);
+}
+
+.birth-date-field__select {
+  min-height: var(--target-base);
+}
+
+.birth-date-field__toggle {
+  margin-top: var(--space-1);
+}
+
+/* --------------------------------------------------------
  * Überlaufmenü (geteilt, native Popover-API)
  *
  * Nutzer: der Kopf der Einkaufsliste auf Touch (utils/popover-menu.js). Er trug

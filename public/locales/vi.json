@@ -3453,7 +3453,13 @@
         "importSuccess": "Đã thêm {{count}} sinh nhật.",
         "importNothingSelected": "Vui lòng chọn ít nhất một liên hệ.",
         "importSelected": "Đã chọn {{count}} liên hệ",
-        "errorBirthdayGone": "Sinh nhật này không còn nữa."
+        "errorBirthdayGone": "Sinh nhật này không còn nữa.",
+        "yearUnknown": "Không rõ năm",
+        "yearlessMonthLabel": "Tháng sinh nhật",
+        "yearlessDayLabel": "Ngày sinh nhật",
+        "yearlessMonthPlaceholder": "Tháng",
+        "yearlessDayPlaceholder": "Ngày",
+        "yearlessIncomplete": "Chọn cả tháng và ngày sinh nhật."
     },
     "recipes": {
         "mealTypeNone": "Không có bữa ăn",

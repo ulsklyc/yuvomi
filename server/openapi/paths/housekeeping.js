@@ -52,7 +52,8 @@ export function housekeepingPaths() {
     },
     '/api/v1/housekeeping/worker': {
       get: op({ summary: 'Get primary housekeeper profile', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
-      post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create or update housekeeper profile', tag: 'Housekeeping', admin: true, stateChanging: true, requestBody: jsonBody(null),
+        description: '`birth_year_unknown` (boolean) saves a birthday known by day and month only (#2095): the server stores the placeholder year 2000 whatever year is sent, and profiles return the flag next to `birth_date`. Omitted, the stored flag stays unless a different date arrives.' }),
     },
     '/api/v1/housekeeping/workers': {
       get: op({ summary: 'List housekeeper profiles', tag: 'Housekeeping', description: 'Next to `data`, `can_manage` is true when the caller may create and edit profiles (`POST /housekeeping/worker`): write access to the module and the admin role. ' + RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),

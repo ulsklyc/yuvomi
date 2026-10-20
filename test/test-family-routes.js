@@ -90,3 +90,89 @@ test('GET /members — Shape enthält family_role, avatar_color, id', async () =
   assert.equal(bobRow.avatar_color, '#111111');
   assert.ok('created_at' in bobRow, 'created_at im Ergebnis');
 });
+
+// --------------------------------------------------------------------------
+// Geburtstag ohne Jahr am Mitglied (#2095, Codex-Befund auf #2111). Ein
+// Kontakt ohne Jahr, der zum Split-Gast wird, hinterlaesst eine birthdays-Zeile
+// mit family_user_id, Platzhalterjahr 2000 und year_unknown = 1. Profil- und
+// Mitgliedsleser muessen die Marke liefern, und das Profil darf sie beim
+// Aendern von Tag oder Monat nicht still abnehmen.
+// --------------------------------------------------------------------------
+const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
+const authActor = { userId: 0 };
+const authApp = express();
+authApp.use(express.json());
+authApp.use(sessionMiddleware);
+authApp.use((req, _res, next) => {
+  if (authActor.userId) { req.session.userId = authActor.userId; req.session.role = 'member'; }
+  next();
+});
+authApp.use('/', authRouter);
+const authServer = authApp.listen(0, '127.0.0.1');
+const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+test.after(() => authServer.close());
+
+async function signIn(userId) {
+  authActor.userId = userId;
+  const res = await fetch(`${authBase}/me`);
+  authActor.userId = 0;
+  const body = await res.json();
+  return { cookies: res.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; '), csrfToken: body.csrfToken, me: body };
+}
+async function authCall(method, path, session, payload) {
+  const res = await fetch(`${authBase}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Cookie: session.cookies, 'X-CSRF-Token': session.csrfToken || '' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+// Angelegt erst im ersten Test: die Zaehl- und Sortiertests oben laufen
+// vorher und rechnen mit drei Mitgliedern.
+let yearlessGuest = null;
+function addYearlessGuest() {
+  yearlessGuest = addUser('Gast Ohne Jahr', 'other', '#555555');
+  db.prepare(`INSERT INTO birthdays (name, birth_date, year_unknown, created_by, family_user_id)
+    VALUES ('Gast Ohne Jahr', '2000-03-15', 1, ?, ?)`).run(yearlessGuest, yearlessGuest);
+}
+const storedBirthday = () => db.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE family_user_id = ?').get(yearlessGuest);
+
+test('GET /members und /me liefern die Marke "Jahr unbekannt"', async () => {
+  addYearlessGuest();
+  const members = (await get('/members')).body.data;
+  const guest = members.find((m) => m.display_name === 'Gast Ohne Jahr');
+  assert.equal(guest.birth_date, '2000-03-15');
+  // Boolean wie im Schema und wie `publicUser` (Codex-Befund auf #2111).
+  assert.equal(guest.birth_year_unknown, true);
+  assert.equal(members.find((m) => m.display_name === 'Bob').birth_year_unknown, false);
+
+  const session = await signIn(yearlessGuest);
+  assert.equal(session.me.user.birth_year_unknown, true);
+});
+
+test('Profil: Tag und Monat aendern laesst die Marke stehen, ein Jahr nimmt sie ab', async () => {
+  const session = await signIn(yearlessGuest);
+  const moved = await authCall('PATCH', '/me/profile', session, { birth_date: '2000-04-20', birth_year_unknown: true });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.deepEqual({ ...storedBirthday() }, { birth_date: '2000-04-20', year_unknown: 1 }, 'kein stilles Jahr 2000');
+  assert.equal(moved.body.user.birth_year_unknown, true);
+
+  // Ein Client ohne das Feld schickt das Platzhalterdatum zurueck: bleibt jahrlos.
+  await authCall('PATCH', '/me/profile', session, { birth_date: '2000-04-20' });
+  assert.equal(storedBirthday().year_unknown, 1);
+
+  // Ausdruecklich `false` bei gleichem Datum: wirklich im Jahr 2000 geboren
+  // (Codex-Befund auf #2111) - die Marke geht, das Datum bleibt.
+  await authCall('PATCH', '/me/profile', session, { birth_date: '2000-04-20', birth_year_unknown: false });
+  assert.deepEqual({ ...storedBirthday() }, { birth_date: '2000-04-20', year_unknown: 0 });
+
+  const withYear = await authCall('PATCH', '/me/profile', session, { birth_date: '1984-04-20', birth_year_unknown: false });
+  assert.equal(withYear.status, 200);
+  assert.deepEqual({ ...storedBirthday() }, { birth_date: '1984-04-20', year_unknown: 0 });
+
+  // Und wieder ohne Jahr: das Jahr weicht dem Platzhalter.
+  const yearless = await authCall('PATCH', '/me/profile', session, { birth_date: '1984-04-20', birth_year_unknown: true });
+  assert.equal(yearless.status, 200);
+  assert.deepEqual({ ...storedBirthday() }, { birth_date: '2000-04-20', year_unknown: 1 });
+});

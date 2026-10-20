@@ -3469,7 +3469,13 @@
         "importSuccess": "{{count}} Geburtstage übernommen.",
         "importNothingSelected": "Bitte mindestens einen Kontakt auswählen.",
         "importSelected": "{{count}} Kontakte ausgewählt",
-        "errorBirthdayGone": "Diesen Geburtstag gibt es nicht mehr."
+        "errorBirthdayGone": "Diesen Geburtstag gibt es nicht mehr.",
+        "yearUnknown": "Jahr unbekannt",
+        "yearlessMonthLabel": "Monat des Geburtstags",
+        "yearlessDayLabel": "Tag des Geburtstags",
+        "yearlessMonthPlaceholder": "Monat",
+        "yearlessDayPlaceholder": "Tag",
+        "yearlessIncomplete": "Bitte Monat und Tag des Geburtstags auswählen."
     },
     "recipes": {
         "mealTypeNone": "Keine Mahlzeit",

@@ -273,6 +273,36 @@ try {
     assert(bad.status === 400, `ungültiges Format → 400, war ${bad.status}`);
   });
 
+  // #2095: ein Geburtstag ohne Jahr. Das Datum traegt das Platzhalterjahr 2000,
+  // die Marke sagt, dass es keines ist; der Export schreibt Apples Form, damit
+  // Apple (und der eigene Import) kein Jahr 1604 oder 2000 als echtes sehen.
+  await asyncTest('birthday_year_unknown: speichern, exportieren, mit Jahr abnehmen (#2095)', async () => {
+    const created = await jsend(`${base}`, 'POST', {
+      name: 'Ohne Jahr', category: 'misc', birthday: '1987-02-29', birthday_year_unknown: true,
+    });
+    assert(created.status === 201, `Status ${created.status} ${JSON.stringify(created.body)}`);
+    assert(created.body.data.birthday === '2000-02-29', `Platzhalterjahr, war ${created.body.data.birthday}`);
+    assert(created.body.data.birthday_year_unknown === 1, 'Marke gesetzt');
+    const bId = created.body.data.id;
+
+    const { text } = await tget(`${base}/${bId}/vcard`);
+    assert(text.includes('BDAY;X-APPLE-OMIT-YEAR=1604:1604-02-29'), `Apple-Form im Export: ${text}`);
+    assert(!text.includes('BDAY:2000'), 'kein Platzhalterjahr als echtes Jahr');
+
+    const untouched = await jsend(`${base}/${bId}`, 'PUT', { notes: 'nur Notiz' });
+    assert(untouched.body.data.birthday_year_unknown === 1, 'Marke bleibt ohne Feld');
+
+    const noYear = await jsend(`${base}/${bId}`, 'PUT', { birthday_year_unknown: false });
+    assert(noYear.status === 400, `Abnehmen ohne Jahr → 400, war ${noYear.status}`);
+
+    const withYear = await jsend(`${base}/${bId}`, 'PUT', { birthday_year_unknown: false, birthday: '1988-02-29' });
+    assert(withYear.status === 200, `Status ${withYear.status}`);
+    assert(withYear.body.data.birthday === '1988-02-29' && withYear.body.data.birthday_year_unknown === 0, 'mit Jahr');
+
+    const cleared = await jsend(`${base}/${bId}`, 'PUT', { birthday: '', birthday_year_unknown: true });
+    assert(cleared.body.data.birthday === null && cleared.body.data.birthday_year_unknown === 0, 'ohne Datum keine Marke');
+  });
+
   // ------------------------------------------------------------------
   // Identitaetsfarbe eines verknuepften Mitglieds (Vollton-Regel, DESIGN.md)
   //

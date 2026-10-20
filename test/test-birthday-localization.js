@@ -87,6 +87,22 @@ test('GET /calendar liefert birthday_name+birthday_date für Geburtstags-Termine
   assert.equal(bday.title, 'Birthday: Lina Müller');
 });
 
+// #2095: ohne Jahr liefert der Kalender-Read kein birthday_date - der Client
+// (localizeBirthdayEvent) schriebe sonst "15.03.2000" in die Beschreibung -, und
+// die gespeicherte Beschreibung nennt ebenfalls kein Datum.
+test('GET /calendar liefert bei einem Geburtstag ohne Jahr kein birthday_date', async () => {
+  const created = await call('POST', '/birthdays', { name: 'Jahrlos Kalender', birth_date: '1604-08-09', year_unknown: true });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+
+  const res = await call('GET', '/calendar?from=2026-01-01&to=2027-12-31');
+  assert.equal(res.status, 200);
+  const bday = res.body.data.find((e) => e.birthday_name === 'Jahrlos Kalender');
+  assert.ok(bday, 'der Termin erscheint im Kalender');
+  assert.equal(bday.birthday_date, null);
+  assert.equal(bday.start_datetime.slice(5, 10), '08-09');
+  assert.doesNotMatch(bday.description ?? '', /2000|1604|08|09/);
+});
+
 test('a name day gets its own localized calendar event and the same reminder offset', async () => {
   await asAdmin(() => call('PUT', '/preferences', { language: 'de' }));
   const created = await call('POST', '/birthdays', {
