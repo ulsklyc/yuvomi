@@ -2748,6 +2748,11 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
     '#bd-photo-edit': editorElement(),
     '#bd-remove-photo': editorElement(),
     '#bd-birth-date': editorElement({ value: eintrag.birth_date }),
+    // "Jahr unbekannt" (#2095, utils/birth-date.js): Haken, Monat, Tag.
+    '#bd-birth-date-yearless': editorElement({ hidden: true }),
+    '#bd-birth-date-month': editorElement(),
+    '#bd-birth-date-day': editorElement(),
+    '#bd-birth-date-year-unknown': editorElement({ checked: false }),
     '#bd-notes': editorElement({ value: eintrag.notes ?? '' }),
     '#bd-name-day-month': editorElement(),
     '#bd-name-day-day': editorElement(),
@@ -2790,6 +2795,35 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
 }
 
 const ERINNERUNGSFELDER = ['reminder_offset', 'reminder_custom_amount', 'reminder_custom_unit'];
+
+// #2095: "Jahr unbekannt" im Editor. Angehakt gehen Monat und Tag mit dem
+// Platzhalterjahr und der Marke an den Server, nie ein erfundenes Jahr; ohne
+// Haken bleibt das Datum, wie der Datumswaehler es zeigt.
+test('Jahr unbekannt: der Editor schickt Monat, Tag und die Marke (#2095)', async () => {
+  const ohneJahr = await geburtstagSpeichern(geburtstag(), {
+    bedienen: async (el) => {
+      el['#bd-birth-date-year-unknown'].checked = true;
+      el['#bd-birth-date-month'].value = '07';
+      el['#bd-birth-date-day'].value = '18';
+    },
+  });
+  assert.equal(ohneJahr.body.year_unknown, true);
+  assert.equal(ohneJahr.body.birth_date, '2000-07-18');
+
+  const mitJahr = await geburtstagSpeichern(geburtstag());
+  assert.equal(mitJahr.body.year_unknown, false);
+  assert.equal(mitJahr.body.birth_date, '1950-04-03');
+
+  const { gesendet, toasts } = await geburtstagSpeichern(geburtstag(), {
+    roh: true,
+    bedienen: async (el) => {
+      el['#bd-birth-date-year-unknown'].checked = true;
+      el['#bd-birth-date-month'].value = '07';
+    },
+  });
+  assert.equal(gesendet.length, 0, 'ohne Tag geht nichts an den Server');
+  assert.ok(toasts.some((x) => x.text === 'birthdays.yearlessIncomplete'), JSON.stringify(toasts));
+});
 
 test('eigene Angabe mit ungueltiger Anzahl: der Editor speichert nicht und sagt es ueber t() (Nachzug zu #1384)', async () => {
   for (const anzahl of ['0', '1000', '1.5', '']) {

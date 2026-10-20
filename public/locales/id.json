@@ -3463,7 +3463,13 @@
         "importSuccess": "{{count}} ulang tahun ditambahkan.",
         "importNothingSelected": "Pilih setidaknya satu kontak.",
         "importSelected": "{{count}} kontak dipilih",
-        "errorBirthdayGone": "Ulang tahun ini sudah tidak ada."
+        "errorBirthdayGone": "Ulang tahun ini sudah tidak ada.",
+        "yearUnknown": "Tahun tidak diketahui",
+        "yearlessMonthLabel": "Bulan ulang tahun",
+        "yearlessDayLabel": "Tanggal ulang tahun",
+        "yearlessMonthPlaceholder": "Bulan",
+        "yearlessDayPlaceholder": "Hari",
+        "yearlessIncomplete": "Pilih bulan dan tanggal ulang tahun."
     },
     "recipes": {
         "mealTypeNone": "Tanpa waktu makan",

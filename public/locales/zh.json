@@ -3486,7 +3486,13 @@
         "importSuccess": "已添加 {{count}} 个生日。",
         "importNothingSelected": "请至少选择一个联系人。",
         "importSelected": "已选择 {{count}} 个联系人",
-        "errorBirthdayGone": "这个生日已不存在。"
+        "errorBirthdayGone": "这个生日已不存在。",
+        "yearUnknown": "年份未知",
+        "yearlessMonthLabel": "生日月份",
+        "yearlessDayLabel": "生日日期",
+        "yearlessMonthPlaceholder": "月份",
+        "yearlessDayPlaceholder": "日期",
+        "yearlessIncomplete": "请选择生日的月份和日期。"
     },
     "reminders": {
         "sectionTitle": "提醒",

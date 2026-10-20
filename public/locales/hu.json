@@ -3447,7 +3447,13 @@
         "importSuccess": "{{count}} születésnap hozzáadva.",
         "importNothingSelected": "Válassz ki legalább egy névjegyet.",
         "importSelected": "{{count}} névjegy kiválasztva",
-        "errorBirthdayGone": "Ez a születésnap már nem létezik."
+        "errorBirthdayGone": "Ez a születésnap már nem létezik.",
+        "yearUnknown": "Az év ismeretlen",
+        "yearlessMonthLabel": "A születésnap hónapja",
+        "yearlessDayLabel": "A születésnap napja",
+        "yearlessMonthPlaceholder": "Hónap",
+        "yearlessDayPlaceholder": "Nap",
+        "yearlessIncomplete": "Válaszd ki a születésnap hónapját és napját."
     },
     "recipes": {
         "mealTypeNone": "Nincs étkezés",

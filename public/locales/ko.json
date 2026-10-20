@@ -3463,7 +3463,13 @@
         "importSuccess": "생일 {{count}}개를 추가했습니다.",
         "importNothingSelected": "연락처를 하나 이상 선택하세요.",
         "importSelected": "연락처 {{count}}개 선택됨",
-        "errorBirthdayGone": "이 생일은 더 이상 없습니다."
+        "errorBirthdayGone": "이 생일은 더 이상 없습니다.",
+        "yearUnknown": "연도 모름",
+        "yearlessMonthLabel": "생일 월",
+        "yearlessDayLabel": "생일 일",
+        "yearlessMonthPlaceholder": "월",
+        "yearlessDayPlaceholder": "일",
+        "yearlessIncomplete": "생일의 월과 일을 모두 선택하세요."
     },
     "recipes": {
         "mealTypeNone": "식사 없음",

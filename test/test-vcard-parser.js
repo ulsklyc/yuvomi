@@ -90,15 +90,40 @@ test('parseVCard nutzt resolveCategory, sonst fallbackCategory', () => {
 });
 
 test('parseBirthdayValue normalisiert diverse Formate auf ISO', () => {
-  assert.equal(parseBirthdayValue('1990-07-18'), '1990-07-18');
-  assert.equal(parseBirthdayValue('19900718'), '1990-07-18');
-  assert.equal(parseBirthdayValue('1990'), '1990-01-01');
+  const known = (date) => ({ date, yearUnknown: false });
+  assert.deepEqual(parseBirthdayValue('1990-07-18'), known('1990-07-18'));
+  assert.deepEqual(parseBirthdayValue('19900718'), known('1990-07-18'));
+  assert.deepEqual(parseBirthdayValue('1990'), known('1990-01-01'));
   // Zeitanteil wird nicht unterstuetzt (identisch zu CardDAV parseBirthday):
   // die Bereinigung laesst "1990-07-1800000000" -> kein Muster -> null.
   assert.equal(parseBirthdayValue('1990-07-18T00:00:00Z'), null);
-  assert.equal(parseBirthdayValue('--0718'), null); // jahrlos: bewusst nicht unterstuetzt (wie CardDAV)
   assert.equal(parseBirthdayValue(''), null);
   assert.equal(parseBirthdayValue(null), null);
+});
+
+// #2095: jahrlos war hier bis v2.78 "bewusst nicht unterstuetzt" (`--0718` ->
+// null), und Apples 1604 lief ungesehen als echtes Jahr durch. Beides ergibt
+// jetzt Tag und Monat mit dem Platzhalterjahr 2000 und der Marke.
+test('parseBirthdayValue erkennt einen Geburtstag ohne Jahr (#2095)', () => {
+  const yearless = (date) => ({ date, yearUnknown: true });
+  assert.deepEqual(parseBirthdayValue('--0718'), yearless('2000-07-18'));
+  assert.deepEqual(parseBirthdayValue('--07-18'), yearless('2000-07-18'));
+  assert.deepEqual(parseBirthdayValue('1604-07-18', 'X-APPLE-OMIT-YEAR=1604'), yearless('2000-07-18'));
+  assert.deepEqual(parseBirthdayValue('1604-02-29', 'VALUE=date;X-APPLE-OMIT-YEAR=1604'), yearless('2000-02-29'));
+  assert.deepEqual(parseBirthdayValue('1604-07-18'), yearless('2000-07-18'), '1604 ohne Marke');
+  assert.deepEqual(parseBirthdayValue('1990-07-18', 'X-APPLE-OMIT-YEAR=1604'), { date: '1990-07-18', yearUnknown: false });
+  assert.equal(parseBirthdayValue('--0230'), null);
+});
+
+test('parseVCard traegt die Marke "Jahr unbekannt" aus BDAY-Parametern (#2095)', () => {
+  const apple = parseVCard('BEGIN:VCARD\r\nFN:A\r\nBDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15\r\nEND:VCARD');
+  assert.equal(apple.birthday, '2000-03-15');
+  assert.equal(apple.birthdayYearUnknown, true);
+  const v4 = parseVCard('BEGIN:VCARD\r\nVERSION:4.0\r\nFN:B\r\nBDAY:--0315\r\nEND:VCARD');
+  assert.equal(v4.birthday, '2000-03-15');
+  assert.equal(v4.birthdayYearUnknown, true);
+  const known = parseVCard('BEGIN:VCARD\r\nFN:C\r\nBDAY:1985-03-09\r\nEND:VCARD');
+  assert.equal(known.birthdayYearUnknown, false);
 });
 
 test('parseVCard extrahiert BDAY nach birthday (ISO)', () => {

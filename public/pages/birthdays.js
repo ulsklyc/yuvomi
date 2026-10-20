@@ -32,6 +32,7 @@ import {
   renderListSection,
 } from '/utils/page-layout.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { birthDateText, birthDateShort, birthDateFieldHtml, wireBirthDateField } from '/utils/birth-date.js';
 
 let state = {
   birthdays: [],
@@ -287,10 +288,13 @@ export function renderNameDayField(birthday = null) {
 }
 
 // Datum + Alter in einer Zeile: „12.08.2026 · wird 30". Der Countdown lebt
-// getrennt im Chip, damit keine Zahl doppelt erscheint.
-function ageMeta(birthday) {
+// getrennt im Chip, damit keine Zahl doppelt erscheint. Ohne Jahr gibt es kein
+// Alter (#2095): der Server liefert `next_age: null`, die Zeile nennt nur den Tag.
+export function ageMeta(birthday) {
   const date = formatDate(birthday.next_birthday);
-  return `${date} · ${t('birthdays.turnsAge', { age: birthday.next_age })}`;
+  return birthday.next_age != null
+    ? `${date} · ${t('birthdays.turnsAge', { age: birthday.next_age })}`
+    : date;
 }
 
 // Countdown im einheitlichen Wort-Register (kein „5d"-Kürzel): Heute / Morgen
@@ -851,7 +855,7 @@ function birthdayReadHtml(birthday) {
         </div>
         <div class="birthday-modal__fields detail-view">
           <div class="detail-view__rows">
-            ${readRowHtml({ icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' })}
+            ${readRowHtml({ icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthDateText(birthday.birth_date, birthday.year_unknown) })}
             ${readRowHtml({ icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayReadText(birthday.name_day) })}
             ${readRowHtml({ icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true })}
             ${readRowHtml({ icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) })}
@@ -917,10 +921,13 @@ function openBirthdayModal({ mode, birthday = null }) {
               <label class="form-label" for="bd-name">${t('birthdays.nameLabel')}</label>
               <input class="form-input" id="bd-name" type="text" value="${esc(birthday?.name || '')}" autocomplete="name">
             </div>
-            <div class="form-group">
-              <label class="form-label" for="bd-birth-date">${t('birthdays.birthDateLabel')}</label>
-              <yuvomi-datepicker id="bd-birth-date" type="date" max="${today}" value="${esc(birthday?.birth_date || '')}"></yuvomi-datepicker>
-            </div>
+            ${birthDateFieldHtml({
+              id: 'bd-birth-date',
+              label: t('birthdays.birthDateLabel'),
+              value: birthday?.birth_date || '',
+              yearUnknown: birthday?.year_unknown,
+              max: today,
+            })}
           </div>
         </div>
         ${advancedSection(`
@@ -996,6 +1003,8 @@ function openBirthdayModal({ mode, birthday = null }) {
         photoEdit?.focus();
       });
 
+      const birthDateField = wireBirthDateField(panel, 'bd-birth-date');
+
       const reminderOffset = panel.querySelector('#bd-reminder-offset');
       const reminderCustom = panel.querySelector('#bd-reminder-custom');
       reminderOffset?.addEventListener('change', () => {
@@ -1053,8 +1062,15 @@ function openBirthdayModal({ mode, birthday = null }) {
       });
       panel.querySelector('#bd-save').addEventListener('click', async () => {
         const saveBtn = panel.querySelector('#bd-save');
-        const birthDateRaw = panel.querySelector('#bd-birth-date').value;
-        const birthDate = parseDateInput(birthDateRaw);
+        // Mit Jahr wie bisher aus dem Datumswaehler; ohne Jahr aus Monat und
+        // Tag, mit dem Platzhalterjahr, das der Server ohnehin setzt (#2095).
+        const birth = birthDateField.read();
+        if (birth.yearUnknown && !birth.complete) {
+          window.yuvomi?.showToast(t('birthdays.yearlessIncomplete'), 'warning');
+          return;
+        }
+        const birthDateRaw = birth.raw;
+        const birthDate = birth.yearUnknown ? birth.date : parseDateInput(birthDateRaw);
         const nameDay = normalizeNameDaySelection(nameDayMonth?.value, nameDayDay?.value);
         if (!nameDay.complete) {
           window.yuvomi?.showToast(t('birthdays.nameDayIncomplete'), 'warning');
@@ -1063,6 +1079,7 @@ function openBirthdayModal({ mode, birthday = null }) {
         const body = {
           name: panel.querySelector('#bd-name').value.trim(),
           birth_date: birthDate,
+          year_unknown: birth.yearUnknown,
           name_day: nameDay.value,
           notes: panel.querySelector('#bd-notes').value.trim(),
           photo_data: photoData,
@@ -1128,7 +1145,7 @@ function importCandidateRowHtml(c) {
       <div class="bd-import-row bd-import-row--done">
         <span class="bd-import-row__check" aria-hidden="true"><i data-lucide="check"></i></span>
         <span class="bd-import-row__name">${esc(c.name)}</span>
-        <span class="bd-import-row__date">${esc(formatDate(c.birthday))}</span>
+        <span class="bd-import-row__date">${esc(birthDateShort(c.birthday, c.birthday_year_unknown))}</span>
         <span class="bd-import-row__badge">${t('birthdays.importAlreadyAdded')}</span>
       </div>`;
   }
@@ -1136,7 +1153,7 @@ function importCandidateRowHtml(c) {
     <label class="bd-import-row">
       <input type="checkbox" value="${c.id}">
       <span class="bd-import-row__name">${esc(c.name)}</span>
-      <span class="bd-import-row__date">${esc(formatDate(c.birthday))}</span>
+      <span class="bd-import-row__date">${esc(birthDateShort(c.birthday, c.birthday_year_unknown))}</span>
     </label>`;
 }
 
@@ -1299,7 +1316,7 @@ function birthdayPaneSections(birthday) {
     // Critique 2026-10-16: "das Geburtstagsdetail sagt dasselbe dreimal").
     // Alter und Abstand stehen als Kennzahlen im Kopf, das Datum als seine
     // Unterzeile (birthdayDetailHead).
-    { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthday.birth_date ? formatDate(birthday.birth_date) : '' },
+    { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthDateText(birthday.birth_date, birthday.year_unknown) },
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
     { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },

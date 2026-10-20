@@ -3447,7 +3447,13 @@
         "importSuccess": "{{count}} fødselsdager lagt til.",
         "importNothingSelected": "Vennligst velg minst én kontakt.",
         "importSelected": "{{count}} kontakter valgt",
-        "errorBirthdayGone": "Denne fødselsdagen finnes ikke lenger."
+        "errorBirthdayGone": "Denne fødselsdagen finnes ikke lenger.",
+        "yearUnknown": "Ukjent år",
+        "yearlessMonthLabel": "Bursdagsmåned",
+        "yearlessDayLabel": "Bursdagsdag",
+        "yearlessMonthPlaceholder": "Måned",
+        "yearlessDayPlaceholder": "Dag",
+        "yearlessIncomplete": "Velg både måned og dag for bursdagen."
     },
     "recipes": {
         "mealTypeNone": "Intet måltid",

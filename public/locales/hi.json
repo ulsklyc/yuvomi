@@ -3486,7 +3486,13 @@
         "importSuccess": "{{count}} जन्मदिन जोड़े गए।",
         "importNothingSelected": "कृपया कम से कम एक संपर्क चुनें।",
         "importSelected": "{{count}} संपर्क चुने गए",
-        "errorBirthdayGone": "यह जन्मदिन अब मौजूद नहीं है।"
+        "errorBirthdayGone": "यह जन्मदिन अब मौजूद नहीं है।",
+        "yearUnknown": "वर्ष अज्ञात",
+        "yearlessMonthLabel": "जन्मदिन का महीना",
+        "yearlessDayLabel": "जन्मदिन का दिन",
+        "yearlessMonthPlaceholder": "महीना",
+        "yearlessDayPlaceholder": "दिन",
+        "yearlessIncomplete": "जन्मदिन का महीना और दिन दोनों चुनें।"
     },
     "reminders": {
         "sectionTitle": "अनुस्मारक",

@@ -3486,7 +3486,13 @@
         "importSuccess": "{{count}} doğum günü eklendi.",
         "importNothingSelected": "Lütfen en az bir kişi seçin.",
         "importSelected": "{{count}} kişi seçildi",
-        "errorBirthdayGone": "Bu doğum günü artık yok."
+        "errorBirthdayGone": "Bu doğum günü artık yok.",
+        "yearUnknown": "Yıl bilinmiyor",
+        "yearlessMonthLabel": "Doğum günü ayı",
+        "yearlessDayLabel": "Doğum gününün günü",
+        "yearlessMonthPlaceholder": "Ay",
+        "yearlessDayPlaceholder": "Gün",
+        "yearlessIncomplete": "Doğum gününün ayını ve gününü seçin."
     },
     "reminders": {
         "sectionTitle": "Hatırlatıcı",

@@ -3696,7 +3696,13 @@
         "importSuccess": "Добавлено дней рождения: {{count}}.",
         "importNothingSelected": "Выберите хотя бы один контакт.",
         "importSelected": "Выбрано контактов: {{count}}",
-        "errorBirthdayGone": "Этого дня рождения больше нет."
+        "errorBirthdayGone": "Этого дня рождения больше нет.",
+        "yearUnknown": "Год неизвестен",
+        "yearlessMonthLabel": "Месяц дня рождения",
+        "yearlessDayLabel": "День рождения (число)",
+        "yearlessMonthPlaceholder": "Месяц",
+        "yearlessDayPlaceholder": "День",
+        "yearlessIncomplete": "Выберите месяц и день рождения."
     },
     "reminders": {
         "sectionTitle": "Напоминание",

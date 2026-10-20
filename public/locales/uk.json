@@ -3737,7 +3737,13 @@
         "importSuccess": "Додано днів народження: {{count}}.",
         "importNothingSelected": "Виберіть принаймні один контакт.",
         "importSelected": "Вибрано контактів: {{count}}",
-        "errorBirthdayGone": "Цього дня народження більше немає."
+        "errorBirthdayGone": "Цього дня народження більше немає.",
+        "yearUnknown": "Рік невідомий",
+        "yearlessMonthLabel": "Місяць дня народження",
+        "yearlessDayLabel": "День народження (число)",
+        "yearlessMonthPlaceholder": "Місяць",
+        "yearlessDayPlaceholder": "День",
+        "yearlessIncomplete": "Виберіть місяць і день народження."
     },
     "onboarding": {
         "step1Title": "Ласкаво просимо до {{name}}",

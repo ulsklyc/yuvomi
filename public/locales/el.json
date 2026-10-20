@@ -3486,7 +3486,13 @@
         "importSuccess": "Προστέθηκαν {{count}} γενέθλια.",
         "importNothingSelected": "Επιλέξτε τουλάχιστον μία επαφή.",
         "importSelected": "Επιλέχθηκαν {{count}} επαφές",
-        "errorBirthdayGone": "Αυτά τα γενέθλια δεν υπάρχουν πια."
+        "errorBirthdayGone": "Αυτά τα γενέθλια δεν υπάρχουν πια.",
+        "yearUnknown": "Άγνωστο έτος",
+        "yearlessMonthLabel": "Μήνας γενεθλίων",
+        "yearlessDayLabel": "Ημέρα γενεθλίων",
+        "yearlessMonthPlaceholder": "Μήνας",
+        "yearlessDayPlaceholder": "Ημέρα",
+        "yearlessIncomplete": "Επιλέξτε μήνα και ημέρα γενεθλίων."
     },
     "reminders": {
         "sectionTitle": "Υπενθύμιση",

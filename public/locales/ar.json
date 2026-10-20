@@ -3802,7 +3802,13 @@
         "importSuccess": "تمت إضافة {{count}} عيد ميلاد.",
         "importNothingSelected": "يرجى اختيار جهة اتصال واحدة على الأقل.",
         "importSelected": "تم تحديد {{count}} جهة اتصال",
-        "errorBirthdayGone": "عيد الميلاد هذا لم يعد موجودًا."
+        "errorBirthdayGone": "عيد الميلاد هذا لم يعد موجودًا.",
+        "yearUnknown": "السنة غير معروفة",
+        "yearlessMonthLabel": "شهر عيد الميلاد",
+        "yearlessDayLabel": "يوم عيد الميلاد",
+        "yearlessMonthPlaceholder": "الشهر",
+        "yearlessDayPlaceholder": "اليوم",
+        "yearlessIncomplete": "اختر شهر ويوم عيد الميلاد."
     },
     "reminders": {
         "sectionTitle": "تذكير",

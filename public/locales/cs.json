@@ -4259,7 +4259,13 @@
         "importSuccess": "Přidáno narozenin: {{count}}.",
         "importNothingSelected": "Vyberte alespoň jeden kontakt.",
         "importSelected": "Vybráno kontaktů: {{count}}",
-        "errorBirthdayGone": "Tyto narozeniny už neexistují."
+        "errorBirthdayGone": "Tyto narozeniny už neexistují.",
+        "yearUnknown": "Rok neznámý",
+        "yearlessMonthLabel": "Měsíc narozenin",
+        "yearlessDayLabel": "Den narozenin",
+        "yearlessMonthPlaceholder": "Měsíc",
+        "yearlessDayPlaceholder": "Den",
+        "yearlessIncomplete": "Vyberte měsíc i den narozenin."
     },
     "rrule": {
         "freqNone": "Bez opakování",

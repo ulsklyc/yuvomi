@@ -3486,7 +3486,13 @@
         "importSuccess": "{{count}} compleanni aggiunti.",
         "importNothingSelected": "Seleziona almeno un contatto.",
         "importSelected": "{{count}} contatti selezionati",
-        "errorBirthdayGone": "Questo compleanno non esiste più."
+        "errorBirthdayGone": "Questo compleanno non esiste più.",
+        "yearUnknown": "Anno sconosciuto",
+        "yearlessMonthLabel": "Mese del compleanno",
+        "yearlessDayLabel": "Giorno del compleanno",
+        "yearlessMonthPlaceholder": "Mese",
+        "yearlessDayPlaceholder": "Giorno",
+        "yearlessIncomplete": "Seleziona il mese e il giorno del compleanno."
     },
     "reminders": {
         "sectionTitle": "Promemoria",

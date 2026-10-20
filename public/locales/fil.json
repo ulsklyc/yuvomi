@@ -3463,7 +3463,13 @@
         "importSuccess": "{{count}} kaarawan ang naidagdag.",
         "importNothingSelected": "Pumili ng kahit isang kontak.",
         "importSelected": "{{count}} kontak ang napili",
-        "errorBirthdayGone": "Wala na ang kaarawang ito."
+        "errorBirthdayGone": "Wala na ang kaarawang ito.",
+        "yearUnknown": "Hindi alam ang taon",
+        "yearlessMonthLabel": "Buwan ng kaarawan",
+        "yearlessDayLabel": "Araw ng kaarawan",
+        "yearlessMonthPlaceholder": "Buwan",
+        "yearlessDayPlaceholder": "Araw",
+        "yearlessIncomplete": "Piliin ang buwan at araw ng kaarawan."
     },
     "recipes": {
         "mealTypeNone": "Walang pagkain",
