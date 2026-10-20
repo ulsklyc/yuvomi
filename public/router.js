@@ -798,7 +798,7 @@ onWallActiveChange(reportWallPauseState);
 // schon gesetzt hat, bevor hier eine Navigation stattfand (Kaltstart auf `/`).
 // Und ein Geraet, das mit aktiver Wand gekilled wurde, bleibt bei Rueckkehr
 // pausiert, bis syncWallMode einen Wechsel sieht.
-// Zwei Stellen schliessen die Luecke:
+// Drei Stellen schliessen die Luecke:
 // - initPushAndReport: einmal pro Sitzung direkt nach initPush()
 // - visibilitychange: bei jedem Aufwachen, z. B. nach Telefon-Sperrbildschirm
 // - stundliches Interval: eine lang laufende Wand erneuert die Pause automatisch

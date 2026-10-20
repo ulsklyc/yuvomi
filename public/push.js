@@ -168,7 +168,9 @@ function stopPush() {
 
 /**
  * Teilt dem Server mit, ob dieses Geraet gerade die Wand zeigt (#1904).
- * Wird von wall-mode.js aufgerufen, wenn sich der aktive Zustand aendert.
+ * Aufrufer stehen alle in router.js: der Hook `onWallActiveChange` (wall-mode.js
+ * ruft ihn, wenn sich der aktive Zustand aendert), der Boot-Report nach
+ * initPush(), der visibilitychange-Listener und die stuendliche Erneuerung.
  * Fire-and-forget: ein Fehler darf die Wand nicht stoeren.
  */
 async function reportWallPauseState(active) {
