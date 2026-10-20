@@ -71,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The demo seed now works on an encrypted database (#2114).** `scripts/seed-demo.js` opened
+  the file without a key and stopped with "file is not a database" on every installation with
+  `DB_ENCRYPTION_KEY` set, which is the installer default. It now opens the database the way the
+  server does: it reads `.env` from the working directory, applies the key, and runs the
+  migrations, so it also fills a database the server has not opened yet. `--db` still wins over
+  `DB_PATH`, and `--locale` is unchanged. A wrong key ends with the same message the server
+  gives instead of a stack trace.
 - **Shared expenses: a group now shows all its expenses, not just the 30 most recent (#2108).**
   Older expenses could not be opened, edited or deleted. "Load more" under the expense list now
   loads the next page, like the history below it, and after you edit or delete an expense the

@@ -339,7 +339,8 @@ argument.
   machine; a public instance filled with a fictional family's health notes and finances would
   be the opposite of that promise as a first impression, and it would be one more server to
   keep patched. What exists instead is a seed that fills a fresh installation with a realistic
-  household in one command, in English or German, so anyone can have a demo that is theirs:
+  household in one command, in English or German, so anyone can have a demo that is theirs.
+  It reads the same `.env` as the server, so an encrypted database works too:
 
   ```bash
   node scripts/seed-demo.js --db ./yuvomi.db --locale en
