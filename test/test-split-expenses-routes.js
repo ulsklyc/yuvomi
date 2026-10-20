@@ -552,6 +552,21 @@ test('POST members via contact_id mit Geburtstag: erzeugt Nutzer + Geburtstags-A
   assert.equal(bday.birth_date, '1992-07-07');
 });
 
+// #2095: ein Kontakt ohne Jahr bleibt ohne Jahr, wenn er Gast wird, und die
+// Kandidatenliste traegt die Marke als Boolean (Codex-Befund auf #2111).
+test('POST members via contact_id ohne Jahr: der Gast-Geburtstag bleibt ohne Jahr', async () => {
+  const contactId = db.prepare(`INSERT INTO contacts (name, category, birthday, birthday_year_unknown) VALUES ('Jahrlos Kontakt', 'Sonstiges', '2000-08-09', 1)`).run().lastInsertRowid;
+  const candidates = await call('GET', `/groups/${OPS}/member-candidates`, { actor: { id: OWNER, role: 'member' } });
+  const candidate = candidates.body.data.find((row) => row.source === 'contact' && row.contact_id === contactId);
+  assert.equal(candidate.birth_year_unknown, true);
+  assert.equal(candidates.body.data.filter((row) => row.source === 'user').every((row) => typeof row.birth_year_unknown === 'boolean'), true);
+
+  const r = await call('POST', `/groups/${OPS}/members`, { actor: { id: OWNER, role: 'member' }, body: { contact_id: contactId, role: 'guest' } });
+  assert.equal(r.status, 201);
+  const bday = db.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE family_user_id = ?').get(r.body.data.user_id);
+  assert.deepEqual({ ...bday }, { birth_date: '2000-08-09', year_unknown: 1 });
+});
+
 // Der Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (Mitglied
 // oder Token) antwortet die Route wie bei einer unbekannten ID und legt
 // nichts an - sonst verriete der angelegte Gast Name, Telefon und E-Mail. Ein

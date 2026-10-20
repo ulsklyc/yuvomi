@@ -143,8 +143,9 @@ test('GET /members und /me liefern die Marke "Jahr unbekannt"', async () => {
   const members = (await get('/members')).body.data;
   const guest = members.find((m) => m.display_name === 'Gast Ohne Jahr');
   assert.equal(guest.birth_date, '2000-03-15');
-  assert.equal(guest.birth_year_unknown, 1);
-  assert.equal(members.find((m) => m.display_name === 'Bob').birth_year_unknown, 0);
+  // Boolean wie im Schema und wie `publicUser` (Codex-Befund auf #2111).
+  assert.equal(guest.birth_year_unknown, true);
+  assert.equal(members.find((m) => m.display_name === 'Bob').birth_year_unknown, false);
 
   const session = await signIn(yearlessGuest);
   assert.equal(session.me.user.birth_year_unknown, true);
@@ -161,9 +162,10 @@ test('Profil: Tag und Monat aendern laesst die Marke stehen, ein Jahr nimmt sie 
   await authCall('PATCH', '/me/profile', session, { birth_date: '2000-04-20' });
   assert.equal(storedBirthday().year_unknown, 1);
 
-  // Abnehmen ohne neues Datum macht 2000 nicht zum Geburtsjahr.
+  // Ausdruecklich `false` bei gleichem Datum: wirklich im Jahr 2000 geboren
+  // (Codex-Befund auf #2111) - die Marke geht, das Datum bleibt.
   await authCall('PATCH', '/me/profile', session, { birth_date: '2000-04-20', birth_year_unknown: false });
-  assert.equal(storedBirthday().year_unknown, 1);
+  assert.deepEqual({ ...storedBirthday() }, { birth_date: '2000-04-20', year_unknown: 0 });
 
   const withYear = await authCall('PATCH', '/me/profile', session, { birth_date: '1984-04-20', birth_year_unknown: false });
   assert.equal(withYear.status, 200);

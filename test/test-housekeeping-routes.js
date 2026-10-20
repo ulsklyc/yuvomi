@@ -1943,6 +1943,35 @@ test('Sekundenbruchteile: eine zonenlose Zeile behaelt ihren Zeitpunkt auf die M
   }),
 ));
 
+// Codex-Befund auf #2111 (#2095): ein Hausprofil, dessen Geburtstag nur Tag
+// und Monat kennt, zeigt kein Platzhalterjahr, und Tag oder Monat aendern
+// macht 2000 nicht still zum Geburtsjahr.
+test('Hausprofil: Geburtstag ohne Jahr bleibt ohne Jahr', async () => {
+  const created = await call('POST', '/worker', { as: ADM, body: {
+    display_name: 'Ohne Jahr', daily_rate: 10, birth_date: '1975-06-01', birth_year_unknown: true,
+  } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.data.birth_date, '2000-06-01');
+  assert.equal(created.body.data.birth_year_unknown, true);
+
+  const moved = await call('POST', '/worker', { as: ADM, body: {
+    id: created.body.data.id, display_name: 'Ohne Jahr', daily_rate: 10, birth_date: '2000-06-02', birth_year_unknown: true,
+  } });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.equal(moved.body.data.birth_date, '2000-06-02');
+  assert.equal(moved.body.data.birth_year_unknown, true, 'Tag aendern nimmt die Marke nicht ab');
+
+  const list = await call('GET', '/workers', { as: ADM });
+  const listed = list.body.data.find((w) => w.id === created.body.data.id);
+  assert.equal(listed.birth_year_unknown, true);
+
+  const withYear = await call('POST', '/worker', { as: ADM, body: {
+    id: created.body.data.id, display_name: 'Ohne Jahr', daily_rate: 10, birth_date: '1975-06-02', birth_year_unknown: false,
+  } });
+  assert.equal(withYear.body.data.birth_date, '1975-06-02');
+  assert.equal(withYear.body.data.birth_year_unknown, false);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

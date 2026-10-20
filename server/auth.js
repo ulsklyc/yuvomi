@@ -751,18 +751,19 @@ function syncFamilyMemberArtifacts(database, userId, {
           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(name, birthDate ?? null, photo ?? null, birthday.id);
-    // "JAHR UNBEKANNT" (#2095). Setzt der Aufrufer es, weicht ein gespeichertes
-    // Jahr dem Platzhalter. Ein Jahr bekommt der Geburtstag nur, wenn wirklich
-    // ein anderes Datum kommt - mit `birth_year_unknown: false` oder ohne das
-    // Feld (ein Client, der es nicht kennt); sonst wuerde das zurueckgeschickte
+    // "JAHR UNBEKANNT" (#2095). Der Aufrufer entscheidet, wenn er das Feld
+    // schickt: `true` setzt die Marke (ein gespeichertes Jahr weicht dem
+    // Platzhalter), `false` nimmt sie ab - auch bei unveraendertem Datum, denn
+    // wer wirklich im Jahr 2000 geboren ist, schickt genau dieses. Nur ein
+    // Client OHNE das Feld (er kennt es nicht) behaelt die Marke, solange kein
+    // anderes Datum kommt: sonst wuerde sein zurueckgeschicktes
     // Platzhalterjahr still zum Geburtsjahr. Geschrieben wird nur, was sich
     // aendert.
-    // Abnehmen ohne neues Datum laesst die Marke stehen: das Platzhalterjahr
-    // waere sonst das Geburtsjahr, ohne dass jemand eines eingegeben hat.
     const storedUnknown = birthday.year_unknown === 1;
     const newDate = !!birthDate && birthDate !== birthday.birth_date;
-    const wantUnknown = birthYearUnknown === true
-      || (storedUnknown && !newDate);
+    const wantUnknown = birthYearUnknown !== undefined
+      ? birthYearUnknown
+      : storedUnknown && !newDate;
     if (wantUnknown !== storedUnknown) {
       const current = database.prepare('SELECT birth_date FROM birthdays WHERE id = ?').get(birthday.id).birth_date;
       database.prepare('UPDATE birthdays SET year_unknown = ?, birth_date = ? WHERE id = ?')

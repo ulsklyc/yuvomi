@@ -791,7 +791,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
     const people = db.get().prepare(`
       SELECT * FROM (
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -802,7 +802,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       WHERE ${householdMemberSql('u')}
       UNION ALL
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -818,7 +818,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       -- sich so jemand nicht mehr, aber der Editor muss die Mitgliedschaft
       -- zeigen, damit sie sich beenden laesst.
       SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date,
+             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
              1 AS in_group,
              gm.role AS group_role,
              ${memberPositionSql('u')} AS sort_order
@@ -847,15 +847,18 @@ router.get('/groups/:id/member-candidates', (req, res) => {
       phone: readsContacts ? row.phone : null,
       email: readsContacts ? row.email : null,
       birth_date: readsBirthdays ? row.birth_date : null,
+      // Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+      birth_year_unknown: readsBirthdays && row.birth_year_unknown === 1,
     }));
     const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
       SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
              NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
-             c.phone, c.email, c.birthday AS birth_date, 0 AS in_group, NULL AS group_role
+             c.phone, c.email, c.birthday AS birth_date, c.birthday_year_unknown AS birth_year_unknown,
+             0 AS in_group, NULL AS group_role
       FROM contacts c
       WHERE c.family_user_id IS NULL
       ORDER BY c.name COLLATE NOCASE ASC
-    `).all() : [];
+    `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 })) : [];
     res.json({ data: [...visiblePeople, ...contacts] });
   } catch (err) {
     log.error('GET /groups/:id/member-candidates error:', err);

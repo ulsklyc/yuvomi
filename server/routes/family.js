@@ -36,7 +36,7 @@ function listMembers() {
     LEFT JOIN birthdays b ON b.family_user_id = u.id
     WHERE ${householdMemberSql('u')}
     ORDER BY ${memberOrderSql('u')}
-  `).all();
+  `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 }));
 }
 
 router.get('/members', (req, res) => {

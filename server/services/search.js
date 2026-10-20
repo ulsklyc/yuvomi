@@ -602,11 +602,12 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
   // Geburtstage: Haushaltsbesitz, Rechte-Modul `calendar` (siehe BUCKET_MODULE).
   if (allows('birthdays')) {
     results.birthdays = firstMatches(database.prepare(`
-      SELECT b.id, b.name AS title, b.birth_date, b.notes
+      SELECT b.id, b.name AS title, b.birth_date, b.notes, b.year_unknown
       FROM birthdays b
       ORDER BY b.name COLLATE NOCASE ASC, b.id ASC
     `).all(), matches, (b) => [b.title, b.notes], limit)
-      .map((b) => withExcerpt(pick(b, ['id', 'title', 'birth_date']), q, [b.notes]));
+      // `year_unknown` (#2095): birth_date traegt dann das Platzhalterjahr.
+      .map((b) => withExcerpt({ ...pick(b, ['id', 'title', 'birth_date']), year_unknown: b.year_unknown === 1 }, q, [b.notes]));
   }
 
   // Budget: gesucht wird im TITEL, also nur dort, wo der Betrachter den Titel

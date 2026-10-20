@@ -308,6 +308,10 @@ test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"'
   assert.match(control, /id="profile-birth-date-year-unknown" checked/);
   assert.match(control, /aria-describedby="profile-error"/);
   const { readFileSync } = await import('node:fs');
+  const hk = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.match(hk, /birthDateText\(worker\.birth_date, worker\.birth_year_unknown\)/, 'Hausprofil zeigt kein Platzhalterjahr');
+  assert.match(hk, /yearUnknown: item\.birth_year_unknown/);
+  assert.match(hk, /birth_year_unknown: workerBirth\.yearUnknown/);
   for (const page of ['personal-account', 'admin-family']) {
     const src = readFileSync(new URL(`../public/settings/pages/${page}.js`, import.meta.url), 'utf8');
     assert.match(src, /birthDateControlHtml\(\{[\s\S]{0,200}yearUnknown: (user\?|member)\.birth_year_unknown/, `${page} reicht die Marke an den Editor`);
