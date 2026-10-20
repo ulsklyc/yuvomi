@@ -64,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Menus no longer all stand open on older browsers (#2107).** On a browser without popover
+  support - Chrome or Edge before 114, Firefox before 125, Safari or iOS before 17, such as a
+  wall frame stuck on an old system WebView - every "more" menu, the account menu and the
+  Overview's New menu were drawn open on top of the page and caught the taps meant for what lay
+  underneath. These menus now stay hidden there, and their buttons do nothing; everything else
+  works as before. Log out is also under Settings > Account. Current browsers are unchanged.
 - **Deleting or editing one occurrence of a series affects only that one, also on the night of a
   clock change (#2034).** For a series at 01:30 in Berlin, "only this one" on 25 March 2035 also
   removed the day before. "This and following" on a series in another time zone - say Los Angeles

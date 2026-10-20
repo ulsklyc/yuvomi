@@ -1492,6 +1492,10 @@ function closeContextMenu() {
 function openContextMenu(anchorBtn, itemsHtml, onAction) {
   closeContextMenu();
   const menu = document.createElement('div');
+  // Ohne Popover-API ist das Menue nicht verfuegbar (#2107, docs/installation.md):
+  // `showPopover()` wuerfe, nachdem das Panel schon im Body haengt, und jeder
+  // weitere Klick haengte ein unsichtbares dazu.
+  if (typeof menu.showPopover !== 'function') return;
   menu.className = 'documents-context-menu';
   menu.setAttribute('role', 'menu');
   menu.setAttribute('popover', 'auto');

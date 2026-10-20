@@ -99,6 +99,34 @@ img[hidden], svg[hidden], video[hidden] {
   display: none;
 }
 
+/* OHNE POPOVER-API BLEIBT EIN POPOVER ZU (#2107).
+ *
+ * Jedes Menue, das am `popover`-Attribut haengt (`.popover-menu` und die
+ * Werkzeugmenues, das Kontextmenue der Dokumente, die Tooltips der
+ * Notizkategorien, das Kalenderblatt des Datumsfelds), verlaesst sich fuer
+ * den geschlossenen Zustand auf das UA-Blatt: `[popover] { display: none }`.
+ * Ein Browser ohne die API (Chrome < 114, Firefox < 125, Safari < 17) hat
+ * diese Regel nicht und verwirft jede Autorenregel mit `:popover-open` - auch
+ * `.popover-menu:not(:popover-open)`, die einzige, die ein geschlossenes
+ * Menue unsichtbar macht. Ergebnis: jedes Panel der Seite stand offen und fing
+ * die Klicks darunter ab.
+ *
+ * Hier wird die UA-Regel genau dort nachgereicht, wo sie fehlt. Die Menues
+ * sind in diesen Browsern NICHT verfuegbar, statt offen zu stehen
+ * (docs/installation.md, "Browser Support"); einen Polyfill gibt es bewusst
+ * nicht. `@supports selector()` kennt schon die Mindestversion der App.
+ *
+ * `[popover]` hat die Spezifitaet einer Klasse und steht im ersten Blatt nach
+ * den Tokens: eine spaetere Regel, die `display` an einer Popover-Klasse setzt,
+ * schluege sie. `display` an einem Popover gehoert deshalb nur unter
+ * `:popover-open` (das in diesen Browsern mit der ganzen Regel wegfaellt) -
+ * test:old-browser-fallbacks haelt beides fest. */
+@supports not selector(:popover-open) {
+  [popover] {
+    display: none;
+  }
+}
+
 /* `color: inherit` ist hier die WICHTIGSTE Zeile, und sie hat gefehlt: `a` und
  * `input, textarea, select` erben ihre Farbe direkt darunter, `button` als
  * einziges der vier tat es nicht. Ohne sie nimmt ein Button die UA-Farbe

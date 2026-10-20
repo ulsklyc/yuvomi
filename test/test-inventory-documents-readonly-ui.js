@@ -136,7 +136,7 @@ function knoten(el, tag) {
  * was in der Zeit gebaut wurde - ein Menue, das NICHT aufgeht, ist darin nicht
  * zu finden.
  */
-async function mitElementen(fn) {
+async function mitElementen(fn, { popoverApi = true } = {}) {
   const gebaut = [];
   const bauen = globalThis.document.createElement;
   const koerper = globalThis.document.body.childNodes.length;
@@ -149,7 +149,8 @@ async function mitElementen(fn) {
       contains: (name) => klassen().includes(name),
       toggle() {},
     };
-    Object.assign(el, { showPopover() {}, hidePopover() {}, remove() {}, focus() {}, offsetWidth: 0, offsetHeight: 0 });
+    Object.assign(el, { remove() {}, focus() {}, offsetWidth: 0, offsetHeight: 0 });
+    if (popoverApi) Object.assign(el, { showPopover() {}, hidePopover() {} });
     gebaut.push(el);
     return el;
   };
@@ -674,6 +675,30 @@ test('Dokumente bei `read`: die Ordnerleiste traegt weder „+" noch Kebab, und 
   assert.deepEqual([...voll.menues[0].matchAll(/data-menu-action="([a-z]+)"/g)].map((m) => m[1]),
     ['subfolder', 'rename', 'move', 'delete'], 'mit seinen vier Schreib-Eintraegen');
   assert.equal(voll.knopf['aria-expanded'], 'true');
+});
+
+// OHNE POPOVER-API (#2107: Chrome < 114, Firefox < 125, Safari < 17) ist das
+// Kontextmenue nicht verfuegbar. Vorher hing das Panel schon im Body, bevor
+// `showPopover()` warf - jeder Klick auf den Kebab haengte ein weiteres
+// unsichtbares Panel dazu, und der Fehler landete in der Konsole.
+test('Dokumente ohne Popover-API: das Ordner-Menue haengt kein Panel ein und wirft nicht', async () => {
+  const attribute = {};
+  const knopf = {
+    attribute, isConnected: false, focus() {},
+    setAttribute(name, wert) { attribute[name] = wert; },
+    getBoundingClientRect: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  };
+  const ergebnis = await withAccess(SCHREIBEN, () => mitSeite({ user: { id: ICH } }, async () => {
+    const vorher = globalThis.document.body.childNodes.length;
+    let fehler = null;
+    await mitElementen(async () => {
+      try { await documents.openFolderMenu(ORDNER[0], knopf); } catch (err) { fehler = err; }
+    }, { popoverApi: false });
+    return { fehler, eingehaengt: globalThis.document.body.childNodes.length - vorher };
+  }));
+  assert.equal(ergebnis.fehler, null, `openFolderMenu() wirft ohne Popover-API: ${ergebnis.fehler}`);
+  assert.equal(ergebnis.eingehaengt, 0, 'kein Panel im Body');
+  assert.deepEqual(attribute, {}, 'der Ausloeser meldet kein offenes Menue');
 });
 
 test('Dokumente bei `read`: ein Ordner zieht nicht um - mit Schreibrecht geht genau der Umzug raus', async () => {

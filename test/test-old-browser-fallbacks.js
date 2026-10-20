@@ -20,6 +20,9 @@
  *        4. GANZE BLOECKE. Kein Stylesheet nutzt ein Konstrukt, bei dem ein
  *           Browser an der Mindestversion einen ganzen Block verwirft
  *           (`@layer`, `@scope`, Nesting, Media-Bereichssyntax) (#1369).
+ *        5. POPOVER. Ohne Popover-API bleibt jedes Popover zu: reset.css reicht
+ *           die UA-Regel `[popover] { display: none }` nach, und keine Regel
+ *           schlaegt sie mit einem `display` an einer Popover-Klasse (#2107).
  *
  * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
  * Support", zweite Tabellenzeile - gemessen am 21.09.2026 (#1369). Die Suite
@@ -967,4 +970,169 @@ test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
   const open = pillRules.filter(({ at }) => !at.some((a) => /^@supports \(translate: 0\)/.test(a)))
     .map(({ selector }) => selector);
   assert.deepEqual(open, [], 'Regeln der Pille ohne @supports (translate: 0)');
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Teil 5: Popover ohne Popover-API (#2107)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Jedes Popover der App verlaesst sich fuer den geschlossenen Zustand auf das
+ * UA-Blatt (`[popover] { display: none }`). Ein Browser ohne die API (Chrome
+ * < 114, Firefox < 125, Safari < 17, also zwischen den beiden Zeilen der
+ * Doku) hat diese Regel nicht und verwirft jede Autorenregel mit
+ * `:popover-open`, auch `.popover-menu:not(:popover-open)`. In einer WebView
+ * mit Chrome 106 stand deshalb jedes Menue der Seite offen und fing die Klicks
+ * darunter ab. reset.css reicht die UA-Regel in
+ * `@supports not selector(:popover-open)` nach.
+ *
+ * Zwei Zusagen:
+ *   1. der Rueckfall steht in einem Stylesheet, das index.html laedt;
+ *   2. keine Regel, die in so einem Browser gilt, setzt `display` (ausser
+ *      `none`) an einer Klasse, die im Markup ein `popover`-Attribut traegt.
+ *      `[popover]` hat die Spezifitaet einer Klasse: eine spaeter geladene
+ *      `.x-menu { display: flex }` schluege den Rueckfall still. Erlaubt ist
+ *      `display` unter `:popover-open` (die Regel faellt dort weg) und in
+ *      `@supports selector(:popover-open)`.
+ */
+const POPOVER_FALLBACK_AT = /^@supports not selector\(\s*:popover-open\s*\)$/;
+
+// Selektorliste an Kommas ausserhalb von Klammern trennen.
+function selectorParts(selector) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < selector.length; i += 1) {
+    const c = selector[i];
+    if (c === '(') depth += 1;
+    else if (c === ')') depth -= 1;
+    else if (c === ',' && depth === 0) {
+      parts.push(selector.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(selector.slice(start));
+  return parts.map((part) => part.trim()).filter(Boolean);
+}
+
+// Das Subjekt eines Selektors: der letzte zusammengesetzte Teil hinter dem
+// letzten Kombinator. Klammerinhalte zaehlen nicht (`:not(.a .b)`).
+function subjectCompound(part) {
+  let flat = part;
+  while (/\([^()]*\)/.test(flat)) flat = flat.replace(/\([^()]*\)/g, '');
+  return flat.trim().split(/\s*[>+~]\s*|\s+/).pop();
+}
+
+/**
+ * Klassen der Elemente, die ein `popover`-Attribut tragen - aus Markup in
+ * Template-Literalen (`class="a b" ... popover`) und aus DOM-Code
+ * (`el.className = 'a b'` vor `el.setAttribute('popover', ...)`).
+ * `popovertarget` ist kein Popover.
+ */
+function popoverClasses(source) {
+  const classes = new Set();
+  const add = (list) => list.split(/\s+/)
+    .filter((name) => /^[\w-]+$/.test(name))
+    .forEach((name) => classes.add(name));
+  for (const tag of source.matchAll(/<[a-z][\w-]*\s([^<>]*)>/gi)) {
+    const attrs = tag[1];
+    if (!/(?:^|\s)popover(?![\w-])/.test(attrs)) continue;
+    const cls = attrs.match(/(?:^|\s)class="([^"]*)"/);
+    if (cls) add(cls[1]);
+  }
+  for (const call of source.matchAll(/\b(\w+)\.setAttribute\(\s*['"]popover['"]/g)) {
+    const before = source.slice(Math.max(0, call.index - 800), call.index);
+    const assignments = [...before.matchAll(new RegExp(`\\b${call[1]}\\.className\\s*=\\s*(['"\`])([^'"\`]*)\\1`, 'g'))];
+    if (assignments.length) add(assignments.at(-1)[2]);
+  }
+  return classes;
+}
+
+function popoverDisplayFindings(css, classes) {
+  const findings = [];
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.some((a) => /^@supports selector\(\s*:popover-open\s*\)$/.test(a))) continue;
+    const display = declarations(body).filter((d) => d.property === 'display' && !/^none\b/i.test(d.value));
+    if (!display.length) continue;
+    for (const part of selectorParts(selector)) {
+      if (part.includes(':popover-open')) continue;
+      const subject = subjectCompound(part);
+      const hit = [...classes].find((name) => new RegExp(`\\.${name}(?![\\w-])`).test(subject));
+      if (hit) findings.push({ selector: part, className: hit, value: display.at(-1).value });
+    }
+  }
+  return findings;
+}
+
+const hasPopoverFallback = (css) => [...eachRule(css)].some(({ selector, body, at }) => (
+  selector === '[popover]'
+  && at.length === 1 && POPOVER_FALLBACK_AT.test(at[0])
+  && declarations(body).some((d) => d.property === 'display' && /^none$/i.test(d.value))
+));
+
+test('Leser: Popover-Klassen aus Markup und DOM-Code, nicht aus popovertarget (erfundene Faelle)', () => {
+  const names = (source) => [...popoverClasses(source)].sort();
+  assert.deepEqual(names('<div class="popover-menu x-menu" id="${esc(id)}" popover role="menu">'), ['popover-menu', 'x-menu']);
+  assert.deepEqual(names('<span class="tip" role="tooltip" popover="manual" hidden>'), ['tip']);
+  assert.deepEqual(names('<button class="trigger" popovertarget="m">'), []);
+  assert.deepEqual(names([
+    "const menu = document.createElement('div');",
+    "menu.className = 'ctx-menu';",
+    "menu.setAttribute('role', 'menu');",
+    "menu.setAttribute('popover', 'auto');",
+    "button.className = 'not-a-popover';",
+    "button.setAttribute('popovertarget', 'x');",
+  ].join('\n')), ['ctx-menu']);
+});
+
+test('Leser: display an einer Popover-Klasse schlaegt den Rueckfall, unter :popover-open nicht (erfundene Faelle)', () => {
+  const classes = new Set(['popover-menu', 'x-menu']);
+  const hits = (css) => popoverDisplayFindings(css, classes).map((f) => f.selector);
+  assert.deepEqual(hits('.popover-menu { display: flex }'), ['.popover-menu']);
+  assert.deepEqual(hits('.page .x-menu, .other { display: grid }'), ['.page .x-menu']);
+  assert.deepEqual(hits('@media (min-width: 768px) { .x-menu.is-wide { display: block } }'), ['.x-menu.is-wide']);
+  assert.deepEqual(hits([
+    '.popover-menu:popover-open { display: flex }',
+    '.popover-menu:not(:popover-open) { display: block }',
+    '.popover-menu { display: none }',
+    '.popover-menu__item { display: flex }',
+    '.popover-menu .row { display: flex }',
+    '@supports selector(:popover-open) { .x-menu { display: flex } }',
+    '.popover-menu { position: fixed }',
+  ].join('\n')), []);
+  assert.equal(hasPopoverFallback('@supports not selector(:popover-open) { [popover] { display: none; } }'), true);
+  assert.equal(hasPopoverFallback('[popover] { display: none; }'), false);
+  assert.equal(hasPopoverFallback('@supports selector(:popover-open) { [popover] { display: none; } }'), false);
+  assert.equal(hasPopoverFallback('@supports not selector(:popover-open) { [popover] { opacity: 0; } }'), false);
+});
+
+test('ohne Popover-API bleibt jedes Popover zu: der Rueckfall steht im Basis-Blatt (#2107)', () => {
+  const linked = [...read('public/index.html').matchAll(/<link\s[^>]*rel="stylesheet"[^>]*href="\/([^"]+\.css)"/g)]
+    .map((m) => `public/${m[1]}`);
+  const carriers = linked.filter((file) => hasPopoverFallback(read(file)));
+  assert.ok(linked.length >= 5, `Reichweite: nur ${linked.length} Stylesheets in index.html gefunden`);
+  assert.deepEqual(carriers, ['public/styles/reset.css'],
+    'Genau ein von index.html geladenes Stylesheet traegt `@supports not selector(:popover-open) '
+    + '{ [popover] { display: none } }` - sonst steht in einem Browser ohne Popover-API jedes Menue offen');
+});
+
+test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#2107)', () => {
+  const classes = new Set();
+  for (const file of appScripts()) popoverClasses(read(file)).forEach((name) => classes.add(name));
+  // Reichweite: die bekannten Popover-Familien muessen gefunden werden, sonst
+  // ist der Leser blind und der Test gruen ueber einer leeren Menge.
+  for (const known of ['popover-menu', 'nav-sidebar__account-menu', 'documents-context-menu',
+    'ydp-popover', 'note-category-overflow-tooltip', 'filter-popover', 'fasting-help__tooltip']) {
+    assert.ok(classes.has(known), `Reichweite: Popover-Klasse ${known} nicht gefunden`);
+  }
+  const offenders = [];
+  for (const file of appStylesheets()) {
+    for (const f of popoverDisplayFindings(read(file), classes)) {
+      offenders.push(`${file}: ${f.selector} { display: ${f.value} } (Popover-Klasse .${f.className})`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'Diese Regel schlaegt in einem Browser ohne Popover-API den Rueckfall `[popover] { display: none }` '
+    + '(reset.css) - das Panel stuende offen. `display` an einem Popover nur unter `:popover-open`:\n'
+    + offenders.join('\n'));
 });

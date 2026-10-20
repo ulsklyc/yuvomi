@@ -63,7 +63,8 @@ export function wireNoteCategoryOverflow(root, formatCount = String, formatMoreA
       tooltip.style.top = `${top}px`;
     };
     const show = () => {
-      if (button.hidden || dismissed) return;
+      // Ohne Popover-API bleibt der Tooltip zu (reset.css, #2107) statt zu werfen.
+      if (button.hidden || dismissed || typeof tooltip.showPopover !== 'function') return;
       if (!open) tooltip.showPopover();
       open = true;
       position();
