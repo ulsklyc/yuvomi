@@ -10,6 +10,7 @@ import { confirmModal, reportFieldError, reportFieldErrors } from '/components/m
 import { errorSentence } from '/utils/friendly-error.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { settingRowHtml } from '/settings/components.js';
+import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -725,8 +726,15 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
                 control: `<input class="form-input" type="email" id="profile-email" value="${esc(user?.email || '')}" autocomplete="email" aria-describedby="profile-error">`,
               })}
               ${settingRowHtml({
-                label: t('settings.memberBirthDateLabel'), labelFor: 'profile-birth-date', field: true,
-                control: `<yuvomi-datepicker type="date" id="profile-birth-date" value="${esc(user?.birth_date || '')}" aria-describedby="profile-error"></yuvomi-datepicker>`,
+                label: t('settings.memberBirthDateLabel'), labelFor: 'profile-birth-date', field: true, labelId: 'profile-birth-date-label',
+                // Wie im Geburtstags-Editor: "Jahr unbekannt" tauscht den
+                // Datumswaehler gegen Monat und Tag (#2095).
+                control: birthDateControlHtml({
+                  id: 'profile-birth-date',
+                  value: user?.birth_date || '',
+                  yearUnknown: user?.birth_year_unknown,
+                  describedBy: 'profile-error',
+                }),
               })}
             </div>
             <p class="form-hint settings-group__footer">${t('settings.memberContactBirthdayHint')}</p>
@@ -897,6 +905,9 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
   });
 
   const profileForm = container.querySelector('#profile-form');
+  const birthDateField = profileForm?.querySelector('#profile-birth-date')
+    ? wireBirthDateField(profileForm, 'profile-birth-date')
+    : null;
   profileForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     clearError(profileError);
@@ -905,13 +916,17 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     // das Formular traegt `novalidate`, alle Meldungen stehen zugleich an
     // ihren Zeilen, der Fokus geht aufs erste (reportFieldErrors).
     const birthDatePicker = container.querySelector('#profile-birth-date');
-    const birthDateRaw = birthDatePicker?.value || '';
+    // Ohne Jahr kommen Monat und Tag mit dem Platzhalterjahr (#2095).
+    const birth = birthDateField?.read() ?? { date: null, yearUnknown: false, complete: true, raw: birthDatePicker?.value || '' };
+    const birthDateRaw = birth.raw;
     const emailInput = container.querySelector('#profile-email');
     const emailValue = emailInput?.value.trim() || '';
     if (reportFieldErrors([
       !displayName.value.trim() && [displayName, t('common.required')],
       emailValue && !isEmailAddress(emailValue) && [emailInput, t('common.emailInvalid')],
       !isDateInputValid(birthDateRaw) && [birthDatePicker, t('settings.memberBirthDateInvalid')],
+      birth.yearUnknown && !birth.complete
+        && [container.querySelector('#profile-birth-date-month'), t('birthdays.yearlessIncomplete')],
     ])) return;
 
     const submitButton = profileForm.querySelector('[type="submit"]');
@@ -923,7 +938,8 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
         avatar_data: profileState.avatarData,
         phone: container.querySelector('#profile-phone')?.value.trim() || null,
         email: container.querySelector('#profile-email')?.value.trim() || null,
-        birth_date: parseDateInput(birthDateRaw) || null,
+        birth_date: (birth.yearUnknown ? birth.date : parseDateInput(birthDateRaw)) || null,
+        birth_year_unknown: birth.yearUnknown,
       });
       if (response?.user) {
         Object.assign(user, response.user);

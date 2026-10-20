@@ -287,3 +287,30 @@ test('der Kalendertermin eines Geburtstags ohne Jahr bekommt die Beschreibung oh
   const ev = localizeBirthdayEvent({ birthday_name: 'Ohne Jahr', birthday_date: null, title: 'x' });
   assert.match(ev.description, /calendarEventDescriptionNoDate/);
 });
+
+// Codex-Befund auf #2111: ein Mitglied, dessen Geburtstag nur Tag und Monat
+// kennt (etwa ein Split-Gast aus einem jahrlosen Kontakt), zeigt in der
+// Mitgliederliste kein Platzhalterjahr, und Profil und Mitglieds-Editor bieten
+// dieselbe Wahl wie der Geburtstags-Editor.
+test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"', async () => {
+  const { __test: family } = await import('../public/settings/pages/admin-family.js');
+  globalThis.__locale = 'de';
+  try {
+    const row = family.memberHtml({ id: 5, username: 'gast', display_name: 'Gast', role: 'member', family_role: 'other',
+      birth_date: '2000-03-15', birth_year_unknown: true }, 1);
+    assert.match(row, /15\. März/);
+    assert.doesNotMatch(row, /2000/);
+  } finally {
+    delete globalThis.__locale;
+  }
+  const { birthDateControlHtml } = await import('../public/utils/birth-date.js');
+  const control = birthDateControlHtml({ id: 'profile-birth-date', value: '2000-03-15', yearUnknown: true, describedBy: 'profile-error' });
+  assert.match(control, /id="profile-birth-date-year-unknown" checked/);
+  assert.match(control, /aria-describedby="profile-error"/);
+  const { readFileSync } = await import('node:fs');
+  for (const page of ['personal-account', 'admin-family']) {
+    const src = readFileSync(new URL(`../public/settings/pages/${page}.js`, import.meta.url), 'utf8');
+    assert.match(src, /birthDateControlHtml\(\{[\s\S]{0,200}yearUnknown: (user\?|member)\.birth_year_unknown/, `${page} reicht die Marke an den Editor`);
+    assert.match(src, /birth_year_unknown: birth\.yearUnknown/, `${page} schickt die Marke mit`);
+  }
+});

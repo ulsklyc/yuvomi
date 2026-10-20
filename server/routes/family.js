@@ -27,6 +27,8 @@ function listMembers() {
            c.phone,
            c.email,
            b.birth_date,
+           -- Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+           COALESCE(b.year_unknown, 0) AS birth_year_unknown,
            u.created_at,
            ${memberPositionSql('u')} AS sort_order
     FROM users u

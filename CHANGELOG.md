@@ -86,8 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the detail view, the overview tile, the wall and the calendar - while sorting, the next birthday
   and reminders work as before, 29 February included. Contacts and birthdays already stored with
   1604 are converted on update, so you do not have to enter them again.
-  **API:** birthdays carry `year_unknown` and contacts `birthday_year_unknown` (0 or 1; true/false
-  accepted on create and update). With it, the date carries the placeholder year 2000 and
+  The same choice is in your profile and in the member editor under Settings, for a member whose
+  birthday has no year.
+  **API:** birthdays carry `year_unknown`, contacts `birthday_year_unknown` (0 or 1; true/false
+  accepted on create and update) and members `birth_year_unknown`. With it, the date carries the placeholder year 2000 and
   `next_age` is `null`; calendar reads return `birthday_date: null` for such a birthday. The vCard
   export writes it as `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`, the form Apple reads.
 - **Deleting or editing one occurrence of a series affects only that one, also on the night of a

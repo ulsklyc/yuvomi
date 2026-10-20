@@ -2676,7 +2676,10 @@ reads as day and month ("15 March"), the generated event description carries no 
 return `birthday_date: null`. The event series starts in 2000. The flag comes from the editor ("Year
 unknown" swaps the date picker for month and day selects), from the API (`year_unknown`, boolean or
 0/1; omitted on update the stored value stays, turning it off needs a `birth_date` with its year) and
-from contacts: `contacts.birthday_year_unknown` travels with the import. The contact parsers (CardDAV
+from contacts: `contacts.birthday_year_unknown` travels with the import (and to the birthday of a
+split-expense guest made from a contact). A member's linked birthday carries it as
+`birth_year_unknown` in the user and member reads; profile and member editor offer the same choice,
+and a profile save only drops the flag when a different date arrives. The contact parsers (CardDAV
 sync and `.vcf` import) read Apple's `BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15`, a bare year 1604 and
 vCard 4 `--0315`/`--03-15` as a birthday without a year. Migration 256 converted stored 1604 dates
 (Apple's placeholder, never a real birth year) on contacts and birthdays, and the sync corrects a

@@ -28,7 +28,7 @@ import {
   DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
   displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
 } from './services/display-accounts.js';
-import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
+import { birthDateInput, deleteBirthdayArtifacts, placeholderBirthDate, syncBirthdayArtifacts, validateYearUnknown } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
 import { revokePaymentTasksForUsers } from './services/payment-task-audience.js';
 import * as oidcClient from 'openid-client';
@@ -204,7 +204,8 @@ const USER_PUBLIC_COLUMNS = `
   created_at,
   (SELECT phone FROM contacts WHERE contacts.family_user_id = users.id LIMIT 1) AS phone,
   (SELECT email FROM contacts WHERE contacts.family_user_id = users.id LIMIT 1) AS email,
-  (SELECT birth_date FROM birthdays WHERE birthdays.family_user_id = users.id LIMIT 1) AS birth_date
+  (SELECT birth_date FROM birthdays WHERE birthdays.family_user_id = users.id LIMIT 1) AS birth_date,
+  (SELECT year_unknown FROM birthdays WHERE birthdays.family_user_id = users.id LIMIT 1) AS birth_year_unknown
 `;
 
 // --------------------------------------------------------
@@ -618,6 +619,9 @@ function publicUser(row) {
     phone: row.phone ?? null,
     email: row.email ?? null,
     birth_date: row.birth_date ?? null,
+    // Nur Tag und Monat bekannt (#2095): `birth_date` traegt dann das
+    // Platzhalterjahr 2000, das kein Profil als Geburtsjahr zeigen darf.
+    birth_year_unknown: row.birth_year_unknown === 1,
     created_at: row.created_at,
     // Seit wann dieses Konto ein ehemaliges ist (#1381), sonst `null`. Die
     // Zeile bleibt, damit Urheberschaft und Salden bleiben; die Oberflaeche
@@ -664,16 +668,19 @@ function validateMemberProfileFields(body) {
   const vEmail = body.email !== undefined
     ? str(body.email, 'Email', { max: MAX_TITLE, required: false })
     : { value: undefined, error: null };
+  // Ohne Jahr (#2095) weicht das Jahr dem Platzhalter, bevor geprueft wird.
+  const vYearUnknown = validateYearUnknown(body.birth_year_unknown, 'birth_year_unknown');
   const vBirthDate = body.birth_date !== undefined
-    ? validateDate(body.birth_date, 'Birthday date')
+    ? validateDate(birthDateInput(body.birth_date, vYearUnknown.value === true), 'Birthday date')
     : { value: undefined, error: null };
   return {
     values: {
       phone: vPhone.value,
       email: vEmail.value,
       birth_date: vBirthDate.value,
+      birth_year_unknown: vYearUnknown.value,
     },
-    errors: collectErrors([vPhone, vEmail, vBirthDate]),
+    errors: collectErrors([vPhone, vEmail, vYearUnknown, vBirthDate]),
   };
 }
 
@@ -682,6 +689,7 @@ function syncFamilyMemberArtifacts(database, userId, {
   phone = undefined,
   email = undefined,
   birthDate = undefined,
+  birthYearUnknown = undefined,
   avatarData = undefined,
   actorUserId,
 } = {}) {
@@ -743,11 +751,22 @@ function syncFamilyMemberArtifacts(database, userId, {
           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(name, birthDate ?? null, photo ?? null, birthday.id);
-    // Ein Geburtstag ohne Jahr (#2095) bekommt hier nur dann ein Jahr, wenn
-    // wirklich ein anderes Datum kommt: das Profil schickt sonst das
-    // Platzhalterjahr unveraendert zurueck, und das waere kein Geburtsjahr.
-    if (birthday.year_unknown === 1 && birthDate && birthDate !== birthday.birth_date) {
-      database.prepare('UPDATE birthdays SET year_unknown = 0 WHERE id = ?').run(birthday.id);
+    // "JAHR UNBEKANNT" (#2095). Setzt der Aufrufer es, weicht ein gespeichertes
+    // Jahr dem Platzhalter. Ein Jahr bekommt der Geburtstag nur, wenn wirklich
+    // ein anderes Datum kommt - mit `birth_year_unknown: false` oder ohne das
+    // Feld (ein Client, der es nicht kennt); sonst wuerde das zurueckgeschickte
+    // Platzhalterjahr still zum Geburtsjahr. Geschrieben wird nur, was sich
+    // aendert.
+    // Abnehmen ohne neues Datum laesst die Marke stehen: das Platzhalterjahr
+    // waere sonst das Geburtsjahr, ohne dass jemand eines eingegeben hat.
+    const storedUnknown = birthday.year_unknown === 1;
+    const newDate = !!birthDate && birthDate !== birthday.birth_date;
+    const wantUnknown = birthYearUnknown === true
+      || (storedUnknown && !newDate);
+    if (wantUnknown !== storedUnknown) {
+      const current = database.prepare('SELECT birth_date FROM birthdays WHERE id = ?').get(birthday.id).birth_date;
+      database.prepare('UPDATE birthdays SET year_unknown = ?, birth_date = ? WHERE id = ?')
+        .run(wantUnknown ? 1 : 0, wantUnknown ? placeholderBirthDate(current) : current, birthday.id);
     }
     const updated = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(birthday.id);
     syncBirthdayArtifacts(database, updated);
@@ -759,6 +778,10 @@ function syncFamilyMemberArtifacts(database, userId, {
       INSERT INTO birthdays (name, birth_date, photo_data, created_by, family_user_id)
       VALUES (?, ?, ?, ?, ?)
     `).run(name, birthDate, photo ?? null, actorUserId || userId, userId);
+    if (birthYearUnknown === true) {
+      database.prepare('UPDATE birthdays SET year_unknown = 1, birth_date = ? WHERE id = ?')
+        .run(placeholderBirthDate(birthDate), result.lastInsertRowid);
+    }
     const created = database.prepare('SELECT * FROM birthdays WHERE id = ?').get(result.lastInsertRowid);
     syncBirthdayArtifacts(database, created);
   }
@@ -3468,6 +3491,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
         phone: memberFields.values.phone,
         email: memberFields.values.email,
         birthDate: memberFields.values.birth_date,
+        birthYearUnknown: memberFields.values.birth_year_unknown,
         avatarData: normalizedAvatarData ?? null,
         actorUserId: req.authUserId,
       });
@@ -3624,6 +3648,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         phone: memberFields.values.phone,
         email: memberFields.values.email,
         birthDate: memberFields.values.birth_date,
+        birthYearUnknown: memberFields.values.birth_year_unknown,
         avatarData: avatarData ?? null,
         actorUserId: req.authUserId,
       });
@@ -3709,6 +3734,7 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, (req, res) => {
         phone: memberFields.values.phone,
         email: memberFields.values.email,
         birthDate: memberFields.values.birth_date,
+        birthYearUnknown: memberFields.values.birth_year_unknown,
         avatarData: avatarData ?? null,
         actorUserId: req.authUserId,
       });

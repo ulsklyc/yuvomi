@@ -832,6 +832,7 @@ export const schemas = {
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
             onboarding_pending: {
               type: 'boolean',
               description: 'Whether this account still needs the onboarding walkthrough. Derived from '
@@ -867,6 +868,7 @@ export const schemas = {
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
             created_at: { type: 'string', format: 'date-time' },
             sort_order: {
               type: ['integer', 'null'],
@@ -987,6 +989,7 @@ export const schemas = {
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
           },
           required: ['username', 'display_name'],
         },
@@ -1009,6 +1012,7 @@ export const schemas = {
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
           },
         },
         ProfileUpdateRequest: {

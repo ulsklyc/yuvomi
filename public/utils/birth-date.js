@@ -96,12 +96,28 @@ function dayOptionsHtml(month, selected) {
  * @param {{ id: string, label: string, value?: string|null, yearUnknown?: boolean|number, max?: string, hint?: string }} opts
  */
 export function birthDateFieldHtml({ id, label, value = '', yearUnknown = false, max = '', hint = '' }) {
+  return `
+    <div class="form-group">
+      <label class="form-label" for="${esc(id)}" id="${esc(id)}-label">${esc(label)}</label>
+      ${birthDateControlHtml({ id, value, yearUnknown, max })}
+      ${hint ? `<p class="form-hint">${esc(hint)}</p>` : ''}
+    </div>`;
+}
+
+/**
+ * Nur das Bedienelement, ohne Gruppe und Beschriftung: fuer Zeilen, die ihre
+ * Beschriftung selbst setzen (`formRowHtml` in den Einstellungen, Profil und
+ * Mitglied). Die Beschriftung muss die id `${id}-label` tragen - die Auswahl
+ * ohne Jahr nennt sie als ihren Namen.
+ * @param {{ id: string, value?: string|null, yearUnknown?: boolean|number, max?: string, describedBy?: string }} opts
+ */
+export function birthDateControlHtml({ id, value = '', yearUnknown = false, max = '', describedBy = '' }) {
   const unknown = isYearUnknown(yearUnknown);
   const [, month = '', day = ''] = String(value || '').split('-');
+  const described = describedBy ? ` aria-describedby="${esc(describedBy)}"` : '';
   return `
-    <div class="form-group birth-date-field" data-birth-date-field="${esc(id)}">
-      <label class="form-label" for="${esc(id)}" id="${esc(id)}-label">${esc(label)}</label>
-      <yuvomi-datepicker id="${esc(id)}" type="date"${max ? ` max="${esc(max)}"` : ''} value="${unknown ? '' : esc(value || '')}"${unknown ? ' hidden' : ''}></yuvomi-datepicker>
+    <div class="birth-date-field" data-birth-date-field="${esc(id)}">
+      <yuvomi-datepicker id="${esc(id)}" type="date"${max ? ` max="${esc(max)}"` : ''} value="${unknown ? '' : esc(value || '')}"${described}${unknown ? ' hidden' : ''}></yuvomi-datepicker>
       <div class="birth-date-field__yearless" id="${esc(id)}-yearless" role="group" aria-labelledby="${esc(id)}-label"${unknown ? '' : ' hidden'}>
         <select class="form-input birth-date-field__select" id="${esc(id)}-month" aria-label="${esc(t('birthdays.yearlessMonthLabel'))}">
           <option value="">${esc(t('birthdays.yearlessMonthPlaceholder'))}</option>
@@ -115,7 +131,6 @@ export function birthDateFieldHtml({ id, label, value = '', yearUnknown = false,
         <input type="checkbox" id="${esc(id)}-year-unknown"${unknown ? ' checked' : ''}>
         <span>${esc(t('birthdays.yearUnknown'))}</span>
       </label>
-      ${hint ? `<p class="form-hint">${esc(hint)}</p>` : ''}
     </div>`;
 }
 
