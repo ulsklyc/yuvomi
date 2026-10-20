@@ -4,8 +4,11 @@
  * in English or German.
  * Usage: node scripts/seed-demo.js [--db /path/to/yuvomi.db] [--locale en|de]
  *
- * Requires a database already migrated to the current schema (open the app once,
- * or run the server, before seeding). Populates EVERY module:
+ * Opens the database through server/db.js, exactly like the server: it reads
+ * `.env` from the working directory, applies DB_ENCRYPTION_KEY (an encrypted
+ * installation works the same as an unencrypted one) and migrates the schema,
+ * so a database the server has not opened yet works too. `--db` wins over
+ * DB_PATH from the environment or `.env`. Populates EVERY module:
  *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children), maria (housekeeper)
  *   - Tasks (categories, priorities, statuses, start/due dates, multi-assignment, tags, points)
  *   - Calendar events (appointments, activities, recurring, assignments)
@@ -34,19 +37,31 @@
  * Login for all demo users: <username> / demo1234
  */
 
-import Database from '../server/utils/sqlite-driver.js';
+// Die Laufzeitpruefung zuerst, vor jedem anderen Import (test:node-runtime):
+// die Datenbank oeffnet server/db.js erst unten per dynamischem Import.
+import '../server/utils/require-supported-runtime.js';
+// `.env` wie der Server (`node --import dotenv/config server/index.js`): ohne
+// das fehlte dem Seed der DB_ENCRYPTION_KEY, mit dem der Server die Datei
+// verschluesselt hat (#2114). Bereits gesetzte Variablen gewinnen.
+import 'dotenv/config';
 import bcrypt from 'bcrypt';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct } from '../server/services/pantry-products.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 const args = process.argv.slice(2);
 const dbIdx = args.indexOf('--db');
-const DB_PATH = dbIdx !== -1 ? args[dbIdx + 1] : resolve(__dirname, '..', 'yuvomi.db');
+if (dbIdx !== -1) {
+  const dbArg = args[dbIdx + 1];
+  if (!dbArg || dbArg.startsWith('--')) {
+    console.error('--db needs a path, e.g. --db ./yuvomi.db');
+    process.exit(1);
+  }
+  // server/db.js liest DB_PATH beim Import. Ohne `--db` gilt, was der Server
+  // nimmt: DB_PATH aus Umgebung oder `.env`, sonst <repo>/yuvomi.db.
+  process.env.DB_PATH = resolve(dbArg);
+}
 
 // ── Locale ───────────────────────────────────────────────────────────────────
 // Der Demo-Inhalt existiert in zwei Sprachen: die Screenshots zeigen entweder
@@ -64,8 +79,18 @@ const L = (en, de) => (LOCALE === 'de' ? de : en);
 
 console.log(`Locale: ${LOCALE}`);
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+// Ueber server/db.js statt `new Database()`: Schluessel, Platzhalter-Guard,
+// Cipher-Pruefung, WAL und Migrationen kommen aus derselben Quelle wie beim
+// Server (#2114). Der Import oeffnet die Datenbank; scheitert das (falscher
+// Schluessel, neueres Schema, leere Datei, ...), steht die Meldung von
+// server/db.js da statt eines Stacktraces.
+let db;
+try {
+  db = (await import('../server/db.js')).get();
+} catch (err) {
+  console.error(`Seed failed: ${err?.message || err}`);
+  process.exit(1);
+}
 
 // ── Date helpers (local time, avoid UTC shift) ───────────────────────────────
 

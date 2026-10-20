@@ -332,7 +332,12 @@ export async function startHarness() {
       await waitForHttp(baseUrl);
       await stopServer(migrator);
 
-      await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de']);
+      // Der Seed liest `.env` (#2114), dieser Server nicht: derselbe Schluessel
+      // wie beim Server, sonst verschluesselte ein Schluessel aus einer lokalen
+      // `.env` die Datei, die der Server danach nicht mehr oeffnet.
+      await run(process.execPath, ['scripts/seed-demo.js', '--db', dbPath, '--locale', 'de'], {
+        DB_ENCRYPTION_KEY: process.env.DB_ENCRYPTION_KEY ?? '',
+      });
 
       server = startServer(dbPath, port);
       await waitForHttp(baseUrl);

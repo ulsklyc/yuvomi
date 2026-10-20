@@ -244,7 +244,7 @@ test('server/index.js refuses an old Node-API before it touches a database file'
   assertRefused(runProgram(['server/index.js'], { napi: '9', dbPath }), dbPath);
 });
 
-test('scripts/seed-demo.js refuses an old Node-API without going through server/db.js', () => {
+test('scripts/seed-demo.js refuses an old Node-API before it touches a database file', () => {
   const dbPath = join(tempDir('yuvomi-node-runtime-'), 'seed.db');
   assertRefused(runProgram(['scripts/seed-demo.js', '--db', dbPath], { napi: '9', dbPath }), dbPath);
 });
