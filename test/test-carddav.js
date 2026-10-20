@@ -2434,8 +2434,8 @@ describe('Contacts API - Multi-Value Fields', () => {
     // Contacts-Routen-Schreibpfade (POST/PUT phones) die Spalte finden.
     const migration95ApiDb = MIGRATIONS.find(m => m.version === 95);
     if (migration95ApiDb) contactsApiDb.exec(migration95ApiDb.up);
-    // "Jahr unbekannt" (Migration 256, #2095): POST und PUT schreiben die
-    // Marke. Nur die Kontaktspalte - Migration 256 fasst auch birthdays an,
+    // "Jahr unbekannt" (Migration 254, #2095): POST und PUT schreiben die
+    // Marke. Nur die Kontaktspalte - Migration 254 fasst auch birthdays an,
     // die dieses Fixture nicht hat.
     contactsApiDb.exec('ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0');
 

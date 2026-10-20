@@ -357,7 +357,7 @@ function parseBirthday(value, params = []) {
     .find(Boolean);
   // 1604 allein zaehlt ebenso: ein Zwischenserver, der Parameter verliert,
   // laesst Apples Platzhalter ohne Marke zurueck, und 1604 ist nie das echte
-  // Geburtsjahr eines Kontakts (dieselbe Regel wie Migration 256).
+  // Geburtsjahr eines Kontakts (dieselbe Regel wie Migration 254).
   if ((omitYear && omitYear[1] === date.slice(0, 4)) || date.startsWith('1604-')) {
     return yearlessBirthday(date.slice(5, 7), date.slice(8, 10));
   }

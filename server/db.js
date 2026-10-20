@@ -11176,11 +11176,8 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 256,
+    version: 254,
     description: 'Birthdays and contacts: a birthday without a year (#2095)',
-    // 254 AND 255 ARE TAKEN BY OPEN PULL REQUESTS, this entry starts at 256 on
-    // purpose; migrate() applies by version and does not need a gap-free list.
-    //
     // A BIRTHDAY CAN BE A DAY AND A MONTH. iCloud stores one without a year with
     // the placeholder year 1604 and marks it, `BDAY;X-APPLE-OMIT-YEAR=1604:
     // 1604-03-15`; vCard 4 writes `--0315`. The parsers read only the value, so
@@ -11251,7 +11248,7 @@ function backfillAvatarKey(database) {
   createAvatarKeyTriggers(database);
 }
 
-/** Der Nachtrag aus Migration 256, derselbe Wortlaut; die Migration bleibt eingefroren. */
+/** Der Nachtrag aus Migration 254, derselbe Wortlaut; die Migration bleibt eingefroren. */
 function backfillBirthdayYearUnknown(database) {
   database.exec(`
     UPDATE birthdays SET birth_date = '2000' || substr(birth_date, 5), year_unknown = 1
@@ -11259,7 +11256,7 @@ function backfillBirthdayYearUnknown(database) {
   `);
 }
 
-/** Der Nachtrag aus Migration 256 fuer Kontakte, derselbe Wortlaut. */
+/** Der Nachtrag aus Migration 254 fuer Kontakte, derselbe Wortlaut. */
 function backfillContactBirthdayYearUnknown(database) {
   database.exec(`
     UPDATE contacts SET birthday = '2000' || substr(birthday, 5), birthday_year_unknown = 1
@@ -11541,7 +11538,7 @@ const CRITICAL_COLUMNS = [
   // Aufgabenaenderung rollt mit zurueck) und jeder Verlauf (er liest sie). Kein
   // Nachtrag: NULL heisst "in Yuvomi abgehakt".
   { table: 'task_completions', column: 'source', type: 'TEXT' },
-  // #2095: v256 traegt "Jahr unbekannt" an Geburtstag und Kontakt nach; ohne die
+  // #2095: v254 traegt "Jahr unbekannt" an Geburtstag und Kontakt nach; ohne die
   // Spalten scheitern Kalender, Uebersicht und Geburtstagsliste (sie lesen sie,
   // um Jahr und Alter wegzulassen). MIT NACHTRAG: Apples Platzhalterjahr 1604
   // wird mit der Spalte umgestellt, wie in der Migration.

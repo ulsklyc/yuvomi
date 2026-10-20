@@ -199,7 +199,7 @@ test('POST /import: 400 bei zu vielen IDs (> 500)', async () => {
 // --------------------------------------------------------------------------
 // Geburtstag ohne Jahr (#2095)
 // --------------------------------------------------------------------------
-test('Migration 256: Apples 1604 wird zu "Jahr unbekannt", an Kontakt und Geburtstag', async () => {
+test('Migration 254: Apples 1604 wird zu "Jahr unbekannt", an Kontakt und Geburtstag', async () => {
   const { default: Database } = await import('better-sqlite3-multiple-ciphers');
   const { join } = await import('node:path');
   const { tempDir } = await import('./tmp-dir.js');

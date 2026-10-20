@@ -2022,7 +2022,7 @@ Primary key: `(note_id, category_id)`.
 | organization | TEXT | nullable |
 | job_title | TEXT | nullable |
 | birthday | TEXT | DATE, nullable |
-| birthday_year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v256, #2095) - only day and month of `birthday` are known; `birthday` then carries the placeholder year 2000 |
+| birthday_year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v254, #2095) - only day and month of `birthday` are known; `birthday` then carries the placeholder year 2000 |
 | website | TEXT | nullable |
 | photo | TEXT | Base64 data URL, nullable |
 | nickname | TEXT | nullable |
@@ -2681,7 +2681,7 @@ split-expense guest made from a contact). A member's linked birthday carries it 
 `birth_year_unknown` in the user and member reads; profile and member editor offer the same choice,
 and a profile save only drops the flag when a different date arrives. The contact parsers (CardDAV
 sync and `.vcf` import) read Apple's `BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15`, a bare year 1604 and
-vCard 4 `--0315`/`--03-15` as a birthday without a year. Migration 256 converted stored 1604 dates
+vCard 4 `--0315`/`--03-15` as a birthday without a year. Migration 254 converted stored 1604 dates
 (Apple's placeholder, never a real birth year) on contacts and birthdays, and the sync corrects a
 contact still stored as 1604, or fills in a year the card has gained, even where the column is not
 empty; a year entered locally stays. The vCard export writes such a birthday in Apple's 3.0 form, as
@@ -2691,7 +2691,7 @@ sabre/vobject does. The separate birthday feed is unchanged: it never carried a 
 |--------|------|-----------|
 | name | TEXT | NOT NULL |
 | birth_date | TEXT | DATE (YYYY-MM-DD), NOT NULL |
-| year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v256, #2095) - the year of birth is unknown; `birth_date` then carries the placeholder year 2000 |
+| year_unknown | INTEGER | 0/1, NOT NULL default 0 (migration v254, #2095) - the year of birth is unknown; `birth_date` then carries the placeholder year 2000 |
 | name_day | TEXT | Month and day (`MM-DD`), nullable |
 | notes | TEXT | nullable |
 | photo_data | TEXT | Base64 data URL (≤ 5 MB), nullable |
