@@ -918,6 +918,16 @@ const REASONS_PASSED_THROUGH = new Map([
     why: 'sendInstallError: InstallError traegt nur 400-429 und 502/503 (REASON_STATUS in services/module-install.js); '
       + 'PATCH /:id: setModuleEnabled setzt nur busy (409) und not_writable (503); '
       + 'die beiden 403 der Modul-Installation (module_web_install_disabled, module_session_required) schickt die Route als Literal, vor dem Body' }],
+  // Der Fall eines gescheiterten Abgleichs eines Rezeptdienstes (#1909,
+  // Migration 255, services/recipe-providers/failure.js): eine kleine feste
+  // Menge recipe_providers_sync_* plus recipe_providers_private_network. Er wird
+  // am Konto gespeichert und reist im Rumpf einer 200 (POST .../sync mit
+  // failed: true, POST .../test mit ok: false) - nie an einer 403. Der Fall
+  // `auth_failed` meint die 401/403 des ANBIETERS, nicht eine Antwort hier.
+  ['routes/recipe-providers.js: failure?.reason ?? null', { sites: 2, at403: [], why: 'Verbindungstest: gespeichert und in der 200-Antwort' }],
+  ['services/recipe-provider-sync.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'Ergebnis eines Abgleichs: gespeichert und in der 200-Antwort' }],
+  ['services/recipe-providers/failure.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'probeFailure: Feld im Ergebnis des Verbindungstests' }],
+  ['services/recipe-providers/failure.js: probe.reason', { sites: 1, at403: [], why: 'classifyProbe: reicht den Fall des Adapters weiter' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],

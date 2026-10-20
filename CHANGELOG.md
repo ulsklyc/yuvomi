@@ -71,6 +71,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Kitchen settings: a recipe provider says why its last sync failed, in your language** (#1909).
+  The account card in Settings > Kitchen showed the raw text of the last failed sync or connection
+  test, for example "Mealie request failed (401)", "getaddrinfo ENOTFOUND mealie" or "HTTP 404". It
+  now names the cause in the language of the app: the provider refuses the API token, no provider
+  answers at the server URL, the provider answered with an error status, it did not answer in time,
+  it cannot be reached, its certificate is not trusted, its answer could not be read, or the address
+  points to a private network (with the setting that allows it). Any other failure gets a general
+  sentence that points to the server log. An account whose last failure happened before this update
+  shows the general sentence until its next sync. For API clients: `GET /recipe-providers/status`
+  carries `lastErrorReason` and `lastErrorParams` next to `lastError`, and a failed sync or
+  connection test answers with `reason` and `params` next to `error`; `lastError` and `error` are
+  unchanged.
 - **Shared expenses: a group now shows all its expenses, not just the 30 most recent (#2108).**
   Older expenses could not be opened, edited or deleted. "Load more" under the expense list now
   loads the next page, like the history below it, and after you edit or delete an expense the

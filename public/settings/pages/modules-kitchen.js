@@ -55,6 +55,22 @@ async function deleteAccountUnlessGone(id) {
   }
 }
 
+/**
+ * Der Satz zum letzten gescheiterten Abgleich eines Kontos (#1909): der Fall
+ * steht seit Migration 255 am Konto (`lastErrorReason`, `lastErrorParams`).
+ * `lastError` selbst ist der rohe Text des Adapters oder des Netzes, englisch
+ * ("Mealie request failed (401)", "getaddrinfo ENOTFOUND mealie"), und kommt
+ * nie auf die Karte; ein Konto ohne gespeicherten Fall (aelter als die
+ * Migration, oder ein Fehlschlag ohne bekannten Fall) bekommt den allgemeinen
+ * Satz, der auf das Server-Log zeigt.
+ */
+function lastErrorSentence(account) {
+  return errorSentence(
+    { data: { reason: account.lastErrorReason, params: account.lastErrorParams } },
+    'settings.recipeProviderErrorSyncUnknown',
+  );
+}
+
 function formatSyncTime(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -157,7 +173,7 @@ function renderProviderAccount(container, account, refresh) {
   card.className = 'caldav-account-item';
 
   const details = [providerLabel(account.provider), lastSyncDetail(account.lastSync), account.baseUrl];
-  if (account.lastError) details.push(t('settings.recipeProviderLastError', { message: account.lastError }));
+  if (account.lastError) details.push(t('settings.recipeProviderLastError', { message: lastErrorSentence(account) }));
 
   const syncBtn = document.createElement('button');
   syncBtn.type = 'button';
@@ -172,7 +188,8 @@ function renderProviderAccount(container, account, refresh) {
       //
       // Der Toast sagt den Satz der App, nie den Text des Abrufs (#1909): der
       // ist der rohe Fehler des Adapters, englisch. Die Ursache steht nach dem
-      // Nachladen gleich darunter an der Karte des Kontos (`lastError`).
+      // Nachladen gleich darunter an der Karte des Kontos, als Satz ihres
+      // Falls (lastErrorSentence).
       const res = await recipeProviders.syncAccount(account.id);
       if (res.data?.failed) {
         showToast(t('settings.recipeProviderSyncFailed'), 'danger');

@@ -22,6 +22,7 @@ import { createGuardedLookup } from '../../utils/ssrf.js';
 // Opt-in RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: one place for both adapters and
 // the route, so the switch named in the error message is the one read here.
 import { isPrivateNetworkAllowed } from './private-network.js';
+import { probeFailure, ProviderResponseError } from './failure.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
 const PAGE_SIZE = 50;
@@ -52,7 +53,7 @@ async function drainBody(res, maxBytes, tooLargeMessage) {
     total += chunk.byteLength;
     if (total > maxBytes) {
       res.body.destroy();
-      throw new Error(tooLargeMessage);
+      throw new ProviderResponseError(tooLargeMessage);
     }
     chunks.push(chunk);
   }
@@ -116,7 +117,7 @@ export class TandoorAdapter {
       if (!res.ok) return { ok: false, status: res.status };
       return { ok: true, status: res.status };
     } catch (err) {
-      return { ok: false, status: 0, error: err.message };
+      return { ok: false, status: 0, error: err.message, ...probeFailure(err) };
     }
   }
 

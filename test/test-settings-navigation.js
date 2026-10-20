@@ -4736,6 +4736,56 @@ test('#1909: die Karte eines Rezeptdienstes - Sync, Aktivieren und Loeschen sage
   }
 });
 
+test('#1909: die Karte eines Rezeptdienstes sagt die Ursache des letzten Fehlschlags als Satz der App, nie den rohen Text', async () => {
+  const { __test: kitchen } = await import('../public/settings/pages/modules-kitchen.js');
+  const { installMiniDom, MiniElement } = await import('./mini-dom.js');
+  const deinstalliere = installMiniDom();
+  // Der rohe Text, wie Adapter und Netz ihn liefern - er darf nie auf die Karte.
+  const ROH = 'getaddrinfo ENOTFOUND mealie.internal';
+  const karte = (felder) => {
+    const container = new MiniElement('div');
+    kitchen.renderProviderAccount(container, {
+      id: 7, provider: 'mealie', name: 'Kueche', baseUrl: 'https://mealie.example', enabled: 1,
+      lastSync: '2026-10-19T08:00:00Z', recipeCount: 3, lastError: ROH, ...felder,
+    }, async () => {});
+    return container.textContent;
+  };
+  const zeile = (message) => `settings.recipeProviderLastError${JSON.stringify({ message })}`;
+  try {
+    for (const [felder, satz] of [
+      [{ lastErrorReason: 'recipe_providers_sync_auth_failed' }, 'settings.recipeProviderErrorSyncAuth'],
+      [{ lastErrorReason: 'recipe_providers_sync_wrong_url' }, 'settings.recipeProviderErrorSyncWrongUrl'],
+      [{ lastErrorReason: 'recipe_providers_sync_http_status', lastErrorParams: { status: 502 } },
+        `settings.recipeProviderErrorSyncStatus${JSON.stringify({ status: 502 })}`],
+      [{ lastErrorReason: 'recipe_providers_sync_timeout' }, 'settings.recipeProviderErrorSyncTimeout'],
+      [{ lastErrorReason: 'recipe_providers_sync_unreachable' }, 'settings.recipeProviderErrorSyncUnreachable'],
+      [{ lastErrorReason: 'recipe_providers_sync_certificate' }, 'settings.recipeProviderErrorSyncCertificate'],
+      [{ lastErrorReason: 'recipe_providers_sync_bad_response' }, 'settings.recipeProviderErrorSyncBadResponse'],
+      // Derselbe Fall wie beim Anlegen, derselbe Satz mit dem Schalter.
+      [{ lastErrorReason: 'recipe_providers_private_network' }, 'settings.recipeProviderErrorPrivateNetwork'],
+      // Ohne gespeicherten Fall (Bestand vor Migration 255, ein Wurf ohne
+      // Klasse), mit unbekanntem Fall oder ohne die Zahl: der allgemeine Satz.
+      [{}, 'settings.recipeProviderErrorSyncUnknown'],
+      [{ lastErrorReason: null, lastErrorParams: null }, 'settings.recipeProviderErrorSyncUnknown'],
+      [{ lastErrorReason: 'recipe_providers_sync_mystery' }, 'settings.recipeProviderErrorSyncUnknown'],
+      [{ lastErrorReason: 'recipe_providers_sync_http_status' }, 'settings.recipeProviderErrorSyncUnknown'],
+      [{ lastErrorReason: 'recipe_providers_sync_http_status', lastErrorParams: { status: '502' } }, 'settings.recipeProviderErrorSyncUnknown'],
+    ]) {
+      const text = karte(felder);
+      const name = JSON.stringify(felder);
+      assert.ok(text.includes(zeile(satz)), `${name}: die Karte sagt ${satz}, sah: ${text}`);
+      assert.equal(text.includes(ROH), false, `${name}: der rohe Text steht nicht auf der Karte`);
+      assert.ok(text.includes('settings.notConnected'), `${name}: der Zustand bleibt "nicht verbunden"`);
+    }
+    // Gegenrichtung: ohne Fehlschlag gibt es keine Fehlerzeile.
+    const gesund = karte({ lastError: null, lastErrorReason: null });
+    assert.equal(gesund.includes('settings.recipeProviderLastError'), false);
+    assert.ok(gesund.includes('settings.connected'));
+  } finally {
+    deinstalliere();
+  }
+});
+
 // Dieselbe Regel fuer die Konten der Synchronisation, die Kalender-Abos und
 // die Schnellzugriffe der Uebersicht (#1997). Gefahren wird je Weg der echte
 // Submit- oder Klick-Handler an einem Attrappen-Panel, in dem jedes Element

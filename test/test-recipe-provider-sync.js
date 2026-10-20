@@ -406,6 +406,101 @@ test('sync(): eine Lookup-Ablehnung schreibt last_error MIT dem Schalter, ein an
   assert.equal(plain.last_error, 'network down', 'kein Hinweis, wo er nicht hingehoert');
 });
 
+// --------------------------------------------------------------------------
+// DER FALL DES LETZTEN FEHLSCHLAGS (#1909, Migration 255). Die Konto-Karte
+// sagt ihn als Satz der App; `last_error` bleibt der rohe Text fuer Log und
+// API. Der Fake wirft dieselben KLASSEN wie die echten Adapter (Status aus
+// #request, Netzcode, BlockedAddressError, SyntaxError) - welche das sind,
+// messen test:recipe-provider-adapter und -tandoor-adapter am echten Server.
+// --------------------------------------------------------------------------
+
+const { BlockedAddressError } = await import('../server/utils/ssrf.js');
+
+function failingAdapter(makeError) {
+  return () => ({
+    testConnection: async () => ({ ok: false, status: 0, error: 'egal' }),
+    listRecipeSummaries: async () => { throw makeError(); },
+    getRecipe: async () => { throw new Error('sollte nicht aufgerufen werden'); },
+    recipeUrl: () => null,
+  });
+}
+const withStatus = (status) => Object.assign(new Error(`Mealie request failed (${status})`), { status });
+const withCode = (code) => Object.assign(new Error(`getaddrinfo ${code} mealie`), { code });
+const failureRow = (id) => conn.prepare(
+  'SELECT last_error, last_error_reason, last_error_params, last_sync FROM recipe_provider_accounts WHERE id = ?',
+).get(id);
+const statusOf = (id) => sync.getStatus().find((a) => a.id === id);
+
+test('syncOne(): ein Fehlschlag speichert seinen Fall neben dem Text, getStatus liefert ihn (#1909)', async () => {
+  const accountId = newAccount('FallJeKlasse');
+  for (const [makeError, reason, params] of [
+    [() => withStatus(401), 'recipe_providers_sync_auth_failed', null],
+    [() => withStatus(403), 'recipe_providers_sync_auth_failed', null],
+    [() => withStatus(404), 'recipe_providers_sync_wrong_url', null],
+    [() => withStatus(502), 'recipe_providers_sync_http_status', { status: 502 }],
+    [() => withCode('ENOTFOUND'), 'recipe_providers_sync_unreachable', null],
+    [() => withCode('ECONNREFUSED'), 'recipe_providers_sync_unreachable', null],
+    [() => withCode('DEPTH_ZERO_SELF_SIGNED_CERT'), 'recipe_providers_sync_certificate', null],
+    [() => new BlockedAddressError('192.168.0.9'), 'recipe_providers_private_network', null],
+    [() => new SyntaxError('Unexpected token < in JSON'), 'recipe_providers_sync_bad_response', null],
+  ]) {
+    _setAdapterFactory(failingAdapter(makeError));
+    const result = await sync.syncOne(accountId);
+    const err = makeError();
+    assert.equal(result.failed, true);
+    assert.equal(result.reason, reason, `${err.message}: Antwort`);
+    assert.deepEqual(result.params, params ?? undefined, `${err.message}: Zahlen in der Antwort`);
+    const row = failureRow(accountId);
+    assert.equal(row.last_error_reason, reason, `${err.message}: gespeichert`);
+    assert.equal(row.last_error_params, params ? JSON.stringify(params) : null);
+    assert.ok(row.last_error.startsWith(err.message), 'der rohe Text bleibt fuer Log und API');
+    const status = statusOf(accountId);
+    assert.equal(status.lastError, row.last_error);
+    assert.equal(status.lastErrorReason, reason);
+    assert.deepEqual(status.lastErrorParams, params, 'die Zahlen kommen als Objekt, nicht als JSON-Text');
+  }
+});
+
+test('syncOne(): ein Fehlschlag ohne bekannten Fall raeumt den alten Fall ab, ein Erfolg leert alle drei (#1909)', async () => {
+  const accountId = newAccount('FallWechsel');
+  _setAdapterFactory(failingAdapter(() => withStatus(503)));
+  await sync.syncOne(accountId);
+  assert.equal(failureRow(accountId).last_error_reason, 'recipe_providers_sync_http_status');
+
+  // Ein Wurf, den niemand einordnet: der Text ist neu, der alte Fall darf
+  // nicht stehen bleiben - sonst sagte die Karte den Satz von vorhin.
+  _setAdapterFactory(failingAdapter(() => new TypeError('body.items is not iterable')));
+  await sync.syncOne(accountId);
+  let row = failureRow(accountId);
+  assert.equal(row.last_error, 'body.items is not iterable');
+  assert.equal(row.last_error_reason, null);
+  assert.equal(row.last_error_params, null);
+  assert.equal(statusOf(accountId).lastErrorReason, null);
+  assert.equal(statusOf(accountId).lastErrorParams, null);
+
+  _setAdapterFactory(failingAdapter(() => withStatus(500)));
+  await sync.syncOne(accountId);
+  _setAdapterFactory(fakeAdapter([], {}));
+  const ok = await sync.syncOne(accountId);
+  assert.equal(ok.failed, false);
+  row = failureRow(accountId);
+  assert.ok(row.last_sync);
+  assert.deepEqual([row.last_error, row.last_error_reason, row.last_error_params], [null, null, null]);
+  const status = statusOf(accountId);
+  assert.deepEqual([status.lastError, status.lastErrorReason, status.lastErrorParams], [null, null, null]);
+});
+
+test('getStatus(): unlesbare Zahlen werden null, ein Fall ohne Text zaehlt nicht (#1909)', () => {
+  const accountId = newAccount('FallKaputt');
+  conn.prepare(`UPDATE recipe_provider_accounts SET last_error = 'x', last_error_reason = 'recipe_providers_sync_http_status',
+    last_error_params = '{kaputt' WHERE id = ?`).run(accountId);
+  assert.equal(statusOf(accountId).lastErrorParams, null);
+  conn.prepare("UPDATE recipe_provider_accounts SET last_error_params = '[502]' WHERE id = ?").run(accountId);
+  assert.equal(statusOf(accountId).lastErrorParams, null, 'ein Array ist kein Zahlen-Objekt');
+  conn.prepare('UPDATE recipe_provider_accounts SET last_error = NULL WHERE id = ?').run(accountId);
+  assert.equal(statusOf(accountId).lastErrorReason, null);
+});
+
 // =========================================================================
 // Die bestaetigte Zuordnung Zutat -> Vorratszeile (#1314) am Spiegel-Weg
 // =========================================================================
