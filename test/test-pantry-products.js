@@ -526,7 +526,11 @@ test('the demo seed gives every batch its product and wipes the products with th
   file.close();
 
   const seed = () => {
-    const run = spawnSync(process.execPath, [resolve(ROOT, 'scripts/seed-demo.js'), '--db', dbPath], { cwd: ROOT, encoding: 'utf8' });
+    // Der Seed liest `.env` wie der Server (#2114); ein leerer Wert hält einen
+    // Schlüssel aus einer lokalen `.env` von dieser unverschlüsselten Datei fern.
+    const run = spawnSync(process.execPath, [resolve(ROOT, 'scripts/seed-demo.js'), '--db', dbPath], {
+      cwd: ROOT, encoding: 'utf8', env: { ...process.env, DB_ENCRYPTION_KEY: '' },
+    });
     assert.equal(run.status, 0, `seed-demo.js failed:\n${run.stderr}`);
   };
   const read = () => {
