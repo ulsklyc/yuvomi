@@ -89,6 +89,7 @@ function resetPantry() {
   __test.intents.clear();
   __test.resetLoadOrderForTest();
   __test.state.items = [];
+  __test.state.products = [];
   __test.state.locations = [];
   __test.state.categories = [];
   __test.state.filter = 'all';
@@ -573,7 +574,7 @@ test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - au
     const fields = {};
     const panel = {
       querySelector: (sel) => {
-        fields[sel] ??= { value: '', addEventListener() {} };
+        fields[sel] ??= { value: '', dataset: {}, addEventListener() {} };
         return fields[sel];
       },
     };
@@ -702,7 +703,7 @@ test('#1997: Artikel speichern - eine spaete Antwort schliesst nur mit dem Konte
     const felder = {};
     const panel = {
       querySelector: (sel) => {
-        felder[sel] ??= { value: '', addEventListener(typ, fn) { klicks[sel] = fn; } };
+        felder[sel] ??= { value: '', dataset: {}, addEventListener(typ, fn) { klicks[sel] = fn; } };
         return felder[sel];
       },
       querySelectorAll: () => [],
@@ -768,7 +769,12 @@ const batch = (id, productId, extra) => ({
   category: 'Sonstiges', location_id: null, location_name: null, notes: null, ...extra,
 });
 
-/** Milk in two places (one batch expired), passata twice in one place, butter once, toothpaste with none. */
+/**
+ * Milk in two places (one batch expired), passata twice in one place, butter
+ * once, toothpaste with none. Since step 3 the minimum is the product's and the
+ * API returns it on every batch: milk 3 l against 4 is low, toothpaste (none
+ * left) has a minimum of 3.
+ */
 function groupedPantry() {
   resetPantry();
   __test.expandedProducts.clear();
@@ -776,14 +782,14 @@ function groupedPantry() {
   __test.state.locations = LOCS;
   __test.state.todayKey = '2026-10-19';
   __test.state.products = [
-    { id: 10, name: 'Milch', unit: 'l', category: 'Milchprodukte', batch_count: 2 },
-    { id: 11, name: 'Passata', unit: 'can', category: 'Sonstiges', batch_count: 2 },
-    { id: 12, name: 'Butter', unit: 'pcs', category: 'Milchprodukte', batch_count: 1 },
-    { id: 13, name: 'Zahnpasta', unit: 'pcs', category: 'Haushalt', batch_count: 0 },
+    { id: 10, name: 'Milch', unit: 'l', category: 'Milchprodukte', batch_count: 2, min_quantity: 4 },
+    { id: 11, name: 'Passata', unit: 'can', category: 'Sonstiges', batch_count: 2, min_quantity: null },
+    { id: 12, name: 'Butter', unit: 'pcs', category: 'Milchprodukte', batch_count: 1, min_quantity: null },
+    { id: 13, name: 'Zahnpasta', unit: 'pcs', category: 'Haushalt', batch_count: 0, min_quantity: 3 },
   ];
   __test.state.items = [
-    batch(1, 10, { name: 'Milch', unit: 'l', quantity: 2, category: 'Milchprodukte', location_id: 2, location_name: 'Dachboden', expires_on: '2026-10-28' }),
-    batch(2, 10, { name: 'Milch', unit: 'l', quantity: 1, category: 'Milchprodukte', location_id: 1, location_name: 'Garage', expires_on: '2026-10-18', min_quantity: 1 }),
+    batch(1, 10, { name: 'Milch', unit: 'l', quantity: 2, category: 'Milchprodukte', location_id: 2, location_name: 'Dachboden', expires_on: '2026-10-28', min_quantity: 4 }),
+    batch(2, 10, { name: 'Milch', unit: 'l', quantity: 1, category: 'Milchprodukte', location_id: 1, location_name: 'Garage', expires_on: '2026-10-18', min_quantity: 4 }),
     batch(3, 11, { name: 'Passata', unit: 'can', quantity: 2, location_id: 3, location_name: 'Speisekammer', expires_on: '2026-11-08' }),
     batch(4, 11, { name: 'Passata', unit: 'can', quantity: 4, location_id: 3, location_name: 'Speisekammer', expires_on: '2027-08-15' }),
     batch(5, 12, { name: 'Butter', category: 'Milchprodukte', location_id: 1, location_name: 'Garage' }),
@@ -866,12 +872,17 @@ test('#1448: mehrere Chargen - eine Produktzeile mit Summe, zugeklappt, die Char
   assert.match(total, /"quantity":"3 /, '2 l + 1 l');
   assert.match(textOf(byClass(el, 'pantry-product__where')[0]), /pantry\.productPlaces\{"count":2\}/, 'zwei Orte');
 
-  // Die Produktzeile hat in Schritt 2 keine Bedienung: kein Stepper, kein Warenkorb, kein Wisch.
+  // Die Produktzeile hat keinen Stepper und keinen Wisch; seit Schritt 3 den
+  // Warenkorb des Produkts (3 l gegen ein Minimum von 4), neben dem Knopf.
   const head = el.children[0];
-  for (const cls of ['pantry-stepper', 'pantry-row__cart', 'swipe-row', 'swipe-reveal']) {
+  for (const cls of ['pantry-stepper', 'swipe-row', 'swipe-reveal']) {
     assert.equal(byClass(head, cls).length, 0, `kein ${cls} an der Produktzeile`);
   }
   assert.doesNotMatch(el.className, /swipe-row/);
+  const [productCart] = byClass(head, 'pantry-row__cart');
+  assert.equal(productCart.dataset.action, 'to-shopping-product');
+  assert.equal(productCart.dataset.productId, '10');
+  assert.ok(!nodesOf(toggle).includes(productCart), 'der Warenkorb steht neben dem Knopf, nicht darin');
 
   const rows = region.children;
   assert.equal(rows.length, 2);
@@ -883,7 +894,10 @@ test('#1448: mehrere Chargen - eine Produktzeile mit Summe, zugeklappt, die Char
   }
   const first = rows[0];
   assert.equal(textOf(byClass(first, 'list-row__name')[0]), 'Milch: Garage', 'benannt nach dem Ort, der Produktname fuer Screenreader');
-  assert.equal(byClass(first, 'pantry-row__cart').length, 1, 'die abgelaufene, knappe Charge behaelt ihren Warenkorb');
+  assert.equal(byClass(first, 'pantry-row__cart').length, 0, 'keine Charge traegt einen Warenkorb: knapp ist das Produkt');
+  assert.deepEqual(byClass(first, 'pantry-badge').map(textOf), ['pantry.badgeExpiredYesterday'],
+    'die Charge behaelt ihr Ablauf-Badge, aber kein "Fast leer"');
+  assert.equal(byClass(rows[1], 'pantry-badge').length, 0, 'die andere Charge: nichts');
   assert.match(textOf(byClass(first, 'pantry-row__date')[0]), /2026/, 'das MHD bleibt an der Charge stehen');
   assert.equal(byClass(first, 'pantry-row__expiry').length, 0, 'nicht als der Knoten, den die schmale Zeile weglaesst');
   const plus = nodesOf(first).find((n) => n.dataset?.action === 'increase');
@@ -967,6 +981,7 @@ test('#1448: ein Produkt ohne Charge steht als "Leer" mit 0 und einem Warenkorb,
   assert.match(row.className, /\bpantry-row--out\b/);
   assert.equal(textOf(byClass(el, 'pantry-badge')[0]), 'pantry.badgeOut');
   assert.match(textOf(byClass(el, 'pantry-row__quantity')[0]), /^0 /, 'null in seiner Einheit');
+  assert.match(textOf(byClass(el, 'pantry-product__min')[0]), /^ · pantry\.minimumShort\{"quantity":"3 /, 'mit seinem Minimum (Schritt 3)');
   assert.equal(byClass(el, 'pantry-stepper').length, 0, 'nichts zu buchen');
   assert.match(el.className, /\bswipe-row\b/, 'wegwischen loescht das leere Produkt (Review #2085, unten)');
   const [cart] = byClass(el, 'pantry-row__cart');
@@ -974,7 +989,7 @@ test('#1448: ein Produkt ohne Charge steht als "Leer" mit 0 und einem Warenkorb,
   assert.equal(cart.dataset.productId, '13');
   assert.match(cart.getAttribute('aria-label'), /Zahnpasta$/);
 
-  // Der Weg in den Einkauf: per Produkt-ID, ohne Menge.
+  // Der Weg in den Einkauf: per Produkt-ID, mit der Fehlmenge zum Minimum.
   let posted = null;
   globalThis.__apiStub = {
     get: async () => ({ data: [{ id: 7, name: 'Wocheneinkauf' }] }),
@@ -991,7 +1006,10 @@ test('#1448: ein Produkt ohne Charge steht als "Leer" mit 0 und einem Warenkorb,
   } finally {
     global.window.yuvomi = yuvomi;
   }
-  assert.deepEqual(posted, { path: '/shopping/7/import-pantry', body: { items: [{ pantry_product_id: 13 }] } });
+  assert.equal(posted.path, '/shopping/7/import-pantry');
+  assert.equal(posted.body.items.length, 1);
+  assert.equal(posted.body.items[0].pantry_product_id, 13);
+  assert.match(posted.body.items[0].quantity, /^3 /, 'die Fehlmenge: 3 gegen ein Minimum von 3');
   assert.equal(toast?.tone, 'success', 'die Meldung des geteilten Uebertrags');
 });
 
@@ -1000,7 +1018,8 @@ test('#1448: mit Filter bleibt die Liste flach je Charge; Ort und Produktsumme s
   __test.state.filter = 'expired';
   const expired = __test.state.items[1];
   const opts = __test.rowOptions(expired);
-  assert.deepEqual(opts, { batch: false, byDate: false, total: 3 }, 'keine Chargen-Zeile, aber die Summe des Produkts');
+  assert.deepEqual(opts, { batch: false, byDate: false, total: 3, stock: null },
+    'keine Chargen-Zeile, aber die Summe des Produkts; kein Bestand: knapp ist das Produkt, nicht diese Charge');
   const el = __test.rowEl(expired, opts);
   assert.match(el.children.at(-1).className, /^list-row pantry-row$/);
   assert.equal(textOf(byClass(el, 'list-row__name')[0]), 'Milch', 'der Name des Produkts, nicht der Ort');
@@ -1046,7 +1065,7 @@ test('#1448: renderList zeichnet ohne Filter Produkte in Kategorie-Abschnitten, 
   assert.equal(byClass(list, 'pantry-product--empty').length, 4, 'alle vier als Leer, kein Leerzustand');
 });
 
-test('#1448: die zugeklappte Produktzeile zeigt das dringendste MHD ihrer Chargen, nie "Fast leer"', () => {
+test('#1448: die zugeklappte Produktzeile zeigt das dringendste MHD ihrer Chargen und den Bestand des Produkts', () => {
   groupedPantry();
   // Milch: eine Charge gestern abgelaufen (und knapp), eine laeuft in zwei Tagen ab.
   __test.state.items[0].expires_on = '2026-10-21';
@@ -1055,16 +1074,23 @@ test('#1448: die zugeklappte Produktzeile zeigt das dringendste MHD ihrer Charge
   const head = el.children[0];
   const [slot] = byClass(head, 'pantry-product__badges');
   const badges = byClass(slot, 'pantry-badge');
-  assert.equal(badges.length, 1, 'ein Badge: das dringendste');
-  assert.equal(textOf(badges[0]), 'pantry.badgeExpiredYesterday', 'abgelaufen schlaegt bald');
+  assert.deepEqual(badges.map(textOf), ['pantry.badgeExpiredYesterday', 'pantry.badgeLow'],
+    'das dringendste MHD (abgelaufen schlaegt bald) und "Fast leer" des Produkts: 3 l gegen 4');
   assert.match(badges[0].className, /pantry-badge--danger/);
+  assert.match(badges[1].className, /pantry-badge--warning/);
   assert.ok(nodesOf(byClass(head, 'pantry-product__toggle')[0]).includes(slot), 'im Knopf: der Screenreader liest es mit dem Namen');
-  assert.ok(!nodesOf(head).some((n) => /pantry\.badge(Low|Out)/.test(n.textContent ?? '')), 'kein Fast leer / Leer an der Produktzeile (Schritt 3)');
 
   // Nur bald: das Badge der Charge, die zuerst ablaeuft.
   __test.state.items[1].expires_on = '2026-10-23';
   const soon = __test.productEl(__test.productSections(__test.state.items)[0].products[1]);
   assert.equal(textOf(byClass(byClass(soon, 'pantry-product__badges')[0], 'pantry-badge')[0]), 'pantry.badgeExpiresDays{"count":2}');
+
+  // Gegenprobe zum Bestand: mit 5 l ist die Milch nicht mehr knapp, und der Warenkorb geht.
+  __test.state.items[0].quantity = 4;
+  const enough = __test.productEl(__test.productSections(__test.state.items)[0].products[1]).children[0];
+  assert.ok(!byClass(enough, 'pantry-badge').some((b) => /badge(Low|Out)/.test(textOf(b))));
+  assert.equal(byClass(enough, 'pantry-row__cart').length, 0);
+  __test.state.items[0].quantity = 2;
 
   // Gegenprobe: alle Chargen in Ordnung (Passata, Monate hin) - kein Badge.
   const passata = __test.productSections(__test.state.items)[2].products[0];
@@ -1098,14 +1124,15 @@ test('#1448: im Rueckgaengig-Fenster zaehlt die Produktzeile die geloeschte Char
     __test.refreshProductTotals(expired, { speak: false });
     assert.match(textOf(total), /"quantity":"2 /, 'nur noch die 2 l im Dachboden');
     assert.match(textOf(where), /pantry\.productBatches\{"count":1\}.*Dachboden/, 'eine Charge an einem Ort');
-    assert.equal(byClass(slot, 'pantry-badge').length, 0, 'das Abgelaufen-Badge geht mit der Charge');
+    assert.deepEqual(byClass(slot, 'pantry-badge').map(textOf), ['pantry.badgeLow'],
+      'das Abgelaufen-Badge geht mit der Charge; 2 l gegen 4 bleiben knapp');
 
     // Rueckgaengig: alles zurueck.
     __test.pendingDeletes.delete(expired.id);
     __test.refreshProductTotals(expired, { speak: false });
     assert.match(textOf(total), /"quantity":"3 /);
     assert.match(textOf(where), /pantry\.productPlaces\{"count":2\}/);
-    assert.equal(textOf(byClass(slot, 'pantry-badge')[0]), 'pantry.badgeExpiredYesterday');
+    assert.deepEqual(byClass(slot, 'pantry-badge').map(textOf), ['pantry.badgeExpiredYesterday', 'pantry.badgeLow']);
   } finally {
     __test.pendingDeletes.clear();
   }
@@ -1391,4 +1418,245 @@ test('#2085: renderList keeps the scroll position of the chip row, so the active
   __test.renderList();
   assert.equal(list.children[0], chipRow);
   assert.equal(chipRow.scrollLeft, 558, 'where renderFilters() scrolled the active chip to');
+});
+
+// --------------------------------------------------------
+// #1448 Schritt 3: das Minimum am Produkt, knapp und leer ueber die Summe
+// --------------------------------------------------------
+
+test('#1448/3: eine einzelne Charge sagt "Fast leer", wenn ihr PRODUKT knapp ist, mit Warenkorb', () => {
+  groupedPantry();
+  // Butter: eine Charge (1), Produkt-Minimum 1 -> knapp.
+  __test.state.products[2].min_quantity = 1;
+  __test.state.items[4].min_quantity = 1;
+  const butter = __test.productSections(__test.state.items)[0].products[0];
+  const el = __test.productEl(butter);
+  assert.deepEqual(byClass(el, 'pantry-badge').map(textOf), ['pantry.badgeLow']);
+  const [cart] = byClass(el, 'pantry-row__cart');
+  assert.equal(cart.dataset.action, 'to-shopping', 'die eigene Zeile des Produkts: der Warenkorb der Charge wie bisher');
+  // Gegenprobe: Minimum weg, nichts mehr.
+  __test.state.products[2].min_quantity = null;
+  __test.state.items[4].min_quantity = null;
+  const calm = __test.productEl(__test.productSections(__test.state.items)[0].products[0]);
+  assert.equal(byClass(calm, 'pantry-badge').length, 0);
+  assert.equal(byClass(calm, 'pantry-row__cart').length, 0);
+});
+
+test('#1448/3: Milch 1 l + 1 l + 2 l bei Minimum 5 ist knapp; jede Charge fuer sich bleibt ohne "Fast leer"', () => {
+  groupedPantry();
+  __test.state.products[0].min_quantity = 5;
+  __test.state.items = __test.state.items.filter((i) => i.product_id !== 10).concat([
+    batch(21, 10, { name: 'Milch', unit: 'l', quantity: 1, category: 'Milchprodukte', location_id: 1, location_name: 'Garage', min_quantity: 5 }),
+    batch(22, 10, { name: 'Milch', unit: 'l', quantity: 1, category: 'Milchprodukte', location_id: 1, location_name: 'Garage', min_quantity: 5 }),
+    batch(23, 10, { name: 'Milch', unit: 'l', quantity: 2, category: 'Milchprodukte', location_id: 2, location_name: 'Dachboden', min_quantity: 5 }),
+  ]);
+  const milk = __test.productSections(__test.state.items)[0].products.find((p) => p.name === 'Milch');
+  assert.deepEqual({ total: milk.stock.total, low: milk.stock.low }, { total: 4, low: true });
+  const el = __test.productEl(milk);
+  const head = el.children[0];
+  assert.deepEqual(byClass(head, 'pantry-badge').map(textOf), ['pantry.badgeLow']);
+  const region = byClass(el, 'pantry-batches')[0];
+  for (const wrap of region.children) {
+    assert.equal(byClass(wrap, 'pantry-badge').length, 0, 'keine Charge sagt "Fast leer"');
+    assert.equal(byClass(wrap, 'pantry-row__cart').length, 0);
+  }
+
+  // Der Warenkorb des Produkts schickt das Produkt mit seiner Fehlmenge: 5 - 4 = 1 l.
+  const entry = __test.shoppingEntry(milk);
+  assert.equal(entry.pantry_product_id, 10);
+  assert.equal(entry.pantry_item_id, undefined);
+  assert.match(entry.quantity, /^1 /);
+  // Ein Produkt mit einer Charge geht ueber die Charge, wie ihr eigener Warenkorb.
+  __test.state.products[2].min_quantity = 2;
+  __test.state.items.find((i) => i.id === 5).min_quantity = 2;
+  const butter = __test.productSections(__test.state.items)[0].products.find((p) => p.name === 'Butter');
+  const butterEntry = __test.shoppingEntry(butter);
+  assert.equal(butterEntry.pantry_item_id, 5);
+  assert.equal(butterEntry.pantry_product_id, undefined);
+  assert.match(butterEntry.quantity, /^1 /, '2 - 1');
+});
+
+test('#2118: ein leeres Produkt ohne Minimum steht schlicht da - kein "Leer", kein Warenkorb, kein Zaehler', () => {
+  // Review of #2118, point 3: a product without batches and without a minimum
+  // tells nobody that something is missing. It stays listed (and deletable),
+  // without the badge, the tint and the cart, and counts in no chip.
+  for (const min of [null, 0]) {
+    groupedPantry();
+    __test.state.products[3].min_quantity = min;
+    const tooth = __test.productSections(__test.state.items)[1].products[0];
+    assert.equal(tooth.stock.out, false, `min ${min}: nicht leer`);
+    assert.equal(tooth.stock.low, false);
+    const el = __test.productEl(tooth);
+    assert.doesNotMatch(el.children[0].className, /\bpantry-row--out\b/, `min ${min}: keine Leer-Toenung`);
+    assert.equal(byClass(el, 'pantry-badge').length, 0, `min ${min}: kein Badge`);
+    assert.match(textOf(byClass(el, 'pantry-row__quantity')[0]), /^0 /, 'die 0 in seiner Einheit bleibt');
+    assert.equal(byClass(el, 'pantry-row__cart').length, 0, `min ${min}: kein Warenkorb`);
+    assert.match(el.className, /\bswipe-row\b/, 'loeschbar bleibt es (#2085)');
+    assert.equal(byClass(el, 'pantry-product__actions').length, 1, 'die Aktionszone traegt den Mehr-Knopf');
+    assert.equal(__test.filterCounts().low, 1, `min ${min}: "Fast leer" zaehlt nur die Milch`);
+    assert.deepEqual(__test.lowProducts().map((p) => p.name), ['Milch']);
+  }
+  // The zone without a cart takes no room, but not when it carries the more
+  // button: the plain row would lose its delete (seen in the browser).
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const hide = /\.pantry-product__actions:not\(:has\(([^)]*)\)\)\s*\{\s*display:\s*none/.exec(css);
+  assert.ok(hide, 'the rule that hides an empty actions zone');
+  assert.match(hide[1], /\.row-action--more/, 'it spares the zone with the more button');
+
+  // With a minimum above 0 it is out again: the badge and the cart are back.
+  groupedPantry();
+  const tooth = __test.productSections(__test.state.items)[1].products[0];
+  const el = __test.productEl(tooth);
+  assert.equal(textOf(byClass(el, 'pantry-badge')[0]), 'pantry.badgeOut');
+  assert.equal(byClass(el, 'pantry-row__cart').length, 1);
+  assert.equal(__test.filterCounts().low, 2);
+});
+
+test('#1448/3: der Chip "Fast leer" listet PRODUKTE, die Pille schickt je Produkt eine Zeile', () => {
+  groupedPantry();
+  // Milch knapp (3 gegen 4), Zahnpasta leer; Passata und Butter ohne Minimum.
+  const counts = __test.filterCounts();
+  assert.equal(counts.low, 2, 'zwei Produkte, nicht die zwei Milch-Chargen plus Zahnpasta');
+  assert.equal(counts.expired, 1, 'abgelaufen zaehlt weiter Chargen');
+
+  const list = makeNode();
+  list.querySelector = () => null;
+  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
+  __test.state.filter = 'low';
+  const pills = [];
+  globalThis.__bulkPill = (opts) => pills.push(opts);
+  __test.renderList();
+  const flat = list.children.filter((c) => hasClass(c, 'pantry-group'));
+  assert.equal(flat.length, 1, 'ein flacher Abschnitt');
+  assert.equal(byClass(flat[0], 'list-group__title').length, 0, 'ohne Ueberschrift');
+  const rows = flat[0].children[0].children;
+  assert.deepEqual(rows.map((r) => r.dataset.productKey), ['p13', 'p10'], 'leer zuerst, dann der kleinste Anteil am Minimum');
+  assert.equal(byClass(rows[1], 'pantry-product__toggle').length, 1, 'Milch als Produktzeile mit ihren Chargen');
+  for (const wrap of byClass(rows[1], 'pantry-batches')[0].children) {
+    assert.match(wrap.children.at(-1).className, /pantry-row--batch/, 'die Chargen bleiben Chargen-Zeilen');
+  }
+  assert.ok(hasClass(rows[0], 'pantry-product--empty'), 'Zahnpasta ist dabei, als leeres Produkt');
+
+  // Ein Schritt in einer Charge unter dem Produkt zeichnet sie als Charge neu.
+  assert.equal(__test.rowOptions(__test.state.items[0]).batch, true);
+
+  // Die Sammelaktion: eine Zeile je Produkt, mit der Fehlmenge des Produkts.
+  const entries = __test.lowProducts().map(__test.shoppingEntry);
+  assert.deepEqual(entries.map((e) => e.pantry_product_id), [13, 10]);
+  assert.match(entries[1].quantity, /^1 /, '4 - 3 = 1 l fuer die Milch, einmal');
+  delete globalThis.__bulkPill;
+});
+
+test('#1448/3: der Dialog zeigt das Minimum des Produkts und schickt es nur, wenn es geaendert wurde', async () => {
+  groupedPantry();
+  const fields = {};
+  const panel = {
+    querySelector: (sel) => {
+      fields[sel] ??= { value: '', dataset: {}, disabled: false, addEventListener() {} };
+      return fields[sel];
+    },
+  };
+  const opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  const sent = [];
+  globalThis.__apiStub = {
+    put: async (path, body) => { sent.push({ path, body }); return { data: __test.state.items[1] }; },
+    post: async (path, body) => { sent.push({ path, body }); return { data: { id: 99 } }; },
+    get: async () => ({ data: __test.state.items, products: __test.state.products, locations: LOCS, categories: CATS }),
+  };
+  const yuvomi = global.window.yuvomi;
+  global.window.yuvomi = { showToast() {} };
+  try {
+    const row = { dataset: { id: '2' } };
+    const editBtn = { dataset: { action: 'edit' }, closest: (sel) => (sel === '.pantry-row[data-id]' ? row : null) };
+    __test.onListClick({ target: { closest: (sel) => (sel === '[data-action]' ? editBtn : null) } });
+    opened[0].onSave(panel);
+    assert.equal(fields['#pantry-min'].value, '4', 'das Minimum des Produkts');
+    fields['#pantry-name'].value = 'Milch';
+    await __test.saveItem(panel, 'edit', __test.state.items[1]);
+    assert.equal('min_quantity' in sent[0].body, false, 'unveraendert: nicht geschickt, das Produkt behaelt seines');
+
+    fields['#pantry-min'].value = '6';
+    await __test.saveItem(panel, 'edit', __test.state.items[1]);
+    assert.equal(sent[1].body.min_quantity, 6, 'geaendert: geschickt, fuer das ganze Produkt');
+    fields['#pantry-min'].value = '';
+    await __test.saveItem(panel, 'edit', __test.state.items[1]);
+    assert.equal(sent[2].body.min_quantity, null, 'geleert: geloescht');
+
+    // Neu angelegt: das leere Feld schickt nichts, eine Zahl setzt es.
+    __test.openItemModal('create');
+    const createFields = {};
+    const createPanel = { querySelector: (sel) => { createFields[sel] ??= { value: '', dataset: {}, addEventListener() {} }; return createFields[sel]; } };
+    opened.at(-1).onSave(createPanel);
+    createFields['#pantry-name'].value = 'Milch';
+    await __test.saveItem(createPanel, 'create', null);
+    assert.equal('min_quantity' in sent.at(-1).body, false, 'eine neue Charge ueberschreibt das Minimum ihres Produkts nicht');
+  } finally {
+    global.window.yuvomi = yuvomi;
+    delete globalThis.__apiStub;
+  }
+});
+
+test('#1448/3: "Fast leer" ordnet nach dem Anteil am Minimum, nicht nach der rohen Menge', () => {
+  resetPantry();
+  __test.state.todayKey = '2026-10-19';
+  __test.state.products = [
+    { id: 1, name: 'Reis', unit: 'kg', category: 'Sonstiges', min_quantity: 10 },     // 2 von 10: 0,2
+    { id: 2, name: 'Olivenoel', unit: 'bottle', category: 'Sonstiges', min_quantity: 1 }, // 1 von 1: 1
+    { id: 3, name: 'Passata', unit: 'can', category: 'Sonstiges', min_quantity: 4 },  // 3 von 4: 0,75
+    { id: 4, name: 'Mehl', unit: 'kg', category: 'Sonstiges', min_quantity: 5 },      // 1 von 5: 0,2, Name vor Reis
+    { id: 5, name: 'Salz', unit: 'pcs', category: 'Sonstiges', min_quantity: 2 },     // leer, mit Minimum
+    { id: 6, name: 'Pfeffer', unit: 'pcs', category: 'Sonstiges', min_quantity: null }, // leer, ohne Minimum: nicht dabei (#2118)
+  ];
+  __test.state.items = [
+    { id: 11, product_id: 1, name: 'Reis', unit: 'kg', quantity: 2, min_quantity: 10, category: 'Sonstiges' },
+    { id: 12, product_id: 2, name: 'Olivenoel', unit: 'bottle', quantity: 1, min_quantity: 1, category: 'Sonstiges' },
+    { id: 13, product_id: 3, name: 'Passata', unit: 'can', quantity: 3, min_quantity: 4, category: 'Sonstiges' },
+    { id: 14, product_id: 4, name: 'Mehl', unit: 'kg', quantity: 1, min_quantity: 5, category: 'Sonstiges' },
+  ];
+  __test.state.filter = 'low';
+  assert.deepEqual(__test.lowProducts().map((p) => p.name), ['Salz', 'Mehl', 'Reis', 'Passata', 'Olivenoel'],
+    'leer zuerst, dann 0,2 (gleich: nach Namen), 0,75, 1 - nach roher Menge stuende das Oel (1) vor dem Reis (2)');
+});
+
+test('#2118: a flat list builds the product stock once per render, not once per row', () => {
+  groupedPantry();
+  // rowOptions() reads the stock the caller passes in, and builds its own only without one.
+  const marker = new Map([['p12', { out: false, low: true, total: 1, min: 9 }]]);
+  const butter = __test.state.items.find((i) => i.id === 5);
+  assert.equal(__test.rowOptions(butter, undefined, marker).stock, marker.get('p12'), 'the map passed in is read');
+  assert.equal(__test.rowOptions(butter).stock.low, false, 'without one it builds its own, as before');
+
+  // The render: n products with one batch each in one place, under its chip.
+  // productStock() filters the batches once per call, so the number of
+  // filter() calls on the batches must not grow with the rows.
+  const filterCalls = (n) => {
+    resetPantry();
+    __test.state.todayKey = '2026-10-19';
+    __test.state.locations = LOCS;
+    __test.state.categories = CATS;
+    __test.state.products = Array.from({ length: n }, (_, i) => ({ id: 100 + i, name: `P${i}`, unit: 'pcs', category: 'Sonstiges', min_quantity: null }));
+    const items = Array.from({ length: n }, (_, i) => batch(200 + i, 100 + i, { name: `P${i}`, location_id: 1, location_name: 'Garage' }));
+    const list = makeNode();
+    list.querySelector = () => null;
+    list.replaceChildren = (...kids) => { list.children = [...kids]; };
+    __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
+    __test.state.filter = 'place:1';
+    let calls = 0;
+    __test.state.items = new Proxy(items, {
+      get(target, key, receiver) {
+        if (key === 'filter') calls += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    try {
+      __test.renderList();
+      assert.equal(list.children.length > 0, true, 'the place lists its batches');
+    } finally {
+      __test.state.items = items;
+    }
+    return calls;
+  };
+  assert.equal(filterCalls(8), filterCalls(2), 'eight rows cost what two cost: one pass per render');
 });

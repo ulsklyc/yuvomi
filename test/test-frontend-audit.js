@@ -6256,11 +6256,34 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
   // die Leiste eine andere Zahl als die Filter-Chips daneben.
   const status = read('../public/utils/pantry-status.js');
   assert.match(status, /const out = quantity <= 0/);
-  assert.match(route, /quantity <= 0/, 'leer: dieselbe Bedingung wie pantryItemStatus');
+  assert.match(route, /quantity <= 0/, 'leer: dieselbe Bedingung wie pantryStockStatus');
   assert.match(route, /min_quantity IS NOT NULL AND quantity <= min_quantity/,
-    'fast leer: dieselbe Bedingung wie pantryItemStatus');
-  assert.match(route, /expires_on IS NOT NULL AND expires_on < \?/,
+    'fast leer: dieselbe Bedingung wie pantryStockStatus');
+  assert.match(route, /expires_on IS NOT NULL AND (pi\.)?expires_on < \?/,
     'abgelaufen: reiner Stringvergleich wie im Client (YYYY-MM-DD ist lexikografisch chronologisch)');
+  // #1448, step 3: low and out are a PRODUCT's, read over the sum of its
+  // batches against the product's minimum, on both sides. The route builds one
+  // row per product (a product without batches included, total 0) and rounds
+  // the sum as normalizePantryQuantity does; the client sums per product key.
+  assert.match(route, /FROM pantry_products p\s+LEFT JOIN pantry_items pi ON pi\.product_id = p\.id\s+GROUP BY p\.id/,
+    'die Leiste zaehlt knapp und leer je Produkt, nicht je Charge');
+  assert.match(route, /ROUND\(COALESCE\(SUM\(pi\.quantity\), 0\), 2\) AS quantity/,
+    'die Summe gerundet wie normalizePantryQuantity');
+  assert.match(route, /p\.min_quantity AS min_quantity/, 'das Minimum des Produkts, nicht der Charge');
+  assert.match(status, /export function pantryProductStock[\s\S]*?normalizePantryQuantity\(sum, \{ fallback: 0 \}\)[\s\S]*?pantryStockStatus\(entry\.total, entry\.min\)/,
+    'der Client liest knapp und leer ueber die gerundete Summe des Produkts');
+  // "One item needing attention, not two": attention counts the product rows.
+  assert.match(route, /WHEN expired > 0 OR is_out OR is_low/, 'attention: ein Produkt einmal, abgelaufen oder knapp oder leer');
+  // #2118, point 3: a product without batches is out only when it has a
+  // minimum above 0, on both sides; a batch at 0 is out with or without one.
+  assert.match(route, /CASE WHEN batches > 0 THEN quantity <= 0 ELSE COALESCE\(min_quantity > 0, 0\) END AS is_out/,
+    'leer ohne Charge: nur mit Minimum ueber 0, wie hasPantryMinimum');
+  assert.match(status, /export function hasPantryMinimum[\s\S]*?return Number\.isFinite\(min\) && min > 0;/,
+    'der Client: ein Minimum ist nicht null und ueber 0');
+  assert.match(status, /entry\.batches\.length\s*\? pantryStockStatus\(entry\.total, entry\.min\)\s*: \{ out: hasPantryMinimum\(entry\.min\), low: false \}/,
+    'der Client: ein Produkt ohne Charge ist nur mit Minimum leer und nie knapp');
+  assert.match(status, /for \(const entry of pantryProductStock\(items, products\)\.values\(\)\) \{\s*if \(entry\.low \|\| entry\.out\) counts\.low \+= 1;/,
+    'der Chip "Fast leer" zaehlt Produkte wie die Leiste');
 
   // Kein Badge auf dem aktiven Tab: dort sagt die Seite es vollständiger, und eine
   // Zahl dort müsste nach jeder Mutation nachgezogen werden.
