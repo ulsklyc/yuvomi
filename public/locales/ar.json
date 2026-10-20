@@ -3285,6 +3285,12 @@
         "recipeProviderAccountDeleted": "تم حذف حساب مزوّد الوصفات.",
         "recipeProviderDeleteAccountConfirm": "سيؤدي هذا أيضًا إلى إزالة {{count}} وصفة معكوسة وفصلها عن أي إدخالات في خطة الوجبات.",
         "recipeProviderLastError": "آخر خطأ في المزامنة: {{message}}",
+        "recipeProviderErrorAccountGone": "حساب مزوّد الوصفات هذا لم يعد موجودًا.",
+        "recipeProviderErrorUrlInvalid": "يجب أن يبدأ رابط الخادم بـ http:// أو https://.",
+        "recipeProviderErrorExternalUrlInvalid": "يجب أن يبدأ رابط URL العام بـ http:// أو https://.",
+        "recipeProviderErrorPrivateNetwork": "يشير رابط الخادم إلى شبكة خاصة أو محلية. للسماح بذلك، اضبط RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true على الخادم.",
+        "recipeProviderErrorConnectionFailed": "تعذّر الاتصال بمزوّد الوصفات. تحقّق من رابط الخادم ورمز API.",
+        "recipeProviderErrorAccountExists": "يوجد بالفعل حساب مزوّد وصفات برابط الخادم هذا.",
         "invites": {
             "title": "الدعوات",
             "intro": "ادعُ أعضاء جددًا برابط. يختارون كلمة المرور بأنفسهم.",

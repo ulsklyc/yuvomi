@@ -4542,6 +4542,200 @@ test('#1997: Rezeptquellen - Konto anlegen und Link aendern schliessen nur mit d
   }
 });
 
+// -------------------------------------------------------------------------
+// #1909: die Rezeptdienste sagen den Satz der App, nie den des Servers
+// -------------------------------------------------------------------------
+
+// Bis dahin zeigte jeder gescheiterte Weg des Kuechenblatts `err.message` -
+// den englischen Text des Servers ("Base URL must start with http(s)://")
+// oder den des Browsers. Gefahren werden die ECHTEN Handler bis in ihr catch:
+// ein Fall mit `reason` wird sein Satz, alles andere der allgemeine Satz der
+// Stelle. Ein Konto, das ein anderer Admin inzwischen entfernt hat, laesst die
+// Liste frisch kommen, und sein Loeschen gilt als erledigt.
+const SERVER_SATZ = 'English text of the server';
+const absage = (status, reason) => Object.assign(new Error(SERVER_SATZ), {
+  status, data: reason ? { error: SERVER_SATZ, code: status, reason } : { error: SERVER_SATZ, code: status },
+});
+const KONTO_WEG = () => absage(404, 'recipe_providers_account_not_found');
+
+test('#1909: Rezeptdienst anlegen und Link aendern - der Satz zum Fall, sonst der allgemeine, nie der Servertext', async () => {
+  const { __test: kitchen } = await import('../public/settings/pages/modules-kitchen.js');
+  const { recipeProviders } = await import('/api.js');
+  const vorher = { createAccount: recipeProviders.createAccount, updateAccount: recipeProviders.updateAccount, window: globalThis.window };
+  const toasts = [];
+  globalThis.window = { ...(vorher.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+
+  const dialog = async (oeffne, formSel, fehlerSel, werte) => {
+    let opts = null;
+    globalThis.__openModal = (o) => { opts = o; };
+    try { await oeffne(); } finally { delete globalThis.__openModal; }
+    const handlers = {};
+    const els = {};
+    const el = (sel) => {
+      els[sel] ??= { value: '', hidden: true, textContent: '', addEventListener(type, fn) { handlers[`${sel}:${type}`] = fn; }, ...werte[sel] };
+      return els[sel];
+    };
+    opts.onSave({ querySelector: el, querySelectorAll: () => [], addEventListener() {} });
+    return { senden: () => handlers[`${formSel}:submit`]({ preventDefault() {} }), fehler: el(fehlerSel) };
+  };
+  const klicks = {};
+  const container = {
+    querySelector: (sel) => (sel === '#recipe-provider-add-account-btn' ? { addEventListener(type, fn) { klicks[type] = fn; } } : null),
+    querySelectorAll: () => [],
+  };
+  let nachgeladen = 0;
+  const anlegen = () => dialog(() => { kitchen.bindProviderAddButton(container); klicks.click(); }, '#recipe-provider-add-form', '#recipe-provider-add-error', {
+    '#recipe-provider-select': { value: 'mealie' }, '#recipe-provider-name': { value: 'Kueche' },
+    '#recipe-provider-url': { value: 'https://mealie.example' }, '#recipe-provider-external-url': { value: '' },
+    '#recipe-provider-token': { value: 'test-token' },
+  });
+  const link = () => dialog(() => kitchen.openProviderLinkModal({ id: 4, provider: 'mealie', externalUrl: '' }, async () => { nachgeladen += 1; }),
+    '#recipe-provider-link-form', '#recipe-provider-link-error', { '#recipe-provider-link-external-url': { value: 'cook.example' } });
+
+  const FAELLE = [
+    [anlegen, absage(400, 'recipe_providers_url_invalid'), 'settings.recipeProviderErrorUrlInvalid'],
+    [anlegen, absage(400, 'recipe_providers_external_url_invalid'), 'settings.recipeProviderErrorExternalUrlInvalid'],
+    [anlegen, absage(400, 'recipe_providers_private_network'), 'settings.recipeProviderErrorPrivateNetwork'],
+    [anlegen, absage(502, 'recipe_providers_connection_failed'), 'settings.recipeProviderErrorConnectionFailed'],
+    [anlegen, absage(409, 'recipe_providers_account_exists'), 'settings.recipeProviderErrorAccountExists'],
+    [anlegen, absage(400), 'common.errorGeneric'],
+    [anlegen, new TypeError('Failed to fetch'), 'common.errorGeneric'],
+    [link, absage(400, 'recipe_providers_external_url_invalid'), 'settings.recipeProviderErrorExternalUrlInvalid'],
+    [link, absage(400), 'common.errorGeneric'],
+    [link, new TypeError('Failed to fetch'), 'common.errorGeneric'],
+  ];
+  try {
+    for (const [weg, fehler, satz] of FAELLE) {
+      const { senden, fehler: zeile } = await weg();
+      const wurf = async () => { throw fehler; };
+      recipeProviders.createAccount = wurf;
+      recipeProviders.updateAccount = wurf;
+      const geschlossen = [];
+      globalThis.__closeModal = (o) => { geschlossen.push(o); };
+      try {
+        await senden();
+      } finally {
+        delete globalThis.__closeModal;
+      }
+      const name = `${weg === anlegen ? 'Anlegen' : 'Link'} / ${fehler.data?.reason ?? fehler.message}`;
+      assert.equal(zeile.textContent, satz, `${name}: die Fehlerzeile sagt den Satz der App`);
+      assert.equal(zeile.hidden, false, `${name}: die Fehlerzeile steht`);
+      assert.equal(geschlossen.length, 0, `${name}: der Dialog bleibt offen`);
+    }
+
+    // Das Konto ist weg, waehrend sein Link-Dialog offen war: an ihm ist nichts
+    // mehr zu aendern. Der Dialog geht zu (mit seinem Kontext), der Toast sagt
+    // warum, die Liste kommt frisch.
+    const { senden, fehler: zeile } = await link();
+    recipeProviders.updateAccount = async () => { throw KONTO_WEG(); };
+    toasts.length = 0;
+    nachgeladen = 0;
+    const geschlossen = [];
+    globalThis.__modalContextId = () => 'link-dialog';
+    globalThis.__closeModal = (o) => { geschlossen.push(o); };
+    try {
+      await senden();
+    } finally {
+      delete globalThis.__closeModal;
+      delete globalThis.__modalContextId;
+    }
+    assert.deepEqual(toasts, [['settings.recipeProviderErrorAccountGone', 'danger']]);
+    assert.equal(nachgeladen, 1, 'die Liste kommt frisch');
+    assert.equal(geschlossen.length, 1, 'der Dialog geht zu');
+    assert.equal(geschlossen[0].context, 'link-dialog', 'mit dem Kontext von vor der Anfrage (#1997)');
+    assert.equal(zeile.hidden, true, 'keine Fehlerzeile in einem Dialog, der zugeht');
+  } finally {
+    recipeProviders.createAccount = vorher.createAccount;
+    recipeProviders.updateAccount = vorher.updateAccount;
+    globalThis.window = vorher.window;
+  }
+});
+
+test('#1909: die Karte eines Rezeptdienstes - Sync, Aktivieren und Loeschen sagen den Satz der App', async () => {
+  const { __test: kitchen } = await import('../public/settings/pages/modules-kitchen.js');
+  const { recipeProviders } = await import('/api.js');
+  const { installMiniDom, MiniElement } = await import('./mini-dom.js');
+  const vorher = {
+    syncAccount: recipeProviders.syncAccount, updateAccount: recipeProviders.updateAccount,
+    deleteAccount: recipeProviders.deleteAccount, window: globalThis.window,
+    addEventListener: MiniElement.prototype.addEventListener,
+  };
+  const deinstalliere = installMiniDom();
+  const toasts = [];
+  globalThis.window = { ...(globalThis.window ?? {}), yuvomi: { showToast: (text, kind) => toasts.push([text, kind]) } };
+  // Der Mini-DOM merkt sich nur, DASS ein Listener haengt - hier braucht der
+  // Test den Handler selbst, um ihn zu fahren.
+  MiniElement.prototype.addEventListener = function merke(typ, fn) { this.listener = typ; (this.handlers ??= {})[typ] = fn; };
+
+  /** Baut die Karte und liefert die Knoepfe nach ihrer Beschriftung. Gesammelt
+   *  wird beim Erzeugen: der Mini-DOM haengt den Sync-Knopf (ohne nodeType) nicht
+   *  in die Zusammenfassung, sein Handler haengt trotzdem daran. */
+  const karte = (refresh) => {
+    const gebaut = [];
+    const erzeuge = globalThis.document.createElement;
+    globalThis.document.createElement = (tag) => { const el = erzeuge(tag); gebaut.push(el); return el; };
+    try {
+      kitchen.renderProviderAccount(new MiniElement('div'), {
+        id: 7, provider: 'mealie', name: 'Kueche', baseUrl: 'https://mealie.example', enabled: 1, lastSync: null, lastError: null, recipeCount: 3,
+      }, refresh);
+    } finally {
+      globalThis.document.createElement = erzeuge;
+    }
+    const knoepfe = Object.fromEntries(gebaut.filter((el) => el.tagName === 'button').map((el) => [el.textContent, el]));
+    for (const name of ['settings.syncNow', 'settings.recipeProviderDisable', 'common.delete']) assert.ok(knoepfe[name], `Knopf ${name} gebaut`);
+    return knoepfe;
+  };
+  const klick = (knopf) => knopf.handlers.click();
+
+  try {
+    for (const [knopf, setze, allgemein] of [
+      ['settings.syncNow', (f) => { recipeProviders.syncAccount = f; }, 'settings.recipeProviderSyncFailed'],
+      ['settings.recipeProviderDisable', (f) => { recipeProviders.updateAccount = f; }, 'common.errorGeneric'],
+    ]) {
+      // Ein Fehler ohne bekannten Fall: der allgemeine Satz der Stelle, der Knopf geht wieder.
+      let nachgeladen = 0;
+      let knoepfe = karte(async () => { nachgeladen += 1; });
+      setze(async () => { throw absage(500); });
+      toasts.length = 0;
+      await klick(knoepfe[knopf]);
+      assert.deepEqual(toasts, [[allgemein, 'danger']], `${knopf}: allgemeiner Satz statt Servertext`);
+      assert.equal(knoepfe[knopf].disabled, false, `${knopf}: der Knopf geht wieder`);
+      assert.equal(nachgeladen, 0, `${knopf}: kein Nachladen ohne Grund`);
+
+      // Das Konto ist weg: sein Satz, und die Liste kommt frisch.
+      knoepfe = karte(async () => { nachgeladen += 1; });
+      setze(async () => { throw KONTO_WEG(); });
+      toasts.length = 0;
+      await klick(knoepfe[knopf]);
+      assert.deepEqual(toasts, [['settings.recipeProviderErrorAccountGone', 'danger']], `${knopf}: der Satz zum Fall`);
+      assert.equal(nachgeladen, 1, `${knopf}: die Liste kommt frisch`);
+    }
+
+    // Loeschen, das ein anderer Admin schon erledigt hat, ist erledigt.
+    let nachgeladen = 0;
+    let knoepfe = karte(async () => { nachgeladen += 1; });
+    recipeProviders.deleteAccount = async () => { throw KONTO_WEG(); };
+    toasts.length = 0;
+    await klick(knoepfe['common.delete']);
+    assert.deepEqual(toasts, [['settings.recipeProviderAccountDeleted', 'success']], 'schon geloescht ist kein Fehler');
+    assert.equal(nachgeladen, 1);
+
+    // Jeder andere Fehler beim Loeschen bleibt einer - mit dem allgemeinen Satz.
+    knoepfe = karte(async () => { nachgeladen += 1; });
+    recipeProviders.deleteAccount = async () => { throw absage(500); };
+    toasts.length = 0;
+    await klick(knoepfe['common.delete']);
+    assert.deepEqual(toasts, [['common.errorGeneric', 'danger']]);
+  } finally {
+    MiniElement.prototype.addEventListener = vorher.addEventListener;
+    recipeProviders.syncAccount = vorher.syncAccount;
+    recipeProviders.updateAccount = vorher.updateAccount;
+    recipeProviders.deleteAccount = vorher.deleteAccount;
+    deinstalliere();
+    globalThis.window = vorher.window;
+  }
+});
+
 // Dieselbe Regel fuer die Konten der Synchronisation, die Kalender-Abos und
 // die Schnellzugriffe der Uebersicht (#1997). Gefahren wird je Weg der echte
 // Submit- oder Klick-Handler an einem Attrappen-Panel, in dem jedes Element

@@ -21782,6 +21782,7 @@ const ERROR_MESSAGE_CLEAN = [
   'pages/waste.js',
   'pages/shopping.js',
   'components/quick-links-manager.js',
+  'settings/pages/modules-kitchen.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

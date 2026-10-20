@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Receptleverantörskonto borttaget.",
         "recipeProviderDeleteAccountConfirm": "Detta tar även bort {{count}} speglade recept och kopplar bort dem från alla måltidsplaneringsposter.",
         "recipeProviderLastError": "Senaste synkroniseringsfel: {{message}}",
+        "recipeProviderErrorAccountGone": "Det här receptleverantörskontot finns inte längre.",
+        "recipeProviderErrorUrlInvalid": "Server-URL:en måste börja med http:// eller https://.",
+        "recipeProviderErrorExternalUrlInvalid": "Den offentliga länk-URL:en måste börja med http:// eller https://.",
+        "recipeProviderErrorPrivateNetwork": "Server-URL:en pekar på ett privat eller lokalt nätverk. För att tillåta det, ange RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true på servern.",
+        "recipeProviderErrorConnectionFailed": "Det gick inte att ansluta till receptleverantören. Kontrollera server-URL:en och API-token.",
+        "recipeProviderErrorAccountExists": "Det finns redan ett receptleverantörskonto med den här server-URL:en.",
         "invites": {
             "title": "Inbjudningar",
             "intro": "Bjud in nya medlemmar med en länk. Lösenordet väljer de själva.",

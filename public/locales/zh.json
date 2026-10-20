@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "已删除食谱提供方账户。",
         "recipeProviderDeleteAccountConfirm": "这也会移除 {{count}} 个镜像食谱，并解除它们与所有膳食计划条目的关联。",
         "recipeProviderLastError": "上次同步错误：{{message}}",
+        "recipeProviderErrorAccountGone": "该食谱提供方账户已不存在。",
+        "recipeProviderErrorUrlInvalid": "服务器网址必须以 http:// 或 https:// 开头。",
+        "recipeProviderErrorExternalUrlInvalid": "公开链接网址必须以 http:// 或 https:// 开头。",
+        "recipeProviderErrorPrivateNetwork": "服务器网址指向私有或本地网络。如需允许，请在服务器上设置 RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true。",
+        "recipeProviderErrorConnectionFailed": "无法连接到食谱提供方。请检查服务器网址和 API 令牌。",
+        "recipeProviderErrorAccountExists": "已存在使用此服务器网址的食谱提供方账户。",
         "invites": {
             "title": "邀请",
             "intro": "用链接邀请新成员，密码由他们自己设置。",

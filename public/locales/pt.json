@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Conta de provedor de receitas excluída.",
         "recipeProviderDeleteAccountConfirm": "Isso também remove {{count}} receitas espelhadas e as desvincula de quaisquer entradas do plano de refeições.",
         "recipeProviderLastError": "Último erro de sincronização: {{message}}",
+        "recipeProviderErrorAccountGone": "Esta conta de provedor de receitas já não existe.",
+        "recipeProviderErrorUrlInvalid": "O URL do servidor tem de começar por http:// ou https://.",
+        "recipeProviderErrorExternalUrlInvalid": "O URL público do link tem de começar por http:// ou https://.",
+        "recipeProviderErrorPrivateNetwork": "O URL do servidor aponta para uma rede privada ou local. Para o permitir, defina RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true no servidor.",
+        "recipeProviderErrorConnectionFailed": "Não foi possível ligar ao provedor de receitas. Verifique o URL do servidor e o token de API.",
+        "recipeProviderErrorAccountExists": "Já existe uma conta de provedor de receitas com este URL do servidor.",
         "invites": {
             "title": "Convites",
             "intro": "Convida novos membros por link. A palavra-passe definem-na eles próprios.",

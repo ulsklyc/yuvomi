@@ -3012,6 +3012,12 @@
         "recipeProviderAccountDeleted": "حساب ارائه‌دهنده دستور پخت حذف شد.",
         "recipeProviderDeleteAccountConfirm": "این کار همچنین {{count}} دستور پخت آینه‌شده را حذف کرده و پیوند آن‌ها را با هر مورد برنامهٔ غذایی قطع می‌کند.",
         "recipeProviderLastError": "آخرین خطای همگام‌سازی: {{message}}",
+        "recipeProviderErrorAccountGone": "این حساب ارائه‌دهنده دستور پخت دیگر وجود ندارد.",
+        "recipeProviderErrorUrlInvalid": "آدرس سرور باید با http:// یا https:// شروع شود.",
+        "recipeProviderErrorExternalUrlInvalid": "آدرس عمومی پیوند باید با http:// یا https:// شروع شود.",
+        "recipeProviderErrorPrivateNetwork": "آدرس سرور به یک شبکه خصوصی یا محلی اشاره می‌کند. برای اجازه دادن، RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true را روی سرور تنظیم کنید.",
+        "recipeProviderErrorConnectionFailed": "اتصال به ارائه‌دهنده دستور پخت ممکن نشد. آدرس سرور و توکن API را بررسی کنید.",
+        "recipeProviderErrorAccountExists": "یک حساب ارائه‌دهنده دستور پخت با این آدرس سرور از قبل وجود دارد.",
         "invites": {
             "title": "دعوت‌ها",
             "intro": "اعضای جدید را با پیوند دعوت کنید. گذرواژه را خودشان تعیین می‌کنند.",

@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Tarif sağlayıcısı hesabı silindi.",
         "recipeProviderDeleteAccountConfirm": "Bu işlem ayrıca {{count}} yansıtılmış tarifi kaldırır ve bunları tüm yemek planı girişlerinden ayırır.",
         "recipeProviderLastError": "Son senkronizasyon hatası: {{message}}",
+        "recipeProviderErrorAccountGone": "Bu tarif sağlayıcısı hesabı artık yok.",
+        "recipeProviderErrorUrlInvalid": "Sunucu URL'si http:// veya https:// ile başlamalıdır.",
+        "recipeProviderErrorExternalUrlInvalid": "Herkese açık bağlantı URL'si http:// veya https:// ile başlamalıdır.",
+        "recipeProviderErrorPrivateNetwork": "Sunucu URL'si özel veya yerel bir ağı gösteriyor. Buna izin vermek için sunucuda RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true ayarlayın.",
+        "recipeProviderErrorConnectionFailed": "Tarif sağlayıcısına bağlanılamadı. Sunucu URL'sini ve API belirtecini kontrol edin.",
+        "recipeProviderErrorAccountExists": "Bu sunucu URL'sine sahip bir tarif sağlayıcısı hesabı zaten var.",
         "invites": {
             "title": "Davetler",
             "intro": "Yeni üyeleri bağlantıyla davet et. Parolalarını kendileri belirler.",

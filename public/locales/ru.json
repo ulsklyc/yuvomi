@@ -3188,6 +3188,12 @@
         "recipeProviderAccountDeleted": "Аккаунт поставщика рецептов удалён.",
         "recipeProviderDeleteAccountConfirm": "Это также удалит {{count}} зеркальных рецептов и отвяжет их от всех записей плана питания.",
         "recipeProviderLastError": "Последняя ошибка синхронизации: {{message}}",
+        "recipeProviderErrorAccountGone": "Этого аккаунта поставщика рецептов больше нет.",
+        "recipeProviderErrorUrlInvalid": "URL сервера должен начинаться с http:// или https://.",
+        "recipeProviderErrorExternalUrlInvalid": "Публичный URL для ссылок должен начинаться с http:// или https://.",
+        "recipeProviderErrorPrivateNetwork": "URL сервера указывает на частную или локальную сеть. Чтобы разрешить это, задайте на сервере RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true.",
+        "recipeProviderErrorConnectionFailed": "Не удалось подключиться к поставщику рецептов. Проверьте URL сервера и API-токен.",
+        "recipeProviderErrorAccountExists": "Аккаунт поставщика рецептов с этим URL сервера уже существует.",
         "invites": {
             "title": "Приглашения",
             "intro": "Приглашайте новых участников по ссылке. Пароль они задают сами.",

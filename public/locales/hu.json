@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Receptszolgáltató fiók törölve.",
         "recipeProviderDeleteAccountConfirm": "Ez törli a(z) {{count}} tükrözött receptet is, és leválasztja őket minden étrendbejegyzésről.",
         "recipeProviderLastError": "Legutóbbi szinkronizálási hiba: {{message}}",
+        "recipeProviderErrorAccountGone": "Ez a receptszolgáltató fiók már nem létezik.",
+        "recipeProviderErrorUrlInvalid": "A szerver URL-nek http:// vagy https:// előtaggal kell kezdődnie.",
+        "recipeProviderErrorExternalUrlInvalid": "A nyilvános link URL-nek http:// vagy https:// előtaggal kell kezdődnie.",
+        "recipeProviderErrorPrivateNetwork": "A szerver URL privát vagy helyi hálózatra mutat. Ha ezt engedélyezni szeretnéd, állítsd be a szerveren: RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true.",
+        "recipeProviderErrorConnectionFailed": "Nem sikerült kapcsolódni a receptszolgáltatóhoz. Ellenőrizd a szerver URL-t és az API-tokent.",
+        "recipeProviderErrorAccountExists": "Ezzel a szerver URL-lel már létezik receptszolgáltató fiók.",
         "invites": {
             "title": "Meghívók",
             "intro": "Hívj meg új tagokat linkkel. A jelszavukat maguk választják.",

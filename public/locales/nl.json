@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Receptprovider-account verwijderd.",
         "recipeProviderDeleteAccountConfirm": "Dit verwijdert ook {{count}} gespiegelde recepten en ontkoppelt ze van eventuele maaltijdplan-items.",
         "recipeProviderLastError": "Laatste synchronisatiefout: {{message}}",
+        "recipeProviderErrorAccountGone": "Dit receptprovider-account bestaat niet meer.",
+        "recipeProviderErrorUrlInvalid": "De server-URL moet beginnen met http:// of https://.",
+        "recipeProviderErrorExternalUrlInvalid": "De openbare link-URL moet beginnen met http:// of https://.",
+        "recipeProviderErrorPrivateNetwork": "De server-URL wijst naar een privé- of lokaal netwerk. Stel RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true in op de server om dit toe te staan.",
+        "recipeProviderErrorConnectionFailed": "Kan geen verbinding maken met de receptprovider. Controleer de server-URL en de API-token.",
+        "recipeProviderErrorAccountExists": "Er bestaat al een receptprovider-account met deze server-URL.",
         "invites": {
             "title": "Uitnodigingen",
             "intro": "Nodig nieuwe leden uit via een link. Hun wachtwoord kiezen ze zelf.",

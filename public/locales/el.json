@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Ο λογαριασμός παρόχου συνταγών διαγράφηκε.",
         "recipeProviderDeleteAccountConfirm": "Αυτό θα αφαιρέσει επίσης {{count}} αντικατοπτρισμένες συνταγές και θα τις αποσυνδέσει από τυχόν καταχωρίσεις προγράμματος γευμάτων.",
         "recipeProviderLastError": "Τελευταίο σφάλμα συγχρονισμού: {{message}}",
+        "recipeProviderErrorAccountGone": "Αυτός ο λογαριασμός παρόχου συνταγών δεν υπάρχει πια.",
+        "recipeProviderErrorUrlInvalid": "Η URL διακομιστή πρέπει να ξεκινά με http:// ή https://.",
+        "recipeProviderErrorExternalUrlInvalid": "Η δημόσια διεύθυνση URL συνδέσμου πρέπει να ξεκινά με http:// ή https://.",
+        "recipeProviderErrorPrivateNetwork": "Η URL διακομιστή δείχνει σε ιδιωτικό ή τοπικό δίκτυο. Για να το επιτρέψετε, ορίστε RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true στον διακομιστή.",
+        "recipeProviderErrorConnectionFailed": "Δεν ήταν δυνατή η σύνδεση με τον πάροχο συνταγών. Ελέγξτε την URL διακομιστή και το διακριτικό API.",
+        "recipeProviderErrorAccountExists": "Υπάρχει ήδη λογαριασμός παρόχου συνταγών με αυτή την URL διακομιστή.",
         "invites": {
             "title": "Προσκλήσεις",
             "intro": "Πρόσκαλεσε νέα μέλη με σύνδεσμο. Τον κωδικό τους τον ορίζουν μόνα τους.",

@@ -3012,6 +3012,12 @@
         "recipeProviderAccountDeleted": "Akun penyedia resep dihapus.",
         "recipeProviderDeleteAccountConfirm": "Ini juga akan menghapus {{count}} resep cerminan dan memutuskan tautannya dari entri rencana makan mana pun.",
         "recipeProviderLastError": "Kesalahan sinkronisasi terakhir: {{message}}",
+        "recipeProviderErrorAccountGone": "Akun penyedia resep ini sudah tidak ada.",
+        "recipeProviderErrorUrlInvalid": "URL Server harus diawali http:// atau https://.",
+        "recipeProviderErrorExternalUrlInvalid": "URL tautan publik harus diawali http:// atau https://.",
+        "recipeProviderErrorPrivateNetwork": "URL Server mengarah ke jaringan pribadi atau lokal. Untuk mengizinkannya, atur RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true di server.",
+        "recipeProviderErrorConnectionFailed": "Tidak dapat terhubung ke penyedia resep. Periksa URL Server dan token API.",
+        "recipeProviderErrorAccountExists": "Akun penyedia resep dengan URL Server ini sudah ada.",
         "invites": {
             "title": "Undangan",
             "intro": "Undang anggota baru lewat tautan. Kata sandi mereka tentukan sendiri.",

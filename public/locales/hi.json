@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Recipe provider खाता हटाया गया।",
         "recipeProviderDeleteAccountConfirm": "इससे {{count}} मिरर की गई व्यंजन विधियाँ भी हट जाएँगी और किसी भी भोजन योजना प्रविष्टि से उनका संबंध टूट जाएगा।",
         "recipeProviderLastError": "अंतिम सिंक त्रुटि: {{message}}",
+        "recipeProviderErrorAccountGone": "यह recipe provider खाता अब मौजूद नहीं है।",
+        "recipeProviderErrorUrlInvalid": "सर्वर URL http:// या https:// से शुरू होना चाहिए।",
+        "recipeProviderErrorExternalUrlInvalid": "सार्वजनिक लिंक URL http:// या https:// से शुरू होना चाहिए।",
+        "recipeProviderErrorPrivateNetwork": "सर्वर URL किसी निजी या स्थानीय नेटवर्क की ओर इशारा करता है। इसकी अनुमति देने के लिए सर्वर पर RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true सेट करें।",
+        "recipeProviderErrorConnectionFailed": "Recipe provider से कनेक्ट नहीं हो सका। सर्वर URL और API टोकन जाँचें।",
+        "recipeProviderErrorAccountExists": "इस सर्वर URL वाला recipe provider खाता पहले से मौजूद है।",
         "invites": {
             "title": "आमंत्रण",
             "intro": "नए सदस्यों को लिंक से आमंत्रित करें। पासवर्ड वे स्वयं तय करते हैं।",
