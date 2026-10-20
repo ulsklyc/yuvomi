@@ -82,6 +82,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by upcoming ones, at most two, and the rest still fold into "+N earlier today". The wall display
   keeps its own limit.
 
+- **Kitchen settings: a recipe provider says why its last sync failed, in your language** (#1909).
+  The account card in Settings > Kitchen showed the raw text of the last failed sync or connection
+  test, for example "Mealie request failed (401)", "getaddrinfo ENOTFOUND mealie" or "HTTP 404". It
+  now names the cause in the language of the app: the provider refuses the API token, no provider
+  answers at the server URL, the provider answered with an error status, it did not answer in time,
+  it cannot be reached, its certificate is not trusted, its answer could not be read, or the address
+  points to a private network (with the setting that allows it). Any other failure gets a general
+  sentence that points to the server log. An account whose last failure happened before this update
+  shows the general sentence until its next sync. For API clients: `GET /recipe-providers/status`
+  carries `lastErrorReason` and `lastErrorParams` next to `lastError`, and a failed sync or
+  connection test answers with `reason` and `params` next to `error`; `lastError` and `error` are
+  unchanged.
 - **The demo seed now works on an encrypted database (#2114).** `scripts/seed-demo.js` opened
   the file without a key and stopped with "file is not a database" on every installation with
   `DB_ENCRYPTION_KEY` set, which is the installer default. It now opens the database the way the

@@ -19,6 +19,11 @@ import test, { before, after, beforeEach } from 'node:test';
 import http from 'node:http';
 import { MealieAdapter } from '../server/services/recipe-providers/mealie.js';
 import { categorizeIngredient } from '../server/services/recipe-providers/categorize.js';
+import {
+  classifyProbe, classifyProviderFailure, ProviderResponseError,
+} from '../server/services/recipe-providers/failure.js';
+import { safeRequest } from '../server/utils/http.js';
+import { BlockedAddressError } from '../server/utils/ssrf.js';
 
 const ENV_FLAG = 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK';
 
@@ -264,4 +269,107 @@ test('categorizeIngredient: norwegisches "oppvaskmiddel" → Haushalt', () => {
 
 test('categorizeIngredient: Kompositum "kyllinglår" bleibt bei der Wortgrenze → Sonstiges', () => {
   assert.equal(categorizeIngredient({ foodName: 'kyllinglår' }), 'Sonstiges');
+});
+
+// --------------------------------------------------------------------------
+// DER FALL EINES GESCHEITERTEN ABRUFS (#1909). Die Konto-Karte sagt ihn als
+// Satz der App; geurteilt wird ueber das, was der Adapter WIRKLICH wirft -
+// gegen den lokalen Server, nie nach dem Wortlaut einer Meldung.
+// --------------------------------------------------------------------------
+
+async function thrownBy(fn) {
+  try {
+    await fn();
+  } catch (err) {
+    return err;
+  }
+  assert.fail('kein Wurf');
+}
+
+test('Fall: der Status einer Antwort ohne Erfolg (401/403 Token, 404 Adresse, sonst mit Zahl)', async () => {
+  for (const [status, expected] of [
+    [401, { reason: 'recipe_providers_sync_auth_failed' }],
+    [403, { reason: 'recipe_providers_sync_auth_failed' }],
+    [404, { reason: 'recipe_providers_sync_wrong_url' }],
+    [500, { reason: 'recipe_providers_sync_http_status', params: { status: 500 } }],
+    [503, { reason: 'recipe_providers_sync_http_status', params: { status: 503 } }],
+  ]) {
+    mockHandler((req, res) => sendJson(res, {}, status));
+    const err = await thrownBy(() => new MealieAdapter(account).listRecipeSummaries());
+    assert.deepEqual(classifyProviderFailure(err), expected, `Status ${status}`);
+    // Der Verbindungstest wirft nicht, er meldet den Status - derselbe Fall.
+    const probe = await new MealieAdapter(account).testConnection();
+    assert.deepEqual(classifyProbe(probe), expected, `Verbindungstest, Status ${status}`);
+  }
+});
+
+test('Fall: kein Server am Port ist "nicht erreichbar", auch im Verbindungstest', async () => {
+  const dead = { ...account, base_url: await deadBaseUrl() };
+  const err = await thrownBy(() => new MealieAdapter(dead).listRecipeSummaries());
+  assert.deepEqual(classifyProviderFailure(err), { reason: 'recipe_providers_sync_unreachable' });
+  const probe = await new MealieAdapter(dead).testConnection();
+  assert.equal(probe.reason, 'recipe_providers_sync_unreachable');
+  assert.deepEqual(classifyProbe(probe), { reason: 'recipe_providers_sync_unreachable' });
+});
+
+test('Fall: unlesbares JSON und eine zu grosse Antwort sind "unlesbar"', async () => {
+  mockHandler((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('<html>login</html>'); });
+  const parseErr = await thrownBy(() => new MealieAdapter(account).listRecipeSummaries());
+  assert.deepEqual(classifyProviderFailure(parseErr), { reason: 'recipe_providers_sync_bad_response' });
+  const probe = await new MealieAdapter(account).testConnection();
+  assert.equal(probe.reason, 'recipe_providers_sync_bad_response');
+
+  const big = Buffer.alloc(10 * 1024 * 1024 + 1, 0x20);
+  mockHandler((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(big); });
+  const sizeErr = await thrownBy(() => new MealieAdapter(account).listRecipeSummaries());
+  assert.ok(sizeErr instanceof ProviderResponseError, 'die Groessengrenze wirft ihre eigene Klasse');
+  assert.match(sizeErr.message, /10 MB/, 'die Meldung fuer Log und API bleibt');
+  assert.deepEqual(classifyProviderFailure(sizeErr), { reason: 'recipe_providers_sync_bad_response' });
+});
+
+test('Fall: eine private Adresse ohne Opt-in ist "privates Netz", auch im Verbindungstest', async () => {
+  delete process.env[ENV_FLAG];
+  try {
+    const err = await thrownBy(() => new MealieAdapter(account).listRecipeSummaries());
+    assert.ok(err instanceof BlockedAddressError);
+    assert.deepEqual(classifyProviderFailure(err), { reason: 'recipe_providers_private_network' });
+    const probe = await new MealieAdapter(account).testConnection();
+    assert.equal(probe.reason, 'recipe_providers_private_network');
+  } finally {
+    process.env[ENV_FLAG] = 'true';
+  }
+  assert.equal(calls.length, 0, 'abgelehnt vor jeder Verbindung');
+});
+
+test('Fall: das Ende der Wartezeit ist "Zeitueberschreitung" (AbortSignal.timeout, wie im Adapter)', async () => {
+  mockHandler(() => { /* antwortet nie */ });
+  const err = await thrownBy(() => safeRequest(`${base}/api/recipes`, { signal: AbortSignal.timeout(50) }));
+  assert.deepEqual(classifyProviderFailure(err), { reason: 'recipe_providers_sync_timeout' });
+});
+
+test('Fall: Fehlercodes von Netz und TLS nach Klasse, Unbekanntes ohne Fall', () => {
+  const coded = (code) => Object.assign(new Error('irgendein Text'), { code });
+  for (const [err, expected] of [
+    [coded('ENOTFOUND'), 'recipe_providers_sync_unreachable'],
+    [coded('EAI_AGAIN'), 'recipe_providers_sync_unreachable'],
+    [coded('ECONNRESET'), 'recipe_providers_sync_unreachable'],
+    [coded('EHOSTUNREACH'), 'recipe_providers_sync_unreachable'],
+    [coded('ETIMEDOUT'), 'recipe_providers_sync_timeout'],
+    [coded('DEPTH_ZERO_SELF_SIGNED_CERT'), 'recipe_providers_sync_certificate'],
+    [coded('SELF_SIGNED_CERT_IN_CHAIN'), 'recipe_providers_sync_certificate'],
+    [coded('CERT_HAS_EXPIRED'), 'recipe_providers_sync_certificate'],
+    [coded('ERR_TLS_CERT_ALTNAME_INVALID'), 'recipe_providers_sync_certificate'],
+  ]) {
+    assert.deepEqual(classifyProviderFailure(err), { reason: expected }, err.code);
+  }
+  // Der Wortlaut allein entscheidet nie: eine Meldung, die nach privatem Netz
+  // klingt, ohne die Klasse des Lookup-Hooks, hat keinen Fall.
+  assert.equal(classifyProviderFailure(new Error('URL resolves to a private IP address: 10.0.0.1')), null);
+  assert.equal(classifyProviderFailure(new Error('Too many redirects')), null);
+  assert.equal(classifyProviderFailure(new TypeError('body.items is not iterable')), null);
+  assert.equal(classifyProviderFailure(null), null);
+  assert.equal(classifyProviderFailure('ECONNREFUSED'), null);
+  // Ein Verbindungstest ohne eingeordneten Wurf hat keinen Fall; ein ok-Test nie.
+  assert.equal(classifyProbe({ ok: false, status: 0, error: 'x', reason: null }), null);
+  assert.equal(classifyProbe({ ok: true, status: 200 }), null);
 });

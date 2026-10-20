@@ -6,7 +6,9 @@
  *        einzigen Provider-spezifischen Codepfad brauchen:
  *
  *          constructor(account)                  account-Zeile: { base_url, external_url, api_token, ... }
- *          async testConnection()                -> { ok, status, error?, linkContext? }
+ *          async testConnection()                -> { ok, status, error?, reason?, params?, linkContext? }
+ *                                                     reason/params: der Fall eines Wurfs (#1909,
+ *                                                     ./failure.js#probeFailure)
  *          async listRecipeSummaries()            -> Array<{ id, ref, updatedAt }>
  *                                                     id  = stabiler Provider-Schlüssel (Upsert-Key,
  *                                                           überlebt Umbenennungen)

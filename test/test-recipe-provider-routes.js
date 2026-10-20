@@ -357,6 +357,68 @@ test('POST /sync: Nicht-Admin → 403', async () => {
 });
 
 // --------------------------------------------------------------------------
+// Der Fall des letzten Fehlschlags (#1909, Migration 255): Verbindungstest und
+// Sync speichern ihn neben `last_error`, /status liefert ihn, ein Erfolg leert ihn.
+// --------------------------------------------------------------------------
+test('Verbindungstest und Sync speichern den Fall des Fehlschlags, /status liefert ihn, ein Erfolg leert ihn (#1909)', () => withEnv('true', async () => {
+  _setAdapterFactory(fakeAdapter());
+  const created = await call('POST', '/accounts', { name: 'Fallkonto', base_url: 'https://fall.example.com', api_token: 't' });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  const row = () => db.prepare('SELECT last_error, last_error_reason, last_error_params FROM recipe_provider_accounts WHERE id = ?').get(id);
+  const status = async () => (await call('GET', '/status')).body.data.find((a) => a.id === id);
+
+  // Verbindungstest: der Status einer Antwort ohne Erfolg (der Adapter wirft nicht).
+  for (const [probe, reason, params] of [
+    [{ ok: false, status: 401 }, 'recipe_providers_sync_auth_failed', undefined],
+    [{ ok: false, status: 404 }, 'recipe_providers_sync_wrong_url', undefined],
+    [{ ok: false, status: 503 }, 'recipe_providers_sync_http_status', { status: 503 }],
+    // Ein Wurf, den der Adapter schon eingeordnet hat (probeFailure).
+    [{ ok: false, status: 0, error: 'The operation was aborted', reason: 'recipe_providers_sync_timeout' }, 'recipe_providers_sync_timeout', undefined],
+    // Ein Wurf ohne Fall: kein Grund, der Text bleibt.
+    [{ ok: false, status: 0, error: 'Too many redirects', reason: null }, null, undefined],
+  ]) {
+    _setAdapterFactory(countingAdapter(probe).factory);
+    const r = await call('POST', `/accounts/${id}/test`);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data.reason, reason, `Antwort: ${JSON.stringify(probe)}`);
+    assert.deepEqual(r.body.data.params, params);
+    assert.equal(row().last_error_reason, reason, `gespeichert: ${JSON.stringify(probe)}`);
+    assert.equal(row().last_error_params, params ? JSON.stringify(params) : null);
+    assert.equal(row().last_error, probe.error ?? `HTTP ${probe.status}`, 'last_error bleibt der rohe Text');
+    const acc = await status();
+    assert.equal(acc.lastErrorReason, reason);
+    assert.deepEqual(acc.lastErrorParams, params ?? null);
+  }
+
+  // Sync: der Wurf des Adapters, mit Zahl.
+  _setAdapterFactory(() => ({
+    testConnection: async () => ({ ok: false, status: 502 }),
+    listRecipeSummaries: async () => { throw Object.assign(new Error('Mealie request failed (502)'), { status: 502 }); },
+    getRecipe: async () => null,
+    recipeUrl: () => null,
+  }));
+  const failed = await call('POST', `/accounts/${id}/sync`);
+  assert.equal(failed.status, 200);
+  assert.equal(failed.body.data.failed, true);
+  assert.equal(failed.body.data.reason, 'recipe_providers_sync_http_status');
+  assert.deepEqual(failed.body.data.params, { status: 502 });
+  assert.equal(failed.body.data.error, 'Mealie request failed (502)', 'error bleibt fuer API-Clients');
+  const acc = await status();
+  assert.equal(acc.lastError, 'Mealie request failed (502)');
+  assert.equal(acc.lastErrorReason, 'recipe_providers_sync_http_status');
+  assert.deepEqual(acc.lastErrorParams, { status: 502 });
+
+  _setAdapterFactory(fakeAdapter());
+  const ok = await call('POST', `/accounts/${id}/sync`);
+  assert.equal(ok.body.data.failed, false);
+  const cleared = await status();
+  assert.deepEqual([cleared.lastError, cleared.lastErrorReason, cleared.lastErrorParams], [null, null, null]);
+  assert.deepEqual(row(), { last_error: null, last_error_reason: null, last_error_params: null });
+  await call('DELETE', `/accounts/${id}`);
+}));
+
+// --------------------------------------------------------------------------
 // GET /status (kein Admin-Gate)
 // --------------------------------------------------------------------------
 test('GET /status: auch für Nicht-Admin lesbar, enthält nie den Token', async () => {

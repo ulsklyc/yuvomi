@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import test, { before, after, beforeEach } from 'node:test';
 import http from 'node:http';
 import { TandoorAdapter } from '../server/services/recipe-providers/tandoor.js';
+import { classifyProviderFailure, ProviderResponseError } from '../server/services/recipe-providers/failure.js';
 
 const ENV_FLAG = 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK';
 
@@ -310,4 +311,29 @@ test('fetchThumbnail: HTTP-Fehler wirft mit Statuscode', async () => {
   mockHandler((req, res) => sendJson(res, {}, 500));
   const adapter = new TandoorAdapter(account);
   await assert.rejects(() => adapter.fetchThumbnail({ slug: '/media/x.jpg' }), /Tandoor thumbnail request failed \(500\)/);
+});
+
+// --------------------------------------------------------------------------
+// Der Fall eines gescheiterten Abrufs (#1909) - dieselbe Einordnung wie bei
+// Mealie (test:recipe-provider-adapter misst sie je Fall); hier, dass der
+// Tandoor-Adapter dieselben Klassen wirft und meldet.
+// --------------------------------------------------------------------------
+
+test('Fall: Verbindungstest ohne Server meldet "nicht erreichbar", unlesbare und zu grosse Antworten werfen ihre Klasse', async () => {
+  const probe = await new TandoorAdapter({ ...account, base_url: await deadBaseUrl() }).testConnection();
+  assert.equal(probe.reason, 'recipe_providers_sync_unreachable');
+
+  mockHandler((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('not json'); });
+  const parseErr = await new TandoorAdapter(account).listRecipeSummaries().catch((err) => err);
+  assert.deepEqual(classifyProviderFailure(parseErr), { reason: 'recipe_providers_sync_bad_response' });
+
+  const big = Buffer.alloc(10 * 1024 * 1024 + 1, 0x20);
+  mockHandler((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(big); });
+  const sizeErr = await new TandoorAdapter(account).listRecipeSummaries().catch((err) => err);
+  assert.ok(sizeErr instanceof ProviderResponseError);
+  assert.deepEqual(classifyProviderFailure(sizeErr), { reason: 'recipe_providers_sync_bad_response' });
+
+  mockHandler((req, res) => sendJson(res, {}, 403));
+  const authErr = await new TandoorAdapter(account).listRecipeSummaries().catch((err) => err);
+  assert.deepEqual(classifyProviderFailure(authErr), { reason: 'recipe_providers_sync_auth_failed' });
 });

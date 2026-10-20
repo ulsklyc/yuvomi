@@ -21848,6 +21848,52 @@ test('die Abfuhr-Seite gibt den gespeicherten Fehlertext einer Quelle nie aus (#
     'pages/waste.js gibt `last_error` aus - den Satz aus last_error_reason/last_error_params bauen (lastFailureSentence)');
 });
 
+/* DER GESPEICHERTE FEHLERTEXT EINES REZEPTDIENST-KONTOS (#1909, Migration 255).
+ *
+ * `account.lastError` (GET /recipe-providers/status) ist der rohe Text des
+ * Adapters oder des Netzes ("Mealie request failed (401)", "getaddrinfo
+ * ENOTFOUND mealie"). Die Kuechen-Einstellungen duerfen ihn als Wahrheitswert
+ * lesen (gibt es einen Fehlschlag?), aber nie als WERT weitergeben - nicht an
+ * t() als Platzhalter, nicht in die Details der Karte, nicht in einen Text.
+ * Den Satz bauen sie aus `lastErrorReason`/`lastErrorParams` (lastErrorSentence).
+ */
+function countLastErrorValueUses(source) {
+  const code = withoutCommentsKeepingLines(source);
+  const blank = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  let count = 0;
+  for (const hit of code.matchAll(/(?:[:(,]|\bpush\s*\(|textContent\s*=|\$\{)\s*[\w$.?]*\blastError\s*(?:[)},;]|\|\||\?\?)/g)) {
+    const at = hit.index + hit[0].lastIndexOf('lastError');
+    if (blank[at] !== code[at]) continue; // Text in einem Literal
+    // Die Bedingung eines `if (...)` ist eine Frage, keine Ausgabe.
+    if (hit[0].startsWith('(') && /\b(?:if|while)\s*$/.test(code.slice(0, hit.index))) continue;
+    count += 1;
+  }
+  return count;
+}
+
+test('der Zaehler fuer lastError sieht die Weitergabe als Wert, nicht die Frage (#1909)', () => {
+  for (const [source, expected] of [
+    ["if (account.lastError) details.push(t('settings.recipeProviderLastError', { message: account.lastError }));", 1],
+    ['details.push(account.lastError);', 1],
+    ['el.textContent = account?.lastError;', 1],
+    ['`${account.lastError}`', 1],
+    ['showToast(account.lastError || fallback);', 1],
+    ["if (account.lastError) details.push(t('settings.recipeProviderLastError', { message: lastErrorSentence(account) }));", 0],
+    ["status: account.lastError\n      ? t('settings.notConnected')\n      : t('settings.connected'),", 0],
+    ["tone: account.lastError ? 'danger' : 'neutral',", 0],
+    ['// { message: account.lastError }', 0],
+    ["const hint = '{ message: account.lastError }';", 0],
+    ['const { lastErrorReason, lastErrorParams } = account;', 0],
+  ]) {
+    assert.equal(countLastErrorValueUses(source), expected, source);
+  }
+});
+
+test('die Kuechen-Einstellungen geben den gespeicherten Fehlertext eines Rezeptdienstes nie aus (#1909)', () => {
+  assert.equal(countLastErrorValueUses(read('../public/settings/pages/modules-kitchen.js')), 0,
+    'settings/pages/modules-kitchen.js gibt `lastError` als Wert weiter - den Satz aus lastErrorReason/lastErrorParams bauen (lastErrorSentence)');
+});
+
 /* DER HINWEIS EINES IMPORTS (#1909). Eine Zeile unter der Vorschau traegt
  * neben `code` den englischen Satz des Servers (`message`, z. B. "3 calendar
  * entries were skipped ..."). Die Seite sagt fuer jeden Code ihren eigenen

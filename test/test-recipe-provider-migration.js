@@ -193,3 +193,41 @@ test('migration v134: partieller UNIQUE-Index und ON-DELETE-CASCADE bleiben unte
 
   assert.deepEqual(db.pragma('foreign_key_check'), []);
 });
+
+// --------------------------------------------------------------------------
+// Migration v255 (#1909): ein Konto merkt sich den FALL seines letzten
+// Fehlschlags neben dem Text. Bestandszeilen behalten ihren Text und bekommen
+// keinen Fall (NULL) - die Karte sagt dann den allgemeinen Satz, bis der
+// naechste Abgleich seinen Fall schreibt.
+// --------------------------------------------------------------------------
+
+test('migration v255: last_error_reason/last_error_params kommen dazu, Bestand behaelt last_error, ohne Fall', (t) => {
+  const db = buildMigratedDatabase(MIGRATIONS.filter(({ version }) => version <= 254));
+  t.after(() => db.close());
+  const userId = db.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin', 'Admin', 'hash', 'admin')
+  `).run().lastInsertRowid;
+  const accountId = db.prepare(`
+    INSERT INTO recipe_provider_accounts (name, base_url, api_token, provider, created_by, last_error)
+    VALUES ('Zuhause', 'https://mealie.example.test', 'tok', 'mealie', ?, 'Mealie request failed (401)')
+  `).run(userId).lastInsertRowid;
+  const columnsBefore = db.prepare('PRAGMA table_info(recipe_provider_accounts)').all().map((c) => c.name);
+  assert.equal(columnsBefore.includes('last_error_reason'), false);
+
+  const v255 = MIGRATIONS.find(({ version }) => version === 255);
+  assert.ok(v255, 'v255 steht in MIGRATIONS');
+  applyMigration(db, v255);
+
+  const columns = db.prepare('PRAGMA table_info(recipe_provider_accounts)').all();
+  for (const name of ['last_error_reason', 'last_error_params']) {
+    const column = columns.find((c) => c.name === name);
+    assert.ok(column, `${name} fehlt`);
+    assert.equal(column.type, 'TEXT');
+    assert.equal(column.notnull, 0, `${name} darf leer sein`);
+  }
+  const row = db.prepare('SELECT last_error, last_error_reason, last_error_params FROM recipe_provider_accounts WHERE id = ?').get(accountId);
+  assert.deepEqual(row, { last_error: 'Mealie request failed (401)', last_error_reason: null, last_error_params: null });
+
+  // Ein zweiter Lauf (etwa eine teilweise angewandte Datenbank) bricht nicht ab.
+  assert.doesNotThrow(() => v255.up(db));
+});

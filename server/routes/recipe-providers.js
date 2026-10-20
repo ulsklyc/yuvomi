@@ -17,7 +17,10 @@ import { getAdapter, SUPPORTED_PROVIDERS } from '../services/recipe-providers/in
 import {
   isBlockedBaseUrl, isPrivateNetworkRefusal, withPrivateNetworkHint, PRIVATE_NETWORK_MESSAGE,
 } from '../services/recipe-providers/private-network.js';
-import { sync, syncOne, getStatus } from '../services/recipe-provider-sync.js';
+import { classifyProbe } from '../services/recipe-providers/failure.js';
+import {
+  sync, syncOne, getStatus, recordAccountFailure,
+} from '../services/recipe-provider-sync.js';
 
 const log = createLogger('RecipeProviders');
 const router = express.Router();
@@ -177,11 +180,23 @@ router.post('/accounts/:id/test', async (req, res) => {
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
     const probe = await getAdapter(account).testConnection();
-    // Die Lookup-Ablehnung bekommt den Schalter angehaengt (#1053) - sie landet
-    // als last_error auf der Konto-Karte, und dort muss stehen, was zu tun ist.
-    const result = probe.ok ? probe : { ...probe, error: withPrivateNetworkHint(probe.error) };
-    if (!result.ok) db.get().prepare('UPDATE recipe_provider_accounts SET last_error = ? WHERE id = ?').run(result.error || `HTTP ${result.status}`, account.id);
-    res.json({ data: result });
+    if (probe.ok) return res.json({ data: probe });
+    // Die Lookup-Ablehnung bekommt den Schalter angehaengt (#1053), fuer Log
+    // und API. Die Konto-Karte sagt den Satz zum FALL (#1909): er steht neben
+    // dem Text am Konto und geht mit dieser Antwort hinaus (`reason`, `params`).
+    const failure = classifyProbe(probe);
+    // recordAccountFailure haengt den Schalter selbst an - hier der rohe Text.
+    recordAccountFailure(account.id, {
+      error: probe.error || `HTTP ${probe.status}`, reason: failure?.reason ?? null, params: failure?.params ?? null,
+    });
+    res.json({
+      data: {
+        ...probe,
+        error: withPrivateNetworkHint(probe.error),
+        reason: failure?.reason ?? null,
+        ...(failure?.params && { params: failure.params }),
+      },
+    });
   } catch (err) {
     log.error('POST /accounts/:id/test error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

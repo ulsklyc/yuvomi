@@ -910,7 +910,7 @@ something without their reference; this row is nothing but the reference, and a 
 batch rather than a product, so once it is gone the statement has no subject left. Because the link
 lives in its own table, the cascade can never reach the ingredient: the recipe keeps it, unmatched.
 
-### Recipe Provider Accounts (migration v118, v119, v134)
+### Recipe Provider Accounts (migration v118, v119, v134, v255)
 Connections to a self-hosted recipe provider instance ([Mealie](https://mealie.io) or [Tandoor](https://tandoor.dev))
 for the Recipes module. Admin-managed in Settings → Kitchen. The mirror is **read-only**: the provider
 stays the source of truth for recipe content, so editing or deleting a mirrored recipe returns 403
@@ -927,7 +927,9 @@ server-side (not merely hidden in the UI) - "Duplicate" forks one into an editab
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 | created_at / updated_at | TEXT | ISO 8601 (`updated_at` via trigger) |
 | last_sync | TEXT | nullable |
-| last_error | TEXT | nullable |
+| last_error | TEXT | nullable - raw message of the last failed sync or connection test (adapter or network text), for logs and API clients |
+| last_error_reason | TEXT | nullable (migration v255, #1909) - the case of that failure, see below; `NULL` for a failure without a known case and for failures stored before v255 |
+| last_error_params | TEXT | nullable (migration v255) - JSON with the numbers of that case (`{"status": 502}`), `NULL` otherwise |
 
 `base_url` is UNIQUE so the same provider server cannot be added twice and mirror every recipe in
 duplicate. Deleting an account cascades to its mirrored recipes.
@@ -956,6 +958,20 @@ that used to slip past it now needs `RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true`
 answer an admin gets without it: the account form refuses a local name or private literal before any
 network call and names the switch, and a hostname that resolves into a private network gets the same
 hint on the connection test, the account card and after a failed sync.
+
+**Why the last sync failed (#1909, migration v255).** `server/services/recipe-providers/failure.js`
+classifies a failed sync or connection test by the class of the error, never by the wording of its
+message: `recipe_providers_sync_auth_failed` (the provider answered 401/403),
+`recipe_providers_sync_wrong_url` (404), `recipe_providers_sync_http_status` (any other status, with
+`params.status`), `recipe_providers_sync_timeout`, `recipe_providers_sync_unreachable` (DNS, refused or
+reset connection), `recipe_providers_sync_certificate` (TLS certificate not trusted),
+`recipe_providers_sync_bad_response` (unreadable JSON or over the size limit) and
+`recipe_providers_private_network` (the lookup hook refused a private address); anything else has no
+case. Text, case and params are written together, a success clears all three. `GET /status` returns
+them as `lastError`, `lastErrorReason` and `lastErrorParams` (object), the sync and connection-test
+answers as `error`, `reason` and `params`. The account card in Settings → Kitchen says the sentence of
+the case (`CASE_MESSAGES` in `public/utils/friendly-error.js`) and never shows `lastError`; without a
+case it says the general sentence, which points to the server log.
 
 ### Meal Ingredients
 | Column | Type | Constraint |

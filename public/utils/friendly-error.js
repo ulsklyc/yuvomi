@@ -305,6 +305,17 @@ export const CASE_MESSAGES = new Map([
   ['recipe_providers_private_network', 'settings.recipeProviderErrorPrivateNetwork'],
   ['recipe_providers_connection_failed', 'settings.recipeProviderErrorConnectionFailed'],
   ['recipe_providers_account_exists', 'settings.recipeProviderErrorAccountExists'],
+  // Der letzte gescheiterte Abgleich eines Kontos (#1909, Migration 255): der
+  // Server speichert den Fall neben dem rohen Text, die Konto-Karte sagt den
+  // Satz (server/services/recipe-providers/failure.js). Das private Netz oben
+  // gilt auch hier.
+  ['recipe_providers_sync_auth_failed', 'settings.recipeProviderErrorSyncAuth'],
+  ['recipe_providers_sync_wrong_url', 'settings.recipeProviderErrorSyncWrongUrl'],
+  ['recipe_providers_sync_http_status', 'settings.recipeProviderErrorSyncStatus'],
+  ['recipe_providers_sync_timeout', 'settings.recipeProviderErrorSyncTimeout'],
+  ['recipe_providers_sync_unreachable', 'settings.recipeProviderErrorSyncUnreachable'],
+  ['recipe_providers_sync_certificate', 'settings.recipeProviderErrorSyncCertificate'],
+  ['recipe_providers_sync_bad_response', 'settings.recipeProviderErrorSyncBadResponse'],
 ]);
 
 /**
@@ -330,6 +341,7 @@ export const CASE_PARAMS = new Map([
   ['health_cycle_import_too_many_rows', ['limit']],
   ['documents_folder_too_deep', ['limit']],
   ['quick_links_limit_reached', ['limit']],
+  ['recipe_providers_sync_http_status', ['status']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
