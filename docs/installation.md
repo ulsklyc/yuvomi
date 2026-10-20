@@ -200,7 +200,7 @@ which version:
 | `color-mix()` | 111 | 113 | 16.2 | Tinted surfaces, selected and hover states lose their color; the dialog backdrop loses its tint |
 | `:has()` | 105 | 121 | 15.4 | Layout details: toolbar wrapping, the space kept free above the bottom navigation, full-height split pages |
 | Container queries | 105 | 110 | 16 | Cards and lists keep their narrow layout; split views stay in one column |
-| Popover | 114 | 125 | 17 | The "more actions" menus (shopping lists, contacts, documents, waste, health, recipes) do not open; the date field's calendar does not behave as intended (typing a date works, touch devices get the system picker) |
+| Popover | 114 | 125 | 17 | The menus behind a button are not available and stay hidden: every "more" menu (module tools, list rows, documents), the account menu at the foot of the sidebar, the Overview's New and tools menus, the calendar's view menu. Their buttons do nothing; Log out is also under Settings > Account. The date field's calendar does not open (typing a date works, touch devices get the system picker) |
 | `dvh` | 108 | 101 | 15.4 | Heights fall back to `vh`; on a phone the bottom edge can sit under the browser's toolbar |
 | `Object.hasOwn`, `Array.at()`, `findLastIndex()` | 97 | 104 | 15.4 | Single actions fail: note category filter, notification channel form, document storage settings, folder upload, fasting controls and durations, a birthday's custom reminder |
 | `<dialog>` `showModal()` | 37 | 98 | 15.4 | Icon picker and photo crop do not open |

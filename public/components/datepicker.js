@@ -395,6 +395,10 @@ class YuvomiDatepicker extends HTMLElement {
   }
 
   _openPopover(sub) {
+    // Ohne Popover-API ist das Kalenderblatt nicht verfuegbar (#2107): reset.css
+    // blendet jedes `[popover]` aus, und ein `aria-expanded="true"` samt
+    // Fokus-Sprung meldete einen Dialog, den niemand sieht. Tippen bleibt.
+    if (!this._supportsPopover()) return;
     const el = this._ensurePopover();
     // IM DIALOG, AUS DEM ER AUFGEHT (D7): ausserhalb eines modalen <dialog>
     // ist alles inert, auch ein Popover in der Top-Layer darueber. Ohne Dialog

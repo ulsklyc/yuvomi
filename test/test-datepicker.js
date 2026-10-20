@@ -176,5 +176,60 @@ test('Keine Locale hat überschüssige datepicker-Keys', () => {
   }
 });
 
+// ── Ohne Popover-API (#2107) ────────────────────────────────────────────
+// Chrome < 114, Firefox < 125, Safari < 17: reset.css blendet jedes
+// `[popover]` aus, das Kalenderblatt ist dort nicht verfuegbar. `_openPopover()`
+// darf dann weder ein Panel anlegen noch `aria-expanded="true"` melden - sonst
+// hoert ein Screenreader einen offenen Dialog, den niemand sieht. Als Programm,
+// nicht als Text: die Klasse laeuft mit einem HTMLElement ohne showPopover.
+{
+  const { register } = await import('node:module');
+  register('./test-browser-loader.mjs', import.meta.url);
+  const saved = {};
+  for (const k of ['HTMLElement', 'customElements', 'document', 'window']) {
+    saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  }
+  const fakeEl = () => ({
+    style: {}, dataset: {}, children: [], attrs: {},
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return this.attrs[k] ?? null; },
+    addEventListener() {}, appendChild(c) { this.children.push(c); return c; },
+    append() {}, replaceChildren() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    insertAdjacentHTML() {}, closest() { return null; }, contains() { return false; },
+    getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+  });
+  Object.assign(globalThis, {
+    HTMLElement: class {},
+    customElements: { get: () => undefined, define() {} },
+    document: Object.assign(fakeEl(), { body: fakeEl(), documentElement: fakeEl(), createElement: fakeEl, addEventListener() {}, removeEventListener() {} }),
+    window: { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: false }), innerWidth: 1024, innerHeight: 768 },
+  });
+  let result;
+  try {
+    const { YuvomiDatepicker } = await import('../public/components/datepicker.js');
+    const picker = new YuvomiDatepicker();
+    // Zeichnen und Positionieren sind hier nicht die Frage, nur die Entscheidung
+    // davor - so laeuft der Stand vor dem Fix bis zu `aria-expanded="true"`.
+    Object.assign(picker, {
+      getAttribute: () => null, hasAttribute: () => false, closest: () => null, isConnected: true,
+      _renderCalendar() {}, _position() {}, _resolveLabel: () => 'Datum',
+    });
+    const trigger = fakeEl();
+    let error = null;
+    try { picker._openPopover({ kind: 'date', trigger, wrap: fakeEl(), iso: '' }); } catch (err) { error = err; }
+    result = { error, expanded: trigger.attrs['aria-expanded'] ?? null, panel: picker._popover };
+  } finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k];
+    }
+  }
+  test('Ohne Popover-API legt _openPopover() kein Panel an und meldet nichts als offen (#2107)', () => {
+    assert(result.error === null, `_openPopover() wirft ohne Popover-API: ${result.error}`);
+    assert(result.panel === null, 'ohne Popover-API darf kein Kalenderblatt angelegt werden');
+    assert(result.expanded === null, `aria-expanded steht auf ${result.expanded} - ein Dialog, den niemand sieht`);
+  });
+}
+
 console.log(`\n  ${passed} bestanden, ${failed} fehlgeschlagen\n`);
 process.exit(failed > 0 ? 1 : 0);
