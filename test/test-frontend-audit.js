@@ -352,7 +352,7 @@ const LATE_MODAL_BESTAND = {
 
 const LATE_MODAL_RAT = {
   close: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben',
-  open: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und nach der Antwort '
+  open: 'den Kontext VOR der Anfrage festhalten (captureOpenContext() - der neueste Oeffnungswunsch gilt) und nach der Antwort '
     + '`if (!isModalContextCurrent(context)) return;` vor openModal()',
 };
 

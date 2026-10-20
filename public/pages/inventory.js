@@ -20,6 +20,7 @@ import {
   confirmModal,
   refocusAfterRender,
   captureModalContext,
+  captureOpenContext,
   isModalContextCurrent,
 } from '/components/modal.js';
 import { errorSentence, isGone, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
@@ -105,7 +106,7 @@ async function openLocationManager() {
   if (readOnly()) return;
   // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
   if (!isModalContextCurrent(context)) return;
 
@@ -172,7 +173,7 @@ async function openCategoryManager() {
   if (readOnly()) return;
   // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
   if (!isModalContextCurrent(context)) return;
 

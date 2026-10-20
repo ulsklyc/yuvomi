@@ -2,7 +2,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal, closeModal, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { todayKey, monthPeriodKeys, defaultDateInPeriod } from '/utils/date.js';
 import { amountStep, amountMin, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
@@ -127,7 +127,7 @@ export async function openTransferDialog(options) {
   // Laedt die Umbuchung erst, kann der Nutzer inzwischen einen anderen Dialog
   // geoeffnet oder die Seite verlassen haben: dann geht dieser nicht mehr auf
   // und verdraengt nichts (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let transfer = null;
   try { if (entry) transfer = (await api.get(`/budget/transfers/${entry.id}`)).data; }
   catch (err) { onError(err); return; }

@@ -23,7 +23,7 @@ import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { AVATAR_COLORS } from '/utils/color.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { makeSortable } from '/utils/sortable.js';
@@ -477,7 +477,7 @@ function listRowHtml(s, canEdit) {
 export async function openQuickLinksManager({ onChange = () => {} } = {}) {
   // Kommt die Liste erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let items = [];
   try {
     items = (await api.get('/quick-links'))?.data ?? [];

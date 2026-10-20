@@ -247,11 +247,20 @@ const STUBS = {
         : swap()
     );
     export const captureModalContext = () => globalThis.__modalContextId?.() ?? 'test-modal-context';
-    export const isModalContextCurrent = (context) => (
-      globalThis.__modalContextId?.() === undefined
+    // Wie das Original: ein Platz in der Reihe der Oeffnungswuensche, und nur
+    // der neueste gilt (#1997, Codex an #2132). Der Kontext selbst bleibt der
+    // von captureModalContext().
+    let openIntent = 0;
+    export const captureOpenContext = () => ({ openContext: captureModalContext(), intent: ++openIntent });
+    export const isModalContextCurrent = (context) => {
+      if (context && typeof context === 'object' && 'openContext' in context) {
+        if (context.intent !== openIntent) return false;
+        context = context.openContext;
+      }
+      return globalThis.__modalContextId?.() === undefined
         ? true
-        : globalThis.__modalContextId() === context
-    );
+        : globalThis.__modalContextId() === context;
+    };
     // Ob der festgehaltene Dialog noch offen ist (#1997). Ohne Sonde: ja - wer
     // die spaete Antwort messen will, setzt globalThis.__isOwnModalOpen.
     export const isOwnModalOpen = (context) => (

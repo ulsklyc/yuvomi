@@ -15,6 +15,7 @@ import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
   captureModalContext,
+  captureOpenContext,
   isModalContextCurrent,
   advancedSection,
   wireBlurValidation,
@@ -1632,7 +1633,7 @@ async function openLocationManager() {
   if (readOnly()) return;
   // Laedt die Komponente erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht die Verwaltung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   await import('/components/category-manager.js');
   if (!isModalContextCurrent(context)) return;
 

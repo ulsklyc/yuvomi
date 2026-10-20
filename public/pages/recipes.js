@@ -6,7 +6,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
-import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
@@ -1482,7 +1482,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
   const owner = _container;
   // Kommt der Vorrat erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];
@@ -1592,7 +1592,7 @@ async function openPantryBulkMatchModal(recipe) {
   const owner = _container;
   // Kommt der Vorrat erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   try {
     const res = await api.get('/pantry');
     items = res.data ?? [];

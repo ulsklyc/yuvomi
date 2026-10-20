@@ -113,9 +113,25 @@ export function isOwnModalOpen(context) {
   return Boolean(context?.overlay) && context.overlay === activeOverlay && modalState !== 'closing';
 }
 
+/**
+ * Der Kontext fuer einen Dialog, der erst nach einer Antwort aufgeht (#1997):
+ * wie captureModalContext(), dazu ein Platz in der Reihe der Oeffnungswuensche.
+ * Tippt der Nutzer A und dann B, bevor eine der Anfragen zurueck ist, gilt nur
+ * B - in welcher Reihenfolge die Antworten auch kommen. Ohne den Platz fingen
+ * beide dieselbe Generation, die zuerst angekommene Antwort oeffnete, und der
+ * zuletzt gewaehlte Dialog wurde verworfen (Codex an #2132).
+ */
+let _openIntent = 0;
+export function captureOpenContext() {
+  _openIntent += 1;
+  return { ...captureModalContext(), intent: _openIntent };
+}
+
 /** Ob seit captureModalContext() weder Dialog noch Seiteninstanz wechselte. */
 export function isModalContextCurrent(context) {
   if (!context || context.generation !== _modalGeneration) return false;
+  // Ein neuerer Oeffnungswunsch loest einen aelteren ab (captureOpenContext).
+  if (context.intent !== undefined && context.intent !== _openIntent) return false;
   const route = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (context.route !== route) return false;
   return !context.pageRoot || context.pageRoot.isConnected;

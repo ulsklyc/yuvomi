@@ -12,7 +12,7 @@ import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
-import { promptModal, openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
@@ -1050,7 +1050,7 @@ async function openSendListDialog(container) {
 
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let members = [];
   try {
     // Nicht `/family/members`: der zeigt dieselben Haushaltsmitglieder, prueft
@@ -3024,7 +3024,7 @@ async function openPantryTransfer(container) {
 
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let locations = [];
   try {
     const res = await api.get('/pantry/locations');

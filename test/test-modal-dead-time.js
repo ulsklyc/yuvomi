@@ -120,7 +120,7 @@ const pointerClick = (target, pointerType = 'mouse') => makeEvent('click', { tar
 /** Ein per Tastatur ausgeloester Klick: leere Zeigerart, detail 0. */
 const keyboardClick = (target) => makeEvent('click', { target, pointerType: '', detail: 0 });
 
-const { armPointerDeadTime, openModal, closeModal, whenModalClosed, captureModalContext, askOverModal, isOwnModalOpen } = await import('../public/components/modal.js');
+const { armPointerDeadTime, openModal, closeModal, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, askOverModal, isOwnModalOpen } = await import('../public/components/modal.js');
 
 // --------------------------------------------------------
 // 1) Die Sperre selbst - mit eigener Uhr, ohne openModal
@@ -681,3 +681,28 @@ test('ein Dialog in seiner Schliess-Animation gehoert dem Ablauf nicht mehr (#19
   fireAnimationEnd(a.overlay);
   await settled(whenModalClosed());
 });
+
+test('Oeffnungswuensche: der neueste gilt, in welcher Reihenfolge die Antworten auch kommen (#1997, Codex an #2132)', async () => {
+  await freshDocument({ width: 1024 });
+  withLocation();
+  globalThis.matchMedia = () => ({ matches: true });
+  // A antwortet zuerst: A ist abgeloest, B oeffnet.
+  const a = captureOpenContext();
+  const b = captureOpenContext();
+  assert.equal(isModalContextCurrent(a), false, 'A oeffnet, obwohl danach B gewaehlt wurde');
+  assert.equal(isModalContextCurrent(b), true, 'B, der zuletzt gewaehlte, darf nicht oeffnen');
+  openDialog({ openedAt: 0 });
+  assert.equal(isModalContextCurrent(b), false, 'nach dem Oeffnen gilt die neue Generation');
+  // B antwortet zuerst und oeffnet: A kommt danach nicht mehr durch.
+  const c = captureOpenContext();
+  const d = captureOpenContext();
+  assert.equal(isModalContextCurrent(d), true);
+  openDialog({ openedAt: 1000 });
+  assert.equal(isModalContextCurrent(c), false, 'der aeltere Wunsch oeffnet ueber dem neueren');
+  // Ein Schliess-Kontext kennt keine Reihe: ein Oeffnungswunsch loest ihn nicht ab.
+  const schliessen = captureModalContext();
+  captureOpenContext();
+  assert.equal(isModalContextCurrent(schliessen), true, 'ein Oeffnungswunsch macht einen Schliess-Kontext ungueltig');
+  await closeModal({ force: true });
+});
+

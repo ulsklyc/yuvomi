@@ -252,6 +252,60 @@ test('#1997: Mitglied bearbeiten - die Betreuenden laden erst', async () => {
   });
 });
 
+// Codex an #2132: tippt der Nutzer A und dann B, bevor eine der Anfragen
+// zurueck ist, gilt B - in welcher Reihenfolge die Antworten auch kommen. Beide
+// Oeffner fingen sonst dieselbe Generation, die zuerst angekommene Antwort
+// oeffnete und loeste die Generation weiter, und B wurde verworfen.
+async function wettlauf(name, { oeffneA, oeffneB, antwortA, antwortB, istB }) {
+  for (const zuerst of ['A', 'B']) {
+    const offen = [];
+    const geoeffnet = [];
+    // Wie das Original: jedes Oeffnen ist eine neue Generation.
+    let kontext = 'seite';
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__openModal = (opts) => { geoeffnet.push(opts); kontext = `dialog-${geoeffnet.length}`; };
+    globalThis.__apiStub = { get: () => new Promise((resolve) => { offen.push(resolve); }) };
+    try {
+      const a = oeffneA();
+      const b = oeffneB();
+      assert.equal(offen.length, 2, `${name}: beide Anfragen laufen`);
+      if (zuerst === 'A') { offen[0](antwortA); await a; offen[1](antwortB); await b; }
+      else { offen[1](antwortB); await b; offen[0](antwortA); await a; }
+      assert.equal(geoeffnet.length, 1, `${name}, ${zuerst} antwortet zuerst: ${geoeffnet.length} Dialoge geoeffnet`);
+      assert.ok(istB(geoeffnet[0]), `${name}, ${zuerst} antwortet zuerst: offen ist nicht der zuletzt gewaehlte (B)`);
+    } finally {
+      delete globalThis.__modalContextId;
+      delete globalThis.__openModal;
+      delete globalThis.__apiStub;
+    }
+  }
+}
+
+test('#1997: Kontakt A, dann B gewaehlt - offen ist B, wer auch zuerst antwortet (Codex an #2132)', async () => {
+  const ada = { id: 1, first_name: 'Ada', last_name: 'Lovelace' };
+  const bo = { id: 2, first_name: 'Bo', last_name: 'Zweitname' };
+  await wettlauf('Kontakt', {
+    oeffneA: () => contacts.openContactModal({ mode: 'edit', contact: ada }),
+    oeffneB: () => contacts.openContactModal({ mode: 'edit', contact: bo }),
+    antwortA: { data: ada },
+    antwortB: { data: bo },
+    istB: (opts) => String(opts.content).includes('Zweitname') && !String(opts.content).includes('Lovelace'),
+  });
+});
+
+test('#1997: Punkteverlauf von A, dann B - offen ist B (Codex an #2132)', async () => {
+  await mitBelohnungen(async () => {
+    rewards.state.overview.balances.push({ id: 2, display_name: 'Zweitname', balance: 1 });
+    await wettlauf('Punkteverlauf', {
+      oeffneA: () => rewards.openMemberDetail(1),
+      oeffneB: () => rewards.openMemberDetail(2),
+      antwortA: { data: [] },
+      antwortB: { data: [] },
+      istB: (opts) => String(opts.title).includes('Zweitname') || String(opts.content).includes('Zweitname'),
+    });
+  });
+});
+
 // Kein Oeffnen, sondern das Schliessen in einem Helfer: reportError() der
 // Vorsorge-Arten schloss bei "gibt es nicht mehr" den Dialog, der gerade offen
 // war - ohne zu fragen, ob es noch der ist, aus dem gespeichert wurde.

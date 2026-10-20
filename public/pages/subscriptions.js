@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -2338,7 +2338,7 @@ function openMetadataModal() {
           // Die Verwaltung ist jetzt zu. Was der Nutzer waehrend des Loeschens
           // und Ladens oeffnet, gehoert ihm: openMetadataModal() schloesse es
           // ebenso wie ein closeModal() ohne Kontext (#1997).
-          const afterConfirm = captureModalContext();
+          const afterConfirm = captureOpenContext();
           try {
             await api.delete(`/budget/subscriptions/${isCat ? 'categories' : 'payment-methods'}/${id}`);
           } catch (err) {

@@ -16,7 +16,8 @@
  * mitgibt (`closeModal({ force: true, context })`, die Regel steht in
  * components/modal.js), und jeder Aufruf, vor dem seit der Antwort ein
  * `isModalContextCurrent(...)` steht (fuer das Oeffnen der einzige Schutz:
- * es nimmt keinen Kontext).
+ * es nimmt keinen Kontext; den Kontext dafuer haelt `captureOpenContext()`
+ * fest, damit von zwei schnell gewaehlten Dialogen der zuletzt gewaehlte gilt).
  *
  * SPAET ist ein Aufruf in zwei Formen:
  * - hinter einem `await` derselben Funktion (ohne die in verschachtelten

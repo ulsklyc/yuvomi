@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed, captureModalContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -1991,7 +1991,7 @@ async function openGroupModal(group = null) {
   const isEdit = Boolean(group);
   // Kommen die Kandidaten erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   const candidates = isEdit ? await loadMemberCandidates() : [];
   if (!isModalContextCurrent(context)) return;
   openSharedModal({
@@ -2651,7 +2651,7 @@ async function openMemberModal() {
   if (readOnly()) return;
   // Kommen die Kandidaten erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   const candidates = await loadMemberCandidates();
   if (!isModalContextCurrent(context)) return;
   openSharedModal({

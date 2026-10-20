@@ -12,7 +12,7 @@ import { AVATAR_COLORS } from '/utils/color.js';
 import { sortMembers } from '/utils/member-order.js';
 import { makeSortable } from '/utils/sortable.js';
 import { vibrate } from '/utils/ux.js';
-import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
@@ -970,7 +970,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
   const state = { avatarData: member.avatar_data ?? null };
   // Kommen die Betreuenden erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   const caregiverIds = await loadCaregiverIds(member.id);
   if (!isModalContextCurrent(context)) return;
   openModal({

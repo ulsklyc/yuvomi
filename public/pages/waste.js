@@ -15,7 +15,7 @@ import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
-import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
@@ -1971,7 +1971,7 @@ function openMappingProfileImportModal(source) {
     if (!file) return;
     // Kommt die Vorschau erst, nachdem der Nutzer einen anderen Dialog
     // geoeffnet oder die Seite verlassen hat, geht sie nicht mehr auf (#1997).
-    const context = captureModalContext();
+    const context = captureOpenContext();
     let profile;
     try {
       profile = JSON.parse(await file.text());
@@ -2324,7 +2324,7 @@ function reminderSettingRowHtml(setting) {
 async function openReminderSettingsModal() {
   // Kommen die Einstellungen erst, nachdem der Nutzer einen anderen Dialog
   // geoeffnet oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let settings;
   try {
     settings = (await api.get('/waste/reminder-settings')).data;

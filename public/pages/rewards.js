@@ -11,7 +11,7 @@ import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
-import { openModal, closeModal, captureModalContext, isModalContextCurrent, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
@@ -1338,7 +1338,7 @@ async function openParticipantsModal() {
   if (readOnly()) return;
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let members = [];
   try {
     const res = await api.get('/rewards/participants');
@@ -1400,7 +1400,7 @@ async function openMemberDetail(memberId) {
   if (!member) return;
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let ledger = [];
   try {
     const res = await api.get(`/rewards/ledger?user_id=${memberId}&limit=12`);
@@ -2046,7 +2046,7 @@ async function openMoneyDetail(memberId) {
   if (!account) return;
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
-  const context = captureModalContext();
+  const context = captureOpenContext();
   let ledger = [];
   try {
     ledger = (await api.get(`/rewards/money/ledger?user_id=${memberId}&limit=20`)).data || [];
