@@ -1450,7 +1450,18 @@
         "errorEmailTooLong": "E-mailová adresa může mít nejvýše {{limit}} znaků.",
         "errorAddressTooLong": "Adresa může mít nejvýše {{limit}} znaků.",
         "errorNotesTooLong": "Poznámky mohou mít nejvýše {{limit}} znaků.",
-        "errorBirthdayInvalid": "Datum narozenin není platné."
+        "errorBirthdayInvalid": "Datum narozenin není platné.",
+        "errorPhoneEntryInvalid": "Jedno z telefonních čísel je neúplné nebo neplatné.",
+        "errorPhonesTooMany": "Tento kontakt má příliš mnoho telefonních čísel. Maximum je {{limit}}.",
+        "errorPhoneLabelTooLong": "Označení telefonního čísla může mít nejvýše {{limit}} znaků.",
+        "errorEmailEntryInvalid": "Jedna z e-mailových adres je neúplná nebo neplatná.",
+        "errorEmailInvalid": "E-mailová adresa není platná. Musí mít tvar jmeno@priklad.cz.",
+        "errorEmailsTooMany": "Tento kontakt má příliš mnoho e-mailových adres. Maximum je {{limit}}.",
+        "errorEmailLabelTooLong": "Označení e-mailové adresy může mít nejvýše {{limit}} znaků.",
+        "errorAddressEntryInvalid": "Jedna z adres je neúplná nebo neplatná.",
+        "errorAddressesTooMany": "Tento kontakt má příliš mnoho adres. Maximum je {{limit}}.",
+        "errorAddressLabelTooLong": "Označení adresy může mít nejvýše {{limit}} znaků.",
+        "errorAddressPartTooLong": "Ulice, obec, kraj, PSČ a země adresy mohou mít každá nejvýše {{limit}} znaků."
     },
     "budget": {
         "title": "Rozpočet",

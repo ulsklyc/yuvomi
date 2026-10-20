@@ -421,6 +421,91 @@ try {
   });
 
   // ------------------------------------------------------------------
+  // Die Mehrfachfelder nennen ihren Fall (#1909): das Kontaktformular schickt
+  // jede Nummer und E-Mail-Adresse als Eintrag, und eine Adresse ohne @ oder
+  // eine Nummer ueber 50 Zeichen bekam bis dahin nur den allgemeinen Satz. Jede
+  // Absage traegt jetzt `reason`, eine Grenze als `params.limit`; der englische
+  // `error` bleibt wortgleich fuer API-Clients.
+  // ------------------------------------------------------------------
+  const MV_CASES = [
+    // [Feld, Wert, Grund, Grenze, error]
+    ['phones', 'keine Liste', 'contacts_phone_entry_invalid', undefined, 'Phones must be an array'],
+    ['phones', Array.from({ length: 21 }, (_, i) => ({ label: 'm', value: `0${i}` })), 'contacts_phones_too_many', 20, 'Too many phone entries (max 20)'],
+    ['phones', [null], 'contacts_phone_entry_invalid', undefined, 'Phone entry must be an object'],
+    ['phones', [{ label: 'Mobil' }], 'contacts_phone_entry_invalid', undefined, 'Phone requires label and value'],
+    ['phones', [{ label: '   ', value: '0800' }], 'contacts_phone_entry_invalid', undefined, 'Phone label invalid or too long'],
+    ['phones', [{ label: 'L'.repeat(51), value: '0800' }], 'contacts_phone_label_too_long', 50, 'Phone label invalid or too long'],
+    ['phones', [{ label: 'Mobil', value: 12345 }], 'contacts_phone_entry_invalid', undefined, 'Phone value invalid or too long'],
+    ['phones', [{ label: 'Mobil', value: '1'.repeat(51) }], 'contacts_phone_too_long', 50, 'Phone value invalid or too long'],
+    ['phones', [{ label: 'Mobil', value: '0800', isPrimary: 'ja' }], 'contacts_phone_entry_invalid', undefined, 'Phone isPrimary must be boolean'],
+    ['emails', {}, 'contacts_email_entry_invalid', undefined, 'Emails must be an array'],
+    ['emails', Array.from({ length: 21 }, (_, i) => ({ label: 'p', value: `a${i}@x.de` })), 'contacts_emails_too_many', 20, 'Too many email entries (max 20)'],
+    ['emails', ['a@x.de'], 'contacts_email_entry_invalid', undefined, 'Email entry must be an object'],
+    ['emails', [{ value: 'a@x.de' }], 'contacts_email_entry_invalid', undefined, 'Email requires label and value'],
+    ['emails', [{ label: 'L'.repeat(51), value: 'a@x.de' }], 'contacts_email_label_too_long', 50, 'Email label invalid or too long'],
+    ['emails', [{ label: 'Privat', value: `${'e'.repeat(251)}@x.de` }], 'contacts_email_too_long', 255, 'Email value invalid or too long'],
+    ['emails', [{ label: 'Privat', value: 'kein-at-zeichen' }], 'contacts_email_invalid', undefined, 'Email value must be a valid email address'],
+    ['emails', [{ label: 'Privat', value: 'a@x.de', isPrimary: 1 }], 'contacts_email_entry_invalid', undefined, 'Email isPrimary must be boolean'],
+    ['addresses', 'keine Liste', 'contacts_address_entry_invalid', undefined, 'Addresses must be an array'],
+    ['addresses', Array.from({ length: 21 }, () => ({ label: 'h' })), 'contacts_addresses_too_many', 20, 'Too many address entries (max 20)'],
+    ['addresses', [42], 'contacts_address_entry_invalid', undefined, 'Address entry must be an object'],
+    ['addresses', [{ city: 'Berlin' }], 'contacts_address_entry_invalid', undefined, 'Address requires label'],
+    ['addresses', [{ label: 'L'.repeat(51) }], 'contacts_address_label_too_long', 50, 'Address label invalid or too long'],
+    ['addresses', [{ label: 'Zuhause', street: 'S'.repeat(256) }], 'contacts_address_part_too_long', 255, 'Address street invalid or too long'],
+    ['addresses', [{ label: 'Zuhause', postalCode: 12345 }], 'contacts_address_entry_invalid', undefined, 'Address postalCode invalid or too long'],
+    ['addresses', [{ label: 'Zuhause', country: 'C'.repeat(256) }], 'contacts_address_part_too_long', 255, 'Address country invalid or too long'],
+    ['addresses', [{ label: 'Zuhause', isPrimary: 'ja' }], 'contacts_address_entry_invalid', undefined, 'Address isPrimary must be boolean'],
+  ];
+  const expectMvCase = (where, res, [field, , reason, limit, error]) => {
+    assert(res.status === 400, `${where} ${field} ${reason}: Status ${res.status}`);
+    assert(res.body.reason === reason, `${where} ${field}: reason ${res.body.reason}, erwartet ${reason}`);
+    assert(JSON.stringify(res.body.params) === JSON.stringify(limit === undefined ? undefined : { limit }),
+      `${where} ${field} ${reason}: params ${JSON.stringify(res.body.params)}`);
+    assert(res.body.error === error, `${where} ${field} ${reason}: error ${res.body.error}`);
+  };
+
+  await asyncTest('POST / mit abgewiesenem Mehrfachfeld nennt Grund und Grenze, error bleibt (#1909)', async () => {
+    for (const c of MV_CASES) {
+      expectMvCase('POST', await jsend(base, 'POST', { name: 'Mehrfach Fall', [c[0]]: c[1] }), c);
+    }
+  });
+
+  await asyncTest('PUT /:id mit abgewiesenem Mehrfachfeld nennt Grund und Grenze, error bleibt (#1909)', async () => {
+    const created = await jsend(base, 'POST', { name: 'Mehrfach Bearbeiten' });
+    const id = created.body.data.id;
+    for (const c of MV_CASES) {
+      expectMvCase('PUT', await jsend(`${base}/${id}`, 'PUT', { [c[0]]: c[1] }), c);
+    }
+  });
+
+  await asyncTest('Mehrfachfelder: der erste scheiternde Eintrag wird benannt, Einzelfelder vorher, gueltige gehen durch (#1909)', async () => {
+    // Zwei Befunde in einer Liste: der erste Eintrag.
+    const twoInList = await jsend(base, 'POST', { name: 'Mehrfach Fall',
+      emails: [{ label: 'Privat', value: 'ohne-at' }, { label: 'L'.repeat(51), value: 'a@x.de' }] });
+    assert(twoInList.body.reason === 'contacts_email_invalid', `reason ${twoInList.body.reason}`);
+    // Zwei Felder: phones vor emails vor addresses.
+    const twoFields = await jsend(base, 'POST', { name: 'Mehrfach Fall',
+      addresses: [{ label: 'L'.repeat(51) }], emails: [{ label: 'Privat', value: 'ohne-at' }],
+      phones: [{ label: 'Mobil', value: '1'.repeat(51) }] });
+    assert(twoFields.body.reason === 'contacts_phone_too_long' && twoFields.body.params?.limit === 50,
+      `phones zuerst: ${JSON.stringify(twoFields.body)}`);
+    // Ein Einzelfeld scheitert vorher und wird benannt, wie in der ersten Scheibe.
+    const single = await jsend(base, 'POST', { name: 'Mehrfach Fall', notes: 'n'.repeat(5001),
+      phones: [{ label: 'Mobil', value: '1'.repeat(51) }] });
+    assert(single.body.reason === 'contacts_notes_too_long', `Einzelfeld zuerst: ${single.body.reason}`);
+    // Die geloeschte Kategorie als einziger Befund der Einzelfelder bleibt ihr Fall.
+    const category = await jsend(base, 'POST', { name: 'Mehrfach Fall', category: 'gibt-es-nicht',
+      emails: [{ label: 'Privat', value: 'ohne-at' }] });
+    assert(category.body.reason === 'contacts_selected_category_not_found', `Kategorie: ${category.body.reason}`);
+    // Genau an der Grenze geht es durch.
+    const ok = await jsend(base, 'POST', { name: 'Mehrfach Grenze',
+      phones: [{ label: 'L'.repeat(50), value: '1'.repeat(50) }],
+      emails: [{ label: 'Privat', value: `${'e'.repeat(250)}@x.de` }],
+      addresses: [{ label: 'Zuhause', street: 'S'.repeat(255) }] });
+    assert(ok.status === 201, `Grenze: ${ok.status} ${JSON.stringify(ok.body)}`);
+  });
+
+  // ------------------------------------------------------------------
   // Kategorie-404-Pfade (Ergänzung zu test-contact-categories.js)
   // ------------------------------------------------------------------
   await asyncTest('PUT /categories/:key für unbekannten Key → 404', async () => {

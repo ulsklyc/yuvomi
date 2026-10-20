@@ -81,9 +81,20 @@ const CATEGORY_GONE = '`contacts_selected_category_not_found` (400, the chosen `
 const FIELD_CASES = '`contacts_name_too_long`, `contacts_phone_too_long`, `contacts_email_too_long`, '
   + '`contacts_address_too_long`, `contacts_notes_too_long` (400, the first field that is too long; '
   + '`params.limit` carries its maximum length), `contacts_birthday_invalid` (400, `birthday` is not a valid date)';
+// Die Mehrfachfelder: erst nach den Einzelfeldern geprueft, in der Reihenfolge
+// phones, emails, addresses, und je Liste der ERSTE Eintrag, der scheitert.
+const MULTI_CASES = 'for `phones`, `emails` and `addresses`, checked after the fields above and in this order, '
+  + 'naming the first entry that fails: `contacts_phones_too_many`, `contacts_emails_too_many`, `contacts_addresses_too_many` '
+  + '(400, more than `params.limit` entries), `contacts_phone_too_long`, `contacts_email_too_long` (400, an entry\'s `value` '
+  + 'is longer than `params.limit`), `contacts_phone_label_too_long`, `contacts_email_label_too_long`, '
+  + '`contacts_address_label_too_long` (400, an entry\'s `label` is longer than `params.limit`), '
+  + '`contacts_address_part_too_long` (400, `street`, `city`, `state`, `postalCode` or `country` is longer than `params.limit`), '
+  + '`contacts_email_invalid` (400, an email `value` has no `@` with text on both sides), '
+  + '`contacts_phone_entry_invalid`, `contacts_email_entry_invalid`, `contacts_address_entry_invalid` (400, the field is not '
+  + 'a list, or an entry is not an object, lacks its `label` or `value`, carries one that is not text, or an `isPrimary` that is not a boolean)';
 const CASE_REASONS = {
-  '/api/v1/contacts': { post: `${CATEGORY_GONE}, ${FIELD_CASES}` },
-  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}, ${FIELD_CASES}`, delete: CONTACT_GONE },
+  '/api/v1/contacts': { post: `${CATEGORY_GONE}, ${FIELD_CASES}; ${MULTI_CASES}` },
+  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}, ${FIELD_CASES}; ${MULTI_CASES}`, delete: CONTACT_GONE },
 };
 
 function withCaseReasons(paths) {

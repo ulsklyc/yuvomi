@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "Az e-mail-cím legfeljebb {{limit}} karakter lehet.",
         "errorAddressTooLong": "A cím legfeljebb {{limit}} karakter lehet.",
         "errorNotesTooLong": "A jegyzetek legfeljebb {{limit}} karakter hosszúak lehetnek.",
-        "errorBirthdayInvalid": "A születésnap nem érvényes dátum."
+        "errorBirthdayInvalid": "A születésnap nem érvényes dátum.",
+        "errorPhoneEntryInvalid": "Az egyik telefonszám hiányos vagy érvénytelen.",
+        "errorPhonesTooMany": "Ennek a névjegynek túl sok telefonszáma van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorPhoneLabelTooLong": "Egy telefonszám címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorEmailEntryInvalid": "Az egyik e-mail-cím hiányos vagy érvénytelen.",
+        "errorEmailInvalid": "Egy e-mail-cím érvénytelen. A formája ilyen legyen: nev@pelda.hu.",
+        "errorEmailsTooMany": "Ennek a névjegynek túl sok e-mail-címe van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorEmailLabelTooLong": "Egy e-mail-cím címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorAddressEntryInvalid": "Az egyik cím hiányos vagy érvénytelen.",
+        "errorAddressesTooMany": "Ennek a névjegynek túl sok címe van. Legfeljebb ennyi lehet: {{limit}}.",
+        "errorAddressLabelTooLong": "Egy cím címkéje legfeljebb {{limit}} karakter lehet.",
+        "errorAddressPartTooLong": "Egy cím utcája, települése, régiója, irányítószáma és országa egyenként legfeljebb {{limit}} karakter lehet."
     },
     "budget": {
         "title": "Költségvetés",

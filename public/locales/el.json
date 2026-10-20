@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "Η διεύθυνση email μπορεί να έχει έως {{limit}} χαρακτήρες.",
         "errorAddressTooLong": "Η διεύθυνση μπορεί να έχει έως {{limit}} χαρακτήρες.",
         "errorNotesTooLong": "Οι σημειώσεις μπορούν να έχουν έως {{limit}} χαρακτήρες.",
-        "errorBirthdayInvalid": "Τα γενέθλια δεν είναι έγκυρη ημερομηνία."
+        "errorBirthdayInvalid": "Τα γενέθλια δεν είναι έγκυρη ημερομηνία.",
+        "errorPhoneEntryInvalid": "Ένας από τους αριθμούς τηλεφώνου είναι ελλιπής ή μη έγκυρος.",
+        "errorPhonesTooMany": "Αυτή η επαφή έχει πάρα πολλούς αριθμούς τηλεφώνου. Το μέγιστο είναι {{limit}}.",
+        "errorPhoneLabelTooLong": "Η ετικέτα ενός αριθμού τηλεφώνου μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorEmailEntryInvalid": "Μία από τις διευθύνσεις email είναι ελλιπής ή μη έγκυρη.",
+        "errorEmailInvalid": "Μια διεύθυνση email δεν είναι έγκυρη. Πρέπει να έχει τη μορφή name@example.com.",
+        "errorEmailsTooMany": "Αυτή η επαφή έχει πάρα πολλές διευθύνσεις email. Το μέγιστο είναι {{limit}}.",
+        "errorEmailLabelTooLong": "Η ετικέτα μιας διεύθυνσης email μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorAddressEntryInvalid": "Μία από τις διευθύνσεις είναι ελλιπής ή μη έγκυρη.",
+        "errorAddressesTooMany": "Αυτή η επαφή έχει πάρα πολλές διευθύνσεις. Το μέγιστο είναι {{limit}}.",
+        "errorAddressLabelTooLong": "Η ετικέτα μιας διεύθυνσης μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorAddressPartTooLong": "Η οδός, η πόλη, η περιοχή, ο ταχυδρομικός κώδικας και η χώρα μιας διεύθυνσης μπορούν να έχουν έως {{limit}} χαρακτήρες το καθένα."
     },
     "budget": {
         "title": "Προϋπολογισμός",

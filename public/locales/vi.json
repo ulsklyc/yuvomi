@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "Địa chỉ email chỉ được dài tối đa {{limit}} ký tự.",
         "errorAddressTooLong": "Địa chỉ chỉ được dài tối đa {{limit}} ký tự.",
         "errorNotesTooLong": "Ghi chú chỉ được dài tối đa {{limit}} ký tự.",
-        "errorBirthdayInvalid": "Ngày sinh nhật không hợp lệ."
+        "errorBirthdayInvalid": "Ngày sinh nhật không hợp lệ.",
+        "errorPhoneEntryInvalid": "Một trong các số điện thoại chưa đầy đủ hoặc không hợp lệ.",
+        "errorPhonesTooMany": "Liên hệ này có quá nhiều số điện thoại. Tối đa là {{limit}}.",
+        "errorPhoneLabelTooLong": "Nhãn của số điện thoại chỉ được dài tối đa {{limit}} ký tự.",
+        "errorEmailEntryInvalid": "Một trong các địa chỉ email chưa đầy đủ hoặc không hợp lệ.",
+        "errorEmailInvalid": "Một địa chỉ email không hợp lệ. Địa chỉ cần có dạng ten@vidu.com.",
+        "errorEmailsTooMany": "Liên hệ này có quá nhiều địa chỉ email. Tối đa là {{limit}}.",
+        "errorEmailLabelTooLong": "Nhãn của địa chỉ email chỉ được dài tối đa {{limit}} ký tự.",
+        "errorAddressEntryInvalid": "Một trong các địa chỉ chưa đầy đủ hoặc không hợp lệ.",
+        "errorAddressesTooMany": "Liên hệ này có quá nhiều địa chỉ. Tối đa là {{limit}}.",
+        "errorAddressLabelTooLong": "Nhãn của địa chỉ chỉ được dài tối đa {{limit}} ký tự.",
+        "errorAddressPartTooLong": "Đường, thành phố, vùng, mã bưu chính và quốc gia của một địa chỉ, mỗi mục chỉ được dài tối đa {{limit}} ký tự."
     },
     "budget": {
         "title": "Ngân sách",

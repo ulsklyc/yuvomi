@@ -1392,7 +1392,18 @@
         "errorEmailTooLong": "이메일 주소는 최대 {{limit}}자까지 입력할 수 있습니다.",
         "errorAddressTooLong": "주소는 최대 {{limit}}자까지 입력할 수 있습니다.",
         "errorNotesTooLong": "메모는 최대 {{limit}}자까지 입력할 수 있습니다.",
-        "errorBirthdayInvalid": "생일이 올바른 날짜가 아닙니다."
+        "errorBirthdayInvalid": "생일이 올바른 날짜가 아닙니다.",
+        "errorPhoneEntryInvalid": "전화번호 중 하나가 불완전하거나 올바르지 않습니다.",
+        "errorPhonesTooMany": "이 연락처에 전화번호가 너무 많습니다. 최대 {{limit}}개까지 가능합니다.",
+        "errorPhoneLabelTooLong": "전화번호 라벨은 최대 {{limit}}자까지 입력할 수 있습니다.",
+        "errorEmailEntryInvalid": "이메일 주소 중 하나가 불완전하거나 올바르지 않습니다.",
+        "errorEmailInvalid": "올바르지 않은 이메일 주소가 있습니다. name@example.com 형식이어야 합니다.",
+        "errorEmailsTooMany": "이 연락처에 이메일 주소가 너무 많습니다. 최대 {{limit}}개까지 가능합니다.",
+        "errorEmailLabelTooLong": "이메일 주소 라벨은 최대 {{limit}}자까지 입력할 수 있습니다.",
+        "errorAddressEntryInvalid": "주소 중 하나가 불완전하거나 올바르지 않습니다.",
+        "errorAddressesTooMany": "이 연락처에 주소가 너무 많습니다. 최대 {{limit}}개까지 가능합니다.",
+        "errorAddressLabelTooLong": "주소 라벨은 최대 {{limit}}자까지 입력할 수 있습니다.",
+        "errorAddressPartTooLong": "주소의 도로명, 도시, 지역, 우편번호, 국가는 각각 최대 {{limit}}자까지 입력할 수 있습니다."
     },
     "budget": {
         "title": "예산",

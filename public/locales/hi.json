@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "ईमेल पता अधिकतम {{limit}} वर्णों का हो सकता है।",
         "errorAddressTooLong": "पता अधिकतम {{limit}} वर्णों का हो सकता है।",
         "errorNotesTooLong": "नोट्स अधिकतम {{limit}} वर्णों के हो सकते हैं।",
-        "errorBirthdayInvalid": "जन्मदिन की तारीख मान्य नहीं है।"
+        "errorBirthdayInvalid": "जन्मदिन की तारीख मान्य नहीं है।",
+        "errorPhoneEntryInvalid": "फ़ोन नंबरों में से एक अधूरा या अमान्य है।",
+        "errorPhonesTooMany": "इस संपर्क में बहुत अधिक फ़ोन नंबर हैं। अधिकतम संख्या {{limit}} है।",
+        "errorPhoneLabelTooLong": "फ़ोन नंबर का लेबल अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorEmailEntryInvalid": "ईमेल पतों में से एक अधूरा या अमान्य है।",
+        "errorEmailInvalid": "एक ईमेल पता मान्य नहीं है। यह name@example.com के रूप में होना चाहिए।",
+        "errorEmailsTooMany": "इस संपर्क में बहुत अधिक ईमेल पते हैं। अधिकतम संख्या {{limit}} है।",
+        "errorEmailLabelTooLong": "ईमेल पते का लेबल अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorAddressEntryInvalid": "पतों में से एक अधूरा या अमान्य है।",
+        "errorAddressesTooMany": "इस संपर्क में बहुत अधिक पते हैं। अधिकतम संख्या {{limit}} है।",
+        "errorAddressLabelTooLong": "पते का लेबल अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorAddressPartTooLong": "किसी पते की सड़क, शहर, क्षेत्र, पिन कोड और देश में से हर एक अधिकतम {{limit}} वर्णों का हो सकता है।"
     },
     "budget": {
         "title": "बजट",

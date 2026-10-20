@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "L’indirizzo email può avere al massimo {{limit}} caratteri.",
         "errorAddressTooLong": "L’indirizzo può avere al massimo {{limit}} caratteri.",
         "errorNotesTooLong": "Le note possono avere al massimo {{limit}} caratteri.",
-        "errorBirthdayInvalid": "Il compleanno non è una data valida."
+        "errorBirthdayInvalid": "Il compleanno non è una data valida.",
+        "errorPhoneEntryInvalid": "Uno dei numeri di telefono è incompleto o non valido.",
+        "errorPhonesTooMany": "Questo contatto ha troppi numeri di telefono. Il massimo è {{limit}}.",
+        "errorPhoneLabelTooLong": "L’etichetta di un numero di telefono può avere al massimo {{limit}} caratteri.",
+        "errorEmailEntryInvalid": "Uno degli indirizzi email è incompleto o non valido.",
+        "errorEmailInvalid": "Un indirizzo email non è valido. Deve avere la forma nome@esempio.it.",
+        "errorEmailsTooMany": "Questo contatto ha troppi indirizzi email. Il massimo è {{limit}}.",
+        "errorEmailLabelTooLong": "L’etichetta di un indirizzo email può avere al massimo {{limit}} caratteri.",
+        "errorAddressEntryInvalid": "Uno degli indirizzi è incompleto o non valido.",
+        "errorAddressesTooMany": "Questo contatto ha troppi indirizzi. Il massimo è {{limit}}.",
+        "errorAddressLabelTooLong": "L’etichetta di un indirizzo può avere al massimo {{limit}} caratteri.",
+        "errorAddressPartTooLong": "Via, città, regione, CAP e paese di un indirizzo possono avere ciascuno al massimo {{limit}} caratteri."
     },
     "budget": {
         "title": "Bilancio",

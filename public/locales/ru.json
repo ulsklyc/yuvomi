@@ -1524,7 +1524,18 @@
         "errorEmailTooLong": "Адрес эл. почты может содержать не более {{limit}} символов.",
         "errorAddressTooLong": "Адрес может содержать не более {{limit}} символов.",
         "errorNotesTooLong": "Заметки могут содержать не более {{limit}} символов.",
-        "errorBirthdayInvalid": "День рождения указан неверной датой."
+        "errorBirthdayInvalid": "День рождения указан неверной датой.",
+        "errorPhoneEntryInvalid": "Один из номеров телефона неполный или недействителен.",
+        "errorPhonesTooMany": "У этого контакта слишком много номеров телефона. Максимум: {{limit}}.",
+        "errorPhoneLabelTooLong": "Метка номера телефона может содержать не более {{limit}} символов.",
+        "errorEmailEntryInvalid": "Один из адресов эл. почты неполный или недействителен.",
+        "errorEmailInvalid": "Адрес эл. почты недействителен. Он должен иметь вид name@example.com.",
+        "errorEmailsTooMany": "У этого контакта слишком много адресов эл. почты. Максимум: {{limit}}.",
+        "errorEmailLabelTooLong": "Метка адреса эл. почты может содержать не более {{limit}} символов.",
+        "errorAddressEntryInvalid": "Один из адресов неполный или недействителен.",
+        "errorAddressesTooMany": "У этого контакта слишком много адресов. Максимум: {{limit}}.",
+        "errorAddressLabelTooLong": "Метка адреса может содержать не более {{limit}} символов.",
+        "errorAddressPartTooLong": "Улица, город, регион, индекс и страна адреса могут содержать не более {{limit}} символов каждое."
     },
     "budget": {
         "title": "Бюджет",

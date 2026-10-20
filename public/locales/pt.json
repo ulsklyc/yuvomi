@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "O endereço de e-mail pode ter no máximo {{limit}} caracteres.",
         "errorAddressTooLong": "O endereço pode ter no máximo {{limit}} caracteres.",
         "errorNotesTooLong": "As notas podem ter no máximo {{limit}} caracteres.",
-        "errorBirthdayInvalid": "O aniversário não é uma data válida."
+        "errorBirthdayInvalid": "O aniversário não é uma data válida.",
+        "errorPhoneEntryInvalid": "Um dos números de telefone está incompleto ou não é válido.",
+        "errorPhonesTooMany": "Este contacto tem demasiados números de telefone. O máximo é {{limit}}.",
+        "errorPhoneLabelTooLong": "A etiqueta de um número de telefone pode ter no máximo {{limit}} caracteres.",
+        "errorEmailEntryInvalid": "Um dos endereços de e-mail está incompleto ou não é válido.",
+        "errorEmailInvalid": "Um endereço de e-mail não é válido. Deve ter a forma nome@exemplo.pt.",
+        "errorEmailsTooMany": "Este contacto tem demasiados endereços de e-mail. O máximo é {{limit}}.",
+        "errorEmailLabelTooLong": "A etiqueta de um endereço de e-mail pode ter no máximo {{limit}} caracteres.",
+        "errorAddressEntryInvalid": "Um dos endereços está incompleto ou não é válido.",
+        "errorAddressesTooMany": "Este contacto tem demasiados endereços. O máximo é {{limit}}.",
+        "errorAddressLabelTooLong": "A etiqueta de um endereço pode ter no máximo {{limit}} caracteres.",
+        "errorAddressPartTooLong": "A rua, a localidade, a região, o código postal e o país de um endereço podem ter cada um no máximo {{limit}} caracteres."
     },
     "budget": {
         "title": "Orçamento",

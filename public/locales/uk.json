@@ -1524,7 +1524,18 @@
         "errorEmailTooLong": "Адреса ел. пошти може містити не більше {{limit}} символів.",
         "errorAddressTooLong": "Адреса може містити не більше {{limit}} символів.",
         "errorNotesTooLong": "Нотатки можуть містити не більше {{limit}} символів.",
-        "errorBirthdayInvalid": "День народження - недійсна дата."
+        "errorBirthdayInvalid": "День народження - недійсна дата.",
+        "errorPhoneEntryInvalid": "Один із номерів телефону неповний або недійсний.",
+        "errorPhonesTooMany": "У цього контакту забагато номерів телефону. Максимум: {{limit}}.",
+        "errorPhoneLabelTooLong": "Мітка номера телефону може містити не більше {{limit}} символів.",
+        "errorEmailEntryInvalid": "Одна з адрес ел. пошти неповна або недійсна.",
+        "errorEmailInvalid": "Адреса ел. пошти недійсна. Вона має бути у вигляді name@example.com.",
+        "errorEmailsTooMany": "У цього контакту забагато адрес ел. пошти. Максимум: {{limit}}.",
+        "errorEmailLabelTooLong": "Мітка адреси ел. пошти може містити не більше {{limit}} символів.",
+        "errorAddressEntryInvalid": "Одна з адрес неповна або недійсна.",
+        "errorAddressesTooMany": "У цього контакту забагато адрес. Максимум: {{limit}}.",
+        "errorAddressLabelTooLong": "Мітка адреси може містити не більше {{limit}} символів.",
+        "errorAddressPartTooLong": "Вулиця, місто, регіон, індекс і країна адреси можуть містити не більше {{limit}} символів кожне."
     },
     "budget": {
         "title": "Бюджет",

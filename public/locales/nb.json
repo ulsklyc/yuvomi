@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "E-postadressen kan være på høyst {{limit}} tegn.",
         "errorAddressTooLong": "Adressen kan være på høyst {{limit}} tegn.",
         "errorNotesTooLong": "Notatene kan være på høyst {{limit}} tegn.",
-        "errorBirthdayInvalid": "Bursdagen er ikke en gyldig dato."
+        "errorBirthdayInvalid": "Bursdagen er ikke en gyldig dato.",
+        "errorPhoneEntryInvalid": "Et av telefonnumrene er ufullstendig eller ugyldig.",
+        "errorPhonesTooMany": "Denne kontakten har for mange telefonnumre. Maksimum er {{limit}}.",
+        "errorPhoneLabelTooLong": "Etiketten til et telefonnummer kan være på høyst {{limit}} tegn.",
+        "errorEmailEntryInvalid": "En av e-postadressene er ufullstendig eller ugyldig.",
+        "errorEmailInvalid": "En e-postadresse er ugyldig. Den må ha formen navn@eksempel.no.",
+        "errorEmailsTooMany": "Denne kontakten har for mange e-postadresser. Maksimum er {{limit}}.",
+        "errorEmailLabelTooLong": "Etiketten til en e-postadresse kan være på høyst {{limit}} tegn.",
+        "errorAddressEntryInvalid": "En av adressene er ufullstendig eller ugyldig.",
+        "errorAddressesTooMany": "Denne kontakten har for mange adresser. Maksimum er {{limit}}.",
+        "errorAddressLabelTooLong": "Etiketten til en adresse kan være på høyst {{limit}} tegn.",
+        "errorAddressPartTooLong": "Gate, sted, region, postnummer og land i en adresse kan hver være på høyst {{limit}} tegn."
     },
     "budget": {
         "title": "Budsjett",

@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "Het e-mailadres mag maximaal {{limit}} tekens lang zijn.",
         "errorAddressTooLong": "Het adres mag maximaal {{limit}} tekens lang zijn.",
         "errorNotesTooLong": "De notities mogen maximaal {{limit}} tekens lang zijn.",
-        "errorBirthdayInvalid": "De verjaardag is geen geldige datum."
+        "errorBirthdayInvalid": "De verjaardag is geen geldige datum.",
+        "errorPhoneEntryInvalid": "Een van de telefoonnummers is onvolledig of ongeldig.",
+        "errorPhonesTooMany": "Dit contact heeft te veel telefoonnummers. Het maximum is {{limit}}.",
+        "errorPhoneLabelTooLong": "Het label van een telefoonnummer mag maximaal {{limit}} tekens lang zijn.",
+        "errorEmailEntryInvalid": "Een van de e-mailadressen is onvolledig of ongeldig.",
+        "errorEmailInvalid": "Een e-mailadres is ongeldig. Het moet de vorm naam@voorbeeld.nl hebben.",
+        "errorEmailsTooMany": "Dit contact heeft te veel e-mailadressen. Het maximum is {{limit}}.",
+        "errorEmailLabelTooLong": "Het label van een e-mailadres mag maximaal {{limit}} tekens lang zijn.",
+        "errorAddressEntryInvalid": "Een van de adressen is onvolledig of ongeldig.",
+        "errorAddressesTooMany": "Dit contact heeft te veel adressen. Het maximum is {{limit}}.",
+        "errorAddressLabelTooLong": "Het label van een adres mag maximaal {{limit}} tekens lang zijn.",
+        "errorAddressPartTooLong": "Straat, plaats, regio, postcode en land van een adres mogen elk maximaal {{limit}} tekens lang zijn."
     },
     "budget": {
         "title": "Budget",

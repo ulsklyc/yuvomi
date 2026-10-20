@@ -1392,7 +1392,18 @@
         "errorEmailTooLong": "Hanggang {{limit}} na character lang ang email address.",
         "errorAddressTooLong": "Hanggang {{limit}} na character lang ang address.",
         "errorNotesTooLong": "Hanggang {{limit}} na character lang ang mga tala.",
-        "errorBirthdayInvalid": "Hindi wastong petsa ang kaarawan."
+        "errorBirthdayInvalid": "Hindi wastong petsa ang kaarawan.",
+        "errorPhoneEntryInvalid": "May isang numero ng telepono na kulang o hindi wasto.",
+        "errorPhonesTooMany": "Masyadong marami ang numero ng telepono ng kontak na ito. Hanggang {{limit}} lang ang puwede.",
+        "errorPhoneLabelTooLong": "Hanggang {{limit}} na character lang ang label ng numero ng telepono.",
+        "errorEmailEntryInvalid": "May isang email address na kulang o hindi wasto.",
+        "errorEmailInvalid": "Hindi wasto ang isang email address. Dapat nasa anyong pangalan@halimbawa.com ito.",
+        "errorEmailsTooMany": "Masyadong marami ang email address ng kontak na ito. Hanggang {{limit}} lang ang puwede.",
+        "errorEmailLabelTooLong": "Hanggang {{limit}} na character lang ang label ng email address.",
+        "errorAddressEntryInvalid": "May isang address na kulang o hindi wasto.",
+        "errorAddressesTooMany": "Masyadong marami ang address ng kontak na ito. Hanggang {{limit}} lang ang puwede.",
+        "errorAddressLabelTooLong": "Hanggang {{limit}} na character lang ang label ng address.",
+        "errorAddressPartTooLong": "Hanggang {{limit}} na character lang ang bawat isa sa kalye, lungsod, rehiyon, postal code at bansa ng address."
     },
     "budget": {
         "title": "Badyet",

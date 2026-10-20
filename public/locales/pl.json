@@ -1540,7 +1540,18 @@
         "errorEmailTooLong": "Adres e-mail może mieć najwyżej {{limit}} znaków.",
         "errorAddressTooLong": "Adres może mieć najwyżej {{limit}} znaków.",
         "errorNotesTooLong": "Notatki mogą mieć najwyżej {{limit}} znaków.",
-        "errorBirthdayInvalid": "Data urodzin jest nieprawidłowa."
+        "errorBirthdayInvalid": "Data urodzin jest nieprawidłowa.",
+        "errorPhoneEntryInvalid": "Jeden z numerów telefonu jest niepełny lub nieprawidłowy.",
+        "errorPhonesTooMany": "Ten kontakt ma zbyt wiele numerów telefonu. Maksimum to {{limit}}.",
+        "errorPhoneLabelTooLong": "Etykieta numeru telefonu może mieć najwyżej {{limit}} znaków.",
+        "errorEmailEntryInvalid": "Jeden z adresów e-mail jest niepełny lub nieprawidłowy.",
+        "errorEmailInvalid": "Adres e-mail jest nieprawidłowy. Musi mieć postać nazwa@przyklad.pl.",
+        "errorEmailsTooMany": "Ten kontakt ma zbyt wiele adresów e-mail. Maksimum to {{limit}}.",
+        "errorEmailLabelTooLong": "Etykieta adresu e-mail może mieć najwyżej {{limit}} znaków.",
+        "errorAddressEntryInvalid": "Jeden z adresów jest niepełny lub nieprawidłowy.",
+        "errorAddressesTooMany": "Ten kontakt ma zbyt wiele adresów. Maksimum to {{limit}}.",
+        "errorAddressLabelTooLong": "Etykieta adresu może mieć najwyżej {{limit}} znaków.",
+        "errorAddressPartTooLong": "Ulica, miejscowość, region, kod pocztowy i kraj adresu mogą mieć każde najwyżej {{limit}} znaków."
     },
     "budget": {
         "title": "Budżet",

@@ -267,6 +267,12 @@ const SERVER_REASONS = [
   // misst test:contacts-routes.
   'contacts_name_too_long', 'contacts_phone_too_long', 'contacts_email_too_long',
   'contacts_address_too_long', 'contacts_notes_too_long', 'contacts_birthday_invalid',
+  // Die Mehrfachfelder des Formulars (#1909); die echte Antwort misst
+  // test:contacts-routes je Fall.
+  'contacts_phone_entry_invalid', 'contacts_phones_too_many', 'contacts_phone_label_too_long',
+  'contacts_email_entry_invalid', 'contacts_email_invalid', 'contacts_emails_too_many', 'contacts_email_label_too_long',
+  'contacts_address_entry_invalid', 'contacts_addresses_too_many', 'contacts_address_label_too_long',
+  'contacts_address_part_too_long',
 ];
 
 test('jeder Grund dieser Module hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {
@@ -679,6 +685,37 @@ test('Kontakte: speichern - ein verschwundener Kontakt schliesst das Formular un
       assertNoServerText();
       assert.equal(closed.length, gone ? 1 : 0, `${label}: geschlossen`);
       assert.deepEqual(contacts.state.contacts.map((c) => c.id), gone ? [6] : [5, 6], `${label}: Stand`);
+    });
+  }
+});
+
+// #1909: das Formular schickt jede Nummer und E-Mail-Adresse als Eintrag
+// (phones, emails). Eine Adresse ohne @ oder eine Nummer ueber 50 Zeichen
+// sagte bis dahin den allgemeinen Satz. Die Absage kommt hier vom ECHTEN
+// Server, der Satz aus der echten Zuordnung - beide Enden in einem Lauf.
+test('Kontakte: speichern - ein abgewiesener Eintrag der Mehrfachfelder sagt seinen Satz, nie den Text des Servers', async () => {
+  const many = (n, make) => Array.from({ length: n }, (_, i) => make(i));
+  for (const [body, expected] of [
+    [{ emails: [{ label: 'other', value: 'ada.example.org' }] }, 'contacts.errorEmailInvalid'],
+    [{ phones: [{ label: 'other', value: '1'.repeat(51) }] }, `contacts.errorPhoneTooLong${JSON.stringify({ limit: 50 })}`],
+    [{ phones: many(21, (i) => ({ label: 'other', value: `0${i}` })) }, `contacts.errorPhonesTooMany${JSON.stringify({ limit: 20 })}`],
+    [{ phones: [{ label: 'other', value: '0800', isPrimary: 'ja' }] }, 'contacts.errorPhoneEntryInvalid'],
+    [{ emails: [{ label: 'L'.repeat(51), value: 'a@x.de' }] }, `contacts.errorEmailLabelTooLong${JSON.stringify({ limit: 50 })}`],
+    [{ addresses: [{ label: 'home', city: 'C'.repeat(256) }] }, `contacts.errorAddressPartTooLong${JSON.stringify({ limit: 255 })}`],
+  ]) {
+    const answer = await call('POST', '/contacts', { name: 'Ada', ...body });
+    assert.equal(answer.status, 400, JSON.stringify(answer.body));
+    const err = Object.assign(new Error(answer.body.error), { name: 'ApiError', status: answer.status, data: answer.body });
+    await mitKontakten(async () => {
+      const panel = formular({ '#cm-first-name': 'Ada', '#cm-last-name': 'Lovelace' });
+      const { closed } = await mit({ post: async () => { throw err; } }, async () => {
+        contacts.buildContactForm({ mode: 'create' }).wire(panel);
+        await panel.querySelector('#cm-save').handlers.click();
+      });
+      const label = answer.body.reason;
+      assert.deepEqual(toasts, [[expected, 'danger']], label);
+      assert.ok(!String(toasts[0][0]).includes(answer.body.error), `${label}: der englische Text des Servers im Toast`);
+      assert.equal(closed.length, 0, `${label}: das Formular bleibt offen`);
     });
   }
 });

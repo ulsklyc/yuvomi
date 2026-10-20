@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "E-posta adresi en fazla {{limit}} karakter olabilir.",
         "errorAddressTooLong": "Adres en fazla {{limit}} karakter olabilir.",
         "errorNotesTooLong": "Notlar en fazla {{limit}} karakter olabilir.",
-        "errorBirthdayInvalid": "Doğum günü geçerli bir tarih değil."
+        "errorBirthdayInvalid": "Doğum günü geçerli bir tarih değil.",
+        "errorPhoneEntryInvalid": "Telefon numaralarından biri eksik veya geçersiz.",
+        "errorPhonesTooMany": "Bu kişinin çok fazla telefon numarası var. En fazla {{limit}} olabilir.",
+        "errorPhoneLabelTooLong": "Bir telefon numarasının etiketi en fazla {{limit}} karakter olabilir.",
+        "errorEmailEntryInvalid": "E-posta adreslerinden biri eksik veya geçersiz.",
+        "errorEmailInvalid": "Bir e-posta adresi geçersiz. ad@ornek.com biçiminde olmalı.",
+        "errorEmailsTooMany": "Bu kişinin çok fazla e-posta adresi var. En fazla {{limit}} olabilir.",
+        "errorEmailLabelTooLong": "Bir e-posta adresinin etiketi en fazla {{limit}} karakter olabilir.",
+        "errorAddressEntryInvalid": "Adreslerden biri eksik veya geçersiz.",
+        "errorAddressesTooMany": "Bu kişinin çok fazla adresi var. En fazla {{limit}} olabilir.",
+        "errorAddressLabelTooLong": "Bir adresin etiketi en fazla {{limit}} karakter olabilir.",
+        "errorAddressPartTooLong": "Bir adresin sokak, şehir, bölge, posta kodu ve ülke bilgilerinin her biri en fazla {{limit}} karakter olabilir."
     },
     "budget": {
         "title": "Bütçe",

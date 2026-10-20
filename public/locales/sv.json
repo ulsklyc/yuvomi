@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "E-postadressen får vara högst {{limit}} tecken lång.",
         "errorAddressTooLong": "Adressen får vara högst {{limit}} tecken lång.",
         "errorNotesTooLong": "Anteckningarna får vara högst {{limit}} tecken långa.",
-        "errorBirthdayInvalid": "Födelsedagen är inget giltigt datum."
+        "errorBirthdayInvalid": "Födelsedagen är inget giltigt datum.",
+        "errorPhoneEntryInvalid": "Ett av telefonnumren är ofullständigt eller ogiltigt.",
+        "errorPhonesTooMany": "Den här kontakten har för många telefonnummer. Maxantalet är {{limit}}.",
+        "errorPhoneLabelTooLong": "Etiketten för ett telefonnummer får vara högst {{limit}} tecken lång.",
+        "errorEmailEntryInvalid": "En av e-postadresserna är ofullständig eller ogiltig.",
+        "errorEmailInvalid": "En e-postadress är ogiltig. Den måste ha formen namn@exempel.se.",
+        "errorEmailsTooMany": "Den här kontakten har för många e-postadresser. Maxantalet är {{limit}}.",
+        "errorEmailLabelTooLong": "Etiketten för en e-postadress får vara högst {{limit}} tecken lång.",
+        "errorAddressEntryInvalid": "En av adresserna är ofullständig eller ogiltig.",
+        "errorAddressesTooMany": "Den här kontakten har för många adresser. Maxantalet är {{limit}}.",
+        "errorAddressLabelTooLong": "Etiketten för en adress får vara högst {{limit}} tecken lång.",
+        "errorAddressPartTooLong": "Gata, ort, region, postnummer och land i en adress får var och en vara högst {{limit}} tecken långa."
     },
     "budget": {
         "title": "Budget",

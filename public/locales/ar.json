@@ -1599,7 +1599,18 @@
         "errorEmailTooLong": "يمكن أن يتكون عنوان البريد الإلكتروني من {{limit}} حرف كحد أقصى.",
         "errorAddressTooLong": "يمكن أن يتكون العنوان من {{limit}} حرف كحد أقصى.",
         "errorNotesTooLong": "يمكن أن تتكون الملاحظات من {{limit}} حرف كحد أقصى.",
-        "errorBirthdayInvalid": "تاريخ عيد الميلاد غير صالح."
+        "errorBirthdayInvalid": "تاريخ عيد الميلاد غير صالح.",
+        "errorPhoneEntryInvalid": "أحد أرقام الهاتف غير مكتمل أو غير صالح.",
+        "errorPhonesTooMany": "لدى جهة الاتصال هذه أرقام هاتف كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorPhoneLabelTooLong": "يمكن أن تتكون تسمية رقم الهاتف من {{limit}} حرف كحد أقصى.",
+        "errorEmailEntryInvalid": "أحد عناوين البريد الإلكتروني غير مكتمل أو غير صالح.",
+        "errorEmailInvalid": "عنوان البريد الإلكتروني غير صالح. يجب أن يكون بالشكل name@example.com.",
+        "errorEmailsTooMany": "لدى جهة الاتصال هذه عناوين بريد إلكتروني كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorEmailLabelTooLong": "يمكن أن تتكون تسمية عنوان البريد الإلكتروني من {{limit}} حرف كحد أقصى.",
+        "errorAddressEntryInvalid": "أحد العناوين غير مكتمل أو غير صالح.",
+        "errorAddressesTooMany": "لدى جهة الاتصال هذه عناوين كثيرة جدًا. الحد الأقصى هو {{limit}}.",
+        "errorAddressLabelTooLong": "يمكن أن تتكون تسمية العنوان من {{limit}} حرف كحد أقصى.",
+        "errorAddressPartTooLong": "يمكن أن يتكون كل من الشارع والمدينة والمنطقة والرمز البريدي والبلد في العنوان من {{limit}} حرف كحد أقصى."
     },
     "budget": {
         "title": "الميزانية",

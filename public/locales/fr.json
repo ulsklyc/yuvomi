@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "L’adresse e-mail ne peut pas dépasser {{limit}} caractères.",
         "errorAddressTooLong": "L’adresse ne peut pas dépasser {{limit}} caractères.",
         "errorNotesTooLong": "Les notes ne peuvent pas dépasser {{limit}} caractères.",
-        "errorBirthdayInvalid": "La date d’anniversaire n’est pas valide."
+        "errorBirthdayInvalid": "La date d’anniversaire n’est pas valide.",
+        "errorPhoneEntryInvalid": "L’un des numéros de téléphone est incomplet ou non valide.",
+        "errorPhonesTooMany": "Ce contact a trop de numéros de téléphone. Le maximum est de {{limit}}.",
+        "errorPhoneLabelTooLong": "Le libellé d’un numéro de téléphone ne peut pas dépasser {{limit}} caractères.",
+        "errorEmailEntryInvalid": "L’une des adresses e-mail est incomplète ou non valide.",
+        "errorEmailInvalid": "Une adresse e-mail n’est pas valide. Elle doit avoir la forme nom@exemple.fr.",
+        "errorEmailsTooMany": "Ce contact a trop d’adresses e-mail. Le maximum est de {{limit}}.",
+        "errorEmailLabelTooLong": "Le libellé d’une adresse e-mail ne peut pas dépasser {{limit}} caractères.",
+        "errorAddressEntryInvalid": "L’une des adresses est incomplète ou non valide.",
+        "errorAddressesTooMany": "Ce contact a trop d’adresses. Le maximum est de {{limit}}.",
+        "errorAddressLabelTooLong": "Le libellé d’une adresse ne peut pas dépasser {{limit}} caractères.",
+        "errorAddressPartTooLong": "La rue, la ville, la région, le code postal et le pays d’une adresse ne peuvent pas dépasser {{limit}} caractères chacun."
     },
     "budget": {
         "title": "Budget",

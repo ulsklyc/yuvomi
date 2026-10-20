@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "メールアドレスは{{limit}}文字以内にしてください。",
         "errorAddressTooLong": "住所は{{limit}}文字以内にしてください。",
         "errorNotesTooLong": "メモは{{limit}}文字以内にしてください。",
-        "errorBirthdayInvalid": "誕生日が有効な日付ではありません。"
+        "errorBirthdayInvalid": "誕生日が有効な日付ではありません。",
+        "errorPhoneEntryInvalid": "電話番号のいずれかが不完全か無効です。",
+        "errorPhonesTooMany": "この連絡先の電話番号が多すぎます。上限は{{limit}}件です。",
+        "errorPhoneLabelTooLong": "電話番号のラベルは{{limit}}文字以内にしてください。",
+        "errorEmailEntryInvalid": "メールアドレスのいずれかが不完全か無効です。",
+        "errorEmailInvalid": "無効なメールアドレスがあります。name@example.com の形式で入力してください。",
+        "errorEmailsTooMany": "この連絡先のメールアドレスが多すぎます。上限は{{limit}}件です。",
+        "errorEmailLabelTooLong": "メールアドレスのラベルは{{limit}}文字以内にしてください。",
+        "errorAddressEntryInvalid": "住所のいずれかが不完全か無効です。",
+        "errorAddressesTooMany": "この連絡先の住所が多すぎます。上限は{{limit}}件です。",
+        "errorAddressLabelTooLong": "住所のラベルは{{limit}}文字以内にしてください。",
+        "errorAddressPartTooLong": "住所の番地、市区町村、都道府県、郵便番号、国はそれぞれ{{limit}}文字以内にしてください。"
     },
     "budget": {
         "title": "家計",

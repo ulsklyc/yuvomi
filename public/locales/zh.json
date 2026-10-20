@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "电子邮箱最多 {{limit}} 个字符。",
         "errorAddressTooLong": "地址最多 {{limit}} 个字符。",
         "errorNotesTooLong": "备注最多 {{limit}} 个字符。",
-        "errorBirthdayInvalid": "生日不是有效日期。"
+        "errorBirthdayInvalid": "生日不是有效日期。",
+        "errorPhoneEntryInvalid": "某个电话号码不完整或无效。",
+        "errorPhonesTooMany": "此联系人的电话号码过多，最多 {{limit}} 个。",
+        "errorPhoneLabelTooLong": "电话号码的标签最多 {{limit}} 个字符。",
+        "errorEmailEntryInvalid": "某个电子邮箱不完整或无效。",
+        "errorEmailInvalid": "某个电子邮箱无效，格式应为 name@example.com。",
+        "errorEmailsTooMany": "此联系人的电子邮箱过多，最多 {{limit}} 个。",
+        "errorEmailLabelTooLong": "电子邮箱的标签最多 {{limit}} 个字符。",
+        "errorAddressEntryInvalid": "某个地址不完整或无效。",
+        "errorAddressesTooMany": "此联系人的地址过多，最多 {{limit}} 个。",
+        "errorAddressLabelTooLong": "地址的标签最多 {{limit}} 个字符。",
+        "errorAddressPartTooLong": "地址中的街道、城市、地区、邮编和国家各自最多 {{limit}} 个字符。"
     },
     "budget": {
         "title": "预算",

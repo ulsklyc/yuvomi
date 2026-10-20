@@ -1392,7 +1392,18 @@
         "errorEmailTooLong": "Alamat email paling banyak {{limit}} karakter.",
         "errorAddressTooLong": "Alamat paling banyak {{limit}} karakter.",
         "errorNotesTooLong": "Catatan paling banyak {{limit}} karakter.",
-        "errorBirthdayInvalid": "Tanggal ulang tahun tidak valid."
+        "errorBirthdayInvalid": "Tanggal ulang tahun tidak valid.",
+        "errorPhoneEntryInvalid": "Salah satu nomor telepon tidak lengkap atau tidak valid.",
+        "errorPhonesTooMany": "Kontak ini memiliki terlalu banyak nomor telepon. Maksimal {{limit}}.",
+        "errorPhoneLabelTooLong": "Label nomor telepon paling banyak {{limit}} karakter.",
+        "errorEmailEntryInvalid": "Salah satu alamat email tidak lengkap atau tidak valid.",
+        "errorEmailInvalid": "Sebuah alamat email tidak valid. Formatnya harus nama@contoh.com.",
+        "errorEmailsTooMany": "Kontak ini memiliki terlalu banyak alamat email. Maksimal {{limit}}.",
+        "errorEmailLabelTooLong": "Label alamat email paling banyak {{limit}} karakter.",
+        "errorAddressEntryInvalid": "Salah satu alamat tidak lengkap atau tidak valid.",
+        "errorAddressesTooMany": "Kontak ini memiliki terlalu banyak alamat. Maksimal {{limit}}.",
+        "errorAddressLabelTooLong": "Label alamat paling banyak {{limit}} karakter.",
+        "errorAddressPartTooLong": "Jalan, kota, wilayah, kode pos, dan negara pada alamat masing-masing paling banyak {{limit}} karakter."
     },
     "budget": {
         "title": "Anggaran",

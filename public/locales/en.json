@@ -1376,7 +1376,18 @@
         "errorEmailTooLong": "The email address can be at most {{limit}} characters long.",
         "errorAddressTooLong": "The address can be at most {{limit}} characters long.",
         "errorNotesTooLong": "The notes can be at most {{limit}} characters long.",
-        "errorBirthdayInvalid": "The birthday is not a valid date."
+        "errorBirthdayInvalid": "The birthday is not a valid date.",
+        "errorPhoneEntryInvalid": "One of the phone numbers is incomplete or invalid.",
+        "errorPhonesTooMany": "This contact has too many phone numbers. The maximum is {{limit}}.",
+        "errorPhoneLabelTooLong": "The label of a phone number can be at most {{limit}} characters long.",
+        "errorEmailEntryInvalid": "One of the email addresses is incomplete or invalid.",
+        "errorEmailInvalid": "An email address is not valid. It needs the form name@example.com.",
+        "errorEmailsTooMany": "This contact has too many email addresses. The maximum is {{limit}}.",
+        "errorEmailLabelTooLong": "The label of an email address can be at most {{limit}} characters long.",
+        "errorAddressEntryInvalid": "One of the addresses is incomplete or invalid.",
+        "errorAddressesTooMany": "This contact has too many addresses. The maximum is {{limit}}.",
+        "errorAddressLabelTooLong": "The label of an address can be at most {{limit}} characters long.",
+        "errorAddressPartTooLong": "Street, city, region, postal code and country of an address can each be at most {{limit}} characters long."
     },
     "budget": {
         "title": "Budget",

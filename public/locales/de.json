@@ -1392,7 +1392,18 @@
         "errorEmailTooLong": "Die E-Mail-Adresse darf höchstens {{limit}} Zeichen lang sein.",
         "errorAddressTooLong": "Die Adresse darf höchstens {{limit}} Zeichen lang sein.",
         "errorNotesTooLong": "Die Notizen dürfen höchstens {{limit}} Zeichen lang sein.",
-        "errorBirthdayInvalid": "Der Geburtstag ist kein gültiges Datum."
+        "errorBirthdayInvalid": "Der Geburtstag ist kein gültiges Datum.",
+        "errorPhoneEntryInvalid": "Eine der Telefonnummern ist unvollständig oder ungültig.",
+        "errorPhonesTooMany": "Dieser Kontakt hat zu viele Telefonnummern. Höchstens {{limit}} sind möglich.",
+        "errorPhoneLabelTooLong": "Die Bezeichnung einer Telefonnummer darf höchstens {{limit}} Zeichen lang sein.",
+        "errorEmailEntryInvalid": "Eine der E-Mail-Adressen ist unvollständig oder ungültig.",
+        "errorEmailInvalid": "Eine E-Mail-Adresse ist nicht gültig. Sie braucht die Form name@beispiel.de.",
+        "errorEmailsTooMany": "Dieser Kontakt hat zu viele E-Mail-Adressen. Höchstens {{limit}} sind möglich.",
+        "errorEmailLabelTooLong": "Die Bezeichnung einer E-Mail-Adresse darf höchstens {{limit}} Zeichen lang sein.",
+        "errorAddressEntryInvalid": "Eine der Adressen ist unvollständig oder ungültig.",
+        "errorAddressesTooMany": "Dieser Kontakt hat zu viele Adressen. Höchstens {{limit}} sind möglich.",
+        "errorAddressLabelTooLong": "Die Bezeichnung einer Adresse darf höchstens {{limit}} Zeichen lang sein.",
+        "errorAddressPartTooLong": "Straße, Ort, Region, Postleitzahl und Land einer Adresse dürfen je höchstens {{limit}} Zeichen lang sein."
     },
     "budget": {
         "title": "Budget",

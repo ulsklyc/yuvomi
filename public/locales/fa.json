@@ -1392,7 +1392,18 @@
         "errorEmailTooLong": "آدرس ایمیل حداکثر می‌تواند {{limit}} نویسه باشد.",
         "errorAddressTooLong": "نشانی حداکثر می‌تواند {{limit}} نویسه باشد.",
         "errorNotesTooLong": "یادداشت‌ها حداکثر می‌توانند {{limit}} نویسه باشند.",
-        "errorBirthdayInvalid": "تاریخ تولد معتبر نیست."
+        "errorBirthdayInvalid": "تاریخ تولد معتبر نیست.",
+        "errorPhoneEntryInvalid": "یکی از شماره‌های تلفن ناقص یا نامعتبر است.",
+        "errorPhonesTooMany": "این مخاطب شماره تلفن بیش از حد دارد. حداکثر {{limit}} مجاز است.",
+        "errorPhoneLabelTooLong": "برچسب شماره تلفن حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorEmailEntryInvalid": "یکی از آدرس‌های ایمیل ناقص یا نامعتبر است.",
+        "errorEmailInvalid": "یک آدرس ایمیل معتبر نیست. باید به شکل name@example.com باشد.",
+        "errorEmailsTooMany": "این مخاطب آدرس ایمیل بیش از حد دارد. حداکثر {{limit}} مجاز است.",
+        "errorEmailLabelTooLong": "برچسب آدرس ایمیل حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorAddressEntryInvalid": "یکی از نشانی‌ها ناقص یا نامعتبر است.",
+        "errorAddressesTooMany": "این مخاطب نشانی بیش از حد دارد. حداکثر {{limit}} مجاز است.",
+        "errorAddressLabelTooLong": "برچسب نشانی حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorAddressPartTooLong": "خیابان، شهر، استان، کد پستی و کشور یک نشانی هر کدام حداکثر می‌توانند {{limit}} نویسه باشند."
     },
     "budget": {
         "title": "بودجه",
