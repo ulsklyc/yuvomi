@@ -553,6 +553,52 @@ test('Raster: die hohe Kalenderkachel traegt ihre Stufe, die Groesse bleibt (#20
   assert.doesNotMatch(other, /data-list-rows/, 'nur der Kalender kennt die Stufe');
 }));
 
+/* Codex-Review zu PR #2117: das Skelett sagt das Raster voraus, das gleich
+ * kommt. Kannte der Layout-Hinweis nur die Groesse, stand die hohe
+ * Kalenderkachel mit zwoelf Terminen im Skelett zwei Zeilen hoch und wuchs beim
+ * Laden auf vier - die Nachbarn sprangen. */
+const hintLayouts = await import('../public/utils/dashboard-layout-hint.js');
+function withStorage(fn) {
+  const store = new Map();
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => { store.set(k, String(v)); },
+    removeItem: (k) => { store.delete(k); },
+  };
+  try {
+    return fn(store);
+  } finally {
+    globalThis.localStorage = prev;
+  }
+}
+const skeletonCalendar = (html) => [...html.matchAll(/<div class="widget-wrapper (widget-size--[0-9x]+)"([^>]*)>/g)].map((m) => `${m[1]}${m[2]}`);
+
+test('Skelett: die hohe Kalenderkachel steht schon mit ihren Rasterzeilen da (Review #2117)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => withStorage((store) => {
+  const cfg = [
+    { id: 'calendar', visible: true, order: 0, size: '1x2', options: { limit: 12 } },
+    { id: 'tasks', visible: true, order: 1, size: '1x1' },
+    { id: 'notes', visible: false, order: 2, size: '1x2' },
+  ];
+  hintLayouts.rememberLayoutHint(cfg, '/dashboard?events_limit=12', dash.calendarListRowsOf);
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2 data-list-rows="12"', 'widget-size--1x1']);
+  hintLayouts.rememberLayoutHint([{ ...cfg[0], options: { limit: 8 } }], null, dash.calendarListRowsOf);
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2 data-list-rows="8"']);
+  hintLayouts.rememberLayoutHint([{ ...cfg[0], options: {} }], null, dash.calendarListRowsOf);
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2'], 'fuenf ist die normale hohe Kachel');
+
+  // Alte Eintraege (vor #2087, auch die Array-Form) sagen weiter die Groessen voraus.
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '2x1'], query: '/dashboard' }));
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--2x1']);
+  store.set('yuvomi-dash-layout-hint', JSON.stringify(['2x2']));
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--2x2']);
+  // Der Eintrag ist von der Seite aus beschreibbar: nur eine Stufe wird zum Attribut.
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '1x2', '1x2'], listRows: ['"><b>', 7, 500] }));
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--1x2', 'widget-size--1x2']);
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2'], listRows: [12, 8] }));
+  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2'], 'Listenzeilen nur passend zu den Groessen');
+})));
+
 test('Raster: dashboard.css macht aus 8 drei und aus 12 vier Rasterzeilen, nur hoch und nur ab 1024px', () => {
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   const start = css.indexOf('@media (min-width: 1024px) {\n  .dashboard__grid {');

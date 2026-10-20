@@ -59,7 +59,7 @@ import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { enterWallMode, exitWallMode, isWallActive, syncWallMode } from '/utils/wall-mode.js';
 import { mountZonePrompt } from '/utils/household-zone-hint.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
-import { rememberLayoutHint, layoutHintSizes, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
+import { rememberLayoutHint, layoutHintTiles, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
 import { emptyHintHTML } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
@@ -1763,10 +1763,22 @@ function calendarRowCap(size, limit) {
  * es greift. So liest `spansForSize` beim Probieren einer anderen Groesse
  * auch die richtige Spanne: an 1x1 passt keine Regel. Die Vorgabe fuenf ist
  * die normale hohe Kachel und braucht kein Attribut. */
-function calendarListRows(w) {
-  if (w.id !== 'calendar') return '';
+function calendarListRowsOf(w) {
+  if (w?.id !== 'calendar') return null;
   const limit = clampEventLimit(w.options?.limit);
-  return limit === EVENT_LIMIT_DEFAULT ? '' : ` data-list-rows="${limit}"`;
+  return limit === EVENT_LIMIT_DEFAULT ? null : limit;
+}
+
+/* Das Attribut aus einer Stufe - fuer das Raster und fuer das Skelett, das
+ * sie aus dem Layout-Hinweis liest. Nur eine der Stufen wird zum Attribut:
+ * der Hinweis liegt im localStorage und ist von der Seite aus beschreibbar. */
+function listRowsAttr(rows) {
+  const limit = Number(rows);
+  return limit !== EVENT_LIMIT_DEFAULT && clampEventLimit(limit) === limit ? ` data-list-rows="${limit}"` : '';
+}
+
+function calendarListRows(w) {
+  return listRowsAttr(calendarListRowsOf(w));
 }
 
 /*
@@ -5253,8 +5265,12 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
  * Abmelden verworfen werden muss - die Begruendung steht dort. */
 
 function renderDashboardSkeleton() {
-  const tiles = layoutHintSizes(buildDefaultWidgetConfig().filter((w) => w.visible).map((w) => w.size))
-    .map((size) => `<div class="widget-wrapper ${widgetSizeClass(size)}">${skeletonWidget(3)}</div>`)
+  // Mit den Listenzeilen (#2087): eine hohe Kalenderkachel mit acht oder
+  // zwoelf Terminen belegt schon im Skelett ihre drei oder vier Zeilen.
+  const defaults = buildDefaultWidgetConfig().filter((w) => w.visible);
+  const hint = layoutHintTiles(defaults.map((w) => w.size));
+  const tiles = hint.sizes
+    .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${listRowsAttr(hint.listRows[i])}>${skeletonWidget(3)}</div>`)
     .join('');
   return `
     <section class="dashboard-overview">
@@ -7142,7 +7158,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
@@ -7264,7 +7280,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Ab jetzt liegt ein eigener Stand vor - die Vorgabe des Haushalts erreicht
     // mich erst wieder, wenn ich ihn loesche.
     followsDefault = false;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     isCustomizing = false;
     // Wird die Zyklus-Kachel gerade erst eingeblendet, ihren owner-only Slice
     // nachladen — sonst zeigte sie fälschlich den Empty-State bis zum Reload.
@@ -7294,7 +7310,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
             await api.put('/preferences', { dashboard_widgets: widgetConfig, dashboard_today_glance: glanceVisible });
             savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
             savedGlanceVisible = glanceVisible;
-            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
             if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
             if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
             await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -7404,7 +7420,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
     followsDefault = true;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     isCustomizing = false;
     if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) await ensureCycleSlice();
     if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) await ensureScheduleSlice();
@@ -7431,7 +7447,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
         savedGlanceVisible = glanceVisible;
         followsDefault = false;
-        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
         if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
         if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
         await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -7475,7 +7491,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig));
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
     isCustomizing = false;
     // Wie beim Speichern: haben sich mit den Optionen die Parameter der Abfrage
     // geaendert, steht noch die alte Antwort da. Ohne den Abruf zeigte die
@@ -8167,7 +8183,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
