@@ -259,7 +259,7 @@ test('Wrapper: was tsdav wirklich meldet, ordnet die bestehende Einordnung richt
     assert.equal(davFailureAction(err, 0), 'wait', `HTTP ${status}`);
     assert.equal(davFailureAction(err, MAX_OUTBOUND_ATTEMPTS - 1), 'wait', `HTTP ${status}, nach vier Absagen am Eintrag`);
   }
-  for (const status of [409, 412, 413, 415, 422]) {
+  for (const status of [409, 412, 413, 415, 422, 423]) {
     const err = await refusal(status);
     assert.equal(davFailureAction(err, 0), 'retry', `HTTP ${status}`);
     assert.equal(davFailureAction(err, MAX_OUTBOUND_ATTEMPTS - 1), 'give-up', `HTTP ${status}, letzter Versuch`);
@@ -1601,7 +1601,9 @@ test('Umzug, die Quelle ist schon weg (404): der Umzug ist vollzogen, nichts wir
 //
 // Nachgestellt mit dem Sofortversuch, wie er hinter jeder Schreibroute läuft:
 // er sendet ein Löschen ohne Abruf und eine Änderung nach einem Abruf des
-// Objekts; `assertSent` prüft, dass beide Anfragen jedes Mal am Server ankamen.
+// Objekts; `assertSent` prüft, dass die Anfrage jedes Mal am Server ankam.
+// Löschen und Ändern laufen getrennt: nach einer kontoweiten Absage geht in
+// diesem Durchgang nichts mehr an das Konto (siehe "Stoppsignal" unten).
 
 const ACCOUNT_WIDE_REFUSALS = [
   ['401', { status: 401 }],
@@ -1610,39 +1612,48 @@ const ACCOUNT_WIDE_REFUSALS = [
   ['503', { status: 503 }],
   ['Netzfehler', { drop: true }],
 ];
-const ENTRY_REFUSALS = [409, 422];
+// 423 (gesperrt) steht für jeden Status, den keiner der beiden Listen kennt:
+// er hängt am Eintrag, sonst wartete ein dauerhaft gesperrter für immer.
+const ENTRY_REFUSALS = [409, 422, 423];
 
-/** Ein wartendes Löschen und eine wartende Änderung im selben Kalender. */
-function pendingEventWork() {
-  const cal = calendar();
-  const { url } = dav.putObject(cal.url, 'gone.ics', vevent('gone@test', 'Gelöscht'));
+/** Ein wartendes Löschen im Kalender `cal`. */
+function pendingEventDeletion(cal, uid = 'gone@test') {
+  const { url } = dav.putObject(cal.url, `${uid}.ics`, vevent(uid, 'Gelöscht'));
   db.prepare(`
     INSERT INTO calendar_pending_deletions (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
-    VALUES ('caldav', ?, 'gone@test', ?, ?)
-  `).run(cal.url, url, accountId);
-  const { id } = mirroredEvent(cal, 'evt-1@test', 'Alter Titel');
-  db.prepare("UPDATE calendar_events SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(id);
-  return { cal, id };
+    VALUES ('caldav', ?, ?, ?, ?)
+  `).run(cal.url, uid, url, accountId);
+  return url;
 }
 
-/** Dasselbe für Aufgaben. */
-function pendingTaskWork() {
-  const list = taskList();
-  const { url } = dav.putObject(list, 'gone.ics', vtodo('gone@test', 'Gelöscht'));
+/** Eine wartende Änderung eines gespiegelten Termins in `cal`. */
+function pendingEventChange(cal, uid = 'evt-1@test') {
+  const { id } = mirroredEvent(cal, uid, 'Alter Titel');
+  db.prepare("UPDATE calendar_events SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(id);
+  return id;
+}
+
+function pendingTaskDeletion(list, uid = 'gone@test') {
+  const { url } = dav.putObject(list, `${uid}.ics`, vtodo(uid, 'Gelöscht'));
   db.prepare(`
     INSERT INTO caldav_todo_pending_deletions (account_id, module, uid, object_url)
-    VALUES (?, 'tasks', 'gone@test', ?)
-  `).run(accountId, url);
-  const { id } = mirroredTask(list, 'todo-1@test', 'Alter Titel');
-  db.prepare("UPDATE tasks SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(id);
-  return { list, id };
+    VALUES (?, 'tasks', ?, ?)
+  `).run(accountId, uid, url);
+  return url;
 }
 
-/** Jede Runde hat ein DELETE und ein PUT gesendet - sonst belegt der Rest nichts. */
-function assertSent(rounds) {
-  assert.equal(dav.seen('DELETE').length, rounds, 'nicht jeder Sofortversuch hat das Löschen gesendet');
-  assert.equal(dav.seen('PUT').length, rounds, 'nicht jeder Sofortversuch hat die Änderung gesendet');
+function pendingTaskChange(list, uid = 'todo-1@test') {
+  const { id } = mirroredTask(list, uid, 'Alter Titel');
+  db.prepare("UPDATE tasks SET title = 'Neuer Titel', outbound_dirty = 1 WHERE id = ?").run(id);
+  return id;
 }
+
+/** So viele Anfragen dieser Methode kamen am Server an - sonst belegt der Rest nichts. */
+function assertSent(method, rounds) {
+  assert.equal(dav.seen(method).length, rounds, `nicht jeder Sofortversuch hat ${method} gesendet`);
+}
+
+const writesSent = () => dav.seen('DELETE').length + dav.seen('PUT').length;
 
 function refuseWrites(refusal) {
   dav.allowAll();
@@ -1651,21 +1662,19 @@ function refuseWrites(refusal) {
 }
 
 for (const [label, refusal] of ACCOUNT_WIDE_REFUSALS) {
-  test(`Termine, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: wartendes Löschen und Ändern bleiben`, async () => {
+  test(`Termin löschen, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: der Auftrag bleibt`, async () => {
     reset();
-    const { cal, id } = pendingEventWork();
+    const cal = calendar();
+    pendingEventDeletion(cal);
 
     refuseWrites(refusal);
     for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS; i++) await caldavSync.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS);
     await caldavSync.flushOutbound();
 
     assert.equal(eventTombstones().length, 1, 'das Löschen wurde nach kontoweiten Absagen aufgegeben');
     assert.equal(eventTombstones()[0].attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
-    let row = event(id);
-    assert.equal(row.outbound_dirty, 1, 'die Änderung wurde nach kontoweiten Absagen aufgegeben');
-    assert.equal(row.outbound_attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
-    assertSent(MAX_OUTBOUND_ATTEMPTS + 1);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS + 1);
 
     // Der Lauf, in dem der Schaden sichtbar wurde: der Server nimmt wieder an.
     dav.allowAll();
@@ -1674,29 +1683,46 @@ for (const [label, refusal] of ACCOUNT_WIDE_REFUSALS) {
       db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = 'gone@test'").get().n, 0,
       'der gelöschte Termin ist zurück'
     );
-    assert.equal(dav.getObject(cal.url, 'gone.ics'), null, 'der Termin liegt weiter auf dem Server');
+    assert.equal(dav.getObject(cal.url, 'gone@test.ics'), null, 'der Termin liegt weiter auf dem Server');
     assert.equal(eventTombstones().length, 0);
+  });
+
+  test(`Termin ändern, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: die Änderung bleibt`, async () => {
+    reset();
+    const cal = calendar();
+    const id = pendingEventChange(cal);
+
+    refuseWrites(refusal);
+    for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS; i++) await caldavSync.flushOutbound();
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS);
+    await caldavSync.flushOutbound();
+
+    let row = event(id);
+    assert.equal(row.outbound_dirty, 1, 'die Änderung wurde nach kontoweiten Absagen aufgegeben');
+    assert.equal(row.outbound_attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS + 1);
+
+    dav.allowAll();
+    await caldavSync.sync();
     row = event(id);
     assert.equal(row.title, 'Neuer Titel', 'der Abruf hat die lokale Bearbeitung überschrieben');
     assert.equal(row.outbound_dirty, 0);
     assert.match(dav.getObject(cal.url, 'evt-1@test.ics').data, /SUMMARY:Neuer Titel/);
   });
 
-  test(`Aufgaben, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: wartendes Löschen und Ändern bleiben`, async () => {
+  test(`Aufgabe löschen, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: der Auftrag bleibt`, async () => {
     reset();
-    const { list, id } = pendingTaskWork();
+    const list = taskList();
+    pendingTaskDeletion(list);
 
     refuseWrites(refusal);
     for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS; i++) await todoOutbound.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS);
     await todoOutbound.flushOutbound();
 
     assert.equal(todoTombstones().length, 1, 'das Löschen wurde nach kontoweiten Absagen aufgegeben');
     assert.equal(todoTombstones()[0].attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
-    let row = task(id);
-    assert.equal(row.outbound_dirty, 1, 'die Änderung wurde nach kontoweiten Absagen aufgegeben');
-    assert.equal(row.outbound_attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
-    assertSent(MAX_OUTBOUND_ATTEMPTS + 1);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS + 1);
 
     dav.allowAll();
     await remindersSync.sync();
@@ -1704,8 +1730,27 @@ for (const [label, refusal] of ACCOUNT_WIDE_REFUSALS) {
       db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE external_uid = 'gone@test'").get().n, 0,
       'die gelöschte Aufgabe ist zurück'
     );
-    assert.equal(dav.getObject(list, 'gone.ics'), null, 'die Aufgabe liegt weiter auf dem Server');
+    assert.equal(dav.getObject(list, 'gone@test.ics'), null, 'die Aufgabe liegt weiter auf dem Server');
     assert.equal(todoTombstones().length, 0);
+  });
+
+  test(`Aufgabe ändern, ${MAX_OUTBOUND_ATTEMPTS + 1} kontoweite Absagen (${label}) hintereinander: die Änderung bleibt`, async () => {
+    reset();
+    const list = taskList();
+    const id = pendingTaskChange(list);
+
+    refuseWrites(refusal);
+    for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS; i++) await todoOutbound.flushOutbound();
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS);
+    await todoOutbound.flushOutbound();
+
+    let row = task(id);
+    assert.equal(row.outbound_dirty, 1, 'die Änderung wurde nach kontoweiten Absagen aufgegeben');
+    assert.equal(row.outbound_attempts, 0, 'eine kontoweite Absage hat einen Versuch des Eintrags verbraucht');
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS + 1);
+
+    dav.allowAll();
+    await remindersSync.sync();
     row = task(id);
     assert.equal(row.title, 'Neuer Titel', 'der Abruf hat die lokale Bearbeitung überschrieben');
     assert.equal(row.outbound_dirty, 0);
@@ -1716,7 +1761,9 @@ for (const [label, refusal] of ACCOUNT_WIDE_REFUSALS) {
 for (const status of ENTRY_REFUSALS) {
   test(`Termine, Absage am Eintrag selbst (${status}): die fünfte beendet die Versuche`, async () => {
     reset();
-    const { id } = pendingEventWork();
+    const cal = calendar();
+    pendingEventDeletion(cal);
+    const id = pendingEventChange(cal);
 
     refuseWrites({ status });
     for (let i = 1; i < MAX_OUTBOUND_ATTEMPTS; i++) {
@@ -1726,17 +1773,20 @@ for (const status of ENTRY_REFUSALS) {
       assert.equal(event(id).outbound_dirty, 1);
     }
     await caldavSync.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS);
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS);
     assert.equal(eventTombstones().length, 0, 'das Löschen wird nach der fünften Absage am Eintrag weiter versucht');
     assert.equal(event(id).outbound_dirty, 0, 'die Änderung wird nach der fünften Absage am Eintrag weiter versucht');
 
     await caldavSync.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assert.equal(writesSent(), 2 * MAX_OUTBOUND_ATTEMPTS);
   });
 
   test(`Aufgaben, Absage am Eintrag selbst (${status}): die fünfte beendet die Versuche`, async () => {
     reset();
-    const { id } = pendingTaskWork();
+    const list = taskList();
+    pendingTaskDeletion(list);
+    const id = pendingTaskChange(list);
 
     refuseWrites({ status });
     for (let i = 1; i < MAX_OUTBOUND_ATTEMPTS; i++) {
@@ -1746,18 +1796,19 @@ for (const status of ENTRY_REFUSALS) {
       assert.equal(task(id).outbound_dirty, 1);
     }
     await todoOutbound.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assertSent('DELETE', MAX_OUTBOUND_ATTEMPTS);
+    assertSent('PUT', MAX_OUTBOUND_ATTEMPTS);
     assert.equal(todoTombstones().length, 0, 'das Löschen wird nach der fünften Absage am Eintrag weiter versucht');
     assert.equal(task(id).outbound_dirty, 0, 'die Änderung wird nach der fünften Absage am Eintrag weiter versucht');
 
     await todoOutbound.flushOutbound();
-    assertSent(MAX_OUTBOUND_ATTEMPTS);
+    assert.equal(writesSent(), 2 * MAX_OUTBOUND_ATTEMPTS);
   });
 }
 
 test('Kontoweite Absagen zwischen Absagen am Eintrag schieben das Aufgeben nicht vor', async () => {
   reset();
-  const { id } = pendingEventWork();
+  pendingEventDeletion(calendar());
 
   for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS - 1; i++) {
     refuseWrites({ status: 422 });
@@ -1768,13 +1819,86 @@ test('Kontoweite Absagen zwischen Absagen am Eintrag schieben das Aufgeben nicht
   assert.deepEqual(eventTombstones().map((t) => t.attempts), [MAX_OUTBOUND_ATTEMPTS - 1],
     'kontoweite Absagen haben Versuche des Eintrags verbraucht');
   assert.match(eventTombstones()[0].last_error, /HTTP 503/, 'die letzte Absage steht nicht am Auftrag');
-  assert.equal(event(id).outbound_attempts, MAX_OUTBOUND_ATTEMPTS - 1);
-  assertSent(2 * (MAX_OUTBOUND_ATTEMPTS - 1));
+  assertSent('DELETE', 2 * (MAX_OUTBOUND_ATTEMPTS - 1));
 
   refuseWrites({ status: 422 });
   await caldavSync.flushOutbound();
   assert.equal(eventTombstones().length, 0);
-  assert.equal(event(id).outbound_dirty, 0);
+});
+
+// Stoppsignal: weil eine kontoweite Absage keinen Versuch mehr kostet, liefe
+// ohne Halt jeder wartende Eintrag bei JEDEM Durchgang in dieselbe Absage -
+// eine Anfrage je Eintrag in einen Server, der gerade "zu viele Anfragen"
+// gesagt hat. Nach der ersten kontoweiten Absage geht in diesem Durchgang
+// nichts mehr an das Konto, weder Löschen noch Ändern; die Aufträge bleiben.
+
+test('Stoppsignal, Termine: drei Löschungen und zwei Änderungen, die erste Antwort ist 429 - genau eine Anfrage', async () => {
+  reset();
+  const cal = calendar();
+  for (const uid of ['gone-1@test', 'gone-2@test', 'gone-3@test']) pendingEventDeletion(cal, uid);
+  const ids = ['evt-1@test', 'evt-2@test'].map((uid) => pendingEventChange(cal, uid));
+
+  refuseWrites({ status: 429 });
+  await caldavSync.flushOutbound();
+  assert.equal(writesSent(), 1, 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.deepEqual(eventTombstones().map((t) => t.attempts), [0, 0, 0]);
+  assert.deepEqual(ids.map((id) => [event(id).outbound_dirty, event(id).outbound_attempts]), [[1, 0], [1, 0]]);
+
+  // Der nächste Durchgang fängt neu an: alles geht hinaus.
+  dav.allowAll();
+  await caldavSync.flushOutbound();
+  assert.equal(eventTombstones().length, 0);
+  assert.deepEqual(ids.map((id) => event(id).outbound_dirty), [0, 0]);
+});
+
+test('Stoppsignal, Aufgaben: drei Löschungen und zwei Änderungen, die erste Antwort ist 429 - genau eine Anfrage', async () => {
+  reset();
+  const list = taskList();
+  for (const uid of ['gone-1@test', 'gone-2@test', 'gone-3@test']) pendingTaskDeletion(list, uid);
+  const ids = ['todo-1@test', 'todo-2@test'].map((uid) => pendingTaskChange(list, uid));
+
+  refuseWrites({ status: 429 });
+  await todoOutbound.flushOutbound();
+  assert.equal(writesSent(), 1, 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.deepEqual(todoTombstones().map((t) => t.attempts), [0, 0, 0]);
+  assert.deepEqual(ids.map((id) => [task(id).outbound_dirty, task(id).outbound_attempts]), [[1, 0], [1, 0]]);
+
+  dav.allowAll();
+  await todoOutbound.flushOutbound();
+  assert.equal(todoTombstones().length, 0);
+  assert.deepEqual(ids.map((id) => task(id).outbound_dirty), [0, 0]);
+});
+
+test('Stoppsignal, Sync-Lauf: auch der volle Lauf sendet nach einer kontoweiten Absage nichts mehr an das Konto', async () => {
+  reset();
+  const cal = calendar();
+  for (const uid of ['gone-1@test', 'gone-2@test']) pendingEventDeletion(cal, uid);
+  pendingEventChange(cal);
+
+  refuseWrites({ status: 503 });
+  await caldavSync.sync();
+  assert.equal(writesSent(), 1, 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.deepEqual(eventTombstones().map((t) => t.attempts), [0, 0]);
+});
+
+test('Stoppsignal: ein 403 sperrt nur seinen Kalender, ein anderer Kalender desselben Kontos läuft weiter', async () => {
+  reset();
+  const shared = calendar('shared', 'Geteilt');
+  const own    = calendar('family', 'Familie');
+  pendingEventDeletion(shared, 'ro-1@test');
+  pendingEventDeletion(shared, 'ro-2@test');
+  pendingEventDeletion(own, 'mine@test');
+  const id = pendingEventChange(own);
+
+  dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/shared/') });
+  dav.refuse({ method: 'PUT', status: 403, when: (req) => req.path.startsWith('/cal/shared/') });
+  await caldavSync.flushOutbound();
+
+  assert.equal(dav.seen('DELETE').filter((r) => r.path.startsWith('/cal/shared/')).length, 1,
+    'nach dem 403 gingen weitere Anfragen an den geteilten Kalender');
+  assert.equal(dav.getObject(own.url, 'mine@test.ics'), null, 'der 403 eines anderen Kalenders hielt das Löschen auf');
+  assert.equal(event(id).outbound_dirty, 0, 'der 403 eines anderen Kalenders hielt die Änderung auf');
+  assert.deepEqual(eventTombstones().map((t) => [t.event_external_id, t.attempts]), [['ro-1@test', 0], ['ro-2@test', 0]]);
 });
 
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────

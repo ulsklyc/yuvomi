@@ -105,7 +105,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tasks came back with the next successful sync and pending changes were overwritten. Now only an
   answer about the entry itself counts (for example a conflict or an invalid entry). Answers about
   the whole account or server (401, 403, 429, 5xx, no connection) leave the work waiting until the
-  server accepts it again. This covers calendars, Apple calendars and tasks; Google is unchanged.
+  server accepts it again, and after the first such answer Yuvomi sends nothing more to that account
+  until the next sync instead of one request per waiting entry; a 403 only pauses its own calendar.
+  This covers calendars, Apple calendars and tasks; Google is unchanged.
 - **The meal plan now follows the household week-start setting, just like the calendar (#2075).**
   Both the server (`GET /meals`, "add week to shopping list") and the frontend week-grid previously
   hard-coded Monday as the week start. Both now read the household `week_start` preference

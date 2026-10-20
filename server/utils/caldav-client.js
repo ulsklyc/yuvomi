@@ -225,6 +225,25 @@ export function isCollectionRefusal(err) {
 }
 
 /**
+ * Sagt die Absage etwas über das Konto oder den Server als Ganzes statt über
+ * den einen Eintrag (#1863)? Daran hängt, ob sie einen der fünf Versuche
+ * eines wartenden Löschens oder Änderns verbraucht (`davFailureAction`,
+ * calendar-outbound.js).
+ *
+ * Bewusst eine Positivliste und nicht das Gegenstück zu `isCollectionRefusal`:
+ * dort kostet ein verkannter Status nur einen Upload je Lauf, hier hiesse er
+ * "wartet für immer". Ein 423 (gesperrt) oder ein anderer unbekannter Status
+ * hängt dann am Eintrag und läuft wie bisher in die fünf Versuche.
+ *   401 Anmeldung abgelehnt, 403 Konto oder Kalender ohne Schreibrecht,
+ *   429 Ratenlimit, 5xx Server; ohne Status ein ERKANNTER Netzfehler.
+ */
+export function isAccountWideRefusal(err) {
+  const status = err?.status;
+  if (typeof status !== 'number') return isNetworkFailure(err);
+  return status === 401 || status === 403 || status === 429 || (status >= 500 && status <= 599);
+}
+
+/**
  * Schranke für Uploads eines Laufs: nach der ersten Absage auf Collection-Ebene
  * geht in DIESE Collection nichts mehr hinaus. Gezählt wird ohne Spalte und
  * ohne Aufgeben - im nächsten Lauf ist die Schranke wieder offen.

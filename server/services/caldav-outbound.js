@@ -30,7 +30,7 @@ import { outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsSnapshot } from './outbound-echo.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
 import { upsertExternalCalendar } from './external-calendars.js';
-import { isOriginRefusal, sameObjectAddress } from '../utils/caldav-client.js';
+import { isOriginRefusal, isAccountWideRefusal, sameObjectAddress, collectionUrlOf } from '../utils/caldav-client.js';
 
 const log = createLogger('CalDAVOutbound');
 
@@ -341,8 +341,10 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, isSelected }) : 0;
-  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId }) : 0;
+  // Ein Stoppsignal für Löschen und Ändern (#1863).
+  const stop = outbound.createRefusalStop();
+  const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, isSelected, stop }) : 0;
+  const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId, stop }) : 0;
   return { deleted, updated };
 }
 
@@ -401,10 +403,13 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
  *   gefragt. Ohne die Funktion (Apple kennt keine Auswahl) gilt jeder als
  *   eingeschaltet.
  * @param {{sent: number}} [scope.outcome] zählt mit, was der Server wirklich gelöscht hat
+ * @param {object} [scope.stop] Stoppsignal des Durchgangs (`createRefusalStop`, #1863);
+ *   nach einer kontoweiten Absage geht keine weitere Anfrage hinaus, die
+ *   Aufträge bleiben ohne Versuch. Der Aufrufer teilt es mit `processPendingUpdates`.
  * @returns {Promise<number>} erledigte Tombstones - auch die, die ohne Anfrage fielen
  */
 export async function processPendingDeletions(client, source, objectIndex, ownCalendarUrls = null, {
-  accountId = null, complete = true, isSelected = null, outcome = null,
+  accountId = null, complete = true, isSelected = null, outcome = null, stop = outbound.createRefusalStop(),
 } = {}) {
   const rows = outbound.pendingDeletions(source, { accountId });
   if (rows.length === 0) return 0;
@@ -479,6 +484,10 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
       continue;
     }
 
+    // Das Konto (oder diese Collection) hat in diesem Durchgang schon
+    // kontoweit abgelehnt: keine weitere Anfrage, der Auftrag bleibt (#1863).
+    if (stop.blocks(collectionUrlOf(url))) continue;
+
     try {
       await client.deleteCalendarObject({ calendarObject: { url, etag: conditional ? row.etag : known?.etag } });
       outbound.dropDeletion(row.id);
@@ -506,7 +515,9 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
         }
         continue;
       }
-      if (outbound.handleDeletionError(err, row, label(source), outbound.davFailureAction)
+      if (outbound.handleDeletionError(err, row, label(source), {
+        failureAction: outbound.davFailureAction, onWait: (refusal) => stop.trip(refusal, collectionUrlOf(url)),
+      })
           && outbound.classifyOutboundError(err) === 'settled') {
         done++;
       }
@@ -530,9 +541,12 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
  * @param {object} [scope]
  * @param {number} [scope.accountId] CalDAV-Konto, dem der Client gehört
  * @param {boolean} [scope.fullRun]  voller Sync-Lauf (nicht der Sofortversuch)
+ * @param {object} [scope.stop] Stoppsignal des Durchgangs (#1863), siehe `processPendingDeletions`
  * @returns {Promise<number>} erfolgreich verarbeitete Termine
  */
-export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, { accountId = null, fullRun = false } = {}) {
+export async function processPendingUpdates(client, source, objectIndex, calendarsByUrl = null, {
+  accountId = null, fullRun = false, stop = outbound.createRefusalStop(),
+} = {}) {
   const events = outbound.pendingUpdates(source, { accountId });
   if (events.length === 0) return 0;
 
@@ -591,6 +605,12 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       continue;
     }
 
+    // Nach einer kontoweiten Absage in diesem Durchgang: nichts senden (#1863).
+    if (stop.blocks(collectionUrlOf(url))) continue;
+    const dav = (collectionUrl) => ({
+      failureAction: outbound.davFailureAction, onWait: (refusal) => stop.trip(refusal, collectionUrl),
+    });
+
     // ── Wechsel des Zielkalenders: anlegen im Ziel, löschen in der Quelle ──────
     const moveTo = event.outbound_move_to;
     if (moveTo && moveTo !== known.calendarUrl) {
@@ -601,6 +621,8 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       if (!destCal) {
         log.warn(`[${label(source)}] Destination calendar ${moveTo} is not available, keeping event ${event.id} where it is.`);
         outbound.clearOutboundMove(event.id);
+      } else if (stop.blocks(destCal.url)) {
+        continue;
       } else {
         try {
           const filename = filenameFromUrl(url, event.external_calendar_id);
@@ -638,6 +660,8 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
             // 404/410 heisst: die Quelle ist schon weg, der Umzug ist vollzogen.
             if (outbound.classifyOutboundError(err) !== 'settled') sourceRefusal = err;
           }
+          // Die Kopie steht; nur weitere Anfragen an die Quelle halten an.
+          if (sourceRefusal && isAccountWideRefusal(sourceRefusal)) stop.trip(sourceRefusal, collectionUrlOf(url));
           // Während der beiden awaits lokal entfernt. Hat der Nutzer gelöscht, gilt
           // der Tombstone der Route nur der Quelle; die Kopie im Ziel bliebe stehen,
           // und der nächste Lauf importierte den Termin von dort neu. Ein Aufräumen
@@ -678,7 +702,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
               // wie jeder gescheiterte Umzug wieder (die Kopie im Ziel wird
               // dabei übernommen) - bis die Quelle fort ist oder aufgegeben wird.
               log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}), and another account already has a pending deletion for that entry; the move stays pending.`);
-              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove, outbound.davFailureAction);
+              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove, dav(collectionUrlOf(url)));
               continue;
             }
           }
@@ -708,7 +732,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // im bisherigen Kalender hinaus. handleUpdateError läse es als
           // "erledigt" und nähme die Bearbeitung mit.
           if (outbound.classifyOutboundError(err) !== 'settled') {
-            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove, outbound.davFailureAction);
+            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove, dav(destCal.url));
             continue;
           }
           log.warn(`[${label(source)}] Destination calendar ${moveTo} no longer accepts event ${event.id} (${err.message}), keeping it where it is.`);
@@ -731,7 +755,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       outbound.settleOutbound(fresh, null, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id, zone) });
       done++;
     } catch (err) {
-      outbound.handleUpdateError(err, event, 'update', label(source), outbound.clearOutbound, outbound.davFailureAction);
+      outbound.handleUpdateError(err, event, 'update', label(source), outbound.clearOutbound, dav(collectionUrlOf(url)));
     }
   }
   return done;

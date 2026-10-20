@@ -612,9 +612,11 @@ async function runSync({ makeClient } = {}) {
     // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
     // nicht leer befunden.
     outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
-    const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls);
+    // Ein Stoppsignal für Löschen und Ändern (#1863).
+    const stop = outbound.createRefusalStop();
+    const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls, { stop });
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
-    const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl);
+    const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl, { stop });
     if (pushed) log.info(`${pushed} local change(s) pushed to iCloud.`);
   } catch (err) {
     log.error('Outbound changes failed:', err.message);

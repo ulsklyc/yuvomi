@@ -1516,14 +1516,16 @@ async function runSync({ createClient } = {}) {
         await outbound.releaseLeftoverUploads(client, {
           source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls,
         });
+        // Ein Stoppsignal für Löschen und Ändern dieses Kontos (#1863).
+        const stop = outbound.createRefusalStop();
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
-          isSelected: selectionOf(account.id),
+          isSelected: selectionOf(account.id), stop,
         });
         if (deletions.sent) log.info(`${deletions.sent} pending deletion(s) applied on the server.`);
         reportWaitingDeletions(account);
         const pushed = await processPendingUpdates(client, 'caldav', objectIndex, calendarsByUrl, {
-          accountId: account.id, fullRun: true,
+          accountId: account.id, fullRun: true, stop,
         });
         if (pushed) log.info(`${pushed} local change(s) pushed to the server.`);
       } catch (err) {
