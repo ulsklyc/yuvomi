@@ -3852,6 +3852,56 @@ test('Loeschen der ersten Serienbuchung sagt, dass "nur dieser" die Serie beende
   }
 });
 
+// #1790: die Rueckfrage beim Loeschen einer Umbuchung hing an `entry.is_recurring`.
+// Ein Vorkommen traegt is_recurring = 0 - wer dort "Gesamte Serie" waehlte, wurde
+// gefragt, ob er "beide Seiten dieser Umbuchung" loeschen wolle, und verlor die
+// ganze Serie. Die Frage folgt dem gewaehlten Umfang. Gefahren wird das echte
+// deleteEntry() bis zur Rueckfrage und dort abgebrochen.
+test('Umbuchung loeschen: die Rueckfrage nennt den gewaehlten Umfang, nicht is_recurring (#1790)', async () => {
+  const s = budgetUi.state;
+  const zuvor = { entries: s.entries, ledgerResults: s.ledgerResults };
+  const vorherModal = globalThis.__openModal;
+  const anker = { id: 20, title: 'Sparen', amount: -100, date: '2026-07-01', is_recurring: 1, recurrence_parent_id: null, transfer_entry_id: 21 };
+  const vorkommen = { id: 22, title: 'Sparen', amount: -100, date: '2026-08-01', is_recurring: 0, recurrence_parent_id: 20, transfer_entry_id: 23 };
+  const einzeln = { id: 24, title: 'Bar', amount: -50, date: '2026-08-03', is_recurring: 0, recurrence_parent_id: null, transfer_entry_id: 25 };
+  let wahl = null;
+  const umfangDialoge = [];
+  const fragen = [];
+  const deletes = [];
+  // Der Umfangsdialog: klickt den Knopf der Wahl, sobald er verdrahtet wird.
+  globalThis.__openModal = (o) => {
+    umfangDialoge.push(o);
+    o.onSave({ querySelector: (sel) => (sel === `#rcs-${wahl}` ? { addEventListener: (_type, fn) => fn() } : null) });
+  };
+  globalThis.__confirmOverModal = (prompt) => { fragen.push(prompt); return false; };
+  globalThis.__apiStub = { delete: async (url) => { deletes.push(url); return { data: null }; } };
+  const frageFuer = async (id, umfang = null) => {
+    wahl = umfang;
+    umfangDialoge.length = 0;
+    fragen.length = 0;
+    await budgetUi.deleteEntry(id);
+    return { umfang: umfangDialoge.length, frage: fragen[0] };
+  };
+  try {
+    Object.assign(s, { entries: [anker, vorkommen, einzeln], ledgerResults: null });
+
+    assert.deepEqual(await frageFuer(22, 'series'), { umfang: 1, frage: 'budget.transferDeleteSeriesConfirm' },
+      'Vorkommen + "Gesamte Serie": die Frage nennt die Serie');
+    assert.deepEqual(await frageFuer(22, 'this'), { umfang: 1, frage: 'budget.transferDeleteConfirm' },
+      'Vorkommen + "Nur dieser": die Frage nennt beide Seiten dieser einen Umbuchung');
+    assert.deepEqual(await frageFuer(20), { umfang: 0, frage: 'budget.transferDeleteSeriesConfirm' },
+      'der Anker loescht die Serie ohne Umfangsdialog - die Frage nennt die Serie');
+    assert.deepEqual(await frageFuer(24), { umfang: 0, frage: 'budget.transferDeleteConfirm' },
+      'eine einzelne Umbuchung fragt nach beiden Seiten');
+    assert.deepEqual(deletes, [], 'abgebrochen: nichts wird geloescht');
+  } finally {
+    delete globalThis.__confirmOverModal;
+    delete globalThis.__apiStub;
+    if (vorherModal === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorherModal;
+    Object.assign(s, zuvor);
+  }
+});
+
 // --------------------------------------------------------
 // Rot ist Warnung, nicht Grundton (Re-Critique 2026-09-27, C1)
 // --------------------------------------------------------

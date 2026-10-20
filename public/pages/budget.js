@@ -5898,12 +5898,17 @@ async function deleteEntry(id) {
   const entry = findEntry(id);
   if (entry?.transfer_entry_id) {
     let route = `/budget/${id}`;
+    // Die Serie geht, wenn der Anker geloescht wird (Server: deleteTransfer) oder
+    // ein Vorkommen mit "Gesamte Serie" - die Frage folgt dem, was geloescht wird.
+    // Ein Vorkommen traegt is_recurring = 0 (#1790).
+    let deletesSeries = Boolean(entry.is_recurring);
     if (entry.recurrence_parent_id) {
       const scope = await recurringChoiceModal({ title: t('budget.recurringSeriesScope'), thisLabel: t('budget.recurringThisOnly'), seriesLabel: t('budget.recurringEntireSeries'), seriesDanger: true });
       if (scope === null) return;
       if (scope === 'series') route += '/series';
+      deletesSeries = scope === 'series';
     }
-    const prompt = t(entry.is_recurring ? 'budget.transferDeleteSeriesConfirm' : 'budget.transferDeleteConfirm');
+    const prompt = t(deletesSeries ? 'budget.transferDeleteSeriesConfirm' : 'budget.transferDeleteConfirm');
     if (!await confirmOverModal(prompt, { confirmLabel: t('common.delete'), danger: true, detail: t('budget.transferDeleteConfirmDetail') })) return;
     try { await api.delete(route); await reloadMonth(); renderBody(); refocusAfterRender(); }
     catch (err) { showBudgetError(err, { fallback: BUDGET_SAVE_FAILED }); }

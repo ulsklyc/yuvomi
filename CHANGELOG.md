@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **You can move money between two budget accounts.** (#1061, from D#781) Use the budget
   entry dialog, with category and subcategory selection. The linked outgoing and incoming entries
-  update each account's balance and stay consistent when edited or deleted. Transfers are shown
+  update each account's balance and stay consistent when edited or deleted. Deleting one occurrence
+  of a recurring transfer asks whether to remove only that pair or the entire series, and the
+  confirmation that follows names what you chose. Transfers are shown
   separately in the month summary and category chart and do not count as income or spending in
   summaries, statistics, budget plans, or the dashboard. Savings is created as a subcategory of Financials
   when Financials still exists, without restoring deleted categories or rewriting entries, series or plans.
