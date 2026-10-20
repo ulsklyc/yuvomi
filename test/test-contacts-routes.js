@@ -423,7 +423,7 @@ try {
   // ------------------------------------------------------------------
   // Die Mehrfachfelder nennen ihren Fall (#1909): das Kontaktformular schickt
   // jede Nummer und E-Mail-Adresse als Eintrag, und eine Adresse ohne @ oder
-  // eine Nummer ueber 50 Zeichen bekam bis dahin nur den allgemeinen Satz. Jede
+  // eine zu lange Nummer bekam bis dahin nur den allgemeinen Satz. Jede
   // Absage traegt jetzt `reason`, eine Grenze als `params.limit`; der englische
   // `error` bleibt wortgleich fuer API-Clients.
   // ------------------------------------------------------------------
@@ -436,7 +436,7 @@ try {
     ['phones', [{ label: '   ', value: '0800' }], 'contacts_phone_entry_invalid', undefined, 'Phone label invalid or too long'],
     ['phones', [{ label: 'L'.repeat(51), value: '0800' }], 'contacts_phone_label_too_long', 50, 'Phone label invalid or too long'],
     ['phones', [{ label: 'Mobil', value: 12345 }], 'contacts_phone_entry_invalid', undefined, 'Phone value invalid or too long'],
-    ['phones', [{ label: 'Mobil', value: '1'.repeat(51) }], 'contacts_phone_too_long', 50, 'Phone value invalid or too long'],
+    ['phones', [{ label: 'Mobil', value: '1'.repeat(101) }], 'contacts_phone_too_long', 100, 'Phone value invalid or too long'],
     ['phones', [{ label: 'Mobil', value: '0800', isPrimary: 'ja' }], 'contacts_phone_entry_invalid', undefined, 'Phone isPrimary must be boolean'],
     ['emails', {}, 'contacts_email_entry_invalid', undefined, 'Emails must be an array'],
     ['emails', Array.from({ length: 21 }, (_, i) => ({ label: 'p', value: `a${i}@x.de` })), 'contacts_emails_too_many', 20, 'Too many email entries (max 20)'],
@@ -486,12 +486,12 @@ try {
     // Zwei Felder: phones vor emails vor addresses.
     const twoFields = await jsend(base, 'POST', { name: 'Mehrfach Fall',
       addresses: [{ label: 'L'.repeat(51) }], emails: [{ label: 'Privat', value: 'ohne-at' }],
-      phones: [{ label: 'Mobil', value: '1'.repeat(51) }] });
-    assert(twoFields.body.reason === 'contacts_phone_too_long' && twoFields.body.params?.limit === 50,
+      phones: [{ label: 'Mobil', value: '1'.repeat(101) }] });
+    assert(twoFields.body.reason === 'contacts_phone_too_long' && twoFields.body.params?.limit === 100,
       `phones zuerst: ${JSON.stringify(twoFields.body)}`);
     // Ein Einzelfeld scheitert vorher und wird benannt, wie in der ersten Scheibe.
     const single = await jsend(base, 'POST', { name: 'Mehrfach Fall', notes: 'n'.repeat(5001),
-      phones: [{ label: 'Mobil', value: '1'.repeat(51) }] });
+      phones: [{ label: 'Mobil', value: '1'.repeat(101) }] });
     assert(single.body.reason === 'contacts_notes_too_long', `Einzelfeld zuerst: ${single.body.reason}`);
     // Die geloeschte Kategorie als einziger Befund der Einzelfelder bleibt ihr Fall.
     const category = await jsend(base, 'POST', { name: 'Mehrfach Fall', category: 'gibt-es-nicht',
@@ -499,10 +499,40 @@ try {
     assert(category.body.reason === 'contacts_selected_category_not_found', `Kategorie: ${category.body.reason}`);
     // Genau an der Grenze geht es durch.
     const ok = await jsend(base, 'POST', { name: 'Mehrfach Grenze',
-      phones: [{ label: 'L'.repeat(50), value: '1'.repeat(50) }],
+      phones: [{ label: 'L'.repeat(50), value: '1'.repeat(100) }],
       emails: [{ label: 'Privat', value: `${'e'.repeat(250)}@x.de` }],
       addresses: [{ label: 'Zuhause', street: 'S'.repeat(255) }] });
     assert(ok.status === 201, `Grenze: ${ok.status} ${JSON.stringify(ok.body)}`);
+  });
+
+  await asyncTest('Telefon: Einzelfeld und Liste haben dieselbe Grenze, wie das Formular beide schickt (#1909)', async () => {
+    // Das Formular schickt die erste Nummer als `phone` UND als ersten Eintrag
+    // von `phones`. Bis hierher liess das Einzelfeld 100 Zeichen zu, die Liste
+    // 50: 101 Zeichen hiessen "hoechstens 100", nach dem Kuerzen auf 60
+    // "hoechstens 50".
+    const formBody = (value) => ({ phone: value, phones: [{ label: 'other', value, isPrimary: true }] });
+    for (const length of [60, 100]) {
+      const value = '1'.repeat(length);
+      const created = await jsend(base, 'POST', { name: `Telefon ${length}`, ...formBody(value) });
+      assert(created.status === 201, `POST ${length}: ${created.status} ${JSON.stringify(created.body)}`);
+      const id = created.body.data.id;
+      const updated = await jsend(`${base}/${id}`, 'PUT', formBody('2'.repeat(length)));
+      assert(updated.status === 200, `PUT ${length}: ${updated.status} ${JSON.stringify(updated.body)}`);
+      // Die Liste allein, ohne Einzelfeld davor.
+      const listOnly = await jsend(`${base}/${id}`, 'PUT', { phones: [{ label: 'other', value: '3'.repeat(length) }] });
+      assert(listOnly.status === 200, `PUT nur Liste ${length}: ${listOnly.status} ${JSON.stringify(listOnly.body)}`);
+    }
+    const tooLong = '1'.repeat(101);
+    const expectLimit = (where, res) => {
+      assert(res.status === 400, `${where}: Status ${res.status}`);
+      assert(res.body.reason === 'contacts_phone_too_long', `${where}: reason ${res.body.reason}`);
+      assert(res.body.params?.limit === 100, `${where}: params ${JSON.stringify(res.body.params)}`);
+    };
+    expectLimit('POST Formular', await jsend(base, 'POST', { name: 'Telefon 101', ...formBody(tooLong) }));
+    expectLimit('POST nur Liste', await jsend(base, 'POST', { name: 'Telefon 101', phones: [{ label: 'other', value: tooLong }] }));
+    const created = await jsend(base, 'POST', { name: 'Telefon Bearbeiten' });
+    expectLimit('PUT Formular', await jsend(`${base}/${created.body.data.id}`, 'PUT', formBody(tooLong)));
+    expectLimit('PUT nur Liste', await jsend(`${base}/${created.body.data.id}`, 'PUT', { phones: [{ label: 'other', value: tooLong }] }));
   });
 
   // ------------------------------------------------------------------

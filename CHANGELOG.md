@@ -301,8 +301,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `contacts_address_too_long`, `contacts_notes_too_long` with `params.limit`, and
   `contacts_birthday_invalid`), and the status codes and texts are unchanged.
 - **Contacts: the form says which phone number or email address it refused** (#1909). Saving a
-  contact with an email address without an @, or a phone number longer than 50 characters, said
-  only that an error occurred. It now says what is wrong: that the email address needs the form
+  contact with an email address without an @, or a phone number that was too long, said only that
+  an error occurred. It now says what is wrong: that the email address needs the form
   name@example.com, or how long a phone number may be, and likewise for too many entries or a label
   that is too long. For API clients: every refusal of `phones`, `emails` and `addresses` carries a
   `reason` next to `error` (`contacts_phones_too_many`, `contacts_emails_too_many`,
@@ -311,6 +311,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `contacts_email_too_long` with `params.limit`, `contacts_email_invalid`, and
   `contacts_phone_entry_invalid`, `contacts_email_entry_invalid`, `contacts_address_entry_invalid`
   for an entry that is incomplete or malformed), and the status codes and texts are unchanged.
+- **Contacts: a phone number may be 100 characters long everywhere** (#1909). The form sends the
+  first number twice, as `phone` and as the first entry of `phones`, and the two had different
+  limits: a number of 101 characters was refused with "at most 100", and after shortening it to 60
+  with "at most 50". The list `phones` now accepts 100 characters like the single field, so a number
+  between 51 and 100 characters - for example one written with an extension or a note - saves, and
+  the phone fields of the form stop at the same 100 characters. One limit for the server and the
+  form lives in `public/utils/contact-limits.js`.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

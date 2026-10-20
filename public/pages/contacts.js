@@ -19,6 +19,7 @@ import { parseVCards } from '/utils/vcard.js';
 import { birthDateText, birthDateFieldHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { composeDisplayName, contactSortKey, splitDisplayName } from '/utils/contact-name.js';
+import { CONTACT_PHONE_MAX_LENGTH } from '/utils/contact-limits.js';
 import { getPhoneFormatter, createAsYouType, countryFromRegion } from '/utils/phone.js';
 import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { splitViewDetailHtml, mountMasterDetail, setSelectionBulk } from '/utils/master-detail.js';
@@ -1403,7 +1404,7 @@ function buildContactForm({ mode, contact = null }) {
   const mvRow = (kind, row, isFirst) => `
     <div class="contact-mv-row" data-mv-row>
       <input type="${kind === 'phone' ? 'tel' : 'email'}" class="form-input" data-mv-value
-             ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"
+             ${isFirst ? `id="cm-${kind}"` : ''} value="${esc(row.value)}"${kind === 'phone' ? ` maxlength="${CONTACT_PHONE_MAX_LENGTH}"` : ''}
              placeholder="${t(kind === 'phone' ? 'contacts.phonePlaceholder' : 'contacts.emailPlaceholder')}"
              autocomplete="${kind === 'phone' ? 'tel' : 'email'}"${mvLocked(kind) ? ' readonly aria-describedby="cm-email-locked"' : ''}>
       <input type="text" class="form-input contact-mv-row__label" data-mv-label maxlength="50"

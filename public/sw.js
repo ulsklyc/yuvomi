@@ -125,6 +125,7 @@ const APP_SHELL = [
   '/utils/category-labels.js',
   '/utils/chart.js',
   '/utils/color.js',
+  '/utils/contact-limits.js',
   '/utils/contact-name.js',
   '/utils/contrast.js',
   '/utils/countdown.js',

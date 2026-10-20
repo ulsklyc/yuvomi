@@ -10,6 +10,7 @@ import * as db from '../db.js';
 import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
+import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown } from '../services/birthdays.js';
 import {
@@ -202,8 +203,8 @@ function loadMultiValueFields(contactId) {
  * eine Grenze gibt, die Zahl. Die Antwort reicht ihn als `reason` und
  * `params.limit` neben dem unveraenderten `error` weiter. Gemeint ist vor allem
  * das Kontaktformular: es schickt jede Telefonnummer und Adresse als Eintrag,
- * und eine E-Mail-Adresse ohne @ oder eine Nummer ueber 50 Zeichen bekam bis
- * dahin nur den allgemeinen Satz. Der ERSTE Eintrag, der scheitert, wird
+ * und eine E-Mail-Adresse ohne @ oder eine zu lange Nummer bekam bis dahin nur
+ * den allgemeinen Satz. Der ERSTE Eintrag, der scheitert, wird
  * benannt; die Felder nacheinander (phones, emails, addresses), alle erst nach
  * den Einzelfeldern.
  *
@@ -216,7 +217,9 @@ function loadMultiValueFields(contactId) {
  */
 const MV_MAX_ENTRIES = 20;
 const MV_MAX_LABEL = 50;
-const MV_MAX_PHONE = 50;
+// Dieselbe Grenze wie das Einzelfeld `phone`: das Formular schickt die erste
+// Nummer in beiden, und zwei Grenzen nannten nacheinander zwei Zahlen.
+const MV_MAX_PHONE = CONTACT_PHONE_MAX_LENGTH;
 const MV_MAX_EMAIL = 255;
 const MV_MAX_ADDRESS_PART = 255;
 
@@ -514,7 +517,7 @@ router.post('/', (req, res) => {
     const nameParts = readNameParts(req.body);
     const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
     const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Category');
-    const vPhone   = limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' });
+    const vPhone   = limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
     const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
     const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
     const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
@@ -652,7 +655,7 @@ router.put('/:id', (req, res) => {
     if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
     const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'Category') : null;
     if (vCat) checks.push(vCat);
-    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', MAX_SHORT, { reason: 'contacts_phone_too_long' }));
+    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
     if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
     if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
     if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
