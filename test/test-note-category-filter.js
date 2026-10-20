@@ -138,6 +138,64 @@ test('overflow formats visible counts separately from whole accessible action la
   }
 });
 
+// OHNE POPOVER-API (#2107): Chrome < 114, Firefox < 125, Safari < 17 kennen
+// `showPopover()` nicht. Der Tooltip bleibt dort zu (reset.css blendet jedes
+// `[popover]` aus); Hover, Fokus und Klick auf +N duerfen nicht werfen.
+test('overflow tooltip stays closed without the Popover API instead of throwing', () => {
+  const previous = {
+    document: globalThis.document,
+    window: globalThis.window,
+    ResizeObserver: globalThis.ResizeObserver,
+    getComputedStyle: globalThis.getComputedStyle,
+  };
+  const makeNode = (tag) => Object.assign(new EventTarget(), {
+    tag,
+    className: '',
+    id: '',
+    textContent: '',
+    style: {},
+    children: [],
+    setAttribute() {},
+    append(child) { this.children.push(child); },
+    replaceChildren() { this.children = []; },
+    remove() {},
+    matches() { return false; },
+    contains() { return false; },
+    getBoundingClientRect() { return { width: 100, height: 30, left: 0, top: 0, bottom: 30 }; },
+  });
+  globalThis.document = Object.assign(new EventTarget(), {
+    body: { append() {} },
+    documentElement: { clientWidth: 800 },
+    activeElement: null,
+    fonts: Object.assign(new EventTarget(), { ready: Promise.resolve() }),
+    createElement: makeNode,
+  });
+  globalThis.window = { innerHeight: 600 };
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    disconnect() {}
+  };
+  globalThis.getComputedStyle = () => ({ columnGap: '4px' });
+
+  let dispose = () => {};
+  try {
+    const fixture = overflowFixture(3);
+    const handlers = new Map();
+    fixture.button.addEventListener = (type, handler) => handlers.set(type, handler);
+    dispose = wireNoteCategoryOverflow(fixture.root);
+    assert.equal(fixture.button.hidden, false, 'Vorbedingung: +N steht da');
+    for (const type of ['mouseenter', 'focus', 'click']) {
+      assert.doesNotThrow(() => handlers.get(type)({ stopPropagation() {} }), type);
+    }
+  } finally {
+    dispose();
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+    }
+  }
+});
+
 const picker = await import('../public/utils/note-category-picker.js');
 
 function fakePickerOption(id) {

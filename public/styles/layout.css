@@ -5140,7 +5140,8 @@ html.fab-steady .page-fab {
 /* `display: none` als Grundzustand, `flex` erst bei :popover-open: das UA-Blatt
  * setzt `display: none` auf `[popover]`, und eine eigene display-Deklaration
  * ohne Popover-Bedingung würde es schlagen - dieselbe Falle wie die
- * [hidden]-Durchsetzung ein paar Zeilen weiter unten. */
+ * [hidden]-Durchsetzung ein paar Zeilen weiter unten. Ohne Popover-API fehlt
+ * die UA-Regel; reset.css reicht sie dort nach (#2107). */
 .popover-menu {
   position: fixed;
   margin: 0;

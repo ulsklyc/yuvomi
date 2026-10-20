@@ -71,6 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Menus no longer all stand open on older browsers (#2107).** On a browser without popover
+  support - Chrome or Edge before 114, Firefox before 125, Safari or iOS before 17, such as a
+  wall frame stuck on an old system WebView - every "more" menu, the account menu and the
+  Overview's New menu were drawn open on top of the page and caught the taps meant for what lay
+  underneath. These menus now stay hidden there, and their buttons do nothing; everything else
+  works as before. Log out is also under Settings > Account. Current browsers are unchanged.
 - **Birthdays without a year from iCloud no longer show the year 1604 and an age of over 400
   (#2095).** iCloud stores a birthday without a year with the placeholder year 1604 and marks it;
   the contact sync and the `.vcf` import read the date but not the mark. Both now recognise it, and
