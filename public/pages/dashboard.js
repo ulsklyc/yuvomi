@@ -1593,8 +1593,15 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
     `;
   }).join('');
 
-  const earlier = folded > 0
-    ? `<p class="event-list__earlier">${esc(t('dashboard.eventsEndedMore', { count: folded }))}</p>`
+  // HOECHSTENS EINE ZUSATZZEILE (Codex-Review zu PR #2117). Jede 1x1-Liste
+  // traegt drei Zeilen plus „+N weitere"; Faltzeile UND Fusszeile machten die
+  // volle 1x1-Kachel eine Zeile hoeher und streckten die Nachbarzeile wieder.
+  // Stehen beide an, teilen sie sich die Fusszeile, das Fruehere zuerst (die
+  // Zeitfolge der Kachel); sonst bleibt die Faltzeile ueber dem Kommenden.
+  const moreAhead = rows < clampEventLimit(limit) && aheadAll.length > ahead.length;
+  const earlierText = folded > 0 ? t('dashboard.eventsEndedMore', { count: folded }) : '';
+  const earlier = earlierText && !moreAhead
+    ? `<p class="event-list__earlier">${esc(earlierText)}</p>`
     : '';
   // KEINE BADGE: die Liste ist nach vorn offen und bei der gewaehlten Stufe
   // (5, 8 oder 12) geschnitten, eine Gesamtzahl gibt es nicht. „5" stuende
@@ -1604,8 +1611,8 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   // weniger zeigt, als geladen ist (#2087): „+2 weitere" hiesse „fuenf geladen,
   // drei gezeigt" und laege bei dreissig kommenden Terminen. Sie steht an der
   // Stelle und in der Form des „+N weitere" der anderen Listen.
-  const more = rows < clampEventLimit(limit) && aheadAll.length > ahead.length
-    ? `<p class="widget-list-more">${esc(t('dashboard.eventsMoreAhead'))}</p>`
+  const more = moreAhead
+    ? `<p class="widget-list-more">${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
     : '';
   return `<div class="widget widget--calendar">
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}

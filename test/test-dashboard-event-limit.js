@@ -506,6 +506,29 @@ test('Kachel: beendete von heute nehmen nur freie Zeilen und verdraengen nie ein
   assert.deepEqual(aheadRows(busy), firstAhead(3), '1x1 an einem vollen Tag: das Kommende zuerst');
   assert.deepEqual(endedRows(busy), []);
   assert.match(busy, /dashboard\.eventsEndedMore\{&quot;count&quot;:2\}/);
+  assert.doesNotMatch(busy, /event-list__earlier/, 'die frueheren stehen in der Fusszeile, nicht in einer eigenen Zeile');
+}));
+
+/* Codex-Review zu PR #2117: eine volle 1x1-Kachel mit beendeten von heute trug
+ * drei Zeilen, die Faltzeile „+N fruehere heute" UND die Fusszeile - eine
+ * Zeile mehr als jede 1x1-Liste (drei Zeilen plus „+N weitere"), und damit
+ * wieder eine gestreckte Nachbarzeile. Eine Kachel traegt hoechstens EINE
+ * Zusatzzeile; stehen beide an, teilen sie sich die Fusszeile. */
+const auxLines = (html) => (html.match(/class="(event-list__earlier|widget-list-more)"/g) ?? []).length;
+
+test('Kachel: 1x1 voll und mit beendeten von heute traegt nur eine Zusatzzeile (Review #2117)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
+  for (const ended of [1, 3]) {
+    const html = dash.renderCalendarWidget({ upcomingEvents: tileEvents(5, { ended }) }, '1x1', {});
+    assert.equal(rowTitles(html).length, 3, `${ended} beendet: drei Terminzeilen`);
+    assert.equal(auxLines(html), 1, `${ended} beendet: eine Zusatzzeile wie jede 1x1-Liste`);
+    const foot = /<p class="widget-list-more">([^<]*)<\/p>/.exec(html)?.[1] ?? '';
+    assert.match(foot, new RegExp(`eventsEndedMore\\{&quot;count&quot;:${ended}\\}`), 'die Fusszeile nennt die frueheren');
+    assert.match(foot, /eventsMoreAhead/, 'und dass weitere kommen');
+  }
+  // Ohne weitere Kommende bleibt die Faltzeile, wo sie war: ueber dem Kommenden.
+  const rest = dash.renderCalendarWidget({ upcomingEvents: tileEvents(3, { ended: 3 }) }, '1x1', {});
+  assert.equal(auxLines(rest), 1);
+  assert.match(rest, /event-list__earlier/);
 }));
 
 /* Die Stufe ist in den hohen Groessen die Hoehe der Kachel (#2087): 5/8/12 ->
