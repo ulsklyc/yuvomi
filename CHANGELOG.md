@@ -97,6 +97,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
+  deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
+  takes the server's version again. Until now every refusal counted, also those that say nothing
+  about the entry: with the server down, rate-limiting or rejecting the password, each edit you made
+  used up an attempt of every waiting deletion and change. After five edits, deleted events and
+  tasks came back with the next successful sync and pending changes were overwritten. Now only an
+  answer about the entry itself counts (for example a conflict or an invalid entry). Answers about
+  the whole account or server (401, 403, 429, 5xx, no connection) leave the work waiting until the
+  server accepts it again. This covers calendars, Apple calendars and tasks; Google is unchanged.
 - **The meal plan now follows the household week-start setting, just like the calendar (#2075).**
   Both the server (`GET /meals`, "add week to shopping list") and the frontend week-grid previously
   hard-coded Monday as the week start. Both now read the household `week_start` preference

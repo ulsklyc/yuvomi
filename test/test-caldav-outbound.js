@@ -932,8 +932,10 @@ test('ein Serverfehler lässt die Löschung für den nächsten Lauf stehen', asy
   const client = fakeClient({ onDelete: () => { throw httpError(503); } });
   assert.equal(await processPendingDeletions(client, 'caldav', new Map(), new Set([CAL_URL])), 0);
 
+  // Ein Serverfehler gilt dem ganzen Server und verbraucht keinen Versuch des
+  // Eintrags (#1863); er steht aber am Auftrag.
   const [row] = tombstones();
-  assert.equal(row.attempts, 1);
+  assert.equal(row.attempts, 0);
   assert.match(row.last_error, /503/);
 });
 
@@ -1049,9 +1051,10 @@ test('ein Serverfehler lässt die Änderung für den nächsten Lauf stehen', asy
   const client = fakeClient({ onUpdate: () => { throw httpError(500); } });
   await processPendingUpdates(client, 'caldav', indexFor('u3@t'));
 
+  // Kein Versuch des Eintrags verbraucht: der Fehler gilt dem Server (#1863).
   const row = reload(event.id);
   assert.equal(row.outbound_dirty, 1);
-  assert.equal(row.outbound_attempts, 1);
+  assert.equal(row.outbound_attempts, 0);
 });
 
 test('ein etag-Konflikt (412) ist ein Wiederholungsfall', async () => {

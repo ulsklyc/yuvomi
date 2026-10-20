@@ -506,7 +506,7 @@ export async function processPendingDeletions(client, source, objectIndex, ownCa
         }
         continue;
       }
-      if (outbound.handleDeletionError(err, row, label(source))
+      if (outbound.handleDeletionError(err, row, label(source), outbound.davFailureAction)
           && outbound.classifyOutboundError(err) === 'settled') {
         done++;
       }
@@ -678,7 +678,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
               // wie jeder gescheiterte Umzug wieder (die Kopie im Ziel wird
               // dabei übernommen) - bis die Quelle fort ist oder aufgegeben wird.
               log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}), and another account already has a pending deletion for that entry; the move stays pending.`);
-              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove);
+              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove, outbound.davFailureAction);
               continue;
             }
           }
@@ -708,7 +708,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // im bisherigen Kalender hinaus. handleUpdateError läse es als
           // "erledigt" und nähme die Bearbeitung mit.
           if (outbound.classifyOutboundError(err) !== 'settled') {
-            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove);
+            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove, outbound.davFailureAction);
             continue;
           }
           log.warn(`[${label(source)}] Destination calendar ${moveTo} no longer accepts event ${event.id} (${err.message}), keeping it where it is.`);
@@ -731,7 +731,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       outbound.settleOutbound(fresh, null, fresh, { snapshot: icsSnapshot(fresh, patched, event.external_calendar_id, zone) });
       done++;
     } catch (err) {
-      outbound.handleUpdateError(err, event, 'update', label(source));
+      outbound.handleUpdateError(err, event, 'update', label(source), outbound.clearOutbound, outbound.davFailureAction);
     }
   }
   return done;

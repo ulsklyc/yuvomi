@@ -954,7 +954,9 @@ test('Umzug, die Quelle lehnt das Löschen ab: der Auftrag gehört dem Konto der
   const { a, b, workUrl } = accountWithTwoCalendars();
   const id = mirror(a, { title: 'Zieht um' });
   db.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE id = ?').run(workUrl, id);
-  a.dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/') });
+  // 409: eine Absage am Eintrag, die als Versuch zählt (eine kontoweite wie
+  // 403 zählt nicht, #1863).
+  a.dav.refuse({ method: 'DELETE', status: 409, when: (req) => req.path.startsWith('/cal/family/') });
 
   await caldavSync.sync();
 
@@ -1058,7 +1060,8 @@ test('Umzug abgelehnt, und für das Objekt steht schon der Auftrag eines ANDEREN
   db.prepare("UPDATE calendar_pending_deletions SET attempts = 3, last_error = 'von B' WHERE id = ?").run(theirs);
   const id = mirror(accounts.a, { title: 'Zieht um' });
   db.prepare('UPDATE calendar_events SET outbound_move_to = ? WHERE id = ?').run(workUrl, id);
-  accounts.a.dav.refuse({ method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/') });
+  // 409, damit die Absage als Versuch zählt (#1863).
+  accounts.a.dav.refuse({ method: 'DELETE', status: 409, when: (req) => req.path.startsWith('/cal/family/') });
 
   const lines = await logged(t, () => caldavSync.flushOutbound());
 

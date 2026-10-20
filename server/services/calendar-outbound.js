@@ -31,7 +31,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
 import { ownUid, ownUploadRowId, parseOwnUid, findObjectWithUid } from '../utils/own-uid.js';
-import { collectionUrlOf } from '../utils/caldav-client.js';
+import { collectionUrlOf, isCollectionRefusal } from '../utils/caldav-client.js';
 import {
   noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
@@ -97,6 +97,40 @@ export function outboundFailureAction(err, attempts) {
   if (kind === 'settled') return 'settled';
   if (kind === 'permanent' || attempts + 1 >= MAX_OUTBOUND_ATTEMPTS) return 'give-up';
   return 'retry';
+}
+
+/**
+ * Dieselbe Regel für die Wege über CalDAV (Termine, Apple, Aufgaben), mit
+ * einem vierten Ausgang (#1863):
+ *   wait - der Auftrag bleibt und verbraucht keinen Versuch
+ *
+ * Der Zähler gilt dem Eintrag. Eine Antwort, die über das Konto oder den
+ * Server als Ganzes etwas sagt (401, 403, 429, 5xx, ein Netzfehler), sagt
+ * nichts über ihn - und sie trifft jeden wartenden Auftrag bei jedem
+ * Sofortversuch, also einmal je Bearbeitung. Mitgezählt verwarf ein
+ * abgelaufenes Passwort oder eine Stunde Ratenlimit nach fünf Bearbeitungen
+ * jedes wartende Löschen und Ändern, und der nächste Abruf holte die
+ * gelöschten Einträge zurück. Gezählt wird nur, was am Eintrag selbst hängt
+ * (400, 409, 412, 413, 415, 422 oder ein Fehler ohne Status aus dem eigenen
+ * Code). Die Linie ist dieselbe wie bei der Schranke für Uploads
+ * (`isCollectionRefusal`, caldav-client.js).
+ *
+ * Ein Auftrag, den der Server dauerhaft so ablehnt (nur lesbar geteilter
+ * Kalender), wartet damit, bis die Absage endet, sein Kalender verschwindet
+ * oder sein Konto gelöscht wird: eine Anfrage je Lauf statt eines
+ * zurückgeholten Eintrags.
+ *
+ * Google bleibt bei `outboundFailureAction`: dort gilt ein 403 je nach Grund
+ * dem Konto (Ratenlimit) oder dem einzelnen Termin (fremder Organisator), und
+ * diese Linie nähme beide als kontoweit.
+ *
+ * @returns {'settled'|'give-up'|'retry'|'wait'}
+ */
+export function davFailureAction(err, attempts) {
+  const action = outboundFailureAction(err, attempts);
+  if (action === 'settled') return action;
+  if (isCollectionRefusal(err)) return 'wait';
+  return action;
 }
 
 // --------------------------------------------------------
@@ -309,7 +343,9 @@ export function isConditionalDeletion(row) {
 /**
  * Merkt eine Löschung vor, deren erster Versuch gerade abgelehnt wurde (#1861):
  * die Quelle eines Umzugs, die ihr Objekt nicht hergibt. Die Absage zählt als
- * Versuch, wie bei jeder anderen abgelehnten Löschung.
+ * Versuch, wie bei jeder anderen abgelehnten Löschung - und wie dort nur,
+ * wenn sie am Eintrag hängt (`davFailureAction`, #1863). Eine kontoweite
+ * Absage steht als Fehlertext am Auftrag, ohne einen Versuch zu verbrauchen.
  *
  * Steht für dieselbe UID in demselben Kalender schon ein Auftrag DESSELBEN
  * Kontos, behält er seine Adresse (`queueDeletion`) und zählt die Absage; der
@@ -325,7 +361,7 @@ export function isConditionalDeletion(row) {
  * `target.etag` (#1883): der Stand des Objekts, an das das abgelehnte DELETE
  * ging. Mit ihm wartet der Auftrag nur auf dieses Objekt in diesem Stand.
  *
- * @returns {boolean} true, wenn die Absage an einem Auftrag dieses Kontos gezählt ist
+ * @returns {boolean} true, wenn die Absage an einem Auftrag dieses Kontos vermerkt ist
  */
 export function queueRefusedDeletion(target, err) {
   const forCaldav = target.source === 'caldav';
@@ -339,10 +375,11 @@ export function queueRefusedDeletion(target, err) {
     if (existing && existing.caldav_account_id != null && existing.caldav_account_id !== target.accountId) return false;
   }
   if (!queueDeletion(target)) return false;
+  const counts = isCollectionRefusal(err) ? 0 : 1;
   db.get().prepare(`
-    UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ?
+    UPDATE calendar_pending_deletions SET attempts = attempts + ?, last_error = ?
     WHERE source = ? AND calendar_external_id = ? AND event_external_id = ?${forCaldav ? ' AND caldav_account_id = ?' : ''}
-  `).run(String(err?.message || err).slice(0, 500), ...key, ...(forCaldav ? [target.accountId] : []));
+  `).run(counts, String(err?.message || err).slice(0, 500), ...key, ...(forCaldav ? [target.accountId] : []));
   return true;
 }
 
@@ -447,21 +484,27 @@ export function dropDeletion(id) {
   db.get().prepare('DELETE FROM calendar_pending_deletions WHERE id = ?').run(id);
 }
 
-export function failDeletion(id, err) {
+export function failDeletion(id, err, { counts = true } = {}) {
   db.get().prepare(
-    'UPDATE calendar_pending_deletions SET attempts = attempts + 1, last_error = ? WHERE id = ?'
-  ).run(String(err?.message || err).slice(0, 500), id);
+    'UPDATE calendar_pending_deletions SET attempts = attempts + ?, last_error = ? WHERE id = ?'
+  ).run(counts ? 1 : 0, String(err?.message || err).slice(0, 500), id);
 }
 
 /**
  * Fehlerbehandlung einer vorgemerkten Löschung, geteilt von allen Providern.
+ * `failureAction`: die Wege über CalDAV geben `davFailureAction` mit (#1863).
  * @returns {boolean} true, wenn der Tombstone erledigt (oder aufgegeben) ist
  */
-export function handleDeletionError(err, row, provider) {
-  const action = outboundFailureAction(err, row.attempts);
+export function handleDeletionError(err, row, provider, failureAction = outboundFailureAction) {
+  const action = failureAction(err, row.attempts);
   if (action === 'settled') {
     dropDeletion(row.id);
     return true;
+  }
+  if (action === 'wait') {
+    failDeletion(row.id, err, { counts: false });
+    log.warn(`[${provider}] Remote deletion of ${row.event_external_id} was refused for the whole account, it waits without using up an attempt:`, err.message);
+    return false;
   }
   const attempts = row.attempts + 1;
   failDeletion(row.id, err);
@@ -626,12 +669,17 @@ export function failOutbound(eventId) {
  * Fehlerbehandlung einer ausgehenden Änderung, geteilt von allen Providern.
  * `giveUp` bestimmt, was beim Aufgeben fallen gelassen wird: beim Umzug nur die
  * Umzugs-Vormerkung (clearOutboundMove), beim Push alles (clearOutbound).
+ * `failureAction`: die Wege über CalDAV geben `davFailureAction` mit (#1863).
  */
-export function handleUpdateError(err, event, what, provider, giveUp = clearOutbound) {
-  const action = outboundFailureAction(err, event.outbound_attempts);
+export function handleUpdateError(err, event, what, provider, giveUp = clearOutbound, failureAction = outboundFailureAction) {
+  const action = failureAction(err, event.outbound_attempts);
   if (action === 'settled') {
     log.warn(`[${provider}] Event ${event.external_calendar_id} no longer exists at the provider, dropping outbound ${what}.`);
     clearOutbound(event.id);
+    return;
+  }
+  if (action === 'wait') {
+    log.warn(`[${provider}] Outbound ${what} of event ${event.id} was refused for the whole account, it waits without using up an attempt:`, err.message);
     return;
   }
   if (action === 'give-up') {

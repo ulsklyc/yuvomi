@@ -45,8 +45,9 @@ const db = dbmod.get();
 const {
   createCalDAVClient, createCardDAVClient, withHttpRefusalsAsErrors, DavHttpError,
 } = await import('../server/utils/caldav-client.js');
-const { classifyOutboundError, outboundFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion, queueEventDeletion } =
-  await import('../server/services/calendar-outbound.js');
+const {
+  classifyOutboundError, outboundFailureAction, davFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion, queueEventDeletion,
+} = await import('../server/services/calendar-outbound.js');
 const todoOutbound   = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync  = await import('../server/services/caldav-reminders-sync.js');
 const caldavSync     = await import('../server/services/caldav-sync.js');
@@ -251,6 +252,25 @@ test('Wrapper: was tsdav wirklich meldet, ordnet die bestehende Einordnung richt
     assert.equal(outboundFailureAction(err, 0), 'retry', `HTTP ${status}, erster Versuch`);
     assert.equal(outboundFailureAction(err, MAX_OUTBOUND_ATTEMPTS - 1), 'give-up', `HTTP ${status}, letzter Versuch`);
   }
+  // Auf den Wegen über CalDAV zählt nur, was am Eintrag hängt (#1863): eine
+  // Absage des Kontos oder des Servers lässt den Auftrag warten, ohne Versuch.
+  for (const status of [401, 403, 429, 500, 503, 507]) {
+    const err = await refusal(status);
+    assert.equal(davFailureAction(err, 0), 'wait', `HTTP ${status}`);
+    assert.equal(davFailureAction(err, MAX_OUTBOUND_ATTEMPTS - 1), 'wait', `HTTP ${status}, nach vier Absagen am Eintrag`);
+  }
+  for (const status of [409, 412, 413, 415, 422]) {
+    const err = await refusal(status);
+    assert.equal(davFailureAction(err, 0), 'retry', `HTTP ${status}`);
+    assert.equal(davFailureAction(err, MAX_OUTBOUND_ATTEMPTS - 1), 'give-up', `HTTP ${status}, letzter Versuch`);
+  }
+  assert.equal(davFailureAction(await refusal(400), 0), 'give-up');
+  assert.equal(davFailureAction(await refusal(404), 0), 'settled');
+  // Ohne Status: ein erkannter Netzfehler gilt dem Server, ein Fehler aus
+  // dem eigenen Code (ICS-Bau, Buchung) der einen Zeile.
+  const offline = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }) });
+  assert.equal(davFailureAction(offline, MAX_OUTBOUND_ATTEMPTS - 1), 'wait');
+  assert.equal(davFailureAction(new Error('kaputtes ICS'), MAX_OUTBOUND_ATTEMPTS - 1), 'give-up');
 });
 
 test('Wrapper: eine abgelehnte Auflistung ist keine leere Liste', async () => {
@@ -316,6 +336,12 @@ test('Wrapper: nur der belegte Erfolg zählt, und der Rest des Clients bleibt', 
 
 // ── Aufgaben und Einkauf (VTODO) ────────────────────────────────────────────────
 
+/**
+ * Versuche, die EINE Absage am Auftrag verbraucht (#1863): 412 hängt am
+ * Eintrag, 403 und 503 gelten dem Konto oder dem Server und zählen nicht.
+ */
+const countedAttempts = (status) => ({ 403: 0, 412: 1, 503: 0 })[status];
+
 for (const status of [403, 412, 503, 507]) {
   test(`Aufgabe anlegen, PUT ${status}: bleibt lokal und übersteht den nächsten Abruf`, async () => {
     reset();
@@ -362,7 +388,7 @@ for (const status of [403, 412, 503]) {
 
     let row = task(id);
     assert.equal(row.outbound_dirty, 1, 'eine abgelehnte Änderung gilt als übertragen');
-    assert.equal(row.outbound_attempts, 1, 'der Fehlversuch wurde nicht gezählt');
+    assert.equal(row.outbound_attempts, countedAttempts(status), 'der Fehlversuch wurde falsch gezählt');
     assert.match(dav.getObject(list, 'todo-1@test.ics').data, /SUMMARY:Alter Titel/);
 
     // Ohne Vormerkung überschrieb der nächste Abruf die Bearbeitung mit dem
@@ -392,7 +418,8 @@ for (const status of [403, 412, 503]) {
     assertRefused('DELETE', status);
 
     assert.equal(todoTombstones().length, 1, 'ein abgelehntes Löschen hat den Tombstone verworfen');
-    assert.equal(todoTombstones()[0].attempts, 1, 'der Fehlversuch wurde nicht gezählt');
+    assert.equal(todoTombstones()[0].attempts, countedAttempts(status), 'der Fehlversuch wurde falsch gezählt');
+    assert.match(todoTombstones()[0].last_error, new RegExp(`HTTP ${status}`), 'die Absage steht nicht am Auftrag');
     assert.ok(dav.getObject(list, 'gone.ics'));
 
     // Ohne Tombstone legte der nächste Abruf die gelöschte Aufgabe neu an.
@@ -509,7 +536,7 @@ for (const status of [403, 412, 503]) {
 
     let row = event(id);
     assert.equal(row.outbound_dirty, 1, 'eine abgelehnte Änderung gilt als übertragen');
-    assert.equal(row.outbound_attempts, 1, 'der Fehlversuch wurde nicht gezählt');
+    assert.equal(row.outbound_attempts, countedAttempts(status), 'der Fehlversuch wurde falsch gezählt');
 
     // Der Abruf lässt eine wartende Bearbeitung stehen - aber nur, solange
     // sie noch als wartend gilt.
@@ -537,7 +564,8 @@ for (const status of [403, 412, 503]) {
     assertRefused('DELETE', status);
 
     assert.equal(eventTombstones().length, 1, 'ein abgelehntes Löschen hat den Tombstone verworfen');
-    assert.equal(eventTombstones()[0].attempts, 1, 'der Fehlversuch wurde nicht gezählt');
+    assert.equal(eventTombstones()[0].attempts, countedAttempts(status), 'der Fehlversuch wurde falsch gezählt');
+    assert.match(eventTombstones()[0].last_error, new RegExp(`HTTP ${status}`), 'die Absage steht nicht am Auftrag');
 
     await caldavSync.sync();
     assert.equal(
@@ -1037,8 +1065,10 @@ test('Umzug, an der Adresse im Ziel liegt ein FREMDES Objekt (412): die Quelle b
 const eventRows = (uid) => db.prepare(
   'SELECT * FROM calendar_events WHERE external_calendar_id = ? ORDER BY id'
 ).all(uid);
-const refuseSourceDelete = () => dav.refuse({
-  method: 'DELETE', status: 403, when: (req) => req.path.startsWith('/cal/family/'),
+// 409: eine Absage am Eintrag selbst, die als Versuch zählt. Eine kontoweite
+// (403, 503) zählt nicht (#1863), siehe den Fall weiter unten.
+const refuseSourceDelete = (status = 409) => dav.refuse({
+  method: 'DELETE', status, when: (req) => req.path.startsWith('/cal/family/'),
 });
 
 /**
@@ -1060,14 +1090,14 @@ function pendingMoveInOrder(uid, sourceFirst) {
 for (const sourceFirst of [true, false]) {
   const order = sourceFirst ? 'Quelle zuerst gelesen' : 'Quelle zuletzt gelesen';
 
-  test(`Umzug, die Quelle lehnt das Löschen ab (403), ${order}: es wird wiederholt, der Termin liegt am Ende einmal`, async () => {
+  test(`Umzug, die Quelle lehnt das Löschen ab (409), ${order}: es wird wiederholt, der Termin liegt am Ende einmal`, async () => {
     reset();
     const uid = 'move-7@test';
     const { source, dest, id } = pendingMoveInOrder(uid, sourceFirst);
 
     refuseSourceDelete();
     await caldavSync.flushOutbound();
-    assertRefused('DELETE', 403);
+    assertRefused('DELETE', 409);
     assert.ok(dav.getObject(dest.url, `${uid}.ics`), 'die Kopie im Ziel fehlt - der Fall ist nicht nachgestellt');
     assert.ok(dav.getObject(source.url, `${uid}.ics`));
 
@@ -1230,6 +1260,37 @@ test('Umzug, die Quelle lehnt das Löschen fünfmal ab: danach wird aufgegeben, 
   assert.equal(eventTombstones().length, 0);
 });
 
+for (const status of [403, 503]) {
+  test(`Umzug, die Quelle lehnt das Löschen kontoweit ab (${status}): kein Versuch wird verbraucht, auch nicht beim Vormerken (#1863)`, async () => {
+    reset();
+    const uid = `move-12-${status}@test`;
+    const { source, dest, id } = pendingMoveInOrder(uid, true);
+    refuseSourceDelete(status);
+
+    // Die Absage beim Umzug selbst legt den Auftrag an (`queueRefusedDeletion`).
+    await caldavSync.flushOutbound();
+    assertRefused('DELETE', status);
+    assert.equal(event(id).calendar_ref_id, dest.refId);
+    assert.deepEqual(eventTombstones().map((t) => t.attempts), [0],
+      'die kontoweite Absage beim Umzug hat einen Versuch verbraucht');
+    assert.match(eventTombstones()[0].last_error, new RegExp(`HTTP ${status}`));
+
+    // Danach der wartende Auftrag, über die Fünf hinaus.
+    for (let i = 0; i < MAX_OUTBOUND_ATTEMPTS; i++) await caldavSync.sync();
+    assert.equal(dav.seen('DELETE').length, MAX_OUTBOUND_ATTEMPTS + 1, 'nicht jeder Lauf hat das Löschen gesendet');
+    assert.deepEqual(eventTombstones().map((t) => t.attempts), [0],
+      'eine kontoweite Absage hat einen Versuch des Auftrags verbraucht');
+    assert.equal(eventRows(uid).length, 1);
+
+    dav.allowAll();
+    await caldavSync.sync();
+    assert.equal(dav.getObject(source.url, `${uid}.ics`), null, 'der Termin liegt weiter in beiden Kalendern');
+    assert.ok(dav.getObject(dest.url, `${uid}.ics`));
+    assert.equal(eventTombstones().length, 0);
+    assert.equal(eventRows(uid).length, 1);
+  });
+}
+
 test('Umzug, die Quelle lehnt das Löschen ab, dann zurück in die Quelle: der Termin bleibt dort stehen', async () => {
   reset();
   const uid = 'move-8@test';
@@ -1271,7 +1332,7 @@ async function refusedMove(uid) {
   const { source, dest, id } = pendingMoveInOrder(uid, true);
   refuseSourceDelete();
   await caldavSync.flushOutbound();
-  assertRefused('DELETE', 403);
+  assertRefused('DELETE', 409);
   assert.equal(event(id).calendar_ref_id, dest.refId);
   assert.equal(eventTombstones().length, 1, 'das abgelehnte Löschen ist nicht vorgemerkt - der Fall ist nicht nachgestellt');
   dav.allowAll();
