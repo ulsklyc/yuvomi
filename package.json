@@ -478,7 +478,7 @@
     "test:task-documents": "node --experimental-sqlite --test test/test-task-documents.js",
     "test:task-tags": "node --experimental-sqlite --test test/test-task-tags.js",
     "test:countdown": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite --test test/test-countdown.js",
-    "test:countdown-household-day": "node scripts/with-env.mjs TZ=UTC node --experimental-sqlite --test test/test-countdown-household-day.js && node scripts/with-env.mjs TZ=Europe/Berlin node --experimental-sqlite --test test/test-countdown-household-day.js && node scripts/with-env.mjs TZ=Pacific/Auckland node --experimental-sqlite --test test/test-countdown-household-day.js",
+    "test:countdown-household-day": "node scripts/with-env.mjs TZ=UTC node --experimental-sqlite --test test/test-countdown-household-day.js && node scripts/with-env.mjs TZ=Europe/Berlin node --experimental-sqlite --test test/test-countdown-household-day.js && node scripts/with-env.mjs TZ=Pacific/Auckland node --experimental-sqlite --test test/test-countdown-household-day.js && node scripts/with-env.mjs TZ=America/Los_Angeles node --experimental-sqlite --test test/test-countdown-household-day.js",
     "test:quick-links": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite --test test/test-quick-links.js",
     "test:image-picker": "node --test test/test-image-picker.js",
     "test:task-completions": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite --test test/test-task-completions.js",
