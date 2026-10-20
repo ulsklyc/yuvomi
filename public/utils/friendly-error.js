@@ -234,6 +234,16 @@ export const CASE_MESSAGES = new Map([
   // Die im Kontaktformular GEWAEHLTE Kategorie gibt es nicht mehr: das
   // Formular bleibt offen und bietet die aktuellen Kategorien an.
   ['contacts_selected_category_not_found', 'contacts.errorSelectedCategoryGone'],
+  // Ein Feld, das der Server abweist (#1909): je Feld ein ganzer Satz, die
+  // Grenze als Zahl (CASE_PARAMS). Erreicht vor allem der vCard-Import, dessen
+  // Toast bis dahin den englischen Servertext zeigte, weil der das Feld nannte.
+  // Das Formular begrenzt seine Felder nicht alle selbst und trifft sie auch.
+  ['contacts_name_too_long', 'contacts.errorNameTooLong'],
+  ['contacts_phone_too_long', 'contacts.errorPhoneTooLong'],
+  ['contacts_email_too_long', 'contacts.errorEmailTooLong'],
+  ['contacts_address_too_long', 'contacts.errorAddressTooLong'],
+  ['contacts_notes_too_long', 'contacts.errorNotesTooLong'],
+  ['contacts_birthday_invalid', 'contacts.errorBirthdayInvalid'],
   // Orte und Kategorien des Inventars (#1909). Den Namen gibt es auf dieser
   // Ebene schon (`category_exists` deckt die Kategorien, oben); ein Ort oder
   // eine Kategorie, die inzwischen geloescht wurde, ist ein "gibt es nicht
@@ -341,6 +351,11 @@ export const CASE_PARAMS = new Map([
   ['health_cycle_import_too_many_rows', ['limit']],
   ['documents_folder_too_deep', ['limit']],
   ['quick_links_limit_reached', ['limit']],
+  ['contacts_name_too_long', ['limit']],
+  ['contacts_phone_too_long', ['limit']],
+  ['contacts_email_too_long', ['limit']],
+  ['contacts_address_too_long', ['limit']],
+  ['contacts_notes_too_long', ['limit']],
   ['recipe_providers_sync_http_status', ['status']],
 ]);
 

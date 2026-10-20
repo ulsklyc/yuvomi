@@ -76,9 +76,14 @@ export function contactsPaths() {
 // englischen `error` - je Operation der Satz, der sie nennt.
 const CONTACT_GONE = '`contacts_contact_not_found` (404, the contact does not exist - deleted)';
 const CATEGORY_GONE = '`contacts_selected_category_not_found` (400, the chosen `category` does not exist - deleted; only when it is the sole finding)';
+// Ein zu langes Feld oder ein ungueltiger Geburtstag: das ERSTE Feld, das so
+// scheitert, mit der Grenze als Zahl (vor allem der vCard-Import erreicht sie).
+const FIELD_CASES = '`contacts_name_too_long`, `contacts_phone_too_long`, `contacts_email_too_long`, '
+  + '`contacts_address_too_long`, `contacts_notes_too_long` (400, the first field that is too long; '
+  + '`params.limit` carries its maximum length), `contacts_birthday_invalid` (400, `birthday` is not a valid date)';
 const CASE_REASONS = {
-  '/api/v1/contacts': { post: CATEGORY_GONE },
-  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}`, delete: CONTACT_GONE },
+  '/api/v1/contacts': { post: `${CATEGORY_GONE}, ${FIELD_CASES}` },
+  '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}, ${FIELD_CASES}`, delete: CONTACT_GONE },
 };
 
 function withCaseReasons(paths) {

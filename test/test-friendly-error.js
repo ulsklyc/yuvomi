@@ -516,7 +516,7 @@ test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Plu
   assert.ok(CASE_PARAMS.size >= 7);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js',
-    '../server/routes/health/cycle.js', '../server/routes/documents.js'].map(read).join('\n');
+    '../server/routes/health/cycle.js', '../server/routes/documents.js', '../server/routes/contacts.js'].map(read).join('\n');
   for (const [reason, names] of CASE_PARAMS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: Zahlen ohne Satz`);
     assert.ok(Array.isArray(names) && names.length > 0, reason);

@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "Διαγραφή {{count}} επαφής;",
         "bulkDeletedToast": "Διαγράφηκαν {{count}} επαφές",
         "errorContactGone": "Αυτή η επαφή δεν υπάρχει πια.",
-        "errorSelectedCategoryGone": "Η επιλεγμένη κατηγορία δεν υπάρχει πλέον."
+        "errorSelectedCategoryGone": "Η επιλεγμένη κατηγορία δεν υπάρχει πλέον.",
+        "errorNameTooLong": "Το όνομα μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorPhoneTooLong": "Ο αριθμός τηλεφώνου μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorEmailTooLong": "Η διεύθυνση email μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorAddressTooLong": "Η διεύθυνση μπορεί να έχει έως {{limit}} χαρακτήρες.",
+        "errorNotesTooLong": "Οι σημειώσεις μπορούν να έχουν έως {{limit}} χαρακτήρες.",
+        "errorBirthdayInvalid": "Τα γενέθλια δεν είναι έγκυρη ημερομηνία."
     },
     "budget": {
         "title": "Προϋπολογισμός",

@@ -15,10 +15,11 @@
  *        ein vom Router abgebrochenes Signal (Seitenwechsel) URL-Bereinigung,
  *        Toast und Retry stilllegt.
  *
- *        Die 403-/404-Meldungstexte kommen aus dem lokalen `friendlyError`-
- *        Stub unten - die echte Zuordnung (`utils/friendly-error.js`:
- *        `common.errorNoPermission`/`common.errorNotFound`/`common.errorServer`)
- *        prueft test:friendly-error, nicht diese Suite.
+ *        Die Saetze kommen aus der echten Zuordnung (`utils/friendly-error.js`,
+ *        `loadErrorSentence`, #1909); `t()` des Loaders gibt den Schluessel
+ *        zurueck. `window.yuvomi.friendlyError` traegt einen Stellvertreter,
+ *        der den Text des Servers zurueckgaebe: fragt die Seite ihn wieder,
+ *        steht dieser Text im Toast und die Erwartungen unten fallen.
  *
  *        Der Erfolgsfall verzweigt seit #1170 nach `visit.can_edit` zwischen
  *        Bearbeiten- und Berichtsmodal (#1135: wer einen abgerechneten Besuch
@@ -36,12 +37,10 @@ globalThis.window = globalThis.window ?? {};
 const toastCalls = [];
 globalThis.window.yuvomi = {
   showToast: (...args) => toastCalls.push(args),
-  friendlyError: (err) => {
-    if (err?.status === 404) return 'Der Eintrag wurde nicht gefunden.';
-    if (err?.status === 403) return 'Zugriff verweigert.';
-    return 'Es ist ein Fehler aufgetreten.';
-  },
+  friendlyError: (err) => err?.data?.error ?? err?.message ?? 'friendlyError',
 };
+// friendly-error.js liest `navigator.onLine`; ohne Wert hielte es jeden Fehler fuer "offline".
+Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
 
 const openModalCalls = [];
 globalThis.__openModal = (...args) => openModalCalls.push(args);
@@ -75,13 +74,22 @@ function apiError(status, message = `HTTP ${status}`) {
 
 test('describeDeepLinkError: 404 ist ein Endzustand - kein Retry', () => {
   const { message, offerRetry } = describeDeepLinkError(apiError(404));
-  assert.equal(message, 'Der Eintrag wurde nicht gefunden.');
+  assert.equal(message, 'common.errorNotFound');
+  assert.equal(offerRetry, false);
+});
+
+test('describeDeepLinkError: ein geloeschter Einsatz sagt den Satz der App, nie den Text des Servers (#1909)', () => {
+  // So antwortet GET /housekeeping/visits/:id (server/routes/housekeeping.js).
+  const err = apiError(404, 'Visit not found.');
+  err.data = { error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' };
+  const { message, offerRetry } = describeDeepLinkError(err);
+  assert.equal(message, 'housekeeping.errorVisitGone');
   assert.equal(offerRetry, false);
 });
 
 test('describeDeepLinkError: 403 ist ein Endzustand - kein Retry, keine Besuchsdetails', () => {
   const { message, offerRetry } = describeDeepLinkError(apiError(403));
-  assert.equal(message, 'Zugriff verweigert.');
+  assert.equal(message, 'common.errorNoPermission');
   assert.equal(offerRetry, false);
 });
 
@@ -99,19 +107,20 @@ test('describeDeepLinkError: Serverfehler darf erneut versucht werden', () => {
   assert.equal(offerRetry, true);
 });
 
-test('describeDeepLinkError: 429 (Rate-Limit) darf erneut versucht werden - generische Meldung', () => {
+test('describeDeepLinkError: 429 (Rate-Limit) darf erneut versucht werden - der Satz "kurz warten"', () => {
   // Der apiLimiter zaehlt pro IP, ein Haushalt hinter einem NAT teilt sich
   // eine - ein 429 ist kein Endzustand fuer diese ID, ein Retry kann gelingen.
   const err = apiError(429, 'Too many requests');
   err.data = { error: 'Too many requests', code: 429 };
   const { message, offerRetry } = describeDeepLinkError(err);
   assert.equal(offerRetry, true);
-  assert.equal(message, 'common.errorGeneric');
+  assert.equal(message, 'common.errorRateLimited');
 });
 
 test('describeDeepLinkError: Netzwerkfehler (kein status) darf erneut versucht werden', () => {
-  const { offerRetry } = describeDeepLinkError(new Error('Failed to fetch'));
+  const { message, offerRetry } = describeDeepLinkError(new Error('Failed to fetch'));
   assert.equal(offerRetry, true);
+  assert.equal(message, 'common.loadErrorDescription');
 });
 
 test('openVisitFromDeepLink: fehlende Besuchs-ID (404) zeigt Meldung ohne Retry und raeumt die URL', async () => {
@@ -128,7 +137,7 @@ test('openVisitFromDeepLink: fehlende Besuchs-ID (404) zeigt Meldung ohne Retry 
   assert.equal(replaceStateCalls[0][0], historyState);
   assert.equal(toastCalls.length, 1);
   const [message, type, duration, action] = toastCalls[0];
-  assert.equal(message, 'Der Eintrag wurde nicht gefunden.');
+  assert.equal(message, 'common.errorNotFound');
   assert.equal(type, 'danger');
   assert.equal(duration, undefined);
   assert.equal(action, undefined);
@@ -144,7 +153,7 @@ test('openVisitFromDeepLink: fremder Besuch (403) zeigt Meldung ohne Retry, kein
   assert.equal(replaceStateCalls.length, 1);
   assert.equal(toastCalls.length, 1);
   const [message, , , action] = toastCalls[0];
-  assert.equal(message, 'Zugriff verweigert.');
+  assert.equal(message, 'common.errorNoPermission');
   assert.equal(action, undefined);
 });
 
@@ -189,7 +198,7 @@ test('openVisitFromDeepLink: anderer Fehler bietet ein Retry an, das dieselbe ID
   assert.equal(lastPath, '/housekeeping/visits/13');
   assert.equal(toastCalls.length, 1);
   const [message, type, duration, action] = toastCalls[0];
-  assert.equal(message, 'Es ist ein Fehler aufgetreten.');
+  assert.equal(message, 'common.errorServer');
   assert.equal(type, 'danger');
   assert.equal(duration, 6000);
   assert.equal(typeof action.onClick, 'function');
@@ -219,7 +228,7 @@ test('openVisitFromDeepLink: 429 (Rate-Limit) bietet ein Retry an, das dieselbe 
   assert.equal(replaceStateCalls.length, 1);
   assert.equal(toastCalls.length, 1);
   const [message, type, duration, action] = toastCalls[0];
-  assert.equal(message, 'common.errorGeneric', 'keine rohe Servermeldung, kein friendlyError-Fallback');
+  assert.equal(message, 'common.errorRateLimited', 'keine rohe Servermeldung, kein friendlyError-Fallback');
   assert.equal(type, 'danger');
   assert.equal(duration, 6000);
   assert.equal(typeof action?.onClick, 'function', '429 ist voruebergehend und muss ein Retry anbieten');

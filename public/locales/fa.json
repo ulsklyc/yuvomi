@@ -1386,7 +1386,13 @@
         "bulkDeleteConfirm_one": "حذف {{count}} مخاطب؟",
         "bulkDeletedToast": "{{count}} مخاطب حذف شد",
         "errorContactGone": "این مخاطب دیگر وجود ندارد.",
-        "errorSelectedCategoryGone": "دستهٔ انتخاب‌شده دیگر وجود ندارد."
+        "errorSelectedCategoryGone": "دستهٔ انتخاب‌شده دیگر وجود ندارد.",
+        "errorNameTooLong": "نام حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorPhoneTooLong": "شماره تلفن حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorEmailTooLong": "آدرس ایمیل حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorAddressTooLong": "نشانی حداکثر می‌تواند {{limit}} نویسه باشد.",
+        "errorNotesTooLong": "یادداشت‌ها حداکثر می‌توانند {{limit}} نویسه باشند.",
+        "errorBirthdayInvalid": "تاریخ تولد معتبر نیست."
     },
     "budget": {
         "title": "بودجه",

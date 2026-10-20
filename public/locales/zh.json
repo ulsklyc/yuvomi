@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "删除 {{count}} 个联系人?",
         "bulkDeletedToast": "已删除 {{count}} 个联系人",
         "errorContactGone": "这个联系人已不存在。",
-        "errorSelectedCategoryGone": "所选类别已不存在。"
+        "errorSelectedCategoryGone": "所选类别已不存在。",
+        "errorNameTooLong": "姓名最多 {{limit}} 个字符。",
+        "errorPhoneTooLong": "电话号码最多 {{limit}} 个字符。",
+        "errorEmailTooLong": "电子邮箱最多 {{limit}} 个字符。",
+        "errorAddressTooLong": "地址最多 {{limit}} 个字符。",
+        "errorNotesTooLong": "备注最多 {{limit}} 个字符。",
+        "errorBirthdayInvalid": "生日不是有效日期。"
     },
     "budget": {
         "title": "预算",

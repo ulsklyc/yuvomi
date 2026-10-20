@@ -1518,7 +1518,13 @@
         "bulkDeleteConfirm_many": "Видалити {{count}} контактів?",
         "bulkDeletedToast": "Видалено контактів: {{count}}",
         "errorContactGone": "Цього контакту більше немає.",
-        "errorSelectedCategoryGone": "Вибраної категорії більше немає."
+        "errorSelectedCategoryGone": "Вибраної категорії більше немає.",
+        "errorNameTooLong": "Ім’я може містити не більше {{limit}} символів.",
+        "errorPhoneTooLong": "Номер телефону може містити не більше {{limit}} символів.",
+        "errorEmailTooLong": "Адреса ел. пошти може містити не більше {{limit}} символів.",
+        "errorAddressTooLong": "Адреса може містити не більше {{limit}} символів.",
+        "errorNotesTooLong": "Нотатки можуть містити не більше {{limit}} символів.",
+        "errorBirthdayInvalid": "День народження - недійсна дата."
     },
     "budget": {
         "title": "Бюджет",

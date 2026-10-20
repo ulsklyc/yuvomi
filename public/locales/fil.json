@@ -1386,7 +1386,13 @@
         "bulkDeleteConfirm_one": "Burahin ang {{count}} kontak?",
         "bulkDeletedToast": "{{count}} kontak ang natanggal",
         "errorContactGone": "Wala na ang kontak na ito.",
-        "errorSelectedCategoryGone": "Wala na ang napiling kategorya."
+        "errorSelectedCategoryGone": "Wala na ang napiling kategorya.",
+        "errorNameTooLong": "Hanggang {{limit}} na character lang ang pangalan.",
+        "errorPhoneTooLong": "Hanggang {{limit}} na character lang ang numero ng telepono.",
+        "errorEmailTooLong": "Hanggang {{limit}} na character lang ang email address.",
+        "errorAddressTooLong": "Hanggang {{limit}} na character lang ang address.",
+        "errorNotesTooLong": "Hanggang {{limit}} na character lang ang mga tala.",
+        "errorBirthdayInvalid": "Hindi wastong petsa ang kaarawan."
     },
     "budget": {
         "title": "Badyet",

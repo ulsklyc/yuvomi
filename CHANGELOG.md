@@ -277,6 +277,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `recipe_providers_url_invalid`, `recipe_providers_external_url_invalid`,
   `recipe_providers_private_network`, `recipe_providers_connection_failed`,
   `recipe_providers_account_exists`), and the status codes and texts are unchanged.
+- **Contacts and housekeeping: error messages in your language** (#1909). When every contact of a
+  vCard import failed, the message named the rejected field in the server's English text, for
+  example "Telefon may be at most 100 characters long." It now says the sentence of the app, which
+  still names the field and its maximum length, or that the birthday is not a valid date; saving
+  the contact form says the same. Opening a housekeeping visit from a calendar link that no longer
+  works now names a deleted visit as such and says to wait a moment when the server asks
+  to wait, instead of a general error. For API clients: creating or editing a contact with a field
+  that is too long or an invalid birthday carries a `reason` next to `error`
+  (`contacts_name_too_long`, `contacts_phone_too_long`, `contacts_email_too_long`,
+  `contacts_address_too_long`, `contacts_notes_too_long` with `params.limit`, and
+  `contacts_birthday_invalid`), and the status codes and texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

@@ -263,6 +263,10 @@ const SERVER_REASONS = [
   'inventory_location_exists', 'inventory_location_not_found', 'inventory_category_not_found',
   'notes_note_not_found', 'notes_selected_category_not_found',
   'contacts_contact_not_found', 'contacts_selected_category_not_found', 'birthdays_birthday_not_found',
+  // Das abgewiesene Feld (#1909, vor allem der vCard-Import); die echte Antwort
+  // misst test:contacts-routes.
+  'contacts_name_too_long', 'contacts_phone_too_long', 'contacts_email_too_long',
+  'contacts_address_too_long', 'contacts_notes_too_long', 'contacts_birthday_invalid',
 ];
 
 test('jeder Grund dieser Module hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {

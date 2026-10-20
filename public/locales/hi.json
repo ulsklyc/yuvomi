@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "{{count}} संपर्क हटाएँ?",
         "bulkDeletedToast": "{{count}} संपर्क हटाए गए",
         "errorContactGone": "यह संपर्क अब मौजूद नहीं है।",
-        "errorSelectedCategoryGone": "चुनी गई श्रेणी अब मौजूद नहीं है।"
+        "errorSelectedCategoryGone": "चुनी गई श्रेणी अब मौजूद नहीं है।",
+        "errorNameTooLong": "नाम अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorPhoneTooLong": "फ़ोन नंबर अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorEmailTooLong": "ईमेल पता अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorAddressTooLong": "पता अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorNotesTooLong": "नोट्स अधिकतम {{limit}} वर्णों के हो सकते हैं।",
+        "errorBirthdayInvalid": "जन्मदिन की तारीख मान्य नहीं है।"
     },
     "budget": {
         "title": "बजट",

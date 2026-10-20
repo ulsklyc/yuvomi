@@ -2128,12 +2128,9 @@ function showImportResult({ imported, withBirthday, failedList, lastName, lastEr
   let type;
   if (imported === 0) {
     // Alles fehlgeschlagen: konkrete Ursache nennen (Recovery), Retry via Aktion.
-    // BEWUSST NOCH friendlyError (#1920): eine abgelehnte vCard nennt hier das
-    // Feld, das der Server zurueckwies - errorSentence sagte nur den
-    // allgemeinen Satz. Das wandert erst, wenn der Import seine Faelle mit
-    // einem `reason` benennt (#1909).
-    const reason = window.yuvomi?.friendlyError?.(lastError) || t('common.errorGeneric');
-    message = t('contacts.importError', { error: reason });
+    // Ein abgewiesenes Feld nennt der Server als `reason` (#1909), der Satz
+    // dazu nennt das Feld und seine Grenze - nie der Text des Servers.
+    message = t('contacts.importError', { error: errorSentence(lastError) });
     type = 'danger';
   } else if (imported === 1 && details.length === 0) {
     // Persönlicher Einzel-Import: Name statt Zähler (Prinzip „persönlich").

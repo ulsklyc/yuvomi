@@ -21956,8 +21956,6 @@ function countFriendlyErrorCalls(source) {
 
 // Datei -> Zahl der Aufrufe von friendlyError. Nur senken.
 const FRIENDLY_ERROR_CALLERS = new Map([
-  ['pages/contacts.js', 1],
-  ['pages/housekeeping.js', 1],
   ['pages/meals.js', 3],
   ['router.js', 2],   // Fehlerbildschirm und unbehandelte Rejection
 ]);

@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "Eliminare {{count}} contatto?",
         "bulkDeletedToast": "{{count}} contatti eliminati",
         "errorContactGone": "Questo contatto non esiste più.",
-        "errorSelectedCategoryGone": "La categoria selezionata non esiste più."
+        "errorSelectedCategoryGone": "La categoria selezionata non esiste più.",
+        "errorNameTooLong": "Il nome può avere al massimo {{limit}} caratteri.",
+        "errorPhoneTooLong": "Il numero di telefono può avere al massimo {{limit}} caratteri.",
+        "errorEmailTooLong": "L’indirizzo email può avere al massimo {{limit}} caratteri.",
+        "errorAddressTooLong": "L’indirizzo può avere al massimo {{limit}} caratteri.",
+        "errorNotesTooLong": "Le note possono avere al massimo {{limit}} caratteri.",
+        "errorBirthdayInvalid": "Il compleanno non è una data valida."
     },
     "budget": {
         "title": "Bilancio",

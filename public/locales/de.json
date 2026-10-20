@@ -1386,7 +1386,13 @@
         "bulkDeleteConfirm_one": "{{count}} Kontakt löschen?",
         "bulkDeletedToast": "{{count}} Kontakte gelöscht",
         "errorContactGone": "Diesen Kontakt gibt es nicht mehr.",
-        "errorSelectedCategoryGone": "Die gewählte Kategorie gibt es nicht mehr."
+        "errorSelectedCategoryGone": "Die gewählte Kategorie gibt es nicht mehr.",
+        "errorNameTooLong": "Der Name darf höchstens {{limit}} Zeichen lang sein.",
+        "errorPhoneTooLong": "Die Telefonnummer darf höchstens {{limit}} Zeichen lang sein.",
+        "errorEmailTooLong": "Die E-Mail-Adresse darf höchstens {{limit}} Zeichen lang sein.",
+        "errorAddressTooLong": "Die Adresse darf höchstens {{limit}} Zeichen lang sein.",
+        "errorNotesTooLong": "Die Notizen dürfen höchstens {{limit}} Zeichen lang sein.",
+        "errorBirthdayInvalid": "Der Geburtstag ist kein gültiges Datum."
     },
     "budget": {
         "title": "Budget",

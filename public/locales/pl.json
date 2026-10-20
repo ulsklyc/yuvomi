@@ -1534,7 +1534,13 @@
         "bulkDeleteConfirm_many": "Usunąć {{count}} kontaktów?",
         "bulkDeletedToast": "Usunięto {{count}} kontaktów",
         "errorContactGone": "Ten kontakt już nie istnieje.",
-        "errorSelectedCategoryGone": "Wybrana kategoria już nie istnieje."
+        "errorSelectedCategoryGone": "Wybrana kategoria już nie istnieje.",
+        "errorNameTooLong": "Imię i nazwisko mogą mieć najwyżej {{limit}} znaków.",
+        "errorPhoneTooLong": "Numer telefonu może mieć najwyżej {{limit}} znaków.",
+        "errorEmailTooLong": "Adres e-mail może mieć najwyżej {{limit}} znaków.",
+        "errorAddressTooLong": "Adres może mieć najwyżej {{limit}} znaków.",
+        "errorNotesTooLong": "Notatki mogą mieć najwyżej {{limit}} znaków.",
+        "errorBirthdayInvalid": "Data urodzin jest nieprawidłowa."
     },
     "budget": {
         "title": "Budżet",

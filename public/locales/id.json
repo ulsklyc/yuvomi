@@ -1386,7 +1386,13 @@
         "bulkDeleteConfirm_one": "Hapus {{count}} kontak?",
         "bulkDeletedToast": "{{count}} kontak dihapus",
         "errorContactGone": "Kontak ini sudah tidak ada.",
-        "errorSelectedCategoryGone": "Kategori yang dipilih sudah tidak ada."
+        "errorSelectedCategoryGone": "Kategori yang dipilih sudah tidak ada.",
+        "errorNameTooLong": "Nama paling banyak {{limit}} karakter.",
+        "errorPhoneTooLong": "Nomor telepon paling banyak {{limit}} karakter.",
+        "errorEmailTooLong": "Alamat email paling banyak {{limit}} karakter.",
+        "errorAddressTooLong": "Alamat paling banyak {{limit}} karakter.",
+        "errorNotesTooLong": "Catatan paling banyak {{limit}} karakter.",
+        "errorBirthdayInvalid": "Tanggal ulang tahun tidak valid."
     },
     "budget": {
         "title": "Anggaran",

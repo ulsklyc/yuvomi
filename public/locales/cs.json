@@ -1444,7 +1444,13 @@
         "bulkDeleteConfirm_few": "Smazat {{count}} kontakty?",
         "bulkDeletedToast": "Smazáno {{count}} kontaktů",
         "errorContactGone": "Tento kontakt už neexistuje.",
-        "errorSelectedCategoryGone": "Vybraná kategorie už neexistuje."
+        "errorSelectedCategoryGone": "Vybraná kategorie už neexistuje.",
+        "errorNameTooLong": "Jméno může mít nejvýše {{limit}} znaků.",
+        "errorPhoneTooLong": "Telefonní číslo může mít nejvýše {{limit}} znaků.",
+        "errorEmailTooLong": "E-mailová adresa může mít nejvýše {{limit}} znaků.",
+        "errorAddressTooLong": "Adresa může mít nejvýše {{limit}} znaků.",
+        "errorNotesTooLong": "Poznámky mohou mít nejvýše {{limit}} znaků.",
+        "errorBirthdayInvalid": "Datum narozenin není platné."
     },
     "budget": {
         "title": "Rozpočet",

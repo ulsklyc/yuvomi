@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "Radera {{count}} kontakt?",
         "bulkDeletedToast": "{{count}} kontakter raderade",
         "errorContactGone": "Den här kontakten finns inte längre.",
-        "errorSelectedCategoryGone": "Den valda kategorin finns inte längre."
+        "errorSelectedCategoryGone": "Den valda kategorin finns inte längre.",
+        "errorNameTooLong": "Namnet får vara högst {{limit}} tecken långt.",
+        "errorPhoneTooLong": "Telefonnumret får vara högst {{limit}} tecken långt.",
+        "errorEmailTooLong": "E-postadressen får vara högst {{limit}} tecken lång.",
+        "errorAddressTooLong": "Adressen får vara högst {{limit}} tecken lång.",
+        "errorNotesTooLong": "Anteckningarna får vara högst {{limit}} tecken långa.",
+        "errorBirthdayInvalid": "Födelsedagen är inget giltigt datum."
     },
     "budget": {
         "title": "Budget",

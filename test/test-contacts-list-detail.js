@@ -362,24 +362,22 @@ test('Neuer Kontakt ist nicht als „Arzt" vorbelegt: aktive Filterkategorie, so
 });
 
 // -------------------------------------------------------------------------
-// Der Import-Toast nennt die Ursache (#1909, Uebergang)
+// Der Import-Toast nennt die Ursache in der Sprache des Nutzers (#1909)
 //
-// Schlaegt jede Anlage fehl, sagt der Toast "Import fehlgeschlagen: <Ursache>"
-// und fragt die Ursache bei `window.yuvomi.friendlyError`. #1916 hatte dessen
-// Rueckfall fuer alle Aufrufer auf den allgemeinen Satz verengt; hier stand
-// dann "Import fehlgeschlagen: Ein Fehler ist aufgetreten" statt des Felds, das
-// der Server ablehnt. Gemessen wird am echten Aufrufer mit der echten Funktion,
-// die der Router an `window.yuvomi` haengt - ein Stellvertreter an ihrer Stelle
-// haette den Fehler nicht gesehen.
+// Schlaegt jede Anlage fehl, sagt der Toast "Import fehlgeschlagen: <Ursache>".
+// Bis #1909 kam die Ursache ueber `window.yuvomi.friendlyError` und war der
+// englische Text des Servers ("Telefon may be at most 100 characters long."),
+// weil nur er das abgewiesene Feld nannte. Jetzt nennt der Server den Fall
+// (`reason`, `params.limit`, server/routes/contacts.js), und der Satz der App
+// nennt Feld und Grenze. Gemessen wird am echten Aufrufer mit der echten
+// Zuordnung (utils/friendly-error.js); `window.yuvomi.friendlyError` traegt
+// hier einen Stellvertreter, der den Servertext zurueckgaebe - fragt die Seite
+// ihn noch, steht der im Toast.
 // -------------------------------------------------------------------------
-test('Import-Toast: schlaegt alles fehl, nennt er die Ursache des Servers (#1909)', async () => {
-  const { friendlyError } = await import('../public/utils/friendly-error.js');
-  assert.match(read('../public/router.js'), /window\.yuvomi = \{[^}]*\bfriendlyError,/,
-    'der Router haengt nicht mehr diese Funktion an window.yuvomi - der Test misst dann die falsche');
-
+test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie den Servertext (#1909)', async () => {
   // Wie der Fehler aus api.js kommt: `message` und `data.error` tragen den Text des Servers.
-  const answer = (status, error, reason) => Object.assign(new Error(error), {
-    name: 'ApiError', status, data: { error, code: status, ...(reason ? { reason } : {}) },
+  const answer = (status, error, extra = {}) => Object.assign(new Error(error), {
+    name: 'ApiError', status, data: { error, code: status, ...extra },
   });
   const yuvomi = globalThis.window.yuvomi;
   const saved = { showToast: yuvomi.showToast, friendlyError: yuvomi.friendlyError };
@@ -387,34 +385,36 @@ test('Import-Toast: schlaegt alles fehl, nennt er die Ursache des Servers (#1909
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   const toasts = [];
   yuvomi.showToast = (message, type, duration, action) => toasts.push({ message, type, duration, action });
-  yuvomi.friendlyError = friendlyError;
+  yuvomi.friendlyError = (err) => err?.data?.error ?? 'friendlyError';
   const failed = (lastError) => {
     toasts.length = 0;
     contacts.showImportResult({ imported: 0, withBirthday: 0, failedList: [{ name: '' }], lastName: null, lastError });
     assert.equal(toasts.length, 1, 'genau ein Toast');
     return toasts[0];
   };
+  const toast = (error) => 'contacts.importError' + JSON.stringify({ error });
   try {
-    // POST /contacts lehnt mit 400 ab und nennt das Feld (server/routes/contacts.js).
-    const invalid = failed(answer(400, 'Name is required. Telefon must not exceed 50 characters.'));
-    assert.equal(invalid.type, 'danger');
-    assert.equal(invalid.message,
-      'contacts.importError' + JSON.stringify({ error: 'Name is required. Telefon must not exceed 50 characters.' }),
-      'die Ursache steht im Toast, nicht der allgemeine Satz');
-    assert.equal(invalid.action?.label, 'contacts.importRetry');
+    // POST /contacts lehnt mit 400 ab und nennt das Feld als Fall.
+    const phone = failed(answer(400, 'Telefon may be at most 100 characters long.',
+      { reason: 'contacts_phone_too_long', params: { limit: 100 } }));
+    assert.equal(phone.type, 'danger');
+    assert.equal(phone.message, toast('contacts.errorPhoneTooLong' + JSON.stringify({ limit: 100 })),
+      'der Satz der App nennt Feld und Grenze');
+    assert.equal(phone.action?.label, 'contacts.importRetry');
+    assert.equal(failed(answer(400, 'Geburtstag must be a valid calendar date.', { reason: 'contacts_birthday_invalid' })).message,
+      toast('contacts.errorBirthdayInvalid'));
+    // Fehlt die Grenze, gibt es keinen Satz mit leerem Platzhalter, sondern den allgemeinen.
+    assert.equal(failed(answer(400, 'Notizen may be at most 5000 characters long.', { reason: 'contacts_notes_too_long' })).message,
+      toast('common.errorGeneric'));
 
-    // Ein Konflikt mit einem Grund ohne eigenen Satz. `email_in_use` schickt
-    // heute nur PUT /contacts/:id, nicht die Anlage - der Toast fragt aber nicht
-    // nach der Route, und ein 409 der Anlage kaeme genauso hier an.
-    const taken = failed(answer(409, 'This email address already belongs to another account.', 'email_in_use'));
-    assert.equal(taken.message,
-      'contacts.importError' + JSON.stringify({ error: 'This email address already belongs to another account.' }));
+    // Ein Befund ohne benannten Fall: der allgemeine Satz, nie der Servertext.
+    const unnamed = failed(answer(400, 'Name is required.'));
+    assert.equal(unnamed.message, toast('common.errorGeneric'));
+    assert.ok(!unnamed.message.includes('required'), 'der englische Servertext steht nicht im Toast');
 
     // Was die App selbst sagen kann, sagt sie weiter in der Sprache des Nutzers.
-    assert.equal(failed(answer(403, 'Not authorized.')).message,
-      'contacts.importError' + JSON.stringify({ error: 'common.errorNoPermission' }));
-    assert.equal(failed(answer(500, 'Internal error.')).message,
-      'contacts.importError' + JSON.stringify({ error: 'common.errorServer' }));
+    assert.equal(failed(answer(403, 'Not authorized.')).message, toast('common.errorNoPermission'));
+    assert.equal(failed(answer(500, 'Internal error.')).message, toast('common.errorGeneric'));
   } finally {
     for (const [k, v] of Object.entries(saved)) {
       if (v === undefined) delete yuvomi[k];

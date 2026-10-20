@@ -1370,7 +1370,13 @@
         "bulkDeleteConfirm_one": "{{count}} kişi silinsin mi?",
         "bulkDeletedToast": "{{count}} kişi silindi",
         "errorContactGone": "Bu kişi artık yok.",
-        "errorSelectedCategoryGone": "Seçilen kategori artık mevcut değil."
+        "errorSelectedCategoryGone": "Seçilen kategori artık mevcut değil.",
+        "errorNameTooLong": "Ad en fazla {{limit}} karakter olabilir.",
+        "errorPhoneTooLong": "Telefon numarası en fazla {{limit}} karakter olabilir.",
+        "errorEmailTooLong": "E-posta adresi en fazla {{limit}} karakter olabilir.",
+        "errorAddressTooLong": "Adres en fazla {{limit}} karakter olabilir.",
+        "errorNotesTooLong": "Notlar en fazla {{limit}} karakter olabilir.",
+        "errorBirthdayInvalid": "Doğum günü geçerli bir tarih değil."
     },
     "budget": {
         "title": "Bütçe",

@@ -1593,7 +1593,13 @@
         "bulkDeleteConfirm_many": "حذف {{count}} جهة اتصال؟",
         "bulkDeletedToast": "تم حذف {{count}} جهة اتصال",
         "errorContactGone": "جهة الاتصال هذه لم تعد موجودة.",
-        "errorSelectedCategoryGone": "الفئة المحددة لم تعد موجودة."
+        "errorSelectedCategoryGone": "الفئة المحددة لم تعد موجودة.",
+        "errorNameTooLong": "يمكن أن يتكون الاسم من {{limit}} حرف كحد أقصى.",
+        "errorPhoneTooLong": "يمكن أن يتكون رقم الهاتف من {{limit}} حرف كحد أقصى.",
+        "errorEmailTooLong": "يمكن أن يتكون عنوان البريد الإلكتروني من {{limit}} حرف كحد أقصى.",
+        "errorAddressTooLong": "يمكن أن يتكون العنوان من {{limit}} حرف كحد أقصى.",
+        "errorNotesTooLong": "يمكن أن تتكون الملاحظات من {{limit}} حرف كحد أقصى.",
+        "errorBirthdayInvalid": "تاريخ عيد الميلاد غير صالح."
     },
     "budget": {
         "title": "الميزانية",

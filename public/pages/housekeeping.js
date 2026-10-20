@@ -2579,21 +2579,15 @@ function openStaffModal(worker, content, options = {}) {
 // NAT teilt sich diese IP, und `api.js` traegt sogar `Retry-After` am
 // `ApiError` - ein Retry kann hier durchaus gelingen. Neben 429 duerfen es
 // also ein Serverfehler und ein Netzwerkproblem (kein Status) erneut
-// versuchen. `friendlyError()` kennt nur 403/404/5xx explizit und faellt
-// sonst auf den rohen, unlokalisierten Servertext zurueck (`err.data.error`,
-// Uebergang bis #1909 durch ist) - fuer jeden anderen 4xx (auch 429) wird
-// deshalb bewusst die generische, lokalisierte Meldung erzwungen. Es gilt keine
-// visit-eigene Zugriffssperre - `GET /visits/:id` prueft nur die ID, der
-// einzige 403 kommt vom Modul-Gate, und der Router leitet vor dieser Stelle
-// schon weg (siehe render()) - 403 wird trotzdem defensiv behandelt, etwa fuer
-// ein Wettrennen zwischen Seitenaufbau und Rechteentzug.
+// versuchen. Der Satz ist der eines Ladefehlers (`loadErrorSentence`, #1909):
+// der Einsatz, den es nicht mehr gibt, die Absage, die Bremse, Server und Netz
+// in der Sprache des Nutzers, sonst der allgemeine Satz - nie der Text des
+// Servers. Eine 403 kommt nur vom Modul-Gate (Wettrennen mit einem
+// Rechteentzug), der Router leitet sonst vorher weg (siehe render()).
 function describeDeepLinkError(err) {
   const status = err?.status;
   const isTransient = status == null || status >= 500 || status === 429;
-  const message = (status >= 400 && status < 500 && status !== 403 && status !== 404)
-    ? t('common.errorGeneric')
-    : (window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'));
-  return { message, offerRetry: isTransient };
+  return { message: loadErrorSentence(err) ?? t('common.errorGeneric'), offerRetry: isTransient };
 }
 
 async function openVisitFromDeepLink(editVisitId, container, signal) {
