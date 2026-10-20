@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "Đã xóa tài khoản recipe provider.",
         "recipeProviderDeleteAccountConfirm": "Thao tác này cũng sẽ xóa {{count}} công thức được phản chiếu và hủy liên kết chúng khỏi mọi mục trong kế hoạch bữa ăn.",
         "recipeProviderLastError": "Lỗi đồng bộ gần nhất: {{message}}",
+        "recipeProviderErrorAccountGone": "Tài khoản recipe provider này không còn tồn tại.",
+        "recipeProviderErrorUrlInvalid": "URL máy chủ phải bắt đầu bằng http:// hoặc https://.",
+        "recipeProviderErrorExternalUrlInvalid": "URL liên kết công khai phải bắt đầu bằng http:// hoặc https://.",
+        "recipeProviderErrorPrivateNetwork": "URL máy chủ trỏ đến một mạng riêng hoặc mạng cục bộ. Để cho phép, hãy đặt RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true trên máy chủ.",
+        "recipeProviderErrorConnectionFailed": "Không thể kết nối với recipe provider. Hãy kiểm tra URL máy chủ và mã thông báo API.",
+        "recipeProviderErrorAccountExists": "Đã có tài khoản recipe provider với URL máy chủ này.",
         "invites": {
             "title": "Lời mời",
             "intro": "Mời thành viên mới bằng liên kết. Họ tự đặt mật khẩu.",

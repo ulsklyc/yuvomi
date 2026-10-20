@@ -34,6 +34,17 @@ function getAccount(id) {
   return db.get().prepare('SELECT * FROM recipe_provider_accounts WHERE id = ?').get(id);
 }
 
+// #1909: die Faelle, die ein Admin im Formular erreicht, tragen einen `reason`
+// neben dem englischen `error` - den Satz dazu sagt die App in der Sprache der
+// Oberflaeche (public/utils/friendly-error.js). Text und Status bleiben.
+function accountGone(res) {
+  return res.status(404).json({ error: 'Recipe provider account not found.', code: 404, reason: 'recipe_providers_account_not_found' });
+}
+
+function externalUrlInvalid(res) {
+  return res.status(400).json({ error: 'External URL must start with http(s)://', code: 400, reason: 'recipe_providers_external_url_invalid' });
+}
+
 router.get('/accounts', (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
@@ -53,7 +64,9 @@ router.post('/accounts', async (req, res) => {
     const vUrl = str(req.body.base_url, 'Base URL', { max: MAX_URL });
     const vToken = str(req.body.api_token, 'API token', { max: 500 });
     for (const v of [vName, vUrl, vToken]) if (v.error) return res.status(400).json({ error: v.error, code: 400 });
-    if (!/^https?:\/\//i.test(vUrl.value)) return res.status(400).json({ error: 'Base URL must start with http(s)://', code: 400 });
+    if (!/^https?:\/\//i.test(vUrl.value)) {
+      return res.status(400).json({ error: 'Base URL must start with http(s)://', code: 400, reason: 'recipe_providers_url_invalid' });
+    }
 
     // Optional: eine von außen erreichbare Adresse für "Im Provider öffnen"-Links,
     // falls base_url (z. B. ein Docker-internes Compose-Hostname) für den
@@ -62,9 +75,7 @@ router.post('/accounts', async (req, res) => {
     if (req.body.external_url) {
       const vExternal = str(req.body.external_url, 'External URL', { max: MAX_URL });
       if (vExternal.error) return res.status(400).json({ error: vExternal.error, code: 400 });
-      if (!/^https?:\/\//i.test(vExternal.value)) {
-        return res.status(400).json({ error: 'External URL must start with http(s)://', code: 400 });
-      }
+      if (!/^https?:\/\//i.test(vExternal.value)) return externalUrlInvalid(res);
       externalUrl = vExternal.value.replace(/\/+$/, '');
     }
 
@@ -74,15 +85,19 @@ router.post('/accounts', async (req, res) => {
     // auf das Formular ist der Ort, an dem ein Admin den Schalter erfaehrt - im
     // Sync-Log Stunden spaeter liest sie niemand. Einen Namen prueft erst der
     // Lookup-Hook im Adapter, je Verbindung.
-    if (isBlockedBaseUrl(baseUrl)) return res.status(400).json({ error: PRIVATE_NETWORK_MESSAGE, code: 400 });
+    if (isBlockedBaseUrl(baseUrl)) {
+      return res.status(400).json({ error: PRIVATE_NETWORK_MESSAGE, code: 400, reason: 'recipe_providers_private_network' });
+    }
     const test = await getAdapter({ provider, base_url: baseUrl, api_token: vToken.value }).testConnection();
     if (!test.ok) {
       // Der Hook lehnt einen Namen ab, der privat aufloest. Das ist keine
       // Credential-Frage - bis #1053 hiess die Antwort trotzdem so.
       if (isPrivateNetworkRefusal(test.error)) {
-        return res.status(400).json({ error: withPrivateNetworkHint(test.error), code: 400 });
+        return res.status(400).json({ error: withPrivateNetworkHint(test.error), code: 400, reason: 'recipe_providers_private_network' });
       }
-      return res.status(502).json({ error: 'Could not connect to the recipe provider with these credentials.', code: 502 });
+      return res.status(502).json({
+        error: 'Could not connect to the recipe provider with these credentials.', code: 502, reason: 'recipe_providers_connection_failed',
+      });
     }
 
     if (!process.env.DB_ENCRYPTION_KEY) {
@@ -95,7 +110,9 @@ router.post('/accounts', async (req, res) => {
     res.status(201).json({ data: publicAccount(getAccount(result.lastInsertRowid)) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'A recipe provider account with this URL already exists.', code: 409 });
+      return res.status(409).json({
+        error: 'A recipe provider account with this URL already exists.', code: 409, reason: 'recipe_providers_account_exists',
+      });
     }
     log.error('POST /accounts error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -106,7 +123,7 @@ router.patch('/accounts/:id', (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
-    if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
+    if (!account) return accountGone(res);
 
     const enabled = req.body.enabled === undefined ? account.enabled : (req.body.enabled ? 1 : 0);
     let name = account.name;
@@ -123,9 +140,7 @@ router.patch('/accounts/:id', (req, res) => {
       } else {
         const vExternal = str(req.body.external_url, 'External URL', { max: MAX_URL });
         if (vExternal.error) return res.status(400).json({ error: vExternal.error, code: 400 });
-        if (!/^https?:\/\//i.test(vExternal.value)) {
-          return res.status(400).json({ error: 'External URL must start with http(s)://', code: 400 });
-        }
+        if (!/^https?:\/\//i.test(vExternal.value)) return externalUrlInvalid(res);
         externalUrl = vExternal.value.replace(/\/+$/, '');
       }
     }
@@ -144,7 +159,7 @@ router.delete('/accounts/:id', (req, res) => {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const id = Number(req.params.id);
     const existing = getAccount(id);
-    if (!existing) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
+    if (!existing) return accountGone(res);
     // Löscht per FK-Kaskade auch alle von diesem Account gespiegelten Rezepte
     // (recipes.provider_account_id ON DELETE CASCADE) - ein Mirror-Rezept hat ohne
     // seinen Quell-Account keinen eigenständigen Inhalt mehr.
@@ -160,7 +175,7 @@ router.post('/accounts/:id/test', async (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
-    if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
+    if (!account) return accountGone(res);
     const probe = await getAdapter(account).testConnection();
     // Die Lookup-Ablehnung bekommt den Schalter angehaengt (#1053) - sie landet
     // als last_error auf der Konto-Karte, und dort muss stehen, was zu tun ist.
@@ -177,7 +192,7 @@ router.post('/accounts/:id/sync', async (req, res) => {
   try {
     if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const account = getAccount(Number(req.params.id));
-    if (!account) return res.status(404).json({ error: 'Recipe provider account not found.', code: 404 });
+    if (!account) return accountGone(res);
     const result = await syncOne(account.id);
     res.json({ data: result });
   } catch (err) {

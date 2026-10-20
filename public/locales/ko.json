@@ -3012,6 +3012,12 @@
         "recipeProviderAccountDeleted": "레시피 제공자 계정이 삭제되었습니다.",
         "recipeProviderDeleteAccountConfirm": "이 작업은 미러링된 레시피 {{count}}개도 제거하고 모든 식단 항목과의 연결을 해제합니다.",
         "recipeProviderLastError": "최근 동기화 오류: {{message}}",
+        "recipeProviderErrorAccountGone": "이 레시피 제공자 계정은 더 이상 존재하지 않습니다.",
+        "recipeProviderErrorUrlInvalid": "서버 URL은 http:// 또는 https://로 시작해야 합니다.",
+        "recipeProviderErrorExternalUrlInvalid": "공개 링크 URL은 http:// 또는 https://로 시작해야 합니다.",
+        "recipeProviderErrorPrivateNetwork": "서버 URL이 사설 또는 로컬 네트워크를 가리킵니다. 허용하려면 서버에서 RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true을(를) 설정하세요.",
+        "recipeProviderErrorConnectionFailed": "레시피 제공자에 연결할 수 없습니다. 서버 URL과 API 토큰을 확인하세요.",
+        "recipeProviderErrorAccountExists": "이 서버 URL을 사용하는 레시피 제공자 계정이 이미 있습니다.",
         "invites": {
             "title": "초대",
             "intro": "링크로 새 구성원을 초대하세요. 비밀번호는 본인이 정합니다.",

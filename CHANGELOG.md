@@ -221,6 +221,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one that is already gone counts as done. For API clients: those answers carry a `reason` next to
   `error` (`quick_links_link_not_found`, and `quick_links_limit_reached` with `params.limit`), and
   the status codes and texts are unchanged.
+- **Kitchen settings: error messages in your language** (#1909). Adding a recipe provider, changing
+  its link, turning it on or off, syncing or removing it showed the server's own English text when
+  something went wrong, for example "Base URL must start with http(s)://" or "Could not connect to
+  the recipe provider with these credentials.", and so did saving the visible meals or their names.
+  All of them now say the sentence of the app, and a server address in a private network still names
+  the setting that allows it. A recipe provider that another admin removed in the meantime is named
+  as such and the list reloads; removing one that is already gone counts as done. For API clients:
+  those answers carry a `reason` next to `error` (`recipe_providers_account_not_found`,
+  `recipe_providers_url_invalid`, `recipe_providers_external_url_invalid`,
+  `recipe_providers_private_network`, `recipe_providers_connection_failed`,
+  `recipe_providers_account_exists`), and the status codes and texts are unchanged.
 - **Recurring events on the day the clocks change are no longer an hour off (#2034).**
   A series with its own time zone, for example a daily 01:30 event in Berlin, showed the occurrence
   on the day of the clock change one hour early or late, both in the calendar and in subscribed

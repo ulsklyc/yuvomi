@@ -2996,6 +2996,12 @@
         "recipeProviderAccountDeleted": "レシピプロバイダーアカウントを削除しました。",
         "recipeProviderDeleteAccountConfirm": "これにより、ミラーリングされた{{count}}件のレシピも削除され、献立の項目との関連付けが解除されます。",
         "recipeProviderLastError": "直近の同期エラー: {{message}}",
+        "recipeProviderErrorAccountGone": "このレシピプロバイダーアカウントはもう存在しません。",
+        "recipeProviderErrorUrlInvalid": "サーバーURLは http:// または https:// で始める必要があります。",
+        "recipeProviderErrorExternalUrlInvalid": "公開リンクURLは http:// または https:// で始める必要があります。",
+        "recipeProviderErrorPrivateNetwork": "サーバーURLがプライベートまたはローカルネットワークを指しています。許可するには、サーバーで RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true を設定してください。",
+        "recipeProviderErrorConnectionFailed": "レシピプロバイダーに接続できませんでした。サーバーURLとAPIトークンを確認してください。",
+        "recipeProviderErrorAccountExists": "このサーバーURLのレシピプロバイダーアカウントはすでに存在します。",
         "invites": {
             "title": "招待",
             "intro": "リンクで新しいメンバーを招待します。パスワードは本人が設定します。",

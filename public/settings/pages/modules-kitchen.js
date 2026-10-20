@@ -10,6 +10,7 @@ import {
 } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
+import { errorSentence, isAlreadyDeleted, isGone, loadErrorSentence } from '/utils/friendly-error.js';
 
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -35,6 +36,23 @@ function providerLabel(provider) {
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
+}
+
+/* DER SATZ DER APP, NIE DER DES SERVERS (#1909). Bis dahin zeigte jeder
+ * gescheiterte Schreibvorgang dieses Blatts `err.message` - den englischen Text
+ * des Servers ("Base URL must start with http(s)://") oder den des Browsers.
+ * Jetzt nennt der Server den Fall (`reason`, server/routes/recipe-providers.js),
+ * und utils/friendly-error.js haelt den Satz dazu; alles andere bekommt den
+ * allgemeinen Satz der Stelle. */
+const ACCOUNT_GONE = 'recipe_providers_account_not_found';
+
+/** Loeschen, das ein anderer Admin schon erledigt hat, ist kein Fehler. */
+async function deleteAccountUnlessGone(id) {
+  try {
+    await recipeProviders.deleteAccount(id);
+  } catch (err) {
+    if (!isAlreadyDeleted(err, ACCOUNT_GONE)) throw err;
+  }
 }
 
 function formatSyncTime(value) {
@@ -163,8 +181,11 @@ function renderProviderAccount(container, account, refresh) {
       }
       await refresh();
     } catch (err) {
-      showToast(err.message || t('settings.recipeProviderSyncFailed'), 'danger');
-      syncBtn.disabled = false;
+      showToast(errorSentence(err, 'settings.recipeProviderSyncFailed'), 'danger');
+      // Das Konto gibt es nicht mehr: die Liste kommt frisch, statt eine Karte
+      // stehen zu lassen, deren Knopf beim naechsten Versuch genauso scheitert.
+      if (isGone(err)) await refresh();
+      else syncBtn.disabled = false;
     }
   });
 
@@ -198,8 +219,9 @@ function renderProviderAccount(container, account, refresh) {
       await recipeProviders.updateAccount(account.id, { enabled: !account.enabled });
       await refresh();
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
-      enableBtn.disabled = false;
+      showToast(errorSentence(err), 'danger');
+      if (isGone(err)) await refresh();
+      else enableBtn.disabled = false;
     }
   });
   actions.appendChild(enableBtn);
@@ -222,12 +244,12 @@ function renderProviderAccount(container, account, refresh) {
     );
     if (!confirmed) return;
     try {
-      await recipeProviders.deleteAccount(account.id);
+      await deleteAccountUnlessGone(account.id);
       showToast(t('settings.recipeProviderAccountDeleted'), 'success');
       await refresh();
       refocusAfterRender();
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     }
   });
   actions.appendChild(deleteBtn);
@@ -275,7 +297,16 @@ function openProviderLinkModal(account, refresh) {
           await refresh();
           refocusAfterRender();
         } catch (err) {
-          errorEl.textContent = err.message || t('common.errorGeneric');
+          // Das Konto gibt es nicht mehr: an seinem Link ist nichts mehr zu
+          // aendern. Der Dialog geht zu, der Toast sagt warum, die Liste kommt frisch.
+          if (isGone(err)) {
+            closeModal({ force: true, context: modalContext });
+            showToast(errorSentence(err), 'danger');
+            await refresh();
+            refocusAfterRender();
+            return;
+          }
+          errorEl.textContent = errorSentence(err);
           errorEl.hidden = false;
         }
       });
@@ -300,7 +331,7 @@ async function loadProviderAccounts(container) {
     accounts = res.data || [];
   } catch (err) {
     listEl.appendChild(createRetryState({
-      message: err.message || t('common.errorGeneric'),
+      message: loadErrorSentence(err) ?? t('common.errorGeneric'),
       onRetry: reload,
     }));
     return;
@@ -406,7 +437,7 @@ function bindProviderAddButton(container) {
             await loadProviderAccounts(container);
             refocusAfterRender();
           } catch (err) {
-            errorEl.textContent = err.message || t('common.errorGeneric');
+            errorEl.textContent = errorSentence(err);
             errorEl.hidden = false;
           }
         });
@@ -446,7 +477,7 @@ function bindEvents(container) {
       );
       window.yuvomi?.showToast(t('settings.mealTypesSaved'), 'success');
     } catch (error) {
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error), 'danger');
     }
   });
 
@@ -477,7 +508,7 @@ function bindEvents(container) {
       window.yuvomi?.showToast(t('settings.mealTypeNamesSaved'), 'success');
     } catch (error) {
       nameInputs.forEach((i) => { i.value = persistedNames[i.dataset.mealName] ?? ''; });
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error), 'danger');
     } finally {
       nameInputs.forEach((i) => { i.disabled = false; });
     }
@@ -493,5 +524,6 @@ export async function render(container, { user }) {
   await loadProviderAccounts(container);
 }
 
-// #1997: die beiden Dialoge der Rezeptquellen, bis in ihren Speichern-Weg.
-export const __test = { openProviderLinkModal, bindProviderAddButton };
+// #1997: die beiden Dialoge der Rezeptquellen, bis in ihren Speichern-Weg;
+// #1909: dazu die Karte eines Kontos, bis in die catch-Zweige ihrer Knoepfe.
+export const __test = { openProviderLinkModal, bindProviderAddButton, renderProviderAccount };

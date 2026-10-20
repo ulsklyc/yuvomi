@@ -3204,6 +3204,12 @@
         "recipeProviderAccountDeleted": "Usunięto konto dostawcy przepisów.",
         "recipeProviderDeleteAccountConfirm": "To usunie również {{count}} odzwierciedlonych przepisów i odłączy je od wszystkich wpisów planu posiłków.",
         "recipeProviderLastError": "Ostatni błąd synchronizacji: {{message}}",
+        "recipeProviderErrorAccountGone": "To konto dostawcy przepisów już nie istnieje.",
+        "recipeProviderErrorUrlInvalid": "Adres URL serwera musi zaczynać się od http:// lub https://.",
+        "recipeProviderErrorExternalUrlInvalid": "Publiczny adres URL linku musi zaczynać się od http:// lub https://.",
+        "recipeProviderErrorPrivateNetwork": "Adres URL serwera wskazuje na sieć prywatną lub lokalną. Aby na to zezwolić, ustaw na serwerze RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true.",
+        "recipeProviderErrorConnectionFailed": "Nie udało się połączyć z dostawcą przepisów. Sprawdź adres URL serwera i token API.",
+        "recipeProviderErrorAccountExists": "Konto dostawcy przepisów z tym adresem URL serwera już istnieje.",
         "invites": {
             "title": "Zaproszenia",
             "intro": "Zapraszaj nowych członków linkiem. Hasło ustalają sami.",

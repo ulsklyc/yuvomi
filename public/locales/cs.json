@@ -3092,6 +3092,12 @@
         "recipeProviderAccountDeleted": "Účet poskytovatele receptů smazán.",
         "recipeProviderDeleteAccountConfirm": "Tím se také odstraní {{count}} zrcadlených receptů a zruší se jejich propojení se všemi položkami jídelníčku.",
         "recipeProviderLastError": "Poslední chyba synchronizace: {{message}}",
+        "recipeProviderErrorAccountGone": "Tento účet poskytovatele receptů už neexistuje.",
+        "recipeProviderErrorUrlInvalid": "URL serveru musí začínat http:// nebo https://.",
+        "recipeProviderErrorExternalUrlInvalid": "Veřejná adresa URL pro odkazy musí začínat http:// nebo https://.",
+        "recipeProviderErrorPrivateNetwork": "URL serveru odkazuje do soukromé nebo místní sítě. Pokud to chcete povolit, nastavte na serveru RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK=true.",
+        "recipeProviderErrorConnectionFailed": "K poskytovateli receptů se nepodařilo připojit. Zkontrolujte URL serveru a API token.",
+        "recipeProviderErrorAccountExists": "Účet poskytovatele receptů s touto URL serveru už existuje.",
         "invites": {
             "title": "Pozvánky",
             "intro": "Pozvi nové členy odkazem. Heslo si zvolí sami.",
