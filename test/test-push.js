@@ -575,18 +575,101 @@ test('wall-mode: syncWallMode ruft den Hook nur bei Uebergaengen, isWallActive m
 });
 
 // ---------------------------------------------------------------------------
-// Boot-time report: initPushAndReport in router.js muss reportWallPauseState
-// mit dem aktuellen Wandzustand aufrufen, damit Kaltstart und stale-Pausen
-// ohne Sitzungsuebergang geheilt werden (#1904).
+// Boot-time report (#1904): router.js laesst sich nicht importieren (es haengt
+// beim Laden Listener an `window` und zieht die halbe App nach). Gefahren wird
+// deshalb der ECHTE Quelltext der Verdrahtung: die Stuecke aus router.js laufen
+// in einem Bereich, in dem jeder freie Name eine Attrappe ist. Ein Textguard auf
+// den Koerper von initPushAndReport sah nicht, ob navigate() sie ueberhaupt
+// bekommt - `initPush: initPushAndReport` -> `initPush` blieb gruen.
 // ---------------------------------------------------------------------------
-test('router.js: initPushAndReport ruft reportWallPauseState(isWallActive()) nach initPush() auf (#1904)', () => {
-  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-  const fnStart = src.indexOf('async function initPushAndReport()');
-  assert.ok(fnStart >= 0, 'initPushAndReport ist in router.js definiert');
-  const fnEnd = src.indexOf('\n}', fnStart);
-  const fn = src.slice(fnStart, fnEnd + 2);
-  assert.match(fn, /reportWallPauseState\s*\(\s*isWallActive\s*\(\s*\)\s*\)/,
-    'initPushAndReport ruft reportWallPauseState(isWallActive()) auf - Boot-Report fuer Kaltstart und stale-Pausen');
+const routerSource = () => readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+
+/** Ab `start` bis zur Klammer, die die erste `open`-Klammer schliesst (Strings und Kommentare uebersprungen). */
+function balancedFrom(src, start, open) {
+  const close = { '(': ')', '{': '}' };
+  let i = src.indexOf(open, start);
+  assert.ok(start >= 0 && i >= 0, `Anfang nicht gefunden: ${src.slice(start, start + 60)}`);
+  const stack = [];
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '/') { i = src.indexOf('\n', i); continue; }
+    if (c === '/' && src[i + 1] === '*') { i = src.indexOf('*/', i) + 1; continue; }
+    if (c === '"' || c === "'" || c === '`') {
+      for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++;
+      continue;
+    }
+    if (c === '(' || c === '{' || c === '[') stack.push(c === '[' ? ']' : close[c]);
+    else if (c === ')' || c === '}' || c === ']') {
+      assert.equal(c, stack.pop(), 'Klammern in router.js passen nicht zusammen');
+      if (stack.length === 0) return src.slice(start, i + 1);
+    }
+  }
+  assert.fail('keine schliessende Klammer');
+}
+
+/** Fuehrt Quelltext aus router.js aus; freie Namen kommen aus `stubs`, sonst ist es eine leere Funktion. */
+function runRouterSnippet(code, stubs) {
+  const noop = () => {};
+  const scope = new Proxy(stubs, {
+    has: (target, key) => key in target || (typeof key === 'string' && !(key in globalThis)),
+    get: (target, key) => (key === Symbol.unscopables ? undefined : key in target ? target[key] : noop),
+  });
+  // `with` braucht den Sloppy-Mode einer Function; der Code ist der eigene Quelltext aus router.js.
+  return new Function('scope', `with (scope) { return (async () => {\n${code}\n})(); }`)(scope);
+}
+
+test('router.js: navigate() bekommt initPushAndReport als initPush - der Boot-Report meldet den Wandzustand (#1904)', async () => {
+  const src = routerSource();
+  const fn = balancedFrom(src, src.indexOf('async function initPushAndReport()'), '{');
+  const call = balancedFrom(src, src.indexOf('createNavigate(routerState'), '(');
+  const calls = [];
+  let deps = null;
+  let wall = true;
+  await runRouterSnippet(`${fn}\n${call};`, {
+    createNavigate: (_state, d) => { deps = d; return () => {}; },
+    initPush: async () => { calls.push('initPush'); },
+    reportWallPauseState: (active) => { calls.push(['report', active]); },
+    isWallActive: () => wall,
+  });
+  assert.equal(typeof deps?.initPush, 'function', 'createNavigate bekommt ein initPush');
+  await deps.initPush();
+  assert.deepEqual(calls, ['initPush', ['report', true]],
+    'navigate() startet Push und meldet danach den Wandzustand - Kaltstart auf der Wand pausiert');
+  calls.length = 0;
+  wall = false;
+  await deps.initPush();
+  assert.deepEqual(calls, ['initPush', ['report', false]],
+    'ohne Wand meldet der Boot-Report false - eine liegengebliebene Pause heilt');
+});
+
+test('router.js: der visibilitychange-Listener meldet beim Aufwachen den Wandzustand (#1904)', async () => {
+  const src = routerSource();
+  const snippets = [...src.matchAll(/document\.addEventListener\(\s*['"]visibilitychange['"]/g)]
+    .map((m) => balancedFrom(src, m.index, '('));
+  assert.ok(snippets.length > 0, 'router.js haengt einen visibilitychange-Listener an');
+  const listeners = [];
+  const reports = [];
+  let wall = true;
+  const doc = { hidden: false, addEventListener: (type, fn) => { if (type === 'visibilitychange') listeners.push(fn); } };
+  for (const snippet of snippets) {
+    await runRouterSnippet(`${snippet};`, {
+      document: doc,
+      reportWallPauseState: (active) => { reports.push(active); },
+      isWallActive: () => wall,
+    });
+  }
+  const wake = () => { for (const fn of listeners) fn(); };
+
+  wake();
+  assert.deepEqual(reports, [true], 'sichtbar mit Wand: die Pause wird erneuert');
+  reports.length = 0;
+  wall = false;
+  wake();
+  assert.deepEqual(reports, [false], 'sichtbar ohne Wand: eine liegengebliebene Pause wird aufgehoben');
+  reports.length = 0;
+  doc.hidden = true;
+  wake();
+  assert.deepEqual(reports, [], 'beim Verstecken meldet die Seite nichts');
 });
 
 test('POST /test hebt die Wand-Pause nur am anfragenden Geraet auf, nicht bei anderen Abos desselben Nutzers (#1904)', async () => {
@@ -624,11 +707,10 @@ test('POST /test ohne endpoint laesst alle Wand-Pausen unveraendert (#1904)', as
 });
 
 test('router.js: onWallActiveChange(reportWallPauseState) und Lebendauer-Erneuerung sind verdrahtet (#1904)', () => {
-  const src = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const src = routerSource();
   assert.match(src, /onWallActiveChange\s*\(\s*reportWallPauseState\s*\)/,
     'onWallActiveChange(reportWallPauseState) muss in router.js stehen');
-  assert.match(src, /document\.addEventListener\s*\(\s*['"]visibilitychange['"]/,
-    'visibilitychange-Listener fuer die Erneuerung nach Aufwachen muss in router.js stehen');
+  // Der visibilitychange-Listener laeuft als Verhalten im Test oben.
   assert.match(src, /setInterval\s*\(.*reportWallPauseState.*60\s*\*\s*60\s*\*\s*1000/s,
     'stuendlicher setInterval fuer laufende Wand muss in router.js stehen');
 });
