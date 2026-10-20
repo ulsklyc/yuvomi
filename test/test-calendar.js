@@ -6097,11 +6097,14 @@ await test('Seitenleiste: scheitert „Als Naechstes", sagt die Leiste das und l
   const restoreDom = installMiniDom();
   const calls = [];
   let fail = true;
+  const soon = (hours) => new Date(Date.now() + hours * 3600000).toISOString().replace(/\.\d{3}Z$/, 'Z');
   globalThis.__apiStub = {
     get: async (url) => {
       calls.push(url);
       if (fail) throw Object.assign(new Error('Service Unavailable'), { status: 503 });
-      return { data: [{ id: 9, title: 'Zahnarzt', start_datetime: '2026-10-20T10:00:00Z', end_datetime: '2026-10-20T11:00:00Z', assigned_users: [] }] };
+      // Relativ zur Uhr: die Leiste laesst Beendetes weg, und ein festes Datum
+      // (hier stand 2026-10-20T10:00Z) machte die Suite ab diesem Vormittag rot.
+      return { data: [{ id: 9, title: 'Zahnarzt', start_datetime: soon(1), end_datetime: soon(2), assigned_users: [] }] };
     },
   };
   try {
