@@ -301,10 +301,18 @@ function ausgabe(id, extra = {}) {
   return { id, title: `Ausgabe ${id}`, amount: '5.00', currency: 'EUR', payer_name: 'Alex', category: 'other', expense_date: '2026-09-01', created_at: '2026-09-01 10:00:00', ...extra };
 }
 
+/** Liegt `e` in der Reihenfolge der Route hinter dem Cursor? (Datum, Anlage, id - je absteigend) */
+function hinterCursor(e, q) {
+  if (e.expense_date !== q.get('before_date')) return e.expense_date < q.get('before_date');
+  if (e.created_at !== q.get('before_at')) return e.created_at < q.get('before_at');
+  return e.id < Number(q.get('before_id'));
+}
+
 /**
  * Buehne fuer die Ausgabenliste: `#split-expense-list` ist der Kasten, den
- * renderExpenseBox neu zeichnet. Der Server-Doppel beantwortet limit/offset
- * wie die Route (has_more genau), je Gruppe aus `server[groupId]`.
+ * renderExpenseBox neu zeichnet. Der Server-Doppel beantwortet limit, offset
+ * und den Cursor wie die Route (has_more genau, next_cursor aus der letzten
+ * Zeile), je Gruppe aus `server[groupId]`.
  */
 function ausgabenBuehne({ server, antwort = null, groupId = 2, modus = 'write', geladen = null }) {
   const gets = [];
@@ -322,7 +330,7 @@ function ausgabenBuehne({ server, antwort = null, groupId = 2, modus = 'write', 
   Object.assign(split.state, {
     activeGroupId: groupId, groupStatus: 'active', user: null, category: '',
     groups: [{ id: groupId, name: 'Urlaub Ostsee', type: 'trip', description: '' }, { id: 5, name: 'WG', type: 'household', description: '' }],
-    expenses: [], expensesHasMore: false, expensesKey: null, expensesLoadingMore: false,
+    expenses: [], expensesCursor: null, expensesKey: null, expensesLoadingMore: false,
     balances: { balances: [], simplified_debts: [] }, activity: [], activityCursor: null, activityGroupId: null,
     meta: { currencies: ['EUR'], default_currency: 'EUR' },
     ...(geladen || {}),
@@ -335,7 +343,11 @@ function ausgabenBuehne({ server, antwort = null, groupId = 2, modus = 'write', 
     const liste = (server[m[1]] || []).filter((e) => !q.get('category') || e.category === q.get('category'));
     const limit = Number(q.get('limit') || 30);
     const offset = Number(q.get('offset') || 0);
-    return { data: liste.slice(offset, offset + limit), pagination: { limit, offset, has_more: offset + limit < liste.length } };
+    const rest = (q.get('before_id') ? liste.filter((e) => hinterCursor(e, q)) : liste).slice(offset);
+    const data = rest.slice(0, limit);
+    const mehr = rest.length > limit;
+    const last = data.at(-1);
+    return { data, pagination: { limit, has_more: mehr, next_cursor: mehr ? { before_date: last.expense_date, before_at: last.created_at, before_id: last.id } : null } };
   };
   globalThis.__apiStub = {
     get: async (path) => { gets.push(path); return (antwort && antwort(path)) ?? routeAntwort(path); },
@@ -359,6 +371,10 @@ function ausgabenBuehne({ server, antwort = null, groupId = 2, modus = 'write', 
 
 const einunddreissig = () => Array.from({ length: 31 }, (_, i) => ausgabe(131 - i));
 
+/** Die Abfrage eines GET-Pfads als Objekt - der Cursor ist dort lesbar. */
+const abfrage = (path) => Object.fromEntries(new URL(path, 'http://x').searchParams);
+const CURSOR_102 = { before_date: '2026-09-01', before_at: '2026-09-01 10:00:00', before_id: '102' };
+
 test('Ausgaben (#2108): 31 Ausgaben zeigen "Mehr laden", der Klick holt die 31. - bei jedem Recht und im Archiv', async () => {
   for (const modus of ['write', 'read']) {
     for (const archiviert of [false, true]) {
@@ -372,7 +388,8 @@ test('Ausgaben (#2108): 31 Ausgaben zeigen "Mehr laden", der Klick holt die 31. 
         assert.match(html, /<button type="button" class="btn btn--secondary split-expenses-more" data-expenses-more>splitExpenses\.loadMoreActivity<\/button>/, `${modus} archiv=${archiviert}`);
         assert.doesNotMatch(html, /data-expense-(?:id|view)="101"/, 'die 31. steht noch nicht da');
         await split.onExpenseListClick(klickAus(html, 'data-expenses-more'));
-        assert.deepEqual(b.ausgabenGets().slice(1), ['/split-expenses/groups/2/expenses?limit=30&offset=30']);
+        assert.equal(b.ausgabenGets().length, 2);
+        assert.deepEqual(abfrage(b.ausgabenGets()[1]), { limit: '30', ...CURSOR_102 }, 'hinter dem Cursor der letzten Zeile, kein offset');
         assert.equal(split.state.expenses.length, 31);
         assert.match(b.box.html, /data-expense-(?:id|view)="101"/, 'die 31. steht im Kasten und laesst sich oeffnen');
         assert.doesNotMatch(b.box.html, /data-expenses-more/, 'alles geladen: kein Knopf mehr');
@@ -386,7 +403,7 @@ test('Ausgaben (#2108): genau 30 Ausgaben - kein "Mehr laden"', async () => {
   try {
     await split.loadGroupData();
     assert.equal(split.state.expenses.length, 30);
-    assert.equal(split.state.expensesHasMore, false);
+    assert.equal(split.state.expensesCursor, null);
     assert.doesNotMatch(b.zeichne(), /data-expenses-more/);
   } finally { b.abbauen(); }
 });
@@ -409,26 +426,26 @@ test('Ausgaben (#2108): nach Bearbeiten und Loeschen bleibt die geladene Tiefe',
     await split.loadGroupData();
     assert.deepEqual(split.state.expenses.map((e) => e.id), server[2].map((e) => e.id), 'alle verbliebenen, keine Dublette');
     assert.ok(split.state.expenses.some((e) => e.id === 101));
-    assert.equal(split.state.expensesHasMore, false);
+    assert.equal(split.state.expensesCursor, null);
   } finally { b.abbauen(); }
 });
 
 test('Ausgaben (#2108): Neuladen blaettert nach, bis die bisher letzte Ausgabe wieder da ist', async () => {
   // 150 Ausgaben, 130 geladen: mehr als eine Abfrage (Obergrenze 100) - der
-  // Rest muss per offset nachkommen, sonst schrumpft die Liste.
+  // Rest muss per Cursor nachkommen, sonst schrumpft die Liste.
   const liste = Array.from({ length: 150 }, (_, i) => ausgabe(1000 - i));
   const b = ausgabenBuehne({
     server: { 2: liste },
-    geladen: { expenses: liste.slice(0, 130), expensesHasMore: true, expensesKey: '2|' },
+    geladen: { expenses: liste.slice(0, 130), expensesCursor: { before_date: '2026-09-01', before_at: '2026-09-01 10:00:00', before_id: 871 }, expensesKey: '2|' },
   });
   try {
     await split.loadGroupData();
-    assert.deepEqual(b.ausgabenGets(), [
-      '/split-expenses/groups/2/expenses?limit=100',
-      '/split-expenses/groups/2/expenses?limit=100&offset=100',
+    assert.deepEqual(b.ausgabenGets().map(abfrage), [
+      { limit: '100' },
+      { limit: '100', before_date: '2026-09-01', before_at: '2026-09-01 10:00:00', before_id: '901' },
     ]);
     assert.ok(split.state.expenses.some((e) => e.id === 871), 'die bisher letzte Ausgabe ist wieder geladen');
-    assert.equal(split.state.expensesHasMore, false);
+    assert.equal(split.state.expensesCursor, null);
   } finally { b.abbauen(); }
 });
 
@@ -451,11 +468,27 @@ test('Ausgaben (#2108): Gruppenwechsel und Kategoriewechsel beginnen bei Seite 1
   } finally { b.abbauen(); }
 });
 
+test('Ausgaben (#2108): loescht jemand zwischen zwei Seiten eine Ausgabe weiter oben, fehlt keine', async () => {
+  // Mit `offset = geladene Zahl` rutschte die 31. nach dem Loeschen der 1. auf
+  // Platz 30, die Abfrage ab 30 begann hinter ihr - sie fehlte, und der Knopf
+  // verschwand trotzdem (Codex-Befund auf #2112). Der Cursor haengt an der
+  // letzten gesehenen Zeile, nicht an einer Zeilenzahl.
+  const server = { 2: einunddreissig() };
+  const b = ausgabenBuehne({ server });
+  try {
+    await split.loadGroupData();
+    server[2] = server[2].filter((e) => e.id !== 131);
+    await split.onExpenseListClick(klickAus(b.zeichne(), 'data-expenses-more'));
+    assert.ok(split.state.expenses.some((e) => e.id === 101), 'die bisher ungesehene 31. ist angehaengt');
+    assert.equal(split.state.expensesCursor, null);
+  } finally { b.abbauen(); }
+});
+
 test('Ausgaben (#2108): ein zweiter Klick waehrend der Ladung laedt nicht doppelt, eine Antwort nach dem Gruppenwechsel wird verworfen', async () => {
   const seite = offen();
   const b = ausgabenBuehne({
     server: { 2: einunddreissig(), 5: [ausgabe(500)] },
-    antwort: (path) => (path.includes('/groups/2/expenses?limit=30&offset=30') ? seite.promise : null),
+    antwort: (path) => (path.includes('/groups/2/expenses?') && path.includes('before_id=102') ? seite.promise : null),
   });
   try {
     await split.loadGroupData();
@@ -465,9 +498,9 @@ test('Ausgaben (#2108): ein zweiter Klick waehrend der Ladung laedt nicht doppel
     assert.match(b.box.html, /data-expenses-more aria-disabled="true" aria-busy="true"/, 'der Knopf ist gesperrt');
     split.state.activeGroupId = 5;
     await split.loadGroupData();
-    seite.resolve({ data: [ausgabe(101)], pagination: { limit: 30, offset: 30, has_more: false } });
+    seite.resolve({ data: [ausgabe(101)], pagination: { limit: 30, has_more: false, next_cursor: null } });
     await Promise.all([erster, zweiter]);
-    assert.equal(b.ausgabenGets().filter((p) => p.includes('offset=30')).length, 1, 'eine Anfrage');
+    assert.equal(b.ausgabenGets().filter((p) => p.includes('before_id=102')).length, 1, 'eine Anfrage');
     assert.deepEqual(split.state.expenses.map((e) => e.id), [500], 'die alte Seite haengt nichts an die neue Gruppe');
   } finally { b.abbauen(); }
 });

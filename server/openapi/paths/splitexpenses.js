@@ -156,12 +156,15 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/groups/{id}/expenses': {
       get: op({
         summary: 'List group expenses',
-        description: `Active expenses, newest first: \`expense_date\`, then \`created_at\`, then \`id\`, each descending - expenses written in the same second keep a fixed order, so \`limit\`/\`offset\` pages neither repeat nor skip one. \`pagination.has_more\` is exact: false when the page holds the last expense, also when exactly \`limit\` remain. Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
+        description: `Active expenses, newest first: \`expense_date\`, then \`created_at\`, then \`id\`, each descending - expenses written in the same second keep a fixed order. Page through every expense with the cursor: pass \`before_date\`, \`before_at\` and \`before_id\` from \`pagination.next_cursor\` of the previous page; an expense added or deleted meanwhile shifts nothing. Without a cursor the endpoint behaves as before (\`limit\`, \`offset\`). \`pagination.has_more\` is exact: false when the page holds the last expense, also when exactly \`limit\` remain; \`pagination.next_cursor\` is null then. A partial cursor, or a cursor together with a non-zero \`offset\`, answers 400. Each expense carries \`attachments\`. ${DOCUMENT_LINKS_READ_NOTE}`,
         tag: 'SplitExpenses',
         params: [
           idParam(),
           { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 30 }, description: 'Page size. Values above 100 are capped at 100.' },
-          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 }, description: 'Number of expenses to skip; pass the number already loaded to get the next page.' },
+          { name: 'before_date', in: 'query', required: false, schema: { type: 'string', maxLength: 64 }, description: 'Cursor, taken from `pagination.next_cursor.before_date`. Only together with `before_at` and `before_id`.' },
+          { name: 'before_at', in: 'query', required: false, schema: { type: 'string', maxLength: 64 }, description: 'Cursor, taken from `pagination.next_cursor.before_at`.' },
+          { name: 'before_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Cursor, taken from `pagination.next_cursor.before_id`, because several expenses can share a second.' },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 }, description: 'Offset paging as before the cursor existed. An expense deleted above the current page while paging makes the next offset page skip one; prefer the cursor.' },
           { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Matches title or description.' },
           { name: 'category', in: 'query', required: false, schema: { type: 'string' }, description: 'Only expenses of this category; an unknown category is ignored.' },
           { name: 'recurring', in: 'query', required: false, schema: { type: 'string', enum: ['1'] }, description: '`1` lists only expenses booked from a recurring expense.' },

@@ -1033,12 +1033,38 @@ router.post('/groups/:id/guests', async (req, res) => {
   }
 });
 
+/**
+ * Cursor der Ausgabenliste (#2108): die Sortierschluessel der letzten Zeile
+ * (`expense_date`, `created_at`, `id`), wie sie `pagination.next_cursor`
+ * liefert. Nur alle drei zusammen - ein halber Cursor ist 400, wie beim Verlauf.
+ */
+function expenseCursor(query) {
+  const given = ['before_date', 'before_at', 'before_id'].filter((k) => query[k] != null && query[k] !== '');
+  if (!given.length) return { cursor: null };
+  const beforeId = Number(query.before_id);
+  const text = (v) => typeof v === 'string' && v.length <= 64;
+  if (given.length < 3 || !text(query.before_date) || !text(query.before_at) || !Number.isInteger(beforeId) || beforeId < 1) {
+    return { error: 'before_date, before_at and before_id belong together: take all three from pagination.next_cursor.' };
+  }
+  return { cursor: { beforeDate: query.before_date, beforeAt: query.before_at, beforeId } };
+}
+
 router.get('/groups/:id/expenses', (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const { cursor, error } = expenseCursor(req.query);
+    if (error) return res.status(400).json({ error, code: 400 });
+    if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
+    // Hinter dem Cursor statt hinter einer Zeilenzahl: loescht jemand zwischen
+    // zwei Seiten eine Ausgabe weiter oben, ueberspringt `offset` eine
+    // ungesehene, der Cursor nicht.
+    const keyset = cursor
+      ? `AND (e.expense_date < @beforeDate OR (e.expense_date = @beforeDate
+          AND (e.created_at < @beforeAt OR (e.created_at = @beforeAt AND e.id < @beforeId))))`
+      : '';
     const search = String(req.query.q || '').trim();
     const category = CATEGORIES.includes(req.query.category) ? req.query.category : null;
     const recurringOnly = req.query.recurring === '1';
@@ -1050,16 +1076,22 @@ router.get('/groups/:id/expenses', (req, res) => {
         AND (@search = '' OR e.title LIKE '%' || @search || '%' OR e.description LIKE '%' || @search || '%')
         AND (@category IS NULL OR e.category = @category)
         AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
+        ${keyset}
       ORDER BY e.expense_date DESC, e.created_at DESC, e.id DESC
       LIMIT @fetch OFFSET @offset
-    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset });
+    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset, ...(cursor || {}) });
     // `created_at` ist sekundengenau: Ausgaben derselben Sekunde (eine Serie,
     // die nachholt) haetten ohne `id` keine feste Reihenfolge, und Offset-Seiten
     // koennten eine doppeln oder auslassen (#2108). Eine Zeile mehr gelesen
     // macht `has_more` genau - bei genau `limit` Ausgaben keine leere Extraseite.
     const hasMore = rows.length > limit;
-    const serialized = serializeExpenseList(hasMore ? rows.slice(0, limit) : rows, documentViewer(req));
-    res.json({ data: serialized, pagination: { limit, offset, has_more: hasMore } });
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
+    const nextCursor = hasMore && last ? { before_date: last.expense_date, before_at: last.created_at, before_id: last.id } : null;
+    const pagination = cursor
+      ? { limit, has_more: hasMore, next_cursor: nextCursor }
+      : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
+    res.json({ data: serializeExpenseList(page, documentViewer(req)), pagination });
   } catch (err) {
     log.error('GET /groups/:id/expenses error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

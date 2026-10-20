@@ -76,8 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loads the next page, like the history below it, and after you edit or delete an expense the
   list keeps everything you had loaded. Switching to another group starts at the top again.
   Balances were always complete and are unchanged. **API:** expenses of a group are now ordered by
-  `id` as a last key, so expenses written in the same second keep their place across `limit` and
-  `offset` pages, and `pagination.has_more` is false when exactly `limit` expenses remain.
+  `id` as a last key, so expenses written in the same second keep a fixed place, and they page
+  with a cursor: `pagination.next_cursor` (`before_date`, `before_at`, `before_id`) continues
+  behind the last expense, so one deleted meanwhile no longer makes the next page skip another.
+  `offset` keeps working, and `pagination.has_more` is false when exactly `limit` expenses remain.
 - **Menus no longer all stand open on older browsers (#2107).** On a browser without popover
   support - Chrome or Edge before 114, Firefox before 125, Safari or iOS before 17, such as a
   wall frame stuck on an old system WebView - every "more" menu, the account menu and the

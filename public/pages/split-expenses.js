@@ -35,10 +35,11 @@ let state = {
   memberCandidates: [],
   activeGroupId: null,
   expenses: [],
-  // Ausgabenliste seitenweise (#2108), wie der Verlauf: ob der Server eine
-  // weitere Seite meldet, und zu welcher Frage (Gruppe + Kategorie) die
-  // geladene Liste gehoert - nur bei DERSELBEN bleibt ihre Tiefe beim Neuladen.
-  expensesHasMore: false,
+  // Ausgabenliste seitenweise (#2108), wie der Verlauf: der Cursor der
+  // naechsten Seite aus `pagination.next_cursor` (null = alles geladen), und zu
+  // welcher Frage (Gruppe + Kategorie) die geladene Liste gehoert - nur bei
+  // DERSELBEN bleibt ihre Tiefe beim Neuladen.
+  expensesCursor: null,
   expensesKey: null,
   expensesLoadingMore: false,
   // Wiederkehrende Ausgaben der aktiven Gruppe (#1647), wie der Server sie
@@ -353,12 +354,20 @@ async function fetchActivity(groupId, { depth = ACTIVITY_PAGE, tail = null } = {
 const EXPENSE_PAGE = 30;
 const EXPENSE_MAX_PAGE = 100;
 
-function expensesPath(groupId, category, limit, offset = 0) {
+function expensesPath(groupId, category, limit, cursor = null) {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (offset) params.set('offset', String(offset));
   if (category) params.set('category', category);
+  if (cursor) {
+    params.set('before_date', cursor.before_date);
+    params.set('before_at', cursor.before_at);
+    params.set('before_id', String(cursor.before_id));
+  }
   return `/split-expenses/groups/${groupId}/expenses?${params}`;
 }
+
+// Ein Cursor statt `offset`: loescht jemand zwischen zwei Seiten eine Ausgabe
+// weiter oben, rutschte die naechste ungesehene unter die Zeilenzahl und fehlte.
+const nextExpenseCursor = (res) => (res?.pagination?.has_more ? res.pagination.next_cursor ?? null : null);
 
 /** Die Frage, zu der eine geladene Ausgabenliste gehoert: Gruppe und Kategoriefilter. */
 const expensesKeyOf = (groupId, category) => `${groupId}|${category || ''}`;
@@ -372,7 +381,7 @@ function expenseAtOrPast(item, tail) {
 
 /**
  * Laedt die Ausgaben von vorn, wie fetchActivity den Verlauf: mit `tail` (der
- * bisher letzten geladenen Ausgabe) wird weitergeblaettert, bis ihre Stelle
+ * bisher letzten geladenen Ausgabe) wird per Cursor weitergeblaettert, bis ihre Stelle
  * wieder erreicht ist. So faellt die Liste nach Bearbeiten oder Loeschen weit
  * unten nicht auf die ersten 30 zurueck. Doppelte IDs fallen heraus, falls sich
  * zwischen zwei Seiten etwas verschoben hat.
@@ -380,18 +389,15 @@ function expenseAtOrPast(item, tail) {
 async function fetchExpenses(groupId, category, { depth = EXPENSE_PAGE, tail = null } = {}) {
   const first = await api.get(expensesPath(groupId, category, Math.min(Math.max(depth, EXPENSE_PAGE), EXPENSE_MAX_PAGE)));
   const items = [...(first.data || [])];
-  let offset = items.length;
-  let hasMore = Boolean(first.pagination?.has_more);
-  while (tail && hasMore && !(items.length && expenseAtOrPast(items[items.length - 1], tail))) {
+  let cursor = nextExpenseCursor(first);
+  while (tail && cursor && !(items.length && expenseAtOrPast(items[items.length - 1], tail))) {
     // eslint-disable-next-line no-await-in-loop
-    const more = await api.get(expensesPath(groupId, category, EXPENSE_MAX_PAGE, offset));
-    const rows = more.data || [];
+    const more = await api.get(expensesPath(groupId, category, EXPENSE_MAX_PAGE, cursor));
     const seen = new Set(items.map((item) => item.id));
-    items.push(...rows.filter((item) => !seen.has(item.id)));
-    offset += rows.length;
-    hasMore = Boolean(more.pagination?.has_more) && rows.length > 0;
+    items.push(...(more.data || []).filter((item) => !seen.has(item.id)));
+    cursor = nextExpenseCursor(more);
   }
-  return { items, hasMore };
+  return { items, cursor };
 }
 
 async function loadGroupData() {
@@ -400,7 +406,7 @@ async function loadGroupData() {
   state.expensesLoadingMore = false;
   if (!state.activeGroupId) {
     state.expenses = [];
-    state.expensesHasMore = false;
+    state.expensesCursor = null;
     state.expensesKey = null;
     state.recurring = [];
     state.balances = { balances: [], simplified_debts: [] };
@@ -432,7 +438,7 @@ async function loadGroupData() {
   // Ein spaeteres Laden hat inzwischen begonnen: dessen Stand gilt, nicht dieser.
   if (generation !== _activityGeneration) return;
   state.expenses = expenses.items;
-  state.expensesHasMore = expenses.hasMore;
+  state.expensesCursor = expenses.cursor;
   state.expensesKey = expensesKey;
   state.balances = balances.data || { balances: [], simplified_debts: [] };
   state.activity = activity.items;
@@ -489,7 +495,8 @@ async function loadMoreActivity() {
 async function loadMoreExpenses() {
   const groupId = state.activeGroupId;
   const key = state.expensesKey;
-  if (!state.expensesHasMore || !groupId || state.expensesLoadingMore || key !== expensesKeyOf(groupId, state.category)) return;
+  const cursor = state.expensesCursor;
+  if (!cursor || !groupId || state.expensesLoadingMore || key !== expensesKeyOf(groupId, state.category)) return;
   const generation = _activityGeneration;
   state.expensesLoadingMore = true;
   const hadFocus = typeof document !== 'undefined'
@@ -497,7 +504,7 @@ async function loadMoreExpenses() {
   renderExpenseBox({ keepFocus: hadFocus });
   let res;
   try {
-    res = await api.get(expensesPath(groupId, state.category, EXPENSE_PAGE, state.expenses.length));
+    res = await api.get(expensesPath(groupId, state.category, EXPENSE_PAGE, cursor));
   } catch (err) {
     if (generation === _activityGeneration) {
       state.expensesLoadingMore = false;
@@ -507,10 +514,9 @@ async function loadMoreExpenses() {
   }
   if (generation !== _activityGeneration || key !== state.expensesKey) return;
   state.expensesLoadingMore = false;
-  const rows = res?.data || [];
   const seen = new Set(state.expenses.map((item) => item.id));
-  state.expenses = [...state.expenses, ...rows.filter((item) => !seen.has(item.id))];
-  state.expensesHasMore = Boolean(res?.pagination?.has_more) && rows.length > 0;
+  state.expenses = [...state.expenses, ...(res?.data || []).filter((item) => !seen.has(item.id))];
+  state.expensesCursor = nextExpenseCursor(res);
   renderExpenseBox({ keepFocus: hadFocus });
 }
 
@@ -1051,7 +1057,7 @@ function renderExpenses(asList = false) {
   // Waehrend eine Seite unterwegs ist `aria-disabled` statt `disabled`, damit
   // der Fokus bleibt; den zweiten Klick faengt loadMoreExpenses() ab.
   const busy = state.expensesLoadingMore;
-  const more = state.expensesHasMore
+  const more = state.expensesCursor
     ? `<button type="button" class="btn btn--secondary split-expenses-more" data-expenses-more${busy ? ' aria-disabled="true" aria-busy="true"' : ''}>${esc(t('splitExpenses.loadMoreActivity'))}</button>`
     : '';
   return `<div class="row-carrier split-expense-rows" tabindex="-1">${state.expenses.map((expense) => {
