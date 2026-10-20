@@ -258,6 +258,21 @@
   .widget-size--4x3 {
     grid-row: span 3;
   }
+
+  /* DIE STUFE DER KALENDERLISTE IST IHRE HOEHE (#2087). Acht Termine belegen
+   * drei Rasterzeilen, zwoelf vier - die Liste waechst um eigene Zeilen statt
+   * die Zeile ihrer Nachbarn zu strecken. Nur an den hohen Klassen: 1x1 zeigt
+   * drei Zeilen, und dort darf die Stufe keine Spanne setzen. Das Attribut
+   * setzt `calendarListRows()` (dashboard.js); gespeichert bleibt die Groesse. */
+  .widget-size--1x2[data-list-rows="8"],
+  .widget-size--2x2[data-list-rows="8"] {
+    grid-row: span 3;
+  }
+
+  .widget-size--1x2[data-list-rows="12"],
+  .widget-size--2x2[data-list-rows="12"] {
+    grid-row: span 4;
+  }
 }
 
 /* DIE KACHEL VOR EINER FREIEN ZELLE WAECHST IN DEN ZEILENREST (Re-Critique

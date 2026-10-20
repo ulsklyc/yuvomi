@@ -1457,7 +1457,11 @@ function skeletonWidget(lines = 3) {
 
 const TASK_STATUS_IN_PROGRESS = () => t('tasks.statusInProgress');
 
-function renderUrgentTasks(tasks, openTotal = null) {
+/* Die Zeilen folgen der Groesse wie bei jeder Liste (`listRowCap`, #2087):
+ * der Server liefert die fuenf dringendsten fuer die hohe Fassung, eine
+ * 1x1-Kachel zeigt davon drei. Ohne Groesse ist es die Vorgabe der Kachel. */
+function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
+  const tasks = allTasks.slice(0, listRowCap(size));
   if (!tasks.length) {
     return `<div class="widget widget--tasks">
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
@@ -1494,8 +1498,8 @@ function renderUrgentTasks(tasks, openTotal = null) {
   }).join('');
 
   // `urgentTasks` sind die fuenf dringendsten, `openTaskCount` alle offenen
-  // (siehe listTotal).
-  const total = listTotal(openTotal, tasks.length);
+  // (siehe listTotal); die Fusszeile nennt, was nicht in DIESER Groesse steht.
+  const total = listTotal(openTotal, allTasks.length);
   return `<div class="widget widget--tasks">
     ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
     <div class="widget__body">${items}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
@@ -1514,21 +1518,33 @@ function renderUrgentTasks(tasks, openTotal = null) {
  * (chronologisch sind sie frueher), der Rest faltet sich in eine Zahl: an einem
  * vollen Tag waeren sonst sechs vergangene Zeilen der Inhalt der Kachel.
  * Zurueckgetreten heisst: Farbe statt Deckung (#1230) und ein Wort im Etikett
- * statt „Heute" - der Zustand haengt nicht an der Farbe allein. */
+ * statt „Heute" - der Zustand haengt nicht an der Farbe allein.
+ *
+ * SEIT #2087 ZAEHLEN SIE INNERHALB DER ZEILEN, aber NACH dem Kommenden. Die
+ * Kachel hat so viele Zeilen, wie ihre Groesse erlaubt (`calendarRowCap`);
+ * zwei beendete obendrauf machten eine 1x1-Kachel fuenf Zeilen hoch und
+ * streckten die Rasterzeile ihrer Nachbarn. Das Kommende fuellt zuerst, die
+ * beendeten nehmen nur, was frei bleibt (hoechstens zwei) - abends, wenn
+ * nicht mehr viel kommt, stehen sie also wieder da. Den Kern von #1449 haelt
+ * das: ein Vergangenes verdraengt nie ein Kommendes. */
 const ENDED_EVENTS_SHOWN = 2;
 
 /* Wie viele Kommende, steht in den Optionen der Kachel (#1680) und geht durch
- * dieselbe Klemme wie der Parameter der Route (`clampEventLimit`). Die Kachel
- * schneidet trotzdem selbst: im Anpassen-Modus steht bis zum Speichern die
- * alte Antwort da, und wer von zwoelf auf fuenf zurueckstellt, soll fuenf
- * sehen und nicht zwoelf bis zum naechsten Abruf. */
-function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT } = {}) {
+ * dieselbe Klemme wie der Parameter der Route (`clampEventLimit`) - in den
+ * hohen Groessen. Eine 1x1-Kachel zeigt die Zeilen ihrer Groesse wie jede
+ * Liste (`calendarRowCap`, #2087). Die Kachel schneidet trotzdem selbst: im
+ * Anpassen-Modus steht bis zum Speichern die alte Antwort da, und wer von
+ * zwoelf auf fuenf zurueckstellt, soll fuenf sehen und nicht zwoelf bis zum
+ * naechsten Abruf. */
+function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit) } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
-  const ended = endedToday.slice(-ENDED_EVENTS_SHOWN);
+  const aheadAll = allEvents.filter((e) => !endedToday.includes(e));
+  const ahead = aheadAll.slice(0, rows);
+  const endedRoom = Math.min(ENDED_EVENTS_SHOWN, rows - ahead.length);
+  const ended = endedRoom > 0 ? endedToday.slice(-endedRoom) : [];
   const folded = endedToday.length - ended.length;
-  const ahead = allEvents.filter((e) => !endedToday.includes(e)).slice(0, clampEventLimit(limit));
   const events = [...ended, ...ahead];
   if (!events.length) {
     return `<div class="widget widget--calendar">
@@ -1584,9 +1600,16 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   // (5, 8 oder 12) geschnitten, eine Gesamtzahl gibt es nicht. „5" stuende
   // genau so lange da, wie mindestens fuenf Termine kommen - eine Zahl, die
   // nur ihre eigene Obergrenze nennt. Beendete zaehlen ohnehin nie mit (#1449).
+  // Aus demselben Grund traegt die Fusszeile keine Zahl, wenn die Groesse
+  // weniger zeigt, als geladen ist (#2087): „+2 weitere" hiesse „fuenf geladen,
+  // drei gezeigt" und laege bei dreissig kommenden Terminen. Sie steht an der
+  // Stelle und in der Form des „+N weitere" der anderen Listen.
+  const more = rows < clampEventLimit(limit) && aheadAll.length > ahead.length
+    ? `<p class="widget-list-more">${esc(t('dashboard.eventsMoreAhead'))}</p>`
+    : '';
   return `<div class="widget widget--calendar">
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
-    <div class="widget__body">${earlier}${items}</div>
+    <div class="widget__body">${earlier}${items}${more}</div>
   </div>`;
 }
 
@@ -1648,12 +1671,12 @@ function renderWeekStrip(weekEvents) {
 }
 
 /** Das Kalender-Widget in seiner Groesse: 2x1 ist die Woche, alles andere die Liste.
- *  Die Stufe aus den Optionen (#1680) gilt nur der Liste - die Woche zeigt
- *  sieben Tage, keine Zeilen. */
+ *  Die Stufe aus den Optionen (#1680) gilt nur der hohen Liste - die Woche
+ *  zeigt sieben Tage, keine Zeilen, und 1x1 die Zeilen seiner Groesse. */
 function renderCalendarWidget(data, size, options = {}) {
   return nearestPreset(size ?? '1x2') === '2x1'
     ? renderWeekStrip(data?.weekEvents)
-    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit });
+    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit) });
 }
 
 /**
@@ -1669,6 +1692,26 @@ function renderCalendarWidget(data, size, options = {}) {
  * Zeilen-Span der Groessenklasse (`<spalten>x<zeilen>`), nicht die Pixelhoehe:
  * die kennt erst der Browser, und eine Zeilenzahl, die vom Messzeitpunkt
  * abhaengt, springt beim Laden.
+ *
+ * DIE REGEL GILT AUCH FUER KALENDER UND AUFGABEN (#2087, D#2038). Beide waren
+ * Ausnahmen: der Kalender zeigte seine Stufe (5/8/12) plus zwei beendete in
+ * jeder Groesse, die Aufgaben bekamen gar keine Groesse und zeigten immer
+ * fuenf. Eine 1x1-Kachel wurde so hoeher als eine Rasterzeile, und weil die
+ * Zeile mit ihrer hoechsten Kachel waechst (`grid-auto-rows: minmax(132px,
+ * auto)`), stand bei den Nachbarn „+N weitere" ueber leerem Raum. Jetzt:
+ *   - 1x1 zeigt drei Zeilen, auch Kalender und Aufgaben, plus Fusszeile.
+ *   - Hoch zeigt fuenf; beim Kalender die Stufe aus seinen Optionen, und die
+ *     Stufe bestimmt, wie viele Rasterzeilen die Kachel belegt (5/8/12 ->
+ *     2/3/4, `calendarListRows` + dashboard.css). Eine laengere Liste ist eine
+ *     hoehere Kachel, nicht eine hoehere Zeile der Nachbarn. Darstellung,
+ *     keine gespeicherte Groesse.
+ *   - Beendete Termine zaehlen innerhalb der Zeilen, nach dem Kommenden
+ *     (`ENDED_EVENTS_SHOWN`).
+ *   - Die Wand hat ihren eigenen Deckel (`WALL_ROW_CAP`) und liest weder
+ *     Groesse noch Stufe.
+ * NICHT geloest ist die Pixelvarianz zwischen Kacheltypen: eine Notizzeile ist
+ * hoeher als eine Geburtstagszeile, drei Zeilen sind also nicht ueberall
+ * gleich hoch.
  */
 const LIST_ROWS_SHORT = 3;
 const LIST_ROWS_TALL = 5;
@@ -1690,9 +1733,33 @@ function onPhoneStage() {
   }
 }
 
+function isTallSize(size) {
+  return Number(String(size ?? '1x1').split('x')[1]) >= 2;
+}
+
 function listRowCap(size) {
   if (onPhoneStage()) return LIST_ROWS_SHORT;
-  return Number(String(size ?? '1x1').split('x')[1]) >= 2 ? LIST_ROWS_TALL : LIST_ROWS_SHORT;
+  return isTallSize(size) ? LIST_ROWS_TALL : LIST_ROWS_SHORT;
+}
+
+/* Die Zeilen der Kalenderliste: hoch die Stufe aus den Optionen (#1680), sonst
+ * die der Groesse. Auf der Telefon-Buehne bleibt es fuer die hohe Fassung bei
+ * der Stufe: dort steht die Kachel unter, nicht neben einer Nachbarin, und
+ * #1676 hat zugesagt, dass eine laengere Liste eine hoehere Kachel ist. */
+function calendarRowCap(size, limit) {
+  return isTallSize(size ?? '1x2') ? clampEventLimit(limit) : listRowCap(size);
+}
+
+/* Wie viele Rasterzeilen eine hohe Kalenderliste belegt, sagt dashboard.css
+ * (`[data-list-rows]` an den hohen Groessenklassen, ab 1024px). Das Attribut
+ * traegt nur die Stufe, nicht die Spanne - die Groessenklasse entscheidet, ob
+ * es greift. So liest `spansForSize` beim Probieren einer anderen Groesse
+ * auch die richtige Spanne: an 1x1 passt keine Regel. Die Vorgabe fuenf ist
+ * die normale hohe Kachel und braucht kein Attribut. */
+function calendarListRows(w) {
+  if (w.id !== 'calendar') return '';
+  const limit = clampEventLimit(w.options?.limit);
+  return limit === EVENT_LIMIT_DEFAULT ? '' : ` data-list-rows="${limit}"`;
 }
 
 /*
@@ -4815,7 +4882,7 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
       </fieldset>
       <fieldset class="form-group widget-options__group">
         <legend class="form-label">${t('dashboard.optionCalendarLimit')}</legend>
-        <p class="widget-options__hint">${esc(t('dashboard.optionCalendarLimitHint', { size: t('dashboard.widgetSizeWide') }))}</p>
+        <p class="widget-options__hint">${esc(t('dashboard.optionCalendarLimitHint', { size: t('dashboard.widgetSizeWide'), small: t('dashboard.widgetSizeTiny') }))}</p>
         ${EVENT_LIMIT_STEPS.map((step) => `
         <label class="widget-options__choice">
           <input type="radio" name="cal-limit" value="${step}" ${clampEventLimit(options.limit) === step ? 'checked' : ''}>
@@ -5078,7 +5145,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
 
 function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
   const widgetById = {
-    tasks: () => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount),
+    tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
@@ -5132,7 +5199,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       }
       if (!html) return '';
       return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
-                   data-widget-id="${esc(w.id)}" ${editing ? 'draggable="true"' : ''}>
+                   data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
         ${editing ? renderWidgetCustomizeControls(w, index, arr.length) : ''}
         ${html}
       </div>`;
@@ -8093,7 +8160,7 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

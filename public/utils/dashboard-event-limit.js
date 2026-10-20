@@ -1,8 +1,9 @@
 /* WIE VIELE TERMINE DIE KALENDER-KACHEL LISTET (#1680).
  *
- * Drei feste Stufen statt einer freien Zahl: die Kachel folgt ihrer Hoehe
- * nicht, und jede Zahl dazwischen waere eine weitere Fassung, die jemand
- * messen muesste. Fuenf ist der Auslieferungszustand und wird deshalb weder
+ * Drei feste Stufen statt einer freien Zahl: jede Zahl dazwischen waere eine
+ * weitere Fassung, die jemand messen muesste. Seit #2087 waehlt die Stufe die
+ * Hoehe der hohen Kachel (2, 3 oder 4 Rasterzeilen, dashboard.css); eine
+ * 1x1-Kachel zeigt die Zeilen ihrer Groesse wie jede Liste. Fuenf ist der Auslieferungszustand und wird deshalb weder
  * gespeichert noch mitgeschickt - dieselbe Regel wie `scope: 'all'`.
  *
  * EINE LISTE FUER BEIDE SEITEN. Die Route (`server/routes/dashboard.js`)

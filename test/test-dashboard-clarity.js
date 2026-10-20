@@ -92,6 +92,52 @@ test('Aufgaben: Badge nennt alle offenen, nicht die fuenf dringendsten', () => {
   assert.ok(!/tasksMore/.test(__test.renderUrgentTasks(tasks, 5)));
 });
 
+/* #2087: die Aufgaben-Kachel bekam keine Groesse und zeigte immer die fuenf
+ * dringendsten - auch als 1x1, wo jede andere Liste drei zeigt. */
+function onPhone(fn) {
+  const prev = globalThis.window;
+  globalThis.window = { ...(prev ?? {}), matchMedia: (query) => ({ matches: query === '(max-width: 639px)' }) };
+  try {
+    return fn();
+  } finally {
+    globalThis.window = prev;
+  }
+}
+const taskRows = (html) => (html.match(/class="task-item"/g) ?? []).length;
+
+test('Aufgaben: die Kachel folgt ihrer Groesse wie jede Liste (#2087)', () => {
+  const tasks = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, title: `Aufgabe ${i}`, priority: 'none', status: 'open' }));
+  const small = __test.renderUrgentTasks(tasks, 12, '1x1');
+  assert.equal(taskRows(small), __test.listRowCap('1x1'), '1x1 zeigt drei');
+  assert.equal(taskRows(small), 3);
+  assert.equal(badgeOf(small), '12', 'die Badge zaehlt weiter alle offenen');
+  assert.match(small, /dashboard\.tasksMore\{&quot;count&quot;:9\}/, 'die Fusszeile nennt, was nicht in DIESER Groesse steht');
+  const tall = __test.renderUrgentTasks(tasks, 12, '1x2');
+  assert.equal(taskRows(tall), 5);
+  assert.match(tall, /dashboard\.tasksMore\{&quot;count&quot;:7\}/);
+  assert.equal(taskRows(__test.renderUrgentTasks(tasks, 3, '1x1')), 3);
+  assert.ok(!/tasksMore/.test(__test.renderUrgentTasks(tasks.slice(0, 3), 3, '1x1')), 'drei von drei: keine Fusszeile');
+  assert.equal(taskRows(onPhone(() => __test.renderUrgentTasks(tasks, 12, '1x2'))), 3, 'die Telefon-Buehne zeigt drei');
+});
+
+test('Aufgaben: das Raster reicht der Kachel ihre Groesse durch (#2087)', async () => {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const tasks = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, title: `Aufgabe ${i}`, priority: 'none', status: 'open' }));
+  const layout = (size) => __test.renderDashboardLayout(
+    [{ id: 'tasks', visible: true, order: 0, size }], { urgentTasks: tasks, openTaskCount: 12 }, null, 'EUR',
+  );
+  const prev = globalThis.window;
+  globalThis.window = { yuvomi: { isModuleDisabled: () => false }, matchMedia: () => ({ matches: false }) };
+  setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+  try {
+    assert.equal(taskRows(layout('1x1')), 3);
+    assert.equal(taskRows(layout('1x2')), 5);
+  } finally {
+    clearPermissions();
+    globalThis.window = prev;
+  }
+});
+
 test('Kalender: keine Badge - "5" waere nur die Obergrenze der Liste', () => {
   // Die Liste ist nach vorn offen (bis 90 Tage) und bei fuenf geschnitten; eine
   // Gesamtzahl gibt es nicht. Eine Badge "5" stuende genau so lange da, wie
