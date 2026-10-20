@@ -183,12 +183,15 @@ test(`TZ=${ZONE}: der Countdown ueberspringt eine Ausnahme in beiden Schluesself
     '2035-10-05');
 });
 
-/** Die Haushaltstage aller Vorkommen, die der Kalender 2034-2045 zeigt. */
-function calendarDays(ev, household) {
+/** Die Haushaltstage aller Vorkommen, die der Kalender ab 2034 zeigt (bis `to`). */
+function calendarDays(ev, household, to = '2045-12-31') {
   const day = new Intl.DateTimeFormat('sv-SE', { timeZone: household, dateStyle: 'short' });
-  return expandRecurringEvents([{ id: 8, ...ev }], '2034-01-01', '2045-12-31', null,
+  return expandRecurringEvents([{ id: 8, ...ev }], '2034-01-01', to, null,
     { householdZone: household, maxIterations: 100000 })
-    .map((o) => (o.all_day ? o.start_datetime.slice(0, 10) : day.format(new Date(o.start_datetime))));
+    // Zonenlose Ziffern sind Wanduhr des Haushalts: ihr Tag ist der Datumsteil.
+    .map((o) => (/(?:Z|[+-]\d{2}:?\d{2})$/.test(o.start_datetime)
+      ? day.format(new Date(o.start_datetime))
+      : o.start_datetime.slice(0, 10)));
 }
 
 /** Der naechste Tag, den der Kalender zeigt (Haushaltstag), oder null. */
@@ -230,27 +233,39 @@ test(`TZ=${ZONE}: Countdown und Kalender nennen denselben Tag auch ohne COUNT`, 
   // erfinden: gegengerechnet gegen die Expansion ab DTSTART, mit und ohne
   // eigene Zone, ueber Monatsenden, Intervalle und Wochentagsregeln.
   const rules = [
-    'RRULE:FREQ=DAILY;INTERVAL=3',
+    'RRULE:FREQ=DAILY;INTERVAL=10',
     'RRULE:FREQ=WEEKLY;INTERVAL=2',
     'RRULE:FREQ=MONTHLY',
     'RRULE:FREQ=MONTHLY;INTERVAL=5',
     'RRULE:FREQ=MONTHLY;BYMONTHDAY=-1',
     'RRULE:FREQ=MONTHLY;BYMONTHDAY=20',
     'RRULE:FREQ=MONTHLY;BYDAY=2MO',
+    'RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR',
     'RRULE:FREQ=YEARLY;INTERVAL=2',
     'RRULE:FREQ=WEEKLY;BYDAY=MO,TH',
-    'RRULE:FREQ=DAILY;UNTIL=20400101T065959Z',
-    'RRULE:FREQ=MONTHLY;UNTIL=20380301',
+    'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,SA',
+    'RRULE:FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR',
+    'RRULE:FREQ=WEEKLY;UNTIL=20380101T065959Z',
+    'RRULE:FREQ=MONTHLY;UNTIL=20370301',
   ];
   const starts = ['2035-01-10T05:30', '2035-01-31T00:30', '2035-02-01T08:30'];
+  const todays = ['2035-01-01', '2035-03-15', '2035-10-20', '2036-03-01', '2037-02-28', '2038-03-01'];
+  const WINDOW_END = '2038-12-31';
   for (const rule of rules) {
     for (const start of starts) {
       for (const tzid of [LA, null]) {
         const ev = { all_day: 0, tzid, start_datetime: start, recurrence_rule: rule };
-        const days = calendarDays(ev, BERLIN);
-        for (const today of TODAYS) {
-          assert.equal(nextEventDate(ev, today, null, { tz: BERLIN }), calendarNextDay(ev, today, BERLIN, days),
-            `${start} ${rule} tzid ${tzid} heute ${today}`);
+        const days = calendarDays(ev, BERLIN, WINDOW_END);
+        for (const today of todays) {
+          const got = nextEventDate(ev, today, null, { tz: BERLIN });
+          const want = calendarNextDay(ev, today, BERLIN, days);
+          // Hinter dem Fenster der Gegenrechnung weiss der Kalender nichts; dort
+          // darf der Countdown nur einen Tag nennen, der wirklich dahinter liegt.
+          if (want === null && got !== null) {
+            assert.ok(got > WINDOW_END, `${start} ${rule} tzid ${tzid} heute ${today}: ${got}`);
+            continue;
+          }
+          assert.equal(got, want, `${start} ${rule} tzid ${tzid} heute ${today}`);
         }
       }
     }

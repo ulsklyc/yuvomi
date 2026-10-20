@@ -3,7 +3,7 @@
  * Zweck: Die als Countdown markierten Termine und Aufgaben zu EINER nach
  *        Nähe sortierten Liste zusammenführen - die Datenseite des
  *        Übersichts-Widgets.
- * Abhängigkeiten: server/services/recurrence.js, server/services/visibility.js
+ * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js
  *
  * WARUM ZWEI QUELLEN UND NICHT EINE TABELLE. Der Thread zu #647 ist genau an
  * dieser Frage entlanggegangen und bei zwei Quellen gelandet: @Kyrodan zählt bis
@@ -38,8 +38,7 @@
 
 import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js';
 
-import { hasAnyOccurrence, nextOccurrenceAfter, seriesStartFor } from './recurrence.js';
-import { exceptionsInclude, loadEventExceptions, occurrenceClock } from './calendar-events.js';
+import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
@@ -65,10 +64,11 @@ const DEFAULT_LIMIT = 5;
  */
 export const DEFAULT_OVERDUE_GRACE_DAYS = 7;
 
-// Sicherheitsgrenze beim Aufholen einer Serie über ausgenommene Vorkommen
-// (EXDATE, #489). Eine Serie, die mehr als das an aufeinanderfolgenden
-// Ausnahmen trägt, hat kein nächstes Vorkommen, das dieses Widget zeigen müsste.
-const MAX_EXCEPTION_SKIPS = 50;
+// Das Ende des Fensters, in dem die Kachel das naechste Vorkommen sucht: keine
+// fachliche Grenze, sondern der letzte Tag, der als YYYY-MM-DD noch richtig
+// sortiert (die Expansion haengt zwei Tage an). Die Serie endet vorher an ihrer
+// Regel oder an der Iterationsgrenze der Expansion (#1998).
+const LAST_DAY = '9999-12-29';
 
 /**
  * Ganze Tage zwischen zwei Datumsschlüsseln (YYYY-MM-DD).
@@ -150,89 +150,58 @@ export function nextEventDate(event, todayKey, exceptions = null, { graceDays = 
     return floor && startKey >= floor ? startKey : null;
   }
 
-  /* `seriesStart` SETZT COUNT DURCH (#877). Ohne die Angabe zaehlte eine Serie
-   * mit "endet nach N Malen" endlos weiter: `nextOccurrence()` ist zustandslos
-   * und weiss nicht, das wievielte Vorkommen es liefert. Gemeldet wurde das als
-   * "abgelaufene Termine bleiben unbegrenzt stehen" - und es war sogar der
-   * schlimmere Fall, weil die Kachel dazu ein Datum in der ZUKUNFT nannte.
+  /* DER COUNTDOWN FRAGT DIE EXPANSION DES KALENDERS (#1998).
    *
-   * Die Kalender-Oberflaeche bietet "endet nach N Malen" ausdruecklich an
-   * (`allowCount` in pages/calendar.js), das ist also keine Sonderform. */
-  // DER START IST NUR DANN DER NAECHSTE TERMIN, WENN ER AUF DER REGEL LIEGT.
-  // Ein Termin am 15. mit "am letzten Tag des Monats" hat am 15. kein
-  // Vorkommen - der Countdown zeigte es trotzdem an, weil dieser Zweig das
-  // Startdatum ungeprueft durchreicht, sobald es in der Zukunft liegt. Das
-  // gespeicherte Datum bleibt dabei unangetastet - gefragt wird nur, welcher
-  // Tag der erste ist.
-  //
-  // OHNE TREFFER GIBT `seriesStartFor` DAS DATUM ZURUECK, DAS ES BEKOMMEN HAT.
-  // Das ist der richtige Umgang fuer eine Funktion, die nichts erfinden soll -
-  // hier waere es aber genau der Fehler von oben: bei
-  // `BYMONTHDAY=-1;UNTIL=20260120` ab dem 15. Januar gibt es kein Vorkommen,
-  // und der unveraenderte 15. saehe aus wie einer. "Nicht bewegt" und "nichts
-  // gefunden" sind vom Rueckgabewert her nicht zu unterscheiden, deshalb wird
-  // vorher gefragt.
-  // DIESELBE ZONENFRAGE WIE IN DER EXPANSION, SONST WIDERSPRECHEN SIE SICH.
-  // Ein Termin mit eigener Zone kann in UTC an einem anderen Kalendertag liegen
-  // als vor Ort: 31. Januar 20:00 in New York ist gespeichert als 1. Februar
-  // 01:00 UTC. Die Monatsletzten-Pruefung sah dort den Ersten, fand kein
-  // Vorkommen und gab `null` zurueck - der Kalender zeigte den Termin, die
-  // Kachel verschwieg ihn. `expandRecurringEvents` setzt die Pruefung in genau
-  // diesem Fall aus (`zonenUnsicher`); hier gilt dieselbe Ruecknahme, sonst
-  // beantworten zwei Stellen dieselbe Frage verschieden.
-  //
-  //
-  // DIE KACHEL ZAEHLT AUF DER UHR DER EXPANSION (#1998, #2034). Bis hierher
-  // lief sie auf Haushaltstagen, die Expansion aber auf Schleifentagen der
-  // Serienzone, und die Ausnahmen trugen deren Schluessel: eine Serie aus Los
-  // Angeles um 23:30 in einem Berliner Haushalt sprang die Regel auf den
-  // falschen Tagen weiter, und eine abgesagte Instanz blieb als Countdown
-  // stehen, waehrend der Kalender sie ausblendete. Jetzt laeuft die Regel auf
-  // denselben Schleifentagen wie in `expandRecurringEvents` (`occurrenceClock`),
-  // eine Ausnahme trifft ueber beide Schluesselformen, und erst das Ergebnis
-  // wird zum Haushaltstag seines Starts. Zonenlose Ziffern liest die Uhr in der
-  // Haushaltszone, nicht in der des Prozesses (#1993).
-  let clock;
+   * Bis hierher rechnete die Kachel die Serie selbst nach: Startpruefung
+   * (`hasAnyOccurrence`, `seriesStartFor`, #960), Aufholen ueber
+   * `nextOccurrenceAfter` (#877), Ausnahmen (#489) und seit #2034 die Uhr der
+   * Expansion. Jede dieser Stellen war eine zweite Antwort auf eine Frage, die
+   * `expandRecurringEvents` schon beantwortet - und an einer zonierten Serie
+   * fiel das auseinander: ein UNTIL mit Uhrzeit wurde nur als Tag gelesen, ein
+   * monatliches COUNT nach dem 28. lief ueber sein Ende hinaus
+   * (`nextOccurrenceAfter` kennt dort keine COUNT-Grenze), und eine
+   * Wochentagsregel nannte einen DTSTART, der gar nicht auf ihr liegt. Der
+   * Kalender zeigte nichts mehr, die Kachel zaehlte weiter.
+   *
+   * Jetzt rollt die Kachel die Serie mit derselben Expansion aus wie der
+   * Kalender: COUNT, UNTIL, EXDATE, Monatsletzter und Zone gelten dort per
+   * Konstruktion. Gesucht wird das erste Vorkommen, dessen Haushaltstag heute
+   * oder spaeter ist (`occurrenceFilter`, `maxOccurrencesPerSeries`).
+   *
+   * DIE ARBEIT BEGINNT NAHE AN HEUTE, nicht an DTSTART (`resumeNear`): ohne
+   * COUNT haengt kein Vorkommen an den frueheren, also setzt die Schleife ein
+   * paar Schleifentage vor heute ein. Zwei Zonen liegen hoechstens gut zwei
+   * Kalendertage auseinander (-12 bis +14); drei Tage Vorlauf decken jedes
+   * Vorkommen ab, das im Haushalt heute oder spaeter liegt. Mit COUNT zaehlt
+   * die Expansion ab DTSTART und ist durch COUNT selbst begrenzt.
+   *
+   * KEINE FESTE OBERGRENZE: das Fenster reicht bis ans Ende des Kalenders, die
+   * Serie endet an ihrer eigenen Regel oder an der Iterationsgrenze der
+   * Expansion. Ein Vorkommen in 40 Jahren ist trotzdem ein Vorkommen. */
+  const floor = shiftKey(todayKey, -3) ?? todayKey;
+  const householdDayOf = (start) => {
+    const raw = String(start ?? '');
+    if (event.all_day || raw.length <= 10 || !hasExplicitZone(raw)) return raw.slice(0, 10);
+    return utcToWall(raw, tz)?.date ?? raw.slice(0, 10);
+  };
+  let next;
   try {
-    clock = occurrenceClock(event, tz);
+    [next] = expandRecurringEvents(
+      [event], floor, LAST_DAY, new Map([[event.id, exceptions]]),
+      {
+        householdZone: tz,
+        maxIterations: MAX_EXPANSION_ITERATIONS,
+        maxOccurrencesPerSeries: 1,
+        resumeNear: floor,
+        occurrenceFilter: (instance) => householdDayOf(instance.start_datetime) >= todayKey,
+      },
+    );
   } catch {
+    // Eine Zeile, deren Start sich nicht lesen laesst, hat kein Vorkommen,
+    // das diese Kachel nennen koennte - lieber nichts als ein falscher Tag.
     return null;
   }
-  const rule = event.recurrence_rule;
-  const seriesStart = clock.seriesStart;
-  const byday = { utcDiffersFromLocal: clock.utcDiffersFromLocal };
-  /** Der Haushaltstag eines Vorkommens. */
-  const householdDayOf = (tag) => {
-    const start = String(clock.instantFor(tag));
-    return hasExplicitZone(start) ? (utcToWall(start, tz)?.date ?? tag) : tag;
-  };
-  const excluded = (tag) => exceptionsInclude(exceptions, clock.keyFor(tag), clock.legacyKeyFor(tag));
-
-  if (!hasAnyOccurrence(seriesStart, rule, byday)) return null;
-  const ersterTreffer = seriesStartFor(seriesStart, rule, byday);
-  // Zwei Zonen liegen hoechstens gut zwei Kalendertage auseinander (-12 bis
-  // +14): drei Schleifentage vor heute decken jedes Vorkommen ab, das im
-  // Haushalt heute oder spaeter liegt. Was davor faellt, ueberspringt die
-  // Schleife unten, ohne es als Ausnahme zu zaehlen.
-  const floor = shiftKey(todayKey, -3) ?? todayKey;
-  let candidate = ersterTreffer >= floor
-    ? ersterTreffer
-    : nextOccurrenceAfter(ersterTreffer, rule, floor, { seriesStart });
-
-  let skips = 0;
-  while (candidate && (householdDayOf(candidate) < todayKey || excluded(candidate))) {
-    if (excluded(candidate) && skips++ >= MAX_EXCEPTION_SKIPS) break;
-    const next = nextOccurrenceAfter(candidate, rule, candidate, { seriesStart });
-    if (!next || next <= candidate) { candidate = null; break; }
-    candidate = next;
-  }
-  // Ein Datum in der Vergangenheit ist kein Countdown, sondern ein falscher -
-  // lieber nichts zeigen. Der haeufigste Weg hierher war frueher die
-  // Schleifengrenze beim Aufholen (eine taegliche Serie ab 2023 gab auf);
-  // seit #877 springt das Aufholen, statt zu zaehlen.
-  if (!candidate || excluded(candidate)) return null;
-  const day = householdDayOf(candidate);
-  return day >= todayKey ? day : null;
+  return next ? householdDayOf(next.start_datetime) : null;
 }
 
 /**

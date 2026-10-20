@@ -487,6 +487,53 @@ function fastForward(fromKey, parsed, notBeforeKey) {
 }
 
 /**
+ * Ein Tag, an dem die Expansion statt an DTSTART einsetzen darf (#1998) - nie
+ * hinter `notBeforeKey`, und so gewaehlt, dass die Schleife von dort genau die
+ * Vorkommen ab `notBeforeKey` erzeugt, die sie ab DTSTART erzeugt haette.
+ *
+ * DER UNTERSCHIED ZU `fastForward` SIND DIE WOCHENTAGSREGELN. Dort wird nicht
+ * gesprungen, weil `nextOccurrenceAfter` danach nur noch auf den Treffer
+ * schaut. Die Expansion dagegen laeuft mit `nextOccurrence` weiter, und das
+ * rechnet bei BYDAY nur aus dem Wochentag (WEEKLY, DAILY) bzw. aus Monat und
+ * Tag (ordinal) des Ausgangstags. Ein Sprung um ganze Perioden der Regel -
+ * INTERVAL Wochen, bei DAILY;BYDAY eine Woche, INTERVAL Monate - landet damit
+ * auf einem Tag, von dem aus die Folge dieselbe ist wie ab DTSTART, nur
+ * verschoben. Monatlich wie bei `fastForward` nur bis zum 28., sonst rollt der
+ * Monat ueber.
+ *
+ * Was vor `notBeforeKey` liegt, kann dabei anders aussehen (der Sprungtag
+ * selbst ist eventuell kein Vorkommen der Regel) - der Aufrufer wirft es weg.
+ * COUNT kennt diese Funktion nicht: wer zaehlen muss, darf nicht springen.
+ *
+ * @returns {string} YYYY-MM-DD, nie hinter `notBeforeKey`
+ */
+function resumeKeyFor(fromKey, parsed, notBeforeKey) {
+  const { freq, interval, byday, bydayOrdinal } = parsed;
+  if (!byday.length && !bydayOrdinal) return fastForward(fromKey, parsed, notBeforeKey);
+
+  const from = new Date(`${fromKey}T00:00:00Z`);
+  const to   = new Date(`${notBeforeKey}T00:00:00Z`);
+  if (isNaN(from.getTime()) || isNaN(to.getTime()) || to <= from) return fromKey;
+
+  const jumped = new Date(from);
+  if (byday.length && (freq === 'WEEKLY' || freq === 'DAILY')) {
+    const period = 7 * (freq === 'WEEKLY' ? interval : 1);
+    const steps = Math.floor(Math.floor((to - from) / 86400000) / period) - 1;
+    if (!Number.isFinite(steps) || steps <= 0) return fromKey;
+    jumped.setUTCDate(jumped.getUTCDate() + steps * period);
+  } else if (bydayOrdinal && freq === 'MONTHLY' && from.getUTCDate() <= 28) {
+    const months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+    const steps = Math.floor(months / interval) - 1;
+    if (!Number.isFinite(steps) || steps <= 0) return fromKey;
+    jumped.setUTCMonth(jumped.getUTCMonth() + steps * interval);
+  } else {
+    return fromKey;
+  }
+  const key = jumped.toISOString().slice(0, 10);
+  return key > notBeforeKey || key < fromKey ? fromKey : key;
+}
+
+/**
  * Wie nextOccurrence, überspringt aber alle Vorkommen vor `notBeforeStr`, bis das
  * erste Vorkommen >= notBeforeStr gefunden ist (Aufholen übersprungener Serien).
  * Gibt null zurück, wenn die Serie (UNTIL) vorher endet oder kein Basisdatum existiert.
@@ -844,5 +891,5 @@ function seriesStartFor(dateKey, rrule, { utcDiffersFromLocal = false } = {}) {
 
 export {
   parseRRule, nextOccurrence, nextOccurrenceAfter, nextDueAfterCompletion, matchesRRuleByday,
-  seriesStartFor, hasAnyOccurrence, endsBeforeStart, untilInstantMs,
+  seriesStartFor, hasAnyOccurrence, endsBeforeStart, untilInstantMs, resumeKeyFor,
 };

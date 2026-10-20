@@ -158,6 +158,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A series from Los Angeles in a Berlin household counted down to an occurrence the calendar had
   already hidden, and could name the wrong day. The tile now counts on the same occurrences as the
   calendar and shows the day it falls on in your household.
+- **The countdown tile stops when a series in another time zone ends (#1998).** For an imported
+  series with its own time zone, the tile could keep counting past the series' end: an end date
+  with a time of day, or "ends after N times" on a monthly series anchored after the 28th, still
+  produced a next date the calendar no longer showed. The tile now takes its next date from the
+  same series calculation as the calendar, so both always name the same day, and a long-running
+  series is still found without counting through every past occurrence.
 - **Search shows the right next date for a calendar series in another time zone (#1999).** A
   series kept in its own time zone, such as an imported one from a calendar in Los Angeles, was
   checked against your household's today on its own calendar day. Near midnight that is a

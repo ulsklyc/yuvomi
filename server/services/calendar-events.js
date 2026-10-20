@@ -4,7 +4,7 @@
  * Abhängigkeiten: server/services/recurrence.js
  */
 
-import { nextOccurrence, parseRRule, matchesRRuleByday, untilInstantMs } from './recurrence.js';
+import { nextOccurrence, parseRRule, matchesRRuleByday, resumeKeyFor, untilInstantMs } from './recurrence.js';
 import {
   hasExplicitZone, householdTimeZone, localToUTCOccurrence, shiftDateKey,
   storedToInstantIso, utcToWall,
@@ -376,6 +376,8 @@ export function seriesReadingZone(database, event) {
  *        Ohne sie bleibt das Fenster in Schleifentagen; so fragt die
  *        Identitaetssuche der Einzelvorkommen, deren Fenster in
  *        Schluesseltagen steht.
+ *        resumeNear: ein Schleifentag, nahe an dem die Schleife einsetzen darf,
+ *        statt ab DTSTART zu zaehlen (#1998) - nur bei einer Regel ohne COUNT.
  * @returns {object[]}  Expandiertes, sortiertes Array
  */
 export function expandRecurringEvents(
@@ -386,7 +388,7 @@ export function expandRecurringEvents(
   {
     includeRecurrenceIdentity = false, maxIterations = DEFAULT_EXPANSION_ITERATIONS,
     maxOccurrencesPerSeries = null, occurrenceFilter = null,
-    householdZone = null, windowZone = null,
+    householdZone = null, windowZone = null, resumeNear = null,
   } = {},
 ) {
   const result = [];
@@ -464,6 +466,31 @@ export function expandRecurringEvents(
     const untilMs    = untilInstantMs(parsedRule, { tzid: event.tzid, toUTC: localToUTCOccurrence });
     let   occurrence = 0;
     let accepted = 0;
+
+    /* NAHE AN `resumeNear` EINSETZEN, WO NICHTS DAVOR ZAEHLT (#1998).
+     *
+     * Wer nur das naechste Vorkommen ab heute braucht (Countdown), muesste
+     * sonst jede Serie ab DTSTART durchzaehlen - eine taegliche seit Jahren
+     * sind tausende Schritte, und die Iterationsgrenze schnitte eine alte
+     * Serie ganz ab. Ohne COUNT haengt kein Vorkommen an denen davor: UNTIL
+     * ist ein fester Punkt, EXDATE ein fester Schluessel. Also springt die
+     * Schleife um ganze Perioden der Regel (`resumeKeyFor` in recurrence.js,
+     * bewusst einen Schritt zu kurz) und laeuft von dort mit ihren eigenen
+     * Schritten weiter.
+     *
+     * MIT COUNT WIRD NICHT GESPRUNGEN: das wievielte Vorkommen eines ist,
+     * weiss nur, wer ab DTSTART zaehlt. Die Arbeit ist dort durch COUNT selbst
+     * begrenzt. Ebenso nicht hinter ein Tages-UNTIL: dort ist die Serie vorbei,
+     * und die Schleife soll das selbst feststellen. Der Zaehler steht danach
+     * auf eins, damit kein spaeteres Vorkommen als Serienanfang gilt. */
+    if (resumeNear && maxCount === null && parsedRule && resumeNear > currentDate) {
+      const sprung = resumeKeyFor(currentDate, parsedRule, resumeNear);
+      const hinterEnde = parsedRule.until && new Date(`${sprung}T00:00:00Z`) > parsedRule.until;
+      if (sprung > currentDate && !hinterEnde) {
+        currentDate = sprung;
+        occurrence = 1;
+      }
+    }
 
     while (currentDate <= schleifenEnde && iterations < iterationLimit) {
       iterations++;
