@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Αυτή η επίσκεψη δεν υπάρχει πια.",
         "errorTaskGone": "Αυτή η εργασία δεν υπάρχει πια.",
         "errorAlreadyCheckedOut": "Αυτός ο βοηθός έχει ήδη αναχωρήσει.",
-        "errorAlreadyCheckedIn": "Αυτός ο βοηθός έχει ήδη καταγράψει άφιξη."
+        "errorAlreadyCheckedIn": "Αυτός ο βοηθός έχει ήδη καταγράψει άφιξη.",
+        "allVisitsInReport": "Όλες οι επισκέψεις στην αναφορά"
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

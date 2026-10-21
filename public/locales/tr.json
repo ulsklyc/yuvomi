@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Bu ziyaret artık yok.",
         "errorTaskGone": "Bu görev artık yok.",
         "errorAlreadyCheckedOut": "Bu yardımcının çıkışı zaten yapıldı.",
-        "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı."
+        "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı.",
+        "allVisitsInReport": "Tüm ziyaretler raporda"
     },
     "userMultiSelect": {
         "moreUsers": "daha",

@@ -4138,7 +4138,8 @@
         "errorVisitGone": "Kunjungan ini sudah tidak ada.",
         "errorTaskGone": "Tugas ini sudah tidak ada.",
         "errorAlreadyCheckedOut": "Asisten rumah tangga ini sudah check-out.",
-        "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in."
+        "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in.",
+        "allVisitsInReport": "Semua kunjungan di laporan"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",

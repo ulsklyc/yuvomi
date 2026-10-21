@@ -4138,7 +4138,8 @@
         "errorVisitGone": "Wala na ang pagbisitang ito.",
         "errorTaskGone": "Wala na ang gawaing ito.",
         "errorAlreadyCheckedOut": "Naka-check out na ang katulong na ito.",
-        "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito."
+        "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito.",
+        "allVisitsInReport": "Lahat ng pagbisita sa ulat"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

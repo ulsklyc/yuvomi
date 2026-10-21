@@ -4134,7 +4134,8 @@
         "errorVisitGone": "यह विज़िट अब मौजूद नहीं है।",
         "errorTaskGone": "यह कार्य अब मौजूद नहीं है।",
         "errorAlreadyCheckedOut": "यह सहायक पहले ही चेक-आउट कर चुका है।",
-        "errorAlreadyCheckedIn": "यह सहायक पहले ही चेक-इन कर चुका है।"
+        "errorAlreadyCheckedIn": "यह सहायक पहले ही चेक-इन कर चुका है।",
+        "allVisitsInReport": "रिपोर्ट में सभी यात्राएं"
     },
     "userMultiSelect": {
         "moreUsers": "और",

@@ -4138,7 +4138,8 @@
         "errorVisitGone": "이 방문은 더 이상 없습니다.",
         "errorTaskGone": "이 작업은 더 이상 없습니다.",
         "errorAlreadyCheckedOut": "이 가사 도우미는 이미 체크아웃했습니다.",
-        "errorAlreadyCheckedIn": "이 가사 도우미는 이미 체크인했습니다."
+        "errorAlreadyCheckedIn": "이 가사 도우미는 이미 체크인했습니다.",
+        "allVisitsInReport": "보고서에서 모든 방문 보기"
     },
     "splitExpenses": {
         "title": "공동 지출",

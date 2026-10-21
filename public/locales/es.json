@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Este servicio ya no existe.",
         "errorTaskGone": "Esta tarea ya no existe.",
         "errorAlreadyCheckedOut": "Esta persona de limpieza ya registró su salida.",
-        "errorAlreadyCheckedIn": "Esta persona de limpieza ya registró su entrada."
+        "errorAlreadyCheckedIn": "Esta persona de limpieza ya registró su entrada.",
+        "allVisitsInReport": "Todas las visitas en el informe"
     },
     "userMultiSelect": {
         "moreUsers": "más",

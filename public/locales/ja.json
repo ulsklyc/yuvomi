@@ -4134,7 +4134,8 @@
         "errorVisitGone": "この訪問はもう存在しません。",
         "errorTaskGone": "このタスクはもう存在しません。",
         "errorAlreadyCheckedOut": "このハウスキーパーはすでにチェックアウトしています。",
-        "errorAlreadyCheckedIn": "このハウスキーパーはすでにチェックインしています。"
+        "errorAlreadyCheckedIn": "このハウスキーパーはすでにチェックインしています。",
+        "allVisitsInReport": "すべての訪問をレポートで見る"
     },
     "userMultiSelect": {
         "moreUsers": "他",

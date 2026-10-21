@@ -4134,7 +4134,8 @@
         "errorVisitGone": "This visit no longer exists.",
         "errorTaskGone": "This task no longer exists.",
         "errorAlreadyCheckedOut": "This housekeeper is already checked out.",
-        "errorAlreadyCheckedIn": "This housekeeper is already checked in."
+        "errorAlreadyCheckedIn": "This housekeeper is already checked in.",
+        "allVisitsInReport": "All visits in the report"
     },
     "userMultiSelect": {
         "moreUsers": "more",

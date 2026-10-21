@@ -4477,7 +4477,8 @@
         "errorVisitGone": "هذه الزيارة لم تعد موجودة.",
         "errorTaskGone": "هذه المهمة لم تعد موجودة.",
         "errorAlreadyCheckedOut": "تم تسجيل خروج عامل التدبير المنزلي هذا بالفعل.",
-        "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل."
+        "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل.",
+        "allVisitsInReport": "كل الزيارات في التقرير"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Cette intervention n’existe plus.",
         "errorTaskGone": "Cette tâche n’existe plus.",
         "errorAlreadyCheckedOut": "Le départ de cette aide ménagère est déjà enregistré.",
-        "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée."
+        "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée.",
+        "allVisitsInReport": "Toutes les visites dans le rapport"
     },
     "userMultiSelect": {
         "moreUsers": "autres",

@@ -617,6 +617,30 @@ test('Uebersicht: die letzten Besuche stehen vor dem Zahlungsdiagramm', () => {
   assert.ok(liste < diagramm, 'mobil begannen die Besuche bei y760 hinter dem 252px-Diagramm');
 });
 
+// R21 S9b (Critique a2, "Besuche = Berichte"): die Uebersicht zeigte die fuenf
+// juengsten Besuche als dieselben Zeilen wie der Bericht, ohne ihn zu nennen.
+// Gibt es mehr, fuehrt eine letzte Zeile zum Bericht; bei fuenf oder weniger
+// gibt es nichts weiter zu zeigen.
+test('Uebersicht: die letzten Besuche fuehren zum Bericht, wenn es mehr gibt', () => {
+  const state = hk.state();
+  const html = (n) => {
+    state.tab = 'dashboard';
+    state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: 45, payment_schedule: 'weekly' }];
+    state.dashboard = { visits_this_month: n, last_visit: null, pending_tasks: 0, finished_tasks_this_month: 0, monthly_payments: [], pending_payments: 0 };
+    state.recentVisits = Array.from({ length: n }, (_, i) => asAdmin({ ...openVisit, id: 100 + i, worker_name: 'Maria Silva' }));
+    const content = fakeContainer();
+    hk.renderDashboard(content);
+    return content.html;
+  };
+  const neun = html(9);
+  assert.equal(visitRows(neun).length, 5, 'die Uebersicht zeigt die fuenf juengsten');
+  assert.match(neun, /<button type="button" class="housekeeping-visits-more" data-show-reports>\s*<span>housekeeping\.allVisitsInReport<\/span>/,
+    'und eine Zeile zum Bericht');
+  assert.doesNotMatch(html(5), /data-show-reports/, 'bei fuenf Besuchen gibt es nichts weiter zu zeigen');
+  const src = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.match(src, /querySelector\('\.housekeeping-tab\[data-tab-id="reports"\]'\)\?\.click\(\)/, 'die Zeile waehlt den Reiter Berichte');
+});
+
 // R20 (Re-Critique 2026-10-17 a5 P2-5): das Zahlungsdiagramm las sich wie
 // sechs Fortschrittskapseln ohne Legende, mit viermal "0,00 €" ueber leeren
 // Monaten und "380,00 €", das bei 390px aus seiner Spalte lief.

@@ -4362,7 +4362,8 @@
         "errorVisitGone": "Цього відвідування більше немає.",
         "errorTaskGone": "Цього завдання більше немає.",
         "errorAlreadyCheckedOut": "Виїзд цього працівника вже записано.",
-        "errorAlreadyCheckedIn": "Прихід цього працівника вже записано."
+        "errorAlreadyCheckedIn": "Прихід цього працівника вже записано.",
+        "allVisitsInReport": "Усі відвідування у звіті"
     },
     "userMultiSelect": {
         "moreUsers": "інші",

@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Lượt đến này không còn nữa.",
         "errorTaskGone": "Nhiệm vụ này không còn nữa.",
         "errorAlreadyCheckedOut": "Người dọn dẹp này đã trả ca.",
-        "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca."
+        "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca.",
+        "allVisitsInReport": "Tất cả lượt đến trong báo cáo"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",

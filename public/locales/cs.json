@@ -3759,7 +3759,8 @@
         "errorVisitGone": "Tato návštěva už neexistuje.",
         "errorTaskGone": "Tento úkol už neexistuje.",
         "errorAlreadyCheckedOut": "Tento pracovník je už odhlášen.",
-        "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen."
+        "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen.",
+        "allVisitsInReport": "Všechny návštěvy v hlášení"
     },
     "splitExpenses": {
         "title": "Společné výdaje",

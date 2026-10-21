@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Det här besöket finns inte längre.",
         "errorTaskGone": "Den här uppgiften finns inte längre.",
         "errorAlreadyCheckedOut": "Den här städaren är redan utcheckad.",
-        "errorAlreadyCheckedIn": "Den här städaren är redan incheckad."
+        "errorAlreadyCheckedIn": "Den här städaren är redan incheckad.",
+        "allVisitsInReport": "Alla besök i rapporten"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

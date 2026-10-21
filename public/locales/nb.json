@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Dette besøket finnes ikke lenger.",
         "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
         "errorAlreadyCheckedOut": "Denne vaskehjelpen er allerede sjekket ut.",
-        "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn."
+        "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn.",
+        "allVisitsInReport": "Alle besøk i rapporten"
     },
     "userMultiSelect": {
         "moreUsers": "mer",

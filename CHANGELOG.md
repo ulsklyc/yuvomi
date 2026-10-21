@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The household help overview leads to the full report.** The overview lists the five latest
+  visits, the same rows the Reports tab shows for the month; when there are more, a last row "All
+  visits in the report" takes you there.
+
 - **A selected row speaks in its module's colour.** In list-and-detail pages the selected row was
   violet while the active filter chip above it carried the module's colour; both now use the module's
   colour. Purchase prices in the inventory read like every other amount, in semibold.

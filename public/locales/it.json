@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Questa visita non esiste più.",
         "errorTaskGone": "Questa attività non esiste più.",
         "errorAlreadyCheckedOut": "Questo collaboratore domestico ha già registrato l’uscita.",
-        "errorAlreadyCheckedIn": "Questo collaboratore domestico ha già registrato l’entrata."
+        "errorAlreadyCheckedIn": "Questo collaboratore domestico ha già registrato l’entrata.",
+        "allVisitsInReport": "Tutte le visite nel resoconto"
     },
     "userMultiSelect": {
         "moreUsers": "altri",

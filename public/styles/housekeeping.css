@@ -957,6 +957,43 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* "Alle Besuche im Bericht" (R21 S9b): die letzte Zeile der Karte fuehrt zum
+ * Monatsbericht - eine Navigationszeile wie "Alle anzeigen" bei Apple, ueber
+ * die volle Kartenbreite, mit Haarlinie und Pfeil, in der Tinte des Moduls. */
+.housekeeping-visits-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  inline-size: calc(100% + 2 * var(--space-4));
+  min-height: var(--target-base);
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: none;
+  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.housekeeping-visits-more:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.housekeeping-visits-more:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.housekeeping-visits-more svg {
+  color: var(--color-text-tertiary);
+}
+
 /* DIE DRITTE FASSUNG DERSELBEN ABLEGEFLÄCHE - jetzt nur noch ihr Maß.
  *
  * document-attach.css erzählt im Kopf seines Dropzone-Blocks, dass diese

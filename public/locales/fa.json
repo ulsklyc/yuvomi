@@ -4138,7 +4138,8 @@
         "errorVisitGone": "این بازدید دیگر وجود ندارد.",
         "errorTaskGone": "این کار دیگر وجود ندارد.",
         "errorAlreadyCheckedOut": "خروج این خدمتکار خانه قبلاً ثبت شده است.",
-        "errorAlreadyCheckedIn": "ورود این خدمتکار خانه قبلاً ثبت شده است."
+        "errorAlreadyCheckedIn": "ورود این خدمتکار خانه قبلاً ثبت شده است.",
+        "allVisitsInReport": "همهٔ بازدیدها در گزارش"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

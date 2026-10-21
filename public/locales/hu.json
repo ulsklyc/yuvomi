@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Ez a látogatás már nem létezik.",
         "errorTaskGone": "Ez a feladat már nem létezik.",
         "errorAlreadyCheckedOut": "Ez a háztartási alkalmazott már kijelentkezett.",
-        "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett."
+        "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett.",
+        "allVisitsInReport": "Minden látogatás a jelentésben"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",

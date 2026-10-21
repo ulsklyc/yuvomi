@@ -787,6 +787,16 @@ function renderDashboard(content) {
       <div class="housekeeping-staff-log-list">
         ${recentRows || `<p class="housekeeping-muted">${esc(t('housekeeping.noVisits'))}</p>`}
       </div>
+      ${/* DIE LETZTEN BESUCHE SIND DER ANFANG DES BERICHTS (R21 S9b, Critique
+            a2 "Besuche = Berichte"): dieselben Zeilen standen auf beiden
+            Reitern, ohne dass einer den anderen nannte. Die Uebersicht zeigt
+            die fuenf juengsten und fuehrt, wenn es mehr gibt, mit einer Zeile
+            zum vollstaendigen Monatsbericht - wie "Alle anzeigen" bei Apple. */ ''}
+      ${(state.recentVisits || []).length > recentVisits.length ? `
+      <button type="button" class="housekeeping-visits-more" data-show-reports>
+        <span>${esc(t('housekeeping.allVisitsInReport'))}</span>
+        <i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
+      </button>` : ''}
       </div>
     </section>
     ${amountsHidden(data.monthly_payments) ? '' : `<section class="housekeeping-section">
@@ -808,6 +818,9 @@ function renderDashboard(content) {
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
   wireMetricGlance(content, 'housekeeping-glance-more', (expanded) => { _metricsExpanded = expanded; });
+  content.querySelector('[data-show-reports]')?.addEventListener('click', () => {
+    (content.closest('.housekeeping-page') || document).querySelector('.housekeeping-tab[data-tab-id="reports"]')?.click();
+  });
   // `if (!readOnly())` statt `return`: die lesende Verdrahtung (Bericht
   // oeffnen) steht dahinter und muss bleiben - dieselbe Form wie in health.js.
   if (!readOnly()) {

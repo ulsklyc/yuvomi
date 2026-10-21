@@ -4134,7 +4134,8 @@
         "errorVisitGone": "该上门记录已不存在。",
         "errorTaskGone": "该任务已不存在。",
         "errorAlreadyCheckedOut": "该家政人员已签退。",
-        "errorAlreadyCheckedIn": "该家政人员已签到。"
+        "errorAlreadyCheckedIn": "该家政人员已签到。",
+        "allVisitsInReport": "在报告中查看所有访问"
     },
     "userMultiSelect": {
         "moreUsers": "更多",

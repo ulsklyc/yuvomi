@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Dit bezoek bestaat niet meer.",
         "errorTaskGone": "Deze taak bestaat niet meer.",
         "errorAlreadyCheckedOut": "Deze schoonmaker is al uitgecheckt.",
-        "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt."
+        "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt.",
+        "allVisitsInReport": "Alle bezoeken in het rapport"
     },
     "userMultiSelect": {
         "moreUsers": "meer",

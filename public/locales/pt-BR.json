@@ -4134,7 +4134,8 @@
         "errorVisitGone": "Esta visita não existe mais.",
         "errorTaskGone": "Esta tarefa não existe mais.",
         "errorAlreadyCheckedOut": "Esta faxineira já registrou a saída.",
-        "errorAlreadyCheckedIn": "Esta faxineira já registrou a entrada."
+        "errorAlreadyCheckedIn": "Esta faxineira já registrou a entrada.",
+        "allVisitsInReport": "Todas as visitas no relatório"
     },
     "userMultiSelect": {
         "moreUsers": "mais",

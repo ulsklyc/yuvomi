@@ -4138,7 +4138,8 @@
         "errorVisitGone": "Diesen Einsatz gibt es nicht mehr.",
         "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
         "errorAlreadyCheckedOut": "Diese Haushaltshilfe ist schon ausgecheckt.",
-        "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt."
+        "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt.",
+        "allVisitsInReport": "Alle Besuche im Bericht"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",

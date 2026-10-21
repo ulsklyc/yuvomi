@@ -4362,7 +4362,8 @@
         "errorVisitGone": "Этого визита больше нет.",
         "errorTaskGone": "Этой задачи больше нет.",
         "errorAlreadyCheckedOut": "Уход этого помощника уже отмечен.",
-        "errorAlreadyCheckedIn": "Приход этого помощника уже отмечен."
+        "errorAlreadyCheckedIn": "Приход этого помощника уже отмечен.",
+        "allVisitsInReport": "Все посещения в отчёте"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

@@ -4366,7 +4366,8 @@
         "errorVisitGone": "Ta wizyta już nie istnieje.",
         "errorTaskGone": "To zadanie już nie istnieje.",
         "errorAlreadyCheckedOut": "Ta pomoc domowa jest już wymeldowana.",
-        "errorAlreadyCheckedIn": "Ta pomoc domowa jest już zameldowana."
+        "errorAlreadyCheckedIn": "Ta pomoc domowa jest już zameldowana.",
+        "allVisitsInReport": "Wszystkie wizyty w raporcie"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
