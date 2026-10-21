@@ -316,6 +316,11 @@ test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu
   assert.match(page, /<a href="\/forgot-password" data-link>\$\{esc\(t\('resetPassword\.requestNew'\)\)\}<\/a>/, 'der Weg zu einem neuen Link steht auf der Seite');
   const dead = page.slice(page.indexOf('const dead = '), page.indexOf('if (!token)'));
   assert.match(dead, /form\.hidden = true/, 'ein toter Link nimmt das Formular weg');
+  // Ein 400 gilt als toter Link - das stimmt nur, wenn das Formular die Laenge
+  // so zaehlt wie der Server (NFC, server/auth.js /reset-password).
+  assert.match(page, /if \(password\.normalize\('NFC'\)\.length < 8\)/,
+    'die Laengenpruefung zaehlt NFC wie der Server, sonst wird ein gueltiger Link fuer tot erklaert');
+  assert.match(read('../server/auth.js'), /if \(normalizePassword\(password\)\.length < 8\)/, 'und der Server zaehlt NFC');
   assert.match(dead, /reset-request-new/, 'und betont den Weg zu einem neuen Link');
   const de = JSON.parse(read('../public/locales/de.json')).resetPassword;
   for (const key of ['missingToken', 'invalidToken']) {

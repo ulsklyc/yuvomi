@@ -116,7 +116,10 @@ export async function render(container) {
     const password = form.password.value;
     const confirm = form.confirm.value;
     // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js, flagField).
-    if (password.length < 8) { flagField(form.password, errorEl); show(errorEl, t('resetPassword.tooShort')); return; }
+    // Gezaehlt wird wie auf dem Server (normalizePassword, NFC): sonst kaeme ein
+    // zerlegtes "é" hier durch, der Server antwortete 400, und der Zweig unten
+    // erklaerte einen gueltigen Link fuer tot.
+    if (password.normalize('NFC').length < 8) { flagField(form.password, errorEl); show(errorEl, t('resetPassword.tooShort')); return; }
     if (password !== confirm) { flagField(form.confirm, errorEl); show(errorEl, t('resetPassword.mismatch')); return; }
     btn.disabled = true;
     try {
