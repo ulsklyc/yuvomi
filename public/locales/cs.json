@@ -105,7 +105,9 @@
         "fieldMax": "Nejvýše {{max}}.",
         "fieldWholeNumber": "Zadejte celé číslo.",
         "fieldStep": "Zadejte hodnotu v krocích po {{step}}.",
-        "fieldInvalid": "Zkontrolujte tento údaj."
+        "fieldInvalid": "Zkontrolujte tento údaj.",
+        "errorCheckRolledBack": "„{{name}}“ je znovu otevřené - odškrtnutí se nepodařilo. Zkuste to znovu.",
+        "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",

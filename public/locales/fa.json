@@ -104,7 +104,9 @@
         "fieldMax": "حداکثر {{max}}.",
         "fieldWholeNumber": "یک عدد صحیح وارد کنید.",
         "fieldStep": "مقداری با گام {{step}} وارد کنید.",
-        "fieldInvalid": "این ورودی را بررسی کنید."
+        "fieldInvalid": "این ورودی را بررسی کنید.",
+        "errorCheckRolledBack": "«{{name}}» دوباره باز است - علامت‌گذاری انجام نشد. دوباره تلاش کنید.",
+        "errorUncheckRolledBack": "«{{name}}» دوباره علامت خورده است - بازگرداندن انجام نشد. دوباره تلاش کنید."
     },
     "kitchen": {
         "noShoppingLists": "هنوز فهرست خریدی وجود ندارد.",

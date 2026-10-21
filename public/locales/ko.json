@@ -104,7 +104,9 @@
         "fieldMax": "{{max}} 이하여야 합니다.",
         "fieldWholeNumber": "정수를 입력하세요.",
         "fieldStep": "{{step}} 단위로 입력하세요.",
-        "fieldInvalid": "이 입력을 확인하세요."
+        "fieldInvalid": "이 입력을 확인하세요.",
+        "errorCheckRolledBack": "'{{name}}' 항목이 다시 열렸습니다 - 체크하지 못했습니다. 다시 시도하세요.",
+        "errorUncheckRolledBack": "'{{name}}' 항목이 다시 체크되었습니다 - 되돌리지 못했습니다. 다시 시도하세요."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",

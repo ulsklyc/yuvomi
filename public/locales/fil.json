@@ -104,7 +104,9 @@
         "fieldMax": "Hindi hihigit sa {{max}}.",
         "fieldWholeNumber": "Maglagay ng buong numero.",
         "fieldStep": "Maglagay ng halaga sa hakbang na {{step}}.",
-        "fieldInvalid": "Suriin ang entry na ito."
+        "fieldInvalid": "Suriin ang entry na ito.",
+        "errorCheckRolledBack": "Bukas muli ang \"{{name}}\" - hindi natuloy ang pag-check. Subukan ulit.",
+        "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",

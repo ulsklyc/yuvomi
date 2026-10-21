@@ -784,7 +784,17 @@ async function toggleShoppingItem(id, checked, container, { settleNow = false, e
       }
       renderTabs(container);
     }
-    reportError(err, container);
+    // ZURUECKGEROLLT HEISST: DIESER ARTIKEL, DIESER STAND, NOCH EINMAL (Critique
+    // R21, D15). Wo die eigene Absicht zurueckgenommen wurde, nennt der Satz
+    // den Artikel und wie er jetzt wieder steht. Hat jemand anderes dasselbe
+    // getan (die Absicht ist erfuellt, die Zeile steht richtig), stimmt "wieder
+    // offen" nicht - dort bleibt der allgemeine Satz.
+    const name = state.items.find((i) => i.id === id)?.name;
+    if (intent && name) {
+      reportError(err, container, newVal ? 'common.errorCheckRolledBack' : 'common.errorUncheckRolledBack', { name });
+    } else {
+      reportError(err, container);
+    }
   }
   return undefined;
 }
@@ -3940,9 +3950,10 @@ function wireLiveUpdates(container, routeSignal) {
  * @param {unknown} err
  * @param {Element} container
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @param {Record<string, unknown>} [params] - Werte fuer diesen Satz
  */
-function reportError(err, container, fallbackKey) {
-  window.yuvomi.showToast(errorSentence(err, fallbackKey), 'danger');
+function reportError(err, container, fallbackKey, params) {
+  window.yuvomi.showToast(errorSentence(err, fallbackKey, params), 'danger');
   if (isGone(err)) reloadAfterGone(container);
 }
 

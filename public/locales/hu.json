@@ -104,7 +104,9 @@
         "fieldMax": "Legfeljebb {{max}}.",
         "fieldWholeNumber": "Adjon meg egy egész számot.",
         "fieldStep": "Adjon meg egy értéket {{step}} lépésközzel.",
-        "fieldInvalid": "Ellenőrizze ezt a bejegyzést."
+        "fieldInvalid": "Ellenőrizze ezt a bejegyzést.",
+        "errorCheckRolledBack": "„{{name}}” ismét nyitott - a kipipálás nem sikerült. Próbálja újra.",
+        "errorUncheckRolledBack": "„{{name}}” ismét ki van pipálva - a visszavétel nem sikerült. Próbálja újra."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",

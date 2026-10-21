@@ -596,7 +596,9 @@ test('Scheitert das Zurueckholen, bleibt das Formular stehen, nichts wird angele
   assert.deepEqual(liste.map((a) => a.method), ['PATCH']);
   assert.equal(shopping.checkedOf(shopping.state.items[0]), 1, 'der Haken steht wieder');
   assert.equal(f.name.value, 'Karotten', 'die Eingabe geht nicht verloren');
-  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']], 'keine Erfolgsmeldung');
+  // Der Satz nennt den Artikel und seinen Stand (Critique R21, D15) - weiter
+  // nie den des Servers ("Nein.").
+  assert.deepEqual(toasts, [['common.errorUncheckRolledBack{"name":"Karotten"}', 'danger']], 'keine Erfolgsmeldung');
 
   const nochmal = await aufrufe(() => f.absenden(), { 'PATCH /shopping/items/2': { data: null } });
   assert.deepEqual(wege(nochmal), ['PATCH /shopping/items/2'], 'die Sperre faellt auch nach einem Fehlschlag');
@@ -622,7 +624,7 @@ test('Lehnt der Server die getippte Menge ab, ist nichts halb geschrieben: Haken
   assert.equal(shopping.state.items[0].quantity, '1 kg');
   assert.equal(f.name.value, 'Karotten', 'der Name bleibt im Feld');
   assert.equal(f.qty.value, '2 kg', 'die getippte Menge bleibt im Feld');
-  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']], 'die Fehlermeldung steht, keine Erfolgsmeldung darueber');
+  assert.deepEqual(toasts, [['common.errorUncheckRolledBack{"name":"Karotten"}', 'danger']], 'die Fehlermeldung steht, keine Erfolgsmeldung darueber');
 });
 
 // -------------------------------------------------------------------------

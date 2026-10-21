@@ -104,7 +104,9 @@
         "fieldMax": "Högst {{max}}.",
         "fieldWholeNumber": "Ange ett heltal.",
         "fieldStep": "Ange ett värde i steg om {{step}}.",
-        "fieldInvalid": "Kontrollera den här uppgiften."
+        "fieldInvalid": "Kontrollera den här uppgiften.",
+        "errorCheckRolledBack": "”{{name}}” är öppen igen - avbockningen gick inte igenom. Försök igen.",
+        "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",

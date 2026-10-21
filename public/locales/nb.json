@@ -104,7 +104,9 @@
         "fieldMax": "Høyst {{max}}.",
         "fieldWholeNumber": "Skriv inn et heltall.",
         "fieldStep": "Skriv inn en verdi i trinn på {{step}}.",
-        "fieldInvalid": "Sjekk denne verdien."
+        "fieldInvalid": "Sjekk denne verdien.",
+        "errorCheckRolledBack": "«{{name}}» er åpen igjen - avkryssingen gikk ikke gjennom. Prøv igjen.",
+        "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",

@@ -104,7 +104,9 @@
         "fieldMax": "अधिकतम {{max}}।",
         "fieldWholeNumber": "कोई पूर्ण संख्या दर्ज करें।",
         "fieldStep": "{{step}} के चरणों में मान दर्ज करें।",
-        "fieldInvalid": "यह प्रविष्टि जाँचें।"
+        "fieldInvalid": "यह प्रविष्टि जाँचें।",
+        "errorCheckRolledBack": "\"{{name}}\" फिर से खुला है - टिक नहीं हो पाया। फिर से कोशिश करें।",
+        "errorUncheckRolledBack": "\"{{name}}\" फिर से टिक है - वापस नहीं हो पाया। फिर से कोशिश करें।"
     },
     "kitchen": {
         "noShoppingLists": "अभी कोई खरीद सूची नहीं है.",

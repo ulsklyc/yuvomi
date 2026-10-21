@@ -569,12 +569,18 @@ function knownSentence(err) {
  * `err.message`) kommt hier nie heraus; aus der Antwort stammen hoechstens die
  * Zahlen, die CASE_PARAMS fuer den Fall freigibt.
  *
+ * DER SATZ DER STELLE DARF SEIN OBJEKT NENNEN (Critique R21, D15): ein
+ * zurueckgerollter Haken sagte nur "Ein Fehler ist aufgetreten." - weder welcher
+ * Artikel noch dass er wieder offen steht noch was jetzt zu tun ist. `params`
+ * setzt t() in den Satz der Stelle ein ("„Milch" ist wieder offen ...").
+ *
  * @param {unknown} err
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
+ * @param {Record<string, unknown>} [params] - Werte fuer den Satz der Stelle
  * @returns {string} uebersetzter Satz
  */
-export function errorSentence(err, fallbackKey = 'common.errorGeneric') {
-  return knownSentence(err) ?? t(fallbackKey);
+export function errorSentence(err, fallbackKey = 'common.errorGeneric', params = undefined) {
+  return knownSentence(err) ?? (params ? t(fallbackKey, params) : t(fallbackKey));
 }
 
 /**

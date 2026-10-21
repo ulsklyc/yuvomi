@@ -556,3 +556,15 @@ test('die Platzhalter jedes Satzes sind in jeder Sprache genau die freigegebenen
   }
   assert.equal(checked, files.length * CASE_MESSAGES.size);
 });
+
+// DER SATZ DER STELLE DARF SEIN OBJEKT NENNEN (Critique R21, D15): ein
+// zurueckgerollter Haken sagt, welcher Artikel wieder offen steht. Ein
+// bekannter Fall behaelt seinen eigenen Satz; ohne Werte bleibt alles wie bisher.
+test('errorSentence: der Satz der Stelle bekommt seine Werte, ein bekannter Fall bleibt seiner (Critique R21)', async () => {
+  const { errorSentence } = await load();
+  const unbekannt = Object.assign(new Error('Server sentence.'), { status: 500, data: { error: 'Server sentence.' } });
+  assert.equal(errorSentence(unbekannt, 'common.errorCheckRolledBack', { name: 'Milch' }), 'common.errorCheckRolledBack{"name":"Milch"}');
+  assert.equal(errorSentence(unbekannt, 'common.errorCheckRolledBack'), 'common.errorCheckRolledBack', 'ohne Werte wie bisher');
+  assert.equal(errorSentence(Object.assign(new Error('x'), { status: 0 }), 'common.errorCheckRolledBack', { name: 'Milch' }),
+    'common.errorOfflineMutation', 'offline sagt seinen eigenen Satz');
+});

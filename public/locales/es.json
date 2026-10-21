@@ -104,7 +104,9 @@
         "fieldMax": "Como máximo {{max}}.",
         "fieldWholeNumber": "Introduce un número entero.",
         "fieldStep": "Introduce un valor en pasos de {{step}}.",
-        "fieldInvalid": "Revisa este dato."
+        "fieldInvalid": "Revisa este dato.",
+        "errorCheckRolledBack": "«{{name}}» vuelve a estar pendiente - no se pudo marcar. Inténtalo de nuevo.",
+        "errorUncheckRolledBack": "«{{name}}» vuelve a estar marcado - no se pudo desmarcar. Inténtalo de nuevo."
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",

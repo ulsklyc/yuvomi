@@ -104,7 +104,9 @@
         "fieldMax": "Höchstens {{max}}.",
         "fieldWholeNumber": "Bitte eine ganze Zahl eingeben.",
         "fieldStep": "Bitte in Schritten von {{step}} eingeben.",
-        "fieldInvalid": "Bitte prüfe diese Eingabe."
+        "fieldInvalid": "Bitte prüfe diese Eingabe.",
+        "errorCheckRolledBack": "„{{name}}“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.",
+        "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",

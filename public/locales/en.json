@@ -104,7 +104,9 @@
         "fieldMax": "At most {{max}}.",
         "fieldWholeNumber": "Enter a whole number.",
         "fieldStep": "Enter a value in steps of {{step}}.",
-        "fieldInvalid": "Check this entry."
+        "fieldInvalid": "Check this entry.",
+        "errorCheckRolledBack": "“{{name}}” is open again - ticking it off didn't go through. Try again.",
+        "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",

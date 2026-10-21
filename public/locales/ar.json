@@ -107,7 +107,9 @@
         "fieldMax": "على الأكثر {{max}}.",
         "fieldWholeNumber": "أدخل عددًا صحيحًا.",
         "fieldStep": "أدخل قيمة بخطوات قدرها {{step}}.",
-        "fieldInvalid": "تحقق من هذا الإدخال."
+        "fieldInvalid": "تحقق من هذا الإدخال.",
+        "errorCheckRolledBack": "«{{name}}» مفتوح مجددًا - لم يتم وضع العلامة. حاول مرة أخرى.",
+        "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",

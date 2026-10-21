@@ -104,7 +104,9 @@
         "fieldMax": "Maksimal {{max}}.",
         "fieldWholeNumber": "Masukkan bilangan bulat.",
         "fieldStep": "Masukkan nilai dengan kelipatan {{step}}.",
-        "fieldInvalid": "Periksa isian ini."
+        "fieldInvalid": "Periksa isian ini.",
+        "errorCheckRolledBack": "\"{{name}}\" terbuka lagi - centang tidak tersimpan. Coba lagi.",
+        "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",

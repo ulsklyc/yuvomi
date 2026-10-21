@@ -104,7 +104,9 @@
         "fieldMax": "En fazla {{max}}.",
         "fieldWholeNumber": "Bir tam sayı girin.",
         "fieldStep": "{{step}} adımlarla bir değer girin.",
-        "fieldInvalid": "Bu girişi kontrol edin."
+        "fieldInvalid": "Bu girişi kontrol edin.",
+        "errorCheckRolledBack": "\"{{name}}\" yeniden açık - işaretleme gerçekleşmedi. Tekrar deneyin.",
+        "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",

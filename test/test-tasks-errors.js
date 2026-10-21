@@ -20,6 +20,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
@@ -398,4 +399,24 @@ test('#1997: Erfolg nach Dialogwechsel - Aufgabe speichern und Schlagwort setzen
       delete globalThis.__modalContextId;
     }
   }
+});
+
+/* ZURUECKGEROLLT NENNT AUFGABE, STAND UND NAECHSTEN SCHRITT (Critique R21,
+ * D15). Scheiterte das Abhaken (Haken in der Zeile oder Wisch), stand nur
+ * "Ein Fehler ist aufgetreten." da - die Liste lud neu, und die Aufgabe stand
+ * wieder offen, ohne dass es jemand sagte. */
+test('Abhaken scheitert: der Satz nennt die Aufgabe und ihren Stand - ein bekannter Fall behaelt seinen (Critique R21)', () => {
+  const vorher = tasks.state.tasks;
+  tasks.state.tasks = [{ id: 7, title: 'Muell rausbringen', status: 'open' }];
+  try {
+    assert.equal(tasks.toggleFailedSentence(fehler(500), 7, 'done'), 'common.errorCheckRolledBack{"name":"Muell rausbringen"}');
+    assert.equal(tasks.toggleFailedSentence(fehler(500), '7', 'open'), 'common.errorUncheckRolledBack{"name":"Muell rausbringen"}');
+    assert.equal(tasks.toggleFailedSentence(fehler(403, 'task_locked'), 7, 'done'), 'tasks.errorLocked', 'der bekannte Fall sagt seinen Satz');
+    assert.equal(tasks.toggleFailedSentence(fehler(500), 99, 'done'), 'common.errorGeneric', 'ohne Aufgabe kein erfundener Name');
+  } finally {
+    tasks.state.tasks = vorher;
+  }
+  const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  assert.equal([...src.matchAll(/showToast\(toggleFailedSentence\(err, (?:taskId|id), nextStatus\), 'danger'\)/g)].length, 2,
+    'Haken und Wisch sagen denselben Satz');
 });

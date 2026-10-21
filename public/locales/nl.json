@@ -104,7 +104,9 @@
         "fieldMax": "Maximaal {{max}}.",
         "fieldWholeNumber": "Voer een geheel getal in.",
         "fieldStep": "Voer een waarde in stappen van {{step}} in.",
-        "fieldInvalid": "Controleer deze invoer."
+        "fieldInvalid": "Controleer deze invoer.",
+        "errorCheckRolledBack": "‘{{name}}’ staat weer open - afvinken is niet gelukt. Probeer het opnieuw.",
+        "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",

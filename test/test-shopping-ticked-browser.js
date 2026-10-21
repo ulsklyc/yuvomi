@@ -341,9 +341,11 @@ test('Lehnt der Server nach dem Umzug ab, kommt die Zeile zurueck', async () => 
   const end = await until((st) => rows(st, 'Obst').join() === '1,2', 400 + 2 * EXIT_BUDGET);
   assert.deepEqual(rows(end, 'Obst'), [1, 2], 'zurueck an ihrem Rang');
   assert.equal(group(end, 'ABGEHAKT').shown, false);
-  // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): eine Antwort
-  // ohne `reason` zeigt den allgemeinen, das "Nein." des Stubs darf nie ankommen.
-  assert.deepEqual(await page.evaluate(() => window.toasts), [['Ein Fehler ist aufgetreten.', 'danger']]);
+  // Der Hinweis ist der Satz der App, nicht der des Servers (#1909): das "Nein."
+  // des Stubs darf nie ankommen. Seit Critique R21 (D15) nennt er den Artikel,
+  // seinen Stand und den naechsten Schritt statt "Ein Fehler ist aufgetreten.".
+  assert.deepEqual(await page.evaluate(() => window.toasts),
+    [['„Apfel“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.', 'danger']]);
 });
 
 test('Umsortieren in der Pause nennt auch die Zeile, die noch im Abschnitt wartet', async () => {

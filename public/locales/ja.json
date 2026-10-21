@@ -104,7 +104,9 @@
         "fieldMax": "{{max}}以下にしてください。",
         "fieldWholeNumber": "整数を入力してください。",
         "fieldStep": "{{step}}刻みで入力してください。",
-        "fieldInvalid": "この入力を確認してください。"
+        "fieldInvalid": "この入力を確認してください。",
+        "errorCheckRolledBack": "「{{name}}」は未完了に戻りました - チェックできませんでした。もう一度お試しください。",
+        "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",

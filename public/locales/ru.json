@@ -106,7 +106,9 @@
         "fieldMax": "Не больше {{max}}.",
         "fieldWholeNumber": "Введите целое число.",
         "fieldStep": "Введите значение с шагом {{step}}.",
-        "fieldInvalid": "Проверьте это значение."
+        "fieldInvalid": "Проверьте это значение.",
+        "errorCheckRolledBack": "«{{name}}» снова не отмечено - отметить не удалось. Попробуйте ещё раз.",
+        "errorUncheckRolledBack": "«{{name}}» снова отмечено - снять отметку не удалось. Попробуйте ещё раз."
     },
     "kitchen": {
         "noShoppingLists": "Списка покупок ещё нет.",

@@ -1904,6 +1904,21 @@ function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
   );
 }
 
+/**
+ * Der Satz, wenn ein Haken nicht ankam (Critique R21, D15): welche Aufgabe, in
+ * welchem Stand sie nach dem Neuladen wieder steht, und dass es noch einmal
+ * geht - statt "Ein Fehler ist aufgetreten.". Ein bekannter Fall (gesperrt,
+ * geloescht, offline) behaelt seinen eigenen Satz (errorSentence).
+ * @param {unknown} err
+ * @param {number|string} taskId
+ * @param {string} nextStatus der Status, der geschrieben werden sollte
+ */
+function toggleFailedSentence(err, taskId, nextStatus) {
+  const title = state.tasks.find((x) => String(x.id) === String(taskId))?.title;
+  if (!title) return errorSentence(err);
+  return errorSentence(err, nextStatus === 'done' ? 'common.errorCheckRolledBack' : 'common.errorUncheckRolledBack', { name: title });
+}
+
 async function loadTaskForEdit(id) {
   const data = await api.get(`/tasks/${id}`);
   return data.data;
@@ -4600,7 +4615,7 @@ function wireSwipeGestures(container) {
           await reloadWithRowMotion(container, taskId);
           acknowledgeStatusToggle(container, taskId, nextStatus, response);
         } catch (err) {
-          window.yuvomi.showToast(errorSentence(err), 'danger');
+          window.yuvomi.showToast(toggleFailedSentence(err, taskId, nextStatus), 'danger');
           await loadTasks(container);
         }
       },
@@ -5559,7 +5574,7 @@ function wireTaskList(container) {
         // Derselbe Rückweg wie beim Wischen - und dieselbe Quittung.
         acknowledgeStatusToggle(container, id, nextStatus, response);
       } catch (err) {
-        window.yuvomi.showToast(errorSentence(err), 'danger');
+        window.yuvomi.showToast(toggleFailedSentence(err, id, nextStatus), 'danger');
         await loadTasks(container);
       }
     }
@@ -6382,6 +6397,8 @@ export async function render(container, { user, signal } = {}) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Critique R21 (D15): der Satz eines zurueckgerollten Hakens.
+  toggleFailedSentence,
   // E13: am Desktop haengen die Filter als Popover am Knopf (utils/filter-sheet.js).
   openTaskFilters,
   // R17: die neue Aufgabe kommt an (Gruppe auf, Zeile zieht ein, rollt ins Bild, ausgewaehlt).

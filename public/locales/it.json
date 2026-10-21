@@ -104,7 +104,9 @@
         "fieldMax": "Al massimo {{max}}.",
         "fieldWholeNumber": "Inserisci un numero intero.",
         "fieldStep": "Inserisci un valore a passi di {{step}}.",
-        "fieldInvalid": "Controlla questo dato."
+        "fieldInvalid": "Controlla questo dato.",
+        "errorCheckRolledBack": "«{{name}}» è di nuovo da fare - la spunta non è andata a buon fine. Riprova.",
+        "errorUncheckRolledBack": "«{{name}}» è di nuovo spuntato - il ripristino non è andato a buon fine. Riprova."
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",

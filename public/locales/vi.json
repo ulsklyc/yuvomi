@@ -104,7 +104,9 @@
         "fieldMax": "Tối đa {{max}}.",
         "fieldWholeNumber": "Hãy nhập một số nguyên.",
         "fieldStep": "Hãy nhập giá trị theo bước {{step}}.",
-        "fieldInvalid": "Hãy kiểm tra mục này."
+        "fieldInvalid": "Hãy kiểm tra mục này.",
+        "errorCheckRolledBack": "\"{{name}}\" đã mở lại - chưa đánh dấu được. Hãy thử lại.",
+        "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",

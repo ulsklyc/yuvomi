@@ -106,7 +106,9 @@
         "fieldMax": "Najwyżej {{max}}.",
         "fieldWholeNumber": "Wpisz liczbę całkowitą.",
         "fieldStep": "Wpisz wartość w krokach co {{step}}.",
-        "fieldInvalid": "Sprawdź ten wpis."
+        "fieldInvalid": "Sprawdź ten wpis.",
+        "errorCheckRolledBack": "„{{name}}” znowu jest otwarte - odhaczenie się nie powiodło. Spróbuj ponownie.",
+        "errorUncheckRolledBack": "„{{name}}” znowu jest odhaczone - przywrócenie się nie powiodło. Spróbuj ponownie."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",

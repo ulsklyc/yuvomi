@@ -106,7 +106,9 @@
         "fieldMax": "Щонайбільше {{max}}.",
         "fieldWholeNumber": "Введіть ціле число.",
         "fieldStep": "Введіть значення з кроком {{step}}.",
-        "fieldInvalid": "Перевірте це значення."
+        "fieldInvalid": "Перевірте це значення.",
+        "errorCheckRolledBack": "«{{name}}» знову не позначено - позначити не вдалося. Спробуйте ще раз.",
+        "errorUncheckRolledBack": "«{{name}}» знову позначено - зняти позначку не вдалося. Спробуйте ще раз."
     },
     "kitchen": {
         "noShoppingLists": "Списку покупок ще немає.",

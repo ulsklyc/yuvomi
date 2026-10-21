@@ -754,7 +754,10 @@ test('scheitert der PATCH, bleibt kein Merker stehen', async () => {
   await __test.toggleShoppingItem(10, 0, makeNullContainer());
   assert.equal(__test.checkedOf(__test.state.items[0]), 0, 'zurueckgedreht');
   assert.equal(__test.intents.size, 0, 'ein gescheiterter Wunsch darf nichts auftragen');
-  assert.equal(toasts.length, 1);
+  // ZURUECKGEROLLT NENNT ARTIKEL, STAND UND NAECHSTEN SCHRITT (Critique R21,
+  // D15): bis hier stand "Ein Fehler ist aufgetreten." - weder welcher Artikel
+  // noch dass er wieder offen ist. Der Text des Servers kommt nie an.
+  assert.deepEqual(toasts, [[`common.errorCheckRolledBack${JSON.stringify({ name: __test.state.items[0].name })}`, 'danger']]);
 
   // Und die naechste Auffrischung traegt nichts nach.
   await __test.loadItems(1);

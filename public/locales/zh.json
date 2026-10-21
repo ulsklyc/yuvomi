@@ -104,7 +104,9 @@
         "fieldMax": "最多为 {{max}}。",
         "fieldWholeNumber": "请输入整数。",
         "fieldStep": "请按 {{step}} 的步长输入。",
-        "fieldInvalid": "请检查此项输入。"
+        "fieldInvalid": "请检查此项输入。",
+        "errorCheckRolledBack": "“{{name}}”已恢复为未完成 - 勾选未成功。请重试。",
+        "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",

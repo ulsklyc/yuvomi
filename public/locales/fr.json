@@ -104,7 +104,9 @@
         "fieldMax": "Au plus {{max}}.",
         "fieldWholeNumber": "Saisissez un nombre entier.",
         "fieldStep": "Saisissez une valeur par pas de {{step}}.",
-        "fieldInvalid": "Vérifiez cette saisie."
+        "fieldInvalid": "Vérifiez cette saisie.",
+        "errorCheckRolledBack": "« {{name}} » est de nouveau à faire - la coche n'a pas été enregistrée. Réessayez.",
+        "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
