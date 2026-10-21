@@ -157,6 +157,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixed: in week and month view the header folded only once - after it unfolded, scrolling no
   longer folded it again.
 
+- **Ticking off a task or a shopping item no longer cuts off the rows below.** While the ticked
+  row left, its card shrank at once and the rows beneath slid up from below: the last one was
+  cut off at the card edge for a moment, and an empty band opened under the card. The rows, the
+  card edge and the groups below now move up together, and the group count changes as the row
+  starts to leave instead of afterwards.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing

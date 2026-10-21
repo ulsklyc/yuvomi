@@ -252,6 +252,18 @@ function closedFrame() {
  * Entscheid 26.09.: `--ease-out` warf die Nachbarn in den ersten 60ms fast ganz
  * nach oben - ein Ruck statt eines Nachrueckens).
  *
+ * ERST GLEITEN, DANN SCHLIESSEN (Critique R21, D3). Fiel die Zeile in Schritt 2
+ * sofort auf null, schrumpfte ihre Karte (`.row-carrier`) im selben Frame - die
+ * Zeilen darunter glitten aber erst noch von unten heran: die letzte war bis zu
+ * 64px lang von der Kartenkante abgeschnitten, und zwischen Karte und naechster
+ * Gruppe stand ein leeres Band derselben Hoehe (gemessen 200ms, Aufgaben und
+ * Einkauf). Jetzt misst Schritt 2 die geschlossene Lage nur (ein Frame, der nie
+ * gemalt wird), die Nachbarn gleiten per `transform` DORTHIN, und die Karte
+ * kuerzt ihre Unterkante im selben Takt per `clip-path` - erst am Ende faellt
+ * die Zeile auf null und die Bewegung ab, in einem Frame und ohne sichtbaren
+ * Unterschied (`glideThenClose`). Zeilen, die im selben Moment gehen (Einkauf:
+ * mehrere Haken in einer Pause), schliessen gemeinsam.
+ *
  * @param {Element} el
  * @param {Object} [opts]
  * @param {number} [opts.duration] - ms des Nachrueckens, Standard `--duration-lg`
@@ -271,6 +283,7 @@ export function collapseOut(el, { duration = durationToken('--duration-lg', 250)
     // Abgebrochen (eine Gegenbewegung hat die Zeile zurueckgeholt) oder
     // inzwischen ausgehaengt: kein zweiter Schritt.
     if (leaving.playState === 'idle' || el.isConnected === false) return undefined;
+    if (!reduced && canClipCards()) return closeTogether(el, { duration, easing });
     const neighbours = followingNeighbours(el);
     const before = flipSnapshotElements(neighbours);
     el.style.overflow = 'hidden';
@@ -288,6 +301,148 @@ export function collapseOut(el, { duration = durationToken('--duration-lg', 250)
 }
 
 const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Kann der Browser eine Karte per `clip-path: inset(... round ...)` kuerzen? */
+function canClipCards() {
+  return typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+    && CSS.supports('clip-path', 'inset(0px round 1px)');
+}
+
+/**
+ * Zeilen, deren Blende im selben Moment endet, schliessen GEMEINSAM: ihre
+ * Nachbarn gleiten einmal um die Summe, statt dass die zweite Messung die
+ * erste ueberschreibt. Gesammelt wird bis zur naechsten Microtask.
+ */
+let _closing = null;
+function closeTogether(el, timing) {
+  if (!_closing) {
+    const batch = { items: [], timing };
+    _closing = batch;
+    batch.done = Promise.resolve().then(() => {
+      if (_closing === batch) _closing = null;
+      return glideThenClose(batch.items.filter((x) => x.isConnected !== false), batch.timing);
+    });
+  }
+  _closing.items.push(el);
+  return _closing.done;
+}
+
+/** Luft der Kartenkappe nach aussen, damit Schatten und Haarlinie der Karte stehen bleiben. */
+const CARD_CLIP_BLEED = 2;
+
+/**
+ * Die Vorfahren bis zum Scrollbereich, die eine sichtbare Flaeche malen
+ * (Hintergrund, Schatten, Unterkante) - die Karten, deren Unterkante mit den
+ * Zeilen hochgehen muss. Dieselbe Grenze wie `followingNeighbours`.
+ */
+function paintedAncestors(el, limit = 4) {
+  const out = [];
+  let node = el.parentElement;
+  for (let depth = 0; node && node !== document.body && depth < limit; depth += 1) {
+    const cs = getComputedStyle(node);
+    if (/^(auto|scroll)$/.test(cs.overflowY || '')) break;
+    const bg = cs.backgroundColor || '';
+    const paints = (bg && bg !== 'transparent' && !/,\s*0\)$/.test(bg))
+      || (cs.boxShadow && cs.boxShadow !== 'none')
+      || parseFloat(cs.borderBottomWidth) > 0;
+    if (paints) out.push(node);
+    node = node.parentElement;
+  }
+  return out;
+}
+
+/** Die Kappe einer Karte, `bottom` px von unten gekuerzt, mit ihren unteren Ecken. */
+function cardClip(cs, bottom) {
+  const b = CARD_CLIP_BLEED;
+  const r = (v) => { const n = parseFloat(v) || 0; return n > 0 ? n + b : 0; };
+  return `inset(${-b}px ${-b}px ${bottom}px ${-b}px round 0px 0px ${r(cs.borderBottomRightRadius)}px ${r(cs.borderBottomLeftRadius)}px)`;
+}
+
+/**
+ * Schritt 2 von collapseOut fuer eine oder mehrere Zeilen: die geschlossene
+ * Lage messen, dorthin gleiten (Nachbarn per transform, Karten per clip-path),
+ * dann in EINEM Frame schliessen und die Bewegung abnehmen.
+ */
+function glideThenClose(items, { duration, easing }) {
+  if (!items.length) return Promise.resolve();
+  const inLeaving = (n) => items.some((x) => x === n || x.contains?.(n));
+  const neighbours = [...new Set(items.flatMap((el) => followingNeighbours(el)))].filter((n) => !inLeaving(n));
+  const cards = [...new Set(items.flatMap((el) => paintedAncestors(el)))].filter((c) => !inLeaving(c));
+  const before = flipSnapshotElements(neighbours);
+  const heights = cards.map((c) => c.getBoundingClientRect().height);
+  // Die geschlossene Lage nur MESSEN: dieselbe Aufgabe nimmt sie wieder zurueck,
+  // dazwischen wird kein Frame gemalt.
+  const probes = items.map((el) => {
+    el.style.overflow = 'hidden';
+    return el.animate([closedFrame(), closedFrame()], { duration: 1, fill: 'forwards' });
+  });
+  const delta = new Map();
+  for (const [n, prev] of before) {
+    const now = n.getBoundingClientRect();
+    delta.set(n, { dx: now.left - prev.left, dy: now.top - prev.top });
+  }
+  const shrink = cards.map((c, i) => heights[i] - c.getBoundingClientRect().height);
+  const cardStyles = cards.map((c) => getComputedStyle(c));
+  probes.forEach((p) => p.cancel());
+
+  // Je Bewegung: Element, Eigenschaft und Endwert - am Ende haelt der
+  // Inline-Wert genau diese Lage, bis die Zeile geschlossen ist.
+  const moves = [];
+  for (const [n, d] of delta) {
+    // Ein Nachbar IN einem gleitenden Nachbarn faehrt dessen Weg schon mit.
+    let up = n.parentElement;
+    while (up && !delta.has(up)) up = up.parentElement;
+    const base = up ? delta.get(up) : { dx: 0, dy: 0 };
+    const dx = d.dx - base.dx;
+    const dy = d.dy - base.dy;
+    if ((Math.abs(dx) < 1 && Math.abs(dy) < 1) || typeof n.animate !== 'function') continue;
+    const to = `translate(${dx}px, ${dy}px)`;
+    moves.push({ el: n, prop: 'transform', value: to, anim: n.animate([{ transform: 'none' }, { transform: to }], { duration, easing, fill: 'forwards' }) });
+  }
+  cards.forEach((c, i) => {
+    if (shrink[i] < 1 || typeof c.animate !== 'function') return;
+    const to = cardClip(cardStyles[i], shrink[i]);
+    moves.push({ el: c, prop: 'clipPath', value: to, anim: c.animate([{ clipPath: cardClip(cardStyles[i], 0) }, { clipPath: to }], { duration, easing, fill: 'forwards' }) });
+  });
+  const close = () => {
+    for (const el of items) {
+      el.style.overflow = 'hidden';
+      el.animate([closedFrame(), closedFrame()], { duration: 1, fill: 'forwards' });
+    }
+  };
+  if (!moves.length) { close(); return Promise.resolve(); }
+  return settleAnimation(moves[0].anim, duration).then(() => new Promise((resolve) => {
+    // ERST DIE ENDLAGE ALS INLINE-WERT, EINEN FRAME SPAETER SCHLIESSEN. Die
+    // Messung der Layout-Verschiebung sieht vom Compositor gefahrene Werte
+    // nicht (holdThenGlide, R20): schloss die Zeile im selben Frame, in dem die
+    // Bewegung endete, zaehlte sie den ganzen Weg als Sprung (gemessen CLS
+    // 0,06). Mit dem gemalten Inline-Halt davor steht alles schon dort, wo das
+    // Layout es hinlegt. Im verdeckten Tab kommt kein Frame - dort sofort.
+    for (const m of moves) {
+      m.prev = m.el.style[m.prop] || '';
+      m.el.style[m.prop] = m.value;
+      // Der Browser schreibt den Wert in seiner eigenen Form zurueck - verglichen
+      // wird beim Abnehmen mit DIESER, sonst bliebe der Halt stehen.
+      m.held = m.el.style[m.prop];
+      m.anim.cancel();
+    }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      close();
+      for (const m of moves) if (m.el.style[m.prop] === m.held) m.el.style[m.prop] = m.prev;
+      resolve();
+    };
+    if (document.visibilityState === 'hidden' || typeof requestAnimationFrame !== 'function') { finish(); return; }
+    setTimeout(finish, 500);
+    try {
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    } catch {
+      finish();
+    }
+  }));
+}
 
 /**
  * Was nachrueckt, wenn `el` auf null faellt: die folgenden Geschwister, und

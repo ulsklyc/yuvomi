@@ -1426,6 +1426,82 @@ test('collapseOut R19: nur transform und opacity - die Nachbarn gleiten per FLIP
   }
 });
 
+/* R21 (Critique 2026-10-21, D3): fiel die Zeile sofort auf null, schrumpfte ihre
+ * Karte im selben Frame, waehrend die Zeilen darunter erst noch heranglitten -
+ * die letzte stand bis zu 64px abgeschnitten unter der Kartenkante, und zwischen
+ * Karte und naechster Gruppe lag ein leeres Band derselben Hoehe (200ms,
+ * Aufgaben und Einkauf). Jetzt: geschlossene Lage messen, Nachbarn DORTHIN
+ * gleiten lassen, die Karte kuerzt ihre Unterkante im selben Takt per
+ * clip-path, und erst am Ende schliesst die Zeile - alles, was sich dann
+ * noch bewegt, steht schon dort. Die Attrappe rechnet Layout wie der Browser:
+ * solange die Zeile geschlossen ist, stehen Nachbarn 48px hoeher und die
+ * Karte ist 48px kuerzer. */
+test('collapseOut R21 (D3): erst gleiten, dann schliessen - die Karte geht mit, kein Clip, kein Leerband', async () => {
+  const saved = { window: globalThis.window, document: globalThis.document, getComputedStyle: globalThis.getComputedStyle, requestAnimationFrame: globalThis.requestAnimationFrame, CSS: globalThis.CSS };
+  const log = [];
+  let closed = 0;
+  const mk = (name, { top = 0, height = 48, styles = {} } = {}) => {
+    const el = {
+      name, style: {}, calls: [], parentElement: null, nextElementSibling: null, isConnected: true, styles,
+      contains: (n) => { for (let x = n; x; x = x.parentElement) if (x === el) return true; return false; },
+      getBoundingClientRect: () => {
+        const shift = closed > 0 && el.movesUp ? 48 : 0;
+        const shrink = closed > 0 && el.shrinks ? 48 : 0;
+        return { left: 0, top: top - shift, width: 300, height: height - shrink };
+      },
+      animate(keyframes, timing) {
+        const anim = { keyframes, timing, playState: 'running', finished: Promise.resolve(), cancel: () => { anim.playState = 'idle'; if (anim.closes) closed -= 1; log.push(`cancel ${name}`); } };
+        if (keyframes.some((k) => k.height === '0px')) { anim.closes = true; closed += 1; }
+        el.calls.push(anim);
+        log.push(`animate ${name} ${Object.keys(keyframes.at(-1)).join(',')}`);
+        return anim;
+      },
+    };
+    return el;
+  };
+  const link = (parent, kids) => { kids.forEach((k, i) => { k.parentElement = parent; k.nextElementSibling = kids[i + 1] ?? null; }); };
+  const scroller = mk('scroller', { styles: { overflowY: 'auto' } });
+  const list = mk('list', { height: 400 });
+  const group = mk('group', { height: 140 });
+  const group2 = mk('group2', { top: 160 });
+  const carrier = mk('carrier', { top: 40, height: 96, styles: { backgroundColor: 'rgb(255, 255, 255)', borderBottomRightRadius: '16px', borderBottomLeftRadius: '16px', boxShadow: 'none' } });
+  const row = mk('row', { top: 40 });
+  const row2 = mk('row2', { top: 88 });
+  link(scroller, [list]); link(list, [group, group2]); link(group, [carrier]); link(carrier, [row, row2]);
+  row2.movesUp = true; group2.movesUp = true; carrier.shrinks = true; group.shrinks = true; list.shrinks = true;
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+  globalThis.document = { visibilityState: 'visible', documentElement: {}, body: {} };
+  globalThis.getComputedStyle = (el) => ({ getPropertyValue: () => '', opacity: '1', overflowY: 'visible', backgroundColor: 'rgba(0, 0, 0, 0)', boxShadow: 'none', borderBottomWidth: '0px', ...(el?.styles ?? {}) });
+  globalThis.requestAnimationFrame = () => { throw new Error('rAF darf fuer den Endzustand nicht noetig sein'); };
+  globalThis.CSS = { supports: () => true };
+  try {
+    const { collapseOut } = await import('../public/utils/ux.js');
+    await collapseOut(row, { duration: 10 });
+    const glide = row2.calls.find((c) => c.keyframes.some((k) => 'transform' in k));
+    assert.ok(glide, 'die Zeile darunter gleitet nicht');
+    assert.deepEqual(glide.keyframes, [{ transform: 'none' }, { transform: 'translate(0px, -48px)' }], 'sie gleitet von ihrer Lage in die geschlossene - nicht von unten heran');
+    const glide2 = group2.calls.find((c) => c.keyframes.some((k) => 'transform' in k));
+    assert.deepEqual(glide2?.keyframes.at(-1), { transform: 'translate(0px, -48px)' }, 'die naechste Gruppe folgt mit demselben Weg - kein Leerband');
+    const clip = carrier.calls.find((c) => c.keyframes.some((k) => 'clipPath' in k));
+    assert.ok(clip, 'die Karte kuerzt ihre Unterkante nicht mit - die letzte Zeile wird abgeschnitten');
+    assert.match(clip.keyframes[0].clipPath, /^inset\(-2px -2px 0px -2px round 0px 0px 18px 18px\)$/);
+    assert.match(clip.keyframes.at(-1).clipPath, /^inset\(-2px -2px 48px -2px round 0px 0px 18px 18px\)$/, 'die Karte endet dort, wo sie geschlossen endet');
+    assert.ok(!group.calls.length && !list.calls.length, 'nur was eine Flaeche malt, wird gekappt');
+    // Geschlossen wird ZULETZT: die Zeile geht erst auf null, wenn alles steht.
+    const closeAt = log.lastIndexOf('animate row opacity,height,paddingTop,paddingBottom,marginTop,marginBottom,borderTopWidth,borderBottomWidth');
+    assert.ok(closeAt > log.indexOf('animate row2 transform'), `die Zeile schliesst vor dem Gleiten: ${log.join(' | ')}`);
+    assert.equal(row.calls.at(-1).timing.fill, 'forwards', 'die Zeile bleibt zu, bis die Liste neu gezeichnet ist');
+    assert.equal(row.calls.at(-1).playState, 'running');
+    assert.equal(glide.playState, 'idle', 'die Bewegung ist am Ende abgenommen');
+    assert.equal(row2.style.transform, '', 'kein Inline-Halt bleibt stehen');
+    assert.equal(carrier.style.clipPath, '', 'keine Kappe bleibt an der Karte');
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+    }
+  }
+});
+
 test('collapseRow: klappt die Zeile aus, mit der letzten Zeile die Gruppe - und loest auch ohne finish auf', async () => {
   const restore = motionEnv();
   try {
@@ -1514,6 +1590,22 @@ test('Listenbewegung: Module, die ihre Zeilen neu bauen, nutzen list-motion bzw.
   const rewards = pageSource('rewards');
   const fn = rewards.slice(rewards.indexOf('async function renderCurrentTab('), rewards.indexOf('async function renderCurrentTab(') + 900);
   assert.match(fn, /if \(first\) \{\s*el\.replaceChildren\(\);\s*el\.insertAdjacentHTML\('beforeend', renderSkeletonList/, 'Skelett nur unter `first`');
+});
+
+/* R21 (Critique 2026-10-21, D3): der Zaehler einer Gruppe zog erst nach dem
+ * Austritt nach - gemessen ~900ms (Aufgaben) bzw. ~1,7s (Einkauf) nach dem
+ * Haken, 400ms nachdem die Zeile zu gehen begann. Der neue Stand steht vor dem
+ * Austritt fest; die Zaehler nehmen ihn im Frame an, in dem die Zeile
+ * ausblendet (gemessen danach: @497 bzw. @1257ms, Blende ab 513 bzw. 1264). */
+test('D3 (R21): der Zaehler wechselt im Frame des Austritts, nicht nach ihm - Aufgaben und Einkauf', () => {
+  const tasks = pageSource('tasks');
+  const reload = tasks.slice(tasks.indexOf('async function reloadWithRowMotion('), tasks.indexOf('function previewGroupCounts('));
+  assert.match(reload, /previewGroupCounts\(container\);\s*await collapseOut\(lastInGroup \? group : row\)/, 'Aufgaben: die Zaehler stehen erst nach dem Austritt');
+  const preview = tasks.slice(tasks.indexOf('function previewGroupCounts('), tasks.indexOf('function patchRowRemoval('));
+  assert.match(preview, /groupBy\(filteredTasks\(\), state\.groupMode\)/, 'Aufgaben: die Vorschau rechnet aus dem neuen Bestand, wie patchRowRemoval');
+  const shopping = pageSource('shopping');
+  const settle = shopping.slice(shopping.indexOf('function settleItemPlacements('), shopping.indexOf('function updateItemRow('));
+  assert.match(settle, /if \(closingRows\.length\) previewGroupCounts\(listEl, first\);\s*const closing = closingRows\.map\(\(row\) => collapseOut\(row\)\);/, 'Einkauf: die Zaehler stehen erst nach dem Umzug');
 });
 
 /* R17, Bewegung: "das System steht, die Abdeckung fehlt". Acht Seiten bauten

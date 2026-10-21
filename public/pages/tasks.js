@@ -1709,11 +1709,32 @@ async function reloadWithRowMotion(container, taskId, { holdUntil = 0 } = {}) {
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const group = row.closest('.task-group');
     const lastInGroup = group && group.querySelectorAll('.swipe-row').length === 1;
+    previewGroupCounts(container);
     await collapseOut(lastInGroup ? group : row);
     if (patchRowRemoval(container, taskId)) return;
   }
   renderTaskList(container);
   if (!row && staysInView && state.viewMode === 'list') expandIn(taskRowEl(container, taskId));
+}
+
+/**
+ * DER ZAEHLER WECHSELT MIT DER ZEILE (Critique R21, D3). Er zog erst nach dem
+ * Austritt nach (patchRowRemoval) - gemessen ~900ms nach dem Haken, 400ms
+ * nachdem die Zeile zu gehen begann. Der neue Bestand steht schon vor dem
+ * Austritt fest (reloadWithRowMotion laedt vorher); die Zaehler nehmen ihn im
+ * selben Frame an, in dem die Zeile ausblendet. Eine Gruppe, die mit ihrer
+ * letzten Zeile geht, behaelt ihre Zahl, bis sie weg ist.
+ */
+function previewGroupCounts(container) {
+  const listEl = container?.querySelector?.('#task-list');
+  if (!listEl || state.viewMode !== 'list') return;
+  const counts = new Map(groupBy(filteredTasks(), state.groupMode).map((g) => [String(g.id), g.tasks.length]));
+  for (const el of listEl.querySelectorAll(':scope > .task-group')) {
+    const n = counts.get(el.dataset.groupId);
+    const count = el.querySelector(':scope > .list-group__title > .list-group__count');
+    if (n == null || !count || count.textContent === String(n)) continue;
+    count.textContent = String(n);
+  }
 }
 
 /**

@@ -1202,7 +1202,17 @@ das Verhaeltnis haelt.
   (`flipPlayElements` in `utils/flip.js`) nur mit `transform` nach - keine Hoehe, kein Abstand
   je Frame (am 4x gedrosselten Telefon sprang die Hoehenanimation in Stufen). Unter reduzierter
   Bewegung blendet die Zeile aus und die Nachbarn blenden an ihrer neuen Stelle ein, statt um
-  die Zeilenhoehe zu springen. **`expandIn` spiegelt das seit R19:** das Element steht sofort in
+  die Zeilenhoehe zu springen. **Seit R21 (D3) erst gleiten, dann schliessen:** fiel die Zeile
+  sofort auf null, schrumpfte ihre Karte (`.row-carrier`) im selben Frame, waehrend die Zeilen
+  darunter noch heranglitten - die letzte stand bis zu 64px abgeschnitten, und unter der Karte
+  lag ein leeres Band derselben Hoehe. Jetzt misst Schritt 2 die geschlossene Lage nur (nie
+  gemalt), die Nachbarn gleiten per `transform` dorthin, jede Karte, die eine Flaeche malt,
+  kuerzt ihre Unterkante im selben Takt per `clip-path: inset(... round ...)`, und erst dann
+  faellt die Zeile auf null - nach einem gemalten Inline-Halt, damit die Layout-Messung nichts
+  zaehlt (CLS 0,048 -> 0). Zeilen, die im selben Moment gehen, schliessen gemeinsam. Der Zaehler
+  der Gruppe wechselt im Frame, in dem die Zeile ausblendet (Aufgaben @913 -> @497ms, Einkauf
+  @1680 -> @1257ms); die Verweildauer davor bleibt. Guard `test:motion` "collapseOut R21 (D3)".
+  **`expandIn` spiegelt das seit R19:** das Element steht sofort in
   voller Hoehe und blendet mit 3 % Skalierung ein, die Nachbarn gleiten per FLIP aus der Lage,
   die ein Frame mit `display: none` am Element misst (damit faellt auch der `gap` des Traegers
   weg - die Option `absorbGap` ist entfallen). `interpolate-size` waere wieder Layout je Frame.

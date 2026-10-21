@@ -2381,6 +2381,26 @@ function syncGroupChrome(listEl) {
   });
 }
 
+/**
+ * DIE ZAEHLER, WIE SIE NACH DEM UMZUG STEHEN (Critique R21, D3). Sie zogen erst
+ * mit `syncGroupChrome` nach dem Austritt nach - gemessen ~1,7s nach dem Haken,
+ * 400ms nachdem die Zeile zu gehen begann. Jetzt nehmen sie den Stand im
+ * selben Frame an, in dem die Zeilen ausblenden: was bleibt, plus was
+ * ankommt. Nur die Zahl - ob eine Gruppe verschwindet, entscheidet weiter
+ * `syncGroupChrome` nach dem Umzug.
+ */
+function previewGroupCounts(listEl, moves) {
+  const leaving = new Set(moves.map((m) => m.row));
+  listEl.querySelectorAll('.list-group').forEach((groupEl) => {
+    const countEl = groupEl.querySelector('.list-group__count');
+    if (!countEl) return;
+    const stay = Array.from(groupEl.querySelectorAll('.row-carrier > .swipe-row')).filter((r) => !leaving.has(r)).length;
+    const arrive = moves.filter((m) => groupEl.contains(m.to)).length;
+    const text = String(stay + arrive);
+    if (countEl.textContent !== text) countEl.textContent = text;
+  });
+}
+
 /** Steht das Element im Bild - weder selbst noch ueber einen Vorfahren `hidden`? */
 function shown(el) {
   return Boolean(el) && !el.closest('[hidden]');
@@ -2490,7 +2510,10 @@ function settleItemPlacements(container, ids, { animate = true } = {}) {
   };
 
   // Aus einem zugeklappten Traeger gibt es nichts zusammenzuklappen.
-  const closing = animate ? leaving.filter((row) => !row.parentElement.hidden).map((row) => collapseOut(row)) : [];
+  const closingRows = animate ? leaving.filter((row) => !row.parentElement.hidden) : [];
+  // Die Zaehler wechseln im Moment des Austritts, nicht nach ihm (D3).
+  if (closingRows.length) previewGroupCounts(listEl, first);
+  const closing = closingRows.map((row) => collapseOut(row));
   if (closing.length) Promise.all(closing).then(move);
   else move();
 }
