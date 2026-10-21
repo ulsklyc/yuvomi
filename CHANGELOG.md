@@ -96,6 +96,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   halfway through it. The old page now stays for up to 150 ms while the new one draws, so the
   fade lands on content - including the scroll position when you go back - and the selection pill
   in the tab bar continues its glide where it was instead of skipping ahead.
+- **Loading spinners turn at one pace and keep turning with reduced motion.** The button,
+  sign-in and document preview spinners turned at three different speeds, and with reduced motion
+  they stood still, so a running action looked stuck. They now share one pace, and as a status
+  they keep turning in place when reduced motion is on.
 - **The kitchen tab bar on phones has a proper capsule.** The highlight of the current kitchen
   tab was almost a circle hugging the word, and a count read as "Pantry10". It is now a 40-pixel
   capsule with even room around the word, the count sits apart as its own badge, and all four

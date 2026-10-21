@@ -1216,6 +1216,11 @@ das Verhaeltnis haelt.
   in `test:motion` (`MOTION_EXCEPTIONS`, jede mit Grund). Eintritt darf federn, Austritt ist
   kuerzer und ohne Ueberschwinger; im Arbeitsfluss laeuft nichts laenger als 300ms. Unter
   reduzierter Bewegung gilt EINE "aus"-Konvention: `0s` aus `reset.css`, kein `0.01ms` daneben.
+  **Spinner (R21, D12):** EINE Statusdrehung (`@keyframes status-spin`, layout.css) in EINEM
+  Tempo (`--spin-period`, 700ms) - vorher Knopf 550, Anmeldung 700, Dokumentvorschau 800ms. Ein
+  Spinner ist Statusbewegung und dreht unter reduzierter Bewegung weiter (Abmeldung per
+  `--motion-blend: var(--spin-period)` in reset.css); ein stehender sah aus wie ein haengender
+  Vorgang. Dekor (Wetter-Strahlen) bleibt aus. Guard: `test:motion` ("Spinner D12").
 - **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
   `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
   `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei

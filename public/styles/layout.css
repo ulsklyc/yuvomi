@@ -8918,7 +8918,8 @@ textarea::placeholder {
 
   .swipe-row--hint > :first-child { animation: none; }
 
-  .btn--loading::after { animation: none; }
+  /* Der Knopf-Spinner steht hier nicht mehr: Statusbewegung dreht weiter
+   * (reset.css, Critique R21 D12). */
 }
 
 /* --------------------------------------------------------
@@ -10070,8 +10071,12 @@ html:has(.app-page.is-selecting) {
   pointer-events: none;
 }
 
-/* Button loading state: hides text, shows spinner */
-@keyframes btn-spin {
+/* Button loading state: hides text, shows spinner.
+ *
+ * `status-spin` ist DIE Statusdrehung jedes Spinners (Knopf, Anmeldung,
+ * Dokumentvorschau), im Tempo `--spin-period` (tokens.css, Critique R21 D12).
+ * Sie steht hier, weil layout.css global laedt - Modul-Blaetter teilen sie. */
+@keyframes status-spin {
   to { transform: rotate(360deg); }
 }
 
@@ -10093,7 +10098,7 @@ html:has(.app-page.is-selecting) {
   border: 2px solid var(--color-glass-hover);
   border-top-color: var(--color-text-on-accent);
   border-radius: var(--radius-full);
-  animation: btn-spin 550ms linear infinite;
+  animation: status-spin var(--spin-period) linear infinite;
 }
 
 /* For non-primary buttons (secondary, ghost) */

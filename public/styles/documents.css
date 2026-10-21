@@ -1916,17 +1916,9 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  animation: documents-spin 800ms linear infinite;
-}
-
-@keyframes documents-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .document-viewer__spinner {
-    animation: none;
-  }
+  /* Die geteilte Statusdrehung (layout.css); unter reduzierter Bewegung
+   * dreht sie weiter (reset.css, D12). */
+  animation: status-spin var(--spin-period) linear infinite;
 }
 
 /* --------------------------------------------------------

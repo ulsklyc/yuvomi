@@ -377,16 +377,10 @@
   border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: auth-spin 0.7s linear infinite;
+  /* Die geteilte Statusdrehung (layout.css); unter reduzierter Bewegung
+   * dreht sie weiter (reset.css, D12). */
+  animation: status-spin var(--spin-period) linear infinite;
   flex-shrink: 0;
-}
-
-@keyframes auth-spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-spinner { animation: none; opacity: 0.6; }
 }
 
 /* --------------------------------------------------------

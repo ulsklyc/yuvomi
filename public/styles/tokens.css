@@ -1816,6 +1816,12 @@
    * auf ihr ruhen, bevor sie ausklappt (150-250ms, A1 P3-1 der Re-Critique
    * 2026-09-27). Eine Wartezeit, keine Bewegungsdauer. */
   --sidebar-hover-intent: 200ms;
+  /* EIN TEMPO FUER JEDEN SPINNER (Critique R21, D12): eine Umdrehung der
+   * Statusdrehung. Vorher drehten drei Spinner in drei Tempi (Knopf 550ms,
+   * Anmeldung 700ms, Dokumentvorschau 800ms) - dieselbe Aussage "es laeuft
+   * noch" in drei Stimmen. Eine Schleife, kein Uebergang: deshalb ausserhalb
+   * der --duration-Stufen. Unter reduzierter Bewegung dreht er weiter (reset.css). */
+  --spin-period: 700ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und

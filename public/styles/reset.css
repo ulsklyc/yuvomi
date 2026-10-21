@@ -227,6 +227,18 @@ h1, h2, h3, h4, h5, h6 {
   .page-toolbar--capped > .page-toolbar__title {
     --motion-blend: var(--duration-sm);
   }
+
+  /* STATUSBEWEGUNG BLEIBT (Critique R21, D12). Ein Spinner sagt "es laeuft
+   * noch"; stand er still, sah ein laufender Vorgang wie ein haengender aus -
+   * die Sperre oben setzte ihn auf 0s. Er dreht auf der Stelle, ohne
+   * Wegstrecke, und behaelt deshalb sein Tempo - ueber dieselbe Abmeldung wie
+   * die Blenden oben, nur mit dem Tempo der Drehung. Nur reine
+   * Statusdrehungen (`status-spin`) stehen hier. */
+  .btn--loading::after,
+  .auth-spinner,
+  .document-viewer__spinner {
+    --motion-blend: var(--spin-period);
+  }
 }
 
 /* Versteckte, aber zugängliche Elemente */

@@ -947,8 +947,10 @@ test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nic
   // der Large Title der gedeckelten Koepfe); alle anderen stehen bei 0s.
   assert.match(globalRule.body, /--motion-blend:\s*0s/, 'ohne Abmeldung bleibt jede Animation bei 0s');
   assert.match(globalRule.body, /animation-duration:\s*var\(--motion-blend\)\s*!important/, 'Animationen bleiben aus');
+  // Seit R21 meldet sich mit `var(--spin-period)` auch die Statusdrehung ab
+  // (eigener Guard: "Spinner D12") - sie ist keine Blende und steht nicht hier.
   const blendRules = [...eachRule(reset)].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
-    && /--motion-blend:\s*var\(/.test(r.body));
+    && /--motion-blend:\s*var\(/.test(r.body) && !/--motion-blend:\s*var\(--spin-period\)/.test(r.body));
   assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title'],
     'eine neue Abmeldung fuer Animationen: nur fuer Elemente, deren einzige Animation eine Blende ist (hier nachtragen und pruefen)');
   for (const name of ['page-title-settle', 'page-title-settle-back']) {
@@ -2512,6 +2514,44 @@ test('tasks: a failing reload after the dialog closed is reported on the page, n
 // Kein toter Keyframe (Critique 2026-10-16, A5): `list-item-in` stand mit
 // einem Kommentar, der einen Nutzer behauptete, den es nicht gab.
 // --------------------------------------------------------
+// Critique R21 (D12): drei Spinner drehten in drei Tempi (Knopf 550ms,
+// Anmeldung 700ms, Dokumentvorschau 800ms), und unter reduzierter Bewegung
+// standen sie - ein laufender Vorgang sah aus wie ein haengender.
+test('Spinner D12: eine Statusdrehung in einem Tempo - und unter reduzierter Bewegung dreht sie weiter', () => {
+  assert.match(css('tokens.css'), /--spin-period:\s*\d+ms;/, 'das Tempo-Token fehlt');
+  // Jede Endlos-Drehung um sich selbst ist ein Spinner - ausser dem Wetter-Dekor.
+  const DECOR = new Set(['weather-rays']);
+  const spins = new Set([...keyframeNames()].filter((name) => {
+    const body = (keyframesBody(name) ?? '').replace(/\s+/g, '');
+    return /^to\{transform:rotate\((360deg|1turn)\);?\}$/.test(body);
+  }));
+  const spinners = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      const m = rule.body.match(/(?:^|;)\s*animation\s*:\s*([^;]+)/);
+      if (!m || !/\binfinite\b/.test(m[1])) continue;
+      const name = m[1].split(/\s+/).find((w) => spins.has(w));
+      if (!name || DECOR.has(name)) continue;
+      assert.equal(name, 'status-spin', `${file}: ${rule.selector} dreht mit einer eigenen Drehung (${name})`);
+      assert.match(m[1], /var\(--spin-period\)/, `${file}: ${rule.selector} dreht in einem eigenen Tempo (${m[1].trim()})`);
+      spinners.push(rule.selector.trim());
+    }
+  }
+  assert.deepEqual(spinners.sort(), ['.auth-spinner', '.btn--loading::after', '.document-viewer__spinner'],
+    'ein neuer Spinner: hier und in der Ausnahme von reset.css eintragen');
+  assert.deepEqual([...spins].filter((n) => !DECOR.has(n)), ['status-spin'], 'mehr als eine Statusdrehung');
+  // Unter reduzierter Bewegung: genau diese drehen weiter, nichts haelt sie an.
+  const reduced = reducedMotionRules();
+  // Ueber die Abmeldung der globalen Sperre (`--motion-blend`), ohne !important.
+  const keep = reduced.find((r) => r.file === 'reset.css' && /--motion-blend:\s*var\(--spin-period\)/.test(r.body));
+  assert.deepEqual(keep?.selectors.slice().sort(), spinners, 'unter reduzierter Bewegung friert ein Spinner ein');
+  for (const r of reduced) {
+    for (const sel of r.selectors) {
+      if (spinners.includes(sel)) assert.doesNotMatch(r.body, /animation(?:-name)?:\s*none/, `${r.file}: ${sel} haelt unter reduzierter Bewegung an`);
+    }
+  }
+});
+
 test('jede @keyframes hat einen Nutzer - im Stylesheet oder im Skript', () => {
   const stripCss = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
   const sheets = allSheets.map((f) => stripCss(css(f)).replace(/@keyframes\s+[\w-]+/g, ''));
