@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A phone number looks the same in the contact list and in the contact.** The list showed a
+  number formatted, the contact's detail showed it as typed; both now use the same format.
+
 - **On a phone, documents filter by folder and category from one place.** The filter row held the
   active/archived switch, the folder button and six category chips, and at phone width none of the
   categories was fully in view. The folder button now opens folders and categories as two groups,

@@ -761,15 +761,19 @@ async function enhancePhones(root) {
   for (const el of els) {
     const raw = el.dataset.phoneRaw;
     if (el.tagName === 'A') {
-      // href aktualisieren; textContent (Icon) bleibt unangetastet.
+      // href aktualisieren. Ein Aktionslink ("Anrufen", Icon) behaelt sein Wort.
       el.href = fmt.tel(raw, country);
-    } else {
-      const display = fmt.display(raw, country);
-      // Nummer ist immer LTR - in RTL-Locales (ar/fa) sonst Bidi-Umbruch bei '+'.
-      el.setAttribute('dir', 'ltr');
-      // Nur den ANZEIGETEXT setzen - der Rohwert lebt weiter in data-phone-raw.
-      if (display !== raw) el.textContent = display;
+      // TRAEGT DER LINK DIE NUMMER SELBST (Zeile der Detailansicht), bekommt er
+      // dieselbe Anzeige wie die Listenzeile (Critique R21, a3): vorher stand
+      // in der Liste "+49 231 4452210", im Detail derselbe Kontakt als
+      // "+49 231 445 2210" - der Zweig hier setzte nur das Ziel.
+      if (el.textContent.trim() !== raw.trim()) continue;
     }
+    const display = fmt.display(raw, country);
+    // Nummer ist immer LTR - in RTL-Locales (ar/fa) sonst Bidi-Umbruch bei '+'.
+    el.setAttribute('dir', 'ltr');
+    // Nur den ANZEIGETEXT setzen - der Rohwert lebt weiter in data-phone-raw.
+    if (display !== raw) el.textContent = display;
   }
 }
 
@@ -2209,4 +2213,6 @@ export const __test = {
   // #1997: der vCard-Import schliesst nur seinen eigenen Dialog.
   openImportSelectionModal,
   setContainerForTest(container) { _container = container; },
+  // R21 S9b: Liste und Detail zeigen eine Nummer gleich.
+  enhancePhones,
 };

@@ -456,3 +456,45 @@ test('R21 S7: Label und Wert stehen dicht, das Labelfeld steht schmal unter dem 
   const label = rules.find((r) => r.selector.trim() === '.contact-mv-row > .contact-mv-row__label' && r.at.some((a) => /@container contact-mv \(max-width:/.test(a)));
   assert.match(label?.body ?? '', /grid-row:\s*2/, 'schmal steht das Label in einer eigenen Zeile');
 });
+
+// R21 S9b (Critique a3): Liste und Detail zeigten dieselbe Nummer verschieden -
+// die Zeile formatiert (enhancePhones), der Link der Detailansicht behielt den
+// Rohwert, weil der A-Zweig nur das Ziel setzte. Jetzt bekommt ein Link, der die
+// Nummer selbst traegt, dieselbe Anzeige; ein Aktionslink ("Anrufen") behaelt
+// sein Wort.
+test('Liste und Detail zeigen eine Telefonnummer in derselben Form', async () => {
+  const { __primePhoneLib } = await import('../public/utils/phone.js');
+  __primePhoneLib({
+    parse: (value) => ({
+      country: 'DE', number: '+492314452210',
+      formatNational: () => '0231 4452210', formatInternational: () => '+49 231 4452210',
+    }),
+    AsYouType: class {}, isPossible: () => true, metadata: {},
+  });
+  try {
+    contacts.state.defaultCountry = 'AT';
+    const raw = '+49 231 445 2210';
+    const el = (tag, text) => {
+      const node = document.createElement(tag);
+      // mini-dom fuehrt den Tag klein; der Browser (und enhancePhones) gross.
+      node.tagName = tag.toUpperCase();
+      node.dataset.phoneRaw = raw;
+      node.textContent = text;
+      if (tag === 'a') node.href = 'tel:x';
+      return node;
+    };
+    const zeile = el('span', raw);
+    const detail = el('a', raw);
+    const aktion = el('a', 'Anrufen');
+    const root = { querySelectorAll: () => [zeile, detail, aktion] };
+    await contacts.enhancePhones(root);
+    assert.equal(zeile.textContent, '+49 231 4452210', 'die Zeile formatiert');
+    assert.equal(detail.textContent, zeile.textContent, 'der Link der Detailansicht zeigt dieselbe Form');
+    assert.equal(detail.getAttribute('dir'), 'ltr');
+    assert.match(detail.href, /^tel:\+492314452210$/, 'und waehlt E.164');
+    assert.equal(aktion.textContent, 'Anrufen', 'ein Aktionslink behaelt sein Wort');
+    assert.match(aktion.href, /^tel:\+492314452210$/);
+  } finally {
+    __primePhoneLib(null);
+  }
+});
