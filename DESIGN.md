@@ -4193,7 +4193,10 @@ Liste weisse Zeile mit 8px-Farbpunkt. Die Monatsbalken sind die Referenz, alle a
   `--cal-event-edge` im Vollton an Inline-Start; kein Rahmen, `--radius-xs`. Gemessen ueber
   die zwoelf Seed-/Kalenderfarben (Amber, Cyan, Teal eingeschlossen): Ruhe mindestens 7,22:1
   light / 6,96:1 dark, Hover 6,83 / 6,47. Die 38 % der Woche waren naeher an der Nutzerfarbe,
-  also nie der bessere Kontrast.
+  also nie der bessere Kontrast. Der Monatschip haelt ueber und unter dem Titel 3px
+  (`--cal-chip-pad-block`, R21 S9b): mit 2px lag die Zeile buendig an Kante und Flaeche
+  (Detektor cramped-padding, 16 Treffer bei 1280). Die Spur der Monatsbaender
+  (`--month-band-h`) rechnet mit demselben Token (`test:calendar`).
 - **Titel oben, Zeit darunter, wenn Platz ist.** Zeitbloecke richten den Titel an der
   Oberkante aus (klebend, wenn der Block oben aus dem Scrollport ragt), halbfett; die Zeitzeile
   tritt ueber das Gewicht zurueck, nie ueber Opacity. Ob sie Platz hat, fragt eine

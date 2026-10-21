@@ -1691,6 +1691,11 @@
    * Tag, Ganztag und Listenzeile tragen sie gleich breit. Die Titelfassung des
    * Telefon-Monats nimmt 2px (--space-0h), eine Geometrie, keine zweite Kante. */
   --cal-event-edge: 3px;
+  /* Das Polster ueber und unter dem Titel eines Monatschips (R21 S9b): 3px
+   * statt 2px, damit die Zeile nicht buendig an Kante und Flaeche liegt
+   * (Detektor cramped-padding ab 3px). Die Spurhoehe der Monatsbaender
+   * (--month-band-h, calendar.css) rechnet mit demselben Wert. */
+  --cal-chip-pad-block: 3px;
   --sub-tabs-height: 52px;
   --kitchen-tabs-height: 56px;
 

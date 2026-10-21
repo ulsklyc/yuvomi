@@ -1033,7 +1033,7 @@
   gap: var(--space-1);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  padding: var(--space-0h) var(--space-1);
+  padding: var(--cal-chip-pad-block) var(--space-1);
   border-radius: var(--radius-xs);
   margin-bottom: var(--space-0h);
   white-space: nowrap;
@@ -2828,7 +2828,7 @@
  * `is-clipped` und zaehlt ins „+N". Die Schicht nimmt keine Zeiger an, nur
  * ihre Baender - ein Klick daneben trifft die Zelle darunter. */
 .month-grid {
-  --month-band-h: calc(var(--text-xs) * 1.4 + 2 * var(--space-0h));
+  --month-band-h: calc(var(--text-xs) * 1.4 + 2 * var(--cal-chip-pad-block));
 }
 
 .month-grid__row--bands {
@@ -3017,7 +3017,7 @@
 .month-day .cal-task-chip {
   border: none;
   box-shadow: none;
-  padding: var(--space-0h) var(--space-1);
+  padding: var(--cal-chip-pad-block) var(--space-1);
 }
 
 /* TABLET: DER TITEL DARF ZWEI ZEILEN NEHMEN (R21, Critique 2026-10-21, D4).

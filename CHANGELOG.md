@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Events in the calendar month have room above and below their title.** The tinted bars in a
+  month cell sat with their text flush against their top and bottom edge; they are now one pixel
+  taller on each side, and multi-day bars grow with them.
+
 - **The same message stands once.** When the same notice comes up again while it is still on
   screen, it stays one notice with a small count instead of stacking up and pushing other notices
   away. Notices with an Undo button stay separate.

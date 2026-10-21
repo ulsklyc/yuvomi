@@ -6721,6 +6721,24 @@ test('R21 S7: im Monat steht kein Mini-Monat in der Seitenleiste', () => {
   assert(/\(miniMonthWanted\(\) \? miniMonthHtml\(\) : ''\)/.test(src), 'renderSidebar fragt nach dem Mini-Monat');
 });
 
+/* R21 S9b (Detektor B): der Monatschip lag mit 2px Polster buendig an Kante und
+ * Flaeche (cramped-padding, 16 Treffer bei 1280 hell/dunkel). Das Polster ist ein
+ * Token, und die Spur der Monatsbaender rechnet mit demselben Wert - sonst stuende
+ * ein Band neben einem Chip anderer Hoehe. */
+test('R21 S9b: Monatschip und Monatsband teilen ein Polster von mindestens 3px', () => {
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const pad = /--cal-chip-pad-block:\s*(\d+)px/.exec(tokens);
+  assert(pad && Number(pad[1]) >= 3, `--cal-chip-pad-block fehlt oder ist kleiner als 3px: ${pad?.[1]}`);
+  const rules = [...eachRule(calendarCss)];
+  const body = (selector) => rules.filter((r) => r.selector.trim() === selector).map((r) => r.body).join(';');
+  for (const selector of ['.month-day__event', '.month-day .cal-task-chip']) {
+    assert(/(?:^|;)\s*padding:\s*var\(--cal-chip-pad-block\) var\(--space-1\)/.test(body(selector)),
+      `${selector}: das Polster kommt nicht aus --cal-chip-pad-block`);
+  }
+  assert(/--month-band-h:\s*calc\(var\(--text-xs\) \* 1\.4 \+ 2 \* var\(--cal-chip-pad-block\)\)/.test(body('.month-grid')),
+    'die Spur der Monatsbaender rechnet nicht mit dem Polster des Chips');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
