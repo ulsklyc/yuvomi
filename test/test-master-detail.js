@@ -1231,3 +1231,17 @@ test('setSelectionBulk: eine Aktion mit paneOnly steht in der Spalte, nicht in d
     Object.assign(document, vorher);
   }
 });
+
+// R21 S9b (Critique a4, "Auswahl violett vs Modulton"): die ausgewaehlte Zeile
+// stand in der Flaeche der violetten Seitenleisten-Pille, waehrend der aktive
+// Filter-Chip darueber und die gewaehlte Dokumentzeile den Modulton trugen.
+// Nach der Eine-Stimme-Regel beantwortet die Zeile "wo bin ich": Modulton.
+test('die ausgewaehlte Zeile der Spaltenform traegt den Modulton, nicht den Akzent der Shell', () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.split-view [data-md-id].is-selected');
+  assert.ok(rule, 'keine Regel fuer die ausgewaehlte Zeile');
+  assert.match(rule.body, /background-color:\s*color-mix\(in srgb, var\(--module-accent, var\(--color-accent\)\) var\(--tint-state\), var\(--color-surface\)\)/);
+  const chip = [...eachRule(readFileSync(new URL('../public/styles/filter-chip.css', import.meta.url), 'utf8'))]
+    .find((r) => r.selector.trim() === '.filter-chip--active' && !r.at.length);
+  assert.match(chip.body, /var\(--module-accent/, 'der aktive Filter-Chip spricht ebenfalls im Modulton');
+});

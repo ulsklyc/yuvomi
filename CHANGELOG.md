@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A selected row speaks in its module's colour.** In list-and-detail pages the selected row was
+  violet while the active filter chip above it carried the module's colour; both now use the module's
+  colour. Purchase prices in the inventory read like every other amount, in semibold.
+
 - **The repeat and receipt marks of a booking stand next to its date.** At the end of the line they
   could wrap onto a line of their own on a phone; now they follow the date ("01.10. ⟳ · Health").
 

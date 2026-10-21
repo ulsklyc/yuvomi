@@ -1157,8 +1157,8 @@
 .due-date--overdue { color: var(--color-danger); font-weight: var(--font-weight-semibold); }
 .due-date--today   { color: var(--color-warning); font-weight: var(--font-weight-semibold); }
 
-/* Auf der ausgewaehlten Zeile der Spaltenform (layout.css: Akzent
- * --tint-state ueber der Flaeche, light #EDE7FD) traegt die Vollfarbe keine
+/* Auf der ausgewaehlten Zeile der Spaltenform (layout.css: Modulton
+ * --tint-state ueber der Flaeche; bis R21 Akzent, light #EDE7FD) traegt die Vollfarbe keine
  * 4,5 mehr: „Heute faellig" 4,14:1 (Sonde 2), „Ueberfaellig" 4,47:1. Gefunden von
  * Sonde 2, sobald die Demo-Saat eine heute faellige Aufgabe als erste Zeile
  * hatte. Die -ink-Stufe ist die Antwort aus tokens.css fuer Text auf einer

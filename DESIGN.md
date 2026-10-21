@@ -826,8 +826,10 @@ das Violett der Bildmarke. Sie traegt alles, was in jedem Modul dasselbe tut: di
 Tab-Leiste und die Sidebar samt Aktiv-Pille, den FAB, den Primaer- und Sekundaerknopf,
 Umschalter und Checkboxen, den Fokusring, den Datepicker, die Suche und jedes
 Shell-Overlay. Der MODULTON traegt, was sagt, wo man ist: das Siegel im Kopf, die Leisten
-und Segmente INNERHALB des Moduls, seine Chips und Sektionsmarken, seine Zeilen-Hover,
-sein Widget auf dem Dashboard, sein Zeichen in der Sidebar-Legende.
+und Segmente INNERHALB des Moduls, seine Chips und Sektionsmarken, seine Zeilen-Hover und
+die ausgewaehlte Zeile der Spaltenform (seit R21 S9b; vorher Violett wie die Seitenleisten-
+Pille, neben einem Filter-Chip im Modulton - zwei Auswahlfarben auf einem Schirm,
+`test:master-detail`), sein Widget auf dem Dashboard, sein Zeichen in der Sidebar-Legende.
 
 **Das Kriterium ist die Frage, die das Element beantwortet** - "was tut das hier" oder "wo
 bin ich". Die Shell beantwortet nie die zweite: sie ist in jedem Modul dieselbe.

@@ -3731,11 +3731,17 @@ html.fab-steady .page-fab {
     outline-offset: var(--focus-ring-offset-inset);
   }
 
-  /* Die ausgewaehlte Zeile: dieselbe Flaeche wie die Aktiv-Pille der
-   * Seitenleiste - „das steht rechts". Nur in der Spaltenform; darunter gibt
-   * es keine Auswahl, nur ein Oeffnen. */
+  /* Die ausgewaehlte Zeile - „das steht rechts". Nur in der Spaltenform;
+   * darunter gibt es keine Auswahl, nur ein Oeffnen.
+   *
+   * IM MODULTON, NICHT IM VIOLETT (R21 S9b, Critique a4 "Auswahl violett vs
+   * Modulton"). Sie stand in der Flaeche der Aktiv-Pille der Seitenleiste,
+   * waehrend der aktive Filter-Chip darueber und die gewaehlte Dokumentzeile
+   * den Modulton trugen - zwei Auswahlfarben auf einem Schirm. Nach der
+   * Eine-Stimme-Regel (DESIGN.md) beantwortet die Zeile "wo bin ich", wie
+   * ihre Chips und ihr Hover: Modulton. Die Seitenleiste bleibt Violett. */
   .split-view [data-md-id].is-selected {
-    background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
   }
 }
 
