@@ -1637,6 +1637,12 @@
    * Seitenleiste (320px, Apples Systemeinstellungen), nicht die Listenbahn
    * oben. EIN Wert fuer beide, damit sie nicht auseinanderlaufen (R10). */
   --layout-nav-list: 20rem;
+  /* Breite eines Textfelds in einer Formularzeile der Einstellungen (R21 S7,
+   * Critique a5): die Bedienspalte ist die halbe Zeile (50cqi), aber hoechstens
+   * so breit. Ohne Obergrenze standen die Felder einer Seite an drei Kanten
+   * (Konto bei 1280: 972 / 922 / 999px), weil Profil, Kontaktdaten und
+   * Datumsfeld verschieden breite Zeilen haben. */
+  --layout-field-max: 16rem;
   /* Seitenspalte der Flaechen mit Spalten (`.page-columns`, layout.css;
    * DESIGN.md, Breitenregel, R16 2026-10-05): links die Liste auf dem
    * Lesemass, rechts eine Spalte, die den Rest bis zur Modulkante nimmt und

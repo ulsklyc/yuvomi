@@ -628,6 +628,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  container: contact-mv / inline-size;
 }
 
 .contact-mv-row {
@@ -655,6 +656,23 @@
 
 .contact-mv-add {
   margin-top: var(--space-2);
+}
+
+/* SCHMAL STEHT DAS LABEL UNTER DEM WERT (R21 S7, Critique a3). In der
+ * 1:1,6-Teilung blieben dem Labelfeld mobil 122px, und sein Platzhalter
+ * "Label (z. B. Arbeit)" brauchte 162 - er endete als "Label (z. B. A"; es
+ * "Etiqueta (p. ej. trabajo)" noch frueher. Unter 28rem Listenbreite steht
+ * das Label deshalb in einer eigenen Zeile unter dem Wert, so breit wie er;
+ * Entfernen bleibt neben dem Wert. */
+@container contact-mv (max-width: 27.99rem) {
+  .contact-mv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .contact-mv-row > .contact-mv-row__label {
+    grid-column: 1;
+    grid-row: 2;
+  }
 }
 
 /* Telefon-Tipphilfe (AsYouType-Vorschau / Plausibilitäts-Hinweis). Rein visuell,
@@ -707,6 +725,16 @@
   color: var(--color-text-primary);
   text-decoration: none;
   overflow-wrap: anywhere;
+}
+
+/* DIE TREFFERFLAECHE WAECHST, NICHT DER ABSTAND ZUM LABEL (R21 S7, Critique
+ * a3). Das 44px-Ziel stellte den ersten Wert mit seinem halben Ueberstand
+ * unter das Label: Label -> Wert 20px bei Telefon, E-Mail und Adresse, 8px
+ * bei Kategorie und Notizen im selben Blatt. Der erste Link zieht seinen
+ * Ueberstand oben zurueck (negativer Rand, Rezept aus tokens.css); die Ziele
+ * untereinander behalten ihren Abstand. */
+.contact-detail__value:first-child > .contact-detail__link {
+  margin-block-start: calc((var(--line-height-base) * 1em - var(--target-base)) / 2);
 }
 
 .detail-row:has(.contact-detail__link) > .detail-row__icon {

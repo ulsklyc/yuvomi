@@ -440,3 +440,19 @@ test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburt
   const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
   assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung kein Weg');
 });
+
+// R21 S7 (Critique a3): zwei Kanten im Kontakt. Im Leseblatt stand der erste
+// antippbare Wert mit dem halben Ueberstand seines 44px-Ziels unter dem Label
+// (Label -> Wert 15px, bei Kategorie 3px); im Formular endete der Platzhalter
+// des Labelfelds mobil als "Label (z. B. A" (122 von 162px).
+test('R21 S7: Label und Wert stehen dicht, das Labelfeld steht schmal unter dem Wert', () => {
+  const css = readFileSync(new URL('../public/styles/contacts.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const pull = rules.find((r) => r.selector.trim() === '.contact-detail__value:first-child > .contact-detail__link');
+  assert.match(pull?.body ?? '', /margin-block-start:\s*calc\(\(var\(--line-height-base\) \* 1em - var\(--target-base\)\) \/ 2\)/,
+    'der erste Wert zieht den Ueberstand seines Ziels zurueck');
+  const list = rules.find((r) => r.selector.trim() === '.contact-mv-list');
+  assert.match(list?.body ?? '', /container:\s*contact-mv \/ inline-size/);
+  const label = rules.find((r) => r.selector.trim() === '.contact-mv-row > .contact-mv-row__label' && r.at.some((a) => /@container contact-mv \(max-width:/.test(a)));
+  assert.match(label?.body ?? '', /grid-row:\s*2/, 'schmal steht das Label in einer eigenen Zeile');
+});

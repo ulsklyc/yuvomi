@@ -4090,7 +4090,9 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   // Ein Textfeld in der Zeile fuellt die Bedienspalte (gemessen: E-Mail am
   // Desktop 201px in einer 680px-Zeile).
   const wide = [...eachRule(css)].find((r) => !r.at.length && /\.settings-group \.settings-setting-row__control > input\.form-input:only-child:is\(/.test(r.selector));
-  assert.match(wide?.body ?? '', /inline-size:\s*50cqi/, 'Textfelder nehmen die halbe Zeile');
+  // Seit R21 S7 hoechstens --layout-field-max, damit die Felder einer Seite an
+  // EINER Kante beginnen (Test "R21 S7" unten).
+  assert.match(wide?.body ?? '', /inline-size:\s*min\(50cqi, var\(--layout-field-max\)\)/, 'Textfelder nehmen die halbe Zeile, hoechstens die Feldbreite');
   assert.match(wide?.selector ?? '', /\[type="email"\]/, 'auch E-Mail');
 
   // Schritt 5b (B7 abgeschlossen): die uebrigen Blaetter mit Feldern unter
@@ -4994,4 +4996,17 @@ test('R21 D7: die Suche findet die Zyklusvorgaben, das Blatt fuehrt in den Dialo
   assert.match(page, /const CYCLE_SETTINGS_HREF = '\/health\/cycle\?open=settings';/, 'der Link oeffnet den Dialog auf der Zyklusseite');
   assert.match(page, /<a href="\$\{CYCLE_SETTINGS_HREF\}" id="health-cycle-settings-link">/);
   assert.match(page, /\$\{esc\(t\('health\.cycle\.settings\.title'\)\)\}/, 'er heisst wie der Dialog (Beschriftung = Suchschluessel)');
+});
+
+// R21 S7 (Critique a5): die Felder der Konto-Seite begannen bei 1280 an drei
+// Kanten (972 / 922 / 999px) - die Bedienspalte ist die halbe Zeile, und
+// Profil, Kontaktdaten und Datum haben verschieden breite Zeilen.
+test('R21 S7: Textfelder und Datumsfeld einer Einstellungsseite teilen eine Kante', async () => {
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const tokens = await readFile(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.includes('.settings-setting-row__control > .birth-date-field')
+    && r.selector.includes('input.form-input:only-child'));
+  assert.ok(rule, 'Textfeld und Datumsfeld stehen in derselben Breitenregel');
+  assert.match(rule.body, /inline-size:\s*min\(50cqi, var\(--layout-field-max\)\)/, 'halbe Zeile, hoechstens die Feldbreite');
+  assert.match(tokens, /--layout-field-max:\s*16rem;/, 'die Feldbreite ist ein Token');
 });

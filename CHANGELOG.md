@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Small alignments in contacts and settings.** In a contact, phone numbers, e-mail addresses
+  and addresses now sit as close under their label as category and notes do. On a phone the
+  label field of a number or address moves under the value, so "Label (e.g. work)" is no longer
+  cut off. The fields of a settings page start at one edge instead of three.
+
 - **Splitting expenses starts with the group.** On a phone "You owe 24.14 €" stood above the
   group choice that says whose debt it is; on a wide screen the two amounts formed their own row
   above the group list. The amounts now sit in the group's column, right above its header, and
