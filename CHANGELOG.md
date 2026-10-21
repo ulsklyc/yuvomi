@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A short birthday list no longer puts a month heading over almost every row.** Month headings
+  appear once the list has, on average, at least two birthdays per month; a shorter list is one
+  sequence by how soon each birthday comes, with the next one still highlighted.
+
 - **A phone number looks the same in the contact list and in the contact.** The list showed a
   number formatted, the contact's detail showed it as typed; both now use the same format.
 

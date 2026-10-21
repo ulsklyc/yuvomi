@@ -225,16 +225,19 @@ test('Liste + Detail: Seite, Markup, Klickweg und die klebende Spalte', () => {
 });
 
 // R19 (Critique 2026-10-16): Monatsgruppen in der Liste, und der naechste
-// Geburtstag fuehrt im Modulton.
+// Geburtstag fuehrt im Modulton. R21 S9b (Critique a3, "7 Monatskoepfe fuer 8
+// Eintraege"): die Koepfe stehen erst, wenn im Mittel zwei auf einen Monat kommen.
 test('R19: die Liste gruppiert nach Monat und hebt den naechsten hervor', async () => {
   const { installMiniDom } = await import('./mini-dom.js');
   const restore = installMiniDom();
   try {
     const row = (id, next) => ({ id, name: `P${id}`, next_birthday: next, days_until: id * 10, next_age: 30, birth_date: '1990-01-01' });
-    const html = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08')]);
-    const heads = [...html.matchAll(/<h2 class="list-group__title birthdays-month">([^<]*)<\/h2>/g)].map((m) => m[1]);
-    assert.equal(heads.length, 2, `ein Kopf je Monat: ${heads.join(', ')}`);
-    assert.ok(html.indexOf(heads[1]) > html.indexOf('data-id="2"'), 'der zweite Kopf steht vor dem Februar, nach beiden Novembern');
+    const heads = (h) => [...h.matchAll(/<h2 class="list-group__title birthdays-month">([^<]*)<\/h2>/g)].map((m) => m[1]);
+    const duenn = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08')]);
+    assert.deepEqual(heads(duenn), [], 'drei Geburtstage in zwei Monaten: kein Register - jeder Kopf wiederholte nur ein Datum');
+    const html = birthdays.__test.birthdayListHtml([row(1, '2026-11-02'), row(2, '2026-11-20'), row(3, '2027-02-08'), row(4, '2027-02-19')]);
+    assert.equal(heads(html).length, 2, `ein Kopf je Monat: ${heads(html).join(', ')}`);
+    assert.ok(html.indexOf(heads(html)[1]) > html.indexOf('data-id="2"'), 'der zweite Kopf steht vor dem Februar, nach beiden Novembern');
     assert.equal((html.match(/birthday-item--next/g) ?? []).length, 1, 'genau einer ist der naechste');
     assert.ok(html.indexOf('birthday-item--next') < html.indexOf('data-id="2"'), 'und zwar der erste');
   } finally { restore(); }

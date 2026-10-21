@@ -475,14 +475,23 @@ ${/* EIN MEHR-KNOPF (Entscheidung 2026-10-07, utils/row-action.js): der
  * Gruppenkoepfe der Aufgaben IN der Liste), und der naechste Geburtstag
  * (`birthday-item--next`) hebt seinen Countdown im Modulton hervor - die
  * Antwort auf die Frage, mit der man die Seite oeffnet.
+ *
+ * DER KOPF IST EIN REGISTER, ERST WENN ER GRUPPIERT (R21 S9b, Critique a3).
+ * Im Seed standen 7 Monatskoepfe ueber 8 Geburtstagen - fast jede Zeile trug
+ * einen eigenen Kopf, der nur wiederholte, was ihr Datum schon sagt (224px
+ * Chrome bei 390px). Die Koepfe stehen deshalb erst, wenn im Mittel mindestens
+ * zwei Geburtstage auf einen Monat kommen; darunter ist die Liste eine Folge
+ * nach Naehe, und der naechste fuehrt weiter im Modulton.
  * @param {Array} list nach Naehe sortiert (sortByProximity)
  * @returns {string}
  */
 function birthdayListHtml(list) {
+  const months = new Set(list.map((b) => String(b.next_birthday ?? '').slice(0, 7)).filter(Boolean));
+  const grouped = list.length >= 2 * months.size;
   let month = '';
   return list.map((birthday, i) => {
     const key = String(birthday.next_birthday ?? '').slice(0, 7);
-    const head = key && key !== month
+    const head = grouped && key && key !== month
       ? `<h2 class="list-group__title birthdays-month">${esc(formatMonthYear(key.slice(0, 4), key.slice(5, 7)))}</h2>`
       : '';
     if (key) month = key;
