@@ -247,3 +247,61 @@ test('Betrachter: Vor/Zurueck nennt das Ziel, die Pfeile blaettern durch die sic
     documentsPage.state.documents = [];
   }
 });
+
+// Codex-Review zu #2142: Blaettern ruft openDocumentViewer() erneut auf, und
+// der neue Dialog merkt sich document.activeElement als Ausloeser (modal.js,
+// rememberFocus) - nach dem Blaettern einen Knopf im alten Betrachter, der mit
+// ihm verschwindet. Beim Schliessen fiel der Fokus dann auf die Seitenwurzel
+// statt zurueck in die Liste, und "Bearbeiten" reichte denselben toten Knopf
+// weiter. Der Betrachter reicht den Ausloeser in der LISTE durch, wie der
+// Wechsel nach "Bearbeiten" es schon tat. Gemessen wird, was im Moment des
+// openModal()-Aufrufs fokussiert ist - genau das merkt sich das echte Modal.
+test('Betrachter: Blaettern reicht den Ausloeser in der Liste weiter, ueber mehrere Schritte bis "Bearbeiten"', () => {
+  const A = { ...PDF, id: 1, name: 'Mietvertrag' };
+  const B = { ...PDF, id: 9, name: 'Impfpass' };
+  documentsPage.state.documents = [A, PDF, B];
+  documentsPage.state.query = '';
+  const opened = [];
+  const previous = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { opened.push({ opts, focus: doc.activeElement }); };
+  /** Verdrahtet wie das Modal; die Knoepfe stehen im Dialog und gehen mit ihm. */
+  const wire = (entry) => {
+    const buttons = new Map(['viewer-prev', 'viewer-next', 'edit-document'].map((action) => [action, element(action)]));
+    const panel = element('panel', { querySelector: (sel) => buttons.get(/data-action="([^"]+)"/.exec(sel)?.[1]) ?? null });
+    entry.opts.onSave(panel);
+    return { panel, buttons, gone() { for (const button of buttons.values()) button.isConnected = false; } };
+  };
+  try {
+    const row = element('row');
+    row.focus();
+    documentsPage.openDocumentViewer(PDF);
+    assert.equal(opened[0].focus, row, 'Ausgangslage: der erste Betrachter merkt sich die Zeile');
+
+    // Schritt 1 per Knopf.
+    const first = wire(opened[0]);
+    first.buttons.get('viewer-next').focus();
+    first.buttons.get('viewer-next').fire('click');
+    first.gone();
+    assert.match(opened[1].opts.title, /Impfpass/);
+    assert.equal(opened[1].focus, row, 'der naechste Dialog merkte sich den Knopf im alten Betrachter - der verschwindet mit ihm');
+
+    // Schritt 2 per Pfeiltaste, aus dem schon geblaetterten Betrachter.
+    const second = wire(opened[1]);
+    const prev = second.buttons.get('viewer-prev');
+    prev.focus();
+    second.panel.fire('keydown', { key: 'ArrowLeft', target: prev, preventDefault() {} });
+    second.gone();
+    assert.match(opened[2].opts.title, /Zeugnis/);
+    assert.equal(opened[2].focus, row, 'nach dem zweiten Schritt kennt der Betrachter die Zeile nicht mehr');
+
+    // Bearbeiten aus dem zweimal geblaetterten Betrachter: derselbe Ausloeser.
+    const third = wire(opened[2]);
+    const edit = third.buttons.get('edit-document');
+    edit.focus();
+    edit.fire('click');
+    assert.equal(doc.activeElement, row, '"Bearbeiten" gab den Fokus an einen Knopf eines laengst geschlossenen Betrachters');
+  } finally {
+    globalThis.__openModal = previous;
+    documentsPage.state.documents = [];
+  }
+});

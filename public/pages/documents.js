@@ -859,11 +859,16 @@ function bindToolsMenu() {
   });
 }
 
-/** Zaehler an Kategorien, Ablauf-Chip und Ordnern - sie haengen alle an der Suche. */
+/**
+ * Zaehler an Kategorien, Ablauf-Chip und Ordnern - sie haengen alle an der
+ * Suche. Dazu die Kategorie-Gruppe der Auswahl unter 768px: sie zaehlt wie die
+ * Chips, und ohne sie blieben ihre Zahlen beim Suchen stehen (Codex zu #2142).
+ */
 function renderFacets() {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
 }
 
 function bindPageEvents() {
@@ -4011,7 +4016,13 @@ function viewerStepKeys() {
   return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
 }
 
-function openDocumentViewer(doc) {
+/**
+ * @param {object} doc
+ * @param {object} [carry]
+ * @param {Element|null} [carry.opener] - beim Blaettern der Ausloeser in der
+ *   Liste, den der vorige Betrachter weiterreicht
+ */
+function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
@@ -4040,19 +4051,34 @@ function openDocumentViewer(doc) {
   const shareSupport = fileShareSupport(doc);
   const shareAbort = new AbortController();
   let shareFile = null;
-  // Der Ausloeser des Betrachters - fuer den Wechsel nach "Bearbeiten" (unten).
-  const opener = document.activeElement;
+  // Der Ausloeser des Betrachters - fuer den Wechsel nach "Bearbeiten" und das
+  // Blaettern (unten). Nach einem Schritt ist der fokussierte Knopf einer des
+  // VORIGEN Betrachters, der mit ihm verschwindet; dann gilt der Ausloeser in
+  // der Liste, den der vorige Betrachter weiterreicht (Codex zu #2142).
+  const trigger = document.activeElement;
+  const opener = listOpener ?? trigger;
   // Per Tastatur geoeffnet? Der Browser weiss es: er zeigt den Fokusring am
   // Ausloeser nur dann. Ein alter Browser ohne den Selektor wirft - dann gilt
-  // "nein", und der Fokus-Waechter des PDFs nimmt nichts zurueck.
+  // "nein", und der Fokus-Waechter des PDFs nimmt nichts zurueck. Beim
+  // Blaettern zaehlt der Knopf oder die Taste des Schritts, nicht die Liste.
   let openedByKeyboard = false;
-  try { openedByKeyboard = opener?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
+  try { openedByKeyboard = trigger?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
 
   // VOR UND ZURUECK IM BETRACHTER (Critique R21, Persona Alex): wer zehn
   // Belege durchsieht, musste je Dokument schliessen und das naechste oeffnen.
   // Die Nachbarn sind die der sichtbaren Liste (Filter, Suche, Sortierung).
   const { prev: prevDoc, next: nextDoc } = viewerNeighbours(doc);
   const stepKeys = viewerStepKeys();
+
+  // NACH EINEM SCHRITT DEN FOKUS VORHER AN DEN AUSLOESER IN DER LISTE (Codex
+  // zu #2142) - derselbe Weg wie "Bearbeiten" unten: openModal() merkt sich
+  // document.activeElement als Ausloeser des neuen Dialogs, und das waere
+  // sonst der Knopf des vorigen Betrachters, der mit ihm verschwindet; nach
+  // dem Schliessen stuende der Fokus auf der Seitenwurzel statt in der Liste.
+  // Es ist die Zeile, aus der der ERSTE Betrachter kam, nicht die des zuletzt
+  // gezeigten Dokuments: hinter dem modalen Dialog ist die Liste inert und
+  // nimmt keinen neuen Fokus an - das braeuchte einen Rueckgabe-Weg in modal.js.
+  if (listOpener?.isConnected && listOpener !== document.body) listOpener.focus();
 
   openSharedModal({
     title: doc.name,
@@ -4144,7 +4170,9 @@ function openDocumentViewer(doc) {
       // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
       // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
       // - dort gehoeren die Pfeile dem Element.
-      const step = (target) => { if (target) openDocumentViewer(target); };
+      // Der Schritt reicht den Ausloeser in der Liste weiter (Codex zu #2142,
+      // der Fokus geht vor dem naechsten Dialog an ihn - siehe dort).
+      const step = (target) => { if (target) openDocumentViewer(target, { opener }); };
       panel.querySelector('[data-action="viewer-prev"]')?.addEventListener('click', () => step(prevDoc));
       panel.querySelector('[data-action="viewer-next"]')?.addEventListener('click', () => step(nextDoc));
       panel.addEventListener('keydown', (e) => {

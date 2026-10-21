@@ -1655,8 +1655,10 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
   // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst
   // der Betrachter animiert, und der Fokus stuende sonst auf einem Knopf, der
-  // gleich aus dem DOM faellt.
-  assert.match(viewer.slice(0, viewer.indexOf('openSharedModal({')), /const opener = document\.activeElement;/);
+  // gleich aus dem DOM faellt. Nach einem Blaetterschritt ist es der Ausloeser
+  // in der Liste, den der vorige Betrachter weiterreicht (Codex zu #2142; das
+  // Verhalten faehrt test-documents-viewer-focus.js).
+  assert.match(viewer.slice(0, viewer.indexOf('openSharedModal({')), /const trigger = document\.activeElement;\s*const opener = listOpener \?\? trigger;/);
   const edit = viewer.slice(viewer.indexOf("querySelector('[data-action=\"edit-document\"]')"));
   assert.match(edit, /if \(opener\?\.isConnected && opener !== document\.body\) opener\.focus\(\);\s*openDocumentModal\(doc\);/);
   assert.doesNotMatch(edit.slice(0, edit.indexOf('openDocumentModal(doc)')), /closeModal\(/, 'kein eigenes Schliessen: openModal ersetzt den Betrachter, EIN History-Marker');
@@ -2040,6 +2042,24 @@ test('R21 S9b: am Telefon stehen die Kategorien in der Auswahl des Ordner-Chips'
     'am Telefon weichen die Kategorie-Chips');
   assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.documents-folder-browser--open .documents-category-browser' && /display:\s*block/.test(r.body)),
     'aufgeklappt steht die Kategorie-Gruppe');
+});
+
+/* Codex-Review zu #2142: unter 768px blieben die Zaehler der Kategorie-Gruppe
+ * beim Suchen auf dem alten Stand. Suche und clearSearch() zeichnen die
+ * Facetten ueber renderFacets() (die Verdrahtung halten die Proben weiter
+ * oben), und das kannte die Gruppe nicht - nur renderAll() rief sie. EIN Leser
+ * fuer beide Seiten: jede Facette, die renderAll() zeichnet, zeichnet auch
+ * renderFacets(); eine morgen ergaenzte Facette faellt hier ebenso auf.
+ */
+test('R21 S9b: die Suche frischt die Zaehler der Kategorie-Gruppe mit auf', () => {
+  const calls = (body) => new Set([...body.matchAll(/^\s*(render\w+)\(/gm)].map((m) => m[1]));
+  const facetsOfAll = [...calls(fnBody('renderAll', 'renderBreadcrumb'))]
+    .filter((name) => name !== 'renderBreadcrumb' && name !== 'renderDocuments');
+  assert.ok(facetsOfAll.includes('renderCategoryBrowser') && facetsOfAll.includes('renderCategoryChips'),
+    'der Leser findet die Facetten in renderAll() nicht mehr - die Probe waere blind');
+  const facets = calls(fnBody('renderFacets', 'bindPageEvents'));
+  assert.deepEqual(facetsOfAll.filter((name) => !facets.has(name)), [],
+    'renderFacets() laesst eine Facette aus, die renderAll() zeichnet - beim Suchen bliebe sie auf dem alten Stand');
 });
 
 // Re-Critique 2026-10-17 (A4 P2-3, P3): im Raster klemmte die leere Suche in
