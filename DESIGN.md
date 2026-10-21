@@ -1292,6 +1292,11 @@ das Verhaeltnis haelt.
   gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
   Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
   utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
+  **Gemessen wird nach dem Gleiten (R21):** der ResizeObserver mass die Zeilen sonst an ihrer
+  gehaltenen alten Lage, nahm dem Kopf die Lead-Zone, und er klappte nach dem ersten Ausklappen
+  nie wieder ein. **Ein Modul kann den Kopf mit seiner Flaeche falten (R21, D9):** ein Port mit
+  `data-head-collapse="module"` urteilt nicht selbst, das Modul ruft `requestHeadCollapse()` -
+  der Telefon-Monat faltet ihn mit dem Raster (Guard `test:ux-utils` "R21").
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
   der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
   Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
@@ -3100,6 +3105,11 @@ und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: cont
 aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
 die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
 eine Ausnahmekarte.
+**Der Kopf steht vor den Daten (R21):** render() baut ihn im synchronen Teil, bis zum ersten
+Laden `inert` - kam die Zeitraum-Zeile mit den Daten, rutschte die Flaeche 52px (CLS 0,057
+mobil, 0,026 laptop -> 0). **Der Ansichtsknopf ist so breit wie sein laengstes Wort (R21):** alle
+vier Woerter liegen unsichtbar in einer Rasterzelle unter dem sichtbaren, sonst sprang der
+Weiter-Pfeil zwischen „Tag" und „Agenda" 26px (Guard `test:calendar` "R21").
 **Das Menue zeigt die aktive Ansicht (R17, E11).** Der Ausloeser traegt statt „..." die Glyphe
 der offenen Ansicht (dieselbe wie ihr Menue-Eintrag: Monat `calendar-days`, Woche
 `calendar-range`, Tag `calendar-1`, Agenda `list`) und nennt sie im Namen („Ansicht: Woche");
@@ -3109,7 +3119,8 @@ Ansicht offen ist - das Segment, das es am Desktop sagt, ist unter 640px ausgebl
 Gemessen 390x844 mass er ausgeklappt wie eingeklappt 117px: Titel und Siegel gingen, aber die
 Werkzeuge hielten Zeile 1 offen (drei Icons neben 206px Leerraum) und der Stepper blieb in
 Zeile 2. Eingeklappt rueckt der Stepper jetzt in Zeile 1 vor das Menue: 117 -> 65px, Port
-719 -> 771px, in Woche, Tag und Agenda (der Monat scrollt nicht und klappt nie ein). Suche,
+719 -> 771px, in Woche, Tag und Agenda; der Telefon-Monat faltet ihn seit R21 (D9) mit seinem
+Raster, wenn die Tagesliste es auf die Woche einklappt (117 -> 65px, Liste ab y 144 statt 196). Suche,
 Filter und "Heute" falten dafuer ins Ansichtsmenue - als Eintraege mit demselben Namen, die das
 Original klicken (`data-collapse-fold` am Werkzeug, `data-collapse-fold-menu` am Menue; die
 Stellvertreter baut `wireCollapsingHeader` beim Oeffnen, wie bei der Faltung der scrollenden
@@ -4035,8 +4046,11 @@ einen Tag in die Tagesansicht - wer lesen wollte, was am Dienstag steht, verlies
   haetten die Aufgaben der Liste zu Quadraten ohne Titel geschrumpft. Ein freier Tag sagt es
   ruhig (kompakter Leerzustand, Aktion `btn--secondary`) - er ist kein Fehlerfall.
 - **Die Punkte sagen nur noch, wo.** Zentriert unter der Ziffer, hoechstens vier, ohne „+N" -
-  wie viel es ist, sagt die Liste. Zeilen fest 48px (Punkte), damit das Einklappen eine
-  animierbare Strecke hat. **Die Titelfassung hat ein Budget von 320px, nicht 80px je Woche**
+  wie viel es ist, sagt die Liste. Zeilen mit fester Hoehe (Punkte), damit das Einklappen eine
+  animierbare Strecke hat - **seit R21 ein Budget von sechs Zeilen zu 48px** (sechs Wochen 48px,
+  fuenf 57,6px, vier 72px): mit 48px je Woche sprang die Liste beim Monatswechsel 48px.
+  Eingeklappt traegt die eine Woche die Hoehe ihres Inhalts (48px Punkte, 80px Titel), damit
+  der Wochenschritt ueber Monatsgrenzen nicht springt. **Die Titelfassung hat ein Budget von 320px, nicht 80px je Woche**
   (vier Wochen 80px, fuenf 64px, sechs 53px): mit 80px fest blieben der Liste bei 375x812
   81px, im Sechs-Wochen-Monat nichts; jetzt ist sie in jedem Monat gleich hoch (170px Zeilen).
   Was nicht passt, zeigt die Zelle als nackte Zahl („+2") - „+2 weitere" brach auf ~50px um
