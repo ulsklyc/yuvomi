@@ -2297,13 +2297,24 @@ function viewMenuLabel(current = state.view) {
   return `${t('calendar.viewSwitcher')}: ${VIEW_LABELS()[current] ?? ''}`;
 }
 
+/* DER KNOPF IST SO BREIT WIE SEIN LAENGSTES WORT (Critique R21, a3: der
+ * Weiter-Pfeil sprang mobil 26px zwischen den Ansichten). Das Label davor
+ * nimmt den Rest der Zeile (`flex: 1 1 0`), und der Rest hing an der Breite
+ * DIESES Worts: „Tag" 66px, „Agenda" 92px. Unter dem sichtbaren Wort liegen
+ * deshalb alle vier Woerter unsichtbar in derselben Rasterzelle - sie geben
+ * die Breite vor, das sichtbare Wort wechselt nur seinen Text
+ * (syncViewMenu), und die Pfeile stehen in jeder Ansicht und jeder Sprache
+ * an derselben Stelle. */
 function viewMenuHtml(current = state.view) {
   const label = viewMenuLabel(current);
   return `
         <button type="button" class="btn btn--secondary cal-toolbar__view-menu popover-menu__trigger" id="cal-views-menu"
                 popovertarget="cal-views-menu-panel" aria-haspopup="menu" aria-expanded="false" data-collapse-fold-menu
                 data-view="${esc(current)}" aria-label="${esc(label)}" title="${esc(label)}">
-          <span class="cal-toolbar__view-menu-label" aria-hidden="true">${esc(VIEW_LABELS()[current] ?? '')}</span>
+          <span class="cal-toolbar__view-menu-words" aria-hidden="true">
+            <span class="cal-toolbar__view-menu-label">${esc(VIEW_LABELS()[current] ?? '')}</span>
+            ${VIEWS.map((v) => `<span class="cal-toolbar__view-menu-sizer">${esc(VIEW_LABELS()[v] ?? '')}</span>`).join('')}
+          </span>
           <i data-lucide="chevrons-up-down" class="icon-sm" aria-hidden="true"></i>
         </button>
         <div class="popover-menu" id="cal-views-menu-panel" popover role="menu">

@@ -625,11 +625,29 @@
     min-height: var(--target-base);
   }
 
-  .cal-toolbar__view-menu-label {
+  /* DIE BREITE GIBT DAS LAENGSTE WORT VOR, NICHT DAS GEZEIGTE (Critique R21,
+   * a3: der Weiter-Pfeil sprang 26px zwischen „Tag" und „Agenda"). Alle vier
+   * Woerter liegen in EINER Rasterzelle, nur das der aktiven Ansicht ist zu
+   * sehen; die Zelle ist so breit wie das breiteste. Die Obergrenze des Knopfs
+   * (oben) und die Ellipse gelten weiter: `minmax(0, 1fr)` laesst die Zelle
+   * darunter schrumpfen. */
+  .cal-toolbar__view-menu-words {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .cal-toolbar__view-menu-label,
+  .cal-toolbar__view-menu-sizer {
+    grid-area: 1 / 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .cal-toolbar__view-menu-sizer {
+    visibility: hidden;
   }
 
   /* DER RESET LIEGT AUF DEM WERT (Muster Budget, layout.css `--period-inline`):

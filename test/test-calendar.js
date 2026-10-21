@@ -3824,7 +3824,8 @@ test('Kalenderkopf (Sonde 1): Stepper und Ansichts-Knopf laufen mobil nie ueber 
   assert(/contain:\s*inline-size/.test(stepper?.body ?? ''), 'der Stepper ist in der Breite eingeschlossen');
   const menu = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu');
   assert(/max-inline-size:/.test(menu?.body ?? '') && /min-width:\s*0/.test(menu?.body ?? ''), 'der Ansichts-Knopf hat eine Obergrenze');
-  const word = rules.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-label');
+  // Seit R21 teilt das Wort seine Regel mit den Platzhaltern des Stapels.
+  const word = rules.find((r) => r.selector.split(',').some((x) => x.trim() === '.cal-toolbar__view-menu-label'));
   assert(/text-overflow:\s*ellipsis/.test(word?.body ?? ''), 'ein langes Wort kuerzt mit Ellipse');
 });
 
@@ -6257,6 +6258,30 @@ test('R21: der volle Kalenderkopf steht vor den Daten, bis dahin inert', () => {
   const inertOff = body.indexOf('toolbarEl.inert = false');
   assert(inertOn > firstToolbar && inertOn < firstAwait, 'der fruehe Kopf ist bis zum Laden inert');
   assert(inertOff > body.indexOf('await Promise.all('), 'nach dem Laden ist der Kopf wieder bedienbar');
+});
+
+// R21 (Critique 2026-10-21, a3): der Weiter-Pfeil sprang mobil 26px zwischen
+// den Ansichten. Das Label nimmt den Rest der Zeile, und der hing an der
+// Breite des Worts im Ansichtsknopf („Tag" 66px, „Agenda" 92px). Unter dem
+// sichtbaren Wort liegen alle vier in einer Rasterzelle und geben die Breite vor.
+test('R21: der Ansichtsknopf ist so breit wie sein laengstes Wort - die Pfeile stehen in jeder Ansicht', () => {
+  const words = new Set();
+  for (const view of ['month', 'week', 'day', 'agenda']) {
+    const html = calendarHelpers.viewMenuHtml(view);
+    const sizers = [...html.matchAll(/<span class="cal-toolbar__view-menu-sizer">([^<]*)<\/span>/g)].map((m) => m[1]);
+    assert(sizers.length === 4, `${view}: alle vier Woerter reservieren ihre Breite, gefunden ${sizers.length}`);
+    words.add(sizers.join('|'));
+    assert(/<span class="cal-toolbar__view-menu-words" aria-hidden="true">\s*<span class="cal-toolbar__view-menu-label">/.test(html),
+      `${view}: das sichtbare Wort steht im selben Stapel`);
+  }
+  assert(words.size === 1, 'der Stapel ist in jeder Ansicht derselbe - sonst haengt die Breite wieder an der Ansicht');
+  const mobile = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const stack = mobile.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-words');
+  assert(/display:\s*grid/.test(stack?.body ?? '') && /min-width:\s*0/.test(stack?.body ?? ''), 'der Stapel ist ein Raster, das unter die Obergrenze schrumpfen darf');
+  const cell = mobile.find((r) => /\.cal-toolbar__view-menu-label/.test(r.selector) && /\.cal-toolbar__view-menu-sizer/.test(r.selector));
+  assert(/grid-area:\s*1 \/ 1/.test(cell?.body ?? ''), 'Wort und Platzhalter liegen in EINER Zelle');
+  const sizer = mobile.find((r) => r.selector.trim() === '.cal-toolbar__view-menu-sizer');
+  assert(/visibility:\s*hidden/.test(sizer?.body ?? ''), 'die Platzhalter sind unsichtbar, nicht weg');
 });
 
 // --------------------------------------------------------

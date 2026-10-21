@@ -143,6 +143,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrived only with the data, and the whole calendar below slid down by 52 pixels on phones. The
   full header now stands from the first frame and becomes usable as soon as the calendar has loaded.
 
+- **The calendar arrows stay put when you change the view on a phone.** The view button was as
+  wide as its word, so the forward arrow moved by up to 26 pixels between "Day" and "Agenda". The
+  button now always takes the width of the longest view name.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing
