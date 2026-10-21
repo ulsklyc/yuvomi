@@ -709,6 +709,26 @@ test('R19/R21: Reiter in der Titelzeile ab 768px, darunter nennt der Kopf den Or
   assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
 });
 
+// R21 S7 (Leitlinie Ulas: mobil mehr Platz fuer Inhalt): angedockt wurde der
+// Kopf der drei Module nur Reiter-Zeile - 73px Haushaltshilfe (Leiste in
+// Kuechenhoehe 56px um 48px-Reiter), 65px Belohnungen - und nannte den Ort
+// nicht mehr. Unter 768px ist die Leiste jetzt so hoch wie ihre Reiter, und
+// angedockt teilen sich Inline-Titel und Leiste EINE Zeile.
+test('R21 S7: angedockt traegt die Reiter-Zeile den Ort, in der Hoehe ihrer Reiter', () => {
+  const own = rules(layoutCss).filter((r) => r.selector.includes('.page-toolbar--tabs-title')
+    && r.at.some((a) => /max-width:\s*767px/.test(a)));
+  const bar = own.find((r) => r.selector.endsWith('> .page-toolbar__bar'));
+  assert.equal(decl(bar?.body ?? '', 'block-size'), 'auto', 'mobil keine feste Leistenhoehe ueber den Reitern');
+  const dock = own.find((r) => /\.page-toolbar--dock-tabs\.is-docked > \.page-toolbar__dock-title$/.test(r.selector.trim()));
+  assert.ok(dock, 'angedockt steht der Inline-Titel in der Reiter-Zeile');
+  assert.equal(decl(dock.body, 'flex'), '0 1 auto');
+  assert.match(decl(dock.body, 'max-inline-size') ?? '', /%$/, 'der Titel laesst der Leiste den groesseren Teil');
+  const tabs = own.find((r) => /\.is-docked:has\(> \.page-toolbar__dock-title\) > \[role="tablist"\]$/.test(r.selector.trim()));
+  assert.equal(decl(tabs?.body ?? '', 'flex'), '1 1 0', 'die Leiste nimmt den Rest - mit Basis 0 bricht die Zeile nie um');
+  assert.equal(decl(tabs.body, 'min-inline-size'), '0', 'und scrollt, statt den Titel zu verdraengen');
+  assert.match(read('../public/utils/ux.js'), /toolbar\.classList\.toggle\('page-toolbar--dock-tabs', tabRow\)/, 'die Shell markiert den Kopf');
+});
+
 // R20 (E1-Befund, gemessen 2026-10-17): der Nachlauf-Platzhalter hinter dem
 // Seiten-Root rutschte beim ersten Rendern von y=0 auf y=508 und trug auf dem
 // Schichtplan bei 390px CLS 0,114 bei. Er malt nichts; unsichtbar behaelt er

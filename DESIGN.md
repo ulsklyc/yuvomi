@@ -3028,7 +3028,9 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9). Eine
    Tab-Leiste als Bar-Zeile gibt es zwischen 768 und 1023px nicht: seit R19 stehen die
    Reiter dort in der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Unter 768px
-   nennt der Kopf seit R21 (D7) wieder den Ort - Siegel und Name, die Reiter darunter. Die dritte Bauart dafuer (Band,
+   nennt der Kopf seit R21 (D7) wieder den Ort - Siegel und Name, die Reiter darunter; angedockt
+   steht der Inline-Titel VOR den Reitern in ihrer Zeile (`--dock-tabs`, R21 S7), die Leiste
+   nimmt den Rest und scrollt. Die dritte Bauart dafuer (Band,
    R11 H1) ist seit R20 entfallen - gemessen erreichte sie keine Route mehr. Kopfhoehe und
    Klebekante haengen in keinem Weg am Andock-Zustand.
    **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
@@ -3199,9 +3201,13 @@ gemessen 69px (834). UNTER 768px NENNT DER KOPF DEN ORT (R21, D7; Critique a2 P2
 wich dort der Titel samt Siegel aus dem Bild, und "Besuche | Arbeiten | Berichte" sagte nicht,
 dass man in der Haushaltshilfe steht - die Kapsel markierte "Mehr". Dort gilt jetzt der Kopf
 aller Module mit Reitern (Budget): Siegel und Name, die Reiter als Bar-Zeile darunter, beim
-Scrollen wandert die Titelzeile aus dem Bild und die Reiter kleben (121/121/129px ruhend statt
-65px - der Preis des Ortsnamens). Am Desktop bleibt die Bar-Zeile eine eigene Zeile. Guard:
-`test:mobile-chrome`.
+Scrollen wandert die Titelzeile aus dem Bild und die Reiter kleben (121/121/121px ruhend statt
+65px - der Preis des Ortsnamens). ANGEDOCKT BLEIBT DER ORT IN DER REITER-ZEILE (R21 S7, Leitlinie
+"mobil mehr Platz fuer Inhalt"): der Kopf ist dann so hoch wie die Leiste (65px; die Haushaltshilfe
+trug bis dahin 73px, ihre Leiste die feste Kuechenhoehe), vorn steht der Inline-Titel (hoechstens
+45 %, Ellipse), die Leiste nimmt den Rest und scrollt mit Fade, der gewaehlte Reiter bleibt im
+Bild; die Reiter gleiten per FLIP an ihre neue Stelle (`wireCollapsingHeader`, `--dock-tabs`).
+Am Desktop bleibt die Bar-Zeile eine eigene Zeile. Guard: `test:mobile-chrome`, `test:ux-utils`.
 Der erste Reiter des Schichtplans heisst seit R21 "Uebersicht" wie in Budget und Gesundheit
 (vorher "Vergleich") und fehlt, solange es keine Schichtart gibt - kein leerer Reiter vorn.
 Ein Abschnittstitel, der den aktiven Reiter wiederholt ("Schichtarten" unter "Schichtarten"),

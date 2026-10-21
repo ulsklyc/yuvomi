@@ -908,6 +908,43 @@ test('wireCollapsingHeader R20: der Inhalt unter dem Kopf springt nicht, er glei
   }
 });
 
+// R21 S7: der Browser legt einen Bruchteil gerundet ab (-147.1875px ->
+// -147.188px). Gegen das geschriebene Literal verglichen gab die Freigabe den
+// Haltewert nie frei - die Reiter der Haushaltshilfe standen nach dem Andocken
+// dauerhaft 147px zu weit links, unter dem angedockten Titel.
+test('wireCollapsingHeader R21: ein Versatz mit Bruchteil wird nach dem Gleiten freigegeben', async () => {
+  const s = collapsingStub();
+  const frames = [];
+  const savedRaf = global.requestAnimationFrame;
+  global.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  try {
+    Object.defineProperty(s.port, 'rect', {
+      get: () => (s.toolbar.classList.contains('is-collapsed') ? { top: 40, bottom: 540, left: 0 } : { top: 90.4375, bottom: 590, left: 0 }),
+      set: () => {},
+    });
+    let stored = '';
+    // Wie der Browser: Zahlen auf drei Stellen gerundet abgelegt.
+    Object.defineProperty(s.port.style, 'transform', {
+      get: () => stored,
+      set: (v) => { stored = String(v).replace(/-?\d+\.\d+/g, (n) => String(Math.round(Number(n) * 1000) / 1000)); },
+      configurable: true,
+    });
+    s.port.animate = () => ({ ready: Promise.resolve() });
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 120);
+    assert.equal(s.port.style.transform, 'translate(0px, 50.438px)', 'Attrappe muss den gerundeten Haltewert ablegen');
+    frames.shift()();
+    frames.shift()();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(s.port.style.transform, '', 'nach dem Start der Animation steht kein Haltewert mehr');
+  } finally {
+    global.requestAnimationFrame = savedRaf;
+    s.restore();
+  }
+});
+
 test('wireCollapsingHeader: ein Ansichtswechsel haelt den eingeklappten Kopf, wo der neue Port ihn tragen kann', () => {
   const s = collapsingStub();
   try {
@@ -1136,12 +1173,14 @@ test('wireScrollFade: eine abgehaengte Leiste haengt ihre Beobachter selbst ab, 
  */
 function dockStub({ withMenu = true, tabBar = false, padTop = 0, barTop = 57 } = {}) {
   const matchOne = (el, s) => {
-    const m = s.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+\])*)$/i);
+    const m = s.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+(?:="[^"]*")?\])*)$/i);
     if (!m) throw new Error(`Attrappe kennt den Selektor nicht: ${s}`);
     const [, tag, cls, attrs] = m;
     if (tag && el.tag !== tag.toLowerCase()) return false;
     for (const c of cls.split('.').filter(Boolean)) if (!el.classes.has(c)) return false;
-    for (const a of (attrs.match(/[\w-]+/g) ?? [])) if (!(a in el.attrs)) return false;
+    for (const [, a, v] of attrs.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)) {
+      if (!(a in el.attrs) || (v !== undefined && el.attrs[a] !== v)) return false;
+    }
     return true;
   };
   const matches = (el, sel) => sel.split(',').map((s) => s.trim()).some((s) => matchOne(el, s));
@@ -1338,6 +1377,44 @@ test('R20: eine Tab-Leiste ohne Platz und ohne Menue bekommt keinen Band-Modus m
     assert.equal(s.ioOptions.at(-1)?.rootMargin, '-1px 0px 0px 0px', 'die Schwelle rueckt um keinen Streifen');
     header.destroy();
   } finally { s.restore(); }
+});
+
+// R21 S7 (Leitlinie Ulas "mobil mehr Platz fuer Inhalt", R9 M9 "nie ein Kopf
+// ohne Ortsangabe"): seit S6 stehen Schichtplan, Belohnungen und
+// Haushaltshilfe mobil zweizeilig (121-129px). Angedockt blieb die
+// Reiter-Zeile ohne ein Wort, wo man ist. Jetzt traegt sie den angedockten
+// Titel VOR der Leiste - in derselben Zeile, ohne Band darunter.
+test('R21 S7: angedockt nennt die Reiter-Zeile eines --tabs-title-Kopfes den Ort', () => {
+  const s = dockStub({ tabBar: true });
+  let ioCallback = null;
+  global.IntersectionObserver = class { constructor(cb, opts) { ioCallback = cb; s.ioOptions.push(opts); } observe() {} disconnect() {} };
+  try {
+    s.toolbar.classList.add('page-toolbar--tabs-title');
+    const tab = new s.title.constructor('button', { attrs: { role: 'tab', 'aria-selected': 'true' }, rect: { top: 57, bottom: 105, left: 0, width: 80 } });
+    let shown = 0;
+    tab.scrollIntoView = () => { shown += 1; };
+    s.tabs.append(tab);
+    // Die Reiter gleiten (holdThenGlide liest die Dauer am Wurzelelement).
+    global.document.documentElement = { cs: { getPropertyValue: () => '' } };
+    wireCollapsingHeader(s.toolbar);
+    assert.ok(s.toolbar.classList.contains('page-toolbar--stacked'), 'Attrappe muss einen gestapelten Kopf ergeben');
+    assert.ok(s.toolbar.classList.contains('page-toolbar--dock-tabs'), 'die Reiter-Zeile ist als Traeger des Titels markiert');
+    assert.equal(s.dockTitle()?.textContent, 'Schichtplan', 'der angedockte Titel nennt den Ort');
+    assert.equal(s.dockTitle()?.nextElementSibling, s.tabs, 'er steht vorn, vor der Leiste');
+    assert.equal(s.toolbar.classList.contains('page-toolbar--dock-band'), false, 'kein Band: die Zeile bleibt eine');
+    ioCallback([{ isIntersecting: false }]);
+    assert.ok(s.toolbar.classList.contains('is-docked'), 'angedockt, sobald die erste Zeile den Port verlassen hat');
+    assert.equal(shown, 1, 'der gewaehlte Reiter bleibt im Bild, auch wenn die Leiste jetzt scrollt');
+    ioCallback([{ isIntersecting: true }]);
+    assert.equal(s.toolbar.classList.contains('is-docked'), false);
+  } finally { s.restore(); }
+  // Ohne die Variante (Reiter in einer Bar-Zeile mit Platz) bleibt es beim alten Kopf.
+  const plain = dockStub({ tabBar: true });
+  try {
+    wireCollapsingHeader(plain.toolbar);
+    assert.equal(plain.toolbar.classList.contains('page-toolbar--dock-tabs'), false);
+    assert.equal(plain.dockTitle(), null);
+  } finally { plain.restore(); }
 });
 
 test('H1: wo der Titel in die Bar-Zeile passt oder faltet, bleibt es beim alten Kopf ohne Band', () => {

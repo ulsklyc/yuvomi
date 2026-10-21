@@ -4843,6 +4843,38 @@ html.fab-steady .page-fab {
   }
 }
 
+/* ANGEDOCKT NENNT DIE REITER-ZEILE DEN ORT, IN DER HOEHE DER LEISTE (R21 S7,
+ * Leitlinie Ulas "mobil mehr Platz fuer Inhalt").
+ *
+ * Unter 768px stehen die drei Koepfe zweizeilig (121-129px); beim Scrollen
+ * wanderte der Large Title weg, und uebrig blieb die Reiter-Zeile - 65px bei
+ * Belohnungen, 73px bei der Haushaltshilfe (ihre Leiste trug die feste
+ * Kuechenhoehe von 56px um 48px-Reiter), und in beiden kein Wort, wo man ist.
+ * Jetzt:
+ * - die Leiste ist so hoch wie ihre Reiter, wie zwischen 768 und 1023px
+ *   (angedockt 73 -> 65px);
+ * - angedockt (`--dock-tabs`, wireCollapsingHeader) steht der Inline-Titel
+ *   vorn in der Zeile, hoechstens 45 % breit, mit Ellipse; die Leiste nimmt
+ *   den Rest und scrollt, wenn ihre Reiter nicht mehr passen - der gewaehlte
+ *   bleibt im Bild. Die Zeile bricht nie um: `flex-basis: 0` an der Leiste,
+ *   sonst begaenne der Titel eine eigene Zeile und das negative `top` stimmte
+ *   nicht mehr. */
+@media (max-width: 767px) {
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__bar {
+    block-size: auto;
+  }
+
+  .page-toolbar--tabs-title.page-toolbar--dock-tabs.is-docked > .page-toolbar__dock-title {
+    flex: 0 1 auto;
+    max-inline-size: 45%;
+  }
+
+  .page-toolbar--tabs-title.page-toolbar--dock-tabs.is-docked:has(> .page-toolbar__dock-title) > [role="tablist"] {
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+}
+
 /* --------------------------------------------------------
  * KOMPAKTE HÖHENKLASSE: der Kopf trägt EINE Zeile.
  *

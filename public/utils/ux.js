@@ -488,9 +488,12 @@ function holdThenGlide(before) {
     const dx = prev.left - now.left;
     const dy = prev.top - now.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-    const from = `translate(${dx}px, ${dy}px)`;
-    el.style.transform = from;
-    held.push([el, from]);
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+    // Der Vergleich beim Freigeben braucht den Wert, wie der Browser ihn
+    // ablegt: er rundet Bruchteile (-147.1875px -> -147.188px), und gegen das
+    // geschriebene Literal verglichen blieb der Versatz nach dem Gleiten
+    // stehen (R21 S7, Reiter-Zeile beim Andocken um 147px verschoben).
+    held.push([el, el.style.transform]);
   }
   if (!held.length) return null;
   // ZWEI Frames Halt: der Wechsel kommt aus einem Scroll-Ereignis, das im
@@ -1098,6 +1101,24 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     });
   };
 
+  // ANDOCKEN IN DER SCROLLENDEN ARCHITEKTUR. Traegt die Reiter-Zeile den
+  // angedockten Titel (`--dock-tabs`, siehe update), rueckt die Leiste beim
+  // Andocken um seine Breite: die Reiter gleiten dorthin (derselbe FLIP wie
+  // oben), und der gewaehlte Reiter bleibt im Bild, auch wenn die Leiste jetzt
+  // scrollt.
+  const setDocked = (on) => {
+    if (toolbar.classList.contains('is-docked') === on) return;
+    const tabs = toolbar.classList.contains('page-toolbar--dock-tabs')
+      ? [...toolbar.children].find((el) => el.getAttribute('role') === 'tablist') ?? null
+      : null;
+    const before = tabs ? flipSnapshotElements([...tabs.children]) : null;
+    toolbar.classList.toggle('is-docked', on);
+    if (!tabs) return;
+    [...tabs.children].find((tab) => tab.getAttribute('aria-selected') === 'true')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    holdThenGlide(before);
+  };
+
   // DER KOPF FOLGT EINEM MODUL, DAS SEINE FLAECHE SELBST FALTET (Critique
   // R21, D9). Der Telefon-Monat klappt sein Raster beim Hochziehen der
   // Tagesliste auf die Woche ein - und der Kopf darueber blieb bei 117px
@@ -1369,7 +1390,21 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // ueber 11 Breiten 320-1023px mit und ohne Touch: keine Route erreichte die
     // Bauart mehr - sie ist mit ihren Regeln (layout.css) entfallen.
 
-    if (lead > 0 && !capped && heading && (roomForDockTitle || fold)) {
+    // DIE REITER-ZEILE NENNT ANGEDOCKT DEN ORT (Critique R21, S7). Seit S6
+    // stehen Schichtplan, Belohnungen und Haushaltshilfe mobil wieder mit
+    // Siegel und Large Title ueber ihren Reitern (121-129px); beim Scrollen
+    // wandert der Titel weg und die Reiter kleben - ohne ein Wort, wo man ist
+    // (R9 M9, "nie ein Kopf ohne Ortsangabe"). Ein Band darunter (bis R20)
+    // kostete wieder Hoehe. Hier teilt sich die Reiter-Zeile den Platz: der
+    // angedockte Titel steht vorn, die Leiste nimmt den Rest und scrollt, wenn
+    // ihre Reiter nicht mehr passen (Werkzeugzeilen-Regel 2, wie im Budget).
+    // Die Zeile bleibt so hoch wie die Leiste - das negative `top` gilt weiter.
+    const tabRow = lead > 0 && !capped && Boolean(heading)
+      && toolbar.classList.contains('page-toolbar--tabs-title')
+      && Boolean(lastLine?.els.some((el) => el.getAttribute('role') === 'tablist'));
+    toolbar.classList.toggle('page-toolbar--dock-tabs', tabRow);
+
+    if (lead > 0 && !capped && heading && (roomForDockTitle || fold || tabRow)) {
       if (!dockTitle) {
         dockTitle = document.createElement('span');
         dockTitle.className = 'page-toolbar__dock-title';
@@ -1381,7 +1416,10 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       // triggert sich damit selbst.
       const text = heading.textContent.trim();
       if (dockTitle.textContent !== text) dockTitle.textContent = text;
-      const anchor = toolbar.querySelector(':scope > .page-toolbar__actions');
+      // In der Reiter-Zeile steht er vor der Leiste, sonst vor den Aktionen.
+      const anchor = tabRow
+        ? lastLine.els.find((el) => el.getAttribute('role') === 'tablist')
+        : toolbar.querySelector(':scope > .page-toolbar__actions');
       if (dockTitle.parentElement !== toolbar || dockTitle.nextElementSibling !== anchor) {
         toolbar.insertBefore(dockTitle, anchor);
       }
@@ -1423,7 +1461,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const firstBottom = firstEl.getBoundingClientRect().bottom - toolbar.getBoundingClientRect().top;
     const overhang = Math.max(0, Math.ceil(firstBottom - lead));
     io = new IntersectionObserver(
-      ([entry]) => toolbar.classList.toggle('is-docked', !entry.isIntersecting),
+      ([entry]) => setDocked(!entry.isIntersecting),
       { root: scrollport, threshold: 0, rootMargin: `-${overhang + 1}px 0px 0px 0px` },
     );
     io.observe(firstEl);

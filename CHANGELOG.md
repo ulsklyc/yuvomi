@@ -67,7 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shift plan, rewards and household help name themselves on a phone again.** Below 768 pixels
   the three showed only their tabs, so nothing on screen said where you were. The header now
   carries the module's symbol and name with the tabs below, like the budget; while you scroll,
-  the tabs stay at the top.
+  the tabs stay at the top with the module's name in front of them, in a header no taller than
+  the tabs - the household help's header shrank from 73 to 65 pixels there.
 
 - **The shift plan's first tab is called "Overview" and only appears when there is something to
   show.** "Compare" stood first even without a single shift type, while you started on "Shift
