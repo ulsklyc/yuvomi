@@ -3302,17 +3302,19 @@ test('R18: "Messwert erfassen" spricht in Formularzeilen - der Blutdruck ist EIN
   const bp = health.valueFieldsMarkup('bp', { id: 1, type: 'bp', value_num: 128, value_num2: 84, value_num3: 66 });
   assert.match(bp, /<span class="form-row__label" id="vital-pair-label">health\.vitals\.metric\.bp<\/span>/, 'die Zeile heisst "Blutdruck"');
   assert.match(bp, /<span class="form-composite" role="group" aria-labelledby="vital-pair-label">/);
-  assert.match(bp, /id="vital-sys" aria-label="health\.vitals\.field\.systolic" placeholder="120" value="128">/);
+  assert.match(bp, /id="vital-sys" aria-label="health\.vitals\.field\.systolic" value="128">/);
   assert.match(bp, /<span class="form-composite__sep" aria-hidden="true">\/<\/span>/);
-  assert.match(bp, /id="vital-dia" aria-label="health\.vitals\.field\.diastolic" aria-describedby="vital-dia-unit" placeholder="80" value="84">/);
+  assert.match(bp, /id="vital-dia" aria-label="health\.vitals\.field\.diastolic" aria-describedby="vital-dia-unit" value="84">/);
   assert.match(bp, /<span class="form-composite__unit" id="vital-dia-unit">mmHg<\/span>/, 'die Einheit steht als Suffix am Paar');
   assert.match(bp, /<label class="form-row__label" for="vital-pulse">health\.vitals\.field\.pulse<\/label>/, 'der Puls ist eine eigene Zeile daneben');
-  assert.match(bp, /id="vital-pulse" aria-describedby="vital-pulse-suffix" placeholder="72" value="66">/);
+  assert.match(bp, /id="vital-pulse" aria-describedby="vital-pulse-suffix" value="66">/);
   assert.ok(bp.indexOf('id="vital-sys"') < bp.indexOf('id="vital-dia"') && bp.indexOf('id="vital-dia"') < bp.indexOf('id="vital-pulse"'),
     'Tastaturfolge: systolisch, diastolisch, Puls');
-  // Ein leeres Paar traegt Beispielwerte als Platzhalter, keinen Bestand.
+  // Ein leeres Paar ist leer: keine Beispielwerte als Platzhalter (Critique
+  // R21 - "120 / 80" las sich wie eine eingetragene Messung), kein Bestand.
   const leer = health.valueFieldsMarkup('bp');
-  assert.match(leer, /id="vital-sys"[^>]*placeholder="120">/);
+  assert.match(leer, /id="vital-sys"/);
+  assert.doesNotMatch(leer, /placeholder=/);
   assert.doesNotMatch(leer, /id="vital-sys"[^>]*value=/);
 
   // Einfacher Wert: Zahl und Einheit sind ein Feld; die Einheit ist Auswahl oder Text.

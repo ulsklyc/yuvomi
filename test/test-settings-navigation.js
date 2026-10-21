@@ -4122,8 +4122,11 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   // verborgen werden, und Schalterzeilen fluchten in der Karte.
   assert.doesNotMatch(css, /\.settings-webdav-toggle-row/, 'die eigene Schalterleiste ist entfallen');
   assert.match(css, /\.settings-card \.settings-group > \.settings-setting-row--switch > \.toggle-row,/, 'Schalterzeile fluchtet in der Karte');
+  // Seit D13 (Critique R21) haelt EINE Regel in reset.css jedes `[hidden]`,
+  // auch `.form-row` und `.row-carrier` - die Liste in layout.css ist gegangen.
   const layout = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  assert.match(layout, /\.form-row\[hidden\],\s*\.row-carrier\[hidden\],/, 'eine verborgene Zeile bleibt verborgen');
+  const reset = await readFile(new URL('../public/styles/reset.css', import.meta.url), 'utf8');
+  assert.match(reset, /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/, 'eine verborgene Zeile bleibt verborgen');
 
   // Re-Kritik 2026-10-17: in der Gesundheit sprach nur der Messwert-Dialog
   // Zeilen; Aktivitaet und Naehrwerte stapelten Felder in Rastern, die

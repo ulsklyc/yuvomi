@@ -635,7 +635,7 @@ test('Seite: jedes Gesundheitsformular traegt novalidate und fragt die Regeln se
   }
   // Ein Blutdruck ist nie ein Beispiel: "120 / 80" und "72" standen grau in
   // leeren Feldern und lasen sich wie eine eingetragene Messung.
-  const pair = page.valueFieldsMarkup('blood_pressure');
+  const pair = page.valueFieldsMarkup('bp');
   assert.match(pair, /id="vital-sys"/, 'Vorbedingung: das Blutdruck-Paar');
   assert.doesNotMatch(pair, /placeholder=/, 'keine Beispielwerte als Platzhalter');
 });
