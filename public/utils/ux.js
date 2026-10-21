@@ -315,10 +315,15 @@ function followingNeighbours(el, limit = 60) {
  * ein Inline-`transform` die alte Lage im Umschalt-Frame, und erst im
  * naechsten Frame uebernimmt die Animation von genau dort. Reduzierte
  * Bewegung: kein Halten, kein Gleiten - der Wechsel steht.
+ *
+ * Liefert ein Promise, das aufloest, wenn das Gleiten vorbei ist (sonst
+ * `null`): solange stehen die Elemente per transform an ihrer ALTEN Lage, und
+ * wer in dieser Zeit misst (getBoundingClientRect), misst den alten Zustand.
  * @param {Map<Element, {left: number, top: number}>} before - flipSnapshotElements()
+ * @returns {Promise<void>|null}
  */
 function holdThenGlide(before) {
-  if (!before?.size || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (!before?.size || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
   const duration = durationToken('--duration-md', 200);
   const easing = easingToken('--ease-out', 'ease-out');
   const held = [];
@@ -332,20 +337,25 @@ function holdThenGlide(before) {
     el.style.transform = from;
     held.push([el, from]);
   }
-  if (!held.length) return;
+  if (!held.length) return null;
   // ZWEI Frames Halt: der Wechsel kommt aus einem Scroll-Ereignis, das im
   // selben Frame VOR den rAF-Rueckrufen laeuft - ein einfaches rAF raeumte
   // ihn, bevor der Frame gemalt war. Eine sofort gestartete Animation zaehlt
   // die Messung nicht (gemessen: CLS 0,055). Danach uebernimmt die Animation;
   // der Inline-Wert geht erst, wenn sie laeuft (`ready`) - sonst stuende ein
   // Frame lang die neue Lage ohne Versatz da.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    for (const [el, from] of held) {
-      const anim = el.animate([{ transform: from }, { transform: 'none' }], { duration, easing });
-      const release = () => { if (el.style.transform === from) el.style.transform = ''; };
-      Promise.resolve(anim.ready).then(release, release);
-    }
-  }));
+  return new Promise((resolve) => {
+    // Rueckfall fuer den verdeckten Tab, in dem kein rAF kommt.
+    const fallback = setTimeout(resolve, duration + 500);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const [el, from] of held) {
+        const anim = el.animate([{ transform: from }, { transform: 'none' }], { duration, easing });
+        const release = () => { if (el.style.transform === from) el.style.transform = ''; };
+        Promise.resolve(anim.ready).then(release, release);
+      }
+      setTimeout(() => { clearTimeout(fallback); resolve(); }, duration);
+    }));
+  });
 }
 
 /**
@@ -910,19 +920,49 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
    * gedeckelte Kopf ordnet seine Zeilen um (der Zeitraum rueckt in die
    * Titelzeile), das ist keine Strecke, die sich an den Scroll binden laesst.
    * Reduzierte Bewegung: flipPlayElements tut nichts - der Wechsel steht. */
+  // WAEHREND DES GLEITENS WIRD NICHT GEMESSEN (Critique R21, D9). Beim
+  // Ausklappen waechst der Kopf, der ResizeObserver ruft `update`, und die
+  // Zeilen stehen in diesem Moment noch per transform an ihrer EINGEKLAPPTEN
+  // Lage - die Zeilenmessung sah eine Zeile, setzte Lead 0 und nahm dem Kopf
+  // `--capped`: danach klappte er nie wieder ein (gemessen in Woche und
+  // Monat, 2. Scroll). Gemessen wird, wenn das Gleiten vorbei ist.
+  let gliding = null;
   const setCollapsed = (on, states) => {
     if (states.every((c) => toolbar.classList.contains(c) === on)) return;
     const moving = [...toolbar.children, ...followingNeighbours(toolbar)];
     const before = flipSnapshotElements(moving);
     if (on) toolbar.classList.add(...states, 'was-collapsed');
     else toolbar.classList.remove(...states);
-    holdThenGlide(before);
+    const glide = holdThenGlide(before);
+    if (!glide) return;
+    gliding = glide;
+    glide.then(() => {
+      if (gliding !== glide) return;
+      gliding = null;
+      update();
+    });
+  };
+
+  // DER KOPF FOLGT EINEM MODUL, DAS SEINE FLAECHE SELBST FALTET (Critique
+  // R21, D9). Der Telefon-Monat klappt sein Raster beim Hochziehen der
+  // Tagesliste auf die Woche ein - und der Kopf darueber blieb bei 117px
+  // stehen: die Liste hat meist zu wenig Reserve fuer die Regel unten, und
+  // ihre eigene Schwelle (12px) ist nicht die des Kopfes (24px). Ein solcher
+  // Port traegt `data-head-collapse="module"`; seine Scroll-Ereignisse
+  // urteilen hier nicht, und das Modul sagt per HEAD_COLLAPSE_EVENT, wann der
+  // Kopf mitfaltet - EINE Geste, EIN Zustand, derselbe Gleitweg wie beim
+  // Scrollen (setCollapsed).
+  const onModuleCollapse = (e) => {
+    const fold = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
+    if (!fold && !toolbar.classList.contains('page-toolbar--capped')) return;
+    setCollapsed(Boolean(e.detail?.collapsed), fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked']);
   };
 
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
     if (!(port instanceof Element) || port === toolbar || toolbar.contains(port)) return;
+    if (port.closest?.(`[${HEAD_COLLAPSE_ATTR}="module"]`)) return;
     const reserve = port.scrollHeight - port.clientHeight;
     // EIN WAAGERECHTER STREIFEN IST NICHT DER SCROLLPORT DER SEITE. Der
     // Lauscher haengt in der Capture-Phase am Modul-Root und faengt damit auch
@@ -986,6 +1026,8 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // lead 0 ergeben und dem CSS die Grundlage entziehen, die es zum Ausklappen
     // braucht. Der Wert der ausgeklappten Form bleibt stehen.
     if (toolbar.classList.contains('is-collapsed')) return;
+    // Mitten im Gleiten stehen die Zeilen an ihrer alten Lage (setCollapsed).
+    if (gliding) return;
     // EIN KASTEN OHNE HÖHE MACHT KEINE ZEILE AUF. Ein leerer Slot bleibt im
     // Markup stehen (das Modul füllt ihn je nach Zustand) und sitzt als
     // Flex-Item mit Höhe 0 unter seinen Geschwistern - die Zeilenmessung unten
@@ -1267,6 +1309,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
   };
   toolbar.addEventListener('beforetoggle', onMenuToggle, { capture: true });
+  toolbar.addEventListener(HEAD_COLLAPSE_EVENT, onModuleCollapse);
 
   const ro = new ResizeObserver(update);
   ro.observe(toolbar);
@@ -1289,6 +1332,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
       for (const type of GESTURES) capped?.removeEventListener(type, onGesture, { capture: true });
       gestureTarget = null;
       toolbar.removeEventListener('beforetoggle', onMenuToggle, { capture: true });
+      toolbar.removeEventListener(HEAD_COLLAPSE_EVENT, onModuleCollapse);
       toolbar.querySelectorAll('[data-dock-fold]').forEach((el) => el.removeAttribute('data-dock-fold'));
       toolbar.style.removeProperty('--dock-fold-bar-h');
       dockTitle?.remove();
@@ -1306,6 +1350,22 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
 
 /** Unter dieser Breite bliebe vom angedockten Titel nur die Ellipse. */
 export const DOCK_TITLE_MIN_WIDTH = 88;
+
+/** Ereignis am Kopf: ein Modul faltet ihn mit seiner Flaeche (wireCollapsingHeader). */
+export const HEAD_COLLAPSE_EVENT = 'yuvomi:head-collapse';
+/** Attribut am Port, dessen Scrollen den Kopf NICHT faltet - das Modul tut es per Ereignis. */
+export const HEAD_COLLAPSE_ATTR = 'data-head-collapse';
+
+/**
+ * Faltet den Kopf mit der Flaeche des Moduls (Telefon-Monat: Raster auf die
+ * Woche). Ein Kopf, der noch nicht vermessen ist, bleibt, wie er ist.
+ * @param {Element|null} toolbar - die `.page-toolbar`
+ * @param {boolean} collapsed
+ */
+export function requestHeadCollapse(toolbar, collapsed) {
+  if (!toolbar || typeof CustomEvent !== 'function') return;
+  toolbar.dispatchEvent(new CustomEvent(HEAD_COLLAPSE_EVENT, { detail: { collapsed: Boolean(collapsed) } }));
+}
 
 /**
  * Das Werkzeugmenue der Bar-Zeile (`pageToolsMenuHtml`, Kennklasse

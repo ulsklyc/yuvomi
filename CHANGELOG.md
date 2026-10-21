@@ -152,6 +152,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now share the same height, so the list always starts at the same place; folded to one week, the
   row keeps its height across month boundaries.
 
+- **Folding the phone month also folds the calendar header.** Pulling the day list up folded the
+  month to its week but left the two-row header standing. Both now fold and unfold together. Also
+  fixed: in week and month view the header folded only once - after it unfolded, scrolling no
+  longer folded it again.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing

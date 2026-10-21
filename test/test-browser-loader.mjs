@@ -358,6 +358,9 @@ const STUBS = {
     export const drawChartOnce = () => 0;
     export const durationToken = (name, fallback) => fallback;
     export const easingToken = (name, fallback = 'ease-out') => fallback;
+    // Den Kopf mit der Flaeche falten (Telefon-Monat): ohne Shell-Kopf nichts zu tun.
+    // Wer pruefen will, OB die Seite fragt, setzt globalThis.__headCollapse.
+    export const requestHeadCollapse = (toolbar, collapsed) => { globalThis.__headCollapse?.(toolbar, collapsed); };
     // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
     export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
   `,

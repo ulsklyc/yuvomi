@@ -11,7 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken } from '/utils/ux.js';
+import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
@@ -3419,7 +3419,9 @@ function monthListHtml() {
           <button type="button" class="btn btn--icon month-list__tool" id="month-collapse" aria-controls="month-grid"></button>
         </div>
       </div>
-      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows"></div>
+      ${/* data-head-collapse="module": das Scrollen der Liste faltet den Kopf
+            nicht selbst - er folgt dem Raster (syncMonthCollapse, D9). */ ''}
+      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows" data-head-collapse="module"></div>
     </section>
   `;
 }
@@ -3472,6 +3474,10 @@ function syncMonthCollapse(view, list) {
   view.classList.toggle('month-view--collapsed', _monthCollapsed);
   // Eingeklappt gehen die Pfeile wochenweise (periodStepOf) - ihr Name folgt.
   syncPeriodArrows();
+  // DER KOPF FALTET MIT (Critique R21, D9): eingeklappt stand das Raster auf
+  // einer Woche, der Kopf darueber blieb zweizeilig (117px). Dieselbe Geste
+  // faltet jetzt beide; der Kopf gleitet wie beim Scrollen (utils/ux.js).
+  requestHeadCollapse(_container?.querySelector('#cal-toolbar'), _monthCollapsed);
   const btn = list.querySelector('#month-collapse');
   if (!btn) return;
   const label = t(_monthCollapsed ? 'calendar.monthShowMonth' : 'calendar.monthShowWeek');

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, requestHeadCollapse, HEAD_COLLAPSE_EVENT, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -942,6 +942,86 @@ test('wireCollapsingHeader: ein Port, der den Kollaps nicht traegt, klappt auch 
     s.scrollTo(monthRows, 0);
     assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
   } finally { s.restore(); }
+});
+
+/* R21 (Critique 2026-10-21, D9): der Telefon-Monat klappt sein Raster beim
+ * Hochziehen der Tagesliste auf die Woche ein - der Kopf blieb bei 117px, weil
+ * die Liste kaum Reserve hat. Jetzt faltet das Modul den Kopf mit seiner
+ * Flaeche (requestHeadCollapse), und sein Port (`data-head-collapse="module"`)
+ * urteilt nicht mehr selbst: weder klappt sein Scrollen den Kopf ein, noch
+ * holt seine fehlende Reserve ihn wieder auf. */
+test('wireCollapsingHeader R21: ein Modul faltet den Kopf mit seiner Flaeche, sein Port urteilt nicht', () => {
+  const s = collapsingStub();
+  try {
+    s.toolbar.dispatchEvent = (ev) => { for (const fn of s.toolbar.handlers[ev.type] ?? []) fn(ev); };
+    wireCollapsingHeader(s.toolbar);
+    const rows = new s.FakeEl('month-rows', { overflowY: 'auto' });
+    rows.scrollHeight = 1600;
+    rows.clientHeight = 500;
+    rows.closest = (sel) => (/data-head-collapse="module"/.test(sel) ? rows : null);
+    s.root.append(rows);
+    s.fire('touchstart', rows);
+    s.scrollTo(rows, 300);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'der Port des Moduls klappt den Kopf nicht selbst ein');
+    requestHeadCollapse(s.toolbar, true);
+    assert.equal(HEAD_COLLAPSE_EVENT, 'yuvomi:head-collapse');
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'das Modul faltet den Kopf mit seinem Raster');
+    // Eingeklappt waechst die Liste und hat keine Reserve mehr - das darf den
+    // Kopf nicht wieder aufholen, solange das Raster eingeklappt ist.
+    rows.scrollHeight = 500;
+    s.scrollTo(rows, 0);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'die fehlende Reserve des Modul-Ports klappt den Kopf nicht auf');
+    requestHeadCollapse(s.toolbar, false);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, 'mit dem Raster klappt der Kopf wieder auf');
+  } finally { s.restore(); }
+});
+
+/* R21 (D9, Beifang): nach dem ersten Ausklappen klappte der Kopf nie wieder
+ * ein - gemessen in Woche und Monat. Der Kopf waechst, der ResizeObserver ruft
+ * `update`, und die Zeilen stehen in diesem Moment per transform noch an ihrer
+ * EINGEKLAPPTEN Lage (holdThenGlide): die Zeilenmessung sah eine Zeile, setzte
+ * Lead 0 und nahm `--capped`. Gemessen wird jetzt nach dem Gleiten. */
+test('wireCollapsingHeader R21: nach dem Ausklappen bleibt der Kopf faltbar - gemessen wird nach dem Gleiten', async () => {
+  const s = collapsingStub();
+  const frames = [];
+  const savedRaf = global.requestAnimationFrame;
+  global.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  const flush = async () => {
+    while (frames.length) frames.shift()();
+    await new Promise((r) => setTimeout(r, 260));
+  };
+  try {
+    // Eingeklappt rueckt die zweite Zeile in die erste (der Zeitraum neben den Werkzeugen).
+    const at = (el, open, closed) => Object.defineProperty(el, 'rect', {
+      get: () => {
+        const b = s.toolbar.classList.contains('is-collapsed') ? closed : open;
+        const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(el.style.transform || '');
+        const dy = m ? Number(m[2]) : 0;
+        return { top: b.top + dy, bottom: b.bottom + dy, left: 0 };
+      },
+      set: () => {},
+    });
+    at(s.tab, { top: 50, bottom: 90 }, { top: 0, bottom: 40 });
+    at(s.port, { top: 90, bottom: 590 }, { top: 40, bottom: 540 });
+    for (const el of [s.tab, s.port]) el.animate = () => ({ ready: Promise.resolve() });
+    const header = wireCollapsingHeader(s.toolbar);
+    assert.ok(s.toolbar.classList.contains('page-toolbar--capped'));
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 300);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true);
+    await flush();
+    s.scrollTo(s.port, 0);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
+    // Der Kopf ist gewachsen - der ResizeObserver meldet sich mitten im Halt.
+    header.update();
+    await flush();
+    assert.ok(s.toolbar.classList.contains('page-toolbar--capped'), 'nach dem Ausklappen hat der Kopf seine Lead-Zone verloren');
+    s.scrollTo(s.port, 300);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'der zweite Scroll klappt den Kopf nicht mehr ein');
+  } finally {
+    global.requestAnimationFrame = savedRaf;
+    s.restore();
+  }
 });
 
 test('watchNavCapsuleHeight: die gemessene Kapselhoehe steht am Root, eine verborgene Kapsel raeumt sie (Review zu #1475)', () => {
