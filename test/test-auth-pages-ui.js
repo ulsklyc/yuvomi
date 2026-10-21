@@ -304,3 +304,29 @@ test('/join ohne gueltige Einladung: der Satz nennt den naechsten Schritt, die A
     assert.doesNotMatch(j.missingToken, /token/i, `${file}: kein "Token" in der Meldung`);
   }
 });
+
+/* KEINE SACKGASSE AUF /reset-password (Critique R21, Persona Inge; D15).
+ * Ohne Token stand "Es wurde kein gueltiger Token gefunden." unter einem
+ * gesperrten Formular - ein Wort aus der Technik und kein Weg hinaus. Jetzt
+ * nennt der Satz den Link und den naechsten Schritt, das Formular weicht, und
+ * "Neuen Link anfordern" fuehrt zu /forgot-password. */
+test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu einem neuen Link (Critique R21)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const page = read('../public/pages/reset-password.js');
+  assert.match(page, /<a href="\/forgot-password" data-link>\$\{esc\(t\('resetPassword\.requestNew'\)\)\}<\/a>/, 'der Weg zu einem neuen Link steht auf der Seite');
+  const dead = page.slice(page.indexOf('const dead = '), page.indexOf('if (!token)'));
+  assert.match(dead, /form\.hidden = true/, 'ein toter Link nimmt das Formular weg');
+  assert.match(dead, /reset-request-new/, 'und betont den Weg zu einem neuen Link');
+  const de = JSON.parse(read('../public/locales/de.json')).resetPassword;
+  for (const key of ['missingToken', 'invalidToken']) {
+    assert.match(de[key], /fordere einen neuen an/, `resetPassword.${key} nennt den naechsten Schritt`);
+  }
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { resetPassword: r } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    for (const key of ['missingToken', 'invalidToken', 'requestNew']) {
+      assert.doesNotMatch(r[key] ?? '', /token/i, `${file}: kein "Token" in resetPassword.${key}`);
+      assert.ok(r[key], `${file}: resetPassword.${key} fehlt`);
+    }
+  }
+});

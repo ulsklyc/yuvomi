@@ -1541,7 +1541,6 @@
         "metaLoadError": "Budsjettkategorier kunne ikke lastes.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ underkategori",
-        "moreDetails": "Flere detaljer",
         "newCategoryPrompt": "Navn på ny kategori:",
         "newSubcategoryPrompt": "Navn på ny underkategori:",
         "categoryAddedToast": "Kategori lagt til.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Trykk for å velge en ZIP-fil"
     },
     "login": {
-        "tagline": "Velkommen tilbake til familieplanleggeren din.",
+        "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
         "usernameLabel": "Brukernavn",
         "passwordLabel": "Passord",
         "loginButton": "Logg inn",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Forkast endringer?",
         "unsavedChangesDetail": "Inntastinger i dette skjemaet vil gå tapt.",
         "discardChanges": "Forkast",
-        "moreSettings": "Flere innstillinger",
         "moreDetails": "Flere detaljer"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Velkommen til {{name}}",
-        "step1Body": "Din personlige familieplanlegger. Oppgaver, kalender, handling og mer - alt på ett sted.",
+        "step1Body": "Oppgaver, kalender, handling og mer for husholdningen din - enten du bor alene, i par eller som familie. Alt på ett sted.",
         "step2Title": "Navigasjon og moduler",
         "step2Body": "Linjen nederst tar deg rett til de viktigste områdene. Alle andre moduler finner du under «Mer».",
         "step3Title": "Kom i gang raskt",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Åpne søk via «Mer» → Søk.",
         "mobileSettings": "Finn innstillinger under «Mer».",
         "guideLink": "Brukerveiledning",
-        "guideHint": "Vedlikeholdes av fellesskapet, i eget depot - kan ligge bak en utgivelse."
+        "guideHint": "Vedlikeholdes av fellesskapet. Åpnes i en ny fane."
     },
     "changelog": {
         "title": "Endringslogg",
@@ -4390,8 +4388,9 @@
         "success": "Passordet ditt er endret. Du kan nå logge inn.",
         "mismatch": "Passordene stemmer ikke overens.",
         "tooShort": "Passordet må være minst 8 tegn langt.",
-        "invalidToken": "Denne lenken er ugyldig eller har utløpt.",
-        "missingToken": "Ingen gyldig token ble funnet."
+        "invalidToken": "Denne tilbakestillingslenken er ugyldig eller utløpt - be om en ny.",
+        "missingToken": "Denne tilbakestillingslenken er ufullstendig - be om en ny.",
+        "requestNew": "Be om en ny lenke"
     },
     "email": {
         "host": "SMTP-vert",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Logg dag",
-                "date": "Dato",
-                "more": "Flere detaljer"
+                "date": "Dato"
             },
             "export": {
                 "csv": "Eksporter som CSV"

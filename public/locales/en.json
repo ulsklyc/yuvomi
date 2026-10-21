@@ -1541,7 +1541,6 @@
         "metaLoadError": "Budget categories could not be loaded.",
         "addCategory": "+ category",
         "addSubcategory": "+ subcategory",
-        "moreDetails": "More details",
         "newCategoryPrompt": "Name of the new category:",
         "newSubcategoryPrompt": "Name of the new subcategory:",
         "categoryAddedToast": "Category added.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Tap to choose a ZIP file"
     },
     "login": {
-        "tagline": "Welcome back to your family planner.",
+        "tagline": "Welcome back. Your home in one place.",
         "usernameLabel": "Username",
         "passwordLabel": "Password",
         "loginButton": "Log in",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Discard changes?",
         "unsavedChangesDetail": "Your entries in this form will be lost.",
         "discardChanges": "Discard",
-        "moreSettings": "More settings",
         "moreDetails": "More details"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",
-        "step1Body": "Your personal family planner. Tasks, calendar, shopping and more - all in one place.",
+        "step1Body": "Tasks, calendar, shopping and more for your household - whether you live alone, as a couple or as a family. All in one place.",
         "step2Title": "Navigation & Modules",
         "step2Body": "The bar at the bottom takes you straight to the most important areas. You will find all other modules under “More”.",
         "step3Title": "Get started quickly",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Open search with the magnifier on the overview or via “More”.",
         "mobileSettings": "Find settings under “More”.",
         "guideLink": "User guide",
-        "guideHint": "Community-maintained, in its own repository - it can lag behind a release."
+        "guideHint": "Maintained by the community. Opens in a new tab."
     },
     "changelog": {
         "title": "Changelog",
@@ -4390,8 +4388,9 @@
         "success": "Your password has been changed. You can now sign in.",
         "mismatch": "The passwords do not match.",
         "tooShort": "The password must be at least 8 characters long.",
-        "invalidToken": "This link is invalid or has expired.",
-        "missingToken": "No valid token was found."
+        "invalidToken": "This reset link is invalid or has expired - request a new one.",
+        "missingToken": "This reset link is incomplete - request a new one.",
+        "requestNew": "Request a new link"
     },
     "email": {
         "host": "SMTP host",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Log day",
-                "date": "Date",
-                "more": "More details"
+                "date": "Date"
             },
             "export": {
                 "csv": "Export as CSV"

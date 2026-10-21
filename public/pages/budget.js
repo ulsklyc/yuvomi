@@ -4323,7 +4323,6 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           icon: 'receipt',
         })}`,
         {
-          label: t('budget.moreDetails'),
           // Beim Bearbeiten offen, sobald eine der Angaben gesetzt ist - ein
           // gesetzter Wert hinter einem geschlossenen Riegel waere unsichtbar.
           open: isEdit && (entry.is_recurring

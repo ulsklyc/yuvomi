@@ -1541,7 +1541,6 @@
         "metaLoadError": "家計のカテゴリーを読み込めませんでした。",
         "addCategory": "+ カテゴリー",
         "addSubcategory": "+ サブカテゴリー",
-        "moreDetails": "その他の項目",
         "newCategoryPrompt": "新しいカテゴリーの名前:",
         "newSubcategoryPrompt": "新しいサブカテゴリーの名前:",
         "categoryAddedToast": "カテゴリーを追加しました。",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択"
     },
     "login": {
-        "tagline": "家族のプランナーへおかえりなさい。",
+        "tagline": "おかえりなさい。暮らしのことを一か所に。",
         "usernameLabel": "ユーザー名",
         "passwordLabel": "パスワード",
         "loginButton": "ログイン",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "変更を破棄しますか？",
         "unsavedChangesDetail": "このフォームに入力した内容は失われます。",
         "discardChanges": "破棄",
-        "moreSettings": "詳細設定",
         "moreDetails": "その他の項目"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "{{name}}へようこそ",
-        "step1Body": "あなただけの家族プランナー。タスク、カレンダー、買い物などを一か所にまとめます。",
+        "step1Body": "タスク、カレンダー、買い物など、暮らしのことを一か所に。ひとり暮らしでも、ふたりでも、家族でも。",
         "step2Title": "ナビゲーションとモジュール",
         "step2Body": "画面下部のバーから主要なエリアに直接移動できます。その他のモジュールは「もっと見る」にあります。",
         "step3Title": "さっそく始めよう",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "検索は概要の虫めがね、または「その他」から開きます。",
         "mobileSettings": "設定は「その他」にあります。",
         "guideLink": "ユーザーガイド",
-        "guideHint": "コミュニティが別のリポジトリで管理しています。リリースより古い場合があります。"
+        "guideHint": "コミュニティが管理しています。新しいタブで開きます。"
     },
     "changelog": {
         "title": "変更履歴",
@@ -4390,8 +4388,9 @@
         "success": "パスワードを変更しました。ログインできます。",
         "mismatch": "パスワードが一致しません。",
         "tooShort": "パスワードは8文字以上にしてください。",
-        "invalidToken": "このリンクは無効か、期限切れです。",
-        "missingToken": "有効なトークンが見つかりませんでした。"
+        "invalidToken": "このリセット用リンクは無効か期限切れです - 新しいリンクをリクエストしてください。",
+        "missingToken": "このリセット用リンクは不完全です - 新しいリンクをリクエストしてください。",
+        "requestNew": "新しいリンクをリクエスト"
     },
     "email": {
         "host": "SMTP ホスト",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "その日を記録",
-                "date": "日付",
-                "more": "その他の項目"
+                "date": "日付"
             },
             "export": {
                 "csv": "CSVでエクスポート"

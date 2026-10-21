@@ -6,6 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
 
 function wireLinks(container) {
@@ -76,6 +77,9 @@ export async function render(container) {
             ${esc(t('resetPassword.submit'))}
           </button>
         </form>
+        <!-- Der Weg zu einem neuen Link steht nur, wenn dieser hier tot ist
+             (dead() unten); sonst reicht der Rueckweg zur Anmeldung. -->
+        <p class="auth-form__forgot" id="reset-request-new" hidden><a href="/forgot-password" data-link>${esc(t('resetPassword.requestNew'))}</a></p>
         <p class="auth-form__forgot"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
       </div>
     </main>
@@ -92,8 +96,19 @@ export async function render(container) {
   wireLinks(container);
 
   const show = (el, msg) => { el.textContent = msg; el.hidden = false; };
+  // KEINE SACKGASSE (Critique R21, Persona Inge; D15): ein toter Link macht
+  // das Formular sinnlos. Statt eines gesperrten Formulars unter "kein
+  // gueltiger Token" stehen der Satz mit dem naechsten Schritt und der Weg
+  // dorthin, betont wie die Anmeldung auf /join (join.js).
+  const dead = (msg) => {
+    show(errorEl, msg);
+    form.hidden = true;
+    const again = container.querySelector('#reset-request-new');
+    again.hidden = false;
+    again.classList.add('auth-form__forgot--emphasis');
+  };
 
-  if (!token) { show(errorEl, t('resetPassword.missingToken')); btn.disabled = true; return; }
+  if (!token) { dead(t('resetPassword.missingToken')); return; }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -110,7 +125,12 @@ export async function render(container) {
       show(successEl, t('resetPassword.success'));
       setTimeout(() => window.yuvomi.navigate('/login'), 1500);
     } catch (err) {
-      show(errorEl, t('resetPassword.invalidToken'));
+      // Ein 400 heisst hier: der Link gilt nicht (mehr) - die Laenge prueft
+      // das Formular selbst, und ohne Token kaeme es gar nicht bis hierher.
+      // Alles andere (429, Netz, Server) laesst das Formular stehen: ein
+      // voller Limiter darf nicht wirken wie ein abgelaufener Link.
+      if (err?.status === 400) { dead(t('resetPassword.invalidToken')); return; }
+      show(errorEl, errorSentence(err));
       btn.disabled = false;
     }
   });

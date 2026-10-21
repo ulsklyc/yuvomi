@@ -9503,7 +9503,7 @@ function openDayLogModal(dateKey) {
           <label class="label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
           <textarea class="input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
         </div>
-        ${advancedSection(moreFieldsHtml, { label: t('health.cycle.dayLog.more'), hint: moreHint, open: moreOpen })}
+        ${advancedSection(moreFieldsHtml, { hint: moreHint, open: moreOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${existing ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-log" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>

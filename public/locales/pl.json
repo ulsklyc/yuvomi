@@ -1712,7 +1712,6 @@
         "metaLoadError": "Nie udało się załadować kategorii budżetu.",
         "addCategory": "+ Kategoria",
         "addSubcategory": "+ Podkategoria",
-        "moreDetails": "Więcej informacji",
         "newCategoryPrompt": "Nazwa nowej kategorii:",
         "newSubcategoryPrompt": "Nazwa nowej podkategorii:",
         "categoryAddedToast": "Kategoria dodana.",
@@ -3502,7 +3501,7 @@
         "installModuleDropzoneTitleTouch": "Dotknij, aby wybrać plik ZIP"
     },
     "login": {
-        "tagline": "Witaj ponownie w swoim planerze rodzinnym.",
+        "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
         "usernameLabel": "Nazwa użytkownika",
         "passwordLabel": "Hasło",
         "loginButton": "Zaloguj",
@@ -3571,7 +3570,6 @@
         "unsavedChanges": "Odrzucić zmiany?",
         "unsavedChangesDetail": "Twoje wpisy w tym formularzu zostaną utracone.",
         "discardChanges": "Odrzuć",
-        "moreSettings": "Więcej ustawień",
         "moreDetails": "Więcej informacji"
     },
     "rrule": {
@@ -3801,7 +3799,7 @@
     },
     "onboarding": {
         "step1Title": "Witaj w {{name}}",
-        "step1Body": "Twój osobisty planer rodzinny. Zadania, kalendarz, zakupy i więcej - wszystko w jednym miejscu.",
+        "step1Body": "Zadania, kalendarz, zakupy i więcej dla twojego domu - niezależnie od tego, czy mieszkasz sam, we dwoje, czy z rodziną. Wszystko w jednym miejscu.",
         "step2Title": "Nawigacja i moduły",
         "step2Body": "Pasek na dole prowadzi bezpośrednio do najważniejszych obszarów. Pozostałe moduły znajdziesz pod „Więcej”.",
         "step3Title": "Szybki start",
@@ -4583,7 +4581,7 @@
         "mobileSearch": "Wyszukiwanie otworzysz lupą na przeglądzie albo przez „Więcej”.",
         "mobileSettings": "Ustawienia znajdziesz w „Więcej”.",
         "guideLink": "Podręcznik użytkownika",
-        "guideHint": "Prowadzony przez społeczność, we własnym repozytorium - może być opóźniony wobec wydania."
+        "guideHint": "Prowadzony przez społeczność. Otwiera się w nowej karcie."
     },
     "changelog": {
         "title": "Zmiany",
@@ -4626,8 +4624,9 @@
         "success": "Hasło zostało zmienione. Możesz się teraz zalogować.",
         "mismatch": "Hasła nie są zgodne.",
         "tooShort": "Hasło musi mieć co najmniej 8 znaków.",
-        "invalidToken": "Ten link jest nieprawidłowy lub wygasł.",
-        "missingToken": "Nie znaleziono prawidłowego tokenu."
+        "invalidToken": "Ten link do resetowania jest nieprawidłowy lub wygasł - poproś o nowy.",
+        "missingToken": "Ten link do resetowania jest niepełny - poproś o nowy.",
+        "requestNew": "Poproś o nowy link"
     },
     "email": {
         "host": "Host SMTP",
@@ -5686,8 +5685,7 @@
             },
             "dayLog": {
                 "title": "Zapisz dzień",
-                "date": "Data",
-                "more": "Więcej informacji"
+                "date": "Data"
             },
             "export": {
                 "csv": "Eksportuj jako CSV"

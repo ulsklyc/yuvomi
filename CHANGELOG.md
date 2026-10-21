@@ -47,6 +47,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Sign-in and the welcome tour speak to every household.** "Welcome back to your family
+  planner" left out everyone who lives alone or as a couple. Sign-in now says "Welcome back. Your
+  home in one place.", and the first step of the tour names tasks, calendar and shopping for a
+  household of any size, in every language. The two fasting texts in German that still addressed
+  you formally now say "du" like the rest of the app.
+
+- **The fold-out for less common fields has one name in every dialog.** Tasks called it "More
+  settings", while bookings, inventory and the cycle diary called it "More details". It is "More
+  details" everywhere now.
+
+- **The note under the keyboard shortcuts no longer apologises for the user guide.** It says who
+  maintains the guide and that it opens in a new tab.
+
 - **Health opens with one sentence about what changed.** The overview now starts with a line
   such as "Since the last measurement: weight -0.2 kg, sleep +30 min and blood oxygen +1 %" - the
   change, never a judgement. Measurements nobody has taken no longer show as grey boxes with a
@@ -179,6 +192,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An invitation link that no longer works says what to do next.** Instead of "no valid token was
   found", the page now says the link is invalid or expired and to ask for a new one, and the way to
   sign in stands out for anyone who already has an account.
+- **A password reset link that no longer works says what to do next.** Instead of "No valid token
+  was found" above a locked form, the page says the link is incomplete or has expired and offers
+  "Request a new link". A busy server or a lost connection no longer reads like an expired link:
+  the form stays, and the message says what went wrong.
 - **When ticking off a task or shopping item does not go through, the message says which one.**
   Instead of "An error occurred", it names the item, says it is open again (or ticked again), and
   that you can try once more.

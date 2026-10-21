@@ -1558,7 +1558,6 @@
         "metaLoadError": "Kategori anggaran tidak dapat dimuat.",
         "addCategory": "+ Kategori",
         "addSubcategory": "+ Subkategori",
-        "moreDetails": "Detail lainnya",
         "newCategoryPrompt": "Nama kategori baru:",
         "newSubcategoryPrompt": "Nama subkategori baru:",
         "categoryAddedToast": "Kategori ditambahkan.",
@@ -3300,7 +3299,7 @@
         "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP"
     },
     "login": {
-        "tagline": "Selamat datang kembali di perencana keluarga Anda.",
+        "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
         "usernameLabel": "Nama pengguna",
         "passwordLabel": "Kata sandi",
         "loginButton": "Masuk",
@@ -3369,7 +3368,6 @@
         "unsavedChanges": "Buang perubahan?",
         "unsavedChangesDetail": "Isian kamu di formulir ini akan hilang.",
         "discardChanges": "Buang",
-        "moreSettings": "Pengaturan lain",
         "moreDetails": "Detail lainnya"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Selamat datang di {{name}}",
-        "step1Body": "Perencana keluarga pribadi Anda. Tugas, kalender, belanja, dan lainnya - semua di satu tempat.",
+        "step1Body": "Tugas, kalender, belanja, dan lainnya untuk rumah tangga Anda - entah Anda tinggal sendiri, berdua, atau bersama keluarga. Semua di satu tempat.",
         "step2Title": "Navigasi & Modul",
         "step2Body": "Bilah di bawah membawa Anda langsung ke area terpenting. Semua modul lainnya ada di bawah “Lainnya”.",
         "step3Title": "Mulai dengan cepat",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Pencarian dibuka lewat kaca pembesar di ringkasan atau melalui „Lainnya\".",
         "mobileSettings": "Pengaturan dapat ditemukan di „Lainnya\".",
         "guideLink": "Panduan pengguna",
-        "guideHint": "Dikelola komunitas, di repositori sendiri - bisa tertinggal dari sebuah rilis."
+        "guideHint": "Dikelola oleh komunitas. Terbuka di tab baru."
     },
     "changelog": {
         "title": "Catatan perubahan",
@@ -4390,8 +4388,9 @@
         "success": "Kata sandi Anda telah diubah. Anda sekarang dapat masuk.",
         "mismatch": "Kata sandi tidak cocok.",
         "tooShort": "Kata sandi harus minimal 8 karakter.",
-        "invalidToken": "Tautan ini tidak valid atau telah kedaluwarsa.",
-        "missingToken": "Tidak ada token yang valid ditemukan."
+        "invalidToken": "Tautan atur ulang ini tidak valid atau sudah kedaluwarsa - minta yang baru.",
+        "missingToken": "Tautan atur ulang ini tidak lengkap - minta yang baru.",
+        "requestNew": "Minta tautan baru"
     },
     "email": {
         "host": "Host SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Catat hari",
-                "date": "Tanggal",
-                "more": "Detail lainnya"
+                "date": "Tanggal"
             },
             "export": {
                 "csv": "Ekspor sebagai CSV"

@@ -1174,7 +1174,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   if (task?.documents?.length) advancedSummary.push(task.documents.map((d) => d.name).join(', '));
 
   const advancedLabel = advancedSummary.length
-    ? `${t('modal.moreSettings')} · ${advancedSummary.join(' · ')}`
+    ? `${t('modal.moreDetails')} · ${advancedSummary.join(' · ')}`
     : undefined;
   /* WIEDERHOLUNG UND ERINNERUNG LIEGEN HINTER DEM AUFKLAPPER, SOLANGE SIE LEER
    * SIND (Critique 2026-10-05, R16). Beide standen offen unter ihm - eine

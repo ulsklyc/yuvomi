@@ -1541,7 +1541,6 @@
         "metaLoadError": "No se pudieron cargar las categorías del presupuesto.",
         "addCategory": "+ categoría",
         "addSubcategory": "+ subcategoría",
-        "moreDetails": "Más datos",
         "newCategoryPrompt": "Nombre de la nueva categoría:",
         "newSubcategoryPrompt": "Nombre de la nueva subcategoría:",
         "categoryAddedToast": "Categoría añadida.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Toca para elegir un archivo ZIP"
     },
     "login": {
-        "tagline": "Bienvenido de nuevo a tu planificador familiar.",
+        "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
         "usernameLabel": "Nombre de usuario",
         "passwordLabel": "Contraseña",
         "loginButton": "Iniciar sesión",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "¿Descartar cambios?",
         "unsavedChangesDetail": "Tus datos introducidos en este formulario se perderán.",
         "discardChanges": "Descartar",
-        "moreSettings": "Más ajustes",
         "moreDetails": "Más datos"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Bienvenido a {{name}}",
-        "step1Body": "Tu planificador familiar personal. Tareas, calendario, compras y más - todo en un solo lugar.",
+        "step1Body": "Tareas, calendario, compras y más para tu hogar - tanto si vives solo como en pareja o en familia. Todo en un solo lugar.",
         "step2Title": "Navegación y módulos",
         "step2Body": "La barra inferior te lleva directamente a las áreas más importantes. Encontrarás el resto de módulos en «Más».",
         "step3Title": "Empieza rápido",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Abre la búsqueda con la lupa de la vista general o desde «Más».",
         "mobileSettings": "Encuentras los ajustes en «Más».",
         "guideLink": "Manual de usuario",
-        "guideHint": "Mantenido por la comunidad, en su propio repositorio: puede ir por detrás de una versión."
+        "guideHint": "Mantenido por la comunidad. Se abre en una pestaña nueva."
     },
     "changelog": {
         "title": "Novedades",
@@ -4390,8 +4388,9 @@
         "success": "Tu contraseña se ha cambiado. Ya puedes iniciar sesión.",
         "mismatch": "Las contraseñas no coinciden.",
         "tooShort": "La contraseña debe tener al menos 8 caracteres.",
-        "invalidToken": "Este enlace no es válido o ha caducado.",
-        "missingToken": "No se ha encontrado ningún token válido."
+        "invalidToken": "Este enlace para restablecer no es válido o ha caducado - solicita uno nuevo.",
+        "missingToken": "Este enlace para restablecer está incompleto - solicita uno nuevo.",
+        "requestNew": "Solicitar un enlace nuevo"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Registrar día",
-                "date": "Fecha",
-                "more": "Más datos"
+                "date": "Fecha"
             },
             "export": {
                 "csv": "Exportar como CSV"

@@ -1558,7 +1558,6 @@
         "metaLoadError": "Budget-Kategorien konnten nicht geladen werden.",
         "addCategory": "+ Kategorie",
         "addSubcategory": "+ Unterkategorie",
-        "moreDetails": "Weitere Angaben",
         "newCategoryPrompt": "Name der neuen Kategorie:",
         "newSubcategoryPrompt": "Name der neuen Unterkategorie:",
         "categoryAddedToast": "Kategorie hinzugefügt.",
@@ -3300,7 +3299,7 @@
         "installModuleDropzoneTitleTouch": "Tippen, um eine ZIP-Datei auszuwählen"
     },
     "login": {
-        "tagline": "Willkommen zurück bei deinem Familienplaner.",
+        "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
         "usernameLabel": "Benutzername",
         "passwordLabel": "Passwort",
         "loginButton": "Anmelden",
@@ -3369,7 +3368,6 @@
         "unsavedChanges": "Änderungen verwerfen?",
         "unsavedChangesDetail": "Deine Eingaben in diesem Formular gehen verloren.",
         "discardChanges": "Verwerfen",
-        "moreSettings": "Weitere Einstellungen",
         "moreDetails": "Weitere Angaben"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Willkommen bei {{name}}",
-        "step1Body": "Dein persönlicher Familienplaner. Aufgaben, Kalender, Einkauf und mehr - alles an einem Ort.",
+        "step1Body": "Aufgaben, Kalender, Einkauf und mehr für deinen Haushalt - ob du allein lebst, zu zweit oder als Familie. Alles an einem Ort.",
         "step2Title": "Navigation & Module",
         "step2Body": "Die Leiste unten führt direkt zu den wichtigsten Bereichen. Alle weiteren Module findest du unter „Mehr“.",
         "step3Title": "Schnell loslegen",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Die Suche öffnest du über die Lupe auf der Übersicht oder unter „Mehr“.",
         "mobileSettings": "Einstellungen findest du unter „Mehr“.",
         "guideLink": "Nutzerhandbuch",
-        "guideHint": "Aus der Community, in einem eigenen Repository - kann hinter einem Release zurückliegen."
+        "guideHint": "Von der Community gepflegt. Öffnet sich in einem neuen Tab."
     },
     "changelog": {
         "title": "Änderungsverlauf",
@@ -4390,8 +4388,9 @@
         "success": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden.",
         "mismatch": "Die Passwörter stimmen nicht überein.",
         "tooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
-        "invalidToken": "Dieser Link ist ungültig oder abgelaufen.",
-        "missingToken": "Es wurde kein gültiger Token gefunden."
+        "invalidToken": "Dieser Link zum Zurücksetzen ist ungültig oder abgelaufen - fordere einen neuen an.",
+        "missingToken": "Dieser Link zum Zurücksetzen ist unvollständig - fordere einen neuen an.",
+        "requestNew": "Neuen Link anfordern"
     },
     "email": {
         "host": "SMTP-Host",
@@ -4690,7 +4689,7 @@
             "targetAt": "Zielzeit: {{date}}",
             "utcOffset": "UTC-Versatz (wiederholte Ortszeit)",
             "wallTimeError": "Diese Ortszeit existiert in der erfassten Zeitzone nicht. Bitte eine andere Zeit wählen.",
-            "dateReadOnly": "Dieses Datum lässt sich nicht im Datumsfeld bearbeiten. Der ursprüngliche Zeitstempel bleibt erhalten; die anderen Felder können Sie ändern.",
+            "dateReadOnly": "Dieses Datum lässt sich nicht im Datumsfeld bearbeiten. Der ursprüngliche Zeitstempel bleibt erhalten; die anderen Felder kannst du ändern.",
             "offline": "Vor Änderungen am Fasten bitte eine Verbindung herstellen.",
             "zoneMode": "Informationen am Zifferblatt",
             "zoneTimer": "Nur Zeitmesser",
@@ -4703,7 +4702,7 @@
             "zoneVariability": "Diese allgemeinen Phasen überlappen. Der Übergang zur stärkeren Nutzung von Fett und Ketonen ist unterschiedlich, häufig über 12-36 Stunden. Dieser Zeitmesser misst keinen Stoffwechselzustand; längeres Fasten ist nicht unbedingt besser.",
             "extraDays": "+{{count}} Tage",
             "extraDays_one": "+{{count}} Tag",
-            "safetyDialog": "Yuvomi dient der Aufzeichnung und ist weder ein Medizinprodukt noch medizinischer Rat. Fasten ist nicht für alle geeignet. Holen Sie fachlichen Rat ein, besonders bei Schwangerschaft oder Stillzeit, für Kinder und Jugendliche, bei früheren Essstörungen, Diabetes, relevanten Medikamenten oder chronischen Erkrankungen. Sie können das Fasten jederzeit beenden.",
+            "safetyDialog": "Yuvomi dient der Aufzeichnung und ist weder ein Medizinprodukt noch medizinischer Rat. Fasten ist nicht für alle geeignet. Hol dir fachlichen Rat, besonders bei Schwangerschaft oder Stillzeit, für Kinder und Jugendliche, bei früheren Essstörungen, Diabetes, relevanten Medikamenten oder chronischen Erkrankungen. Du kannst das Fasten jederzeit beenden.",
             "saveError": "Fasten konnte nicht gespeichert werden.",
             "loadError": "Fasten konnte nicht geladen werden.",
             "zone": {
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Tag protokollieren",
-                "date": "Datum",
-                "more": "Weitere Angaben"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Als CSV exportieren"

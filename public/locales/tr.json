@@ -1541,7 +1541,6 @@
         "metaLoadError": "Bütçe kategorileri yüklenemedi.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ alt kategori",
-        "moreDetails": "Diğer bilgiler",
         "newCategoryPrompt": "Yeni kategorinin adı:",
         "newSubcategoryPrompt": "Yeni alt kategorinin adı:",
         "categoryAddedToast": "Kategori eklendi.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun"
     },
     "login": {
-        "tagline": "Aile planlayıcına tekrar hoş geldin.",
+        "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
         "usernameLabel": "Kullanıcı adı",
         "passwordLabel": "Şifre",
         "loginButton": "Giriş yap",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Değişiklikler atılsın mı?",
         "unsavedChangesDetail": "Bu formdaki girişlerin kaybolacak.",
         "discardChanges": "At",
-        "moreSettings": "Diğer ayarlar",
         "moreDetails": "Diğer bilgiler"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "{{name}} uygulamasına hoş geldiniz",
-        "step1Body": "Kişisel aile planlayıcın. Görevler, takvim, alışveriş ve daha fazlası - hepsi tek yerde.",
+        "step1Body": "Hanen için görevler, takvim, alışveriş ve daha fazlası - ister yalnız, ister çift, ister aile olarak yaşa. Hepsi tek yerde.",
         "step2Title": "Gezinme ve Modüller",
         "step2Body": "Alttaki çubuk sizi doğrudan en önemli alanlara götürür. Diğer tüm modülleri “Daha Fazla” altında bulursunuz.",
         "step3Title": "Hızlıca başlayın",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Aramayı genel bakıştaki büyüteçle ya da „Daha fazla” ile açın.",
         "mobileSettings": "Ayarları „Daha fazla” altında bulursunuz.",
         "guideLink": "Kullanıcı kılavuzu",
-        "guideHint": "Toplulukça, ayrı bir depoda tutuluyor - bir sürümün gerisinde kalabilir."
+        "guideHint": "Topluluk tarafından sürdürülür. Yeni sekmede açılır."
     },
     "changelog": {
         "title": "Değişiklikler",
@@ -4390,8 +4388,9 @@
         "success": "Parolan değiştirildi. Artık giriş yapabilirsin.",
         "mismatch": "Parolalar eşleşmiyor.",
         "tooShort": "Parola en az 8 karakter olmalı.",
-        "invalidToken": "Bu bağlantı geçersiz ya da süresi dolmuş.",
-        "missingToken": "Geçerli bir belirteç bulunamadı."
+        "invalidToken": "Bu sıfırlama bağlantısı geçersiz veya süresi dolmuş - yenisini isteyin.",
+        "missingToken": "Bu sıfırlama bağlantısı eksik - yenisini isteyin.",
+        "requestNew": "Yeni bağlantı iste"
     },
     "email": {
         "host": "SMTP sunucusu",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Günü kaydet",
-                "date": "Tarih",
-                "more": "Diğer bilgiler"
+                "date": "Tarih"
             },
             "export": {
                 "csv": "CSV olarak dışa aktar"

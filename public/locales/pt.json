@@ -1541,7 +1541,6 @@
         "metaLoadError": "Categorias do orçamento não puderam ser carregadas.",
         "addCategory": "+ categoria",
         "addSubcategory": "+ subcategoria",
-        "moreDetails": "Mais detalhes",
         "newCategoryPrompt": "Nome da nova categoria:",
         "newSubcategoryPrompt": "Nome da nova subcategoria:",
         "categoryAddedToast": "Categoria adicionada.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Toque para escolher um ficheiro ZIP"
     },
     "login": {
-        "tagline": "Bem-vindo de volta ao teu planeador familiar.",
+        "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
         "usernameLabel": "Nome de usuário",
         "passwordLabel": "Senha",
         "loginButton": "Entrar",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Descartar alterações?",
         "unsavedChangesDetail": "Os teus dados neste formulário serão perdidos.",
         "discardChanges": "Descartar",
-        "moreSettings": "Mais definições",
         "moreDetails": "Mais detalhes"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Bem-vindo ao {{name}}",
-        "step1Body": "Seu planejador familiar pessoal. Tarefas, calendário, compras e mais - tudo em um só lugar.",
+        "step1Body": "Tarefas, calendário, compras e mais para a tua casa - quer vivas sozinho, a dois ou em família. Tudo num só lugar.",
         "step2Title": "Navegação e módulos",
         "step2Body": "A barra inferior leva-te diretamente às áreas mais importantes. Os restantes módulos estão em «Mais».",
         "step3Title": "Comece rapidamente",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Abra a busca com a lupa na visão geral ou em “Mais”.",
         "mobileSettings": "As configurações ficam em “Mais”.",
         "guideLink": "Manual do utilizador",
-        "guideHint": "Mantido pela comunidade, num repositório próprio - pode estar atrasado face a uma versão."
+        "guideHint": "Mantido pela comunidade. Abre num novo separador."
     },
     "changelog": {
         "title": "Alterações",
@@ -4390,8 +4388,9 @@
         "success": "A tua palavra-passe foi alterada. Já podes iniciar sessão.",
         "mismatch": "As palavras-passe não coincidem.",
         "tooShort": "A palavra-passe tem de ter pelo menos 8 caracteres.",
-        "invalidToken": "Esta ligação é inválida ou expirou.",
-        "missingToken": "Não foi encontrado nenhum token válido."
+        "invalidToken": "Esta ligação de reposição é inválida ou expirou - peça uma nova.",
+        "missingToken": "Esta ligação de reposição está incompleta - peça uma nova.",
+        "requestNew": "Pedir uma nova ligação"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Registar dia",
-                "date": "Data",
-                "more": "Mais detalhes"
+                "date": "Data"
             },
             "export": {
                 "csv": "Exportar como CSV"

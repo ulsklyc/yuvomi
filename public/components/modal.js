@@ -3061,7 +3061,8 @@ export function btnError(btn) {
  *
  * @param {string} innerHtml        - Markup der Sekundärfelder (bereits esc-sicher)
  * @param {Object} [opts]
- * @param {string} [opts.label]     - Aufklapper-Beschriftung (Default: t('modal.moreSettings'))
+ * @param {string} [opts.label]     - Aufklapper-Beschriftung (Default: t('modal.moreDetails') -
+ *   EIN Wort fuer diesen Baustein in jedem Modul, Critique R21 D15)
  * @param {boolean} [opts.open=false] - Initial geöffnet (z. B. wenn Sekundärfelder bereits befüllt sind)
  * @param {string} [opts.hint]      - Zweite Zeile unter der Beschriftung: was hinter dem
  *   Aufklapper liegt (Klartext, wird escaped). Ohne sie findet ein Feld dort nur, wer
@@ -3069,7 +3070,7 @@ export function btnError(btn) {
  * @returns {string} HTML-String
  */
 export function advancedSection(innerHtml, { label, open = false, hint = '' } = {}) {
-  const text = esc(label ?? t('modal.moreSettings'));
+  const text = esc(label ?? t('modal.moreDetails'));
   const labelHtml = hint
     ? `<span class="form-advanced__label"><span>${text}</span><span class="form-advanced__hint">${esc(hint)}</span></span>`
     : `<span>${text}</span>`;

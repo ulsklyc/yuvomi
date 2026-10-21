@@ -1541,7 +1541,6 @@
         "metaLoadError": "Impossible de charger les catégories du budget.",
         "addCategory": "+ catégorie",
         "addSubcategory": "+ sous-catégorie",
-        "moreDetails": "Plus de détails",
         "newCategoryPrompt": "Nom de la nouvelle catégorie :",
         "newSubcategoryPrompt": "Nom de la nouvelle sous-catégorie :",
         "categoryAddedToast": "Catégorie ajoutée.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP"
     },
     "login": {
-        "tagline": "Bon retour sur votre planificateur familial.",
+        "tagline": "Bon retour. Votre foyer, au même endroit.",
         "usernameLabel": "Nom d'utilisateur",
         "passwordLabel": "Mot de passe",
         "loginButton": "Se connecter",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Abandonner les modifications ?",
         "unsavedChangesDetail": "Tes saisies dans ce formulaire seront perdues.",
         "discardChanges": "Abandonner",
-        "moreSettings": "Plus de paramètres",
         "moreDetails": "Plus de détails"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Bienvenue dans {{name}}",
-        "step1Body": "Votre planificateur familial personnel. Tâches, calendrier, courses et plus - le tout au même endroit.",
+        "step1Body": "Tâches, calendrier, courses et plus pour votre foyer - que vous viviez seul, à deux ou en famille. Le tout au même endroit.",
         "step2Title": "Navigation & modules",
         "step2Body": "La barre du bas mène directement aux espaces les plus importants. Tous les autres modules se trouvent sous « Plus ».",
         "step3Title": "Démarrer rapidement",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Ouvrez la recherche avec la loupe de l’aperçu ou via « Plus ».",
         "mobileSettings": "Vous trouvez les paramètres sous « Plus ».",
         "guideLink": "Guide utilisateur",
-        "guideHint": "Tenu par la communauté, dans son propre dépôt - il peut être en retard sur une version."
+        "guideHint": "Tenu à jour par la communauté. S'ouvre dans un nouvel onglet."
     },
     "changelog": {
         "title": "Journal des changements",
@@ -4390,8 +4388,9 @@
         "success": "Votre mot de passe a été modifié. Vous pouvez vous connecter.",
         "mismatch": "Les mots de passe ne correspondent pas.",
         "tooShort": "Le mot de passe doit comporter au moins 8 caractères.",
-        "invalidToken": "Ce lien est invalide ou expiré.",
-        "missingToken": "Aucun jeton valide n'a été trouvé."
+        "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré - demandez-en un nouveau.",
+        "missingToken": "Ce lien de réinitialisation est incomplet - demandez-en un nouveau.",
+        "requestNew": "Demander un nouveau lien"
     },
     "email": {
         "host": "Hôte SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Enregistrer le jour",
-                "date": "Date",
-                "more": "Plus de détails"
+                "date": "Date"
             },
             "export": {
                 "csv": "Exporter au format CSV"

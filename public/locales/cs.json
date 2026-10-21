@@ -1618,7 +1618,6 @@
         "metaLoadError": "Kategorie rozpočtu se nepodařilo načíst.",
         "addCategory": "+ kategorie",
         "addSubcategory": "+ podkategorie",
-        "moreDetails": "Další údaje",
         "newCategoryPrompt": "Název nové kategorie:",
         "newSubcategoryPrompt": "Název nové podkategorie:",
         "emptyAction": "Vytvořit záznam",
@@ -3385,7 +3384,7 @@
         "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP"
     },
     "login": {
-        "tagline": "Vítejte zpět ve svém rodinném plánovači.",
+        "tagline": "Vítejte zpět. Váš domov na jednom místě.",
         "usernameLabel": "Uživatelské jméno",
         "passwordLabel": "Heslo",
         "loginButton": "Přihlásit se",
@@ -3454,7 +3453,6 @@
         "unsavedChanges": "Zahodit změny?",
         "unsavedChangesDetail": "Tvoje zadané údaje v tomto formuláři budou ztraceny.",
         "discardChanges": "Zahodit",
-        "moreSettings": "Další nastavení",
         "moreDetails": "Další údaje"
     },
     "search": {
@@ -3556,7 +3554,7 @@
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",
-        "step1Body": "Váš osobní rodinný plánovač. Úkoly, kalendář, nákupy a další - vše na jednom místě.",
+        "step1Body": "Úkoly, kalendář, nákupy a další pro vaši domácnost - ať žijete sami, ve dvou, nebo jako rodina. Vše na jednom místě.",
         "step2Title": "Navigace a moduly",
         "step2Body": "Lišta dole vede přímo k nejdůležitějším částem. Všechny ostatní moduly najdeš pod „Více“.",
         "step3Title": "Rychlý start",
@@ -4467,7 +4465,7 @@
         "mobileSearch": "Vyhledávání otevřeš lupou na přehledu nebo přes „Více“.",
         "mobileSettings": "Nastavení najdeš pod „Více“.",
         "guideLink": "Uživatelská příručka",
-        "guideHint": "Spravuje ji komunita ve vlastním repozitáři - může zaostávat za vydáním."
+        "guideHint": "Spravuje ho komunita. Otevře se na nové kartě."
     },
     "changelog": {
         "title": "Změny",
@@ -4509,8 +4507,9 @@
         "success": "Heslo bylo změněno. Nyní se můžeš přihlásit.",
         "mismatch": "Hesla se neshodují.",
         "tooShort": "Heslo musí mít alespoň 8 znaků.",
-        "invalidToken": "Tento odkaz je neplatný nebo vypršel.",
-        "missingToken": "Nebyl nalezen platný token."
+        "invalidToken": "Tento odkaz pro obnovení je neplatný nebo vypršel - vyžádejte si nový.",
+        "missingToken": "Tento odkaz pro obnovení je neúplný - vyžádejte si nový.",
+        "requestNew": "Vyžádat nový odkaz"
     },
     "email": {
         "host": "SMTP server",
@@ -5559,8 +5558,7 @@
             },
             "dayLog": {
                 "title": "Zaznamenat den",
-                "date": "Datum",
-                "more": "Další údaje"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exportovat jako CSV"

@@ -1541,7 +1541,6 @@
         "metaLoadError": "Không thể tải danh mục ngân sách.",
         "addCategory": "+ danh mục",
         "addSubcategory": "+ danh mục phụ",
-        "moreDetails": "Thông tin thêm",
         "newCategoryPrompt": "Tên của danh mục mới:",
         "newSubcategoryPrompt": "Tên của danh mục phụ mới:",
         "categoryAddedToast": "Danh mục đã được thêm.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP"
     },
     "login": {
-        "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
+        "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
         "usernameLabel": "Tên người dùng",
         "passwordLabel": "Mật khẩu",
         "loginButton": "Đăng nhập",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Bỏ qua các thay đổi?",
         "unsavedChangesDetail": "Nội dung bạn đã nhập trong biểu mẫu này sẽ bị mất.",
         "discardChanges": "Bỏ qua",
-        "moreSettings": "Cài đặt khác",
         "moreDetails": "Thông tin thêm"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
-        "step1Body": "Bảng kế hoạch gia đình cá nhân của bạn. Nhiệm vụ, lịch, mua sắm và hơn thế nữa - tất cả ở cùng một nơi.",
+        "step1Body": "Nhiệm vụ, lịch, mua sắm và hơn thế nữa cho ngôi nhà của bạn - dù bạn sống một mình, hai người hay cả gia đình. Tất cả ở cùng một nơi.",
         "step2Title": "Điều hướng & Các mô-đun",
         "step2Body": "Thanh bên dưới đưa bạn thẳng đến những khu vực quan trọng nhất. Các mô-đun còn lại nằm trong “Thêm”.",
         "step3Title": "Bắt đầu nhanh chóng",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Mở tìm kiếm bằng kính lúp trên trang tổng quan hoặc qua “Thêm”.",
         "mobileSettings": "Bạn tìm thấy cài đặt trong “Thêm”.",
         "guideLink": "Hướng dẫn sử dụng",
-        "guideHint": "Do cộng đồng duy trì, trong kho riêng - có thể chậm hơn một bản phát hành."
+        "guideHint": "Do cộng đồng duy trì. Mở trong thẻ mới."
     },
     "changelog": {
         "title": "Nhật ký thay đổi",
@@ -4390,8 +4388,9 @@
         "success": "Mật khẩu của bạn đã được thay đổi. Bây giờ bạn có thể đăng nhập.",
         "mismatch": "Mật khẩu không khớp.",
         "tooShort": "Mật khẩu phải dài ít nhất 8 ký tự.",
-        "invalidToken": "Liên kết này không hợp lệ hoặc đã hết hạn.",
-        "missingToken": "Không tìm thấy mã hợp lệ."
+        "invalidToken": "Liên kết đặt lại này không hợp lệ hoặc đã hết hạn - hãy yêu cầu liên kết mới.",
+        "missingToken": "Liên kết đặt lại này không đầy đủ - hãy yêu cầu liên kết mới.",
+        "requestNew": "Yêu cầu liên kết mới"
     },
     "email": {
         "host": "Máy chủ SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Ghi lại ngày",
-                "date": "Ngày",
-                "more": "Thông tin thêm"
+                "date": "Ngày"
             },
             "export": {
                 "csv": "Xuất ra CSV"

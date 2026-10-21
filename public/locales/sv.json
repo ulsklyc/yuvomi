@@ -1541,7 +1541,6 @@
         "metaLoadError": "Budgetkategorier kunde inte läsas in.",
         "addCategory": "+ kategori",
         "addSubcategory": "+ underkategori",
-        "moreDetails": "Fler uppgifter",
         "newCategoryPrompt": "Namn på den nya kategorin:",
         "newSubcategoryPrompt": "Namn på den nya underkategorin:",
         "categoryAddedToast": "Kategori tillagd.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil"
     },
     "login": {
-        "tagline": "Välkommen tillbaka till din familjeplanerare.",
+        "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
         "usernameLabel": "Användarnamn",
         "passwordLabel": "Lösenord",
         "loginButton": "Logga in",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Ignorera ändringar?",
         "unsavedChangesDetail": "Dina uppgifter i formuläret går förlorade.",
         "discardChanges": "Ignorera",
-        "moreSettings": "Fler inställningar",
         "moreDetails": "Fler uppgifter"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Välkommen till {{name}}",
-        "step1Body": "Din personliga familjeplanerare. Uppgifter, kalender, shopping och mer - allt på ett ställe.",
+        "step1Body": "Uppgifter, kalender, inköp och mer för ditt hushåll - oavsett om du bor ensam, som par eller som familj. Allt på ett ställe.",
         "step2Title": "Navigering och moduler",
         "step2Body": "Fältet längst ner tar dig direkt till de viktigaste områdena. Alla andra moduler hittar du under ”Mer”.",
         "step3Title": "Kom igång snabbt",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Öppna sök med förstoringsglaset på översikten eller via ”Mer”.",
         "mobileSettings": "Inställningar hittar du under ”Mer”.",
         "guideLink": "Användarhandbok",
-        "guideHint": "Underhålls av communityn, i ett eget repository - kan ligga efter en release."
+        "guideHint": "Underhålls av communityn. Öppnas i en ny flik."
     },
     "changelog": {
         "title": "Ändringar",
@@ -4390,8 +4388,9 @@
         "success": "Ditt lösenord har ändrats. Du kan logga in nu.",
         "mismatch": "Lösenorden stämmer inte överens.",
         "tooShort": "Lösenordet måste vara minst 8 tecken långt.",
-        "invalidToken": "Länken är ogiltig eller har gått ut.",
-        "missingToken": "Ingen giltig token hittades."
+        "invalidToken": "Den här återställningslänken är ogiltig eller har gått ut - begär en ny.",
+        "missingToken": "Den här återställningslänken är ofullständig - begär en ny.",
+        "requestNew": "Begär en ny länk"
     },
     "email": {
         "host": "SMTP-värd",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Logga dag",
-                "date": "Datum",
-                "more": "Fler uppgifter"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exportera som CSV"

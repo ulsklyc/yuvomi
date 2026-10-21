@@ -2142,7 +2142,9 @@ test('R17 E10: Blutung, Symptome und Gefuehle stehen oben, vier Angaben hinter "
   }
   assert.ok(oben.indexOf('<!--mehr-->') > oben.indexOf('id="cycle-log-note"'), 'der Aufklapper steht als Letztes vor dem Fuss');
   assert.ok(oben.indexOf('<!--mehr-->') < oben.indexOf('modal-panel__footer'));
-  assert.equal(mehr.options.label, 'health.cycle.dayLog.more');
+  // EIN Wort fuer den Baustein (Critique R21, D15): der Dialog nimmt die
+  // Beschriftung des Aufklappers selbst ("Weitere Angaben"), keine eigene.
+  assert.equal(mehr.options.label, undefined);
   assert.equal(mehr.options.open, false, 'ohne Werte startet er geschlossen');
   for (const key of ['health.cycle.bbt.label', 'health.cycle.mucus.label', 'health.cycle.test.label', 'health.cycle.intimacy.label']) {
     assert.ok(mehr.options.hint.includes(key), `der Aufklapper nennt, was er birgt (${key})`);

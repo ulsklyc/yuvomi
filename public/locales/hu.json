@@ -1541,7 +1541,6 @@
         "metaLoadError": "A költségvetési kategóriák betöltése sikertelen.",
         "addCategory": "+ kategória",
         "addSubcategory": "+ alkategória",
-        "moreDetails": "További adatok",
         "newCategoryPrompt": "Új kategória neve:",
         "newSubcategoryPrompt": "Új alkategória neve:",
         "categoryAddedToast": "Kategória hozzáadva.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához"
     },
     "login": {
-        "tagline": "Üdv újra a családi tervezőben.",
+        "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
         "usernameLabel": "Felhasználónév",
         "passwordLabel": "Jelszó",
         "loginButton": "Bejelentkezés",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Módosítások elvetése?",
         "unsavedChangesDetail": "Az űrlapon megadott adataid elvesznek.",
         "discardChanges": "Elvetés",
-        "moreSettings": "További beállítások",
         "moreDetails": "További adatok"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
-        "step1Body": "Az Ön személyes családi tervezője. Feladatok, naptár, bevásárlólista és még sok más - mind egy helyen.",
+        "step1Body": "Feladatok, naptár, bevásárlólista és még sok más a háztartásához - akár egyedül él, párban vagy családban. Mind egy helyen.",
         "step2Title": "Navigáció és modulok",
         "step2Body": "Az alsó sáv közvetlenül a legfontosabb területekre visz. A többi modult a „Több” alatt találja.",
         "step3Title": "Gyors kezdés",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "A keresést az áttekintés nagyítójával vagy a „Több” menüből nyithatod meg.",
         "mobileSettings": "A beállítások a „Több” menü alatt találhatók.",
         "guideLink": "Felhasználói kézikönyv",
-        "guideHint": "A közösség tartja karban, saját tárolóban - lemaradhat egy kiadás mögött."
+        "guideHint": "A közösség gondozza. Új lapon nyílik meg."
     },
     "changelog": {
         "title": "Változások",
@@ -4390,8 +4388,9 @@
         "success": "A jelszava megváltozott. Most már be tud jelentkezni.",
         "mismatch": "A jelszavak nem egyeznek.",
         "tooShort": "A jelszónak legalább 8 karakter hosszúnak kell lennie.",
-        "invalidToken": "Ez a link érvénytelen vagy lejárt.",
-        "missingToken": "Nem található érvényes token."
+        "invalidToken": "Ez a visszaállító link érvénytelen vagy lejárt - kérjen egy újat.",
+        "missingToken": "Ez a visszaállító link hiányos - kérjen egy újat.",
+        "requestNew": "Új link kérése"
     },
     "email": {
         "host": "SMTP-kiszolgáló",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Nap rögzítése",
-                "date": "Dátum",
-                "more": "További adatok"
+                "date": "Dátum"
             },
             "export": {
                 "csv": "Exportálás CSV-ként"

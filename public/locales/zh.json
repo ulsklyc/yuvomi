@@ -1541,7 +1541,6 @@
         "metaLoadError": "无法加载预算分类。",
         "addCategory": "+ 类别",
         "addSubcategory": "+ 子分类",
-        "moreDetails": "更多信息",
         "newCategoryPrompt": "新分类的名称：",
         "newSubcategoryPrompt": "新子分类的名称：",
         "categoryAddedToast": "已添加分类。",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "点按以选择 ZIP 文件"
     },
     "login": {
-        "tagline": "欢迎回到您的家庭计划工具。",
+        "tagline": "欢迎回来。您的家，尽在一处。",
         "usernameLabel": "用户名",
         "passwordLabel": "密码",
         "loginButton": "登录",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "放弃更改？",
         "unsavedChangesDetail": "你在此表单中的输入将丢失。",
         "discardChanges": "放弃",
-        "moreSettings": "更多设置",
         "moreDetails": "更多信息"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "欢迎使用{{name}}",
-        "step1Body": "你的专属家庭计划助手。任务、日历、购物等等，全都在一处。",
+        "step1Body": "任务、日历、购物等等，为你的家而设 - 无论独居、两人还是一家人。全都在一处。",
         "step2Title": "导航与模块",
         "step2Body": "底部栏可直接进入最重要的区域。其他模块都在“更多”中。",
         "step3Title": "快速开始",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "在概览页点放大镜，或通过“更多”打开搜索。",
         "mobileSettings": "设置在“更多”中。",
         "guideLink": "用户手册",
-        "guideHint": "由社区在独立仓库维护，可能落后于某个版本。"
+        "guideHint": "由社区维护。在新标签页中打开。"
     },
     "changelog": {
         "title": "更新日志",
@@ -4390,8 +4388,9 @@
         "success": "你的密码已更改，现在可以登录了。",
         "mismatch": "两次输入的密码不一致。",
         "tooShort": "密码至少需要 8 个字符。",
-        "invalidToken": "此链接无效或已过期。",
-        "missingToken": "未找到有效的令牌。"
+        "invalidToken": "此重置链接无效或已过期 - 请重新申请一个。",
+        "missingToken": "此重置链接不完整 - 请重新申请一个。",
+        "requestNew": "申请新链接"
     },
     "email": {
         "host": "SMTP 主机",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "记录当天",
-                "date": "日期",
-                "more": "更多信息"
+                "date": "日期"
             },
             "export": {
                 "csv": "导出为 CSV"

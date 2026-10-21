@@ -1541,7 +1541,6 @@
         "metaLoadError": "Budgetcategorieën konden niet worden geladen.",
         "addCategory": "+ categorie",
         "addSubcategory": "+ subcategorie",
-        "moreDetails": "Meer gegevens",
         "newCategoryPrompt": "Naam van de nieuwe categorie:",
         "newSubcategoryPrompt": "Naam van de nieuwe subcategorie:",
         "categoryAddedToast": "Categorie toegevoegd.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen"
     },
     "login": {
-        "tagline": "Welkom terug bij je gezinsplanner.",
+        "tagline": "Welkom terug. Je huishouden op één plek.",
         "usernameLabel": "Gebruikersnaam",
         "passwordLabel": "Wachtwoord",
         "loginButton": "Inloggen",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Wijzigingen verwerpen?",
         "unsavedChangesDetail": "Je invoer in dit formulier gaat verloren.",
         "discardChanges": "Verwerpen",
-        "moreSettings": "Meer instellingen",
         "moreDetails": "Meer gegevens"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
-        "step1Body": "Je persoonlijke gezinsplanner. Taken, kalender, boodschappen en meer - allemaal op één plek.",
+        "step1Body": "Taken, kalender, boodschappen en meer voor je huishouden - of je nu alleen woont, met z'n tweeën of als gezin. Alles op één plek.",
         "step2Title": "Navigatie & Modules",
         "step2Body": "De balk onderaan brengt je direct naar de belangrijkste onderdelen. Alle andere modules vind je onder ‘Meer’.",
         "step3Title": "Snel aan de slag",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Open zoeken met het vergrootglas op het overzicht of via ‘Meer’.",
         "mobileSettings": "Je vindt instellingen onder ‘Meer’.",
         "guideLink": "Gebruikershandleiding",
-        "guideHint": "Door de community bijgehouden, in een eigen repository - kan achterlopen op een release."
+        "guideHint": "Onderhouden door de community. Opent in een nieuw tabblad."
     },
     "changelog": {
         "title": "Wijzigingen",
@@ -4390,8 +4388,9 @@
         "success": "Je wachtwoord is gewijzigd. Je kunt nu inloggen.",
         "mismatch": "De wachtwoorden komen niet overeen.",
         "tooShort": "Het wachtwoord moet minstens 8 tekens lang zijn.",
-        "invalidToken": "Deze link is ongeldig of verlopen.",
-        "missingToken": "Er is geen geldig token gevonden."
+        "invalidToken": "Deze resetlink is ongeldig of verlopen - vraag een nieuwe aan.",
+        "missingToken": "Deze resetlink is onvolledig - vraag een nieuwe aan.",
+        "requestNew": "Nieuwe link aanvragen"
     },
     "email": {
         "host": "SMTP-host",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Dag registreren",
-                "date": "Datum",
-                "more": "Meer gegevens"
+                "date": "Datum"
             },
             "export": {
                 "csv": "Exporteren als CSV"

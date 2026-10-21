@@ -1541,7 +1541,6 @@
         "metaLoadError": "Impossibile caricare le categorie del budget.",
         "addCategory": "+ categoria",
         "addSubcategory": "+ sottocategoria",
-        "moreDetails": "Altri dettagli",
         "newCategoryPrompt": "Nome della nuova categoria:",
         "newSubcategoryPrompt": "Nome della nuova sottocategoria:",
         "categoryAddedToast": "Categoria aggiunta.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP"
     },
     "login": {
-        "tagline": "Bentornato nel tuo pianificatore familiare.",
+        "tagline": "Bentornato. La tua casa in un unico posto.",
         "usernameLabel": "Nome utente",
         "passwordLabel": "Password",
         "loginButton": "Accedi",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Scartare le modifiche?",
         "unsavedChangesDetail": "I dati inseriti in questo modulo andranno persi.",
         "discardChanges": "Scarta",
-        "moreSettings": "Altre impostazioni",
         "moreDetails": "Altri dettagli"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Benvenuto in {{name}}",
-        "step1Body": "Il tuo assistente personale per la famiglia. Attività, calendario, spesa e molto altro - tutto in un unico posto.",
+        "step1Body": "Attività, calendario, spesa e molto altro per la tua casa - che tu viva da solo, in coppia o in famiglia. Tutto in un unico posto.",
         "step2Title": "Navigazione e moduli",
         "step2Body": "La barra in basso porta direttamente alle aree più importanti. Tutti gli altri moduli si trovano in «Altro».",
         "step3Title": "Inizia subito",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Apri la ricerca con la lente nella panoramica o da „Altro“.",
         "mobileSettings": "Trovi le impostazioni sotto la voce „Altro“.",
         "guideLink": "Manuale utente",
-        "guideHint": "Curato dalla community, in un repository proprio: può essere indietro rispetto a una versione."
+        "guideHint": "Curato dalla community. Si apre in una nuova scheda."
     },
     "changelog": {
         "title": "Novità",
@@ -4390,8 +4388,9 @@
         "success": "La tua password è stata modificata. Ora puoi accedere.",
         "mismatch": "Le password non corrispondono.",
         "tooShort": "La password deve contenere almeno 8 caratteri.",
-        "invalidToken": "Questo link non è valido o è scaduto.",
-        "missingToken": "Nessun token valido trovato."
+        "invalidToken": "Questo link di reimpostazione non è valido o è scaduto - richiedine uno nuovo.",
+        "missingToken": "Questo link di reimpostazione è incompleto - richiedine uno nuovo.",
+        "requestNew": "Richiedi un nuovo link"
     },
     "email": {
         "host": "Host SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Registra giorno",
-                "date": "Data",
-                "more": "Altri dettagli"
+                "date": "Data"
             },
             "export": {
                 "csv": "Esporta come CSV"

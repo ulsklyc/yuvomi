@@ -1541,7 +1541,6 @@
         "metaLoadError": "Categorias do orçamento não puderam ser carregadas.",
         "addCategory": "+ categoria",
         "addSubcategory": "+ subcategoria",
-        "moreDetails": "Mais detalhes",
         "newCategoryPrompt": "Nome da nova categoria:",
         "newSubcategoryPrompt": "Nome da nova subcategoria:",
         "categoryAddedToast": "Categoria adicionada.",
@@ -3284,7 +3283,7 @@
         "installModuleDropzoneTitleTouch": "Toque para escolher um arquivo ZIP"
     },
     "login": {
-        "tagline": "Bem-vindo de volta ao seu planejador familiar.",
+        "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",
         "usernameLabel": "Nome de usuário",
         "passwordLabel": "Senha",
         "loginButton": "Entrar",
@@ -3353,7 +3352,6 @@
         "unsavedChanges": "Descartar alterações?",
         "unsavedChangesDetail": "Seus dados neste formulário serão perdidos.",
         "discardChanges": "Descartar",
-        "moreSettings": "Mais configurações",
         "moreDetails": "Mais detalhes"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Bem-vindo ao {{name}}",
-        "step1Body": "Seu planejador familiar pessoal. Tarefas, calendário, compras e mais - tudo em um só lugar.",
+        "step1Body": "Tarefas, calendário, compras e mais para a sua casa - seja morando sozinho, a dois ou em família. Tudo em um só lugar.",
         "step2Title": "Navegação e módulos",
         "step2Body": "A barra inferior leva você direto às áreas mais importantes. Os demais módulos ficam em “Mais”.",
         "step3Title": "Comece rapidamente",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Abra a busca pela lupa no painel ou em “Mais”.",
         "mobileSettings": "As configurações ficam em “Mais”.",
         "guideLink": "Manual do usuário",
-        "guideHint": "Mantido pela comunidade, num repositório particular - pode estar atrasado em relação à versão atual."
+        "guideHint": "Mantido pela comunidade. Abre em uma nova aba."
     },
     "changelog": {
         "title": "Alterações",
@@ -4390,8 +4388,9 @@
         "success": "Sua senha foi alterada. Você já pode fazer login.",
         "mismatch": "As senhas não coincidem.",
         "tooShort": "A senha deve ter pelo menos 8 caracteres.",
-        "invalidToken": "Este link é inválido ou expirou.",
-        "missingToken": "Não foi encontrado nenhum token válido."
+        "invalidToken": "Este link de redefinição é inválido ou expirou - solicite um novo.",
+        "missingToken": "Este link de redefinição está incompleto - solicite um novo.",
+        "requestNew": "Solicitar um novo link"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Registrar dia",
-                "date": "Data",
-                "more": "Mais detalhes"
+                "date": "Data"
             },
             "export": {
                 "csv": "Exportar como CSV"

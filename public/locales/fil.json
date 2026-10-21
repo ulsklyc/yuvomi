@@ -1558,7 +1558,6 @@
         "metaLoadError": "Hindi ma-load ang mga kategorya ng badyet.",
         "addCategory": "+ Category",
         "addSubcategory": "+ Subcategory",
-        "moreDetails": "Iba pang detalye",
         "newCategoryPrompt": "Pangalan ng bagong kategorya:",
         "newSubcategoryPrompt": "Pangalan ng bagong subkategorya:",
         "categoryAddedToast": "Naidagdag ang kategorya.",
@@ -3300,7 +3299,7 @@
         "installModuleDropzoneTitleTouch": "I-tap para pumili ng ZIP file"
     },
     "login": {
-        "tagline": "Maligayang pagbabalik sa iyong family planner.",
+        "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
         "usernameLabel": "Username",
         "passwordLabel": "Password",
         "loginButton": "Mag-log in",
@@ -3369,7 +3368,6 @@
         "unsavedChanges": "Itapon ang mga pagbabago?",
         "unsavedChangesDetail": "Mawawala ang mga inilagay mo sa form na ito.",
         "discardChanges": "Itapon",
-        "moreSettings": "Higit pang setting",
         "moreDetails": "Iba pang detalye"
     },
     "rrule": {
@@ -3591,7 +3589,7 @@
     },
     "onboarding": {
         "step1Title": "Maligayang pagdating sa {{name}}",
-        "step1Body": "Ang iyong personal na family planner. Mga gawain, kalendaryo, pamimili at higit pa - nasa isang lugar lang.",
+        "step1Body": "Mga gawain, kalendaryo, pamimili at higit pa para sa iyong tahanan - mag-isa ka man, may kapareha o kasama ang pamilya. Nasa isang lugar lang.",
         "step2Title": "Nabigasyon at mga Modyul",
         "step2Body": "Dinadala ka ng bar sa ibaba nang direkta sa pinakamahahalagang bahagi. Makikita mo ang iba pang module sa ilalim ng “Higit pa”.",
         "step3Title": "Magsimula agad",
@@ -4349,7 +4347,7 @@
         "mobileSearch": "Buksan ang paghahanap gamit ang magnifier sa overview o sa \"Higit pa\".",
         "mobileSettings": "Matatagpuan ang mga setting sa ilalim ng \"Higit pa\".",
         "guideLink": "Gabay ng gumagamit",
-        "guideHint": "Pinapanatili ng komunidad, sa sariling repository - maaaring mahuli sa isang release."
+        "guideHint": "Pinapanatili ng komunidad. Bubukas sa bagong tab."
     },
     "changelog": {
         "title": "Changelog",
@@ -4390,8 +4388,9 @@
         "success": "Nabago na ang iyong password. Puwede ka nang mag-sign in.",
         "mismatch": "Hindi magkatugma ang mga password.",
         "tooShort": "Dapat may hindi bababa sa 8 karakter ang password.",
-        "invalidToken": "Hindi wasto o expired na ang link na ito.",
-        "missingToken": "Walang natagpuang wastong token."
+        "invalidToken": "Hindi wasto o expired na ang reset link na ito - humiling ng bago.",
+        "missingToken": "Kulang ang reset link na ito - humiling ng bago.",
+        "requestNew": "Humiling ng bagong link"
     },
     "email": {
         "host": "SMTP host",
@@ -5430,8 +5429,7 @@
             },
             "dayLog": {
                 "title": "Itala ang araw",
-                "date": "Petsa",
-                "more": "Iba pang detalye"
+                "date": "Petsa"
             },
             "export": {
                 "csv": "I-export bilang CSV"
