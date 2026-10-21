@@ -48,6 +48,85 @@ const SWAPPING_CLASS = 'page-swapping';
 /** So lange nach der Blende wartet ein abgebrochener Tipp noch auf sein `click`. */
 const LOST_TAP_WINDOW_MS = 1000;
 
+/**
+ * So lange haelt ein Seitenwechsel hoechstens das alte Bild, waehrend die
+ * Zielseite ihren ersten echten Inhalt zeichnet (Critique R21, D1).
+ *
+ * WARUM: der Browser nahm das neue Bild gleich nach dem synchronen Teil von
+ * render() auf - und der zeigt das Skelett. Die Blende lief also vom alten
+ * Inhalt INS SKELETT, und der echte Inhalt sprang 45-123 ms spaeter (4x CPU:
+ * 139-245 ms) mitten in die laufende Blende (gemessen auf allen Hauptzielen,
+ * mobil und Laptop, 0 von 6 Wechseln mit Inhalt im neuen Bild). Jetzt wartet
+ * der Update-Callback auf den Render der Seite, aber nie laenger als diese
+ * Frist: eine langsame Seite blendet danach wie bisher ins Skelett, statt das
+ * alte Bild stehen zu lassen. 150 ms liegen unter der Schwelle, ab der ein
+ * Tipp ohne Antwort als Haenger gilt - die Kapsel hat ihn da laengst quittiert.
+ */
+export const FIRST_RENDER_WAIT_MS = 150;
+
+/**
+ * Wartet auf `rendered`, hoechstens `ms` lang. Ein Fehler der Seite haelt den
+ * Wechsel nicht an - er gehoert dem Router, der denselben Render selbst abwartet.
+ * @param {unknown} rendered  was der Tausch zurueckgab (Promise oder nichts)
+ * @param {number} [ms]
+ * @returns {Promise<void>|null}  null, wenn es nichts abzuwarten gibt
+ */
+export function awaitFirstRender(rendered, ms = FIRST_RENDER_WAIT_MS) {
+  if (!rendered || typeof rendered.then !== 'function') return null;
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(rendered).then(() => {}, () => {}),
+    new Promise((resolve) => { timer = setTimeout(resolve, ms); }),
+  ]).then(() => clearTimeout(timer));
+}
+
+/**
+ * WAS LAEUFT, HAELT MIT DEM BILD AN (Critique R21, D1). Solange der
+ * Update-Callback auf den Render wartet, zeichnet der Browser nichts - die
+ * Zeit der laufenden Animationen lief aber weiter. Die Pille der Kapsel
+ * gleitet seit dem Tipp; nach der Wartezeit stand sie gemessen 74px weiter
+ * (100 -> 26, ohne Frame dazwischen) und sprang. Angehalten setzt jede
+ * Bewegung nach dem Warten dort fort, wo das Bild stand.
+ *
+ * Nur, was gerade LAEUFT: eine absichtlich pausierte Animation bleibt, wie sie
+ * ist, und was waehrend des Wartens entsteht, startet ohnehin erst mit dem
+ * naechsten gezeichneten Frame.
+ *
+ * VERSCHOBEN WIRD DER START, nicht `pause()` und nicht `currentTime` (im
+ * Browser gemessen): beide rechnen mit der Zeit der Dokument-Zeitleiste, und
+ * die steht waehrend des Wartens - sie rueckt nur mit gezeichneten Frames
+ * vor. Ein Anhalten wurde nie wirksam, ein Zuruecksetzen setzte auf denselben
+ * Start, und mit dem ersten Frame danach sprang die Zeitleiste um die ganze
+ * Wartezeit. Der Start jeder laufenden Animation rueckt deshalb um die
+ * gewartete Zeit nach hinten - sie setzt dort fort, wo das alte Bild stand.
+ * @param {Document} [doc]
+ * @param {() => number} [now]  Uhr (Tests)
+ * @returns {() => void} setzt die gehaltenen Animationen an ihrer Stelle fort
+ */
+export function holdRunningAnimations(doc = typeof document !== 'undefined' ? document : null, now = () => performance.now()) {
+  let held = [];
+  let since = 0;
+  try {
+    held = (doc?.getAnimations?.() ?? [])
+      .filter((anim) => anim.playState === 'running' && Number.isFinite(anim.startTime));
+    since = now();
+  } catch {
+    held = [];
+  }
+  return () => {
+    const lost = held.length ? now() - since : 0;
+    for (const anim of held) {
+      try {
+        // Ersetzt oder abgebrochen ('idle', pausiert) bleibt, wie es ist.
+        if (lost > 0 && anim.playState === 'running' && Number.isFinite(anim.startTime)) {
+          anim.startTime += lost;
+        }
+      } catch { /* inzwischen abgebrochen */ }
+    }
+    held = [];
+  };
+}
+
 /** Klasse an <html> fuer die Dauer eines Theme-Wechsels (kein Chrome-Name). */
 const THEME_CLASS = 'theme-swapping';
 
@@ -129,7 +208,15 @@ function nameToolbar(root) {
  * `update` laeuft in beiden Faellen genau einmal und synchron zu Ende, bevor
  * das zurueckgegebene Promise aufloest; Fehler daraus kommen dort an.
  *
- * @param {() => void} update      tauscht den Inhalt (synchroner Teil des Renders)
+ * DAS NEUE BILD ZEIGT DEN INHALT, NICHT DAS SKELETT (Critique R21, D1). Gibt
+ * `update` ein Promise zurueck (der Router: den Render der Seite), wartet die
+ * Transition im Callback darauf - hoechstens FIRST_RENDER_WAIT_MS lang, so
+ * lange steht das alte Bild. Der Kopf bekommt seinen Namen erst danach: eine
+ * Seite, die ihn mit den Daten neu baut, haette sonst den Namen am alten
+ * Knoten stehen lassen (zwei Traeger verwerfen die ganze Transition).
+ *
+ * @param {() => (void|Promise<unknown>)} update  tauscht den Inhalt (synchroner
+ *   Teil des Renders) und gibt auf Wunsch zurueck, worauf das neue Bild wartet
  * @param {object}     opts
  * @param {Element}    opts.content  der Scrollport, dessen Inhalt getauscht wird
  * @param {string|null} opts.from    Pfad vor dem Wechsel
@@ -165,15 +252,25 @@ export async function swapPage(update, { content, from = null, animate = true, w
   const releaseSwapping = holdPageSwapping();
   let oldToolbar = nameToolbar(content);
   let newToolbar = null;
-  const transition = document.startViewTransition(() => {
+  const transition = document.startViewTransition(async () => {
     // Der alte Kopf faellt mit dem Tausch ohnehin aus dem Dokument; der Name
     // geht trotzdem vorher weg, falls eine Seite ihren Kopf wiederverwendet.
     // Danach laesst ihn dieser Rueckruf los: haelt etwas den Rueckruf (der
     // Stapel einer Ausnahme, R20), hielte er sonst den ganzen alten Baum.
     if (oldToolbar) oldToolbar.style.viewTransitionName = '';
     oldToolbar = null;
-    update();
-    newToolbar = nameToolbar(content);
+    // Das alte Bild ist aufgenommen; ab hier zeichnet der Browser bis zum Ende
+    // dieses Rueckrufs nichts. Was laeuft (die Pille seit dem Tipp), haelt an.
+    const resume = holdRunningAnimations(document);
+    try {
+      const rendered = update();
+      // D1: das alte Bild steht, bis die Seite gezeichnet hat - hoechstens
+      // FIRST_RENDER_WAIT_MS. Erst danach traegt der Kopf seinen Namen.
+      await awaitFirstRender(rendered);
+      newToolbar = nameToolbar(content);
+    } finally {
+      resume();
+    }
   });
   // `ready` lehnt ab, wenn der Browser die Transition verwirft (doppelter
   // Name, verdeckter Tab) - das ist kein Fehler des Wechsels, der Tausch

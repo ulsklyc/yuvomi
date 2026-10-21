@@ -1294,6 +1294,16 @@ das Verhaeltnis haelt.
   Blende bricht sie ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
   seinen `click` dort an und reicht ihn nach dem Ende der Blende und der Navigation an das
   Element an derselben Stelle (vorher ging er verloren, gemessen 0 von 12 Doppeltipps).
+  **Die Blende laeuft in den Inhalt, nicht ins Skelett (R21, D1):** der Update-Callback wartet
+  auf den Render der Zielseite, hoechstens `FIRST_RENDER_WAIT_MS` (150 ms); so lange steht das
+  alte Bild. Vorher zeigte das neue Bild 0 von 6 Mal Inhalt, der echte Inhalt sprang 45-123 ms
+  (4x CPU: bis 245 ms) spaeter mitten in die Blende; jetzt 6 von 6 auf 390 und 1280, 1x und 4x.
+  Was waehrenddessen laeuft (die Pille seit dem Tipp), setzt danach an seiner Stelle fort
+  (`holdRunningAnimations`, der Start ruckt um die Wartezeit - `pause()` wirkt dort nicht, die
+  Zeitleiste steht). Der Router gibt dazu Scrollstand des Rueckwegs und Nachzuegler-FAB in
+  denselben Render. Ein blendendes Bild unter einer stehenden Gruppe (`animation: none`) traegt
+  `animation-fill-mode: both`, sonst steht es im letzten Frame wieder deckend (Geisterframe des
+  Kopfes, R21). Guards: `test:motion`.
 - **Bewegung haengt an der Beruehrung, nicht am Zustand (R18):** eine Zustandsklasse
   (`--checked`, `--done`, `.is-*`) traegt Aussehen, nie eine `animation` - sie spielte bei jedem
   Neuzeichnen auf Zeilen, die niemand beruehrt hat. Die Quittung eines Hakens startet der

@@ -591,6 +591,95 @@ test('swapPage R20: was ausfaehrt, steht vor dem alten Bild am Ende - kein Mehr-
     'settleClosingOverlays beendet die Ausfahrt von Mehr-Blatt und Abdunklung nicht');
 });
 
+// Critique R21 (D1): das neue Bild zeigte das Skelett - 0 von 6 Wechseln mit
+// Inhalt im neuen Bild, der echte Inhalt sprang 45-123 ms (4x CPU 139-245 ms)
+// spaeter mitten in die Blende. Der Callback wartet jetzt auf den Render der
+// Seite, hoechstens FIRST_RENDER_WAIT_MS.
+test('swapPage D1: das neue Bild wartet auf den Render der Seite - hoechstens FIRST_RENDER_WAIT_MS', async () => {
+  const vt = await import('../public/utils/view-transition.js');
+  const { swapPage } = vt;
+  assert.equal(vt.FIRST_RENDER_WAIT_MS, 150, 'D1: die Frist ist 150 ms - laenger stuende das alte Bild wie ein Haenger');
+  const env = stubDocument();
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    // 1. Der Render kommt nach 40 ms: das Bild wartet, und der Kopf, den die
+    //    Seite mit ihren Daten baut, traegt den Namen - nicht der Zwischenstand.
+    const interim = { style: {} };
+    let t0 = Date.now();
+    const first = await swapPage(() => {
+      env.content.current = interim;
+      return new Promise((resolve) => setTimeout(() => { env.content.current = env.toolbarNew; resolve(); }, 40));
+    }, { content: env.content, from: '/tasks', animate: true });
+    assert.ok(Date.now() - t0 >= 35, `das neue Bild wartete nicht auf den Render (${Date.now() - t0} ms)`);
+    assert.equal(env.toolbarNew.style.viewTransitionName, 'page-toolbar', 'der Kopf nach dem Render traegt den Namen');
+    assert.ok(!interim.style.viewTransitionName, 'der Zwischenkopf behielt den Namen - zwei Traeger verwerfen die Transition');
+    env.finish();
+    await first.finished;
+
+    // 2. Ein Render, der nie fertig wird, haelt das alte Bild hoechstens die Frist.
+    t0 = Date.now();
+    const slow = await swapPage(() => new Promise(() => {}), { content: env.content, from: '/', animate: true });
+    const waited = Date.now() - t0;
+    assert.ok(waited >= vt.FIRST_RENDER_WAIT_MS - 10 && waited < vt.FIRST_RENDER_WAIT_MS + 200,
+      `ein haengender Render hielt das alte Bild ${waited} ms (Frist ${vt.FIRST_RENDER_WAIT_MS})`);
+    env.finish();
+    await slow.finished;
+
+    // 3. Ein Fehler der Seite haelt den Wechsel nicht an - er gehoert dem Router.
+    const failing = await swapPage(() => Promise.reject(new Error('Seite kaputt')), { content: env.content, from: '/', animate: true });
+    assert.equal(failing.transition, true);
+    env.finish();
+    await failing.finished;
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+  // Der Router gibt den Render zurueck - samt Scrollstand des Rueckwegs und
+  // nachzueglerndem FAB, die zum ersten Bild gehoeren.
+  const router = stripComments(readFileSync(new URL('../public/router.js', import.meta.url), 'utf8'));
+  const swap = router.match(/const swap = \(\) => \{([\s\S]*?)\n {4}\};/)?.[1] ?? '';
+  assert.ok(swap, 'der Tausch im Router ist nicht mehr zu finden - der Guard liest nichts');
+  assert.match(swap, /return Promise\.resolve\(renderPromise\)\.then\(\(\) => \{[\s\S]*?scrollTarget[\s\S]*?adoptPageFab\(\)/,
+    'der Tausch gibt den Render nicht an swapPage zurueck - das neue Bild zeigt wieder das Skelett');
+});
+
+test('swapPage D1: was laeuft, setzt nach dem Warten dort fort, wo das alte Bild stand', async () => {
+  // Gemessen: die Pille der Kapsel gleitet seit dem Tipp; waehrend des Wartens
+  // zeichnet der Browser nichts, die Zeitleiste steht - und mit dem ersten
+  // Frame danach sprang sie 74px (100 -> 26). `pause()` und `currentTime`
+  // wirkten dort nicht; der Start ruckt um die gewartete Zeit.
+  const { swapPage, holdRunningAnimations } = await import('../public/utils/view-transition.js');
+  const running = { playState: 'running', startTime: 1000 };
+  const paused = { playState: 'paused', startTime: 900 };
+  const replaced = { playState: 'running', startTime: 950 };
+  let clock = 2000;
+  const resume = holdRunningAnimations({ getAnimations: () => [running, paused, replaced] }, () => clock);
+  clock = 2096;
+  replaced.playState = 'idle';
+  resume();
+  assert.equal(running.startTime, 1096, 'die laufende Animation setzt nicht an ihrer Stelle fort');
+  assert.equal(paused.startTime, 900, 'eine pausierte Animation wurde verschoben');
+  assert.equal(replaced.startTime, 950, 'eine ersetzte Animation wurde verschoben');
+
+  // Und swapPage haelt sie wirklich - waehrend des Wartens auf den Render.
+  const env = stubDocument();
+  const pill = { playState: 'running', startTime: 10 };
+  env.doc.getAnimations = () => [pill];
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  globalThis.performance ??= { now: () => Date.now() };
+  try {
+    const done = await swapPage(() => new Promise((r) => setTimeout(r, 40)), { content: env.content, from: '/tasks', animate: true });
+    assert.ok(pill.startTime >= 10 + 35, `die Pille setzte nach dem Warten nicht an ihrer Stelle fort (Start ${pill.startTime})`);
+    env.finish();
+    await done.finished;
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
+  }
+});
+
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
   // Zwei Tipps innerhalb der Transition: der Browser verwirft die erste, ihr
   // `finished` loest auf, waehrend die zweite ihr altes Bild noch nicht

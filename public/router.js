@@ -1829,6 +1829,20 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // erscheinen. Der zweite Aufruf unten holt die Nachzügler.
       adoptPageFab();
       wirePageToolbars();
+
+      // DAS NEUE BILD WARTET AUF DEN INHALT (Critique R21, D1): swapPage haelt
+      // das alte Bild, bis dieser Render steht - hoechstens FIRST_RENDER_WAIT_MS
+      // (utils/view-transition.js). Was zum fertigen ersten Bild gehoert, kommt
+      // deshalb hier schon dazu: der gemerkte Scrollstand des Rueckwegs (sonst
+      // zeigte das neue Bild den Seitenanfang und sprang danach) und ein FAB,
+      // den die Seite erst mit ihren Daten anlegt. Beides ist idempotent; der
+      // Router wiederholt es unten fuer eine Seite, die die Frist verpasst.
+      // Ein Fehler der Seite gehoert dem `await` unten, nicht diesem Zweig.
+      return Promise.resolve(renderPromise).then(() => {
+        if (signal?.aborted) return;
+        if (scrollTarget > 0) content.scrollTop = scrollTarget;
+        adoptPageFab();
+      }, () => {});
     };
 
     // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue
