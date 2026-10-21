@@ -494,6 +494,42 @@ test('Quellliste abgewaehlt: aus ihr wird nichts gelesen und nichts entfernt, de
   assert.deepEqual(objectsWith(dav, a.url), []);
 });
 
+// Eine kontoweite Absage (429, 503) sagt nichts über den EINTRAG (#2137): der
+// Umzug bleibt stehen, verbraucht keinen Versuch, und der Durchgang sendet
+// nach der ersten Antwort nichts mehr an das Konto. Ein 403 zaehlt trotzdem -
+// ein nur lesbares Ziel ist genau der Fall, den `returnShoppingMove`
+// bewältigt, und einen Umzug gibt es zurück.
+for (const status of [429, 503]) {
+  test(`Zielliste antwortet kontoweit (${status}): der Umzug bleibt stehen, und kein weiterer PUT geht`, async () => {
+    const { a, b, item } = await mirroredItem();
+    dav.refuse({ method: 'PUT', status });
+
+    await patch(item.id, { list_id: b.listId });           // Absage 1
+    let now = row(item.id);
+    assert.deepEqual([now.list_id, now.outbound_move, now.outbound_move_attempts], [b.listId, 1, 0]);
+    assert.equal(dav.seen('PUT').length, 1, 'nur der erste PUT ging');
+    assert.equal(objectsWith(dav, a.url).length, 1, 'das Original ist unberuehrt');
+    assert.equal(objectsWith(dav, b.url).length, 0, 'am neuen Platz liegt nichts');
+
+    await remindersSync.sync();                             // Absage 2
+    now = row(item.id);
+    assert.deepEqual([now.list_id, now.outbound_move, now.outbound_move_attempts], [b.listId, 1, 0]);
+    assert.equal(dav.seen('PUT').length, 2, 'nur ein PUT pro Durchgang');
+
+    // Fünf kontoweite Absagen verbrauchen keine Versuche (#2137).
+    for (let n = 3; n <= 5; n++) {
+      await remindersSync.sync();
+      now = row(item.id);
+      assert.deepEqual([now.list_id, now.outbound_move, now.outbound_move_attempts], [b.listId, 1, 0], `Absage ${n}`);
+    }
+
+    dav.allowAll();
+    await remindersSync.sync();
+    assertCarried(dav, b.url);
+    assert.deepEqual(rowsOf().map((x) => [x.id, x.list_id]), [[item.id, b.listId]]);
+  });
+}
+
 test('Zielliste lehnt ab (403): das Original bleibt, und nach der fuenften Absage steht der Artikel wieder, wo er war', async () => {
   const { a, b, item } = await mirroredItem();
   dav.refuse({ method: 'PUT', status: 403 });

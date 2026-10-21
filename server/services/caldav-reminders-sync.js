@@ -945,7 +945,7 @@ async function runSync({ createClient: makeClient } = {}) {
           account.id,
           targets.map((s) => ({ listUrl: s.list_url, targetListId: s.target_list_id })),
           lists,
-          { clientFor }
+          { clientFor, stop }
         );
         totalPushed += carried;
         if (carried) log.info(`${carried} moved shopping item(s) carried to their new list on the server.`);
