@@ -969,7 +969,12 @@ function guardFakes() {
   };
   const form = {
     isConnected: true,
-    querySelector: (sel) => (/type="submit"/.test(sel) ? {} : null),
+    invalid: false,
+    querySelector(sel) {
+      if (/type="submit"/.test(sel)) return {};
+      if (/aria-invalid="true"/.test(sel)) return this.invalid ? {} : null;
+      return null;
+    },
   };
   const field = (instant = false) => ({
     closest: (sel) => (sel === 'form' ? form : (sel === '[data-instant-save]' && instant ? {} : null)),
@@ -982,14 +987,22 @@ function guardFakes() {
 
 async function withGuardEnv(fn) {
   const prev = { window: globalThis.window, confirm: globalThis.__confirmModal };
-  globalThis.window = { ...(prev.window ?? {}), addEventListener() {}, removeEventListener() {} };
+  // Ein eigenes window je Lauf, das seine Zuhoerer kennt: der Guard gibt ein
+  // abgeschicktes Formular erst mit `yuvomi:write` frei (Critique R21).
+  const zuhoerer = {};
+  globalThis.window = {
+    ...(prev.window ?? {}),
+    addEventListener(type, fn) { (zuhoerer[type] ??= []).push(fn); },
+    removeEventListener() {},
+  };
+  const geschrieben = () => { for (const fn of zuhoerer['yuvomi:write'] ?? []) fn({ type: 'yuvomi:write' }); };
   const gefragt = [];
   let antwort = false;
   globalThis.__confirmModal = async (title, options) => { gefragt.push({ title, options }); return antwort; };
   const guard = await import('/settings/dirty-guard.js');
   const leave = await import('/utils/leave-guard.js');
   try {
-    await fn({ guard, leave, gefragt, antworte: (a) => { antwort = a; } });
+    await fn({ guard, leave, gefragt, geschrieben, antworte: (a) => { antwort = a; } });
   } finally {
     guard.clearLeafEdits?.();
     globalThis.window = prev.window;
@@ -998,7 +1011,7 @@ async function withGuardEnv(fn) {
 }
 
 test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Router - nur solange etwas offen ist (R15 A7 P1-1)', async () => {
-  await withGuardEnv(async ({ guard, leave, gefragt, antworte }) => {
+  await withGuardEnv(async ({ guard, leave, gefragt, geschrieben, antworte }) => {
     const { container, form, field, fire } = guardFakes();
     guard.watchLeafForms(container);
     assert.equal(leave.hasLeaveGuard(), false, 'sauberes Blatt: kein Waechter, die Navigation bleibt ohne await');
@@ -1023,6 +1036,8 @@ test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Rout
     fire('change', field());
     assert.equal(leave.hasLeaveGuard(), true);
     fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'abgeschickt ist noch nicht gespeichert (Critique R21)');
+    geschrieben();
     assert.equal(leave.hasLeaveGuard(), false, 'gespeichert = sauber, der Waechter geht');
 
     fire('change', field());
@@ -1030,6 +1045,54 @@ test('Einstellungen: ein offenes Formular fragt vor JEDEM Wechsel ueber den Rout
     const vorher = gefragt.length;
     assert.equal(await leave.mayLeave('/tasks'), true, 'ein abgehaengtes Formular haelt niemanden');
     assert.equal(gefragt.length, vorher, 'und fragt auch nicht');
+  });
+});
+
+/* ABGESCHICKT IST NICHT GESPEICHERT (Critique R21, a5). Der Guard gab ein
+ * Formular schon beim `submit` frei - in der Capture-Phase, VOR dem Handler
+ * des Blatts. Scheiterte dessen Pruefung am Feld oder lehnte der Server ab,
+ * fragte der naechste Wechsel nicht mehr, und die Eingabe war weg
+ * (nachgestellt im Konto-Blatt). Frei wird es jetzt erst mit einem
+ * geglueckten Schreibvorgang (api.js meldet nur Erfolge als `yuvomi:write`). */
+test('Einstellungen: ein gescheitertes Speichern laesst das Formular offen - frei erst nach dem Erfolg (Critique R21)', async () => {
+  await withGuardEnv(async ({ guard, leave, gefragt, geschrieben, antworte }) => {
+    const { container, form, field, fire } = guardFakes();
+    guard.watchLeafForms(container);
+
+    // 1. Der Server lehnt ab: kein `yuvomi:write`, das Blatt bleibt offen.
+    fire('input', field());
+    fire('submit', field());
+    assert.equal(leave.hasLeaveGuard(), true, 'abgeschickt, aber nicht gespeichert: der Waechter bleibt');
+    antworte(false);
+    assert.equal(await leave.mayLeave('/tasks'), false, 'und der Wechsel fragt nach');
+    assert.equal(gefragt.length, 1);
+
+    // 2. Die Pruefung am Feld scheitert, danach glueckt ein ANDERER
+    //    Schreibvorgang (ein Sofort-Schalter): das Formular bleibt offen.
+    form.invalid = true;
+    fire('submit', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Feldfehler heisst: dieses Absenden hat nichts geschrieben');
+
+    // 3. Korrigiert und gespeichert: jetzt ist es sauber.
+    form.invalid = false;
+    fire('input', field());
+    fire('submit', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), false, 'geglueckt gespeichert: der Waechter geht');
+
+    // 4. Nach dem Absenden weitergetippt: der spaete Erfolg gilt dem alten Stand.
+    fire('input', field());
+    fire('submit', field());
+    fire('input', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'was nach dem Absenden getippt wurde, ist nicht gespeichert');
+
+    // 5. Ein Erfolg ohne vorheriges Absenden gibt nichts frei.
+    guard.clearLeafEdits();
+    fire('input', field());
+    geschrieben();
+    assert.equal(leave.hasLeaveGuard(), true, 'ein Schreibvorgang ohne Absenden gehoert nicht diesem Formular');
   });
 });
 

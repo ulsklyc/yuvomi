@@ -30,8 +30,17 @@ const dirtyForms = new Set();
 // Blaetter ohne Formular: Knoten -> "ist etwas offen?". Der Knoten sagt, ob
 // die Quelle noch im Dokument steht; faellt er heraus, faellt sie mit.
 const dirtySources = new Map();
-let unloadBound = false;
+// Das zuletzt abgeschickte Formular, dessen Speichern noch aussteht - siehe
+// "ERST NACH DEM ERFOLG" in watchLeafForms.
+let pendingForm = null;
+// Das window, an dem die beiden Zuhoerer haengen. Im Browser gibt es nur eins;
+// ein Test, der window austauscht, bekommt sie an seinem neu.
+let boundTo = null;
 let releaseLeaveGuard = null;
+
+// Wie api.js ihn ausschreibt (WRITE_EVENT): der Test-Loader stubt api.js, ein
+// Import der Konstante braeche jede Suite, die diesen Guard laedt.
+const WRITE_EVENT = 'yuvomi:write';
 
 /**
  * Nur Formulare mit eigenem Absenden koennen ungespeicherte Aenderungen haben.
@@ -110,6 +119,21 @@ function onBeforeUnload(event) {
 }
 
 /**
+ * Ein geglueckter Schreibvorgang (api.js meldet nur Erfolge) gibt das
+ * abgeschickte Formular frei - es sei denn, es traegt noch einen Feldfehler:
+ * dann hat sein Absenden nichts geschrieben, und der Erfolg gehoert einem
+ * anderen Weg (ein Sofort-Schalter daneben).
+ */
+function onWriteSucceeded() {
+  const form = pendingForm;
+  pendingForm = null;
+  if (!form || !dirtyForms.has(form)) return;
+  if (typeof form.querySelector === 'function' && form.querySelector('[aria-invalid="true"]')) return;
+  dirtyForms.delete(form);
+  syncLeafEdits();
+}
+
+/**
  * Bindet das Tracking an den Blatt-Container. Der Container ist pro Blatt neu,
  * die Listener verschwinden also mit ihm.
  */
@@ -118,6 +142,7 @@ export function watchLeafForms(container) {
   // das Blatt hat seine eben beim Rendern angemeldet; abgehaengte faellt
   // hasOpenEdits() ueber isConnected heraus.
   dirtyForms.clear();
+  pendingForm = null;
   syncLeafEdits();
 
   const mark = (event) => {
@@ -127,31 +152,50 @@ export function watchLeafForms(container) {
     const form = savableForm(event.target);
     if (form) {
       dirtyForms.add(form);
+      // Nach dem Absenden weitergetippt: das Neue ist mit keinem Speichern
+      // unterwegs, ein spaeter eintreffender Erfolg gibt es nicht frei.
+      if (form === pendingForm) pendingForm = null;
       syncLeafEdits();
     }
+  };
+  /* ERST NACH DEM ERFOLG (Critique R21, a5). Das Absenden gab das Formular
+   * sofort frei - in der Capture-Phase, also BEVOR sein eigener Handler
+   * pruefen oder speichern konnte. Scheiterte die Pruefung am Feld oder lehnte
+   * der Server ab, galt das Blatt trotzdem als sauber: der naechste Wechsel
+   * fragte nicht, und die Eingabe war weg. Jetzt merkt sich das Absenden nur,
+   * welches Formular unterwegs ist; frei wird es mit dem naechsten
+   * geglueckten Schreibvorgang (`yuvomi:write`, onWriteSucceeded), mit einem
+   * `reset` oder wenn das Blatt es nach dem Speichern neu zeichnet
+   * (isConnected). */
+  const submitted = (event) => {
+    const form = event.target?.closest?.('form');
+    if (form && dirtyForms.has(form)) pendingForm = form;
   };
   const release = (event) => {
     const form = event.target?.closest?.('form');
     if (form) {
       dirtyForms.delete(form);
+      if (form === pendingForm) pendingForm = null;
       syncLeafEdits();
     }
   };
 
   container.addEventListener('input', mark, true);
   container.addEventListener('change', mark, true);
-  container.addEventListener('submit', release, true);
+  container.addEventListener('submit', submitted, true);
   container.addEventListener('reset', release, true);
 
-  if (!unloadBound) {
+  if (boundTo !== window) {
     window.addEventListener('beforeunload', onBeforeUnload);
-    unloadBound = true;
+    window.addEventListener(WRITE_EVENT, onWriteSucceeded);
+    boundTo = window;
   }
 }
 
 export function clearLeafEdits() {
   dirtyForms.clear();
   dirtySources.clear();
+  pendingForm = null;
   syncLeafEdits();
 }
 
