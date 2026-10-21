@@ -1622,7 +1622,8 @@ test('K1: das CSS faltet die Zeile nur eingeklappt, nie mit Fokus, Suchbegriff o
     assert.match(r.selector, /:not\(:has\(input:not\(:placeholder-shown\)\)\)/, `${r.selector}: ein Suchbegriff haelt die Zeile offen`);
     assert.match(r.selector, /:not\(:has\(:popover-open\)\)/, `${r.selector}: ein offenes Menue haelt seinen Knopf`);
   }
-  assert.doesNotMatch(folded.filter((r) => !/>\s*\*\s*$/.test(r.selector)).map((r) => r.body).join(';'), /opacity/,
+  // Die Blende haengt an den Kindern - seit R21 S8 beim Namen (`> :is(...)`), nicht `> *`.
+  assert.doesNotMatch(folded.filter((r) => !/>\s*(?:\*|:is\([^)]*\))\s*$/.test(r.selector)).map((r) => r.body).join(';'), /opacity/,
     'die Zeile selbst blendet nicht aus - ihre Linie bleibt die Kante unter der Leiste');
   const base = compact.find((r) => r.selector.trim() === '.page-toolbar--fold-row');
   // Seit R20 gleitet nicht mehr der Rand (Layout je Frame, CLS 0,06), sondern die

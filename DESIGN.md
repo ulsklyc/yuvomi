@@ -4793,3 +4793,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   vorsorglich in jeder Zelle einen Bildslot geben. Ein Vorschaubild steht in einem festen
   Rahmen mit `object-fit: cover`, und im Wochenplaner wird nur die bebilderte Karte zum Grid;
   ein fehlendes Bild ist eine ruhige Luecke, keine Layout-Aenderung (siehe „Das Vorschaubild").
+- **Don't** hinter ein `:has()`, das nicht im Subjekt steht, einen Universalselektor (`> *`)
+  oder ein `::placeholder` setzen (R21 S8). Chrome fuehrt die Reste aller solchen Regeln in
+  EINER Invalidierungsmenge; ein `*` oder `::placeholder` darin macht sie zum ganzen
+  Teilbaum, und jedes Einfuegen unter `<html>` - ein Dialog, ein Toast, ein Feld - rechnete
+  den Stil des ganzen Dokuments neu (gemessen /tasks 1x, Einfuegen + Stil 2,7 -> 1,3 ms).
+  Die Kinder beim Namen (`> :is(.a, .b)`), eine Bedingung, die sich selbst erfuellt, oder
+  das `:has()` ins Subjekt. Guard `test:frontend-audit`.

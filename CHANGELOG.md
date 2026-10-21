@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a four times slower processor, the screen answered after 104-176 ms; now the page dims
   after about 70 ms and the sheet follows a frame later.
 
+- **Adding a dialog, a notification or a field no longer recalculates the whole page.** Four
+  style rules (the collapsed search, the folding toolbar and the budget's two ledger sections)
+  made the browser re-style every element on the page whenever something was inserted. They
+  now only touch what they style; measured on the task list, an insertion costs about half as
+  much.
+
 - **Two rows of documents fit on a laptop screen.** Each card's preview showed the whole page in
   a tall frame, so the second row stood half below the edge. The frame is square now and the
   page still shows whole inside it; a card is about 60 pixels shorter.

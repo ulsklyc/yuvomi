@@ -563,7 +563,9 @@
     color: transparent;
   }
 
-  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input::placeholder {
+  /* Ohne `:has()`: ein Platzhalter steht nur im leeren Feld (Begruendung und
+   * Messung an der gleichen Regel in layout.css). */
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within) .page-search__input::placeholder {
     color: transparent;
   }
 

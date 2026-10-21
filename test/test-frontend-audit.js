@@ -22912,3 +22912,45 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
   }
   assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
 });
+
+/**
+ * R21 S8: KEIN `:has()` VOR EINEM UNIVERSALSELEKTOR ODER `::placeholder`.
+ * Chrome fuehrt die Reste aller Regeln, in denen `:has()` nicht im Subjekt
+ * steht, in EINER Invalidierungsmenge. Steht in einem dieser Reste `*` oder ein
+ * `::placeholder`, wird daraus "der ganze Teilbaum": jedes Einfuegen unter
+ * <html>, das ein `:has()`-Argument beruehren koennte (ein Dialog, ein Feld, ein
+ * Toast), rechnete den Stil des GANZEN Dokuments neu. Gemessen /tasks 1x, ein
+ * Overlay mit Feld einfuegen + Stil: 2,7 -> 1,3 ms; beim Anlegen-Blatt (4x)
+ * zweimal je Oeffnen. Ein Rest mit Klassen bleibt gezielt.
+ */
+function hasTailViolations(file) {
+  const out = [];
+  for (const rule of eachRule(read(file))) {
+    for (const sel of rule.selector.split(/,(?![^(]*\))/)) {
+      const s = sel.trim();
+      const at = s.lastIndexOf(':has(');
+      if (at < 0) continue;
+      // Ende des Compounds mit dem letzten :has(): erste Stelle auf Klammertiefe 0
+      // mit Kombinator oder Leerraum.
+      let depth = 0;
+      for (let i = 0; i < at; i += 1) { if (s[i] === '(') depth += 1; else if (s[i] === ')') depth -= 1; }
+      let end = s.length;
+      for (let i = at; i < s.length; i += 1) {
+        if (s[i] === '(') depth += 1;
+        else if (s[i] === ')') depth -= 1;
+        else if (depth === 0 && /[\s>+~]/.test(s[i])) { end = i; break; }
+      }
+      const tail = s.slice(end).trim();
+      if (!tail) continue; // :has() im Subjekt - invalidiert nur sich selbst
+      if (/(^|[\s>+~])\*\s*$/.test(tail) || /::placeholder/.test(tail)) out.push(`${file.split('/').pop()}: ${s}`);
+    }
+  }
+  return out;
+}
+
+test('R21 S8: kein :has() vor einem Universalselektor oder ::placeholder (ganzer Teilbaum je Einfuegen)', () => {
+  const files = readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css'));
+  const bad = files.flatMap((f) => hasTailViolations(`../public/styles/${f}`));
+  assert.deepEqual(bad, [], `Ganzer-Teilbaum-Rest hinter :has():\n${bad.join('\n')}`);
+});
+

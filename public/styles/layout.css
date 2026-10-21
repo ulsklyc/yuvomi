@@ -4612,8 +4612,13 @@ html.fab-steady .page-fab {
     pointer-events: none;
   }
 
-  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt. */
-  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > * {
+  /* Die Blende gehoert dem Inhalt, nicht der Zeile: deren Linie bleibt.
+   * DIE KINDER BEIM NAMEN, NICHT `> *` (Critique R21 S8): ein Universalselektor
+   * hinter `:has()` machte die gemeinsame `:has()`-Invalidierung zum ganzen
+   * Teilbaum (siehe `.page-search__input::placeholder` unten). Die Faltzeile
+   * traegt die Slots der Werkzeugzeile (gemessen Rezepte, Vorrat, Mahlzeiten,
+   * Einkauf: __center + __actions). */
+  .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools) {
     opacity: 0;
   }
 }
@@ -5080,12 +5085,17 @@ html.fab-steady .page-fab {
     background: transparent;
   }
 
-  .page-toolbar
-    .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))
-    .page-search__input::placeholder,
-  .section-toolbar
-    .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))
-    .page-search__input::placeholder {
+  /* OHNE `:has()`, UND DAS IST GLEICHBEDEUTEND: einen Platzhalter zeigt das
+   * Feld nur, solange es leer ist - die Bedingung "ohne Wert" erfuellt er von
+   * selbst. Mit `:has()` VOR einem `::placeholder` hatte die Regel einen Preis
+   * weit ausserhalb der Suche (Critique R21 S8): Chrome fuehrt die Reste aller
+   * `:has()`-Regeln in EINER Invalidierungsmenge, ein Pseudo-Element darin
+   * macht sie zum "ganzen Teilbaum", und jedes Einfuegen unter <html> (Dialog,
+   * Toast, ein Feld) rechnete den Stil des ganzen Dokuments neu. Gemessen
+   * /tasks 1x: Einfuegen + Stil 2,7 -> 1,3 ms zusammen mit der Faltzeile.
+   * Guard: test:frontend-audit. */
+  .page-toolbar .page-search:not(.page-search--field):not(:focus-within) .page-search__input::placeholder,
+  .section-toolbar .page-search:not(:focus-within) .page-search__input::placeholder {
     color: transparent;
   }
 

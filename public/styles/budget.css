@@ -2181,7 +2181,11 @@ button.budget-bar-row:focus-visible {
   box-shadow: none;
 }
 
-.budget-list:has(> .budget-ledger-section) > * + * {
+/* Ohne `:has()` vor `> * + *` (Critique R21 S8): ein Universalselektor
+ * hinter `:has()` machte die gemeinsame `:has()`-Invalidierung zum ganzen
+ * Teilbaum (Guard test:frontend-audit). In der Huelle stehen dann nur die
+ * Abschnitte - also beim Namen. */
+.budget-list > .budget-ledger-section + .budget-ledger-section {
   border-top: 0;
 }
 
