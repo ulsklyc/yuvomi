@@ -137,6 +137,26 @@ test('Admin legt ein Kind an: Budget aus, Haushaltshilfe nur lesen ohne Betraege
   assert.equal(moduleAccessVerdict(map, 'budget', 'read'), MODULE_ACCESS_DENIED);
 });
 
+// R21 (Critique 2026-10-21, D6): ein neues Kind startet auch ohne Zyklus-Tab.
+// Kein Recht, sondern die persoenliche Abwahl aus #760 - gelesen ueber
+// DIESELBE Funktion, die /preferences ausliefert.
+test('R21 D6: ein neues Kind startet ohne Zyklus - Erwachsene und das bestehende Kind behalten ihn', async () => {
+  const { healthCycleViews } = await import('../server/routes/preferences.js');
+  const id = await createMember({ username: 'zyklus-kind', family_role: 'child' });
+  assert.equal(healthCycleViews(id).health_cycle_effective, false, 'der Zyklus-Tab ist ausgeblendet');
+  assert.equal(healthCycleViews(id).health_cycle_enabled, true, 'der Haushalt bleibt unberuehrt');
+  assert.equal(resolvePermissions(db, { id, role: 'member', family_role: 'child' }).capabilities.health_use_fasting, 'none',
+    'und das Fasten ist schon ueber die Startrechte aus');
+  const adult = await createMember({ username: 'zyklus-erw', family_role: 'mom' });
+  assert.equal(healthCycleViews(adult).health_cycle_effective, true, 'Erwachsene behalten den Zyklus');
+  assert.equal(healthCycleViews(EXISTING_CHILD).health_cycle_effective, true, 'keine Migration: das bestehende Kind behaelt ihn');
+  // Nur, wo noch nichts steht: eine schon gesetzte Wahl bleibt.
+  const lea = addUser('lea', 'member', 'child');
+  db.prepare("INSERT INTO sync_config (key, value) VALUES (?, '1')").run(`health_cycle_enabled:user:${lea}`);
+  applyChildStartPermissions(db, { id: lea, role: 'member', family_role: 'child' });
+  assert.equal(healthCycleViews(lea).health_cycle_effective, true);
+});
+
 test('andere Rollen und ein Kind mit Admin-Recht bekommen keine Zeile', async () => {
   for (const role of ['parent', 'dad', 'mom', 'grandparent', 'relative', 'other']) {
     const id = await createMember({ username: `erw-${role}`, family_role: role });

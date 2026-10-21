@@ -2157,7 +2157,7 @@
         "familyRoleGrandparent": "Nagyszülő",
         "familyRoleRelative": "Rokon",
         "familyRoleOther": "Családtag",
-        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod.",
+        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod. A ciklus is rejtve van; a gyerek saját beállításaiban jeleníthető meg.",
         "systemAdminLabel": "Rendszergazda",
         "systemAdminHint": "A rendszergazdák kezelhetik az alkalmazás beállításait, integrációit, API tokenjeit és családi fiókjait.",
         "systemAdminBadge": "Rendszergazda",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Következő emlékeztetők",
                 "empty": "Ma nincs több bevétel"
+            },
+            "brief": {
+                "changes": "Az utolsó mérés óta: {{list}}.",
+                "latest": "Utoljára rögzítve: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} változatlan"
             }
         },
         "vitals": {

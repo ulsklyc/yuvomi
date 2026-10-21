@@ -2200,7 +2200,7 @@
         "familyRoleGrandparent": "조부모",
         "familyRoleRelative": "친척",
         "familyRoleOther": "가족 구성원",
-        "childStartHint": "새 자녀 계정은 예산과 단식 없이 시작하며 가사 도우미는 읽기 전용으로, 급여와 지급 내역 없이 봅니다. 나중에 “역할 및 권한”에서 바꿀 수 있습니다.",
+        "childStartHint": "새 자녀 계정은 예산과 단식 없이 시작하며 가사 도우미는 읽기 전용으로, 급여와 지급 내역 없이 봅니다. 나중에 “역할 및 권한”에서 바꿀 수 있습니다. 주기도 숨겨지며, 자녀의 개인 설정에서 다시 표시할 수 있습니다.",
         "systemAdminLabel": "시스템 관리자",
         "systemAdminHint": "시스템 관리자는 앱 설정, 통합, API 토큰 및 가족 계정을 관리할 수 있습니다.",
         "systemAdminBadge": "시스템 관리자",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "다음 알림",
                 "empty": "오늘 남은 복용 없음"
+            },
+            "brief": {
+                "changes": "지난 측정 이후: {{list}}.",
+                "latest": "마지막 기록: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} 변화 없음"
             }
         },
         "vitals": {

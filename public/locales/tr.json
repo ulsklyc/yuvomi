@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Büyükanne/Büyükbaba",
         "familyRoleRelative": "Akraba",
         "familyRoleOther": "Aile üyesi",
-        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz.",
+        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz. Döngü de gizlidir; çocuğun kişisel ayarlarından gösterilebilir.",
         "systemAdminLabel": "Sistem yöneticisi",
         "systemAdminHint": "Sistem yöneticileri ayarları, entegrasyonları, API tokenlarını ve aile hesaplarını yönetebilir.",
         "systemAdminBadge": "Sistem yöneticisi",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Sonraki hatırlatmalar",
                 "empty": "Bugün başka kullanım yok"
+            },
+            "brief": {
+                "changes": "Son ölçümden bu yana: {{list}}.",
+                "latest": "Son kayıt: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} değişmedi"
             }
         },
         "vitals": {

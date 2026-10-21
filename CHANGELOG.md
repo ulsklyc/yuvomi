@@ -47,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Health opens with one sentence about what changed.** The overview now starts with a line
+  such as "Since the last measurement: weight -0.2 kg, sleep +30 min and blood oxygen +1 %" - the
+  change, never a judgement. Measurements nobody has taken no longer show as grey boxes with a
+  dash; a single quiet row offers to record the first one. The charts read better: each kind of
+  measurement keeps a minimum range, so a blood sugar between 88 and 90 no longer looks like a
+  swing, the unit stands at the axis, the pulse has its own axis below the blood pressure, and the
+  lines are named where they end instead of in a colour legend. The activity chart names its
+  minutes, and a lab result without a rating shows an empty cell instead of a dash. New child
+  accounts start without the cycle, as they already did without fasting; it can be shown again
+  in the child's own settings, and existing accounts keep what they have.
+
 - **The Overview opens with your day.** On a phone, "Today" now shows as many entries as fit on
   the first screen instead of stopping after two, with the rest behind "+N more". The budget card
   and the account balance are no longer on a new Overview - bring the card back under

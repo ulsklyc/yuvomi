@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Grand-parent",
         "familyRoleRelative": "Proche",
         "familyRoleOther": "Membre de la famille",
-        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations».",
+        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations». Le cycle est également masqué ; il peut être réaffiché dans les réglages personnels de l’enfant.",
         "systemAdminLabel": "Administrateur système",
         "systemAdminHint": "Les administrateurs système peuvent gérer les paramètres, intégrations, jetons API et comptes familiaux.",
         "systemAdminBadge": "Admin système",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Prochains rappels",
                 "empty": "Plus aucune prise aujourd'hui"
+            },
+            "brief": {
+                "changes": "Depuis la dernière mesure : {{list}}.",
+                "latest": "Dernière saisie : {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} : sans changement"
             }
         },
         "vitals": {

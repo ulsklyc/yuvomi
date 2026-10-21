@@ -2362,7 +2362,7 @@
         "familyRoleGrandparent": "Dziadkowie",
         "familyRoleRelative": "Krewny/Krewna",
         "familyRoleOther": "Członek rodziny",
-        "childStartHint": "Nowe konta dzieci zaczynają bez Budżetu i postu, a pomoc domową widzą tylko do odczytu, bez wynagrodzeń i płatności. Możesz to później zmienić w sekcji „Role i uprawnienia”.",
+        "childStartHint": "Nowe konta dzieci zaczynają bez Budżetu i postu, a pomoc domową widzą tylko do odczytu, bez wynagrodzeń i płatności. Możesz to później zmienić w sekcji „Role i uprawnienia”. Cykl jest również ukryty; można go włączyć w ustawieniach osobistych dziecka.",
         "systemAdminLabel": "Administrator systemu",
         "systemAdminHint": "Administratorzy systemu mogą zarządzać ustawieniami aplikacji, integracjami, tokenami API i kontami rodzinnymi.",
         "systemAdminBadge": "Administrator systemu",
@@ -5046,6 +5046,12 @@
             "reminders": {
                 "title": "Kolejne przypomnienia",
                 "empty": "Brak kolejnych dawek na dziś"
+            },
+            "brief": {
+                "changes": "Od ostatniego pomiaru: {{list}}.",
+                "latest": "Ostatni zapis: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} bez zmian"
             }
         },
         "vitals": {

@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Abuelo/a",
         "familyRoleRelative": "Familiar",
         "familyRoleOther": "Miembro de la familia",
-        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos».",
+        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos». El ciclo también está oculto; se puede mostrar en los ajustes personales del niño.",
         "systemAdminLabel": "Administrador del sistema",
         "systemAdminHint": "Los administradores del sistema pueden gestionar ajustes, integraciones, tokens de API y cuentas familiares.",
         "systemAdminBadge": "Admin del sistema",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Próximos recordatorios",
                 "empty": "Hoy no hay más tomas"
+            },
+            "brief": {
+                "changes": "Desde la última medición: {{list}}.",
+                "latest": "Último registro: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} sin cambios"
             }
         },
         "vitals": {

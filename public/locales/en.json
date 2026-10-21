@@ -2157,7 +2157,7 @@
         "familyRoleGrandparent": "Grandparent",
         "familyRoleRelative": "Relative",
         "familyRoleOther": "Family member",
-        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\".",
+        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\". The cycle is hidden too; it can be shown again in the child's personal settings.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "System admins can manage application settings, integrations, API tokens and family accounts.",
         "systemAdminBadge": "System admin",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Upcoming reminders",
                 "empty": "No more doses today"
+            },
+            "brief": {
+                "changes": "Since the last measurement: {{list}}.",
+                "latest": "Last recorded: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} unchanged"
             }
         },
         "vitals": {

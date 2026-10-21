@@ -2157,7 +2157,7 @@
         "familyRoleGrandparent": "Grootouder",
         "familyRoleRelative": "Familie",
         "familyRoleOther": "Gezinslid",
-        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”.",
+        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”. Ook de cyclus is verborgen; die kan worden getoond in de persoonlijke instellingen van het kind.",
         "systemAdminLabel": "Systeembeheerder",
         "systemAdminHint": "Systeembeheerders kunnen applicatie-instellingen, integraties, API-tokens en gezinsaccounts beheren.",
         "systemAdminBadge": "Systeembeheerder",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Volgende herinneringen",
                 "empty": "Vandaag geen innames meer"
+            },
+            "brief": {
+                "changes": "Sinds de laatste meting: {{list}}.",
+                "latest": "Laatst vastgelegd: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} onveranderd"
             }
         },
         "vitals": {

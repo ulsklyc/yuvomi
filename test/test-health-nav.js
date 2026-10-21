@@ -532,8 +532,8 @@ test('R14 P3/P6: der Umzugsplan - Desktop Detailkopf, Bereich schmal Kopfzeile, 
   assert.deepEqual(hoistPlan({ split: false, overview: false, phone: true }), [{ part: 'person', slot: 'toolbar' }],
     'Bereichsseite: die Pille teilt die Zeile mit „‹ Gesundheit" statt eine eigene zu kosten');
   assert.deepEqual(hoistPlan({ split: false, overview: true, phone: true }).map((p) => `${p.part}>${p.slot}`),
-    ['person>priority', 'banner>priority', 'due>priority', 'quick>priority'],
-    'Telefon-Uebersicht: Person, Hinweis, Heute faellig, Schnell erfassen stehen VOR der Bereichsliste');
+    ['person>priority', 'banner>priority', 'brief>priority', 'due>priority', 'quick>priority'],
+    'Telefon-Uebersicht: Person, Hinweis, der Satz (R21 D6), Heute faellig, Schnell erfassen stehen VOR der Bereichsliste');
   assert.deepEqual(hoistPlan({ split: false, overview: true, phone: false }), [], 'Tablet: das Raster bleibt, wie es ist');
 });
 

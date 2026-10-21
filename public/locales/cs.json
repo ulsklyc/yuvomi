@@ -2265,7 +2265,7 @@
         "familyRoleGrandparent": "Prarodič",
         "familyRoleRelative": "Příbuzný/á",
         "familyRoleOther": "Člen rodiny",
-        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“.",
+        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“. Cyklus je také skrytý; zobrazit ho lze v osobním nastavení dítěte.",
         "systemAdminLabel": "Správce systému",
         "systemAdminHint": "Správci systému mohou spravovat nastavení aplikace, integrace, API tokeny a rodinné účty.",
         "systemAdminBadge": "Správce systému",
@@ -4924,6 +4924,12 @@
             "reminders": {
                 "title": "Další připomenutí",
                 "empty": "Dnes už žádné další užití"
+            },
+            "brief": {
+                "changes": "Od posledního měření: {{list}}.",
+                "latest": "Naposledy zaznamenáno: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} beze změny"
             }
         },
         "vitals": {

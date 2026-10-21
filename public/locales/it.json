@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Nonno/a",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro della famiglia",
-        "childStartHint": "I nuovi account bambino partono senza Budget e digiuno e vedono l’Aiuto domestico in sola lettura, senza compensi e pagamenti. Puoi cambiarlo dopo in «Ruoli e autorizzazioni».",
+        "childStartHint": "I nuovi account bambino partono senza Budget e digiuno e vedono l’Aiuto domestico in sola lettura, senza compensi e pagamenti. Puoi cambiarlo dopo in «Ruoli e autorizzazioni». Anche il ciclo è nascosto; si può mostrare nelle impostazioni personali del bambino.",
         "systemAdminLabel": "Amministratore di sistema",
         "systemAdminHint": "Gli amministratori di sistema possono gestire impostazioni, integrazioni, token API e account familiari.",
         "systemAdminBadge": "Admin sistema",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Prossimi promemoria",
                 "empty": "Nessun'altra assunzione oggi"
+            },
+            "brief": {
+                "changes": "Dall'ultima misurazione: {{list}}.",
+                "latest": "Ultimo rilevamento: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}}: nessuna variazione"
             }
         },
         "vitals": {

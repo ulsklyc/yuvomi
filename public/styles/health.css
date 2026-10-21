@@ -584,26 +584,28 @@
  * sondern in EINER Zeile „Weitere Messwerte". Ab 640px bleibt alles, wie es
  * war - dieselbe Grenze wie `PHONE_QUERY` in health.js.
  * -------------------------------------------------------- */
-.health-vitals__more {
+/* SEIT R21 AUF JEDER BREITE (Critique 2026-10-21, D6): die leeren Messarten
+ * stehen nicht mehr als graue Kacheln im Raster, sondern hier - renderCards()
+ * zeichnet nur noch gemessene. Unter 640px liegen Zeitraum und Diagramm
+ * weiter im Blatt der Kachel. */
+@media (max-width: 639px) {
+  .health-vitals__toolbar,
+  .health-vitals__detail {
+    display: none;
+  }
+}
+
+/* Ohne jede Messung entfallen Zeitraum und Diagramm; es bleibt die ruhige
+ * Zeile mit der Erfassen-Aktion (renderCards). */
+.health-vitals--empty .health-vitals__toolbar,
+.health-vitals--empty .health-vitals__detail {
   display: none;
 }
 
-@media (max-width: 639px) {
-  .health-vitals__toolbar,
-  .health-vitals__detail,
-  .health-vitals__cards > .health-vitals__card--empty {
-    display: none;
-  }
-
-  .health-vitals__more {
-    display: block;
-  }
-
-  /* Ohne Inhalt (jede Metrik hat einen Wert) nimmt der Wirt keine Luecke
-   * aus dem Spaltenabstand der Ansicht. */
-  .health-vitals__more:empty {
-    display: none;
-  }
+/* Ohne Inhalt (jede Metrik hat einen Wert) nimmt der Wirt keine Luecke
+ * aus dem Spaltenabstand der Ansicht. */
+.health-vitals__more:empty {
+  display: none;
 }
 
 /* Die Flaeche der Zeile. NICHT `.row-carrier`: der kappt auf --page-measure,
@@ -775,24 +777,19 @@
   fill: color-mix(in oklab, var(--module-health) 14%, transparent);
 }
 
-.health-chart__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+/* DIE REIHEN STEHEN BESCHRIFTET AN IHRER KURVE (R21, Critique 2026-10-21, D6):
+ * der Name ueber dem letzten Punkt, in der Farbe der Kurve (`fill` am Element).
+ * Hier stand eine Legende aus Farbquadraten unter dem Diagramm - die Zuordnung
+ * lief nur ueber die Farbe. Die Schrift ist die feste Achsenschrift
+ * (`.chart__axis`), halbfett, damit sie sich vom Gitter abhebt. */
+.health-chart__series-label {
+  font-weight: var(--font-weight-semibold);
 }
 
-.health-chart__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.health-chart__swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-2xs);
+/* Die zweite Achse einer Messart (der Puls unter dem Blutdruck) folgt direkt;
+ * sie ist ein Teil desselben Diagramms, keine neue Karte. */
+.health-chart--secondary {
+  margin-block-start: var(--space-2);
 }
 
 .health-chart-empty {
@@ -1590,7 +1587,6 @@ button.health-med-card:hover {
 .health-lab-flag--low,
 .health-lab-flag--high   { color: var(--color-warning-ink); }
 .health-lab-flag--normal { color: var(--color-success); }
-.health-lab-flag--none   { color: var(--color-text-tertiary, var(--color-text-secondary)); }
 
 /* Analyt-Trend */
 .health-lab-trend {
@@ -2094,6 +2090,48 @@ button.health-med-card:hover {
 .health-overview__grid {
   column-width: 320px;
   column-gap: var(--space-4);
+}
+
+/* DER SATZ OBEN (R21, Critique 2026-10-21, D6 "Gesundheit als Briefing"):
+ * was sich seit der letzten Messung getan hat, als Lesetext ueber den Karten
+ * - Body 17 in Textfarbe, keine Flaeche, kein Symbol. Auf dem Telefon zieht er
+ * mit Personenwahl und "Heute faellig" vor die Bereichsliste (health-hoist.js). */
+.health-brief {
+  margin: 0 0 var(--space-4);
+  max-inline-size: 65ch;
+  font-size: var(--type-body);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  text-wrap: pretty;
+}
+
+.health-priority > .health-brief {
+  margin-block-end: 0;
+}
+
+/* EINE RUHIGE ZEILE STATT LEERER KACHELN (R21, D6): "Noch keine Messwerte"
+ * und daneben die Erfassen-Aktion. In der Uebersichtskarte steht sie auf der
+ * Karte; auf der Vitalwerte-Seite traegt sie die Flaeche einer Zeile selbst. */
+.health-overview__empty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-block-size: var(--target-base);
+}
+
+.health-overview__empty-text {
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+}
+
+.health-vitals__empty-row {
+  grid-column: 1 / -1;
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .health-overview__card {

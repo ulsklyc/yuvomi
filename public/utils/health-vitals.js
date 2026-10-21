@@ -46,6 +46,14 @@ export const MOOD_MAX = MOOD_SCALE[MOOD_SCALE.length - 1].value;
 // ist der Wert eine schlichte Zahl mit Einheit. Vor #609 stand diese
 // Fallunterscheidung als `type === 'bp'` an fünf Stellen im Seitenmodul; jede
 // weitere Metrik hätte sie ein weiteres Mal vervielfacht.
+// `minSpan` (R21, Critique 2026-10-21, D6) ist die MINDESTSPANNE der Werteachse
+// je Einheit. Ohne sie zoomte das Diagramm auf die vorkommenden Werte: drei
+// Blutzuckerwerte zwischen 88 und 90 standen auf einer Achse "88 / 88,5 / 89 /
+// 89,5 / 90" und sahen aus wie ein Ausschlag - Rauschen als Drama. Die Spanne
+// ist so gewaehlt, dass eine alltaegliche Schwankung flach bleibt und eine
+// echte Veraenderung sichtbar wird; sie ist keine Bewertung und kein
+// Normbereich. `axes` teilt die Kanaele auf eigene Achsen: der Puls zaehlt
+// Schlaege je Minute und stand auf der mmHg-Achse des Blutdrucks.
 export const VITAL_METRICS = Object.freeze([
   {
     type: 'bp',
@@ -59,6 +67,11 @@ export const VITAL_METRICS = Object.freeze([
     ],
     units: ['mmHg'],
     format: 'pair',
+    minSpan: { mmHg: 40 },
+    axes: [
+      { channels: [0, 1] },
+      { channels: [2], unit: '/min', minSpan: 40 },
+    ],
   },
   {
     type: 'glucose',
@@ -67,6 +80,7 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.glucose'],
     units: ['mg/dL', 'mmol/L'],
+    minSpan: { 'mg/dL': 40, 'mmol/L': 2 },
   },
   {
     type: 'weight',
@@ -75,6 +89,7 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.weight'],
     units: ['kg', 'lb'],
+    minSpan: { kg: 5, lb: 10 },
   },
   // Körpermaße (#683). Stehen bewusst neben dem Gewicht: bei einem Säugling
   // werden die drei gemeinsam erhoben, und wer eines eintragen will, sucht die
@@ -88,6 +103,7 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.height'],
     units: ['cm', 'in'],
+    minSpan: { cm: 10, in: 4 },
   },
   {
     type: 'head_circumference',
@@ -96,6 +112,7 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.headCircumference'],
     units: ['cm', 'in'],
+    minSpan: { cm: 4, in: 2 },
   },
   {
     type: 'spo2',
@@ -104,6 +121,8 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.spo2'],
     units: ['%'],
+    minSpan: { '%': 10 },
+    ceiling: 100,
   },
   {
     type: 'temp',
@@ -112,6 +131,7 @@ export const VITAL_METRICS = Object.freeze([
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.temp'],
     units: ['°C', '°F'],
+    minSpan: { '°C': 2, '°F': 4 },
   },
   // Schlafdauer einer Nacht (#609). Gespeichert werden Dezimalstunden, damit
   // Trend, Mittelwert und Delta dieselbe Rechnung wie bei jeder anderen Metrik
@@ -127,6 +147,7 @@ export const VITAL_METRICS = Object.freeze([
     channelLabelKeys: ['health.vitals.metric.sleep'],
     units: ['h'],
     format: 'duration',
+    minSpan: { h: 4 },
   },
   // Stimmung als 1-5-Skala (#609). Bewusst ohne Einheit: die Zahl ist eine
   // Stufe, kein Messwert. Nicht zu verwechseln mit der Stimmung im
@@ -273,6 +294,27 @@ export const VITAL_TYPES = Object.freeze(VITAL_METRICS.map((m) => m.type));
 
 export function vitalMetric(type) {
   return VITAL_METRICS.find((m) => m.type === type) || null;
+}
+
+/**
+ * Die Werteachse einer Messart: mindestens `span` breit, um die Mitte der
+ * Werte gelegt (R21, D6). Unter 0 wird keine Spanne erfunden, wenn kein Wert
+ * darunter liegt; ueber `ceiling` (Sauerstoffsaettigung: 100 %) ebenso wenig.
+ * Die runden Schritte legt danach `niceDomain` (utils/chart.js).
+ * @param {number} lo  kleinster Wert
+ * @param {number} hi  groesster Wert
+ * @param {number} span  Mindestspanne (0/undefined: unveraendert)
+ * @param {{ ceiling?: number }} [opts]
+ * @returns {{ lo: number, hi: number }}
+ */
+export function widenToSpan(lo, hi, span, { ceiling = Infinity } = {}) {
+  if (!(span > 0) || !Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo >= span) return { lo, hi };
+  const mid = (lo + hi) / 2;
+  let a = mid - span / 2;
+  let b = mid + span / 2;
+  if (a < 0 && lo >= 0) { b -= a; a = 0; }
+  if (b > ceiling && hi <= ceiling) { a -= b - ceiling; b = ceiling; }
+  return { lo: a, hi: b };
 }
 
 const CHANNEL_KEYS = ['value_num', 'value_num2', 'value_num3'];

@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "親族",
         "familyRoleOther": "家族メンバー",
-        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。",
+        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。周期も非表示になります。子どもの個人設定で表示できます。",
         "systemAdminLabel": "システム管理者",
         "systemAdminHint": "システム管理者は設定、連携、APIトークン、家族アカウントを管理できます。",
         "systemAdminBadge": "システム管理者",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "次のリマインダー",
                 "empty": "本日の服薬はこれ以上ありません"
+            },
+            "brief": {
+                "changes": "前回の測定から: {{list}}。",
+                "latest": "最新の記録: {{list}}。",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} 変化なし"
             }
         },
         "vitals": {

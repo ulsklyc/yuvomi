@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Far-/morförälder",
         "familyRoleRelative": "Släkting",
         "familyRoleOther": "Familjemedlem",
-        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”.",
+        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”. Även cykeln är dold; den kan visas i barnets personliga inställningar.",
         "systemAdminLabel": "Systemadministratör",
         "systemAdminHint": "Systemadministratörer kan hantera inställningar, integrationer, API-token och familjekonton.",
         "systemAdminBadge": "Systemadmin",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Nästa påminnelser",
                 "empty": "Inga fler intag idag"
+            },
+            "brief": {
+                "changes": "Sedan senaste mätningen: {{list}}.",
+                "latest": "Senast registrerat: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}}: oförändrat"
             }
         },
         "vitals": {

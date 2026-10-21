@@ -2200,7 +2200,7 @@
         "familyRoleGrandparent": "Lolo/Lola",
         "familyRoleRelative": "Kamag-anak",
         "familyRoleOther": "Miyembro ng pamilya",
-        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”.",
+        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”. Nakatago rin ang siklo; maipapakita ito sa mga personal na setting ng bata.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "Napapamahalaan ng mga system admin ang mga setting ng aplikasyon, integrasyon, API token at account ng pamilya.",
         "systemAdminBadge": "System admin",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Mga paparating na paalala",
                 "empty": "Wala nang dosis ngayong araw"
+            },
+            "brief": {
+                "changes": "Mula sa huling sukat: {{list}}.",
+                "latest": "Huling naitala: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} walang pagbabago"
             }
         },
         "vitals": {

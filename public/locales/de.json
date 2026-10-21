@@ -2200,7 +2200,7 @@
         "familyRoleGrandparent": "Großelternteil",
         "familyRoleRelative": "Verwandte/r",
         "familyRoleOther": "Familienmitglied",
-        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“.",
+        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“. Auch der Zyklus ist ausgeblendet; einblenden lässt er sich in den persönlichen Einstellungen des Kindes.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratoren können App-Einstellungen, Integrationen, API-Tokens und Familienkonten verwalten.",
         "systemAdminBadge": "Systemadministrator",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Nächste Erinnerungen",
                 "empty": "Heute keine weiteren Einnahmen"
+            },
+            "brief": {
+                "changes": "Seit der letzten Messung: {{list}}.",
+                "latest": "Zuletzt erfasst: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} unverändert"
             }
         },
         "vitals": {

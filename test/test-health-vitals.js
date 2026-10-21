@@ -331,7 +331,7 @@ async function imBlatt(fn, { access = 'write', view = {} } = {}) {
   }
 }
 
-test('M3: mobil oeffnet die Kachel ein Blatt - sie behauptet keinen Umschalt-Zustand, die leere Kachel ist markiert', async () => {
+test('M3: mobil oeffnet die Kachel ein Blatt - sie behauptet keinen Umschalt-Zustand', async () => {
   await imBlatt(() => {
     const weight = vitalMetric('weight');
     const series = computeVitalSeries([{ id: 1, type: 'weight', value_num: 65, measured_at: '2026-09-22T07:00' }], { type: 'weight', range: 'month', anchor: '2026-09-27' });
@@ -341,9 +341,6 @@ test('M3: mobil oeffnet die Kachel ein Blatt - sie behauptet keinen Umschalt-Zus
     const desktop = health.cardMarkup(weight, series);
     assert.match(desktop, /aria-pressed="/, 'am Desktop bleibt sie der Umschalter des Details darunter');
     assert.doesNotMatch(desktop, /aria-haspopup/);
-    const leer = health.cardMarkup(vitalMetric('height'), computeVitalSeries([], { type: 'height', range: 'month', anchor: '2026-09-27' }), { phone: true });
-    assert.match(leer, /health-vitals__card--empty/);
-    assert.doesNotMatch(telefon, /health-vitals__card--empty/);
   });
 });
 
@@ -455,19 +452,21 @@ test('M3: Bearbeiten aus dem Blatt fuehrt im selben Zug zurueck ins Blatt - auss
   assert.doesNotMatch(weg.replace(/\/\*[\s\S]*?\*\//g, ''), /whenModalClosed\(/);
 });
 
-test('M3: unter 640px entfallen Seiten-Umschalter, Detail und leere Kacheln; die Zeile gibt es nur dort', () => {
+test('M3 + R21: unter 640px entfallen Zeitraum und Detail; leere Messarten stehen auf jeder Breite in der Zeile', () => {
   const rules = [...eachRule(HEALTH_CSS)];
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
   const hidden = rules.filter((r) => phone(r) && /display:\s*none/.test(r.body)).map((r) => r.selector);
-  for (const sel of ['.health-vitals__toolbar', '.health-vitals__detail', '.health-vitals__cards > .health-vitals__card--empty']) {
+  for (const sel of ['.health-vitals__toolbar', '.health-vitals__detail']) {
     assert.ok(hidden.some((s) => s.split(',').map((x) => x.trim()).includes(sel)), `${sel} bleibt mobil stehen`);
   }
-  const base = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.health-vitals__more');
-  assert.ok(base && /display:\s*none/.test(base.body), 'ab 640px gibt es keine Zeile „Weitere Messwerte"');
-  const shown = rules.find((r) => phone(r) && r.selector.trim() === '.health-vitals__more');
-  assert.ok(shown && /display:\s*block/.test(shown.body));
-  assert.ok(!rules.some((r) => !phone(r) && /health-vitals__card--empty/.test(r.selector) && /display:\s*none/.test(r.body)),
-    'am Desktop bleiben die leeren Kacheln');
+  // R21 (D6): keine leere Kachel mehr, auch nicht am Desktop - die Zeile
+  // "Weitere Messwerte" steht auf jeder Breite.
+  assert.ok(!rules.some((r) => r.at.length === 0 && r.selector.trim() === '.health-vitals__more' && /display:\s*none/.test(r.body)),
+    'die Zeile "Weitere Messwerte" ist nicht auf das Telefon beschraenkt');
+  assert.doesNotMatch(HEALTH_CSS, /health-vitals__card--empty/, 'eine leere Kachel gibt es nicht mehr');
+  const leer = rules.filter((r) => r.at.length === 0 && /\.health-vitals--empty/.test(r.selector)).map((r) => r.selector).join(',');
+  assert.match(leer, /\.health-vitals--empty \.health-vitals__toolbar/);
+  assert.match(leer, /\.health-vitals--empty \.health-vitals__detail/);
 });
 
 // --------------------------------------------------------
@@ -995,4 +994,133 @@ test('Blutdruck ohne Puls: der Puls fehlt, er ist nicht 0', () => {
   assert.equal(at('2026-06-14').value_num3, 70);
   assert.equal(at('2026-06-12').value_num, 130, 'der Druck selbst bleibt');
   assert.equal(s.deltas.value_num3, null, 'kein Delta gegen einen Puls, der nie gemessen wurde');
+});
+
+
+// --------------------------------------------------------
+// R21 (Critique 2026-10-21, D6): Gesundheit als Briefing
+// --------------------------------------------------------
+//
+// Oben ein Satz aus vorhandenen Daten (Veraenderung seit der letzten Messung,
+// keine Bewertung); Messarten ohne Wert sind keine grauen Wells, sondern eine
+// ruhige Zeile mit Erfassen-Aktion; die Achsen nennen ihre Einheit, haben eine
+// Mindestspanne, der Puls steht auf eigener Achse, die Reihen sind direkt
+// beschriftet; der Laborbefund zeigt kein "-" fuer fehlende Bewertung, die
+// Aktivitaetsachse nennt Minuten.
+
+const R21_ROWS = [
+  { id: 1, type: 'weight', value_num: 65.2, unit: 'kg', measured_at: '2026-10-13T07:00' },
+  { id: 2, type: 'weight', value_num: 65.0, unit: 'kg', measured_at: '2026-10-20T07:00' },
+  { id: 3, type: 'bp', value_num: 120, value_num2: 76, value_num3: 70, unit: 'mmHg', measured_at: '2026-10-14T08:00' },
+  { id: 4, type: 'bp', value_num: 116, value_num2: 74, value_num3: 68, unit: 'mmHg', measured_at: '2026-10-18T08:00' },
+  { id: 5, type: 'height', value_num: 168, unit: 'cm', measured_at: '2026-09-11T08:00' },
+];
+
+async function inUebersicht(fn, rows, { access = 'write' } = {}) {
+  const abraeumen = installMiniDom();
+  setPermissions({ admin: false, modules: { health: access }, widgets: {}, capabilities: {} });
+  health.setViewStateForTest('overview', { meId: 1, personId: 1, vitals: rows });
+  try {
+    return await fn();
+  } finally {
+    health.setViewStateForTest('overview', { vitals: [], personId: null, meId: null });
+    clearPermissions();
+    abraeumen();
+  }
+}
+
+test('R21 D6: ohne Messung keine grauen Wells, sondern eine ruhige Zeile mit Erfassen', async () => {
+  await inUebersicht(() => {
+    const html = health.overviewVitalsMarkup();
+    assert.doesNotMatch(html, /metric-card__value--empty|metric-card/, 'keine Kachel ohne Wert');
+    assert.match(html, /health-overview__empty-row/);
+    assert.match(html, /health\.vitals\.emptyTitle/);
+    assert.match(html, /data-action="ov-add-vital"/, 'mit Schreibrecht der Weg zum Erfassen');
+  }, []);
+  await inUebersicht(() => {
+    assert.doesNotMatch(health.overviewVitalsMarkup(), /data-action="ov-add-vital"/, 'ohne Schreibrecht nur die Zeile');
+  }, [], { access: 'read' });
+  await inUebersicht(() => {
+    const html = health.overviewVitalsMarkup();
+    const kacheln = html.match(/data-vital-nav="/g) ?? [];
+    assert.equal(kacheln.length, 3, 'nur die drei gemessenen Messarten');
+    assert.doesNotMatch(html, /metric-card__value--empty/);
+  }, R21_ROWS);
+});
+
+test('R21 D6: der Satz oben nennt die Veraenderung seit der letzten Messung - ohne Bewertung', async () => {
+  await inUebersicht(() => {
+    const html = health.overviewBriefMarkup();
+    assert.match(html, /^<p class="health-brief"/);
+    assert.match(html, /health\.overview\.brief\.changes/);
+    // Gewicht 65,2 -> 65,0 und Blutdruck 120/76 -> 116/74, die juengste zuerst.
+    assert.match(html, /health\.vitals\.metric\.weight/);
+    assert.match(html, /health\.vitals\.metric\.bp/);
+    assert.match(html, /-0,2 kg|−0,2 kg|-0\.2 kg|−0\.2 kg/);
+    assert.match(html, /-4\/-2 mmHg|−4\/−2 mmHg/);
+    assert.doesNotMatch(html, /health\.vitals\.metric\.height/, 'eine Messart ohne Vorwert hat keine Veraenderung');
+    assert.doesNotMatch(html, /besser|schlechter|zu hoch|zu niedrig|better|worse/i, 'keine Bewertung');
+  }, R21_ROWS);
+  await inUebersicht(() => {
+    assert.match(health.overviewBriefMarkup(), /health\.overview\.brief\.latest/, 'ohne Vorwert: der letzte Wert');
+  }, [R21_ROWS[4]]);
+  await inUebersicht(() => {
+    assert.equal(health.overviewBriefMarkup(), '', 'ohne Messung kein Satz');
+  }, []);
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /\$\{overviewBriefMarkup\(\)\}\s*\$\{overviewGridMarkup\(\)\}/, 'der Satz steht ueber den Karten');
+  const { hoistPlan } = await import('../public/utils/health-hoist.js');
+  assert.ok(hoistPlan({ split: false, overview: true, phone: true }).some((p) => p.part === 'brief'),
+    'auf dem Telefon zieht er mit vor die Bereichsliste');
+});
+
+test('R21 D6: die Vitalwerte-Seite zeigt keine leere Kachel mehr - auf keiner Breite', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function renderCards() {'), src.indexOf('function vitalsEmptyRowMarkup() {'));
+  assert.match(fn, /all\.filter\(\(entry\) => entry\.series\.latest\)/, 'nur gemessene Messarten werden zur Kachel');
+  assert.match(fn, /vitalsEmptyRowMarkup\(\)/, 'ohne jede Messung die ruhige Zeile');
+  assert.doesNotMatch(src, /health-vitals__card--empty/);
+});
+
+test('R21 D6: Achsen mit Einheit und Mindestspanne, der Puls auf eigener Achse, Reihen direkt beschriftet', () => {
+  const bp = computeVitalSeries(R21_ROWS, { type: 'bp', range: 'month', anchor: '2026-10-21' });
+  const html = health.chartMarkup(vitalMetric('bp'), bp);
+  const svgs = html.match(/<svg class="chart health-chart[^"]*"/g) ?? [];
+  assert.equal(svgs.length, 2, 'Blutdruck und Puls je eine Achse');
+  const [druck, puls] = html.split(/<svg class="chart health-chart/).slice(1);
+  assert.equal((druck.match(/<polyline/g) ?? []).length, 2, 'auf der mmHg-Achse nur Systole und Diastole');
+  assert.equal((puls.match(/<polyline/g) ?? []).length, 1, 'der Puls hat seine eigene');
+  assert.match(druck, /class="chart__axis-unit"> mmHg</, 'die Einheit steht am obersten Wert');
+  assert.match(puls, /class="chart__axis-unit"> \/min</);
+  assert.equal((html.match(/health-chart__series-label/g) ?? []).length, 3, 'jede Kurve traegt ihren Namen');
+  assert.doesNotMatch(html, /health-chart__legend/, 'keine Farblegende mehr');
+  // Blutzucker zwischen 88 und 90: die Achse steht mindestens 40 mg/dL weit.
+  const zucker = [88, 90, 89].map((v, i) => ({ id: 10 + i, type: 'glucose', value_num: v, unit: 'mg/dL', measured_at: `2026-10-1${i + 1}T07:00` }));
+  const gl = health.chartMarkup(vitalMetric('glucose'), computeVitalSeries(zucker, { type: 'glucose', range: 'month', anchor: '2026-10-21' }));
+  const ticks = yTicks(gl);
+  assert.ok(Math.max(...ticks) - Math.min(...ticks) >= 40, `Achse ${ticks.join('/')} dramatisiert 2 mg/dL Rauschen`);
+  assert.ok(ticks.every((v) => Number.isInteger(v)), `keine halben Schritte: ${ticks.join('/')}`);
+});
+
+test('R21: der Laborbefund zeigt kein "-" fuer eine fehlende Bewertung, die Aktivitaetsachse nennt Minuten', () => {
+  const abraeumen = installMiniDom();
+  health.setViewStateForTest('labs', {
+    meId: 1, personId: 1, selectedReportId: 7,
+    reports: [{ id: 7, report_date: '2026-10-03', results: [
+      { id: 1, analyte: 'Ferritin', value_num: 24, unit: 'ng/mL', ref_low: 15, ref_high: 150, flag: null },
+      { id: 2, analyte: 'Vitamin D', value_num: 22, unit: 'ng/mL', ref_low: 30, ref_high: 100, flag: 'low' },
+    ] }],
+  });
+  try {
+    const html = health.labDetailMarkup();
+    assert.doesNotMatch(html, /health-lab-flag--none|<span class="health-lab-flag[^"]*">-<\/span>/);
+    assert.match(html, /health-lab-flag--low/, 'die Bewertung des Labors bleibt');
+  } finally {
+    health.setViewStateForTest('labs', { reports: [], selectedReportId: null, personId: null, meId: null });
+    abraeumen();
+  }
+  const summary = { buckets: [30, 0, 55, 48, 40, 32, 0].map((durationMin, i) => ({ date: `2026-10-1${5 + i}`, weekday: i, durationMin })) };
+  const svg = health.activityChartMarkup(summary);
+  const oben = svg.match(/class="chart__axis chart__axis--y"[^>]*>([^<]*)</)?.[1] ?? '';
+  assert.match(oben, /health\.activity\.unit\.min/, `oberster Achsenwert ohne Einheit: "${oben}"`);
 });

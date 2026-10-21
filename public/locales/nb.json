@@ -2157,7 +2157,7 @@
         "familyRoleGrandparent": "Besteforelder",
         "familyRoleRelative": "Slektning",
         "familyRoleOther": "Familiemedlem",
-        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser».",
+        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser». Syklusen er også skjult; den kan vises i barnets personlige innstillinger.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratorer kan administrere applikasjonsinnstillinger, integrasjoner, API-tokener og familiekontoer.",
         "systemAdminBadge": "Systemadministrator",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Kommende påminnelser",
                 "empty": "Ingen flere doser i dag"
+            },
+            "brief": {
+                "changes": "Siden siste måling: {{list}}.",
+                "latest": "Sist registrert: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} uendret"
             }
         },
         "vitals": {

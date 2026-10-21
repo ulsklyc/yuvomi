@@ -1616,6 +1616,22 @@ Apple Health "Durchsuchen"). Jeder Bereich hat eine Pfad-Adresse `/health/<berei
 Bereichsnamen als Titel auf; ab der Split-Schwelle stehen links Uebersicht und Bereiche
 (`--layout-nav-list`), rechts der Bereich (Baustein mit `address`).
 
+**Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
+EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
+veraendert hat, die drei zuletzt gemessenen Messarten ("Seit der letzten Messung: Gewicht -0,2 kg,
+Schlaf +30 Min. und ..."), ohne Vorwert der letzte Wert, ohne Messung kein Satz. Er nennt Richtung
+und Betrag, nie eine Bewertung - die Zahl gehoert der Person, das Urteil ihrer Aerztin. Mobil zieht er
+mit Personenwahl und "Heute faellig" vor die Bereichsliste. **Was nicht gemessen ist, bekommt keine
+Kachel:** keine grauen Felder mit "-" (ein Kind ohne Messung hatte neun, 145.200px² am Laptop), sondern
+EINE ruhige Zeile "Noch keine Messwerte" mit der Erfassen-Aktion (`.health-overview__empty-row`); die
+Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte". **Die Kurven sind
+ablesbar:** Mindestspanne je Messart (`minSpan` in utils/health-vitals.js, z. B. Blutzucker 40 mg/dL -
+drei Werte zwischen 88 und 90 standen vorher auf einer 0,5er-Achse), die Einheit am obersten
+Achsenwert ("120 mmHg", `chartGridMarkup({ unit })`), der Puls auf eigener Achse unter dem Blutdruck
+(`axes`), die Reihen direkt an ihrer Kurve beschriftet statt einer Farblegende. Die Aktivitaetsachse
+nennt Minuten; eine fehlende Bewertung im Laborbefund bleibt eine leere Zelle statt "-".
+Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
+
 Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in
 dieser Tabelle, keine Kernseite fuehrt `data`, eine Lesemass-Seite fuehrt `reading`/`form`, eine
 Liste-+-Detail-Seite haengt den Baustein ein (Ausnahmeliste, die nur schrumpft, bis die Module
@@ -2542,6 +2558,9 @@ Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
 (`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
 Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
 Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
+Seit R21 (D6) startet es ausserdem ohne Zyklus-Tab (`CHILD_START_PREFERENCES`): keine Rechte-Zeile,
+sondern die persoenliche Abwahl aus #760, die das Kind in seinen Einstellungen selbst umschaltet -
+geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6").
 
 - **Betraege fehlen am Server, nicht nur im Bild.** Ohne `housekeeping_view_amounts` kommen
   Satz, Summen, Zahlstatus und offener Lohn als `null`; die Seite zeigt dann statt

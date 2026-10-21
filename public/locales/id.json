@@ -2200,7 +2200,7 @@
         "familyRoleGrandparent": "Kakek/Nenek",
         "familyRoleRelative": "Kerabat",
         "familyRoleOther": "Anggota keluarga",
-        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”.",
+        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”. Siklus juga disembunyikan; dapat ditampilkan di pengaturan pribadi anak.",
         "systemAdminLabel": "Administrator sistem",
         "systemAdminHint": "Administrator sistem dapat mengelola pengaturan aplikasi, integrasi, token API, dan akun keluarga.",
         "systemAdminBadge": "Administrator sistem",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Pengingat berikutnya",
                 "empty": "Tidak ada minum obat lagi hari ini"
+            },
+            "brief": {
+                "changes": "Sejak pengukuran terakhir: {{list}}.",
+                "latest": "Terakhir dicatat: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} tidak berubah"
             }
         },
         "vitals": {

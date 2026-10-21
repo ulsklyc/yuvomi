@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "Avô/Avó",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro da família",
-        "childStartHint": "Contas infantis novas começam sem Orçamento e jejum e veem a Ajuda doméstica só para leitura, sem salários e pagamentos. Você pode mudar isso depois em “Funções e permissões”.",
+        "childStartHint": "Contas infantis novas começam sem Orçamento e jejum e veem a Ajuda doméstica só para leitura, sem salários e pagamentos. Você pode mudar isso depois em “Funções e permissões”. O ciclo também fica oculto; ele pode ser exibido nas configurações pessoais da criança.",
         "systemAdminLabel": "Administrador do sistema",
         "systemAdminHint": "Administradores do sistema podem gerenciar configurações, integrações, tokens de API e contas da família.",
         "systemAdminBadge": "Admin do sistema",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "Próximos lembretes",
                 "empty": "Nenhuma dose restante hoje"
+            },
+            "brief": {
+                "changes": "Desde a última medição: {{list}}.",
+                "latest": "Último registro: {{list}}.",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}} sem alterações"
             }
         },
         "vitals": {

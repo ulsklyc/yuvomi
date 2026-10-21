@@ -2046,7 +2046,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "亲属",
         "familyRoleOther": "家庭成员",
-        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。",
+        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。周期也会隐藏，可在孩子的个人设置中重新显示。",
         "systemAdminLabel": "系统管理员",
         "systemAdminHint": "系统管理员可以管理应用设置、集成、API 令牌和家庭账户。",
         "systemAdminBadge": "系统管理员",
@@ -4800,6 +4800,12 @@
             "reminders": {
                 "title": "接下来的提醒",
                 "empty": "今日没有更多服药"
+            },
+            "brief": {
+                "changes": "自上次测量以来：{{list}}。",
+                "latest": "最近记录：{{list}}。",
+                "item": "{{metric}} {{value}}",
+                "same": "{{metric}}无变化"
             }
         },
         "vitals": {

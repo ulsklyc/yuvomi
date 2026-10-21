@@ -27,6 +27,8 @@
 export const HOIST_PARTS = {
   person: '.health-person-switcher',
   banner: '.health-readonly-banner',
+  // Der Satz der Uebersicht (R21, D6) steht vor "Heute faellig".
+  brief: '.health-brief',
   due: '.health-overview__card--due',
   quick: '.health-overview__card--quick',
 };
@@ -40,7 +42,7 @@ export function hoistPlan({ split, overview, phone }) {
   if (split) return [{ part: 'person', slot: 'detail' }];
   if (!overview) return [{ part: 'person', slot: 'toolbar' }];
   if (!phone) return [];
-  return ['person', 'banner', 'due', 'quick'].map((part) => ({ part, slot: 'priority' }));
+  return ['person', 'banner', 'brief', 'due', 'quick'].map((part) => ({ part, slot: 'priority' }));
 }
 
 const homes = new WeakMap();

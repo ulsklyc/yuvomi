@@ -204,6 +204,18 @@ export const CHILD_START_PERMISSIONS = Object.freeze({
   capabilities: Object.freeze({ health_use_fasting: 'none', housekeeping_view_amounts: 'none' }),
 });
 
+// Persoenliche Vorgaben eines NEUEN Kinderkontos (R21, Critique 2026-10-21,
+// D6): der Zyklus-Tab startet ausgeblendet. Er ist kein Recht, sondern die
+// persoenliche Abwahl aus #760 (`health_cycle_enabled` je Person, gelesen von
+// `healthCycleViews()` in server/routes/preferences.js) - dieselbe Zeile, die
+// das Kind in seinen Einstellungen selbst umschaltet. Gemessen sah ein Kind
+// "Zyklus" und "Fasten" in der Bereichsliste, obwohl die Gesundheit selbst
+// sagt, beides sei Erwachsenensache; das Fasten nimmt schon die Capability
+// oben, der Zyklus braucht diese Zeile. Wie die Rechte: nur beim Anlegen, nie
+// rueckwirkend, und nur, wo noch nichts steht. Der Schluessel folgt
+// `userCfgKey()` (preferences.js): `<key>:user:<id>` in `sync_config`.
+export const CHILD_START_PREFERENCES = Object.freeze({ health_cycle_enabled: '0' });
+
 const MODULE_ACCESS_RANK = Object.freeze({ none: 0, read: 1, write: 2 });
 const CAPABILITY_ACCESS_RANK = Object.freeze({ none: 0, allow: 1 });
 
@@ -721,6 +733,13 @@ export function applyChildStartPermissions(database, user) {
     if (CAPABILITY_ACCESS_RANK[access] >= CAPABILITY_ACCESS_RANK[current.capabilities[key]]) continue;
     upsert.run(String(user.id), 'capability', key, access);
     written += 1;
+  }
+  const preference = database.prepare(`
+    INSERT INTO sync_config (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO NOTHING
+  `);
+  for (const [key, value] of Object.entries(CHILD_START_PREFERENCES)) {
+    written += preference.run(`${key}:user:${Number(user.id)}`, value).changes;
   }
   return written;
 }
