@@ -641,8 +641,11 @@ function localDate(str) {
   return zonedDateKey(str);
 }
 
+// Geprueft wird derselbe Wert, der zurueckgeht: nur so erkennt CodeQL den
+// verankerten Test als Bereinigung des URL-Parameters (js/xss, #2142).
 function validDateParam(value) {
-  return DATE_KEY_RE.test(String(value || '')) ? String(value) : '';
+  const text = String(value || '');
+  return DATE_KEY_RE.test(text) ? text : '';
 }
 
 /**
