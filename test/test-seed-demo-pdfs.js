@@ -26,6 +26,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 import { buildDemoPdf, toWinAnsi } from '../scripts/seed-demo-pdf.js';
+import { matchChecklistLine } from '../public/utils/markdown-checklist.js';
+import { CHILD_START_PERMISSIONS, CHILD_START_PREFERENCES } from '../server/permissions.js';
 import { freshTestDbPath } from './tmp-db.js';
 import { tempDir } from './tmp-dir.js';
 
@@ -183,6 +185,67 @@ test('Seed (de): Umlaute, ß und Klammern sind im Seed wirklich vertreten', () =
   const names = seed('de').filter((doc) => doc.mime_type === 'application/pdf').map((doc) => doc.name);
   assert.ok(names.some((name) => /[()]/.test(name)), `ein Titel mit Klammern: ${names.join(' | ')}`);
   assert.ok(names.some((name) => /[äöüß]/.test(name)), `ein Titel mit Umlaut: ${names.join(' | ')}`);
+});
+
+// ── Demo-Inhalt (R21, Critique 2026-10-21, D14) ──────────────────────────────
+// Der Seed ist die Grundlage der README-Screenshots. Er zeigte drei Dinge, die
+// es in einem echten Haushalt nicht gibt: eine "Checkliste" aus der Glyphe □
+// (Text, kein Kaestchen), englische Darreichungsformen in der deutschen Demo
+// und Kinderkonten ohne die Startrechte, die die App jedem neuen Kind gibt -
+// Emma sah Kontostaende, Loehne der Haushaltshilfe, Zyklus und Fasten.
+
+function readSeeded(locale, query) {
+  seed(locale);
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    return query(db);
+  } finally {
+    db.close();
+  }
+}
+
+test('Seed (de): Listen in Notizen sind Markdown, die Gartenliste hakt man ab', () => {
+  const notes = readSeeded('de', (db) => db.prepare('SELECT title, content FROM notes').all());
+  const glyphs = notes.filter((n) => /^\s*[□☐☑✓✔•]/mu.test(n.content)).map((n) => n.title);
+  assert.deepEqual(glyphs, [], `Notizen mit Glyphen statt Markdown-Liste: ${glyphs.join(', ')}`);
+  const checklists = notes
+    .map((n) => n.content.split('\n').map(matchChecklistLine).filter(Boolean))
+    .filter((items) => items.length >= 3);
+  assert.ok(checklists.length >= 1, 'keine Notiz mit einer echten Checkliste (- [ ])');
+  const items = checklists.flat();
+  assert.ok(items.some((i) => i.checked) && items.some((i) => !i.checked),
+    'die Checkliste zeigt beide Zustaende, abgehakt und offen');
+});
+
+test('Seed (de): Darreichungsformen stehen auf Deutsch', () => {
+  const forms = readSeeded('de', (db) => db.prepare('SELECT form FROM medications').all().map((r) => r.form));
+  assert.ok(forms.length >= 3, `erwartet mehrere Medikamente, gefunden ${forms.length}`);
+  const english = forms.filter((f) => /^(tablets?|capsules?|drops|syrup|spray)$/i.test(f));
+  assert.deepEqual(english, [], `englische Formen in der deutschen Demo: ${english.join(', ')}`);
+});
+
+test('Seed: Kinder starten mit den Kinder-Startrechten der App', () => {
+  const { children, rows, prefs } = readSeeded('en', (db) => ({
+    children: db.prepare("SELECT id, username FROM users WHERE family_role = 'child'").all(),
+    rows: db.prepare("SELECT subject_id, resource_type, resource_key, access FROM access_permissions WHERE subject_type = 'user'").all(),
+    prefs: db.prepare('SELECT key, value FROM sync_config').all(),
+  }));
+  assert.ok(children.length >= 2, `erwartet zwei Kinderkonten, gefunden ${children.length}`);
+  for (const child of children) {
+    const mine = rows.filter((r) => r.subject_id === String(child.id));
+    for (const [key, access] of Object.entries(CHILD_START_PERMISSIONS.modules)) {
+      assert.ok(mine.some((r) => r.resource_type === 'module' && r.resource_key === key && r.access === access),
+        `${child.username}: Modul ${key} startet nicht mit ${access}`);
+    }
+    for (const [key, access] of Object.entries(CHILD_START_PERMISSIONS.capabilities)) {
+      assert.ok(mine.some((r) => r.resource_type === 'capability' && r.resource_key === key && r.access === access),
+        `${child.username}: Faehigkeit ${key} startet nicht mit ${access}`);
+    }
+    for (const [key, value] of Object.entries(CHILD_START_PREFERENCES)) {
+      const row = prefs.find((p) => p.key === `${key}:user:${child.id}`);
+      assert.equal(row?.value, value, `${child.username}: Vorgabe ${key} fehlt`);
+    }
+  }
 });
 
 // ── Verschlüsselte Datenbank (#2114) ─────────────────────────────────────────

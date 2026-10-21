@@ -9,7 +9,8 @@
  * installation works the same as an unencrypted one) and migrates the schema,
  * so a database the server has not opened yet works too. `--db` wins over
  * DB_PATH from the environment or `.env`. Populates EVERY module:
- *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children), maria (housekeeper)
+ *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children, with the
+ *     child start permissions the app gives every new child), maria (housekeeper)
  *   - Tasks (categories, priorities, statuses, start/due dates, multi-assignment, tags, points)
  *   - Calendar events (appointments, activities, recurring, assignments)
  *   - Meals (full week, all slots incl. today) linked to recipes,
@@ -49,6 +50,7 @@ import { resolve } from 'node:path';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct } from '../server/services/pantry-products.js';
+import { applyChildStartPermissions } from '../server/permissions.js';
 
 const args = process.argv.slice(2);
 const dbIdx = args.indexOf('--db');
@@ -398,6 +400,14 @@ const lindaId   = insertUser.run('linda', 'Linda Johnson', pw, 'admin',  'mom', 
 const emmaId  = insertUser.run('emma',  'Emma Johnson',  pw, 'member', 'child', '#EC4899').lastInsertRowid;
 const leoId   = insertUser.run('leo',   'Leo Johnson',   pw, 'member', 'child', '#F97316').lastInsertRowid;
 const mariaId = insertUser.run('maria', 'Maria Silva',   pw, 'member', 'other', '#7C3AED').lastInsertRowid;
+// Die Kinder entstehen wie in der App (POST /auth/users, Einladung): direkt
+// nach dem Konto die Kinder-Startrechte (server/permissions.js) - kein Budget,
+// Haushaltshilfe nur lesend und ohne Betraege, kein Fasten, Zyklus aus. Ohne
+// diesen Schritt zeigte die Demo ein Kinderkonto, das es so nie gaebe: Emma
+// sah Kontostaende, Loehne und den Zyklus (Critique 2026-10-21, D14).
+for (const childId of [emmaId, leoId]) {
+  applyChildStartPermissions(db, { id: Number(childId), role: 'member', family_role: 'child' });
+}
 console.log(`  alex=${alexId} linda=${lindaId} emma=${emmaId} leo=${leoId} maria=${mariaId}`);
 
 // ── Tasks ────────────────────────────────────────────────────────────────────
@@ -912,8 +922,8 @@ console.log('Inserting notes…');
 const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned, created_by) VALUES (?, ?, ?, ?, ?)');
 [
   [L('Holiday Checklist 🌍', 'Urlaubs-Checkliste 🌍'),
-   L('Passports (exp. 2028)\nTravel insurance - check!\nEuro cash - €300\nBook airport parking\nAsk Mike to water the plants\nPack sunscreen SPF 50',
-     'Reisepässe (gültig bis 2028)\nAuslandskrankenschein - prüfen!\nBargeld - 300 €\nParkplatz am Flughafen buchen\nMike wegen Blumengießen fragen\nSonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
+   L('- [x] Passports (exp. 2028)\n- [x] Travel insurance\n- [ ] Euro cash - €300\n- [ ] Book airport parking\n- [ ] Ask Mike to water the plants\n- [ ] Pack sunscreen SPF 50',
+     '- [x] Reisepässe (gültig bis 2028)\n- [x] Auslandskrankenschein\n- [ ] Bargeld - 300 €\n- [ ] Parkplatz am Flughafen buchen\n- [ ] Mike wegen Blumengießen fragen\n- [ ] Sonnencreme LSF 50 einpacken'), '#0EA5E9', 1, alexId],
   [L('WiFi & Smart Home', 'WLAN & Smart Home'),
    L('WiFi: Yuvomi_Home_5G (password in the router app)\nPhilips Hue: bridge 192.168.1.42\nThermostat: eco mode 18°C\nRouter admin: fritz.box',
      'WLAN: Yuvomi_Home_5G (Passwort in der Router-App)\nPhilips Hue: Bridge 192.168.1.42\nThermostat: Eco-Modus 18 °C\nRouter-Verwaltung: fritz.box'), '#F59E0B', 1, alexId],
@@ -930,11 +940,14 @@ const insertNote = db.prepare('INSERT INTO notes (title, content, color, pinned,
    L('Next service: this June (60,000 km)\nMOT due: September\nWinter tyres: stored at AutoHaus König\nInsurance renewal: October',
      'Nächste Inspektion: im Juni (60.000 km)\nTÜV fällig: September\nWinterreifen: eingelagert beim AutoHaus König\nVersicherungswechsel: Oktober'), '#6B7280', 0, alexId],
   [L('Book Recommendations', 'Buchempfehlungen'),
-   L('Reading: "Atomic Habits" - James Clear\nWishlist:\n• The Thursday Murder Club\n• Lessons in Chemistry\n• Tomorrow, and Tomorrow, and Tomorrow',
-     'Gerade dabei: „Die 1%-Methode" - James Clear\nWunschliste:\n• Der Donnerstagsmordclub\n• Eine Frage der Chemie\n• Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
+   L('Reading: "Atomic Habits" - James Clear\nWishlist:\n- The Thursday Murder Club\n- Lessons in Chemistry\n- Tomorrow, and Tomorrow, and Tomorrow',
+     'Gerade dabei: „Die 1%-Methode" - James Clear\nWunschliste:\n- Der Donnerstagsmordclub\n- Eine Frage der Chemie\n- Morgen, morgen und wieder morgen'), '#8B5CF6', 0, lindaId],
   [L('Garden To-Do', 'Garten-Aufgaben'),
-   L('□ Re-pot herbs (basil, rosemary)\n□ Fix fence panel (3rd from gate)\n□ Order mulch for the flower beds\n□ Plant tulip bulbs before November',
-     '□ Kräuter umtopfen (Basilikum, Rosmarin)\n□ Zaunfeld reparieren (3. vom Tor)\n□ Rindenmulch für die Beete bestellen\n□ Tulpenzwiebeln vor November setzen'), '#10B981', 0, alexId],
+   // Eine echte Markdown-Checkliste (`- [ ]`), wie sie der Knopf im Editor
+   // schreibt: nur dann zeichnet die Notiz Kaestchen, die man abhaken kann
+   // (utils/markdown-checklist.js). Die Glyphe □ war Text.
+   L('- [x] Re-pot herbs (basil, rosemary)\n- [ ] Fix fence panel (3rd from gate)\n- [ ] Order mulch for the flower beds\n- [ ] Plant tulip bulbs before November',
+     '- [x] Kräuter umtopfen (Basilikum, Rosmarin)\n- [ ] Zaunfeld reparieren (3. vom Tor)\n- [ ] Rindenmulch für die Beete bestellen\n- [ ] Tulpenzwiebeln vor November setzen'), '#10B981', 0, alexId],
 ].forEach(row => insertNote.run(...row));
 
 // ── Birthdays ────────────────────────────────────────────────────────────────
@@ -1326,14 +1339,14 @@ const insertMedLog = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?)
 `);
 // Daily supplements with a schedule + a week of adherence logs (evening dose still open today)
-const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), 'tablet', 1, 0, 42,
+const vitDId = insertMed.run(lindaId, L('Vitamin D3', 'Vitamin D3'), L('1000 IU', '1000 IE'), L('tablet', 'Tablette'), 1, 0, 42,
   L('tablets', 'Tabletten'), 10, L('With breakfast', 'Zum Frühstück')).lastInsertRowid;
 const vitDSched = insertMedSched.run(vitDId, '08:00', 127, 1, daysFromNow(-40)).lastInsertRowid;
-const ironId = insertMed.run(lindaId, L('Iron (Ferrous bisglycinate)', 'Eisen (Eisenbisglycinat)'), '25 mg', 'capsule', 1, 0, 18,
+const ironId = insertMed.run(lindaId, L('Iron (Ferrous bisglycinate)', 'Eisen (Eisenbisglycinat)'), '25 mg', L('capsule', 'Kapsel'), 1, 0, 18,
   L('capsules', 'Kapseln'), 14, L('Low ferritin - evening, away from dairy', 'Niedriges Ferritin - abends, nicht mit Milchprodukten')).lastInsertRowid;
 const ironSched = insertMedSched.run(ironId, '20:00', 127, 1, daysFromNow(-25)).lastInsertRowid;
 // As-needed medication (no schedule)
-insertMed.run(lindaId, 'Ibuprofen', '400 mg', 'tablet', 1, 1, 20,
+insertMed.run(lindaId, 'Ibuprofen', '400 mg', L('tablet', 'Tablette'), 1, 1, 20,
   L('tablets', 'Tabletten'), 5, L('For headaches - max 3/day', 'Bei Kopfschmerzen - höchstens 3 pro Tag'));
 // Adherence logs: the morning dose is taken every day INCLUDING today, only the
 // evening iron is still open today. The screenshot clock stands at 18:10: an

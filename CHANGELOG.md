@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The demo household looks like one the app would create.** Emma and Leo start with the
+  permissions every new child account gets - no budget, household help without amounts, no fasting
+  and the cycle tab off - so the demo no longer shows a child account with bank balances and wages.
+  The holiday and garden notes are real checklists you can tick off, and the German demo names
+  medication forms in German.
+
 - **Events in the calendar month have room above and below their title.** The tinted bars in a
   month cell sat with their text flush against their top and bottom edge; they are now one pixel
   taller on each side, and multi-day bars grow with them.
