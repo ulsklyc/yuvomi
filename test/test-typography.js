@@ -1136,7 +1136,8 @@ test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () 
   const rolle = typo.find((rule) => !rule.at.length && sels(rule).includes('.u-meta'));
   assert.ok(rolle, '.u-meta steht in typography.css');
   assert.match(rolle.body, /font-size:\s*var\(--type-secondary\)/);
-  const SEKUNDAER = ['.u-meta', '.empty-state__description', '.document-card__description', '.contact-card__sub', '.task-comments__status'];
+  // R21 S9b: die Beschreibung einer Einstellungskarte stand noch bei 14.
+  const SEKUNDAER = ['.u-meta', '.empty-state__description', '.document-card__description', '.settings-card-description', '.contact-card__sub', '.task-comments__status'];
   for (const sel of SEKUNDAER) assert.ok(sels(rolle).includes(sel), `${sel} nimmt die Sekundaerrolle`);
 
   const VARIANTE = new Map([['.empty-state--compact .empty-state__description', 'var(--type-caption)']]);

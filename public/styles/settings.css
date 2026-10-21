@@ -2537,7 +2537,6 @@
    -------------------------------------------------------- */
 
 .settings-card-description {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-4);
   line-height: 1.5;

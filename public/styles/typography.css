@@ -526,6 +526,7 @@
 .u-meta,
 .empty-state__description,
 .document-card__description,
+.settings-card-description,
 .contact-card__sub,
 .task-comments__status {
   font-size: var(--type-secondary);
