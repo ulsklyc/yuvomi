@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Red in the budget means something needs doing.** The statistics showed seven red amounts
+  for categories that simply cost a little more than last month - "+25.00 €" while 25 of 80 € were
+  spent. Changes against the previous month now show in grey with their sign and arrow, here and
+  on the budget cards; red marks a category only once its plan is exceeded. A credit card's usual
+  minus is no longer red, only a card over its limit; any other account in the minus stays red.
+  What you owe in shared expenses, on its card and on the Overview tile, is shown in the normal
+  text colour.
+
 - **Sign-in and the welcome tour speak to every household.** "Welcome back to your family
   planner" left out everyone who lives alone or as a couple. Sign-in now says "Welcome back. Your
   home in one place.", and the first step of the tour names tasks, calendar and shopping for a

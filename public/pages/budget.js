@@ -1374,16 +1374,16 @@ function renderBody() {
       <div class="metric-card metric-card--income">
         <div class="metric-card__label">${t('budget.income')}</div>
         <div class="metric-card__value">${amountByRole(s.income, 'total').text}</div>
-        ${p ? renderTrend(s.income, p.income, prevLabel, 'higher') : ''}
+        ${p ? renderTrend(s.income, p.income, prevLabel) : ''}
       </div>`;
   // Ausgaben-Trend im Betragsraum (Math.abs), wie die Zahl auf der Karte:
   // die API liefert expenses signiert negativ, aber „+954 € ggü. Jul" muss
-  // hier „954 € mehr ausgegeben" heißen. Valenz: weniger ist besser.
+  // hier „954 € mehr ausgegeben" heißen.
   const expensesCard = `
       <div class="metric-card metric-card--expenses">
         <div class="metric-card__label">${t('budget.expenses')}</div>
         <div class="metric-card__value">${amountByRole(s.expenses, 'total').text}</div>
-        ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel, 'lower') : ''}
+        ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel) : ''}
       </div>`;
   // Rolle `balance`: hier trägt die Zahl selbst die Richtung.
   // DER SALDO FUEHRT (Critique R18): eine Display-Stufe in der Seitenleiste,
@@ -1392,7 +1392,7 @@ function renderBody() {
       <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance').text)}">
         <div class="metric-card__label">${t('budget.balance')}</div>
         <div class="metric-card__value">${amountByRole(s.balance, 'balance').text}</div>
-        ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel, 'higher') : ''}
+        ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel) : ''}
       </div>`;
 
   const chartBlocks = categoryBlocks(s.byCategory);
@@ -2738,6 +2738,21 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
   }).join('');
 }
 
+/**
+ * Ton des Kontostands (D8): `negative` nur, wo ein Minus eine Handlung
+ * verlangt - ein Konto im Minus, eine Kreditkarte ueber ihrem Rahmen. Die
+ * Kreditkarte im ueblichen Minus steht in Textfarbe (`neutral`).
+ * @param {{type?: string, current_balance: number, available_limit?: number|null}} a
+ * @returns {string}
+ */
+function accountBalanceClass(a) {
+  if (a.type === 'credit') {
+    return a.available_limit != null && Number(a.available_limit) < 0
+      ? 'budget-account__balance--negative' : 'budget-account__balance--neutral';
+  }
+  return a.current_balance >= 0 ? 'budget-account__balance--positive' : 'budget-account__balance--negative';
+}
+
 function renderAccountsPage() {
   // Bei `budget: read` bleiben Saldo, Nettovermoegen, Archiv-Umschalter und der
   // Kontoauszug (Drilldown) - alles Lesen. Anlegen und Bearbeiten gehen.
@@ -2818,7 +2833,11 @@ function renderAccountsPage() {
   }
 
   const cards = visible.map((a) => {
-    const balClass = a.current_balance >= 0 ? 'budget-account__balance--positive' : 'budget-account__balance--negative';
+    // DIE KREDITKARTE IST KEIN KONTO IM MINUS (Critique R21, D8). Ihr Saldo ist
+    // ihrer Natur nach negativ - die offene Rechnung -, und er stand dauerhaft
+    // rot. Rot traegt sie erst, wenn der gepflegte Rahmen ueberschritten ist
+    // (`available_limit` unter null); jedes andere Konto im Minus bleibt rot.
+    const balClass = accountBalanceClass(a);
     const icon = ACCOUNT_TYPE_ICONS[a.type] || ACCOUNT_TYPE_ICONS.other;
     const archivedBadge = a.archived
       ? `<span class="budget-account__badge">${t('budget.archivedBadge')}</span>`
@@ -3905,22 +3924,24 @@ function renderLoanCard(loan) {
 }
 
 /**
- * Rendert eine Trend-Zeile im Vergleich zum Vormonat, in zwei getrennten
- * Kanälen (Critique 2026-08-10, P0):
- *   - PFEIL und Vorzeichen zeigen die Richtung der Zahl auf der Karte. Die
- *     Karten zeigen Beträge („die Richtung steht im Label"), also rechnet auch
- *     das Delta im Betragsraum - vorher lief es über die signierte Rohsumme,
- *     und „-954 € ggü. Jul" unter „Ausgaben 3.000 €" behauptete weniger
- *     Ausgaben, wo 954 € mehr ausgegeben wurden.
- *   - Die FARBE trägt allein die Valenz: `betterWhen` sagt pro Kennzahl, ob
- *     mehr oder weniger die gute Richtung ist. Vorher kodierte die Klasse das
- *     Vorzeichen der Differenz, und gesunkene Ausgaben lasen sich als Alarm.
+ * Rendert eine Trend-Zeile im Vergleich zum Vormonat (Critique 2026-08-10, P0):
+ * PFEIL und Vorzeichen zeigen die Richtung der Zahl auf der Karte. Die Karten
+ * zeigen Beträge („die Richtung steht im Label"), also rechnet auch das Delta
+ * im Betragsraum - vorher lief es über die signierte Rohsumme, und „-954 €
+ * ggü. Jul" unter „Ausgaben 3.000 €" behauptete weniger Ausgaben, wo 954 €
+ * mehr ausgegeben wurden.
+ *
+ * KEINE VALENZFARBE (Critique R21, D8). Bis dahin faerbte `betterWhen` das
+ * Delta: mehr Ausgaben rot, weniger gruen. Eine Veraenderung ist aber keine
+ * Warnung - gestiegene Ausgaben bei 25 von 80 € Plan lasen sich als Alarm,
+ * und ein echter (ueberschrittener Plan, Konto im Minus) hob sich nicht mehr
+ * ab. Die Zeile steht in der Sekundaerfarbe; Vorzeichen und Pfeil sagen die
+ * Richtung (DESIGN.md „Rot ist eine Warnung").
  * @param {number} current   Aktueller Wert (im Anzeigeraum der Karte)
  * @param {number} prev      Vormonatswert (im selben Raum)
  * @param {string} prevLabel Kurzname des Vormonats (z.B. "Mär")
- * @param {'higher'|'lower'} betterWhen Welche Richtung die gute ist
  */
-function renderTrend(current, prev, prevLabel, betterWhen = 'higher') {
+function renderTrend(current, prev, prevLabel) {
   // Auf die Waehrung gerundet (Critique R19, roundToCurrency): die feste
   // Schwelle 0,005 kannte nur Waehrungen mit zwei Nachkommastellen.
   const delta = roundToCurrency(current - prev, state.currency);
@@ -3930,12 +3951,11 @@ function renderTrend(current, prev, prevLabel, betterWhen = 'higher') {
     });
   }
   // Rolle `flow`: eine Veränderung gegenüber dem Vormonat trägt immer ein
-  // Vorzeichen, aus demselben Zahlformat wie die Buchungen selbst. Valenz und
-  // Pfeil entscheidet utils/metric-card.js (Farbe = Valenz via betterWhen,
-  // Pfeil = Richtung) - die Trennung der beiden Kanäle ist dort API.
+  // Vorzeichen, aus demselben Zahlformat wie die Buchungen selbst. Den Pfeil
+  // setzt utils/metric-card.js; ohne `betterWhen` bleibt die Farbe neutral.
   const deltaText = amountByRole(delta, 'flow').text;
   return trendMarkup({
-    delta, betterWhen,
+    delta,
     text: esc(t('budget.trendDelta', { amount: deltaText, month: prevLabel })),
   });
 }

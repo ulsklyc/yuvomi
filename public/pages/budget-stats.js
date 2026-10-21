@@ -285,8 +285,8 @@ function renderCatBars() {
   // Zeitraum exakt mit dem stetigen Monatsplan (kein irreführendes Hochskalieren).
   const plans = view.data.range === 'month' ? (view.data.plans || {}) : {};
   const blocks = [
-    { kind: 'expenses', labelKey: 'budget.statsExpenses', betterWhen: 'lower' },
-    { kind: 'income', labelKey: 'budget.statsIncome', betterWhen: 'higher' },
+    { kind: 'expenses', labelKey: 'budget.statsExpenses' },
+    { kind: 'income', labelKey: 'budget.statsIncome' },
   ].map((b) => {
     const now = categoryAmounts(view.data.byCategory, b.kind);
     const before = categoryAmounts(view.prev?.byCategory, b.kind);
@@ -298,7 +298,7 @@ function renderCatBars() {
   if (!blocks.length) return;
 
   const colors = categoryColorIndex(view.data.byCategory, view.ctx.expenseCategoryKeys);
-  const html = blocks.map(({ kind, labelKey, betterWhen, rows }) => {
+  const html = blocks.map(({ kind, labelKey, rows }) => {
     // DAS EIGENE MAXIMUM DES BLOCKS, wie im Monats-Diagramm - samt der Ziele
     // (Critique R19): eine Zielmarke ueber dem groessten Betrag klemmte vorher
     // per Math.min an der Kante und sagte damit "Ziel erreicht", wo noch Luft war.
@@ -317,8 +317,12 @@ function renderCatBars() {
       const targetMarker = target != null
         ? `<div class="budget-bar-row__target" style="--target-pos:${(target / max).toFixed(4)}" aria-hidden="true"></div>`
         : '';
+      // ROT ERST AM UEBERSCHRITTENEN PLAN (Critique R21, D8): das "von 80 €"
+      // traegt die Warnung, nicht das Delta daneben. Der Text sagt es mit
+      // (95 € von 80 €, im Screenreader samt Prozent) - nie die Farbe allein.
+      const over = target != null && target > 0 && Math.abs(r.amount) > target;
       const targetText = target != null
-        ? `<span class="budget-bar-row__of"><span aria-hidden="true">${view.ctx.esc(t('budget.planTargetOf', { amount: view.ctx.formatAmount(target) }))}</span><span class="sr-only">${view.ctx.esc(t('budget.planTargetSr', {
+        ? `<span class="budget-bar-row__of${over ? ' budget-bar-row__of--over' : ''}"><span aria-hidden="true">${view.ctx.esc(t('budget.planTargetOf', { amount: view.ctx.formatAmount(target) }))}</span><span class="sr-only">${view.ctx.esc(t('budget.planTargetSr', {
           amount: view.ctx.formatAmount(target),
           percent: target > 0 ? sharePercent(Math.abs(r.amount), target) : '-',
         }))}</span></span>`
@@ -329,8 +333,11 @@ function renderCatBars() {
       // Auf die Waehrung gerundet (Critique R19): sonst trug eine Differenz
       // von 2e-14 einen roten Pfeil neben "0,00 €".
       const delta = roundToCurrency(Math.abs(r.amount) - Math.abs(r.prev), view.ctx.currency);
+      // KEINE VALENZFARBE (Critique R21, D8): "+25,00 €" bei 25 von 80 € Plan
+      // stand rot - siebenmal auf einer Seite. Das Delta ist Sekundaerfarbe mit
+      // Vorzeichen und Pfeil; Rot traegt der ueberschrittene Plan (oben).
       const deltaHtml = (hasPrev
-        ? trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })
+        ? trendMarkup({ delta, text: view.ctx.esc(signed(delta)) })
         : '');
       // Ausgaben: Farbe des Donut-Segments und der Anteil als Text - die Farbe
       // ist Zuordnung, der Anteil die Aussage (auch ohne Farbsehen lesbar).
@@ -616,8 +623,8 @@ function renderTrendChart() {
       </div>
       <div class="budget-stats__readout" id="budget-stats-readout" aria-hidden="true"></div>
       <div class="budget-stats__legend">
-        ${legendItemHtml('income', 'budget.statsIncome', trendLegendFigures(incomes, rawIncomes, markIndex, todayIndex >= 0), comparison?.income, 'higher')}
-        ${legendItemHtml('expense', 'budget.statsExpenses', trendLegendFigures(expenses, rawExpenses, markIndex, todayIndex >= 0), comparison && Math.abs(comparison.expenses), 'lower')}
+        ${legendItemHtml('income', 'budget.statsIncome', trendLegendFigures(incomes, rawIncomes, markIndex, todayIndex >= 0), comparison?.income)}
+        ${legendItemHtml('expense', 'budget.statsExpenses', trendLegendFigures(expenses, rawExpenses, markIndex, todayIndex >= 0), comparison && Math.abs(comparison.expenses))}
       </div>
       </div>
     </div>`);
@@ -848,17 +855,18 @@ function trendLegendFigures(shownArr, rawArr, markIndex, running) {
   return { total, value, planned: planned > 0 ? planned : 0 };
 }
 
-function legendItemHtml(kind, labelKey, { total, value, planned }, previous, betterWhen) {
+function legendItemHtml(kind, labelKey, { total, value, planned }, previous) {
   const plannedHtml = planned > 0
     ? ` <span class="budget-stats__legend-planned">${view.ctx.esc(t('budget.statsPlannedRest', { amount: fmtAmount(planned) }))}</span>`
     : '';
-  return `<span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--${kind}"></i>${t(labelKey)} · ${fmtAmount(value)}${plannedHtml}${totalTrend(total, previous, betterWhen)}</span>`;
+  return `<span class="budget-stats__legend-item"><i class="budget-stats__swatch budget-stats__swatch--${kind}"></i>${t(labelKey)} · ${fmtAmount(value)}${plannedHtml}${totalTrend(total, previous)}</span>`;
 }
 
-function totalTrend(current, previous, betterWhen) {
+function totalTrend(current, previous) {
   if (previous == null) return '';
   const delta = roundToCurrency(current - previous, view.ctx.currency);
-  return ` ${trendMarkup({ delta, betterWhen, text: view.ctx.esc(signed(delta)) })}`;
+  // Sekundaerfarbe mit Vorzeichen und Pfeil, keine Valenz (Critique R21, D8).
+  return ` ${trendMarkup({ delta, text: view.ctx.esc(signed(delta)) })}`;
 }
 
 function wireTrendPoints(host, series, labelKey, raw = series, startIndex = null) {

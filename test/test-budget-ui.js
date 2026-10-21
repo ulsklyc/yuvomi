@@ -3241,7 +3241,7 @@ test('Statistik wiederholt die Uebersicht nicht: Vergleich je Kategorie und aufs
     'die drei Kennzahl-Karten der Uebersicht standen hier 1:1 noch einmal');
   assert.match(src, /api\.get\(`\/budget\/stats\?range=\$\{view\.range\}&anchor=\$\{addLocalDays\(data\.from, -1\)\}/,
     'der Vorzeitraum kommt vom selben Endpunkt, verankert am Tag davor');
-  assert.match(src, /trendMarkup\(\{ delta, betterWhen/, 'die Veraenderung spricht die Trend-Sprache der Karten');
+  assert.match(src, /trendMarkup\(\{ delta, text/, 'die Veraenderung spricht die Trend-Sprache der Karten');
   assert.match(src, /budgetMaxOwn|const max = Math\.max\(\.\.\.rows\.map/, 'jeder Block nach seinem eigenen Maximum');
   assert.match(src, /const cumulative = s\.length > 0 && /);
   assert.match(src, /cumulative \? running\(rawIncomes\) : rawIncomes/);
@@ -5064,7 +5064,9 @@ test('R16 Budget: "Darlehenstransaktionen" ist eine Ueberschrift auf der Buehne,
 test('R16 Aufteilung: null ist weder Gewinn noch Schuld - der Ton haengt am Betrag', () => {
   const src = read('../public/pages/split-expenses.js');
   assert.match(src, /class="metric-card\$\{owed\.length \? ' metric-card--positive' : ''\}"/);
-  assert.match(src, /class="metric-card\$\{owing\.length \? ' metric-card--negative' : ''\}"/);
+  // Die Schuld traegt seit D8 (Critique R21) gar keinen Ton mehr - weder bei
+  // null noch mit Betrag (siehe "D8: eine Schuld in der Aufteilung").
+  assert.match(src, /<div class="metric-card">\s*<div class="metric-card__label">\$\{esc\(owingLabel\)\}/);
   assert.doesNotMatch(src, /class="metric-card metric-card--(?:positive|negative)">\s*<div class="metric-card__label">\$\{t\('splitExpenses\.you/);
 });
 
@@ -5747,7 +5749,8 @@ test('R17/E5: Kurzzeile und Karten zeigen den Saldo der GEWAEHLTEN Gruppe, die S
     splitGlance.renderSummaryForTest(container);
     assert.match(boxen.glance.html, /24,14/, 'die Kurzzeile nennt den Saldo der Gruppe');
     assert.doesNotMatch(boxen.glance.html, /196,14/, 'nicht die Summe aller Gruppen');
-    assert.match(boxen.summary.html, /metric-card metric-card--negative">\s*<div class="metric-card__label">splitExpenses\.youOwe<\/div>\s*<div class="metric-card__value">24,14/);
+    // D8 (Critique R21): eine Schuld in der Gruppe ist kein Alarm - Textfarbe.
+    assert.match(boxen.summary.html, /<div class="metric-card">\s*<div class="metric-card__label">splitExpenses\.youOwe<\/div>\s*<div class="metric-card__value">24,14/);
     assert.doesNotMatch(boxen.summary.html, /196,14/);
     assert.equal(boxen.total.hidden, false);
     assert.match(boxen.total.html, /splitExpenses\.allGroups<\/span>[\s\S]*splitExpenses\.youOwe <strong>196,14/, 'die Summe ueber alle Gruppen steht in der Gruppenwahl');
@@ -7220,4 +7223,63 @@ test('Erfolg nach Dialogwechsel - jeder Weg schliesst nur mit dem Kontext von VO
     globalThis.window.yuvomi.showToast = vorherToast;
     Object.assign(s, zuvor);
   }
+});
+
+// --------------------------------------------------------
+// D8 (Critique R21): Rot nur fuer echte Ueberziehung oder Fehler
+// --------------------------------------------------------
+
+/* SIEBENMAL ROT IN DER STATISTIK. Jede Kategorie, die mehr kostete als im
+ * Vormonat, trug ihr Delta in --color-danger - "+25,00 €" bei 25 von 80 €
+ * Plan. Eine Veraenderung ist keine Warnung: Deltas und Richtungen stehen in
+ * der Sekundaerfarbe mit Vorzeichen und Pfeil (trendMarkup ohne Valenz). Rot
+ * traegt erst ein ueberschrittener Plan, und der steht dann am "von 80 €". */
+test('D8: Veraenderungen im Budget sind Sekundaerfarbe, Rot erst am ueberschrittenen Plan', () => {
+  const src = withoutCommentsKeepingLines(stats);
+  const calls = [...src.matchAll(/trendMarkup\(\{[^}]*\}\)/g)].map((m) => m[0]);
+  assert.ok(calls.length >= 2, `die Statistik ruft trendMarkup nicht mehr: ${calls.length}`);
+  for (const call of calls) assert.doesNotMatch(call, /betterWhen/, `${call}: ein Delta traegt keine Valenzfarbe`);
+  const own = withoutCommentsKeepingLines(budget);
+  const trend = own.slice(own.indexOf('function renderTrend('), own.indexOf('function formatEntryDate('));
+  assert.ok(trend.length > 50, 'renderTrend nicht gefunden');
+  assert.doesNotMatch(trend, /betterWhen/, 'die Kennzahlkarten faerben ihr Delta nicht mehr nach Valenz');
+  // Der ueberschrittene Plan: Klasse am "von"-Text, Rot in der Regel dazu.
+  assert.match(src, /budget-bar-row__of\$\{over \? ' budget-bar-row__of--over' : ''\}/, 'der Plan sagt, wenn er ueberschritten ist');
+  assert.match(src, /const over = target != null && target > 0 && Math\.abs\(r\.amount\) > target;/);
+  const rule = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-bar-row__of--over');
+  assert.ok(rule, '.budget-bar-row__of--over fehlt in budget.css');
+  assert.match(rule.body, /color:\s*var\(--color-danger\)/);
+});
+
+/* DIE KREDITKARTE STAND DAUERHAFT ROT. Ihr Saldo ist ihrer Natur nach ein
+ * Minus (-560,98 €) - das ist kein Konto im Minus, sondern die offene
+ * Rechnung. Rot traegt sie erst, wenn der gepflegte Rahmen ueberschritten
+ * ist; jedes andere Konto im Minus bleibt rot (D8). */
+test('D8: eine Kreditkarte im Minus ist nicht rot, erst ueber dem Rahmen', () => {
+  const zuvor = { accounts: budgetUi.state.accounts, netWorth: budgetUi.state.netWorth };
+  try {
+    budgetUi.state.netWorth = 100;
+    const row = (account) => {
+      budgetUi.state.accounts = [{ id: 1, name: 'Konto', starting_balance: 0, archived: 0, ...account }];
+      const html = budgetUi.renderAccountsPage();
+      return /budget-account__balance (budget-account__balance--[a-z]+)/.exec(html)?.[1];
+    };
+    assert.equal(row({ type: 'credit', current_balance: -560.98 }), 'budget-account__balance--neutral', 'die offene Kartenrechnung ist kein Alarm');
+    assert.equal(row({ type: 'credit', current_balance: -560.98, available_limit: 439.02 }), 'budget-account__balance--neutral');
+    assert.equal(row({ type: 'credit', current_balance: -1200, available_limit: -200 }), 'budget-account__balance--negative', 'ueber dem Rahmen ist sie rot');
+    assert.equal(row({ type: 'checking', current_balance: -1.6 }), 'budget-account__balance--negative', 'ein Girokonto im Minus bleibt rot');
+    assert.equal(row({ type: 'savings', current_balance: 5 }), 'budget-account__balance--positive');
+  } finally {
+    budgetUi.state.accounts = zuvor.accounts;
+    budgetUi.state.netWorth = zuvor.netWorth;
+  }
+});
+
+/* "DU SCHULDEST 24,14 €" IN ROT. Eine offene Position in einer geteilten
+ * Gruppe ist Alltag, kein Fehler - die Karte und die Kurzzeile tragen sie in
+ * Textfarbe; "Du bekommst" darf gruen bleiben wie eine Einnahme (D8). */
+test('D8: eine Schuld in der Aufteilung ist Textfarbe', () => {
+  const src = withoutCommentsKeepingLines(splitExpenses);
+  assert.doesNotMatch(src, /owing\.length \? ' metric-card--negative'/, 'die Schuld-Karte traegt kein Rot');
+  assert.doesNotMatch(src, /tone: owing\.length \? 'negative'/, 'die Kurzzeile traegt kein Rot');
 });

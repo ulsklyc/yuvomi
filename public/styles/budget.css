@@ -2793,6 +2793,13 @@ button.budget-entry__title {
   white-space: nowrap;
 }
 
+/* Der ueberschrittene Plan ist die eine Warnung der Statistik (Critique R21,
+ * D8): Rot am "von 80 €", nicht am Delta daneben. Die Zahlen davor sagen es
+ * mit (95 € ueber "von 80 €") - die Farbe steht nie allein. */
+.budget-bar-row__of--over {
+  color: var(--color-danger);
+}
+
 @container budget-page (min-width: 480px) {
   .budget-bar-row--compare {
     row-gap: var(--space-0h);

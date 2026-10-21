@@ -811,6 +811,16 @@ bleibt fuer das, was wirklich eine Handlung verlangt: ein Konto im Minus, ein ne
 Saldo, ein ueberschrittener Plan. Ein Zustand steht nie NUR in der Farbe
 (`test:budget-ui`).
 
+Seit R21 (D8) gilt das auch fuer Veraenderungen und Schulden: ein Delta ("+25,00 € ggue.
+Sep", je Kategorie und auf den Kennzahlkarten) steht in der Sekundaerfarbe mit Vorzeichen
+und Pfeil - `trendMarkup` ohne `betterWhen`; die Valenzfarbe bleibt Metriken mit fester
+guter Richtung ausserhalb des Geldes vorbehalten. Der ueberschrittene Plan traegt sein Rot
+am "von 80 €" der Statistik (`.budget-bar-row__of--over`). Eine Kreditkarte im ueblichen
+Minus ist Textfarbe, rot erst ueber ihrem Rahmen (`available_limit` unter null). Eine
+offene Schuld in der Aufteilung - Karte, Kurzzeile, Kachel der Uebersicht - ist Textfarbe;
+"Du bekommst" darf gruen bleiben wie eine Einnahme (`test:budget-ui`,
+`test:dashboard-split-balance`).
+
 **Die Eine-Stimme-Regel (2026-08-10).** Die App hat GENAU EINE Akzentfarbe, und das ist
 das Violett der Bildmarke. Sie traegt alles, was in jedem Modul dasselbe tut: die
 Tab-Leiste und die Sidebar samt Aktiv-Pille, den FAB, den Primaer- und Sekundaerknopf,

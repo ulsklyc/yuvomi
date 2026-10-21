@@ -333,7 +333,10 @@ test('Kachel: Netto als Wert, groesste Position plus Rest als Fussnote, Sprung i
   assert.equal(tile.route, '/budget?tab=split-expenses&group=7');
 });
 
-test('Kachel: wer schuldet, sieht ein Minus in Rot', async () => {
+// D8 (Critique R21): eine offene Ausgleichs-Schuld ist kein Alarm. Die Kachel
+// trug sie rot ("-196,14 €") - wie ein Konto im Minus. Das Minus sagt die
+// Richtung, die Farbe bleibt Textfarbe (DESIGN.md "Rot ist eine Warnung").
+test('Kachel: wer schuldet, sieht ein Minus in Textfarbe (D8)', async () => {
   const __test = await dashboardTest();
   const tile = splitTile(__test.selectMetricTiles({
     ...BASE_DATA,
@@ -343,7 +346,7 @@ test('Kachel: wer schuldet, sieht ein Minus in Rot', async () => {
     },
   }, 'EUR', new Set()));
   assert.equal(nbsp(tile.value), '-13,00 €');
-  assert.equal(tile.tone, 'balance-negative');
+  assert.equal(tile.tone, 'balance-neutral');
   assert.equal(tile.note, 'dashboard.splitYouOwe{"name":"Alex"}', 'eine einzige Position traegt kein „+0"');
 });
 
@@ -442,7 +445,7 @@ test('Kachel: Wert und Position kommen aus der Waehrung, in der wirklich etwas o
   }, 'EUR', new Set()));
   assert.ok(tile, 'das offene USD-Netto bekommt eine Kachel');
   assert.match(nbsp(tile.value), /-20,00/, `der Wert ist das offene Netto, nicht "0": ${nbsp(tile.value)}`);
-  assert.equal(tile.tone, 'balance-negative');
+  assert.equal(tile.tone, 'balance-neutral');
   assert.match(tile.note, /Cleo/, 'die genannte Position gehoert zur Waehrung des Werts');
   assert.equal(tile.route, '/budget?tab=split-expenses&group=9');
 });

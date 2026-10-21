@@ -702,7 +702,9 @@ function renderSummary() {
       label: t('splitExpenses.youAreOwed'),
       value: owedText,
       tone: owed.length ? 'positive' : 'neutral',
-      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: owing.length ? 'negative' : '' }],
+      // Eine offene Schuld in der Gruppe ist Alltag, kein Alarm (Critique R21,
+      // D8): Textfarbe. „Du bekommst" darf gruen bleiben wie eine Einnahme.
+      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: '' }],
     }));
     wireMetricGlance(glance, 'split-glance-more');
   }
@@ -715,7 +717,7 @@ function renderSummary() {
       <div class="metric-card__label">${esc(owedLabel)}</div>
       <div class="metric-card__value">${owedText}</div>
     </div>
-    <div class="metric-card${owing.length ? ' metric-card--negative' : ''}">
+    <div class="metric-card">
       <div class="metric-card__label">${esc(owingLabel)}</div>
       <div class="metric-card__value">${owingText}</div>
     </div>

@@ -2859,8 +2859,10 @@ function formatLedgerAmount(amount, currency) {
  * stehe ich insgesamt", die Zeile darunter „bei wem" - mit „+N" fuer die
  * uebrigen Positionen, statt eine Liste in eine Kachel zu zwaengen. Das Netto
  * gehoert zur Waehrung der genannten Position; Betraege verschiedener
- * Waehrungen addiert niemand. Vorzeichen und Farbe nach der Rolle `balance`
- * (utils/money.js): Minus nur, wer schuldet.
+ * Waehrungen addiert niemand. Das Vorzeichen sagt die Richtung (Minus nur,
+ * wer schuldet); ROT TRAEGT DIE SCHULD NICHT (Critique R21, D8) - eine offene
+ * Position in einer geteilten Gruppe ist kein Konto im Minus. Gruen bleibt
+ * fuer das, was man bekommt, wie bei einer Einnahme.
  *
  * AUSGEGLICHEN GIBT ES KEINE KACHEL, auch wenn sich zwei Gruppen nur
  * gegenseitig aufheben. „Alles ausgeglichen" waere wahr, verlangt
@@ -2899,7 +2901,7 @@ function splitBalanceTile(balance) {
     label: t('splitExpenses.title'),
     value: formatLedgerAmount(net.amount, net.currency),
     note,
-    tone: netMinor > 0 ? 'balance-positive' : netMinor < 0 ? 'balance-negative' : 'balance-neutral',
+    tone: netMinor > 0 ? 'balance-positive' : 'balance-neutral',
   };
 }
 
