@@ -3509,3 +3509,20 @@ test('R21: der erste Reiter heisst Uebersicht, fehlt solange nichts geplant ist,
   assert.match(tablist, /const buttons = \(\) => \[\.\.\.container\.querySelectorAll\('\[data-tab-id\]'\)\]\.filter\(\(b\) => !b\.hidden\);/,
     'ein ausgeblendeter Reiter ist kein Ziel der Pfeiltasten');
 });
+
+// R21 S7 (Critique a3, 1440): das Auswertungs-Segment lief 788px breit (jedes
+// Segment 260px um ein Wort), und die Planung stapelte drei Leerzustaende
+// (299 + 145 + 145px). Das Segment steht in seiner Inhaltsbreite; Ausnahmen
+// und Zusatzschichten ohne Eintrag sind eine ruhige Zeile (56px).
+test('R21 S7: Segment in Inhaltsbreite, Nebenabschnitte ohne Eintrag als ruhige Zeile', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const seg = rules.find((r) => r.selector.trim() === '.schedule-stat-range__choices' && !r.at.length);
+  assert.match(seg?.body ?? '', /inline-size:\s*fit-content/, 'das Segment ist so breit wie seine Worte');
+  const item = rules.find((r) => r.selector.trim() === '.schedule-stat-range__choices .segmented__item');
+  assert.match(item?.body ?? '', /flex:\s*0 0 auto/, 'kein Segment waechst in die Breite');
+  const row = rules.find((r) => /\.schedule-library--overrides > \.empty-state--compact/.test(r.selector) && /\.schedule-library--extras > \.empty-state--compact$/.test(r.selector.trim()));
+  assert.match(row?.body ?? '', /flex-direction:\s*row/, 'Satz und Aktion nebeneinander');
+  assert.match(row.body, /text-align:\s*start/, 'buendig wie eine Zeile, nicht mittig');
+});

@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The shift plan's planning tab is shorter when it is still empty.** Exceptions and extra
+  shifts without an entry are now one quiet row each, with the sentence on the left and the add
+  button on the right, instead of two more centred empty pages below the empty shift plan. The
+  period choice in the evaluation is as wide as its three words instead of the whole card.
+
 - **Settings, Help, What's new and Sign out are always visible in the More sheet.** On a phone
   they sat at the end of the scrolling list, below the edge of the sheet on most screens. They
   now stay fixed at its bottom while the modules scroll above them, and the sheet uses the

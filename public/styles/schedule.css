@@ -544,14 +544,18 @@
   container: schedule-stat-range / inline-size;
 }
 
+/* SO BREIT WIE SEINE DREI WORTE (R21 S7, Critique a3). Das Segment nahm die
+ * volle Breite der Karte - bei 1440 788px fuer "Aktueller Monat | Volle Monate
+ * | Eigener Zeitraum", jedes Segment 260px um ein Wort. Ein Segment ist eine
+ * Wahl, keine Leiste (panel.css): es steht in seiner Inhaltsbreite am Anfang. */
 .schedule-stat-range__choices {
   display: flex;
-  inline-size: 100%;
+  inline-size: fit-content;
   max-inline-size: 100%;
 }
 
 .schedule-stat-range__choices .segmented__item {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
 }
 
 .schedule-stat-range__select {
@@ -1264,4 +1268,38 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+/* NEBENABSCHNITTE OHNE EINTRAG SIND EINE RUHIGE ZEILE (R21 S7, Critique a3:
+ * "drei gestapelte Leerzustaende"). Ausnahmen und Zusatzschichten trugen
+ * ihren kompakten Leerzustand mittig mit Knopf darunter - 145px je
+ * Abschnitt, zusammen mit dem vollen Leerzustand der Schichtplaene 589px
+ * Leere bei 1440. Hier steht er wie die leere Zeile der Gesundheit (D6): auf
+ * der Flaeche einer Zeile, der Satz links, die Anlege-Aktion rechts. Der volle
+ * Leerzustand bleibt dem Hauptabschnitt. */
+.schedule-library--overrides > .empty-state--compact,
+.schedule-library--extras > .empty-state--compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  min-block-size: var(--target-base);
+  text-align: start;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.schedule-library--overrides > .empty-state--compact .empty-state__description,
+.schedule-library--extras > .empty-state--compact .empty-state__description {
+  flex: 1 1 18rem;
+  margin: 0;
+  max-inline-size: none;
+}
+
+.schedule-library--overrides > .empty-state--compact .empty-state__cta,
+.schedule-library--extras > .empty-state--compact .empty-state__cta {
+  margin: 0;
 }
