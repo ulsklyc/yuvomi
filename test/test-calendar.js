@@ -3835,14 +3835,27 @@ test('Kalenderkopf (Sonde 19): die eine Zeile gilt nur, wenn Titelzeile und Mind
     const wide = make(1176);
     calendarHelpers.syncToolbarFit(wide);
     assert(wide.classes.has('cal-toolbar--one-row'), 'passt genau: eine Zeile');
+    assert(!wide.classes.has('cal-toolbar--compact'), 'die volle Zeile braucht keine kompakte Form');
+    // R21 S7 (D9): ein Pixel zu wenig fuer das Suchfeld - die Zeile bleibt eine,
+    // kompakt: die Suche in Icon-Form (44px statt 152).
     const narrow = make(1175);
     calendarHelpers.syncToolbarFit(narrow);
-    assert(!narrow.classes.has('cal-toolbar--one-row'), 'ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
+    assert(narrow.classes.has('cal-toolbar--one-row') && narrow.classes.has('cal-toolbar--compact'),
+      'ein Pixel zu wenig fuer das Suchfeld: eine kompakte Zeile statt zweier (1280: 113 -> 69px)');
+    // Titelzeile 656 + kompakte Bar (280 + 8 + 44 + 8 + 40 = 380) + 32 = 1068.
+    const compactFit = make(1068);
+    calendarHelpers.syncToolbarFit(compactFit);
+    assert(compactFit.classes.has('cal-toolbar--compact'), 'passt kompakt genau: eine Zeile');
+    const tooNarrow = make(1067);
+    calendarHelpers.syncToolbarFit(tooNarrow);
+    assert(!tooNarrow.classes.has('cal-toolbar--one-row') && !tooNarrow.classes.has('cal-toolbar--compact'),
+      'auch kompakt ein Pixel zu wenig: die Bar-Zeile steht als eigene Zeile');
     globalThis.window = { matchMedia: () => ({ matches: false }) };
     const phone = make(5000);
     phone.classes.add('cal-toolbar--one-row');
     calendarHelpers.syncToolbarFit(phone);
     assert(!phone.classes.has('cal-toolbar--one-row'), 'unter 1024px gibt es die eine Zeile nicht');
+    assert(!phone.classes.has('cal-toolbar--compact'));
   } finally {
     globalThis.window = prevWindow;
     globalThis.getComputedStyle = prevGcs;
@@ -6510,6 +6523,77 @@ test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den W
   // Nach jedem Zeichnen liegen die Nachbarn bereit.
   const view = src.slice(src.indexOf('function renderView()'), src.indexOf('function syncHeadToScrollport('));
   assert(/scheduleNeighborPrefetch\(\);/.test(view), 'renderView() laedt die Nachbarn nicht vor');
+});
+
+/* R21 S7 (D9, Handoff 2): DAS ZEITRAUM-LABEL WIRD NIE GEKAPPT. Gemessen vor dem
+ * Fix: mobil uk "21.10. - 23.10.2026" um 24px gekappt (el/it 13, ru 11), am
+ * Desktop en "Wednesday, 21.10.2026" um 20px. Statt der Ellipse nimmt das Label
+ * die kuerzere Fassung desselben Zeitraums - ohne das laufende Jahr, mit dem
+ * kurzen Wochentag. Ein anderes Jahr bleibt stehen. */
+test('R21 S7: das Zeitraum-Label nimmt die kuerzere Fassung, bevor es kappt', () => {
+  const s = calendarHelpers.state;
+  const prev = { view: s.view, cursor: s.cursor, today: s.today };
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = { ...(prevWindow ?? {}), matchMedia: () => ({ matches: true }) };
+    s.today = '2026-10-21';
+    s.cursor = '2026-10-21';
+    s.view = 'week';
+    const [short] = calendarHelpers.periodLabelFallbacks();
+    assert(short, 'mobil im laufenden Jahr gibt es die Fassung ohne Jahr');
+    // Ein Label, das 8px je Zeichen misst, in einer 120px-Box.
+    const lbl = { clientWidth: 120, textContent: 'x'.repeat(19), get scrollWidth() { return this.textContent.length * 8; } };
+    calendarHelpers.fitPeriodLabel(lbl);
+    assert(lbl.textContent === short, `die kurze Fassung ersetzt die gekappte: ${lbl.textContent}`);
+    // Ein anderes Jahr verliert es nicht - lieber die Ellipse als ein falsches Jahr.
+    s.cursor = '2027-01-05';
+    assert(calendarHelpers.periodLabelFallbacks().length === 0, 'ausserhalb des laufenden Jahres keine Fassung ohne Jahr');
+    // Der Tag nimmt den kurzen Wochentag.
+    s.view = 'day';
+    s.cursor = '2026-10-21';
+    assert(calendarHelpers.periodLabelFallbacks().length === 1, 'der Tag hat eine kurze Fassung');
+    // Was passt, bleibt, wie es ist.
+    const fits = { clientWidth: 300, textContent: 'KW 43', scrollWidth: 60 };
+    calendarHelpers.fitPeriodLabel(fits);
+    assert(fits.textContent === 'KW 43', 'ein Label, das passt, bleibt');
+  } finally {
+    Object.assign(s, prev);
+    globalThis.window = prevWindow;
+  }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const upd = src.slice(src.indexOf('function updateLabel('), src.indexOf('function updateLabel(') + 2600);
+  assert(/fitPeriodLabel\(lbl\);\s*syncPeriodArrows\(\);/.test(upd), 'updateLabel() passt das Label nach jedem Setzen ein');
+  assert(/to: formatDayMonth\(span\.to\)/.test(src), 'die kurze Spanne nennt das Ende ohne Jahr');
+});
+
+/* R21 S7 (D9): die kompakte eine Zeile - Suche als Icon, Verwalten im Filterblatt. */
+test('R21 S7: die kompakte Kopfzeile faltet Suche und Verwalten, die offene Suche nimmt den Platz der Ansichtswahl', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a))
+    && r.selector.includes('.cal-toolbar--compact'));
+  const hides = rules.find((r) => /\.cal-toolbar__calendars-btn$/.test(r.selector.trim()));
+  assert(hides && /display:\s*none/.test(hides.body), 'kompakt steht Verwalten nur im Filterblatt');
+  const icon = rules.find((r) => /label\.page-search:not\(:focus-within\):not\(:has\(input:not\(:placeholder-shown\)\)\)$/.test(r.selector.trim()));
+  assert(icon && /width:\s*var\(--target-base\)/.test(icon.body) && /border-radius:\s*var\(--radius-full\)/.test(icon.body),
+    'die Suche steht als Icon-Knopf in Zielgroesse');
+  const views = rules.find((r) => /\.cal-toolbar__views$/.test(r.selector.trim()) && /display:\s*none/.test(r.body));
+  assert(views && /:focus-within/.test(views.selector) && /:placeholder-shown/.test(views.selector),
+    'mit Fokus und mit Begriff weicht die Ansichtswahl - die Zeile bricht nicht um');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/data-filter-manage-calendars/.test(src), 'Verwalten steht im Filterblatt');
+});
+
+/* R21 S7 (a3): bei 1920 doppelte der Mini-Monat neben dem Monat das Raster. */
+test('R21 S7: im Monat steht kein Mini-Monat in der Seitenleiste', () => {
+  const s = calendarHelpers.state;
+  const prev = s.view;
+  try {
+    s.view = 'month';
+    assert(calendarHelpers.miniMonthWanted() === false, 'im Monat zeigt die Ansicht selbst den Monat');
+    s.view = 'week';
+    assert(calendarHelpers.miniMonthWanted() === true, 'in Woche und Tag bleibt er die Uebersicht');
+  } finally { s.view = prev; }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/\(miniMonthWanted\(\) \? miniMonthHtml\(\) : ''\)/.test(src), 'renderSidebar fragt nach dem Mini-Monat');
 });
 
 // --------------------------------------------------------

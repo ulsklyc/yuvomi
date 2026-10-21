@@ -1995,6 +1995,12 @@ export async function render(container, { user, signal } = {}) {
   // erst die Praeferenzen kennen. Nach dem Laden baut renderToolbar() ihn mit
   // Filterzahl und Warnung neu - derselbe Knoten, nur sein Inhalt.
   state.scheduleWarnings = [];
+  // WER SCHAUT, STEHT VOR DEM ERSTEN KOPF FEST: der Kopf steht seit R21 vor
+  // den Daten (renderToolbar unten), und sein Filterzaehler liest
+  // "Mir zugewiesen". Der Rest des Zustands folgt nach dem Laden.
+  state.currentUserId = user?.id ?? null;
+  state.user          = user ?? null;
+  state.assignedToMe  = restoreAssignedToMe(state.user);
   const toolbarEl = container.querySelector('#cal-toolbar');
   renderToolbar();
   toolbarEl.inert = true;
@@ -2476,12 +2482,25 @@ const ONE_ROW_MEDIA = '(min-width: 1024px)';
 // auch in 152px mit Lupe und Polster ganz da.
 const SEARCH_MIN_PX = 152;
 let toolbarFitObserver = null;
+// Breite des Verwalten-Knopfs, gemessen, solange er steht: kompakt ist er aus
+// dem Bild, und die Rechnung darf nicht davon abhaengen, in welcher Form der
+// Kopf gerade steht (sonst pendelt sie).
+let calendarsBtnWidth = 0;
 
+/* DIE KOMPAKTE EINE ZEILE (Critique R21, D9: "Kalenderkopf bei 1280 einzeilig,
+ * Suche als Icon-Knopf"). Bei 1280 fehlten der einen Zeile 153px (de): sie
+ * brach in zwei Zeilen, 113px Kopf mit ~410px Leerraum in Zeile 1. Passt die
+ * volle Zeile nicht, versucht der Waechter die kompakte: die Suche in der
+ * Icon-Form der Shell (sie geht beim Tippen auf und nimmt dann den Platz der
+ * Ansichtswahl - die Treffer ersetzen die Ansicht ohnehin), und "Kalender
+ * verwalten" nur noch im Filterblatt, wo der Eintrag auf jeder Breite steht
+ * (calendarFilterParts) und wo er unter 1024px schon allein wohnt. Passt
+ * auch das nicht (uk, neben der Seitenleiste), bleiben es zwei Zeilen. */
 function syncToolbarFit(bar) {
   if (!bar?.isConnected) return;
   const wide = window.matchMedia?.(ONE_ROW_MEDIA).matches;
   if (!wide) {
-    bar.classList.remove('cal-toolbar--one-row');
+    bar.classList.remove('cal-toolbar--one-row', 'cal-toolbar--compact');
     return;
   }
   const cs = getComputedStyle(bar);
@@ -2491,11 +2510,25 @@ function syncToolbarFit(bar) {
     && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().width > 0);
   const views = bar.querySelector('.cal-toolbar__views');
   const filter = bar.querySelector('#cal-filters');
+  const manage = bar.querySelector('#cal-calendars');
+  const actionsGap = parseFloat(getComputedStyle(bar.querySelector(':scope > .page-toolbar__actions') ?? bar).columnGap) || 0;
+  if (manage && manage.getBoundingClientRect().width > 0) calendarsBtnWidth = manage.getBoundingClientRect().width;
+  // Kompakt steht der Knopf nicht da; die volle Rechnung zaehlt ihn trotzdem.
+  const manageFold = manage && bar.classList.contains('cal-toolbar--compact') ? calendarsBtnWidth + actionsGap : 0;
+  const manageFree = manage ? calendarsBtnWidth + actionsGap : 0;
   const toolsGap = parseFloat(getComputedStyle(bar.querySelector('.cal-toolbar__tools') ?? bar).columnGap) || 0;
   const barGap = parseFloat(getComputedStyle(bar.querySelector('.page-toolbar__bar') ?? bar).columnGap) || 0;
-  const barMin = (views?.scrollWidth ?? 0) + barGap + SEARCH_MIN_PX + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
-  const need = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + barMin + gap * row.length;
-  bar.classList.toggle('cal-toolbar--one-row', need <= inner);
+  const barRest = (views?.scrollWidth ?? 0) + barGap + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
+  const rowNeed = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + gap * row.length + manageFold;
+  const full = rowNeed + barRest + SEARCH_MIN_PX <= inner;
+  const compact = !full && rowNeed - manageFree + barRest + searchIconWidth(bar) <= inner;
+  bar.classList.toggle('cal-toolbar--one-row', full || compact);
+  bar.classList.toggle('cal-toolbar--compact', compact);
+}
+
+/** Breite der Such-Icon-Form (die Zielgroesse der Shell, --target-base). */
+function searchIconWidth(bar) {
+  return parseFloat(getComputedStyle(bar).getPropertyValue?.('--target-base')) || 44;
 }
 
 function watchToolbarFit(bar) {
@@ -2505,9 +2538,56 @@ function watchToolbarFit(bar) {
   // der Kopf-Knoten bleibt derselbe.
   if (toolbarFitObserver?.target === bar) return;
   toolbarFitObserver?.observer.disconnect();
-  const observer = new ResizeObserver(() => syncToolbarFit(bar));
+  // Aendert sich die Breite des Kopfs, misst auch das Label neu (fitPeriodLabel):
+  // mobil ist seine Breite der Rest der Zeile.
+  let lastWidth = 0;
+  const observer = new ResizeObserver(() => {
+    syncToolbarFit(bar);
+    const width = bar.clientWidth;
+    if (width !== lastWidth) {
+      if (lastWidth) updateLabel();
+      lastWidth = width;
+    }
+  });
   observer.observe(bar);
   toolbarFitObserver = { target: bar, observer };
+}
+
+/**
+ * DAS ZEITRAUM-LABEL WIRD NIE GEKAPPT (Critique R21, D9; Handoff 2).
+ *
+ * Das Label hat eine feste Breite, damit die Pfeile in allen vier Ansichten
+ * stillstehen (calendar.css). In langen Sprachen reichte sie nicht: mobil kappte
+ * uk "21.10. - 23.10.2026" um 24px (el/it 13, ru 11, vi 8, hu 6, fr 3) - der
+ * Knopf der Ansicht traegt dort "Порядок денний" -, am Desktop en "Wednesday,
+ * 21.10.2026" um 20px und de "Mittwoch, 21.10.2026" um 1px. Statt der Ellipse
+ * nimmt das Label die naechst kuerzere Fassung DESSELBEN Zeitraums, gemessen in
+ * der echten Breite:
+ *   - eine Spanne im laufenden Jahr verliert das Jahr ("21.10. - 23.10.") - wie
+ *     Apples Kalender das laufende Jahr nicht nennt; ein anderes Jahr bleibt;
+ *   - ein Tag nimmt den kurzen Wochentag ("Mi, 21.10.2026"), wie mobil.
+ * Passt auch das nicht, kuerzt die Ellipse wie bisher. Die Box bleibt, wie sie
+ * ist - kein Pfeil bewegt sich.
+ */
+function periodLabelFallbacks() {
+  const year = state.today.slice(0, 4);
+  if (state.view === 'day') return [formatDate(state.cursor, { weekday: true })];
+  const span = state.view === 'agenda'
+    ? getAgendaRange(state.cursor)
+    : state.view === 'week' && window.matchMedia(MOBILE_MEDIA_QUERY).matches
+      ? { from: mobileWeekDays(state.cursor)[0], to: mobileWeekDays(state.cursor)[2] }
+      : null;
+  if (!span || span.from.slice(0, 4) !== year || span.to.slice(0, 4) !== year) return [];
+  return [t('calendar.dayRangeLabel', { from: formatDayMonth(span.from), to: formatDayMonth(span.to) })];
+}
+
+function fitPeriodLabel(lbl) {
+  // Ohne Layout (verborgen, Test-Umgebung) gibt es nichts zu messen.
+  if (!(lbl?.clientWidth > 0) || lbl.scrollWidth <= lbl.clientWidth) return;
+  for (const text of periodLabelFallbacks()) {
+    lbl.textContent = text;
+    if (lbl.scrollWidth <= lbl.clientWidth) return;
+  }
 }
 
 function updateLabel() {
@@ -2541,6 +2621,7 @@ function updateLabel() {
     const { from, to } = getAgendaRange(state.cursor);
     lbl.textContent = t('calendar.dayRangeLabel', { from: formatDayMonth(from), to: formatPreferredDate(to) });
   }
+  fitPeriodLabel(lbl);
 
   syncPeriodArrows();
   syncTodayButton();
@@ -5370,6 +5451,17 @@ function upNextWanted() {
   return state.view !== 'agenda';
 }
 
+/**
+ * DER MINI-MONAT GEHOERT NICHT NEBEN DEN MONAT (Critique R21, a3: bei 1920
+ * doppelte die 300px-Spalte das Raster daneben - dieselben 42 Tage zweimal).
+ * In Woche und Tag ist er die Uebersicht, aus der man springt; im Monat zeigt
+ * die Ansicht selbst, was er zeigen wuerde. Die Spalte bleibt (Filter, "Als
+ * Naechstes"), ihre Breite auch - nichts rueckt beim Ansichtswechsel.
+ */
+function miniMonthWanted() {
+  return state.view !== 'month';
+}
+
 /** Steht die Spalte (Container-Abfrage) - oder ist sie unter der Schwelle verborgen? */
 function sidebarShown(aside) {
   return Boolean(aside) && !aside.hidden && getComputedStyle(aside).display !== 'none';
@@ -5535,7 +5627,7 @@ function renderSidebar() {
     }
   }
   aside.replaceChildren();
-  aside.insertAdjacentHTML('beforeend', miniMonthHtml() + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
+  aside.insertAdjacentHTML('beforeend', (miniMonthWanted() ? miniMonthHtml() : '') + sidebarFiltersHtml() + (upNextWanted() ? upNextHtml() : ''));
   window.lucide?.createIcons({ el: aside });
   if (refocus) aside.querySelector(refocus)?.focus();
 }
@@ -6875,7 +6967,7 @@ export const __test = {
   get upNext() { return _upNext; },
   resetUpNext() { _upNext = { events: null, loading: null, day: null, error: null }; },
   // Sonde 19 (#882): eine Zeile nur, wenn sie passt.
-  syncToolbarFit,
+  syncToolbarFit, periodLabelFallbacks, fitPeriodLabel, miniMonthWanted,
   // R17 Schritt 8: der Fokus nach der Suche, wenn ihr Knopf gefaltet ist.
   closeSearchForTest(container) { _container = container; searchActive = true; closeCalendarSearch({ restoreView: false }); },
   // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.

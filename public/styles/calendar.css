@@ -530,6 +530,58 @@
   .page-toolbar.cal-toolbar.cal-toolbar--one-row > .page-toolbar__actions {
     order: 1;
   }
+
+  /* DIE KOMPAKTE EINE ZEILE (Critique R21, D9 - calendar.js `syncToolbarFit`).
+   * Wo die volle Zeile nicht passt (1280: 153px zu wenig), steht der Kopf
+   * trotzdem in einer Zeile: "Kalender verwalten" wohnt dann nur im
+   * Filterblatt (dort steht der Eintrag auf jeder Breite), und die Suche nimmt
+   * die Icon-Form der Shell - dieselbe Haut wie unter 768px (layout.css,
+   * "Die Suche wechselt in ihre Icon-Form"): Quadrat in Zielgroesse, Ring,
+   * Lupe im Akzent, das Feld darin unsichtbar. Mit Fokus oder Begriff geht sie
+   * zum Feld auf und nimmt den Platz der Ansichtswahl - die Treffer ersetzen
+   * die Ansicht ohnehin, und die Zeile bricht nicht um. */
+  .page-toolbar.cal-toolbar--compact > .page-toolbar__actions > .cal-toolbar__calendars-btn {
+    display: none;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+    flex: 0 0 auto;
+    width: var(--target-base);
+    min-width: var(--target-base);
+    max-width: var(--target-base);
+    block-size: var(--target-base);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input {
+    min-height: 0;
+    block-size: calc(var(--target-base) - 2 * 1.5px);
+    padding-inline: 0;
+    border-color: transparent;
+    background: transparent;
+    color: transparent;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input::placeholder {
+    color: transparent;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__icon {
+    inset-inline: 0;
+    margin-inline: auto;
+    color: var(--color-accent);
+  }
+
+  .page-toolbar.cal-toolbar--compact:has(.cal-toolbar__search:focus-within) .cal-toolbar__views,
+  .page-toolbar.cal-toolbar--compact:has(.cal-toolbar__search input:not(:placeholder-shown)) .cal-toolbar__views {
+    display: none;
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:is(:focus-within, :has(input:not(:placeholder-shown))) {
+    flex: 1 1 auto;
+    max-width: none;
+  }
 }
 
 /* TABLET (768-1023px): ZWEI ZEILEN STATT DREI (Critique 2026-10-16: 182px in

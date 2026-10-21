@@ -47,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The calendar header takes one line on a laptop, and the date above it is never cut.** At
+  1280 pixels the header used two lines, with an empty stretch next to the date. When the full
+  line does not fit, the search now waits as a magnifier button and opens over the view switch
+  while you type, and "Manage calendars" stays in the filter sheet: the header shrank from 113
+  to 69 pixels. Where the date ran out of room - "21.10. - 23.10.2026" on a phone in Ukrainian,
+  "Wednesday, 21.10.2026" on a laptop in English - it now drops the current year or shortens
+  the weekday instead of ending in "...". In the month view the sidebar no longer repeats the
+  month as a small calendar.
+
 - **The cycle settings are easier to find and to read.** Searching the settings for "cycle",
   "contraception" or "pregnancy" now finds "Cycle settings", and the health settings link straight
   into them. The dialog uses switches instead of checkboxes, puts "days" after each length, and

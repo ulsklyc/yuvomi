@@ -8475,6 +8475,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // Feld darin traegt weder Kante noch Grund. Mit Fokus wird sie wieder Feld.
     ['.page-toolbar .page-search:not(.page-search--field):not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kopfsuche; ein Knopf in der Kopf-Icon-Haut, kein Feld (ausser --field, R19)'],
     ['.section-toolbar .page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Abschnittssuche; derselbe Knopf'],
+    // R21 S7 (D9): die kompakte eine Kopfzeile des Kalenders ab 1024px nimmt
+    // dieselbe Icon-Form (calendar.css, `cal-toolbar--compact`).
+    ['.page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kalendersuche in der kompakten Kopfzeile; derselbe Knopf'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt
     // seither die Glaskante der schwebenden Flaechen (--glass-border), keine

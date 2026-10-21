@@ -3238,6 +3238,16 @@ Laden `inert` - kam die Zeitraum-Zeile mit den Daten, rutschte die Flaeche 52px 
 mobil, 0,026 laptop -> 0). **Der Ansichtsknopf ist so breit wie sein laengstes Wort (R21):** alle
 vier Woerter liegen unsichtbar in einer Rasterzelle unter dem sichtbaren, sonst sprang der
 Weiter-Pfeil zwischen „Tag" und „Agenda" 26px (Guard `test:calendar` "R21").
+**Das Zeitraum-Label wird nie gekappt (R21 S7, D9):** passt der Text nicht in seine feste Box,
+nimmt es die kuerzere Fassung desselben Zeitraums - eine Spanne im laufenden Jahr ohne Jahr
+(„21.10. - 23.10."), ein Tag mit kurzem Wochentag; ein anderes Jahr bleibt stehen
+(`fitPeriodLabel`). Gemessen vorher: mobil uk 24px, el/it 13, ru 11; Desktop en 20px - danach 0.
+**Ab 1024px eine Zeile, notfalls kompakt (R21 S7, D9):** passt die volle Zeile nicht (1280:
+153px zu wenig), steht sie kompakt (`cal-toolbar--compact`, `syncToolbarFit`): die Suche in
+der Icon-Form der Shell, die mit Fokus oder Begriff aufgeht und dann den Platz der
+Ansichtswahl nimmt; „Kalender verwalten" nur im Filterblatt. 1280: 113 -> 69px. Erst wenn
+auch das nicht passt (uk bei 1280), bricht die Bar-Zeile um. Im Monat zeigt die Seitenleiste
+keinen Mini-Monat - die Ansicht ist der Monat (`miniMonthWanted`).
 **Das Menue zeigt die aktive Ansicht (R17, E11).** Der Ausloeser traegt statt „..." die Glyphe
 der offenen Ansicht (dieselbe wie ihr Menue-Eintrag: Monat `calendar-days`, Woche
 `calendar-range`, Tag `calendar-1`, Agenda `list`) und nennt sie im Namen („Ansicht: Woche");
