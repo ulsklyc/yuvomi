@@ -1930,6 +1930,23 @@
   margin-bottom: var(--space-4);
 }
 
+/* LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST - wie Aufgaben, Kontakte und
+ * Rezepte (Critique R21 S8; Guide defer-rendering-heavy-content). Die Agenda
+ * ist die laengste Liste der App: im Seed 26 Tage, rund 800 Knoten unter der
+ * Falz, und jeder Dialog (Inertheit des Hintergrunds) berechnete ihren Stil
+ * mit. Ab dem zweiten Tag - der erste steht immer in der Falz - ueberspringt
+ * der Browser Tage ausser Sicht; `auto` merkt sich danach die echte Hoehe.
+ * `overflow-clip-margin` laesst Schatten und Fokusring des Traegers ueber die
+ * Gruppenkante, die die Paint-Containment sonst abschnitte (im Browser
+ * geprueft). Der klebende Tageskopf bleibt in seinem Tag, wie bisher. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .agenda-day + .agenda-day {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 160px;
+    overflow-clip-margin: var(--space-2);
+  }
+}
+
 
 /* Der Kopf fluchtet mit dem Träger der Tageszeilen (.row-carrier aus
  * list-row.css, mit dem app-weit einen Lesemaß) - sonst stünde das Datum

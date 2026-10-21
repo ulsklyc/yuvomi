@@ -1150,6 +1150,15 @@ das Verhaeltnis haelt.
   >=1024 Desktop (Sidebar, mehrspaltig), >=1440 Wide; dazu die zweite Achse <500px Hoehe
   (kompakte Hoehe, siehe „Die Chrome-Regel"). Komponenten-interne Umbrueche gehoeren in
   @container-Queries, nicht in neue Viewport-Breakpoints.
+- **Lange Listen rechnen nur, was in Sicht ist (`content-visibility: auto`):** Aufgaben (ab der
+  zweiten Gruppe), Kontakte und Rezepte (je Zeile) seit R20, seit R21 S8 auch die Agenda (ab dem
+  zweiten Tag), Vorrat und Inventar (ab der zweiten Gruppe), die Buchungen des Budgets (je
+  Zeile) und der Einkauf in der einen Spalte. Immer unter `@supports` mit
+  `contain-intrinsic-size: auto none auto <gemessene Hoehe>` (sonst springt der Bildlaufbalken),
+  und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
+  Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
+  nach Hoehe verteilen (Notizen; Einkauf ab 60rem): Platzhalterhoehen liessen Gruppen beim
+  Scrollen die Spalte wechseln. Guard `test:frontend-audit`.
 - **Fensterhoehe in einer Rechnung:** `var(--viewport-height)`, nie `100dvh` direkt
   (#1276). Der Token steht auf `100vh` und kippt per `@supports (height: 100dvh)` auf dvh.
   Ein vh-Zwilling davor rettet nur Deklarationen OHNE `var()`/`env()`: mit `var()` gilt

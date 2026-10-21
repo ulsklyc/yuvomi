@@ -191,6 +191,18 @@
  * Der Vorrat war hier der Ausreißer -
  * 14px/text-transform:none gegen 12px/uppercase in den beiden Geschwistertabs. */
 
+/* Lange Listen rechnen nur, was in Sicht ist (Critique R21 S8; dieselbe Regel
+ * wie die Agenda in calendar.css): ab dem zweiten Lagerort ueberspringt der
+ * Browser Gruppen ausser Sicht, `auto` merkt sich ihre echte Hoehe, und
+ * `overflow-clip-margin` laesst den Schatten des Traegers ueber die Kante. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .pantry-group + .pantry-group {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 210px;
+    overflow-clip-margin: var(--space-2);
+  }
+}
+
 /* --------------------------------------------------------
  * Zeile
  * -------------------------------------------------------- */

@@ -680,6 +680,21 @@
   display: contents;
 }
 
+/* Lange Listen rechnen nur, was in Sicht ist (Critique R21 S8; dieselbe Regel
+ * wie die Agenda in calendar.css) - NUR in der einen Spalte. Ab 60rem verteilen
+ * Spalten bzw. Masonry die Kategorien nach ihrer Hoehe, und Platzhalterhoehen
+ * liessen Gruppen beim Scrollen die Spalte wechseln (derselbe Grund, aus dem
+ * die Notizen ohne die Regel bleiben). */
+@container shopping-surface (width < 60rem) {
+  @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+    .shopping-page .items-lanes > .list-group + .list-group {
+      content-visibility: auto;
+      contain-intrinsic-size: auto none auto 125px;
+      overflow-clip-margin: var(--space-2);
+    }
+  }
+}
+
 @container shopping-surface (min-width: 60rem) {
   /* Die Kategorie kappt weiter ueber `--page-measure` (list-row.css) - hier
    * ist das Mass die Spalte selbst, wie im Liste-+-Detail-Baustein. */

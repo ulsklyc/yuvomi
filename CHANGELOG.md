@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a four times slower processor, the screen answered after 104-176 ms; now the page dims
   after about 70 ms and the sheet follows a frame later.
 
+- **Long lists only do the work for what is on screen.** The agenda, the pantry, the inventory,
+  the budget's entries and the shopping list on a phone now skip days, groups and rows below the
+  screen until you scroll near them, as tasks, contacts and recipes already did. Opening a dialog
+  over a long agenda is lighter for it.
+
 - **Adding a dialog, a notification or a field no longer recalculates the whole page.** Four
   style rules (the collapsed search, the folding toolbar and the budget's two ledger sections)
   made the browser re-style every element on the page whenever something was inserted. They

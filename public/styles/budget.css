@@ -2165,6 +2165,20 @@ button.budget-bar-row:focus-visible {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST (Critique R21 S8; dieselbe Regel
+ * wie Kontakte und Rezepte, je Zeile): ein Monat mit vielen Buchungen haelt
+ * sonst jede Zeile im Stil- und Layoutlauf, auch die weit unter der Falz. Die
+ * Zeile ist 62px hoch (gemessen 390 und 1280px); ihre Trennlinie ist ihr
+ * eigener Rand und bleibt, der Fokusring darf ueber die Kante. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .budget-list > .list-row,
+  .budget-ledger-section__rows > .list-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 62px;
+    overflow-clip-margin: var(--space-1);
+  }
+}
+
 /* GEPLANT UND GEBUCHT SIND ZWEI ABSCHNITTE (Entscheidung R17, E4).
  *
  * Im laufenden Monat standen die Zeilen mit einem Datum nach heute oben in der

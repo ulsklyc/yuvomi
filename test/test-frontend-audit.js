@@ -22954,3 +22954,34 @@ test('R21 S8: kein :has() vor einem Universalselektor oder ::placeholder (ganzer
   assert.deepEqual(bad, [], `Ganzer-Teilbaum-Rest hinter :has():\n${bad.join('\n')}`);
 });
 
+/**
+ * R21 S8 (Critique a6 "lange Listen"): DIESELBE REGEL UEBER AUFGABEN HINAUS.
+ * Die Agenda ist die laengste Liste der App (Seed: 26 Tage, ~800 Knoten unter
+ * der Falz); jeder Dialog berechnete ihren Stil mit (Inertheit des
+ * Hintergrunds). Gruppen ab der zweiten (die erste steht in der Falz), Zeilen
+ * des Budgets je Zeile wie Kontakte. `overflow-clip-margin` haelt Schatten und
+ * Fokusring des Traegers, die die Paint-Containment sonst an der Gruppenkante
+ * abschnitte. Einkauf nur in der einen Spalte: ab 60rem verteilen Spalten bzw.
+ * Masonry die Kategorien nach Hoehe (wie bei den Notizen).
+ */
+test('R21 S8: Agenda, Vorrat, Inventar, Budget und Einkauf rechnen nur, was in Sicht ist', () => {
+  const expect = [
+    ['../public/styles/calendar.css', '.agenda-day + .agenda-day'],
+    ['../public/styles/pantry.css', '.pantry-group + .pantry-group'],
+    ['../public/styles/inventory.css', '.inventory-list > .list-group + .list-group'],
+    ['../public/styles/budget.css', '.budget-list > .list-row, .budget-ledger-section__rows > .list-row'],
+    ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group + .list-group'],
+  ];
+  for (const [file, selector] of expect) {
+    const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
+      && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
+    assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
+    assert.match(rule.body, /content-visibility:\s*auto/);
+    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto \d+px/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')), `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
+    assert.match(rule.body, /overflow-clip-margin:\s*var\(--space-\d\)/, `${selector}: Schatten und Fokusring des Traegers wuerden an der Kante abgeschnitten`);
+  }
+  const shop = [...eachRule(read('../public/styles/shopping.css'))].find((r) => /content-visibility/.test(r.body));
+  assert.ok(shop.at.some((at) => /@container shopping-surface \(width < 60rem\)/.test(at)),
+    'Einkauf: in Spalten/Masonry wechselten Gruppen mit Platzhalterhoehe beim Scrollen die Spalte');
+});
