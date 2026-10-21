@@ -6240,6 +6240,25 @@ test('R20: die Seitenleiste reserviert ihre Spalte schon im ersten Markup', () =
   assert(/<aside class="cal-sidebar" id="cal-sidebar" aria-label="[^"]*"\$\{sidebarWanted\(\) \? '' : ' hidden'\}><\/aside>/.test(src), 'die leere Leiste ist nicht verborgen');
 });
 
+// R21 (Critique 2026-10-21, a1/a6): der Kalender sprang beim Laden - der erste
+// Frame trug nur Titel und Aktions-Slot, die Zeitraum-Zeile kam mit den Daten,
+// und `.cal-frame` rutschte von y 65 auf 117 (CLS 0,057 mobil, 0,026 laptop).
+// Der volle Kopf steht jetzt im synchronen Teil von render(), vor dem ersten
+// await; bis die Daten da sind, ist er inert.
+test('R21: der volle Kalenderkopf steht vor den Daten, bis dahin inert', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const start = src.indexOf('export async function render(');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  const firstAwait = body.indexOf('await ');
+  const firstToolbar = body.indexOf('renderToolbar();');
+  assert(firstToolbar > 0 && firstToolbar < firstAwait,
+    'renderToolbar() laeuft erst nach dem ersten await - die Zeitraum-Zeile kommt mit den Daten und schiebt die Flaeche');
+  const inertOn = body.indexOf('toolbarEl.inert = true');
+  const inertOff = body.indexOf('toolbarEl.inert = false');
+  assert(inertOn > firstToolbar && inertOn < firstAwait, 'der fruehe Kopf ist bis zum Laden inert');
+  assert(inertOff > body.indexOf('await Promise.all('), 'nach dem Laden ist der Kopf wieder bedienbar');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

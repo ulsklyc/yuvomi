@@ -139,6 +139,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   end of the page fade, the title of the page you came from (for example "Tasks") stood fully
   visible over the greeting. The fading title now keeps its end state until the fade is gone.
 
+- **The calendar no longer jumps while it loads.** The row with the arrows and the view switch
+  arrived only with the data, and the whole calendar below slid down by 52 pixels on phones. The
+  full header now stands from the first frame and becomes usable as soon as the calendar has loaded.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing

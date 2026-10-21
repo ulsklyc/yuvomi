@@ -1984,6 +1984,21 @@ export async function render(container, { user, signal } = {}) {
     </div>
   `);
 
+  // DER VOLLE KOPF STEHT VOR DEN DATEN (Critique R21, a1/a6: CLS 0,057 mobil,
+  // 0,026 laptop). Bis hierher trug der erste Frame nur Titel und Aktions-Slot,
+  // und die Zeitraum-Zeile kam mit renderToolbar() nach dem Laden dazu - die
+  // ganze Flaeche darunter (`.cal-frame`) rutschte 52px tiefer. Zeitraum,
+  // Ansicht und Werkzeuge haengen an Cursor und Ansicht, nicht an den Daten;
+  // die Ueberlappungswarnung ist eine Meldung UEBER die Daten und kommt mit
+  // ihnen. Bis die Daten da sind, ist der Kopf `inert`: ein Schritt oder
+  // Ansichtswechsel vor dem ersten Laden liefe gegen einen Wochenstart, den
+  // erst die Praeferenzen kennen. Nach dem Laden baut renderToolbar() ihn mit
+  // Filterzahl und Warnung neu - derselbe Knoten, nur sein Inhalt.
+  state.scheduleWarnings = [];
+  const toolbarEl = container.querySelector('#cal-toolbar');
+  renderToolbar();
+  toolbarEl.inert = true;
+
   // Lade-Skeleton sofort einblenden, damit der erste Frame nicht leer bleibt,
   // während Termine/Präferenzen laden (Sichtbarkeit des Systemstatus). Wird von
   // renderView() beim ersten Render ersetzt; aria-busy quittiert den Ladezustand.
@@ -2023,6 +2038,7 @@ export async function render(container, { user, signal } = {}) {
     api.get('/preferences').catch(() => ({ data: {} })),
     api.get('/documents/meta/options').catch(() => ({ data: {} })),
   ]);
+  toolbarEl.inert = false;
   state.holidayPrefs  = prefsRes.data ?? {};
   state.weekStart     = weekStartIndex(prefsRes.data?.week_start);
   state.defaultDuration = Number(prefsRes.data?.calendar_default_duration) || 60;
