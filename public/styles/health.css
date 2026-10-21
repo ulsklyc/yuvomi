@@ -2102,7 +2102,10 @@ button.health-med-card:hover {
   font-size: var(--type-body);
   line-height: var(--line-height-base);
   color: var(--color-text-primary);
-  text-wrap: pretty;
+  /* Ein bis drei Zeilen ohne Flaeche: ausgeglichene Umbrueche statt einer
+   * langen und einer kurzen Zeile (modern-web-guidance
+   * improve-text-layout-and-legibility; ohne Unterstuetzung normaler Umbruch). */
+  text-wrap: balance;
 }
 
 .health-priority > .health-brief {
