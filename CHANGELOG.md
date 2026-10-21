@@ -128,6 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read like a saved measurement.
 - **The add button on the cycle page says what it is for: adding a past period.** "Period started"
   next to Today records today with one tap; the dialog behind the add button is for entering dates.
+- **An invitation link that no longer works says what to do next.** Instead of "no valid token was
+  found", the page now says the link is invalid or expired and to ask for a new one, and the way to
+  sign in stands out for anyone who already has an account.
 - **Settings keep asking before you leave when saving did not work.** A form counted as saved the
   moment you pressed Save - before its fields were checked and before the server answered. If a
   field was wrong or the server refused, leaving the page no longer asked, and what you had typed was

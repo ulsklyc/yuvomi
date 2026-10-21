@@ -60,7 +60,7 @@ export async function render(container) {
             ${esc(t('join.submit'))}
           </button>
         </form>
-        <p class="auth-form__forgot"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
+        <p class="auth-form__forgot" id="join-login"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
       </div>
     </main>
   `);
@@ -85,8 +85,16 @@ export async function render(container) {
   // Der Fokus wandert in die Fehlermeldung, damit auch sehende Tastaturnutzer
   // sie bemerken und nicht nur Screenreader über role="alert" (wie login.js).
   const fail = (msg) => { show(errorEl, msg); errorEl.focus(); };
-  // Ein toter Token macht das Formular sinnlos: nur die Meldung bleibt stehen.
-  const dead = (msg) => { fail(msg); form.hidden = true; intro.hidden = true; };
+  // Ein toter Token macht das Formular sinnlos: nur die Meldung bleibt stehen -
+  // und der Weg hinaus. KEINE SACKGASSE (Critique R21, a1; D15): die Meldung
+  // sagt, was zu tun ist ("bitte um einen neuen"), und wer schon ein Konto hat,
+  // findet die Anmeldung betont wie nach falschen Zugangsdaten (login.js).
+  const dead = (msg) => {
+    fail(msg);
+    form.hidden = true;
+    intro.hidden = true;
+    container.querySelector('#join-login')?.classList.add('auth-form__forgot--emphasis');
+  };
 
   if (!token) { dead(t('join.missingToken')); return; }
 

@@ -279,3 +279,28 @@ test('Befund 15: die Eingabe in ein markiertes Feld blendet die Meldung aus', as
   assert.equal(errorEl.hidden, true, 'die Meldung blieb nach der Korrektur stehen');
   assert.equal(attrs.has('aria-invalid'), false);
 });
+
+/* KEINE SACKGASSE AUF /join (Critique R21, a1; D15). Ohne gueltige Einladung
+ * stand "Es wurde kein gueltiger Token gefunden." - ein Wort aus der Technik,
+ * kein naechster Schritt, und der Weg zur Anmeldung als unscheinbare Zeile.
+ * Jetzt sagt der Satz, was zu tun ist (um einen neuen Link bitten), und die
+ * Anmeldung steht betont wie nach falschen Zugangsdaten (login.js). */
+test('/join ohne gueltige Einladung: der Satz nennt den naechsten Schritt, die Anmeldung steht betont (Critique R21)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const join = read('../public/pages/join.js');
+  assert.match(join, /<p class="auth-form__forgot" id="join-login"><a href="\/login" data-link>/, 'der Weg zur Anmeldung hat einen Namen');
+  const dead = join.slice(join.indexOf('const dead = '), join.indexOf("if (!token)"));
+  assert.match(dead, /querySelector\('#join-login'\)\?\.classList\.add\('auth-form__forgot--emphasis'\)/,
+    'eine tote Einladung betont die Anmeldung');
+  assert.match(css, /\.auth-form__forgot--emphasis a \{/, 'die Betonung hat ihre Regel');
+
+  const de = JSON.parse(read('../public/locales/de.json')).join;
+  for (const key of ['missingToken', 'invalidToken']) {
+    assert.match(de[key], /bitte um einen neuen/, `join.${key} nennt den naechsten Schritt`);
+  }
+  const dir = new URL('../public/locales/', import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { join: j } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    assert.doesNotMatch(j.missingToken, /token/i, `${file}: kein "Token" in der Meldung`);
+  }
+});
