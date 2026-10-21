@@ -393,6 +393,20 @@
     border-radius: 0;
   }
 
+  /* DER KOPF DES BEREICHS HAT EINEN TRAEGER (R21 S7, D9). Die Spalte traegt
+   * hier keine Karte (siehe oben), und ihr klebender Kopf stand als weisser
+   * eckiger Balken ueber der Buehne, ohne Rundung, Schatten oder Flaeche
+   * darunter - als einziges Element der Seite. Er wird die Karte, die er
+   * ohnehin schon ist: Radius und leiser Schatten wie die Bereichskarten
+   * darunter, ohne Trennlinie (die Kante ist der Schatten), und Luft zum
+   * ersten Bereich. */
+  .health-split > .split-view__detail .split-view__detail-head {
+    border-radius: var(--radius-lg);
+    border-block-end-color: transparent;
+    box-shadow: var(--shadow-sm);
+    margin-block-end: var(--space-3);
+  }
+
   .health-areas__overview {
     display: block;
   }
@@ -2519,6 +2533,19 @@ button.health-med-card:hover {
   margin-inline: auto;
 }
 
+/* DIE TAGESMARKE RAGT UEBER DEN RING, ALSO HAT ER LUFT DAFUER (R21 S7,
+ * Critique a5: "Tag 7" lag bei 1280 5px auf der Kennzahlkarte daneben). Die
+ * Marke sitzt am Jetzt-Punkt und steht bis zu ihrer halben Breite (rund 29px)
+ * ueber den Rand - der Abstand zur Seitenspalte (24px) reichte nicht. Neben
+ * den Kennzahlen bekommt der Ring deshalb auf beiden Seiten so viel Rand, wie
+ * die Marke hinausragen kann; untereinander (unter 640px) zentriert er wie
+ * bisher. */
+@media (min-width: 640px) {
+  .cycle-ring {
+    margin-inline: var(--space-4);
+  }
+}
+
 .cycle-ring__svg { width: 100%; height: 100%; display: block; }
 
 .cycle-ring__track { stroke: color-mix(in oklab, var(--color-border) 75%, transparent); }
@@ -3755,6 +3782,13 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 @media (max-width: 639px) {
   .cycle-hero { flex-direction: column; }
   .cycle-ring { width: 200px; height: 200px; }
+
+  /* Die Legende direkt unter dem Ring (health.js, renderCycleShell): mittig
+   * wie er, und der Abstand kommt aus dem `gap` der Spalte. */
+  .cycle-hero > .cycle-ring__legend {
+    justify-content: center;
+    margin-top: 0;
+  }
 
   /* Schmal steht die Heute-Karte IN der Spalte, zwischen Ring und Kennzahlen
    * (health.js, renderCycleShell): volle Breite statt mittig auf

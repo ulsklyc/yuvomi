@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The cycle page keeps its pieces together.** On a phone the legend of the cycle ring now
+  sits right under the ring instead of below the today card and four tiles. On wider screens
+  the "Day 7" marker on the ring no longer lies on the tile next to it, and the header of each
+  health area is a card like the areas below it instead of a square white bar.
+
 - **The detail column next to a list ends under its content.** On a wide screen a birthday, a
   recipe, a contact or a task stood in a card that reached the bottom of the window, with up to
   half a screen of white above its buttons. The card is now as tall as what it shows, the

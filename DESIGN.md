@@ -1527,7 +1527,9 @@ Gesundheit und bei den Vitalwerten schoben sich Ziffern und Kennzahlen mit eigen
 beim Scrollen ueber den Kopf. Statt
 eines z-index-Wettlaufs bekommt alles hinter `.split-view__detail-head` einen eigenen
 Stapelkontext (`isolation: isolate`, layout.css) - fuer jede Split-Detailspalte
-(`test:master-detail`).
+(`test:master-detail`). Wo die Spalte selbst keine Karte traegt (Gesundheit: die Bereiche
+bringen ihre Karten mit), ist der Kopf die Karte - Radius `--radius-lg`, leiser Schatten, keine
+Trennlinie (R21 S7, D9: vorher ein weisser eckiger Balken ohne Traeger; `test:health-cycle`).
 
 **Eine Aussenkante je Modul, kurze Listen zweispaltig** (R16, 2026-10-05). Die Messmatrix
 vom 05.10. fand die 720px-Spalte weiter in leerer Flaeche: Haushaltshilfe (Aufgaben, Berichte,

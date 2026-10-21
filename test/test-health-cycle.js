@@ -2165,10 +2165,12 @@ test('R17 E10: "Weitere Angaben" startet offen, sobald dort ein Wert steht - und
 test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unter der Legende', () => {
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   const shell = src.match(/function renderCycleShell\(\)[\s\S]*?\n\}\n/)?.[0] ?? '';
-  const hero = shell.match(/<div class="cycle-hero">[\s\S]*?\$\{cycleRingLegendMarkup\(prediction\)\}\n[^\n]*\n/)?.[0] ?? '';
-  assert.match(hero, /\$\{cycleRingMarkup\(prediction\)\}\s*\$\{darf && todayLeads \? cycleTodayActionsMarkup\(\) : ''\}\s*<div class="cycle-hero__side">/,
-    'schmal: Ring, Heute-Karte, Kennzahlen - in dieser Reihenfolge im Markup (Tab-Folge = Bild)');
-  assert.match(hero, /\$\{cycleRingLegendMarkup\(prediction\)\}\s*\$\{darf && !todayLeads \? cycleTodayActionsMarkup\(\) : ''\}/,
+  // Seit R21 S7 steht schmal die Legende zwischen Ring und Heute-Karte (sie
+  // erklaert den Ring), breit bleibt sie unter dem Kopfbereich.
+  const hero = shell.match(/<div class="cycle-hero">[\s\S]*?\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}\n[^\n]*\n/)?.[0] ?? '';
+  assert.match(hero, /\$\{cycleRingMarkup\(prediction\)\}[\s\S]{0,700}?\$\{todayLeads \? cycleRingLegendMarkup\(prediction\) : ''\}\s*\$\{darf && todayLeads \? cycleTodayActionsMarkup\(\) : ''\}\s*<div class="cycle-hero__side">/,
+    'schmal: Ring, Legende, Heute-Karte, Kennzahlen - in dieser Reihenfolge im Markup (Tab-Folge = Bild)');
+  assert.match(hero, /\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}\s*\$\{darf && !todayLeads \? cycleTodayActionsMarkup\(\) : ''\}/,
     'breit: unter der Legende, wo sie stand');
   assert.match(src, /const CYCLE_TODAY_LEADS_QUERY = '\(max-width: 639px\)'/, 'dieselbe Schwelle wie die Spaltenform des Kopfbereichs');
   const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
@@ -2245,4 +2247,22 @@ test('R21 D7: /health/cycle?open=settings oeffnet die Zyklus-Einstellungen', () 
   const mount = src.slice(src.indexOf('async function mountCycle('), src.indexOf('async function loadCycle('));
   assert.match(mount, /openCycleSettingsFromQuery\(\)/);
   assert.match(src, /function openCycleSettingsFromQuery\(\{ loc = window\.location \} = \{\}\) \{/);
+});
+
+// R21 S7 (Critique a5, D9): drei Stellen der Zyklus-Flaeche. Gemessen vorher:
+// die Legende stand mobil 486px unter dem Ring, "Tag 7" lag ab 640px 5px auf
+// der Kennzahlkarte, und der Kopf des Bereichs war ein weisser eckiger Balken.
+test('R21 S7: Legende am Ring, Luft fuer die Tagesmarke, ein Traeger fuer den Bereichskopf', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /\$\{cycleRingMarkup\(prediction\)\}[\s\S]{0,700}\$\{todayLeads \? cycleRingLegendMarkup\(prediction\) : ''\}/,
+    'schmal steht die Legende im Markup direkt hinter dem Ring');
+  assert.match(src, /\$\{todayLeads \? '' : cycleRingLegendMarkup\(prediction\)\}/, 'breit bleibt sie unter dem Kopfbereich');
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const ring = rules.find((r) => r.selector.trim() === '.cycle-ring' && r.at.some((a) => /min-width:\s*640px/.test(a)));
+  assert.match(ring?.body ?? '', /margin-inline:\s*var\(--space-4\)/, 'neben den Kennzahlen hat der Ring Rand fuer die Tagesmarke');
+  const head = rules.find((r) => r.selector.trim() === '.health-split > .split-view__detail .split-view__detail-head');
+  assert.match(head?.body ?? '', /border-radius:\s*var\(--radius-lg\)/, 'der Bereichskopf ist eine Karte');
+  assert.match(head.body, /box-shadow:\s*var\(--shadow-sm\)/);
 });

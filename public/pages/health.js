@@ -7479,12 +7479,17 @@ function renderCycleShell() {
     ${own ? cycleBubbleMarkup(prediction, pms, darf, { withRing: true }) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
+      ${/* DIE LEGENDE STEHT AM RING, DEN SIE ERKLAERT (R21 S7, Critique a5):
+            schmal kamen Heute-Karte und vier Kennzahlen dazwischen, und die
+            Legende stand 486px unter dem Ring (390px). Dort steht sie jetzt
+            direkt darunter - im Markup, damit die Tab-Folge dem Bild folgt. */ ''}
+      ${todayLeads ? cycleRingLegendMarkup(prediction) : ''}
       ${darf && todayLeads ? cycleTodayActionsMarkup() : ''}
       <div class="cycle-hero__side">
         ${cycleStatsMarkup(prediction)}
       </div>
     </div>
-    ${cycleRingLegendMarkup(prediction)}
+    ${todayLeads ? '' : cycleRingLegendMarkup(prediction)}
     ${darf && !todayLeads ? cycleTodayActionsMarkup() : ''}
     ${cyclePairMarkup(cycleCalendarMarkup(own, pms, darf), cycleTrendsMarkup())}
     ${cycleHistoryMarkup(darf)}
