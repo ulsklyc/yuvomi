@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The detail column next to a list ends under its content.** On a wide screen a birthday, a
+  recipe, a contact or a task stood in a card that reached the bottom of the window, with up to
+  half a screen of white above its buttons. The card is now as tall as what it shows, the
+  buttons sit right below, and a long detail still scrolls inside it.
+
 - **The calendar header takes one line on a laptop, and the date above it is never cut.** At
   1280 pixels the header used two lines, with an empty stretch next to the date. When the full
   line does not fit, the search now waits as a magnifier button and opens over the view switch

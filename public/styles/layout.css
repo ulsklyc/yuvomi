@@ -3658,9 +3658,19 @@ html.fab-steady .page-fab {
     overflow-y: auto;
   }
 
+  /* DIE HOEHE FOLGT DEM INHALT (Critique R21, D9: "Detailspalten nicht
+   * kuenstlich strecken"). Die Karte fuellte die ganze Zeile des Rasters, und
+   * ein kurzes Detail trug seinen Fuss an der Fensterkante - gemessen 1920:
+   * Geburtstag 528px leer ueber dem Fuss, Rezept 419, Kontakt 285, Aufgabe
+   * 210. Jetzt endet sie unter ihrem Inhalt (`align-self: start`), hoechstens
+   * so hoch wie die Spalte; laenger scrollt sie wie bisher, Kopf und Fuss
+   * kleben. Der Rand unten zaehlt in die Obergrenze, sonst ragte die Karte um
+   * ihn ueber die Zeile. */
   .split-view__detail {
     display: flex;
     flex-direction: column;
+    align-self: start;
+    max-block-size: calc(100% - var(--space-4));
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -3821,8 +3831,9 @@ html.fab-steady .page-fab {
 .split-view__detail-body {
   display: flex;
   flex-direction: column;
-  /* Fuellt die Spalte, damit ein kurzes Detail seinen Fuss unten traegt. */
-  flex: 1 0 auto;
+  /* Waechst nicht mehr in eine gestreckte Spalte (R21, D9): die Karte ist so
+   * hoch wie ihr Inhalt, der Fuss steht direkt darunter. */
+  flex: 0 0 auto;
   min-height: 0;
 }
 

@@ -182,11 +182,13 @@ test('die Hoehe der klebenden Spalte rechnet ab ihrer gemessenen Oberkante bis z
     && r.at.some((a) => /module-surface/.test(a)));
   assert.ok(rule, 'Regel der klebenden Detailspalte fehlt');
   assert.match(rule.body, /position:\s*sticky/);
-  // R10 L3 (A8 P1-2): VOLLE Hoehe (`height`, nicht `max-height` - sonst eine
-  // 301px-Karte) und buendig mit der Liste (kein Versatz nach unten).
-  assert.doesNotMatch(rule.body, /max-height\s*:/, 'die Spalte ist ein Ort, keine mit dem Inhalt wachsende Karte');
+  // R10 L3 (A8 P1-2) stand hier VOLLE Hoehe. R21 S7 (D9, "Detailspalten
+  // nicht kuenstlich strecken"): hoechstens bis zur Luft ueber dem Fensterrand,
+  // sonst so hoch wie der Inhalt (1920: 194px leer ueber dem Fuss). Buendig
+  // mit der Liste bleibt sie (kein Versatz nach unten).
+  assert.doesNotMatch(rule.body, /(?:^|;|\s)height\s*:/, 'keine feste Hoehe: die Spalte folgt ihrem Inhalt');
   assert.doesNotMatch(rule.body, /margin-block-start\s*:/, 'die Spalte beginnt buendig mit der Liste');
-  const maxHeight = rule.body.match(/(?:^|;|\s)height:\s*([^;]+);/)?.[1] ?? '';
+  const maxHeight = rule.body.match(/(?:^|;|\s)max-height:\s*([^;]+);/)?.[1] ?? '';
   // Die Oberkante ist der Messwert; ohne ihn (erster Frame) der Klebestand.
   // Und sie endet ueber dem Nachlauf der Shell (Installationsbanner, FAB):
   // eine klebende Spalte bis an den Fensterrand liegt sonst mit ihrem Fuss

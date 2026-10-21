@@ -620,9 +620,12 @@
     /* Von der GEMESSENEN Oberkante bis zur Luft ueber dem Fensterrand
      * (inventory.js, syncDetailTop): in Ruhe steht die Filterzeile zwischen
      * Kopf und Spalte, beim Kleben nicht mehr. Ohne Messwert (erster Frame)
-     * gilt der Klebestand. Volle Hoehe statt Hoechstmass: die Spalte ist ein
-     * Ort, keine Karte, die mit ihrem Inhalt waechst. */
-    height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
+     * gilt der Klebestand. HOECHSTMASS STATT VOLLER HOEHE (R21, D9: "Detail-
+     * spalten nicht kuenstlich strecken"): bis dahin galt die Spalte als Ort,
+     * der bis zum Fensterrand reicht - und trug bei 1920 ein Leerband ueber
+     * dem Fuss. Jetzt endet sie unter ihrem Inhalt und scrollt, wo er laenger
+     * ist, wie Kontakte, Rezepte und Aufgaben. */
+    max-height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
   }
 
   /* KENNZAHLEN ALS ZEILEN, NICHT ALS DREI KACHELN IN 424PX. Drei Kacheln je

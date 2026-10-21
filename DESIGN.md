@@ -1484,6 +1484,13 @@ Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
 1920 auf allen Seiten (`test:dashboard-clarity`).
 
+**Die Detailspalte ist so hoch wie ihr Inhalt** (R21 S7, D9). Sie reichte als Karte bis an den
+Fensterrand, und ein kurzes Detail trug seinen Fuss dort - gemessen 1920: Geburtstag 528px leer
+ueber dem Fuss, Rezept 419, Kontakt 285, Aufgabe 210, Inventar 194. Jetzt endet sie unter ihrem
+Inhalt (`align-self: start`, Obergrenze die Zeile bzw. bei den klebenden Spalten von Geburtstagen
+und Inventar die Luft ueber dem Fensterrand); laengerer Inhalt scrollt, Kopf und Fuss kleben wie
+bisher. Guard: `test:master-detail`, `test:inventory-list-detail`, `test:birthday-localization`.
+
 **Bearbeiten geschieht in der Detailspalte** (R19, 2026-10-16). Ab der Schwelle legt sich das
 Formular deckungsgleich auf die Spalte (gleiche Flaeche, Radius `--radius-lg`, leiser Schatten,
 als Grund nur ein Hauch - die halbe leichte Abdunklung, `--color-overlay-light` zu

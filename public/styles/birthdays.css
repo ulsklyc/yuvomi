@@ -674,8 +674,10 @@
      * (birthdays.js, syncBirthdaysDetailTop); ohne Messwert der Klebestand.
      * Minus `--shell-tail`: was unten fest steht (Installationsbanner, FAB),
      * verlangt seinen Nachlauf auch von einer klebenden Spalte - sonst endet
-     * ihr Fuss darunter (test:dashboard-surface-browser, Nachlauf). */
-    height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
+     * ihr Fuss darunter (test:dashboard-surface-browser, Nachlauf).
+     * HOECHSTENS so hoch, nicht immer (R21, D9): die Spalte endet unter ihrem
+     * Inhalt - gemessen 1920 standen 528px leer ueber dem Fuss. */
+    max-height: calc(var(--viewport-height) - var(--birthdays-detail-top, calc(var(--birthdays-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
   }
 }
 

@@ -215,8 +215,11 @@ test('Liste + Detail: Seite, Markup, Klickweg und die klebende Spalte', () => {
   const block = css.slice(css.indexOf('@container module-surface (min-width: 65rem)'));
   assert.ok(block.length > 0, 'die Spalte gilt ab der Schwelle aus tokens.css');
   assert.match(block, /position: sticky;/);
-  assert.match(block, /height: calc\(var\(--viewport-height\) - var\(--birthdays-detail-top/,
-    'die Hoehe rechnet ab der gemessenen Oberkante - sonst ragt sie in Ruhe unter den Falz');
+  // R21 S7 (D9): HOECHSTENS bis zur Luft ueber dem Fensterrand, nicht immer -
+  // die Spalte endet unter ihrem Inhalt (1920: 528px leer ueber dem Fuss).
+  assert.match(block, /max-height: calc\(var\(--viewport-height\) - var\(--birthdays-detail-top/,
+    'die Obergrenze rechnet ab der gemessenen Oberkante - sonst ragt sie in Ruhe unter den Falz');
+  assert.doesNotMatch(block, /(?:^|[;\s])height: calc\(var\(--viewport-height\)/, 'keine feste Hoehe: die Spalte folgt dem Inhalt');
 });
 
 // R19 (Critique 2026-10-16): Monatsgruppen in der Liste, und der naechste

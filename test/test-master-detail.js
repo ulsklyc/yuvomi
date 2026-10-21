@@ -933,7 +933,13 @@ test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inh
   assert.match(foot, /flex-wrap:\s*nowrap/, 'einreihig');
   assert.match(foot, /margin-block-start:\s*auto/, 'kurzer Inhalt: Fuss an der Unterkante');
   assert.match(foot, /background-color:\s*var\(--color-surface\)/, 'deckt den Inhalt, der darunter scrollt');
-  assert.match(body(layout, '.split-view__detail-body'), /flex:\s*1 0 auto/, 'der Koerper fuellt die Spalte');
+  // R21 S7 (D9, "Detailspalten nicht kuenstlich strecken"): die Spalte ist so
+  // hoch wie ihr Inhalt, hoechstens so hoch wie die Zeile - gemessen 1920
+  // standen bis 528px leer ueber dem Fuss. Der Koerper waechst nicht mehr.
+  assert.match(body(layout, '.split-view__detail-body'), /flex:\s*0 0 auto/, 'der Koerper waechst nicht in eine gestreckte Spalte');
+  const pane = [...eachRule(layout)].find((r) => r.selector.trim() === '.split-view__detail' && r.at.some((a) => /module-surface \(min-width: 65rem\)/.test(a)));
+  assert.match(pane?.body ?? '', /align-self:\s*start/, 'die Spalte endet unter ihrem Inhalt');
+  assert.match(pane.body, /max-block-size:\s*calc\(100% - var\(--space-4\)\)/, 'hoechstens so hoch wie die Zeile, dann scrollt sie');
   assert.match(body(dv, '.detail-view--in-pane'), /flex:\s*1 0 auto/, 'die Ansicht fuellt den Koerper');
   // Und die Leseansicht haengt genau diese Klasse an ihren Fuss in der Spalte.
   const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
