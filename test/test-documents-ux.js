@@ -2068,7 +2068,7 @@ test('jede Ablage sagt auf Touch "tippen" statt "ablegen" - zwei Fassungen, eine
   ];
   for (const [file, key] of sites) {
     const src = read(file);
-    const esc = key.replace(/\./g, '\\.');
+    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     assert.match(src, new RegExp(`<span class="u-pointer-only">\\$\\{(?:esc\\()?t\\('${esc}'\\)\\)?\\}</span><span class="u-touch-only">\\$\\{(?:esc\\()?t\\('${esc}Touch'\\)\\)?\\}</span>`),
       `${file}: ${key} ohne Touch-Zwilling`);
   }
