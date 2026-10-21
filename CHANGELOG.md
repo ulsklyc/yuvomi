@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The small line under a name reads the same in every module, and a little larger where it
+  was smallest.** Dates, places, amounts and counts under a task, an entry or a contact were 12
+  pixels in tasks and on the Overview and 14 pixels in budget, inventory, contacts and the
+  agenda. They now share one size, 13 pixels, everywhere. Explanations in empty pages, document
+  descriptions and the line under a contact's name move from 14 to 15 pixels.
+
 - **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed
   two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage
   participants" is reached via the ⋯ button next to it.

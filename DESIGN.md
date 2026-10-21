@@ -113,6 +113,13 @@ typography:
     fontSize: "0.8125rem"
     fontWeight: 500
     lineHeight: 1.21
+  # Metazeile: was unter dem Namen einer Zeile, Karte oder Kachel steht
+  # (Datum, Ort, Anzahl, Betrag, Stand). Footnote in regular, Zeilenhoehe
+  # erbt die Zeile (R21, 2026-10-21, D4, test:typography).
+  meta-line:
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
   micro-label:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif"
     fontSize: "0.75rem"
@@ -994,9 +1001,24 @@ Subheadline 15, Footnote 13, Caption 2 11.
   Regel in typography.css; vorher vier (einzeilig, unbegrenzt, mobil anders als Desktop).
   Kein Modulblatt setzt dort `nowrap` oder eine andere Zeilenzahl (Guard `test:typography`).
 - **Body** (regular, 17px, lh 1.47 = Apples 17/25): Fliesstext, Listenzellen.
-- **Subheadline** (regular, 15px): Sekundaerzeilen.
-- **Footnote** (medium, 13px, lh 1.21): Metazeilen, Label ueber Feldern, das Versal-Datum
-  ueber dem Gruss.
+- **Subheadline** (regular, 15px): Sekundaertext - freistehender Lesetext neben dem
+  Hauptinhalt (Erklaerung eines Leerzustands, Beschreibung einer Karte, Untertitel eines
+  Kontaktkopfs). `.u-meta` traegt die Rolle, Bestandsklassen sind in typography.css
+  registriert; bis R21 standen sie bei 14, der Stufe der Bedienelemente. Guard
+  `test:typography` "Sekundaertext ist Subheadline 15".
+- **Footnote** (13px): in regular die **Metazeile**, in medium das Label ueber Feldern und das
+  Versal-Datum ueber dem Gruss. **Eine Zeile ist Titel 16 + Metazeile 13** (R21, D4): was
+  unter dem Namen einer Zeile, Karte oder Kachel steht - Datum, Ort, Anzahl, Betrag,
+  Kategorie, Stand, Veraenderung -, nimmt die EINE Metazeilen-Rolle in typography.css.
+  Gemessen standen dort drei Groessen (Aufgaben 12, Budget/Inventar/Kontakte/Agenda 14,
+  Dashboard 12 neben 13). Das Modulblatt traegt Farbe, Layout und Hervorhebung
+  (Ueberfaellig halbfett), keine Groesse; ein Chip IN der Zeile bleibt Caption 1. Guard
+  `test:typography` "die Metazeile ist eine Rolle": er liest jede `__meta`-Klasse aus
+  Stylesheets UND Markup und verlangt sie registriert oder als benannte Ausnahme (heute
+  `.day-event__meta`, Mikrotext im Zeitraster).
+- **Caption 1** (12px, `--text-xs`): nur Badges, Zaehler, Chips, Nav-Labels und
+  Mikro-Labels - nie eine Lesezeile (R21, D4). Die dichte Monatszelle des Kalenders ist
+  Mikrotext und bleibt bei 12, darf aber am Tablet zwei Zeilen nehmen.
 - **Versal-Mikro-Label** (semibold, 12px, Tracking 0.05em, uppercase): der Sektionskopf
   einer Grouped-Liste. 0.05em (`--tracking-label`) ist der EINE Tracking-Wert und hat sechs
   gestreute Werte abgeloest.
@@ -1103,7 +1125,7 @@ ohnehin das Signal, der Name steht im `title`. Vorher stand hier eine 9px-Unterg
 die Kalender-Gitter riefen mit `size` 14-16 genau hinein (Sonde `undersized-ui-text`, 13
 Fundstellen). Ein 9px-Text sagt weniger als ein sauberer Punkt. Wo der Stapel neben
 Fliesstext steht statt in einem Chip, hebt `minFont` die Untergrenze (Agenda-Zeile seit
-2026-09-24: 12px auf 22px Scheibe, neben der 14px-Metazeile) - die Scheibe waechst mit, damit
+2026-09-24: 12px auf 22px Scheibe, neben der Metazeile - damals 14px, seit R21 13px) - die Scheibe waechst mit, damit
 das Verhaeltnis haelt.
 
 ## Layout

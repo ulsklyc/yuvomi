@@ -769,15 +769,20 @@ test('R18: eine Bereichszeile ist immer zwei Zeilen hoch - ihr Status schiebt ni
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(read('public/styles/health.css'))];
   const main = rules.filter((r) => r.selector.trim() === '.health-area-row__main').map((r) => r.body).join(';');
-  assert.match(main, /min-block-size:\s*calc\(1lh \+ var\(--space-0h\) \+ var\(--text-sm\) \* var\(--line-height-base\)\)/,
+  assert.match(main, /min-block-size:\s*calc\(1lh \+ var\(--space-0h\) \+ var\(--type-caption\) \* var\(--line-height-base\)\)/,
     'Name plus Statuszeile, ob der Status schon da ist oder nie kommt');
   assert.match(main, /justify-content:\s*center/, 'ein Name ohne Status steht mittig');
   // Der Name darf die reservierte Hoehe nicht selbst fuellen (.list-row__name waechst im Flex-Traeger).
   const name = rules.find((r) => r.selector.trim() === '.health-area-row__main > .health-area-row__name');
   assert.ok(name && /flex:\s*0 0 auto/.test(name.body), 'sonst steht der Name oben statt mittig');
-  // Reichweite der Rechnung: der Status laeuft wirklich in --text-sm.
+  // Reichweite der Rechnung: der Status laeuft wirklich in der Metazeile
+  // (--type-caption, seit R21 aus der Rolle in typography.css, nicht aus health.css).
   const status = rules.filter((r) => r.selector.trim() === '.health-area-row__status').map((r) => r.body).join(';');
-  assert.match(status, /font-size:\s*var\(--text-sm\)/);
+  assert.doesNotMatch(status, /font-size:/, 'die Groesse kommt aus der Rolle, nicht aus dem Modulblatt');
+  const typo = [...eachRule(read('public/styles/typography.css'))];
+  const rolle = typo.find((r) => !r.at.length && r.selector.split(',').map((s) => s.trim()).includes('.health-area-row__status'));
+  assert.ok(rolle, 'der Status steht in der Metazeilen-Rolle');
+  assert.match(rolle.body, /font-size:\s*var\(--type-caption\)/);
   assert.match(status, /white-space:\s*nowrap/, 'und bleibt eine Zeile');
 });
 

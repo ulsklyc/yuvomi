@@ -1154,8 +1154,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1h);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
+  /* Groesse UND Gewicht traegt die Metazeile (typography.css, R21): das
+   * Etikett stand 12px halbfett neben der 12px-Faelligkeit in regular - zwei
+   * Schnitte in einer Zeile, und den Rang sagt ohnehin der Punkt. */
   color: var(--color-text-secondary);
 }
 
@@ -1167,7 +1168,6 @@
 
 /* Fälligkeitsdatum */
 .due-date {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
@@ -1996,7 +1996,6 @@
 
 .task-comments__status {
   margin: 0;
-  font-size: var(--text-sm);
   color: var(--color-text-tertiary);
 }
 

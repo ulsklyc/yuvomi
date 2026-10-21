@@ -72,7 +72,6 @@
 /* Die Angaben des Gruppen-Dialogs bei `budget: read` (#1265 P7): eine Zeile
  * unter der Beschreibung, eine Stufe kleiner, damit sie als Nachsatz liest. */
 .split-group-meta {
-  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
@@ -301,7 +300,6 @@
 .split-expense__body span,
 .split-activity-item span {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 /* Beleg-Marke in der Metazeile (#583): gleiche Größe wie der Text daneben,

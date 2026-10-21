@@ -323,7 +323,6 @@
 
 .settings-overview__row-description {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   line-height: var(--line-height-snug);
 }
 
@@ -1127,7 +1126,6 @@
 }
 
 .weather-place__meta {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
@@ -1917,7 +1915,6 @@
 
 .settings-member__meta {
   display: block;
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   margin-top: 1px;
 }
@@ -4156,7 +4153,6 @@
 .backfill-moved__meta,
 .backfill-moved__change {
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
 }
 
 /* Die Sprungmarke zum Blatt (R20, settings/shell.js createSheetSkipLink)

@@ -553,7 +553,6 @@
 /* Fußnote unter dem Betrag: „7 aktiv", „121% des Budgets genutzt", „EUR".
  * Löst die frühere <small>-Sonderbehandlung in subscriptions.css ab. */
 .metric-card__note {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   min-width: 0;
   hyphens: auto;
@@ -664,7 +663,6 @@
 .metric-card--forecast .metric-card__value { color: var(--color-text-secondary); }
 
 .metric-card__trend {
-  font-size: var(--text-xs);
   /* Icon und Text bilden eine Zeile an der Fluchtlinie von Label und Betrag. */
   display: flex;
   align-items: center;
@@ -1012,7 +1010,6 @@ svg.chart {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 

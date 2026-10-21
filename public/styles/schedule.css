@@ -94,7 +94,6 @@
 
 .schedule-today__meta,
 .schedule-today__empty {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 

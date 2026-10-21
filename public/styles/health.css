@@ -335,7 +335,8 @@
  * kleine Spruenge unter dem Finger. Die Hoehe ist jetzt die von Name plus
  * Status, ob der Status schon da ist oder nie kommt (Fasten ohne laufende
  * Phase); ein Name allein steht mittig. `1lh` ist die Namenszeile, der Status
- * laeuft in --text-sm mit der geerbten Zeilenhoehe. Ohne `lh` (aeltere
+ * laeuft in der Metazeile (--type-caption, typography.css; bis R21 --text-sm)
+ * mit der geerbten Zeilenhoehe. Ohne `lh` (aeltere
  * Browser) faellt die Zeile auf das alte Verhalten zurueck. */
 .health-area-row__main {
   flex: 1 1 auto;
@@ -344,7 +345,7 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--space-0h);
-  min-block-size: calc(1lh + var(--space-0h) + var(--text-sm) * var(--line-height-base));
+  min-block-size: calc(1lh + var(--space-0h) + var(--type-caption) * var(--line-height-base));
 }
 
 /* `.list-row__name` waechst in einem Flex-Traeger (`flex: 1 1 auto`,
@@ -361,7 +362,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .health-area-row__status:empty {
@@ -1021,7 +1021,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   flex: 0 0 auto;
   margin-inline-start: auto;
@@ -1188,7 +1187,6 @@ button.health-med-card:hover {
 }
 
 .health-med-card__sub {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
@@ -1522,7 +1520,6 @@ button.health-med-card:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  font-size: var(--text-sm);
 }
 
 .health-lab-rows__ref {
@@ -1532,7 +1529,8 @@ button.health-med-card:hover {
 
 .health-lab-rows__meta .health-lab-flag {
   margin-inline-start: auto;
-  font-size: var(--text-sm);
+  /* Die Groesse erbt die Metazeile (Footnote 13, typography.css): hier
+   * stand 14, groesser als die Zeile, in der die Marke steht (R21, D4). */
 }
 
 .health-lab-rows__row--low .health-lab-rows__value,
@@ -2036,7 +2034,6 @@ button.health-med-card:hover {
 }
 
 .health-prevention-due-row__date {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -3764,7 +3761,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .health-recent__date {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   min-width: 96px;
 }
 
@@ -3901,7 +3897,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
 .fasting-dial__days { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
-.fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); }
 .fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
 /* Vor dem ersten Fasten (health-fasting.js `idle`): kein leerer Ring, keine
  * Umschaltung der Uhr - Satz und Knoepfe, darunter gleich der Leerzustand

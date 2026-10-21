@@ -217,7 +217,6 @@
 }
 
 .inventory-detail-list__sub {
-  font-size: var(--type-caption);
   color: var(--color-text-tertiary);
 }
 
@@ -557,7 +556,6 @@
 }
 
 .inventory-history-entry__sub {
-  font-size: var(--type-caption);
   color: var(--color-text-tertiary);
 }
 

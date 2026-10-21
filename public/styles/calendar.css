@@ -2263,7 +2263,6 @@
  * nicht (drei 20px-Avatare, feste Breite), der ORT gibt nach. Er ist die
  * einzige Angabe der Zeile, von der ein Anfang schon nützt. */
 .agenda-event__meta {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;

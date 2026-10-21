@@ -371,6 +371,119 @@
 }
 
 /* --------------------------------------------------------------------------
+ * DIE METAZEILE: Footnote 13, regular (R21, Critique 2026-10-21, D4)
+ *
+ * EINE ZEILE IST TITEL 16 + METAZEILE 13. Was unter dem Namen einer Zeile,
+ * einer Karte oder einer Kachel steht und sie beschreibt - Datum, Ort, Anzahl,
+ * Betrag, Kategorie, Stand, Veraenderung -, ist die Metazeile. Gemessen stand
+ * dieselbe Stelle in drei Groessen: Aufgaben 12 (`.due-date`,
+ * `.priority-badge`), Budget, Inventar, Kontakte und Agenda 14
+ * (`.list-row__meta` und Verwandte), das Dashboard 12 neben seiner eigenen
+ * 13er Cockpitzeile. 14 gehoert Bedienelementen, 12 Badges, Nav-Labels und
+ * Mikrotext (DESIGN.md, Typography) - fuer Lesetext unter einem Namen war
+ * beides die falsche Stufe.
+ *
+ * Groesse und Grundgewicht stehen HIER, Farbe, Layout und Hervorhebung
+ * (Ueberfaellig halbfett, Planstand im Ton) im Modulblatt. Ein Chip oder Badge
+ * IN der Zeile (`.task-tag`, `.list-row__tag`, `.doc-badge`) ist ein Etikett
+ * und bleibt Caption 1. Die Zeilenhoehe erbt die Zeile.
+ *
+ * Guard: test-typography.js, "R21: die Metazeile ist eine Rolle" - er liest
+ * jede `__meta`-Klasse aus Stylesheets und Markup und verlangt sie hier oder
+ * als benannte Ausnahme dort; kein anderes Blatt setzt an diesen Subjekten
+ * eine Groesse.
+ * ------------------------------------------------------------------------ */
+.list-row__meta,
+/* Aufgaben: die Zeile und ihre Teile, die vorher je 12px trugen */
+.task-card__meta,
+.kanban-card__meta,
+.due-date,
+.priority-badge,
+/* Kalender, Kontakte, Geburtstage */
+.agenda-event__meta,
+.contact-item__meta,
+.birthday-item__meta,
+/* Budget, Darlehen, Statistik, Plan */
+.budget-entry__meta,
+.budget-account__meta,
+.budget-loan-card__meta,
+.budget-loan-card__dates > span,
+.budget-loan-card__amounts span,
+.budget-bar-row__share,
+.budget-bar-row__of,
+.budget-plan-row__foot,
+.budget-chart-head__income,
+.budget-stats__readout,
+.budget-stats__legend,
+.split-group-meta,
+.split-group__meta,
+.split-expense__body span,
+.split-activity-item span,
+.subscription-card__meta,
+/* Kennzahl-Karten: Veraenderung, Notiz und Zusatz unter dem Wert */
+.metric-card__meta,
+.metric-card__trend,
+.metric-card__note,
+/* Dokumente und Inventar */
+.document-row__meta,
+.document-card__meta,
+.document-card__date,
+.document-viewer__meta,
+.document-upload-meta,
+.doc-attach-picker__item-meta,
+.inventory-booking-picker__item-meta,
+.dms-result__sub,
+.inventory-detail-list__sub,
+.inventory-history-entry__sub,
+/* Kueche, Belohnungen, Haushalt */
+.item-meta,
+.meal-card__meta,
+.meal-card__ingredients-count,
+.rw-ledger-row__meta,
+.rw-pending__meta,
+.rw-progress__label,
+.schedule-today__meta,
+.schedule-today__empty,
+.waste-source-detail__meta,
+/* Gesundheit */
+.health-area-row__status,
+.health-dose__status,
+.health-med-card__sub,
+.health-recent__date,
+.health-prevention-due-row__date,
+.health-lab-rows__meta,
+.health-prevention-row__meta,
+.health-nutrition-row__meta,
+.health-activity-row__meta,
+.cycle-history__meta,
+.cycle-preg__meta,
+.fasting-hero__meta,
+/* Uebersicht: jede Kachelzeile unter einem Namen */
+.dashboard-overview__weather,
+.today-cockpit-card__sub,
+.today-cockpit-card__time,
+.task-item__meta,
+.birthday-widget-item__meta,
+.countdown-item__meta,
+.pantry-widget-row__meta,
+.weather-widget__meta,
+.fasting-widget__meta,
+.housekeeping-widget__sub,
+.waste-widget-row__date,
+.cycle-widget__date,
+/* Shell und Einstellungen */
+.search-result__meta,
+.settings-overview__row-description,
+.settings-member__meta,
+.weather-place__meta,
+.backfill-moved__meta,
+.backfill-moved__change,
+.dms-account-meta {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-regular);
+}
+
+/* --------------------------------------------------------------------------
  * Generische Rollen für neuen Code (Markup trägt u-* direkt)
  * ------------------------------------------------------------------------ */
 .u-body {
@@ -378,7 +491,18 @@
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-base);
 }
-.u-meta {
+/* SEKUNDAERTEXT: Subheadline 15 (R21, D4). Freistehender Lesetext neben dem
+ * Hauptinhalt - die Erklaerung eines Leerzustands, die Beschreibung einer
+ * Karte, der Untertitel eines Kontaktkopfs. Er stand bei 14, der Stufe der
+ * Bedienelemente; Apple setzt ihn auf 15. Was unter dem NAMEN einer Zeile
+ * steht, ist dagegen die Metazeile (13, Block oben). `.u-meta` heisst aus
+ * Zeiten vor den Rollen so und ist genau diese Rolle.
+ * Guard: test-typography.js, "R21: Sekundaertext ist Subheadline 15". */
+.u-meta,
+.empty-state__description,
+.document-card__description,
+.contact-card__sub,
+.task-comments__status {
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-base);

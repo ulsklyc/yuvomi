@@ -256,7 +256,6 @@ a.doc-attach__chip-name:focus-visible {
 
 .doc-attach-picker__item-meta {
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
 }
 
 /* --------------------------------------------------------

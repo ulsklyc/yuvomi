@@ -642,7 +642,6 @@
 }
 
 .task-item__meta {
-  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   margin-top: 1px;
 }
@@ -1558,7 +1557,6 @@
 }
 
 .weather-widget__meta {
-  font-size: var(--text-xs);
   /* Auf der opaken Karte trägt die Sekundärfarbe die Abstufung; die frühere
    * opacity war nur nötig, weil der Text auf dem Verlauf stand und dort keine
    * gemessene Farbe haben konnte. */
@@ -2747,7 +2745,6 @@ svg.weather-forecast__icon {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-secondary);
-  font-size: var(--type-caption);
   line-height: var(--line-height-tight);
 }
 
@@ -2760,7 +2757,6 @@ svg.weather-forecast__icon {
  * eine Badge-Form fuer drei Bedeutungen war ein Critique-Befund, H6). */
 .today-cockpit-card__time {
   color: var(--color-text-secondary);
-  font-size: var(--type-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -3144,7 +3140,6 @@ button.today-cockpit__more--link {
   gap: var(--space-1);
   margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 .dashboard-overview__weather-icon {
@@ -3988,7 +3983,6 @@ button.today-cockpit__more--link {
 .birthday-widget-item__meta {
   margin-top: var(--space-0h);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4114,7 +4108,6 @@ button.today-cockpit__more--link {
 .countdown-item__meta {
   margin-top: var(--space-0h);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5116,7 +5109,6 @@ button.today-cockpit__more--link {
 
 .waste-widget-row__date {
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -5235,7 +5227,6 @@ button.today-cockpit__more--link {
 .pantry-widget-row__meta {
   margin-top: var(--space-0h);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5435,7 +5426,6 @@ button.today-cockpit__more--link {
 }
 
 .cycle-widget__date {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -5525,7 +5515,6 @@ button.today-cockpit__more--link {
 .housekeeping-widget__sub {
   margin-top: var(--space-0h);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7152,7 +7141,7 @@ button.today-cockpit__more--link {
 .fasting-widget .fasting-dial__content { display: grid; gap: var(--space-2); }
 .fasting-widget__controls { display: grid; justify-items: center; gap: var(--space-3); min-width: 0; }
 .fasting-widget__timer { font-size: var(--text-2xl); line-height: var(--line-height-tight); font-weight: var(--font-weight-bold); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.fasting-widget__meta { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fasting-widget__meta { color: var(--color-text-secondary); }
 .fasting-widget__remaining { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .fasting-widget__actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); }
 @container (min-width: 380px) {

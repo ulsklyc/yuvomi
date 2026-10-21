@@ -881,7 +881,6 @@
 .document-card__description {
   margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -892,7 +891,6 @@
   display: flex;
   gap: var(--space-2);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
 }
 
 /* Die Karte braucht den Abstand zum Titel; die ZEILE bekommt ihn von
@@ -990,7 +988,6 @@
 
 .document-card__date {
   min-width: 0;
-  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1648,7 +1645,6 @@
   padding: var(--space-3) 0 var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
 }
 
 .document-viewer__meta span {
@@ -2182,7 +2178,6 @@
 
 .dms-result__sub {
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

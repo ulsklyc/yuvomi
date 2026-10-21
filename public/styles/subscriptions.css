@@ -495,7 +495,6 @@
   gap: 0 var(--space-3);
   margin-top: var(--space-0h);
   color: var(--color-text-secondary);
-  font-size: var(--text-xs);
 }
 
 /* Eine Angabe bricht als Ganzes um, nicht mitten in „Faellig in 6 | Tagen" -

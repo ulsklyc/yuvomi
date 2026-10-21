@@ -1948,7 +1948,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .search-result__meta {
   display: block;
   margin-top: var(--space-0h);
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -9160,7 +9159,6 @@ textarea::placeholder {
 }
 
 .empty-state__description {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   max-width: 280px;
   line-height: var(--line-height-base);
@@ -9291,8 +9289,11 @@ textarea::placeholder {
   padding: var(--space-4) var(--space-3);
   gap: var(--space-2);
 }
+/* Kompakt (Widgets, Seitenspalten): eine Stufe tiefer als die Rolle, auf
+ * die Footnote - nach UNTEN umgestellt, damit kein neuer Umbruch entsteht
+ * (R21, D4; vorher 14, die Stufe der Bedienelemente). */
 .empty-state--compact .empty-state__description {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
 }
 
 /* --------------------------------------------------------

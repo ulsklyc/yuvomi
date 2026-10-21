@@ -575,7 +575,6 @@
 }
 
 .meal-card__ingredients-count {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }

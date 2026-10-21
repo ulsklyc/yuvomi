@@ -1012,3 +1012,107 @@ test('R19 Gesundheit: keine Schrift unter Caption 2, eine Flag-Sprache, ein Diag
   assert.match(body('.health-lab-badge--warn'), /color:\s*var\(--color-warning-ink\)/);
   assert.doesNotMatch(css, /fasting-week__[a-z]+[^{]*\{[^}]*chart-series/, 'die Fastenwoche laeuft auf fremden Serienfarben');
 });
+
+// R21 (Critique 2026-10-21, D4): DIE METAZEILE IST EINE ROLLE - Footnote 13.
+// Gemessen stand dieselbe Stelle in drei Groessen: Aufgaben 12 (`.due-date`,
+// `.priority-badge`), Budget/Inventar/Kontakte/Agenda 14 (`.list-row__meta`,
+// `.contact-item__meta`, `.agenda-event__meta`), das Dashboard 12 neben seiner
+// eigenen 13er Cockpitzeile. Die Rolle steht in typography.css; ein Modulblatt
+// traegt Farbe und Layout, keine Groesse.
+//
+// Der Guard prueft das SUBJEKT, nicht eine Liste: jede Klasse, die als BEM-
+// Element `__meta` (oder als Block `-meta`) heisst - im Stylesheet ODER im
+// Markup -, ist in der Rolle registriert oder steht als benannte Ausnahme mit
+// Grund darunter. Eine neue Metazeile, die niemand registriert, erbt sonst die
+// Groesse ihres Traegers und faellt hier auf statt in der naechsten Critique.
+test('R21: die Metazeile ist eine Rolle - Footnote 13, kein Modul setzt eine eigene Groesse', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => !rule.at.length && sels(rule).includes('.list-row__meta'));
+  assert.ok(rolle, 'typography.css registriert die Metazeile (`.list-row__meta`)');
+  assert.match(rolle.body, /font-size:\s*var\(--type-caption\)/, 'die Metazeile ist Footnote 13 (--type-caption)');
+  assert.match(rolle.body, /font-weight:\s*var\(--font-weight-regular\)/);
+  const registriert = sels(rolle);
+  const klassen = new Set(registriert.filter((s) => /^\.[\w-]+$/.test(s)).map((s) => s.slice(1)));
+
+  // Benannte Ausnahmen - jede mit dem Grund, warum sie KEINE Metazeile ist.
+  const AUSNAHMEN = new Map([
+    ['u-meta', 'die Subheadline-Utility (15) fuer Sekundaertext; der Name ist aelter als die Rollen'],
+    ['day-event__meta', 'Mikrotext im Zeitraster: die Zeile lebt in einem Terminblock, dessen Hoehe die Dauer ist'],
+  ]);
+
+  const META = /(?<![\w-])([a-z][a-z0-9_-]*(?:__|-)meta)(?![\w-])/g;
+  const gefunden = new Map();
+  const merke = (cls, wo) => { if (!gefunden.has(cls)) gefunden.set(cls, wo); };
+  for (const name of cssFiles) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      for (const m of rule.selector.matchAll(META)) merke(m[1], name);
+    }
+  }
+  const PUBLIC = new URL('../', STYLES_DIR);
+  const jsFiles = (dir) => readdirSync(new URL(dir, PUBLIC), { withFileTypes: true }).flatMap((e) => {
+    if (e.isDirectory()) return e.name === 'vendor' ? [] : jsFiles(`${dir}${e.name}/`);
+    return e.name.endsWith('.js') ? [`${dir}${e.name}`] : [];
+  });
+  for (const file of jsFiles('')) {
+    const src = readFileSync(new URL(file, PUBLIC), 'utf8');
+    for (const m of src.matchAll(/class(?:Name)?\s*[=:]\s*["'`]([^"'`]*)["'`]/g)) {
+      for (const k of m[1].matchAll(META)) merke(k[1], file);
+    }
+  }
+  assert.ok(gefunden.size >= 40, `nur ${gefunden.size} Meta-Klassen gefunden - liest der Guard noch?`);
+  const offen = [...gefunden].filter(([cls]) => !klassen.has(cls) && !AUSNAHMEN.has(cls)).map(([cls, wo]) => `.${cls} (${wo})`);
+  assert.deepStrictEqual(offen, [], 'Metazeilen ohne Rolle - in typography.css registrieren oder als Ausnahme begruenden');
+
+  // Kein Blatt ausser typography.css setzt am Subjekt einer Metazeile eine
+  // Groesse - auch nicht in einer Media- oder Container-Query. Ein Chip IN der
+  // Zeile (`.x__meta .chip`) ist ein anderes Subjekt und darf Caption 1 tragen.
+  const subjekt = (sel) => sel.split(/\s*[\s>+~]\s*/).pop();
+  const trifft = (sel) => registriert.some((r) => {
+    if (r.includes(' ')) return sel.replace(/\s+/g, ' ') === r;
+    return new RegExp(`${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(subjekt(sel));
+  });
+  const dialekt = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs || ['inherit', 'unset', 'revert'].includes(fs[1].trim())) continue;
+      const hit = sels(rule).filter(trifft);
+      if (hit.length) dialekt.push(`${name}: ${hit.join(', ')} { font-size: ${fs[1].trim()} }`);
+    }
+  }
+  assert.deepStrictEqual(dialekt, [], 'eine eigene Groesse an der Metazeile ist ein Dialekt - die Rolle in typography.css ist die Quelle');
+});
+
+// R21 (D4): SEKUNDAERTEXT IST SUBHEADLINE 15. Die Erklaerung eines Leerzustands,
+// die Beschreibung einer Dokumentkarte, der Untertitel eines Kontaktkopfs
+// standen bei 14 - der Stufe der Bedienelemente. Die Rolle steht in
+// typography.css; kein Blatt setzt an diesen Subjekten eine eigene Groesse.
+// Einzige Variante: der kompakte Leerzustand (Widgets, Seitenspalten) geht
+// eine Stufe TIEFER auf die Footnote, damit kein neuer Umbruch entsteht.
+test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () => {
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+  const rolle = typo.find((rule) => !rule.at.length && sels(rule).includes('.u-meta'));
+  assert.ok(rolle, '.u-meta steht in typography.css');
+  assert.match(rolle.body, /font-size:\s*var\(--type-secondary\)/);
+  const SEKUNDAER = ['.u-meta', '.empty-state__description', '.document-card__description', '.contact-card__sub', '.task-comments__status'];
+  for (const sel of SEKUNDAER) assert.ok(sels(rolle).includes(sel), `${sel} nimmt die Sekundaerrolle`);
+
+  const VARIANTE = new Map([['.empty-state--compact .empty-state__description', 'var(--type-caption)']]);
+  const funde = [];
+  for (const name of cssFiles.filter((n) => n !== 'typography.css')) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs) continue;
+      for (const sel of sels(rule)) {
+        const last = sel.split(/\s*[\s>+~]\s*/).pop();
+        if (!SEKUNDAER.some((s) => new RegExp(`${s.replace('.', '\\.')}(?![\\w-])`).test(last))) continue;
+        if (VARIANTE.get(sel.replace(/\s+/g, ' ')) === fs[1].trim()) continue;
+        funde.push(`${name}: ${sel} { font-size: ${fs[1].trim()} }`);
+      }
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'eine eigene Groesse am Sekundaertext ist ein Dialekt');
+});
+

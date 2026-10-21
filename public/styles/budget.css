@@ -778,7 +778,6 @@
 /* Bank und verfügbarer Rahmen einer Kreditkarte (#541). Einzeilig mit Ellipse:
    ein langer Herausgebername darf die Karte nicht in die Höhe ziehen. */
 .budget-account__meta {
-  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1219,7 +1218,6 @@
   display: none;
   gap: var(--space-1);
   margin: 0;
-  font-size: var(--text-xs);
   line-height: var(--line-height-tight);
   color: var(--color-text-secondary);
   white-space: nowrap;
@@ -1693,7 +1691,6 @@ button.budget-bar-row:focus-visible {
 .budget-loan-card__meta,
 .budget-loan-card__dates > span {
   display: block;
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -2735,7 +2732,6 @@ button.budget-entry__title {
 }
 .budget-stats__readout {
   margin-top:var(--space-2);
-  font-size:var(--text-xs);
   color:var(--color-text-secondary);
   min-height:1.5em;   /* Platz reservieren: der Text wechselt, das Layout nicht */
 }
@@ -2743,7 +2739,7 @@ button.budget-entry__title {
 @media (prefers-reduced-motion: reduce) {
   .budget-stats__point::after { transition:none; }
 }
-.budget-stats__legend { display:flex; gap:var(--space-4); margin-top:var(--space-2); font-size:var(--text-sm); color:var(--color-text-secondary); }
+.budget-stats__legend { display:flex; gap:var(--space-4); margin-top:var(--space-2); color:var(--color-text-secondary); }
 .budget-stats__legend--wrap { flex-wrap:wrap; gap:var(--space-2) var(--space-4); }
 /* Legenden-Swatches zeigen die Linie ihrer Serie. Seit R18 beide durchgezogen
  * (EIN Strichprinzip: gestrichelt heisst im Diagramm "kommt noch"); den
@@ -2790,7 +2786,6 @@ button.budget-entry__title {
 }
 
 .budget-bar-row__of {
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -3192,7 +3187,7 @@ button.budget-entry__title {
   transform-origin: left center;
   transition: transform var(--transition-slow);
 }
-.budget-plan-row__foot { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--plan-tone-color); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+.budget-plan-row__foot { display: flex; align-items: center; gap: var(--space-1); color: var(--plan-tone-color); font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
 .budget-plan-row__foot svg { flex: none; }
 
 @media (prefers-reduced-motion: reduce) {
