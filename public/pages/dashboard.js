@@ -7306,7 +7306,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
   try {
     const requestDay = householdToday();
     // Aus dem gemerkten Stand dieselben vier Antworten - samt der Slices, die
-    // er schon traegt (die ensure*-Aufrufe unten fragen dann nichts).
+    // er schon traegt (die ensure*-Aufrufe unten fragen dann nichts; die
+    // stille Nachfrage danach holt sie neu, siehe refreshDashboardData).
     const [dashRes, weatherRes, prefsRes, remindersRes] = memo
       ? [memo.data, memo.weatherRes, { data: memo.prefs }, memo.data.pendingReminders]
       : await Promise.all([
@@ -7394,8 +7395,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   // Zyklus-Slice strikt owner-only nachladen: Zyklusdaten sind privat und dürfen
-  // nicht in den familienweiten /dashboard-Payload. Genau einmal (data.cycle bleibt
-  // sonst undefined = „noch nie geladen"). Ein Fehler lässt die Kachel auf ihren
+  // nicht in den familienweiten /dashboard-Payload. Einmal je Stand (data.cycle
+  // bleibt sonst undefined = „noch nie geladen"; der stille Refresh setzt ihn
+  // zurueck und holt neu). Ein Fehler lässt die Kachel auf ihren
   // Onboarding-Empty fallen, statt das Dashboard zu kippen.
   async function ensureCycleSlice() {
     if (data.cycle !== undefined) return;
@@ -8254,24 +8256,37 @@ export async function render(container, { user, signal: routeSignal = null } = {
       const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
       if (signal.aborted) return;
       localizeEventLists(fresh);
-      // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
-      // liefert ihn nie, ein Refresh darf ihn nicht auf „nie geladen"
-      // zurückwerfen.
-      fresh.cycle = data.cycle;
-      // Schedule hat anders als Cycle keinen Privatsphaere-Grund, den alten
-      // Stand einfach mitzuschleppen (M-6a): "wer heute Dienst hat" blieb
-      // sonst bis zu 15 Minuten stehen und ueberlebte sogar einen
-      // Mitternachts-Wechsel auf dem Wandtablet. Vor der Uebernahme
-      // zuruecksetzen und mit frisch berechnetem Tag neu laden - derselbe
+      // DIE EIGENEN SLICES WERDEN NEU GEHOLT, NICHT WEITERGEREICHT. /dashboard
+      // liefert Zyklus (owner-only), Dienstplan und Abfuhr nie mit, und ein
+      // Refresh darf sie nicht auf „nie geladen" zurueckwerfen - nur
+      // mitschleppen darf er sie auch nicht: "wer heute Dienst hat" blieb sonst
+      // bis zu 15 Minuten stehen und ueberlebte sogar einen Mitternachts-
+      // Wechsel auf dem Wandtablet (M-6a). Seit dem gemerkten Stand (R21,
+      // `_overviewMemo`) fragt ein Aufbau daraus die Slices gar nicht, und
+      // diese Nachfrage stempelt ihn neu - ein Weiterreichen hielte einen alten
+      // Abholtermin oder einen auf einem anderen Geraet geaenderten Zyklus
+      // unbegrenzt, solange man unter einer Minute wiederkommt (Review zu
+      // R21). Also vor der Uebernahme zuruecksetzen und neu laden - derselbe
       // Weg, den ein frisch eingeblendetes Widget in persistWidgetConfig()
       // schon nimmt. Das heilt nebenbei auch einen zuvor gescheiterten Slice
       // (M-6b) beim naechsten stillen Takt, statt auf den Retry-Knopf zu warten.
+      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+        data.cycle = undefined;
+        await ensureCycleSlice();
+        if (signal.aborted) return;
+      }
+      fresh.cycle = data.cycle;
       if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
         data.schedule = undefined;
         await ensureScheduleSlice();
         if (signal.aborted) return;
       }
       fresh.schedule = data.schedule;
+      if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+        data.waste = undefined;
+        await ensureWasteSlice();
+        if (signal.aborted) return;
+      }
       fresh.waste = data.waste;
       fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;

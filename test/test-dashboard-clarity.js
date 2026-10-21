@@ -1600,3 +1600,40 @@ test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge d
   assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
   assert.match(render, /if \(!unchanged\) rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
 });
+
+// Review zu R21 (PR #2142): der gemerkte Stand traegt die eigenen Slices
+// (Abfuhr, Zyklus), die /dashboard nie mitliefert - die ensure*-Aufrufe fragen
+// beim Aufbau daraus nichts. Reichte die stille Nachfrage sie dann nur weiter
+// (`fresh.waste = data.waste;`) und stempelte den Stand neu (`rememberOverview`),
+// hielten Besuche unter einer Minute Abstand einen alten Abholtermin oder einen
+// auf einem anderen Geraet geaenderten Zyklus unbegrenzt. Vorher holte jedes
+// Mounten die Slices neu. Jeder Slice, den die Nachfrage in den neuen Stand
+// uebernimmt, wird deshalb vorher zurueckgesetzt und neu geholt - derselbe Weg
+// wie beim Dienstplan (test:dashboard, M-6a).
+test('R21 Rueckweg: die stille Nachfrage holt jeden eigenen Slice neu, bevor sie den Stand neu stempelt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const refreshFn = src.slice(src.indexOf('async function refreshDashboardData('), src.indexOf('const refreshTimerId'));
+  assert.ok(refreshFn.length > 0, 'refreshDashboardData() nicht gefunden');
+  const carried = [...refreshFn.matchAll(/fresh\.(\w+) = data\.\1;/g)].map((m) => m[1]);
+  for (const slice of ['cycle', 'waste']) {
+    assert.ok(carried.includes(slice), `fresh.${slice} wird in der Nachfrage gar nicht mehr gesetzt - die Kachel fiele auf ihren Leerzustand`);
+  }
+  const stamp = refreshFn.indexOf('rememberOverview();');
+  assert.ok(stamp > 0, 'die Nachfrage merkt den neuen Stand nicht mehr');
+  for (const slice of carried) {
+    const ensure = `ensure${slice[0].toUpperCase()}${slice.slice(1)}Slice`;
+    // Ohne Ruecksetzen kehrt ensure*() an seinem eigenen "schon geladen" um.
+    assert.match(src, new RegExp(`async function ${ensure}\\(\\) \\{\\s*if \\(data\\.${slice} !== undefined\\) return;`),
+      `${ensure}() laedt nicht mehr nur bei undefined - dann misst dieser Test das Falsche`);
+    const visible = refreshFn.indexOf(`widgetConfig.some((w) => w.id === '${slice}' && w.visible)`);
+    const reset = refreshFn.indexOf(`data.${slice} = undefined;`);
+    const reload = refreshFn.indexOf(`await ${ensure}();`);
+    const carry = refreshFn.indexOf(`fresh.${slice} = data.${slice};`);
+    assert.ok(visible > -1 && reset > visible,
+      `${slice}: die Nachfrage setzt den Slice nicht (fuer eine sichtbare Kachel) zurueck - er reist nur weiter und bleibt alt, solange man unter einer Minute wiederkommt`);
+    assert.ok(reload > reset, `${slice}: nach dem Ruecksetzen wird nicht neu geholt`);
+    assert.ok(carry > reload, `${slice}: der Slice wird uebernommen, bevor er neu geholt ist`);
+    assert.ok(stamp > carry, `${slice}: der Stand wird neu gestempelt, bevor der Slice neu ist`);
+  }
+});
