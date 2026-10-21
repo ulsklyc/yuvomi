@@ -2802,7 +2802,9 @@ test('R19: das Skelett blendet nach --duration-sm ein und schimmert nur mit tran
 test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () => {
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
-  assert.match(src, /swapContent\(shell, \(\) => setHtml\(shell, `[\s\S]*?`\), \{ animate: fromSkeleton \}\);/);
+  // Seit R21 (D5) misst der Rueckruf nach dem Zeichnen noch das Heute-Blatt
+  // (measurePhoneProgram) - im selben Rueckruf, also unter derselben Blende.
+  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, `[\s\S]*?`\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
 });
 
 /* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der
