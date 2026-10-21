@@ -179,6 +179,9 @@ function initFlags(arg) {
     localStorage.setItem('yuvomi-onboarded', '1');
     localStorage.setItem('yuvomi-install-dismissed', String(Date.now()));
     localStorage.setItem('yuvomi-theme', arg.theme);
+    // Erstbesuch-Hinweis der Uebersicht (CUSTOMIZE_HINT_KEY in dashboard.js):
+    // ohne die Marke zeigt jedes Uebersicht-Bild einen Puls-Ring um "Anpassen".
+    localStorage.setItem('yuvomi-dash-customize-hint', '1');
   } catch {}
   window.addEventListener('beforeinstallprompt', (e) => e.preventDefault());
 
@@ -225,6 +228,7 @@ async function applyAppState(page, theme, locale) {
     localStorage.setItem('yuvomi-onboarded', '1');
     localStorage.setItem('yuvomi-install-dismissed', String(Date.now()));
     localStorage.setItem('yuvomi-theme', a.theme);
+    localStorage.setItem('yuvomi-dash-customize-hint', '1');
     document.documentElement.setAttribute('data-theme', a.theme);
   }, { theme, locale });
 }
