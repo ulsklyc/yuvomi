@@ -1512,11 +1512,35 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * ausgeben, den Lucide-Rückfall eingeschlossen (`lucide.createIcons()`
  * übernimmt die Klassen des Platzhalters auf das erzeugte <svg>). Die beiden
  * Nav-Selektoren bleiben daneben stehen: die Sidebar-Suche baut ihr Zeichen als
- * rohen Lucide-Platzhalter, gehört aber in dieselbe Leiste. */
+ * rohen Lucide-Platzhalter, gehört aber in dieselbe Leiste.
+ *
+ * SEIT R21 (Critique 2026-10-21, D4) GILT DIE HAND FUER JEDES ZEICHEN, nicht
+ * nur fuer die Modulzeichen: `.lucide` (jedes von `createIcons()` erzeugte
+ * <svg>) und die eigenen Terminzeichen (`.event-icon--custom`) stehen in
+ * derselben Liste. Gemessen standen vorher 9 (mobil) bis 12 (Laptop)
+ * gerenderte Strichstaerken zwischen 1,0 und 4,7px nebeneinander - Lucide
+ * skaliert seine 2 mit der Groesse, ein 12px-Zeichen zeichnete 1,0px, ein
+ * 24px-Zeichen 2,0px.
+ *
+ * `vector-effect` STEHT AN DEN STRICHEN, NICHT AM <svg>. Die Eigenschaft gilt
+ * fuer Grafikelemente und wird nicht vererbt; am Wurzelelement, wo sie bis
+ * R21 stand, wirkte sie nie (gemessen: `none` auf jedem Pfad). Die
+ * Modulzeichen zeichneten deshalb skaliert - 1.5 auf viewBox 24 sind bei
+ * 16px 1,0px. `stroke-width` dagegen erbt und bleibt am Behaelter.
+ * Guard: test:frontend-audit, "Strich der Modulzeichen". */
+.lucide,
 .module-glyph,
 .nav-item__icon,
-.more-item__icon {
+.more-item__icon,
+.event-icon--custom {
   stroke-width: var(--icon-stroke);
+}
+
+.lucide *,
+.module-glyph *,
+.nav-item__icon *,
+.more-item__icon *,
+.event-icon--custom * {
   vector-effect: non-scaling-stroke;
 }
 

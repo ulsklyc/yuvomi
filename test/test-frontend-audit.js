@@ -2956,8 +2956,31 @@ test('Strich der Modulzeichen liegt in der Mitte der Lucide-Spanne von --icon-md
   assert.ok(Math.abs(Number(stroke[1]) - mid) <= 0.05,
     `--icon-stroke ${stroke[1]} liegt nicht in der Mitte der Lucide-Spanne (${mid.toFixed(2)})`);
   const layout = read('../public/styles/layout.css');
-  assert.match(layout, /\.module-glyph,\s*\.nav-item__icon,\s*\.more-item__icon\s*\{\s*stroke-width:\s*var\(--icon-stroke\);\s*vector-effect:\s*non-scaling-stroke;/,
-    'die Modulzeichen tragen --icon-stroke als feste gerenderte Breite');
+  const rules = [...eachRule(layout)].filter((r) => !r.at.length);
+  const parts = (r) => r.selector.split(',').map((s) => s.trim());
+
+  // R21 (Critique 2026-10-21, D4): EIN STRICH FUER JEDES ZEICHEN, nicht nur
+  // fuer die Modulzeichen. Gemessen standen 9 (mobil) bis 12 (Laptop)
+  // gerenderte Strichstaerken zwischen 1,0 und 4,7px nebeneinander.
+  const HAENDE = ['lucide', 'module-glyph', 'nav-item__icon', 'more-item__icon', 'event-icon--custom'];
+  const breite = rules.find((r) => /stroke-width:\s*var\(--icon-stroke\)/.test(r.body)
+    && HAENDE.every((cls) => parts(r).includes(`.${cls}`)));
+  assert.ok(breite, `eine Regel gibt ${HAENDE.map((c) => `.${c}`).join(', ')} --icon-stroke`);
+
+  // DIE EIGENSCHAFT ERBT NICHT. `vector-effect` stand bis R21 am <svg> selbst
+  // und wirkte dort nie: sie gilt fuer die Grafikelemente (path, line, circle),
+  // nicht fuer ihren Behaelter, und sie wird nicht vererbt (gemessen in Chrome:
+  // am Wurzelelement `none` auf jedem Pfad). Die Modulzeichen zeichneten also
+  // die ganze Zeit skaliert - 1.5 auf viewBox 24 sind bei 16px 1,0px, nicht 1,5.
+  // Der Guard verlangt die Eigenschaft an den Kindern, und keine Regel darf sie
+  // nur an die Wurzel schreiben, wo sie gruen aussieht und nichts tut.
+  const nonScaling = rules.filter((r) => /vector-effect:\s*non-scaling-stroke/.test(r.body));
+  for (const cls of HAENDE) {
+    assert.ok(nonScaling.some((r) => parts(r).includes(`.${cls} *`)),
+      `.${cls} * traegt vector-effect: non-scaling-stroke (an den Strichen, nicht am <svg>)`);
+  }
+  const amBehaelter = nonScaling.flatMap(parts).filter((s) => !/\s\*$/.test(s));
+  assert.deepEqual(amBehaelter, [], 'vector-effect am Behaelter wirkt nicht - es gehoert an die Striche');
 });
 
 test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht vom ersten Eintrag herein', () => {

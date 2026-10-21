@@ -1181,7 +1181,12 @@ das Verhaeltnis haelt.
   und auf der Kachel Funkeln (`sparkles`). Jetzt gibt es `MODULE_ICON`, und die Koepfe
   bekommen ihre WIDGET-ID statt eines Icon-Namens: die Abweichung ist nicht mehr schreibbar.
 - **Die Strichstaerke ist die Handschrift, nicht ein Zufall** (`--icon-stroke`, 1.5 gerenderte
-  px plus `vector-effect: non-scaling-stroke` auf Siegel- und Nav-Zeichen). Der eigene Satz
+  px plus `vector-effect: non-scaling-stroke`). **Seit R21 (D4) fuer JEDES Zeichen**: Lucide
+  (`.lucide`), der eigene Satz und die eigenen Terminzeichen zeichnen in jeder Groesse 1,5px;
+  vorher standen 9 bis 12 Strichstaerken (1,0-4,7px) nebeneinander. `vector-effect` steht an
+  den STRICHEN (`.lucide *`), nicht am `<svg>`: die Eigenschaft erbt nicht, und an der Wurzel,
+  wo sie bis R21 stand, wirkte sie nie - die Modulzeichen zeichneten skaliert (1.5 bei 16px =
+  1,0px). Guard `test:frontend-audit` "Strich der Modulzeichen". Der eigene Satz
   zeichnet mit 1.6 auf viewBox 24, Lucide mit 2; bei 20px bzw. 16px ergab beides zufaellig
   1,333px - die Uebereinstimmung hing an den GROESSEN, nicht an einer Regel, und fiel, sobald
   ein eigenes Zeichen bei 16px stand. CSS schlaegt das `stroke-width`-Attribut, deshalb gilt

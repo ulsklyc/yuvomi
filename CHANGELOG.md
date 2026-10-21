@@ -121,6 +121,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Icons are drawn with one line weight, at every size.** Small icons looked thin and large
+  ones heavy: next to each other, icons on one screen used up to twelve different line widths,
+  from 1 to almost 5 pixels. The module symbols were meant to keep a fixed line all along, but
+  the setting sat where the browser ignores it. Every icon now draws a 1.5-pixel line.
+
 - **Health forms point at the field that needs attention, in the app's own words.** Leaving out a
   value, typing a number outside its range or an end date before the start no longer shows the
   browser's speech bubble or a message without a place; the note now stands under the field, and the
