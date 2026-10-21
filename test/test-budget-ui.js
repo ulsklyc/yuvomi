@@ -7318,3 +7318,26 @@ test('R21 S7: die Abos stehen in der Bahn - Liste links, Kennzahlleiste rechts',
   assert.match(cards?.body ?? '', /--summary-cards:\s*1/, 'eine Karte je Zeile');
   assert.match(cards.body, /--metric-value-size:\s*var\(--text-3xl\)/, 'mit dem Wertgrad der Seitenspalte');
 });
+
+// R21 S7 (D9 "Aufteilen: Gruppenwahl zuerst, Kennzahl im Gruppenkopf, Hover !=
+// Aktiv"): mobil stand "Du schuldest 24,14 €" vor der Gruppenwahl, breit eine
+// eigene Kartenreihe ueber Gruppenliste und Gruppe (41px Luft unter den
+// Reitern statt 25), und Hover trug dieselbe Toenung wie die gewaehlte Gruppe.
+test('R21 S7: Aufteilung - Gruppenwahl zuerst, die Kennzahl in der Spalte der Gruppe, Hover ist nicht Auswahl', () => {
+  const src = withoutHtmlComments(splitExpenses);
+  const layout = src.indexOf('<div class="split-layout">');
+  const panel = src.indexOf('<aside class="split-groups-panel">');
+  const column = src.indexOf('<div class="split-main-column">');
+  const glance = src.indexOf('<div id="split-glance"></div>');
+  const summary = src.indexOf('id="split-summary"');
+  const main = src.indexOf('<div class="split-main" id="split-main"');
+  assert.ok(layout >= 0 && layout < panel && panel < column, 'die Gruppenwahl steht vorn');
+  assert.ok(column < glance && glance < summary && summary < main, 'Kurzzeile und Kennzahlen stehen in der Spalte der Gruppe, vor ihrem Kopf');
+  const css = read('../public/styles/split-expenses.css');
+  const rules = [...eachRule(css)];
+  assert.ok(!rules.some((r) => /\.split-group:hover/.test(r.selector) && /split-group--active/.test(r.selector) && !/:not\(/.test(r.selector)),
+    'Hover und Auswahl teilen sich keine Regel');
+  const hover = rules.find((r) => /\.split-group:not\(\.split-group--active\):hover/.test(r.selector));
+  assert.ok(hover && hover.at.some((a) => /hover:\s*hover/.test(a)), 'Hover nur, wo es Hover gibt');
+  assert.match(hover.body, /var\(--color-surface-hover\)/, 'Hover ist die neutrale Zeilenflaeche');
+});

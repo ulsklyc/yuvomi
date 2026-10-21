@@ -183,10 +183,6 @@ export async function render(container, { user, embedded = false, onAddableChang
   setHtml(container, `
     <div class="split-page app-page app-page--split" data-composition="split">
       ${head}
-      <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
-           klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
-      <div id="split-glance"></div>
-      <section class="metric-grid budget-glance-details" id="split-summary"></section>
       <div class="split-layout">
         <aside class="split-groups-panel">
           <!-- SCHMAL IST DIE GRUPPENWAHL EINE ZEILE (R16, Critique 2026-10-05):
@@ -241,7 +237,20 @@ export async function render(container, { user, embedded = false, onAddableChang
         ${/* KEIN ZWEITES <main> (R20, axe landmark-*): der Ausgleich steht als
              Reiter im Budget, und dessen Seite liegt schon in #main-content der
              Shell - ein <main> darin war ein zweiter Hauptbereich. */ ''}
-        <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+        ${/* GRUPPENWAHL ZUERST, DIE KENNZAHL BEI IHRER GRUPPE (R21 S7, D9). Die
+              Kennzahlen der gewaehlten Gruppe standen ueber der ganzen Seite:
+              mobil "Du schuldest 24,14 €" vor der Gruppenwahl, die erst sagt,
+              wessen Schuld das ist, und breit eine eigene Kartenreihe ueber
+              Gruppenliste und Gruppe (41px Luft unter den Reitern statt 25).
+              Jetzt stehen sie in der Spalte der Gruppe, direkt ueber ihrem
+              Kopf - die Gruppenliste beginnt oben, wie jede Liste daneben. */ ''}
+        <div class="split-main-column">
+          <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
+               klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
+          <div id="split-glance"></div>
+          <section class="metric-grid budget-glance-details" id="split-summary"></section>
+          <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
+        </div>
       </div>${fab}
     </div>
   `);

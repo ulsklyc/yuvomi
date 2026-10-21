@@ -246,8 +246,13 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.split-group--active,
-.split-group:hover {
+/* HOVER IST NICHT AUSWAHL (R21 S7, D9; Critique a4). Beide trugen dieselbe
+ * Modultoenung: wer mit der Maus ueber die zweite Gruppe fuhr, sah zwei
+ * gewaehlte Gruppen. Gewaehlt bleibt die Toenung (wie die Auswahl in jeder
+ * Liste + Detail, layout.css); Hover ist die neutrale Flaeche einer Zeile,
+ * und nur wo es Hover gibt (Regel am Dateiende - vor einem Raster duerfen
+ * hier keine Media-Queries stehen, test:frontend-audit). */
+.split-group--active {
   background: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface));
 }
 
@@ -313,6 +318,21 @@
 .split-expense__receipt svg {
   width: 14px;
   height: 14px;
+}
+
+/* Die Spalte der Gruppe: Kennzahlen, dann Kopf und Inhalt (R21 S7, D9). */
+.split-main-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Der Traeger der Kurzzeile ist kein Kasten: breit ist die Kurzzeile aus dem
+ * Bild, und ein leerer Kasten haette der Spalte trotzdem einen Abstand vor
+ * die Karten gesetzt (16px unter der Oberkante der Gruppenliste). */
+.split-main-column > #split-glance {
+  display: contents;
 }
 
 .split-main {
@@ -861,6 +881,7 @@ button.split-expense:hover {
        bleiben sichtbar;
      - Salden und Karten ruecken zusammen. */
   .split-layout,
+  .split-main-column,
   .split-main {
     gap: var(--space-3);
   }
@@ -1029,5 +1050,13 @@ button.split-expense:hover {
 
   .split-topbar > .btn {
     display: none;
+  }
+}
+
+/* Hover einer nicht gewaehlten Gruppe: neutrale Zeilenflaeche (R21 S7, Regel
+ * "Hover ist nicht Auswahl" bei `.split-group--active` oben). */
+@media (hover: hover) {
+  .split-group:not(.split-group--active):hover {
+    background: var(--color-surface-hover);
   }
 }

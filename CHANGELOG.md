@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Splitting expenses starts with the group.** On a phone "You owe 24.14 €" stood above the
+  group choice that says whose debt it is; on a wide screen the two amounts formed their own row
+  above the group list. The amounts now sit in the group's column, right above its header, and
+  the group list starts at the top like every list beside a detail. Pointing at a group no
+  longer looks like selecting it.
+
 - **Subscriptions read like the other budget tabs on a wide screen.** The list ran across the
   whole budget width, a full screen from a name to its amount. It now stands on the reading
   width with the key figures and the charts in a column on the right, like the overview and the
