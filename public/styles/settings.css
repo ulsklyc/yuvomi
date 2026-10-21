@@ -587,8 +587,9 @@
    Nur in Blaettern mit mehr als drei Abschnitten (registry.js,
    settingsSheetJumpTargets). EINE Zeile, die scrollt: umgebrochen kosteten
    fuenf Marken mobil drei Reihen - vor dem ersten Schalter, den sie
-   erreichbar machen sollen. Die Marken sind die geteilten Chips
-   (filter-chip.css), hier als Links.
+   erreichbar machen sollen. Die Marken sind TEXTLINKS im App-Akzent
+   (Critique R21, a5 P3): als Filter-Chips sahen sie aus wie die Auswahl
+   darunter - im Kalender-Blatt direkt ueber den Erinnerungs-Chips.
    -------------------------------------------------------- */
 .settings-sheet-jump {
   margin-bottom: var(--space-4);
@@ -597,7 +598,7 @@
 .settings-sheet-jump__list {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-2);
+  gap: 0 var(--space-4);
   margin: 0;
   /* Luft fuer den Fokusring, den `overflow` sonst kappte. */
   padding: var(--space-1);
@@ -617,7 +618,27 @@
 }
 
 .settings-sheet-jump__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--space-8);
+  color: var(--color-accent);
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-medium);
   text-decoration: none;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.settings-sheet-jump__link:hover,
+.settings-sheet-jump__link:focus-visible {
+  text-decoration: underline;
+}
+
+/* Am Finger das volle Ziel, wie jede andere Zeile, die man antippt. */
+@media (hover: none) {
+  .settings-sheet-jump__link {
+    min-block-size: var(--target-base);
+  }
 }
 
 /* AB 768px BRECHEN DIE MARKEN UM (R20, Re-Critique 2026-10-17 a5 P3). Die
@@ -3470,46 +3491,6 @@
 
 .perm-empty { padding: var(--space-6) 0; }
 
-/* Legende der Icon-Segmente (Re-Critique 2026-09-27, A7 P2-13): am breiten
- * Zeiger-Viewport tragen die Segmente nur ihr Icon, der Klartext stand allein
- * im Tooltip. Wo die Segmente ihr Wort selbst zeigen (schmal oder Finger,
- * Media-Query unten), faellt die Legende weg - sie waere dort die zweite
- * Beschriftung derselben Knoepfe. */
-.perm-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
-/* Je Abschnitt eine Gruppe mit eigener Ueberschrift: dasselbe Icon heisst am
- * Modul „Lesen", am Widget „Verfuegbar" und an einer Faehigkeit „Erlaubt". */
-.perm-legend__group {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-3);
-}
-
-.perm-legend__scope {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.perm-legend__item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.perm-legend__item svg {
-  width: var(--icon-md);
-  height: var(--icon-md);
-  flex: none;
-}
-
 /* Fokussierte Spalte: Label und Control nah beieinander statt breit gestreckt. */
 .perm-matrix { max-width: 640px; }
 
@@ -3589,8 +3570,6 @@
 
 .perm-modgroup__capabilities-title svg { width: var(--icon-md); height: var(--icon-md); }
 .perm-row--capability { padding: var(--space-3); }
-.perm-row--capability .perm-seg__opt { display: inline-flex; gap: var(--space-1); padding-inline: var(--space-3); }
-.perm-row--capability .perm-seg__label { display: inline; font-size: var(--text-xs); }
 
 .perm-modgroup--general .perm-modgroup__general-title {
   padding: var(--space-3) var(--space-4) 0;
@@ -3601,10 +3580,24 @@
 
 .perm-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-3) var(--space-4);
+}
+
+/* MIT WORT SIND DIE STUFEN BREITER (R21): vier Stufen im Mitglieds-Modus
+ * ("Erben" dazu) brauchen bei 1280 rund 500px. Der Name behaelt mindestens
+ * 12rem; reicht die Zeile nicht, rueckt das Segment in eine eigene Zeile,
+ * rechtsbuendig wie in der einzeiligen Form - statt den Namen auf einen
+ * Buchstaben je Zeile zu quetschen. */
+.perm-row > .perm-row__label {
+  flex: 1 1 12rem;
+}
+
+.perm-row > .perm-seg {
+  margin-inline-start: auto;
 }
 
 .perm-row.is-locked { opacity: 0.5; }
@@ -3631,7 +3624,9 @@
 .perm-row--widget .perm-row__label { color: var(--color-text-secondary); }
 .perm-row__wicon { width: 15px !important; height: 15px !important; color: var(--color-text-tertiary) !important; }
 
-.perm-row__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Der Name bricht um statt abzuschneiden (R21): neben Stufen mit Wort blieb
+ * "Gemeinsame Notizkategorien verwalten" bei 1280 sonst als "Gemeinsame Not..." */
+.perm-row__name { min-width: 0; overflow-wrap: anywhere; }
 
 .perm-row__hint {
   color: var(--color-text-tertiary);
@@ -3644,9 +3639,14 @@
 
 /* Icon-Segment mit gleitender Aktiv-Pille. Optionen gleich breit; die Pille
    (thumb) wandert per translateX zur aktiven Position. */
+/* GLEICH BREITE STUFEN, JEDE MIT WORT (Critique R21, a5 P3). Mit dem Wort neben
+ * dem Icon sind die Stufen verschieden lang ("Kein Zugriff" / "Voll"); der
+ * gleitende Daumen rechnet aber mit gleichen Spalten ((100% - 4px) / Anzahl).
+ * Das Raster gibt jeder Spalte die Breite der laengsten. */
 .perm-seg {
   position: relative;
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: repeat(var(--seg-count, 3), 1fr);
   flex-shrink: 0;
   padding: var(--space-0h);
   background: var(--color-surface-raised);
@@ -3685,19 +3685,19 @@
   pointer-events: none;
 }
 
-/* DIE LABEL-VERLUST-REGEL (Runde 6, Phase 3b), hier im umgekehrten Fall: das
- * Label faellt auf dem BREITEN Viewport (siehe .perm-seg__label). Damit ist das
- * Segment dort ein Icon-Ziel und traegt `--target-base` in beiden Richtungen -
- * vorher blieben 34x30 uebrig, also unter jedem Zielmass, das die App kennt.
- * Segmente stehen aneinander; die Spacing-Ausnahme aus WCAG 2.5.8 greift fuer
- * sie gerade nicht. */
+/* Am Zeiger stehen Icon und Wort nebeneinander (R21); das Ziel bleibt
+ * mindestens `--target-base` hoch und breit - Segmente stehen aneinander, die
+ * Spacing-Ausnahme aus WCAG 2.5.8 greift fuer sie nicht. */
 .perm-seg__opt {
   position: relative;
   z-index: 1;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
   min-width: var(--target-base);
   min-height: var(--target-base);
+  padding-inline: var(--space-3);
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
@@ -3715,8 +3715,13 @@
   color: color-mix(in srgb, var(--color-accent) var(--tint-ink), var(--color-text-primary));
 }
 
-/* Am Zeiger traegt der Tooltip den Klartext; unter 768px wird er sichtbar. */
-.perm-seg__label { display: none; }
+/* Das Wort der Stufe, in jeder Breite (R21) - am Zeiger in einer Zeile neben
+ * dem Icon, am Finger darunter (Media-Query unten). */
+.perm-seg__label {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
 
 .perm-seg__opt:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
@@ -3780,8 +3785,6 @@
    `pointer: coarse` deckt zusätzlich das Tablet im Querformat, wo der
    Viewport breiter als Desktop ist, der Finger aber derselbe bleibt. */
 @media (max-width: 1023px), (pointer: coarse) {
-  .perm-legend { display: none; }
-
   .perm-modgroup__widgets { padding-inline-start: var(--space-4); }
   .perm-modgroup__capabilities { margin-inline-start: var(--space-4); }
 
@@ -3810,6 +3813,8 @@
   /* Hier traegt das Segment sein Label wieder - es ist kein Icon-Ziel mehr und
    * gibt die quadratische Mindestbreite an die Rasterspalte ab. */
   .perm-seg__opt {
+    display: grid;
+    place-items: center;
     grid-auto-flow: row;
     align-content: center;
     gap: var(--space-0h);
@@ -3824,6 +3829,7 @@
     font-weight: var(--font-weight-medium);
     line-height: 1.15;
     text-align: center;
+    white-space: normal;
   }
 
   /* Zwei Buttons plus Statuszeile passen bei 390px nicht nebeneinander. Die

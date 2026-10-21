@@ -4957,3 +4957,20 @@ test('#1997: Synchronisation, Kalender-Abo und Schnellzugriff schliessen nur mit
     globalThis.document = vorher.document;
   }
 });
+
+/* SPRUNGMARKEN SIND LINKS, KEINE AUSWAHL (Critique R21, a5 P3; clarify). Die
+ * Marken am Blattanfang trugen die Optik der Filter-Chips - im Kalender-Blatt
+ * standen sie direkt ueber den Erinnerungs-Chips, die etwas AUSWAEHLEN, und
+ * sahen genauso aus. Eine Marke springt; sie steht jetzt als Textlink im
+ * App-Akzent, ohne Kapsel, mit Unterstreichung bei Zeiger und Fokus. */
+test('R21: die Sprungmarken sind Textlinks, nicht in der Optik der Auswahl-Chips', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const jump = shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function syncJumpLabels('));
+  assert.match(jump, /link\.className = 'settings-sheet-jump__link';/, 'die Marke traegt nur ihre eigene Klasse');
+  assert.doesNotMatch(jump, /filter-chip/, 'keine Chip-Klassen an einem Link');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const link = [...eachRule(css)].filter((r) => r.selector.trim() === '.settings-sheet-jump__link' && !r.at.length).map((r) => r.body).join(';');
+  assert.match(link, /color:\s*var\(--color-accent\)/, 'die Farbe der Handlung');
+  assert.match(link, /font-size:\s*var\(--type-secondary\)/, 'Sekundaertext, nicht die Chip-Schrift');
+  assert.doesNotMatch(link, /border|background/, 'keine Kapsel');
+});

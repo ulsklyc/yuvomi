@@ -47,6 +47,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Roles and permissions name every level in words, also with a mouse.** From 1024 pixels with a
+  mouse the matrix showed only icons - a crossed-out eye, an eye, a pencil - with a legend above to
+  look them up. Each level now reads "No access", "Read only" or "Full" next to its icon, and the
+  legend is gone. When a row runs out of room, as for a member with "Inherit", the levels move
+  under the name instead of squeezing it.
+
+- **Jump links at the top of a settings page look like links.** They used the same capsules as
+  the choices below them, such as the default reminders in the calendar settings. They are now
+  plain links in the accent colour.
+
+- **"No one" no longer sits among the people in a multiple choice.** Who may record health data,
+  who a task or booking is assigned to and whom the shift plan compares: choosing nobody now
+  means choosing no one, instead of a chip that looked like another person. Picking a meal's
+  cook keeps "No one", because there it is one of the answers.
+
 - **The numbers on the faces in the Overview's family card say what they count.** On a phone, a
   bare "1" next to a face read like a notification. The badge now starts with the tasks symbol,
   and it sits at the edge of the face so the initials stay readable.

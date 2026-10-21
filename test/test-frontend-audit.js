@@ -11908,8 +11908,9 @@ test('Rechtevergabe ist auf dem Telefon beschriftet und mit dem Finger bedienbar
   assert.match(mobile, /\.perm-row \{[^}]*flex-direction: column;/s);
   assert.match(mobile, /\.perm-seg \{[^}]*grid-template-columns: repeat\(var\(--seg-count, 3\), 1fr\);/s);
 
-  // Am Zeiger bleibt es kompakt: das Label ist dort ausgeblendet.
-  assert.match(css, /\.perm-seg__label \{ display: none; \}/);
+  // Seit R21 traegt das Segment sein Wort auch am Zeiger (neben dem Icon) -
+  // die kompakte Icon-Fassung mit Legende ist gegangen (test:permissions).
+  assert.doesNotMatch(css, /\.perm-seg__label \{ display: none; \}/);
 });
 
 // "Automatische Backups" mit Titel, Hinweis und leerem Inhalt liest sich als

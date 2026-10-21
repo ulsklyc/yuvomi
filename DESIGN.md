@@ -1877,7 +1877,10 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   `object-fit: cover` (beschneiden, nie stauchen), ohne Bild kein Platzhalterblock.
 - **Ein langes Blatt beginnt mit dem Weg zu seinen Teilen.** Einstellungen: ab vier
   Abschnitten Sprungmarken als eine scrollende Zeile von Links auf `?section=`
-  (`settingsSheetJumpTargets`), mobil zwei Zeilen Blattbeschreibung. Eine Marke heisst wie
+  (`settingsSheetJumpTargets`), mobil zwei Zeilen Blattbeschreibung. Die Marken sind
+  TEXTLINKS im App-Akzent, keine Chips (R21): in Chip-Optik sahen sie aus wie die Auswahl
+  darunter (Erinnerungs-Chips im Kalender-Blatt) - eine Marke springt, sie waehlt nichts
+  (`test:settings-navigation`). Eine Marke heisst wie
   die Ueberschrift, an die sie springt (`syncJumpLabels`, R17): der Registry-Name des
   Abschnitts ist nur der Rueckfall und bleibt der Suchbegriff. Gesundheit mobil: nach
   der Bereichsliste zwei Vitalkennzahlen (Titel = Weg zu allen) und EINE Zeile "Alle Werte
@@ -2025,6 +2028,13 @@ seinen Innenabstand zusammen und blieb als 50x48-Oval in einer Form zurueck, die
 nirgends gibt, `.perm-seg__opt` stand als Icon-Segment auf 34x30, und allein
 `.documents-dms-link-btn` machte es richtig. Alle messen `--target-base`
 (auf Touch `--target-lg`).
+
+Die Rechte-Matrix hat das Label seit R21 in JEDER Breite: am Zeiger Icon und Wort
+nebeneinander, am Finger untereinander, gleich breite Stufen fuer den gleitenden Daumen.
+Die Legende ueber der Matrix, die am Zeiger die Icons erklaerte, entfiel - wer bei jedem
+Schalter nachschlagen muss, was ein durchgestrichenes Auge heisst, setzt Rechte fuer Kinder
+nach Gefuehl. Reicht die Zeile nicht (Mitglieds-Modus mit "Erben"), rueckt das Segment
+unter den Namen (`test:permissions`).
 
 **Der erste der vier ist seit 2026-08-28 GESCHICHTE, und sein Ende ist die staerkere Lesart
 derselben Regel.** `.cal-toolbar__mine-btn` und die vier Ebenen-Chips daneben sind aus dem
@@ -4299,7 +4309,9 @@ Zeile des Aufklappers nennt sie.
   Anhang. Farbe und Icon zeigt der Termin selbst. Eine Warnung, die im zugeklappten Teil
   erscheint, oeffnet ihn - aufklappen, nie zuklappen.
 - **„Niemand" ist ein ruhiger Eintrag, keine Person:** kein Avatar, keine Striche um das Wort
-  (`.user-ms__option--none`, gilt fuer jede Personenwahl). Doppelte Initialen (Leo und Linda
+  (`.user-ms__option--none`). Und er steht NUR in einer Einzelwahl (der Koch einer
+  Mahlzeit), nie in einer Mehrfachwahl (R21): dort heisst „niemand" kein Chip gewaehlt -
+  als erster Chip zwischen den Personen sah er aus wie eine weitere (`test:people-pickers`). Doppelte Initialen (Leo und Linda
   Johnson, beide „LJ") loest die EINE geteilte Funktion auf (`public/utils/initials.js`,
   #1464): wer seine Zeichen teilt, bekommt den naechsten freien Buchstaben seines Vornamens
   („LE", „LI"), aus der Liste aller Konten, also in jeder Ansicht gleich.

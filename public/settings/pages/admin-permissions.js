@@ -207,8 +207,11 @@ function accessShort(value) {
 // Die Zugriffsstufen waren reine Icon-Segmente; ihr Klartext stand nur in
 // `title`, und `title` erscheint auf Touch nie (Critique 2026-07-27). Genau
 // die Aufgabe mit den groessten sozialen Folgen war damit auf dem Telefon
-// unbeschriftet. Das Label steht jetzt im Markup und wird unter 768px
-// sichtbar; am Zeiger bleibt der Tooltip die kompaktere Antwort.
+// unbeschriftet. Das Label steht im Markup und ist seit R21 in JEDER Breite
+// sichtbar: am Zeiger neben dem Icon, am Finger darunter (settings.css). Die
+// Legende ueber der Matrix, die am Zeiger die Icons erklaerte, entfiel damit -
+// jedes Segment nennt das Wort seines Abschnitts selbst (am Modul "Lesen", am
+// Widget "Verfuegbar", an einer Faehigkeit "Erlaubt").
 function segControl({ group, label, current, options, disabled = false }) {
   const activeIdx = Math.max(0, options.findIndex((o) => o.value === current));
   const opts = options.map((o) => {
@@ -373,37 +376,6 @@ function renderSummary(container) {
   window.lucide?.createIcons({ el: host });
 }
 
-// ── Legende der Icon-Segmente ────────────────────────────────────────────────
-//
-// Am breiten Zeiger-Viewport tragen die Segmente nur ihr Icon; der Klartext
-// stand allein im `title` (Re-Critique 2026-09-27, A7 P2-13). Die Legende sagt
-// einmal ueber der Liste, was die Zeichen heissen - aus DENSELBEN Optionen, aus
-// denen die Segmente gebaut sind, damit Legende und Knopf nie auseinanderlaufen.
-// Sie ist ein Bild zum Nachschlagen: jedes Segment traegt seinen Namen selbst
-// (`aria-label`), ein Screenreader hoerte die Liste sonst ein zweites Mal.
-//
-// DIESELBEN ICONS HEISSEN JE ABSCHNITT ETWAS ANDERES (Codex an #1485): das
-// Auge ist am Modul „Lesen", am Widget „Verfuegbar", an einer Faehigkeit
-// „Erlaubt". Eine Legende nur aus den Modul-Optionen stand auch ueber Widget-
-// und Faehigkeits-Zeilen und nannte dort die falsche Bedeutung. Jeder Abschnitt
-// traegt deshalb seine eigenen Woerter unter seiner Ueberschrift; „Erben"
-// bedeutet ueberall dasselbe und steht einmal vorn.
-export function permLegendHtml(mode = state.mode, { widgets = true, capabilities = true } = {}) {
-  const item = (o) => `
-      <span class="perm-legend__item"><i data-lucide="${esc(o.icon)}" aria-hidden="true"></i>${esc(o.label)}</span>`;
-  const own = (options) => options.filter((o) => o.value !== 'inherit');
-  const group = (heading, options) => `
-    <span class="perm-legend__group"><span class="perm-legend__scope">${esc(heading)}</span>${own(options).map(item).join('')}</span>`;
-  const inherit = moduleOptions(mode).find((o) => o.value === 'inherit');
-  const parts = [
-    inherit ? `<span class="perm-legend__group">${item(inherit)}</span>` : '',
-    group(t('settings.permModulesHeading'), moduleOptions(mode)),
-    widgets ? group(t('settings.permWidgetsHeading'), widgetOptions(mode)) : '',
-    capabilities ? group(t('settings.permCapabilitiesHeading'), capabilityOptions(mode)) : '',
-  ];
-  return `<p class="perm-legend" aria-hidden="true">${parts.join('')}</p>`;
-}
-
 // ── Matrix ─────────────────────────────────────────────────────────────────────
 
 function subjectTitle() {
@@ -472,10 +444,6 @@ function renderMatrix(container) {
       <p class="perm-matrix__hint">${esc(
         state.mode === 'role' ? t('settings.permRoleLegend') : t('settings.permMemberLegend'),
       )}</p>
-      ${permLegendHtml(state.mode, {
-        widgets: state.catalog.widgets.length > 0,
-        capabilities: (state.catalog.capabilities || []).length > 0,
-      })}
     </div>
     <div id="perm-summary"></div>
     <div class="perm-list">${groupsHtml}${generalHtml}</div>

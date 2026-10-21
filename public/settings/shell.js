@@ -891,7 +891,9 @@ function createSheetJump(leaf, user, leafContainer, headingId) {
   for (const target of targets) {
     const item = document.createElement('li');
     const link = document.createElement('a');
-    link.className = 'filter-chip filter-chip--sm settings-sheet-jump__link';
+    // EIN LINK, KEIN CHIP (Critique R21, a5 P3): in der Optik der Filter-Chips
+    // sahen die Marken aus wie die Auswahl darunter (Erinnerungs-Chips).
+    link.className = 'settings-sheet-jump__link';
     link.href = target.url;
     link.dataset.jumpSection = target.id;
     link.textContent = t(target.labelKey);

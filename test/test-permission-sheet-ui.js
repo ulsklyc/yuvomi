@@ -95,49 +95,22 @@ test('die Rollen-Chips sagen ihren Zustand, und die erste Rolle steht gewaehlt d
     // bis R10 sichtbar davor und verdeckten den Sprung; seit dem Blatt je
     // Modul sind sie dort nicht mehr im Bild (Sonde 10 der Dokument-Guards).
     assert.match(matrix, /<h2 class="perm-matrix__subject">/, 'die Matrix-Ueberschrift folgt dem h1 ohne Sprung');
-    assert.match(matrix, /class="perm-legend"/, 'mit sichtbarer Legende der Icon-Segmente');
+    assert.doesNotMatch(matrix, /class="perm-legend"/, 'die Stufen tragen ihr Wort selbst - keine Legende (R21)');
   } finally {
     delete globalThis.__apiStub;
   }
 });
 
-test('die Legende nennt jedes Segment-Icon mit seinem Wort, im Mitglieds-Modus auch „Erben" (H7)', async () => {
-  const { permLegendHtml, initialSubject } = await import('../public/settings/pages/admin-permissions.js');
-  const items = (html) => [...html.matchAll(/data-lucide="([^"]+)"[^>]*><\/i>([^<]+)</g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(items(permLegendHtml('role', { widgets: false, capabilities: false })), [
-    ['eye-off', 'settings.permAccessNone'],
-    ['eye', 'settings.permAccessRead'],
-    ['pencil', 'settings.permAccessWrite'],
-  ]);
-  assert.deepEqual(items(permLegendHtml('user'))[0], ['corner-down-right', 'settings.permInherit']);
-  assert.equal(items(permLegendHtml('user')).filter(([icon]) => icon === 'corner-down-right').length, 1,
-    '„Erben" heisst ueberall dasselbe und steht einmal');
+// Die beiden Legenden-Tests (H7, Codex an #1485) entfallen mit der Legende
+// (R21): jedes Segment nennt sein Wort aus den Optionen SEINES Abschnitts
+// (moduleOptions/widgetOptions/capabilityOptions) - am Modul "Lesen", am
+// Widget "Verfuegbar", an einer Faehigkeit "Erlaubt".
+test('jede Stufe nennt das Wort ihres Abschnitts (H7, Codex an #1485)', async () => {
+  const { initialSubject } = await import('../public/settings/pages/admin-permissions.js');
+  const page = (await import('node:fs')).readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(page, /<span class="perm-seg__label">\$\{esc\(o\.label\)\}<\/span>/, 'das Wort steht im Segment');
   assert.equal(initialSubject('role', CATALOG), 'parent');
   assert.equal(initialSubject('user', CATALOG), null, 'Mitglieder bleiben ohne Vorwahl');
-});
-
-test('Codex an #1485: die Legende nennt je Abschnitt dessen eigene Bedeutung der Icons', async () => {
-  const { permLegendHtml } = await import('../public/settings/pages/admin-permissions.js');
-  // Je Gruppe: Ueberschrift und ihre Icon-Woerter. Das Auge ist am Modul
-  // „Lesen", am Widget „Verfuegbar", an einer Faehigkeit „Erlaubt" - eine
-  // Legende nur aus den Modul-Optionen nannte ueber Widget- und
-  // Faehigkeits-Zeilen die falsche Bedeutung.
-  const groups = (html) => html.split('class="perm-legend__group"').slice(1).map((g) => ({
-    scope: /class="perm-legend__scope">([^<]+)</.exec(g)?.[1] ?? null,
-    items: [...g.matchAll(/data-lucide="([^"]+)"[^>]*><\/i>([^<]+)</g)].map((m) => [m[1], m[2]]),
-  }));
-  assert.deepEqual(groups(permLegendHtml('role')), [
-    { scope: 'settings.permModulesHeading', items: [['eye-off', 'settings.permAccessNone'], ['eye', 'settings.permAccessRead'], ['pencil', 'settings.permAccessWrite']] },
-    { scope: 'settings.permWidgetsHeading', items: [['eye-off', 'settings.permWidgetBlocked'], ['eye', 'settings.permWidgetAllowed']] },
-    { scope: 'settings.permCapabilitiesHeading', items: [['eye-off', 'settings.permCapabilityBlocked'], ['eye', 'settings.permCapabilityAllowed']] },
-  ]);
-  const user = groups(permLegendHtml('user'));
-  assert.deepEqual(user[0], { scope: null, items: [['corner-down-right', 'settings.permInherit']] });
-  assert.deepEqual(user.slice(1).map((g) => g.scope),
-    ['settings.permModulesHeading', 'settings.permWidgetsHeading', 'settings.permCapabilitiesHeading']);
-  // Ein Abschnitt, den die Matrix nicht zeigt, steht auch nicht in der Legende.
-  assert.deepEqual(groups(permLegendHtml('role', { widgets: false, capabilities: false })).map((g) => g.scope),
-    ['settings.permModulesHeading']);
 });
 
 // ── Codex an #1485: scheitert das Laden eines Subjekts, steht keine scheinbar bearbeitbare Matrix da ──
@@ -477,4 +450,28 @@ test('Rechte-Matrix: der Fuss klebt am Telefon nur, solange etwas ungespeichert 
   const src = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
   const fn = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
   assert.match(fn, /classList\??\.toggle\('is-dirty', state\.dirty\)/, 'derselbe Weg, der Speichern freigibt, schaltet den Fuss');
+});
+
+/* DIE STUFEN STEHEN AM ZEIGER IN WORTEN (Critique R21, a5 P3; clarify). Ab
+ * 1024px mit Maus trug die Matrix nur Icons - Auge, durchgestrichenes Auge,
+ * Stift - und eine Legende darueber, die man beim Setzen jedes Schalters
+ * nachschlagen musste. Die Aufgabe mit den groessten sozialen Folgen ("was
+ * darf das Kind") steht jetzt in jeder Breite mit Wort: neben dem Icon am
+ * Zeiger, darunter am Finger. Die Legende entfaellt, sie waere die zweite
+ * Beschriftung derselben Knoepfe. Die Segmente bleiben gleich breit - der
+ * gleitende Daumen rechnet mit (100% - 4px) / --seg-count. */
+test('R21: die Rechte-Matrix nennt ihre Stufen auch am Zeiger in Worten, ohne Legende', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const base = (sel) => rules.filter(({ selector, at }) => selector.split(',').map((s) => s.trim()).includes(sel) && at.length === 0);
+  const label = base('.perm-seg__label').map((r) => r.body).join(';');
+  assert.doesNotMatch(label, /display:\s*none/, 'am Zeiger ist das Wort nicht mehr versteckt');
+  assert.match(label, /font-size:\s*var\(--type-caption\)/, 'das Wort steht in der Footnote-Rolle');
+  const seg = base('.perm-seg').map((r) => r.body).join(';');
+  assert.match(seg, /grid-template-columns:\s*repeat\(var\(--seg-count, 3\), 1fr\)/, 'gleich breite Stufen - der Daumen rechnet mit gleichen Spalten');
+  assert.doesNotMatch(page, /perm-legend/, 'keine Legende mehr im Blatt');
+  assert.doesNotMatch(css, /\.perm-legend/, 'und keine Regel fuer sie');
 });
