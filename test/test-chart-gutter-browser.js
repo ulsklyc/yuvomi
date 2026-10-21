@@ -113,8 +113,10 @@ async function waitFitted(page, scope) {
 }
 
 /** Jeder Wert steht in der Flaeche seines Diagramms, und der Traeger kennt seine Breite. */
-function assertFitted(chart, where) {
-  const widest = Math.max(...chart.labels.map((label) => label.width));
+function assertFitted(chart, where, sharedWidest = null) {
+  // Diagramme EINES Traegers teilen seine Breite (fitChartGutter misst je
+  // Traeger): dann gilt der breiteste Wert aller Diagramme darin.
+  const widest = sharedWidest ?? Math.max(...chart.labels.map((label) => label.width));
   assert.ok(chart.shown, `${where}: "${chart.name}" hat keine Flaeche - die Sonde misst nichts`);
   assert.ok(widest > 0, `${where}: "${chart.name}" hat keinen Achsenwert mit Breite`);
   assert.ok(chart.fitted, `${where}: der Traeger von "${chart.name}" ist nicht gemessen (kein .chart-host) - breitester Wert ${widest.toFixed(1)}px`);
@@ -208,8 +210,17 @@ for (const device of ['mobile', 'desktop']) {
     await card.click();
     await waitFitted(page, 'body');
     const vitals = (await axisGeometry(page, 'body')).filter((chart) => chart.shown);
-    assert.equal(vitals.length, 1, `erwartet ist ein sichtbarer Vitalwerte-Verlauf, gefunden: ${vitals.length}`);
-    assertFitted(vitals[0], 'Vitalwerte');
+    // Seit R21 (D6, 2026-10-21) steht der Puls auf eigener Achse: zum Blutdruck
+    // kann ein zweiter Verlauf gehoeren. Gemessen wird jede sichtbare Achse.
+    const vitalNames = vitals.map((c) => c.name).join(' | ');
+    assert.ok(vitals.length >= 1 && vitals.length <= 2, `erwartet ist der Blutdruck-Verlauf, hoechstens mit Puls, gefunden: ${vitalNames}`);
+    assert.ok(vitals.some((c) => /Blutdruck/.test(c.name)), `der Blutdruck-Verlauf fehlt: ${vitalNames}`);
+    // Blutdruck und Puls stehen in einem Traeger und teilen die Achsenbreite,
+    // damit ihre Zeitachsen buendig stehen.
+    const shared = vitals.length > 1 && vitals.every((c) => c.labelWidth === vitals[0].labelWidth)
+      ? Math.max(...vitals.flatMap((c) => c.labels.map((label) => label.width)))
+      : null;
+    for (const chart of vitals) assertFitted(chart, `Vitalwerte (${chart.name})`, shared);
 
     // Labor: ein sechsstelliger Wert.
     await gotoRoute(page, '/health/labs');
