@@ -9732,6 +9732,21 @@ html:has(.app-page.is-selecting) {
   touch-action: pan-y pinch-zoom;
 }
 
+/* WIE OFT DERSELBE SATZ KAM (Critique R21): ein gleicher Toast stapelt sich
+ * nicht mehr, er zaehlt mit - als ruhige Zahl am Ende, in der Tinte des
+ * Toasts auf einem Hauch seiner selbst. */
+.toast__count {
+  flex-shrink: 0;
+  min-width: var(--space-5);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-full);
+  background-color: color-mix(in srgb, currentColor var(--tint-surface), transparent);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .toast__icon {
   flex-shrink: 0;
   width: 16px;

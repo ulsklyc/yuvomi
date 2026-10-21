@@ -67,6 +67,24 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
     return;
   }
 
+  // GLEICHES STEHT EINMAL DA (Critique R21, a2): dreimal derselbe Satz
+  // ("Konnte nicht gespeichert werden") stapelte sich zu drei gleichen Toasts,
+  // die zwei andere verdraengten. Ein Toast ohne Aktion mit demselben Typ und
+  // Text, der noch steht, nimmt die Wiederholung auf: seine Frist beginnt von
+  // vorn, eine Zahl zaehlt mit. Der Screenreader hoert die Wiederholung
+  // trotzdem (stille Ansage) - die Region kuendigt unveraenderten Text nicht
+  // neu an. Toasts mit Aktion bleiben einzeln: jedes "Rueckgaengig" meint etwas
+  // anderes.
+  const key = `${type}\u0000${message}`;
+  if (!action) {
+    const twin = Array.from(container.children ?? []).find((el) => el._toastKey === key && !el.classList.contains('toast--out'));
+    if (twin) {
+      twin._toastRepeat(duration);
+      announceQuietly(container, message);
+      return;
+    }
+  }
+
   // Max. 3 gleichzeitige Toasts (global): ältesten entfernen falls Limit erreicht
   const existing = document.querySelectorAll('.toast-container .toast');
   if (existing.length >= 3) existing[0].remove();
@@ -110,6 +128,24 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   // `wireSwipeToDismiss` (utils/ux.js), das CSS-Gegenstück ist das
   // `touch-action: pan-y` auf `.toast`.
   wireSwipeToDismiss(toast, { onDismiss: dismiss });
+
+  if (!action) {
+    let count = 1;
+    let badge = null;
+    toast._toastKey = key;
+    toast._toastRepeat = (ms) => {
+      count += 1;
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'toast__count';
+        // Nur fuer die Augen: die Wiederholung sagt die stille Ansage.
+        badge.setAttribute('aria-hidden', 'true');
+        toast.appendChild(badge);
+      }
+      badge.textContent = String(count);
+      deadline.restart(ms);
+    };
+  }
 }
 
 
@@ -201,6 +237,14 @@ export function pausableDeadline(el, onExpire, duration, { minRest = TOAST_RESUM
     cancel() {
       done = true;
       clearTimeout(timer);
+    },
+    /** Die volle Frist von vorn (ein gleicher Toast kam dazu); ein Griff haelt weiter. */
+    restart(ms = duration) {
+      if (done) return;
+      clearTimeout(timer);
+      remaining = ms;
+      startedAt = Date.now();
+      if (holds.size === 0) timer = setTimeout(expire, remaining);
     },
   };
 }

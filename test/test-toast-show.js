@@ -241,3 +241,37 @@ test('Erfolgs-Zaehler: ein Speicher, der wirft, kostet keine Rueckmeldung', asyn
     removeDom();
   }
 });
+
+// Critique R21 (a2): dreimal derselbe Satz stapelte sich zu drei gleichen
+// Toasts. Ein gleicher Toast ohne Aktion nimmt die Wiederholung auf - die
+// Frist beginnt von vorn, eine Zahl zaehlt, und die Ansage kommt trotzdem.
+test('Gleiches steht einmal da: dieselbe Meldung zaehlt mit, statt sich zu stapeln', async () => {
+  const { polite, assertive } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { showToast } = await import('../public/utils/toast-show.js');
+    showToast('Konnte nicht speichern', 'danger', 4000);
+    mock.timers.tick(3000);
+    showToast('Konnte nicht speichern', 'danger', 4000);
+    showToast('Konnte nicht speichern', 'danger', 4000);
+    const toasts = toastsIn(assertive);
+    assert.equal(toasts.length, 1, 'drei gleiche Meldungen sind EIN Toast');
+    const badge = toasts[0].children.find((c) => c.classList.contains('toast__count'));
+    assert.equal(badge?.textContent, '3', 'die Zahl nennt die Wiederholungen');
+    assert.equal(badge.getAttribute('aria-hidden'), 'true');
+    assert.equal(assertive.children.filter((c) => c.classList.contains('sr-only')).length, 2, 'jede Wiederholung wird angesagt');
+    mock.timers.tick(3500);
+    assert.equal(leaving(toasts[0]), false, 'die Frist begann mit der letzten Wiederholung von vorn');
+    mock.timers.tick(600);
+    assert.equal(leaving(toasts[0]), true);
+    // Anderer Text, anderer Typ oder eine Aktion: einzeln wie bisher.
+    showToast('Gespeichert', 'default', 3000);
+    showToast('Geloescht', 'default', 3000, () => {});
+    showToast('Geloescht', 'default', 3000, () => {});
+    assert.equal(toastsIn(polite).filter((x) => x.textContent.startsWith('Geloescht')).length, 2,
+      'Toasts mit Rueckgaengig bleiben einzeln');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+  }
+});
