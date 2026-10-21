@@ -3626,7 +3626,14 @@
 
 /* Der Name bricht um statt abzuschneiden (R21): neben Stufen mit Wort blieb
  * "Gemeinsame Notizkategorien verwalten" bei 1280 sonst als "Gemeinsame Not..." */
-.perm-row__name { min-width: 0; overflow-wrap: anywhere; }
+.perm-row__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
 
 .perm-row__hint {
   color: var(--color-text-tertiary);
