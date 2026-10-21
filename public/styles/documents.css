@@ -1671,6 +1671,22 @@
   height: 13px;
 }
 
+/* VOR UND ZURUECK (Critique R21): ein Paar am Anfang der Leiste, durch
+ * eine Haarlinie von den Handlungen getrennt. Am Rand der Liste haelt eine
+ * Luecke die Stelle des fehlenden Pfeils, damit der andere nicht springt. */
+.document-viewer__pager {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-end: var(--space-2);
+  margin-inline-end: var(--space-1);
+  border-inline-end: 1px solid var(--color-border-subtle);
+}
+
+.document-viewer__pager-gap {
+  width: var(--target-lg);
+  flex-shrink: 0;
+}
+
 .document-viewer__actions {
   display: flex;
   align-items: center;

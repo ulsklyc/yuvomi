@@ -177,7 +177,9 @@
         "goTo": "Buka",
         "newSection": "Buat baru",
         "recentLabel": "Baru dibuka",
-        "createTaskNamed": "Buat “{{title}}” sebagai tugas"
+        "createTaskNamed": "Buat “{{title}}” sebagai tugas",
+        "hintMove": "Pilih",
+        "hintOpen": "Buka"
     },
     "dashboard": {
         "title": "Ringkasan",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Dokumen ini sudah tidak ada di DMS.",
         "errorDmsAlreadyLinked": "Dokumen DMS ini sudah ditautkan.",
         "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS.",
-        "dropzoneTitleTouch": "Ketuk untuk memilih file"
+        "dropzoneTitleTouch": "Ketuk untuk memilih file",
+        "viewerPrevNamed": "Dokumen sebelumnya: {{name}}",
+        "viewerNextNamed": "Dokumen berikutnya: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",

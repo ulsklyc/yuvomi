@@ -177,7 +177,9 @@
         "goTo": "Pumunta sa",
         "newSection": "Gumawa ng bago",
         "recentLabel": "Kamakailang binuksan",
-        "createTaskNamed": "Gawing gawain ang “{{title}}”"
+        "createTaskNamed": "Gawing gawain ang “{{title}}”",
+        "hintMove": "Pumili",
+        "hintOpen": "Buksan"
     },
     "dashboard": {
         "title": "Pangkalahatang-tanaw",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Wala na sa DMS ang dokumentong ito.",
         "errorDmsAlreadyLinked": "Naka-link na ang dokumentong ito mula sa DMS.",
         "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito.",
-        "dropzoneTitleTouch": "I-tap para pumili ng file"
+        "dropzoneTitleTouch": "I-tap para pumili ng file",
+        "viewerPrevNamed": "Nakaraang dokumento: {{name}}",
+        "viewerNextNamed": "Susunod na dokumento: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Wala",

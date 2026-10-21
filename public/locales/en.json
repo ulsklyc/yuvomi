@@ -3589,7 +3589,9 @@
         "goTo": "Go to",
         "newSection": "Create new",
         "recentLabel": "Recently opened",
-        "createTaskNamed": "Create “{{title}}” as a task"
+        "createTaskNamed": "Create “{{title}}” as a task",
+        "hintMove": "Select",
+        "hintOpen": "Open"
     },
     "onboarding": {
         "step1Title": "Welcome to {{name}}",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "This document no longer exists in the DMS.",
         "errorDmsAlreadyLinked": "This DMS document is already linked.",
         "errorDmsAlreadyStored": "This document is already stored in a DMS.",
-        "dropzoneTitleTouch": "Tap to choose a file"
+        "dropzoneTitleTouch": "Tap to choose a file",
+        "viewerPrevNamed": "Previous document: {{name}}",
+        "viewerNextNamed": "Next document: {{name}}"
     },
     "housekeeping": {
         "title": "Housekeeping",

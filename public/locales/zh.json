@@ -3479,7 +3479,9 @@
         "goTo": "前往",
         "newSection": "新建",
         "recentLabel": "最近打开",
-        "createTaskNamed": "将“{{title}}”创建为任务"
+        "createTaskNamed": "将“{{title}}”创建为任务",
+        "hintMove": "选择",
+        "hintOpen": "打开"
     },
     "birthdays": {
         "inDays_one": "{{count}}天后",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "此文档在 DMS 中已不存在。",
         "errorDmsAlreadyLinked": "此 DMS 文档已关联。",
         "errorDmsAlreadyStored": "此文档已存储在 DMS 中。",
-        "dropzoneTitleTouch": "点按以选择文件"
+        "dropzoneTitleTouch": "点按以选择文件",
+        "viewerPrevNamed": "上一个文档：{{name}}",
+        "viewerNextNamed": "下一个文档：{{name}}"
     },
     "shortcuts": {
         "goKitchen": "厨房",

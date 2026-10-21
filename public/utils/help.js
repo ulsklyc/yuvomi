@@ -20,5 +20,7 @@ export function buildHelpRows({ coarsePointer, shortcuts, t }) {
     ];
   }
   // `label` nennt Zweitbelegungen mit („k / ←"); ohne sie steht die Taste selbst.
-  return shortcuts.map((s) => ({ key: s.label?.() ?? s.key, desc: s.description() }));
+  // `hidden`: ein Kuerzel, das wirkt, aber schon im Label eines anderen steht
+  // (`g s` in „g s / g k s") - ein Ziel, eine Zeile.
+  return shortcuts.filter((s) => !s.hidden).map((s) => ({ key: s.label?.() ?? s.key, desc: s.description() }));
 }

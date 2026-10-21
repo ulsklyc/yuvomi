@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { periodStepperHtml, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
@@ -2030,9 +2030,9 @@ function renderOverview() {
            steht nur, wenn der heutige Tag NICHT zu sehen ist - bis R16 2b stand
            es auch in der laufenden Woche, als einziger der fuenf Stepper. */ ''}
       <div class="schedule-overview__stepper">${periodStepperHtml({
-        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
+        prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), keys: periodArrowKeys().prev, attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
         value: { className: `schedule-overview__week-label${showsToday ? '' : ' period-stepper__value--away'}`, text: weekLabel, live: true },
-        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
+        next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), keys: periodArrowKeys().next, attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
         reset: { label: t('calendar.today'), current: showsToday, attrs: { 'data-action': 'overview-week', 'data-direction': 'today' } },
       })}
       </div>
@@ -2309,6 +2309,8 @@ function renderPage() {
   if (activeView === 'overview') {
     bindUserMultiSelect(body, 'overview-people');
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
+    // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
+    wirePeriodArrowKeys(body.querySelector('.schedule-overview__stepper'));
   }
   // Statistik-Zeitraum und Woche/Tag entstehen mit jedem renderPage() neu:
   // der Schluessel laesst die neue Kapsel von der Stelle der alten gleiten.
@@ -3319,7 +3321,12 @@ async function action(event) {
       const today = todayKey();
       const towards = days ? Math.sign(days) : (today === overview.weekCursor ? 0 : (today < overview.weekCursor ? -1 : 1));
       overview = { ...overview, weekCursor: days ? addLocalDays(overview.weekCursor, days) : today };
+      // Der Stepper entsteht mit dem Neuaufbau neu: wer per Tastatur blaettert
+      // (Pfeile oder Enter), behaelt den Fokus auf demselben Pfeil, statt auf
+      // <body> zu fallen (Critique R21, Persona Alex).
+      const keepFocus = document.activeElement === button && button.dataset.direction !== 'today';
       await activateView('overview', { step: towards });
+      if (keepFocus) root?.querySelector(`[data-action="overview-week"][data-direction="${button.dataset.direction}"]`)?.focus();
       return;
     }
     if (button.dataset.action === 'overview-view-mode') {

@@ -3728,7 +3728,9 @@
         "goTo": "Перейти до",
         "newSection": "Створити",
         "recentLabel": "Нещодавно відкриті",
-        "createTaskNamed": "Створити «{{title}}» як завдання"
+        "createTaskNamed": "Створити «{{title}}» як завдання",
+        "hintMove": "Вибрати",
+        "hintOpen": "Відкрити"
     },
     "birthdays": {
         "inDays_one": "через {{count}} день",
@@ -4108,7 +4110,9 @@
         "errorDmsDocumentGone": "Цього документа більше немає в DMS.",
         "errorDmsAlreadyLinked": "Цей документ із DMS уже пов’язано.",
         "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS.",
-        "dropzoneTitleTouch": "Торкніться, щоб вибрати файл"
+        "dropzoneTitleTouch": "Торкніться, щоб вибрати файл",
+        "viewerPrevNamed": "Попередній документ: {{name}}",
+        "viewerNextNamed": "Наступний документ: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

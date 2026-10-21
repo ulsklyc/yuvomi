@@ -3479,7 +3479,9 @@
         "goTo": "移動",
         "newSection": "新規作成",
         "recentLabel": "最近開いた項目",
-        "createTaskNamed": "「{{title}}」をタスクとして作成"
+        "createTaskNamed": "「{{title}}」をタスクとして作成",
+        "hintMove": "選択",
+        "hintOpen": "開く"
     },
     "birthdays": {
         "inDays_one": "あと{{count}}日",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "このドキュメントは DMS にもう存在しません。",
         "errorDmsAlreadyLinked": "この DMS ドキュメントはすでにリンクされています。",
         "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。",
-        "dropzoneTitleTouch": "タップしてファイルを選択"
+        "dropzoneTitleTouch": "タップしてファイルを選択",
+        "viewerPrevNamed": "前のドキュメント: {{name}}",
+        "viewerNextNamed": "次のドキュメント: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "キッチン",

@@ -204,3 +204,46 @@ test('R21 S8: das Bild steht auf einer Buehne mit Ladezeichen, die mit dem Bild 
     options.onClose?.();
   }
 });
+
+// Critique R21 (Persona Alex): Vor und Zurueck im Betrachter - Knoepfe mit dem
+// Namen des Ziels und die Pfeiltasten, die auf sie zeigen. Die Nachbarn sind
+// die der SICHTBAREN Liste; aus einem Feld heraus gehoeren die Pfeile dem Feld.
+test('Betrachter: Vor/Zurueck nennt das Ziel, die Pfeile blaettern durch die sichtbare Liste', () => {
+  const A = { ...PDF, id: 1, name: 'Mietvertrag' };
+  const B = { ...PDF, id: 9, name: 'Impfpass' };
+  documentsPage.state.documents = [A, PDF, B];
+  documentsPage.state.query = '';
+  const opened = [];
+  const previous = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  try {
+    doc.activeElement = element('opener', { matches: () => false });
+    documentsPage.openDocumentViewer(PDF);
+    const html = opened[0].content;
+    assert.match(html, /data-action="viewer-prev"[^>]*aria-label="documents\.viewerPrevNamed\{&quot;name&quot;:&quot;Mietvertrag&quot;\}"/);
+    assert.match(html, /data-action="viewer-next"[^>]*aria-label="documents\.viewerNextNamed\{&quot;name&quot;:&quot;Impfpass&quot;\}"/);
+    assert.match(html, /aria-keyshortcuts="ArrowLeft"/);
+    const panel = element('panel', { querySelector: () => null });
+    opened[0].onSave(panel);
+    const key = (k, target = element('body-target', { closest: () => null })) => {
+      let prevented = false;
+      panel.fire('keydown', { key: k, target, preventDefault: () => { prevented = true; } });
+      return prevented;
+    };
+    assert.equal(key('ArrowRight'), true);
+    assert.match(opened.at(-1).title, /Impfpass/, 'Rechts oeffnet das naechste Dokument der Liste');
+    assert.equal(key('ArrowLeft'), true);
+    assert.match(opened.at(-1).title, /Mietvertrag/, 'Links das vorige');
+    const count = opened.length;
+    assert.equal(key('ArrowRight', element('feld', { closest: (sel) => (/input/.test(sel) ? {} : null) })), false, 'aus einem Feld heraus nicht');
+    assert.equal(opened.length, count);
+    // Am Rand der Liste: kein Pfeil ins Leere, eine Luecke haelt die Stelle.
+    opened.length = 0;
+    documentsPage.openDocumentViewer(B);
+    assert.doesNotMatch(opened[0].content, /data-action="viewer-next"/);
+    assert.match(opened[0].content, /document-viewer__pager-gap/);
+  } finally {
+    globalThis.__openModal = previous;
+    documentsPage.state.documents = [];
+  }
+});

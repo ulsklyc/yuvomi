@@ -3472,7 +3472,9 @@
         "goTo": "Přejít na",
         "newSection": "Vytvořit nové",
         "recentLabel": "Nedávno otevřené",
-        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol"
+        "createTaskNamed": "Vytvořit „{{title}}“ jako úkol",
+        "hintMove": "Vybrat",
+        "hintOpen": "Otevřít"
     },
     "shortcuts": {
         "search": "Otevřít vyhledávání",
@@ -4211,7 +4213,9 @@
         "errorDmsDocumentGone": "Tento dokument už v DMS neexistuje.",
         "errorDmsAlreadyLinked": "Tento dokument z DMS je už propojený.",
         "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS.",
-        "dropzoneTitleTouch": "Klepnutím vyberte soubor"
+        "dropzoneTitleTouch": "Klepnutím vyberte soubor",
+        "viewerPrevNamed": "Předchozí dokument: {{name}}",
+        "viewerNextNamed": "Další dokument: {{name}}"
     },
     "reminders": {
         "sectionTitle": "Připomínka",

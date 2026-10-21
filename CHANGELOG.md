@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The arrow keys page through a period, and through documents.** With focus on the month or week
+  switcher of the budget, the meal plan, the household help reports or the shift plan, Left and
+  Right go to the previous or next period. The document viewer has previous and next buttons, and
+  the arrow keys move through the documents of the list you opened it from.
+
+- **The search lists coming events first and shows its keys.** Events from today on come first, past
+  ones after them, the latest first. On a computer, a line under the results names the keys:
+  arrows to select, Enter to open, Esc to close. The keyboard help lists "g s" and "g k s" in one
+  line, since both open the shopping list.
+
 - **Every list row ends the same way, and a tap anywhere on a row opens it.** Rows now end with at
   most one visible action, then the More button, then the drag handle in sortable lists. Shopping
   moved its More button in front of the handle, a medication dose shows Take with Skip under More,

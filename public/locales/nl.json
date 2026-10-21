@@ -3589,7 +3589,9 @@
         "goTo": "Ga naar",
         "newSection": "Nieuw aanmaken",
         "recentLabel": "Recent geopend",
-        "createTaskNamed": "„{{title}}” als taak aanmaken"
+        "createTaskNamed": "„{{title}}” als taak aanmaken",
+        "hintMove": "Selecteren",
+        "hintOpen": "Openen"
     },
     "onboarding": {
         "step1Title": "Welkom bij {{name}}",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Dit document bestaat niet meer in het DMS.",
         "errorDmsAlreadyLinked": "Dit DMS-document is al gekoppeld.",
         "errorDmsAlreadyStored": "Dit document staat al in een DMS.",
-        "dropzoneTitleTouch": "Tik om een bestand te kiezen"
+        "dropzoneTitleTouch": "Tik om een bestand te kiezen",
+        "viewerPrevNamed": "Vorig document: {{name}}",
+        "viewerNextNamed": "Volgend document: {{name}}"
     },
     "housekeeping": {
         "title": "Huishouden",

@@ -177,7 +177,9 @@
         "goTo": "이동",
         "newSection": "새로 만들기",
         "recentLabel": "최근에 연 항목",
-        "createTaskNamed": "“{{title}}”을(를) 할 일로 만들기"
+        "createTaskNamed": "“{{title}}”을(를) 할 일로 만들기",
+        "hintMove": "선택",
+        "hintOpen": "열기"
     },
     "dashboard": {
         "title": "개요",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "이 문서는 DMS에 더 이상 존재하지 않습니다.",
         "errorDmsAlreadyLinked": "이 DMS 문서는 이미 연결되어 있습니다.",
         "errorDmsAlreadyStored": "이 문서는 이미 DMS에 저장되어 있습니다.",
-        "dropzoneTitleTouch": "탭하여 파일 선택"
+        "dropzoneTitleTouch": "탭하여 파일 선택",
+        "viewerPrevNamed": "이전 문서: {{name}}",
+        "viewerNextNamed": "다음 문서: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "없음",

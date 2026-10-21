@@ -2303,6 +2303,28 @@ function renderAppShell(container) {
   searchPanel.className = 'search-overlay__panel';
   searchPanel.appendChild(searchHeader);
   searchPanel.appendChild(searchResults);
+  // TASTENHINWEISE (Critique R21, Persona Alex): die Palette ist eine Combobox
+  // (Pfeile markieren, Enter oeffnet, Esc schliesst), aber nichts sagte es -
+  // wer sie mit ⌘K oeffnet, kennt den Weg, wer sie anklickt, nicht. Eine
+  // ruhige Fusszeile in der Tastenform der Kuerzel-Hilfe (`.shortcut-kbd`).
+  // Nur fuer die Augen (`aria-hidden`): Screenreader hoeren die Bedienung
+  // schon aus der Combobox-Rolle. Ohne feinen Zeiger blendet layout.css sie aus.
+  const searchHints = document.createElement('div');
+  searchHints.className = 'search-overlay__hints';
+  searchHints.setAttribute('aria-hidden', 'true');
+  for (const [keys, label] of [[['\u2191', '\u2193'], t('search.hintMove')], [['\u21b5'], t('search.hintOpen')], [['Esc'], t('common.close')]]) {
+    const hint = document.createElement('span');
+    hint.className = 'search-overlay__hint';
+    for (const key of keys) {
+      const kbd = document.createElement('kbd');
+      kbd.className = 'shortcut-kbd';
+      kbd.textContent = key;
+      hint.appendChild(kbd);
+    }
+    hint.append(label);
+    searchHints.appendChild(hint);
+  }
+  searchPanel.appendChild(searchHints);
   // Sr-only Live-Region: sagt „Suche läuft…" und die Trefferzahl an, damit der
   // debounced Fetch für Screenreader nicht als Stille verpufft (Critique P1).
   // Die sichtbaren Skeletons tragen aria-hidden; die Semantik lebt hier.
@@ -2748,7 +2770,10 @@ const SHORTCUTS = [
   { key: 'g d', description: () => t('shortcuts.goDash'),  action: () => navigate('/') },
   { key: 'g t', description: () => t('shortcuts.goTasks'), action: () => navigate('/tasks') },
   { key: 'g c', description: () => t('shortcuts.goCal'),   action: () => navigate('/calendar') },
-  { key: 'g s', description: () => t('shortcuts.goShop'),  action: () => navigate('/shopping') },
+  // `g s` WIRKT WEITER, steht aber nicht doppelt in der Hilfe (Critique R21,
+  // Alex): neben `g k s` stand derselbe Einkauf zweimal. Die eine Zeile nennt
+  // beide Wege (Label an `g k s`).
+  { key: 'g s', hidden: true, description: () => t('shortcuts.goShop'),  action: () => navigate('/shopping') },
   { key: 'g n', description: () => t('shortcuts.goNotes'),   action: () => navigate('/notes')              },
   { key: 'g h', description: () => t('shortcuts.goHealth'),  action: () => navigate(getLastHealthRoute())  },
   // Die 3er-Chords nennen ihr konkretes Ziel (Essensplan/Rezepte/Einkauf):
@@ -2757,7 +2782,7 @@ const SHORTCUTS = [
   { key: 'g k',   description: () => t('shortcuts.goKitchen'), action: () => navigate(getLastKitchenRoute()) },
   { key: 'g k m', description: () => t('nav.meals'),           action: () => navigate('/meals')             },
   { key: 'g k r', description: () => t('nav.recipes'),         action: () => navigate('/recipes')           },
-  { key: 'g k s', description: () => t('nav.shopping'),        action: () => navigate('/shopping')          },
+  { key: 'g k s', label: () => 'g s / g k s', description: () => t('nav.shopping'), action: () => navigate('/shopping') },
   { key: 'g k v', description: () => t('nav.pantry'),          action: () => navigate('/pantry')            },
   { key: 'g i', description: () => t('shortcuts.goInventory'), action: () => navigate('/inventory') },
   // Beschriftung wie bei den Kuechen-3er-Chords direkt aus den Nav-Labels -

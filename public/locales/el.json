@@ -3479,7 +3479,9 @@
         "goTo": "Μετάβαση σε",
         "newSection": "Νέα δημιουργία",
         "recentLabel": "Άνοιξαν πρόσφατα",
-        "createTaskNamed": "Δημιουργία «{{title}}» ως εργασίας"
+        "createTaskNamed": "Δημιουργία «{{title}}» ως εργασίας",
+        "hintMove": "Επιλογή",
+        "hintOpen": "Άνοιγμα"
     },
     "birthdays": {
         "inDays_one": "σε {{count}} ημέρα",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "Αυτό το έγγραφο δεν υπάρχει πια στο DMS.",
         "errorDmsAlreadyLinked": "Αυτό το έγγραφο DMS είναι ήδη συνδεδεμένο.",
         "errorDmsAlreadyStored": "Αυτό το έγγραφο είναι ήδη αποθηκευμένο σε DMS.",
-        "dropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο"
+        "dropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο",
+        "viewerPrevNamed": "Προηγούμενο έγγραφο: {{name}}",
+        "viewerNextNamed": "Επόμενο έγγραφο: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Κουζίνα",

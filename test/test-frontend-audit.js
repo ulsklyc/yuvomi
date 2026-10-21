@@ -8465,6 +8465,9 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
   // hier - mit dem Grund, warum sie kein Eingabefeld ist.
   const FIELD_WORD = /search|input|field|select|textarea/i;
   const NOT_A_FIELD = new Map([
+    // R21 S9a: die Fusszeile der Tastenhinweise unter der Palette; ihre
+    // Haarlinie trennt sie von den Treffern, sie ist kein Feld.
+    ['.search-overlay__hints', 'Tastenhinweise der Palette (R21); Trennlinie ueber der Fusszeile, kein Feld'],
     // `.more-sheet__search` stand hier bis 2026-09-26: seit dem Komponenten-
     // Kanon traegt der Knopf die gefuellte Kapsel des EINEN Suchfelds, in Ruhe
     // ohne Kante und im Hover mit --color-border-control - keine Kartenkante mehr.

@@ -3589,7 +3589,9 @@
         "goTo": "Gå til",
         "newSection": "Ny",
         "recentLabel": "Nylig åpnet",
-        "createTaskNamed": "Opprett «{{title}}» som oppgave"
+        "createTaskNamed": "Opprett «{{title}}» som oppgave",
+        "hintMove": "Velg",
+        "hintOpen": "Åpne"
     },
     "onboarding": {
         "step1Title": "Velkommen til {{name}}",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Dette dokumentet finnes ikke lenger i DMS-systemet.",
         "errorDmsAlreadyLinked": "Dette DMS-dokumentet er allerede koblet til.",
         "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS.",
-        "dropzoneTitleTouch": "Trykk for å velge en fil"
+        "dropzoneTitleTouch": "Trykk for å velge en fil",
+        "viewerPrevNamed": "Forrige dokument: {{name}}",
+        "viewerNextNamed": "Neste dokument: {{name}}"
     },
     "housekeeping": {
         "title": "Husarbeid",

@@ -131,3 +131,49 @@ export function syncPeriodReset(root, { reset, isCurrent, prev = '.period-steppe
 export function swapPeriod(host, step, update) {
   return swapContent(host, update, { direction: step });
 }
+
+/**
+ * Welche Pfeiltaste zurueck und welche vor heisst: die, die auf den Knopf
+ * zeigt. In einer RTL-Locale steht „zurueck" rechts (wie im Kalender).
+ *
+ * @param {boolean} [rtl]
+ * @returns {{ prev: string, next: string }}
+ */
+export function periodArrowKeys(rtl = typeof document !== 'undefined' && document.documentElement?.dir === 'rtl') {
+  return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
+}
+
+/**
+ * PFEILTASTEN AM ZEITRAUM-STEPPER (Critique R21, Persona Alex). Wer per Tab auf
+ * einem Pfeil, dem Wert oder "Heute" steht, blaettert mit Links/Rechts -
+ * vorher half nur Enter auf genau dem richtigen Pfeil, und wer weiter wollte,
+ * musste erst hinueber tabben. Gefragt wird die Taste, die auf den Knopf
+ * zeigt (RTL gespiegelt); ausgeloest wird der Knopf selbst (`click()`), also
+ * derselbe Weg, dieselbe Ansage, dieselbe Sperre wie mit der Maus. Der Fokus
+ * bleibt, wo er war.
+ *
+ * Am Traeger des Steppers (dem Eltern-Element der Pfeile), je Traeger nur
+ * einmal - NICHT am Seitencontainer des Routers: der ueberlebt den
+ * Seitenwechsel, und im Kalender gelten die Pfeile schon seitenweit
+ * (router.js, SHORTCUTS mit `bareFocusOnly`) - dort schluege jeder Druck
+ * doppelt an.
+ *
+ * @param {Element|null} root  Traeger der Pfeile
+ */
+export function wirePeriodArrowKeys(root) {
+  if (!root || root.dataset?.periodKeys) return;
+  root.dataset.periodKeys = '1';
+  root.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const part = e.target?.closest?.('.period-stepper__prev, .period-stepper__next, .period-stepper__reset, .period-stepper__value');
+    const group = part?.parentElement;
+    if (!group) return;
+    const keys = periodArrowKeys(getComputedStyle(group).direction === 'rtl');
+    const dir = e.key === keys.prev ? 'prev' : 'next';
+    const btn = group.querySelector(`.period-stepper__${dir}`);
+    if (!btn || btn.disabled || btn.hidden || btn.inert) return;
+    e.preventDefault();
+    btn.click();
+  });
+}

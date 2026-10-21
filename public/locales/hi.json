@@ -3479,7 +3479,9 @@
         "goTo": "यहाँ जाएँ",
         "newSection": "नया बनाएँ",
         "recentLabel": "हाल ही में खोले गए",
-        "createTaskNamed": "“{{title}}” को कार्य के रूप में बनाएँ"
+        "createTaskNamed": "“{{title}}” को कार्य के रूप में बनाएँ",
+        "hintMove": "चुनें",
+        "hintOpen": "खोलें"
     },
     "birthdays": {
         "inDays_one": "{{count}} दिन में",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "यह दस्तावेज़ अब DMS में मौजूद नहीं है।",
         "errorDmsAlreadyLinked": "यह DMS दस्तावेज़ पहले से जुड़ा हुआ है।",
         "errorDmsAlreadyStored": "यह दस्तावेज़ पहले से किसी DMS में संग्रहीत है।",
-        "dropzoneTitleTouch": "फ़ाइल चुनने के लिए टैप करें"
+        "dropzoneTitleTouch": "फ़ाइल चुनने के लिए टैप करें",
+        "viewerPrevNamed": "पिछला दस्तावेज़: {{name}}",
+        "viewerNextNamed": "अगला दस्तावेज़: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "रसोई",

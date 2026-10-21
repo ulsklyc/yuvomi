@@ -3792,7 +3792,9 @@
         "goTo": "انتقل إلى",
         "newSection": "إنشاء جديد",
         "recentLabel": "فُتح مؤخرًا",
-        "createTaskNamed": "إنشاء „{{title}}“ كمهمة"
+        "createTaskNamed": "إنشاء „{{title}}“ كمهمة",
+        "hintMove": "تحديد",
+        "hintOpen": "فتح"
     },
     "birthdays": {
         "inDays_one": "خلال {{count}} يوم",
@@ -4223,7 +4225,9 @@
         "errorDmsDocumentGone": "هذا المستند لم يعد موجودًا في نظام إدارة المستندات.",
         "errorDmsAlreadyLinked": "مستند نظام إدارة المستندات هذا مرتبط بالفعل.",
         "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات.",
-        "dropzoneTitleTouch": "اضغط لاختيار ملف"
+        "dropzoneTitleTouch": "اضغط لاختيار ملف",
+        "viewerPrevNamed": "المستند السابق: {{name}}",
+        "viewerNextNamed": "المستند التالي: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "المطبخ",

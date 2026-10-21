@@ -177,7 +177,9 @@
         "goTo": "Gehe zu",
         "newSection": "Neu anlegen",
         "recentLabel": "Zuletzt geöffnet",
-        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen"
+        "createTaskNamed": "„{{title}}“ als Aufgabe anlegen",
+        "hintMove": "Auswählen",
+        "hintOpen": "Öffnen"
     },
     "dashboard": {
         "title": "Übersicht",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Dieses Dokument gibt es im DMS nicht mehr.",
         "errorDmsAlreadyLinked": "Dieses DMS-Dokument ist schon verknüpft.",
         "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS.",
-        "dropzoneTitleTouch": "Tippen, um eine Datei auszuwählen"
+        "dropzoneTitleTouch": "Tippen, um eine Datei auszuwählen",
+        "viewerPrevNamed": "Vorheriges Dokument: {{name}}",
+        "viewerNextNamed": "Nächstes Dokument: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Niemand",

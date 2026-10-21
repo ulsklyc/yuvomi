@@ -1948,6 +1948,38 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   padding: var(--space-3) var(--space-4) calc(var(--space-4) + var(--safe-area-inset-bottom));
 }
 
+/* TASTENHINWEISE DER PALETTE (Critique R21): eine ruhige Fusszeile unter den
+ * Treffern - Pfeile, Enter, Esc in der Tastenform der Kuerzel-Hilfe. Nur mit
+ * feinem Zeiger: am Telefon gibt es diese Tasten nicht, und die Zeile naehme
+ * dem Sheet nur Hoehe. */
+.search-overlay__hints {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-overlay__hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    /* Footnote (13px), die Rolle der Metazeile - 12px bleibt Badges (D4). */
+    font-size: var(--type-caption);
+  }
+}
+
+.search-overlay__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.search-overlay__hint .shortcut-kbd {
+  min-width: var(--space-5);
+  padding-inline: var(--space-1);
+}
+
 /* Hinweis-, Fehler- und Kein-Treffer-Zustand der Suche sind seit Block 2 die
  * geteilte .empty-state--compact (emptyHintEl, utils/empty-state.js). */
 

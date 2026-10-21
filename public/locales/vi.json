@@ -3589,7 +3589,9 @@
         "goTo": "Đi tới",
         "newSection": "Tạo mới",
         "recentLabel": "Mở gần đây",
-        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm"
+        "createTaskNamed": "Tạo “{{title}}” thành việc cần làm",
+        "hintMove": "Chọn",
+        "hintOpen": "Mở"
     },
     "onboarding": {
         "step1Title": "Chào mừng đến với {{name}}",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Tài liệu này không còn tồn tại trong DMS.",
         "errorDmsAlreadyLinked": "Tài liệu DMS này đã được liên kết.",
         "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS.",
-        "dropzoneTitleTouch": "Chạm để chọn tệp"
+        "dropzoneTitleTouch": "Chạm để chọn tệp",
+        "viewerPrevNamed": "Tài liệu trước: {{name}}",
+        "viewerNextNamed": "Tài liệu tiếp theo: {{name}}"
     },
     "housekeeping": {
         "title": "Dọn dẹp",

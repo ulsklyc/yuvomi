@@ -8,7 +8,7 @@ import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { esc } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1484,10 +1484,11 @@ function applyVisitReport(data) {
  * Knopfbreite, sobald man den laufenden Monat verliess. */
 function reportMonthNavHtml(shownMonth, isCurrentMonth) {
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  const keys = periodArrowKeys();
   return periodStepperHtml({
-    prev: { id: 'housekeeping-report-prev', label: t('housekeeping.prevMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    prev: { id: 'housekeeping-report-prev', label: t('housekeeping.prevMonth'), keys: keys.prev, attrs: { 'aria-describedby': 'housekeeping-report-month' } },
     value: { id: 'housekeeping-report-month', className: `housekeeping-month-nav__label${isCurrentMonth ? '' : ' period-stepper__value--away'}`, text: formatMonthLabel(shownMonth) },
-    next: { id: 'housekeeping-report-next', label: t('housekeeping.nextMonth'), attrs: { 'aria-describedby': 'housekeeping-report-month' } },
+    next: { id: 'housekeeping-report-next', label: t('housekeeping.nextMonth'), keys: keys.next, attrs: { 'aria-describedby': 'housekeeping-report-month' } },
     reset: { id: 'housekeeping-report-current', className: 'housekeeping-month-nav__current', label: t('housekeeping.currentMonth'), current: isCurrentMonth },
   });
 }
@@ -1571,6 +1572,8 @@ function syncReportPeriod(content) {
     slot.querySelector('#housekeeping-report-current')?.addEventListener('click', () => (
       showReportMonth(content, currentMonthKey(), 'housekeeping-report-current')
     ));
+    // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
+    wirePeriodArrowKeys(slot);
     if (window.lucide) window.lucide.createIcons({ el: slot });
   }
   slot.hidden = false;

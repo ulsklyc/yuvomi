@@ -3479,7 +3479,9 @@
         "goTo": "Ir a",
         "newSection": "Crear nuevo",
         "recentLabel": "Abiertos recientemente",
-        "createTaskNamed": "Crear «{{title}}» como tarea"
+        "createTaskNamed": "Crear «{{title}}» como tarea",
+        "hintMove": "Seleccionar",
+        "hintOpen": "Abrir"
     },
     "birthdays": {
         "inDays_one": "en {{count}} día",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "Este documento ya no existe en el DMS.",
         "errorDmsAlreadyLinked": "Este documento del DMS ya está vinculado.",
         "errorDmsAlreadyStored": "Este documento ya está guardado en un DMS.",
-        "dropzoneTitleTouch": "Toca para elegir un archivo"
+        "dropzoneTitleTouch": "Toca para elegir un archivo",
+        "viewerPrevNamed": "Documento anterior: {{name}}",
+        "viewerNextNamed": "Documento siguiente: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Cocina",

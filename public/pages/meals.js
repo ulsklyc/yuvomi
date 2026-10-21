@@ -9,7 +9,7 @@ import { openModal as openSharedModal, closeModal as closeSharedModal, selectMod
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
@@ -601,10 +601,11 @@ async function loadPreferences() {
  */
 function weekNavHtml() {
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  const keys = periodArrowKeys();
   return periodStepperHtml({
-    prev: { id: 'week-prev', label: t('meals.prevWeek') },
+    prev: { id: 'week-prev', label: t('meals.prevWeek'), keys: keys.prev },
     value: { id: 'week-label', className: 'week-nav__label' },
-    next: { id: 'week-next', label: t('meals.nextWeek') },
+    next: { id: 'week-next', label: t('meals.nextWeek'), keys: keys.next },
     reset: { id: 'week-today', className: 'week-nav__today', label: t('meals.today') },
   });
 }
@@ -1325,6 +1326,8 @@ function swapWeek(step) {
 }
 
 function wireNav() {
+  // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
+  wirePeriodArrowKeys(_container.querySelector('#week-prev')?.parentElement ?? null);
   _container.querySelector('#week-prev')?.addEventListener('click', async () => {
     setWeekBusy();
     await loadWeek(addDays(state.currentWeek, -7));

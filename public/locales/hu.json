@@ -3589,7 +3589,9 @@
         "goTo": "Ugrás ide",
         "newSection": "Új létrehozása",
         "recentLabel": "Legutóbb megnyitott",
-        "createTaskNamed": "„{{title}}” létrehozása feladatként"
+        "createTaskNamed": "„{{title}}” létrehozása feladatként",
+        "hintMove": "Kijelölés",
+        "hintOpen": "Megnyitás"
     },
     "onboarding": {
         "step1Title": "Üdvözöljük a {{name}} alkalmazásban",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "Ez a dokumentum már nem létezik a DMS-ben.",
         "errorDmsAlreadyLinked": "Ez a DMS-dokumentum már össze van kapcsolva.",
         "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva.",
-        "dropzoneTitleTouch": "Koppintson egy fájl kiválasztásához"
+        "dropzoneTitleTouch": "Koppintson egy fájl kiválasztásához",
+        "viewerPrevNamed": "Előző dokumentum: {{name}}",
+        "viewerNextNamed": "Következő dokumentum: {{name}}"
     },
     "housekeeping": {
         "title": "Háztartás",

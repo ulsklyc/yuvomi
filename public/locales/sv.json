@@ -3479,7 +3479,9 @@
         "goTo": "Gå till",
         "newSection": "Skapa ny",
         "recentLabel": "Nyligen öppnade",
-        "createTaskNamed": "Skapa ”{{title}}” som uppgift"
+        "createTaskNamed": "Skapa ”{{title}}” som uppgift",
+        "hintMove": "Välj",
+        "hintOpen": "Öppna"
     },
     "birthdays": {
         "inDays_one": "om {{count}} dag",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "Det här dokumentet finns inte längre i DMS.",
         "errorDmsAlreadyLinked": "Det här DMS-dokumentet är redan länkat.",
         "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS.",
-        "dropzoneTitleTouch": "Tryck för att välja en fil"
+        "dropzoneTitleTouch": "Tryck för att välja en fil",
+        "viewerPrevNamed": "Föregående dokument: {{name}}",
+        "viewerNextNamed": "Nästa dokument: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Kök",

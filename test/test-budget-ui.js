@@ -5121,7 +5121,7 @@ test('R16: Kalender, Essensplan, Budget, Haushaltshilfe und Schichtplan bauen ih
   const seiten = { calendar: 4, meals: 4, budget: 4, housekeeping: 4, schedule: 4 };
   for (const name of Object.keys(seiten)) {
     const src = withoutHtmlComments(withoutComments(read(`../public/pages/${name}.js`)));
-    assert.match(src, /import \{ periodStepperHtml(?:, syncPeriodReset)?(?:, swapPeriod)? \} from '\/utils\/period-stepper\.js';/, `${name}.js nimmt den Baustein`);
+    assert.match(src, /import \{ periodStepperHtml(?:, syncPeriodReset)?(?:, swapPeriod)?(?:, periodArrowKeys, wirePeriodArrowKeys)? \} from '\/utils\/period-stepper\.js';/, `${name}.js nimmt den Baustein`);
     assert.match(src, /periodStepperHtml\(\{\s*prev: \{[^}]*label:[\s\S]*?value: \{[\s\S]*?next: \{[^}]*label:[\s\S]*?reset: \{/, `${name}.js: prev, value, next, reset`);
     assert.doesNotMatch(src, /classList\.toggle\('is-current'/, `${name}.js fuehrt keine eigene Fassung der Reset-Regel`);
     assert.doesNotMatch(src, /\.inert = isCurrent/, `${name}.js setzt inert nicht selbst`);
@@ -7340,4 +7340,53 @@ test('R21 S7: Aufteilung - Gruppenwahl zuerst, die Kennzahl in der Spalte der Gr
   const hover = rules.find((r) => /\.split-group:not\(\.split-group--active\):hover/.test(r.selector));
   assert.ok(hover && hover.at.some((a) => /hover:\s*hover/.test(a)), 'Hover nur, wo es Hover gibt');
   assert.match(hover.body, /var\(--color-surface-hover\)/, 'Hover ist die neutrale Zeilenflaeche');
+});
+
+// --------------------------------------------------------
+// Pfeiltasten am Zeitraum-Stepper (Critique R21, Persona Alex): wer auf einem
+// Pfeil, dem Wert oder "Aktuell" steht, blaettert mit Links/Rechts - die
+// Taste, die auf den Knopf zeigt (RTL gespiegelt). Ausgeloest wird der Knopf.
+// --------------------------------------------------------
+test('Zeitraum-Stepper: Links/Rechts loesen den Pfeil aus, RTL gespiegelt, mit Modifikator nichts', async () => {
+  const { wirePeriodArrowKeys, periodArrowKeys } = await import('../public/utils/period-stepper.js');
+  assert.deepEqual(periodArrowKeys(false), { prev: 'ArrowLeft', next: 'ArrowRight' });
+  assert.deepEqual(periodArrowKeys(true), { prev: 'ArrowRight', next: 'ArrowLeft' });
+  const clicks = [];
+  const button = (cls) => ({ cls, disabled: false, hidden: false, inert: false, click: () => clicks.push(cls) });
+  const prev = button('prev');
+  const next = button('next');
+  let direction = 'ltr';
+  const group = { dataset: {}, querySelector: (sel) => (sel === '.period-stepper__prev' ? prev : sel === '.period-stepper__next' ? next : null) };
+  const value = { closest: () => ({ parentElement: group }) };
+  let handler = null;
+  group.addEventListener = (type, fn) => { if (type === 'keydown') handler = fn; };
+  const realStyle = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = () => ({ direction });
+  try {
+    wirePeriodArrowKeys(group);
+    wirePeriodArrowKeys(group); // ein Traeger, ein Lauscher
+    assert.equal(typeof handler, 'function');
+    const press = (key, extra = {}) => {
+      let prevented = false;
+      handler({ key, target: value, preventDefault: () => { prevented = true; }, ...extra });
+      return prevented;
+    };
+    assert.equal(press('ArrowRight'), true);
+    assert.equal(press('ArrowLeft'), true);
+    assert.deepEqual(clicks, ['next', 'prev']);
+    direction = 'rtl';
+    press('ArrowRight');
+    assert.deepEqual(clicks.at(-1), 'prev', 'in RTL zeigt Rechts auf "zurueck"');
+    assert.equal(press('ArrowRight', { altKey: true }), false, 'mit Modifikator gehoert die Taste dem Browser');
+    assert.equal(press('ArrowUp'), false);
+    next.disabled = true;
+    direction = 'ltr';
+    assert.equal(press('ArrowRight'), false, 'ein gesperrter Pfeil (Laden) bleibt gesperrt');
+  } finally {
+    globalThis.getComputedStyle = realStyle;
+  }
+  // Und das Budget haengt ihn an seinen Stepper, mit angesagten Tasten.
+  const budget = read('../public/pages/budget.js');
+  assert.match(budget, /wirePeriodArrowKeys\(_container\.querySelector\('#budget-prev'\)\?\.parentElement \?\? null\)/);
+  assert.match(budget, /prev: \{ id: 'budget-prev', label: t\('budget\.prevMonth'\), keys: keys\.prev \}/);
 });

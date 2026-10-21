@@ -18,7 +18,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
+import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
@@ -765,10 +765,12 @@ function reportMetaError() {
  */
 function monthNavHtml() {
   // Markup und Reihenfolge kommen aus dem EINEN Baustein (utils/period-stepper.js).
+  // Links/Rechts blaettern am Stepper (wirePeriodArrowKeys); die Knoepfe sagen es an.
+  const keys = periodArrowKeys();
   return `${periodStepperHtml({
-    prev: { id: 'budget-prev', label: t('budget.prevMonth') },
+    prev: { id: 'budget-prev', label: t('budget.prevMonth'), keys: keys.prev },
     value: { id: 'budget-label', className: 'budget-nav__label', live: true },
-    next: { id: 'budget-next', label: t('budget.nextMonth') },
+    next: { id: 'budget-next', label: t('budget.nextMonth'), keys: keys.next },
     reset: { id: 'budget-today', className: 'budget-nav__today', label: t('budget.currentMonth') },
   })}
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
@@ -1067,6 +1069,7 @@ function wireNav() {
   _container.querySelector('#budget-prev').addEventListener('click', () => stepPeriod(-1));
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
   _container.querySelector('#budget-today').addEventListener('click', jumpToCurrentPeriod);
+  wirePeriodArrowKeys(_container.querySelector('#budget-prev')?.parentElement ?? null);
   // Ansichts-Scope (Mein Budget / Haushalt) — nur im personal-Modus vorhanden.
   // Dieselbe Verhaltensschicht wie die Haupt-Tabs: Roving-Tabindex ohne
   // Pfeiltasten wäre eine Tastaturfalle (nur ein Button per Tab erreichbar).

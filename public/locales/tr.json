@@ -3479,7 +3479,9 @@
         "goTo": "Git",
         "newSection": "Yeni oluştur",
         "recentLabel": "Son açılanlar",
-        "createTaskNamed": "“{{title}}” görevini oluştur"
+        "createTaskNamed": "“{{title}}” görevini oluştur",
+        "hintMove": "Seç",
+        "hintOpen": "Aç"
     },
     "birthdays": {
         "inDays_one": "{{count}} gün sonra",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "Bu belge artık DMS'de yok.",
         "errorDmsAlreadyLinked": "Bu DMS belgesi zaten bağlı.",
         "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor.",
-        "dropzoneTitleTouch": "Dosya seçmek için dokunun"
+        "dropzoneTitleTouch": "Dosya seçmek için dokunun",
+        "viewerPrevNamed": "Önceki belge: {{name}}",
+        "viewerNextNamed": "Sonraki belge: {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",

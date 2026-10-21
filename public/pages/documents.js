@@ -3909,6 +3909,25 @@ function viewerDetailsHtml(doc) {
   return rows.trim() ? `<div class="document-viewer__details detail-view__rows">${rows}</div>` : '';
 }
 
+/**
+ * Die Nachbarn eines Dokuments in der SICHTBAREN Liste (Filter, Suche,
+ * Sortierung - dieselbe Folge wie drawDocuments). Kein Umlauf am Ende: ein
+ * stiller Sprung vom letzten zum ersten Beleg laese sich als "die Liste ist
+ * kuerzer, als ich dachte".
+ */
+function viewerNeighbours(doc) {
+  const docs = filteredDocuments();
+  const index = docs.findIndex((item) => String(item.id) === String(doc.id));
+  if (index < 0) return { prev: null, next: null };
+  return { prev: docs[index - 1] ?? null, next: docs[index + 1] ?? null };
+}
+
+/** Die Pfeiltaste, die auf "zurueck" zeigt - in RTL rechts (wie die Zeitraum-Stepper). */
+function viewerStepKeys() {
+  const rtl = typeof document !== 'undefined' && document.documentElement?.dir === 'rtl';
+  return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
+}
+
 function openDocumentViewer(doc) {
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
@@ -3946,6 +3965,12 @@ function openDocumentViewer(doc) {
   let openedByKeyboard = false;
   try { openedByKeyboard = opener?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
 
+  // VOR UND ZURUECK IM BETRACHTER (Critique R21, Persona Alex): wer zehn
+  // Belege durchsieht, musste je Dokument schliessen und das naechste oeffnen.
+  // Die Nachbarn sind die der sichtbaren Liste (Filter, Suche, Sortierung).
+  const { prev: prevDoc, next: nextDoc } = viewerNeighbours(doc);
+  const stepKeys = viewerStepKeys();
+
   openSharedModal({
     title: doc.name,
     size: 'xl',
@@ -3973,6 +3998,11 @@ function openDocumentViewer(doc) {
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
           <span class="document-viewer__actions">
+            ${prevDoc || nextDoc ? `
+            <span class="document-viewer__pager">
+              ${prevDoc ? rowActionHtml({ icon: 'chevron-left', action: 'viewer-prev', label: t('documents.viewerPrevNamed', { name: prevDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.prev, title: t('documents.viewerPrevNamed', { name: prevDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
+              ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
+            </span>` : ''}
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
@@ -4028,6 +4058,21 @@ function openDocumentViewer(doc) {
         openDocumentModal(doc);
       });
       wireViewerStage(panel);
+      // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
+      // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
+      // - dort gehoeren die Pfeile dem Element.
+      const step = (target) => { if (target) openDocumentViewer(target); };
+      panel.querySelector('[data-action="viewer-prev"]')?.addEventListener('click', () => step(prevDoc));
+      panel.querySelector('[data-action="viewer-next"]')?.addEventListener('click', () => step(nextDoc));
+      panel.addEventListener('keydown', (e) => {
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+        if (e.key !== stepKeys.prev && e.key !== stepKeys.next) return;
+        if (e.target?.closest?.('input, textarea, select, [contenteditable="true"], [data-pdf-pages], [role="toolbar"]')) return;
+        const target = e.key === stepKeys.prev ? prevDoc : nextDoc;
+        if (!target) return;
+        e.preventDefault();
+        step(target);
+      });
       // PDFs ohne nativen Inline-Viewer (mobile Browser): mit pdf.js auf Canvas rendern
       if (previewKind(doc.mime_type) === 'pdf' && !canRenderPdfNatively()) {
         const container = panel.querySelector('[data-pdf-pages]');

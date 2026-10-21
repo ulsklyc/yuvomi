@@ -177,7 +177,9 @@
         "goTo": "رفتن به",
         "newSection": "ساختن مورد تازه",
         "recentLabel": "اخیراً باز شده",
-        "createTaskNamed": "ایجاد «{{title}}» به‌عنوان کار"
+        "createTaskNamed": "ایجاد «{{title}}» به‌عنوان کار",
+        "hintMove": "انتخاب",
+        "hintOpen": "باز کردن"
     },
     "dashboard": {
         "title": "نمای کلی",
@@ -3944,7 +3946,9 @@
         "errorDmsDocumentGone": "این سند دیگر در DMS وجود ندارد.",
         "errorDmsAlreadyLinked": "این سند DMS از قبل پیوند داده شده است.",
         "errorDmsAlreadyStored": "این سند از قبل در یک DMS ذخیره شده است.",
-        "dropzoneTitleTouch": "برای انتخاب فایل ضربه بزنید"
+        "dropzoneTitleTouch": "برای انتخاب فایل ضربه بزنید",
+        "viewerPrevNamed": "سند قبلی: {{name}}",
+        "viewerNextNamed": "سند بعدی: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",

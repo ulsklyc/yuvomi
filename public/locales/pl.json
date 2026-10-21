@@ -185,7 +185,9 @@
         "goTo": "Przejdź do",
         "newSection": "Utwórz nowe",
         "recentLabel": "Ostatnio otwierane",
-        "createTaskNamed": "Utwórz „{{title}}” jako zadanie"
+        "createTaskNamed": "Utwórz „{{title}}” jako zadanie",
+        "hintMove": "Zaznacz",
+        "hintOpen": "Otwórz"
     },
     "dashboard": {
         "title": "Pulpit",
@@ -4172,7 +4174,9 @@
         "errorDmsDocumentGone": "Ten dokument już nie istnieje w systemie DMS.",
         "errorDmsAlreadyLinked": "Ten dokument z systemu DMS jest już połączony.",
         "errorDmsAlreadyStored": "Ten dokument jest już zapisany w systemie DMS.",
-        "dropzoneTitleTouch": "Dotknij, aby wybrać plik"
+        "dropzoneTitleTouch": "Dotknij, aby wybrać plik",
+        "viewerPrevNamed": "Poprzedni dokument: {{name}}",
+        "viewerNextNamed": "Następny dokument: {{name}}"
     },
     "userMultiSelect": {
         "nobody": "Nikt",

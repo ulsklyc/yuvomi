@@ -3479,7 +3479,9 @@
         "goTo": "Aller à",
         "newSection": "Créer",
         "recentLabel": "Ouverts récemment",
-        "createTaskNamed": "Créer « {{title}} » comme tâche"
+        "createTaskNamed": "Créer « {{title}} » comme tâche",
+        "hintMove": "Sélectionner",
+        "hintOpen": "Ouvrir"
     },
     "birthdays": {
         "inDays_one": "dans {{count}} jour",
@@ -3880,7 +3882,9 @@
         "errorDmsDocumentGone": "Ce document n’existe plus dans la GED.",
         "errorDmsAlreadyLinked": "Ce document de la GED est déjà lié.",
         "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED.",
-        "dropzoneTitleTouch": "Touchez pour choisir un fichier"
+        "dropzoneTitleTouch": "Touchez pour choisir un fichier",
+        "viewerPrevNamed": "Document précédent : {{name}}",
+        "viewerNextNamed": "Document suivant : {{name}}"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",
