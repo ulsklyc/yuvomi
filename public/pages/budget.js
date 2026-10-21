@@ -2731,7 +2731,13 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
         <div class="budget-entry__indicator ${indClass}"></div>
         <div class="list-row__main">
           ${titleCell}
-          <div class="list-row__meta budget-entry__meta">${date}${upcomingMark}${categoryMetaText}${isTransfer ? transferRoute : acctMeta}${recurTag}${receiptMark}${responsibleMark}</div>
+          ${/* DIE ZEICHEN STEHEN AM DATUM (R21 S9b, Critique a4). Am Ende der
+               Metazeile brach bei 390px die Zeile vor dem Symbol um, und das
+               Wiederkehr-Zeichen stand allein in Zeile 3 (Krankenversicherung).
+               Ein geschuetztes Leerzeichen hilft nicht: Chrome bricht vor
+               jedem atomaren Inline-Element. Neben dem kurzen Datum steht es
+               immer in der ersten Zeile und sagt, wann und wie oft. */ ''}
+          <div class="list-row__meta budget-entry__meta">${date}${upcomingMark}${recurTag}${receiptMark}${categoryMetaText}${isTransfer ? transferRoute : acctMeta}${responsibleMark}</div>
         </div>
         <div class="budget-entry__amount ${amtClass}">${amountText}</div>
         <div class="list-row__actions">${rowActions}

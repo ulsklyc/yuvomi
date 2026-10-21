@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The repeat and receipt marks of a booking stand next to its date.** At the end of the line they
+  could wrap onto a line of their own on a phone; now they follow the date ("01.10. ⟳ · Health").
+
 - **Editing an amount shows it with its cents.** An entry of 200 € opened as "200" and 38.50 € as
   "38.5" in the budget, subscription, loan, plan and household help dialogs; they now read "200,00"
   and "38,50" in the format of your region. Nothing is rounded: an amount with more decimals stays

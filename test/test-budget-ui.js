@@ -1312,6 +1312,17 @@ test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt
   for (const [field, name] of raten) assert.match(field, /value="\$\{esc\(amountFieldValue\(/, `housekeeping.js: ${name} ohne amountFieldValue`);
 });
 
+// R21 S9b (Critique a4): am Ende der Metazeile stand das Wiederkehr-Zeichen
+// bei 390px allein in Zeile 3 (Krankenversicherung). Chrome bricht vor jedem
+// atomaren Inline-Element, auch nach einem geschuetzten Leerzeichen - die
+// Zeichen stehen deshalb am Datum, in der ersten Zeile.
+test('Buchungszeile: Wiederkehr- und Belegzeichen stehen am Datum, nicht am Zeilenende', () => {
+  const meta = withoutComments(budget).match(/<div class="list-row__meta budget-entry__meta">([^<]*)<\/div>/);
+  assert.ok(meta, 'Metazeile der Buchung nicht gefunden');
+  assert.match(meta[1], /^\$\{date\}\$\{upcomingMark\}\$\{recurTag\}\$\{receiptMark\}\$\{categoryMetaText\}/,
+    `die Zeichen folgen dem Datum: ${meta[1]}`);
+});
+
 test('wählbare Währungen ziehen das Betragsfeld nach', () => {
   // Ein Formular, in dem die Währung gewählt werden kann, muss das Betragsfeld
   // beim Wechsel nachziehen - sonst behält es das Format der vorherigen Währung
