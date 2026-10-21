@@ -1084,6 +1084,47 @@ test('R21: die Metazeile ist eine Rolle - Footnote 13, kein Modul setzt eine eig
   assert.deepStrictEqual(dialekt, [], 'eine eigene Groesse an der Metazeile ist ein Dialekt - die Rolle in typography.css ist die Quelle');
 });
 
+// R21 S5 (Critique 2026-10-21, D5): DAS INNENLEBEN DER UEBERSICHT LIEST IN
+// ROLLEN. Nach S4 trugen die Kacheln noch 14 und 12 an Lesetext: Zaehler
+// ("1/2"), Restzeit ("in 22 Tagen", "Noch 2 Tage"), Mengen, das leere Widget,
+// die Beschriftungen der Budget-Kachel und - bei 12 - jede Fussnote
+// "+N weitere". D4: 14 gehoert Bedienelementen, 12 Badges, Avataren und
+// Mikro-Labels. Dieser Guard listet, was in dashboard.css noch 14 oder 12
+// traegt, und jede Stelle steht mit ihrem Grund da - eine neue Lesezeile in
+// diesen Groessen faellt hier auf.
+test('R21 S5: die Uebersicht traegt 14 und 12 nur an Bedienelementen, Badges, Avataren und Mikro-Labels', () => {
+  const ERLAUBT = new Map([
+    ['.widget__badge', 'Badge'], ['.event-time-badge', 'Badge'], ['.shopping-widget-list__count', 'Zaehler-Badge der Liste'],
+    ['.family-member__count', 'Badge am Avatar'], ['.health-widget__next-time', 'Uhrzeit als Pille'],
+    ['.task-item__avatar', 'Avatar-Initialen'], ['.birthday-widget-item__avatar', 'Avatar-Initialen'],
+    ['.family-widget-avatar', 'Avatar-Initialen'], ['.rewards-member__avatar', 'Avatar-Initialen'],
+    ['.schedule-widget-row__avatar', 'Avatar-Initialen'],
+    ['.week-strip__weekday', 'Mikro-Label der Wochenleiste'], ['.week-strip__date', 'Ziffer im Tageskaestchen'],
+    ['.weather-forecast__label', 'Mikro-Label der Vorhersage'], ['.weather-forecast__temps', 'Mikro-Label der Vorhersage'],
+    ['.dashboard-overview__date', 'Mikro-Label ueber dem Gruss (versal)'], ['.quick-link-tile__name', 'Mikro-Label unter dem Symbol'],
+    ['.fab-action__label', 'Bedienelement'], ['.widget-restore-chip', 'Bedienelement'], ['.dashboard-customize-scope', 'Bedienelement'],
+    ['.widget-restore__title', 'Anpassen-Ablage (Bedienflaeche)'], ['.dashboard-customize-footnote', 'Anpassen-Fussnote (Bedienflaeche)'],
+    ['.widget-options__hint', 'Formularhinweis im Optionen-Dialog (Formular-Typo, S9)'],
+    ['.quick-link-manage-row__host', 'Verwalten-Dialog (Formular)'], ['.quick-link-manage-row__locked', 'Verwalten-Dialog (Formular)'],
+  ]);
+  const css = readFileSync(new URL('dashboard.css', STYLES_DIR), 'utf8');
+  const funde = [];
+  for (const rule of eachRule(css)) {
+    const fs = rule.body.match(/font-size:\s*var\(--text-(sm|xs)\)/);
+    if (!fs) continue;
+    for (const sel of rule.selector.split(',').map((x) => x.trim().replace(/\s+/g, ' '))) {
+      if (!ERLAUBT.has(sel)) funde.push(`${sel} { font-size: var(--text-${fs[1]}) }`);
+    }
+  }
+  assert.deepStrictEqual(funde, [], 'Lesetext der Uebersicht in 14 oder 12 - in die Rolle (typography.css) oder mit Grund hier eintragen');
+  // Und die Fussnote "+N weitere" jeder Listenkachel ist mindestens Footnote 13.
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const rolle = typo.find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes('.list-row__meta'));
+  for (const sel of ['.widget-list-more', '.countdown-more', '.waste-widget-more', '.pantry-widget-more', '.week-strip__more']) {
+    assert.ok(rolle.selector.split(',').map((x) => x.trim()).includes(sel), `${sel} nimmt die Metazeile (13)`);
+  }
+});
+
 // R21 (D4): SEKUNDAERTEXT IST SUBHEADLINE 15. Die Erklaerung eines Leerzustands,
 // die Beschreibung einer Dokumentkarte, der Untertitel eines Kontaktkopfs
 // standen bei 14 - der Stufe der Bedienelemente. Die Rolle steht in

@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Small text on the Overview tiles reads at the sizes used everywhere else.** Counts, time
+  left, amounts and the line under an empty tile were 14 pixels, the "+N more" line under every
+  list tile only 12. They now use the shared sizes: 13 pixels for the small line under a name and
+  for "+N more", 15 for a nutrient's name; badges, avatars and buttons keep their size.
+
 - **Recipe rows keep their actions in one More menu.** From a medium width up, every recipe row
   showed edit, duplicate and a delete bin, and the detail column next to it offered the same three
   again; on a wide screen the titles were cut to make room. The row now carries only its More
