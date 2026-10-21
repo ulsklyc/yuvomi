@@ -29,6 +29,55 @@
   min-height: 0;
 }
 
+/* ABOS IN DER BAHN DES BUDGETS (R21 S7, D9). Als Budget-Reiter lief die Liste
+ * ueber die ganze Bahn (1124px bei 1440): vom Namen bei x 308 bis zum Betrag
+ * bei x 1312 lagen 1000px Blickweg, und Kennzahlen und Diagramme standen als
+ * eigene Baender darueber und darunter. Jetzt dieselbe Zweispalte wie
+ * Uebersicht und Plan (budget.css): links die Liste auf dem Lesemass, rechts
+ * die Kennzahlleiste - eine Karte je Zeile (`--summary-cards: 1` mit dem
+ * Wertgrad der Seitenspalte) - und darunter die Diagramme einspaltig. Im
+ * Markup bleibt die Reihenfolge (Kennzahlen, Liste, Diagramme); schmal
+ * aendert sich nichts. Die Gast-Route ohne Budget-Seite bleibt, wie sie ist. */
+@container budget-page (min-width: 960px) {
+  .budget-page .subscriptions-page {
+    display: grid;
+    grid-template-columns:
+      minmax(0, var(--layout-reading))
+      clamp(
+        var(--budget-rail-min),
+        calc(100% - var(--layout-reading) - var(--budget-column-gap)),
+        var(--budget-rail-max)
+      );
+    grid-template-rows: auto 1fr;
+    column-gap: var(--budget-column-gap);
+    align-items: start;
+  }
+
+  .budget-page .subscriptions-summary {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .budget-page .subscriptions-summary > .metric-grid {
+    --summary-cards: 1;
+    --metric-value-size: var(--text-3xl);
+  }
+
+  .budget-page .subscriptions-list-section {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .budget-page #subscriptions-analytics {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .budget-page .subscriptions-analytics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Suche, Filterknopf und Werkzeug-Menue stehen im Kopf der Abo-Liste
  * (`.subscriptions-section-head.section-toolbar`, R14 P8): die Suche liest
  * Breite und Lage aus page-search.css (`--page-search-width`, mobil Icon-Form
@@ -590,13 +639,13 @@
  * `.row-action`, layout.css) - vorher violett umrandete `btn--secondary
  * btn--icon`, und Loeschen stand im selben Violett statt im Danger-Ton. */
 
-/* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor - im
- * Ton der Ueberschreitung (Danger, wie im Plan). */
-.subscriptions-page .metric-card--over .metric-card__label svg {
+/* „Ueber Budget" nennt sich im Label und traegt das Warnsymbol davor, in der
+ * Zeile des Labels. Seit R21 S7 in der Farbe des Labels: das Rot traegt der
+ * Balken der Kostenkarte (die Warnung steht einmal, D8). */
+.subscriptions-page .metric-card__label svg {
   display: inline-block;
   vertical-align: -2px;
   margin-inline-end: var(--space-1);
-  color: var(--color-danger);
 }
 
 /* Der Weg aus „Ueber Budget" heraus: ein Textknopf IN der Fussnote, hinter

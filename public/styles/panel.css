@@ -608,8 +608,7 @@
 
 /* Dieselben Stufen wie der Budgetplan (budget-plans.js `toneForRatio`): ab
  * 85 % der Warnton, ueber 100 % Danger - eine Ueberschreitung ist eine
- * Tatsache, kein Hinweis. `.metric-card--over` traegt dieselbe Stimme an der
- * Karte daneben. */
+ * Tatsache, kein Hinweis - und sie steht einmal: am Balken (R21 S7). */
 .metric-card__progress--near > span { background: var(--color-warning); }
 .metric-card__progress--over > span { background: var(--color-danger); }
 
@@ -644,16 +643,11 @@
   color: var(--color-warning);
 }
 
-/* Eine tatsaechliche Ueberschreitung (Abo-Budget): derselbe Danger-Ton wie die
- * ueberzogene Plan-Kategorie (budget.css `--tone-over`). Das Label nennt den
- * Zustand samt Symbol - die Farbe ist nicht der einzige Traeger. */
-.metric-card--over {
-  border-color: color-mix(in oklch, var(--color-danger) 40%, transparent);
-}
-
-.metric-card--over .metric-card__value {
-  color: var(--color-danger);
-}
+/* `.metric-card--over` ist entfallen (R21 S7): die Ueberschreitung des
+ * Abo-Budgets stand zweimal rot - am Balken der Kostenkarte und als eigene
+ * rote Karte daneben. Das Rot traegt jetzt nur der Balken
+ * (`.metric-card__progress--over`, wie im Plan); die Karte nennt die Tatsache
+ * in Worten samt Symbol. */
 .metric-card--balance-negative .metric-card__value { color: var(--color-danger);  }
 /* Reines Ausgaben-Tracking (keine Einnahmen im Monat): Saldo = -Ausgaben ist eine
    Tautologie, die rote Zahl wird als „im Minus" fehlgelesen (#504). Neutral statt rot. */

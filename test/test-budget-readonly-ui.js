@@ -534,7 +534,11 @@ test('Abo-Budget spricht wie der Plan: ab 85 % Warnton, ueberschritten Danger (C
   try {
     abos.state.summary = summe(123.6);
     const over = abos.renderSummary();
-    assert.match(over, /class="metric-card metric-card--over"/, 'eine Ueberschreitung ist eine Tatsache - dieselbe Stimme wie die Plan-Kategorie');
+    // R21 S7 (Critique a4 "Warnung doppelt", D8): die Ueberschreitung steht
+    // EINMAL rot - am Balken der Kostenkarte, wie im Plan; die Karte daneben
+    // nennt sie in Worten, ohne zweite rote Flaeche.
+    assert.doesNotMatch(over, /metric-card--over/, 'keine zweite rote Karte neben dem roten Balken');
+    assert.match(over, /triangle-alert[\s\S]{0,120}subscriptions\.overBudget/, 'das Label nennt die Tatsache samt Symbol');
     assert.doesNotMatch(over, /metric-card--warning/);
     assert.match(over, /metric-card__progress metric-card__progress--over/);
     assert.match(over, /id="subscriptions-over-budget-action"/, 'der Handlungsweg bleibt');
@@ -549,7 +553,6 @@ test('Abo-Budget spricht wie der Plan: ab 85 % Warnton, ueberschritten Danger (C
   const rule = (sel) => [...eachRule(panel)].find((r) => r.selector.trim() === sel)?.body ?? '';
   assert.match(rule('.metric-card__progress--over > span'), /--color-danger/);
   assert.match(rule('.metric-card__progress--near > span'), /--color-warning/);
-  assert.match(rule('.metric-card--over .metric-card__value'), /--color-danger/);
   const plansCss = readFileSync(new URL('../public/styles/budget.css', import.meta.url), 'utf8');
   assert.match(plansCss, /\.budget-plan-row--tone-over \{ --plan-tone-color: var\(--color-danger\);/, 'der Plan ist die Referenz');
 });

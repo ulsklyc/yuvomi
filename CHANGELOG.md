@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Subscriptions read like the other budget tabs on a wide screen.** The list ran across the
+  whole budget width, a full screen from a name to its amount. It now stands on the reading
+  width with the key figures and the charts in a column on the right, like the overview and the
+  plan. When the subscriptions cost more than their budget, the bar says so in red once; the
+  card next to it names it in words instead of repeating the red.
+
 - **The shift plan's planning tab is shorter when it is still empty.** Exceptions and extra
   shifts without an entry are now one quiet row each, with the sentence on the left and the add
   button on the right, instead of two more centred empty pages below the empty shift plan. The

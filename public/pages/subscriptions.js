@@ -798,7 +798,7 @@ function renderSummary() {
   //
   // UEBER BUDGET SAGT DASSELBE WIE IM PLAN (Critique 2026-09-25). Eine
   // tatsaechliche Ueberschreitung ist eine Tatsache und traegt den Danger-Ton
-  // wie die ueberzogene Plan-Kategorie (`.metric-card--over`, Symbol und
+  // wie die ueberzogene Plan-Kategorie (seit R21 S7 am Balken, Symbol und
   // Label als Text); die Annaeherung ab 85 % traegt den Warnton am Balken -
   // wie im Plan. Neu ist der Weg zur Handlung: zur Liste, teuerste zuerst.
   // Das ist Lesen, kein Schreiben - der Weg steht bei jedem Recht.
@@ -845,7 +845,11 @@ function renderSummary() {
         </div>` : ''}
         <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
       </article>
-      <article class="metric-card${isOverBudget ? ' metric-card--over' : ''}">
+      ${/* DIE WARNUNG STEHT EINMAL (R21 S7, Critique a4 "Warnung doppelt"): der
+         Balken der Kostenkarte daneben steht ueber 100 % schon im Danger-Ton
+         (wie der Plan). Diese Karte nennt die Tatsache in Worten samt Symbol
+         und den Weg zur Handlung - ohne zweite rote Flaeche und Zahl. */ ''}
+      <article class="metric-card">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
         <div class="metric-card__note">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>

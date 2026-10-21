@@ -7298,3 +7298,23 @@ test('R21 S7: der Plan beginnt mit den Kategorien, die Sparziel-Aufforderung ste
   const dense = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '#budget-plan-body' && /grid-auto-flow:\s*row dense/.test(r.body));
   assert.ok(dense, 'breit fuellt das Raster die Seitenspalte trotzdem von oben');
 });
+
+// R21 S7 (D9 "Abonnements in die Budget-Bahn"): die Abo-Liste lief 1124px breit
+// (Name x 308 -> Betrag x 1312 = 1000px Blickweg). Ab 960px Budget-Flaeche
+// dieselbe Zweispalte wie Uebersicht und Plan: Liste auf dem Lesemass (720),
+// rechts die Kennzahlleiste mit einer Karte je Zeile und die Diagramme.
+test('R21 S7: die Abos stehen in der Bahn - Liste links, Kennzahlleiste rechts', () => {
+  const css = read('../public/styles/subscriptions.css');
+  const lane = [...eachRule(css)].filter((r) => r.at.some((a) => /@container budget-page \(min-width: 960px\)/.test(a)));
+  const page = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-page');
+  assert.match(page?.body ?? '', /display:\s*grid/);
+  assert.match(page.body, /minmax\(0, var\(--layout-reading\)\)/, 'die Liste steht auf dem Lesemass');
+  assert.match(page.body, /var\(--budget-rail-max\)/, 'rechts die Seitenspalte des Budgets');
+  const list = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-list-section');
+  assert.match(list?.body ?? '', /grid-column:\s*1/);
+  const summary = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-summary');
+  assert.match(summary?.body ?? '', /grid-column:\s*2/);
+  const cards = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-summary > .metric-grid');
+  assert.match(cards?.body ?? '', /--summary-cards:\s*1/, 'eine Karte je Zeile');
+  assert.match(cards.body, /--metric-value-size:\s*var\(--text-3xl\)/, 'mit dem Wertgrad der Seitenspalte');
+});
