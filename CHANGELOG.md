@@ -126,7 +126,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the child's own settings, and existing accounts keep what they have.
 
 - **The Overview opens with your day.** On a phone, "Today" now shows as many entries as fit on
-  the first screen instead of stopping after two, with the rest behind "+N more". The budget card
+  the first screen instead of stopping after two, with the rest behind "+N more"; the shopping
+  line counts too, so it no longer slips behind the tab bar, and the number follows when you turn
+  the phone or the browser bar changes the height of the window. The budget card
   and the account balance are no longer on a new Overview - bring the card back under
   "Customize" if you want it there; layouts you saved keep it. On wide screens the tiles close the
   gap that was left under a small tile next to two tall ones.

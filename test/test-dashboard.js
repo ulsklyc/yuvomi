@@ -3374,6 +3374,41 @@ test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten
   nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
 });
 
+test('R21 S7: die Einkaufszeile unter dem Programm zaehlt mit - nichts rutscht hinter die Kapsel', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  // Gemessen 390x844 vor dem Fix: acht Zeilen (Unterkante 744 von 764) passten,
+  // die Einkaufszeile darunter stand bei 744-809 halb hinter der Kapsel.
+  const day = { fold: 764, rowsTop: 226, rowHeight: 64, trailing: 65, total: 8, rest: 65 };
+  const cap = __test.programRowsThatFit(day);
+  nodeAssert.ok(cap < 8, `acht Zeilen plus Einkaufszeile passen nicht in 538px (gezeigt: ${cap})`);
+  nodeAssert.ok(day.rowsTop + cap * day.rowHeight + day.trailing <= day.fold, 'die Zeilen samt "+N weitere" enden ueber dem Falz');
+  nodeAssert.equal(__test.programRowsThatFit({ ...day, fold: 900 }), 8, 'mit Platz fuer alles steht alles');
+});
+
+test('R21 S7: das Heute-Blatt misst nach Drehung und Fensterhoehe neu', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.createPhoneProgramFit, 'function', 'createPhoneProgramFit fehlt');
+  const listeners = {};
+  const frames = [];
+  const win = {
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    requestAnimationFrame: (fn) => { frames.push(fn); return frames.length; },
+    cancelAnimationFrame: () => {},
+  };
+  const controller = new AbortController();
+  const calls = [];
+  __test.createPhoneProgramFit(win, controller.signal, (crossed) => calls.push(crossed));
+  nodeAssert.equal(typeof listeners.resize, 'function', 'kein resize-Lauscher');
+  listeners.resize(); listeners.resize();
+  nodeAssert.equal(frames.length, 1, 'mehrere Ereignisse eines Bildes werden gebuendelt');
+  frames[0]();
+  nodeAssert.deepEqual(calls, [false], 'nach dem Bild wird nachgemessen');
+  // Verdrahtet: die Seite reicht den Neuaufbau durch, nicht nur der Test.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  nodeAssert.match(src, /createPhoneProgramFit\(window, signal, \(crossed\) => \{[\s\S]{0,300}measurePhoneProgram\(container\.querySelector\('#dashboard-shell'\)\)\) rebuildDashboard\(widgetConfig\)/,
+    'render() verdrahtet das Nachmessen mit dem Neuaufbau');
+});
+
 
 test('isUserOrderedConfig gibt es nicht mehr - das Raster schaltet nach keiner Reihenfolge um', () => {
   // Gegenprobe zur Entscheidung vom 2026-09-23 (immer dicht): ein Aufrufer,

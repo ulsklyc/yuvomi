@@ -3924,22 +3924,32 @@ function phoneProgramCap() {
  *   rowHeight Hoehe einer Zeile
  *   trailing  was unter den Zeilen steht, solange es einen Ueberlauf gibt ("+N weitere")
  *   total     Zeilen des ganzen Tages (nach der Sammelzeile)
+ *   rest      was unter den Zeilen steht, wenn ALLE stehen (Einkaufszeile, Coda)
  * @returns {number}
  */
-function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total }) {
+/* ALLES PASST NUR, WENN AUCH DER REST PASST (R21 S7, Handoff 5). Die Rechnung
+ * verglich nur die Zeilen mit dem Platz: bei 390x844 passten alle acht (Unterkante
+ * 744 von 764), und die Einkaufszeile darunter stand bei 744-809 halb hinter der
+ * Kapsel. Was ohne Ueberlauf unter den Zeilen bleibt, zaehlt jetzt mit; passt es
+ * nicht, faltet die Einkaufszeile mit der letzten Zeile in "+N weitere". */
+function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0 }) {
   if (!(rowHeight > 0) || !(total > 0)) return PROGRAM_ROW_CAP_PHONE;
   const room = fold - rowsTop;
-  if (total * rowHeight <= room) return total;
-  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total, Math.floor((room - trailing) / rowHeight)));
+  if (total * rowHeight + rest <= room) return total;
+  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, Math.floor((room - trailing) / rowHeight)));
 }
 
 /**
  * Misst das gezeichnete Blatt auf dem Telefon und meldet die passende
  * Zeilenzahl, wenn sie von der gezeichneten abweicht - sonst `null`.
+ * `shrinkOnly`: der zweite Blick nach einem Neuzeichnen meldet nur ein
+ * Weniger. Der Rest unter den Zeilen wechselt mit dem Deckel (Einkaufszeile
+ * gegen "+N weitere"); ein Mehr an dieser Stelle hiesse Pendeln.
  * @param {Element} shell
+ * @param {{ shrinkOnly?: boolean }} [opts]
  * @returns {number|null}
  */
-function measurePhoneProgram(shell) {
+function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
   const section = shell?.querySelector?.('.today-cockpit[data-program-cap]');
   if (!section || !onPhoneStage()) return null;
   const rows = section.querySelector('.today-cockpit__rows:not(.today-cockpit__rows--more)');
@@ -3954,18 +3964,71 @@ function measurePhoneProgram(shell) {
   const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-2')) || 8;
   const rowsRect = rows.getBoundingClientRect();
   const sectionRect = section.getBoundingClientRect();
+  const rowHeight = first.getBoundingClientRect().height;
+  const trailing = Math.max(0, sectionRect.bottom - rowsRect.bottom);
+  const shown = Number(section.dataset.programCap) || 0;
+  const total = Number(section.dataset.programTotal) || 0;
+  // Was unter den Zeilen bleibt, wenn alle stehen: gezeichnet ohne Ueberlauf
+  // ist es gemessen, sonst steckt die Einkaufszeile im Ueberlauf und zaehlt
+  // als eine Zeile (gleiche Karte), die Coda mit ihrer Hoehe.
+  const coda = section.querySelector('.today-cockpit__coda')?.getBoundingClientRect().height ?? 0;
+  const rest = shown >= total
+    ? trailing
+    : (section.dataset.programShopping === '1' ? rowHeight : 0) + coda;
   const geometry = {
     fold: foldViewport + scrollTop - gap,
     rowsTop: rowsRect.top + scrollTop,
-    rowHeight: first.getBoundingClientRect().height,
-    trailing: Math.max(0, sectionRect.bottom - rowsRect.bottom),
-    total: Number(section.dataset.programTotal) || 0,
+    rowHeight,
+    trailing,
+    total,
+    rest,
   };
   // Ein leerer Tag hat eine Zustandszeile und nichts zu deckeln.
   if (!geometry.total) return null;
-  const cap = programRowsThatFit(geometry);
-  phoneProgramFit = { height: window.innerHeight, cap };
-  return cap === Number(section.dataset.programCap) ? null : cap;
+  const height = window.innerHeight;
+  const fit = programRowsThatFit(geometry);
+  // Musste der zweite Blick zuruecknehmen (mit einer Zeile weniger im Ueberlauf
+  // fuehrt "+N weitere" in eine Ansicht, und die Einkaufszeile bleibt stehen),
+  // gilt das als Decke fuer diese Fensterhoehe - sonst zeichnete jeder
+  // Neuaufbau erst die hoehere Zahl und nahm sie dann zurueck.
+  if (shrinkOnly) {
+    if (fit >= shown) return null;
+    phoneProgramFit = { height, cap: fit, ceiling: fit };
+    return fit;
+  }
+  const ceiling = phoneProgramFit?.height === height ? phoneProgramFit.ceiling ?? Infinity : Infinity;
+  const cap = Math.min(fit, ceiling);
+  phoneProgramFit = { height, cap, ceiling };
+  return cap === shown ? null : cap;
+}
+
+/** Tauscht das Heute-Blatt gegen eine neu gezeichnete Fassung (gleicher Platz). */
+function replaceProgramSheet(shell, html) {
+  shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', html);
+  shell.querySelector('.today-cockpit')?.remove();
+}
+
+/* DAS BLATT PASST SICH DEM SCHIRM AN, NICHT NUR DEM AUFBAU (R21 S7, Handoff 5).
+ * `measurePhoneProgram` lief nur beim Neuaufbau: nach einer Drehung oder wenn
+ * die Browserleiste die Fensterhoehe aendert, blieb die Zeilenzahl der alten
+ * Hoehe stehen - gemessen 390x844 -> 390x664: acht Zeilen, die letzten fuenf
+ * hinter der Kapsel. Hier wird bei jeder Groessenaenderung (ein Bild spaeter,
+ * gebuendelt) nachgemessen, und nur wenn die Zahl nicht mehr stimmt oder die
+ * Buehne zwischen Telefon und breit wechselt, baut die Uebersicht neu. */
+function createPhoneProgramFit(win, signal, rebuild) {
+  let frame = 0;
+  let phone = onPhoneStage();
+  win.addEventListener('resize', () => {
+    if (frame) return;
+    frame = win.requestAnimationFrame(() => {
+      frame = 0;
+      const now = onPhoneStage();
+      const crossed = now !== phone;
+      phone = now;
+      rebuild(crossed);
+    });
+  }, { signal, passive: true });
+  signal.addEventListener('abort', () => win.cancelAnimationFrame(frame), { once: true });
 }
 
 /* AB ZWEI UEBERFAELLIGEN EINE SAMMELZEILE (R14, A7 P2-2). Fuenfmal rotes
@@ -4368,7 +4431,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // Zeilenzahl und Tagesumfang stehen am Blatt, damit `measurePhoneProgram`
   // nach dem Zeichnen nachrechnen kann, ohne das Modell ein zweites Mal zu bauen.
   const fit = onPhoneStage() && !editing
-    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"`
+    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}`
     : '';
   return `
     <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
@@ -7960,6 +8023,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
   signal.addEventListener('abort', () => disposeNoteCategories(), { once: true });
   // Das Einpassen der Wand auf Aufbau und Fenstergroesse (#1817).
   const wallFit = createWallFit(window, signal);
+  // Das Heute-Blatt folgt Drehung und Fensterhoehe (createPhoneProgramFit).
+  createPhoneProgramFit(window, signal, (crossed) => {
+    if (signal.aborted || wallMode || loadFailed || isCustomizing) return;
+    if (crossed || measurePhoneProgram(container.querySelector('#dashboard-shell'))) rebuildDashboard(widgetConfig);
+  });
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
     // die nach dem Verlassen der Seite oder nach dem naechsten render()
@@ -8040,8 +8108,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
-        shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
-        shell.querySelector('.today-cockpit')?.remove();
+        replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
+        const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
+        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
       }
     }, { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
@@ -8382,7 +8452,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
