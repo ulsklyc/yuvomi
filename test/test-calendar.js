@@ -2023,7 +2023,10 @@ test('Monatswechsel: gewaehlt ist heute, wenn der Monat heute enthaelt, sonst de
   assert(monthStepCursor('2026-03-31', -1, TODAY) === '2026-02-01', 'rueckwaerts genauso');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const nav = src.slice(src.indexOf('async function navigate('), src.indexOf('async function goToday('));
-  assert(/monthStepCursor\(/.test(nav), 'navigate() blaettert den Monat nicht ueber monthStepCursor()');
+  // Seit R21 (D2) rechnet EINE Stelle den Nachbarzeitraum fuer Pfeil, Kuerzel und Wisch.
+  assert(/state\.cursor = neighborCursor\(dir\)/.test(nav), 'navigate() rechnet den Schritt nicht ueber neighborCursor()');
+  const nc = src.slice(src.indexOf('function neighborCursor('), src.indexOf('function canPagePeriods('));
+  assert(/monthStepCursor\(/.test(nc), 'der Nachbarzeitraum blaettert den Monat nicht ueber monthStepCursor()');
 });
 
 // EINGEKLAPPT GEHT DER TELEFON-MONAT WOCHENWEISE (Critique 2026-09-24, Rest 1).
@@ -6301,6 +6304,176 @@ test('R21: das Telefon-Raster hat in jedem Monat dieselbe Hoehe, die Liste sprin
   assert(48 * rows / 6 >= 48, 'sechs Wochen bleiben mindestens 48px hoch');
   const collapsed = mobile.find((r) => r.selector.trim() === '.month-view--split.month-view--collapsed .month-day--selweek');
   assert(/--month-row-h:\s*var\(--space-12\)/.test(collapsed?.body ?? ''), 'eingeklappt springt die Liste an Monatsgrenzen nicht mit dem Budget');
+});
+
+/* R21 (Critique 2026-10-21, D2): ECHTES UMBLAETTERN. Der Wisch zog die ganze
+ * Ansicht samt Stundenachse ~110px gedaempft mit, daneben stand leere Flaeche,
+ * und der neue Zeitraum kam erst nach Loslassen und Laden. Jetzt: der Nachbar
+ * (neighbor) steht als Panel daneben und zieht 1:1 mit, die Achse (axis) steht,
+ * Einrasten ab Schwelle ODER mit Schwung, sonst Zurueckfedern; reduziert kein
+ * Zug, nur Blende. Gemessen an der echten Geste mit einer gestellten Uhr. */
+test('R21 D2: ein Flick blaettert auch unter der Schwelle um, ein langsamer kurzer Wisch nicht', () => {
+  const { periodSwipeCommit, PERIOD_FLICK_VELOCITY, PERIOD_FLICK_MIN } = periodSwipe;
+  assert(periodSwipeCommit(-120, 0) === 1 && periodSwipeCommit(120, 0) === -1, 'ab der Schwelle zaehlt der Weg allein');
+  assert(periodSwipeCommit(-50, -1.2) === 1, 'ein schneller kurzer Wisch nach links blaettert vor');
+  assert(periodSwipeCommit(50, 1.2) === -1, 'nach rechts zurueck');
+  assert(periodSwipeCommit(-50, -0.1) === 0, 'langsam und kurz federt zurueck');
+  assert(periodSwipeCommit(-50, 1.2) === 0, 'Schwung gegen den Weg (Finger kehrt um) blaettert nicht');
+  assert(periodSwipeCommit(-(PERIOD_FLICK_MIN - 1), -3) === 0, 'unter dem Mindestweg ist es ein Zittern');
+  assert(periodSwipeCommit(-50, -1.2, { rtl: true }) === -1, 'RTL gespiegelt');
+  assert(PERIOD_FLICK_VELOCITY > 0.2 && PERIOD_FLICK_VELOCITY < 1, `Schwelle plausibel: ${PERIOD_FLICK_VELOCITY}`);
+});
+
+function pagerFixture({ reduced = false } = {}) {
+  const classes = () => { const set = new Set(); return { add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)), contains: (c) => set.has(c) }; };
+  const axisLive = { style: {} };
+  const live = {
+    style: {}, isConnected: true, offsetTop: 12, offsetLeft: 0, offsetHeight: 600, classList: classes(),
+    getBoundingClientRect: () => ({ width: 390 }),
+    querySelectorAll: () => [axisLive],
+    addEventListener() {}, removeEventListener() {},
+  };
+  const made = [];
+  const neighbor = (step) => {
+    const ghost = { step, style: {}, isConnected: false, classList: classes(), attrs: {}, axis: { style: {} } };
+    ghost.setAttribute = (k, v) => { ghost.attrs[k] = v; };
+    ghost.querySelectorAll = () => [ghost.axis];
+    ghost.remove = () => { ghost.removed = true; ghost.isConnected = false; };
+    made.push(ghost);
+    return ghost;
+  };
+  const handlers = {};
+  const surface = {
+    firstElementChild: live, classList: classes(),
+    appendChild(el) { el.isConnected = true; },
+    addEventListener: (t, fn) => { handlers[t] = fn; }, removeEventListener() {}, closest: () => null,
+  };
+  const realNow = performance.now;
+  let clock = 1000;
+  performance.now = () => clock;
+  const zuvor = { window: globalThis.window, document: globalThis.document };
+  globalThis.window = { matchMedia: (q) => ({ matches: reduced && /reduce/.test(q) }), innerWidth: 390 };
+  globalThis.document = { getElementById: () => null, documentElement: { dir: '' } };
+  const target = { closest: () => null };
+  const at = (x) => ({ clientX: x, clientY: 300 });
+  return {
+    live, axisLive, made, surface,
+    wire: (opts) => periodSwipe.wirePeriodSwipe(surface, { enabled: () => true, neighbor, axis: '.axis', ...opts }),
+    start: (x) => handlers.touchstart({ touches: [at(x)], target }),
+    move: (x, ms = 16) => { clock += ms; handlers.touchmove({ touches: [at(x)], cancelable: true, preventDefault() {} }); },
+    end: () => handlers.touchend({ touches: [] }),
+    restore: () => { performance.now = realNow; globalThis.window = zuvor.window; globalThis.document = zuvor.document; },
+  };
+}
+
+await test('R21 D2: der Nachbar zieht 1:1 mit, die Achse steht, eingerastet baut onStep an derselben Stelle', async () => {
+  const f = pagerFixture();
+  try {
+    const steps = [];
+    const fresh = { classList: { list: [], add(c) { this.list.push(c); }, remove() {} } };
+    f.wire({ onStep: (step) => { steps.push(step); f.live.isConnected = false; f.surface.firstElementChild = fresh; } });
+    f.start(300);
+    f.move(250);
+    assert(f.made.length === 1 && f.made[0].step === 1, `Finger nach links holt den NAECHSTEN Zeitraum: ${f.made.map((g) => g.step)}`);
+    const ghost = f.made[0];
+    assert(ghost.isConnected && ghost.inert === true && ghost.attrs['aria-hidden'] === 'true', 'der Nachbar steht im Traeger, inert und verborgen fuer Hilfsmittel');
+    assert(ghost.style.width === '390px' && ghost.style.top === '12px', 'deckungsgleich mit dem Panel');
+    f.move(150);
+    assert(f.live.style.transform === 'translateX(-150px)', `1:1 statt gedaempft: ${f.live.style.transform}`);
+    assert(ghost.style.transform === 'translateX(240px)', `der Nachbar haengt am Panel: ${ghost.style.transform}`);
+    assert(f.axisLive.style.transform === 'translateX(150px)', `die Achse steht (gegen den Zug gehalten): ${f.axisLive.style.transform}`);
+    assert(ghost.axis.style.transform === 'translateX(-240px)', 'auch die Achse des Nachbarn steht');
+    assert(f.surface.classList.contains('is-period-paging'), 'der Traeger weiss, dass geblaettert wird');
+    await f.end();
+    assert(steps.length === 1 && steps[0] === 1, `eingerastet blaettert genau einmal vor: ${steps}`);
+    assert(!fresh.classList.list.length, `kein zweites Hereingleiten ueber dem Neuaufbau: ${fresh.classList.list}`);
+    assert(!f.surface.classList.contains('is-period-paging'), 'danach ist das Blaettern abgeraeumt');
+  } finally { f.restore(); }
+});
+
+await test('R21 D2: ein langsamer kurzer Wisch federt zurueck, Nachbar und Achse raeumen ab', async () => {
+  const f = pagerFixture();
+  try {
+    const steps = [];
+    f.wire({ onStep: (step) => { steps.push(step); } });
+    f.start(300);
+    f.move(285, 120);
+    f.move(260, 120);
+    await f.end();
+    await new Promise((r) => setTimeout(r, 300));
+    assert(steps.length === 0, 'zurueckgefedert blaettert nichts');
+    assert(f.made[0]?.removed === true, 'der Nachbar geht wieder');
+    assert(!f.live.style.transform && !f.axisLive.style.transform, `Panel und Achse stehen wieder an ihrem Platz: ${f.live.style.transform} / ${f.axisLive.style.transform}`);
+  } finally { f.restore(); }
+});
+
+await test('R21 D2: unter reduzierter Bewegung kein Zug und kein Nachbar - der neue Zeitraum blendet nur ein', async () => {
+  const f = pagerFixture({ reduced: true });
+  try {
+    const fresh = { classList: { list: [], add(c) { this.list.push(c); }, remove() {} } };
+    f.wire({ onStep: () => { f.surface.firstElementChild = fresh; } });
+    f.start(300);
+    f.move(150);
+    assert(!f.live.style.transform && f.made.length === 0, 'reduziert folgt nichts dem Finger');
+    await f.end();
+    assert(fresh.classList.list.includes('period-swipe-in--fade'), `reduziert: Blende statt hartem Schnitt, gesetzt: ${fresh.classList.list}`);
+  } finally { f.restore(); }
+});
+
+/* Das Bild des Nachbarn zeichnet der Renderer der Ansicht mit den Daten des
+ * NACHBARN - und danach gilt wieder der gezeigte Zeitraum: ein Leck hier
+ * zeigte nach dem Wisch die Termine des falschen Zeitraums. */
+test('R21 D2: das Bild des Nachbarn traegt seine eigenen Termine, der gezeigte Zustand bleibt unberuehrt', () => {
+  const restoreDom = installMiniDom();
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const zuvor = { ...calendarHelpers.state };
+  try {
+    Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5 }, configurable: true, writable: true });
+    globalThis.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+    calendarHelpers.setContainerForTest({ isConnected: true, querySelector: () => null });
+    const live = { id: 1, title: 'Gezeigt', start_datetime: '2026-06-17T09:00', end_datetime: '2026-06-17T10:00', assigned_users: [] };
+    const next = { id: 2, title: 'Naechste Woche', start_datetime: '2026-06-23T09:00', end_datetime: '2026-06-23T10:00', assigned_users: [] };
+    Object.assign(calendarHelpers.state, {
+      view: 'week', cursor: '2026-06-15', today: '2026-06-15', weekStart: 1, events: [live], tasks: [], holidays: [],
+      scheduleEntries: [], wasteOccurrences: [], rangeFrom: '2026-06-15', rangeTo: '2026-06-21', loadError: null,
+      layerSchedule: false, layerWaste: false, assignedToMe: false, people: new Set(), hiddenSources: new Map(), users: [],
+    });
+    const nextCursor = calendarHelpers.neighborCursor(1);
+    assert(nextCursor === '2026-06-22', `eine Woche weiter: ${nextCursor}`);
+    const { from, to } = calendarHelpers.getRangeForView('week', nextCursor);
+    calendarHelpers.setNeighborDataForTest(`${from}|${to}`, { from, to, events: [next], holidays: [], scheduleEntries: [], scheduleWarnings: [], wasteOccurrences: [] });
+    const host = fakeContainer();
+    calendarHelpers.buildPeriodGhost(1, host);
+    const html = host.html;
+    assert(html.includes('Naechste Woche') && !html.includes('Gezeigt'), 'das Bild zeigt den Nachbarn, nicht den gezeigten Zeitraum');
+    assert(html.includes('data-date="2026-06-22"'), 'mit den Tagen des Nachbarn');
+    const s = calendarHelpers.state;
+    assert(s.cursor === '2026-06-15' && s.events.length === 1 && s.events[0].id === 1 && s.rangeFrom === '2026-06-15',
+      `der gezeigte Zustand ist zurueck: ${s.cursor} ${s.rangeFrom} ${s.events.map((e) => e.id)}`);
+    // Ohne vorgeladene Daten gibt es kein Bild - der Wisch faellt auf den alten Weg zurueck.
+    calendarHelpers.clearNeighborDataForTest();
+    const empty = fakeContainer();
+    assert(calendarHelpers.buildPeriodGhost(1, empty) === null && empty.html === '', 'ohne Daten kein Bild');
+  } finally {
+    calendarHelpers.clearNeighborDataForTest();
+    Object.assign(calendarHelpers.state, zuvor);
+    if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc); else delete globalThis.navigator;
+    restoreDom();
+  }
+});
+
+test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den Weg eines Blatts', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const wire = src.slice(src.indexOf('wirePeriodSwipe(bodyEl, {'), src.indexOf('});', src.indexOf('wirePeriodSwipe(bodyEl, {')));
+  for (const part of ['neighbor: periodGhost', 'axis: CAL_SWIPE_AXIS', 'ghostMounted: alignPeriodGhost', 'span: periodSpan', 'onStep: (step) => stepFromSwipe(bodyEl, step)']) {
+    assert(wire.includes(part), `der Wisch kennt ${part} nicht`);
+  }
+  for (const sel of ['.month-weekdays', '.week-view__times', '.day-view__times', '.week-view__time-gutter']) {
+    assert(calendarHelpers.CAL_SWIPE_AXIS.includes(sel), `${sel} steht beim Blaettern nicht`);
+  }
+  // Nach jedem Zeichnen liegen die Nachbarn bereit.
+  const view = src.slice(src.indexOf('function renderView()'), src.indexOf('function syncHeadToScrollport('));
+  assert(/scheduleNeighborPrefetch\(\);/.test(view), 'renderView() laedt die Nachbarn nicht vor');
 });
 
 // --------------------------------------------------------

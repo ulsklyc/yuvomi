@@ -1291,7 +1291,9 @@ das Verhaeltnis haelt.
   Budget-Reiter mit Zeitachse (`TAB_CAPS.month`: Budget, Plan, Berichte) blaettern per
   waagerechtem Wisch ueber denselben Stepper wie die Pfeile. Senkrecht gewinnt das Scrollen;
   was selbst waagerecht arbeitet (`.u-scroll-fade`, die Diagrammflaeche der Berichte,
-  Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css.
+  Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css. Im Kalender
+  seit R21 echtes Umblaettern mit vorgeladenem Nachbarn und stehender Achse (D2, siehe
+  „Der Zeitraum-Wisch" unter Wischbedienung).
 - **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
   `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
   `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
@@ -3540,6 +3542,23 @@ gespiegelt. Der Inhalt folgt dem Finger und der neue Zeitraum gleitet von der Se
 aus der er geholt wurde; unter reduzierter Bewegung beides nicht, die Geste bleibt. Die
 Pfeilknoepfe bleiben der Weg fuer Maus und Tastatur. Die Flaeche traegt
 `touch-action: pan-y pinch-zoom` - ohne `pinch-zoom` verwirft Chromium das Aufziehen.
+
+**Im Kalender blaettert der Wisch echt um (R21, D2).** Vorher zog der Finger die ganze Ansicht
+samt Stundenachse ~110px gedaempft mit, daneben stand leere Flaeche (29 % der Breite), und der
+neue Zeitraum kam erst nach Loslassen und Laden mit einer Blende. Jetzt liegen die Daten beider
+Nachbarn nach jedem Zeichnen bereit (nur an Touch-Geraeten, ein Schreibvorgang verwirft sie),
+der Leerlauf baut daraus ihr Bild mit demselben Renderer, und die Geste stellt es neben die
+Ansicht (`neighbor` an `wirePeriodSwipe`): der Inhalt folgt dem Finger 1:1, der Nachbar zieht
+mit, Stundenachse, Ganztags-Beschriftung und Wochentagskopf STEHEN (`axis`, gegen den Zug
+gehalten, eine Ebene ueber dem Raster). In der Woche ist ein Blatt so breit wie die Spalten
+neben der Achse (`span`) - die Spalten des Nachbarn schliessen nahtlos an; Tag (eine Karte) und
+Monat blaettern um ihre ganze Breite. Losgelassen rastet er ab 80px oder mit Schwung ein
+(Flick: ab 0,35 px/ms und 24px, `periodSwipeCommit`), sonst federt alles zurueck; erst wenn der
+Nachbar steht, baut `navigate()` den Zeitraum wirklich auf - an derselben Stelle, mit derselben
+Uhrzeit auf derselben Hoehe (`stepFromSwipe`). Ohne vorgeladene Daten bleibt es beim alten
+Weg. Reduzierte Bewegung: kein Zug, der neue Zeitraum blendet ein (`period-swipe-in--fade`).
+Gemessen 390/834px, 1x und 4x: Achse 112 -> 0px Drift, Abdeckung 71 -> 100 %, CLS 0. Guard
+`test:calendar` "R21 D2".
 
 **Geprueft auf zwei Ebenen, weil jede etwas anderes sehen kann.** Ebene 3 (statisch, in
 `test-frontend-audit.js`) folgt von jeder Wischrichtung mit `--delete` der Kante zu der

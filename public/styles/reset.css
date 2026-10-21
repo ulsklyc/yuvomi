@@ -228,6 +228,12 @@ h1, h2, h3, h4, h5, h6 {
     --motion-blend: var(--duration-sm);
   }
 
+  /* Der Zeitraum-Wisch (R21, D2): kein Zug, aber der neue Zeitraum blendet ein
+   * (`period-swipe-fade`, layout.css) - reine Deckkraft, keine Wegstrecke. */
+  .period-swipe-in--fade {
+    --motion-blend: var(--duration-sm);
+  }
+
   /* STATUSBEWEGUNG BLEIBT (Critique R21, D12). Ein Spinner sagt "es laeuft
    * noch"; stand er still, sah ein laufender Vorgang wie ein haengender aus -
    * die Sperre oben setzte ihn auf 0s. Er dreht auf der Stelle, ohne

@@ -28,10 +28,23 @@
  *
  * BEWEGUNG NUR MIT ERLAUBNIS. Unter `prefers-reduced-motion: reduce` folgt der
  * Inhalt dem Finger nicht und gleitet nicht herein; die Geste selbst bleibt
- * (sie ist Bedienung, keine Animation), der Wechsel ist ein harter Schnitt.
+ * (sie ist Bedienung, keine Animation), der neue Zeitraum blendet nur ein
+ * (`period-swipe-in--fade`, R21 D2 - vorher ein harter Schnitt).
+ *
+ * ECHTES UMBLAETTERN (Critique R21, D2). Bis hierher zog der Finger die ganze
+ * Ansicht samt Stundenachse ~110px weit gedaempft mit, daneben stand leere
+ * Flaeche, und erst nach dem Loslassen und Laden kam der neue Zeitraum mit
+ * einer 32px-Blende. Liefert der Aufrufer `neighbor(step)` - den vorgeladenen
+ * Nachbarzeitraum als fertiges Panel -, ist die Geste ein Blaettern wie in
+ * Apples Kalender: der Inhalt folgt dem Finger 1:1, der Nachbar zieht von der
+ * Seite mit, Achse und Wochentagskopf (`axis`) stehen. Losgelassen rastet er
+ * ab der Schwelle ODER mit Schwung ein (`periodSwipeCommit`), sonst federt
+ * alles zurueck. Erst wenn der Nachbar steht, laeuft `onStep` - sein Neuaufbau
+ * ersetzt das Panel an derselben Stelle, ohne sichtbaren Wechsel. Ohne
+ * vorgeladenen Nachbarn (Budget, langsames Netz) bleibt es beim bisherigen Weg.
  */
 
-import { vibrate, durationToken } from '/utils/ux.js';
+import { vibrate, durationToken, easingToken } from '/utils/ux.js';
 import { SWIPE_THRESHOLD, SWIPE_MAX_VERT } from '/utils/swipe-row.js';
 
 /** Abstand zur Bildschirmkante, in dem ein Kontakt der Systemgeste gehoert. */
@@ -39,6 +52,13 @@ export const PERIOD_SWIPE_EDGE = 20;
 
 /** Dauer des Hereingleitens = --duration-md der Keyframe-Regel in layout.css. */
 const SLIDE_IN_MS = durationToken('--duration-md', 200);
+
+/** Schwung (px/ms), mit dem auch ein kurzer Wisch umblaettert - ein Flick. */
+export const PERIOD_FLICK_VELOCITY = 0.35;
+/** Mindestweg eines Flicks (px): darunter ist es ein Zittern, kein Wisch. */
+export const PERIOD_FLICK_MIN = 24;
+/** Wie weit zurueck die Geschwindigkeit gemessen wird (ms). */
+const VELOCITY_WINDOW_MS = 100;
 
 /**
  * Gehoert ein Kontakt, der bei `x` beginnt, der Randgeste des Systems?
@@ -75,6 +95,24 @@ export function periodSwipeStep(dx, { rtl = false } = {}) {
   return next ? 1 : -1;
 }
 
+/**
+ * Blaettert ein losgelassener Wisch um? Ab der Schwelle immer; darunter, wenn
+ * er mit Schwung in seine Richtung ging (Flick) - so blaettert man in jeder
+ * Seitenansicht des Systems, und ein schneller kurzer Wisch federte sonst
+ * zurueck, obwohl er gemeint war.
+ * @param {number} dx        - waagerechter Weg (px)
+ * @param {number} velocity  - Geschwindigkeit am Ende (px/ms, Vorzeichen wie dx)
+ * @param {{ rtl?: boolean }} [opts]
+ * @returns {1 | -1 | 0}
+ */
+export function periodSwipeCommit(dx, velocity = 0, { rtl = false } = {}) {
+  const step = periodSwipeStep(dx, { rtl });
+  if (step) return step;
+  if (Math.abs(dx) < PERIOD_FLICK_MIN || Math.abs(velocity) < PERIOD_FLICK_VELOCITY) return 0;
+  if (Math.sign(velocity) !== Math.sign(dx)) return 0;
+  return periodSwipeStep(Math.sign(dx) * SWIPE_THRESHOLD, { rtl });
+}
+
 function prefersReducedMotion() {
   return typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -106,9 +144,19 @@ function overlayOpen() {
  *   ueberholt) - dann gleitet nichts herein. Alles andere, auch gar keine
  *   Rueckgabe, heisst: gezeichnet.
  * @param {string} [opts.ignore]              - Selektor, an dem die Geste einem anderen Zweck gehoert
+ * @param {(step: 1 | -1) => HTMLElement|null} [opts.neighbor] - der vorgeladene
+ *   Nachbarzeitraum als Panel (losgeloest, ohne ids). Mit ihm blaettert die Geste
+ *   echt um; `null`, solange er nicht bereitsteht.
+ * @param {string} [opts.axis]                - Selektor der Teile, die beim Blaettern
+ *   stehen bleiben (Stundenachse, Wochentagskopf) - im Panel und im Nachbarn
+ * @param {(ghost: HTMLElement, live: HTMLElement) => void} [opts.ghostMounted] -
+ *   der Nachbar steht im Dokument (z. B. Scrollstand angleichen, Zellen vermessen)
+ * @param {(live: HTMLElement) => number} [opts.span] - Weg eines Blatts (px); Standard
+ *   die Breite des Panels. Steht eine Spalte (Stundenachse), ist es die Breite
+ *   daneben - die Spalten des Nachbarn schliessen dann nahtlos an.
  * @returns {() => void} Abbau
  */
-export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
+export function wirePeriodSwipe(surface, { enabled, onStep, ignore, neighbor, axis, ghostMounted, span } = {}) {
   if (!surface) return () => {};
   let startX = 0;
   let startY = 0;
@@ -117,8 +165,104 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
   let thresholdHit = false;
   let moving = null;     // das Element, das dem Finger folgt
   let stepping = false;  // ein Schritt laedt noch (onStep ist nicht zurueck)
+  let pager = null;      // Blaettern mit Nachbar: { live, panelWidth, width (Weg), side, ghost, axisLive, axisGhost, x }
+  let samples = [];      // [zeit, x] fuer den Schwung am Ende
+
+  const setX = (el, x) => { el.style.transform = x ? `translateX(${x}px)` : ''; };
+
+  /** Die Seite (physisch), von der der Nachbar kommt: +1 rechts, -1 links. */
+  const stepForSide = (side) => (isRtl(surface) ? -side : side);
+
+  const dropGhost = () => {
+    if (!pager?.ghost) return;
+    pager.ghost.remove();
+    pager.ghost = null;
+    pager.axisGhost = [];
+  };
+
+  /** Holt den Nachbarn der Seite `side` und stellt ihn neben das Panel. */
+  const mountGhost = (side) => {
+    dropGhost();
+    pager.side = side;
+    const ghost = neighbor(stepForSide(side));
+    if (!ghost || !pager.live.isConnected) return;
+    ghost.classList.add('period-swipe-ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.inert = true;
+    ghost.style.top = `${pager.live.offsetTop}px`;
+    ghost.style.left = `${pager.live.offsetLeft}px`;
+    ghost.style.width = `${pager.panelWidth}px`;
+    ghost.style.height = `${pager.live.offsetHeight}px`;
+    surface.appendChild(ghost);
+    pager.ghost = ghost;
+    pager.axisGhost = axis ? [...ghost.querySelectorAll(axis)] : [];
+    ghostMounted?.(ghost, pager.live);
+  };
+
+  /** Panel, Nachbar und stehende Achsen an die Stelle x des Panels. */
+  const place = (x) => {
+    pager.x = x;
+    setX(pager.live, x);
+    for (const a of pager.axisLive) setX(a, -x);
+    if (!pager.ghost) return;
+    const g = pager.side * pager.width + x;
+    setX(pager.ghost, g);
+    for (const a of pager.axisGhost) setX(a, -g);
+  };
+
+  /**
+   * Gleitet Panel (und Nachbar) nach x. Inline-Werte statt einer Animation mit
+   * `fill`: am Ende steht der Zielwert im Stil, nichts bleibt haengen.
+   */
+  const glide = (x, ms) => new Promise((resolve) => {
+    const easing = easingToken('--ease-out', 'ease-out');
+    const parts = [[pager.live, x], ...pager.axisLive.map((a) => [a, -x])];
+    if (pager.ghost) {
+      const g = pager.side * pager.width + x;
+      parts.push([pager.ghost, g], ...pager.axisGhost.map((a) => [a, -g]));
+    }
+    for (const [el] of parts) el.style.transition = `transform ${ms}ms ${easing}`;
+    place(x);
+    // Fertig ist es, wenn das Panel ankommt - nicht nach der Uhr: ein Timer,
+    // der einen Frame zu frueh feuert, nahm die Transition mitten im Lauf ab.
+    let done = false;
+    const live = pager.live;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      live.removeEventListener('transitionend', arrived);
+      for (const [el] of parts) el.style.transition = '';
+      resolve();
+    };
+    const arrived = (e) => { if (e.target === live) finish(); };
+    live.addEventListener('transitionend', arrived);
+    setTimeout(finish, ms + 50);
+  });
+
+  /** Raeumt das Blaettern ab - das Panel steht wieder an seinem Platz. */
+  const endPaging = () => {
+    if (!pager) return;
+    dropGhost();
+    if (pager.live.isConnected) {
+      setX(pager.live, 0);
+      pager.live.style.willChange = '';
+      for (const a of pager.axisLive) setX(a, 0);
+    }
+    surface.classList.remove('is-period-paging');
+    pager = null;
+  };
 
   const reset = (animate) => {
+    if (pager) {
+      const p = pager;
+      moving = null;
+      if (animate && !prefersReducedMotion()) {
+        glide(0, SLIDE_IN_MS).then(() => { if (pager === p) endPaging(); });
+      } else {
+        endPaging();
+      }
+      return;
+    }
     const el = moving;
     moving = null;
     if (!el) return;
@@ -146,6 +290,9 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     // zuletzt antwortete. Solange ein Schritt laedt, gehoert der Finger dem
     // Scrollen - die Geste beginnt gar nicht erst.
     if (stepping) return;
+    // Federt der letzte Wisch noch zurueck, steht er jetzt - der neue beginnt
+    // vom Platz des Panels, nicht neben einem uebrig gebliebenen Nachbarn.
+    if (pager) endPaging();
     if (e.touches.length !== 1) return;
     if (enabled && !enabled()) return;
     if (overlayOpen()) return;
@@ -157,6 +304,16 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     dx = 0;
     thresholdHit = false;
     lock = null;
+    samples = [[performance.now(), touch.clientX]];
+  };
+
+  /** Geschwindigkeit am Ende (px/ms) aus den letzten VELOCITY_WINDOW_MS. */
+  const velocity = () => {
+    const last = samples[samples.length - 1];
+    if (!last) return 0;
+    const first = samples.find(([t]) => last[0] - t <= VELOCITY_WINDOW_MS) ?? last;
+    const dt = last[0] - first[0];
+    return dt > 0 ? (last[1] - first[1]) / dt : 0;
   };
 
   const onMove = (e) => {
@@ -165,16 +322,41 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     const touch = e.touches[0];
     dx = touch.clientX - startX;
     const dy = touch.clientY - startY;
+    samples.push([performance.now(), touch.clientX]);
+    if (samples.length > 8) samples.shift();
     if (lock === null) {
       lock = periodSwipeLock(dx, dy);
       if (lock !== 'swipe') return;
       moving = prefersReducedMotion() ? null : surface.firstElementChild;
       if (moving) moving.style.willChange = 'transform';
+      if (moving && typeof neighbor === 'function') {
+        surface.classList.add('is-period-paging');
+        const panelWidth = moving.getBoundingClientRect().width;
+        pager = {
+          live: moving,
+          panelWidth,
+          width: typeof span === 'function' ? span(moving) : panelWidth,
+          side: 0,
+          ghost: null,
+          axisLive: axis ? [...moving.querySelectorAll(axis)] : [],
+          axisGhost: [],
+          x: 0,
+        };
+      }
     }
     // Ab hier gehoert der Kontakt der Geste: kein senkrechtes Mitscrollen.
     if (e.cancelable) e.preventDefault();
 
-    if (moving) {
+    if (pager) {
+      // Der Nachbar kommt von der Seite, die der Finger freigibt. Kehrt der
+      // Finger ueber den Anfang zurueck, wechselt er den Nachbarn.
+      const side = dx < 0 ? 1 : -1;
+      if (dx !== 0 && side !== pager.side) mountGhost(side);
+      // Mit Nachbar 1:1 - es gibt etwas zu zeigen. Ohne (noch nicht geladen)
+      // gedaempft wie bisher: der Rand sagt „hier ist noch nichts".
+      const abs = Math.abs(dx);
+      place(pager.ghost ? dx : Math.sign(dx) * (abs <= SWIPE_THRESHOLD ? abs : SWIPE_THRESHOLD + (abs - SWIPE_THRESHOLD) * 0.2));
+    } else if (moving) {
       // Bis zur Schwelle 1:1, darueber gedaempft - dasselbe Gefuehl wie in
       // den Wischzeilen: der Inhalt sagt „gleich", bevor er „jetzt" sagt.
       const sign = Math.sign(dx);
@@ -188,11 +370,50 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     }
   };
 
+  /**
+   * Einrasten mit Nachbar: das Panel gleitet hinaus, der Nachbar an seinen
+   * Platz - die Dauer folgt dem Rest des Wegs. Erst dann baut onStep den
+   * Zeitraum wirklich auf; bis dahin steht der Nachbar dort, wo er hingehoert.
+   */
+  const commitPaged = async (step) => {
+    const p = pager;
+    stepping = true;
+    const target = -p.side * p.width;
+    const rest = Math.abs(target - p.x) / Math.max(1, p.width);
+    const full = durationToken('--duration-lg', 250);
+    await glide(target, Math.max(Math.round(full * rest), Math.round(full * 0.4)));
+    let drawn;
+    try {
+      drawn = await onStep(step);
+    } finally {
+      stepping = false;
+      // Gezeichnet: Panel und Nachbar sind mit dem Neuaufbau gegangen. Steht
+      // das alte Panel noch (Schritt ueberholt, Ladefehler), kommt es zurueck.
+      if (pager === p) {
+        if (drawn === false || p.live.isConnected) endPaging();
+        else { surface.classList.remove('is-period-paging'); pager = null; }
+      }
+    }
+  };
+
   const onEnd = async () => {
     if (lock !== 'swipe') { lock = 'off'; return; }
     lock = 'off';
-    const step = periodSwipeStep(dx, { rtl: isRtl(surface) });
+    const step = periodSwipeCommit(dx, velocity(), { rtl: isRtl(surface) });
     if (!step) { reset(true); return; }
+    if (pager?.ghost) {
+      moving = null;
+      await commitPaged(step);
+      return;
+    }
+    // Ohne Nachbarn: der bisherige Weg (Panel steht, Neuaufbau gleitet herein).
+    if (pager) {
+      const p = pager;
+      dropGhost();
+      surface.classList.remove('is-period-paging');
+      for (const a of p.axisLive) setX(a, 0);
+      pager = null;
+    }
     // Der alte Inhalt bleibt stehen, wo der Finger ihn losliess, bis der neue
     // Zeitraum geladen ist - ein Zurueckschnappen davor saehe aus wie ein
     // abgelehnter Wisch. Laesst der Neuaufbau ihn stehen (Ladefehler), muss
@@ -214,10 +435,11 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore } = {}) {
     // Nicht gezeichnet (#1781): im Traeger steht noch das ALTE Panel. Es als
     // "hereinkommend" zu animieren zeigte einen Wechsel, den es nicht gab.
     if (drawn === false) return;
-    if (prefersReducedMotion()) return;
     const incoming = surface.firstElementChild;
     if (!incoming) return;
-    const cls = step > 0 ? 'period-swipe-in--next' : 'period-swipe-in--prev';
+    // Reduzierte Bewegung: kein Zug, nur Blende (D2) - kein harter Schnitt.
+    const cls = prefersReducedMotion() ? 'period-swipe-in--fade'
+      : step > 0 ? 'period-swipe-in--next' : 'period-swipe-in--prev';
     incoming.classList.add(cls);
     setTimeout(() => incoming.classList.remove(cls), SLIDE_IN_MS);
   };

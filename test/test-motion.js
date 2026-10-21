@@ -951,8 +951,15 @@ test('reduzierte Bewegung: die globale Sperre laesst Blenden durch, Bewegung nic
   // (eigener Guard: "Spinner D12") - sie ist keine Blende und steht nicht hier.
   const blendRules = [...eachRule(reset)].filter((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a))
     && /--motion-blend:\s*var\(/.test(r.body) && !/--motion-blend:\s*var\(--spin-period\)/.test(r.body));
-  assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title'],
+  assert.deepEqual(blendRules.map((r) => r.selector.trim()), ['.page-toolbar--capped > .page-toolbar__title', '.period-swipe-in--fade'],
     'eine neue Abmeldung fuer Animationen: nur fuer Elemente, deren einzige Animation eine Blende ist (hier nachtragen und pruefen)');
+  // R21 (D2): der Zeitraum-Wisch blendet unter reduzierter Bewegung ein - geprueft:
+  // seine einzige Animation ist `period-swipe-fade`, und die aendert nur die Deckkraft.
+  const layoutCss = css('layout.css');
+  const fade = [...eachRule(layoutCss)].find((r) => r.selector.trim() === '.period-swipe-in--fade');
+  assert.match(fade?.body ?? '', /animation:\s*period-swipe-fade var\(--duration-sm\) var\(--ease-out\)/);
+  const frames = layoutCss.match(/@keyframes period-swipe-fade\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.ok(/opacity/.test(frames) && !/transform|translate|scale/.test(frames), `period-swipe-fade bewegt mehr als die Deckkraft: ${frames}`);
   for (const name of ['page-title-settle', 'page-title-settle-back']) {
     const body = keyframesBody(name);
     assert.ok(body, `@keyframes ${name} fehlt`);
@@ -1564,7 +1571,9 @@ test('Inhaltswechsel: Reiter, Zeitraeume und Bereiche tauschen ueber swapContent
   const missing = carriers.filter(([name, pattern]) => !pattern.test(pageSource(name))).map(([name, , what]) => `${name}.js: ${what}`);
   assert.deepEqual(missing, [], `Traeger ohne den geteilten Uebergang:\n  ${missing.join('\n  ')}`);
   // Der Wisch im Kalender bringt sein eigenes Hereingleiten mit - kein zweiter Uebergang darueber.
-  assert.match(pageSource('calendar'), /onStep: \(step\) => navigate\(step, \{ swap: false \}\)/);
+  // Seit R21 (D2) ueber stepFromSwipe, das die Uhrzeit des Nachbarn behaelt.
+  assert.match(pageSource('calendar'), /onStep: \(step\) => stepFromSwipe\(bodyEl, step\)/);
+  assert.match(pageSource('calendar'), /async function stepFromSwipe\(bodyEl, step\) \{[\s\S]*?await navigate\(step, \{ swap: false \}\);/);
   // Die zwei Einzelloesungen sind im Helfer aufgegangen.
   for (const file of ['budget.css', 'health.css']) {
     assert.ok(![...eachRule(css(file))].some((r) => /--entering\b/.test(r.selector)), `${file}: eigene Einblend-Klasse`);

@@ -2070,6 +2070,7 @@ export async function render(container, { user, signal } = {}) {
 
   _miniMonth = null;
   _upNext = { events: null, loading: null, day: null, error: null };
+  _neighborData.clear();
   wireSidebar(signal);
   renderToolbar();
   renderView();
@@ -2081,10 +2082,17 @@ export async function render(container, { user, signal } = {}) {
   // sind Zeitraeume mit Nachbarn; die Agenda ist eine fortlaufende Liste, die
   // senkrecht gelesen wird, und die Suche hat gar keinen Zeitraum. Die
   // Pfeilknoepfe bleiben der Weg fuer Tastatur und Maus.
+  // Seit R21 (D2) blaettert der Wisch ECHT um: der Nachbarzeitraum steht
+  // vorgeladen als Panel bereit (periodGhost) und zieht mit, Stundenachse und
+  // Wochentagskopf stehen (CAL_SWIPE_AXIS).
   wirePeriodSwipe(bodyEl, {
     enabled: () => !searchActive && PERIOD_SWIPE_VIEWS.has(state.view),
     // Der Wisch gleitet selbst herein (period-swipe.js) - kein zweiter Uebergang.
-    onStep: (step) => navigate(step, { swap: false }),
+    onStep: (step) => stepFromSwipe(bodyEl, step),
+    neighbor: periodGhost,
+    axis: CAL_SWIPE_AXIS,
+    ghostMounted: alignPeriodGhost,
+    span: periodSpan,
   });
 
   if (initialEvent) {
@@ -2642,9 +2650,7 @@ async function navigate(dir, { swap = true } = {}) {
   const gridFocus = monthGridHasFocus();
   _monthFocusDate = null;
   const step = currentPeriodStep();
-  state.cursor = step.unit === 'month'
-    ? monthStepCursor(state.cursor, dir)
-    : addDays(state.cursor, dir * step.days);
+  state.cursor = neighborCursor(dir);
   await reloadForView();
   updateLabel();
   if (swap) swapPeriod(_container?.querySelector('#cal-body'), dir, renderView);
@@ -3023,6 +3029,7 @@ function renderView() {
   }
   if (window.lucide) lucide.createIcons({ el: body });
   updateOfflineNotice();
+  scheduleNeighborPrefetch();
   syncHeadToScrollport(body);
   renderSidebar();
 }
@@ -3054,6 +3061,231 @@ function syncHeadToScrollport(body) {
   requestAnimationFrame(() => {
     if (port.isConnected) port.dispatchEvent(new Event('scroll'));
   });
+}
+
+// --------------------------------------------------------
+// Blaettern per Wisch: der Nachbarzeitraum (Critique R21, D2)
+// --------------------------------------------------------
+//
+// Der Wisch zog bis hierher die ganze Ansicht samt Stundenachse ~110px weit
+// gedaempft mit, daneben stand leere Flaeche, und der neue Zeitraum kam erst
+// nach Loslassen und Laden. Jetzt liegen die Daten der beiden Nachbarn schon
+// bereit (nach jedem Zeichnen, nur an Touch-Geraeten), und zu Beginn der Geste
+// entsteht aus ihnen ein fertiges Panel desselben Renderers - der Nachbar, der
+// mit dem Finger hereinzieht. Er ist ein Bild: ohne ids, inert, aria-hidden;
+// nach dem Einrasten baut navigate() den Zeitraum wie bisher wirklich auf, an
+// derselben Stelle. Ohne vorgeladene Daten (erste Sekunde, Netzfehler) bleibt
+// es beim bisherigen Wisch.
+
+/** Was beim Blaettern steht: Stundenachse, Ecke ueber ihr, Ganztags-Beschriftung, Wochentage. */
+const CAL_SWIPE_AXIS = '.month-weekdays, .week-view__time-gutter, .calendar-all-day-label, .week-view__times, .day-view__times';
+/** Wie lange vorgeladene Nachbarn gelten (ms) - danach wird neu gefragt. */
+const NEIGHBOR_TTL_MS = 60_000;
+/** Bereichsschluessel `${from}|${to}` -> { at, data } */
+const _neighborData = new Map();
+let _neighborTimer = 0;
+
+/** Der Cursor einen Schritt weiter - EINE Regel fuer Pfeil, Kuerzel und Wisch. */
+function neighborCursor(dir) {
+  const step = currentPeriodStep();
+  return step.unit === 'month'
+    ? monthStepCursor(state.cursor, dir)
+    : addDays(state.cursor, dir * step.days);
+}
+
+function canPagePeriods() {
+  return Boolean(_container?.isConnected) && !searchActive && PERIOD_SWIPE_VIEWS.has(state.view)
+    && typeof navigator !== 'undefined' && (navigator.maxTouchPoints ?? 0) > 0;
+}
+
+/** Die Daten eines Zeitraums, wie loadRange() sie fragt - ohne den Zustand anzufassen. */
+async function fetchPeriodData(from, to) {
+  const win = fetchWindow(from, to);
+  const [evRes, holRes, scheduleRes, wasteRes] = await Promise.all([
+    api.get(`/calendar?from=${win.from}&to=${win.to}`),
+    api.get(`/calendar/holidays?from=${from}&to=${to}`).catch(() => ({ data: [] })),
+    scheduleEnabled()
+      ? api.get(`/schedule/entries?from=${from}&to=${to}`).catch(() => ({ data: { entries: [] } }))
+      : Promise.resolve({ data: { entries: [] } }),
+    wasteEnabled()
+      ? api.get(`/waste/occurrences?from=${win.from}&to=${win.to}`).catch(() => ({ data: [] }))
+      : Promise.resolve({ data: [] }),
+  ]);
+  return {
+    from, to,
+    events: (evRes.data ?? []).map(localizeBirthdayEvent),
+    holidays: holRes.data ?? [],
+    scheduleEntries: scheduleRes.data?.entries ?? [],
+    scheduleWarnings: scheduleRes.data?.warnings ?? [],
+    wasteOccurrences: wasteRes.data ?? [],
+  };
+}
+
+function freshNeighbor(key) {
+  const hit = _neighborData.get(key);
+  return hit && performance.now() - hit.at < NEIGHBOR_TTL_MS ? hit.data : null;
+}
+
+function scheduleNeighborPrefetch() {
+  clearTimeout(_neighborTimer);
+  // Jedes Zeichnen kann zeigen, was die Bilder zeigen (Filter, Titel, Zeitraum).
+  _ghostCache.clear();
+  if (!canPagePeriods()) return;
+  _neighborTimer = setTimeout(prefetchNeighbors, 150);
+}
+
+/**
+ * DIE BILDER ENTSTEHEN IM LEERLAUF, NICHT UNTER DEM FINGER. Am Beginn der
+ * Geste gebaut, kostete ein Nachbar am 4x gedrosselten Telefon 50-70ms - der
+ * erste Frame des Zugs kam zu spaet. Nach dem Vorladen baut der Leerlauf beide
+ * vor; die Geste nimmt sie, solange Ansicht, Zeitraum und Darstellung noch
+ * dieselben sind (ghostKey), sonst baut sie selbst.
+ */
+const _ghostCache = new Map();
+function ghostKey(dir) {
+  return [state.view, state.cursor, dir, _monthCollapsed, state.monthTitles, state.alldayExpanded, isMonthSplit()].join('|');
+}
+
+function prebuildGhosts() {
+  const idle = typeof requestIdleCallback === 'function'
+    ? (cb) => requestIdleCallback(cb, { timeout: 600 })
+    : (cb) => setTimeout(cb, 50);
+  for (const dir of [1, -1]) {
+    idle(() => {
+      if (!canPagePeriods()) return;
+      const key = ghostKey(dir);
+      if (_ghostCache.get(dir)?.key === key) return;
+      const el = buildPeriodGhost(dir);
+      if (el) _ghostCache.set(dir, { key, el });
+    });
+  }
+}
+
+async function prefetchNeighbors() {
+  if (!canPagePeriods()) return;
+  // Der gezeigte Zeitraum ist nach dem naechsten Schritt selbst ein Nachbar.
+  if (!state.loadError && state.rangeFrom) {
+    _neighborData.set(`${state.rangeFrom}|${state.rangeTo}`, {
+      at: performance.now(),
+      data: {
+        from: state.rangeFrom, to: state.rangeTo, events: state.events, holidays: state.holidays,
+        scheduleEntries: state.scheduleEntries, scheduleWarnings: state.scheduleWarnings,
+        wasteOccurrences: state.wasteOccurrences,
+      },
+    });
+  }
+  // Beide Nachbarn zugleich: der zweite soll nicht auf den ersten warten.
+  await Promise.all([1, -1].map(async (dir) => {
+    const { from, to } = getRangeForView(state.view, neighborCursor(dir));
+    const key = `${from}|${to}`;
+    if (freshNeighbor(key)) return;
+    try {
+      _neighborData.set(key, { at: performance.now(), data: await fetchPeriodData(from, to) });
+    } catch {
+      // Kein Nachbar - der Wisch faellt auf das Nachladen zurueck.
+    }
+  }));
+  // Nur die juengsten Zeitraeume behalten.
+  while (_neighborData.size > 6) _neighborData.delete(_neighborData.keys().next().value);
+  prebuildGhosts();
+}
+
+/** Der Nachbar fuer die Geste: das vorgebaute Bild, wenn es noch stimmt, sonst ein frisches. */
+function periodGhost(dir) {
+  const hit = _ghostCache.get(dir);
+  _ghostCache.delete(dir);
+  if (hit && hit.key === ghostKey(dir) && canPagePeriods()) return hit.el;
+  return buildPeriodGhost(dir);
+}
+
+/**
+ * Der Nachbarzeitraum als fertiges Panel, gezeichnet vom Renderer der Ansicht
+ * mit SEINEN Daten - fuer die Dauer des Zeichnens stehen sie im Zustand, danach
+ * gilt wieder der gezeigte Zeitraum. `null`, solange keine Daten bereitliegen.
+ */
+function buildPeriodGhost(dir, host = document.createElement('div')) {
+  if (!canPagePeriods()) return null;
+  const cursor = neighborCursor(dir);
+  const { from, to } = getRangeForView(state.view, cursor);
+  const data = freshNeighbor(`${from}|${to}`);
+  if (!data) return null;
+  const keys = ['cursor', 'events', 'holidays', 'scheduleEntries', 'scheduleWarnings', 'wasteOccurrences', 'wasteLoadError', 'rangeFrom', 'rangeTo', 'loadError'];
+  const saved = Object.fromEntries(keys.map((k) => [k, state[k]]));
+  const liveObserver = _monthGridResizeObserver;
+  try {
+    Object.assign(state, {
+      cursor, events: data.events, holidays: data.holidays, scheduleEntries: data.scheduleEntries,
+      scheduleWarnings: data.scheduleWarnings, wasteOccurrences: data.wasteOccurrences, wasteLoadError: null,
+      rangeFrom: data.from, rangeTo: data.to, loadError: null,
+    });
+    applyPendingCalendarDeleteOverlay(state);
+    buildDayIndex();
+    if (state.view === 'month') renderMonthView(host);
+    else if (state.view === 'week') renderWeekView(host);
+    else renderDayView(host);
+  } finally {
+    _dayIndex.active = false;
+    Object.assign(state, saved);
+    // renderMonthView hat den Beobachter des lebenden Rasters abgehaengt und
+    // einen an das Bild gehaengt - zurueck an das lebende.
+    if (_monthGridResizeObserver !== liveObserver) {
+      _monthGridResizeObserver?.disconnect();
+      _monthGridResizeObserver = liveObserver;
+      const liveGrid = _container?.querySelector('#month-grid');
+      if (liveObserver && liveGrid) liveObserver.observe(liveGrid);
+    }
+  }
+  // Das Panel ist das erste Kind; die Tagesliste des Telefon-Monats steht und gehoert nicht dazu.
+  const panel = host.firstElementChild;
+  if (!panel) return null;
+  if (window.lucide) lucide.createIcons({ el: panel });
+  panel.removeAttribute('id');
+  for (const el of panel.querySelectorAll('[id]')) el.removeAttribute('id');
+  return panel;
+}
+
+/**
+ * Der Weg eines Blatts: in der Woche ohne die stehende Stundenachse, damit die
+ * Spalten des Nachbarn an die eigenen anschliessen statt eine leere
+ * Achsenbreite dazwischen zu lassen. Tag (eine Karte) und Monat blaettern um
+ * ihre ganze Breite.
+ */
+function periodSpan(live) {
+  const width = live.getBoundingClientRect().width;
+  if (state.view !== 'week') return width;
+  return width - (live.querySelector('.week-view__times')?.getBoundingClientRect().width ?? 0);
+}
+
+/**
+ * Der Nachbar steht im Dokument: dieselbe Uhrzeit auf derselben Hoehe wie im
+ * Panel (eine andere Ganztags-Zeile verschiebt sein Raster), und am Desktop-
+ * Monat vermessen die Zellen ihre Chips wie im lebenden Raster.
+ */
+function alignPeriodGhost(ghost, live) {
+  const lp = live.querySelector('.page-scrollport');
+  const gp = ghost.querySelector('.page-scrollport');
+  if (lp && gp && state.view !== 'month') {
+    gp.scrollTop = lp.scrollTop + (gp.getBoundingClientRect().top - lp.getBoundingClientRect().top);
+  }
+  const grid = ghost.querySelector('.month-grid');
+  if (grid) fitMonthDayCells(grid);
+}
+
+/**
+ * Der eingerastete Wisch baut den Zeitraum auf - und behaelt die Uhrzeit, die
+ * man zuletzt sah: der Nachbar stand auf der Hoehe des Panels, der Neuaufbau
+ * stellte das Raster sonst auf „jetzt" zurueck (scrollToHour), und das Bild
+ * sprang nach dem Einrasten.
+ */
+async function stepFromSwipe(bodyEl, step) {
+  const shown = bodyEl.querySelector('.period-swipe-ghost .page-scrollport');
+  const keep = shown && state.view !== 'month'
+    ? { top: shown.scrollTop, y: shown.getBoundingClientRect().top }
+    : null;
+  await navigate(step, { swap: false });
+  if (!keep) return;
+  const port = bodyEl.querySelector('.page-scrollport');
+  if (port) port.scrollTop = keep.top + (port.getBoundingClientRect().top - keep.y);
 }
 
 // --------------------------------------------------------
@@ -3647,6 +3879,8 @@ function bindPageListeners() {
   if (_pageListenersBound) return;
   _pageListenersBound = true;
   document.addEventListener?.('yuvomi:calendar-command', onCalendarCommand);
+  // Jeder Schreibvorgang (api.js) verwirft die vorgeladenen Nachbarn (D2).
+  window.addEventListener?.('yuvomi:write', () => _neighborData.clear());
   _monthSplitQuery = window.matchMedia?.(MOBILE_MEDIA_QUERY) ?? null;
   _monthSplitQuery?.addEventListener?.('change', onPhoneQueryChange);
 }
@@ -4378,6 +4612,9 @@ function renderWeekView(container) {
 
   // Scrollen zu aktueller Zeit
   scrollToHour(container.querySelector('#week-scroll'), container.querySelector('.week-view__body'));
+  // Zwei Aufrufer (renderView, das Bild des Nachbarn beim Wisch): die Zeichen
+  // entstehen hier, nicht bei jedem Aufrufer.
+  if (window.lucide) lucide.createIcons({ el: container });
 }
 
 /**
@@ -6638,6 +6875,10 @@ export const __test = {
   // #1504: der Wechsel ueber die Telefonschwelle, gemessen am echten Renderer.
   onPhoneQueryChange,
   setContainerForTest(container) { _container = container; },
+  // R21 D2: der Nachbar als Bild - gezeichnet mit SEINEN Daten, der Zustand bleibt.
+  buildPeriodGhost, neighborCursor, periodSpan, stepFromSwipe, CAL_SWIPE_AXIS,
+  setNeighborDataForTest(key, data) { _neighborData.set(key, { at: performance.now(), data }); },
+  clearNeighborDataForTest() { _neighborData.clear(); },
   // test:initials: die Scheibe einer Person im Filterblatt.
   personFilterChipsHtml,
   viewSwapDirection, unbreakable,

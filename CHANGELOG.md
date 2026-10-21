@@ -112,6 +112,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   area until you scroll near them. Measured on a slowed-down device, opening 500 contacts blocked
   the page for about 0.8 s, now about 0.55 s; 300 recipes went from about 0.45 s to under 0.4 s.
 
+- **Swiping through the calendar now turns the page.** In month, week and day view the next or
+  previous period now comes along with your finger, while the hour column and the weekday row stay
+  where they are. Let go after a short distance or with a quick flick and it settles into place; a
+  short, slow swipe springs back. Before, the whole view including the hours moved only a little,
+  next to an empty area, and the new period appeared only after you let go. With reduced
+  motion, the new period fades in instead of switching abruptly.
+
 ### Fixed
 
 - **Sheets and glass controls settle sooner.** Their springy entrance kept them slightly past their

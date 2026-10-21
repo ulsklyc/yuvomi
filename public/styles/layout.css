@@ -4440,6 +4440,32 @@ html.fab-steady .page-fab {
   }
 }
 
+/* Reduzierte Bewegung (R21, D2): kein Zug, kein Versatz - der neue Zeitraum
+ * blendet ein, statt hart zu schneiden. Dieselbe Start-Deckkraft wie oben. */
+.period-swipe-in--fade {
+  animation: period-swipe-fade var(--duration-sm) var(--ease-out);
+}
+
+@keyframes period-swipe-fade {
+  from {
+    opacity: 0.4;
+  }
+}
+
+/* ECHTES UMBLAETTERN (R21, D2): waehrend der Geste steht der vorgeladene
+ * Nachbarzeitraum (`.period-swipe-ghost`) neben dem Panel und zieht mit. Er
+ * liegt absolut im Traeger, deckungsgleich mit dem Panel (Lage und Groesse
+ * setzt period-swipe.js), und nimmt keine Eingaben an. */
+.is-period-paging {
+  position: relative;
+  overflow: hidden;
+}
+
+.period-swipe-ghost {
+  position: absolute;
+  pointer-events: none;
+}
+
 @keyframes page-title-settle {
   from { opacity: 0; }
 }

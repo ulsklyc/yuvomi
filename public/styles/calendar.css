@@ -63,6 +63,40 @@
   touch-action: pan-y pinch-zoom;
 }
 
+/* ECHTES UMBLAETTERN (Critique R21, D2). Waehrend des Wischs steht der
+ * vorgeladene Nachbarzeitraum als Bild neben der Ansicht (`.period-swipe-ghost`,
+ * absolut im Traeger) und zieht mit dem Finger herein; Stundenachse, die Ecke
+ * darueber, die Ganztags-Beschriftung und die Wochentage stehen (period-swipe.js
+ * haelt sie gegen den Zug). Der Inhalt gleitet UNTER ihnen durch: sie liegen
+ * eine Ebene hoeher und tragen die Flaeche, auf der sie sonst stehen - die
+ * Seite in der Woche, die Karte im Tag. Waagerecht scrollt das Raster dabei
+ * nicht mit (die gehaltene Achse ragte sonst als Ueberlauf hinaus). */
+#cal-body {
+  position: relative;
+}
+
+/* Ueber allem, was im Raster liegt (Termine bis z-index 3, der Jetzt-Punkt 3):
+ * die Achse klebt, solange geblaettert wird - `--z-sticky`. */
+#cal-body.is-period-paging .week-view__time-gutter,
+#cal-body.is-period-paging .week-view .calendar-all-day-label,
+#cal-body.is-period-paging .week-view__times {
+  position: relative;
+  z-index: var(--z-sticky);
+  background-color: var(--color-bg);
+}
+
+#cal-body.is-period-paging .day-view .calendar-all-day-label,
+#cal-body.is-period-paging .day-view__times {
+  position: relative;
+  z-index: var(--z-sticky);
+  background-color: var(--color-surface);
+}
+
+#cal-body.is-period-paging .week-view__scroll,
+#cal-body.is-period-paging .day-view__scroll {
+  overflow-x: hidden;
+}
+
 /* Das Hereingleiten des neuen Zeitraums (`.period-swipe-in--next/--prev`) steht
  * in layout.css: der Wisch (utils/period-swipe.js) blaettert seit R17 auch den
  * Monat im Budget, und dieses Stylesheet laedt nur mit dem Kalender. */
