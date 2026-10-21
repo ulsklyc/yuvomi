@@ -4279,6 +4279,12 @@ nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite 
 `edit.primary` gilt jetzt auch dort: Aufruferaktionen zuerst, Bearbeiten primaer am Ende. In
 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten steht unten am Ende -
 dasselbe Bild wie im Sheet, und kein Aktionsknopf verliert seine Beschriftung.
+**Ein Weg in ein anderes Modul ist eine Folgeaktion der Zeile, die ihn begruendet** (R21, D7):
+die Geburtstagszeile eines Kontakts fuehrt "In Geburtstagen anzeigen", die Datumszeile eines
+importierten Geburtstags "Kontakt anzeigen" (`birthday_id` / `contact_id`, Migration 90) - nur
+mit Zugang zum Zielmodul. `leaveDetailTo()` (detail-view.js) schliesst Blatt oder Popover vor
+dem Sprung; der Router schliesst kein geteiltes Modal (`test:contacts-list-detail`,
+`test:birthday-localization`, `test:contacts-routes`).
 
 
 **Im Formular eines Leseblatts gibt es EINEN Rueckweg (R19, Critique 2026-10-16, Heuristik 3).**

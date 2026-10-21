@@ -547,6 +547,22 @@ try {
     const { status } = await jsend(`${base}/categories/gibt-es-nicht`, 'DELETE');
     assert(status === 404, `Status ${status}`);
   });
+  // ------------------------------------------------------------------
+  // D7 (Critique R21): der Weg vom Kontakt zu seinem Geburtstag. Die
+  // Verbindung steht seit Migration 90 im Datenmodell (birthdays.contact_id,
+  // der Import), die Kontaktseite kannte sie aber nicht.
+  // ------------------------------------------------------------------
+  await asyncTest('GET / und GET /:id nennen den verknuepften Geburtstag (birthday_id), sonst null', async () => {
+    const linked = await jsend(base, 'POST', { name: 'Tante Verknuepft', birthday: '1970-05-04' });
+    const loose = await jsend(base, 'POST', { name: 'Onkel Lose', birthday: '1968-02-01' });
+    const bid = database.prepare("INSERT INTO birthdays (name, birth_date, created_by, contact_id) VALUES ('Tante Verknuepft', '1970-05-04', 1, ?)")
+      .run(linked.body.data.id).lastInsertRowid;
+    const list = (await jget(base)).body.data;
+    assert(list.find((c) => c.id === linked.body.data.id)?.birthday_id === Number(bid), `Liste: birthday_id ${JSON.stringify(list.find((c) => c.id === linked.body.data.id))}`);
+    assert(list.find((c) => c.id === loose.body.data.id)?.birthday_id === null, 'ohne Verknuepfung null');
+    const one = (await jget(`${base}/${linked.body.data.id}`)).body.data;
+    assert(one.birthday_id === Number(bid), `Detail: birthday_id ${one.birthday_id}`);
+  });
 } finally {
   server.close();
   try { fs.unlinkSync(process.env.DB_PATH); } catch { /* egal */ }

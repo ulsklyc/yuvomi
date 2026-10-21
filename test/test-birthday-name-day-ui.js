@@ -318,3 +318,17 @@ test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"'
     assert.match(src, /birth_year_unknown: birth\.yearUnknown/, `${page} schickt die Marke mit`);
   }
 });
+
+/* D7 (Critique R21): DER GEBURTSTAG FUEHRT ZU SEINEM KONTAKT. Ein importierter
+ * Eintrag traegt `contact_id` (Migration 90) - die Leseansicht bietet an der
+ * Datumszeile "Kontakt anzeigen" an, wie Apples Kalender am Geburtstag. Ohne
+ * Verknuepfung bleibt die Zeile reiner Text. */
+test('R21 D7: ein importierter Geburtstag fuehrt zu seinem Kontakt', () => {
+  const rows = birthdays.__test.birthdayPaneSections({ id: 1, name: 'Tante', birth_date: '1970-05-04', year_unknown: 0, contact_id: 9 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.action, 'die Datumszeile traegt eine Folgeaktion');
+  assert.equal(row.action.label, 'birthdays.showContact');
+  assert.equal(birthdays.__test.contactHref(9), '/contacts?open=9');
+  const own = birthdays.__test.birthdayPaneSections({ id: 2, name: 'Lose', birth_date: '1970-05-04', year_unknown: 0, contact_id: null });
+  assert.equal(own.find((r) => r.icon === 'cake')?.action ?? null, null);
+});

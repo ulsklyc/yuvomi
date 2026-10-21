@@ -309,6 +309,8 @@ const STUBS = {
       return { update: () => true, isOpen: () => true };
     };
     export const closeDetailView = () => {};
+    // R21 D7: Sprung aus der Leseansicht in ein anderes Modul - hier nur Merker.
+    export const leaveDetailTo = (url) => { globalThis.__leftDetailTo = url; };
     // Dieselbe Regel wie im Original (R19): Bearbeiten als der eine
     // Primaerknopf am Ende, andere Primaerknoepfe treten zurueck.
     export const withPrimaryEdit = (actions = [], edit = null) => {

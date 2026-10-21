@@ -13,6 +13,7 @@ import { composeDisplayName, normalizeNameParts } from '../../public/utils/conta
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown } from '../services/birthdays.js';
+import { mayReadModule } from '../permissions.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -464,9 +465,26 @@ const CONTACT_SELECT = `
   SELECT contacts.*,
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
-         u.avatar_data   AS family_avatar_data
+         u.avatar_data   AS family_avatar_data,
+         (SELECT b.id FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_id
     FROM contacts
     LEFT JOIN users u ON u.id = contacts.family_user_id`;
+
+/**
+ * DER WEG ZUM GEBURTSTAG (Critique R21, D7). `birthday_id` ist der Eintrag im
+ * Geburtstagsmodul, den der Import aus diesem Kontakt angelegt hat
+ * (Migration 90, `birthdays.contact_id`, eindeutig je Kontakt). Die
+ * Kontaktseite fuehrt damit einen Link "In Geburtstagen anzeigen".
+ *
+ * Geburtstage gehoeren dem Modul `calendar` (server/permissions.js) - eine
+ * Mischstelle wie der Import in die Gegenrichtung (routes/birthdays.js,
+ * `contactsHidden`). Wer den Kalender nicht lesen darf, bekommt keine id:
+ * sie verriete sonst, wer im Geburtstagsmodul steht.
+ */
+function withBirthdayLink(req, contact) {
+  if (!contact || mayReadModule(req, 'calendar')) return contact;
+  return { ...contact, birthday_id: null };
+}
 
 /**
  * GET /api/v1/contacts
@@ -497,7 +515,7 @@ router.get('/', (req, res) => {
     // `category` sonst mehrdeutig.
     sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
 
-    const contacts = db.get().prepare(sql).all(...params);
+    const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
@@ -837,7 +855,7 @@ router.put('/:id', (req, res) => {
 
     res.json({
       data: {
-        ...updated,
+        ...withBirthdayLink(req, updated),
         ...multiValueFields
       }
     });
@@ -907,7 +925,7 @@ router.get('/:id', (req, res) => {
 
     res.json({
       data: {
-        ...contact,
+        ...withBirthdayLink(req, contact),
         ...multiValueFields
       }
     });

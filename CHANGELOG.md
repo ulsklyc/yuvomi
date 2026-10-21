@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A contact and its birthday lead to each other.** When a birthday was imported from a contact,
+  the contact's birthday line now offers "Show in birthdays", and the birthday offers "Show contact"
+  next to its date - one tap instead of switching modules and searching. The link only shows when
+  you can open the other module.
+
 - **Shift plan, rewards and household help name themselves on a phone again.** Below 768 pixels
   the three showed only their tabs, so nothing on screen said where you were. The header now
   carries the module's symbol and name with the tabs below, like the budget; while you scroll,

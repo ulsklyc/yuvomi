@@ -1143,6 +1143,19 @@ export function openDetailView(opts = {}) {
  * @param {{force?: boolean, fokus?: boolean}} [opts]
  * @returns {Promise<void>}
  */
+/**
+ * VON DER LESEANSICHT IN EIN ANDERES MODUL (Critique R21, D7: Kontakt und
+ * Geburtstag fuehren zueinander). Das Blatt oder Popover geht zuerst zu - der
+ * Router schliesst kein geteiltes Modal, und ueber der neuen Seite stuende
+ * sonst die alte Ansicht. Der Fokus kehrt nicht zur Zeile zurueck: die Seite,
+ * auf der sie stand, geht gleich weg.
+ * @param {string} url  Ziel innerhalb der App (`/birthdays?open=4`)
+ */
+export async function leaveDetailTo(url) {
+  await closeDetailView({ force: true, fokus: false });
+  window.yuvomi?.navigate?.(url);
+}
+
 export function closeDetailView({ force = false, fokus = true } = {}) {
   activeViewToken = 0;
   if (activePopover) {

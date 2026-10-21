@@ -7,7 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, leaveDetailTo } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
@@ -27,7 +27,7 @@ import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
-import { mayWritePath } from '/utils/module-access.js';
+import { mayWritePath, pathAccess } from '/utils/module-access.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -1100,6 +1100,15 @@ function renderContactDetail(contact) {
       icon: 'cake',
       label: t('contacts.birthdayLabel'),
       value: birthDateText(contact.birthday, contact.birthday_year_unknown),
+      // DER WEG ZUM GEBURTSTAG (Critique R21, D7): hat der Import aus diesem
+      // Kontakt einen Geburtstag angelegt (`birthday_id`, routes/contacts.js),
+      // fuehrt die Zeile dorthin - statt Modulwechsel, Suche und Antippen.
+      action: contact.birthday_id && mayOpenBirthdays() ? {
+        id: 'contact-detail-birthday',
+        label: t('contacts.showBirthday'),
+        icon: 'cake',
+        onClick: () => leaveDetailTo(birthdayHref(contact.birthday_id)),
+      } : null,
     },
     {
       icon: 'globe',
@@ -2033,6 +2042,21 @@ function openImportSelectionModal(named, skipped) {
   });
 }
 
+/** Die Adresse eines Geburtstags: dieselbe wie aus der Suche (`?open=`). */
+function birthdayHref(id) {
+  return `/birthdays?open=${encodeURIComponent(String(id))}`;
+}
+
+/**
+ * Darf die Leseansicht zum Geburtstag springen? (Critique R21, D7) Dieselbe
+ * Paarung wie beim Import unten: `/birthdays` gehoert `calendar`, und ein
+ * haushaltweit abgeschaltetes Modul leitet der Router um - beides waere eine
+ * Sackgasse hinter dem Knopf.
+ */
+function mayOpenBirthdays() {
+  return !globalThis.window?.yuvomi?.isModuleDisabled?.('birthdays') && pathAccess('/birthdays') !== 'none';
+}
+
 /**
  * Darf der Import-Toast in den Geburtstags-Import springen? (#1348)
  *
@@ -2166,6 +2190,8 @@ export const __test = {
   // R8 H14: der Auswahlkreis als Programm.
   toggleContactSelection,
   openContactDetail, readOnly, state, buildContactForm,
+  // R21 D7: der Weg zum Geburtstag (die Zeilen stehen unten).
+  birthdayHref,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,

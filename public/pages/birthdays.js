@@ -17,7 +17,8 @@ import { moduleAccess, isNavModuleReadOnly } from '/permissions.js';
 import { findPageFab } from '/utils/fab.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, leaveDetailTo } from '/components/detail-view.js';
+import { pathAccess } from '/utils/module-access.js';
 // Alias: dieses Modul fuehrt selbst eine `emptyStateHtml()`, die den Renderer
 // mit den Geburtstags-Texten fuellt. Zwei Namen, die sich nur in der
 // Gross-Schreibung unterscheiden, waeren im Modul nicht auseinanderzuhalten.
@@ -1303,6 +1304,20 @@ function deleteBirthday(id) {
 // Liste + Detail (R10 L5)
 // --------------------------------------------------------
 
+/** Die Adresse eines Kontakts: dieselbe wie aus der Suche (`?open=`). */
+function contactHref(id) {
+  return `/contacts?open=${encodeURIComponent(String(id))}`;
+}
+
+/**
+ * Darf die Leseansicht zum Kontakt springen? Ein Modul ohne Zugang oder ein
+ * haushaltweit abgeschaltetes leitet der Router um - der Knopf fuehrte dann
+ * zurueck auf die Uebersicht (Critique R21, D7).
+ */
+function mayOpenContacts() {
+  return !globalThis.window?.yuvomi?.isModuleDisabled?.('contacts') && pathAccess('/contacts') !== 'none';
+}
+
 /**
  * Der Geburtstag in der Detailspalte: dieselben Angaben wie die Leseansicht
  * (birthdayReadHtml), dazu die Auskunft, die die Zeile nur knapp traegt - wann
@@ -1320,7 +1335,20 @@ function birthdayPaneSections(birthday) {
     // Critique 2026-10-16: "das Geburtstagsdetail sagt dasselbe dreimal").
     // Alter und Abstand stehen als Kennzahlen im Kopf, das Datum als seine
     // Unterzeile (birthdayDetailHead).
-    { icon: 'cake', label: t('birthdays.birthDateLabel'), value: birthDateText(birthday.birth_date, birthday.year_unknown) },
+    // DER WEG ZUM KONTAKT (Critique R21, D7): ein importierter Geburtstag kennt
+    // seinen Kontakt (`contact_id`, Migration 90). Wie "Kontakt anzeigen" an
+    // einem Geburtstag in Apples Kalender - an der Datumszeile, nicht im Fuss.
+    {
+      icon: 'cake',
+      label: t('birthdays.birthDateLabel'),
+      value: birthDateText(birthday.birth_date, birthday.year_unknown),
+      action: birthday.contact_id && mayOpenContacts() ? {
+        id: 'birthday-detail-contact',
+        label: t('birthdays.showContact'),
+        icon: 'book-user',
+        onClick: () => leaveDetailTo(contactHref(birthday.contact_id)),
+      } : null,
+    },
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
     { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },
@@ -1554,7 +1582,7 @@ export const __test = {
   onListClick, openBirthdayModal,
   birthdayPreviewHtml,
   // R10 L5: die Detailspalte.
-  birthdayPaneSections, birthdayDetailHead, renderBirthdayPane,
+  birthdayPaneSections, birthdayDetailHead, renderBirthdayPane, contactHref,
   // #1821: `?open=` unter der Spaltenschwelle.
   openBirthdayFromQueryNarrow,
   // #1909: Speichern, Loeschen und Import, wenn der Server ablehnt.

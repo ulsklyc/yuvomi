@@ -424,3 +424,19 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
     else delete globalThis.navigator;
   }
 });
+
+/* D7 (Critique R21): KONTAKT UND GEBURTSTAG KENNEN EINANDER. Ein importierter
+ * Geburtstag traegt seit Migration 90 seinen Kontakt (`contact_id`), die
+ * Kontaktseite bekommt den Rueckweg (`birthday_id`, routes/contacts.js). Die
+ * Geburtstagszeile der Leseansicht fuehrt dann "In Geburtstagen anzeigen" -
+ * ein Schritt statt Modulwechsel, Suche und Antippen. Ohne Verknuepfung, oder
+ * ohne Zugang zum Geburtstagsmodul, gibt es den Knopf nicht. */
+test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburtstag', () => {
+  const rows = contacts.renderContactDetail({ id: 7, name: 'Tante', birthday: '1970-05-04', birthday_year_unknown: 0, birthday_id: 42 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.action, 'die Zeile traegt eine Folgeaktion');
+  assert.equal(row.action.label, 'contacts.showBirthday');
+  assert.equal(contacts.birthdayHref(42), '/birthdays?open=42');
+  const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
+  assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung kein Weg');
+});
