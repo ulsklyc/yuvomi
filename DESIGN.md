@@ -1564,7 +1564,9 @@ sie: Plan mit Kategorien links und Sparziel in der Seitenleiste, Darlehen mit Fi
 und Transaktionen links und den drei Kennzahlen rechts (vorher vier Kanten), Konten mit dem
 Nettovermoegen als Leistenkarte NEBEN den Konten (R17, E14: `.budget-accounts`, die Karte
 `.metric-grid--rail`; die Konten je Zeile eines auf dem Lesemass - vorher EINE Karte ueber
-981 / 1124px), Aufteilung mit den Ausgaben in der breiten Spalte,
+981 / 1124px), Abonnements mit der Liste auf dem Lesemass und Kennzahlen samt Diagrammen in
+der Seitenleiste (R21 S7, D9: vorher die Liste ueber 1124px, Name -> Betrag 1004px, jetzt 600px;
+`test:budget-ui`), Aufteilung mit den Ausgaben in der breiten Spalte,
 Statistik mit dem Anteilsring in Zeile 1 neben dem Verlauf, darunter Ausgaben und Einnahmen
 NEBENEINANDER (R17: zwei Bloecke je ~480-550px, der Name 14px, der Betrag am Balkenende - vorher
 ein 830px-Balken zwischen Name und Betrag); der Verlauf laeuft ab heute punktiert weiter und
