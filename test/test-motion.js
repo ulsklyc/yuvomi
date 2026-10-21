@@ -661,6 +661,15 @@ test('swapPage D1: was laeuft, setzt nach dem Warten dort fort, wo das alte Bild
   assert.equal(running.startTime, 1096, 'die laufende Animation setzt nicht an ihrer Stelle fort');
   assert.equal(paused.startTime, 900, 'eine pausierte Animation wurde verschoben');
   assert.equal(replaced.startTime, 950, 'eine ersetzte Animation wurde verschoben');
+  // Eine eben gestartete (Start steht noch aus) - die Kuechen-Kapsel 10 ms vor
+  // dem Wechsel: ihr Start loeste sonst rueckwirkend auf den letzten Frame auf
+  // und sie stand nach dem Warten 33 ms weit (16 -> 64px).
+  const fresh = { playState: 'running', startTime: null, pending: true };
+  const resumeFresh = holdRunningAnimations({ getAnimations: () => [fresh], timeline: { currentTime: 500 } }, () => clock);
+  assert.equal(fresh.startTime, 500, 'der ausstehende Start wird nicht auf den gezeichneten Frame festgelegt');
+  clock += 60;
+  resumeFresh();
+  assert.equal(fresh.startTime, 560, 'die eben gestartete Animation setzt nicht an ihrer Stelle fort');
 
   // Und swapPage haelt sie wirklich - waehrend des Wartens auf den Render.
   const env = stubDocument();
@@ -678,6 +687,44 @@ test('swapPage D1: was laeuft, setzt nach dem Warten dort fort, wo das alte Bild
     delete globalThis.document;
     delete globalThis.matchMedia;
   }
+});
+
+// Critique R21 (D11): zwischen zwei Kuechen-Reitern blendete die Kontextzeile
+// (Wochenschritt <-> Suche) 200ms doppelt belichtet mit der Seite. Sie wechselt
+// jetzt mit dem Tipp, nur der Koerper blendet - ueber den Typ `kitchen`.
+test('swapPage D11: zwischen Kuechen-Reitern blendet nur der Koerper (Typ kitchen)', async () => {
+  const { swapPage } = await import('../public/utils/view-transition.js');
+  for (const supported of [true, false]) {
+    const env = stubDocument();
+    const start = env.doc.startViewTransition;
+    let arg = null;
+    env.doc.startViewTransition = (a) => { arg = a; return start(typeof a === 'function' ? a : a.update); };
+    globalThis.document = env.doc;
+    globalThis.matchMedia = () => ({ matches: false });
+    globalThis.CSS = { supports: (q) => supported && /active-view-transition-type/.test(q) };
+    try {
+      let swapped = false;
+      const { finished } = await swapPage(() => { swapped = true; }, { content: env.content, from: '/meals', animate: true, types: ['kitchen'] });
+      assert.equal(swapped, true, 'der Tausch lief nicht');
+      if (supported) assert.deepEqual(arg?.types, ['kitchen'], 'der Typ erreicht die Transition nicht');
+      else assert.equal(typeof arg, 'function', 'ohne Typen-Unterstuetzung laeuft der Wechsel wie bisher');
+      env.finish();
+      await finished;
+    } finally {
+      delete globalThis.document;
+      delete globalThis.matchMedia;
+      delete globalThis.CSS;
+    }
+  }
+  const rules = [...eachRule(css('layout.css'))].filter((r) => !r.at.length);
+  const body = (sel) => rules.find((r) => r.selector.replace(/\s+/g, '') === sel)?.body ?? '';
+  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar)'), /display:\s*none/,
+    'die alte Kontextzeile blendet weiter doppelt belichtet');
+  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar)'), /animation:\s*none/,
+    'die neue Kontextzeile steht nicht mit dem Tipp');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /await swapPage\(swap, \{[^}]*types: isKitchenRoute\(previousPath\) && isKitchenRoute\(route\.path\) \? \['kitchen'\] : \[\],/,
+    'der Router setzt den Typ nicht fuer einen Wechsel innerhalb der Kueche');
 });
 
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {

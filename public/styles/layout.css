@@ -346,6 +346,20 @@ html.page-swapping .fab-layer .page-fab {
   animation: none;
 }
 
+/* ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21, D11).
+ * Die Leiste steht (`kitchen-tabs`, lebendes Bild), ihre Kapsel gleitet - aber
+ * die Kontextzeile darunter (`page-toolbar`: Wochenschritt, Suche, Listen)
+ * blendete 200ms doppelt belichtet mit der Seite: zwei verschiedene
+ * Bedienzeilen uebereinander. Sie gehoert zum Bedienelement und wechselt mit
+ * dem Tipp; nur der Inhalt darunter blendet. Typ aus swapPage (router.js). */
+html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar) {
+  display: none;
+}
+
+html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar) {
+  animation: none;
+}
+
 /* GERICHTETER WECHSEL EINER REGION (R19, utils/content-swap.js swapRegion).
  * Kalender-Ansichten und Drill-down: die Region traegt fuer die Dauer den
  * Namen `region-swap`, Navigation/Kapsel/FAB stehen (`html.page-swapping`

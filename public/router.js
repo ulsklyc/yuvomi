@@ -1857,6 +1857,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // solange `isNavigating` steht.
       whenSettled: navigationIdle,
       settle: settleClosingOverlays,
+      // ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21,
+      // D11): Leiste und Kontextzeile sind das Bedienelement, die Zeile wechselt
+      // mit dem Tipp statt doppelt belichtet zu blenden (layout.css, `kitchen`).
+      types: isKitchenRoute(previousPath) && isKitchenRoute(route.path) ? ['kitchen'] : [],
     });
 
     // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch

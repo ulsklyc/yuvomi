@@ -107,8 +107,19 @@ export function holdRunningAnimations(doc = typeof document !== 'undefined' ? do
   let held = [];
   let since = 0;
   try {
-    held = (doc?.getAnimations?.() ?? [])
-      .filter((anim) => anim.playState === 'running' && Number.isFinite(anim.startTime));
+    held = (doc?.getAnimations?.() ?? []).filter((anim) => anim.playState === 'running');
+    // Auch eine eben gestartete, deren Start noch aussteht (die Kuechen-Kapsel
+    // gleitet seit dem Tipp, 10 ms vor dem Wechsel): ihr Start loeste erst
+    // nach dem Warten auf, und zwar rueckwirkend auf den letzten gezeichneten
+    // Frame - gemessen stand sie im ersten Frame danach 33 ms weit (16 -> 64px).
+    // Ihr Start wird hier auf diesen Frame festgelegt, also auf denselben Wert,
+    // und ruckt dann wie jeder andere nach.
+    const frame = doc?.timeline?.currentTime;
+    if (Number.isFinite(frame)) {
+      for (const anim of held) {
+        if (anim.startTime == null && anim.pending) anim.startTime = frame;
+      }
+    }
     since = now();
   } catch {
     held = [];
@@ -196,6 +207,15 @@ export function canViewTransition() {
   return true;
 }
 
+/** Ob der Browser Typen an einer Transition kennt (`:active-view-transition-type()`). */
+function supportsTransitionTypes() {
+  try {
+    return typeof CSS !== 'undefined' && CSS.supports('selector(:active-view-transition-type(a))');
+  } catch {
+    return false;
+  }
+}
+
 function nameToolbar(root) {
   const toolbar = root?.querySelector?.('.page-toolbar') ?? null;
   if (toolbar) toolbar.style.viewTransitionName = TOOLBAR_NAME;
@@ -226,9 +246,11 @@ function nameToolbar(root) {
  *   er jede weitere)
  * @param {() => void} [opts.settle] bringt, was gerade AUSFAEHRT, an sein Ende,
  *   bevor der Browser das alte Bild aufnimmt (siehe unten)
+ * @param {string[]} [opts.types] Typen der Transition (`:active-view-transition-type()`
+ *   in layout.css); ohne Unterstuetzung laeuft der Wechsel ohne sie
  * @returns {Promise<{ transition: boolean, finished: Promise<void> }>}
  */
-export async function swapPage(update, { content, from = null, animate = true, whenSettled = null, settle = null } = {}) {
+export async function swapPage(update, { content, from = null, animate = true, whenSettled = null, settle = null, types = [] } = {}) {
   _from = from;
 
   if (!animate || !canViewTransition()) {
@@ -252,7 +274,7 @@ export async function swapPage(update, { content, from = null, animate = true, w
   const releaseSwapping = holdPageSwapping();
   let oldToolbar = nameToolbar(content);
   let newToolbar = null;
-  const transition = document.startViewTransition(async () => {
+  const callback = async () => {
     // Der alte Kopf faellt mit dem Tausch ohnehin aus dem Dokument; der Name
     // geht trotzdem vorher weg, falls eine Seite ihren Kopf wiederverwendet.
     // Danach laesst ihn dieser Rueckruf los: haelt etwas den Rueckruf (der
@@ -271,7 +293,10 @@ export async function swapPage(update, { content, from = null, animate = true, w
     } finally {
       resume();
     }
-  });
+  };
+  const transition = document.startViewTransition(types.length && supportsTransitionTypes()
+    ? { update: callback, types }
+    : callback);
   // `ready` lehnt ab, wenn der Browser die Transition verwirft (doppelter
   // Name, verdeckter Tab) - das ist kein Fehler des Wechsels, der Tausch
   // selbst laeuft trotzdem.
