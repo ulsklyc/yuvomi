@@ -248,6 +248,19 @@ test('Seed: Kinder starten mit den Kinder-Startrechten der App', () => {
   }
 });
 
+// "Fast leer" an 10 von 24 Vorratszeilen (Critique a2): fast jeder Bestand lag
+// genau auf seinem Minimum, das Signal war Grundfarbe. Dieselbe Regel wie die
+// Kuechen-Route (server/routes/kitchen.js): Menge > 0, Minimum gesetzt, Menge <= Minimum.
+test('Seed: "Fast leer" ist ein Signal - hoechstens ein Viertel des Vorrats', () => {
+  const { total, low } = readSeeded('de', (db) => db.prepare(`
+    SELECT COUNT(*) AS total,
+           SUM(CASE WHEN quantity > 0 AND min_quantity IS NOT NULL AND quantity <= min_quantity THEN 1 ELSE 0 END) AS low
+    FROM pantry_items`).get());
+  assert.ok(total >= 15, `erwartet einen vollen Vorrat, gefunden ${total}`);
+  assert.ok(low >= 2, `die Demo zeigt den Zustand "Fast leer" (${low})`);
+  assert.ok(low / total <= 0.25, `${low} von ${total} Artikeln sind "Fast leer" - mehr als ein Viertel`);
+});
+
 // ── Verschlüsselte Datenbank (#2114) ─────────────────────────────────────────
 // Installer-Installationen sind standardmäßig verschlüsselt. Der Seed öffnete
 // die Datei ohne Schlüssel und brach mit "file is not a database" ab - auch mit

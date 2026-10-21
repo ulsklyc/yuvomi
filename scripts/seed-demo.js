@@ -722,29 +722,33 @@ const insertPantry = db.prepare(`
 `);
 // unit MUSS aus PANTRY_UNITS stammen (public/utils/pantry-units.js) - alles
 // andere fällt beim Speichern still auf 'pcs' zurück.
+// "Fast leer" ist ein Signal, keine Grundfarbe (Critique 2026-10-21, a2): es
+// stand an 10 von 24 Zeilen, weil fast jeder Bestand genau auf seinem Minimum
+// lag. Knapp sind jetzt vier Dinge, wie in einem echten Haushalt - Mehl,
+// Milch, Butter und das Wasser im Keller.
 [
   // name, qty, unit, location, category, expires in days (null = unbegrenzt), min, note
   [L('Spaghetti',        'Spaghetti'),            3,   'pkg',    LOC.pantry,  CAT.other,     240,  2,    null],
   [L('Passata',          'Passierte Tomaten'),    4,   'can',    LOC.pantry,  CAT.other,     300,  2,    null],
   [L('Basmati rice',     'Basmatireis'),          1.5, 'kg',     LOC.pantry,  CAT.other,     400,  1,    null],
-  [L('Olive oil',        'Olivenöl'),             1,   'bottle', LOC.pantry,  CAT.other,     500,  1,    null],
+  [L('Olive oil',        'Olivenöl'),             2,   'bottle', LOC.pantry,  CAT.other,     500,  1,    null],
   [L('Plain flour',      'Mehl'),                 0.5, 'kg',     LOC.pantry,  CAT.other,     180,  1,    L('Running low - pizza night', 'Wird knapp - Pizzaabend')],
   [L('Coffee beans',     'Kaffeebohnen'),         2,   'pkg',    LOC.pantry,  CAT.drinks,    120,  1,    null],
   [L('Tinned chickpeas', 'Kichererbsen'),         6,   'can',    LOC.pantry,  CAT.other,     540,  3,    null],
   [L('Whole milk',       'Vollmilch'),            1,   'l',      LOC.fridge,  CAT.dairy,     3,    2,    null],
   [L('Butter',           'Butter'),               1,   'pcs',    LOC.fridge,  CAT.dairy,     14,   1,    null],
-  [L('Greek yoghurt',    'Griechischer Joghurt'), 2,   'jar',    LOC.fridge,  CAT.dairy,     6,    2,    null],
-  [L('Parmesan',         'Parmesan'),             1,   'pcs',    LOC.fridge,  CAT.dairy,     21,   1,    null],
+  [L('Greek yoghurt',    'Griechischer Joghurt'), 2,   'jar',    LOC.fridge,  CAT.dairy,     6,    1,    null],
+  [L('Parmesan',         'Parmesan'),             1,   'pcs',    LOC.fridge,  CAT.dairy,     21,   null, null],
   [L('Eggs',             'Eier'),                 8,   'pcs',    LOC.fridge,  CAT.dairy,     11,   6,    null],
   [L('Baby spinach',     'Babyspinat'),           1,   'bag',    LOC.fridge,  CAT.produce,   2,    null, L('Use for the curry', 'Für das Curry verwenden')],
   [L('Frozen peas',      'Tiefkühlerbsen'),       2,   'pkg',    LOC.freezer, CAT.frozen,    365,  1,    null],
-  [L('Fish fingers',     'Fischstäbchen'),        1,   'pkg',    LOC.freezer, CAT.frozen,    200,  1,    null],
+  [L('Fish fingers',     'Fischstäbchen'),        2,   'pkg',    LOC.freezer, CAT.frozen,    200,  1,    null],
   [L('Berry mix',        'Beerenmischung'),       3,   'pkg',    LOC.freezer, CAT.frozen,    280,  2,    null],
   [L('Sparkling water',  'Sprudelwasser'),        4,   'bottle', LOC.cellar,  CAT.drinks,    null, 6,    L('Crate in the cellar', 'Kasten steht im Keller')],
   [L('Apple juice',      'Apfelsaft'),            6,   'bottle', LOC.cellar,  CAT.drinks,    150,  4,    null],
   [L('Potatoes',         'Kartoffeln'),           4,   'kg',     LOC.cellar,  CAT.produce,   40,   2,    null],
-  [L('Kitchen roll',     'Küchenrolle'),          2,   'pkg',    LOC.other,   CAT.household, null, 2,    null],
-  [L('Washing powder',   'Waschmittel'),          1,   'pkg',    LOC.other,   CAT.household, null, 1,    null],
+  [L('Kitchen roll',     'Küchenrolle'),          4,   'pkg',    LOC.other,   CAT.household, null, 2,    null],
+  [L('Washing powder',   'Waschmittel'),          2,   'pkg',    LOC.other,   CAT.household, null, 1,    null],
 ].forEach(([name, qty, unit, loc, cat, expiresInDays, min, note]) => {
   const { lastInsertRowid } = insertPantry.run(name, qty, unit, locId[loc] ?? null, cat,
     expiresInDays === null ? null : daysFromNow(expiresInDays), min, note, alexId);

@@ -5090,9 +5090,13 @@ test('R16 Budget: Gewichte kommen aus den Tokens, ohne !important - und der Betr
     ['budget.css', '.budget-account__balance'],
     ['budget.css', '.budget-plan-row__amounts strong'],
     ['split-expenses.css', '.split-expense__amount'],
+    // R21 S9b (a4): der Kaufpreis im Inventar stand regulaer und sekundaer.
+    ['inventory.css', '.inventory-row__value'],
   ]) {
     assert.match(body(file, sel), /font-weight:\s*var\(--font-weight-semibold\)/, `${sel}: ein Betrag steht semibold`);
   }
+  assert.doesNotMatch(body('inventory.css', '.inventory-row__value'), /(?:^|;)\s*color:\s*var\(--color-text-secondary\)/,
+    'der Kaufpreis steht in Textfarbe wie jeder Betrag');
 });
 
 test('R16 Budget: "Darlehenstransaktionen" ist eine Ueberschrift auf der Buehne, kein div', () => {

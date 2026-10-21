@@ -181,10 +181,13 @@
 }
 
 /* Kaufpreis, trailing außerhalb des Klickbereichs (wie der Stepper im Vorrat) -
- * reine Anzeige, kein eigenes Bedienelement, deshalb kein .list-row__actions. */
+ * reine Anzeige, kein eigenes Bedienelement, deshalb kein .list-row__actions.
+ * DIE BETRAGSREGEL (DESIGN.md, R16) gilt auch hier (R21 S9b, Critique a4): ein
+ * Betrag in einer Zeile steht semibold, in Tabellenziffern und in Textfarbe -
+ * der Preis stand als einziger Betrag der App regulaer und sekundaer. */
 .inventory-row__value {
   flex-shrink: 0;
-  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
