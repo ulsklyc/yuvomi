@@ -278,13 +278,23 @@ html.page-swapping .fab-layer .page-fab {
   pointer-events: none;
 }
 
-/* Die Bilder von Wurzel und Kopf blenden auf dem Token. */
+/* Die Bilder von Wurzel und Kopf blenden auf dem Token.
+ *
+ * UND HALTEN IHR ENDE (Critique R21, Geisterframe): die Gruppe des Kopfs
+ * steht (`animation: none` unten), und der Shorthand setzt dabei auch
+ * `animation-fill-mode` auf `none` - die Bilder erben ihn. Das alte Kopfbild
+ * war nach 200ms fertig, die Transition lebte aber noch einen Frame, weil die
+ * Wurzel ihr Ende per `both` haelt; ohne Fuellung stand der alte Kopf dort
+ * wieder deckend ueber dem neuen (beim Ankommen auf / 5 von 5 Mal "Aufgaben"
+ * ueber dem Gruss). Gilt auch unter reduzierter Bewegung, wo alle Gruppen
+ * stehen. Guard: test-motion.js. */
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-old(page-toolbar),
 ::view-transition-new(page-toolbar) {
   animation-duration: var(--duration-md);
   animation-timing-function: var(--ease-out);
+  animation-fill-mode: both;
 }
 
 /* AUCH DIE GRUPPEN laufen auf dem Token, nicht auf dem UA-Default (Critique

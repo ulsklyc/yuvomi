@@ -668,6 +668,46 @@ test('View Transition: die Gruppen laufen auf --duration-md/--ease-out, nicht au
   }
 });
 
+// Critique R21 (a1 P2, Frame-Serie): beim Ankommen auf / stand der alte Kopf
+// ("Aufgaben") 5 von 5 Mal einen Frame lang deckend ueber dem Gruss. Die
+// Gruppe `page-toolbar` steht (`animation: none`) - und der Shorthand setzt
+// dabei auch `animation-fill-mode` auf `none`, das die Bilder erben. Das alte
+// Kopfbild war nach 200ms fertig, die Transition lebte noch einen Frame (die
+// Wurzel haelt ihr Ende per `both` aus dem UA-Stylesheet), und ohne Fuellung
+// sprang das Bild dort auf Deckkraft 1 zurueck (gemessen: old(page-toolbar) 1,
+// old(root) 0 im letzten Frame).
+test('View Transition: ein Bild, das unter einer stehenden Gruppe blendet, haelt sein Ende (fill both)', () => {
+  const rules = [...eachRule(css('layout.css'))];
+  const REDUCE = /prefers-reduced-motion:\s*reduce/;
+  const contexts = [
+    { name: 'Basis', applies: (r) => !r.at.length },
+    { name: 'reduce', applies: (r) => !r.at.length || r.at.every((a) => REDUCE.test(a)) },
+  ];
+  const PLAIN = /^::view-transition-(group|old|new)\(([\w-]+|\*)\)$/;
+  for (const { name, applies } of contexts) {
+    const decls = new Map();
+    for (const rule of rules.filter(applies)) {
+      for (const sel of selectorList(rule.selector)) {
+        const m = sel.replace(/\s+/g, '').match(PLAIN);
+        if (!m) continue;
+        const key = `${m[1]}(${m[2]})`;
+        decls.set(key, `${decls.get(key) ?? ''};${rule.body}`);
+      }
+    }
+    const stands = (vtName) => [`group(${vtName})`, 'group(*)'].some((k) => /(^|;)\s*animation:\s*none/.test(decls.get(k) ?? ''));
+    let checked = 0;
+    for (const [key, body] of decls) {
+      const m = key.match(/^(old|new)\(([\w-]+)\)$/);
+      if (!m || !/animation-duration:/.test(body) || /animation:\s*none|display:\s*none/.test(body)) continue;
+      if (!stands(m[2])) continue;
+      checked += 1;
+      assert.match(body, /animation-fill-mode:\s*(both|forwards)/,
+        `${name}: ::view-transition-${key} blendet unter einer stehenden Gruppe ohne Fuellung - im letzten Frame der Transition steht es wieder deckend (Geisterframe)`);
+    }
+    assert.ok(checked >= 2, `${name}: der Guard prueft kein Bild mehr (${checked}) - liest er noch layout.css?`);
+  }
+});
+
 test('reduzierte Bewegung: der Seitenwechsel blendet - die Gruppen stehen, die Bilder blenden kurz', async () => {
   const { swapPage, swapTheme } = await import('../public/utils/view-transition.js');
   for (const [name, run] of [['swapPage', (env) => swapPage(() => {}, { content: env.content })], ['swapTheme', () => swapTheme(() => {})]]) {

@@ -97,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Switching to the Overview no longer flashes the previous page's title.** For one frame at the
+  end of the page fade, the title of the page you came from (for example "Tasks") stood fully
+  visible over the greeting. The fading title now keeps its end state until the fade is gone.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing
