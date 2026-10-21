@@ -100,10 +100,12 @@ function formatOptions(selected) {
  * bekommt ein 400 statt still zu landen.
  *
  * Die erste Option speichert den leeren Wert und stellt damit auf den Rückfall
- * zurück (TZ → Systemzone → UTC). Ihr Label nennt die Zone, die dann tatsächlich
- * gilt - sonst wäre "Automatisch" eine Zusage ohne Inhalt.
+ * zurück (TZ → Systemzone → UTC). Die Zone, die dann tatsächlich gilt, nennt
+ * die Hinweiszeile (`timezoneHintText`) - sonst wäre "Automatisch" eine Zusage
+ * ohne Inhalt. Bis R21 stand sie im Label selbst und wurde mobil gekappt
+ * ("Automatisch (Eur…").
  */
-function timeZoneOptions(selected, effective) {
+function timeZoneOptions(selected) {
   let zones = [];
   try { zones = Intl.supportedValuesOf('timeZone'); } catch { zones = []; }
   // Eine gespeicherte Zone, die dieses ICU nicht (mehr) kennt, muss sichtbar
@@ -111,8 +113,7 @@ function timeZoneOptions(selected, effective) {
   // alte Zone benutzt - ein Select, das die Wahrheit verschweigt.
   if (selected && !zones.includes(selected)) zones = [...zones, selected].sort();
 
-  const auto = `<option value=""${selected ? '' : ' selected'}>`
-    + `${esc(t('settings.timezoneAuto', { zone: effective || 'UTC' }))}</option>`;
+  const auto = `<option value=""${selected ? '' : ' selected'}>${esc(t('settings.timezoneAuto'))}</option>`;
 
   // UTC von Hand davor. `Intl.supportedValuesOf('timeZone')` fuehrt WEDER `UTC`
   // NOCH ein einziges `Etc/*` - und UTC ist ausgerechnet der Auslieferungs-
@@ -152,7 +153,7 @@ function regionOptions(selectedRegion) {
   // über 60 - da findet man "Spanisch (Peru)" nur alphabetisch wieder.
   // detectRegion() bleibt von der Sortierung unberührt, es liest das Objekt.
   const presets = [...REGION_CODES]
-    .map((code) => ({ code, label: regionLabel(code, locale) }))
+    .map((code) => ({ code, label: regionLabel(code, locale, (region, language) => t('settings.regionWithLanguage', { region, language })) }))
     .sort((a, b) => a.label.localeCompare(b.label, locale))
     .map(({ code, label }) => (
       `<option value="${esc(code)}"${selectedRegion === code ? ' selected' : ''}>${esc(label)}</option>`
@@ -180,14 +181,48 @@ function localeOptions() {
 }
 
 /**
- * Optionen für die Datensprache des Haushalts (#631, #632). Der leere Wert steht
- * für "automatisch"; sein Label nennt die Sprache, auf die die Automatik fiele -
- * `language_auto`, nicht `language_effective`. Bei explizit gewählter Sprache
- * sind die beiden verschieden, und `language_effective` würde dort genau die
- * gewählte Sprache als Automatik-Ergebnis ausgeben.
+ * DER WERT IST KURZ, DAS DETAIL STEHT VORN IN DER HINWEISZEILE (R21, Critique
+ * 2026-10-21, Entscheidung Ulas): mobil hat die geschlossene Auswahl rund
+ * 180 px, und "Automatisch (Englisch)" endete dort als "Automatisch (Engl…" -
+ * abgeschnitten genau an der Stelle, die sagt, was gilt. Die Zeile sagt jetzt
+ * "Automatisch", die Hinweiszeile beginnt mit "Gerade Englisch.".
+ *
+ * Ohne `current` bleibt der Hinweis, wie er ist: eine ausdrücklich gewählte
+ * Sprache oder Zone steht schon vollständig in der Auswahl.
  */
-function dataLanguageOptions(selected, auto_) {
-  const auto = t('settings.dataLanguageAuto', { language: localeLabel(auto_) });
+export function hintWithCurrent(hint, current) {
+  return current ? t('settings.hintWithCurrent', { value: current, hint }) : hint;
+}
+
+/**
+ * Die Hinweiszeile der Datensprache. Bei "automatisch" nennt sie die Sprache,
+ * auf die die Automatik fiele - `language_auto`, nicht `language_effective`.
+ * Bei explizit gewählter Sprache sind die beiden verschieden, und
+ * `language_effective` würde dort genau die gewählte Sprache als
+ * Automatik-Ergebnis ausgeben.
+ */
+export function dataLanguageHintText(selected, auto_) {
+  return hintWithCurrent(t('settings.dataLanguageHint'), selected ? null : localeLabel(auto_ || 'en'));
+}
+
+/** Die Hinweiszeile der Haushaltszone: bei "automatisch" mit der Zone, die gilt. */
+export function timezoneHintText(selected, effective) {
+  return hintWithCurrent(t('settings.timezoneHint'), selected ? null : (effective || 'UTC'));
+}
+
+/** Setzt den Text einer Hinweiszeile (per id), wenn es sie gibt. */
+function setHint(container, id, text) {
+  const hint = container.querySelector(`#${id}`);
+  if (hint) hint.textContent = text;
+}
+
+/**
+ * Optionen für die Datensprache des Haushalts (#631, #632). Der leere Wert steht
+ * für "automatisch"; welche Sprache das gerade ist, sagt die Hinweiszeile
+ * (`dataLanguageHintText`).
+ */
+function dataLanguageOptions(selected) {
+  const auto = t('settings.dataLanguageAuto');
   return [
     `<option value=""${selected ? '' : ' selected'}>${esc(auto)}</option>`,
     ...getSupportedLocales().map((locale) => (
@@ -327,11 +362,11 @@ function renderPage(container, preferences, isAdmin) {
         ${isAdmin ? settingRowHtml({
           label: t('settings.dataLanguageLabel'),
           labelFor: 'data-language-select',
-          description: t('settings.dataLanguageHint'),
+          description: dataLanguageHintText(preferences.language, preferences.language_auto),
           descriptionId: 'data-language-hint',
           extra: '<div id="data-language-error" class="form-error" role="alert" hidden></div>',
           control: `<select class="form-input" id="data-language-select" aria-describedby="data-language-hint data-language-error">
-            ${dataLanguageOptions(preferences.language, preferences.language_auto)}
+            ${dataLanguageOptions(preferences.language)}
           </select>`,
         }) : ''}
       </div>
@@ -384,20 +419,27 @@ function renderPage(container, preferences, isAdmin) {
         ${settingRowHtml({
           label: t('settings.timezoneLabel'),
           labelFor: 'timezone-select',
-          description: t('settings.timezoneHint'),
+          description: timezoneHintText(preferences.timezone, preferences.timezone_effective),
           descriptionId: 'timezone-hint',
           extra: '<div id="timezone-error" class="form-error" role="alert" hidden></div>',
           control: `<select class="form-input" id="timezone-select" aria-describedby="timezone-hint timezone-error">
-            ${timeZoneOptions(preferences.timezone, preferences.timezone_effective)}
+            ${timeZoneOptions(preferences.timezone)}
           </select>`,
           attrs: { id: 'timezone-card' },
         })}
       </div>` : `
       <div class="row-carrier settings-group">
+        <!-- Dieselbe Aufteilung wie in der Auswahl der Admins: der Wert kurz,
+             die gerade geltende Zone vorn im Hinweis. Eine gesetzte Zone steht
+             selbst da - bis R21 hiess sie hier immer "Automatisch (...)", auch
+             wenn ein Admin sie ausdruecklich gewaehlt hatte. -->
         ${settingRowHtml({
           label: t('settings.timezoneTitle'),
-          description: t('settings.timezoneAdminOnly'),
-          control: `<span class="settings-setting-row__value">${esc(t('settings.timezoneAuto', { zone: preferences.timezone_effective || 'UTC' }))}</span>`,
+          description: hintWithCurrent(
+            t('settings.timezoneAdminOnly'),
+            preferences.timezone ? null : (preferences.timezone_effective || 'UTC'),
+          ),
+          control: `<span class="settings-setting-row__value">${esc(preferences.timezone ? preferences.timezone.replace(/_/g, ' ') : t('settings.timezoneAuto'))}</span>`,
           attrs: { id: 'timezone-card' },
         })}
       </div>
@@ -521,17 +563,33 @@ function syncRegionSelect(container, { mayHide = true, region = null } = {}) {
  * steht die Datensprache auf "automatisch", leitet der Server sie aus der Region
  * ab, und das Label nennt dann eine andere Sprache. Die Ableitung bleibt dabei
  * beim Server - hier wird nur der frisch gelesene Wert angezeigt, statt die
- * Regel im Client zu wiederholen.
+ * Regel im Client zu wiederholen. Die Hinweiszeile geht mit (R21).
  */
-async function refreshDataLanguageOptions(container) {
+export async function refreshDataLanguageOptions(container) {
   const select = container.querySelector('#data-language-select');
   if (!select) return;
   const preferences = await getPreferences();
   select.replaceChildren();
-  select.insertAdjacentHTML('beforeend', dataLanguageOptions(
-    preferences.language || null,
-    preferences.language_auto || 'en',
-  ));
+  select.insertAdjacentHTML('beforeend', dataLanguageOptions(preferences.language || null));
+  // Die Hinweiszeile traegt das Automatik-Ergebnis ("Gerade Englisch.") - sie
+  // geht mit, auch wenn sich nur die Ableitung geaendert hat (Regionswechsel).
+  setHint(container, 'data-language-hint', dataLanguageHintText(preferences.language || null, preferences.language_auto));
+}
+
+/**
+ * Zieht Auswahl und Hinweiszeile der Haushaltszone einer frischen Antwort nach.
+ * Zwei Wege fuehren hierher: der Wechsel in der Auswahl (PUT-Antwort) und das
+ * "Uebernehmen" im Zonen-Hinweis - der setzte die Zone bis R21, waehrend die
+ * Auswahl darunter weiter "Automatisch" zeigte. Exportiert wie
+ * `refreshDataLanguageOptions`, damit test:settings-navigation beide Wege fahren kann.
+ */
+export function refreshTimezone(container, { timezone, timezone_effective: effective } = {}) {
+  const select = container.querySelector('#timezone-select');
+  if (select) {
+    select.replaceChildren();
+    select.insertAdjacentHTML('beforeend', timeZoneOptions(timezone ?? null));
+  }
+  setHint(container, 'timezone-hint', timezoneHintText(timezone ?? null, effective));
 }
 
 /**
@@ -559,6 +617,9 @@ function mountTimezoneMismatch(container, preferences, isAdmin) {
         api: { get: (path) => api.get(path), put: (_path, patch) => savePreferences(patch) },
       });
       resetPreferencesCache();
+      // Gesetzt ist die Zone in beiden Faellen (uebernommen oder schon von
+      // jemand anderem gewaehlt) - Auswahl und Hinweiszeile zeigen sie.
+      if (result.timezone) refreshTimezone(container, { timezone: result.timezone, timezone_effective: result.timezone });
       if (result.adopted) window.yuvomi?.showToast(t('settings.timezoneSaved'), 'success');
     } : undefined,
     onError: (error) => {
@@ -755,15 +816,12 @@ function bindEvents(container, user) {
     timezoneSelect.disabled = true;
     try {
       const saved = await savePreferences({ timezone: timezoneSelect.value || null });
-      // Neu beschriften statt nur zu speichern: das Label der ersten Option
-      // nennt die Zone, die bei "Automatisch" GILT. Wer von einer gesetzten Zone
-      // auf Automatisch zurückstellt, sieht sonst weiter den alten Rückfallwert.
-      // Genommen wird die PUT-Antwort, nicht ein zweiter GET - beide Felder
-      // stehen dort, und der Server hat sie gerade frisch aufgelöst.
-      timezoneSelect.replaceChildren();
-      timezoneSelect.insertAdjacentHTML(
-        'beforeend', timeZoneOptions(saved?.data?.timezone, saved?.data?.timezone_effective)
-      );
+      // Neu beschriften statt nur zu speichern: die Hinweiszeile nennt die Zone,
+      // die bei "Automatisch" GILT. Wer von einer gesetzten Zone auf Automatisch
+      // zurückstellt, sieht sonst weiter den alten Rückfallwert. Genommen wird
+      // die PUT-Antwort, nicht ein zweiter GET - beide Felder stehen dort, und
+      // der Server hat sie gerade frisch aufgelöst.
+      refreshTimezone(container, saved?.data);
       // Die Anzeige folgt der neuen Zone sofort - dasselbe Paar aus Spiegeln und
       // Neuzeichnen wie bei Datums- und Zeitformat. Ohne das Ereignis blieben die
       // bereits gezeichneten Uhrzeiten bis zum naechsten Seitenwechsel stehen.

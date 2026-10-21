@@ -164,12 +164,48 @@ export function numberLocaleFor(prefs = {}) {
   return REGION_CODES.includes(region) ? region : '';
 }
 
-// Lokalisierter Anzeigename eines Regions-Codes (z. B. "de-DE" → "Deutsch (Deutschland)").
-// Fällt auf den Code zurück, wenn Intl.DisplayNames nicht verfügbar ist.
-export function regionLabel(code, locale) {
+// Laender, deren Voreinstellung die Sprache im Namen behaelt, obwohl es nur
+// EINE gibt: dort haengt das Format an der Sprache, nicht am Land (de-CH
+// schreibt 1'234.50, fr-CH 1 234,50). "Schweiz" allein verspraeche jedem dort
+// das deutschschweizer Format. Laender mit mehreren Voreinstellungen (Kanada,
+// Philippinen) brauchen keinen Eintrag - sie zaehlt `regionKeepsLanguage()`.
+const LANGUAGE_BOUND_COUNTRIES = ['CH'];
+
+function countryOf(code) {
+  return code.slice(code.lastIndexOf('-') + 1);
+}
+
+/**
+ * Traegt der Name dieser Region ihre Sprache? Ja, wenn das Land mehr als eine
+ * Voreinstellung hat (sonst waeren "Kanada" und "Kanada" nicht unterscheidbar)
+ * oder seine Sprache das Format bestimmt (LANGUAGE_BOUND_COUNTRIES).
+ */
+export function regionKeepsLanguage(code) {
+  const country = countryOf(code);
+  return LANGUAGE_BOUND_COUNTRIES.includes(country)
+    || REGION_CODES.filter((other) => countryOf(other) === country).length > 1;
+}
+
+/**
+ * Lokalisierter Anzeigename eines Regions-Codes: das LAND ("de-DE" →
+ * "Deutschland"), bei mehrsprachigen Regionen mit Sprache ("de-CH" →
+ * "Schweiz (Deutsch)").
+ *
+ * KURZ, WEIL DER WERT IN DER ZEILE STEHT (R21, Critique 2026-10-21): mobil hat
+ * die geschlossene Auswahl rund 180 px, und "Deutsch (Deutschland)" endete dort
+ * als "Deutsch (Deutsch…". Wer seine Region sucht, sucht sein Land - die
+ * Sprache sagt nur dort etwas, wo das Land allein es nicht tut.
+ *
+ * `withLanguage(region, language)` setzt die Langform, damit sie der Seite
+ * folgt (t('settings.regionWithLanguage')); ohne sie gilt "Land (Sprache)".
+ * Fällt auf den Code zurück, wenn Intl.DisplayNames nicht verfügbar ist.
+ */
+export function regionLabel(code, locale, withLanguage = (region, language) => `${region} (${language})`) {
   try {
-    const names = new Intl.DisplayNames([locale], { type: 'language' });
-    return names.of(code) || code;
+    const region = new Intl.DisplayNames([locale], { type: 'region' }).of(countryOf(code)) || code;
+    if (!regionKeepsLanguage(code)) return region;
+    const language = new Intl.DisplayNames([locale], { type: 'language' }).of(code.slice(0, code.indexOf('-')));
+    return language ? withLanguage(region, language) : region;
   } catch {
     return code;
   }

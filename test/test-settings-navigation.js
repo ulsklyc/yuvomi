@@ -5010,3 +5010,174 @@ test('R21 S7: Textfelder und Datumsfeld einer Einstellungsseite teilen eine Kant
   assert.match(rule.body, /inline-size:\s*min\(50cqi, var\(--layout-field-max\)\)/, 'halbe Zeile, hoechstens die Feldbreite');
   assert.match(tokens, /--layout-field-max:\s*16rem;/, 'die Feldbreite ist ein Token');
 });
+
+// R21 S9c (Critique 2026-10-21, Entscheidung Ulas: Option 3): bei 390 px waren
+// auf "Darstellung" 3 von 5 Auswahlwerten gekappt - "Automatisch (Engl…",
+// "Deutsch (Deutsch…", "Automatisch (Eur…". Die geschlossene Auswahl hat dort
+// 179 px (davon rund 22 Polster und Pfeil), und das Abgeschnittene war genau
+// das Detail, das sagt, was gilt. Jetzt ist der Wert kurz ("Automatisch",
+// "Deutschland") und das Detail steht vorn in der Hinweiszeile ("Gerade
+// Englisch."). Die R17-Zeile (zweispaltig, Bedienspalte 50cqi) bleibt, wie sie
+// ist - geloest wird es im Text, nicht im Raster.
+const APPEARANCE_PREFS = {
+  currency: 'EUR', date_format: 'dmy', time_format: '24h', region: 'de-DE',
+  language: null, language_auto: 'en', timezone: null, timezone_effective: 'Europe/Berlin',
+};
+
+/** Rendert das Blatt Darstellung mit diesen Preferences und liefert das Markup. */
+async function renderAppearance(preferences, role = 'admin') {
+  const { render } = await import('/settings/pages/personal-appearance.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const prev = { window: globalThis.window, document: globalThis.document, api: globalThis.__apiStub };
+  globalThis.window = { yuvomi: { showToast() {} }, addEventListener() {}, localStorage: { getItem: () => null, setItem() {}, removeItem() {} } };
+  globalThis.document = fakeDocument();
+  globalThis.__apiStub = { get: async () => ({ data: preferences }) };
+  resetPreferencesCache();
+  const host = sheetProbeContainer();
+  try {
+    await render(host, { user: { id: 1, role } });
+  } finally {
+    globalThis.window = prev.window;
+    globalThis.document = prev.document;
+    globalThis.__apiStub = prev.api;
+    resetPreferencesCache();
+  }
+  return stripHtmlComments(host.html);
+}
+
+const unescapeHtml = (text) => text.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+/** Text der gewaehlten Option der Auswahl `id` (das, was die geschlossene Auswahl zeigt). */
+function selectedOptionText(html, id) {
+  const select = html.match(new RegExp(`<select\\b[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</select>`));
+  assert.ok(select, `#${id} fehlt im Markup`);
+  const option = select[1].match(/<option\b[^>]*\bselected[^>]*>([^<]*)<\/option>/);
+  assert.ok(option, `#${id}: keine gewaehlte Option`);
+  return unescapeHtml(option[1]);
+}
+/** Text eines Elements per id (Hinweiszeile, Wert-Span). */
+function textById(html, id, tag = 'p') {
+  const m = html.match(new RegExp(`<${tag}\\b[^>]*\\bid="${id}"[^>]*>([^<]*)</${tag}>`));
+  assert.ok(m, `#${id} fehlt im Markup`);
+  return unescapeHtml(m[1]);
+}
+// Der Stub von t() haengt die Werte als JSON an den Schluessel: ein Wert ohne
+// Anhang ist der kurze, ein Hinweis mit Anhang traegt das Detail.
+const withValues = (key, values) => key + JSON.stringify(values);
+
+test('R21 S9c: Darstellung - der Auswahlwert ist kurz, das Detail steht vorn in der Hinweiszeile', async () => {
+  const html = await renderAppearance(APPEARANCE_PREFS);
+  assert.equal(selectedOptionText(html, 'data-language-select'), 'settings.dataLanguageAuto',
+    'der Wert sagt nur "Automatisch" - die Sprache in Klammern wurde mobil gekappt');
+  assert.equal(selectedOptionText(html, 'timezone-select'), 'settings.timezoneAuto', 'ebenso die Zone');
+  assert.equal(selectedOptionText(html, 'region-select'), new Intl.DisplayNames(['de'], { type: 'region' }).of('DE'),
+    'die Region heisst nach ihrem Land ("Deutschland", nicht "Deutsch (Deutschland)")');
+
+  const english = new Intl.DisplayNames(['de'], { type: 'language' }).of('en');
+  assert.equal(textById(html, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: english, hint: 'settings.dataLanguageHint' }),
+    'die Hinweiszeile beginnt mit der Sprache, die gerade gilt');
+  assert.equal(textById(html, 'timezone-hint'),
+    withValues('settings.hintWithCurrent', { value: 'Europe/Berlin', hint: 'settings.timezoneHint' }),
+    'und mit der Zone, die gerade gilt');
+
+  // Ausdruecklich gewaehlt: der Wert steht vollstaendig in der Auswahl, die
+  // Hinweiszeile wiederholt ihn nicht.
+  const chosen = await renderAppearance({ ...APPEARANCE_PREFS, language: 'en', timezone: 'Europe/Paris' });
+  assert.equal(selectedOptionText(chosen, 'data-language-select'), english);
+  assert.equal(selectedOptionText(chosen, 'timezone-select'), 'Paris');
+  assert.equal(textById(chosen, 'data-language-hint'), 'settings.dataLanguageHint');
+  assert.equal(textById(chosen, 'timezone-hint'), 'settings.timezoneHint');
+
+  // Ein Mitglied sieht die Zone als Wert: dieselbe Aufteilung - und eine
+  // gesetzte Zone heisst nicht mehr "Automatisch (...)".
+  const member = await renderAppearance(APPEARANCE_PREFS, 'member');
+  assert.match(member, /<span class="settings-setting-row__value">settings\.timezoneAuto<\/span>/);
+  assert.match(member, /<p class="settings-setting-row__description form-row__description">settings\.hintWithCurrent\{&quot;value&quot;:&quot;Europe\/Berlin&quot;,&quot;hint&quot;:&quot;settings\.timezoneAdminOnly&quot;\}<\/p>/);
+  const memberSet = await renderAppearance({ ...APPEARANCE_PREFS, timezone: 'America/New_York' }, 'member');
+  assert.match(memberSet, /<span class="settings-setting-row__value">America\/New York<\/span>/);
+  assert.match(memberSet, /<p class="settings-setting-row__description form-row__description">settings\.timezoneAdminOnly<\/p>/);
+});
+
+test('R21 S9c: die Hinweiszeile folgt der Auswahl und der Automatik', async () => {
+  const { refreshDataLanguageOptions, refreshTimezone } = await import('/settings/pages/personal-appearance.js');
+  const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const el = () => ({ html: '', textContent: '', replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } });
+  const nodes = { '#data-language-select': el(), '#data-language-hint': el(), '#timezone-select': el(), '#timezone-hint': el() };
+  const container = { querySelector: (sel) => nodes[sel] ?? null };
+  const prevApi = globalThis.__apiStub;
+  const names = new Intl.DisplayNames(['de'], { type: 'language' });
+  try {
+    // Regionswechsel: die Automatik ergibt jetzt Deutsch - der Wert bleibt
+    // "Automatisch", die Hinweiszeile nennt die neue Sprache.
+    globalThis.__apiStub = { get: async () => ({ data: { ...APPEARANCE_PREFS, region: 'de-CH', language_auto: 'de' } }) };
+    resetPreferencesCache();
+    await refreshDataLanguageOptions(container);
+    assert.match(nodes['#data-language-select'].html, /<option value="" selected>settings\.dataLanguageAuto<\/option>/);
+    assert.equal(nodes['#data-language-hint'].textContent,
+      withValues('settings.hintWithCurrent', { value: names.of('de'), hint: 'settings.dataLanguageHint' }));
+    // Ausdruecklich gewaehlt: der Vorsatz faellt.
+    globalThis.__apiStub = { get: async () => ({ data: { ...APPEARANCE_PREFS, language: 'en' } }) };
+    resetPreferencesCache();
+    await refreshDataLanguageOptions(container);
+    assert.equal(nodes['#data-language-hint'].textContent, 'settings.dataLanguageHint');
+
+    // Zone: gesetzt (PUT-Antwort oder "Uebernehmen") ohne Vorsatz, zurueck auf
+    // Automatisch mit der Zone, die dann gilt.
+    refreshTimezone(container, { timezone: 'Europe/Paris', timezone_effective: 'Europe/Paris' });
+    assert.match(nodes['#timezone-select'].html, /<option value="Europe\/Paris" selected>Paris<\/option>/);
+    assert.equal(nodes['#timezone-hint'].textContent, 'settings.timezoneHint');
+    refreshTimezone(container, { timezone: null, timezone_effective: 'Asia/Tokyo' });
+    assert.match(nodes['#timezone-select'].html, /<option value="" selected>settings\.timezoneAuto<\/option>/);
+    assert.equal(nodes['#timezone-hint'].textContent,
+      withValues('settings.hintWithCurrent', { value: 'Asia/Tokyo', hint: 'settings.timezoneHint' }));
+  } finally {
+    globalThis.__apiStub = prevApi;
+    resetPreferencesCache();
+  }
+  // Der echte Aufrufer: "Uebernehmen" im Zonen-Hinweis zieht Auswahl und Hinweis nach.
+  const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(page, /const result = await adoptZone\([\s\S]{0,400}if \(result\.timezone\) refreshTimezone\(container, \{ timezone: result\.timezone/,
+    'nach dem Uebernehmen zeigte die Auswahl bis R21 weiter "Automatisch"');
+  assert.match(page, /const saved = await savePreferences\(\{ timezone: timezoneSelect\.value \|\| null \}\);\s*(?:\/\/[^\n]*\n\s*)*refreshTimezone\(container, saved\?\.data\);/);
+});
+
+test('R21 S9c: in jeder Sprache ist "Automatisch" ein Wort, das in die Zeile passt, und das Detail steht vorn', async () => {
+  // 179 px Auswahl bei 390, davon rund 157 px Text bei 17 px Schrift; die
+  // breiteste gemessene Schrift (Kyrillisch) braucht rund 10 px je Zeichen.
+  const MAX_CHARS = 15;
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
+  assert.ok(files.length >= 20, 'die Locales sind da');
+  const offenders = [];
+  for (const file of files) {
+    const { settings } = JSON.parse(await readFile(new URL(file, dir), 'utf8'));
+    for (const key of ['dataLanguageAuto', 'timezoneAuto']) {
+      const value = settings[key];
+      if (/\{\{/.test(value)) offenders.push(`${file} ${key}: traegt wieder ein Detail ("${value}")`);
+      if ([...value].length > MAX_CHARS) offenders.push(`${file} ${key}: "${value}" ist laenger als ${MAX_CHARS} Zeichen`);
+    }
+    const hint = settings.hintWithCurrent ?? '';
+    const v = hint.indexOf('{{value}}');
+    const h = hint.indexOf('{{hint}}');
+    if (v < 0 || h < 0 || v > h) offenders.push(`${file} hintWithCurrent: das Detail steht nicht vor dem Hinweis ("${hint}")`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('R21 S9c: Regionen heissen nach ihrem Land, mehrsprachige mit Sprache - und keine zwei gleich', async () => {
+  const { REGION_CODES, regionLabel, regionKeepsLanguage } = await import('../public/settings/region-presets.js');
+  const keeps = REGION_CODES.filter(regionKeepsLanguage).sort();
+  assert.deepEqual(keeps, ['de-CH', 'en-CA', 'en-PH', 'fil-PH', 'fr-CA'],
+    'Laender mit mehreren Voreinstellungen und die Schweiz behalten ihre Sprache');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const locales = (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+  for (const locale of locales) {
+    const labels = REGION_CODES.map((code) => regionLabel(code, locale));
+    assert.equal(new Set(labels).size, labels.length, `${locale}: zwei Regionen heissen gleich`);
+    const country = new Intl.DisplayNames([locale], { type: 'region' }).of('DE');
+    assert.equal(regionLabel('de-DE', locale), country, `${locale}: Deutschland heisst nach dem Land`);
+  }
+  const withLanguage = (region, language) => `${region} / ${language}`;
+  assert.equal(regionLabel('de-CH', 'de', withLanguage), 'Schweiz / Deutsch', 'die Langform setzt die Seite (t())');
+  assert.equal(regionLabel('fr-CA', 'de'), 'Kanada (Französisch)');
+});

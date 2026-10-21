@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Language, region and time zone settings show their whole value on a phone.** On a narrow
+  screen the choice was cut off at the part that matters, such as "Automatic (Europe/Ber…".
+  "Automatic" now stands alone, and the hint below starts with what it means right now
+  ("Currently English.", "Currently Europe/Berlin."), updating when you change the choice or the
+  region. Regions are named after their country ("Germany"); Canada, the Philippines and
+  Switzerland keep their language ("Canada (French)"), since there the language sets the format.
+  Members who see the household time zone see a chosen zone by its name instead of "Automatic".
+
 - **The loading screen sketches the overview you are about to see.** While the app starts, it now
   shows the greeting, the "Today" heading and one tall card where the day's program will appear
   (with the tile row below on larger screens) instead of three generic cards.
