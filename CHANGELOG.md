@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The budget plan starts with your categories.** On a phone the plan opened with the card
+  asking you to set a savings goal; the category budgets started below it. Without a goal that
+  card now comes after the categories; a goal you set still leads.
+
 - **The cycle page keeps its pieces together.** On a phone the legend of the cycle ring now
   sits right under the ring instead of below the today card and four tiles. On wider screens
   the "Day 7" marker on the ring no longer lies on the tile next to it, and the header of each

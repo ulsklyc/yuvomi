@@ -103,7 +103,12 @@ function renderBody(body) {
       <p class="budget-plan__historic-note">
         <i data-lucide="info" class="icon-md" aria-hidden="true"></i>${t('budget.planHistoricNote')}
       </p>`}
-    ${renderSavingsCard(d.savings)}
+    ${/* DER PLAN BEGINNT MIT DEM PLAN (R21 S7, Critique a4). Ohne Sparziel
+          stand mobil zuerst die Aufforderung, eines zu setzen - eine 117px-
+          Karte vor dem ersten Kategorie-Budget. Ein gesetztes Ziel ist Zustand
+          und steht vorn; die Aufforderung steht hinter den Kategorien. Breit
+          setzt das Raster sie ohnehin in die Seitenspalte (`dense`). */ ''}
+    ${d.savings ? renderSavingsCard(d.savings) : ''}
     <div class="budget-plan__section">
       <!-- KEIN ZWEITES „+ BUDGET FESTLEGEN" IM KOERPER (Re-Critique
            2026-09-27, A5 / R10 L11): der Budget-FAB nennt auf diesem Reiter
@@ -114,6 +119,7 @@ function renderBody(body) {
       </div>
       <div id="budget-plan-rows" class="row-carrier">${renderRows(d.plans)}</div>
     </div>
+    ${d.savings ? '' : renderSavingsCard(d.savings)}
   `);
   if (window.lucide) lucide.createIcons({ el: body });
   wire(body);

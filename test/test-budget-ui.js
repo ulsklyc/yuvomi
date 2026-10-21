@@ -7283,3 +7283,18 @@ test('D8: eine Schuld in der Aufteilung ist Textfarbe', () => {
   assert.doesNotMatch(src, /owing\.length \? ' metric-card--negative'/, 'die Schuld-Karte traegt kein Rot');
   assert.doesNotMatch(src, /tone: owing\.length \? 'negative'/, 'die Kurzzeile traegt kein Rot');
 });
+
+// R21 S7 (Critique a4): der Plan begann mobil mit der 117px-Aufforderung
+// "Sparziel festlegen" vor dem ersten Kategorie-Budget (y 266 statt 129). Ein
+// gesetztes Ziel ist Zustand und steht vorn; die Aufforderung hinter den
+// Kategorien. Breit setzt das Raster sie in die Seitenspalte (`dense`).
+test('R21 S7: der Plan beginnt mit den Kategorien, die Sparziel-Aufforderung steht dahinter', () => {
+  const body = plans.slice(plans.indexOf('function renderBody('), plans.indexOf('function renderSavingsCard('));
+  const goal = body.indexOf("${d.savings ? renderSavingsCard(d.savings) : ''}");
+  const section = body.indexOf('<div class="budget-plan__section">');
+  const prompt = body.indexOf("${d.savings ? '' : renderSavingsCard(d.savings)}");
+  assert.ok(goal >= 0 && goal < section, 'ein gesetztes Sparziel steht vor den Kategorien');
+  assert.ok(prompt > body.indexOf('id="budget-plan-rows"'), 'die Aufforderung steht hinter den Kategorien');
+  const dense = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '#budget-plan-body' && /grid-auto-flow:\s*row dense/.test(r.body));
+  assert.ok(dense, 'breit fuellt das Raster die Seitenspalte trotzdem von oben');
+});
