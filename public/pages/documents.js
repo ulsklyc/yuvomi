@@ -4027,6 +4027,7 @@ function openDocumentViewer(doc) {
         if (opener?.isConnected && opener !== document.body) opener.focus();
         openDocumentModal(doc);
       });
+      wireViewerStage(panel);
       // PDFs ohne nativen Inline-Viewer (mobile Browser): mit pdf.js auf Canvas rendern
       if (previewKind(doc.mime_type) === 'pdf' && !canRenderPdfNatively()) {
         const container = panel.querySelector('[data-pdf-pages]');
@@ -4093,6 +4094,39 @@ function openDocumentViewer(doc) {
 
 const PDF_EMBED_FRAGMENT = '#toolbar=0&navpanes=0&view=Fit&zoom=page-fit';
 
+/**
+ * Das Poster des Betrachters: die Vorschau, die die Kachel schon gerastert hat
+ * (data:-URL aus dem Seitenspeicher, nie ein Abruf). `null`, wenn es keine gibt -
+ * dann steht nur das Ladezeichen da.
+ */
+function viewerPoster(doc) {
+  const url = _thumbs?.peek(doc);
+  return typeof url === 'string' && url.startsWith('data:image/') ? url : null;
+}
+
+/** Ladezeichen ueber der Buehne; die Ansage liest der Screenreader. */
+function viewerStageStatusHtml() {
+  return `<span class="document-viewer__stage-status" role="status">
+      <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
+      <span class="sr-only">${t('common.loading')}</span>
+    </span>`;
+}
+
+/**
+ * Sobald das Bild da ist (oder scheitert), geht die Buehne aus dem Ladezustand:
+ * das Bild blendet ueber das Poster, Poster und Ladezeichen treten zurueck.
+ * Ein Bild aus dem Cache ist beim Verdrahten schon `complete`.
+ */
+function wireViewerStage(panel) {
+  const stage = panel.querySelector('.document-viewer__stage[data-stage-loading]');
+  const img = stage?.querySelector('img.document-viewer__image:not(.document-viewer__poster)');
+  if (!stage || !img) return;
+  const done = () => stage.removeAttribute('data-stage-loading');
+  if (img.complete && img.naturalWidth > 0) { done(); return; }
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}
+
 function renderViewerContent(doc, previewUrl, downloadUrl) {
   const kind = previewKind(doc.mime_type);
   if (kind === 'pdf') {
@@ -4122,21 +4156,37 @@ function renderViewerContent(doc, previewUrl, downloadUrl) {
     // Ehrliche Semantik: der Canvas-Render ist grafisch (keine Textebene) -> ein sr-only-Hinweis
     // verweist auf den vorlesbaren Weg (Meta-Leiste: "In neuem Tab öffnen"/Download), die
     // Seiten-Canvases selbst sind aria-hidden. data-pdf-live kündigt Ladeende/Fehler an.
+    // Die erste Seite steht als Poster da, bis pdf.js sie gezeichnet hat (wie beim Bild).
+    const pdfPoster = viewerPoster(doc);
     return `<div class="document-viewer__pdf-pages" data-pdf-pages tabindex="0" role="region" aria-label="${esc(doc.name)}">
       <p class="sr-only" data-pdf-note>${t('documents.viewerPdfA11yNote')}</p>
       <span class="sr-only" role="status" aria-live="polite" data-pdf-live></span>
       <div class="document-viewer__pdf-indicator" data-pdf-indicator aria-hidden="true" hidden></div>
       <div class="document-viewer__pdf-content" data-pdf-content>
-        <div class="document-viewer__loading" role="status">
-          <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
-          <span data-pdf-loading-text>${t('documents.viewerPdfLoading')}</span>
+        <div class="document-viewer__stage document-viewer__stage--page${pdfPoster ? ' document-viewer__stage--poster' : ''}" data-stage-loading>
+          ${pdfPoster ? `<img class="document-viewer__poster document-viewer__poster--page" src="${esc(pdfPoster)}" alt="" aria-hidden="true">` : ''}
+          <div class="document-viewer__loading" role="status">
+            <i data-lucide="loader-circle" class="document-viewer__spinner" aria-hidden="true"></i>
+            <span data-pdf-loading-text>${t('documents.viewerPdfLoading')}</span>
+          </div>
         </div>
       </div>
     </div>`;
   }
   if (kind === 'image') {
-    return `<img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}"`
-      + ` loading="lazy">`;
+    // DIE BUEHNE IST NIE LEER (Critique R21, a4): mobil stand der Betrachter
+    // 300-400 ms ohne Bild und ohne Ladezeichen da, bis die volle Datei kam.
+    // Die Kachel hat ihre Vorschau schon gerastert (utils/document-thumbs.js,
+    // nur im Seitenspeicher) - sie steht als Poster in derselben Zelle, das
+    // Ladezeichen darueber, und das Bild blendet darueber, sobald es da ist
+    // (wireViewerStage). Ohne Lazy-Laden: im offenen Dialog ist das Bild
+    // immer im Blick, und das Lazy-Attribut wartete dafuer erst ein Layout ab.
+    const poster = viewerPoster(doc);
+    return `<div class="document-viewer__stage" data-stage-loading>
+        ${poster ? `<img class="document-viewer__image document-viewer__poster" src="${esc(poster)}" alt="" aria-hidden="true">` : ''}
+        <img class="document-viewer__image" src="${previewUrl}" alt="${esc(doc.name)}" decoding="async">
+        ${viewerStageStatusHtml()}
+      </div>`;
   }
   if (kind === 'text') {
     // Inhalt wird asynchron in onSave geladen; Platzhalter anzeigen
@@ -4345,12 +4395,16 @@ function renderPdfPages(container, previewUrl, doc, downloadUrl) {
       const visible = new Set();
       const order = [];
 
+      // Das Poster der ersten Seite zieht in ihren Platzhalter um und bleibt,
+      // bis die Seite gezeichnet ist (renderPage ersetzt den Inhalt).
+      const poster = content.querySelector('.document-viewer__poster--page');
       content.replaceChildren();
       for (let n = 1; n <= pdf.numPages; n += 1) {
         const wrap = document.createElement('div');
         wrap.className = 'document-viewer__pdf-page';
         wrap.dataset.page = String(n);
         wrap.style.aspectRatio = String(defaultRatio);
+        if (n === 1 && poster) wrap.appendChild(poster);
         // Rein grafisch (kein Textlayer) -> aria-hidden; die vorlesbare Alternative liegt im
         // sr-only-Hinweis + Meta-Leiste. Der sichtbare Seitenindikator übernimmt "n von total".
         wrap.setAttribute('aria-hidden', 'true');

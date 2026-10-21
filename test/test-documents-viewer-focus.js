@@ -168,3 +168,39 @@ test('beim Schliessen haengt nichts mehr an Fenster und Dokument', async () => {
   );
   assert.equal(await v.frameTakesFocus(), v.frame, 'ein geschlossener Betrachter fasst den Fokus nicht mehr an');
 });
+
+/**
+ * DIE BUEHNE IST NIE LEER (Critique R21, a4). Mobil stand der Betrachter
+ * 300-400 ms ohne Bild und ohne Ladezeichen da, bis die volle Datei kam. Jetzt
+ * steht das Bild auf einer Buehne mit Ladezeichen (und dem Poster der Kachel,
+ * wenn es eines gibt); sobald das Bild da ist oder scheitert, geht sie aus dem
+ * Ladezustand. Gemessen am Aufrufer: Betrachter ueber seinen Einstieg, das
+ * Verdrahten ueber `onSave`.
+ */
+test('R21 S8: das Bild steht auf einer Buehne mit Ladezeichen, die mit dem Bild ihren Ladezustand verlaesst', () => {
+  const IMG = { ...PDF, id: 4, name: 'Impfpass', original_name: 'impfpass.jpg', mime_type: 'image/jpeg' };
+  for (const outcome of ['load', 'error']) {
+    let options = null;
+    const previous = globalThis.__openModal;
+    globalThis.__openModal = (opts) => { options = opts; };
+    try { documentsPage.openDocumentViewer(IMG); } finally { globalThis.__openModal = previous; }
+    assert.match(options.content, /<div class="document-viewer__stage" data-stage-loading>/, 'ohne Buehne steht bis zum Bild eine leere Flaeche');
+    assert.match(options.content, /<span class="document-viewer__stage-status" role="status">/, 'ohne Ladezeichen sieht das Warten aus wie ein Fehler');
+    assert.doesNotMatch(options.content, /loading="lazy"/, 'im offenen Dialog wartete lazy erst ein Layout ab');
+
+    const attrs = new Set(['data-stage-loading']);
+    const img = element('img', { complete: false, naturalWidth: 0 });
+    const stage = element('stage', {
+      removeAttribute: (a) => { attrs.delete(a); },
+      querySelector: (sel) => (sel.startsWith('img.document-viewer__image') ? img : null),
+    });
+    const panel = element('panel', {
+      querySelector: (sel) => (sel === '.document-viewer__stage[data-stage-loading]' ? stage : null),
+    });
+    options.onSave(panel);
+    assert.ok(attrs.has('data-stage-loading'), 'die Buehne gab den Ladezustand vor dem Bild auf');
+    img.fire(outcome);
+    assert.equal(attrs.has('data-stage-loading'), false, `nach ${outcome} blieben Poster und Ladezeichen stehen`);
+    options.onClose?.();
+  }
+});

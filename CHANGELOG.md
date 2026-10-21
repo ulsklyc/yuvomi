@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a four times slower processor, the screen answered after 104-176 ms; now the page dims
   after about 70 ms and the sheet follows a frame later.
 
+- **A document preview never opens on an empty stage.** On a phone the viewer showed nothing
+  and no sign of loading until the file had arrived. It now shows a loading indicator right away,
+  on top of the card's thumbnail when the card has one (grid view), and the full image fades in
+  over it; a PDF from a card shows its first page the same way until it is drawn.
+
 - **Long lists only do the work for what is on screen.** The agenda, the pantry, the inventory,
   the budget's entries and the shopping list on a phone now skip days, groups and rows below the
   screen until you scroll near them, as tasks, contacts and recipes already did. Opening a dialog

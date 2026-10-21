@@ -1732,6 +1732,62 @@
   box-shadow: var(--glass-shadow-md);
 }
 
+/* DIE BUEHNE IST NIE LEER (Critique R21, a4: mobil 300-400 ms ohne Bild und
+ * ohne Ladezeichen). Poster (die Vorschau der Kachel, documents.js
+ * `viewerPoster`), Bild und Ladezeichen teilen EINE Rasterzelle: das Poster
+ * steht sofort da und hat das Seitenverhaeltnis des Bildes, also auch seine
+ * Groesse - das Bild blendet darueber, ohne dass etwas springt. Danach tritt
+ * das Poster zurueck (Deckkraft, damit ein Bild mit Transparenz es nicht
+ * durchscheinen laesst). */
+.document-viewer__stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.document-viewer__stage > * {
+  grid-area: 1 / 1;
+}
+
+.document-viewer__stage > .document-viewer__image,
+.document-viewer__stage > .document-viewer__poster {
+  transition: opacity var(--duration-sm) var(--ease-out);
+}
+
+.document-viewer__stage[data-stage-loading] > .document-viewer__image:not(.document-viewer__poster),
+.document-viewer__stage:not([data-stage-loading]) > .document-viewer__poster {
+  opacity: 0;
+}
+
+.document-viewer__stage:not([data-stage-loading]) > .document-viewer__stage-status {
+  display: none;
+}
+
+.document-viewer__stage-status {
+  display: inline-flex;
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* Die erste PDF-Seite als Poster: so breit wie die Seite, die pdf.js gleich
+ * an ihre Stelle zeichnet (`.document-viewer__pdf-canvas`). Mit Poster liegt
+ * das Ladezeichen in seiner Kapsel darueber; ohne bleibt es, wie es war. */
+.document-viewer__poster--page {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.document-viewer__stage--poster > .document-viewer__loading {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
 .document-viewer__pdf {
   width: 100%;
   height: 65vh;

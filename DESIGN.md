@@ -1304,6 +1304,15 @@ das Verhaeltnis haelt.
   Tipp, Tafel 135 -> 159 ms (ein Frame spaeter, dafuer ohne Luecke in der Feder). Gestuft nur fuer
   Aufrufer, die nach `openModal()` nicht synchron ins Formular greifen; wer ein offenes Modal
   abloest (Leseansicht -> Bearbeiten), fuellt sofort. Guard: `test:modal-dialog`.
+- **Die Dokumentvorschau ist nie eine leere Buehne (R21 S8):** der Betrachter stellt die Vorschau,
+  die die Kachel schon gerastert hat (data:-URL nur im Seitenspeicher,
+  `utils/document-thumbs.js`), als Poster in dieselbe Rasterzelle wie das Bild, darueber ein
+  Ladezeichen in seiner Kapsel; das Bild blendet darueber (`--duration-sm`), sobald es da ist oder
+  scheitert, und das Poster tritt zurueck (Deckkraft, damit ein Bild mit Transparenz es nicht
+  durchscheinen laesst). Gleiches Seitenverhaeltnis, also gleiche Groesse - nichts springt. Am
+  Telefon zieht das Poster beim PDF in den Platz der ersten Seite, bis pdf.js sie gezeichnet hat.
+  Ohne Kachel-Vorschau steht nur das Ladezeichen. Guards: `test:documents-ux`,
+  `test:documents-viewer-focus`.
 - **Menue-Ausgang:** Popover-Menues (`.popover-menu`, Dokument-Kontextmenue) blenden aus und
   nehmen die 4 % Wachstum zurueck (`overlay`/`display` diskret, `--duration-xs` gegen
   `--duration-md` der Einfahrt). Zwei `transition`-Deklarationen, die erste ohne

@@ -2063,3 +2063,38 @@ test('R21 S7: die Vorschau der Rasterkarte hat einen quadratischen Rahmen, das B
   const img = rules.find((r) => r.selector.trim() === '.document-thumb__img' && !r.at.length);
   assert.match(img?.body ?? '', /object-fit:\s*contain/, 'das Blatt wird nicht beschnitten');
 });
+
+
+// --------------------------------------------------------
+// R21 S8 (Critique a4): die Vorschau zeigt sofort das Poster der Kachel
+
+test('R21 S8: der Betrachter zeigt sofort das Poster der Kachel und ein Ladezeichen, nie eine leere Buehne', () => {
+  const content = fnBody('renderViewerContent', 'renderViewerFallback');
+  const image = content.slice(content.indexOf("if (kind === 'image')"), content.indexOf("if (kind === 'text')"));
+  assert.match(image, /const poster = viewerPoster\(doc\);/, 'das Bild nimmt das Poster der Kachel');
+  assert.match(image, /class="document-viewer__stage" data-stage-loading/);
+  assert.match(image, /class="document-viewer__image document-viewer__poster" src="\$\{esc\(poster\)\}" alt="" aria-hidden="true"/,
+    'das Poster traegt die Masse des Bildes (dieselbe Klasse) und schweigt fuer den Screenreader');
+  assert.match(image, /\$\{viewerStageStatusHtml\(\)\}/);
+  assert.doesNotMatch(image, /loading="lazy"/);
+  // Das Poster kommt aus dem Seitenspeicher der Kacheln, nie aus einem Abruf.
+  const poster = fnBody('viewerPoster', 'viewerStageStatusHtml');
+  assert.match(poster, /_thumbs\?\.peek\(doc\)/);
+  assert.match(poster, /startsWith\('data:image\/'\)/, 'nur ein gerastertes Bild (data:-URL) ist ein Poster');
+  // Das PDF am Telefon zeigt seine erste Seite, bis pdf.js sie gezeichnet hat.
+  const pdf = content.slice(content.indexOf('const pdfPoster = viewerPoster(doc);'), content.indexOf("if (kind === 'image')"));
+  assert.match(pdf, /document-viewer__poster document-viewer__poster--page/);
+  const pages = page.slice(page.indexOf('function renderPdfPages('));
+  assert.match(pages, /const poster = content\.querySelector\('\.document-viewer__poster--page'\);/);
+  assert.match(pages, /if \(n === 1 && poster\) wrap\.appendChild\(poster\);/, 'das Poster zieht in den Platz der ersten Seite');
+  // Die Buehne ist eine Zelle: Poster, Bild und Ladezeichen liegen uebereinander.
+  const rules = [...eachRule(css)];
+  const cell = rules.find((r) => r.selector.trim() === '.document-viewer__stage > *');
+  assert.match(cell?.body ?? '', /grid-area:\s*1 \/ 1/);
+  const hide = rules.find((r) => r.selector.includes('.document-viewer__stage[data-stage-loading] > .document-viewer__image:not(.document-viewer__poster)'));
+  assert.match(hide?.body ?? '', /opacity:\s*0/, 'das noch leere Bild deckte das Poster zu');
+  assert.ok(hide.selector.includes('.document-viewer__stage:not([data-stage-loading]) > .document-viewer__poster'),
+    'nach dem Laden tritt das Poster zurueck (ein Bild mit Transparenz liesse es sonst durchscheinen)');
+  const status = rules.find((r) => r.selector.trim() === '.document-viewer__stage:not([data-stage-loading]) > .document-viewer__stage-status');
+  assert.match(status?.body ?? '', /display:\s*none/);
+});
