@@ -193,10 +193,6 @@
   transform-origin: 0 0;
 }
 
-.seg-indicator[hidden] {
-  display: none;
-}
-
 .has-seg-indicator [data-seg-active][data-seg-active] {
   background-color: transparent;
   box-shadow: none;
@@ -252,15 +248,6 @@
   /* Ohne sie springt die Leiste bei jeder Änderung seitlich. */
   font-variant-numeric: tabular-nums;
   line-height: var(--line-height-tight);
-}
-
-/* `display: inline-flex` schlägt das UA-`[hidden] { display: none }` bei gleicher
- * Spezifität - der aktive Tab trug dadurch ein 16 × 0px breites totes Innenmaß
- * (Tab „Mahlzeiten" 137.9px aktiv gegen 143.3px mit Badge, gemessen). Fünfte
- * Fundstelle derselben Falle in diesem Repo; die geteilte Durchsetzungsliste in
- * layout.css greift hier nicht, weil sie nur App-Shell-Komponenten führt. */
-.sub-tab__badge[hidden] {
-  display: none;
 }
 
 /* NEUTRAL, NICHT ZWEIMAL IM MODULTON.

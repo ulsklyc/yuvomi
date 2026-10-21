@@ -309,5 +309,6 @@ test('R16: die Leiste laeuft einzeilig und scrollt, statt umzubrechen', async ()
   assert.match(rule, /overflow-x:\s*auto/);
   assert.doesNotMatch(css, /flex-wrap:\s*wrap/, 'kein Umbruch: dreireihig waren es 162px vor dem Textfeld');
   // `display` an einem per `hidden` geschalteten Element schluege das UA-[hidden].
-  assert.match(css, /\.md-toolbar\[hidden\]\s*\{\s*display:\s*none/, 'verborgen heisst verborgen, trotz display: flex');
+  // Seit R21 S9a haelt das die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok((await import('../test/css-rules.js')).globalHiddenRule(), 'verborgen heisst verborgen, trotz display: flex');
 });

@@ -82,10 +82,6 @@
   text-decoration: none;
 }
 
-.health-toolbar__back[hidden] {
-  display: none;
-}
-
 /* DIE PERSONENWAHL TEILT DIE ZEILE DES RUECKWEGS (R14 P3, A8 P3-3). Auf
  * jeder Bereichsseite kostete sie eine eigene Zeile vor der ersten Karte
  * (y122-170 bei 390x844). Jetzt steht sie rechts neben „‹ Gesundheit" wie
@@ -451,10 +447,6 @@
   gap: var(--space-4);
   min-width: 0;
   padding-inline: var(--page-inline-pad);
-}
-
-.health-panel[hidden] {
-  display: none;
 }
 
 /* Ein neuer Bereich blendet ein: seit R16 ueber swapContent()
@@ -3750,19 +3742,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 /* display erst wenn sichtbar - sonst überschreibt der Flex das UA-[hidden]. */
 .cycle-bulk__confirm:not([hidden]) { display: flex; }
-/* [hidden] durchsetzen: `.form-field` (layout.css) setzt `display: flex` mit
- * derselben Spezifitaet wie das UA-`[hidden] { display: none }` und gewinnt
- * als spaeter geladene Regel - betraf schon das Entbindungstermin-Feld
- * (#cs-due-field, unveraendert sichtbar geblieben, obwohl der Schwanger-
- * schafts-Modus aus war) und beim Bau der Partner-Erinnerung neu dazu-
- * gekommene #cs-notify-partner-days-field genauso. Gleiches Muster wie
- * .inventory-filters[hidden]/.tasks-filters-row[hidden] in ihren jeweiligen
- * Modulen - hier lokal auf die beiden betroffenen Felder begrenzt, statt
- * layout.css global anzufassen. */
-#cs-due-field[hidden],
-#cs-notify-partner-days-field[hidden] {
-  display: none;
-}
 .cycle-bulk__question { color: var(--color-text-primary); }
 /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
  * (layout.css, #872). */
@@ -3974,7 +3953,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero--idle .fasting-clock-switch { display: none; }
 .fasting-hero--idle .u-section-title { margin-block-end: var(--space-3); }
 .fasting-history-more { display: grid; justify-items: center; gap: var(--space-2); padding-block-start: var(--space-3); }
-.fasting-history-more [hidden] { display: none; }
 .fasting-card__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-3); flex-wrap: wrap; }
 .fasting-card__heading .u-section-title { margin: 0; }
 .fasting-history { list-style: none; margin: 0; padding: 0; }

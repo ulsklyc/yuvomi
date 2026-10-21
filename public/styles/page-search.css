@@ -159,8 +159,6 @@
   color: var(--color-text-primary);
 }
 
-.page-search__clear[hidden] { display: none; }
-
 /* --------------------------------------------------------
  * EINE BREITE, EINE STELLE (Re-Critique 2026-09-27, A8 P3-2 / A1 P2-5)
  *

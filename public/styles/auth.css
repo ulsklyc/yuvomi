@@ -250,12 +250,6 @@
   color: var(--color-warning);
 }
 
-/* Das display:flex oben überschreibt sonst das UA-display:none des
- * hidden-Attributs – Hinweis würde permanent sichtbar sein. */
-.auth-capslock[hidden] {
-  display: none;
-}
-
 /* Nach falschen Zugangsdaten wird der Recovery-Link betont, damit der Nutzer
  * einen Ausweg sieht statt es blind erneut zu versuchen. */
 .auth-form__forgot--emphasis a {

@@ -56,10 +56,6 @@
   padding-top: 0;
 }
 
-.pantry-filters[hidden] {
-  display: none;
-}
-
 /* Die Sammelaktions-Leiste („Alles auf die Einkaufsliste", sobald der
  * Fast-leer-Filter aktiv ist) braucht in dieser Seite keinen Träger mehr: sie
  * ist seit Etappe 5 die Pille der unteren Shell-Zone (.list-bulkbar in

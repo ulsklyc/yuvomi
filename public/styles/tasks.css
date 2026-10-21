@@ -118,13 +118,6 @@
  * Kopf (Re-Critique 2026-09-27, D4). Hier standen `max-width: 320px` und ab
  * 1024px `flex-basis: 0` - beides lief seit der Shell-Regel ins Leere. */
 
-/* Sichtbarkeit wird per [hidden] geschaltet (der Verlauf blendet Suche und
- * Filterknopf aus). Ohne diese Regel gewinnt display:flex/inline-flex der
- * Komponente gegen das Attribut. */
-.tasks-toolbar [hidden] {
-  display: none;
-}
-
 @media (max-width: 639px) {
   /* Kompakter Kopf (Finish-Review Fundament-Phase): die Toolbar schob die
    * erste Aufgabe unter die Falz. Eine Stufe weniger Vertikalraum je Naht. */
@@ -1506,15 +1499,6 @@
   transition: background-color var(--transition-fast);
 }
 
-/* `hidden` ALLEIN REICHT HIER NICHT, und das ist keine Vorsichtsmassnahme: die
- * Regel darueber setzt `display: flex`, und eine Klassenregel sticht das
- * `[hidden] { display: none }` des Browsers. Ohne diese Zeile traegt eine
- * zugeklappte Spalte ihr Attribut und bleibt trotzdem stehen - sichtbar, voll,
- * und fuer Screenreader zugleich als versteckt ausgewiesen. */
-.kanban-col__body[hidden] {
-  display: none;
-}
-
 .kanban-card {
   background-color: var(--color-surface);
   border-radius: var(--radius-sm);
@@ -1990,12 +1974,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-
-/* Loeschen blendet den Kommentar per `hidden` aus, solange der Rueckgaengig-Toast
- * steht - `display: flex` hielt ihn dabei sichtbar (#1340). */
-.task-comment[hidden] {
-  display: none;
 }
 
 .task-comment + .task-comment {

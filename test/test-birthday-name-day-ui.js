@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
+import { globalHiddenRule } from './css-rules.js';
 
 const birthdays = await import('../public/pages/birthdays.js');
 const { __test: calendar } = await import('../public/pages/calendar.js');
@@ -157,8 +158,9 @@ test('the remove-photo button exists only while there is a photo', () => {
   assert.match(renderPreview, /removePhoto\.hidden = !photoData/, 'follows the photo state after crop and removal');
   const onRemove = modal.slice(modal.indexOf("removePhoto.addEventListener('click'"));
   assert.match(onRemove.slice(0, 400), /photoEdit\?*\.focus\(\)/, 'removing hides the focused button - focus moves to the edit button');
-  const css = readFileSync(new URL('../public/styles/birthdays.css', import.meta.url), 'utf8');
-  assert.match(css, /\.birthday-modal__photo-action\[hidden\]\s*\{\s*display:\s*none;?\s*\}/, 'display: inline-flex would beat the UA [hidden]');
+  // display: inline-flex would beat the UA [hidden] - since R21 S9a the one
+  // global rule in reset.css (D13) holds it, not one rule per class.
+  assert.ok(globalHiddenRule(), 'display: inline-flex would beat the UA [hidden]');
 });
 
 // ── R10 L5: Geburtstage als Liste + Detail ────────────────────────────────

@@ -495,10 +495,6 @@
   font-size: var(--text-sm);
 }
 
-.split-groups-total[hidden] {
-  display: none;
-}
-
 .split-groups-total__label {
   flex-basis: 100%;
   font-weight: var(--font-weight-medium);
@@ -810,11 +806,6 @@ button.split-expense:hover {
   grid-template-columns: minmax(0, 1fr) minmax(96px, 140px);
   align-items: center;
   gap: var(--space-2);
-}
-
-.split-split-value[hidden],
-.split-default-value[hidden] {
-  display: none;
 }
 
 .split-empty-inline {

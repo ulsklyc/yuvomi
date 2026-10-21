@@ -404,12 +404,6 @@
   cursor: pointer;
 }
 
-/* `display: inline-flex` schlaegt das UA-`[hidden]` - ohne diese Regel stand
- * "Bild entfernen" auch ohne Bild da. */
-.birthday-modal__photo-action[hidden] {
-  display: none;
-}
-
 .birthday-modal__photo-action:hover {
   background: var(--color-surface-hover);
 }

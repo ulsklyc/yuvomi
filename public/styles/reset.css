@@ -92,13 +92,6 @@ img, svg, video {
   max-width: 100%;
 }
 
-/* `display: block` oben ist eine Autorenregel und schlaegt das UA-`[hidden]` -
- * jedes `<img hidden>` der App stand damit sichtbar da, etwa das noch nicht
- * geladene Dokument-Thumbnail ueber seinem Glyph (#1340, test:hidden-cascade). */
-img[hidden], svg[hidden], video[hidden] {
-  display: none;
-}
-
 /* `hidden` HEISST WEG - UEBERALL (D13, Critique R21).
  *
  * Das UA-Blatt traegt `[hidden] { display: none }` auf der untersten Ebene,
@@ -114,9 +107,10 @@ img[hidden], svg[hidden], video[hidden] {
  * schlagen koennte - ein `display` ungleich `none` mit `!important` - verbietet
  * test:hidden-cascade. Ausgenommen ist `hidden="until-found"`: das Element
  * bleibt fuer die Seitensuche im Fluss (content-visibility), dafuer ist es da.
- * Die einzelnen Rettungsregeln in den Modulblaettern sind seitdem doppelt,
- * stoeren aber nicht; die mit `!important` sind gegangen (Sperrklinke in
- * test:frontend-audit). */
+ * Die einzelnen Rettungsregeln der Modulblaetter (55, dazu die fuer img, svg
+ * und video) sind seit R21 S9a entfernt - sie doppelten diese Regel nur; eine
+ * neue haelt test:hidden-cascade auf, die mit `!important` die Sperrklinke in
+ * test:frontend-audit. */
 [hidden]:not([hidden="until-found"]) {
   display: none !important;
 }

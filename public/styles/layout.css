@@ -3782,10 +3782,6 @@ html.fab-steady .page-fab {
   padding: var(--space-8) var(--space-6);
 }
 
-.split-view__selection[hidden] {
-  display: none;
-}
-
 .selection-pane {
   display: flex;
   flex-direction: column;
@@ -3863,11 +3859,6 @@ html.fab-steady .page-fab {
   align-items: center;
   justify-content: center;
   padding: var(--space-8) var(--space-6);
-}
-
-.split-view__empty[hidden],
-.split-view__detail-body[hidden] {
-  display: none;
 }
 
 .split-view__detail-body {
@@ -5304,14 +5295,9 @@ html.fab-steady .page-fab {
  * Geteilt von Geburtstagen und Kontakten, deshalb hier und nicht im
  * Seiten-Stylesheet: der Router laedt je Route genau eines. "Jahr unbekannt"
  * tauscht den Datumswaehler gegen Monat und Tag - dieselbe Aufteilung wie der
- * Namenstag (`.birthday-name-day__controls`). `[hidden]` steht ausdruecklich
- * da: `yuvomi-datepicker { display: block }` schlaegt das UA-`[hidden]`.
+ * Namenstag (`.birthday-name-day__controls`). Das Ausblenden des jeweils
+ * anderen Teils traegt die globale `[hidden]`-Regel (reset.css, D13).
  * -------------------------------------------------------- */
-.birth-date-field yuvomi-datepicker[hidden],
-.birth-date-field__yearless[hidden] {
-  display: none;
-}
-
 .birth-date-field__yearless {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(88px, 0.55fr);
@@ -5429,14 +5415,6 @@ html.fab-steady .page-fab {
    * Trennung durch Abstand, nicht als isolierte Ziele in einer Zeile. */
   min-height: var(--target-md);
   transition: background-color var(--transition-fast);
-}
-
-/* `display: flex` oben schlaegt das UA-`[hidden]`. Menues blenden Eintraege
- * nach Zustand aus (Aufgaben: Ablegen und Tags nur waehrend der Auswahl;
- * Dokumente: „Alle auswaehlen" und Archivieren, R11 H4) - ohne diese Regel
- * standen sie immer da. */
-.popover-menu__item[hidden] {
-  display: none;
 }
 
 @media (hover: none) {
@@ -5606,10 +5584,6 @@ a.popover-menu__item {
  * Text liest sich als Fussnote, nicht als Zustand. */
 .page-filter-btn--labeled .page-filter-btn__count {
   position: static;
-}
-
-.page-filter-btn__count[hidden] {
-  display: none;
 }
 
 .filter-sheet__group + .filter-sheet__group {
@@ -7132,11 +7106,6 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 
 .form-pair--wide {
   --form-pair-min: 11rem;
-}
-
-/* `hidden` verliert gegen `display: grid` (Kilometerstand im Inventar). */
-.form-pair[hidden] {
-  display: none;
 }
 
 /* Gleich hohe Karten/Boxen in Modal-Grids */
@@ -10128,12 +10097,6 @@ html:has(.app-page.is-selecting) {
   border-radius: var(--radius-sm);
 }
 
-/* Progressive Disclosure: bei „keine Wiederholung" trägt das Element das
- * hidden-Attribut — display:flex oben darf es nicht überstimmen. */
-.rrule-details[hidden] {
-  display: none;
-}
-
 .rrule-row {
   display: flex;
   align-items: flex-end;
@@ -10672,10 +10635,6 @@ html:has(.app-page.is-selecting) {
   font-weight: var(--font-weight-medium);
   border-bottom: 1px solid color-mix(in srgb, var(--color-warning) var(--tint-hint), transparent);
   animation: offline-banner-in var(--duration-md) var(--ease-out);
-}
-
-.offline-banner[hidden] {
-  display: none;
 }
 
 /* AM DESKTOP UEBER DEM INHALT, NICHT UEBER DER SEITENLEISTE (Re-Critique

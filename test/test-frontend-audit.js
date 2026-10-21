@@ -6170,9 +6170,11 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
     'die Zahl ist redundant, sobald das Label sie nennt');
   // `display: inline-flex` schlägt das UA-`[hidden]`: der aktive Tab trug ohne diese
   // Regel ein 16 x 0px breites totes Innenmaß. Fünfte Fundstelle dieser Falle.
+  // Seit R21 S9a haelt das die EINE globale Regel in reset.css (D13), nicht
+  // mehr eine Rettung je Klasse.
   const subCss = read('../public/styles/sub-tabs.css');
-  assert.match(subCss, /\.sub-tab__badge\[hidden\]\s*\{\s*display:\s*none/,
-    'ohne diese Regel bleibt das leere Badge 16px breit stehen');
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
+    'ohne die globale [hidden]-Regel bliebe das leere Badge 16px breit stehen');
   // Getönter Grund plus currentColor ergab auf inaktiven Tabs 4.02:1 bei 12px/600,
   // unter der AA-Schwelle 4.5. Gemessen nach dem Fix: 11.0 hell, 16.43 dunkel.
   assert.match(subCss, /\.sub-tab__badge\s*\{[\s\S]*?color:\s*var\(--color-text-primary\)/,
@@ -6680,7 +6682,8 @@ test('Tasks toolbar follows the mobile header rule: one tools menu, "Filter (n)"
 
   // [hidden] muss gegen display:flex/inline-flex gewinnen, sonst bleiben die im
   // Verlauf ausgeblendeten Controls (Suche, Filterknopf) sichtbar.
-  assert.match(tasksCss, /\.tasks-toolbar \[hidden\]\s*\{[\s\S]*display:\s*none/);
+  // Ausgeblendetes im Kopf haelt die globale [hidden]-Regel (reset.css, D13; R21 S9a).
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/);
 });
 
 test('Notes follow the mobile header rule: chips inside the port, category management in the menu', () => {
@@ -7713,10 +7716,11 @@ test('R19: die Pfeile jedes Zeitraum-Steppers stehen neutral, kein Modul faerbt 
 });
 
 test('calendar attachment removal control honors its hidden state', () => {
-  const calendarCss = read('../public/styles/calendar.css');
+  // Since R21 S9a the one global rule in reset.css (D13) keeps it hidden.
+  const resetCss = read('../public/styles/reset.css');
   assert.match(
-    calendarCss,
-    /#modal-remove-attachment\[hidden\]\s*\{\s*display:\s*none;/,
+    resetCss,
+    /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
     'the remove-attachment button must stay hidden for events without an attachment'
   );
 });
@@ -21132,8 +21136,8 @@ test('R17 E6: die Zwei-Felder-Zeile steht einmal in layout.css, kein Modulblatt 
   const layout = [...eachRule(read('../public/styles/layout.css'))];
   const pair = layout.find((r) => r.selector.trim() === '.form-pair' && !r.at.length);
   assert.match(pair?.body ?? '', /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(/, '.form-pair ist das auto-fit-Raster');
-  assert.ok(layout.some((r) => r.selector.trim() === '.form-pair[hidden]' && /display:\s*none/.test(r.body)),
-    '`hidden` muss gegen `display: grid` gewinnen (Kilometerstand im Inventar)');
+  assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display:\s*none\s*!important/,
+    '`hidden` muss gegen `display: grid` gewinnen (Kilometerstand im Inventar) - die globale Regel, R21 S9a');
   assert.match(read('../public/index.html'), /styles\/layout\.css/, 'layout.css laedt auf jeder Seite');
 
   const copies = [];

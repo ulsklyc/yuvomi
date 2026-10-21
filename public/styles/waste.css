@@ -509,15 +509,6 @@
   padding-left: var(--space-6);
 }
 
-/* `display: flex` schlaegt das UA-`[hidden] { display: none }` bei gleicher
- * Spezifitaet - dieselbe wiederkehrende Falle wie .cat-row__colors[hidden]
- * (category-manager.css) und .budget-nav__month [hidden] (budget.css), jedes
- * Mal wenn ein Aufklapper eine Flex-Zeile ist. Ohne diese Regel blieben die
- * Vorlauftage/Uhrzeit-Felder sichtbar, auch wenn die Checkbox unmarkiert war. */
-.waste-reminder-setting-row__fields[hidden] {
-  display: none;
-}
-
 .waste-reminder-setting-row__fields .form-input {
   width: 90px;
 }

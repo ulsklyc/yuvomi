@@ -1243,9 +1243,6 @@
   color: var(--color-text-secondary);
 }
 
-.note-item__category[hidden],
-.note-item__categories-more[hidden] { display: none; }
-
 .note-item__categories-more {
   border: 0;
   min-height: var(--space-6);
@@ -2920,12 +2917,7 @@ button.today-cockpit__more--link {
 }
 
 /* Die aufgeklappten verdeckten Zeilen (Codex an #1485) setzen die Liste fort:
- * dieselbe Haarlinie zur letzten sichtbaren Zeile, und zugeklappt nimmt ihr
- * `display: grid` dem `hidden` nicht die Wirkung. */
-.today-cockpit__rows--more[hidden] {
-  display: none;
-}
-
+ * dieselbe Haarlinie zur letzten sichtbaren Zeile. */
 .today-cockpit__rows + .today-cockpit__rows--more {
   border-top: 1px solid var(--color-border-subtle);
 }

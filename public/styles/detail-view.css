@@ -450,11 +450,6 @@
   gap: var(--space-2);
 }
 
-.detail-subtask-compose[hidden],
-.detail-subtask--add[hidden] {
-  display: none;
-}
-
 .detail-subtask-compose__input {
   flex: 1;
   min-width: 0;

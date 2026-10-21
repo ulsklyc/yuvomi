@@ -510,6 +510,8 @@ test('Teilaufgabe: Knopf und Feld verstecken sich wirklich - display: flex stich
   const css = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
   const hides = (sel) => [...eachRule(css)].some((r) => r.selector.split(',').some((s) => s.trim() === sel)
     && /display:\s*none/.test(r.body));
-  assert.ok(hides('.detail-subtask--add[hidden]'), 'der Knopf verschwindet, solange das Feld offen ist');
-  assert.ok(hides('.detail-subtask-compose[hidden]'), 'das Feld verschwindet, solange es zu ist');
+  // Seit R21 S9a haelt das die EINE globale [hidden]-Regel (reset.css, D13).
+  const { globalHiddenRule } = await import('./css-rules.js');
+  assert.ok(globalHiddenRule() || hides('.detail-subtask--add[hidden]'), 'der Knopf verschwindet, solange das Feld offen ist');
+  assert.ok(globalHiddenRule() || hides('.detail-subtask-compose[hidden]'), 'das Feld verschwindet, solange es zu ist');
 });

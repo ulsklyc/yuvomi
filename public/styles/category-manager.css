@@ -85,15 +85,6 @@
   padding: var(--space-2) 0 var(--space-1) calc(var(--space-6) + var(--space-4));
 }
 
-/* `display: flex` schlaegt das UA-`[hidden] { display: none }` bei gleicher
- * Spezifitaet - ohne diese Zeile standen alle sieben Paletten gleichzeitig
- * offen. Dieselbe Falle wie an .page-search__clear und im Budget-Monatswechsel;
- * sie kommt in diesem Repo jedes Mal wieder, wenn ein Aufklapper eine
- * Flex-Zeile ist. */
-.cat-row__colors[hidden] {
-  display: none;
-}
-
 .cat-color-swatch {
   width: var(--space-6);
   height: var(--space-6);

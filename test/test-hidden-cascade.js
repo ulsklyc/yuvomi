@@ -1166,6 +1166,25 @@ test('die globale [hidden]-Regel steht in reset.css, und kein display mit !impor
   assert.deepEqual(beats, [], 'ein display mit !important hielte ein ausgeblendetes Element sichtbar');
 });
 
+/* KEINE DOPPELTE RETTUNG (R21 S9a). Seit der globalen Regel in reset.css war
+ * jede `.x[hidden] { display: none }` eines Modulblatts doppelt - 55 Stueck,
+ * und jede neue Klasse lud zur 56. ein, als waere sie noetig. Sie sind
+ * entfernt; eine Regel, deren Subjekt nur `[hidden]` traegt und die nur
+ * `display: none` setzt, steht nirgends ausser der globalen. */
+test('keine Modulregel wiederholt die globale [hidden]-Regel (R21 S9a)', () => {
+  const doppelt = [];
+  for (const file of readdirSync(STYLES).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(readFileSync(new URL(file, STYLES), 'utf8'))) {
+      if (rule.selector.trim() === '[hidden]:not([hidden="until-found"])') continue;
+      const parts = rule.selector.split(/,(?![^(]*\))/).map((x) => x.trim());
+      const decls = rule.body.split(';').map((d) => d.trim()).filter(Boolean);
+      if (!decls.length || !decls.every((d) => /^display\s*:\s*none$/.test(d))) continue;
+      if (parts.every((p) => /\[hidden\](?::[\w-]+(?:\([^)]*\))?)*$/.test(p))) doppelt.push(`${file}: ${rule.selector.trim()}`);
+    }
+  }
+  assert.deepEqual(doppelt, [], 'reset.css blendet jedes [hidden] aus - die Regel ist doppelt');
+});
+
 test('Reichweite: der Sammler findet ausgeblendete Elemente und die Regeln, die sie ueberstimmen', (t) => {
   // REICHWEITE VOR DEM URTEIL. Die Liste oben ist leer, sobald der Baum sauber
   // ist - und genauso leer, wenn ein Leser nichts mehr liefert. Diese Schwellen

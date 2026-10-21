@@ -296,9 +296,8 @@ test('the fasting ring is a real stroke with round ends whose trace moves by tra
   assert.match(reduced?.body ?? '', /transition:\s*none/, 'reduced motion: the trace jumps');
   // `hidden` muss gegen die display-Regeln der Traeger gewinnen, sonst bleibt
   // der Ruhezustand bei Nullen stehen, obwohl das Attribut gesetzt ist.
-  for (const sel of ['.fasting-clock-switch[hidden]', '[data-fasting-timer][hidden]', '[data-fasting-days][hidden]']) {
-    assert.ok(rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(sel) && /display:\s*none/.test(r.body)), `${sel} hides`);
-  }
+  // Seit R21 S9a die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok((await import('./css-rules.js')).globalHiddenRule(), '[hidden] hides the clock parts');
 });
 
 // ---------------------------------------------------------------------------

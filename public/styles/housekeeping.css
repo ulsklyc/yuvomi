@@ -274,10 +274,6 @@
   padding: var(--space-1) var(--page-inline-pad) 0;
 }
 
-.housekeeping-period[hidden] {
-  display: none;
-}
-
 /* AM DESKTOP IN DER TITELZEILE (Entscheidung R17, E16): ab 1024px haengt
  * placeReportPeriod() die Zeile als Center-Slot in den Kopf. Dort bringt die
  * Shell Abstand und Seitenpolster mit, das eigene Polster der Zeile faellt -
@@ -440,12 +436,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* `display: grid` schlaegt das UA-`[hidden]`: Stunden- und Tagessatz standen
- * sonst beide im Formular, gleich welche Abrechnungsart gewaehlt war (#1340). */
-.housekeeping-field[hidden] {
-  display: none;
-}
-
 .housekeeping-field input,
 .housekeeping-field textarea,
 .housekeeping-field select {
@@ -520,13 +510,6 @@
 
 .housekeeping-form-grid--wide {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-/* Ohne Betragsrecht (R20) blendet der Besuchsdialog das Raster mit Satz und
- * Extras aus - `display: grid` schlaegt sonst das UA-`[hidden]`, wie oben bei
- * `.housekeeping-field`. */
-.housekeeping-form-grid[hidden] {
-  display: none;
 }
 
 /* Bereich und Rhythmus im Anlegedialog: zwei kurze Felder nebeneinander, auch

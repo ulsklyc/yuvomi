@@ -2050,7 +2050,8 @@ test('R17/E1: shift types and plans are rows, edited in the create dialog with O
   assert.doesNotMatch(sync.replace(/\/\*[\s\S]*?\*\//g, ''), /\.remove\(\)/, 'no day group is removed while typing');
   assert.match(sync, /group\.hidden = Number\(group\.dataset\.dayGroup\) >= cycleLength/);
   assert.match(schedulePage, /form\.querySelectorAll\('\[data-day-group\]:not\(\[hidden\]\) \[data-day-row\]'\)/, 'hidden days are not collected');
-  assert.match(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'), /\.schedule-day-group\[hidden\]\s*\{\s*display:\s*none/);
+  // Seit R21 S9a die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok((await import('./css-rules.js')).globalHiddenRule(), 'ein ausgeblendeter Tag verschwindet');
   // Half written (review of #1767): when the fields request fails after the
   // type was saved, the page reloads the server state instead of staying stale.
   assert.match(saveType, /typeSaved = true;/);

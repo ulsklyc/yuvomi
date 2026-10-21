@@ -13,7 +13,6 @@
 /* Die Ziel-Wahl ist eine .segmented-Leiste (R14 P3); schmal scrollt sie quer statt umzubrechen. */
 .fasting-presets { max-width: 100%; overflow-x: auto; margin-block: var(--space-3); }
 .fasting-custom { margin-block-start: var(--space-4); }
-.fasting-custom[hidden] { display: none; }
 .fasting-notifications { border-top: 1px solid var(--color-border-subtle); padding-block-start: var(--space-4); }
 /* Die Zeile behaelt ihr Polster (Hover-Flaeche), der Text fluchtet mit der
  * Ueberschrift darueber. */
@@ -64,10 +63,6 @@ yuvomi-fasting-help { display: inline-flex; flex-shrink: 0; }
 .fasting-help__button > svg { width: var(--icon-lg); height: var(--icon-lg); }
 .fasting-help__tooltip { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - var(--space-6))); max-height: calc(var(--viewport-height) - var(--space-6)); overflow: auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--color-text-primary); color: var(--color-bg); text-align: start; font-size: var(--text-sm); font-weight: var(--font-weight-regular); line-height: var(--line-height-relaxed); box-shadow: var(--shadow-md); }
 .fasting-help__tooltip > span { display: block; margin-block-start: var(--space-2); }
-/* Ruhezustand: updateFastingClock() blendet Zeit, Fastentag und Umschalter per
- * `hidden` aus - die Anzeigeregeln der Traeger (display: block/inline-flex)
- * schluegen das UA-[hidden] sonst. */
-.fasting-clock-switch[hidden], [data-fasting-timer][hidden], [data-fasting-days][hidden] { display: none; }
 @media (max-width: 639px) {
   .fasting-editor-grid { grid-template-columns: 1fr; }
 }

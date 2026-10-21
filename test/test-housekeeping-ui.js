@@ -1073,8 +1073,10 @@ test('R17: der Zeitraum der Berichte steht unter den Reitern, nicht im Kopf', as
   assert.ok(basis, '.housekeeping-period hat eine Basisregel');
   assert.match(basis.body, /display:\s*flex/);
   assert.match(basis.body, /var\(--page-inline-pad\)/, 'dasselbe Seitenpolster wie der Inhalt darunter');
-  const verborgen = regeln.findIndex((r) => r.selector.trim() === '.housekeeping-period[hidden]' && /display:\s*none/.test(r.body));
-  assert.ok(verborgen > regeln.indexOf(basis), '`[hidden]` gewinnt gegen `display: flex` (steht dahinter)');
+  // `[hidden]` gewinnt gegen `display: flex`: seit R21 S9a die EINE globale
+  // Regel in reset.css (`!important`, D13) statt einer dahinter stehenden.
+  const { globalHiddenRule } = await import('./css-rules.js');
+  assert.ok(globalHiddenRule(), '`[hidden]` gewinnt gegen `display: flex`');
 });
 
 /* Entscheidung R17 (E16): am Desktop steht der Zeitraum wieder in der

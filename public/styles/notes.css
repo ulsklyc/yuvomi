@@ -114,10 +114,6 @@
   background-clip: padding-box;
 }
 
-.notes-filters[hidden] {
-  display: none;
-}
-
 /* Platzhalter, solange die Reihe auf die Daten wartet (notes.js): drei
  * Pillen in Chiphoehe, damit das Raster darunter nicht springt. */
 .notes-filters__skeleton {
@@ -483,8 +479,6 @@
   box-shadow: var(--shadow-md);
 }
 
-.note-category-picker__list[hidden] { display: none; }
-
 .note-category-picker__option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -528,8 +522,6 @@
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
-
-.note-category-editor__create[hidden] { display: none; }
 
 @media (max-width: 639px) {
   .notes-filter-group + .notes-filter-group {

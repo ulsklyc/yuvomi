@@ -132,7 +132,7 @@ test('die anderen Spalten bleiben vom Zuklappen unberuehrt', () => {
     'und meldet das auch');
 });
 
-test('der Koerper hat eine eigene hidden-Regel, weil display: flex sie sonst sticht', () => {
+test('der Koerper ist ausblendbar, obwohl display: flex die UA-Regel sticht', async () => {
   // NICHT KOSMETIK: `.kanban-col__body` setzt `display: flex`, und eine
   // Klassenregel sticht das `[hidden] { display: none }` des Browsers. Ohne
   // diese Regel traegt eine zugeklappte Spalte ihr Attribut und steht trotzdem
@@ -142,9 +142,9 @@ test('der Koerper hat eine eigene hidden-Regel, weil display: flex sie sonst sti
   assert.ok(koerper, '.kanban-col__body fehlt');
   assert.match(koerper.body, /display:\s*flex/, 'der Koerper ist ein Flex-Container');
 
-  const versteckt = regeln.find((r) => r.selector === '.kanban-col__body[hidden]');
-  assert.ok(versteckt, '.kanban-col__body[hidden] fehlt - hidden waere wirkungslos');
-  assert.match(versteckt.body, /display:\s*none/, 'und sie muss display: none setzen');
+  // Seit R21 S9a die EINE globale Regel in reset.css statt einer je Klasse.
+  const { globalHiddenRule } = await import('./css-rules.js');
+  assert.ok(globalHiddenRule(), 'ohne die globale [hidden]-Regel waere hidden wirkungslos');
 });
 
 /**

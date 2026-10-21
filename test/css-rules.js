@@ -36,6 +36,8 @@
  * Wer CSS parst, nimmt IHN - vier Kopien des alten Musters waren vier
  * Gelegenheiten, dieselbe Falle wieder einzubauen.
  */
+
+import { readFileSync } from 'node:fs';
 const AT_RULES_WITH_RULES = /^@(?:media|supports|container|layer|scope)\b/;
 
 export function* eachRule(css) {
@@ -84,4 +86,18 @@ export function* eachRule(css) {
     index = end;
     start = index;
   }
+}
+
+/**
+ * DIE EINE [hidden]-REGEL (D13, Critique R21). reset.css blendet jedes Element
+ * mit `hidden` aus (`display: none !important`, ausser `until-found`); seit R21
+ * S9a gibt es keine Rettungsregel je Klasse mehr. Tests, die frueher
+ * `.x[hidden] { display: none }` verlangten, fragen hier, ob die globale Regel
+ * steht - gelesen ueber eachRule(), auf der Basisebene.
+ * @returns {boolean}
+ */
+export function globalHiddenRule() {
+  const reset = readFileSync(new URL('../public/styles/reset.css', import.meta.url), 'utf8');
+  return [...eachRule(reset)].some((r) => r.selector.trim() === '[hidden]:not([hidden="until-found"])'
+    && !r.at.length && /display:\s*none\s*!important/.test(r.body));
 }

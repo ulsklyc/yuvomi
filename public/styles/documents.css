@@ -143,13 +143,6 @@
  * Hier bleibt nur, wie eine gewaehlte Karte oder Zeile aussieht.
  * -------------------------------------------------------- */
 
-/* `.btn` setzt ein eigenes display und schlaegt damit das UA-`[hidden]
- * { display: none }`. Ohne diesen Guard blieb der DMS-Button sichtbar, obwohl
- * gar kein DMS-Konto konfiguriert ist. */
-.documents-dms-link-btn[hidden] {
-  display: none;
-}
-
 /* Die RASTERKARTE traegt ihre Auswahl als Ring - sie ist ein eigenes Objekt
  * (randlos seit 2026-09-25, der Ring ist deshalb ein Schatten, keine Kante). Die ZEILE hat beides nicht mehr und traegt sie als getoente
  * Flaeche: dasselbe Vokabular wie jeder andere ausgewaehlte Zustand der App
@@ -353,12 +346,6 @@
   gap: var(--space-1);
   margin-bottom: var(--space-3);
   font-size: var(--text-sm);
-}
-
-/* `display: flex` schlaegt das UA-`[hidden]`: im Wurzelordner blieb der leere
- * Pfad samt Aussenabstand ueber der Liste stehen (#1340). */
-.documents-breadcrumb[hidden] {
-  display: none;
 }
 
 .documents-breadcrumb__crumb {
@@ -1191,10 +1178,6 @@
   cursor: pointer;
 }
 
-.document-folder-link[hidden] {
-  display: none;
-}
-
 .document-folder-link:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
@@ -1221,10 +1204,6 @@
   border-radius: var(--radius-md);
   background: var(--color-fill-well);
   overflow-wrap: anywhere;
-}
-
-.folder-upload-preview[hidden] {
-  display: none;
 }
 
 .folder-upload-preview__summary {

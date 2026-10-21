@@ -27,10 +27,6 @@
   background-color: var(--color-surface-2);
 }
 
-.md-toolbar[hidden] {
-  display: none;
-}
-
 .md-toolbar::-webkit-scrollbar {
   display: none;
 }

@@ -189,15 +189,6 @@
   gap: inherit;
 }
 
-/* The rule above's `display: flex` otherwise outranks the browser's own
-   `[hidden] { display: none }` (class+attribute beats a lone attribute
-   selector) - without this, a hidden mode's fieldset stayed visually
-   stacked under the active one even though `disabled` correctly kept it
-   out of FormData/validation. */
-.schedule-modal-form fieldset[data-field][hidden] {
-  display: none;
-}
-
 .schedule-create-mode {
   margin-top: 4px;
 }
@@ -236,11 +227,6 @@
 
 /* A cycle day can carry several classes (a timetable), not just one - a small
  * add/remove list instead of a single <select>, same grid cell as before. */
-/* Tage jenseits der getippten Zykluslaenge bleiben im Dialog, verborgen
- * (schedule.js, syncPatternDayGroups) - die Klasse unten setzt `display`. */
-.schedule-day-group[hidden] {
-  display: none;
-}
 
 .schedule-day-group {
   min-width: 0;
@@ -321,12 +307,6 @@
   gap: var(--space-1);
   align-items: center;
   margin-bottom: var(--space-2);
-}
-
-/* Ohne waehlbares Feld ist die Auswahl `hidden` (schedule.js,
-   syncTypeFieldPicker) - `display: flex` oben schluege das Attribut sonst. */
-.schedule-type-field-add[hidden] {
-  display: none;
 }
 
 .schedule-type-field-add .form-input {
