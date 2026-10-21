@@ -6440,6 +6440,42 @@ await test('R21 D2: der Nachbar zieht 1:1 mit, die Achse steht, eingerastet baut
   } finally { f.restore(); }
 });
 
+/* R21 S8 (Nachtrag aus D2): DER NACHBAR WIRD IM LEERLAUF GEPARKT. Eingesetzt
+ * erst bei der Sperre auf "waagerecht", kostete er den ersten Zugframe (4x CPU:
+ * Monat 41, Woche 45, Tag 37 ms; davor 19-31): Stil und Layout seines Teilbaums,
+ * im Monat das Vermessen der Zellen. Geparkt steht er mit der Box des Panels im
+ * Traeger, unsichtbar und ruhend; die Geste haengt ihn nicht neu ein und schreibt
+ * seine Box nicht neu - sie deckt ihn nur auf. */
+await test('R21 S8: ein geparkter Nachbar wird bei der Geste nur aufgedeckt, nicht neu eingesetzt', async () => {
+  const f = pagerFixture();
+  try {
+    const classes = () => { const set = new Set(); return { add: (...c) => c.forEach((x) => set.add(x)), remove: (...c) => c.forEach((x) => set.delete(x)), contains: (c) => set.has(c) }; };
+    const writes = [];
+    const style = new Proxy({}, { set(t, k, v) { writes.push(k); t[k] = v; return true; } });
+    const ghost = { step: 1, style, isConnected: false, parentNode: null, classList: classes(), attrs: {}, axis: { style: {} } };
+    ghost.setAttribute = (k, v) => { ghost.attrs[k] = v; };
+    ghost.querySelectorAll = () => [ghost.axis];
+    ghost.remove = () => { ghost.removed = true; };
+    let appended = 0;
+    f.surface.appendChild = (el) => { appended += 1; el.isConnected = true; el.parentNode = f.surface; };
+    let parkedWith = null;
+    assert(periodSwipe.parkPeriodGhost(f.surface, ghost, (g, live) => { parkedWith = [g, live]; }) === true, 'geparkt');
+    assert(appended === 1 && ghost.parentNode === f.surface, 'der Nachbar steht schon vor der Geste im Traeger');
+    assert(ghost.classList.contains('period-swipe-ghost--parked') && ghost.classList.contains('period-swipe-ghost--rest'), 'unsichtbar und ruhend');
+    assert(ghost.inert === true && ghost.attrs['aria-hidden'] === 'true', 'ohne Eingaben, verborgen fuer Hilfsmittel');
+    assert(ghost.style.width === '390px' && ghost.style.top === '12px' && ghost.style.height === '600px', 'mit der Box des Panels');
+    assert(parkedWith?.[0] === ghost && parkedWith[1] === f.live, 'ausgerichtet wird beim Parken, im Leerlauf');
+    writes.length = 0;
+    f.wire({ neighbor: () => ghost, onStep: () => {} });
+    f.start(300);
+    f.move(250);
+    assert(appended === 1, 'die Geste haengte den geparkten Nachbarn neu ein - sein Layout waere verworfen');
+    assert(!writes.some((k) => ['top', 'left', 'width', 'height'].includes(k)), `gleiche Box neu geschrieben: ${writes.join(',')}`);
+    assert(!ghost.classList.contains('period-swipe-ghost--parked') && !ghost.classList.contains('period-swipe-ghost--rest'), 'aufgedeckt');
+    assert(ghost.style.transform === 'translateX(340px)', `und er zieht mit: ${ghost.style.transform}`);
+  } finally { f.restore(); }
+});
+
 await test('R21 D2: ein langsamer kurzer Wisch federt zurueck, Nachbar und Achse raeumen ab', async () => {
   const f = pagerFixture();
   try {
@@ -6556,6 +6592,17 @@ await test('R21 S8: beide Nachbarn kommen in einem Abruf je Quelle, jeder mit se
     if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc); else delete globalThis.navigator;
     restoreDom();
   }
+});
+
+test('R21 S8: der Kalender parkt die vorgebauten Nachbarn und vermisst die Zellen nur einmal', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const pre = src.slice(src.indexOf('function prebuildGhosts()'), src.indexOf('async function prefetchNeighbors()'));
+  assert(/parkPeriodGhost\(surface, el, alignPeriodGhost\)/.test(pre), 'die Bilder werden im Leerlauf nur gebaut, nicht geparkt - der erste Zugframe setzt sie ein');
+  assert(/hit\?\.parked\) hit\.el\.remove\(\)/.test(pre), 'ein verworfenes geparktes Bild bliebe im Traeger stehen');
+  const align = src.slice(src.indexOf('function alignPeriodGhost('), src.indexOf('async function stepFromSwipe('));
+  assert(/if \(ghost\._fittedWidth === width\) return;/.test(align), 'beim Aufdecken vermass der Monat seine Zellen ein zweites Mal');
+  const view = src.slice(src.indexOf('function scheduleNeighborPrefetch()'), src.indexOf('const _ghostCache'));
+  assert(/clearGhostCache\(\);/.test(view), 'nach dem Zeichnen blieben alte geparkte Bilder im Traeger');
 });
 
 test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den Weg eines Blatts', () => {

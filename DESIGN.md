@@ -3732,6 +3732,13 @@ S8):** fehlen beide, reicht die Spanne vom vorigen bis zum naechsten Zeitraum, u
 Nachbar behaelt seine eigenen Grenzen (`buildDayIndex()` klammert, was ueber den Rand reicht);
 fehlt einer, wird nur er gefragt. Vorher je Nachbar vier Quellen - nach jedem Zeichnen bis zu
 acht Anfragen fuer zwei Zeitraeume, jetzt hoechstens vier. Guard `test:calendar` "R21 S8".
+**Der Nachbar wird im Leerlauf geparkt, nicht unter dem Finger eingesetzt (R21 S8):** das
+vorgebaute Bild steht schon im Traeger, mit der Box des Panels, unsichtbar
+(`.period-swipe-ghost--parked`) und nach dem Ausrichten ruhend (`--rest`,
+`content-visibility: hidden` - das Layout bleibt, Stilrunden der Seite rechnen es nicht mit);
+die Geste nimmt beide Klassen ab, haengt es nicht neu ein und schreibt seine Box nicht neu
+(`parkPeriodGhost`, `placeGhostBox`). Der Monat vermisst seine Zellen dabei nur einmal je Breite.
+Guard `test:calendar` "R21 S8".
 
 **Geprueft auf zwei Ebenen, weil jede etwas anderes sehen kann.** Ebene 3 (statisch, in
 `test-frontend-audit.js`) folgt von jeder Wischrichtung mit `--delete` der Kante zu der

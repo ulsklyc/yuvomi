@@ -50,7 +50,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { filterButtonHtml, openFilterSheet, filterChipsHtml, filtersAsPopover } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator, afterGlideStart } from '/utils/segment-indicator.js';
-import { wirePeriodSwipe } from '/utils/period-swipe.js';
+import { wirePeriodSwipe, parkPeriodGhost } from '/utils/period-swipe.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -3216,7 +3216,7 @@ function freshNeighbor(key) {
 function scheduleNeighborPrefetch() {
   clearTimeout(_neighborTimer);
   // Jedes Zeichnen kann zeigen, was die Bilder zeigen (Filter, Titel, Zeitraum).
-  _ghostCache.clear();
+  clearGhostCache();
   if (!canPagePeriods()) return;
   _neighborTimer = setTimeout(prefetchNeighbors, 150);
 }
@@ -3242,10 +3242,28 @@ function prebuildGhosts() {
       if (!canPagePeriods()) return;
       const key = ghostKey(dir);
       if (_ghostCache.get(dir)?.key === key) return;
+      dropCachedGhost(dir);
       const el = buildPeriodGhost(dir);
-      if (el) _ghostCache.set(dir, { key, el });
+      if (!el) return;
+      // GEPARKT, NICHT NUR GEBAUT (R21 S8): Stil, Layout und das Vermessen der
+      // Zellen fallen hier in den Leerlauf statt in den ersten Zugframe
+      // (parkPeriodGhost, utils/period-swipe.js).
+      const surface = _container?.querySelector('#cal-body');
+      const parked = surface ? parkPeriodGhost(surface, el, alignPeriodGhost) : false;
+      _ghostCache.set(dir, { key, el, parked });
     });
   }
+}
+
+/** Ein vorgebautes Bild verwerfen - ein geparktes geht dabei aus dem Traeger. */
+function dropCachedGhost(dir) {
+  const hit = _ghostCache.get(dir);
+  _ghostCache.delete(dir);
+  if (hit?.parked) hit.el.remove();
+}
+
+function clearGhostCache() {
+  for (const dir of [..._ghostCache.keys()]) dropCachedGhost(dir);
 }
 
 async function prefetchNeighbors() {
@@ -3292,6 +3310,7 @@ function periodGhost(dir) {
   const hit = _ghostCache.get(dir);
   _ghostCache.delete(dir);
   if (hit && hit.key === ghostKey(dir) && canPagePeriods()) return hit.el;
+  if (hit?.parked) hit.el.remove();
   return buildPeriodGhost(dir);
 }
 
@@ -3364,8 +3383,15 @@ function alignPeriodGhost(ghost, live) {
   if (lp && gp && state.view !== 'month') {
     gp.scrollTop = lp.scrollTop + (gp.getBoundingClientRect().top - lp.getBoundingClientRect().top);
   }
+  // Im Leerlauf geparkt, sind die Zellen schon vermessen - fuer genau diese
+  // Breite. Ein zweites Vermessen beim Aufdecken schriebe Klassen und Texte neu
+  // und kostete den ersten Zugframe wieder ein Layout.
   const grid = ghost.querySelector('.month-grid');
-  if (grid) fitMonthDayCells(grid);
+  if (!grid) return;
+  const width = Math.round(grid.getBoundingClientRect().width);
+  if (ghost._fittedWidth === width) return;
+  fitMonthDayCells(grid);
+  ghost._fittedWidth = width;
 }
 
 /**
@@ -3375,7 +3401,8 @@ function alignPeriodGhost(ghost, live) {
  * sprang nach dem Einrasten.
  */
 async function stepFromSwipe(bodyEl, step) {
-  const shown = bodyEl.querySelector('.period-swipe-ghost .page-scrollport');
+  // Der Nachbar unter dem Finger - nicht der fuer die Gegenrichtung, der noch geparkt steht.
+  const shown = bodyEl.querySelector('.period-swipe-ghost:not(.period-swipe-ghost--parked) .page-scrollport');
   const keep = shown && state.view !== 'month'
     ? { top: shown.scrollTop, y: shown.getBoundingClientRect().top }
     : null;

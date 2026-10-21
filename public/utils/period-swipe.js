@@ -132,6 +132,56 @@ function overlayOpen() {
   return Boolean(document.getElementById('shared-modal-overlay'));
 }
 
+/** Die Box des Nachbarn: deckungsgleich mit dem Panel - EINE Rechnung fuer Parken und Zug. */
+function ghostBox(live) {
+  return {
+    top: `${live.offsetTop}px`,
+    left: `${live.offsetLeft}px`,
+    width: `${live.getBoundingClientRect().width}px`,
+    height: `${live.offsetHeight}px`,
+  };
+}
+
+/**
+ * Setzt nur, was sich aendert - derselbe Wert neu geschrieben verwuerfe das
+ * Layout des Nachbarn. Verglichen als Zahl: das CSSOM rundet Bruchteile beim
+ * Zurueckgeben (389.984375px -> 389.984px).
+ */
+function placeGhostBox(ghost, box) {
+  for (const [key, value] of Object.entries(box)) {
+    if (Math.abs((parseFloat(ghost.style[key]) || 0) - parseFloat(value)) > 0.01 || !ghost.style[key]) ghost.style[key] = value;
+  }
+}
+
+/**
+ * DER NACHBAR WIRD IM LEERLAUF GEPARKT, NICHT UNTER DEM FINGER EINGESETZT
+ * (Critique R21 S8, Nachtrag aus D2). Eingesetzt erst bei der Sperre auf
+ * „waagerecht", kostete er den ersten Zugframe: Stil und Layout seines ganzen
+ * Teilbaums, im Monat dazu das Vermessen der Zellen - gemessen 4x CPU 37-48 ms
+ * statt eines Frames. Geparkt steht er schon im Traeger, mit der Box des
+ * Panels, unsichtbar und ohne Eingaben (`.period-swipe-ghost--parked`);
+ * `onParked` richtet ihn aus (Scrollstand, Zellen), danach ruht sein Teilbaum
+ * (`--rest`, content-visibility: hidden: das Layout bleibt, Stilrunden der
+ * Seite rechnen ihn nicht mit). Die Geste deckt ihn nur noch auf.
+ *
+ * @param {HTMLElement} surface - der Traeger (dieselbe Flaeche wie bei wirePeriodSwipe)
+ * @param {HTMLElement} ghost   - das Bild des Nachbarn (losgeloest, ohne ids)
+ * @param {(ghost: HTMLElement, live: HTMLElement) => void} [onParked]
+ * @returns {boolean} geparkt
+ */
+export function parkPeriodGhost(surface, ghost, onParked) {
+  const live = surface?.firstElementChild;
+  if (!live || !ghost || ghost === live) return false;
+  ghost.classList.add('period-swipe-ghost', 'period-swipe-ghost--parked');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.inert = true;
+  placeGhostBox(ghost, ghostBox(live));
+  if (ghost.parentNode !== surface) surface.appendChild(ghost);
+  onParked?.(ghost, live);
+  ghost.classList.add('period-swipe-ghost--rest');
+  return true;
+}
+
 /**
  * Verdrahtet die Geste auf `surface` (einem Element, das ueber die Renders
  * hinweg bestehen bleibt; seine KINDER werden je Zeitraum ersetzt).
@@ -189,11 +239,12 @@ export function wirePeriodSwipe(surface, { enabled, onStep, ignore, neighbor, ax
     ghost.classList.add('period-swipe-ghost');
     ghost.setAttribute('aria-hidden', 'true');
     ghost.inert = true;
-    ghost.style.top = `${pager.live.offsetTop}px`;
-    ghost.style.left = `${pager.live.offsetLeft}px`;
-    ghost.style.width = `${pager.panelWidth}px`;
-    ghost.style.height = `${pager.live.offsetHeight}px`;
-    surface.appendChild(ghost);
+    // Ein geparkter Nachbar (parkPeriodGhost) steht schon mit dieser Box im
+    // Traeger: nicht neu einhaengen, gleiche Werte nicht neu schreiben - er
+    // wird nur aufgedeckt.
+    placeGhostBox(ghost, ghostBox(pager.live));
+    if (ghost.parentNode !== surface) surface.appendChild(ghost);
+    ghost.classList.remove('period-swipe-ghost--parked', 'period-swipe-ghost--rest');
     pager.ghost = ghost;
     pager.axisGhost = axis ? [...ghost.querySelectorAll(axis)] : [];
     ghostMounted?.(ghost, pager.live);

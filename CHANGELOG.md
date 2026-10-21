@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen until you scroll near them, as tasks, contacts and recipes already did. Opening a dialog
   over a long agenda is lighter for it.
 
+- **Swiping the calendar starts moving with your finger right away.** The neighbouring week or
+  month is now placed and measured while the app is idle, so the first frame of the swipe only
+  has to uncover it.
+
 - **Swiping the calendar asks the server less often.** To have the next and the previous week
   or month ready under your finger, the calendar used to ask four sources for each of them,
   up to eight requests after every change of period on a touch device. It now asks each

@@ -4521,6 +4521,19 @@ html.fab-steady .page-fab {
   pointer-events: none;
 }
 
+/* GEPARKT (R21 S8, parkPeriodGhost): der Nachbar steht schon vor der Geste im
+ * Traeger, unsichtbar. Nach dem Ausrichten ruht sein Teilbaum
+ * (`content-visibility: hidden`): das Layout bleibt erhalten, und die
+ * Stilrunden der Seite (ein Dialog, ein Toast) rechnen ihn nicht mit. Die
+ * Geste nimmt beide Klassen ab und deckt ihn nur noch auf. */
+.period-swipe-ghost--parked {
+  visibility: hidden;
+}
+
+.period-swipe-ghost--rest {
+  content-visibility: hidden;
+}
+
 @keyframes page-title-settle {
   from { opacity: 0; }
 }
