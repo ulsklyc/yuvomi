@@ -2089,6 +2089,9 @@ export function openModal({
   // Escape (nur einmal binden)
   bindEscape();
 
+  // „Weitere Angaben" klappt ins Bild, nicht unter den Fuss (Critique R21).
+  _wireAdvancedReveal(panel);
+
   // Callback für Aufrufer
   if (typeof onSave === 'function') onSave(panel);
 
@@ -2112,6 +2115,55 @@ export function openModal({
   }
 
   modalState = 'open';
+}
+
+/**
+ * „WEITERE ANGABEN" KLAPPT INS BILD, NICHT UNTER DEN FUSS (Critique R21, a4).
+ *
+ * Der Aufklapper steht in langen Dialogen am unteren Rand des Scrollbereichs.
+ * Am Telefon ging er auf, und alles, was er zeigte, lag unter der festen
+ * Fusszeile: gemessen im Buchungsdialog 0 von 5 neuen Zeilen sichtbar, die
+ * erste 8px unter der Kante des Fusses. Wer ihn antippt, bekommt jetzt so viel
+ * vom Neuen zu sehen, wie hineinpasst - die Beschriftung bleibt dabei im Bild,
+ * damit klar ist, was da aufging.
+ *
+ * Nur auf den Klick hin: ein Aufklapper, der schon offen geladen wird (beim
+ * Bearbeiten, sobald dahinter ein Wert steht) oder den ein Feldfehler aufmacht
+ * (constraintErrors), feuert dasselbe `toggle` und darf den Dialog nicht
+ * verschieben. `toggle` steigt nicht auf - deshalb die Capture-Phase.
+ */
+function _wireAdvancedReveal(panel) {
+  let clicked = null;
+  panel.addEventListener('click', (event) => {
+    const summary = event.target instanceof Element ? event.target.closest('details.form-advanced > summary') : null;
+    clicked = summary ? summary.parentElement : null;
+  }, true);
+  panel.addEventListener('toggle', (event) => {
+    const details = event.target;
+    if (details !== clicked) return;
+    clicked = null;
+    if (!details.open) return;
+    requestAnimationFrame(() => _revealOpenedSection(panel, details));
+  }, true);
+}
+
+function _revealOpenedSection(panel, details) {
+  const body = details.querySelector('.form-advanced__body') ?? details;
+  const scroller = details.closest('.modal-panel__body') ?? panel;
+  if (typeof scroller.scrollBy !== 'function') return;
+  const view = scroller.getBoundingClientRect();
+  // Die Fusszeile steht fest ueber dem Scrollbereich oder klebt in ihm: was
+  // hinter ihr liegt, ist nicht zu sehen.
+  const footer = panel.querySelector('.modal-panel__footer');
+  const footerTop = footer ? footer.getBoundingClientRect().top : view.bottom;
+  const visibleBottom = Math.min(view.bottom, footerTop > view.top ? footerTop : view.bottom);
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-4')) || 16;
+  const need = body.getBoundingClientRect().bottom + gap - visibleBottom;
+  const summary = details.querySelector('summary') ?? details;
+  const room = summary.getBoundingClientRect().top - view.top;
+  const delta = Math.min(need, room);
+  if (delta <= 1) return;
+  scroller.scrollBy({ top: delta, behavior: _reducedMotion() ? 'auto' : 'smooth' });
 }
 
 // --------------------------------------------------------
@@ -2578,6 +2630,8 @@ export const askOverModal = createAskOverModal();
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   serializeForm,
+  // Critique R21: „Weitere Angaben" klappt ins Bild (der Zuhoerer am Panel).
+  wireAdvancedReveal: (panel) => _wireAdvancedReveal(panel),
   // #1784: die Dirty-Basis als Programm - ein Overlay ohne openModal() zum
   // offenen Formular erklaeren (Basis sofort, ohne den 150-ms-Nachlauf), den
   // Waechter fragen und wieder aufraeumen.

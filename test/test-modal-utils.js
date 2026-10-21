@@ -2406,3 +2406,77 @@ test('clearFieldError: nimmt Rahmen und aria-invalid, die reportFieldError geset
   assert.equal(field.classes.has('form-field--error'), false);
   clearFieldError(null);
 });
+
+/* „WEITERE ANGABEN" KLAPPT INS BILD, NICHT UNTER DEN FUSS (Critique R21, a4).
+ * Im Buchungsdialog am Telefon ging der Aufklapper auf, und alles Neue lag
+ * unter der festen Fusszeile (0 von 5 Zeilen sichtbar). Nach dem Tipp rollt
+ * der Scrollbereich so weit, dass das Neue ueber dem Fuss steht - aber nie so
+ * weit, dass die Beschriftung oben hinausrollt. Nur nach einem Tipp: ein
+ * offen geladener Aufklapper verschiebt nichts. */
+test('Weitere Angaben: nach dem Tipp rollt der Dialog das Neue ueber den Fuss, die Beschriftung bleibt im Bild (Critique R21)', async () => {
+  const listeners = {};
+  const rect = (top, bottom) => ({ top, bottom });
+  const scrolled = [];
+  const scroller = {
+    getBoundingClientRect: () => rect(160, 760),
+    scrollBy: (opts) => scrolled.push(opts),
+  };
+  const summary = { getBoundingClientRect: () => rect(720, 760) };
+  const body = { getBoundingClientRect: () => rect(760, 1300) };
+  const details = {
+    open: false,
+    querySelector: (sel) => (sel === '.form-advanced__body' ? body : sel === 'summary' ? summary : null),
+    closest: (sel) => (sel === '.modal-panel__body' ? scroller : null),
+  };
+  summary.parentElement = details;
+  const target = { closest: (sel) => (sel === 'details.form-advanced > summary' ? summary : null) };
+  const footer = { getBoundingClientRect: () => rect(758, 830) };
+  const panel = {
+    addEventListener: (type, fn) => { (listeners[type] ??= []).push(fn); },
+    querySelector: (sel) => (sel === '.modal-panel__footer' ? footer : null),
+  };
+  const prevRaf = globalThis.requestAnimationFrame;
+  const prevGcs = globalThis.getComputedStyle;
+  const prevDoc = globalThis.document;
+  const prevElement = globalThis.Element;
+  globalThis.requestAnimationFrame = (fn) => fn();
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => '16px' });
+  globalThis.document = { ...(prevDoc ?? {}), documentElement: {} };
+  if (!globalThis.Element) globalThis.Element = class {};
+  Object.setPrototypeOf(target, globalThis.Element.prototype);
+  try {
+    modalInternals.wireAdvancedReveal(panel);
+    // Offen geladen (kein Tipp davor): nichts rollt.
+    details.open = true;
+    for (const fn of listeners.toggle) fn({ target: details });
+    assert.equal(scrolled.length, 0, 'ein offen geladener Aufklapper verschiebt den Dialog nicht');
+
+    // Getippt: der Dialog rollt - so weit, wie die Beschriftung im Bild bleibt.
+    details.open = false;
+    for (const fn of listeners.click) fn({ target });
+    details.open = true;
+    for (const fn of listeners.toggle) fn({ target: details });
+    assert.equal(scrolled.length, 1, 'nach dem Tipp rollt der Scrollbereich');
+    // Gebraucht: 1300 + 16 - 758 = 558; Platz bis zur Beschriftung: 720 - 160 = 560.
+    assert.equal(scrolled[0].top, 558, 'das Neue steht ganz ueber dem Fuss');
+
+    // Ein langer Inhalt: die Beschriftung bleibt oben im Bild.
+    body.getBoundingClientRect = () => rect(760, 2400);
+    details.open = false;
+    for (const fn of listeners.click) fn({ target });
+    details.open = true;
+    for (const fn of listeners.toggle) fn({ target: details });
+    assert.equal(scrolled[1].top, 560, 'nie weiter, als die Beschriftung oben stehen bleibt');
+
+    // Zuklappen rollt nichts.
+    for (const fn of listeners.click) fn({ target });
+    details.open = false;
+    for (const fn of listeners.toggle) fn({ target: details });
+    assert.equal(scrolled.length, 2);
+  } finally {
+    globalThis.requestAnimationFrame = prevRaf;
+    globalThis.getComputedStyle = prevGcs;
+    globalThis.document = prevDoc;
+    if (!prevElement) delete globalThis.Element; else globalThis.Element = prevElement;
+  }
+});

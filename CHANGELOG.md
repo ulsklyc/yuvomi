@@ -137,6 +137,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Upload areas on phones and tablets say "tap" instead of "drop here".** Documents, event
   attachments, backup restore and module install offered to drop a file where there is nothing to
   drop; on touch screens they now say to tap and choose a file.
+- **"More details" in a dialog opens into view instead of under the buttons.** On phones the fields
+  it revealed lay behind the fixed Save and Cancel row; the dialog now scrolls them into view. In
+  the budget entry dialog the account moved out of "More details" and sits right after the date
+  once you have accounts.
 - **Settings keep asking before you leave when saving did not work.** A form counted as saved the
   moment you pressed Save - before its fields were checked and before the server answered. If a
   field was wrong or the server refused, leaving the page no longer asked, and what you had typed was

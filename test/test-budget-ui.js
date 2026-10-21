@@ -3202,10 +3202,16 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"/);
   assert.match(modal, /inputmode="decimal"/);
   const adv = pos('${advancedSection(`');
-  for (const rare of ['${accountField}', 'id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
+  for (const rare of ['id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
   }
   assert.ok(pos('id="bm-date"') < adv);
+  // DAS KONTO STEHT VORNE (Critique R21, a4): hinter „Weitere Angaben" klappte
+  // es am Telefon unter den Fuss, und wer Konten fuehrt, bucht auf eines. Es
+  // folgt dem Datum, vor dem Aufklapper - und schaltet mit dem Buchungstyp.
+  assert.ok(pos('id="bm-date"') < pos('    ${accountField}') && pos('    ${accountField}') < adv, 'das Konto steht zwischen Datum und „Weitere Angaben"');
+  assert.match(modal, /const accountField = hasAccounts \? `\s*<div class="form-group js-entry-field">/, 'ohne Konten kein Feld, mit Konten eines, das der Buchungstyp schaltet');
+  assert.doesNotMatch(modal, /entry\.account_id != null\s*\|\|/, 'ein gesetztes Konto oeffnet den Riegel nicht mehr - es steht davor');
   assert.match(modal, /label: t\('budget\.moreDetails'\)/);
   assert.match(modal, /entry\.responsible_users\?\.length/, 'eine gesetzte Zustaendigkeit oeffnet den Riegel beim Bearbeiten');
   assert.match(modal, /size: 'md'/, '400px fuer zehn Felder waren schmaler als jeder andere Formulardialog');

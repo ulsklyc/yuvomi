@@ -4187,8 +4187,12 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   const accountOpts = `<option value="">${t('budget.noAccount')}</option>` + (state.accounts ?? []).map((a) =>
     `<option value="${a.id}" ${isEdit && entry.account_id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`
   ).join('');
+  // DAS KONTO STEHT VORNE, SOBALD ES KONTEN GIBT (Critique R21, a4). Hinter
+  // „Weitere Angaben" klappte es am Telefon unter den Fuss, und wer Konten
+  // fuehrt, bucht jede Ausgabe auf eines - selten ist es dann nicht mehr. Ohne
+  // Konten gibt es das Feld gar nicht.
   const accountField = hasAccounts ? `
-        <div class="form-group">
+        <div class="form-group js-entry-field">
           <label class="form-label" for="bm-account">${t('budget.accountLabel')}</label>
           <select class="form-input" id="bm-account">${accountOpts}</select>
         </div>` : '';
@@ -4218,10 +4222,10 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         * standen sofort offen, 36 % unter dem Falz, und der Fokus begann beim
         * Titel. Eine Buchung beginnt mit dem Betrag - er steht zuerst, gross
         * und mit Ziffern gleicher Breite, und bekommt den Erstfokus (das erste
-        * Feld des Dialogs, components/modal.js). Dann Titel, Kategorie, Datum.
-        * Was selten gesetzt wird (Konto, Sichtbarkeit, Zustaendige, Serie,
-        * Belege), steht hinter „Weitere Angaben" - beim Bearbeiten offen,
-        * sobald eines davon einen Wert traegt. */ ''}
+        * Feld des Dialogs, components/modal.js). Dann Titel, Kategorie, Datum
+        * und - wo es Konten gibt - das Konto (R21). Was selten gesetzt wird
+        * (Sichtbarkeit, Zustaendige, Serie, Belege), steht hinter „Weitere
+        * Angaben" - beim Bearbeiten offen, sobald eines davon einen Wert traegt. */ ''}
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
@@ -4257,10 +4261,10 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <yuvomi-datepicker type="date" id="bm-date"
              value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
     </div>
+    ${accountField}
 
     <div class="js-entry-field">
       ${advancedSection(`
-        ${accountField}
         ${state.budgetMode === 'personal' ? `
         <div class="form-group">
           <label class="form-label" for="bm-visibility">${t('budget.visibilityLabel')}</label>
@@ -4322,7 +4326,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           label: t('budget.moreDetails'),
           // Beim Bearbeiten offen, sobald eine der Angaben gesetzt ist - ein
           // gesetzter Wert hinter einem geschlossenen Riegel waere unsichtbar.
-          open: isEdit && (entry.is_recurring || entry.account_id != null
+          open: isEdit && (entry.is_recurring
             || (entry.attachments?.length ?? 0) > 0
             || (entry.responsible_users?.length ?? 0) > 0
             || (state.budgetMode === 'personal' && (entry.visibility ?? 'shared') !== 'shared')),

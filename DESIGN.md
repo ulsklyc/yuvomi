@@ -2463,7 +2463,10 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Bestandsstimme der Aufgaben und Erinnerungen.
 - **„Weitere Einstellungen" nennt, was dahinter liegt:** `advancedSection(..., { hint })` setzt
   unter die Beschriftung eine Caption-Zeile mit den Feldnamen. Ein Feld, das nur hinter dem
-  Aufklapper steht, findet sonst nur, wer schon weiss, dass es existiert.
+  Aufklapper steht, findet sonst nur, wer schon weiss, dass es existiert. Nach dem Tipp rollt
+  der Dialog das Aufgeklappte ueber die feste Fusszeile, die Beschriftung bleibt im Bild
+  (openModal, R21; vorher 0 von 5 neuen Zeilen sichtbar am Telefon). Was fast jede Buchung
+  braucht, gehoert nicht dahinter: das Konto steht vor dem Aufklapper, sobald es Konten gibt.
 
 ### Nur lesen: das Zeichen statt des Knopfs (#1252, #1265)
 Wer ein Modul nur lesen darf, sieht den ZUSTAND, aber keine Handlung. Der Server weist
