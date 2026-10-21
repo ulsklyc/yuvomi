@@ -1290,12 +1290,19 @@ test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-
   const NOT_ROW_ACTIONS = new Map([
     ['.fab-actions', 'Aufklapp-Menue der Schnellaktionen (dashboard.css), keine Zeilenaktion'],
     ['.meal-card__actions', 'Essenskarte im 148px-Slot des Wochenrasters, eigene Grammatik (meals.css, benannt in scanRowAction)'],
+    // R21 S8: die Faltzeile der Kueche (layout.css, R17 K1) gleitet angedockt als
+    // GANZE Werkzeugzeile hinter die Leiste; ihr Inhalt blendet mit. Bis R21 stand
+    // dort `> *` - derselbe Knoten, nur ohne Namen (der Universalselektor hinter
+    // :has() machte jede Einfuegung zur Stilrunde ueber das ganze Dokument).
+    ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
+      'Faltzeile: die ganze Werkzeugzeile gleitet hinter die Leiste, keine Zeilenaktion'],
   ]);
   const hidden = [];
   for (const { file, src } of CSS) {
     for (const rule of eachRule(src)) {
       if (!/(?:^|;|\s)opacity\s*:\s*0(?![.\d])/.test(rule.body)) continue;
-      for (const part of rule.selector.split(',').map((x) => x.trim().replace(/\s+/g, ' '))) {
+      // Kommas in Klammern (`:is(a, b)`) trennen keine Selektoren.
+      for (const part of rule.selector.split(/,(?![^(]*\))/).map((x) => x.trim().replace(/\s+/g, ' '))) {
         if (!/(?:__actions|row-actions|row-action)(?![\w-])/.test(part)) continue;
         if (NOT_ROW_ACTIONS.has(part)) continue;
         hidden.push(`${file}: ${part}${rule.at.length ? `  [${rule.at.join(' ')}]` : ''}`);
