@@ -141,11 +141,21 @@ function assertReminderYields(measured) {
 
 /** Wartet, bis jede laufende Animation der Seite zu Ende ist. */
 async function settleAnimations(page) {
-  // Endlose Animationen (der Hintergrund der Shell driftet dauernd) enden nie.
+  // Erst den laufenden Seitenwechsel abwarten (D1, R21: er wartet auf das
+  // gerenderte Bild und dauert dadurch laenger). Seine Pseudo-Animationen
+  // werden beim Abbrechen `idle`, und das `finished` einer abgebrochenen
+  // Animation ist ein neues Versprechen, das nie aufgeht - der Lauf hing daran
+  // 180 s im Protokoll-Timeout, waehrend die Seite laengst fertig gezeichnet war.
+  await page.evaluate(() => document.activeViewTransition?.finished.catch(() => {}));
+  // Endlose Animationen (der Hintergrund der Shell driftet dauernd) enden nie,
+  // abgebrochene auch nicht: sie zaehlen mit ihrem `cancel` als erledigt.
   await page.evaluate(() => Promise.all(
     document.getAnimations()
       .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-      .map((a) => a.finished.catch(() => {})),
+      .map((a) => Promise.race([
+        a.finished.catch(() => {}),
+        new Promise((resolve) => a.addEventListener('cancel', resolve, { once: true })),
+      ])),
   ));
   // Zwei Frames fuer die Reaktion auf `animationend`.
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
