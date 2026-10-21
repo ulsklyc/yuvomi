@@ -2216,6 +2216,9 @@ function renderAppShell(container) {
     moreSheet.setAttribute('role', 'dialog');
     moreSheet.setAttribute('aria-modal', 'true');
     moreSheet.setAttribute('aria-label', t('nav.more'));
+    // Der Toast-Stapel weicht dem offenen Blatt ganz (utils/toast-placement.js,
+    // YIELD_SELECTOR): er landete sonst auf Griff und Suche.
+    moreSheet.dataset.toastYield = '';
     setOverlayInteractive(moreSheet, false);
     const dragHandle = document.createElement('div');
     dragHandle.className = 'more-sheet__handle';

@@ -185,6 +185,10 @@ export function pausableDeadline(el, onExpire, duration, { minRest = TOAST_RESUM
     timer = setTimeout(expire, remaining);
   }
 
+  // Der Stapel weicht einer Flaeche (das Mehr-Blatt, utils/toast-placement.js):
+  // solange der Toast nicht zu sehen ist, laeuft seine Frist nicht ab.
+  el.addEventListener('toast:hold', () => hold('yield'));
+  el.addEventListener('toast:release', () => release('yield'));
   el.addEventListener('pointerenter', () => hold('pointer'));
   el.addEventListener('pointerleave', () => release('pointer'));
   el.addEventListener('focusin', () => hold('focus'));

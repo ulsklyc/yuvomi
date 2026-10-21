@@ -116,6 +116,31 @@ test('Frist: Zeiger auf dem Toast haelt ihn, danach bleiben mindestens 2s', asyn
   }
 });
 
+// Critique R21: der Stapel weicht dem offenen Mehr-Blatt ganz (toast-placement,
+// `[data-toast-yield]`) und meldet das am Toast. Solange er nicht zu sehen ist,
+// laeuft seine Frist nicht ab - ein Rueckgaengig ueberlebt den Blick ins Blatt.
+test('Frist: weicht der Stapel einer Flaeche (toast:hold), steht die Frist bis toast:release', async () => {
+  const { polite } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { showToast } = await import('../public/utils/toast-show.js');
+    showToast('Aufgabe erledigt', 'default', 3000, () => {});
+    const [toast] = toastsIn(polite);
+    mock.timers.tick(500);
+    toast.dispatch('toast:hold');
+    mock.timers.tick(10000);
+    assert.equal(leaving(toast), false, 'die Frist lief ab, waehrend der Toast dem Mehr-Blatt wich');
+    toast.dispatch('toast:release');
+    mock.timers.tick(2400);
+    assert.equal(leaving(toast), false, 'nach dem Schliessen blieb nicht die Restfrist');
+    mock.timers.tick(200);
+    assert.equal(leaving(toast), true, 'nach der Restfrist muss der Toast gehen');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+  }
+});
+
 test('Frist: Fokus im Toast haelt ihn, ein Fokuswechsel innerhalb laesst ihn stehen', async () => {
   const { polite } = installDom();
   mock.timers.enable({ apis: ['setTimeout', 'Date'] });

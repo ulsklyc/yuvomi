@@ -1001,3 +1001,55 @@ test('A1 P2-2: der Toast ist im Dunkeln nicht die hellste Flaeche, und alles dar
   assert.ok(shell.length >= 2, 'Glas und Reduced-Transparency-Fallback');
   for (const rule of shell) assert.match(rule.body, /var\(--toast-bg\)/, `${rule.at.join(' ')}: nicht auf --toast-bg`);
 });
+
+// Critique R21 (gemessen 390x844): ueber dem offenen Mehr-Blatt (32-764) gab es
+// keine freie Lage, der Rueckgaengig-Toast landete auf Griff und Suche
+// (12-66, die Suche ab 62). Vor einer `[data-toast-yield]`-Flaeche weicht der
+// Stapel ganz - zurueckgenommen, inert, Frist angehalten - und kommt mit dem
+// Schliessen wieder.
+test('R21: vor dem offenen Mehr-Blatt weicht der Stapel ganz und kommt mit dem Schliessen wieder', async () => {
+  const { placeToastStack, YIELD_SELECTOR } = await import('../public/utils/toast-placement.js');
+  const events = [];
+  const classes = new Set(['toast']);
+  const toast = {
+    dataset: {},
+    inert: false,
+    classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
+    dispatchEvent: (e) => events.push(e.type),
+  };
+  let sheetOpen = true;
+  const sheet = {
+    closest: (sel) => (sel === '[inert]' && !sheetOpen ? sheet : null),
+    checkVisibility: () => true,
+    getBoundingClientRect: () => ({ top: 32, bottom: 764, left: 12, right: 378, width: 366, height: 732 }),
+  };
+  const stack = {
+    dataset: { dock: 'placed' },
+    style: { removeProperty() {}, setProperty() {} },
+    querySelectorAll: (sel) => (sel === '.toast' || (sel === '.toast[data-toast-yielded]' && toast.dataset.toastYielded)
+      || (sel === '.toast--tucked' && classes.has('toast--tucked')) ? [toast] : []),
+    getBoundingClientRect: () => ({ top: 694, bottom: 748, left: 12, right: 378, width: 366, height: 0 }),
+  };
+  const saved = { document: globalThis.document, CustomEvent: globalThis.CustomEvent };
+  globalThis.CustomEvent ??= class { constructor(type) { this.type = type; } };
+  globalThis.document = {
+    querySelectorAll: (sel) => (sel === YIELD_SELECTOR ? [sheet] : []),
+    documentElement: { clientHeight: 844, clientWidth: 390 },
+  };
+  try {
+    assert.equal(placeToastStack(stack), null);
+    assert.ok(classes.has('toast--tucked') && toast.inert, 'der Toast steht weiter ueber dem offenen Blatt');
+    assert.equal(stack.dataset.dock, undefined, 'eine alte Lage am Dialog blieb gesetzt');
+    assert.deepEqual(events, ['toast:hold'], 'die Frist laeuft weiter, waehrend der Toast nicht zu sehen ist');
+    placeToastStack(stack);
+    assert.deepEqual(events, ['toast:hold'], 'ein zweites Messen haelt die Frist nicht noch einmal an');
+    sheetOpen = false;
+    placeToastStack(stack);
+    assert.ok(!classes.has('toast--tucked') && !toast.inert, 'nach dem Schliessen kommt der Toast nicht wieder');
+    assert.deepEqual(events, ['toast:hold', 'toast:release'], 'die Frist laeuft nach dem Schliessen nicht weiter');
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; }
+  }
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /moreSheet\.dataset\.toastYield = '';/, 'das Mehr-Blatt ist keine Flaeche, vor der der Stapel weicht');
+});

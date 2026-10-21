@@ -135,6 +135,19 @@ const SURFACE_SELECTOR = `${DIALOG_SELECTOR}, ${PANE_SELECTOR}`;
  */
 export const KEEPOUT_SELECTOR = '[data-toast-keepout]';
 
+/**
+ * FLAECHEN, VOR DENEN DER STAPEL GANZ WEICHT (Critique R21): `[data-toast-yield]`.
+ * Das Mehr-Blatt steht fast so hoch wie das Bild; es gab keine freie Lage, und
+ * der Rueckgaengig-Toast landete oben auf Griff und Suche (gemessen 390x844:
+ * Toast 12-66 ueber dem Blatt ab 32, die Suche ab 62). Das Blatt ist ein
+ * Startpunkt in einen anderen Raum, keine Arbeit an der Seite, deren Meldung
+ * der Toast ist. Solange es offen ist, nimmt der Stapel seine Toasts zurueck
+ * (`inert`, wie beim Weichen vor einem Dialog) und haelt ihre Frist an
+ * (`toast:hold`, utils/toast-show.js) - mit dem Schliessen kommen sie mit der
+ * Restfrist wieder, ein Rueckgaengig geht nicht verloren.
+ */
+export const YIELD_SELECTOR = '[data-toast-yield]';
+
 /** Die ausgezeichneten Bedienleisten eines Dialogs (und der Detailspalte). */
 export const ACTION_ZONE_SELECTOR =
   '.modal-panel__header, .modal-panel__footer, .modal-actions, [data-dialog-actions], '
@@ -503,6 +516,27 @@ function undock(stack) {
   clearDock(stack);
 }
 
+/** Weicht vor einer offenen `[data-toast-yield]`-Flaeche: zurueck und Frist angehalten. */
+function yieldStack(stack) {
+  for (const toast of stack.querySelectorAll('.toast')) {
+    if (toast.dataset.toastYielded) continue;
+    toast.dataset.toastYielded = '1';
+    toast.classList.add('toast--tucked');
+    toast.inert = true;
+    toast.dispatchEvent(new CustomEvent('toast:hold'));
+  }
+}
+
+/** Die Flaeche ist zu: die geweichten Toasts kommen mit ihrer Restfrist wieder. */
+function releaseYield(stack) {
+  for (const toast of stack.querySelectorAll('.toast[data-toast-yielded]')) {
+    delete toast.dataset.toastYielded;
+    toast.classList.remove('toast--tucked');
+    toast.inert = false;
+    toast.dispatchEvent(new CustomEvent('toast:release'));
+  }
+}
+
 /** Der Stapel steht wieder an seinem Platz; Zurueckgenommenes bleibt es. */
 function clearDock(stack) {
   delete stack.dataset.dock;
@@ -517,6 +551,12 @@ function clearDock(stack) {
  * @param {HTMLElement} stack
  */
 export function placeToastStack(stack) {
+  if ([...document.querySelectorAll(YIELD_SELECTOR)].some(isOpen)) {
+    yieldStack(stack);
+    clearDock(stack);
+    return null;
+  }
+  releaseYield(stack);
   undock(stack);
   const rect = stack.getBoundingClientRect();
   if (rect.height === 0) return null;
