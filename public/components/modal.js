@@ -352,10 +352,24 @@ function trapFocus(container, initialFocus = 'first-field') {
   container.addEventListener('keydown', focusTrapHandler);
 
   // Virtual Keyboard: Focused Input in sichtbaren Bereich scrollen
+  //
+  // NUR WAS NICHT SCHON OBEN IM BILD STEHT (R21 S7, Critique a3). Ein hohes
+  // Feld - der Notiztext mit 300px Mindesthoehe - laesst sich nicht
+  // zentrieren: der Koerper rollte beim Wechsel in den Editor 54px hoch, und
+  // der Umschalter Lesen/Bearbeiten stand 38 von 48px unter dem Blattkopf.
+  // Steht die Oberkante des Felds schon in der oberen Haelfte seines
+  // Scrollports, bleibt alles stehen; tiefer liegende Felder (die die
+  // Tastatur verdecken wuerde) ruecken wie bisher in die Mitte.
   function onInputFocus(e) {
     const tag = e.target.tagName;
     if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
     setTimeout(() => {
+      const port = e.target.closest('.modal-panel__body');
+      if (port) {
+        const top = e.target.getBoundingClientRect().top;
+        const box = port.getBoundingClientRect();
+        if (top >= box.top && top < box.top + box.height / 2) return;
+      }
       e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 300);
   }

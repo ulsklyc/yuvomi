@@ -2480,3 +2480,15 @@ test('Weitere Angaben: nach dem Tipp rollt der Dialog das Neue ueber den Fuss, d
     if (!prevElement) delete globalThis.Element; else globalThis.Element = prevElement;
   }
 });
+
+// R21 S7 (Critique a3): der Fokus-Helfer zentrierte JEDES Feld nach 300ms -
+// auch den 300px hohen Notiztext, der oben im Blatt schon im Bild stand: der
+// Koerper rollte 54px, und der Umschalter Lesen/Bearbeiten lag 38 von 48px
+// unter dem Blattkopf (gemessen 390x844, im Browser nachgeprueft: 38 -> 0).
+test('R21 S7: ein Feld, das schon oben im Blatt steht, rollt den Koerper nicht', () => {
+  const src = readFileSync(new URL('../public/components/modal.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function onInputFocus('), src.indexOf("container.addEventListener('focusin', onInputFocus);"));
+  assert.match(fn, /e\.target\.closest\('\.modal-panel__body'\)/, 'gemessen wird am Scrollport des Blatts');
+  assert.match(fn, /if \(top >= box\.top && top < box\.top \+ box\.height \/ 2\) return;/, 'oben im Bild bleibt alles stehen');
+  assert.ok(fn.indexOf('return;') < fn.indexOf('scrollIntoView'), 'erst pruefen, dann rollen');
+});

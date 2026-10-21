@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Switching a note to editing keeps the Read/Edit switch in view.** On a phone the long text
+  field pulled the sheet up by about two lines when it got the cursor, and the switch slid under
+  the sheet's header. Dialogs now only move a field into view when it is not already in the
+  upper half of the sheet.
+
 - **Small alignments in contacts and settings.** In a contact, phone numbers, e-mail addresses
   and addresses now sit as close under their label as category and notes do. On a phone the
   label field of a number or address moves under the value, so "Label (e.g. work)" is no longer
