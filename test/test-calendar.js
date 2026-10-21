@@ -6511,6 +6511,53 @@ test('R21 D2: das Bild des Nachbarn traegt seine eigenen Termine, der gezeigte Z
   }
 });
 
+/* R21 S8 (Nachtrag aus Handoff 2): DAS VORLADEN FRAGT BEIDE NACHBARN IN EINEM
+ * ABRUF JE QUELLE. Vorher je Nachbar vier Quellen (Termine, Feiertage,
+ * Schichtplan, Abfall) - nach jedem Zeichnen am Telefon bis zu acht Anfragen
+ * fuer zwei Zeitraeume. Jeder Nachbar behaelt seine eigenen Grenzen; was ueber
+ * seinen Rand reicht, klammert buildDayIndex() weg. */
+await test('R21 S8: beide Nachbarn kommen in einem Abruf je Quelle, jeder mit seinen eigenen Grenzen', async () => {
+  const restoreDom = installMiniDom();
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const zuvor = { ...calendarHelpers.state };
+  const savedStub = globalThis.__apiStub;
+  const calls = [];
+  try {
+    Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 5, onLine: true }, configurable: true, writable: true });
+    calendarHelpers.setContainerForTest({ isConnected: true, querySelector: () => null });
+    globalThis.__apiStub = { get: async (url) => { calls.push(url); return { data: url.startsWith('/calendar?') ? [{ id: 7, title: 'X', start_datetime: '2026-06-10T09:00', end_datetime: '2026-06-10T10:00', assigned_users: [] }] : [] }; } };
+    Object.assign(calendarHelpers.state, {
+      view: 'week', cursor: '2026-06-17', today: '2026-06-17', weekStart: 1, events: [], tasks: [], holidays: [],
+      scheduleEntries: [], wasteOccurrences: [], rangeFrom: '2026-06-15', rangeTo: '2026-06-21', loadError: null,
+    });
+    calendarHelpers.clearNeighborDataForTest();
+    await calendarHelpers.prefetchNeighbors();
+    const prev = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(-1));
+    const next = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(1));
+    const cal = calls.filter((u) => u.startsWith('/calendar?'));
+    const hol = calls.filter((u) => u.startsWith('/calendar/holidays?'));
+    assert(cal.length === 1 && hol.length === 1, `je Quelle EIN Abruf fuer beide Nachbarn, nicht einer je Nachbar: ${calls.join(' ')}`);
+    assert(hol[0] === `/calendar/holidays?from=${prev.from}&to=${next.to}`, `die Spanne reicht vom vorigen bis zum naechsten Zeitraum: ${hol[0]}`);
+    for (const r of [prev, next]) {
+      const data = calendarHelpers.neighborDataForTest(`${r.from}|${r.to}`);
+      assert(data && data.from === r.from && data.to === r.to, `jeder Nachbar behaelt seine Grenzen: ${JSON.stringify(data && { from: data.from, to: data.to })}`);
+    }
+    // Liegt einer schon bereit, fragt der Abruf nur den anderen.
+    calls.length = 0;
+    calendarHelpers.state.cursor = next.from;
+    await calendarHelpers.prefetchNeighbors();
+    const after = calendarHelpers.getRangeForView('week', calendarHelpers.neighborCursor(1));
+    const hol2 = calls.filter((u) => u.startsWith('/calendar/holidays?'));
+    assert(hol2.length === 1 && hol2[0] === `/calendar/holidays?from=${after.from}&to=${after.to}`, `nur der fehlende Nachbar: ${calls.join(' ')}`);
+  } finally {
+    calendarHelpers.clearNeighborDataForTest();
+    Object.assign(calendarHelpers.state, zuvor);
+    globalThis.__apiStub = savedStub;
+    if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc); else delete globalThis.navigator;
+    restoreDom();
+  }
+});
+
 test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den Weg eines Blatts', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const wire = src.slice(src.indexOf('wirePeriodSwipe(bodyEl, {'), src.indexOf('});', src.indexOf('wirePeriodSwipe(bodyEl, {')));

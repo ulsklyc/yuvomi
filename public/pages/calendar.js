@@ -3261,17 +3261,27 @@ async function prefetchNeighbors() {
       },
     });
   }
-  // Beide Nachbarn zugleich: der zweite soll nicht auf den ersten warten.
-  await Promise.all([1, -1].map(async (dir) => {
-    const { from, to } = getRangeForView(state.view, neighborCursor(dir));
-    const key = `${from}|${to}`;
-    if (freshNeighbor(key)) return;
+  // BEIDE NACHBARN IN EINEM ABRUF (Critique R21 S8). Je Nachbar fragte das
+  // Vorladen vier Quellen (Termine, Feiertage, Schichtplan, Abfall) - nach
+  // jedem Zeichnen am Telefon bis zu acht Anfragen fuer zwei Zeitraeume, neben
+  // den fuenf des gezeigten. Fehlen beide, fragt EIN Abruf ueber die Spanne vom
+  // vorigen bis zum naechsten Zeitraum; jeder Nachbar behaelt seine eigenen
+  // Grenzen (`from`/`to`), und buildDayIndex() klammert die Termine darauf -
+  // was ueber den Rand reicht, zeigt das Bild nicht.
+  const missing = [1, -1]
+    .map((dir) => getRangeForView(state.view, neighborCursor(dir)))
+    .filter(({ from, to }) => !freshNeighbor(`${from}|${to}`));
+  if (missing.length) {
+    const from = missing.reduce((min, r) => (r.from < min ? r.from : min), missing[0].from);
+    const to = missing.reduce((max, r) => (r.to > max ? r.to : max), missing[0].to);
     try {
-      _neighborData.set(key, { at: performance.now(), data: await fetchPeriodData(from, to) });
+      const data = await fetchPeriodData(from, to);
+      const at = performance.now();
+      for (const r of missing) _neighborData.set(`${r.from}|${r.to}`, { at, data: { ...data, from: r.from, to: r.to } });
     } catch {
       // Kein Nachbar - der Wisch faellt auf das Nachladen zurueck.
     }
-  }));
+  }
   // Nur die juengsten Zeitraeume behalten.
   while (_neighborData.size > 6) _neighborData.delete(_neighborData.keys().next().value);
   prebuildGhosts();
@@ -6977,6 +6987,9 @@ export const __test = {
   buildPeriodGhost, neighborCursor, periodSpan, stepFromSwipe, CAL_SWIPE_AXIS,
   setNeighborDataForTest(key, data) { _neighborData.set(key, { at: performance.now(), data }); },
   clearNeighborDataForTest() { _neighborData.clear(); },
+  // R21 S8: beide Nachbarn in einem Abruf je Quelle.
+  prefetchNeighbors,
+  neighborDataForTest(key) { return _neighborData.get(key)?.data ?? null; },
   // test:initials: die Scheibe einer Person im Filterblatt.
   personFilterChipsHtml,
   viewSwapDirection, unbreakable,

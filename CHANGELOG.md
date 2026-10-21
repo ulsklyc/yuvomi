@@ -63,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen until you scroll near them, as tasks, contacts and recipes already did. Opening a dialog
   over a long agenda is lighter for it.
 
+- **Swiping the calendar asks the server less often.** To have the next and the previous week
+  or month ready under your finger, the calendar used to ask four sources for each of them,
+  up to eight requests after every change of period on a touch device. It now asks each
+  source once for both.
+
 - **Adding a dialog, a notification or a field no longer recalculates the whole page.** Four
   style rules (the collapsed search, the folding toolbar and the budget's two ledger sections)
   made the browser re-style every element on the page whenever something was inserted. They

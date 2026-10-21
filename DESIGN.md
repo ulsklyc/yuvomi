@@ -3727,7 +3727,11 @@ Nachbar steht, baut `navigate()` den Zeitraum wirklich auf - an derselben Stelle
 Uhrzeit auf derselben Hoehe (`stepFromSwipe`). Ohne vorgeladene Daten bleibt es beim alten
 Weg. Reduzierte Bewegung: kein Zug, der neue Zeitraum blendet ein (`period-swipe-in--fade`).
 Gemessen 390/834px, 1x und 4x: Achse 112 -> 0px Drift, Abdeckung 71 -> 100 %, CLS 0. Guard
-`test:calendar` "R21 D2".
+`test:calendar` "R21 D2". **Das Vorladen fragt beide Nachbarn in EINEM Abruf je Quelle (R21
+S8):** fehlen beide, reicht die Spanne vom vorigen bis zum naechsten Zeitraum, und jeder
+Nachbar behaelt seine eigenen Grenzen (`buildDayIndex()` klammert, was ueber den Rand reicht);
+fehlt einer, wird nur er gefragt. Vorher je Nachbar vier Quellen - nach jedem Zeichnen bis zu
+acht Anfragen fuer zwei Zeitraeume, jetzt hoechstens vier. Guard `test:calendar` "R21 S8".
 
 **Geprueft auf zwei Ebenen, weil jede etwas anderes sehen kann.** Ebene 3 (statisch, in
 `test-frontend-audit.js`) folgt von jeder Wischrichtung mit `--delete` der Kante zu der
