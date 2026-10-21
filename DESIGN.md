@@ -2669,6 +2669,9 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   je Reiter springen (382 -> 334px bei 390) und stand linksbuendig vor einem Loch.
 - Labels mobil in 11px (`--type-micro`, Caption 2 - der iOS-Wert fuer Tab-Bar-Titel; Begruendung
   an `.nav-bottom .nav-item__label`); lange Locales duerfen die Kapsel wachsen lassen, nie clippen.
+  **Ab 640px Caption 1 (12px, R21, D4):** die 11px sind die Antwort auf 58px je Slot am
+  375er-Telefon; am Tablet hat jeder Slot ueber 100px, und das Label war dort die kleinste
+  Schrift des Schirms (Guard `test:typography` "R21 Inge").
 - **"Mehr" ist kein Modul (Nav-Polish 2026-10-15):** in Ruhe steht sein Zeichen tertiaer wie
   beim Aufbau (`--color-text-tertiary`, hell #6B675F); vorher setzte der Zustand nach jeder
   Navigation den App-Akzent, und der Ueberlauf sah aus wie der aktive Tab. Liegt die aktive
