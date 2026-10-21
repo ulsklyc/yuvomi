@@ -110,6 +110,19 @@ test('die namensabhaengigen Felder gibt es in beiden Quellen', () => {
   assert.equal(server.short_name, 'TEST_APP_NAME');
 });
 
+// D15 (Critique R21): die Beschreibungstexte sagten "Familienplaner" - wer
+// allein oder zu zweit wohnt, war darin nicht gemeint (wie Anmeldung und
+// Rundgang, test:i18n). Der App-NAME (`name`) bleibt: Bestandsinstallationen
+// tragen ihn als Titel des installierten Symbols.
+test('die Beschreibungen sprechen vom Zuhause, nicht vom Familienplaner (D15)', () => {
+  assert.doesNotMatch(staticManifest.description, /familienplaner|family planner/i, 'manifest.json description');
+  assert.doesNotMatch(serverManifest().description, /familienplaner|family planner/i, 'Route /manifest.webmanifest description');
+  const html = fs.readFileSync(path.join(HERE, '..', 'public', 'index.html'), 'utf8');
+  const meta = html.match(/<meta name="description" content="([^"]*)"/);
+  assert.ok(meta, 'index.html traegt eine meta description');
+  assert.doesNotMatch(meta[1], /familienplaner|family planner/i, 'index.html meta description');
+});
+
 test('theme_color folgt dem Rohwert von --_neutral-100 aus tokens.css', () => {
   const tokens = fs.readFileSync(path.join(HERE, '..', 'public', 'styles', 'tokens.css'), 'utf8');
   const m = tokens.match(/--_neutral-100:\s*(#[0-9a-fA-F]{3,8})\s*;/);

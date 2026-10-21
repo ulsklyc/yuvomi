@@ -1,7 +1,7 @@
 {
   "name": "Yuvomi Familienplaner",
   "short_name": "Yuvomi",
-  "description": "Selbstgehosteter Familienplaner",
+  "description": "Selbstgehostet: dein Zuhause an einem Ort - allein, zu zweit oder als Familie",
   "id": "/",
   "start_url": "/",
   "scope": "/",

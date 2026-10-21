@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The installed app describes itself as a home, not a family planner.** The description of the
+  installable app and of the start page names your home in one place - whether you live alone, as a
+  couple or as a family -, like the sign-in page and the welcome tour already do. The app's name is
+  unchanged.
+
 - **Forms use one text size around their fields.** Field labels, the hints below a field, field
   errors and the heading of a field group are all one size now; before, labels and most hints were a
   step larger than the system's label size and some hints a step smaller. The description under a

@@ -462,7 +462,7 @@ app.get('/manifest.webmanifest', apiLimiter, (req, res) => {
   res.json({
     name: `${appName} Familienplaner`,
     short_name: appName,
-    description: 'Selbstgehosteter Familienplaner',
+    description: 'Selbstgehostet: dein Zuhause an einem Ort - allein, zu zweit oder als Familie',
     id: '/',
     start_url: '/',
     scope: '/',
