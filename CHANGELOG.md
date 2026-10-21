@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On a phone, documents filter by folder and category from one place.** The filter row held the
+  active/archived switch, the folder button and six category chips, and at phone width none of the
+  categories was fully in view. The folder button now opens folders and categories as two groups,
+  shows the chosen category with its icon, and the row fits the screen. On larger screens nothing
+  changes.
+
 - **The installed app describes itself as a home, not a family planner.** The description of the
   installable app and of the start page names your home in one place - whether you live alone, as a
   couple or as a family -, like the sign-in page and the welcome tour already do. The app's name is

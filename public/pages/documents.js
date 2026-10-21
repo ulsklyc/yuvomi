@@ -433,9 +433,10 @@ export async function render(container, context = {}) {
                `aria-label` - Begruendung am alten Ort, siehe unten. Am Desktop
                ist er ausgeblendet; dort steht die Ordnerspalte. */ ''}
           <button class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"
-                  aria-expanded="false" aria-controls="documents-folder-browser">
-            <i data-lucide="folders" class="icon-md" aria-hidden="true"></i>
+                  aria-expanded="false" aria-controls="documents-folder-browser documents-category-browser">
+            <i data-lucide="folders" class="icon-md documents-folder-chip__icon" aria-hidden="true"></i>
             <span class="documents-folder-browser__toggle-label">${esc(t('documents.allDocuments'))}</span>
+            <span class="documents-folder-chip__facet" id="documents-folder-chip-facet"></span>
             <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
           </button>
           <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
@@ -465,6 +466,17 @@ export async function render(container, context = {}) {
             </button>`}
           </div>
           <ul class="documents-folder-browser__list row-carrier" id="documents-folder-browser"></ul>
+          ${/* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4/D7). Am Telefon
+               standen drei Filterachsen in einer Zeile - Status, Ordner und
+               die Kategorie-Chips -, und von den sechs Kategorien war bei 390px
+               keine ganz im Bild (die Spur lief 775px ueber). Unter 768px
+               stehen die Kategorien deshalb als zweite Gruppe in der Auswahl,
+               die der Ordner-Chip aufklappt, wie Orte und Tags in einer
+               Dateien-App; die Chips weichen dort. Beide Ordnungen bleiben
+               (D7), nur die Zeile ordnet sich. Ab 768px steht alles wie
+               vorher (documents.css). */ ''}
+          <h2 class="documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
+          <ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
         </aside>
         <div class="documents-browser-main">
           ${/* Der Pfad, in dem man steht (#785). Er steht ueber der Liste und
@@ -497,6 +509,7 @@ export async function render(container, context = {}) {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
   renderDocuments();
 }
 
@@ -506,6 +519,7 @@ function renderAll({ motion = false } = {}) {
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
+  renderCategoryBrowser();
   renderBreadcrumb();
   renderDocuments({ motion });
 }
@@ -965,6 +979,18 @@ function bindPageEvents() {
   folderToggle?.addEventListener('click', () => {
     setFolderListOpen(folderToggle.getAttribute('aria-expanded') !== 'true');
   });
+  // Die Kategorie-Gruppe der Auswahl (unter 768px): derselbe Filter wie der
+  // Chip, danach zu wie nach der Wahl eines Ordners.
+  _container.querySelector('#documents-category-browser')?.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-category]');
+    if (!row) return;
+    if (row.dataset.category !== state.category) {
+      state.category = row.dataset.category;
+      applyFilters();
+      renderAll();
+    }
+    setFolderListOpen(false);
+  });
   folderBrowser?.addEventListener('click', (e) => {
     const menuBtn = e.target.closest('[data-folder-menu]');
     if (menuBtn) {
@@ -1359,6 +1385,59 @@ function renderCategoryChips() {
     </button>`).join('')}
   `);
   if (window.lucide) lucide.createIcons({ el: host });
+}
+
+/**
+ * Die Kategorien als zweite Gruppe der aufklappbaren Auswahl (unter 768px, die
+ * Regeln in documents.css). Dieselben Kategorien und Zaehler wie die Chips,
+ * dieselbe Zeilen-Grammatik wie die Ordner darueber; die Zeile traegt
+ * `data-category` wie der Chip, und die Wahl laeuft ueber denselben Weg.
+ */
+function renderCategoryBrowser() {
+  const host = _container?.querySelector('#documents-category-browser');
+  if (!host) return;
+  const counts = categoryCounts();
+  const present = presentCategories();
+  const labels = categoryLabels();
+  const showCounts = state.allDocuments.length > 0;
+  const treeHasFolders = visibleFolderRows().length > 0;
+  const lead = folderRowLead({ managed: false }, treeHasFolders) === 'none'
+    ? '' : '<span class="documents-folder-item__twisty documents-folder-item__twisty--leaf" aria-hidden="true"></span>';
+  const rows = [
+    { id: '', name: t('documents.allCategories'), icon: 'shapes' },
+    ...CATEGORIES.filter((category) => present.get(category) || category === state.category)
+      .map((category) => ({ id: category, name: labels[category], icon: CATEGORY_ICONS[category] || 'folder' })),
+  ];
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', rows.map((row) => {
+    const active = (state.category || '') === row.id;
+    return `
+    <li class="list-row documents-folder-item${active ? ' documents-folder-item--active' : ''}">
+      ${lead}
+      <button class="documents-folder-item__select list-row__main--interactive" type="button" data-category="${esc(row.id)}" aria-current="${active ? 'true' : 'false'}">
+        <span class="documents-folder-item__icon"><i data-lucide="${esc(row.icon)}" aria-hidden="true"></i></span>
+        <span class="list-row__name documents-folder-item__name">${esc(row.name)}</span>
+        ${showCounts ? `<span class="documents-folder-item__count">${counts.get(row.id) || 0}</span>` : ''}
+      </button>
+    </li>`;
+  }).join(''));
+  if (window.lucide) lucide.createIcons({ el: host });
+  // Der Chip nennt am Telefon auch die gewaehlte Kategorie - die Chips, die
+  // es sonst sagten, stehen dort nicht. Ohne gewaehlten Ordner steht sie
+  // allein ("Schule" statt "Alle Dokumente · Schule"), sonst hinter dem Ordner.
+  // Mit dem Zeichen der Kategorie: "Schule" heisst im Seed auch ein Ordner.
+  const name = state.category ? (labels[state.category] ?? state.category) : '';
+  const facet = _container.querySelector('#documents-folder-chip-facet');
+  if (facet) {
+    facet.replaceChildren();
+    if (name) {
+      facet.insertAdjacentHTML('beforeend', `${state.folderId ? '<span aria-hidden="true">·</span>' : ''}<i data-lucide="${esc(CATEGORY_ICONS[state.category] || 'folder')}" class="icon-md" aria-hidden="true"></i><span class="documents-folder-chip__facet-name">${esc(name)}</span>`);
+      if (window.lucide) lucide.createIcons({ el: facet });
+    }
+  }
+  const toggle = _container.querySelector('#documents-folder-toggle');
+  toggle?.toggleAttribute('data-category-active', Boolean(state.category));
+  toggle?.toggleAttribute('data-category-only', Boolean(state.category) && !state.folderId);
 }
 
 // Ein einzelner Umschalt-Chip, gleiches Muster wie renderCategoryChips - nur ein

@@ -3122,6 +3122,12 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Ansicht unter 768px als Einfachauswahl im Kopf-Menue (wie im Kalender), der Umschalter ab
    768px. Damit entfaellt in Notizen und Dokumenten die Zeile ueber der Chipreihe: Notizen
    erste Karte y 232 -> 183, Dokumente 249 -> 200 (vier Baender -> drei).
+   Seit R21 S9b ordnet sich die Filterzeile der Dokumente unter 768px nach Achsen: Status als
+   Segment, Ordner UND Kategorie in EINER Auswahl hinter dem Ordner-Chip (zwei Gruppen,
+   wie Orte und Tags einer Dateien-App), dazu hoechstens der Fristen-Chip. Die Kategorie-Chips
+   stehen ab 768px; beide Ordnungen bleiben (D7). Der Chip nennt die gewaehlte Kategorie mit
+   ihrem Zeichen. Gemessen 390px: Kategorien ganz im Bild 0/6 (Spur 775px ueber) -> alle sechs
+   nach einem Tipp, Spur 0px ueber (`test:documents-ux`).
    Seit D1 (Critique 2026-10-16) traegt auch der Aufgabenkopf seine Werkzeuge in der
    Titelzeile: Lupe, Filter als Icon mit Zaehler (D2) und „...", die Ansicht Liste/Brett
    unter 768px als Einfachauswahl im Menue. Gemessen 390px: Kopf 120 -> 65px, erste

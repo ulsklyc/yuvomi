@@ -1999,7 +1999,7 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
   const chip = spur.indexOf('id="documents-folder-toggle"');
   assert.ok(chip > -1, 'der Auslöser steht in der Chip-Spur');
   assert.ok(chip < spur.indexOf('id="documents-expiring-filter"') && chip < spur.indexOf('id="documents-category"'), 'und zwar als erster Chip');
-  assert.match(spur, /class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"\s+aria-expanded="false" aria-controls="documents-folder-browser">/,
+  assert.match(spur, /class="filter-chip filter-chip--sm documents-folder-chip" id="documents-folder-toggle" type="button"\s+aria-expanded="false" aria-controls="documents-folder-browser(?: documents-category-browser)?">/,
     'Chip-Haut, Zustand und Ziel des Aufklappens');
   assert.equal((page.match(/id="documents-folder-toggle"/g) ?? []).length, 1, 'genau EIN Auslöser');
   assert.match(page, /toggleAttribute\('data-folder-active', Boolean\(state\.folderId\)\)/, 'ein gewaehlter Ordner zeigt sich am Chip');
@@ -2010,6 +2010,36 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
   assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-chip' && /display:\s*inline-flex/.test(r.body)));
   assert.ok(rules.some((r) => tablet(r) && r.selector.trim() === '.documents-folder-browser:not(.documents-folder-browser--open)' && /display:\s*none/.test(r.body)),
     'zugeklappt belegt die Ordnerauswahl keine Zeile');
+});
+
+// R21 S9b (Critique a4, D7): am Telefon standen drei Filterachsen in EINER
+// Zeile - Status-Segment, Ordner-Chip und sechs Kategorie-Chips -, und bei
+// 390px war keine Kategorie ganz im Bild (Spur 775px ueber). D7: beide
+// Ordnungen bleiben, nur die Zeile ordnet sich. Unter 768px stehen die
+// Kategorien als zweite Gruppe in der Auswahl, die der Ordner-Chip aufklappt;
+// die Chips weichen dort, der Chip nennt die gewaehlte Kategorie.
+test('R21 S9b: am Telefon stehen die Kategorien in der Auswahl des Ordner-Chips', () => {
+  const aside = page.slice(page.indexOf('<aside class="documents-folder-browser"'), page.indexOf('</aside>'));
+  assert.match(aside, /<ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"><\/ul>/,
+    'die Kategorie-Gruppe steht in der Auswahl, unter den Ordnern');
+  assert.ok(aside.indexOf('id="documents-folder-browser"') < aside.indexOf('id="documents-category-browser"'), 'Ordner zuerst, dann Kategorien');
+  assert.match(page, /aria-controls="documents-folder-browser documents-category-browser"/, 'der Chip klappt beide Gruppen auf');
+  const fn = page.slice(page.indexOf('function renderCategoryBrowser()'), page.indexOf('function renderExpiringChip()'));
+  assert.match(fn, /data-category="\$\{esc\(row\.id\)\}"/, 'die Zeile traegt data-category wie der Chip');
+  assert.match(fn, /toggleAttribute\('data-category-active', Boolean\(state\.category\)\)/, 'eine gewaehlte Kategorie zeigt sich am Chip');
+  assert.match(page.slice(page.indexOf('function renderAll('), page.indexOf('function renderBreadcrumb(')), /renderCategoryBrowser\(\);/,
+    'jedes Zeichnen haelt die Gruppe aktuell');
+  const bind = page.slice(page.indexOf("querySelector('#documents-category-browser')?.addEventListener"), page.indexOf('folderBrowser?.addEventListener'));
+  assert.match(bind, /state\.category = row\.dataset\.category;[\s\S]*applyFilters\(\);[\s\S]*setFolderListOpen\(false\);/,
+    'die Wahl filtert wie der Chip und klappt zu');
+  const rules = [...eachRule(css)];
+  const phone = (r) => r.at.some((a) => /max-width:\s*767px/.test(a));
+  assert.ok(rules.some((r) => r.at.length === 0 && /\.documents-category-browser(?![\w-])/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'ab 768px keine Kategorie-Gruppe - dort stehen die Chips');
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '#documents-category' && /display:\s*none/.test(r.body)),
+    'am Telefon weichen die Kategorie-Chips');
+  assert.ok(rules.some((r) => phone(r) && r.selector.trim() === '.documents-folder-browser--open .documents-category-browser' && /display:\s*block/.test(r.body)),
+    'aufgeklappt steht die Kategorie-Gruppe');
 });
 
 // Re-Critique 2026-10-17 (A4 P2-3, P3): im Raster klemmte die leere Suche in

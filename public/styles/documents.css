@@ -235,6 +235,14 @@
   display: none;
 }
 
+/* Die Kategorien als zweite Gruppe der Auswahl gibt es nur am Telefon (Block
+ * unten, max-width 767px); daneben tragen die Chips die Kategorie. */
+.documents-category-browser,
+.documents-category-browser__title,
+.documents-folder-chip__facet {
+  display: none;
+}
+
 /* Freistehendes Ziel im Kopf der Ordnerliste - kein gleichartiges Ziel engt es
  * ein, also die volle Zielgröße (tokens.css, „Die Zielgrößen-Regel").
  * --target-sm ist laut Token ausdrücklich „kein Touch-Target": 32x32 am Zeiger,
@@ -1495,6 +1503,74 @@
 
   .documents-filters__chips {
     padding-inline-start: var(--space-2);
+  }
+
+  /* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4, D7: beide Ordnungen
+   * bleiben, nur die Zeile ordnet sich). Drei Achsen in einer Zeile liessen
+   * bei 390px keine der sechs Kategorien ganz im Bild - die Spur lief 775px
+   * ueber. Hier weichen die Kategorie-Chips; die Kategorien stehen als zweite
+   * Gruppe unter den Ordnern in der Auswahl, die der Ordner-Chip aufklappt,
+   * und der Chip nennt die gewaehlte mit. Die Zeile behaelt EINE Bedienzeile
+   * (Chrome-Regel): Status-Segment, Auswahl, Fristen-Chip. */
+  #documents-category {
+    display: none;
+  }
+
+  .documents-folder-browser--open .documents-category-browser {
+    display: block;
+  }
+
+  .documents-folder-chip__facet:not(:empty) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: 0;
+  }
+
+  .documents-folder-chip__facet-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Ohne Ordner nennt der Chip nur die Kategorie; und er darf schrumpfen -
+   * hinter ihm steht hoechstens noch der Fristen-Chip. */
+  .documents-folder-chip[data-category-only] :is(.documents-folder-browser__toggle-label, .documents-folder-chip__icon) {
+    display: none;
+  }
+
+  .documents-folder-chip {
+    flex-shrink: 1;
+    min-inline-size: 0;
+  }
+
+  .documents-folder-chip[data-category-active] {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+    border-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-hint), transparent);
+    color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  }
+
+  /* Zwei Gruppen brauchen zwei Koepfe: der Ordner-Titel, zwischen 768 und
+   * 1023px nur fuer Screenreader (der Chip nennt den Ordner), steht hier
+   * wieder sichtbar ueber seiner Gruppe, der Kategorie-Titel ueber seiner. */
+  .documents-folder-browser__head {
+    justify-content: space-between;
+  }
+
+  .documents-folder-browser__title {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .documents-folder-browser--open .documents-category-browser__title {
+    display: block;
+    margin-block-start: var(--space-2);
+    padding-inline-start: var(--space-1);
   }
 
   /* HIER STAND EIN VERSCHACHTELTER `max-height: 499px`-BLOCK mit genau den
