@@ -2126,6 +2126,26 @@
   --mask-opaque: #000;
 }
 
+/* DIE GLASFEDER ALS FEDER (Critique R21, D1). `--ease-glass` ist eine
+ * Back-Out-Bezier: der Gipfel des Ueberschwingers liegt bei 57 % der Zeit, und
+ * erst ab 91 % steht sie innerhalb von 1 % - das Blatt hing gemessen 117ms
+ * sichtbar ueber seiner Ruhelage (Gipfel -2,33px bei +162ms der 300ms). Wo der
+ * Browser `linear()` kennt, laeuft dieselbe Bewegung als gedaempfte Feder
+ * (Daempfung 0,6, Eigenfrequenz 11/Dauer): gleicher Gipfel (1,095 gegen 1,098),
+ * gleiche Dauer, aber der Gipfel liegt bei 36 % und sie steht ab 57 % - das
+ * Blatt schwingt einmal kurz und ruht dann. Die Stuetzstellen sind die Feder,
+ * abgetastet in 2,5-%-Schritten (Interpolationsfehler unter 1 %). Ohne
+ * `linear()` bleibt die Bezier; ungetestet waere der Wert dort ungueltig und
+ * jede Transition, die ihn liest, fiele aus - daher der @supports-Rahmen. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-glass: linear(0, 0.034 2.5%, 0.12 5%, 0.238 7.5%, 0.372 10%, 0.508 12.5%, 0.638 15%, 0.754 17.5%,
+      0.853 20%, 0.934 22.5%, 0.997 25%, 1.042 27.5%, 1.071 30%, 1.088 32.5%, 1.094 35%, 1.093 37.5%,
+      1.086 40%, 1.076 42.5%, 1.063 45%, 1.05 47.5%, 1.038 50%, 1.026 52.5%, 1.016 55%, 1.008 57.5%,
+      1.002 60%, 0.997 62.5%, 0.992 67.5%, 0.991 72.5%, 0.994 80%, 0.998 90%, 1);
+  }
+}
+
 /* ================================================================
  * Fensterhoehe: dvh, wo der Browser es kennt (#1276)
  *

@@ -1189,7 +1189,10 @@ das Verhaeltnis haelt.
   `test:frontend-audit` rechnet die Mitte aus `--icon-md`/`--icon-lg`, statt die Zahl festzunageln.
 - **Motion:** Dauern kanonisch 80-400ms (`--duration-2xs..2xl`), immer in ms. `--ease-out`
   cubic-bezier(0.16,1,0.3,1) fuer Einblendungen; Feder mit Overshoot `--ease-glass`
-  cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente; die Sidebar-Pille bekommt die sanftere
+  cubic-bezier(0.34,1.56,0.64,1) fuer Glas-Elemente - seit R21 dort, wo der Browser `linear()`
+  kennt, als gedaempfte Feder (`@supports` in tokens.css): gleicher Gipfel (1,095), gleiche Dauer,
+  aber in Ruhe ab 57 % statt 91 % der Zeit (Blatt-Einfahrt gemessen: Ueberschwinger 117 -> 67ms
+  sichtbar, Gipfel bei +100 statt +162ms; Guard `test:motion` "Glasfeder D1"); die Sidebar-Pille bekommt die sanftere
   Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
   Hoehenwechsel (Zeile oder Gruppe klappt ein/auf, `collapseOut`/`expandIn` in `utils/ux.js`,
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):

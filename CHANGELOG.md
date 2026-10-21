@@ -114,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sheets and glass controls settle sooner.** Their springy entrance kept them slightly past their
+  resting place for most of the movement. In current browsers it now moves like a real spring: the
+  same small overshoot and the same duration, but it comes to rest after about half the time.
 - **The tab bar no longer nudges the page when it shrinks while you read.** Shrinking changed its
   height, which moved its top edge a little in every frame (and in one step with reduced motion).
   It now keeps its size and squeezes from the bottom edge, so nothing on the page shifts.

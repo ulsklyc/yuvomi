@@ -2552,6 +2552,32 @@ test('Spinner D12: eine Statusdrehung in einem Tempo - und unter reduzierter Bew
   }
 });
 
+// Critique R21 (D1): die Glasfeder ist eine Back-Out-Bezier - das Blatt hing
+// gemessen 117ms sichtbar ueber der Ruhelage (Gipfel -2,33px bei +162ms der
+// 300ms). Wo `linear()` gilt, laeuft dieselbe Bewegung als gedaempfte Feder:
+// gleicher Gipfel, gleiche Dauer, frueher in Ruhe (danach 64-67ms, Gipfel
+// -2,16px bei +95-103ms).
+test('Glasfeder D1: linear()-Feder nur als @supports-Verfeinerung, gleicher Gipfel, Endwert 1', () => {
+  const rules = [...eachRule(css('tokens.css'))];
+  const base = rules.find((r) => !r.at.length && /--ease-glass:/.test(r.body));
+  assert.match(base?.body ?? '', /--ease-glass:\s*cubic-bezier\(0\.34, 1\.56, 0\.64, 1\);/, 'der Rueckfall ist nicht mehr die Bezier');
+  const spring = rules.filter((r) => r.at.some((a) => /@supports \(transition-timing-function: linear\(0, 1\)\)/.test(a))
+    && /--ease-glass:/.test(r.body));
+  assert.equal(spring.length, 1, 'die Feder steht nicht (oder nicht nur) im @supports-Rahmen');
+  assert.ok(rules.every((r) => !/--ease-glass:\s*linear\(/.test(r.body) || r.at.some((a) => /@supports/.test(a))),
+    'eine linear()-Feder ohne @supports macht in alten Browsern jede Transition ungueltig');
+  const value = spring[0].body.match(/--ease-glass:\s*linear\(([^)]*)\)/)?.[1] ?? '';
+  const stops = value.split(',').map((s) => parseFloat(s.trim()));
+  assert.equal(stops[0], 0, 'die Feder beginnt nicht bei 0');
+  assert.equal(stops.at(-1), 1, 'die Feder endet nicht bei 1');
+  // Derselbe Gipfel wie die Bezier (1,098): keine neue Bewegung, nur eine andere Zeit.
+  const peak = Math.max(...stops);
+  assert.ok(Math.abs(peak - 1.098) <= 0.01, `Gipfel ${peak} - die Feder schwingt anders weit als --ease-glass`);
+  // Und sie haengt nicht: ab 60 % steht sie innerhalb von 1 %.
+  const late = value.split(',').map((s) => s.trim().split(/\s+/)).filter(([, at]) => parseFloat(at) >= 60).map(([v]) => parseFloat(v));
+  assert.ok(late.length && late.every((v) => Math.abs(v - 1) <= 0.01), 'die Feder steht nach 60 % nicht in Ruhe');
+});
+
 test('jede @keyframes hat einen Nutzer - im Stylesheet oder im Skript', () => {
   const stripCss = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '');
   const sheets = allSheets.map((f) => stripCss(css(f)).replace(/@keyframes\s+[\w-]+/g, ''));
