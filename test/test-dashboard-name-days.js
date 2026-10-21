@@ -58,8 +58,13 @@ test('birthday metric identifies a name-day occurrence instead of calling it a b
   const previousWindow = globalThis.window;
   globalThis.window = { yuvomi: { isModuleDisabled: () => false } };
   try {
+    // Eine Kachelreihe braucht mindestens zwei Kacheln (selectMetricTiles). Die
+    // zweite war bis R21 der Saldo; seit D5 steht kein Kontostand mehr in der
+    // Reihe, also traegt eine angeheftete Notiz die Reihe. Die Geburtstagskachel
+    // selbst ist unveraendert in METRIC_TILE_ORDER (test-dashboard.js prueft das).
     const tiles = dashboard.__test.selectMetricTiles({
-      budget: { entryCount: 1, income: 1, balance: 0 },
+      pinnedNotes: [{ title: 'Zettel', pinned: 1 }],
+      pinnedNotesCount: 1,
       birthdays: [{
         id: 10,
         kind: 'name_day',
