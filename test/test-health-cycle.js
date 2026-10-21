@@ -2174,3 +2174,16 @@ test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unt
   assert.match(css, /\.cycle-hero > \.cycle-today \{\s*align-self: stretch;/, 'in der Spalte nimmt die Karte die volle Breite');
 });
 
+
+/* ZWEI KNOEPFE, ZWEI AUFGABEN (Critique R21, a5). "+ Periode" und "Periode
+ * gestartet" lasen sich wie dieselbe Handlung. "Periode gestartet" neben
+ * "Heute" erfasst heute mit einem Tipp; der Dialog hinter dem FAB ist fuer
+ * Daten - also heisst er "Periode nachtragen", als Aktion und als Titel. */
+test('Zyklus: der FAB-Dialog heisst "Periode nachtragen", die Heute-Aktion bleibt der eine Tipp (Critique R21)', () => {
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).health.cycle;
+  assert.equal(de.add, 'Periode nachtragen');
+  assert.equal(de.period.add, de.add, 'Knopf und Dialogtitel sagen dasselbe');
+  assert.notEqual(de.add, de.today.startPeriod, 'und etwas anderes als die Heute-Aktion');
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(src, /label: t\('health\.cycle\.add'\), dockLabel: t\('newLabel\.healthCycle'\), onClick: \(\) => openPeriodModal\(null\)/);
+});

@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Nichts passt zu deiner Suche und den Filtern.",
         "searchReset": "Suche zurücksetzen",
         "passwordMinLength": "Mindestens 8 Zeichen.",
-        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt."
+        "savedReloadFailed": "Die Änderung ist gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Lade die Seite neu, falls etwas fehlt.",
+        "fieldNumber": "Bitte eine Zahl eingeben.",
+        "fieldMin": "Mindestens {{min}}.",
+        "fieldMax": "Höchstens {{max}}.",
+        "fieldWholeNumber": "Bitte eine ganze Zahl eingeben.",
+        "fieldStep": "Bitte in Schritten von {{step}} eingeben.",
+        "fieldInvalid": "Bitte prüfe diese Eingabe."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Erfasse deine erste Periode, um Vorhersagen, Kalender und Statistik zu sehen.",
             "emptyCta": "Erste Periode erfassen",
             "personsLabel": "Person",
-            "add": "Periode erfassen",
+            "add": "Periode nachtragen",
             "loadError": "Zyklusdaten konnten nicht geladen werden.",
             "loadErrorDesc": "Bitte versuche es später erneut.",
             "retry": "Erneut versuchen",
@@ -5406,7 +5412,7 @@
                 "family": "Familie"
             },
             "period": {
-                "add": "Periode erfassen",
+                "add": "Periode nachtragen",
                 "edit": "Periode bearbeiten",
                 "warningFuture": "Startdatum liegt in der Zukunft - Vorhersagen basieren nur auf vergangenen Perioden.",
                 "warningOverlap": "Überschneidet sich mit einer bereits erfassten Periode."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Bitte eine CSV-Datei auswählen oder Text einfügen.",
                 "error": "Import fehlgeschlagen."
             },
-            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/modules/calendar?section=personal-feeds\">Einstellungen → Module → Kalender</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden."
+            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/modules/calendar?section=personal-feeds\">Einstellungen → Module → Kalender</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden.",
+            "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",

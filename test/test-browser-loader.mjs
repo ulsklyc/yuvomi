@@ -233,6 +233,13 @@ const STUBS = {
       }
       return any;
     };
+    // Die Regeln des Markups (components/modal.js, Critique R21): das Original
+    // liest den ValidityState der Felder - die Attrappen-Panels der Suiten
+    // haben keinen, also meldet der Stub nichts. Wer den Weg messen will,
+    // setzt globalThis.__constraintErrors.
+    export const constraintErrors = (...args) => (
+      typeof globalThis.__constraintErrors === 'function' ? globalThis.__constraintErrors(...args) : []
+    );
     export const mountFooter = () => null;
     // Wer sehen will, WOHIN ein Formular sich legt (R19, Bearbeiten in der
     // Detailspalte), setzt globalThis.__dockNextModal.

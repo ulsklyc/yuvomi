@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Niets komt overeen met je zoekopdracht en filters.",
         "searchReset": "Zoekopdracht wissen",
         "passwordMinLength": "Minstens 8 tekens.",
-        "savedReloadFailed": "Je wijziging is opgeslagen, maar de weergave kon niet worden vernieuwd. Herlaad de pagina als er iets ontbreekt."
+        "savedReloadFailed": "Je wijziging is opgeslagen, maar de weergave kon niet worden vernieuwd. Herlaad de pagina als er iets ontbreekt.",
+        "fieldNumber": "Voer een getal in.",
+        "fieldMin": "Minimaal {{min}}.",
+        "fieldMax": "Maximaal {{max}}.",
+        "fieldWholeNumber": "Voer een geheel getal in.",
+        "fieldStep": "Voer een waarde in stappen van {{step}} in.",
+        "fieldInvalid": "Controleer deze invoer."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Registreer je eerste menstruatie om voorspellingen, kalender en statistieken te zien.",
             "emptyCta": "Eerste menstruatie registreren",
             "personsLabel": "Person",
-            "add": "Menstruatie registreren",
+            "add": "Eerdere menstruatie toevoegen",
             "loadError": "Cyclusgegevens konden niet worden geladen.",
             "loadErrorDesc": "Probeer het later opnieuw.",
             "retry": "Opnieuw proberen",
@@ -5406,7 +5412,7 @@
                 "family": "Gezinsbeheer"
             },
             "period": {
-                "add": "Menstruatie registreren",
+                "add": "Eerdere menstruatie toevoegen",
                 "edit": "Menstruatie bewerken",
                 "warningFuture": "Startdatum ligt in de toekomst - voorspellingen zijn alleen gebaseerd op eerdere cycli.",
                 "warningOverlap": "Overlapt met een al geregistreerde cyclus."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Kies een CSV-bestand of plak tekst.",
                 "error": "Importeren mislukt."
             },
-            "discoveryHint": "Tip: abonneer je op de voorspelde cyclus als ICS-feed onder <a href=\"/settings/modules/calendar?section=personal-feeds\">Instellingen → Modules → Agenda</a>, of toon de cyclus-widget op het <a href=\"/\">Overzicht</a> via de aanpasmodus."
+            "discoveryHint": "Tip: abonneer je op de voorspelde cyclus als ICS-feed onder <a href=\"/settings/modules/calendar?section=personal-feeds\">Instellingen → Modules → Agenda</a>, of toon de cyclus-widget op het <a href=\"/\">Overzicht</a> via de aanpasmodus.",
+            "endBeforeStart": "Het einde mag niet vóór het begin liggen."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",

@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "没有与你的搜索和筛选条件匹配的内容。",
         "searchReset": "重置搜索",
         "passwordMinLength": "至少 8 个字符。",
-        "savedReloadFailed": "更改已保存，但无法刷新视图。如有缺失，请重新加载页面。"
+        "savedReloadFailed": "更改已保存，但无法刷新视图。如有缺失，请重新加载页面。",
+        "fieldNumber": "请输入数字。",
+        "fieldMin": "至少为 {{min}}。",
+        "fieldMax": "最多为 {{max}}。",
+        "fieldWholeNumber": "请输入整数。",
+        "fieldStep": "请按 {{step}} 的步长输入。",
+        "fieldInvalid": "请检查此项输入。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "记录你的第一次月经，即可查看预测、日历和统计。",
             "emptyCta": "记录第一次月经",
             "personsLabel": "Person",
-            "add": "记录月经",
+            "add": "补记月经",
             "loadError": "无法加载周期数据。",
             "loadErrorDesc": "请稍后重试。",
             "retry": "重试",
@@ -5406,7 +5412,7 @@
                 "family": "家庭"
             },
             "period": {
-                "add": "记录月经",
+                "add": "补记月经",
                 "edit": "编辑月经",
                 "warningFuture": "开始日期在未来 - 预测仅基于过去的周期。",
                 "warningOverlap": "与已记录的周期重叠。"
@@ -5533,7 +5539,8 @@
                 "emptyError": "请选择 CSV 文件或粘贴文本。",
                 "error": "导入失败。"
             },
-            "discoveryHint": "提示:可以在<a href=\"/settings/modules/calendar?section=personal-feeds\">设置 → 模块 → 日历</a>中以 ICS 订阅源的形式订阅预测周期,也可以通过自定义模式在<a href=\"/\">概览</a>中显示周期小组件。"
+            "discoveryHint": "提示:可以在<a href=\"/settings/modules/calendar?section=personal-feeds\">设置 → 模块 → 日历</a>中以 ICS 订阅源的形式订阅预测周期,也可以通过自定义模式在<a href=\"/\">概览</a>中显示周期小组件。",
+            "endBeforeStart": "结束不能早于开始。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",

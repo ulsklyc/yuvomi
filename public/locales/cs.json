@@ -99,7 +99,13 @@
         "searchNoResultsFilteredDescription": "Vašemu hledání a filtrům nic neodpovídá.",
         "searchReset": "Zrušit hledání",
         "passwordMinLength": "Alespoň 8 znaků.",
-        "savedReloadFailed": "Změna je uložena, ale zobrazení se nepodařilo obnovit. Pokud něco chybí, načtěte stránku znovu."
+        "savedReloadFailed": "Změna je uložena, ale zobrazení se nepodařilo obnovit. Pokud něco chybí, načtěte stránku znovu.",
+        "fieldNumber": "Zadejte číslo.",
+        "fieldMin": "Nejméně {{min}}.",
+        "fieldMax": "Nejvýše {{max}}.",
+        "fieldWholeNumber": "Zadejte celé číslo.",
+        "fieldStep": "Zadejte hodnotu v krocích po {{step}}.",
+        "fieldInvalid": "Zkontrolujte tento údaj."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -5322,7 +5328,7 @@
             "emptyDesc": "Zaznamenej svou první menstruaci a uvidíš předpovědi, kalendář a statistiky.",
             "emptyCta": "Zaznamenat první menstruaci",
             "personsLabel": "Person",
-            "add": "Zaznamenat menstruaci",
+            "add": "Doplnit dřívější menstruaci",
             "loadError": "Data cyklu se nepodařilo načíst.",
             "loadErrorDesc": "Zkuste to prosím později.",
             "retry": "Zkusit znovu",
@@ -5535,7 +5541,7 @@
                 "family": "Rodina"
             },
             "period": {
-                "add": "Zaznamenat menstruaci",
+                "add": "Doplnit dřívější menstruaci",
                 "edit": "Upravit menstruaci",
                 "warningFuture": "Datum zahájení je v budoucnosti - předpovědi vycházejí jen z minulých cyklů.",
                 "warningOverlap": "Překrývá se s již zaznamenaným cyklem."
@@ -5663,7 +5669,8 @@
                 "emptyError": "Vyberte soubor CSV nebo vložte text.",
                 "error": "Import se nezdařil."
             },
-            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/modules/calendar?section=personal-feeds\">Nastavení → Moduly → Kalendář</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav."
+            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/modules/calendar?section=personal-feeds\">Nastavení → Moduly → Kalendář</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav.",
+            "endBeforeStart": "Konec nesmí být před začátkem."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

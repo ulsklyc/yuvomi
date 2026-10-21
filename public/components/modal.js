@@ -24,7 +24,7 @@
  *   updateHeaderAction(panel, …)   → Beschriftung/Handler des Kopf-Buttons tauschen
  */
 
-import { t } from '/i18n.js';
+import { t, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
@@ -2890,6 +2890,58 @@ export function reportFieldErrors(errors) {
   }
   _focusField(firstField);
   return true;
+}
+
+/**
+ * DIE REGELN DES MARKUPS, IN DER STIMME DER APP (Critique R21, a5).
+ *
+ * Ein Formular mit `novalidate` zeigt keine Browser-Blasen mehr - aber dann
+ * prueft auch niemand mehr `required`, `min`, `max`, `step` und den Zahltyp,
+ * die im Markup stehen. Statt sie im Handler ein zweites Mal von Hand
+ * nachzurechnen, liest diese Funktion den ValidityState jedes Feldes (Guide
+ * `forms`: "use ValidityState interfaces") und macht daraus Eintraege fuer
+ * `reportFieldErrors()`: die Regel bleibt im Markup, die Meldung steht am Feld.
+ *
+ * Ausgenommen: Felder, die gerade nicht gezeichnet sind (`display: none` am
+ * Feld oder einem Vorfahren - ihr Wert geht nicht mit), und die inneren Felder
+ * des Datumsfelds, das seine Eingabe selbst prueft. Ein Feld in einem
+ * zugeklappten „Weitere Angaben" zaehlt: der Aufklapper geht dafuer auf.
+ *
+ * @param {HTMLFormElement|null|undefined} form
+ * @returns {Array<[Element, string]>}
+ */
+export function constraintErrors(form) {
+  const out = [];
+  for (const el of Array.from(form?.elements ?? [])) {
+    if (!el.willValidate || el.validity?.valid !== false) continue;
+    if (el.closest?.('yuvomi-datepicker')) continue;
+    const folded = el.closest?.('details:not([open])');
+    if (folded) folded.open = true;
+    if (typeof el.getClientRects === 'function' && el.getClientRects().length === 0) {
+      // Auch aufgeklappt nicht gezeichnet: kein Feld, das jemand sieht.
+      if (folded) folded.open = false;
+      continue;
+    }
+    out.push([el, constraintMessage(el)]);
+  }
+  return out;
+}
+
+function constraintMessage(el) {
+  const v = el.validity;
+  const num = (raw) => {
+    const n = Number(raw);
+    return Number.isFinite(n) ? getNumberFormat({ maximumFractionDigits: 6 }).format(n) : String(raw);
+  };
+  if (v.valueMissing) return t('common.required');
+  if (v.badInput) return t('common.fieldNumber');
+  if (v.rangeUnderflow) return t('common.fieldMin', { min: num(el.min) });
+  if (v.rangeOverflow) return t('common.fieldMax', { max: num(el.max) });
+  if (v.stepMismatch) {
+    const step = Number(el.step);
+    return Number.isInteger(step) && step === 1 ? t('common.fieldWholeNumber') : t('common.fieldStep', { step: num(el.step) });
+  }
+  return t('common.fieldInvalid');
 }
 
 export function btnSuccess(btn, originalLabel) {

@@ -22,7 +22,7 @@ import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
 import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
@@ -2120,9 +2120,10 @@ function chartMarkup(metric, series, geo = CHART) {
 // Erfassungs-Modal
 // --------------------------------------------------------
 
-// Beispielwerte als Platzhalter des Blutdruck-Paars und die Einheit des
-// Pulses. Zahlen und ein Einheitenzeichen, keine Texte - wie `metric.units`.
-const PAIR_EXAMPLE = Object.freeze({ systolic: 120, diastolic: 80, pulse: 72 });
+// Die Einheit des Pulses: ein Einheitenzeichen, kein Text - wie `metric.units`.
+// KEINE BEISPIELWERTE ALS PLATZHALTER (Critique R21, a5): "120 / 80" und "72"
+// standen grau in leeren Feldern und lasen sich wie eine eingetragene Messung.
+// Ein Blutdruck ist nie ein Beispiel; das leere Feld sagt, dass er fehlt.
 const PULSE_UNIT = '/min';
 
 function valueFieldsMarkup(type, row = null) {
@@ -2185,7 +2186,6 @@ function valueFieldsMarkup(type, row = null) {
     // Einheit. Jetzt steht er, wie man ihn sagt - "120 / 80 mmHg" -, der Puls
     // als eigene Zeile darunter. Die Teilfelder behalten ihre ids und Namen
     // (Screenreader: Gruppe "Blutdruck", "Systolisch", "Diastolisch, mmHg").
-    // Die Platzhalter sind Beispielwerte, keine Vorgaben.
     return formRowHtml({
       label: t(metric.labelKey),
       labelId: 'vital-pair-label',
@@ -2195,11 +2195,9 @@ function valueFieldsMarkup(type, row = null) {
         unit: metric.units[0],
         parts: [
           { id: 'vital-sys', label: t('health.vitals.field.systolic'), value: has(row?.value_num) ? row.value_num : null,
-            placeholder: PAIR_EXAMPLE.systolic,
             attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
           { separator: '/' },
           { id: 'vital-dia', label: t('health.vitals.field.diastolic'), value: has(row?.value_num2) ? row.value_num2 : null,
-            placeholder: PAIR_EXAMPLE.diastolic,
             attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0', required: true } },
         ],
       }),
@@ -2210,7 +2208,7 @@ function valueFieldsMarkup(type, row = null) {
       control: formCompositeHtml({
         parts: [
           { id: 'vital-pulse', suffix: PULSE_UNIT,
-            value: has(row?.value_num3) ? row.value_num3 : null, placeholder: PAIR_EXAMPLE.pulse,
+            value: has(row?.value_num3) ? row.value_num3 : null,
             attrs: { type: 'number', inputmode: 'numeric', step: '1', min: '0' } },
         ],
       }),
@@ -2274,7 +2272,7 @@ function openVitalModal(opts = {}) {
     // zurueck (openVitalSheet) - auf jedem Weg: Speichern, Abbrechen, Loeschen.
     onClose: opts.onClose,
     content: `
-      <form id="vital-form" class="form-stack">
+      <form id="vital-form" class="form-stack" novalidate>
         ${/* GRUPPIERTE ZEILEN (R18, 2026-10-07, utils/form-row.js): Etikett
              links, Wert rechts. Reihenfolge, ids und Verhalten der Felder
              sind die alten - Art, Wert, Zeitpunkt, Sichtbarkeit, Notiz. Die
@@ -2402,6 +2400,10 @@ function openVitalModal(opts = {}) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(form))) return;
         const body = collectVitalBody(panel, isEdit ? row.type : typeSelect.value);
         if (!body) {
           submitBtn.disabled = false;
@@ -3432,7 +3434,7 @@ function openMedLogModal(logId) {
     title: t('health.meds.log.editTitle'),
     size: 'sm',
     content: `
-      <form id="medlog-form" class="form-stack">
+      <form id="medlog-form" class="form-stack" novalidate>
         <p class="form-hint">${esc(entry.medName)}</p>
         <div class="form-field">
           <label class="label" for="medlog-status">${esc(t('health.meds.log.statusLabel'))}</label>
@@ -3481,6 +3483,10 @@ function openMedLogModal(logId) {
       panel.querySelector('#medlog-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const status = statusField.value;
         const body = { status };
         if (status === 'taken') {
@@ -3729,7 +3735,7 @@ function openMedModal(med) {
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
     size: 'md',
     content: `
-      <form id="med-form" class="form-stack">
+      <form id="med-form" class="form-stack" novalidate>
         <div class="form-field">
           <label class="label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
           <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
@@ -3832,6 +3838,10 @@ function openMedModal(med) {
       panel.querySelector('#med-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const body = collectMedBody(panel);
         if (!body) {
           reportFieldError(panel.querySelector('#med-name'), t('health.meds.nameRequired'));
@@ -4498,7 +4508,7 @@ function openLabModal(report) {
     title: isEdit ? t('health.labs.edit') : t('health.labs.add'),
     size: 'md',
     content: `
-      <form id="lab-form" class="form-stack">
+      <form id="lab-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
@@ -4543,6 +4553,10 @@ function openLabModal(report) {
       panel.querySelector('#lab-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const body = collectLabHead(panel);
         if (!body) {
           reportFieldError(panel.querySelector('#lab-date'), t('health.labs.dateRequired'));
@@ -5167,7 +5181,7 @@ function openActivityModal(row, opts = {}) {
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
     size: 'md',
     content: `
-      <form id="activity-form" class="form-stack">
+      <form id="activity-form" class="form-stack" novalidate>
         ${/* GRUPPIERTE ZEILEN wie die Messung (Re-Kritik 2026-10-17): Art,
              Zeitpunkt, Kennzahlen und Sichtbarkeit standen in drei Rastern
              gestapelt unter ihren Etiketten - der zweite Dialekt im selben
@@ -5251,6 +5265,18 @@ function openActivityModal(row, opts = {}) {
       panel.querySelector('#activity-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        // Dazu, was das Markup nicht weiss: Zeitpunkt und die eigene Art.
+        const customType = panel.querySelector('#activity-custom');
+        if (reportFieldErrors([
+          ...constraintErrors(e.currentTarget),
+          !panel.querySelector('#activity-performed-at')?.value
+            && [panel.querySelector('#activity-performed-at'), t('common.required')],
+          panel.querySelector('#activity-type')?.value === '__custom__' && !customType?.value.trim()
+            && [customType, t('common.required')],
+        ])) return;
         const body = collectActivityBody(panel);
         if (!body) {
           window.yuvomi?.showToast(t('health.activity.invalid'), 'danger');
@@ -5643,7 +5669,7 @@ function openPreventionModal(row) {
     title: isEdit ? t('health.prevention.edit') : t('health.prevention.add'),
     size: 'md',
     content: `
-      <form id="prevention-form" class="form-stack">
+      <form id="prevention-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="prevention-type">${esc(t('health.prevention.field.type'))}</label>
@@ -5704,6 +5730,23 @@ function openPreventionModal(row) {
       panel.querySelector('#prevention-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        // Dazu, was das Markup nicht weiss: ohne Art ist der Name Pflicht, und
+        // das Intervall hat seine Grenze in MONATEN (50 Jahre = 600 Monate).
+        const intervalInput = panel.querySelector('#prevention-interval');
+        const intervalUnit = panel.querySelector('#prevention-interval-unit')?.value || 'months';
+        const intervalMonths = intervalInput?.value.trim() ? intervalInputToMonths(intervalInput.value.trim(), intervalUnit) : undefined;
+        if (reportFieldErrors([
+          ...constraintErrors(e.currentTarget),
+          !panel.querySelector('#prevention-type')?.value && !panel.querySelector('#prevention-name')?.value.trim()
+            && [panel.querySelector('#prevention-name'), t('common.required')],
+          !panel.querySelector('#prevention-given-on')?.value
+            && [panel.querySelector('#prevention-given-on'), t('common.required')],
+          typeof intervalMonths === 'number' && intervalMonths > 600
+            && [intervalInput, t('common.fieldMax', { max: intervalUnit === 'years' ? 50 : 600 })],
+        ])) return;
         const body = collectPreventionBody(panel);
         if (!body) {
           window.yuvomi?.showToast(t('health.prevention.invalid'), 'danger');
@@ -6116,7 +6159,7 @@ function openNutritionTargetModal() {
     title: t('health.nutrition.targetTitle'),
     size: 'md',
     content: `
-      <form id="nutrition-target-form" class="form-stack">
+      <form id="nutrition-target-form" class="form-stack" novalidate>
         <p class="form-hint">${esc(t('health.nutrition.targetHint'))}</p>
         ${nutrientFieldsMarkup('nutrition-target', target)}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -6129,6 +6172,10 @@ function openNutritionTargetModal() {
       panel.querySelector('#nutrition-target-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const values = collectNutrients(panel);
         if (!values) {
           window.yuvomi?.showToast(t('health.nutrition.invalid'), 'danger');
@@ -6165,7 +6212,7 @@ function openNutritionModal(row) {
     title: isEdit ? t('health.nutrition.edit') : t('health.nutrition.add'),
     size: 'md',
     content: `
-      <form id="nutrition-form" class="form-stack">
+      <form id="nutrition-form" class="form-stack" novalidate>
         ${formRowsHtml([
           formRowHtml({
             label: t('health.nutrition.field.title'),
@@ -6219,6 +6266,14 @@ function openNutritionModal(row) {
       panel.querySelector('#nutrition-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors([
+          ...constraintErrors(e.currentTarget),
+          !panel.querySelector('#nutrition-consumed-at')?.value
+            && [panel.querySelector('#nutrition-consumed-at'), t('common.required')],
+        ])) return;
         const body = collectNutritionBody(panel);
         if (!body) {
           window.yuvomi?.showToast(t('health.nutrition.invalid'), 'danger');
@@ -8903,7 +8958,7 @@ function openPeriodModal(period) {
     title: isEdit ? t('health.cycle.period.edit') : t('health.cycle.period.add'),
     size: 'sm',
     content: `
-      <form id="cycle-period-form" class="form-stack">
+      <form id="cycle-period-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
             <label class="label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
@@ -8958,8 +9013,15 @@ function openPeriodModal(period) {
         const submitBtn = panel.querySelector('[type="submit"]');
         const start = panel.querySelector('#cycle-start').value;
         const end = panel.querySelector('#cycle-end').value;
-        if (!start) { window.yuvomi?.showToast(t('health.cycle.invalid'), 'danger'); return; }
-        if (end && end < start) { window.yuvomi?.showToast(t('health.cycle.invalid'), 'danger'); return; }
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        // Der Fehler steht am Feld, das ihn traegt, statt als ortloser Toast.
+        if (reportFieldErrors([
+          ...constraintErrors(e.currentTarget),
+          !start && [panel.querySelector('#cycle-start'), t('common.required')],
+          start && end && end < start && [panel.querySelector('#cycle-end'), t('health.cycle.endBeforeStart')],
+        ])) return;
         const body = {
           start_date: start,
           end_date: end || null,
@@ -9016,7 +9078,7 @@ function openCycleImportModal() {
     title: t('health.cycle.import.title'),
     size: 'sm',
     content: `
-      <form id="cycle-import-form" class="form-stack">
+      <form id="cycle-import-form" class="form-stack" novalidate>
         <p class="cycle-hint">${esc(t('health.cycle.import.explainer'))}</p>
         <div class="form-field">
           <label class="label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
@@ -9052,10 +9114,12 @@ function openCycleImportModal() {
         errorsBox.hidden = true;
         errorsBox.replaceChildren();
 
-        if (!csv) {
-          window.yuvomi?.showToast(t('health.cycle.import.emptyError'), 'danger');
-          return;
-        }
+        // Am Feld statt als Toast (Critique R21): das leere Einfuegefeld traegt
+        // die Meldung, der Fokus geht dorthin.
+        if (reportFieldErrors([
+          ...constraintErrors(e.currentTarget),
+          !csv && [pasteInput, t('health.cycle.import.emptyError')],
+        ])) return;
 
         const modalContext = captureModalContext();
         submitBtn.disabled = true;
@@ -9263,7 +9327,7 @@ function openDayLogModal(dateKey) {
     // gezielt auf den ersten Flow-Chip.
     initialFocus: 'none',
     content: `
-      <form id="cycle-log-form" class="form-stack">
+      <form id="cycle-log-form" class="form-stack" novalidate>
         <div class="form-field">
           <span class="label">${esc(t('health.cycle.flow.label'))}</span>
           <div class="health-choices" data-group="flow" role="group" aria-label="${esc(t('health.cycle.flow.label'))}">${flowButtons}</div>
@@ -9343,6 +9407,10 @@ function openDayLogModal(dateKey) {
       panel.querySelector('#cycle-log-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const flowBtn = panel.querySelector('[data-group="flow"] .health-choice[aria-pressed="true"]');
         const symptoms = [...panel.querySelectorAll('[data-symptom][aria-pressed="true"]')]
           .map((b) => ({ key: b.dataset.symptom, intensity: Number(b.dataset.intensity) || null }));
@@ -9438,7 +9506,7 @@ function openCycleSettingsModal() {
     title: t('health.cycle.settings.title'),
     size: 'sm',
     content: `
-      <form id="cycle-settings-form" class="form-stack">
+      <form id="cycle-settings-form" class="form-stack" novalidate>
         <div class="form-field">
           <label class="label" for="cs-cycle">${esc(t('health.cycle.settings.cycleLength'))}</label>
           <input class="input" id="cs-cycle" type="number" inputmode="numeric" min="15" max="60" step="1"
@@ -9600,6 +9668,10 @@ function openCycleSettingsModal() {
       panel.querySelector('#cycle-settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = panel.querySelector('[type="submit"]');
+        // KEINE BROWSER-BLASEN (Critique R21, a5): das Formular traegt
+        // `novalidate`, die Regeln des Markups (required, min, step, Zahl)
+        // melden sich am Feld - in der Stimme der App (constraintErrors).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const numOr = (sel) => { const raw = panel.querySelector(sel).value.trim(); return raw === '' ? null : Number(raw); };
         const pregnant = pregToggle.checked;
         const due = (panel.querySelector('#cs-due').value || '').trim();

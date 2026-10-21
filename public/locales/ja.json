@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "検索とフィルターに一致する項目はありません。",
         "searchReset": "検索をリセット",
         "passwordMinLength": "8文字以上。",
-        "savedReloadFailed": "変更は保存されましたが、表示を更新できませんでした。足りないものがあればページを再読み込みしてください。"
+        "savedReloadFailed": "変更は保存されましたが、表示を更新できませんでした。足りないものがあればページを再読み込みしてください。",
+        "fieldNumber": "数値を入力してください。",
+        "fieldMin": "{{min}}以上にしてください。",
+        "fieldMax": "{{max}}以下にしてください。",
+        "fieldWholeNumber": "整数を入力してください。",
+        "fieldStep": "{{step}}刻みで入力してください。",
+        "fieldInvalid": "この入力を確認してください。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "予測・カレンダー・統計を表示するには、最初の生理を記録してください。",
             "emptyCta": "最初の生理を記録",
             "personsLabel": "Person",
-            "add": "生理を記録",
+            "add": "過去の生理を追加",
             "loadError": "周期データを読み込めませんでした。",
             "loadErrorDesc": "後でもう一度お試しください。",
             "retry": "再試行",
@@ -5406,7 +5412,7 @@
                 "family": "家族"
             },
             "period": {
-                "add": "生理を記録",
+                "add": "過去の生理を追加",
                 "edit": "生理を編集",
                 "warningFuture": "開始日が未来の日付です - 予測は過去の周期のみに基づきます。",
                 "warningOverlap": "すでに記録済みの周期と重なっています。"
@@ -5533,7 +5539,8 @@
                 "emptyError": "CSVファイルを選択するか、テキストを貼り付けてください。",
                 "error": "インポートに失敗しました。"
             },
-            "discoveryHint": "ヒント:予測される周期は<a href=\"/settings/modules/calendar?section=personal-feeds\">設定 → モジュール → カレンダー</a>でICSフィードとして購読できます。また、周期ウィジェットはカスタマイズモードから<a href=\"/\">ダッシュボード</a>に表示できます。"
+            "discoveryHint": "ヒント:予測される周期は<a href=\"/settings/modules/calendar?section=personal-feeds\">設定 → モジュール → カレンダー</a>でICSフィードとして購読できます。また、周期ウィジェットはカスタマイズモードから<a href=\"/\">ダッシュボード</a>に表示できます。",
+            "endBeforeStart": "終了を開始より前にはできません。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",

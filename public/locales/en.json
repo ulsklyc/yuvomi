@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Nothing matches your search and filters.",
         "searchReset": "Reset search",
         "passwordMinLength": "At least 8 characters.",
-        "savedReloadFailed": "Your change is saved, but the view could not be refreshed. Reload the page if something is missing."
+        "savedReloadFailed": "Your change is saved, but the view could not be refreshed. Reload the page if something is missing.",
+        "fieldNumber": "Enter a number.",
+        "fieldMin": "At least {{min}}.",
+        "fieldMax": "At most {{max}}.",
+        "fieldWholeNumber": "Enter a whole number.",
+        "fieldStep": "Enter a value in steps of {{step}}.",
+        "fieldInvalid": "Check this entry."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Log your first period to see predictions, calendar and statistics.",
             "emptyCta": "Log first period",
             "personsLabel": "Person",
-            "add": "Log period",
+            "add": "Add past period",
             "loadError": "Cycle data could not be loaded.",
             "loadErrorDesc": "Please try again later.",
             "retry": "Try again",
@@ -5406,7 +5412,7 @@
                 "family": "Family"
             },
             "period": {
-                "add": "Log period",
+                "add": "Add past period",
                 "edit": "Edit period",
                 "warningFuture": "Start date is in the future - predictions are based only on past periods.",
                 "warningOverlap": "Overlaps with an already logged period."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Please choose a CSV file or paste text.",
                 "error": "Import failed."
             },
-            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Settings → Modules → Calendar</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode."
+            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Settings → Modules → Calendar</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode.",
+            "endBeforeStart": "The end can't be before the start."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

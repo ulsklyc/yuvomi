@@ -100,7 +100,13 @@
         "searchNoResultsFilteredDescription": "Nic nie pasuje do wyszukiwania i filtrów.",
         "searchReset": "Resetuj wyszukiwanie",
         "passwordMinLength": "Co najmniej 8 znaków.",
-        "savedReloadFailed": "Zmiana została zapisana, ale nie udało się odświeżyć widoku. Jeśli czegoś brakuje, wczytaj stronę ponownie."
+        "savedReloadFailed": "Zmiana została zapisana, ale nie udało się odświeżyć widoku. Jeśli czegoś brakuje, wczytaj stronę ponownie.",
+        "fieldNumber": "Wpisz liczbę.",
+        "fieldMin": "Co najmniej {{min}}.",
+        "fieldMax": "Najwyżej {{max}}.",
+        "fieldWholeNumber": "Wpisz liczbę całkowitą.",
+        "fieldStep": "Wpisz wartość w krokach co {{step}}.",
+        "fieldInvalid": "Sprawdź ten wpis."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -5446,7 +5452,7 @@
             "emptyDesc": "Zapisz pierwszą miesiączkę, aby zobaczyć prognozy, kalendarz i statystyki.",
             "emptyCta": "Zapisz pierwszą miesiączkę",
             "personsLabel": "Person",
-            "add": "Zapisz miesiączkę",
+            "add": "Dodaj wcześniejszą miesiączkę",
             "loadError": "Nie udało się wczytać danych cyklu.",
             "loadErrorDesc": "Spróbuj ponownie później.",
             "retry": "Spróbuj ponownie",
@@ -5662,7 +5668,7 @@
                 "family": "Rodzina"
             },
             "period": {
-                "add": "Zapisz miesiączkę",
+                "add": "Dodaj wcześniejszą miesiączkę",
                 "edit": "Edytuj miesiączkę",
                 "warningFuture": "Data rozpoczęcia jest w przyszłości - prognozy opierają się tylko na minionych cyklach.",
                 "warningOverlap": "Nakłada się na już zapisany cykl."
@@ -5791,7 +5797,8 @@
                 "emptyError": "Wybierz plik CSV lub wklej tekst.",
                 "error": "Import nie powiódł się."
             },
-            "discoveryHint": "Wskazówka: przewidywany cykl można subskrybować jako kanał ICS w <a href=\"/settings/modules/calendar?section=personal-feeds\">Ustawienia → Moduły → Kalendarz</a>, a widżet cyklu można pokazać na <a href=\"/\">Pulpicie</a> w trybie dostosowywania."
+            "discoveryHint": "Wskazówka: przewidywany cykl można subskrybować jako kanał ICS w <a href=\"/settings/modules/calendar?section=personal-feeds\">Ustawienia → Moduły → Kalendarz</a>, a widżet cyklu można pokazać na <a href=\"/\">Pulpicie</a> w trybie dostosowywania.",
+            "endBeforeStart": "Koniec nie może być przed początkiem."
         },
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",

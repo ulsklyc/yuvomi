@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Inget matchar din sökning och dina filter.",
         "searchReset": "Återställ sökning",
         "passwordMinLength": "Minst 8 tecken.",
-        "savedReloadFailed": "Ändringen är sparad, men vyn kunde inte uppdateras. Läs in sidan igen om något saknas."
+        "savedReloadFailed": "Ändringen är sparad, men vyn kunde inte uppdateras. Läs in sidan igen om något saknas.",
+        "fieldNumber": "Ange ett tal.",
+        "fieldMin": "Minst {{min}}.",
+        "fieldMax": "Högst {{max}}.",
+        "fieldWholeNumber": "Ange ett heltal.",
+        "fieldStep": "Ange ett värde i steg om {{step}}.",
+        "fieldInvalid": "Kontrollera den här uppgiften."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Registrera din första mens för att se prognoser, kalender och statistik.",
             "emptyCta": "Registrera första mens",
             "personsLabel": "Person",
-            "add": "Registrera mens",
+            "add": "Lägg till tidigare mens",
             "loadError": "Cykeldata kunde inte laddas.",
             "loadErrorDesc": "Försök igen senare.",
             "retry": "Försök igen",
@@ -5406,7 +5412,7 @@
                 "family": "Familj"
             },
             "period": {
-                "add": "Registrera mens",
+                "add": "Lägg till tidigare mens",
                 "edit": "Redigera mens",
                 "warningFuture": "Startdatumet ligger i framtiden - prognoser baseras endast på tidigare cykler.",
                 "warningOverlap": "Överlappar en redan loggad cykel."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Välj en CSV-fil eller klistra in text.",
                 "error": "Importen misslyckades."
             },
-            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/modules/calendar?section=personal-feeds\">Inställningar → Moduler → Kalender</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge."
+            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/modules/calendar?section=personal-feeds\">Inställningar → Moduler → Kalender</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge.",
+            "endBeforeStart": "Slutet får inte vara före början."
         },
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",

@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Aramanız ve filtrelerinizle eşleşen bir şey yok.",
         "searchReset": "Aramayı sıfırla",
         "passwordMinLength": "En az 8 karakter.",
-        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin."
+        "savedReloadFailed": "Değişiklik kaydedildi ancak görünüm yenilenemedi. Eksik bir şey varsa sayfayı yeniden yükleyin.",
+        "fieldNumber": "Bir sayı girin.",
+        "fieldMin": "En az {{min}}.",
+        "fieldMax": "En fazla {{max}}.",
+        "fieldWholeNumber": "Bir tam sayı girin.",
+        "fieldStep": "{{step}} adımlarla bir değer girin.",
+        "fieldInvalid": "Bu girişi kontrol edin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Tahminleri, takvimi ve istatistikleri görmek için ilk adet dönemini kaydet.",
             "emptyCta": "İlk adeti kaydet",
             "personsLabel": "Person",
-            "add": "Adeti kaydet",
+            "add": "Geçmiş adet ekle",
             "loadError": "Döngü verileri yüklenemedi.",
             "loadErrorDesc": "Lütfen daha sonra tekrar deneyin.",
             "retry": "Tekrar dene",
@@ -5406,7 +5412,7 @@
                 "family": "Aile"
             },
             "period": {
-                "add": "Adeti kaydet",
+                "add": "Geçmiş adet ekle",
                 "edit": "Adeti düzenle",
                 "warningFuture": "Başlangıç tarihi gelecekte - tahminler yalnızca geçmiş döngülere dayanır.",
                 "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
                 "error": "İçe aktarma başarısız oldu."
             },
-            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/modules/calendar?section=personal-feeds\">Ayarlar → Modüller → Takvim</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin."
+            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/modules/calendar?section=personal-feeds\">Ayarlar → Modüller → Takvim</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin.",
+            "endBeforeStart": "Bitiş başlangıçtan önce olamaz."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",

@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Ingenting passer til søket og filtrene dine.",
         "searchReset": "Tilbakestill søk",
         "passwordMinLength": "Minst 8 tegn.",
-        "savedReloadFailed": "Endringen er lagret, men visningen kunne ikke oppdateres. Last inn siden på nytt hvis noe mangler."
+        "savedReloadFailed": "Endringen er lagret, men visningen kunne ikke oppdateres. Last inn siden på nytt hvis noe mangler.",
+        "fieldNumber": "Skriv inn et tall.",
+        "fieldMin": "Minst {{min}}.",
+        "fieldMax": "Høyst {{max}}.",
+        "fieldWholeNumber": "Skriv inn et heltall.",
+        "fieldStep": "Skriv inn en verdi i trinn på {{step}}.",
+        "fieldInvalid": "Sjekk denne verdien."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Registrer din første periode for å se prognoser, kalender og statistikk.",
             "emptyCta": "Registrer første periode",
             "personsLabel": "Person",
-            "add": "Registrer periode",
+            "add": "Legg til tidligere periode",
             "loadError": "Syklusdata kunne ikke lastes.",
             "loadErrorDesc": "Vennligst prøv igjen senere.",
             "retry": "Prøv igjen",
@@ -5406,7 +5412,7 @@
                 "family": "Familie"
             },
             "period": {
-                "add": "Registrer periode",
+                "add": "Legg til tidligere periode",
                 "edit": "Menstruasjonsperiode",
                 "warningFuture": "Startdatoen er i fremtiden - forutsigelser er kun basert på tidligere perioder.",
                 "warningOverlap": "Overlapper med en allerede registrert periode."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Vennligst velg en CSV-fil eller lim inn tekst.",
                 "error": "Import feilet."
             },
-            "discoveryHint": "Tips: Abonner på den forutsagte syklusen som en ICS-feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Innstillinger → Moduler → Kalender</a>, eller vis syklus-widgeten på <a href=\"/\">Oversikt</a> via tilpasningsmodus."
+            "discoveryHint": "Tips: Abonner på den forutsagte syklusen som en ICS-feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Innstillinger → Moduler → Kalender</a>, eller vis syklus-widgeten på <a href=\"/\">Oversikt</a> via tilpasningsmodus.",
+            "endBeforeStart": "Slutten kan ikke være før starten."
         },
         "duration": {
             "hm": "{{hours}} t {{minutes}} min",

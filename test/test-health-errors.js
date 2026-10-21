@@ -22,6 +22,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
@@ -603,5 +604,92 @@ test('Einstellungen: Erfolg nach Dialogwechsel - Vorsorgeart anlegen, aendern, l
       delete globalThis.__modalContextId;
       delete globalThis.__confirmOverModal;
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// KEINE BROWSER-BLASEN, KEINE ORTLOSEN TOASTS (Critique R21, a5)
+//
+// Keines der zwoelf Gesundheitsformulare trug `novalidate`: `required`, `min`
+// und `step` zeigten die Blase des Browsers, gegen die DESIGN.md-Regel "Keine
+// Browser-Blasen", die die Einstellungen seit R20 halten. Und wo der Handler
+// selbst pruefte, sagte er es oft als Toast ohne Ort ("Bitte gueltige Werte
+// eingeben."). Jetzt traegt jedes Formular `novalidate`, jeder Handler fragt
+// die Regeln des Markups (constraintErrors) und meldet am Feld.
+// ---------------------------------------------------------------------------
+
+test('Seite: jedes Gesundheitsformular traegt novalidate und fragt die Regeln seines Markups (Critique R21)', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const forms = [...src.matchAll(/<form id="([\w-]+)"([^>]*)>/g)];
+  assert.ok(forms.length >= 12, `Reichweite: ${forms.length} Formulare gefunden`);
+  const ohne = forms.filter(([, , attrs]) => !/\bnovalidate\b/.test(attrs)).map(([, id]) => id);
+  assert.deepEqual(ohne, [], 'ohne novalidate zeigt der Browser seine Blase');
+  for (const [, id] of forms) {
+    // Der Handler haengt am Formular per Selektor - oder, beim Messwert, an
+    // der Variablen `form` hinter dem Markup.
+    let at = src.indexOf(`'#${id}').addEventListener('submit'`);
+    if (at < 0) at = src.indexOf("form.addEventListener('submit'", src.indexOf(`<form id="${id}"`));
+    assert.ok(at > 0, `${id}: Submit-Handler gefunden`);
+    const handler = src.slice(at, at + 1600);
+    assert.match(handler, /reportFieldErrors\(\[?\s*(?:\.\.\.)?constraintErrors\(/, `${id}: der Handler meldet die Regeln des Markups am Feld`);
+  }
+  // Ein Blutdruck ist nie ein Beispiel: "120 / 80" und "72" standen grau in
+  // leeren Feldern und lasen sich wie eine eingetragene Messung.
+  const pair = page.valueFieldsMarkup('blood_pressure');
+  assert.match(pair, /id="vital-sys"/, 'Vorbedingung: das Blutdruck-Paar');
+  assert.doesNotMatch(pair, /placeholder=/, 'keine Beispielwerte als Platzhalter');
+});
+
+test('Seite: Periode - Beginn fehlt oder Ende vor Beginn: der Fehler steht am Feld, kein Toast, keine Anfrage (Critique R21)', async () => {
+  const gemeldet = [];
+  globalThis.__reportFieldError = (feld, text) => gemeldet.push([feld, text]);
+  try {
+    const d = await dialog(() => page.openPeriodModal(null), {
+      '#cycle-start': { value: '2026-01-10' }, '#cycle-end': { value: '2026-01-05' },
+    });
+    const { calls } = await mit({}, () => d.absenden('#cycle-period-form'));
+    assert.deepEqual(gemeldet.map(([feld, text]) => [feld === d.element('#cycle-end'), text]), [[true, 'health.cycle.endBeforeStart']],
+      'die Meldung steht am Ende-Feld');
+    assert.equal(toasts.length, 0, `kein ortloser Toast (${JSON.stringify(toasts)})`);
+    assert.equal(calls.filter(([verb]) => verb !== 'GET').length, 0, 'nichts gesendet');
+
+    gemeldet.length = 0;
+    const leer = await dialog(() => page.openPeriodModal(null), { '#cycle-start': { value: '' } });
+    await mit({}, () => leer.absenden('#cycle-period-form'));
+    assert.deepEqual(gemeldet.map(([feld, text]) => [feld === leer.element('#cycle-start'), text]), [[true, 'common.required']]);
+    assert.equal(toasts.length, 0);
+  } finally {
+    delete globalThis.__reportFieldError;
+  }
+});
+
+test('Seite: Import der Historie ohne Inhalt meldet am Einfuegefeld, Aktivitaet ohne Zeitpunkt am Zeitpunkt (Critique R21)', async () => {
+  const gemeldet = [];
+  globalThis.__reportFieldError = (feld, text) => gemeldet.push([feld, text]);
+  try {
+    const imp = await dialog(() => page.openCycleImportModal(), { '#cycle-import-paste': { value: '  ' } });
+    await mit({}, () => imp.absenden('#cycle-import-form'));
+    assert.deepEqual(gemeldet.map(([feld, text]) => [feld === imp.element('#cycle-import-paste'), text]), [[true, 'health.cycle.import.emptyError']]);
+    assert.equal(toasts.length, 0, `kein Toast (${JSON.stringify(toasts)})`);
+
+    gemeldet.length = 0;
+    const akt = await dialog(() => page.openActivityModal(null), { '#activity-type': { value: 'walk' }, '#activity-performed-at': { value: '' } });
+    await mit({}, () => akt.absenden('#activity-form'));
+    assert.deepEqual(gemeldet.map(([feld, text]) => [feld === akt.element('#activity-performed-at'), text]), [[true, 'common.required']]);
+    assert.equal(toasts.length, 0, `kein Toast (${JSON.stringify(toasts)})`);
+
+    // Die Regeln des Markups selbst: was constraintErrors meldet, haelt den
+    // Handler an, bevor er etwas sendet (Messwert, Zyklus-Einstellungen).
+    gemeldet.length = 0;
+    globalThis.__constraintErrors = (form) => [[form ?? 'feld', 'common.fieldMin{"min":"15"}']];
+    const vital = await dialog(() => page.openVitalModal({ type: 'weight' }), {
+      '#vital-measured-at': { value: '2026-01-05T08:00' }, '#vital-value': { value: '70' },
+    });
+    const { calls } = await mit({}, () => vital.absenden('#vital-form'));
+    assert.equal(calls.filter(([verb]) => verb !== 'GET').length, 0, 'ein Feldfehler sendet nichts');
+    assert.equal(gemeldet.length, 1);
+  } finally {
+    delete globalThis.__reportFieldError;
+    delete globalThis.__constraintErrors;
   }
 });

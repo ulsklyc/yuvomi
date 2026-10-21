@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Semmi sem felel meg a keresésnek és a szűrőknek.",
         "searchReset": "Keresés visszaállítása",
         "passwordMinLength": "Legalább 8 karakter.",
-        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt."
+        "savedReloadFailed": "A módosítás mentve, de a nézetet nem sikerült frissíteni. Ha valami hiányzik, töltsd újra az oldalt.",
+        "fieldNumber": "Adjon meg egy számot.",
+        "fieldMin": "Legalább {{min}}.",
+        "fieldMax": "Legfeljebb {{max}}.",
+        "fieldWholeNumber": "Adjon meg egy egész számot.",
+        "fieldStep": "Adjon meg egy értéket {{step}} lépésközzel.",
+        "fieldInvalid": "Ellenőrizze ezt a bejegyzést."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Rögzítsd az első menstruációdat, hogy lásd az előrejelzéseket, a naptárat és a statisztikát.",
             "emptyCta": "Első menstruáció rögzítése",
             "personsLabel": "Person",
-            "add": "Menstruáció rögzítése",
+            "add": "Korábbi menstruáció rögzítése",
             "loadError": "A ciklusadatok betöltése nem sikerült.",
             "loadErrorDesc": "Kérjük, próbáld újra később.",
             "retry": "Újra",
@@ -5406,7 +5412,7 @@
                 "family": "Család"
             },
             "period": {
-                "add": "Menstruáció rögzítése",
+                "add": "Korábbi menstruáció rögzítése",
                 "edit": "Menstruáció szerkesztése",
                 "warningFuture": "A kezdő dátum a jövőben van - az előrejelzések csak a korábbi ciklusokon alapulnak.",
                 "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Válassz egy CSV-fájlt, vagy illessz be szöveget.",
                 "error": "Az importálás nem sikerült."
             },
-            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/modules/calendar?section=personal-feeds\">Beállítások → Modulok → Naptár</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban."
+            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/modules/calendar?section=personal-feeds\">Beállítások → Modulok → Naptár</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban.",
+            "endBeforeStart": "A vége nem lehet a kezdete előtt."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",

@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Nulla corrisponde alla tua ricerca e ai filtri.",
         "searchReset": "Reimposta ricerca",
         "passwordMinLength": "Almeno 8 caratteri.",
-        "savedReloadFailed": "La modifica è salvata, ma non è stato possibile aggiornare la vista. Ricarica la pagina se manca qualcosa."
+        "savedReloadFailed": "La modifica è salvata, ma non è stato possibile aggiornare la vista. Ricarica la pagina se manca qualcosa.",
+        "fieldNumber": "Inserisci un numero.",
+        "fieldMin": "Almeno {{min}}.",
+        "fieldMax": "Al massimo {{max}}.",
+        "fieldWholeNumber": "Inserisci un numero intero.",
+        "fieldStep": "Inserisci un valore a passi di {{step}}.",
+        "fieldInvalid": "Controlla questo dato."
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Registra il tuo primo ciclo per vedere previsioni, calendario e statistiche.",
             "emptyCta": "Registra il primo ciclo",
             "personsLabel": "Person",
-            "add": "Registra ciclo",
+            "add": "Aggiungi ciclo passato",
             "loadError": "Impossibile caricare i dati del ciclo.",
             "loadErrorDesc": "Riprova più tardi.",
             "retry": "Riprova",
@@ -5406,7 +5412,7 @@
                 "family": "Famiglia"
             },
             "period": {
-                "add": "Registra ciclo",
+                "add": "Aggiungi ciclo passato",
                 "edit": "Modifica ciclo",
                 "warningFuture": "La data di inizio è nel futuro - le previsioni si basano solo sui cicli passati.",
                 "warningOverlap": "Si sovrappone a un ciclo già registrato."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Scegli un file CSV o incolla del testo.",
                 "error": "Importazione non riuscita."
             },
-            "discoveryHint": "Suggerimento: puoi abbonarti al ciclo previsto come feed ICS in <a href=\"/settings/modules/calendar?section=personal-feeds\">Impostazioni → Moduli → Calendario</a>, oppure mostrare il widget del ciclo nella <a href=\"/\">Panoramica</a> tramite la modalità di personalizzazione."
+            "discoveryHint": "Suggerimento: puoi abbonarti al ciclo previsto come feed ICS in <a href=\"/settings/modules/calendar?section=personal-feeds\">Impostazioni → Moduli → Calendario</a>, oppure mostrare il widget del ciclo nella <a href=\"/\">Panoramica</a> tramite la modalità di personalizzazione.",
+            "endBeforeStart": "La fine non può precedere l'inizio."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

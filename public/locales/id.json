@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Tidak ada yang cocok dengan pencarian dan filtermu.",
         "searchReset": "Atur ulang pencarian",
         "passwordMinLength": "Minimal 8 karakter.",
-        "savedReloadFailed": "Perubahan tersimpan, tetapi tampilan tidak dapat diperbarui. Muat ulang halaman jika ada yang hilang."
+        "savedReloadFailed": "Perubahan tersimpan, tetapi tampilan tidak dapat diperbarui. Muat ulang halaman jika ada yang hilang.",
+        "fieldNumber": "Masukkan angka.",
+        "fieldMin": "Minimal {{min}}.",
+        "fieldMax": "Maksimal {{max}}.",
+        "fieldWholeNumber": "Masukkan bilangan bulat.",
+        "fieldStep": "Masukkan nilai dengan kelipatan {{step}}.",
+        "fieldInvalid": "Periksa isian ini."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Catat menstruasi pertamamu untuk melihat prediksi, kalender, dan statistik.",
             "emptyCta": "Catat menstruasi pertama",
             "personsLabel": "Person",
-            "add": "Catat menstruasi",
+            "add": "Tambahkan menstruasi sebelumnya",
             "loadError": "Data siklus gagal dimuat.",
             "loadErrorDesc": "Silakan coba lagi nanti.",
             "retry": "Coba lagi",
@@ -5406,7 +5412,7 @@
                 "family": "Keluarga"
             },
             "period": {
-                "add": "Catat menstruasi",
+                "add": "Tambahkan menstruasi sebelumnya",
                 "edit": "Edit menstruasi",
                 "warningFuture": "Tanggal mulai berada di masa depan - prediksi hanya didasarkan pada siklus sebelumnya.",
                 "warningOverlap": "Tumpang tindih dengan siklus yang sudah tercatat."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Pilih file CSV atau tempel teks.",
                 "error": "Impor gagal."
             },
-            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/modules/calendar?section=personal-feeds\">Pengaturan → Modul → Kalender</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi."
+            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/modules/calendar?section=personal-feeds\">Pengaturan → Modul → Kalender</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi.",
+            "endBeforeStart": "Akhir tidak boleh sebelum awal."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",

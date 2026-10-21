@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "검색 및 필터와 일치하는 항목이 없습니다.",
         "searchReset": "검색 초기화",
         "passwordMinLength": "8자 이상.",
-        "savedReloadFailed": "변경 사항은 저장되었지만 화면을 새로 고치지 못했습니다. 빠진 내용이 있으면 페이지를 다시 불러오세요."
+        "savedReloadFailed": "변경 사항은 저장되었지만 화면을 새로 고치지 못했습니다. 빠진 내용이 있으면 페이지를 다시 불러오세요.",
+        "fieldNumber": "숫자를 입력하세요.",
+        "fieldMin": "{{min}} 이상이어야 합니다.",
+        "fieldMax": "{{max}} 이하여야 합니다.",
+        "fieldWholeNumber": "정수를 입력하세요.",
+        "fieldStep": "{{step}} 단위로 입력하세요.",
+        "fieldInvalid": "이 입력을 확인하세요."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "예측, 캘린더, 통계를 보려면 첫 생리를 기록하세요.",
             "emptyCta": "첫 생리 기록",
             "personsLabel": "Person",
-            "add": "생리 기록",
+            "add": "지난 생리 추가",
             "loadError": "주기 데이터를 불러오지 못했습니다.",
             "loadErrorDesc": "나중에 다시 시도해 주세요.",
             "retry": "다시 시도",
@@ -5406,7 +5412,7 @@
                 "family": "가족"
             },
             "period": {
-                "add": "생리 기록",
+                "add": "지난 생리 추가",
                 "edit": "생리 편집",
                 "warningFuture": "시작일이 미래입니다 - 예측은 과거 주기만을 기준으로 합니다.",
                 "warningOverlap": "이미 기록된 주기와 겹칩니다."
@@ -5533,7 +5539,8 @@
                 "emptyError": "CSV 파일을 선택하거나 텍스트를 붙여넣으세요.",
                 "error": "가져오기에 실패했습니다."
             },
-            "discoveryHint": "팁: 예측된 주기는 <a href=\"/settings/modules/calendar?section=personal-feeds\">설정 → 모듈 → 캘린더</a>에서 ICS 피드로 구독할 수 있으며, 주기 위젯은 <a href=\"/\">개요</a>에서 사용자 지정 모드를 통해 표시할 수 있습니다."
+            "discoveryHint": "팁: 예측된 주기는 <a href=\"/settings/modules/calendar?section=personal-feeds\">설정 → 모듈 → 캘린더</a>에서 ICS 피드로 구독할 수 있으며, 주기 위젯은 <a href=\"/\">개요</a>에서 사용자 지정 모드를 통해 표시할 수 있습니다.",
+            "endBeforeStart": "종료는 시작보다 앞설 수 없습니다."
         },
         "duration": {
             "hm": "{{hours}}시간 {{minutes}}분",

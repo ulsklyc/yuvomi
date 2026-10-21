@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Không có mục nào khớp với tìm kiếm và bộ lọc của bạn.",
         "searchReset": "Đặt lại tìm kiếm",
         "passwordMinLength": "Ít nhất 8 ký tự.",
-        "savedReloadFailed": "Thay đổi đã được lưu nhưng không thể làm mới chế độ xem. Hãy tải lại trang nếu thiếu thứ gì đó."
+        "savedReloadFailed": "Thay đổi đã được lưu nhưng không thể làm mới chế độ xem. Hãy tải lại trang nếu thiếu thứ gì đó.",
+        "fieldNumber": "Hãy nhập một số.",
+        "fieldMin": "Tối thiểu {{min}}.",
+        "fieldMax": "Tối đa {{max}}.",
+        "fieldWholeNumber": "Hãy nhập một số nguyên.",
+        "fieldStep": "Hãy nhập giá trị theo bước {{step}}.",
+        "fieldInvalid": "Hãy kiểm tra mục này."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Ghi lại kỳ kinh đầu tiên để xem dự đoán, lịch và thống kê.",
             "emptyCta": "Ghi kỳ kinh đầu tiên",
             "personsLabel": "Person",
-            "add": "Ghi kỳ kinh",
+            "add": "Thêm kỳ kinh trước đó",
             "loadError": "Không thể tải dữ liệu chu kỳ.",
             "loadErrorDesc": "Vui lòng thử lại sau.",
             "retry": "Thử lại",
@@ -5406,7 +5412,7 @@
                 "family": "Gia đình"
             },
             "period": {
-                "add": "Ghi kỳ kinh",
+                "add": "Thêm kỳ kinh trước đó",
                 "edit": "Sửa kỳ kinh",
                 "warningFuture": "Ngày bắt đầu nằm trong tương lai - dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
                 "warningOverlap": "Trùng với một chu kỳ đã được ghi lại."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Vui lòng chọn tệp CSV hoặc dán văn bản.",
                 "error": "Nhập không thành công."
             },
-            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/modules/calendar?section=personal-feeds\">Cài đặt → Mô-đun → Lịch</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh."
+            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/modules/calendar?section=personal-feeds\">Cài đặt → Mô-đun → Lịch</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh.",
+            "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",

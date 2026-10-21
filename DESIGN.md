@@ -2446,7 +2446,12 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   sichtbaren Traeger und fokussieren selbst: die Ablage der Dokumente (`reportDropzoneError`,
   Meldung hinter der Ablage, `aria-invalid`/`aria-describedby` am Datei-Input, der den Fokus
   bekommt) und die Wochentags-Chips der Entsorgung (Fokus auf den ersten Tag). Eine Absage des
-  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld.
+  Servers mit `reason` (`wrong_password`, `email_port_invalid`) geht an dasselbe Feld. Die Regeln
+  des Markups (`required`, `min`, `max`, `step`, Zahltyp) bleiben im Markup: `constraintErrors(form)`
+  (components/modal.js) liest ihren ValidityState und gibt `reportFieldErrors()` die Meldung in
+  der Stimme der App ("Mindestens 15.") - kein zweites Nachrechnen im Handler. Seit R21 halten das
+  alle zwoelf Gesundheitsformulare (`test:health-errors`); Beispielwerte sind keine Platzhalter
+  (ein leeres Blutdruckfeld zeigte "120 / 80" wie eine Messung).
 - **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
   ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
   Feldfehler, nicht diese Zeile.

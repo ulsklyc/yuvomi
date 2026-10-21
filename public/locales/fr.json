@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Rien ne correspond à votre recherche et à vos filtres.",
         "searchReset": "Réinitialiser la recherche",
         "passwordMinLength": "8 caractères minimum.",
-        "savedReloadFailed": "La modification est enregistrée, mais l’affichage n’a pas pu être actualisé. Rechargez la page s’il manque quelque chose."
+        "savedReloadFailed": "La modification est enregistrée, mais l’affichage n’a pas pu être actualisé. Rechargez la page s’il manque quelque chose.",
+        "fieldNumber": "Saisissez un nombre.",
+        "fieldMin": "Au moins {{min}}.",
+        "fieldMax": "Au plus {{max}}.",
+        "fieldWholeNumber": "Saisissez un nombre entier.",
+        "fieldStep": "Saisissez une valeur par pas de {{step}}.",
+        "fieldInvalid": "Vérifiez cette saisie."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Enregistrez vos premières règles pour voir les prévisions, le calendrier et les statistiques.",
             "emptyCta": "Enregistrer les premières règles",
             "personsLabel": "Person",
-            "add": "Enregistrer les règles",
+            "add": "Ajouter des règles passées",
             "loadError": "Impossible de charger les données du cycle.",
             "loadErrorDesc": "Veuillez réessayer plus tard.",
             "retry": "Réessayer",
@@ -5406,7 +5412,7 @@
                 "family": "Famille"
             },
             "period": {
-                "add": "Enregistrer les règles",
+                "add": "Ajouter des règles passées",
                 "edit": "Modifier les règles",
                 "warningFuture": "La date de début est dans le futur - les prévisions ne se basent que sur les cycles passés.",
                 "warningOverlap": "Chevauche un cycle déjà enregistré."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Choisissez un fichier CSV ou collez du texte.",
                 "error": "Échec de l'import."
             },
-            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/modules/calendar?section=personal-feeds\">Paramètres → Modules → Calendrier</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation."
+            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/modules/calendar?section=personal-feeds\">Paramètres → Modules → Calendrier</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation.",
+            "endBeforeStart": "La fin ne peut pas précéder le début."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

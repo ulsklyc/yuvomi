@@ -98,7 +98,13 @@
         "searchNoResultsFilteredDescription": "Walang tumutugma sa iyong paghahanap at mga filter.",
         "searchReset": "I-reset ang paghahanap",
         "passwordMinLength": "Hindi bababa sa 8 character.",
-        "savedReloadFailed": "Na-save ang pagbabago, pero hindi ma-refresh ang view. I-reload ang page kung may kulang."
+        "savedReloadFailed": "Na-save ang pagbabago, pero hindi ma-refresh ang view. I-reload ang page kung may kulang.",
+        "fieldNumber": "Maglagay ng numero.",
+        "fieldMin": "Hindi bababa sa {{min}}.",
+        "fieldMax": "Hindi hihigit sa {{max}}.",
+        "fieldWholeNumber": "Maglagay ng buong numero.",
+        "fieldStep": "Maglagay ng halaga sa hakbang na {{step}}.",
+        "fieldInvalid": "Suriin ang entry na ito."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -5196,7 +5202,7 @@
             "emptyDesc": "Itala ang iyong unang regla para makita ang mga hula, kalendaryo at estadistika.",
             "emptyCta": "Itala ang unang regla",
             "personsLabel": "Tao",
-            "add": "Itala ang regla",
+            "add": "Magdagdag ng nakaraang regla",
             "loadError": "Hindi ma-load ang datos ng siklo.",
             "loadErrorDesc": "Pakisubukang muli mamaya.",
             "retry": "Subukang muli",
@@ -5406,7 +5412,7 @@
                 "family": "Pamilya"
             },
             "period": {
-                "add": "Itala ang regla",
+                "add": "Magdagdag ng nakaraang regla",
                 "edit": "I-edit ang regla",
                 "warningFuture": "Ang petsa ng simula ay nasa hinaharap - batay lang ang hula sa nakaraang mga siklo.",
                 "warningOverlap": "Nagsasapawan sa isang siklo na naitala na."
@@ -5533,7 +5539,8 @@
                 "emptyError": "Pumili ng CSV file o mag-paste ng teksto.",
                 "error": "Nabigo ang pag-import."
             },
-            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/modules/calendar?section=personal-feeds\">Mga Setting → Mga Modyul → Kalendaryo</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito."
+            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/modules/calendar?section=personal-feeds\">Mga Setting → Mga Modyul → Kalendaryo</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito.",
+            "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",

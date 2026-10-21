@@ -21,7 +21,7 @@ const {
   rememberFocus,
   __test: modalTest,
   restoreFocusAfterClose, refocusAfterRender, forgetRestore, renderKeepingFocus,
-  reportFieldErrors, reportFieldError, clearFieldError,
+  reportFieldErrors, reportFieldError, clearFieldError, constraintErrors,
 } = await import('../public/components/modal.js');
 
 // matchMedia und document.createElementNS werden von btnSuccess/btnError benötigt
@@ -2215,6 +2215,69 @@ test('reportFieldErrors: meldet jeden Fehler und fokussiert das erste Feld im Bi
   }
   assert.deepEqual([amount.focused, title.focused, category.focused], [1, 0, 0],
     'der Fokus gehoert dem ersten Feld in Dokumentreihenfolge, und nur ihm');
+});
+
+/* DIE REGELN DES MARKUPS, IN DER STIMME DER APP (Critique R21, a5). Die
+ * Gesundheitsformulare tragen jetzt `novalidate`; was `required`, `min`,
+ * `max`, `step` und der Zahltyp verlangen, liest constraintErrors() aus dem
+ * ValidityState und gibt es reportFieldErrors() - statt einer Browser-Blase.
+ * Ein Feld, das nicht gezeichnet ist, zaehlt nicht (sein Wert geht nicht mit);
+ * eines in einem zugeklappten Aufklapper zaehlt, und der Aufklapper geht auf;
+ * die inneren Felder des Datumsfelds prueft das Datumsfeld selbst. */
+function constraintField({ validity = {}, min = '', max = '', step = '', rendered = true, folded = null, inDatepicker = false, willValidate = true } = {}) {
+  return {
+    willValidate,
+    validity: { valid: !Object.values(validity).some(Boolean), ...validity },
+    min, max, step,
+    getClientRects: () => (rendered || (folded && folded.open) ? [{}] : []),
+    closest: (sel) => {
+      if (sel === 'yuvomi-datepicker') return inDatepicker ? {} : null;
+      if (sel === 'details:not([open])') return folded && !folded.open ? folded : null;
+      return null;
+    },
+  };
+}
+
+test('constraintErrors: required, Zahl, min, max, step - am Feld, in der Stimme der App (Critique R21)', () => {
+  const missing = constraintField({ validity: { valueMissing: true } });
+  const bad = constraintField({ validity: { badInput: true } });
+  const low = constraintField({ validity: { rangeUnderflow: true }, min: '0.01' });
+  const high = constraintField({ validity: { rangeOverflow: true }, max: '24' });
+  const whole = constraintField({ validity: { stepMismatch: true }, step: '1' });
+  const step = constraintField({ validity: { stepMismatch: true }, step: '0.5' });
+  const other = constraintField({ validity: { typeMismatch: true } });
+  const fine = constraintField();
+  const form = { elements: [missing, bad, low, high, whole, step, other, fine] };
+  const found = constraintErrors(form);
+  assert.deepEqual(found.map(([el]) => form.elements.indexOf(el)), [0, 1, 2, 3, 4, 5, 6], 'jedes ungueltige Feld, das gueltige nicht');
+  assert.deepEqual(found.map(([, msg]) => msg), [
+    'common.required',
+    'common.fieldNumber',
+    'common.fieldMin{"min":"0,01"}',
+    'common.fieldMax{"max":"24"}',
+    'common.fieldWholeNumber',
+    'common.fieldStep{"step":"0,5"}',
+    'common.fieldInvalid',
+  ], 'die Grenze steht als Zahl der Format-Locale da');
+  assert.deepEqual(constraintErrors(null), [], 'ohne Formular nichts');
+  assert.deepEqual(constraintErrors({}), [], 'ein Panel ohne elements meldet nichts');
+});
+
+test('constraintErrors: Ungezeichnetes zaehlt nicht, Zugeklapptes klappt auf, das Datumsfeld prueft selbst (Critique R21)', () => {
+  const hidden = constraintField({ validity: { valueMissing: true }, rendered: false });
+  const details = { open: false };
+  const folded = constraintField({ validity: { rangeUnderflow: true }, min: '1', rendered: false, folded: details });
+  const inner = constraintField({ validity: { rangeUnderflow: true }, min: '2026-01-01', inDatepicker: true });
+  const disabled = constraintField({ validity: { valueMissing: true }, willValidate: false });
+  const found = constraintErrors({ elements: [hidden, folded, inner, disabled] });
+  assert.deepEqual(found.map(([el]) => el), [folded], 'nur das Feld hinter dem Aufklapper');
+  assert.equal(details.open, true, 'der Aufklapper geht auf, damit die Meldung zu sehen ist');
+
+  const nowhere = { open: false };
+  const stillHidden = constraintField({ validity: { valueMissing: true }, rendered: false, folded: nowhere });
+  stillHidden.getClientRects = () => [];
+  assert.deepEqual(constraintErrors({ elements: [stillHidden] }), [], 'auch aufgeklappt unsichtbar: kein Feld, das jemand sieht');
+  assert.equal(nowhere.open, false, 'und der Aufklapper geht wieder zu');
 });
 
 test('reportFieldErrors: ohne Fehler meldet es nichts und sagt false', () => {

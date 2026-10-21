@@ -121,6 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Health forms point at the field that needs attention, in the app's own words.** Leaving out a
+  value, typing a number outside its range or an end date before the start no longer shows the
+  browser's speech bubble or a message without a place; the note now stands under the field, and the
+  cursor goes there. The empty blood pressure fields no longer show 120 / 80 and 72 in grey, which
+  read like a saved measurement.
+- **The add button on the cycle page says what it is for: adding a past period.** "Period started"
+  next to Today records today with one tap; the dialog behind the add button is for entering dates.
 - **Settings keep asking before you leave when saving did not work.** A form counted as saved the
   moment you pressed Save - before its fields were checked and before the server answered. If a
   field was wrong or the server refused, leaving the page no longer asked, and what you had typed was
