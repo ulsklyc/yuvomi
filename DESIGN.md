@@ -2757,9 +2757,12 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Seitenleiste eine eingelassene Liste (`.more-sheet__list`): Zeile >= `--target-base`, Siegel
   32px, Name in `--type-body` einzeilig, Zaehlbadge und Pfeil am Ende, Trennlinie ab der
   Textkante. Vorher je Sektion ein Vierer-Raster mit 1-2 Kacheln je Gruppe (724px, Luecken).
-  Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen. Die Listen
-  dunkel eine Stufe ueber dem Blatt (`--sheet-tile-bg` = `--color-surface-raised` #37332E auf
-  #2B2825, 1,00 -> 1,17:1); hell bleiben sie Surface, dort trennt `--shadow-xs`.
+  Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen und ist der
+  **feste Fuss** des Blatts (`.more-sheet__foot`, R21 S7, D7): nur die Module scrollen, Einstellungen,
+  Hilfe, Neuigkeiten und Abmelden sind immer zu sehen (vorher bei 390x844 unter dem Blattende).
+  Das Blatt traegt den **gruppierten Grund** (`--color-bg`), die Listen ihre Flaeche
+  (`--sheet-tile-bg`) ohne Schatten - keine Karte auf einer Karte (R21 S7, Detektor nested-cards).
+  Guard: `test:mobile-chrome`.
 - **Navigations-Ordnung (R19, Ulas 2026-10-16):** Planen = Kalender, Aufgaben, Belohnungen,
   Notizen, Schichtplan; Haushalt = Kueche, Haushaltshilfe, Entsorgung, Dokumente, Inventar;
   Menschen = Kontakte, Geburtstage, Gesundheit; Budget. **Eine Sektion mit nur einem Eintrag

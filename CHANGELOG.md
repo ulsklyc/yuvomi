@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings, Help, What's new and Sign out are always visible in the More sheet.** On a phone
+  they sat at the end of the scrolling list, below the edge of the sheet on most screens. They
+  now stay fixed at its bottom while the modules scroll above them, and the sheet uses the
+  grouped background of the app, so its lists no longer look like cards stacked on a card.
+
 - **The budget plan starts with your categories.** On a phone the plan opened with the card
   asking you to set a savings goal; the category budgets started below it. Without a goal that
   card now comes after the categories; a goal you set still leads.

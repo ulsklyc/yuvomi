@@ -786,3 +786,24 @@ test('R21: minimiert staucht sich die Kapsel per scale, ohne ihre Layout-Hoehe z
   const [probe] = topLevel(layoutCss, '.nav-bottom__probe');
   assert.equal(probe && decl(probe.body, 'min-height'), 'var(--nav-height-minimized)', 'der Messfuehler loest nicht die minimierte Hoehe auf');
 });
+
+// R21 S7 (D7 "Mehr-Blatt mit festem Fuss"; Detektor nested-cards 3x mobil):
+// Einstellungen, Hilfe, Neuigkeiten und Abmelden lagen am Ende des scrollenden
+// Koerpers (390x844: y 753-802 unter dem Blattende 764; 375x667 ganz
+// ausserhalb), und die Modullisten standen als weisse Karten mit Schatten auf
+// dem weissen Blatt.
+test('R21 S7: das Mehr-Blatt hat einen festen Fuss und gruppierten Grund', () => {
+  const router = read('../public/router.js');
+  const build = router.slice(router.indexOf('function buildMoreSheetBody('), router.indexOf('async function renderPage('));
+  assert.match(build, /foot\.className = 'more-sheet__foot'/, 'die Systemreihe hat einen eigenen Abschnitt');
+  assert.match(build, /foot\.appendChild\(system\)/, 'die Systemreihe steht im Fuss, nicht im Koerper');
+  assert.match(build, /return \[body, foot\];/, 'der Fuss steht neben dem Koerper, nicht in ihm');
+  const all = rules(layoutCss);
+  const foot = all.find((r) => r.selector.trim() === '.more-sheet__foot');
+  assert.equal(decl(foot?.body ?? '', 'flex-shrink'), '0', 'der Fuss schrumpft nie');
+  const sheet = all.find((r) => r.selector.trim() === '.more-sheet' && !r.at.length);
+  assert.equal(decl(sheet?.body ?? '', 'background-color'), 'var(--color-bg)', 'das Blatt traegt den gruppierten Grund');
+  const list = all.find((r) => r.selector.trim() === '.more-sheet__list');
+  assert.ok(list, 'Regel der Modulliste fehlt');
+  assert.equal(decl(list.body, 'box-shadow'), null, 'keine Karte mit Schatten auf dem Blatt');
+});

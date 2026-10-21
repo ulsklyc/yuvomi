@@ -1216,7 +1216,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * selbst; unter 584px greift die Grenze nicht (390px: unveraendert 366px). */
   max-inline-size: var(--nav-capsule-max);
   margin-inline: auto;
-  background-color: var(--color-surface);
+  /* GRUPPIERT, NICHT KARTE IN KARTE (R21 S7, Detektor nested-cards, 3x mobil).
+   * Die Listen der Module sind Flaechen (`--sheet-tile-bg`), und sie standen
+   * als weisse Karten mit Schatten auf einem weissen Blatt. Wie die iOS-
+   * Einstellungen in einem Blatt traegt das Blatt den gruppierten Grund der
+   * Seite, die Listen heben sich davon ohne Schatten ab. */
+  background-color: var(--color-bg);
   border: 1px solid var(--glass-border);
   /* Dieselbe Stufe wie der Dialog (R18, Begruendung an `.modal-panel`). */
   border-radius: var(--radius-xl);
@@ -1316,7 +1321,6 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   flex-direction: column;
   background-color: var(--sheet-tile-bg);
   border-radius: calc(var(--radius-xl) - var(--space-3));
-  box-shadow: var(--shadow-xs);
   overflow: clip;
 }
 
@@ -1744,6 +1748,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   height: 1px;
   background-color: var(--color-border-subtle);
   margin-block: var(--space-2h);
+}
+
+/* Der feste Fuss des Blatts (R21 S7): Trennlinie und Systemreihe stehen
+ * unter dem scrollenden Koerper und schrumpfen nie - sie sind immer zu sehen. */
+.more-sheet__foot {
+  flex-shrink: 0;
 }
 
 /* ── System-Reihe: Einstellungen | Hilfe | Änderungen | Abmelden ──

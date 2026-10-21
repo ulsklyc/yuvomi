@@ -1474,8 +1474,9 @@ function paintMoreSheetBadges(sheet) {
  * (keine Luecke), monochrom (Meta, nicht Modul) und kostet als Reihe 64px
  * statt vier Zeilen.
  *
- * Gibt EINEN Knoten in einem Array zurück (`.more-sheet__body`, der Scroller);
- * beide Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
+ * Gibt ZWEI Knoten in einem Array zurück (`.more-sheet__body`, der Scroller,
+ * und `.more-sheet__foot`, die feste Systemreihe darunter, R21 S7); beide
+ * Aufrufer spreizen das Ergebnis und bleiben davon unberührt.
  *
  * EINE Quelle der Wahrheit für renderAppShell() UND rebuildNavigation() —
  * beide Pfade müssen dieselbe Struktur erzeugen, sonst zerstört ein
@@ -1558,10 +1559,18 @@ function buildMoreSheetBody() {
   const labelCounts = navSectionEntryCounts(navItems().filter((item) => item.module !== 'settings'));
   nodes.push(...moreSheetSections(modules, labelCounts));
 
+  // DER FUSS STEHT FEST, NICHT IM SCROLLER (R21 S7, D7: "Mehr-Blatt mit
+  // festem Fuss"). Einstellungen, Hilfe, Neuigkeiten und Abmelden lagen am
+  // Ende des Koerpers: bei 390x844 stand die Reihe bei y 753-802 unter dem
+  // Blattende (764), bei 375x667 ganz ausserhalb - erreichbar nur durch
+  // Scrollen in einem Blatt, das nicht nach Scrollen aussieht. Sie stehen
+  // jetzt als eigener Abschnitt unter dem Koerper; nur die Module scrollen.
+  const foot = document.createElement('div');
+  foot.className = 'more-sheet__foot';
   const divider = document.createElement('div');
   divider.className = 'more-sheet__divider';
   divider.setAttribute('aria-hidden', 'true');
-  nodes.push(divider);
+  foot.appendChild(divider);
 
   // System-Reihe im selben Vierer-Raster (Icon-über-Label, monochrom).
   const system = document.createElement('div');
@@ -1625,10 +1634,10 @@ function buildMoreSheetBody() {
   // sind es drei Ziele, und drei Ziele in vier Spalten lassen eine Lücke, die
   // wie ein fehlendes Element aussieht.
   system.style.setProperty('--more-system-cols', String(system.children.length || 1));
-  nodes.push(system);
+  foot.appendChild(system);
 
   body.append(...nodes);
-  return [body];
+  return [body, foot];
 }
 
 /**
