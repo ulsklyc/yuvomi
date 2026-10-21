@@ -6502,7 +6502,7 @@
         "templateWork": "Trabajo",
         "templateSchool": "Colegio",
         "templateUniversity": "Universidad",
-        "overview": "Comparativa",
+        "overview": "Resumen",
         "overviewPeopleLabel": "Comparar personas",
         "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",

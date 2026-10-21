@@ -6502,7 +6502,7 @@
         "templateWork": "Werk",
         "templateSchool": "School",
         "templateUniversity": "Universiteit",
-        "overview": "Vergelijking",
+        "overview": "Overzicht",
         "overviewPeopleLabel": "Personen vergelijken",
         "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",

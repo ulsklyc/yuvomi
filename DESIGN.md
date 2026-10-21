@@ -3015,8 +3015,9 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    **Nie ein Kopf ohne Ortsangabe.** Angedockt wandert Zeile 1 aus dem Bild, und der Titel
    kommt als kleiner Inline-Titel zurueck (`wireCollapsingHeader`, utils/ux.js): in die
    Bar-Zeile, wo sie ihm 88px laesst; sonst falten ihre Kontrollen ins „..." (R9 M9). Eine
-   Tab-Leiste als Bar-Zeile gibt es unter 1024px nicht mehr: seit R19 stehen die Reiter in
-   der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Die dritte Bauart dafuer (Band,
+   Tab-Leiste als Bar-Zeile gibt es zwischen 768 und 1023px nicht: seit R19 stehen die
+   Reiter dort in der Titelzeile (`--tabs-title`), der Kopf ist einzeilig. Unter 768px
+   nennt der Kopf seit R21 (D7) wieder den Ort - Siegel und Name, die Reiter darunter. Die dritte Bauart dafuer (Band,
    R11 H1) ist seit R20 entfallen - gemessen erreichte sie keine Route mehr. Kopfhoehe und
    Klebekante haengen in keinem Weg am Andock-Zustand.
    **1a. Werkzeuge in der Titelzeile.** (R16, Critique 2026-10-05 P1 mobil.) Traegt die
@@ -3181,13 +3182,19 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
 **Variante: die Reiter sind die Titelzeile (R19, Critique 2026-10-16 P2).** Schichtplan,
 Belohnungen und Haushaltshilfe trugen unter 1024px den Large Title ueber ihrer Reiterleiste:
 121/121/129px bei 390px, 118-130px bei 834px. `page-toolbar--tabs-title` stellt die Leiste in
-die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt. Ab 768px stehen
-Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade); unter 768px
-weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum - wie die Kuechen-Leiste seit R9:
-die vier Reiter der Haushaltshilfe brauchen 351 der 358px, mit Titel oder Siegel davor lief der
-vierte in den Fade („Hau..."). Den Ort sagen die Reiter, ihr Segment im Modulton und der
-Mehr-Tab in derselben Farbe. Gemessen: 65px (390) und 69px (834) auf jedem Reiter. Am Desktop
-bleibt die Bar-Zeile eine eigene Zeile. Guard: `test:mobile-chrome`.
+die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt - zwischen 768 und
+1023px: Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade),
+gemessen 69px (834). UNTER 768px NENNT DER KOPF DEN ORT (R21, D7; Critique a2 P2): bis dahin
+wich dort der Titel samt Siegel aus dem Bild, und "Besuche | Arbeiten | Berichte" sagte nicht,
+dass man in der Haushaltshilfe steht - die Kapsel markierte "Mehr". Dort gilt jetzt der Kopf
+aller Module mit Reitern (Budget): Siegel und Name, die Reiter als Bar-Zeile darunter, beim
+Scrollen wandert die Titelzeile aus dem Bild und die Reiter kleben (121/121/129px ruhend statt
+65px - der Preis des Ortsnamens). Am Desktop bleibt die Bar-Zeile eine eigene Zeile. Guard:
+`test:mobile-chrome`.
+Der erste Reiter des Schichtplans heisst seit R21 "Uebersicht" wie in Budget und Gesundheit
+(vorher "Vergleich") und fehlt, solange es keine Schichtart gibt - kein leerer Reiter vorn.
+Ein Abschnittstitel, der den aktiven Reiter wiederholt ("Schichtarten" unter "Schichtarten"),
+steht nur im Baum (`test:schedule`).
 Was hier NICHT umgezogen ist und warum, steht in der Messmatrix der Umsetzung: Vorrat (die
 Kuechen-Leiste hat keine Titelzeile, die Werkzeugzeile faltet beim Scrollen), Rezepte
 (ebenso), Gesundheit-Startseite, Einstellungsblaetter, Budget/Statistik.

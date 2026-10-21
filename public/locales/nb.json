@@ -6502,7 +6502,7 @@
         "templateWork": "Arbeid",
         "templateSchool": "Skole",
         "templateUniversity": "Universitet",
-        "overview": "Sammenlign",
+        "overview": "Oversikt",
         "overviewPeopleLabel": "Sammenlign personer",
         "continuesUntil": "…varer til {{time}}",
         "overviewEmptyTitle": "Velg personer som skal sammenlignes",

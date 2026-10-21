@@ -6502,7 +6502,7 @@
         "templateWork": "Munka",
         "templateSchool": "Iskola",
         "templateUniversity": "Egyetem",
-        "overview": "Összehasonlítás",
+        "overview": "Áttekintés",
         "overviewPeopleLabel": "Személyek összehasonlítása",
         "continuesUntil": "…eddig tart: {{time}}",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",

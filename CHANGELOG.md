@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shift plan, rewards and household help name themselves on a phone again.** Below 768 pixels
+  the three showed only their tabs, so nothing on screen said where you were. The header now
+  carries the module's symbol and name with the tabs below, like the budget; while you scroll,
+  the tabs stay at the top.
+
+- **The shift plan's first tab is called "Overview" and only appears when there is something to
+  show.** "Compare" stood first even without a single shift type, while you started on "Shift
+  types" next to it. It now uses the same name as the first tab in budget and health, shows up
+  with the first shift type, and the "Shift types" heading no longer repeats the tab above it.
+
 - **Roles and permissions name every level in words, also with a mouse.** From 1024 pixels with a
   mouse the matrix showed only icons - a crossed-out eye, an eye, a pencil - with a legend above to
   look them up. Each level now reads "No access", "Read only" or "Full" next to its icon, and the

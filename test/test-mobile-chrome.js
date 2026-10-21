@@ -686,25 +686,26 @@ test('R20: der Gesundheits-Bereichskopf klappt beim Lesen auf eine Zeile ein', (
   assert.equal(decl(back?.body ?? '', 'min-inline-size'), 'var(--target-base)', 'der Rueckweg bleibt ein volles Ziel');
 });
 
-// R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE.
-// Schichtplan, Belohnungen und Haushaltshilfe massen 121/121/129px bei 390px
-// (Large Title ueber den Reitern), jetzt 65px; bei 834px 118-130 -> 69px.
+// R19 (Critique 2026-10-16 P2 mobil): DIE TAB-LEISTE IST DIE TITELZEILE - ab
+// 768px. R21 (D7, Critique a2 P2): unter 768px wich der Titel samt Siegel aus
+// dem Bild, und Schichtplan, Belohnungen und Haushaltshilfe zeigten mobil nur
+// noch ihre Reiter - kein Kopf nannte den Ort, die Kapsel sagte "Mehr". Unter
+// 768px steht wieder der Kopf aller Module: Siegel und Name, die Reiter als
+// Bar-Zeile darunter (wie Budget), mit demselben Einklappen beim Scrollen.
 const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js', 'pages/schedule.js'];
-test('R19: Schichtplan, Belohnungen und Haushaltshilfe fuehren ihre Reiter in der Titelzeile', () => {
+test('R19/R21: Reiter in der Titelzeile ab 768px, darunter nennt der Kopf den Ort', () => {
   for (const f of TABS_TITLE_MODULES) {
     assert.match(read(`../public/${f}`), /<header class="page-toolbar [^"]*\bpage-toolbar--tabs-title\b/, `${f}: der Kopf traegt die Variante`);
   }
   const own = rules(layoutCss).filter((r) => r.selector.includes('.page-toolbar--tabs-title'));
-  const at = (r, px) => r.at.some((a) => new RegExp(`max-width:\\s*${px}px`).test(a));
-  const bar = own.find((r) => at(r, 1023) && r.selector.endsWith('> .page-toolbar__bar'));
-  assert.equal(bar && decl(bar.body, 'flex'), '1 1 0', 'die Leiste nimmt den Rest der Titelzeile und scrollt dort');
+  const tabletOnly = (r) => r.at.some((a) => /min-width:\s*768px/.test(a) && /max-width:\s*1023px/.test(a));
+  const bar = own.find((r) => r.selector.endsWith('> .page-toolbar__bar') && decl(r.body, 'flex') === '1 1 0');
+  assert.ok(bar, 'die Leiste nimmt den Rest der Titelzeile');
+  assert.ok(tabletOnly(bar), 'in der Titelzeile nur zwischen 768 und 1023px');
   assert.equal(decl(bar.body, 'block-size'), 'auto', 'so hoch wie ihre Reiter, nicht wie eine eigene Leistenzeile');
-  assert.ok(own.every((r) => at(r, 1023) || at(r, 767)), 'nur unter 1024px - am Desktop bleibt die Bar-Zeile eine eigene Zeile');
-  const title = own.find((r) => at(r, 767) && r.selector.endsWith('> .page-toolbar__title'));
-  assert.equal(title && decl(title.body, 'clip-path'), 'inset(50%)', 'unter 768px weicht der Titel aus dem Bild ...');
-  assert.equal(decl(title.body, 'display'), null, '... nicht aus dem Baum: das <h1> bleibt die Seitenueberschrift');
-  assert.ok(own.some((r) => at(r, 767) && r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'),
-    'das Siegel geht mit (die vier Reiter der Haushaltshilfe brauchen 351 von 358px)');
+  const hides = own.filter((r) => (r.selector.endsWith('> .page-toolbar__title') && decl(r.body, 'clip-path') === 'inset(50%)')
+    || (r.selector.endsWith('> .module-seal--head') && decl(r.body, 'display') === 'none'));
+  assert.deepEqual(hides.map((r) => r.selector), [], 'kein Kopf ohne Ortsangabe: Titel und Siegel bleiben im Bild');
   assert.ok(read('../DESIGN.md').includes('page-toolbar--tabs-title'), 'DESIGN.md nennt die Variante');
 });
 

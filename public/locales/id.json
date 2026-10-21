@@ -6502,7 +6502,7 @@
         "templateWork": "Kerja",
         "templateSchool": "Sekolah",
         "templateUniversity": "Universitas",
-        "overview": "Perbandingan",
+        "overview": "Ringkasan",
         "overviewPeopleLabel": "Bandingkan orang",
         "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",

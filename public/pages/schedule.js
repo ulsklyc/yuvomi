@@ -2127,13 +2127,15 @@ function navigateToView(id) {
  * being destroyed along with a full-page reset.
  */
 /**
- * Kopf der Seite: Titel und Reiter. Unter 1024px SIND die Reiter der Titel
- * (`.page-toolbar--tabs-title`, das h1 tritt zurueck) - deshalb baut auch der
- * Ladefehler in render() diesen Kopf, statt die Seite ohne ihn zu zeigen.
+ * Kopf der Seite: Titel und Reiter. Zwischen 768 und 1023px stehen die Reiter
+ * in der Titelzeile (`.page-toolbar--tabs-title`), darunter wieder unter dem
+ * Titel - der Kopf nennt den Ort (R21, D7). Auch der Ladefehler in render()
+ * baut diesen Kopf, statt die Seite ohne ihn zu zeigen.
  */
 function scheduleHeadHtml(current = activeView) {
-  // DER PLAN ZUERST (Entscheidung R17, E1). "Vergleich" - die Woche als Raster -
-  // ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
+  // DER PLAN ZUERST (Entscheidung R17, E1). Die Uebersicht - die Woche als Raster,
+  // bis R21 "Vergleich" (Critique a3: anders benannt als der erste Reiter jedes
+  // anderen Moduls) - ist das, wofuer jemand den Schichtplan oeffnet; bis R17 stand er als
   // letzter Reiter hinter drei Reitern Stammdaten und verlangte dort erst eine
   // Personenwahl. Die Adressen der Reiter bleiben (utils/schedule-tabs.js).
   const tabs = [
@@ -2254,12 +2256,21 @@ function renderPage() {
   // Leiste selbst nie angeklickt haben, z. B. den FAB oder "Heute" im
   // Uebersicht-Tab).
   scheduleTablist?.sync(activeView);
+  // KEIN LEERER REITER VORN (Critique R21, a3): ohne Schichtart gibt es nichts
+  // zu ueberblicken, und der Start liegt auf "Schichtarten" (render()). Die
+  // Uebersicht erscheint, sobald etwas angelegt ist - und bleibt sichtbar,
+  // solange sie selbst gewaehlt ist (eine Adresse /schedule/overview).
+  const overviewTab = root.querySelector('#schedule-tab-overview');
+  if (overviewTab) overviewTab.hidden = planningNeedsShiftTypes() && activeView !== 'overview';
   const locked = readOnly();
   const panel = activeView === 'shifts'
     // Der Quickstart bleibt erreichbar, auch nachdem der erste Typ existiert -
     // ein Haushalt kann durchaus "Arbeit" fuer ein Mitglied und spaeter
     // "Schule" fuer ein anderes brauchen, nicht nur beim allerersten Typ.
-    ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>'
+    // DER TITEL WIEDERHOLTE DEN REITER (Critique R21, a3): unter "Schichtarten"
+    // stand "Schichtarten". Er bleibt die Ueberschrift des Abschnitts im Baum
+    // (neben "Eigene Felder"), sichtbar sagt es der aktive Reiter.
+    ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title sr-only">' + esc(t('schedule.shiftTypes')) + '</h2>'
       // App-weite UX-Durchsicht 2026-09-12 (Batch 4): `.segmented` bildet eine
       // Auswahl aus sich GEGENSEITIG AUSSCHLIESSENDEN Zustaenden ab (Statistik-
       // Zeitraum, Woche/Tag im Uebersicht-Tab, Muster/Ersetzen/Extra im

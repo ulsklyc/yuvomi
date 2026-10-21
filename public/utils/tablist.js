@@ -135,7 +135,8 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
   if (!container) return { setActive() {} };
   let current = activeId;
 
-  const buttons = () => [...container.querySelectorAll('[data-tab-id]')];
+  // Ein ausgeblendeter Reiter (Schichtplan ohne Schichtart, R21) ist kein Ziel.
+  const buttons = () => [...container.querySelectorAll('[data-tab-id]')].filter((b) => !b.hidden);
 
   const paint = () => {
     let activeBtn = null;

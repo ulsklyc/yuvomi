@@ -6502,7 +6502,7 @@
         "templateWork": "工作",
         "templateSchool": "学校",
         "templateUniversity": "大学",
-        "overview": "对比",
+        "overview": "概览",
         "overviewPeopleLabel": "比较成员",
         "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",

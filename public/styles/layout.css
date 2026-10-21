@@ -4803,26 +4803,23 @@ html.fab-steady .page-fab {
   }
 }
 
-/* DIE TAB-LEISTE IST DIE TITELZEILE (R19, Critique 2026-10-16 P2 mobil).
- *
+/* DIE REITER IN DER TITELZEILE (R19, Critique 2026-10-16 P2 mobil) - AB 768px.
  * Schichtplan, Belohnungen und Haushaltshilfe trugen unter 1024px zwei
- * Kopfzeilen: den Large Title und darunter ihre Reiter - 121/121/129px bei
- * 390px, 118-130px bei 834px, waehrend elf Module mit 65px auskommen.
- * `--tabs-title` stellt die Leiste in die Titelzeile, wie iOS ein Segment als
- * Titel der Navigationsleiste fuehrt:
- * - ab 768px stehen Large Title und Reiter nebeneinander; der Titel gibt nach
- *   (Ellipse), die Leiste scrollt, wenn sie nicht passt (Werkzeugzeilen-Regel 2);
- * - unter 768px weicht der Titel samt Siegel aus dem Bild, nicht aus dem Baum
- *   (das <h1> bleibt die Seitenueberschrift) - dasselbe, was die Kuechen-Leiste
- *   seit R9 tut. Die vier Reiter der Haushaltshilfe brauchen 351 der 358px;
- *   mit Titel oder Siegel davor liefe der vierte in den Fade ("Hau...").
- *   Wo man ist, sagen die Reiter selbst, ihr Segment im Modulton und der
- *   Mehr-Tab der Kapsel in derselben Farbe.
- * Der Kopf ist damit einzeilig: keine Lead-Zone, nichts dockt, die Linie steht
- * durchgehend (wie `--title-tools`). Am Desktop (ab 1024px) bleibt die
- * Bar-Zeile eine eigene Zeile unter dem Inline-Titel - dort traegt die
- * Titelzeile die angedockte Kopf-Pille. */
-@media (max-width: 1023px) {
+ * Kopfzeilen: den Large Title und darunter ihre Reiter - 118-130px bei 834px.
+ * `--tabs-title` stellt die Leiste dort in die Titelzeile, wie iOS ein Segment
+ * als Titel der Navigationsleiste fuehrt: Large Title und Reiter nebeneinander;
+ * der Titel gibt nach (Ellipse), die Leiste scrollt, wenn sie nicht passt
+ * (Werkzeugzeilen-Regel 2).
+ *
+ * UNTER 768px NENNT DER KOPF WIEDER DEN ORT (Critique R21, D7; a2 P2). Bis
+ * dahin wich dort der Titel samt Siegel aus dem Bild, und die drei Module
+ * zeigten nur ihre Reiter - "Besuche | Arbeiten | Berichte" sagt nicht, dass
+ * man in der Haushaltshilfe steht, und die Kapsel markierte "Mehr". Dort gilt
+ * jetzt der Kopf aller Module mit Reitern (Budget): Siegel und Name in der
+ * Titelzeile, die Reiter als Bar-Zeile darunter, und beim Scrollen klappt der
+ * Large Title ein wie ueberall (wireCollapsingHeader). Am Desktop (ab 1024px)
+ * bleibt die Bar-Zeile ohnehin eine eigene Zeile unter dem Inline-Titel. */
+@media (min-width: 768px) and (max-width: 1023px) {
   .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 0 1 auto;
     min-width: 0;
@@ -4838,23 +4835,10 @@ html.fab-steady .page-fab {
     flex: 1 1 0;
     block-size: auto;
   }
-
-  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__actions:empty {
-    display: none;
-  }
 }
 
-@media (max-width: 767px) {
-  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    min-block-size: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .module-seal--head {
+@media (max-width: 1023px) {
+  .page-toolbar.page-toolbar--tabs-title:not(.page-toolbar--in-group) > .page-toolbar__actions:empty {
     display: none;
   }
 }

@@ -6816,7 +6816,7 @@
         "templateWork": "Praca",
         "templateSchool": "Szkoła",
         "templateUniversity": "Uczelnia",
-        "overview": "Porównanie",
+        "overview": "Przegląd",
         "overviewPeopleLabel": "Porównaj osoby",
         "continuesUntil": "…trwa do {{time}}",
         "overviewEmptyTitle": "Wybierz osoby do porównania",

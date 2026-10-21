@@ -6502,7 +6502,7 @@
         "templateWork": "Công việc",
         "templateSchool": "Trường học",
         "templateUniversity": "Đại học",
-        "overview": "So sánh",
+        "overview": "Tổng quan",
         "overviewPeopleLabel": "So sánh mọi người",
         "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
