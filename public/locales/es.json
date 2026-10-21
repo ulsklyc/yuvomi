@@ -6504,7 +6504,6 @@
         "templateUniversity": "Universidad",
         "overview": "Comparativa",
         "overviewPeopleLabel": "Comparar personas",
-        "overviewClearSelection": "Borrar la selección",
         "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",
         "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro.",

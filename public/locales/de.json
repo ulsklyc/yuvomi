@@ -6504,7 +6504,6 @@
         "templateUniversity": "Universität",
         "overview": "Vergleich",
         "overviewPeopleLabel": "Personen vergleichen",
-        "overviewClearSelection": "Auswahl leeren",
         "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
         "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen.",

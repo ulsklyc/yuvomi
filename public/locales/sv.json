@@ -6504,7 +6504,6 @@
         "templateUniversity": "Universitet",
         "overview": "Jämförelse",
         "overviewPeopleLabel": "Jämför personer",
-        "overviewClearSelection": "Rensa urvalet",
         "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
         "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida.",

@@ -1251,12 +1251,6 @@
     flex: 0 0 auto;
   }
 
-  /* In der einen Zeile stehen die Personen vorn; „Auswahl leeren" (124px)
-     schob sonst die erste Person halb aus dem Bild. */
-  .schedule-overview__toolbar > .user-ms .user-ms__option--none {
-    order: 1;
-  }
-
   .schedule-overview__stepper {
     grid-area: step;
     flex-wrap: nowrap;

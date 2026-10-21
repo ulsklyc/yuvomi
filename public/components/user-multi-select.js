@@ -101,13 +101,14 @@ function userChipName(displayName, surname) {
  * @param {number[]} selectedIds                               Bereits ausgewählte IDs
  * @param {string}   inputName                                 Name-Attribut des Widgets
  * @param {string}   labelKey                                  i18n-Schlüssel für das Label
- * @param {string}   [noneLabelKey]                            i18n-Schlüssel für die "Niemand"-Zeile;
- *   Vorgabe passt für "wem zugewiesen" (Tasks/Kalender/Budget). Ein Aufrufer, dessen Auswahl kein
- *   Zuweisen ist - z. B. der Schedule-Vergleich, wo "Niemand" nur die Auswahl leert - übergibt
- *   seinen eigenen Schlüssel (S-19).
+ * @param {string|null} [noneLabelKey]                         i18n-Schlüssel für einen "Niemand"-Chip.
+ *   NUR FÜR DIE EINZELWAHL (Critique R21, a5): in einer Mehrfachwahl - Zuständige, Betreuende,
+ *   der Schichtplan-Vergleich - stand "Niemand" als erster Chip zwischen den Personen, wie eine
+ *   weitere Person. Dort heißt "niemand" schlicht: kein Chip gewählt. Eine Einzelwahl (der Koch
+ *   einer Mahlzeit, `single`) übergibt `'userMultiSelect.nobody'` - dort ist es eine der Antworten.
  * @returns {string} HTML-String
  */
-export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey, noneLabelKey = 'userMultiSelect.nobody') {
+export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey, noneLabelKey = null) {
   const selectedSet = new Set(selectedIds ?? []);
   const surname = sharedSurname(allUsers);
   const items = allUsers.map((u) => {
@@ -130,16 +131,17 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
   // Striche um das Wort. Hier stand ein grauer Kreis mit einem Gedankenstrich
   // und „- Niemand -" daneben - ein Platzhalter-Gesicht, das neben echten
   // Initialen wie ein weiteres Mitglied aussah (Critique 2026-09-24).
-  const noneLabel = t(noneLabelKey);
+  const none = noneLabelKey ? `
+        <label class="user-ms__option user-ms__option--none">
+          <input type="checkbox" class="user-ms__checkbox user-ms__none" value=""
+                 data-ms-input="${esc(inputName)}" ${selectedSet.size === 0 ? 'checked' : ''}>
+          <span class="user-ms__name">${t(noneLabelKey)}</span>
+        </label>` : '';
   return `
     <div class="user-ms" data-ms-name="${esc(inputName)}">
       <label class="label">${t(labelKey)}</label>
       <div class="user-ms__options">
-        <label class="user-ms__option user-ms__option--none">
-          <input type="checkbox" class="user-ms__checkbox user-ms__none" value=""
-                 data-ms-input="${esc(inputName)}" ${selectedSet.size === 0 ? 'checked' : ''}>
-          <span class="user-ms__name">${noneLabel}</span>
-        </label>
+        ${none}
         ${items.join('')}
       </div>
     </div>`;

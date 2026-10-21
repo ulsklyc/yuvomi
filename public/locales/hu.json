@@ -6504,7 +6504,6 @@
         "templateUniversity": "Egyetem",
         "overview": "Összehasonlítás",
         "overviewPeopleLabel": "Személyek összehasonlítása",
-        "overviewClearSelection": "Kijelölés törlése",
         "continuesUntil": "…eddig tart: {{time}}",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
         "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd.",

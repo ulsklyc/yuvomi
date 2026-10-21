@@ -6504,7 +6504,6 @@
         "templateUniversity": "Universitet",
         "overview": "Sammenlign",
         "overviewPeopleLabel": "Sammenlign personer",
-        "overviewClearSelection": "Tøm valg",
         "continuesUntil": "…varer til {{time}}",
         "overviewEmptyTitle": "Velg personer som skal sammenlignes",
         "overviewEmptyDescription": "Velg minst ett medlem av husholdningen over for å se deres ukesplaner ved siden av hverandre.",

@@ -6504,7 +6504,6 @@
         "templateUniversity": "Université",
         "overview": "Comparaison",
         "overviewPeopleLabel": "Comparer des personnes",
-        "overviewClearSelection": "Effacer la sélection",
         "continuesUntil": "…se poursuit jusqu’à {{time}}",
         "overviewEmptyTitle": "Choisissez des personnes à comparer",
         "overviewEmptyDescription": "Sélectionnez ci-dessus au moins un membre du foyer pour voir les emplois du temps hebdomadaires côte à côte.",

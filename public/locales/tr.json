@@ -6504,7 +6504,6 @@
         "templateUniversity": "Üniversite",
         "overview": "Karşılaştırma",
         "overviewPeopleLabel": "Kişileri karşılaştır",
-        "overviewClearSelection": "Seçimi temizle",
         "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
         "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç.",

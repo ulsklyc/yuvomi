@@ -6504,7 +6504,6 @@
         "templateUniversity": "University",
         "overview": "Compare",
         "overviewPeopleLabel": "Compare people",
-        "overviewClearSelection": "Clear selection",
         "continuesUntil": "…continues until {{time}}",
         "overviewEmptyTitle": "Pick people to compare",
         "overviewEmptyDescription": "Select at least one household member above to see their weekly timetables side by side.",

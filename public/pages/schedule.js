@@ -2002,7 +2002,7 @@ function renderOverview() {
   if (!state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length) {
     return `<section class="schedule-overview schedule-overview--start">${emptyPatternState()}</section>`;
   }
-  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
+  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel');
   const weekDays = overviewVisibleDays();
   const showsToday = weekDays.includes(todayKey());
   const weekLabel = overview.viewMode === 'day'

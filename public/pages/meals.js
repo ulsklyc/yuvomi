@@ -2296,7 +2296,7 @@ function cookPickerHtml(meal) {
   const hidden = isSoloHousehold() && people.length <= 1;
   return `
     <div class="form-group meal-modal__cook"${hidden ? ' hidden' : ''}>
-      ${renderUserMultiSelect(people, cook ? [cook.id] : [], COOK_INPUT, 'meals.cookLabel')}
+      ${renderUserMultiSelect(people, cook ? [cook.id] : [], COOK_INPUT, 'meals.cookLabel', 'userMultiSelect.nobody')}
     </div>`;
 }
 

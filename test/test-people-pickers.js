@@ -615,3 +615,23 @@ test('R19: tragen alle denselben Nachnamen, zeigt der Chip den Vornamen - der vo
   assert.match(renderUserMultiSelect([{ id: 1, display_name: 'A <b> Johnson' }, { id: 2, display_name: 'B Johnson' }], [], 'x', 'l'),
     /<span class="user-ms__name">A &lt;b&gt;<span class="sr-only"> Johnson<\/span>/, 'escaped');
 });
+
+// "NIEMAND" STEHT NICHT IN DER MEHRFACHWAHL (Critique R21, a5; clarify). In
+// "Darf Gesundheitsdaten eintragen" stand "Niemand" als erster Chip zwischen
+// den Personen - wie eine weitere Person, und neben einer Auswahl von
+// mehreren eine Option, die alle anderen abwaehlt. Wer niemanden waehlt, waehlt
+// keinen Chip. Nur die EINZELWAHL (der Koch einer Mahlzeit) behaelt "Niemand":
+// dort ist es eine der Antworten, nicht das Fehlen einer.
+test('R21: die Mehrfachwahl fuehrt keinen Niemand-Chip, nur die Einzelwahl', async () => {
+  const { readFileSync } = await import('node:fs');
+  const family = [{ id: 1, display_name: 'Alex Johnson' }, { id: 2, display_name: 'Leo Johnson' }];
+  const multi = renderUserMultiSelect(family, [], 'x', 'tasks.assignedLabel');
+  assert.doesNotMatch(multi, /user-ms__none/, 'keine Niemand-Option in der Reihe');
+  assert.equal((multi.match(/class="user-ms__checkbox"/g) || []).length, 2, 'nur die Personen');
+  const single = renderUserMultiSelect(family, [], 'meal_cook', 'meals.cookLabel', 'userMultiSelect.nobody');
+  assert.match(single, /user-ms__option--none/, 'wer einen Schluessel fuer "Niemand" uebergibt, bekommt den Chip');
+  const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  assert.match(src('../public/pages/meals.js'), /renderUserMultiSelect\(people, cook \? \[cook\.id\] : \[\], COOK_INPUT, 'meals\.cookLabel', 'userMultiSelect\.nobody'\)/,
+    'der Koch ist eine Einzelwahl und behaelt "Niemand"');
+  assert.doesNotMatch(src('../public/pages/schedule.js'), /overviewClearSelection/, 'der Vergleich leert die Auswahl ohne eigenen Chip');
+});
