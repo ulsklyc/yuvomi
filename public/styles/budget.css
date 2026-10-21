@@ -1445,8 +1445,10 @@ button.budget-bar-row:focus-visible {
  * Balkenbahn, die bei sieben Zeilen zu ueber 94 % leer war (Critique
  * 2026-08-13). Ein gekappter Kategoriename ist wertlos, genau wie ein
  * gekappter Artikelname im Einkauf. */
+/* Kompakt (Telefon, Seitenleiste der Uebersicht): Name und Betrag in der
+ * Metazeile, Footnote 13 statt 12 (R21, D4 - 12 ist Badges vorbehalten). */
 .budget-bar-row__label {
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
   hyphens: auto;
@@ -1592,7 +1594,7 @@ button.budget-bar-row:focus-visible {
  * sie deterministisch) und bleibt für alle Zeilen gleich, damit die
  * flex:1-Balkenspuren gleich breit bleiben und die Balken vergleichbar sind. */
 .budget-bar-row__amount {
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
   /* Label-Farbe statt Rot/Gruen je Zeile (Critique 2026-09-25): neun farbige
@@ -2877,22 +2879,23 @@ button.budget-entry__title {
  * 8px-Balken - Name und Zahl derselben Zeile standen eine Handbreit
  * auseinander, in 12px. Ab 960px Modulflaeche stehen Ausgaben und Einnahmen
  * NEBENEINANDER, jeder Block auf rund 480-550px: der Betrag steht am Ende
- * seines Balkens. Der Name traegt die Zeilentypo der App (14px, Primaertinte)
- * statt der Caption - er ist der Inhalt der Zeile, nicht ihre Beschriftung.
+ * seines Balkens. Der Name traegt Lesetext (Subheadline 15, Primaertinte;
+ * bis R21 14px, die Stufe der Bedienelemente) statt der Caption - er ist der
+ * Inhalt der Zeile, nicht ihre Beschriftung.
  * Nur in der Statistik: in der Seitenleiste der Uebersicht bleibt die
  * kompakte Form (dort stapelt die Zeile ohnehin).
  * -------------------------------------------------------- */
 /* Ab der dreispaltigen Zeile (Name | Balken | Betrag); gestapelt (Telefon)
  * bleibt die kompakte Form - dort stehen Name und Betrag schon in einer
- * Zeile beieinander, und 14px kosteten nur Hoehe. */
+ * Zeile beieinander, in der Metazeile (Footnote 13). */
 @container budget-page (min-width: 480px) {
   .budget-stats__main--wide .budget-bar-row__label {
-    font-size: var(--text-sm);
+    font-size: var(--type-secondary);
     color: var(--color-text-primary);
   }
 
   .budget-stats__main--wide .budget-bar-row__amount {
-    font-size: var(--text-sm);
+    font-size: var(--type-secondary);
   }
 }
 

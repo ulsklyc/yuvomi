@@ -2959,6 +2959,44 @@
   padding: var(--space-0h) var(--space-1);
 }
 
+/* TABLET: DER TITEL DARF ZWEI ZEILEN NEHMEN (R21, Critique 2026-10-21, D4).
+ * Gemessen bei 834px: Zellen 118x170, 51 Chips, 40 davon gekuerzt, im Mittel
+ * 12,6 Zeichen sichtbar - "Klavierstun...", "Fussballtrain...". Die Zelle hat
+ * die Hoehe, die ihr an Breite fehlt. fitMonthDayCells misst die echte Hoehe
+ * und zaehlt, was nicht mehr passt, ins "+N" - zwei Zeilen kosten keine
+ * Zusage, nur Platz. Darunter (Telefon) gelten Punkt und Titelfassung, ab
+ * 1024px haben die Spalten die Breite fuer eine Zeile. Die Baender
+ * (`.month-bands`) bleiben einzeilig: sie stehen in Spuren fester Hoehe ueber
+ * mehrere Zellen. Ein langes Wort trennt an der Silbe (W1). */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .month-day .month-day__event,
+  .month-day .cal-task-chip {
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .month-day .month-day__event > span:last-child,
+  .month-day .cal-task-chip > span:last-child {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    hyphenate-limit-chars: 6 4 4;
+    -webkit-hyphenate-limit-before: 4;
+    -webkit-hyphenate-limit-after: 4;
+  }
+
+  /* Glyphe und Rangpunkt stehen an der ERSTEN Zeile, nicht in der Mitte von
+   * zweien: die Zeilenhoehe des Chips (1.4 bzw. 1.3) ist ihre Hoehe. */
+  .month-day .month-day__event > :not(:last-child),
+  .month-day .cal-task-chip > :not(:last-child) {
+    margin-block-start: calc((1lh - 1em) / 2);
+  }
+}
+
 /* Aufgaben-Sektion in Agenda-Ansicht (und in der Tagesliste des
  * Telefon-Monats, die dieselben Zeilen baut).
  *
@@ -3000,6 +3038,10 @@
   position: relative;
   min-height: var(--space-6);
   overflow: visible;
+  /* In der Liste ist der Chip eine Aufgabenzeile, kein Etikett: sein Titel
+   * steht in der Metazeilen-Stufe (Footnote 13) neben den Terminzeilen, nicht
+   * in der 12px-Caption der Badges (R21, D4). Das Raster behaelt seine 12. */
+  font-size: var(--type-caption);
 }
 
 .agenda-tasks .cal-task-chip::before {

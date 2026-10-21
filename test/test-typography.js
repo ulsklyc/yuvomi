@@ -1116,3 +1116,34 @@ test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () 
   assert.deepStrictEqual(funde, [], 'eine eigene Groesse am Sekundaertext ist ein Dialekt');
 });
 
+// R21 (D4, Persona Inge, 834px): die Stellen, an denen Lesetext unter 13 lag.
+// Gemessen: Tab-Labels 11px am Tablet, Kalender-Chips 12px auf im Mittel 12,6
+// sichtbare Zeichen (40 von 51 gekuerzt) in 118x170er Zellen, Budget-Summen,
+// Plan und Veraenderung 12px, Darlehen-Meta 12px, Aufgaben in der Agenda 12px.
+test('R21 Inge: am Tablet keine Lesezeile unter 13, Nav-Label 12, Monatstitel zweizeilig', () => {
+  const rules = (name) => [...eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))];
+  const sels = (rule) => rule.selector.split(',').map((s) => s.trim());
+
+  const label = rules('layout.css').find((r) => r.at.some((a) => /min-width:\s*640px/.test(a)) && sels(r).includes('.nav-bottom .nav-item__label'));
+  assert.ok(label, 'ab 640px eine eigene Regel fuer das Tab-Label');
+  assert.match(label.body, /font-size:\s*var\(--text-xs\)/, 'am Tablet Caption 1 (12) statt Caption 2 (11)');
+
+  const tablet = (r) => r.at.some((a) => /min-width:\s*640px/.test(a) && /max-width:\s*1023px/.test(a));
+  const cal = rules('calendar.css');
+  const titel = cal.find((r) => tablet(r) && sels(r).includes('.month-day .month-day__event > span:last-child'));
+  assert.ok(titel, 'am Tablet eine Titelregel fuer die Chips der Monatszelle');
+  assert.ok(sels(titel).includes('.month-day .cal-task-chip > span:last-child'), 'Aufgaben-Chips ziehen mit');
+  assert.match(titel.body, /-webkit-line-clamp:\s*2/);
+  assert.match(titel.body, /white-space:\s*normal/);
+  assert.match(titel.body, /hyphens:\s*auto/, 'ein langes Wort trennt an der Silbe (W1)');
+  const chip = cal.find((r) => tablet(r) && sels(r).includes('.month-day .month-day__event'));
+  assert.match(chip?.body ?? '', /white-space:\s*normal/, 'der Chip selbst haelt den Titel nicht mehr einzeilig');
+  const agenda = cal.find((r) => !r.at.length && r.selector.trim() === '.agenda-tasks .cal-task-chip');
+  assert.match(agenda?.body ?? '', /font-size:\s*var\(--type-caption\)/, 'die Aufgabe in der Agenda ist eine Zeile, kein Etikett');
+
+  const budget = rules('budget.css');
+  for (const sel of ['.budget-bar-row__label', '.budget-bar-row__amount']) {
+    const base = budget.find((r) => !r.at.length && r.selector.trim() === sel && /font-size/.test(r.body));
+    assert.match(base?.body ?? '', /font-size:\s*var\(--type-caption\)/, `${sel}: Footnote 13 statt 12`);
+  }
+});

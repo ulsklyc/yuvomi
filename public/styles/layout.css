@@ -2482,6 +2482,17 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   line-height: 1.1;
 }
 
+/* AB 640px CAPTION 1 STATT CAPTION 2 (R21, Critique 2026-10-21, D4). Die 11px
+ * sind die Antwort auf 58px je Slot am 375er-Telefon (oben); am Tablet traegt
+ * dieselbe Kapsel bei 834px fuenf Slots mit je ueber 100px, und das Label stand
+ * dort trotzdem in Caption 2 - fuer Inge die kleinste Schrift des Schirms.
+ * 12px ist die Stufe, die D4 den Nav-Labels gibt. */
+@media (min-width: 640px) {
+  .nav-bottom .nav-item__label {
+    font-size: var(--text-xs);
+  }
+}
+
 /* Das Label steht auf der getönten Indikator-Pille, also auf einer Tönung
  * SEINER EIGENEN FARBE - genau der Fall, für den tokens.css die Konvention
  * „Akzent-Text auf akzent-getöntem Grund" führt (70 % Akzent + 30 %

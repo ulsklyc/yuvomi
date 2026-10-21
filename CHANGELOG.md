@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agenda. They now share one size, 13 pixels, everywhere. Explanations in empty pages, document
   descriptions and the line under a contact's name move from 14 to 15 pixels.
 
+- **On tablets, the month view shows more of each title, and the tab bar is easier to read.**
+  Event and task titles in a month cell may now take two lines instead of being cut after about a
+  dozen letters; what no longer fits is counted in "+N more". The tab bar labels grow from 11 to
+  12 pixels, the budget statistics name each category in 15 instead of 14 pixels, and the compact
+  budget figures, tasks in the agenda and the loan details no longer drop to 12 pixels.
+
 - **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed
   two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage
   participants" is reached via the ⋯ button next to it.

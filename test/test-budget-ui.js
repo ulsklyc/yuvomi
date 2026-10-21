@@ -5925,11 +5925,15 @@ test('R17: in der Statistik stehen Ausgaben und Einnahmen nebeneinander, der Nam
   assert.match(wide?.body ?? '', /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
     'zwei Bloecke je ~480-550px statt einer 830px langen Balkenbahn zwischen Name und Betrag');
   const label = rules.find((r) => r.selector.trim() === '.budget-stats__main--wide .budget-bar-row__label' && at(/budget-page\s*\(\s*min-width:\s*480px\s*\)/)(r));
-  assert.match(label?.body ?? '', /font-size:\s*var\(--text-sm\)/, '14px statt der 12px-Caption');
+  // R21 (D4): Lesetext ist Subheadline 15 - 14 ist die Stufe der Bedienelemente.
+  assert.match(label?.body ?? '', /font-size:\s*var\(--type-secondary\)/, '15px statt der 12px-Caption');
   assert.match(label?.body ?? '', /color:\s*var\(--color-text-primary\)/);
-  // Die Seitenleiste der Uebersicht behaelt die kompakte Form.
+  // Die Seitenleiste der Uebersicht behaelt die kompakte Form - seit R21 (D4)
+  // in der Metazeile (Footnote 13) statt in der 12px-Caption der Badges.
   const base = rules.find((r) => r.selector.trim() === '.budget-bar-row__label' && r.at.length === 0 && /font-size/.test(r.body));
-  assert.match(base?.body ?? '', /font-size:\s*var\(--text-xs\)/);
+  assert.match(base?.body ?? '', /font-size:\s*var\(--type-caption\)/);
+  const amount = rules.find((r) => r.selector.trim() === '.budget-bar-row__amount' && r.at.length === 0 && /font-size/.test(r.body));
+  assert.match(amount?.body ?? '', /font-size:\s*var\(--type-caption\)/, 'der Betrag steht neben dem Namen in derselben Stufe');
 });
 
 // Review an #1767: zwei Stellen, die an der Fensterbreite haengen.
