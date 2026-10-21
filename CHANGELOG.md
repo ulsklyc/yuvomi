@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The same message stands once.** When the same notice comes up again while it is still on
+  screen, it stays one notice with a small count instead of stacking up and pushing other notices
+  away. Notices with an Undo button stay separate.
+
+- **Swiping through days joins the two days seamlessly.** In the calendar's day view the next day
+  now follows directly after the current one while you swipe, without an empty strip in between.
+
 - **Every form points at the field that needs attention.** Leaving out a required field in the shift
   plan, shared expenses, household help, subscriptions, documents, fasting, the settings or the
   tablet pairing no longer shows the browser's bubble; the message stands at the field in the app's

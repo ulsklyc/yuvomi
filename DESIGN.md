@@ -1360,7 +1360,10 @@ das Verhaeltnis haelt.
   was selbst waagerecht arbeitet (`.u-scroll-fade`, die Diagrammflaeche der Berichte,
   Eingabefelder), behaelt seinen Finger. Das Hereingleiten steht in layout.css. Im Kalender
   seit R21 echtes Umblaettern mit vorgeladenem Nachbarn und stehender Achse (D2, siehe
-  „Der Zeitraum-Wisch" unter Wischbedienung).
+  „Der Zeitraum-Wisch" unter Wischbedienung). Der Weg eines Blatts ist, was neben der Achse
+  zieht: in der Woche die Spalten, im Tag (eine Karte) seine Spalte - dem Nachbarn sind Rand und
+  Achsenflaeche abgeschnitten, sonst zog zwischen den Spalten eine 76px-Luecke mit (S9a,
+  `periodSpan`/`alignPeriodGhost`, `test:calendar`).
 - **Titel im Kopf:** der Groessenwechsel des Large Title faellt weiter in einen Frame (keine
   `font-size`-Transition); der Titel blendet an der neuen Stelle ein (`opacity`,
   `--duration-xs`), ebenso der angedockte Titel der scrollenden Seiten (ein und aus).
@@ -1799,7 +1802,11 @@ Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag. **Weichen ganz 
 offenen Flaeche mit `data-toast-yield` nimmt der Stapel alle Toasts zurueck (`inert`) und haelt
 ihre Frist an (`toast:hold`/`toast:release`); mit dem Schliessen kommen sie mit der Restfrist
 wieder. Gesetzt am Mehr-Blatt: es steht fast bildhoch, es gab keine freie Lage, und der
-Rueckgaengig-Toast lag auf Griff und Suche (390x844: Toast 12-66, Suche ab 62).
+Rueckgaengig-Toast lag auf Griff und Suche (390x844: Toast 12-66, Suche ab 62). **Gleiches steht
+einmal da (R21 S9a):** derselbe Satz desselben Typs ohne Aktion, waehrend er noch steht, wird kein
+zweiter Toast - die Frist beginnt von vorn, eine ruhige Zahl (`.toast__count`, `aria-hidden`)
+zaehlt mit, die Ansage kommt trotzdem (stille Ansage). Vorher stapelten sich drei gleiche und
+verdraengten zwei andere. Toasts mit Aktion bleiben einzeln (`test:toast-show`).
 
 ## Shapes
 

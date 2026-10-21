@@ -6619,6 +6619,37 @@ test('R21 D2: der Kalender verdrahtet den Nachbarn, die stehende Achse und den W
   assert(/scheduleNeighborPrefetch\(\);/.test(view), 'renderView() laedt die Nachbarn nicht vor');
 });
 
+/* R21 S9a (Handoff 2, "Tag: Kartenluecke im Einrastframe"): der Tag blaetterte
+ * um seine ganze Breite, waehrend seine Stundenachse stand - zwischen alter und
+ * neuer Spalte zogen beide Kartenraender und die leere Achsenflaeche des
+ * Nachbarn mit (gemessen 76px in 44 von 110 Frames bei 390). Jetzt ist der Weg
+ * die Spalte, und dem Nachbarn sind Rand und Achse abgeschnitten. */
+test('R21 S9a: der Tag blaettert um seine Spalte, der Nachbar zeigt nur seine Spalte', () => {
+  const rect = (left, width) => ({ left, right: left + width, width, top: 0 });
+  const live = {
+    getBoundingClientRect: () => rect(0, 390),
+    querySelector: (sel) => (sel === '.day-view__col' ? { getBoundingClientRect: () => rect(60, 314) }
+      : sel === '.week-view__times' ? { getBoundingClientRect: () => rect(0, 44) } : null),
+  };
+  const ghost = { style: {}, querySelector: () => null };
+  const zuvor = calendarHelpers.state.view;
+  try {
+    calendarHelpers.state.view = 'day';
+    assert(calendarHelpers.periodSpan(live) === 314, `der Tag blaettert um ${calendarHelpers.periodSpan(live)}px statt um seine Spalte (314)`);
+    calendarHelpers.alignPeriodGhost(ghost, live);
+    assert(ghost.style.clipPath === 'inset(0 0 0 60px)', `Rand und Achse des Nachbarn stehen sichtbar: ${ghost.style.clipPath}`);
+    calendarHelpers.state.view = 'week';
+    assert(calendarHelpers.periodSpan(live) === 346, 'die Woche blaettert weiter ohne ihre Achse');
+    const weekGhost = { style: {}, querySelector: () => null };
+    calendarHelpers.alignPeriodGhost(weekGhost, live);
+    assert(!weekGhost.style.clipPath, 'die Woche schneidet nichts ab');
+    calendarHelpers.state.view = 'month';
+    assert(calendarHelpers.periodSpan(live) === 390, 'der Monat blaettert um seine ganze Breite');
+  } finally {
+    calendarHelpers.state.view = zuvor;
+  }
+});
+
 /* R21 S7 (D9, Handoff 2): DAS ZEITRAUM-LABEL WIRD NIE GEKAPPT. Gemessen vor dem
  * Fix: mobil uk "21.10. - 23.10.2026" um 24px gekappt (el/it 13, ru 11), am
  * Desktop en "Wednesday, 21.10.2026" um 20px. Statt der Ellipse nimmt das Label

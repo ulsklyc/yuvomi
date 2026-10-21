@@ -3363,11 +3363,19 @@ function buildPeriodGhost(dir, host = document.createElement('div')) {
 /**
  * Der Weg eines Blatts: in der Woche ohne die stehende Stundenachse, damit die
  * Spalten des Nachbarn an die eigenen anschliessen statt eine leere
- * Achsenbreite dazwischen zu lassen. Tag (eine Karte) und Monat blaettern um
- * ihre ganze Breite.
+ * Achsenbreite dazwischen zu lassen. Der Monat blaettert um seine ganze Breite.
+ *
+ * DER TAG BLAETTERT UM SEINE SPALTE (R21 S9a). Er stand auf der ganzen Breite
+ * ("eine Karte") - seine Stundenachse steht aber wie die der Woche
+ * (CAL_SWIPE_AXIS), und so zogen zwischen der alten und der neuen Tagesspalte
+ * der Kartenrand beider Karten und die leere Achsenflaeche des Nachbarn mit:
+ * im Einrastframe die Kartenluecke aus S2, gemessen 76px bei 390. Jetzt ist der
+ * Weg die Spaltenbreite, und alignPeriodGhost schneidet dem Nachbarn Rand und
+ * Achsenflaeche ab - die neue Spalte schliesst an die alte an.
  */
 function periodSpan(live) {
   const width = live.getBoundingClientRect().width;
+  if (state.view === 'day') return live.querySelector('.day-view__col')?.getBoundingClientRect().width ?? width;
   if (state.view !== 'week') return width;
   return width - (live.querySelector('.week-view__times')?.getBoundingClientRect().width ?? 0);
 }
@@ -3382,6 +3390,14 @@ function alignPeriodGhost(ghost, live) {
   const gp = ghost.querySelector('.page-scrollport');
   if (lp && gp && state.view !== 'month') {
     gp.scrollTop = lp.scrollTop + (gp.getBoundingClientRect().top - lp.getBoundingClientRect().top);
+  }
+  // Im Tag zeigt der Nachbar nur seine Spalte (periodSpan): Kartenrand und
+  // Achsenflaeche davor sind abgeschnitten, sonst laege seine leere Achse ueber
+  // dem Ende der alten Spalte. Gemessen am Panel - der Nachbar hat dieselbe Form.
+  if (state.view === 'day') {
+    const col = live.querySelector('.day-view__col');
+    const inset = col ? Math.round(col.getBoundingClientRect().left - live.getBoundingClientRect().left) : 0;
+    ghost.style.clipPath = inset > 0 ? `inset(0 0 0 ${inset}px)` : '';
   }
   // Im Leerlauf geparkt, sind die Zellen schon vermessen - fuer genau diese
   // Breite. Ein zweites Vermessen beim Aufdecken schriebe Klassen und Texte neu
@@ -7011,7 +7027,7 @@ export const __test = {
   onPhoneQueryChange,
   setContainerForTest(container) { _container = container; },
   // R21 D2: der Nachbar als Bild - gezeichnet mit SEINEN Daten, der Zustand bleibt.
-  buildPeriodGhost, neighborCursor, periodSpan, stepFromSwipe, CAL_SWIPE_AXIS,
+  buildPeriodGhost, neighborCursor, periodSpan, alignPeriodGhost, stepFromSwipe, CAL_SWIPE_AXIS,
   setNeighborDataForTest(key, data) { _neighborData.set(key, { at: performance.now(), data }); },
   clearNeighborDataForTest() { _neighborData.clear(); },
   // R21 S8: beide Nachbarn in einem Abruf je Quelle.
