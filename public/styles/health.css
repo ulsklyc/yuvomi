@@ -3707,7 +3707,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 .health-choice__dot--filled { opacity: 1; }
 
-.cycle-hint { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0; }
+.cycle-hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin: 0; }
 
 /* A-3: weiche Warnung im Perioden-Modal (Zukunftsdatum/Ueberschneidung) - Ton
  * wie eine Warn-Kachel, nicht wie `.form-error` (das waere Gefahr/blockierend,

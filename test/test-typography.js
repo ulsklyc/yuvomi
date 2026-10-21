@@ -1104,7 +1104,6 @@ test('R21 S5: die Uebersicht traegt 14 und 12 nur an Bedienelementen, Badges, Av
     ['.dashboard-overview__date', 'Mikro-Label ueber dem Gruss (versal)'], ['.quick-link-tile__name', 'Mikro-Label unter dem Symbol'],
     ['.fab-action__label', 'Bedienelement'], ['.widget-restore-chip', 'Bedienelement'], ['.dashboard-customize-scope', 'Bedienelement'],
     ['.widget-restore__title', 'Anpassen-Ablage (Bedienflaeche)'], ['.dashboard-customize-footnote', 'Anpassen-Fussnote (Bedienflaeche)'],
-    ['.widget-options__hint', 'Formularhinweis im Optionen-Dialog (Formular-Typo, S9)'],
     ['.quick-link-manage-row__host', 'Verwalten-Dialog (Formular)'], ['.quick-link-manage-row__locked', 'Verwalten-Dialog (Formular)'],
   ]);
   const css = readFileSync(new URL('dashboard.css', STYLES_DIR), 'utf8');
@@ -1155,6 +1154,69 @@ test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () 
     }
   }
   assert.deepStrictEqual(funde, [], 'eine eigene Groesse am Sekundaertext ist ein Dialekt');
+});
+
+// R21 S9b (D4; DESIGN.md "Footnote ... in medium das Label ueber Feldern"):
+// DAS FELD SPRICHT IN FOOTNOTE 13. Gemessen in 10 Anlege-Dialogen und 8
+// Einstellungsblaettern (390/1280): Labels 92x 14/500, Hinweise 46x 14 und 13x
+// 12, Feldgruppen-Legende 14/600 - drei Groessen fuer dieselbe Stelle, keine
+// davon die des Systems. 14 gehoert Bedienelementen, 12 Badges.
+//
+// Der Guard prueft das SUBJEKT: jede Regel, deren letztes Glied ein Feldlabel,
+// ein Feldfehler oder eine Klasse auf `-hint`/`__hint` ist und eine Groesse
+// setzt, setzt Footnote 13 - oder die Klasse steht als benannte Ausnahme mit
+// Grund darunter (Hinweise, die nicht unter einem Feld stehen).
+test('R21 S9b: Label, Hinweis und Fehler am Feld sind Footnote 13', () => {
+  const FELD = /\.(label|form-label|form-field__error|settings-fieldset__legend|[a-z][\w-]*(?:-|__)hint)(?![\w-])/;
+  const AUSNAHMEN = new Map([
+    ['form-label__hint', 'Nebensatz IM Label - eine Stufe leiser als das Label (Caption 1)'],
+    ['empty-state__hint', 'Leerzustand, kein Feld'],
+    ['empty-hint', 'Leerzustand der Fastenhistorie, kein Feld'],
+    ['day-view__empty-hint', 'Leerzustand im Zeitraster, kein Feld'],
+    ['dashboard-grid-hint', 'Hinweisband beim Anpassen der Uebersicht, Sekundaertext'],
+    ['document-dropzone__hint', 'Text IN einer Ablageflaeche, nicht unter einem Feld'],
+    ['document-viewer__unsupported-hint', 'Leerzustand im Dokumentbetrachter'],
+    ['health-results-hint', 'Erklaerung ueber der Befundtabelle, kein Feld'],
+    ['health-overview__export-hint', 'Erklaerung neben dem Export, kein Feld'],
+    ['shopping-transfer__hint', 'Einleitung des Uebertragen-Blatts, Sekundaertext'],
+    ['recipe-sidebar__hint', 'Leerzustand der Rezept-Seitenspalte'],
+    ['rw-own__hint', 'Fortschritt auf der eigenen Karte, Sekundaertext'],
+    ['rw-detail-hint', 'Zeile in der Leseansicht, kein Feld'],
+    ['perm-matrix__hint', 'Einleitung der Rechte-Matrix, Sekundaertext'],
+    ['perm-row__hint', 'Stand einer Rechtezeile (Metazeile der Matrix)'],
+    ['bd-import__without-hint', 'Fussnote der Importliste, kein Feld'],
+  ]);
+  const funde = [];
+  let geprueft = 0;
+  for (const name of cssFiles) {
+    for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
+      const fs = rule.body.match(/font-size:\s*([^;]+)/);
+      if (!fs || ['inherit', 'unset', 'revert'].includes(fs[1].trim())) continue;
+      for (const sel of rule.selector.split(',').map((x) => x.trim())) {
+        const m = sel.split(/\s*[\s>+~]\s*/).pop().match(FELD);
+        if (!m || AUSNAHMEN.has(m[1])) continue;
+        geprueft += 1;
+        if (fs[1].trim() !== 'var(--type-caption)') funde.push(`${name}: ${sel} { font-size: ${fs[1].trim()} }`);
+      }
+    }
+  }
+  assert.ok(geprueft >= 15, `nur ${geprueft} Feld-Regeln gefunden - liest der Guard noch?`);
+  assert.deepStrictEqual(funde, [], 'Label, Hinweis oder Fehler am Feld nicht in Footnote 13 - var(--type-caption) oder als Ausnahme begruenden');
+
+  // Die Beschreibung einer Einstellungszeile und die Nebenwerte der mobilen
+  // Kurzzeile stehen UNTER bzw. NEBEN einem Namen: Metazeile (typography.css).
+  const typo = [...eachRule(readFileSync(new URL('typography.css', STYLES_DIR), 'utf8'))];
+  const rolle = typo.find((r) => !r.at.length && r.selector.split(',').map((x) => x.trim()).includes('.list-row__meta'));
+  for (const sel of ['.settings-setting-row__description', '.budget-glance__flows']) {
+    assert.ok(rolle.selector.split(',').map((x) => x.trim()).includes(sel), `${sel} nimmt die Metazeile (13)`);
+  }
+  // Der Tageskopf der Agenda: Subheadline 15, halbfett (nicht 14/700).
+  const cal = [...eachRule(readFileSync(new URL('calendar.css', STYLES_DIR), 'utf8'))];
+  const body = (sel) => cal.filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+  for (const sel of ['.agenda-day__header', '.agenda-day__date', '.agenda-day__weekday']) {
+    assert.match(body(sel), /font-size:\s*var\(--type-secondary\)/, `${sel} ist nicht Subheadline 15`);
+  }
+  assert.match(body('.agenda-day__date'), /font-weight:\s*var\(--font-weight-semibold\)/, 'das Datum im Tageskopf ist halbfett, nicht fett');
 });
 
 // R21 (D4): ERHOEHTER KONTRAST HEBT AUCH DEN METATEXT. Unter

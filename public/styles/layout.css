@@ -7421,7 +7421,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 }
 
 .form-advanced__hint {
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-regular);
   color: var(--color-text-tertiary);
 }
@@ -8378,9 +8378,14 @@ textarea::placeholder {
   opacity: 1; /* Firefox setzt ::placeholder sonst auf opacity < 1 und senkt den Kontrast erneut */
 }
 
+/* DAS FELD SPRICHT IN FOOTNOTE 13 (R21 S9b, D4; DESIGN.md "Footnote ... in
+ * medium das Label ueber Feldern"). Label, Hinweis darunter und Feldfehler
+ * standen bei 14 bzw. 12 - 14 ist die Stufe der Bedienelemente, 12 die der
+ * Badges; das Feld selbst traegt 16 (iOS-Zoom-Schwelle). Guard
+ * test:typography "R21 S9b: Label, Hinweis und Fehler am Feld sind Footnote 13". */
 .label, .form-label {
   display: block;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-1);
@@ -8415,7 +8420,7 @@ textarea::placeholder {
  * index.html fuer jede Route verlinkt. Nur die Zeilenlaenge der
  * Einstellungen (`.settings-page .form-hint`) bleibt in settings.css. */
 .form-hint {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -8462,7 +8467,7 @@ textarea::placeholder {
 
 .form-field__error {
   display: none;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-danger);
   gap: var(--space-1);
   align-items: center;
@@ -10160,7 +10165,7 @@ html:has(.app-page.is-selecting) {
 
 .rrule-anchor__hint {
   margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
@@ -10170,7 +10175,7 @@ html:has(.app-page.is-selecting) {
  * dem Zustand, in dem der Irrtum moeglich ist, und verschwindet mit ihm. */
 .rrule-hint {
   margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 

@@ -1025,7 +1025,18 @@ Subheadline 15, Footnote 13, Caption 2 11.
   (Ueberfaellig halbfett), keine Groesse; ein Chip IN der Zeile bleibt Caption 1. Guard
   `test:typography` "die Metazeile ist eine Rolle": er liest jede `__meta`-Klasse aus
   Stylesheets UND Markup und verlangt sie registriert oder als benannte Ausnahme (heute
-  `.day-event__meta`, Mikrotext im Zeitraster).
+  `.day-event__meta`, Mikrotext im Zeitraster: die Zeile lebt in einem Block, dessen Hoehe die
+  Dauer ist, und erscheint erst, wenn der Block sie fasst - R21 S9b hat das geprueft und
+  bewusst bei 12 gelassen).
+  **Das Feld spricht in Footnote 13** (R21 S9b): Label (medium), Hinweis darunter, Feldfehler
+  und die Legende einer Feldgruppe; vorher 14 (Labels, die meisten Hinweise) neben 12 (Hinweise
+  in Aufgaben, Dokumenten, Belohnungen, Zyklus). Das Feld selbst bleibt 16. Die Beschreibung
+  unter einer Einstellungszeile und die Nebenwerte der mobilen Kurzzeile (Ein/Aus) sind
+  Metazeile. Guard `test:typography` "Label, Hinweis und Fehler am Feld sind Footnote 13"; er
+  liest jede Klasse auf `-hint`/`__hint` und fuehrt Hinweise, die nicht unter einem Feld
+  stehen, als benannte Ausnahmen.
+- **Der Tageskopf der Agenda** ist Subheadline 15 halbfett (das relative Wort in der Textfarbe,
+  der volle Tag sekundaer) - bis R21 14/700, eine Stufe ausserhalb der Rollen.
 - **Caption 1** (12px, `--text-xs`): nur Badges, Zaehler, Chips, Nav-Labels und
   Mikro-Labels - nie eine Lesezeile (R21, D4). Die dichte Monatszelle des Kalenders ist
   Mikrotext und bleibt bei 12, darf aber am Tablet zwei Zeilen nehmen.

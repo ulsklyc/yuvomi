@@ -2526,7 +2526,7 @@ button.budget-entry__title {
 .budget-type-locked-hint {
   margin: var(--space-2) 0 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
 }
 
 /* `.js-entry-field`, `#bm-loan-fields`, `#am-credit-fields` werden je

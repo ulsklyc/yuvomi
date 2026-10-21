@@ -22237,10 +22237,10 @@ test('D8: ein Listen-Gruppenkopf - Versal-Mikro-Label ohne Icon in Kontakten und
   assert.doesNotMatch(notes, /notes-group__title u-section-title/);
   // Der Tageskopf der Agenda ist die begruendete eigene Stufe (Zeitachse,
   // calendar.css) - aber sein Kasten traegt die Groesse seiner Schrift, nicht
-  // die 24px der h2-Rolle.
+  // die 24px der h2-Rolle. Seit R21 S9b ist das Subheadline 15 (D4).
   const agenda = [...eachRule(read('../public/styles/calendar.css'))]
     .find(({ selector, at }) => selector.trim() === '.agenda-day__header' && at.length === 0);
-  assert.match(agenda?.body ?? '', /font-size\s*:\s*var\(--text-sm\)/);
+  assert.match(agenda?.body ?? '', /font-size\s*:\s*var\(--type-secondary\)/);
 });
 
 test('D3: die Reiter der Haushaltshilfe sind Text-Reiter ohne Icon', () => {

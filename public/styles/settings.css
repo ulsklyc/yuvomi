@@ -812,7 +812,6 @@
 .settings-setting-row__description {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
   line-height: var(--line-height-snug);
 }
 
@@ -1740,7 +1739,7 @@
 .settings-fieldset__legend {
   padding: 0;
   margin-bottom: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }

@@ -1140,7 +1140,7 @@
 .document-form__hint {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
 }
 
 /* Folder upload stays within one form: the drop zone picks files, a secondary

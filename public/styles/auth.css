@@ -226,7 +226,7 @@
  * hidden-Attributs, und der Hinweis stünde auch ohne Vorgabe da. */
 .auth-form__hint {
   margin-top: var(--space-1);
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 

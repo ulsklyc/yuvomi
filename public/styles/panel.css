@@ -1192,7 +1192,6 @@ svg.chart {
   gap: var(--space-0h);
   min-width: 0;
   margin-inline-start: auto;
-  font-size: var(--text-sm);
   line-height: var(--line-height-tight);
   color: var(--color-text-secondary);
 }
@@ -1283,8 +1282,10 @@ svg.chart {
   gap: var(--space-2);
 }
 
+/* Das Etikett neben der Zahl ist ein Feldlabel (Footnote 13), keine 14 der
+ * Bedienelemente (R21 S9b, D4). */
 .budget-glance--fold.budget-glance--lead .budget-glance__label {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
 }
 
 .budget-glance--fold.budget-glance--lead .budget-glance__value {

@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Forms use one text size around their fields.** Field labels, the hints below a field, field
+  errors and the heading of a field group are all one size now; before, labels and most hints were a
+  step larger than the system's label size and some hints a step smaller. The description under a
+  setting, the income and spending figures next to a balance on phones, and the day headings of the
+  calendar agenda follow the same text styles as the rest of the app.
+
 - **The demo household looks like one the app would create.** Emma and Leo start with the
   permissions every new child account gets - no budget, household help without amounts, no fasting
   and the cycle tab off - so the demo no longer shows a child account with bank balances and wages.

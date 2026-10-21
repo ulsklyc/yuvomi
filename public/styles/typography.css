@@ -420,8 +420,10 @@
 .split-expense__body span,
 .split-activity-item span,
 .subscription-card__meta,
-/* Kennzahl-Karten: Veraenderung, Notiz und Zusatz unter dem Wert */
+/* Kennzahl-Karten: Veraenderung, Notiz und Zusatz unter dem Wert; dazu die
+   Nebenwerte der mobilen Kurzzeile (Ein/Aus neben dem Saldo, bis S9b 14) */
 .metric-card__meta,
+.budget-glance__flows,
 .metric-card__trend,
 .metric-card__note,
 /* Dokumente und Inventar */
@@ -496,6 +498,7 @@
 /* Shell und Einstellungen */
 .search-result__meta,
 .settings-overview__row-description,
+.settings-setting-row__description,
 .settings-member__meta,
 .weather-place__meta,
 .backfill-moved__meta,
