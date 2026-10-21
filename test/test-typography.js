@@ -1116,6 +1116,33 @@ test('R21: Sekundaertext ist Subheadline 15 - eine Rolle in typography.css', () 
   assert.deepStrictEqual(funde, [], 'eine eigene Groesse am Sekundaertext ist ein Dialekt');
 });
 
+// R21 (D4): ERHOEHTER KONTRAST HEBT AUCH DEN METATEXT. Unter
+// `prefers-contrast: more` wurden Glas, Kanten und Blur gehaertet, aber die
+// Metazeile blieb gemessen in derselben Farbe (hell #63615B, dunkel #B4AEA5) -
+// gerade die kleinste Schrift des Schirms bekam nichts. Sekundaer- und
+// Tertiaertext stehen dort eine Rampenstufe naeher an der Textfarbe; ueber die
+// Rampe statt als Literal, damit der Wert dem Theme folgt (die Dark-Bloecke
+// setzen nur die private Haelfte, siehe tokens.css).
+test('R21: prefers-contrast: more hebt Sekundaer- und Tertiaertext eine Rampenstufe an', () => {
+  const tokens = readFileSync(new URL('tokens.css', STYLES_DIR), 'utf8');
+  const rules = [...eachRule(tokens)];
+  const kontrast = rules.filter((r) => r.at.some((a) => /prefers-contrast:\s*more/.test(a)) && r.selector.trim() === ':root');
+  assert.ok(kontrast.length, 'tokens.css fuehrt einen :root-Block unter prefers-contrast: more');
+  const body = kontrast.map((r) => r.body).join(';');
+  for (const token of ['--color-text-secondary', '--color-text-tertiary']) {
+    const m = body.match(new RegExp(`${token}:\\s*([^;]+)`));
+    assert.ok(m, `${token} bleibt unter prefers-contrast: more unveraendert`);
+    assert.match(m[1].trim(), /^var\(--neutral-(?:700|800|900)\)$/, `${token} folgt der Rampe (eine Stufe naeher an der Textfarbe), kein Literal`);
+  }
+  const hex = (name) => tokens.match(new RegExp(`${name}:\\s*(#[0-9A-Fa-f]{6})`))?.[1];
+  const lum = (h) => {
+    const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  assert.ok(ratio(hex('--_neutral-700'), '#FFFFFF') >= 7, 'hell: mindestens 7:1 (AAA) auf Weiss');
+});
+
 // R21 (D4, Persona Inge, 834px): die Stellen, an denen Lesetext unter 13 lag.
 // Gemessen: Tab-Labels 11px am Tablet, Kalender-Chips 12px auf im Mittel 12,6
 // sichtbare Zeichen (40 von 51 gekuerzt) in 118x170er Zellen, Budget-Summen,

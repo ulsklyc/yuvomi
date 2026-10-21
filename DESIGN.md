@@ -1689,7 +1689,10 @@ war es die kleinste Fassung seiner selbst.
 backdrop-filter steht drin (mit webkit-Zwilling fuer Safari < 18). prefers-reduced-
 transparency kippt alle Glas-Tokens auf `--color-surface`-Werte und alle Blur-Stufen auf 0;
 prefers-contrast: more haertet Kanten auf Textfarben, schaltet Blur und beide Lichtfelder
-ab und hebt den Notes-Tint auf 6.3:1.
+ab und hebt den Notes-Tint auf 6.3:1. Seit R21 (D4) hebt es auch den Metatext: Sekundaer- und
+Tertiaertext stehen eine Rampenstufe naeher an der Textfarbe (`--neutral-700`, hell 9,3:1
+statt 6,2 auf Weiss) - die kleinste Schrift des Schirms war bis dahin die einzige, die
+unveraendert blieb. Guard `test:typography` "prefers-contrast: more hebt".
 
 **Die Ausweich-Regel des Toast-Stapels (#1421, 2026-09-22).** Der untere Shell-Stapel
 (Toasts, Sammelpille) liegt UEBER Dialogen (`--z-toast` 300 ueber `--z-modal` 200), damit

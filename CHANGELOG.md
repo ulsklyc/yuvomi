@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   12 pixels, the budget statistics name each category in 15 instead of 14 pixels, and the compact
   budget figures, tasks in the agenda and the loan details no longer drop to 12 pixels.
 
+- **With "Increase contrast" turned on, small grey text gets darker too.** The setting already
+  made borders and glass solid, but dates, counts and other secondary lines kept their light
+  grey. They now move one step closer to the main text colour, in light and dark mode.
+
 - **"Manage participants" in rewards now lives in a More-actions menu.** The section header showed
   two equally-weighted buttons; only "Grant bonus" stays as the primary section action. "Manage
   participants" is reached via the ⋯ button next to it.

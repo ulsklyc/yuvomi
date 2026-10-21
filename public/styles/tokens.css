@@ -2895,5 +2895,17 @@
     --brand-field-opacity: 0;  /* Marken-Lichtfeld aus - gleiche Gattung */
     /* Specular aus, siehe der Schwesterblock oben. */
     --glass-inset-strength: 0;
+
+    /* METATEXT HEBT SICH MIT (R21, Critique 2026-10-21, D4). Glas, Kanten
+     * und Blur wurden hier gehaertet, die Metazeile - die kleinste Schrift
+     * des Schirms - blieb in derselben Farbe (gemessen hell #63615B, dunkel
+     * #B4AEA5). Sekundaer- und Tertiaertext stehen eine Rampenstufe naeher an
+     * der Textfarbe: hell #4A4741 (9,3:1 auf Weiss statt 6,2), dunkel #CBC5BC
+     * (8,6:1 auf der Karte #2B2825 statt 6,7).
+     * Ueber die Rampe, nicht als Literal: die Dark-Bloecke setzen nur die
+     * private Haelfte (--_neutral-700), der Wert folgt so dem Theme.
+     * Guard: test:typography "prefers-contrast: more hebt". */
+    --color-text-secondary: var(--neutral-700);
+    --color-text-tertiary:  var(--neutral-700);
   }
 }
