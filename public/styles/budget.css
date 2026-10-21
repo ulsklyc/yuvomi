@@ -88,10 +88,9 @@
  * Scroll-Anfang nahtlos auf dem Grund, und die weisse Fläche zog eine Kante
  * quer durch die eine Komponente, die alle 17 Module teilen. */
 
-/* [hidden] durchsetzen: die Icon-Buttons (.btn) setzen display:flex mit gleicher
- * Spezifität wie [hidden] und blieben so trotz hidden=true sichtbar. Betrifft den
- * Stepper und den Kontexttext, die sich je Tab gegenseitig ablösen. */
-.budget-nav__month [hidden] { display: none !important; }
+/* Die Icon-Buttons (.btn) setzen display:flex und schlugen damit das UA-[hidden]
+ * am Stepper und am Kontexttext, die sich je Tab abloesen. Seit D13 haelt das
+ * die globale Regel in reset.css. */
 
 .budget-nav__label {
   font-size: var(--text-base);
@@ -2522,11 +2521,9 @@ button.budget-entry__title {
   font-size: var(--text-sm);
 }
 
-.modal-panel .js-entry-field[hidden],
-.modal-panel #bm-loan-fields[hidden],
-.modal-panel #am-credit-fields[hidden] {
-  display: none !important;
-}
+/* `.js-entry-field`, `#bm-loan-fields`, `#am-credit-fields` werden je
+ * Buchungstyp per `hidden` geschaltet - das haelt seit D13 die globale Regel
+ * in reset.css. */
 
 /* Zins-Darlehen (#569): Live-Vorschau + Variabel-Hinweis unter den Zinsfeldern.
  * Groesse und Farbe bringt `.form-hint` (layout.css, global); hier steht nur

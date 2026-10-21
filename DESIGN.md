@@ -4523,6 +4523,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   (`.page-toolbar__bar`): eine eigene, volle Zeile unter Titel, Center und Aktionen, auf
   allen Viewports, scrollend mit Peek-Fade statt buendigem Ende (Werkzeugzeilen-Regel).
   Ein Zwei-Optionen-Scope-Schalter bleibt in der Titelzeile.
+- **Do** ausblenden mit `hidden` und sonst nichts (D13, R21): EINE Regel in reset.css,
+  `[hidden]:not([hidden="until-found"]) { display: none !important }`, schlaegt jede Klasse mit
+  `display`. Keine Rettungsregel je Klasse mehr, und nie ein `display` ungleich `none` mit
+  `!important` - das allein koennte sie schlagen (`test:hidden-cascade`).
 
 ### Don't:
 - **Don't** einem Nur-lesen-Nutzer einen `disabled`-Knopf hinstellen, wo ein Zustand

@@ -2433,9 +2433,8 @@
   border-top: var(--space-px) solid var(--color-border);
 }
 
-/* display:flex schlägt das UA-[hidden] bei gleicher Spezifität - die
- * Sichtbarkeitssteuerung (nur bei aktivem WebDAV) braucht den Guard. */
-.settings-document-storage-warning[hidden] { display: none !important; }
+/* Die Warnung steht nur bei aktivem WebDAV (per `hidden`); ihr display:flex
+ * schlug das UA-[hidden] - seit D13 haelt das die globale Regel in reset.css. */
 
 .settings-document-storage-warning {
   display: flex;
@@ -3868,11 +3867,9 @@
    Fehlermeldung, dessen Speichern-Button eine bestehende Verbindung
    ueberschrieben haette.
 
-   Die Regel gilt fuer die gesamte Settings-Flaeche statt fuer eine Liste
-   einzelner Klassen, damit das naechste `hidden` nicht dieselbe Falle stellt.
-   Dasselbe Muster steht in budget.css:86, calendar.css:596 und
-   documents.css:140 - dort jeweils punktuell. */
-.settings-page [hidden] { display: none !important; }
+   Die Regel galt fuer die gesamte Settings-Flaeche; seit D13 (Critique R21)
+   gilt sie als `[hidden]:not([hidden="until-found"])` in reset.css fuer die
+   ganze App. */
 
 /* --------------------------------------------------------
    Auf anderen Geraeten abmelden (#1354, #1423)

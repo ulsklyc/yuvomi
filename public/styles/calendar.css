@@ -2214,10 +2214,6 @@
 /* Der Kein-Treffer-Zustand der Icon-Suche ist seit Block 2 die geteilte
  * .empty-state--compact (layout.css). */
 
-.event-icon-picker__grid[hidden] {
-  display: none !important;
-}
-
 .event-icon-picker__option {
   height: 42px;
   display: inline-flex;

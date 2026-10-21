@@ -99,6 +99,28 @@ img[hidden], svg[hidden], video[hidden] {
   display: none;
 }
 
+/* `hidden` HEISST WEG - UEBERALL (D13, Critique R21).
+ *
+ * Das UA-Blatt traegt `[hidden] { display: none }` auf der untersten Ebene,
+ * und JEDE Autorenregel mit `display` schlaegt es. Bis hier hielt das eine
+ * Rettungsregel je Klasse zusammen (`.x[hidden] { display: none }`, rund 60
+ * Stueck, test:hidden-cascade) - und die naechste Klasse ohne Rettung stand
+ * wieder sichtbar da: zuletzt der Glyph der Dokument-Vorschau als
+ * 3x32-px-Splitter neben jedem Bild, weil `.document-thumb__glyph` ein
+ * `inline-flex` traegt und die Stelle das Attribut per `setAttribute` setzt.
+ *
+ * `!important` ist hier der Sinn der Regel und kein Notbehelf: nur so gewinnt
+ * sie gegen jede Klasse, gleich welcher Spezifitaet und Reihenfolge. Was sie
+ * schlagen koennte - ein `display` ungleich `none` mit `!important` - verbietet
+ * test:hidden-cascade. Ausgenommen ist `hidden="until-found"`: das Element
+ * bleibt fuer die Seitensuche im Fluss (content-visibility), dafuer ist es da.
+ * Die einzelnen Rettungsregeln in den Modulblaettern sind seitdem doppelt,
+ * stoeren aber nicht; die mit `!important` sind gegangen (Sperrklinke in
+ * test:frontend-audit). */
+[hidden]:not([hidden="until-found"]) {
+  display: none !important;
+}
+
 /* OHNE POPOVER-API BLEIBT EIN POPOVER ZU (#2107).
  *
  * Jedes Menue, das am `popover`-Attribut haengt (`.popover-menu` und die

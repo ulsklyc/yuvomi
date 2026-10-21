@@ -3923,10 +3923,11 @@ test('die Küchen-Listen teilen eine Zeilen-Grammatik', () => {
   // zeigte - und ein Prüfskript, das nur die DOM-Property `hidden` liest, sieht
   // das nicht. Vorgänger: .page-fab/.btn/.form-group, dann .page-toolbar.
   const recipesCssForHidden = read('../public/styles/recipes.css');
-  const layoutCss = read('../public/styles/layout.css');
+  // Seit D13 (Critique R21) holt EINE Regel in reset.css jedes `[hidden]`
+  // zurueck; die Liste in layout.css ist gegangen. Verlangt wird diese Regel.
   if (/\.recipe-detail\s*\{[^}]*display:/.test(recipesCssForHidden)) {
-    assert.match(layoutCss, /\.recipe-detail\[hidden\],/,
-      '.recipe-detail setzt display und muss deshalb in der [hidden]-Durchsetzungsliste in layout.css stehen');
+    assert.match(read('../public/styles/reset.css'), /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/,
+      '.recipe-detail setzt display - die globale [hidden]-Regel in reset.css muss es zurueckholen');
   }
 
   // Die Content-Spalte darf pro Ahnenkette genau einmal gesetzt werden.
@@ -11913,9 +11914,11 @@ test('admin-backup sagt bei Ladefehlern, dass der Stand unbekannt ist', () => {
   // ... und `hidden` muss auf der Settings-Flaeche auch wirken: `.settings-form`
   // setzt display:flex mit derselben Spezifitaet wie das UA-`[hidden]` und
   // stand spaeter im Stylesheet, also blieb das Formular sichtbar.
+  // Seit D13 (Critique R21) fuer die ganze App in reset.css, nicht mehr nur
+  // fuer die Settings-Flaeche.
   assert.match(
-    read('../public/styles/settings.css'),
-    /\.settings-page \[hidden\] \{ display: none !important; \}/,
+    read('../public/styles/reset.css'),
+    /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/,
   );
 });
 
@@ -22448,7 +22451,9 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 // `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
 // ignoriert der Browser `!important` ohnehin). vendor/ liegt nicht unter
 // public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
-const IMPORTANT_CEILING = 34;
+// Stand 2026-10-21 (D13, Critique R21): 28 - die globale `[hidden]`-Regel in
+// reset.css kam dazu, sieben Rettungsregeln mit `!important` gingen.
+const IMPORTANT_CEILING = 28;
 test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
   const dir = new URL('../public/styles/', import.meta.url);
   const found = [];

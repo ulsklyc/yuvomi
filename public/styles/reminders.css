@@ -145,7 +145,3 @@ button.toast__reminder-text:focus-visible {
 .reminder-custom {
   margin-top: var(--space-3);
 }
-
-.reminder-custom[hidden] {
-  display: none !important;
-}

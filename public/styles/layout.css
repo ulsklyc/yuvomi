@@ -5799,18 +5799,9 @@ a.popover-menu__item {
  * ihrem Quellenfilter, und nur `display: flex` hier hielt den Knopf sichtbar -
  * eine Rettungsregel an dieser Stelle haette ihn versteckt (Review zu #1347).
  * Der Slot wird deshalb nie `hidden`; test:hidden-cascade verbietet es. */
-.page-fab[hidden],
-.btn[hidden],
-.form-group[hidden],
-.form-field[hidden],
-.form-row[hidden],
-.row-carrier[hidden],
-.row-action[hidden],
-.page-toolbar[hidden],
-.recipe-detail[hidden],
-p.field-hint--warn[hidden] {
-  display: none !important;
-}
+/* Die Liste darueber ist Geschichte: seit D13 (Critique R21) holt EINE Regel
+ * in reset.css jedes `[hidden]` zurueck, `!important` und ohne Klasse. Die
+ * Kommentare bleiben als Fundliste der Falle stehen. */
 
 /* DER RESET DER ZEITRAUM-NAVIGATION (Kalender „Heute", Essensplan „Heute",
  * Budget „Aktuell") BRAUCHT `hidden` GERADE NICHT - er braucht das Gegenteil.

@@ -260,9 +260,22 @@ function chainBefore(src, at) {
   return src.slice(start, at).trim();
 }
 
-/** Jede Schreibstelle `X.hidden = ...` (nicht `==`/`===`), mit Kette X. */
+/**
+ * Jede Schreibstelle `X.hidden = ...` (nicht `==`/`===`), mit Kette X - und
+ * jedes `X.setAttribute('hidden', ...)` / `X.toggleAttribute('hidden', ...)`.
+ *
+ * DER ATTRIBUT-WEG WAR EIN BLINDER FLECK (Critique R21, a4). Die Dokument-
+ * Vorschau blendet ihren Glyph mit `slot.querySelector('[data-thumb-icon]')
+ * ?.setAttribute('hidden', '')` aus, `.document-thumb__glyph { display:
+ * inline-flex }` hielt ihn sichtbar - als 3x32-px-Splitter neben jeder
+ * Vorschau, und dieser Leser sah die Stelle nicht. Die Kette beginnt bei
+ * einem `?.` am Fragezeichen, sonst fiele sie leer aus.
+ */
 function hiddenWrites(src) {
-  return [...src.matchAll(/\.hidden\s*=(?!=)/g)].map((m) => ({ index: m.index, expr: chainBefore(src, m.index) }));
+  const assigns = [...src.matchAll(/\.hidden\s*=(?!=)/g)].map((m) => ({ index: m.index, expr: chainBefore(src, m.index), via: 'assign' }));
+  const attrs = [...src.matchAll(/\??\.(?:setAttribute|toggleAttribute)\s*\(\s*(['"`])hidden\1/g)]
+    .map((m) => ({ index: m.index, expr: chainBefore(src, m.index), via: 'attribute' }));
+  return [...assigns, ...attrs].sort((a, b) => a.index - b.index);
 }
 
 /** Umschliesst der Block, in dem `from` steht, noch die Stelle `to`? */
@@ -652,13 +665,12 @@ function displayRules(css, file) {
  * Grund fuer JEDE Datei des Musters gilt. Ein Eintrag, der das nicht tut, ist
  * eine Generalabsolution und gehoert geloescht.
  */
-const RUNTIME_ANCESTORS = new Map([
-  ['.settings-page', {
-    files: /^settings\//,
-    reason: "settings/shell.js setzt `page.className = 'settings-page'` auf den "
-      + 'Seitencontainer, und jedes Blatt unter settings/ rendert in diese Shell.',
-  }],
-]);
+// Leer seit D13 (Critique R21): `.settings-page` stand hier, solange
+// `.settings-page [hidden] { display: none !important }` die Settings-Flaeche
+// rettete ("settings/shell.js setzt `page.className = 'settings-page'`, und
+// jedes Blatt unter settings/ rendert in diese Shell"). Die globale Regel in
+// reset.css hat sie ersetzt, und ohne Rettungsregel traegt der Eintrag nichts.
+const RUNTIME_ANCESTORS = new Map();
 
 /** Zustaende, die ein Element mit `display: none` nie haben kann. */
 const UNREACHABLE_STATES = new Set(['hover', 'focus', 'focus-visible', 'focus-within', 'active']);
@@ -864,7 +876,7 @@ function collectTree() {
     const lineOf = lineCounter(src);
     for (const w of hiddenWrites(src)) {
       writes += 1;
-      const site = `${file}:${lineOf(w.index)} (\`${w.expr.replace(/\s+/g, ' ')}.hidden = ...\`)`;
+      const site = `${file}:${lineOf(w.index)} (\`${w.expr.replace(/\s+/g, ' ')}${w.via === 'attribute' ? ".setAttribute('hidden')" : '.hidden = ...'}\`)`;
       const resolved = resolveChain(file, src, lineOf, w.expr, w.index);
       if (!resolved.length) { unresolved.push(site); continue; }
       for (const el of resolved) elements.push({ el, site });
@@ -1002,6 +1014,22 @@ test('JS-Leser: Kette, Bindung an der Stelle, Liste, createElement', () => {
     'nach einer Neuzuweisung gilt die NAECHSTE Bindung davor, nicht die erste');
 });
 
+test('JS-Leser: setAttribute und toggleAttribute zaehlen wie `.hidden =` - auch hinter `?.` (Critique R21)', () => {
+  const src = [
+    'function e(slot) {',
+    "  slot.querySelector('[data-zz-icon]')?.setAttribute('hidden', '');",
+    "  document.getElementById('zz-t').toggleAttribute(\"hidden\", true);",
+    "  slot.querySelector('.zz-shown').removeAttribute('hidden');",
+    "  slot.querySelector('.zz-other').setAttribute('aria-hidden', 'true');",
+    '}',
+  ].join('\n');
+  const writes = hiddenWrites(src);
+  assert.deepEqual(writes.map((w) => w.via), ['attribute', 'attribute'],
+    'zwei Stellen blenden aus; removeAttribute zeigt, aria-hidden ist kein hidden');
+  assert.deepEqual(writes.map((w) => targetsOf(w.expr, src, w.index)?.map((x) => x.selector)),
+    [['[data-zz-icon]'], ['#zz-t']], 'die Kette beginnt vor dem `?.`, nicht dahinter');
+});
+
 test('CSS-Leser: display je Einzelselektor, Subjekt und Vorfahren getrennt', () => {
   const css = '/* .zz-kommentar { display: flex } */\n'
     + '.zz-a, .zz-wrap > .zz-b { display: grid; }\n'
@@ -1118,6 +1146,24 @@ test('jedes ausgeblendete Element, das eine Regel sichtbar haelt, hat eine [hidd
     + 'und schlaegt damit das UA-`[hidden] { display: none }` - sie bleiben sichtbar und bedienbar:\n  '
     + lines.join('\n  '),
   );
+});
+
+/* EINE REGEL FUER ALLE (D13, Critique R21). reset.css holt jedes `[hidden]`
+ * mit `display: none !important` zurueck - ausser `hidden="until-found"`, das
+ * fuer die Seitensuche im Fluss bleibt. Gegen `!important` gewinnt nur ein
+ * anderes `!important`: deshalb darf keine Regel ein `display` ungleich `none`
+ * mit `!important` setzen, sonst stuende ihr Element trotz `hidden` da. */
+test('die globale [hidden]-Regel steht in reset.css, und kein display mit !important schlaegt sie (D13)', () => {
+  const reset = readFileSync(new URL('reset.css', STYLES), 'utf8');
+  const global = displayRules(reset, 'reset.css').filter((r) => r.selector.trim() === '[hidden]:not([hidden="until-found"])');
+  assert.equal(global.length, 1, 'reset.css: `[hidden]:not([hidden="until-found"]) { display: none !important }` fehlt');
+  assert.equal(global[0].display, 'none');
+  assert.equal(global[0].important, true, 'ohne !important schlaegt jede Klasse mit display die Regel');
+  assert.deepEqual(global[0].at, [], 'auf der Basisebene, nicht in einer Media-Query');
+
+  const beats = theTree().rules.filter((r) => r.important && r.display !== 'none')
+    .map((r) => `${r.file}: \`${r.selector} { display: ${r.display} !important }\``);
+  assert.deepEqual(beats, [], 'ein display mit !important hielte ein ausgeblendetes Element sichtbar');
 });
 
 test('Reichweite: der Sammler findet ausgeblendete Elemente und die Regeln, die sie ueberstimmen', (t) => {

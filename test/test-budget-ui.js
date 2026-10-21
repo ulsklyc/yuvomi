@@ -386,14 +386,18 @@ test('hidden greift bei geteilten Bedienelementen trotz display-Klasse', () => {
   // Selektorliste und schlug damit bei jeder legitimen Ergänzung an; die Liste ist
   // aber ausdrücklich zum Wachsen gedacht (bei `.list-bulkbar` war sie 141
   // Zeichen lang und der Guard rot, obwohl die Struktur korrekt war).
-  const sameBlock = (selector) => new RegExp(`${selector}[^{}]*\\{\\s*display:\\s*none\\s*!important`);
   // `.list-bulkbar` stand hier, solange sie ein dauerhafter, leerer Knoten im
   // Seitenfluss war. Seit Etappe 5 wird sie angelegt und entfernt
   // (utils/bulk-pill.js) und trägt nie `hidden` - ein Eintrag für einen
   // Zustand, den niemand setzt, prüft nichts.
-  for (const selector of ['\\.page-fab\\[hidden\\]', '\\.btn\\[hidden\\]', '\\.form-group\\[hidden\\]']) {
-    assert.match(layoutCss, sameBlock(selector), `${selector} steht nicht im Durchsetzungsblock`);
-  }
+  //
+  // SEIT D13 (Critique R21) EINE REGEL FUER ALLE: `[hidden]:not([hidden=
+  // "until-found"]) { display: none !important }` in reset.css. Die Liste
+  // `.page-fab[hidden], .btn[hidden], .form-group[hidden], ...` in layout.css
+  // ist gegangen; verlangt wird die globale Regel.
+  assert.match(readFileSync(new URL('../public/styles/reset.css', import.meta.url), 'utf8'),
+    /\[hidden\]:not\(\[hidden="until-found"\]\) \{\s*display: none !important;/,
+    'die globale [hidden]-Regel fehlt in reset.css');
 });
 
 // --------------------------------------------------------

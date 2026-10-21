@@ -125,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moment you pressed Save - before its fields were checked and before the server answered. If a
   field was wrong or the server refused, leaving the page no longer asked, and what you had typed was
   gone. Now a form is only clean once saving actually worked.
+- **Document previews no longer show a thin sliver next to each picture.** The file icon behind a
+  loaded preview stayed on screen as a narrow strip beside it. Anything the app hides is now hidden
+  everywhere, by one rule instead of one per element.
 - **Sheets and glass controls settle sooner.** Their springy entrance kept them slightly past their
   resting place for most of the movement. In current browsers it now moves like a real spring: the
   same small overshoot and the same duration, but it comes to rest after about half the time.
