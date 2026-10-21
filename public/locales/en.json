@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Enter at least two characters.",
         "weatherPlaceNotFound": "No place found with this name. Add the country, e.g. “Springfield, USA”.",
         "weatherPlaceUnavailable": "Place search is not reachable right now. Try again in a moment or enter the coordinates by hand.",
-        "weatherManualTitle": "Coordinates by hand"
+        "weatherManualTitle": "Coordinates by hand",
+        "backupDropzoneTitleTouch": "Tap to choose a backup file",
+        "installModuleDropzoneTitleTouch": "Tap to choose a ZIP file"
     },
     "login": {
         "tagline": "Welcome back to your family planner.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "This DMS account no longer exists.",
         "errorDmsDocumentGone": "This document no longer exists in the DMS.",
         "errorDmsAlreadyLinked": "This DMS document is already linked.",
-        "errorDmsAlreadyStored": "This document is already stored in a DMS."
+        "errorDmsAlreadyStored": "This document is already stored in a DMS.",
+        "dropzoneTitleTouch": "Tap to choose a file"
     },
     "housekeeping": {
         "title": "Housekeeping",

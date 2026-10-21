@@ -3295,7 +3295,9 @@
         "weatherPlaceTooShort": "두 글자 이상 입력하세요.",
         "weatherPlaceNotFound": "이 이름의 장소를 찾지 못했습니다. 국가를 덧붙이세요. 예: “광주, 대한민국”.",
         "weatherPlaceUnavailable": "지금은 장소 검색에 연결할 수 없습니다. 잠시 후 다시 시도하거나 좌표를 직접 입력하세요.",
-        "weatherManualTitle": "좌표 직접 입력"
+        "weatherManualTitle": "좌표 직접 입력",
+        "backupDropzoneTitleTouch": "탭하여 백업 파일 선택",
+        "installModuleDropzoneTitleTouch": "탭하여 ZIP 파일 선택"
     },
     "login": {
         "tagline": "가족 플래너에 다시 오신 것을 환영합니다.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "이 DMS 계정은 더 이상 존재하지 않습니다.",
         "errorDmsDocumentGone": "이 문서는 DMS에 더 이상 존재하지 않습니다.",
         "errorDmsAlreadyLinked": "이 DMS 문서는 이미 연결되어 있습니다.",
-        "errorDmsAlreadyStored": "이 문서는 이미 DMS에 저장되어 있습니다."
+        "errorDmsAlreadyStored": "이 문서는 이미 DMS에 저장되어 있습니다.",
+        "dropzoneTitleTouch": "탭하여 파일 선택"
     },
     "userMultiSelect": {
         "nobody": "없음",

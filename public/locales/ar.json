@@ -3583,7 +3583,9 @@
         "weatherPlaceTooShort": "أدخل حرفين على الأقل.",
         "weatherPlaceNotFound": "لم يُعثر على مكان بهذا الاسم. أضف البلد، مثل «الإسكندرية، مصر».",
         "weatherPlaceUnavailable": "البحث عن الأماكن غير متاح حاليًا. حاول مجددًا بعد قليل أو أدخل الإحداثيات يدويًا.",
-        "weatherManualTitle": "الإحداثيات يدويًا"
+        "weatherManualTitle": "الإحداثيات يدويًا",
+        "backupDropzoneTitleTouch": "اضغط لاختيار ملف نسخة احتياطية",
+        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP"
     },
     "login": {
         "tagline": "مرحبًا بعودتك إلى منظّم عائلتك.",
@@ -4218,7 +4220,8 @@
         "errorDmsAccountGone": "حساب نظام إدارة المستندات هذا لم يعد موجودًا.",
         "errorDmsDocumentGone": "هذا المستند لم يعد موجودًا في نظام إدارة المستندات.",
         "errorDmsAlreadyLinked": "مستند نظام إدارة المستندات هذا مرتبط بالفعل.",
-        "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات."
+        "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات.",
+        "dropzoneTitleTouch": "اضغط لاختيار ملف"
     },
     "shortcuts": {
         "goKitchen": "المطبخ",

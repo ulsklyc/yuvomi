@@ -3481,7 +3481,9 @@
         "weatherPlaceTooShort": "Введи щонайменше два символи.",
         "weatherPlaceNotFound": "Місце з такою назвою не знайдено. Додай країну, наприклад «Первомайськ, Україна».",
         "weatherPlaceUnavailable": "Пошук місць зараз недоступний. Спробуй трохи згодом або введи координати вручну.",
-        "weatherManualTitle": "Координати вручну"
+        "weatherManualTitle": "Координати вручну",
+        "backupDropzoneTitleTouch": "Торкніться, щоб вибрати файл резервної копії",
+        "installModuleDropzoneTitleTouch": "Торкніться, щоб вибрати ZIP-файл"
     },
     "login": {
         "tagline": "З поверненням до вашого сімейного планувальника.",
@@ -4103,7 +4105,8 @@
         "errorDmsAccountGone": "Цього облікового запису DMS більше немає.",
         "errorDmsDocumentGone": "Цього документа більше немає в DMS.",
         "errorDmsAlreadyLinked": "Цей документ із DMS уже пов’язано.",
-        "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS."
+        "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS.",
+        "dropzoneTitleTouch": "Торкніться, щоб вибрати файл"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

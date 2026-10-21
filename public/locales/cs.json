@@ -3380,7 +3380,9 @@
         "weatherPlaceTooShort": "Zadej alespoň dva znaky.",
         "weatherPlaceNotFound": "Místo s tímto názvem nebylo nalezeno. Připoj zemi, např. „Most, Česko“.",
         "weatherPlaceUnavailable": "Vyhledávání míst teď není dostupné. Zkus to za chvíli znovu nebo zadej souřadnice ručně.",
-        "weatherManualTitle": "Souřadnice ručně"
+        "weatherManualTitle": "Souřadnice ručně",
+        "backupDropzoneTitleTouch": "Klepnutím vyberte soubor zálohy",
+        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP"
     },
     "login": {
         "tagline": "Vítejte zpět ve svém rodinném plánovači.",
@@ -4207,7 +4209,8 @@
         "errorDmsAccountGone": "Tento účet DMS už neexistuje.",
         "errorDmsDocumentGone": "Tento dokument už v DMS neexistuje.",
         "errorDmsAlreadyLinked": "Tento dokument z DMS je už propojený.",
-        "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS."
+        "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS.",
+        "dropzoneTitleTouch": "Klepnutím vyberte soubor"
     },
     "reminders": {
         "sectionTitle": "Připomínka",

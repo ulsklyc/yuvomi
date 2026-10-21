@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Adj meg legalább két karaktert.",
         "weatherPlaceNotFound": "Nincs ilyen nevű hely. Írd hozzá az országot, pl. „Szeged, Magyarország”.",
         "weatherPlaceUnavailable": "A helykeresés most nem érhető el. Próbáld újra kicsit később, vagy add meg kézzel a koordinátákat.",
-        "weatherManualTitle": "Koordináták kézzel"
+        "weatherManualTitle": "Koordináták kézzel",
+        "backupDropzoneTitleTouch": "Koppintson egy biztonsági mentés kiválasztásához",
+        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához"
     },
     "login": {
         "tagline": "Üdv újra a családi tervezőben.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Ez a DMS-fiók már nem létezik.",
         "errorDmsDocumentGone": "Ez a dokumentum már nem létezik a DMS-ben.",
         "errorDmsAlreadyLinked": "Ez a DMS-dokumentum már össze van kapcsolva.",
-        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva."
+        "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva.",
+        "dropzoneTitleTouch": "Koppintson egy fájl kiválasztásához"
     },
     "housekeeping": {
         "title": "Háztartás",

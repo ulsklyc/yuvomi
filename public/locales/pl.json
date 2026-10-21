@@ -3497,7 +3497,9 @@
         "weatherPlaceTooShort": "Wpisz co najmniej dwa znaki.",
         "weatherPlaceNotFound": "Nie znaleziono miejsca o tej nazwie. Dodaj kraj, np. „Opole, Polska”.",
         "weatherPlaceUnavailable": "Wyszukiwanie miejsc jest teraz niedostępne. Spróbuj ponownie za chwilę albo wpisz współrzędne ręcznie.",
-        "weatherManualTitle": "Współrzędne ręcznie"
+        "weatherManualTitle": "Współrzędne ręcznie",
+        "backupDropzoneTitleTouch": "Dotknij, aby wybrać plik kopii zapasowej",
+        "installModuleDropzoneTitleTouch": "Dotknij, aby wybrać plik ZIP"
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",
@@ -4167,7 +4169,8 @@
         "errorDmsAccountGone": "To konto DMS już nie istnieje.",
         "errorDmsDocumentGone": "Ten dokument już nie istnieje w systemie DMS.",
         "errorDmsAlreadyLinked": "Ten dokument z systemu DMS jest już połączony.",
-        "errorDmsAlreadyStored": "Ten dokument jest już zapisany w systemie DMS."
+        "errorDmsAlreadyStored": "Ten dokument jest już zapisany w systemie DMS.",
+        "dropzoneTitleTouch": "Dotknij, aby wybrać plik"
     },
     "userMultiSelect": {
         "nobody": "Nikt",

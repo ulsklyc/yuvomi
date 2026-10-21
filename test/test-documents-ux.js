@@ -2018,3 +2018,35 @@ test('R20: der Leerzustand nimmt im Raster die ganze Breite, und der Titel haelt
   assert.ok(title, 'keine Rasterregel fuer den Kartentitel');
   assert.match(title.body, /min-block-size:\s*2lh/, 'ein einzeiliger Titel haelt die zweite Zeile frei');
 });
+
+/* "DATEI HIER ABLEGEN" AUF DEM TELEFON (Critique R21, a4). Jede Ablage sagte
+ * auch auf Touch "ablegen" - dort gibt es nichts abzulegen, man tippt. Jede
+ * Ablage traegt jetzt ihren Satz fuer den Zeiger UND seinen Zwilling fuer den
+ * Finger; welcher steht, entscheidet `hover: none` (reset.css). */
+test('jede Ablage sagt auf Touch "tippen" statt "ablegen" - zwei Fassungen, eine Medienabfrage (Critique R21)', () => {
+  const sites = [
+    ['../public/pages/documents.js', 'documents.dropzoneTitle'],
+    ['../public/pages/calendar.js', 'documents.dropzoneTitle'],
+    ['../public/settings/pages/admin-backup.js', 'settings.backupDropzoneTitle'],
+    ['../public/settings/pages/modules-install.js', 'settings.installModuleDropzoneTitle'],
+  ];
+  for (const [file, key] of sites) {
+    const src = read(file);
+    const esc = key.replace(/\./g, '\\.');
+    assert.match(src, new RegExp(`<span class="u-pointer-only">\\$\\{(?:esc\\()?t\\('${esc}'\\)\\)?\\}</span><span class="u-touch-only">\\$\\{(?:esc\\()?t\\('${esc}Touch'\\)\\)?\\}</span>`),
+      `${file}: ${key} ohne Touch-Zwilling`);
+  }
+  const reset = read('../public/styles/reset.css');
+  const rules = [...eachRule(reset)];
+  const base = rules.find((r) => r.selector.trim() === '.u-touch-only' && r.at.length === 0);
+  assert.match(base?.body ?? '', /display:\s*none/, 'der Touch-Satz ist am Zeiger weg');
+  const touch = rules.filter((r) => r.at.some((a) => /\(hover:\s*none\)/.test(a)));
+  assert.match(touch.find((r) => r.selector.trim() === '.u-pointer-only')?.body ?? '', /display:\s*none/, 'der Zeiger-Satz ist am Finger weg');
+  assert.match(touch.find((r) => r.selector.trim() === '.u-touch-only')?.body ?? '', /display:\s*inline/, 'und der Touch-Satz steht da');
+  const de = JSON.parse(read('../public/locales/de.json'));
+  for (const key of ['documents.dropzoneTitleTouch', 'settings.backupDropzoneTitleTouch', 'settings.installModuleDropzoneTitleTouch']) {
+    const value = key.split('.').reduce((o, k) => o?.[k], de);
+    assert.match(value ?? '', /^Tippen/, `${key}: der Finger tippt`);
+    assert.doesNotMatch(value, /ablegen|ziehen|klicken/, `${key}: kein Wort des Zeigers`);
+  }
+});

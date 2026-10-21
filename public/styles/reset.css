@@ -269,6 +269,26 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* WAS DER ZEIGER TUT, TUT DER FINGER ANDERS (Critique R21, a4). "Datei hier
+ * ablegen" stand auch auf dem Telefon, wo nichts abzulegen ist - dort tippt
+ * man. Zwei Fassungen desselben Satzes, die eine fuer Zeigergeraete, die andere
+ * fuer Touch; das Kriterium ist `hover: none` wie bei den Zielgroessen, nicht
+ * die Breite. `display: none` nimmt die jeweils andere auch aus dem
+ * Barrierebaum, gelesen wird nur die, die zu sehen ist. */
+.u-touch-only {
+  display: none;
+}
+
+@media (hover: none) {
+  .u-pointer-only {
+    display: none;
+  }
+
+  .u-touch-only {
+    display: inline;
+  }
+}
+
 /* Versteckte, aber zugängliche Elemente */
 .sr-only {
   position: absolute;

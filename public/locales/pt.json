@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Escreve pelo menos dois caracteres.",
         "weatherPlaceNotFound": "Não foi encontrado nenhum local com este nome. Acrescenta o país, p. ex. «Viana, Portugal».",
         "weatherPlaceUnavailable": "A pesquisa de locais não está acessível agora. Tenta de novo daqui a pouco ou introduz as coordenadas à mão.",
-        "weatherManualTitle": "Coordenadas à mão"
+        "weatherManualTitle": "Coordenadas à mão",
+        "backupDropzoneTitleTouch": "Toque para escolher um ficheiro de cópia de segurança",
+        "installModuleDropzoneTitleTouch": "Toque para escolher um ficheiro ZIP"
     },
     "login": {
         "tagline": "Bem-vindo de volta ao teu planeador familiar.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Esta conta de DMS já não existe.",
         "errorDmsDocumentGone": "Este documento já não existe no DMS.",
         "errorDmsAlreadyLinked": "Este documento do DMS já está associado.",
-        "errorDmsAlreadyStored": "Este documento já está guardado num DMS."
+        "errorDmsAlreadyStored": "Este documento já está guardado num DMS.",
+        "dropzoneTitleTouch": "Toque para escolher um ficheiro"
     },
     "shortcuts": {
         "goKitchen": "Cozinha",

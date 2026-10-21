@@ -3295,7 +3295,9 @@
         "weatherPlaceTooShort": "دست‌کم دو نویسه وارد کن.",
         "weatherPlaceNotFound": "مکانی با این نام پیدا نشد. نام کشور را اضافه کن، مثلاً «تبریز، ایران».",
         "weatherPlaceUnavailable": "جست‌وجوی مکان اکنون در دسترس نیست. کمی بعد دوباره امتحان کن یا مختصات را دستی وارد کن.",
-        "weatherManualTitle": "مختصات به‌صورت دستی"
+        "weatherManualTitle": "مختصات به‌صورت دستی",
+        "backupDropzoneTitleTouch": "برای انتخاب فایل پشتیبان ضربه بزنید",
+        "installModuleDropzoneTitleTouch": "برای انتخاب فایل ZIP ضربه بزنید"
     },
     "login": {
         "tagline": "دوباره به برنامه‌ریز خانوادگی‌تان خوش آمدید.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "این حساب DMS دیگر وجود ندارد.",
         "errorDmsDocumentGone": "این سند دیگر در DMS وجود ندارد.",
         "errorDmsAlreadyLinked": "این سند DMS از قبل پیوند داده شده است.",
-        "errorDmsAlreadyStored": "این سند از قبل در یک DMS ذخیره شده است."
+        "errorDmsAlreadyStored": "این سند از قبل در یک DMS ذخیره شده است.",
+        "dropzoneTitleTouch": "برای انتخاب فایل ضربه بزنید"
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",

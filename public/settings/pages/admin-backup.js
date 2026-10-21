@@ -68,7 +68,7 @@ function renderPage(container) {
           <form id="backup-restore-form" class="settings-form settings-form--compact">
             <label class="settings-backup-dropzone" id="backup-dropzone" for="backup-restore-file">
               <i data-lucide="upload-cloud" aria-hidden="true"></i>
-              <span>${t('settings.backupDropzoneTitle')}</span>
+              <span><span class="u-pointer-only">${t('settings.backupDropzoneTitle')}</span><span class="u-touch-only">${t('settings.backupDropzoneTitleTouch')}</span></span>
               <small>${t('settings.backupDropzoneHint')}</small>
             </label>
             <input class="sr-only" type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />

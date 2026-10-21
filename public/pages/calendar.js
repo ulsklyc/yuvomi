@@ -8765,7 +8765,7 @@ function eventAttachmentFieldHtml(event) {
         <span class="document-dropzone__icon">
           <i data-lucide="file-up" aria-hidden="true"></i>
         </span>
-        <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+        <span class="document-dropzone__title"><span class="u-pointer-only">${t('documents.dropzoneTitle')}</span><span class="u-touch-only">${t('documents.dropzoneTitleTouch')}</span></span>
         <span class="document-dropzone__file" id="modal-selected-attachment" ${event?.attachment_name ? '' : 'hidden'}>
           ${event?.attachment_name ? esc(selectedAttachmentLabel(event.attachment_name)) : ''}
         </span>

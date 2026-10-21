@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Skriv minst två tecken.",
         "weatherPlaceNotFound": "Ingen plats med det namnet hittades. Lägg till landet, t.ex. ”Lund, Sverige”.",
         "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
-        "weatherManualTitle": "Koordinater för hand"
+        "weatherManualTitle": "Koordinater för hand",
+        "backupDropzoneTitleTouch": "Tryck för att välja en säkerhetskopia",
+        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil"
     },
     "login": {
         "tagline": "Välkommen tillbaka till din familjeplanerare.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Det här DMS-kontot finns inte längre.",
         "errorDmsDocumentGone": "Det här dokumentet finns inte längre i DMS.",
         "errorDmsAlreadyLinked": "Det här DMS-dokumentet är redan länkat.",
-        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS."
+        "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS.",
+        "dropzoneTitleTouch": "Tryck för att välja en fil"
     },
     "shortcuts": {
         "goKitchen": "Kök",

@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Saisis au moins deux caractères.",
         "weatherPlaceNotFound": "Aucun lieu trouvé avec ce nom. Ajoute le pays, p. ex. « Valence, France ».",
         "weatherPlaceUnavailable": "La recherche de lieu est injoignable pour le moment. Réessaie dans un instant ou saisis les coordonnées à la main.",
-        "weatherManualTitle": "Coordonnées à la main"
+        "weatherManualTitle": "Coordonnées à la main",
+        "backupDropzoneTitleTouch": "Touchez pour choisir un fichier de sauvegarde",
+        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP"
     },
     "login": {
         "tagline": "Bon retour sur votre planificateur familial.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Ce compte de GED n’existe plus.",
         "errorDmsDocumentGone": "Ce document n’existe plus dans la GED.",
         "errorDmsAlreadyLinked": "Ce document de la GED est déjà lié.",
-        "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED."
+        "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED.",
+        "dropzoneTitleTouch": "Touchez pour choisir un fichier"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",

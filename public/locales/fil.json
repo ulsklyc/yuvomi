@@ -3295,7 +3295,9 @@
         "weatherPlaceTooShort": "Maglagay ng hindi bababa sa dalawang character.",
         "weatherPlaceNotFound": "Walang nahanap na lugar sa pangalang ito. Idagdag ang bansa, hal. “San Jose, Philippines”.",
         "weatherPlaceUnavailable": "Hindi maabot ang paghahanap ng lugar ngayon. Subukan ulit mamaya o ilagay nang mano-mano ang mga coordinate.",
-        "weatherManualTitle": "Mano-manong coordinate"
+        "weatherManualTitle": "Mano-manong coordinate",
+        "backupDropzoneTitleTouch": "I-tap para pumili ng backup file",
+        "installModuleDropzoneTitleTouch": "I-tap para pumili ng ZIP file"
     },
     "login": {
         "tagline": "Maligayang pagbabalik sa iyong family planner.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Wala na ang DMS account na ito.",
         "errorDmsDocumentGone": "Wala na sa DMS ang dokumentong ito.",
         "errorDmsAlreadyLinked": "Naka-link na ang dokumentong ito mula sa DMS.",
-        "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito."
+        "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito.",
+        "dropzoneTitleTouch": "I-tap para pumili ng file"
     },
     "userMultiSelect": {
         "nobody": "Wala",

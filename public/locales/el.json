@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Πληκτρολόγησε τουλάχιστον δύο χαρακτήρες.",
         "weatherPlaceNotFound": "Δεν βρέθηκε τοποθεσία με αυτό το όνομα. Πρόσθεσε τη χώρα, π.χ. «Λάρισα, Ελλάδα».",
         "weatherPlaceUnavailable": "Η αναζήτηση τοποθεσίας δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκίμασε ξανά σε λίγο ή συμπλήρωσε τις συντεταγμένες χειροκίνητα.",
-        "weatherManualTitle": "Συντεταγμένες χειροκίνητα"
+        "weatherManualTitle": "Συντεταγμένες χειροκίνητα",
+        "backupDropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο αντιγράφου ασφαλείας",
+        "installModuleDropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο ZIP"
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά στον οικογενειακό σας οργανωτή.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Αυτός ο λογαριασμός DMS δεν υπάρχει πια.",
         "errorDmsDocumentGone": "Αυτό το έγγραφο δεν υπάρχει πια στο DMS.",
         "errorDmsAlreadyLinked": "Αυτό το έγγραφο DMS είναι ήδη συνδεδεμένο.",
-        "errorDmsAlreadyStored": "Αυτό το έγγραφο είναι ήδη αποθηκευμένο σε DMS."
+        "errorDmsAlreadyStored": "Αυτό το έγγραφο είναι ήδη αποθηκευμένο σε DMS.",
+        "dropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο"
     },
     "shortcuts": {
         "goKitchen": "Κουζίνα",

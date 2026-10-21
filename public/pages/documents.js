@@ -2658,7 +2658,7 @@ function openDocumentModal(doc = null) {
             <span class="document-dropzone__icon">
               <i data-lucide="file-up" aria-hidden="true"></i>
             </span>
-            <span class="document-dropzone__title">${t('documents.dropzoneTitle')}</span>
+            <span class="document-dropzone__title"><span class="u-pointer-only">${t('documents.dropzoneTitle')}</span><span class="u-touch-only">${t('documents.dropzoneTitleTouch')}</span></span>
             <span class="document-dropzone__file" id="document-selected-file" hidden></span>
           </label>
           <input class="sr-only" id="document-folder-input" type="file" webkitdirectory tabindex="-1"

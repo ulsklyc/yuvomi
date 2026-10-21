@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "2文字以上入力してください。",
         "weatherPlaceNotFound": "この名前の場所は見つかりませんでした。国名を付けてください（例: 「府中, 日本」）。",
         "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
-        "weatherManualTitle": "座標を手動で入力"
+        "weatherManualTitle": "座標を手動で入力",
+        "backupDropzoneTitleTouch": "タップしてバックアップファイルを選択",
+        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択"
     },
     "login": {
         "tagline": "家族のプランナーへおかえりなさい。",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "この DMS アカウントはもう存在しません。",
         "errorDmsDocumentGone": "このドキュメントは DMS にもう存在しません。",
         "errorDmsAlreadyLinked": "この DMS ドキュメントはすでにリンクされています。",
-        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。"
+        "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。",
+        "dropzoneTitleTouch": "タップしてファイルを選択"
     },
     "shortcuts": {
         "goKitchen": "キッチン",

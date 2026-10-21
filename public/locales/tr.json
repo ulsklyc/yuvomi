@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "En az iki karakter gir.",
         "weatherPlaceNotFound": "Bu adla bir yer bulunamadı. Ülkeyi ekle, örn. “Ereğli, Türkiye”.",
         "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
-        "weatherManualTitle": "Koordinatları elle gir"
+        "weatherManualTitle": "Koordinatları elle gir",
+        "backupDropzoneTitleTouch": "Yedek dosyası seçmek için dokunun",
+        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun"
     },
     "login": {
         "tagline": "Aile planlayıcına tekrar hoş geldin.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Bu DMS hesabı artık yok.",
         "errorDmsDocumentGone": "Bu belge artık DMS'de yok.",
         "errorDmsAlreadyLinked": "Bu DMS belgesi zaten bağlı.",
-        "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor."
+        "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor.",
+        "dropzoneTitleTouch": "Dosya seçmek için dokunun"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",

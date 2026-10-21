@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Inserisci almeno due caratteri.",
         "weatherPlaceNotFound": "Nessun luogo trovato con questo nome. Aggiungi il paese, ad es. «Bari, Italia».",
         "weatherPlaceUnavailable": "La ricerca dei luoghi non è raggiungibile ora. Riprova tra poco o inserisci le coordinate a mano.",
-        "weatherManualTitle": "Coordinate a mano"
+        "weatherManualTitle": "Coordinate a mano",
+        "backupDropzoneTitleTouch": "Tocca per scegliere un file di backup",
+        "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP"
     },
     "login": {
         "tagline": "Bentornato nel tuo pianificatore familiare.",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "Questo account DMS non esiste più.",
         "errorDmsDocumentGone": "Questo documento non esiste più nel DMS.",
         "errorDmsAlreadyLinked": "Questo documento del DMS è già collegato.",
-        "errorDmsAlreadyStored": "Questo documento è già archiviato in un DMS."
+        "errorDmsAlreadyStored": "Questo documento è già archiviato in un DMS.",
+        "dropzoneTitleTouch": "Tocca per scegliere un file"
     },
     "shortcuts": {
         "goKitchen": "Cucina",

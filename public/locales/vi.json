@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Nhập ít nhất hai ký tự.",
         "weatherPlaceNotFound": "Không tìm thấy địa điểm nào có tên này. Hãy thêm tên nước, ví dụ “Tân An, Việt Nam”.",
         "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
-        "weatherManualTitle": "Nhập tọa độ thủ công"
+        "weatherManualTitle": "Nhập tọa độ thủ công",
+        "backupDropzoneTitleTouch": "Chạm để chọn tệp sao lưu",
+        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại trình lập kế hoạch gia đình.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Tài khoản DMS này không còn tồn tại.",
         "errorDmsDocumentGone": "Tài liệu này không còn tồn tại trong DMS.",
         "errorDmsAlreadyLinked": "Tài liệu DMS này đã được liên kết.",
-        "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS."
+        "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS.",
+        "dropzoneTitleTouch": "Chạm để chọn tệp"
     },
     "housekeeping": {
         "title": "Dọn dẹp",

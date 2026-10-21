@@ -3295,7 +3295,9 @@
         "weatherPlaceTooShort": "Gib mindestens zwei Zeichen ein.",
         "weatherPlaceNotFound": "Kein Ort mit diesem Namen gefunden. Häng das Land an, z. B. „Halle, Deutschland“.",
         "weatherPlaceUnavailable": "Die Ortssuche ist gerade nicht erreichbar. Versuch es gleich noch einmal oder trag die Koordinaten von Hand ein.",
-        "weatherManualTitle": "Koordinaten von Hand"
+        "weatherManualTitle": "Koordinaten von Hand",
+        "backupDropzoneTitleTouch": "Tippen, um eine Backup-Datei auszuwählen",
+        "installModuleDropzoneTitleTouch": "Tippen, um eine ZIP-Datei auszuwählen"
     },
     "login": {
         "tagline": "Willkommen zurück bei deinem Familienplaner.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Dieses DMS-Konto gibt es nicht mehr.",
         "errorDmsDocumentGone": "Dieses Dokument gibt es im DMS nicht mehr.",
         "errorDmsAlreadyLinked": "Dieses DMS-Dokument ist schon verknüpft.",
-        "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS."
+        "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS.",
+        "dropzoneTitleTouch": "Tippen, um eine Datei auszuwählen"
     },
     "userMultiSelect": {
         "nobody": "Niemand",

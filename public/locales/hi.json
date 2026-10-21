@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "कम से कम दो अक्षर दर्ज करें।",
         "weatherPlaceNotFound": "इस नाम का कोई स्थान नहीं मिला। देश जोड़ें, जैसे “Aurangabad, India”।",
         "weatherPlaceUnavailable": "स्थान खोज अभी उपलब्ध नहीं है। थोड़ी देर में फिर कोशिश करें या निर्देशांक हाथ से दर्ज करें।",
-        "weatherManualTitle": "निर्देशांक हाथ से"
+        "weatherManualTitle": "निर्देशांक हाथ से",
+        "backupDropzoneTitleTouch": "बैकअप फ़ाइल चुनने के लिए टैप करें",
+        "installModuleDropzoneTitleTouch": "ZIP फ़ाइल चुनने के लिए टैप करें"
     },
     "login": {
         "tagline": "अपने पारिवारिक प्लानर में फिर से आपका स्वागत है।",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "यह DMS खाता अब मौजूद नहीं है।",
         "errorDmsDocumentGone": "यह दस्तावेज़ अब DMS में मौजूद नहीं है।",
         "errorDmsAlreadyLinked": "यह DMS दस्तावेज़ पहले से जुड़ा हुआ है।",
-        "errorDmsAlreadyStored": "यह दस्तावेज़ पहले से किसी DMS में संग्रहीत है।"
+        "errorDmsAlreadyStored": "यह दस्तावेज़ पहले से किसी DMS में संग्रहीत है।",
+        "dropzoneTitleTouch": "फ़ाइल चुनने के लिए टैप करें"
     },
     "shortcuts": {
         "goKitchen": "रसोई",

@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "请至少输入两个字符。",
         "weatherPlaceNotFound": "未找到此名称的地点。请加上国家，例如“朝阳, 中国”。",
         "weatherPlaceUnavailable": "地点搜索暂时无法访问。请稍后重试，或手动输入坐标。",
-        "weatherManualTitle": "手动输入坐标"
+        "weatherManualTitle": "手动输入坐标",
+        "backupDropzoneTitleTouch": "点按以选择备份文件",
+        "installModuleDropzoneTitleTouch": "点按以选择 ZIP 文件"
     },
     "login": {
         "tagline": "欢迎回到您的家庭计划工具。",
@@ -3875,7 +3877,8 @@
         "errorDmsAccountGone": "此 DMS 账户已不存在。",
         "errorDmsDocumentGone": "此文档在 DMS 中已不存在。",
         "errorDmsAlreadyLinked": "此 DMS 文档已关联。",
-        "errorDmsAlreadyStored": "此文档已存储在 DMS 中。"
+        "errorDmsAlreadyStored": "此文档已存储在 DMS 中。",
+        "dropzoneTitleTouch": "点按以选择文件"
     },
     "shortcuts": {
         "goKitchen": "厨房",

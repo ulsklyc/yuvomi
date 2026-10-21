@@ -3481,7 +3481,9 @@
         "weatherPlaceTooShort": "Введи не меньше двух символов.",
         "weatherPlaceNotFound": "Место с таким названием не найдено. Добавь страну, например «Кировск, Россия».",
         "weatherPlaceUnavailable": "Поиск мест сейчас недоступен. Попробуй чуть позже или введи координаты вручную.",
-        "weatherManualTitle": "Координаты вручную"
+        "weatherManualTitle": "Координаты вручную",
+        "backupDropzoneTitleTouch": "Нажмите, чтобы выбрать файл резервной копии",
+        "installModuleDropzoneTitleTouch": "Нажмите, чтобы выбрать ZIP-файл"
     },
     "login": {
         "tagline": "С возвращением в ваш семейный планировщик.",
@@ -4103,7 +4105,8 @@
         "errorDmsAccountGone": "Этой учётной записи DMS больше нет.",
         "errorDmsDocumentGone": "Этого документа больше нет в DMS.",
         "errorDmsAlreadyLinked": "Этот документ из DMS уже привязан.",
-        "errorDmsAlreadyStored": "Этот документ уже хранится в DMS."
+        "errorDmsAlreadyStored": "Этот документ уже хранится в DMS.",
+        "dropzoneTitleTouch": "Нажмите, чтобы выбрать файл"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

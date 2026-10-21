@@ -128,7 +128,7 @@ function pageHtml(maxZipMb) {
           <form class="settings-form settings-form--compact" data-install-form novalidate>
             <label class="settings-backup-dropzone" id="module-install-dropzone" for="module-install-file">
               <i data-lucide="upload-cloud" aria-hidden="true"></i>
-              <span>${esc(t('settings.installModuleDropzoneTitle'))}</span>
+              <span><span class="u-pointer-only">${esc(t('settings.installModuleDropzoneTitle'))}</span><span class="u-touch-only">${esc(t('settings.installModuleDropzoneTitleTouch'))}</span></span>
               <small>${esc(t('settings.installModuleDropzoneHint'))}</small>
             </label>
             <input class="sr-only" type="file" id="module-install-file" accept=".zip,application/zip" />

@@ -3279,7 +3279,9 @@
         "weatherPlaceTooShort": "Skriv minst to tegn.",
         "weatherPlaceNotFound": "Fant ikke noe sted med dette navnet. Legg til landet, f.eks. «Bø, Norge».",
         "weatherPlaceUnavailable": "Stedssøket er ikke tilgjengelig akkurat nå. Prøv igjen om litt, eller skriv inn koordinatene for hånd.",
-        "weatherManualTitle": "Koordinater for hånd"
+        "weatherManualTitle": "Koordinater for hånd",
+        "backupDropzoneTitleTouch": "Trykk for å velge en sikkerhetskopifil",
+        "installModuleDropzoneTitleTouch": "Trykk for å velge en ZIP-fil"
     },
     "login": {
         "tagline": "Velkommen tilbake til familieplanleggeren din.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Denne DMS-kontoen finnes ikke lenger.",
         "errorDmsDocumentGone": "Dette dokumentet finnes ikke lenger i DMS-systemet.",
         "errorDmsAlreadyLinked": "Dette DMS-dokumentet er allerede koblet til.",
-        "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS."
+        "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS.",
+        "dropzoneTitleTouch": "Trykk for å velge en fil"
     },
     "housekeeping": {
         "title": "Husarbeid",

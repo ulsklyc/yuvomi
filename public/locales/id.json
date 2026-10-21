@@ -3295,7 +3295,9 @@
         "weatherPlaceTooShort": "Masukkan minimal dua karakter.",
         "weatherPlaceNotFound": "Tidak ada tempat dengan nama ini. Tambahkan negaranya, mis. “Padang, Indonesia”.",
         "weatherPlaceUnavailable": "Pencarian tempat sedang tidak dapat dijangkau. Coba lagi sebentar lagi atau masukkan koordinat secara manual.",
-        "weatherManualTitle": "Koordinat manual"
+        "weatherManualTitle": "Koordinat manual",
+        "backupDropzoneTitleTouch": "Ketuk untuk memilih file cadangan",
+        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP"
     },
     "login": {
         "tagline": "Selamat datang kembali di perencana keluarga Anda.",
@@ -3939,7 +3941,8 @@
         "errorDmsAccountGone": "Akun DMS ini sudah tidak ada.",
         "errorDmsDocumentGone": "Dokumen ini sudah tidak ada di DMS.",
         "errorDmsAlreadyLinked": "Dokumen DMS ini sudah ditautkan.",
-        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS."
+        "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS.",
+        "dropzoneTitleTouch": "Ketuk untuk memilih file"
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",
