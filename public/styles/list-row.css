@@ -312,6 +312,49 @@
   flex-wrap: nowrap;
 }
 
+/* --------------------------------------------------------
+ * DIE GANZE ZEILE OEFFNET (Critique R21, D10 "Zeilen-Endzone")
+ *
+ * Gemessen vorher (390px, Seed, Anteil der Zeilenflaeche ohne Steuerelemente,
+ * die auf einen Tipp oeffnet): Aufgaben 42 % (Laptop 26 %: nur der Titeltext
+ * 218x31), Budget 46 %, Geburtstage 51 %, Vorrat 51 %, Inventar 62 % - der
+ * Rest war tote Flaeche (Metazeile, Betrag, Avatar, Polster). Der Oeffner der
+ * Zeile ist EIN Knopf, der Zeilentitel (`.u-row-title`) oder der antippbare
+ * Hauptteil (`.list-row__main--interactive`); sein `::after` streckt ihn ueber
+ * die ganze Zeile. Tastatur und Screenreader sehen weiter den einen Knopf mit
+ * seinem Namen, die Zeile bleibt ohne zweites Ziel.
+ *
+ * STEUERELEMENTE BLEIBEN OBEN: jeder Knopf, Link und jedes Feld in der Zeile
+ * steht ueber der Strecke (`z-index: 1`); die Zeile ist ihr eigener
+ * Stapelkontext (`isolation`), damit diese Stufe nicht ueber einen klebenden
+ * Kopf der Liste hinausreicht. Die Regel hat Spezifitaet null (`:where`): ein
+ * Modul, das ein Element absolut stellt, behaelt das.
+ *
+ * DER OEFFNER BLEIBT `position: static` - sonst endete die Strecke an ihm.
+ * Seine Ellipse (`overflow: hidden`) schneidet die Strecke nicht: ein absolut
+ * positionierter Nachfahre, dessen Bezugsrahmen (die Zeile) ausserhalb liegt,
+ * wird nicht beschnitten.
+ *
+ * Ohne `:is()`/`:where()` (Chrome 87) fallen beide Regeln zusammen weg: dann
+ * oeffnet der Knopf allein, wie vorher - nie eine Strecke ueber Knoepfen, die
+ * nicht gehoben sind. Guard: test:control-dialect "D10".
+ * -------------------------------------------------------- */
+.list-row {
+  position: relative;
+  isolation: isolate;
+}
+
+.list-row :is(.u-row-title, .list-row__main--interactive)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+:where(.list-row :is(a[href], button, input, select, textarea, label, summary, [role="button"], [role="checkbox"], [role="switch"]):not(.u-row-title, .list-row__main--interactive)) {
+  position: relative;
+  z-index: 1;
+}
+
 /* HOVER NUR AN EINEM ECHTEN ZEIGER (Critique R18, Bewegung). Auf einem
  * Touch-Geraet bleibt `:hover` nach dem Tipp am Element haengen, bis woanders
  * getippt wird: die Zeile sah nach dem Loslassen weiter "beruehrt" aus.
@@ -398,9 +441,9 @@
  * Abweichung muss sich dann an ihnen messen, statt eine dritte Zahl zu setzen.
  * -------------------------------------------------------- */
 
-/* Die Polsterung als eigene GRÖSSE, nicht als Wert: die Trefferfläche des
- * Titels rechnet mit ihr (`.task-card__title::before` liest dieselbe Variable),
- * und sie wird unter 640px kleiner. Zwei Leser, ein Wert. */
+/* Die Polsterung als eigene GRÖSSE, nicht als Wert: Titel und Mehr-Knopf der
+ * Aufgabe rechnen mit ihr (Polster und Gegenrand in tasks.css lesen dieselbe
+ * Variable), und sie wird unter 640px kleiner. Mehrere Leser, ein Wert. */
 .list-row--roomy {
   --list-row-pad: var(--space-4);
   padding: var(--list-row-pad);
@@ -603,6 +646,21 @@
  *    knappen Artikeln; läge er ohne Platzhalter in der Bedienzone, wäre diese je
  *    Zeile anders breit und die Stepper stünden pro Zeile woanders.
  */
+
+/* SCHMAL, ABER HOCH: der Mehr-Knopf, wo die Textspalte knapp ist (R21, D10
+ * Zeilen-Endzone). Dasselbe Mass wie der Griff darunter und der Mehr-Knopf der
+ * Aufgaben (tasks.css): als 48er-Quadrat kostet er den Namen 14px, die
+ * Trefferflaeche bleibt ueber die Hoehe seines Nachbarn (Zeile oder Knopf),
+ * nie unter --target-md. Die Dosis der Gesundheit steht so neben "Einnehmen". */
+.row-action--slim {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  align-self: stretch;
+  min-height: var(--target-md);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+}
 
 /* --------------------------------------------------------
    Sortiergriff (#678)

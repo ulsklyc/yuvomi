@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every list row ends the same way, and a tap anywhere on a row opens it.** Rows now end with at
+  most one visible action, then the More button, then the drag handle in sortable lists. Shopping
+  moved its More button in front of the handle, a medication dose shows Take with Skip under More,
+  a pocket-money account shows Book with plan and close under More, recipe rows lost their arrow
+  and wide document rows their eye. Tasks, birthdays, inventory, contacts, pantry, recipes and
+  household help now open from the whole row, not only from the title.
+
 - **The add sheet answers your tap right away.** Tapping + to add a task, event, note, contact,
   birthday, entry or any other item first dims the page and then slides the form in once it is
   ready, with its full spring. On a slow phone the tap used to wait for the whole form: measured

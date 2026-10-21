@@ -24,7 +24,7 @@ import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
 import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
@@ -3035,12 +3035,31 @@ function doseActionsMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
     return `<span class="health-dose__status">${esc(t('health.meds.status.pending'))}</span>`;
   }
   const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
-  // Das `aria-label` traegt den ganzen Satz weiter, wenn der sichtbare Text
-  // nach der Containerbreite faellt (health.css).
+  // EINNEHMEN SICHTBAR, UEBERSPRINGEN IM MEHR-KNOPF (R21, D10 Zeilen-Endzone:
+  // hoechstens EINE sichtbare Primaeraktion, dahinter der Mehr-Knopf). Bis
+  // dahin standen beide als Knopf mit Wort in der Zeile - die einzige Liste der
+  // App mit zwei gleichrangigen Handlungen je Zeile. Der Eintrag traegt dieselben
+  // Haken und Daten wie der Knopf vorher; wireMeds()/wireOverview() finden ihn
+  // ueber denselben Selektor. Das `aria-label` traegt den ganzen Satz weiter,
+  // wenn der sichtbare Text nach der Containerbreite faellt (health.css).
+  const skipAttrs = {
+    [hooks.skip]: true,
+    'data-med-id': dose.medicationId,
+    'data-schedule-id': dose.scheduleId ?? '',
+    'data-scheduled-at': dose.scheduledAt,
+    'data-log-id': log?.id ?? '',
+    'data-dose': dose.dose_qty ?? '',
+  };
+  const menuId = `${hooks === OVERVIEW_DOSE_HOOKS ? 'ov' : 'meds'}-dose-menu-${dose.medicationId}-${String(dose.scheduledAt).replace(/[^\w-]/g, '')}`;
   return `
       <div class="health-dose__actions">
         <button type="button" class="btn btn--sm btn--primary health-dose__take" ${hooks.take} ${data} aria-label="${esc(t('health.meds.takeNamed', { name }))}"><i data-lucide="pill" class="icon-sm health-dose__take-icon" aria-hidden="true"></i><span class="health-dose__take-label">${esc(t('health.meds.take'))}</span></button>
-        <button type="button" class="btn btn--sm btn--ghost health-dose__skip" ${hooks.skip} ${data} aria-label="${esc(t('health.meds.skipNamed', { name }))}"><i data-lucide="skip-forward" class="icon-sm" aria-hidden="true"></i><span class="health-dose__skip-label">${esc(t('health.meds.skip'))}</span></button>
+        ${rowMenuHtml({
+          id: menuId,
+          label: t('common.moreActionsNamed', { name }),
+          className: 'row-action--slim',
+          items: [{ action: 'skip-dose', icon: 'skip-forward', label: t('health.meds.skip'), attrs: skipAttrs }],
+        })}
       </div>`;
 }
 

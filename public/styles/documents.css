@@ -1098,30 +1098,37 @@
    * fuer die Tastatur (Codex-Review zu PR #754, dort als Tastaturfall gemeldet).
    * Die Dichte holt sich die Breite aus den Statistiken und dem
    * Herunterladen-Link - das Herunterladen bietet der Betrachter selbst noch
-   * einmal an. Seit 2026-09-25 geht auch das Auge (Regel unten): die Zeile
+   * einmal an. Seit 2026-09-25 geht auch das Auge (Regel darunter): die Zeile
    * oeffnet den Betrachter per Klick, und das Kebab-Menue fuehrt "Ansehen",
    * sobald die Leiste es nicht zeigt - der Weg ins Dokument bleibt fuer Maus,
    * Touch und Tastatur. */
   .document-row__actions a[download] {
     display: none;
   }
+}
 
-  /* DAS AUGE GEHT, DIE ZEILE OEFFNET (Re-Critique 2026-09-25, P2). Mit Auge
-   * und Kebab blieben dem Titel bei 375px 153px, und lange Titel brachen auf
-   * vier Zeilen - fuer einen Knopf, der dasselbe tut wie ein Tipp auf die
-   * Zeile. Der Kebab bleibt das eine nachlaufende Element; fuer die Tastatur
-   * traegt sein Menue dann "Ansehen" (openDocumentMenu), und der Tab-Stopp der
-   * Leiste rueckt auf ihn (utils/roving-toolbar.js, repairRovingStops). Raster
-   * und breite Liste behalten das Auge. */
-  /* OHNE KEBAB BLEIBT DAS AUGE (#1265). Wer das Dokument nicht verwalten darf
-   * (`documents: read` oder ein fremdes Dokument), bekommt kein Menue - seine
-   * Eintraege sind alle Handlungen. Dann ist das Auge das eine nachlaufende
-   * Element und der Tab-Stopp der Zeile; die Breite ist dieselbe wie mit dem
-   * Kebab. Als `:not()` an der Regel selbst statt als zweite, spaetere Regel:
-   * so gibt es keinen Gleichstand, den die Reihenfolge entscheiden muesste. */
-  .document-row__actions:not([data-read-bar]) [data-action="view"] {
-    display: none;
-  }
+/* DAS AUGE GEHT, DIE ZEILE OEFFNET - IN JEDER BREITE (Re-Critique 2026-09-25,
+ * P2; seit R21 auch in der breiten Liste, D10 Zeilen-Endzone). Mit Auge und
+ * Kebab blieben dem Titel bei 375px 153px, und lange Titel brachen auf vier
+ * Zeilen - fuer einen Knopf, der dasselbe tut wie ein Tipp auf die Zeile. Die
+ * breite Liste behielt es bis R21 und trug damit [Auge][Herunterladen][Mehr],
+ * drei Icon-Aktionen, wo die Endzone EINE sichtbare Handlung und den
+ * Mehr-Knopf kennt: jetzt [Herunterladen][Mehr], schmal nur [Mehr]. Fuer die
+ * Tastatur traegt das Menue dann "Ansehen" (openDocumentMenu), und der
+ * Tab-Stopp der Leiste rueckt auf den ersten sichtbaren Knopf
+ * (utils/roving-toolbar.js, repairRovingStops). Das Raster behaelt das Auge:
+ * eine Karte ist keine Zeile.
+ *
+ * OHNE KEBAB BLEIBT DAS AUGE (#1265). Wer das Dokument nicht verwalten darf
+ * (`documents: read` oder ein fremdes Dokument), bekommt kein Menue - seine
+ * Eintraege sind alle Handlungen. Dann ist das Auge das eine nachlaufende
+ * Element und der Tab-Stopp der Zeile, und das Herunterladen geht (der
+ * Betrachter bietet es an): EIN Knopf, wie mit dem Kebab. Als `:not()` an der
+ * Regel selbst statt als zweite, spaetere Regel: so gibt es keinen
+ * Gleichstand, den die Reihenfolge entscheiden muesste. */
+.document-row__actions:not([data-read-bar]) [data-action="view"],
+.document-row__actions[data-read-bar] a[download] {
+  display: none;
 }
 
 .documents-danger {

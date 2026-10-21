@@ -1031,10 +1031,12 @@ function buildRecipeList() {
     toggle.appendChild(sub);
 
     if (hasDetail) {
-      // Ein Wegweiser, kein Aufklapp-Winkel: die Zeile oeffnet das Rezept.
+      // Die Zeile oeffnet das Rezept. KEIN Chevron (R21, D10 Zeilen-Endzone):
+      // ein Wegweiser steht nur an reiner Navigation (Bereiche der Gesundheit,
+      // Einstellungen); eine Zeile, die ein Objekt oeffnet UND einen
+      // Mehr-Knopf traegt, zeigt keinen - der Chevron stand 12px versetzt
+      // neben dem Mehr-Knopf und war die einzige Zeile dieser Art.
       toggle.setAttribute('aria-haspopup', 'dialog');
-      toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron" aria-hidden="true"></i>');
     } else if (!isMirrored) {
       // Ohne Detail kein Versprechen: kein Chevron, kein aria-expanded. Der
       // Button öffnet dann direkt das Bearbeiten-Formular.
@@ -1054,12 +1056,6 @@ function buildRecipeList() {
       // sein Detail rechts, also ist die Zeile dort ein Knopf wie jede andere
       // (syncRowMode).
       toggle.dataset.narrowInert = "";
-      // Trotzdem einen (unsichtbaren) Chevron-Platzhalter einfügen: sonst
-      // wächst der Name per flex-grow um genau dessen Breite, und das Badge
-      // vor ihm rutscht gegenüber jeder anderen gespiegelten Zeile nach
-      // rechts - derselbe Mechanismus wie bei der Zutatenzahl oben.
-      toggle.insertAdjacentHTML('beforeend',
-        '<i data-lucide="chevron-right" class="icon-sm recipe-row__chevron recipe-row__chevron--placeholder" aria-hidden="true"></i>');
     }
 
     heading.appendChild(toggle);

@@ -381,9 +381,12 @@ test('Dosis-Knoepfe: Name nennt das Medikament, kein Haken-Kreis, beide Renderer
   const { eachRule } = await import('./css-rules.js');
   const dosis = (medicationId) => ({ medicationId, scheduleId: 2, scheduledAt: '2026-06-15T08:00', time: '08:00', dose_qty: 1 });
   const med = (id, name) => ({ id, name, active: 1, prn: 0 });
+  // Ueberspringen steht seit R21 (D10 Zeilen-Endzone) als Eintrag im
+  // Mehr-Knopf der Zeile; den Namen MIT Medikament traegt der Ausloeser.
   const knoepfe = (html) => ({
     take: html.match(/<button[^>]*health-dose__take[^>]*>[\s\S]*?<\/button>/)?.[0],
-    skip: html.match(/<button[^>]*health-dose__skip[^>]*>[\s\S]*?<\/button>/)?.[0],
+    skip: html.match(/<button[^>]*data-(?:ov-)?dose-skip[^>]*>[\s\S]*?<\/button>/)?.[0],
+    more: html.match(/<button[^>]*row-action--more[^>]*>/)?.[0],
   });
   const label = (tag) => tag.match(/aria-label="([^"]*)"/)?.[1] ?? '';
   healthHelpers.setViewStateForTest('meds', { meId: 1, personId: 1 });
@@ -395,10 +398,11 @@ test('Dosis-Knoepfe: Name nennt das Medikament, kein Haken-Kreis, beide Renderer
     for (const [wo, render] of renderers) {
       const a = knoepfe(render(dosis(1), med(1, 'Vitamin D3')));
       const b = knoepfe(render(dosis(2), med(2, 'Eisen')));
-      assert.ok(a.take && a.skip, `${wo}: beide Knoepfe gerendert`);
+      assert.ok(a.take && a.skip && a.more, `${wo}: Einnehmen, Mehr-Knopf und sein Eintrag Ueberspringen gerendert`);
       assert.match(label(a.take), /Vitamin D3/, `${wo}: Einnehmen nennt das Medikament`);
-      assert.match(label(a.skip), /Vitamin D3/, `${wo}: Ueberspringen nennt das Medikament`);
-      assert.notEqual(label(a.take), label(a.skip), `${wo}: zwei Knoepfe, zwei Namen`);
+      assert.match(label(a.more), /Vitamin D3/, `${wo}: der Mehr-Knopf mit Ueberspringen nennt das Medikament`);
+      assert.match(a.skip, /data-med-id="1"[\s\S]*data-scheduled-at="2026-06-15T08:00"/, `${wo}: der Eintrag traegt die Daten der Dosis`);
+      assert.notEqual(label(a.take), label(a.more), `${wo}: zwei Knoepfe, zwei Namen`);
       assert.notEqual(label(a.take), label(b.take), `${wo}: zwei Medikamente, zwei Namen`);
       assert.doesNotMatch(a.take, /data-lucide="check"/, `${wo}: kein Haken auf der Handlung - der Haken ist der Zustand danach`);
       assert.match(a.take, /health-dose__take-label/, `${wo}: der Knopf traegt sein Wort`);

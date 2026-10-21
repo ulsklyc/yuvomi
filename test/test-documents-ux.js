@@ -1533,18 +1533,22 @@ test('Fristen: der Ablauf-Chip steht VOR den Kategorien, abgesetzt, und heisst n
   }
 });
 
-test('kompakte Zeile: kein Auge, die Zeile oeffnet, und das Menue traegt Ansehen fuer die Tastatur', () => {
+test('Zeile: kein Auge (in jeder Breite), die Zeile oeffnet, und das Menue traegt Ansehen fuer die Tastatur', () => {
   // Re-Critique P2: mobil blieben dem Titel 153px, weil Auge und Kebab je 48px
-  // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter.
-  const compact = [...eachRule(css)].filter((rule) => rule.at.some((a) => /@container list-rows \(max-width: 30rem\)/.test(a)));
-  const hides = compact.find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions:not([data-read-bar]) [data-action="view"]'));
+  // standen - und ein Tipp auf die Zeile oeffnet ohnehin den Betrachter. Seit
+  // R21 (D10 Zeilen-Endzone) auch in der breiten Liste: dort standen Auge,
+  // Herunterladen und Kebab, drei Icon-Aktionen statt [eine Handlung][Mehr].
+  const hides = [...eachRule(css)].find((rule) => rule.selector.split(',').map((x) => x.trim()).includes('.document-row__actions:not([data-read-bar]) [data-action="view"]'));
   // Seit #1265 nur dort, wo ein Kebab steht: ohne Verwaltungsrecht gibt es
   // kein Menue, das „Ansehen" fuehren koennte, also bleibt das Auge (`data-read-bar`).
-  assert.ok(hides, 'das Auge faellt unter 30rem weg - ausser in einer Leiste ohne Kebab');
+  assert.ok(hides, 'das Auge faellt in der Zeile weg - ausser in einer Leiste ohne Kebab');
   assert.match(hides.body, /display:\s*none/);
-  // Raster und breite Liste behalten es: sonst blendet es keine Regel aus.
-  const elsewhere = [...eachRule(css)].filter((rule) => /\[data-action="view"\]/.test(rule.selector)
-    && /display:\s*none/.test(rule.body) && !rule.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)));
+  assert.deepEqual(hides.at, [], 'in jeder Breite, nicht nur unter 30rem');
+  // Ohne Kebab bleibt das Auge die eine Handlung: das Herunterladen geht dort.
+  assert.ok(hides.selector.split(',').map((x) => x.trim()).includes('.document-row__actions[data-read-bar] a[download]'));
+  // Das Raster behaelt es (eine Karte ist keine Zeile): keine weitere Regel blendet es aus.
+  const elsewhere = [...eachRule(css)].filter((rule) => rule.selector !== hides.selector && /\[data-action="view"\]/.test(rule.selector)
+    && /display:\s*none/.test(rule.body));
   assert.deepEqual(elsewhere.map((rule) => rule.selector), []);
   assert.match(fnBody('handleDocumentAction', 'runDocumentAction'), /if \(doc\) openDocumentViewer\(doc\);/, 'die Zeile oeffnet den Betrachter');
   // Die Zeile ist kein Tab-Stopp. Wer per Tastatur kommt, landet auf dem Kebab

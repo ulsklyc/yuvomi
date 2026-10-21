@@ -313,20 +313,10 @@
   .recipe-row__planned { display: none; }
 }
 
-.recipe-row__chevron {
-  flex-shrink: 0;
-  color: var(--color-text-tertiary);
-  /* Ein Wegweiser (chevron-right): die Zeile oeffnet das Rezept als
-   * Leseblatt (R19). Bis dahin drehte sich hier ein Aufklapp-Winkel. */
-}
-
-/* Gespiegelte Zeile ganz ohne Detail (recipes.js, isMirrored && !hasDetail):
- * derselbe Chevron als reiner Breiten-Platzhalter, unsichtbar statt entfernt.
- * `display: none` würde ihn wieder aus dem Flex-Fluss nehmen und das Badge
- * erneut verschieben - genau das Problem, das er lösen soll. */
-.recipe-row__chevron--placeholder {
-  visibility: hidden;
-}
+/* KEIN CHEVRON IN DER REZEPTZEILE (R21, D10): sie oeffnet ein Objekt und
+ * traegt einen Mehr-Knopf - der Wegweiser gehoert nur reiner Navigation. Damit
+ * entfaellt auch sein unsichtbarer Platzhalter in gespiegelten Zeilen ohne
+ * Detail: keine Zeile traegt ihn mehr, das Badge steht ueberall gleich. */
 
 /* --------------------------------------------------------
  * Rezept-Detail: EIN Inhalt fuer Leseblatt (unter der Schwelle) und
@@ -642,10 +632,6 @@ button.recipe-detail__ingredient-match:hover {
  * naechsten Aenderung still davon. `.recipes-list--split` setzt recipes.js
  * nach der gerechneten Darstellung der Spalte (syncRowMode).
  * -------------------------------------------------------- */
-
-.recipes-list--split .recipe-row__chevron {
-  display: none;
-}
 
 /* Derselbe Inhalt wie der Aufklapper, aber mit dem Polster der Spalte: der
  * Aufklapper haengt unter einer Zeile und rueckt nur um die Zeilenkante ein,

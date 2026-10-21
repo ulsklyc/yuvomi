@@ -1590,7 +1590,23 @@ function renderItem(item) {
              vorher hingen die zwei Buttons als direkte Flex-Kinder in der Zeile,
              wodurch die Bedienzone in jedem Tab anders zusammengesetzt war. -->
         <div class="list-row__actions">
-          ${ro ? renderReadActions(item) : `<!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
+          ${ro ? renderReadActions(item) : `${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
+               utils/row-action.js): Stift und Papierkorb standen in jeder der
+               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
+               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
+               widerrufbar (Undo-Toast) und per Wischen erreichbar.
+               MEHR VOR DEM GRIFF (R21, D10 Zeilen-Endzone): der Griff steht
+               in jeder sortierbaren Liste ganz rechts, wie in den Aufgaben -
+               hier stand er als einziges Modul vor dem Mehr-Knopf. */ ''}
+          ${rowMenuHtml({
+            id: `shopping-item-menu-${item.id}`,
+            label: t('common.moreActionsNamed', { name: item.name }),
+            items: [
+              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
+              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
+            ],
+          })}
+          <!-- Griff für die Handsortierung (#678). Ein BUTTON, kein role="img"
                wie im Kategorie-Manager: dort steht daneben ein Auf/Ab-Paar als
                Tastaturpfad, hier trägt der Griff ihn selbst (Pfeiltasten bei
                Fokus). Die Einkaufszeile hat schon Abhaken, Details, Löschen und
@@ -1601,19 +1617,7 @@ function renderItem(item) {
                   title="${t('shopping.reorderHandleHint')}">
             <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
           </button>
-${/* ZWEI SICHTBAR, DER REST IM MEHR-KNOPF (Entscheidung 2026-10-07,
-               utils/row-action.js): Stift und Papierkorb standen in jeder der
-               23 Zeilen - drei Dauer-Aktionen neben dem Haken. Bearbeiten und
-               Loeschen sind jetzt Eintraege mit Wort; Loeschen bleibt
-               widerrufbar (Undo-Toast) und per Wischen erreichbar. */ ''}
-          ${rowMenuHtml({
-            id: `shopping-item-menu-${item.id}`,
-            label: t('common.moreActionsNamed', { name: item.name }),
-            items: [
-              { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
-              { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
-            ],
-          })}`}
+`}
         </div>
       </div>
     </div>`;

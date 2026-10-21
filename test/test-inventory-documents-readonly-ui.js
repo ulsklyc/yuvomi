@@ -420,12 +420,12 @@ test('Dokumente: der Kebab folgt dem Dokument - `read` nie, `write` nur am eigen
   assert.equal(hatKebab(admin.zeile), true, 'ein Admin verwaltet jedes Dokument, wie am Server');
 });
 
-test('Dokumente: die kompakte Zeile behaelt ihr Auge, wenn kein Kebab da ist', () => {
-  // Unter 30rem faellt das Auge weg, weil das Kebab-Menue „Ansehen" fuehrt.
-  // Ohne Kebab waere die Zeile dann fuer die Tastatur zu.
+test('Dokumente: die Zeile behaelt ihr Auge, wenn kein Kebab da ist', () => {
+  // In der Zeile faellt das Auge weg, weil das Kebab-Menue „Ansehen" fuehrt
+  // (seit R21 in jeder Breite, D10). Ohne Kebab waere die Zeile dann fuer die
+  // Tastatur zu.
   const css = readFileSync(new URL('../public/styles/documents.css', import.meta.url), 'utf8');
-  const kompakt = [...eachRule(css)].filter((rule) => rule.at.some((a) => /@container list-rows \(max-width: 30rem\)/.test(a)));
-  const versteckt = kompakt.filter((rule) => /\[data-action="view"\]/.test(rule.selector) && /display:\s*none/.test(rule.body));
+  const versteckt = [...eachRule(css)].filter((rule) => /\[data-action="view"\]/.test(rule.selector) && /display:\s*none/.test(rule.body));
   assert.equal(versteckt.length, 1, 'genau eine Regel blendet das Auge aus');
   assert.match(versteckt[0].selector, /\.document-row__actions:not\(\[data-read-bar\]\)/,
     'und sie nimmt die kebablose Leiste aus');

@@ -463,11 +463,11 @@
   color: var(--color-text-tertiary);
 }
 
-/* Die Polsterung steht als eigene Eigenschaft, weil die Trefferfläche des
- * Titels sie mitrechnet (.task-card__title::before). Als zwei getrennte
- * Literale liefen sie schon auseinander: das ::before rechnete mit --space-3,
- * während die Karte hier --space-4 trug - auf dem Desktop endete die
- * Trefferfläche damit 4px vor der Kartenkante. Ein Wert, zwei Leser. */
+/* Die Polsterung steht als eigene Eigenschaft, weil Titel und Mehr-Knopf sie
+ * mitrechnen (Polster und Gegenrand, siehe unten). Als zwei getrennte
+ * Literale liefen sie schon auseinander: das fruehere ::before des Titels
+ * rechnete mit --space-3, waehrend die Karte hier --space-4 trug. Ein Wert,
+ * mehrere Leser. */
 /* SIE TRAEGT `.list-row` (Critique 2026-08-13, P2). Anzeigeart, Abstand,
  * Umbruchverbot, Mindesthoehe, Uebergang und Hover kommen von dort - sie
  * standen hier und in der Regel darueber ein zweites Mal.
@@ -585,10 +585,15 @@
  * (utils/popover-menu.js misst `[popovertarget]`). `display: none` liesse
  * das Menue an der Ecke des Fensters aufgehen; `visibility: hidden` nimmt
  * ihn trotzdem aus Tab-Folge und Barrierebaum - der Tastaturweg ist das
- * Detail. Absolut ohne Versatz steht er an seiner statischen Stelle, am
- * Zeilenanfang unter dem Haken. */
+ * Detail. Er steht am Zeilenanfang unter dem Haken: bis R21 "absolut ohne
+ * Versatz an seiner statischen Stelle" - seit die Zeile selbst positioniert
+ * ist (list-row.css, D10: die ganze Zeile oeffnet), rechnet ein Raster seine
+ * statische Stelle aber von der Polsterkante (mobil 8px links und oben
+ * daneben). Der Versatz ist deshalb ausgeschrieben: das Polster der Zeile. */
 .task-card__main > .task-doer-btn {
   position: absolute;
+  inset-inline-start: var(--list-row-pad, var(--space-3));
+  inset-block-start: var(--list-row-pad, var(--space-3));
   visibility: hidden;
   pointer-events: none;
 }
@@ -768,8 +773,10 @@
    * Die Reset-Regeln (font/border/background) kommen aus reset.css, hier nur
    * die Block-Geometrie, damit der Button wie der frühere Div fließt; die
    * Anzeige (`-webkit-box`, hoechstens zwei Zeilen) setzt die Titelregel in
-   * typography.css. */
-  position: relative;
+   * typography.css.
+   * KEIN `position` (R21, D10): der Titel ist der Oeffner der Zeile, sein
+   * `::after` streckt sich ueber die ganze Zeile (list-row.css) - als
+   * `relative` endete die Strecke am Titel selbst. */
   width: 100%;
   padding-inline: 0;
   text-align: start;
@@ -798,33 +805,13 @@
     text-decoration-color var(--transition-base);
 }
 
-/* DER TITEL NIMMT DEN PLATZ, DEN SEINE KARTE IHM LÄSST (Zielgrössen-Regel,
- * DESIGN.md). Die Box misst 22,1px - eine Textzeile im Body-Schnitt - und kam
- * bisher allein über die Spacing-Ausnahme von WCAG 2.5.8 durch: das nächste
- * Zielzentrum liegt weit genug weg. Genau das war der Fehlschluss. Die
- * Ausnahme ist für Ziele gedacht, die dicht stehen MÜSSEN, weil sie nicht
- * wachsen können, ohne ihren Nachbarn zu verdrängen. Dieser Titel kann: über
- * ihm liegen 12px Karten-Padding und unter ihm 4px bis zur Metazeile, beide
- * leer. Er war kurz aus Versehen, nicht aus Platznot.
- *
- * ::before statt Padding, weil der Text bleiben soll, wo er ist - dasselbe
- * Rezept wie bei `.weather-widget__refresh` („kompakt aussehen, voll treffen",
- * DESIGN.md). Die Fläche endet exakt an der Metazeile: unten steht der Wert des
- * `margin-bottom` darüber, keinen Pixel mehr, sonst nähme sie den Tag-Filtern
- * ihre eigenen Treffer weg. Oben steht die Polsterung der Zeile.
- *
- * BEIDE SEITEN LESEN IHREN NACHBARN, statt ihn zu wiederholen: `--list-row-pad`
- * kommt aus `.list-row--roomy` (list-row.css) und wird mobil kleiner,
- * `--space-0h` ist derselbe Token wie im margin-bottom darüber. Vorher standen
- * hier zwei Literale, und eines davon (--space-3 gegen --space-4 Polsterung)
- * stimmte schon nicht. */
-.task-card__title::before {
-  content: '';
-  position: absolute;
-  inset-block: calc(-1 * var(--list-row-pad, var(--space-3))) calc(-1 * var(--space-0h));
-  inset-inline: 0;
-}
-
+/* DER TITEL NIMMT DIE GANZE ZEILE (Critique R21, D10). Hier stand ein
+ * `::before`, das die Trefferflaeche des Titels nach oben bis an die
+ * Zeilenkante und nach unten bis an die Metazeile zog - die Box mass sonst
+ * 22,1px, und ein Tipp auf Metazeile, Avatar oder Polster tat nichts (gemessen
+ * oeffneten 42 % der freien Zeilenflaeche mobil, 26 % am Laptop). Jetzt streckt
+ * das `::after` aus list-row.css den Titel ueber die ganze Zeile; Haken,
+ * Personenwahl, Etiketten-Filter, Mehr-Knopf und Griff stehen darueber. */
 .task-card--done .task-card__title {
   color: var(--color-text-secondary);
   text-decoration-color: var(--color-text-secondary);
