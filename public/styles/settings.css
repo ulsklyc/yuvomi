@@ -629,9 +629,14 @@
   white-space: nowrap;
 }
 
-.settings-sheet-jump__link:hover,
 .settings-sheet-jump__link:focus-visible {
   text-decoration: underline;
+}
+
+@media (hover: hover) {
+  .settings-sheet-jump__link:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Am Finger das volle Ziel, wie jede andere Zeile, die man antippt. */
