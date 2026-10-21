@@ -6708,6 +6708,7 @@
         "labelLabel": "Název tohoto zařízení (nepovinné)",
         "labelHint": "Pomůže později poznat, o které zařízení jde.",
         "submit": "Spárovat",
-        "failed": "Tento párovací kód neplatí."
+        "failed": "Tento párovací kód neplatí.",
+        "codeRequired": "Zadej párovací kód zobrazený v nastavení."
     }
 }

@@ -27,6 +27,7 @@
  *          row-endzone-order   [eine Handlung][Mehr-Knopf][Griff], der Griff zuletzt
  *          row-primary-count   hoechstens EINE sichtbare Handlung je Zeile
  *          row-chevron-with-menu  Chevron nur an reiner Navigation
+ *          form-novalidate     ein Formular mit Feldregeln traegt novalidate
  *
  * DAS IST EIN RATCHET, KEINE ALLOWLIST. `PENDING` ist der Bestand vom
  * 2026-09-26 (Datei -> Anzahl), fuer die sechs Regeln der Runde 7 der vom
@@ -440,6 +441,43 @@ export function scanRowChevronWithMenu(src) {
       || /class="[^"]*(?:list-row__main--interactive|u-row-title)[^"]*"[^<]*>(?:(?!<\/button>)[\s\S])*$/.test(before);
     if (!onOpener) continue;
     found.push({ line: lineOf(src, m.index), what: `${m[1] || m[2]} am Oeffner einer Zeile mit Mehr-Knopf` });
+  }
+  return found;
+}
+
+/**
+ * KEINE BROWSER-BLASEN (DESIGN.md "Keine Browser-Blasen", Critique R21 a5 und
+ * S9a): ein Formular, dessen Felder Regeln tragen (required, min, max, step,
+ * minlength, pattern, Zahl-/Mail-/URL-Typ), traegt `novalidate` - sonst zeigt
+ * der Browser seine Blase in seiner Sprache und Gestalt, statt dass die
+ * Meldung am Feld steht (`constraintErrors()` + `reportFieldErrors()` aus
+ * components/modal.js). Gemessen vor S9a: 28 von 59 solchen Formularen ohne,
+ * in Schichtplan (5), Aufteilung (5), Haushaltshilfe (4), Abos, Dokumenten,
+ * Fasten, den Einstellungen und der Tablet-Kopplung. `maxlength` zaehlt
+ * nicht: es laesst sich nicht verletzen.
+ * Template: `<form ...>` bis `</form>`; DOM: `createElement('form')` mit
+ * Regel-Feldern in derselben Funktion verlangt `form.noValidate = true`.
+ */
+const FORM_CONSTRAINT = /\brequired\b|\bminlength=|\bmin=|\bmax=|\bstep=|type="(?:number|email|url|tel)"|\bpattern=|required:\s*true|type:\s*'number'/;
+export function scanFormNovalidate(src) {
+  const found = [];
+  const re = /<form\b[^>]*>/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const end = src.indexOf('</form>', m.index);
+    const body = src.slice(m.index, end < 0 ? m.index + 4000 : end);
+    if (!FORM_CONSTRAINT.test(body) || /\bnovalidate\b/i.test(m[0])) continue;
+    found.push({ line: lineOf(src, m.index), what: (m[0].match(/\b(?:id|class)="[^"]*"/) || [m[0].slice(0, 40)])[0] });
+  }
+  const dom = /(?:const|let)\s+(\w+)\s*=\s*document\.createElement\(\s*['"]form['"]\s*\)/g;
+  while ((m = dom.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const endRel = src.slice(m.index).search(/\n\}\n/);
+    const body = src.slice(m.index, endRel === -1 ? src.length : m.index + endRel);
+    if (!FORM_CONSTRAINT.test(body)) continue;
+    if (new RegExp(`\\b${reEsc(m[1])}\\.noValidate\\s*=\\s*true`).test(body)) continue;
+    found.push({ line: lineOf(src, m.index), what: `${m[1]} = createElement('form') ohne noValidate` });
   }
   return found;
 }
@@ -1436,6 +1474,15 @@ test('D10: kein Modul stellt den Oeffner einer Zeile selbst auf position - die S
   assert.deepEqual(found, []);
 });
 
+test('Scanner: form-novalidate faengt das Formular mit Feldregeln ohne novalidate, laesst maxlength und novalidate durch', () => {
+  assert.equal(scanFormNovalidate('<form id="a"><input required></form>').length, 1);
+  assert.equal(scanFormNovalidate('<form id="a" novalidate><input required></form>').length, 0);
+  assert.equal(scanFormNovalidate('<form id="a"><input maxlength="64"></form>').length, 0);
+  const dom = "function f() {\n  const form = document.createElement('form');\n  form.insertAdjacentHTML('beforeend', '<input type=\"url\" required>');\n}\n";
+  assert.equal(scanFormNovalidate(dom).length, 1);
+  assert.equal(scanFormNovalidate(dom.replace("('form');", "('form');\n  form.noValidate = true;")).length, 0);
+});
+
 test('rowActionHtml: type=button, Name mit Objekt escaped, Ton als Modifier, Icon stumm', () => {
   const html = rowActionHtml({ icon: 'trash-2', label: 'Kategorie "Obst" <loeschen>', action: 'delete', tone: 'danger', attrs: { 'data-id': 7 } });
   assert.match(html, /^<button type="button" class="row-action row-action--danger"/);
@@ -1587,6 +1634,8 @@ const PENDING = {
   },
   // Leer seit R21: gegen den Stand davor rot gesehen (Rezeptzeile).
   'row-chevron-with-menu': {},
+  // Leer seit R21 S9a (28 Formulare umgestellt): gegen den Stand davor rot gesehen.
+  'form-novalidate': {},
   // BESTAND 2026-10-07 (R18), nur nach UNTEN: Zeilen, die ihren Papierkorb
   // noch dauerhaft zeigen. Die Kette hat die im Auftrag genannten Listen
   // umgestellt (Einkauf, Geburtstage, Schichtplan, Darlehen, Aufgaben,
@@ -1662,6 +1711,7 @@ const RULES = {
   'row-action-count': { files: JS, scan: (s) => scanRowActionCount(s), canon: 'hoechstens zwei sichtbare `.row-action` je Zeile, der Rest in `rowMenuHtml()` (utils/row-action.js)' },
   'row-endzone-order': { files: JS, scan: (s) => scanRowEndzoneOrder(s), canon: 'Endzone [eine Handlung][Mehr-Knopf][Griff] - der Griff zuletzt, keine Aktion hinter dem Mehr-Knopf (DESIGN.md D10)' },
   'row-primary-count': { files: JS, scan: (s) => scanRowPrimaryCount(s), canon: 'hoechstens EINE sichtbare Handlung je Zeile, der Rest in `rowMenuHtml()` (DESIGN.md D10)' },
+  'form-novalidate': { files: JS, scan: (s) => scanFormNovalidate(s), canon: '`<form novalidate>` + `reportFieldErrors(constraintErrors(form))` (components/modal.js) - keine Browser-Blase' },
   'row-chevron-with-menu': { files: JS, scan: (s) => scanRowChevronWithMenu(s), canon: 'Chevron nur an reiner Navigation; eine Zeile mit Mehr-Knopf traegt keinen (DESIGN.md D10)' },
   'row-text-capsule': { files: JS, scan: (s) => scanRowTextCapsule(s), canon: 'Bearbeiten/Loeschen einer Listenzeile = `rowMenuHtml()`, keine beschriftete `.btn`-Kapsel' },
   'row-danger-visible': { files: JS, scan: (s) => scanRowDangerVisible(s), canon: 'Loeschen einer Zeile = Eintrag in `rowMenuHtml()` (`danger: true`), kein sichtbarer Papierkorb' },

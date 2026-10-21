@@ -5890,7 +5890,8 @@
         "labelLabel": "Nome deste dispositivo (opcional)",
         "labelHint": "Ajuda a identificar este aparelho no futuro.",
         "submit": "Conectar",
-        "failed": "Este código de pareamento é inválido."
+        "failed": "Este código de pareamento é inválido.",
+        "codeRequired": "Digite o código de pareamento mostrado nas configurações."
     },
     "pantry": {
         "badgeExpiredDays_one": "Venceu há {{count}} dia",

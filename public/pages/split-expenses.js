@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -2008,7 +2008,7 @@ async function openGroupModal(group = null) {
   openSharedModal({
     title: isEdit ? t('splitExpenses.editGroup') : t('splitExpenses.addGroup'),
     content: `
-      <form id="split-group-form" class="split-form">
+      <form id="split-group-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.name')}${REQUIRED_MARK}</span><input class="form-input" name="name" required maxlength="200" value="${esc(group?.name || '')}"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.description')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(group?.description || '')}</textarea></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.type')}</span><select class="form-input" name="type">${state.meta.group_types.map((type) => `<option value="${type}" ${type === group?.type ? 'selected' : ''}>${t(`splitExpenses.groupType.${type}`)}</option>`).join('')}</select></label>
@@ -2029,6 +2029,9 @@ async function openGroupModal(group = null) {
       panel.querySelector('#split-group-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const form = panel.querySelector('#split-group-form');
         const data = Object.fromEntries(new FormData(form));
         collectGroupDefaults(form, data);
@@ -2133,7 +2136,7 @@ function openExpenseModal(expense = null, prefill = null) {
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('splitExpenses.editExpense') : t('splitExpenses.addExpense'),
     content: `
-      <form id="split-expense-form" class="split-form">
+      <form id="split-expense-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
@@ -2205,6 +2208,9 @@ function openExpenseModal(expense = null, prefill = null) {
       panel.querySelector('#split-expense-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         if (!validateSplitForm(panel)) return;
         const form = panel.querySelector('#split-expense-form');
         const data = Object.fromEntries(new FormData(form));
@@ -2381,7 +2387,7 @@ function openRecurringModal(recurring = null) {
   openSharedModal({
     title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
     content: `
-      <form id="split-recurring-form" class="split-form">
+      <form id="split-recurring-form" class="split-form" novalidate>
         ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
         <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
@@ -2457,6 +2463,9 @@ function openRecurringModal(recurring = null) {
         e.preventDefault();
         if (readOnly()) return;
         if (!mayStillAct() || busy) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(form))) return;
         if (!validateSplitForm(panel)) return;
         const chosenCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, chosenCurrency,
@@ -2569,7 +2578,7 @@ function openSettlementModal() {
   openSharedModal({
     title: t('splitExpenses.registerPayment'),
     content: `
-      <form id="split-settlement-form" class="split-form">
+      <form id="split-settlement-form" class="split-form" novalidate>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.payer')}</span><select class="form-input" name="payer_id">${memberOptions(debt?.from_user_id ?? state.user?.id)}</select></label>
           <label class="form-field"><span class="form-label">${t('splitExpenses.payee')}</span><select class="form-input" name="payee_id">${memberOptions(debt?.to_user_id)}</select></label>
@@ -2637,6 +2646,9 @@ function openSettlementModal() {
         e.preventDefault();
         if (readOnly()) return;
         if (samePerson()) { syncSameHint(); payeeSel.focus(); return; }
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(form))) return;
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
         if (rejectSplitAmount(form.querySelector('[name="amount"]'),
@@ -2669,7 +2681,7 @@ async function openMemberModal() {
   openSharedModal({
     title: t('splitExpenses.addMember'),
     content: `
-      <form id="split-member-form" class="split-form">
+      <form id="split-member-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.member')}</span><select class="form-input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.role')}</span><select class="form-input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -2687,6 +2699,9 @@ async function openMemberModal() {
       panel.querySelector('#split-member-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const data = Object.fromEntries(new FormData(panel.querySelector('#split-member-form')));
         const [source, id] = String(data.member_ref || '').split(':');
         delete data.member_ref;
@@ -2712,7 +2727,7 @@ function openGuestModal() {
   openSharedModal({
     title: t('splitExpenses.createGuest'),
     content: `
-      <form id="split-guest-form" class="split-form">
+      <form id="split-guest-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.displayName')}${REQUIRED_MARK}</span><input class="form-input" name="display_name" required maxlength="128"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.usernameOptional')}</span><input class="form-input" name="username" autocomplete="off" maxlength="64"></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.temporaryPassword')}${REQUIRED_MARK}</span><input class="form-input" name="password" type="password" minlength="8" required autocomplete="new-password"></label>
@@ -2737,6 +2752,9 @@ function openGuestModal() {
       panel.querySelector('#split-guest-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const form = panel.querySelector('#split-guest-form');
         const birthDateRaw = form.querySelector('[name="birth_date"]')?.value || '';
         if (!isDateInputValid(birthDateRaw)) return;

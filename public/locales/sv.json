@@ -6546,6 +6546,7 @@
         "labelLabel": "Den här enhetens namn (valfritt)",
         "labelHint": "Hjälper dig att senare känna igen vilken enhet som avses.",
         "submit": "Parkoppla",
-        "failed": "Den här parkopplingskoden gäller inte."
+        "failed": "Den här parkopplingskoden gäller inte.",
+        "codeRequired": "Ange parkopplingskoden som visas i inställningarna."
     }
 }

@@ -6546,6 +6546,7 @@
         "labelLabel": "Bu cihazın adı (isteğe bağlı)",
         "labelHint": "Daha sonra hangi cihaz olduğunu anlamana yardımcı olur.",
         "submit": "Eşleştir",
-        "failed": "Bu eşleştirme kodu geçerli değil."
+        "failed": "Bu eşleştirme kodu geçerli değil.",
+        "codeRequired": "Ayarlarda gösterilen eşleştirme kodunu girin."
     }
 }

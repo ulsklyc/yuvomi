@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -2682,7 +2682,7 @@ function openDocumentModal(doc = null) {
     title: isEdit ? t('documents.editTitle') : t('documents.newTitle'),
     size: 'lg',
     content: `
-      <form id="document-form" class="document-form">
+      <form id="document-form" class="document-form" novalidate>
         ${isEdit ? '' : fileFieldHtml}
         <div class="modal-grid modal-grid--2">
           <div class="form-group">
@@ -3285,6 +3285,8 @@ async function saveFolderUpload(panel, payload) {
 async function saveDocument(event, doc, panel) {
   if (doc ? !mayManage(doc) : readOnly()) { event?.preventDefault?.(); return; }
   event.preventDefault();
+  // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+  if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
   // Der Dialog dieser Handlung, vor jeder Anfrage gemerkt (reportError).
   const modalContext = captureModalContext();
   const owner = _container;
@@ -3416,7 +3418,7 @@ function openFolderModal({ parentId = null } = {}) {
     title: t('documents.newFolderTitle'),
     size: 'sm',
     content: `
-      <form id="document-folder-form" class="document-form">
+      <form id="document-folder-form" class="document-form" novalidate>
         <div class="form-group">
           <label class="label" for="document-folder-name">${t('documents.folderNameLabel')}${REQUIRED_MARK}</label>
           <input class="input" id="document-folder-name" required maxlength="200" autocomplete="off">
@@ -3438,6 +3440,8 @@ function openFolderModal({ parentId = null } = {}) {
     onSave(panel) {
       panel.querySelector('#document-folder-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const error = panel.querySelector('#document-folder-error');
         const input = panel.querySelector('#document-folder-name');
         const parentSelect = panel.querySelector('#document-folder-parent');

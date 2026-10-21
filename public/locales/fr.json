@@ -6546,6 +6546,7 @@
         "labelLabel": "Nom de cet appareil (facultatif)",
         "labelHint": "Aide à reconnaître plus tard de quel appareil il s'agit.",
         "submit": "Appairer",
-        "failed": "Ce code d'appairage n'est pas valide."
+        "failed": "Ce code d'appairage n'est pas valide.",
+        "codeRequired": "Saisis le code d’appairage affiché dans les réglages."
     }
 }

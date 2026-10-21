@@ -12,7 +12,7 @@ import { AVATAR_COLORS } from '/utils/color.js';
 import { sortMembers } from '/utils/member-order.js';
 import { makeSortable } from '/utils/sortable.js';
 import { vibrate } from '/utils/ux.js';
-import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
@@ -258,7 +258,7 @@ function switchRowHtml({ id, label, hint = '', checked = false }) {
 
 function addMemberFormHtml() {
   return `
-        <form id="add-member-form" class="settings-form">
+        <form id="add-member-form" class="settings-form" novalidate>
           ${formRowsHtml([
             formRowHtml({
               label: t('settings.usernameLabel'), labelFor: 'new-username', labelExtra: REQUIRED_MARK, field: true,
@@ -310,7 +310,7 @@ function addMemberFormHtml() {
 
 function addInviteFormHtml() {
   return `
-        <form id="add-invite-form" class="settings-form">
+        <form id="add-invite-form" class="settings-form" novalidate>
           ${formRowsHtml([
             formRowHtml({
               label: t('settings.usernameLabel'), labelFor: 'invite-username', field: true,
@@ -799,6 +799,8 @@ function bindInviteEvents(container, initialInvites) {
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
           errorEl.hidden = true;
+          // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+          if (reportFieldErrors(constraintErrors(form))) return;
           output.hidden = true;
           const sendEmail = panel.querySelector('#invite-send-email')?.checked === true;
           const payload = {
@@ -977,7 +979,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
     title: t('settings.editMemberTitle'),
     size: 'md',
     content: `
-      <form id="edit-member-form" class="settings-form">
+      <form id="edit-member-form" class="settings-form" novalidate>
         <div class="settings-profile-editor">
           ${avatarEditorHtml(member, 'edit-member')}
           <div class="settings-profile-editor__fields">
@@ -1113,6 +1115,8 @@ async function openEditMemberModal(member, currentUser, users, container) {
       panel.querySelector('#edit-member-cancel')?.addEventListener('click', closeModal);
       panel.querySelector('#edit-member-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const submitBtn = panel.querySelector('[type=submit]');
         errorEl.hidden = true;
         const birth = memberBirthField.read();
@@ -1211,6 +1215,8 @@ function openAddMemberModal(container, currentUser, users) {
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(form))) return;
         const errorEl = panel.querySelector('#member-error');
         errorEl.hidden = true;
         const birthDateRaw = panel.querySelector('#new-member-birth-date')?.value || '';

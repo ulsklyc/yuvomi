@@ -18,6 +18,7 @@ import { api } from '/api.js';
 import { clearApiCache } from '/sw-register.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { flagField } from '/utils/auth-ui.js';
 
 export async function render(container) {
   container.replaceChildren();
@@ -26,7 +27,7 @@ export async function render(container) {
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('pairDisplay.title'))}</h1>
         <p class="auth-card__intro">${esc(t('pairDisplay.intro'))}</p>
-        <form id="pair-form" class="auth-form" autocomplete="off">
+        <form id="pair-form" class="auth-form" autocomplete="off" novalidate>
           <div class="form-group">
             <label class="form-label" for="pair-code">${esc(t('pairDisplay.codeLabel'))}${REQUIRED_MARK}</label>
             <input class="form-input" type="text" id="pair-code" required
@@ -52,8 +53,18 @@ export async function render(container) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     errorEl.hidden = true;
-    const code = container.querySelector('#pair-code').value.trim();
+    const codeEl = container.querySelector('#pair-code');
+    const code = codeEl.value.trim();
     const label = container.querySelector('#pair-label').value.trim();
+    // KEINE BROWSER-BLASE (Critique R21): `novalidate`; das leere Pflichtfeld
+    // sagt das eine Fehlerfeld der Seite, und das Feld traegt den Bezug.
+    if (!code) {
+      flagField(codeEl, errorEl);
+      errorEl.textContent = t('pairDisplay.codeRequired');
+      errorEl.hidden = false;
+      codeEl.focus();
+      return;
+    }
     const btn = form.querySelector('[type=submit]');
     btn.disabled = true;
     try {

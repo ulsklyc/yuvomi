@@ -24,7 +24,7 @@
 import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender } from '/components/modal.js';
+import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
@@ -262,7 +262,7 @@ function openIcsEditModal(container, sub, subs, user) {
     title: t('settings.ics.actions.edit'),
     size: 'sm',
     content: `
-      <form id="ics-edit-form" class="settings-form">
+      <form id="ics-edit-form" class="settings-form" novalidate>
         ${/* DER DIALOG SPRICHT DENSELBEN DIALEKT (R19, B7): Name, Farbe,
              Teilen und Zuweisung als Zeilen im Traeger - vorher Felder unter
              ihren Etiketten und ein Schalter, der neben der Farbe klemmte. */ ''}
@@ -315,6 +315,8 @@ function openIcsEditModal(container, sub, subs, user) {
       panel.querySelector('#ics-edit-cancel')?.addEventListener('click', () => closeModal());
       panel.querySelector('#ics-edit-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
         const submitBtn = panel.querySelector('[type=submit]');
         const errEl = panel.querySelector('#ics-edit-error');
         const name = panel.querySelector('#ics-edit-name').value.trim();

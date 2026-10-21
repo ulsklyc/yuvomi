@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { confirmModal, refocusAfterRender } from '/components/modal.js';
+import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createRetryState, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
@@ -167,7 +167,7 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensHint')}</p>
         <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensMcpHint')}</p>
         <ul class="settings-members row-divided" id="api-token-list"></ul>
-        <form id="api-token-form" class="settings-form" autocomplete="off">
+        <form id="api-token-form" class="settings-form" autocomplete="off" novalidate>
           ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Name, Person,
                Ablauf und die Rechte-Grenze als Zeilen der Gruppe; die
                Rechtetabelle erscheint darunter, sobald die Grenze gilt. */ ''}
@@ -263,6 +263,8 @@ function bindEvents(container, initialTokens, users, currentUserId) {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+    if (reportFieldErrors(constraintErrors(form))) return;
     const errorEl = container.querySelector('#api-token-error');
     const output = container.querySelector('#api-token-created');
     const outputValue = container.querySelector('#api-token-created-value');

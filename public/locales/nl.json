@@ -6546,6 +6546,7 @@
         "labelLabel": "Naam van dit apparaat (optioneel)",
         "labelHint": "Helpt later te herkennen welk apparaat wordt bedoeld.",
         "submit": "Koppelen",
-        "failed": "Deze koppelcode is niet geldig."
+        "failed": "Deze koppelcode is niet geldig.",
+        "codeRequired": "Voer de koppelcode in die in de instellingen staat."
     }
 }

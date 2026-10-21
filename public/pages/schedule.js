@@ -6,7 +6,7 @@ import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -1565,7 +1565,7 @@ function renderStatistics() {
   // Einstellungen dahinter. Sie bleiben auf diesem Tab, weil sie die Zahlen
   // betreffen (Wochenstunden -> Ueberstunden-Kachel).
   return '<section class="schedule-statistics">'
-    + '<form class="card card--padded schedule-stat-filters" data-form="statistics">'
+    + '<form class="card card--padded schedule-stat-filters" novalidate data-form="statistics">'
     // S-13 (UX-Audit, Entscheidung D-B): userOptions() statt der vollen
     // state.users-Liste - ein Nicht-Admin sieht hier nur sich selbst, ein
     // Admin weiterhin alle. Das ist eine reine Client-Einschraenkung der
@@ -2416,7 +2416,7 @@ function updateScheduleFab() {
  */
 function openOverrideEditModal(group) {
   const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
-  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="override-edit">'
+  const content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="override-edit">'
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
     + '<input type="hidden" name="original_from" value="' + esc(group.from) + '">'
     + '<input type="hidden" name="original_to" value="' + esc(group.to) + '">'
@@ -2475,7 +2475,7 @@ function wireOccurrenceFieldReactivity(scope) {
  * das Anlegen fehl, bleiben hoechstens Duplikate statt eines Datenverlusts.
  */
 function openExtraGroupEditModal(group) {
-  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-edit-range">'
+  const content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="extra-edit-range">'
     + '<input type="hidden" name="ids" value="' + esc(group.ids.join(',')) + '">'
     + '<input type="hidden" name="user_id" value="' + esc(String(group.user_id)) + '">'
     + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(group.user_id)) + '">')
@@ -2507,7 +2507,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
   let content;
   if (view === 'shifts') {
     title = t('schedule.createShiftType');
-    content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="shift-create">'
+    content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="shift-create">'
       + formField(t('schedule.preset'), '<select class="form-input" name="shift_preset">' + shiftPresetOptions() + '</select>')
       + shiftFields()
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('common.add')) + '</button></div></form>';
@@ -2527,7 +2527,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     // kann, um den Fehler zu zeigen.
     title = t('schedule.addEntry');
     const modes = [['pattern', 'schedule.pattern'], ['replace', 'schedule.override'], ['add', 'schedule.extraBadgeLabel']];
-    content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="pattern-create">'
+    content = '<form id="schedule-create-form" novalidate class="form-stack schedule-modal-form" data-form="pattern-create">'
       + formField(t('schedule.owner'), '<select class="form-input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
       // data-dirty-ignore (S-14): merely switching the segmented Pattern/
       // Override/Extra control rewrites this hidden value - without the
@@ -2665,6 +2665,9 @@ function collectFieldValues(scope) {
 async function saveCreatedSchedule(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const data = formData(form);
   if (reportReversedRange(form, data)) return;
   // Der Dialog, aus dem gesendet wird - VOR der ersten Rueckfrage und Anfrage
@@ -2822,7 +2825,7 @@ function openCustomFieldModal(field = null) {
   openModal({
     title: isEdit ? t('schedule.editCustomField') : t('schedule.createCustomField'),
     size: 'sm',
-    content: '<form id="schedule-custom-field-form" class="form-stack schedule-modal-form">'
+    content: '<form id="schedule-custom-field-form" novalidate class="form-stack schedule-modal-form">'
       + formField(t('schedule.fieldName'), '<input class="form-input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t(isEdit ? 'schedule.save' : 'common.add')) + '</button></div></form>',
     onSave: (modal) => {
@@ -2833,7 +2836,11 @@ function openCustomFieldModal(field = null) {
 
 async function saveCustomField(event, fieldId) {
   event.preventDefault();
-  const data = formData(event.currentTarget);
+  const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
+  const data = formData(form);
   const modalContext = captureModalContext();
   try {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
@@ -2978,7 +2985,7 @@ function syncPatternDayGroups(form) {
  */
 function openShiftTypeEditModal(type) {
   const fieldsEditor = state.customFields.length ? shiftTypeFieldsEditor(type) : '';
-  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="shift-update" data-id="' + type.id + '">'
+  const content = '<form id="schedule-edit-form" novalidate class="form-stack schedule-modal-form" data-form="shift-update" data-id="' + type.id + '">'
     + shiftFields(type)
     + fieldsEditor
     + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
@@ -2999,6 +3006,9 @@ async function saveShiftTypeEdit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   if (readOnly()) return;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const id = form.dataset.id;
   // ZWEI Schreibvorgaenge hinter EINEM "Speichern": die Stammdaten und die
   // Felder. Scheitert der zweite (ein gewaehltes Feld wurde inzwischen
@@ -3037,7 +3047,7 @@ async function saveShiftTypeEdit(event) {
  */
 function openPatternEditModal(pattern) {
   const writable = canWrite(pattern.user_id);
-  const content = '<form id="schedule-edit-form" class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
+  const content = '<form id="schedule-edit-form" novalidate class="form-stack schedule-modal-form" data-form="pattern-update" data-id="' + pattern.id + '">'
     + formField(t('schedule.owner'), '<input class="form-input" readonly value="' + esc(userName(pattern.user_id)) + '">')
     + '<fieldset class="schedule-pattern-fields" data-field="pattern-fields"' + (writable ? '' : ' disabled') + '>' + patternFields(pattern) + '</fieldset>'
     + patternDaysEditorHtml(pattern, writable)
@@ -3092,6 +3102,9 @@ function patternSaveOrder(oldCycleLength, newCycleLength) {
 async function savePatternEdit(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const id = form.dataset.id;
   const pattern = state.patterns.find((item) => Number(item.id) === Number(id));
   if (!pattern || !canWrite(pattern.user_id)) return;
@@ -3160,6 +3173,9 @@ function formValue(form, name, fallback = '') {
 async function submitForm(event) {
   event.preventDefault();
   const form = event.target;
+  // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
+  // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
+  if (reportFieldErrors(constraintErrors(form))) return;
   const data = formData(form);
   // Reserviert die Generation dieses Statistik-Ladevorgangs (siehe
   // refreshStatistics()/activateView()) - nur fuer den 'statistics'-Zweig

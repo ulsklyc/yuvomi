@@ -6546,6 +6546,7 @@
         "labelLabel": "Name dieses Geräts (optional)",
         "labelHint": "Hilft später zu erkennen, welches Gerät gemeint ist.",
         "submit": "Koppeln",
-        "failed": "Dieser Kopplungscode gilt nicht."
+        "failed": "Dieser Kopplungscode gilt nicht.",
+        "codeRequired": "Gib den Kopplungscode aus den Einstellungen ein."
     }
 }

@@ -13,7 +13,7 @@ import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -954,7 +954,7 @@ function openTaskCreateModal(content) {
           <div class="housekeeping-template-list">${templateButtons}
           </div>
         </section>` : ''}
-        <form id="housekeeping-task-form" class="housekeeping-task-form" aria-labelledby="housekeeping-custom-title">
+        <form id="housekeeping-task-form" class="housekeeping-task-form" novalidate aria-labelledby="housekeeping-custom-title">
           <h3 class="housekeeping-create__heading" id="housekeeping-custom-title">${esc(t('housekeeping.addCustomTask'))}</h3>
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.taskName'))}</span>
@@ -1007,6 +1007,9 @@ function openTaskCreateModal(content) {
       panel.querySelector('[data-create-cancel]')?.addEventListener('click', () => closeModal());
       panel.querySelector('#housekeeping-task-form')?.addEventListener('submit', (event) => {
         event.preventDefault();
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
@@ -2004,7 +2007,7 @@ function openTaskEditModal(task, content) {
     title: t('housekeeping.editTask'),
     size: 'md',
     content: `
-      <form id="housekeeping-task-edit-form" class="housekeeping-worker-form">
+      <form id="housekeeping-task-edit-form" class="housekeeping-worker-form" novalidate>
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.taskName'))}</span>
           <input name="name" required maxlength="200" value="${esc(task.name)}">
@@ -2048,6 +2051,9 @@ function openTaskEditModal(task, content) {
         // Der Dialog kann vor einem Rechtewechsel aufgegangen sein: dann
         // unterbleibt der Schreibvorgang, statt am 403 zu enden.
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const fields = event.currentTarget.elements;
         const frequencyDays = Number(fields.frequency_days.value);
         if (!fields.name.value.trim() || !fields.area.value.trim() || !Number.isInteger(frequencyDays) || frequencyDays < 1) return;
@@ -2134,7 +2140,7 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
     title: t('housekeeping.editVisit'),
     size: 'md',
     content: `
-      <form id="housekeeping-visit-form" class="housekeeping-worker-form">
+      <form id="housekeeping-visit-form" class="housekeeping-worker-form" novalidate>
         <label class="housekeeping-field">
           <span>${esc(t('housekeeping.visitDate'))}</span>
           <yuvomi-datepicker name="date" type="date" value="${esc(visitDay)}"></yuvomi-datepicker>
@@ -2173,6 +2179,9 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
       panel.querySelector('#housekeeping-visit-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const form = event.currentTarget;
         const fields = form.elements;
         const dateValue = fields.date.value;
@@ -2352,7 +2361,7 @@ function openStaffModal(worker, content, options = {}) {
     title: item.id ? t('housekeeping.editWorker') : t('housekeeping.addWorker'),
     size: 'lg',
     content: `
-      <form id="housekeeping-worker-form" class="housekeeping-worker-form">
+      <form id="housekeeping-worker-form" class="housekeeping-worker-form" novalidate>
         <input type="hidden" name="id" value="${esc(item.id || '')}">
         <div class="housekeeping-profile-editor">
           <button class="housekeeping-avatar housekeeping-avatar--lg" type="button" id="housekeeping-avatar-btn"
@@ -2441,6 +2450,9 @@ function openStaffModal(worker, content, options = {}) {
       panel.querySelector('#housekeeping-worker-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!mayManageWorkers()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
+        // Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const form = event.currentTarget;
         const fields = form.elements;
         // Bei einem Bestandssatz neben dem Raster liefert amountStep "any" -

@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
   formatDate,
   getLocale,
@@ -1548,7 +1548,7 @@ export function openSubscriptionModal(subscription = null) {
       </section>`;
 
   const content = `
-    <form id="subscription-form" class="subscription-form">
+    <form id="subscription-form" class="subscription-form" novalidate>
       <section class="subscription-form__section subscription-form__identity">
         <div class="subscription-logo-tools">
           <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
@@ -1819,6 +1819,11 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       step: smallestUnitLabel(targetCurrency),
     })]);
   }
+  // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+  // Was die eigenen Pruefungen oben schon nennen, steht nicht doppelt.
+  for (const entry of constraintErrors(panel.querySelector('#subscription-form'))) {
+    if (!fieldErrors.some(([field]) => field === entry[0])) fieldErrors.push(entry);
+  }
   if (reportFieldErrors(fieldErrors)) return;
 
   const submit = panel.querySelector('[type="submit"]');
@@ -2040,7 +2045,7 @@ async function deleteSubscription(subscription) {
 async function openSettingsModal() {
   if (readOnly()) return;
   const content = `
-    <form id="subscriptions-settings-form">
+    <form id="subscriptions-settings-form" novalidate>
       <div class="form-group">
         <label class="form-label" for="subscriptions-budget">${t('subscriptions.monthlyBudgetLabel')}</label>
         <input class="form-input" id="subscriptions-budget" type="number" min="0"
@@ -2077,6 +2082,8 @@ async function openSettingsModal() {
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         if (readOnly()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const baseCurrency = panel.querySelector('#subscriptions-base-currency').value;
         if (!baseCurrency) {
           reportFieldError(panel.querySelector('#subscriptions-base-currency-search'), t('subscriptions.currencyRequired'));

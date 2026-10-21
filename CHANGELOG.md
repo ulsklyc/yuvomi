@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every form points at the field that needs attention.** Leaving out a required field in the shift
+  plan, shared expenses, household help, subscriptions, documents, fasting, the settings or the
+  tablet pairing no longer shows the browser's bubble; the message stands at the field in the app's
+  own words, like in the health forms. The household help's task form said nothing at all before.
+
 - **The arrow keys page through a period, and through documents.** With focus on the month or week
   switcher of the budget, the meal plan, the household help reports or the shift plan, Left and
   Right go to the previous or next period. The document viewer has previous and next buttons, and

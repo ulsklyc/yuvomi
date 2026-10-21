@@ -6546,6 +6546,7 @@
         "labelLabel": "Ennek az eszköznek a neve (nem kötelező)",
         "labelHint": "Segít később felismerni, melyik eszközről van szó.",
         "submit": "Párosítás",
-        "failed": "Ez a párosítókód nem érvényes."
+        "failed": "Ez a párosítókód nem érvényes.",
+        "codeRequired": "Add meg a beállításokban látható párosítási kódot."
     }
 }

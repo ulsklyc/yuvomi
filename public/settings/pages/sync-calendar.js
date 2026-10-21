@@ -7,6 +7,8 @@ import {
   isModalContextCurrent,
   openModal,
   refocusAfterRender,
+  reportFieldErrors,
+  constraintErrors,
 } from '/components/modal.js';
 import {
   createDisclosure,
@@ -1567,6 +1569,9 @@ function buildAppleProvider(appleStatus, user) {
 function buildAppleConnectForm() {
   const form = document.createElement('form');
   form.className = 'settings-form settings-form--compact';
+  // KEINE BROWSER-BLASEN (Critique R21): die Regeln des Markups melden sich
+  // am Feld (constraintErrors, components/modal.js).
+  form.noValidate = true;
   // EIN FORMULAR-DIALEKT (R19, Einstellungen B7): die drei Felder als Zeilen
   // der Gruppe, der Passwort-Hinweis unter seiner Zeile.
   form.insertAdjacentHTML('beforeend', `
@@ -1591,6 +1596,7 @@ function buildAppleConnectForm() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (reportFieldErrors(constraintErrors(form))) return;
     const errorEl = form.querySelector('#apple-connect-error');
     errorEl.hidden = true;
     const url = form.querySelector('#apple-caldav-url').value.trim();

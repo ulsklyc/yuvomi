@@ -2578,7 +2578,11 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   (components/modal.js) liest ihren ValidityState und gibt `reportFieldErrors()` die Meldung in
   der Stimme der App ("Mindestens 15.") - kein zweites Nachrechnen im Handler. Seit R21 halten das
   alle zwoelf Gesundheitsformulare (`test:health-errors`); Beispielwerte sind keine Platzhalter
-  (ein leeres Blutdruckfeld zeigte "120 / 80" wie eine Messung).
+  (ein leeres Blutdruckfeld zeigte "120 / 80" wie eine Messung). Seit R21 S9a gilt es fuer JEDES
+  Formular mit Feldregeln (`maxlength` zaehlt nicht, es laesst sich nicht verletzen): 28 von 59
+  hatten noch kein `novalidate` (Schichtplan, Aufteilung, Haushaltshilfe, Abos, Dokumente, Fasten,
+  Einstellungen, Tablet-Kopplung), jetzt 0; Guard `test:control-dialect` `form-novalidate`. Die
+  Seiten vor der Anmeldung melden ueber ihr EINES Fehlerfeld (`flagField`, utils/auth-ui.js).
 - **Nachfragen ohne Sperre (R19):** `.form-hint--warning` (Tinte `--color-warning-ink`) fuer
   ungewoehnliche, aber speicherbare Werte (Vitalwerte: 650 kg). Unmoegliches ist ein
   Feldfehler, nicht diese Zeile.

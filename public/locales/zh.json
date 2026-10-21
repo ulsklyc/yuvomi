@@ -6546,6 +6546,7 @@
         "labelLabel": "这台设备的名称（可选）",
         "labelHint": "有助于以后辨认是哪一台设备。",
         "submit": "配对",
-        "failed": "此配对码无效。"
+        "failed": "此配对码无效。",
+        "codeRequired": "请输入设置中显示的配对码。"
     }
 }

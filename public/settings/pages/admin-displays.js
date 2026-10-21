@@ -14,7 +14,7 @@
 import { api, auth } from '/api.js';
 import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { confirmModal, refocusAfterRender } from '/components/modal.js';
+import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -157,7 +157,7 @@ function renderPage(container) {
         <p class="form-hint" id="display-areas-hint" style="margin-top:var(--space-2)" hidden></p>
         </div>
         <ul class="settings-cards" id="display-list"></ul>
-        <form id="display-form" class="settings-form" autocomplete="off">
+        <form id="display-form" class="settings-form" autocomplete="off" novalidate>
           ${/* displayDeviceNameLabel, NICHT displayNameLabel: der zweite heisst
                "Anzeigename" - der Name eines MENSCHEN (admin-family.js,
                personal-account.js). Eine Zeile der Gruppe (R19, B7). */ ''}
@@ -256,6 +256,8 @@ function bindEvents(container) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     clearError(errorEl);
+    // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+    if (reportFieldErrors(constraintErrors(form))) return;
     const input = container.querySelector('#display-name');
     const name = input.value.trim();
     if (!name) return;

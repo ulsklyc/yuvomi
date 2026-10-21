@@ -6546,6 +6546,7 @@
         "labelLabel": "Pangalan ng device na ito (opsyonal)",
         "labelHint": "Nakakatulong itong makilala mamaya kung aling device ang tinutukoy.",
         "submit": "Ipares",
-        "failed": "Hindi balido ang pairing code na ito."
+        "failed": "Hindi balido ang pairing code na ito.",
+        "codeRequired": "Ilagay ang pairing code na nasa Settings."
     }
 }

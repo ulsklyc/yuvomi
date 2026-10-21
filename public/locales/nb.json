@@ -6546,6 +6546,7 @@
         "labelLabel": "Navn på denne enheten (valgfritt)",
         "labelHint": "Hjelper deg å gjenkjenne hvilken enhet dette er senere.",
         "submit": "Par",
-        "failed": "Denne paringskoden er ikke gyldig."
+        "failed": "Denne paringskoden er ikke gyldig.",
+        "codeRequired": "Skriv inn paringskoden som vises i innstillingene."
     }
 }

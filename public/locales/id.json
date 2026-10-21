@@ -6546,6 +6546,7 @@
         "labelLabel": "Nama perangkat ini (opsional)",
         "labelHint": "Membantu mengenali nanti perangkat mana yang dimaksud.",
         "submit": "Pasangkan",
-        "failed": "Kode pemasangan ini tidak berlaku."
+        "failed": "Kode pemasangan ini tidak berlaku.",
+        "codeRequired": "Masukkan kode pemasangan yang ditampilkan di Pengaturan."
     }
 }

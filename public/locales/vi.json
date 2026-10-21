@@ -6546,6 +6546,7 @@
         "labelLabel": "Tên thiết bị này (không bắt buộc)",
         "labelHint": "Giúp nhận ra sau này đây là thiết bị nào.",
         "submit": "Ghép nối",
-        "failed": "Mã ghép nối này không hợp lệ."
+        "failed": "Mã ghép nối này không hợp lệ.",
+        "codeRequired": "Nhập mã ghép nối hiển thị trong Cài đặt."
     }
 }

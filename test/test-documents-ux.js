@@ -11,7 +11,7 @@ import { getSupportedLocales } from '../public/i18n.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { eachRule } from './css-rules.js';
+import { eachRule, globalHiddenRule } from './css-rules.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(resolve(HERE, rel), 'utf8');
@@ -319,7 +319,8 @@ test('Mehrfachauswahl ist opt-in, und ihre Leiste ist die Pille der Shell (R11 H
   // `.btn` setzt ein eigenes display und schlaegt sonst das UA-`[hidden]
   // { display: none }` - der DMS-Button blieb dadurch sichtbar, obwohl kein
   // DMS-Konto existierte.
-  assert.match(css, /\.documents-dms-link-btn\[hidden\]\s*\{[^}]*display:\s*none/);
+  // Seit R21 S9a haelt das die EINE globale [hidden]-Regel (reset.css, D13).
+  assert.ok(globalHiddenRule(), 'der ausgeblendete DMS-Knopf verschwindet');
   for (const fn of ['enterSelectMode', 'exitSelectMode', 'toggleSelectAll', 'moveSelected', 'archiveSelected', 'deleteSelected']) {
     assert.ok(page.includes(`function ${fn}`), `${fn} fehlt`);
   }
@@ -376,7 +377,7 @@ test('das Speichern referenziert den Submit-Button am Panel, nicht am Formular (
   // dann null, und submit.disabled würfe einen unbehandelten TypeError, der als
   // generischer Fehler-Toast erscheint, statt das Dokument zu speichern.
   assert.match(page, /async function saveDocument\(event, doc, panel\)/);
-  const save = page.slice(page.indexOf('async function saveDocument'), page.indexOf('async function saveDocument') + 900);
+  const save = page.slice(page.indexOf('async function saveDocument'), page.indexOf('async function saveDocument') + 1200);
   assert.match(save, /panel\.querySelector\('#document-submit'\)/);
   assert.doesNotMatch(save, /form\.querySelector\('#document-submit'\)/);
   // Der Submit-Handler reicht das Panel an saveDocument durch.

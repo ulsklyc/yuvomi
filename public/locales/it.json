@@ -6546,6 +6546,7 @@
         "labelLabel": "Nome di questo dispositivo (facoltativo)",
         "labelHint": "Aiuta a riconoscere in seguito di quale dispositivo si tratta.",
         "submit": "Associa",
-        "failed": "Questo codice di associazione non è valido."
+        "failed": "Questo codice di associazione non è valido.",
+        "codeRequired": "Inserisci il codice di abbinamento mostrato nelle impostazioni."
     }
 }

@@ -6546,6 +6546,7 @@
         "labelLabel": "Nombre de este dispositivo (opcional)",
         "labelHint": "Ayuda a reconocer más tarde de qué dispositivo se trata.",
         "submit": "Vincular",
-        "failed": "Este código de vinculación no es válido."
+        "failed": "Este código de vinculación no es válido.",
+        "codeRequired": "Introduce el código de emparejamiento que aparece en Ajustes."
     }
 }

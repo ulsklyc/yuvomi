@@ -6860,6 +6860,7 @@
         "labelLabel": "Nazwa tego urządzenia (opcjonalnie)",
         "labelHint": "Pomaga później rozpoznać, o które urządzenie chodzi.",
         "submit": "Sparuj",
-        "failed": "Ten kod parowania jest nieprawidłowy."
+        "failed": "Ten kod parowania jest nieprawidłowy.",
+        "codeRequired": "Wpisz kod parowania widoczny w ustawieniach."
     }
 }

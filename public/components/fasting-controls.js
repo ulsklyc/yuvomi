@@ -2,7 +2,7 @@
 import { api } from '/api.js';
 import { t, formatDate, formatTime } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingNotificationAvailability, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
 import { wallTimeValue, wallTimeInstant, wallTimeCandidates } from '/utils/timezone.js';
 import { moduleAccess } from '/permissions.js';
@@ -223,7 +223,7 @@ export function openFastingEditor(row, refresh, finished = false) {
   openModal({
     title: t(finished ? 'health.fasting.finishedTitle' : creating ? completed ? 'health.fasting.backfill' : 'health.fasting.earlier' : 'health.fasting.editTitle'),
     size: 'lg',
-    content: `<form data-fasting-edit-form>
+    content: `<form data-fasting-edit-form novalidate>
       ${finished ? `<p class="form-hint">${esc(t('health.fasting.finishedHint'))}</p>` : ''}
       <p class="form-hint">${esc(row.start_tzid)}</p>
       <div class="fasting-editor-grid">
@@ -271,7 +271,8 @@ export function openFastingEditor(row, refresh, finished = false) {
       let saving = false;
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (saving || !form.reportValidity()) return;
+        // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
+        if (saving || reportFieldErrors(constraintErrors(form))) return;
         const fields = new FormData(form);
         const startValue = fields.get('start');
         const endValue = fields.get('end');
