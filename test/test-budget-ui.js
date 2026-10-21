@@ -1289,6 +1289,29 @@ test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
   );
 });
 
+// R21 S9b (Critique a4): "Bearbeiten zeigt 200 statt 200,00". Ein Betragsfeld
+// vom Typ number, das einen Bestandswert zeigt, nimmt ihn ueber
+// amountFieldValue - in den Stellen der Waehrung, nur mit Nullen aufgefuellt.
+test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt 200)', () => {
+  const plans = read('../public/pages/budget-plans.js');
+  const felder = [
+    ['budget.js', budget, 'bm-amount', /value="\$\{absAmountField\}"/],
+    ['budget.js', budget, 'cb-amount', /value="\$\{amountFieldValue\(absAmount, currency\)\}"/],
+    ['budget.js', budget, 'lm-amount', /value="\$\{loan \? amountFieldValue\(loan\.total_amount, loanCurrency\) : ''\}"/],
+    ['budget-plans.js', plans, 'plan-amount', /value="\$\{amountFieldValue\(value, view\.ctx\.currency\)\}"/],
+    ['subscriptions.js', subscriptions, 'subscription-amount', /value="\$\{esc\(amountFieldValue\(subscription\?\.amount \?\? '', formCurrency\)\)\}"/],
+  ];
+  for (const [file, src, id, value] of felder) {
+    const field = withoutComments(src).match(new RegExp(`<input[^>]*id="${id}"[^>]*>`));
+    assert.ok(field, `${file}: #${id} nicht gefunden`);
+    assert.match(field[0], value, `${file}: #${id} zeigt den Bestand ohne die Stellen der Waehrung`);
+  }
+  assert.match(budget, /const absAmountField = amountFieldValue\(absAmount, state\.currency\);/);
+  const raten = [...withoutComments(housekeeping).matchAll(/<input name="(daily_rate|hourly_rate|extras)"[^>]*>/g)];
+  assert.ok(raten.length >= 4, `Raten der Haushaltshilfe nicht gefunden (${raten.length})`);
+  for (const [field, name] of raten) assert.match(field, /value="\$\{esc\(amountFieldValue\(/, `housekeeping.js: ${name} ohne amountFieldValue`);
+});
+
 test('wählbare Währungen ziehen das Betragsfeld nach', () => {
   // Ein Formular, in dem die Währung gewählt werden kann, muss das Betragsfeld
   // beim Wechsel nachziehen - sonst behält es das Format der vorherigen Währung
@@ -3222,8 +3245,14 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.match(input.body, /font-size:\s*var\(--text-xl\)/);
   const add = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-inline-add::before');
   assert.ok(add && /height:\s*var\(--target-base\)/.test(add.body), '„+ Kategorie" traf nur 25px');
+  // R21 S9b (a4): die Zeile ist so hoch wie ein Label - mit der Zielhoehe stand
+  // „Kategorie" 43px statt 32 unter dem Feld darueber. Die Treffflaeche waechst
+  // vom Knopf aus nach oben (in die Fuge), nie ins Auswahlfeld darunter.
+  assert.match(add.body, /(?:^|;)\s*bottom:\s*0/, 'die Treffflaeche endet an der Unterkante des Knopfs');
+  assert.doesNotMatch(add.body, /translateY|(?:^|;)\s*top:/, 'und ist nicht mehr um die Mitte zentriert');
   const head = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-field-header');
-  assert.match(head.body, /min-height:\s*var\(--target-base\)/, 'die Zeile fasst die Treffflaeche, ohne sie ins Feld darunter ragen zu lassen');
+  assert.doesNotMatch(head.body, /min-height/, 'die Zeile traegt keine Zielhoehe');
+  assert.match(head.body, /margin-bottom:\s*var\(--space-1\)/, 'und den Abstand eines Labels zum Feld');
 });
 
 test('Darlehen: hoechstens ein Primaerknopf - die Rate buchen ist sekundaer', () => {

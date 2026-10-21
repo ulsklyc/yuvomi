@@ -31,7 +31,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -4185,6 +4185,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // hätte den Betrag dauerhaft auf den gerundeten Wert gesetzt. Dass ein
   // solcher Bestandswert nicht ins Raster passt, fängt amountStep ab.
   const absAmount  = isEdit ? String(Math.abs(editAmount)) : '';
+  // Angezeigt in den Stellen der Waehrung ("200.00" -> "200,00"), nur mit
+  // Nullen aufgefuellt, nie gerundet (amountFieldValue).
+  const absAmountField = amountFieldValue(absAmount, state.currency);
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
@@ -4255,7 +4258,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <input type="number" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
-             inputmode="decimal" value="${absAmount}" required>
+             inputmode="decimal" value="${absAmountField}" required>
     </div>
 
     <div class="form-group js-entry-field">
@@ -5223,7 +5226,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
                step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
                min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
                placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
-               value="${loan ? String(loan.total_amount) : ''}" required>
+               value="${loan ? amountFieldValue(loan.total_amount, loanCurrency) : ''}" required>
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
@@ -5831,7 +5834,7 @@ async function openConfirmBookingModal(id) {
       <label class="form-label" for="cb-amount">${t('budget.amountLabel')}</label>
       <input type="number" class="form-input" id="cb-amount" inputmode="decimal"
              step="${amountStep(currency, absAmount)}"
-             min="${amountMin(currency)}" value="${absAmount}">
+             min="${amountMin(currency)}" value="${amountFieldValue(absAmount, currency)}">
     </div>
     <div class="form-group">
       <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>

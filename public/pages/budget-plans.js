@@ -10,7 +10,7 @@ import { openModal, closeModal, captureModalContext, reportFieldError, refocusAf
 import { vibrate, isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -331,7 +331,7 @@ function amountFieldHtml(value) {
       <label class="form-label" for="plan-amount">${t('budget.planMonthlyAmount')}</label>
       <input id="plan-amount" class="form-input" type="number" inputmode="decimal" min="0"
              step="${amountStep(view.ctx.currency, value)}"
-             value="${value === '' ? '' : String(value)}" placeholder="${amountPlaceholder(view.ctx.currency)}" />
+             value="${amountFieldValue(value, view.ctx.currency)}" placeholder="${amountPlaceholder(view.ctx.currency)}" />
     </div>`;
 }
 

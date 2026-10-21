@@ -2542,15 +2542,19 @@ button.budget-entry__title {
   margin-top: var(--space-1);
 }
 
+/* DIE KOPFZEILE IST SO HOCH WIE EIN LABEL (R21 S9b, Critique a4). Sie war
+ * so hoch wie ein volles Ziel (--target-base), damit „+ Kategorie" seine
+ * Treffflaeche fasste (Critique 2026-09-25: es traf nur 25px) - und stand
+ * damit 11px tiefer als jedes andere Label: vor „Kategorie" 43px Luft statt
+ * 32. Jetzt traegt sie den Abstand eines Labels, und die Treffflaeche waechst
+ * vom Knopf aus NACH OBEN in die Fuge zur Gruppe darueber (`::before`), nie
+ * ins Auswahlfeld darunter. */
 .budget-field-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  /* Die Zeile ist so hoch wie ein volles Ziel: „+ Kategorie" traf nur 25px
-   * (Critique 2026-09-25). Seine Treffflaeche (::before) fuellt die Zeilen-
-   * hoehe, ohne ueber das Auswahlfeld darunter zu ragen. */
-  min-height: var(--target-base);
+  margin-bottom: var(--space-1);
 }
 
 .budget-field-header .form-label {
@@ -2568,9 +2572,8 @@ button.budget-entry__title {
   content: '';
   position: absolute;
   inset-inline: 0;
-  top: 50%;
+  bottom: 0;
   height: var(--target-base);
-  transform: translateY(-50%);
 }
 
 /* Der Betrag ist die Buchung (Critique 2026-09-25): gross, Ziffern gleicher

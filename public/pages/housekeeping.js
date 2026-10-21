@@ -21,7 +21,7 @@ import { wireScrollFade, vibrate, acknowledgeCheck, scheduleUndoableDelete } fro
 import { swapContent } from '/utils/content-swap.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { isNavModuleReadOnly, canSeeHousekeepingAmounts } from '/permissions.js';
@@ -2159,13 +2159,13 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             <label class="housekeeping-field">
               <span>${esc(t('housekeeping.dailyRate'))}</span>
               <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, visit.daily_rate ?? 0)}"
-                     placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(visit.daily_rate ?? 0)}">
+                     placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.daily_rate ?? 0, state.currency))}">
             </label>
           `}
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.extras'))}</span>
             <input name="extras" type="number" min="0" step="${amountStep(state.currency, visit.extras ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(visit.extras ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.extras ?? 0, state.currency))}">
           </label>
         </div>
         ${receiptFieldHtml(visit)}
@@ -2408,12 +2408,12 @@ function openStaffModal(worker, content, options = {}) {
           <label class="housekeeping-field" id="housekeeping-field-daily-rate">
             <span>${esc(t('housekeeping.dailyRate'))}</span>
             <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, item.daily_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(item.daily_rate ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.daily_rate ?? 0, state.currency))}">
           </label>
           <label class="housekeeping-field" id="housekeeping-field-hourly-rate"${(!item.rate_type || item.rate_type === 'daily') ? ' hidden' : ''}>
             <span>${esc(t('housekeeping.hourlyRate'))}</span>
             <input name="hourly_rate" type="number" min="0" step="${amountStep(state.currency, item.hourly_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(item.hourly_rate ?? 0)}">
+                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.hourly_rate ?? 0, state.currency))}">
           </label>
           <label class="housekeeping-field housekeeping-field--color">
             <span>${esc(t('housekeeping.calendarColor'))}</span>

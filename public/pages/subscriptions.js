@@ -21,7 +21,7 @@ import { todayKey } from '/utils/date.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -1585,7 +1585,7 @@ export function openSubscriptionModal(subscription = null) {
                    min="0"
                    step="${amountStep(formCurrency, subscription?.amount ?? '')}"
                    placeholder="${amountPlaceholder(formCurrency)}"
-                   inputmode="decimal" required value="${subscription?.amount ?? ''}">
+                   inputmode="decimal" required value="${esc(amountFieldValue(subscription?.amount ?? '', formCurrency))}">
           </div>
           ${comboboxMarkup({
             id: 'subscription-currency',

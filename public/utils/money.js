@@ -432,6 +432,29 @@ export function centsToAmountInput(cents, currency) {
 }
 
 /**
+ * Der Bestandswert eines Betragsfeldes vom Typ `number` in den Stellen der
+ * Währung: EUR "200.00" statt "200", "38.50" statt "38.5" (Critique R21, a4:
+ * "Bearbeiten zeigt 200 statt 200,00"). Das Feld bleibt Punkt-Dezimal - der
+ * Browser zeigt ihn in der Schreibweise der Region ("200,00"). Aufgefüllt wird
+ * nur mit Nullen, nie gerundet und nie gekappt: ein Bestandswert mit mehr
+ * Stellen (12,555 EUR, 12,5 JPY) bleibt, wie er gespeichert ist - dieselbe
+ * Zusage wie bei `amountToInput`, und dasselbe Arbeiten auf dem TEXT.
+ * @param {number|string|null|undefined} amount
+ * @param {string} currency
+ * @returns {string}
+ */
+export function amountFieldValue(amount, currency) {
+  if (amount === '' || amount == null) return '';
+  const text = String(amount).trim();
+  const match = /^(-?\d+)(?:\.(\d+))?$/.exec(text);
+  if (!match) return text;
+  const digits = currencyFractionDigits(currency);
+  const fraction = match[2] ?? '';
+  if (!digits || fraction.length >= digits) return text;
+  return `${match[1]}.${fraction.padEnd(digits, '0')}`;
+}
+
+/**
  * Ein Dezimalbetrag (Zahl oder Punkt-Dezimaltext vom Server, "12.50") als Wert
  * für ein Eingabefeld - das Gegenstück zu `toDecimalString`.
  *

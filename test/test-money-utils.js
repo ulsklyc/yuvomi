@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits } from '../public/utils/money.js';
+import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits, amountFieldValue } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
@@ -433,4 +433,19 @@ test('roundToCurrency: Float-Rest wird 0, -0 wird 0, die Nachkommastellen folgen
   assert.equal(roundToCurrency(1700.10 - 1700.00, 'EUR'), 0.1);
   assert.equal(roundToCurrency(12.4, 'JPY'), 12);
   assert.equal(roundToCurrency(1.23456, 'KWD'), 1.235);
+});
+
+// R21 S9b (Critique a4): der Bestand im number-Feld in den Stellen der Waehrung.
+// Nur aufgefuellt, nie gerundet - ein Wert neben dem Raster bleibt, wie er ist.
+test('amountFieldValue fuellt auf die Stellen der Waehrung auf und rundet nie', () => {
+  assert.equal(amountFieldValue(200, 'EUR'), '200.00');
+  assert.equal(amountFieldValue('38.5', 'EUR'), '38.50');
+  assert.equal(amountFieldValue(0, 'EUR'), '0.00');
+  assert.equal(amountFieldValue('12.555', 'EUR'), '12.555', 'mehr Stellen als die Waehrung: unveraendert');
+  assert.equal(amountFieldValue(1300, 'JPY'), '1300');
+  assert.equal(amountFieldValue(12.5, 'JPY'), '12.5', 'neben dem Raster: nicht gerundet');
+  assert.equal(amountFieldValue('1.5', 'KWD'), '1.500');
+  assert.equal(amountFieldValue('', 'EUR'), '');
+  assert.equal(amountFieldValue(null, 'EUR'), '');
+  assert.equal(amountFieldValue('1e21', 'EUR'), '1e21', 'keine Dezimalschreibweise: unveraendert');
 });

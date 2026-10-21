@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Editing an amount shows it with its cents.** An entry of 200 € opened as "200" and 38.50 € as
+  "38.5" in the budget, subscription, loan, plan and household help dialogs; they now read "200,00"
+  and "38,50" in the format of your region. Nothing is rounded: an amount with more decimals stays
+  as saved. In the budget entry dialog, "Category" and "Subcategory" also stand as close to the field
+  above as every other label.
+
 - **A short birthday list no longer puts a month heading over almost every row.** Month headings
   appear once the list has, on average, at least two birthdays per month; a shorter list is one
   sequence by how soon each birthday comes, with the next one still highlighted.
