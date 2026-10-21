@@ -167,9 +167,28 @@ export function attachSegmentIndicator(bar, {
   let destroyed = false;
   let wasConnected = false;
 
-  const measure = (el) => (el && el.offsetWidth
-    ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
-    : null);
+  // DIE KAPSEL IST NICHT DIE TREFFERFLAECHE (Critique R21, D11). Eine Leiste
+  // kann der Kapsel per CSS eine eigene Form geben: `--seg-pill-outset` legt
+  // sie waagerecht ueber den Eintrag hinaus (in dessen Polster zum Nachbarn),
+  // `--seg-pill-block` gibt ihr eine eigene Hoehe, mittig im Eintrag. Die
+  // Kueche hielt so mobil 48px hohe Ziele, aber ihre Kapsel war ein 58x48-
+  // Fast-Kreis mit 3px Luft ums Wort. Ohne die Eigenschaften (alle anderen
+  // Leisten) misst sie den Eintrag wie bisher.
+  const pillShape = () => {
+    if (typeof getComputedStyle !== 'function') return { outset: 0, block: 0 };
+    const style = getComputedStyle(bar);
+    const read = (name) => {
+      const value = parseFloat(style.getPropertyValue(name));
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    };
+    return { outset: read('--seg-pill-outset'), block: read('--seg-pill-block') };
+  };
+  const measure = (el) => {
+    if (!el || !el.offsetWidth) return null;
+    const { outset, block } = pillShape();
+    const h = block ? Math.min(block, el.offsetHeight) : el.offsetHeight;
+    return { x: el.offsetLeft - outset, y: el.offsetTop + (el.offsetHeight - h) / 2, w: el.offsetWidth + 2 * outset, h };
+  };
 
   /** Wo die Kapsel GERADE zu sehen ist - mitten in einer Bewegung nicht ihr Ziel. */
   const visibleBox = () => {

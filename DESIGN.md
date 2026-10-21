@@ -2712,6 +2712,17 @@ zwei von ihnen tragen gar keinen Seitentitel. `renderSubTabs` weist ein Siegel d
 zurueck, wenn die Leiste das Modul nicht wechselt (`semantics: 'tabs'`, Gesundheit) - dort
 liegt sie IM Kopf, und der traegt seinen Absender bereits.
 
+**Die Kapsel ist nicht die Trefferflaeche (R21, D11).** Mobil war die aktive Kuechen-Kapsel
+ein 58x48-Fast-Kreis mit rund 3px Luft ums Wort, "Vorrat11" klebte. Die Leiste gibt der
+geteilten Kapsel (`utils/segment-indicator.js`) per CSS eine eigene Form: `--seg-pill-block`
+(`--target-md`, 40px, mittig im 48px-Ziel) und `--seg-pill-outset` (4px ueber den Tab hinaus,
+in dessen 8px Polster) - 12px Luft ums Wort, 16px zwischen zwei Worten, und die Leiste passt
+bei 375px weiter ohne Scrollen. Der Zaehler steht 4px neben dem Wort mit 4px Innenpolster.
+Andere Leisten setzen die Eigenschaften nicht und messen den Eintrag wie bisher. Zwischen zwei
+Kuechen-Reitern blendet nur der Koerper (Typ `kitchen` am Seitenwechsel): die Kontextzeile
+wechselt mit dem Tipp, statt doppelt belichtet zu blenden. Guards: `test:kitchen-tabs`,
+`test:motion`.
+
 **Andocken kann nur ein Kopf mit Lead-Zone** - und eine hat nur, wessen Inhalt auf mehr als
 einer Zeile steht. Wo keine ist, traegt die Leiste ihre Linie durchgehend und markiert
 schlicht die Kopfkante. Das ist kein Sonderfall, sondern derselbe Satz von der anderen

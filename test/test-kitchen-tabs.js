@@ -152,6 +152,55 @@ test('Indikator: gleitet per transform mit --duration-lg/--ease-out; auch ein Br
   assert.equal(wide.handle.indicator.style.width, '130px', 'die Kapsel steht sofort in der Zielbreite');
 });
 
+// Critique R21 (D11): die Kuechen-Kapsel war mobil ein 58x48-Fast-Kreis mit
+// rund 3px Luft ums Wort - sie trug die Masse der Trefferflaeche. Eine Leiste
+// gibt ihr jetzt per CSS eine eigene Form: `--seg-pill-outset` (waagerecht ueber
+// den Eintrag hinaus) und `--seg-pill-block` (eigene Hoehe, mittig).
+test('Indikator D11: eine Leiste gibt der Kapsel ihre eigene Form - breiter als der Eintrag, niedriger als das Ziel', () => {
+  const prev = global.getComputedStyle;
+  const shape = { '--seg-pill-outset': ' 4px', '--seg-pill-block': ' 40px' };
+  global.getComputedStyle = (el) => ({
+    borderRadius: '9999px',
+    getPropertyValue: (name) => (el?.querySelectorAll ? shape[name] ?? '' : ''),
+  });
+  try {
+    const { handle, activate, animations } = fakeBar([
+      { offsetLeft: 16, offsetTop: 4, offsetWidth: 58, offsetHeight: 48, active: true },
+      { offsetLeft: 74, offsetTop: 4, offsetWidth: 71, offsetHeight: 48 },
+    ]);
+    assert.equal(handle.indicator.style.transform, 'translate(12px, 8px)', 'die Kapsel steht nicht 4px ueber dem Eintrag und mittig im Ziel');
+    assert.equal(handle.indicator.style.width, '66px');
+    assert.equal(handle.indicator.style.height, '40px', 'die Kapsel traegt die Hoehe der Trefferflaeche statt ihrer eigenen');
+    activate(1);
+    handle.place({ glide: true });
+    assert.deepEqual(animations.at(-1).frames.map((f) => f.transform), ['translate(12px, 8px) scale(0.8354, 1)', 'translate(70px, 8px) scale(1, 1)'],
+      'die geformte Kapsel gleitet wie jede andere nur per transform');
+    // Ohne die Eigenschaften misst sie den Eintrag wie bisher.
+    shape['--seg-pill-outset'] = '';
+    shape['--seg-pill-block'] = '';
+    const plain = fakeBar([{ offsetLeft: 16, offsetTop: 4, offsetWidth: 58, offsetHeight: 48, active: true }]);
+    assert.equal(plain.handle.indicator.style.transform, 'translate(16px, 4px)');
+    assert.equal(plain.handle.indicator.style.height, '48px');
+  } finally {
+    global.getComputedStyle = prev;
+  }
+});
+
+test('Kueche mobil D11: Kapsel 36-40px hoch, 12px Luft ums Wort, der Zaehler mit Abstand (Critique R21)', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const tokens = readSrc('../public/styles/tokens.css');
+  const tok = (name) => Number(tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`))?.[1]);
+  const px = (value) => tok(String(value ?? '').match(/^var\(--([\w-]+)\)$/)?.[1]);
+  const narrow = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))].filter((r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a)));
+  const decl = (sel, prop) => narrow.filter((r) => r.selector.trim() === sel).map((r) => r.body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`))?.[1]?.trim()).filter(Boolean).at(-1);
+  const block = px(decl('.kitchen-tabs-bar', '--seg-pill-block'));
+  assert.ok(block >= 36 && block <= 40, `die aktive Kapsel ist ${block}px hoch - D11 verlangt 36-40`);
+  const air = px(decl('.kitchen-tabs-bar .sub-tab', 'padding-inline')) + px(decl('.kitchen-tabs-bar', '--seg-pill-outset'));
+  assert.equal(air, 12, `${air}px Luft ums Wort in der aktiven Kapsel - D11 verlangt 12`);
+  assert.ok(px(decl('.kitchen-tabs-bar .sub-tab', 'gap')) >= 4, 'der Zaehler klebt am Wort ("Vorrat11")');
+  assert.ok(px(decl('.kitchen-tabs-bar .sub-tab__badge', 'padding-inline')) >= 4, 'der Zaehler hat keine Luft in seiner Marke');
+});
+
 test('Indikator: reduzierte Bewegung springt', () => {
   global.matchMedia = (q) => ({ matches: /reduced-motion/.test(q) });
   try {

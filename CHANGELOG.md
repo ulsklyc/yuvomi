@@ -96,6 +96,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   halfway through it. The old page now stays for up to 150 ms while the new one draws, so the
   fade lands on content - including the scroll position when you go back - and the selection pill
   in the tab bar continues its glide where it was instead of skipping ahead.
+- **The kitchen tab bar on phones has a proper capsule.** The highlight of the current kitchen
+  tab was almost a circle hugging the word, and a count read as "Pantry10". It is now a 40-pixel
+  capsule with even room around the word, the count sits apart as its own badge, and all four
+  tabs still fit on a 375-pixel screen. Switching between kitchen tabs fades only the page
+  content: the tab bar and the row under it change at once, and the highlight glides over.
 - **Going back to the Overview shows it at once.** If the Overview was loaded less than a minute
   ago and nothing was changed since, it appears straight away instead of through loading
   placeholders, then quietly checks for news and only redraws when something is different.
