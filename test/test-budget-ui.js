@@ -2750,7 +2750,9 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   // teilt der Knopf die Zeile mit dem Stepper und behaelt nur sein Zeichen.
   // R20 6c: das Wort bleibt eingeklappt stehen, dafuer halbiert der Knopf
   // seinen Innenrand (das Label traegt die Agenda-Spanne bei 390px ungekuerzt).
-  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu$/];
+  // R21: eingeklappt verlassen die Platzhalter des Ansichtsworts den Fluss -
+  // ohne Pfeile muss der Knopf keine Breite fuer das laengste Wort halten.
+  const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu$/, / \.cal-toolbar__view-menu-sizer$/];
   const strangers = [...eachRule(calendarCss)]
     .filter((r) => /\.is-collapsed/.test(r.selector))
     .flatMap((r) => r.selector.split(',').map((part) => part.trim()))

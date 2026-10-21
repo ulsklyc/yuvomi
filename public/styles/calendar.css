@@ -746,6 +746,13 @@
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu {
     padding-inline: var(--space-2);
   }
+
+  /* Eingeklappt gibt es keine Pfeile, die stehen muessten (R21): der Knopf
+   * nimmt dort nur sein eigenes Wort, und das Label behaelt die Breite
+   * (320px, Tag: 92 -> 118px). Die Platzhalter verlassen nur den Fluss. */
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu-sizer {
+    position: absolute;
+  }
 }
 
 /* DIE TITELZEILE KLAPPT GANZ EIN - die Regel steht seit der Budget-Critique
