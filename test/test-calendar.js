@@ -6284,6 +6284,25 @@ test('R21: der Ansichtsknopf ist so breit wie sein laengstes Wort - die Pfeile s
   assert(/visibility:\s*hidden/.test(sizer?.body ?? ''), 'die Platzhalter sind unsichtbar, nicht weg');
 });
 
+// R21 (Critique 2026-10-21, a3): beim Monatswechsel am Telefon sprang die
+// Tagesliste 48px - fuenf gegen sechs Wochen. Die Wochen teilen sich jetzt ein
+// festes Budget von sechs Zeilen zu 48px (wie die Titelfassung ihre 320px);
+// eingeklappt traegt die eine Woche die Hoehe ihres Inhalts.
+test('R21: das Telefon-Raster hat in jedem Monat dieselbe Hoehe, die Liste springt nicht', () => {
+  const mobile = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const day = mobile.find((r) => r.selector.trim() === '.month-view--split .month-day');
+  const m = (day?.body ?? '').match(/--month-row-h:\s*calc\(var\(--space-12\) \* (\d+) \/ var\(--month-weeks, 5\)\)/);
+  assert(m, `die Zeilenhoehe teilt kein festes Budget: ${(day?.body ?? '').match(/--month-row-h:[^;]*/)?.[0]}`);
+  const rows = Number(m[1]);
+  // Hoehe des Rasters = Wochen x Zeilenhoehe: fuer 4, 5 und 6 Wochen gleich, und
+  // keine Zeile unter der Zielgroesse (48px).
+  const heights = [4, 5, 6].map((w) => Math.round(w * 48 * rows / w));
+  assert(new Set(heights).size === 1, `Rasterhoehe je Wochenzahl: ${heights.join(', ')}`);
+  assert(48 * rows / 6 >= 48, 'sechs Wochen bleiben mindestens 48px hoch');
+  const collapsed = mobile.find((r) => r.selector.trim() === '.month-view--split.month-view--collapsed .month-day--selweek');
+  assert(/--month-row-h:\s*var\(--space-12\)/.test(collapsed?.body ?? ''), 'eingeklappt springt die Liste an Monatsgrenzen nicht mit dem Budget');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

@@ -3322,8 +3322,16 @@
    *     Polsterung unten 2, Rahmen 1                          = 45
    * und damit zugleich die Zielgroesse am Finger. 80px in der Titelfassung:
    *     4 + Ziffer 20 + 2, drei Zeilen 3 x 16, 2 + 1           = 77. */
+  /* DAS RASTER HAT IN JEDEM MONAT DIESELBE HOEHE (Critique R21, a3: die Liste
+   * darunter sprang beim Monatswechsel 48px - fuenf gegen sechs Wochen).
+   * Wie die Titelfassung darunter teilen sich die Wochen ein festes Budget:
+   * sechs Zeilen zu 48px. Sechs Wochen behalten 48px, fuenf bekommen 57,6px,
+   * vier 72px - nie weniger als die Zielgroesse am Finger. Die Zahl der
+   * Wochen bleibt, was der Monat braucht (test:calendar, „vier bis sechs
+   * Wochenzeilen"); die Tagesliste beginnt in jedem Monat an derselben
+   * Stelle. */
   .month-view--split .month-day {
-    --month-row-h: var(--space-12);
+    --month-row-h: calc(var(--space-12) * 6 / var(--month-weeks, 5));
     height: var(--month-row-h);
     min-height: 0;
     padding: var(--space-1) var(--space-0h) var(--space-0h);
@@ -3357,6 +3365,18 @@
     height: 0;
     padding-block: 0;
     border-bottom-width: 0;
+  }
+
+  /* Eingeklappt geht der Schritt wochenweise ueber Monatsgrenzen (periodStepOf)
+   * - die eine Woche traegt deshalb die Hoehe ihres INHALTS, nicht ihren Anteil
+   * am Budget, sonst spraenge die Liste an jeder Grenze um die Differenz:
+   * 48px fuer Ziffer und Punkte, 80px fuer drei Titel. */
+  .month-view--split.month-view--collapsed .month-day--selweek {
+    --month-row-h: var(--space-12);
+  }
+
+  .month-view--split.month-view--titles.month-view--collapsed .month-day--selweek {
+    --month-row-h: calc(var(--space-16) + var(--space-4));
   }
 
   /* Die Punkte sagen nur noch, WO etwas ist: zentriert unter der Ziffer wie

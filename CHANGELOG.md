@@ -147,6 +147,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wide as its word, so the forward arrow moved by up to 26 pixels between "Day" and "Agenda". The
   button now always takes the width of the longest view name.
 
+- **The day list under the phone month no longer jumps when you change months.** A month with
+  five weeks was 48 pixels shorter than one with six, and the list below moved with it. The weeks
+  now share the same height, so the list always starts at the same place; folded to one week, the
+  row keeps its height across month boundaries.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing
