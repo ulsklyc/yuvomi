@@ -1226,6 +1226,10 @@ const SHAPE_EXEMPT = new Map([
   // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status
   // Aktiv/Archiviert es direkt auf /documents.
   ['segmented__item', 'Zustandsschalter: Segment des geteilten Segmented Controls (panel.css)'],
+  // Das antippbare Kaestchen einer Notiz-Checkliste (#704, role="checkbox",
+  // typography.css) ist ein Quadrat wie jede Checkbox. Es stand erst im Bild,
+  // seit der Demo-Seed echte Checklisten traegt (R21, 2026-10-21).
+  ['note-md-box', 'Zustandsschalter: Kaestchen einer Notiz-Checkliste (role="checkbox")'],
   // 3. Zellen eines Rasters
   // `.month-day` stand hier, bis die Monatszelle 2026-09-24 vom role="button" zur
   // gridcell eines ARIA-Grids wurde - Sonde 3 misst sie seitdem nicht mehr.

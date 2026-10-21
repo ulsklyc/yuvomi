@@ -659,7 +659,7 @@
   align-self: stretch;
   min-height: var(--target-md);
   padding-inline: var(--space-2);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
 }
 
 /* --------------------------------------------------------
