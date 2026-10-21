@@ -3212,7 +3212,9 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.ok(pos('id="bm-date"') < pos('    ${accountField}') && pos('    ${accountField}') < adv, 'das Konto steht zwischen Datum und „Weitere Angaben"');
   assert.match(modal, /const accountField = hasAccounts \? `\s*<div class="form-group js-entry-field">/, 'ohne Konten kein Feld, mit Konten eines, das der Buchungstyp schaltet');
   assert.doesNotMatch(modal, /entry\.account_id != null\s*\|\|/, 'ein gesetztes Konto oeffnet den Riegel nicht mehr - es steht davor');
-  assert.match(modal, /label: t\('budget\.moreDetails'\)/);
+  // Der Aufklapper traegt den Namen des Bausteins ("Weitere Angaben", D15) -
+  // kein eigenes Budget-Wort daneben.
+  assert.doesNotMatch(modal, /budget\.moreDetails/);
   assert.match(modal, /entry\.responsible_users\?\.length/, 'eine gesetzte Zustaendigkeit oeffnet den Riegel beim Bearbeiten');
   assert.match(modal, /size: 'md'/, '400px fuer zehn Felder waren schmaler als jeder andere Formulardialog');
   const input = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-amount-input');
