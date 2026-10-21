@@ -519,8 +519,12 @@ Ausschalter (in reduced-transparency und prefers-contrast auf 0):
   Opakes darueber liegt. Ohne Filter, ohne Animation. Kein Text steht direkt darauf
   (Sekundaertext fiele im Kern auf 2,96:1): auf den Zugangsseiten steht alles auf der
   Tafel, der Schriftzug des Ladebilds in Label-Farbe. Das Ladebild ist seit R20 eine stehende
-  Skizze der Shell (Kopf mit Siegel, drei leere Kartenflaechen, Kapsel bzw. Seitenleiste), ohne
-  Puls; `role="progressbar"` mit dem Markennamen, die Ansage kommt vom Screenreader.
+  Skizze der Shell (Kopf mit Siegel, Kapsel bzw. Seitenleiste), ohne Puls; `role="progressbar"`
+  mit dem Markennamen, die Ansage kommt vom Screenreader. Seit R21 S9b skizziert es die
+  Uebersicht, wo sie gleich steht: Balken fuer Gruss, Wetter und "Heute wichtig", EINE hohe
+  Programmkarte, am Desktop ohne Kopf (die Schiene traegt die Marke) und mit der Kachelreihe
+  darunter. Oberkante der Programmkarte gegen den ersten Schirm: 390px 84 -> 223 (Programm 226),
+  1280px 80 -> 158 (166), Kachelreihe 482 (486); `test:material`.
 
 **Die App selbst hat keinen Backdrop mehr.** Bis R18 liefen hinter dem Inhalt vier
 driftende, weichgezeichnete Farbfelder (`.lg-blob`) und ein Akzentverlauf auf der Shell -

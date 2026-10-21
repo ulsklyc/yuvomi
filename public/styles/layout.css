@@ -104,8 +104,75 @@
   box-shadow: var(--shadow-xs);
 }
 
-.app-loading__card + .app-loading__card { block-size: 6rem; }
-.app-loading__card:last-child { block-size: 12rem; }
+/* DIE SKIZZE IST DIE UEBERSICHT (R21 S9b, Critique a1 "Ladebild passt nicht
+ * zum ersten Schirm"). Seit D5 beginnt die Uebersicht mit Gruss, Wetterzeile
+ * und dem Tagesprogramm als EINER hohen Karte; die Skizze zeigte drei Karten
+ * (144/96/192px) ab y=84, das Programm stand dann ab y=226. Jetzt stehen
+ * Balken fuer Gruss, Wetter und "Heute wichtig" und eine Programmkarte dort,
+ * wo sie gleich stehen; am Desktop darunter die Kachelreihe. Die Balken sind
+ * Flaechen der Mulde, keine Schrift - nichts bewegt sich (R20). */
+.app-loading__bar {
+  display: block;
+  border-radius: var(--radius-full);
+  background-color: var(--color-fill-well);
+}
+
+.app-loading__bar--title {
+  block-size: var(--type-page-title-mobile);
+  inline-size: 64%;
+}
+
+.app-loading__bar--weather {
+  block-size: var(--type-caption);
+  inline-size: 28%;
+}
+
+.app-loading__bar--section {
+  block-size: var(--type-section-title);
+  inline-size: 36%;
+  margin-block-start: calc(var(--space-6) + var(--space-3));
+}
+
+.app-loading__card--program {
+  block-size: min(27rem, 52vh);
+}
+
+.app-loading__row {
+  display: none;
+}
+
+/* Am Desktop traegt die Seitenleiste die Marke (ihre Skizze ist die Schiene),
+ * und die Uebersicht beginnt mit dem Gruss ohne Wetterzeile: kein Kopf, kein
+ * Wetterbalken, der Gruss auf seiner Hoehe. */
+@media (min-width: 1024px) {
+  .app-loading__head,
+  .app-loading__bar--weather {
+    display: none;
+  }
+
+  .app-loading__bar--title {
+    margin-block-start: calc(var(--space-8) + var(--space-2));
+  }
+
+  .app-loading__bar--section {
+    margin-block-start: var(--space-6);
+  }
+
+  .app-loading__card--program {
+    block-size: min(19rem, 38vh);
+  }
+
+  .app-loading__row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+    margin-block-start: var(--space-2);
+  }
+
+  .app-loading__row > .app-loading__card {
+    block-size: 12rem;
+  }
+}
 
 .app-loading__capsule {
   position: fixed;

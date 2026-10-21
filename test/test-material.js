@@ -521,6 +521,13 @@ test('R18: auf der Zugangstafel halten Text und Feldkante ihre Schwelle, direkt 
   for (const part of ['app-loading__seal', 'app-loading__card', 'app-loading__capsule', 'app-loading__rail']) {
     assert.ok(index.includes(`class="${part}`), `die Skizze der Shell hat kein ${part}`);
   }
+  // R21 S9b (Critique a1, "Ladebild passt nicht zum ersten Schirm"): seit D5
+  // beginnt die Uebersicht mit Gruss und EINER hohen Programmkarte - die Skizze
+  // zeigte drei Karten ab y=84, das Programm stand dann ab y=226 (390px).
+  const skizze = index.slice(index.indexOf('<div class="app-loading__page"'), index.indexOf('<div class="app-loading__capsule"'));
+  const order = ['app-loading__bar--title', 'app-loading__bar--section', 'app-loading__card--program', 'app-loading__row'].map((c) => skizze.indexOf(c));
+  assert.ok(order.every((pos) => pos > 0), `die Skizze nennt Gruss, Abschnitt, Programmkarte und Kachelreihe: ${order.join(',')}`);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'in der Reihenfolge der Uebersicht');
   // Auf den Seiten steht alles in der Tafel: der Kopf ist ein Kind von
   // `main.auth-page` (test:auth-pages-ui haelt, dass jede Seite so beginnt),
   // und die Versionszeile steht vor dem schliessenden </main>.

@@ -238,9 +238,18 @@
           <span class="app-loading__seal"><svg class="brand-mark" viewBox="0 0 160 160" fill="none" focusable="false"><defs><linearGradient id="yuvomi-brand-mark-boot" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop class="brand-mark__from" offset="0%"/><stop class="brand-mark__to" offset="100%"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#yuvomi-brand-mark-boot)"/><g class="brand-mark__circles"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg></span>
           <span class="app-loading__logo">Yuvomi</span>
         </div>
-        <div class="app-loading__card"></div>
-        <div class="app-loading__card"></div>
-        <div class="app-loading__card"></div>
+        <!-- Die Uebersicht als Skizze (R21 S9b): Gruss, Wetterzeile, "Heute
+             wichtig" und das Tagesprogramm als EINE hohe Karte, am Desktop
+             darunter die Kachelreihe - dort, wo sie gleich stehen. -->
+        <span class="app-loading__bar app-loading__bar--title"></span>
+        <span class="app-loading__bar app-loading__bar--weather"></span>
+        <span class="app-loading__bar app-loading__bar--section"></span>
+        <div class="app-loading__card app-loading__card--program"></div>
+        <div class="app-loading__row">
+          <div class="app-loading__card"></div>
+          <div class="app-loading__card"></div>
+          <div class="app-loading__card"></div>
+        </div>
       </div>
       <div class="app-loading__capsule" aria-hidden="true"></div>
     </div>

@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The loading screen sketches the overview you are about to see.** While the app starts, it now
+  shows the greeting, the "Today" heading and one tall card where the day's program will appear
+  (with the tile row below on larger screens) instead of three generic cards.
+
 - **The household help overview leads to the full report.** The overview lists the five latest
   visits, the same rows the Reports tab shows for the month; when there are more, a last row "All
   visits in the report" takes you there.
