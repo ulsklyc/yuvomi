@@ -5375,7 +5375,14 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await gotoRoute(page, '/notes');
     await openExistingNoteEditor(page, failureFixture.id);
     await replaceExactly(page, '#note-content', 'This PUT is expected to fail after its editor closes.');
-    await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
+    // Seit #2091 sagt die Notiz ihren eigenen Satz (errorSentence) und nie den
+    // Text des Servers: erwartet wird, was die App fuer diese 500er-Antwort zeigt.
+    const putFailureText = await page.evaluate(async (serverText) => {
+      const { errorSentence } = await import('/utils/friendly-error.js');
+      return errorSentence({ status: 500, data: { error: serverText } });
+    }, 'PUT note save delayed failure');
+    assert.notEqual(putFailureText, 'PUT note save delayed failure');
+    await clearMatchingToast(page, { tone: 'danger', text: putFailureText });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
     await page.click('#note-modal-save');
     await heldRequest.seen;
@@ -5386,7 +5393,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await page.focus('#note-content');
     await heldRequest.reject();
     heldRequest = null;
-    await waitForMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
+    await waitForMatchingToast(page, { tone: 'danger', text: putFailureText });
 
     const afterLateFailure = await page.evaluate((errorText) => ({
       replacementOpen: document.querySelector('.note-modal')?.isConnected ?? false,
@@ -5395,7 +5402,7 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
       focus: document.activeElement?.id,
       errorVisible: [...document.querySelectorAll('.toast--danger')]
         .some((toast) => toast.textContent.includes(errorText)),
-    }), 'PUT note save delayed failure');
+    }), putFailureText);
     assert.deepEqual(afterLateFailure, {
       replacementOpen: true,
       title: failureReplacementTitle,
@@ -5420,13 +5427,13 @@ test('Sonde 23 - spaete Notizantworten respektieren Ersatz- und Bestaetigungsdia
     await gotoRoute(page, '/notes');
     await openExistingNoteEditor(page, failureFixture.id);
     await replaceExactly(page, '#note-content', retryContent);
-    await clearMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
+    await clearMatchingToast(page, { tone: 'danger', text: putFailureText });
     heldRequest = holdNextNoteSave(page, { method: 'PUT', noteId: failureFixture.id });
     await page.click('#note-modal-save');
     await heldRequest.seen;
     await heldRequest.reject();
     heldRequest = null;
-    await waitForMatchingToast(page, { tone: 'danger', text: 'PUT note save delayed failure' });
+    await waitForMatchingToast(page, { tone: 'danger', text: putFailureText });
     await page.waitForFunction(() => !document.querySelector('#note-modal-save')?.disabled);
     assert.deepEqual(await page.evaluate(() => ({
       open: document.querySelector('.note-modal')?.isConnected ?? false,
