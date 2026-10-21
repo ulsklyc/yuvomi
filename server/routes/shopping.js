@@ -1318,7 +1318,11 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/shopping/:listId/import-pantry
 // Setzt Vorratsartikel auf die Einkaufsliste (leer oder unter Mindestbestand).
-// Body: { items: [{ pantry_item_id, quantity? }] }
+// Body: { items: [{ pantry_item_id, quantity? } | { pantry_product_id, quantity? }] }
+//
+// `pantry_product_id` hands over a household product (#1448): its name and
+// category, and the shortfall to its minimum over all its batches as the
+// quantity (step 3), or none, like an empty batch without a minimum.
 //
 // Die Mengen-Angabe kommt als fertiger Anzeigetext vom Client: shopping_items.quantity
 // ist Freitext, und die Einheiten des Vorrats ('pcs', 'can', …) sind erst über t()
@@ -1363,6 +1367,7 @@ router.post('/:listId/import-pantry', (req, res) => {
 
     const result = db.get().transaction(() => {
       const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
+      const findPantryProduct = db.get().prepare('SELECT name, category FROM pantry_products WHERE id = ?');
       const findDuplicate = db.get().prepare(`
         SELECT id FROM shopping_items
         WHERE list_id = ? AND is_checked = 0 AND name = ? COLLATE NOCASE
@@ -1376,7 +1381,10 @@ router.post('/:listId/import-pantry', (req, res) => {
       const addedIds = [];
 
       for (const entry of entries) {
-        const pantryItem = findPantryItem.get(Number(entry?.pantry_item_id));
+        const byProduct = entry?.pantry_item_id == null && entry?.pantry_product_id != null;
+        const pantryItem = byProduct
+          ? findPantryProduct.get(Number(entry.pantry_product_id))
+          : findPantryItem.get(Number(entry?.pantry_item_id));
         if (!pantryItem) { skipped += 1; continue; }
         if (findDuplicate.get(req.params.listId, pantryItem.name)) { skipped += 1; continue; }
 

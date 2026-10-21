@@ -1784,7 +1784,14 @@ hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester O
   (bis R18 ein Papierkorb in der Zeile), Dialogfuss (immer).
 - **Vorrat:** Koerper oeffnet. Loeschen: Wisch zum Zeilenende (Touch; Stepper und Warenkorb
   sind Ausnahmezone, `wirePantrySwipe()`), Dialogfuss (immer), jeweils mit Rueckgaengig. Der
-  Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf.
+  Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf. Ein Produkt mit mehreren
+  Chargen (#1448) ist eine Produktzeile, die nur auf- und zuklappt (Knopf mit `aria-expanded`,
+  Winkel `.list-group__chevron` am Zeilenende, wie die Sammelzeile der Uebersicht); ihre
+  Chargen darunter sind die gewohnten Zeilen mit Koerper, Stepper, Warenkorb und Wisch. Ein
+  Produkt ohne Charge hat keinen Dialog, also keinen Dialogfuss: es loescht per Wisch (Touch) und
+  ueber den Eintrag "Loeschen" im Mehr-Knopf der Zeile (fester Ort), mit Rueckgaengig wie eine
+  Charge. Die Chipzeile des Vorrats traegt bewusst ZWEI Dimensionen (Status und Lagerort) als
+  Chips mit Einfachauswahl, auf Wunsch des Maintainers in #2085: benannte Ausnahme von D2.
 - **Mahlzeiten:** die Karte oeffnet den Dialog, Loeschen steht im Dialogfuss - in jeder
   Breite. Die Karte traegt seit R18 keinen Papierkorb mehr (benannte Ausnahme der
   Zeilenaktionen im Kanon oben).

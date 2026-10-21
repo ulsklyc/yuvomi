@@ -14,6 +14,13 @@
  *
  * Every write of a batch's name, unit or category puts the batch into its
  * household product in the same transaction (assignPantryProduct, #1448).
+ *
+ * THE MINIMUM IS THE PRODUCT'S (#1448, step 3). A batch read returns
+ * `min_quantity` as its product's value (MIRRORED_MIN), and a batch write that
+ * carries `min_quantity` writes it through to the product
+ * (writeMinimumThrough), for the deprecation window named in the CHANGELOG:
+ * refusing it would break a client that worked yesterday. The batch's own
+ * column is still written as before, but nothing reads it any more.
  */
 
 import express from 'express';
@@ -22,7 +29,7 @@ import { createLogger } from '../logger.js';
 import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizePantryUnit, normalizePantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
-import { assignPantryProduct } from '../services/pantry-products.js';
+import { assignPantryProduct, writeMinimumThrough } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../permissions.js';
 
@@ -37,6 +44,27 @@ function loadLocations() {
   return db.get().prepare('SELECT * FROM pantry_locations ORDER BY sort_order ASC, id ASC').all();
 }
 
+/**
+ * The household products with the number of batches each one has (#1448). A
+ * product outlives its last batch, so this is the only place a product without
+ * batches can be seen: the stock page shows it as out of stock. The batches
+ * themselves stay in `data`; this list only names the products, with their
+ * minimum and the sum of their batches (`total_quantity`, 0 without a batch),
+ * the two numbers low and out are read from (step 3). The status itself is not
+ * sent: its rule lives in public/utils/pantry-status.js and in the kitchen
+ * count, and a third copy would be one more to keep equal.
+ */
+function loadProducts() {
+  return db.get().prepare(`
+    SELECT p.id, p.name, p.unit, p.category, p.min_quantity,
+           COUNT(pi.id) AS batch_count, ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS total_quantity
+    FROM pantry_products p
+    LEFT JOIN pantry_items pi ON pi.product_id = p.id
+    GROUP BY p.id
+    ORDER BY p.name COLLATE NOCASE ASC, p.id ASC
+  `).all();
+}
+
 function loadCategories() {
   return db.get().prepare('SELECT * FROM shopping_categories ORDER BY sort_order ASC').all();
 }
@@ -45,8 +73,20 @@ function validCategoryNames() {
   return loadCategories().map((c) => c.name);
 }
 
+/**
+ * `min_quantity` of a batch as read through the API: its product's minimum
+ * (#1448, step 3). Listed after `pi.*`, so it takes the place of the batch's
+ * own column. A batch without a product (written by an older version, until the
+ * next start adopts it) keeps its own.
+ */
+const MIRRORED_MIN = 'CASE WHEN pi.product_id IS NULL THEN pi.min_quantity ELSE pp.min_quantity END AS min_quantity';
+
 function getItem(itemId) {
-  return db.get().prepare('SELECT * FROM pantry_items WHERE id = ?').get(itemId);
+  return db.get().prepare(`
+    SELECT pi.*, ${MIRRORED_MIN}
+    FROM pantry_items pi LEFT JOIN pantry_products pp ON pp.id = pi.product_id
+    WHERE pi.id = ?
+  `).get(itemId);
 }
 
 /**
@@ -69,8 +109,9 @@ function syncReminder(item, access = null, today = null) {
  */
 function loadItems() {
   return db.get().prepare(`
-    SELECT pi.*, pl.name AS location_name, pl.icon AS location_icon
+    SELECT pi.*, ${MIRRORED_MIN}, pl.name AS location_name, pl.icon AS location_icon
     FROM pantry_items pi
+    LEFT JOIN pantry_products pp ON pp.id = pi.product_id
     LEFT JOIN pantry_locations pl ON pl.id = pi.location_id
     ORDER BY
       CASE WHEN pi.location_id IS NULL THEN 1 ELSE 0 END,
@@ -143,7 +184,11 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     values.expires_on = vExp.value;
   }
 
-  if (!partial || body.min_quantity !== undefined) {
+  // ONLY WHEN SENT, also on a full update and on create: the minimum is the
+  // product's, so a body without it leaves the product's minimum alone instead
+  // of clearing it for every batch (an older client's PUT without the field, a
+  // new batch of a product that has one). Sent as null or '', it clears.
+  if (body.min_quantity !== undefined) {
     if (body.min_quantity === null || body.min_quantity === '' || body.min_quantity === undefined) {
       values.min_quantity = null;
     } else {
@@ -425,13 +470,59 @@ router.post('/import-shopping', (req, res) => {
 // Alle Vorratsartikel plus Lagerorte und Kategorien in einem Roundtrip.
 // Der Ablauf-/Bestands-Status wird bewusst NICHT hier berechnet: "abgelaufen"
 // hängt am lokalen Datum des Nutzers, der Server rechnet in UTC.
-// Response: { data: PantryItem[], locations: [], categories: [] }
+// `products` names the household products with their number of batches,
+// including products without batches (#1448).
+// Response: { data: PantryItem[], products: [], locations: [], categories: [] }
 // --------------------------------------------------------
 router.get('/', (_req, res) => {
   try {
-    res.json({ data: loadItems(), locations: loadLocations(), categories: loadCategories() });
+    res.json({ data: loadItems(), products: loadProducts(), locations: loadLocations(), categories: loadCategories() });
   } catch (err) {
     log.error('GET / error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// DELETE /api/v1/pantry/products/:productId
+// Deletes a household product that has no batches left (#1448; brought
+// forward from step 5 so a product that outlived its last batch can go). A
+// product with batches is refused with 409 and `reason`
+// `pantry_product_has_batches`, so the ON DELETE CASCADE on
+// `pantry_items.product_id` never takes stock with it. Count and delete run in
+// one transaction: a batch written in between cannot slip under the check.
+// Nothing else points at a product: recipe matches and reminders point at
+// batches. Behind the pantry write permission like every DELETE under /pantry
+// (module gate in server/index.js).
+// Response: 204
+// --------------------------------------------------------
+router.delete('/products/:productId', (req, res) => {
+  try {
+    const vId = idParam(req.params.productId, 'Produkt-ID');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+
+    const outcome = db.get().transaction(() => {
+      const product = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(vId.value);
+      if (!product) return { status: 404 };
+      const { batches } = db.get()
+        .prepare('SELECT COUNT(*) AS batches FROM pantry_items WHERE product_id = ?').get(vId.value);
+      if (batches > 0) return { status: 409, batches };
+      db.get().prepare('DELETE FROM pantry_products WHERE id = ?').run(vId.value);
+      return { status: 204 };
+    })();
+
+    if (outcome.status === 404) return res.status(404).json({ error: 'Product not found.', code: 404 });
+    if (outcome.status === 409) {
+      return res.status(409).json({
+        error: 'The product still has batches; delete them first.',
+        code: 409,
+        reason: 'pantry_product_has_batches',
+        count: outcome.batches,
+      });
+    }
+    res.status(204).end();
+  } catch (err) {
+    log.error('DELETE /products/:productId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -456,10 +547,14 @@ router.post('/', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, values.min_quantity, values.notes,
+        values.category, values.expires_on, values.min_quantity ?? null, values.notes,
         req.authUserId || req.session.userId
       );
       assignPantryProduct(db.get(), result.lastInsertRowid, { userId: req.authUserId || req.session.userId });
+      // A new batch sets its product's minimum only with a number: a create
+      // without one (or with an empty field) leaves the minimum of an existing
+      // product alone, it cannot know better than the product.
+      if (values.min_quantity != null) writeMinimumThrough(db.get(), result.lastInsertRowid, values.min_quantity);
       const item = getItem(result.lastInsertRowid);
       syncReminder(item);
       return item;
@@ -487,16 +582,17 @@ router.put('/:itemId', (req, res) => {
 
     const { values, errors } = validateItemFields(req.body, { current: item });
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const minGiven = 'min_quantity' in values;
 
     const updated = db.get().transaction(() => {
       db.get().prepare(`
         UPDATE pantry_items
         SET name = ?, quantity = ?, unit = ?, location_id = ?, category = ?,
-            expires_on = ?, min_quantity = ?, notes = ?
+            expires_on = ?, min_quantity = CASE WHEN ? THEN ? ELSE min_quantity END, notes = ?
         WHERE id = ?
       `).run(
         values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, values.min_quantity, values.notes, item.id
+        values.category, values.expires_on, minGiven ? 1 : 0, values.min_quantity ?? null, values.notes, item.id
       );
       // A changed name or unit moves the batch to the matching product (#1448).
       // The category reaches the product only when this edit changed it: the
@@ -506,6 +602,8 @@ router.put('/:itemId', (req, res) => {
         userId: req.authUserId || req.session.userId,
         syncCategory: values.category !== item.category,
       });
+      // Sent, the minimum goes to the product the batch belongs to now.
+      if (minGiven) writeMinimumThrough(db.get(), item.id, values.min_quantity);
       const fresh = getItem(item.id);
       syncReminder(fresh);
       return fresh;
@@ -554,6 +652,7 @@ router.patch('/:itemId', (req, res) => {
           syncCategory: fields.includes('category') && values.category !== item.category,
         });
       }
+      if (fields.includes('min_quantity')) writeMinimumThrough(db.get(), item.id, values.min_quantity);
 
       // Auch der ±-Stepper landet hier: wer den letzten Joghurt ausbucht, soll
       // nicht in fünf Tagen an sein Ablaufdatum erinnert werden.
