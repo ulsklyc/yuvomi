@@ -696,3 +696,22 @@ test('R20: der Shell-Nachlauf ist unsichtbar und damit kein Layout-Shift', () =>
   assert.equal(decl(tail.body, 'block-size'), 'var(--shell-tail)', 'der Platz bleibt');
   assert.equal(decl(tail.body, 'visibility'), 'hidden');
 });
+
+// R21 (Critique a1, gemessen 390x844): im Aufgaben-Blatt stand die Titelkante
+// bei einzeiligem Titel 25px unter der Blattoberkante, bei zweizeiligem 13px -
+// der Kopf zentrierte senkrecht, und von Aufgabe zu Aufgabe sprang der Titel um
+// 12px. Jetzt steht die erste Zeile mittig neben den Knoepfen (beide Faelle 25px).
+test('R21: die Titelkante im Blatt steht - die erste Zeile mittig neben den Knoepfen', () => {
+  const sel = '.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close)';
+  const [head] = topLevel(layoutCss, sel);
+  assert.equal(head && decl(head.body, 'align-items'), 'flex-start', 'der Kopf zentriert wieder - ein zweizeiliger Titel rutscht 12px hoch');
+  const [title] = topLevel(layoutCss, `${sel} > .modal-panel__title`);
+  assert.ok(title, 'die Regel fuer die erste Titelzeile fehlt');
+  assert.equal(decl(title.body, 'line-height'), 'var(--line-height-tight)');
+  // Dieselben Tokens wie Schriftgroesse und Knopfhoehe: (Knopf - Zeile) / 2.
+  assert.equal(decl(title.body, 'margin-block-start'), 'calc((var(--target-base) - var(--type-section-title) * var(--line-height-tight)) / 2)');
+  const [base] = topLevel(layoutCss, '.modal-panel__title');
+  assert.equal(decl(base.body, 'font-size'), 'var(--type-section-title)', 'die Rechnung nimmt eine andere Schriftgroesse als der Titel');
+  const [close] = topLevel(layoutCss, '.modal-panel__close');
+  assert.equal(decl(close.body, 'height'), 'var(--target-base)', 'die Rechnung nimmt eine andere Hoehe als der Knopf');
+});

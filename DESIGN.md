@@ -1221,6 +1221,11 @@ das Verhaeltnis haelt.
   Spinner ist Statusbewegung und dreht unter reduzierter Bewegung weiter (Abmeldung per
   `--motion-blend: var(--spin-period)` in reset.css); ein stehender sah aus wie ein haengender
   Vorgang. Dekor (Wetter-Strahlen) bleibt aus. Guard: `test:motion` ("Spinner D12").
+- **Die Titelkante im Blatt steht (R21):** ein Kopf mit Knoepfen richtet die ERSTE Titelzeile
+  mittig an ihnen aus (`align-items: flex-start` plus `(--target-base - Zeilenhoehe) / 2` am
+  Titel), weitere Zeilen wachsen nach unten. Vorher zentrierte er: ein zweizeiliger Titel
+  rutschte an die Polsterkante, die Titelkante sprang von Aufgabe zu Aufgabe um 12px (25 gegen
+  13px). Guard: `test:mobile-chrome`.
 - **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
   `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
   `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei
@@ -1660,7 +1665,11 @@ liegen Ausstieg und Timer-Knoepfe. **Sperrzonen ohne Dialog (#1917):** was `data
 traegt, haelt der Stapel frei wie eine Bedienleiste, auch wenn kein Dialog offen ist - er nimmt
 dann die naechste freie Kante, in seiner eigenen Breite und Mitte. Die Regel haengt am Attribut,
 nicht an einer Seite; gesetzt ist es an Uhrzeit, Datum und Fuss der Wand, wo der Hinweis beim
-Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag.
+Einschalten bis rund 834px Breite acht Sekunden auf der Uhr lag. **Weichen ganz (R21):** vor einer
+offenen Flaeche mit `data-toast-yield` nimmt der Stapel alle Toasts zurueck (`inert`) und haelt
+ihre Frist an (`toast:hold`/`toast:release`); mit dem Schliessen kommen sie mit der Restfrist
+wieder. Gesetzt am Mehr-Blatt: es steht fast bildhoch, es gab keine freie Lage, und der
+Rueckgaengig-Toast lag auf Griff und Suche (390x844: Toast 12-66, Suche ab 62).
 
 ## Shapes
 

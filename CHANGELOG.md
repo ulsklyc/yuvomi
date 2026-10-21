@@ -114,6 +114,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An undo message no longer covers the top of the More sheet.** With no free spot beside the
+  nearly full-height sheet, the message sat on its handle and search field. It now steps back
+  while the sheet is open, its countdown paused, and returns when the sheet closes, so the undo
+  is still there.
+
+- **The title of a sheet stays at the same height, however long it is.** A title that wrapped to
+  two lines started 12 pixels higher than a one-line title, so the title jumped from task to
+  task. The first line now always lines up with the buttons beside it.
+
 - **Opening a settings page on a phone no longer starts from a half-finished frame.** The first
   frame of the slide already showed the back link and cut the settings list to its first two
   rows. The list now stays whole while the page slides in with its content, and the title fades

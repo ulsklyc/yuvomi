@@ -6806,6 +6806,22 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   text-wrap: balance;
 }
 
+/* DIE TITELKANTE STEHT, WIE LANG DER TITEL AUCH IST (Critique R21). Der Kopf
+ * zentrierte seine Kinder senkrecht: ein einzeiliger Titel stand mittig neben
+ * den 48px-Knoepfen (Oberkante 25px), ein zweizeiliger fuellte ihre Hoehe und
+ * rutschte an die Polsterkante (13px) - von Aufgabe zu Aufgabe sprang die
+ * Titelkante um 12px. Jetzt steht die ERSTE Zeile mittig neben den Knoepfen,
+ * und weitere Zeilen wachsen nach unten. Nur in einem Kopf mit Knoepfen; ohne
+ * `:has()` bleibt es beim Zentrieren. */
+.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close) {
+  align-items: flex-start;
+}
+
+.modal-panel__header:has(> .modal-panel__header-actions, > .modal-panel__close) > .modal-panel__title {
+  line-height: var(--line-height-tight);
+  margin-block-start: calc((var(--target-base) - var(--type-section-title) * var(--line-height-tight)) / 2);
+}
+
 .modal-panel__close {
   width: var(--target-base);
   height: var(--target-base);
