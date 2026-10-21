@@ -2602,20 +2602,26 @@ function syncViewPanel() {
  * `inert` ein fokussiertes Element ebenso blurred wie `display: none` es taete.
  *
  * Die Frage „ist heute zu sehen" beantwortet der ANGEZEIGTE BEREICH, nicht
- * eine Fallunterscheidung je Ansicht: `getRangeForView` kennt ihn fuer alle
- * vier, und eine zweite Rechnung daneben waere die naechste Stelle, an der
- * Monat und Agenda auseinanderlaufen.
+ * eine Fallunterscheidung je Ansicht - und zwar `visibleDayRange`, die eine
+ * Rechnung dafuer, die auch „+" fragt (newEventDate). NICHT `getRangeForView`:
+ * das ist die LADESPANNE, und sie ist zweimal groesser als das Bild.
  *
- * AUSNAHME TAG (PR #1673 Review): dort ist `getRangeForView` seit R16 die
- * LADESPANNE - der Tag plus die Folgetage fuer die Seitenspalte. Gezeigt wird
- * EIN Tag; die Spalte ist Ausblick und am Telefon gar nicht da. Mit dem Cursor
- * auf einem der sieben Tage vor heute lag heute in der Spanne, und der Reset
- * verschwand, obwohl heute nicht der angezeigte Tag war.
+ * TAG (PR #1673 Review): geladen werden der Tag plus die Folgetage fuer die
+ * Seitenspalte. Gezeigt wird EIN Tag; die Spalte ist Ausblick und am Telefon
+ * gar nicht da. Mit dem Cursor auf einem der sieben Tage vor heute lag heute
+ * in der Spanne, und der Reset verschwand, obwohl heute nicht der angezeigte
+ * Tag war.
+ *
+ * TELEFON-WOCHE (Critique R21, a3): geladen wird die ganze 7-Tage-Woche plus
+ * das 3-Tage-Fenster, gezeigt nur die drei Tage ab dem Cursor. Nach „Weiter"
+ * stand heute nicht mehr auf dem Schirm, lag aber in der Woche - der Reset
+ * blieb inert, und es gab keinen Weg zurueck zu heute.
  */
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#cal-today');
   if (!btn) return;
-  const { from, to } = getRangeForView(state.view, state.cursor);
+  // Dieselbe Telefonbreite, die renderWeekView das 3-Tage-Fenster zeichnen laesst.
+  const { from, to } = visibleDayRange(state.view, state.cursor, state.weekStart, { mobile: isMonthSplit() });
   // In der Tagesansicht und im geteilten Monat ist „heute" ein TAG, nicht der
   // Zeitraum: steht die Auswahl auf einem anderen Tag, führt der Reset zu heute
   // zurück und bleibt sichtbar.

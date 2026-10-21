@@ -130,6 +130,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   everywhere, by one rule instead of one per element.
 - **Messages sit just above the tab bar on phones with a home indicator.** The space for the
   indicator was counted twice, so a message floated about 34 px higher than on other phones.
+- **"Today" in the phone week view is there as soon as today is off screen.** The phone week shows
+  three days at a time, but the button checked the whole week: after one step forward today was out
+  of sight, and the way back to it was missing until the next week.
 - **Sheets and glass controls settle sooner.** Their springy entrance kept them slightly past their
   resting place for most of the movement. In current browsers it now moves like a real spring: the
   same small overshoot and the same duration, but it comes to rest after about half the time.

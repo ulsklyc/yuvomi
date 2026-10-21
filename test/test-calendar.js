@@ -2344,6 +2344,42 @@ test('Tagesansicht: der Reset ist nur am heutigen TAG aktuell, nicht in der Lade
   }
 });
 
+// Critique R21 (a3): am Telefon zeigt die Woche drei Tage ab dem Cursor, die
+// Ladespanne ist aber die ganze 7-Tage-Woche (getWeekRange, mobile). Nach
+// "Weiter" stand heute nicht mehr auf dem Schirm, lag aber in der Ladespanne -
+// der Reset blieb inert, und es gab keinen Weg zurueck zu heute.
+test('Telefon-Woche: „Heute" bleibt erreichbar, sobald heute nicht unter den drei sichtbaren Tagen steht (Critique R21)', () => {
+  const { state, syncTodayButton, getRangeForView } = calendarHelpers;
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const previousWindow = globalThis.window;
+  const zuvor = { view: state.view, cursor: state.cursor, today: state.today, weekStart: state.weekStart };
+  const btn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#cal-today' ? btn : null), contains: () => false };
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    // Mittwoch heute, die Woche beginnt Montag; "Weiter" fuehrt auf Freitag.
+    Object.assign(state, { view: 'week', weekStart: 1, today: '2026-10-21', cursor: '2026-10-23' });
+    const { from, to } = getRangeForView('week', state.cursor);
+    assert(state.today >= from && state.today <= to, 'Vorbedingung: heute liegt in der Ladespanne der Woche');
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === false, 'Fr-So sichtbar, heute (Mi) nicht - „Heute" muss erreichbar sein');
+    assert(btn.inert === false, 'der Reset darf nicht inert sein');
+
+    state.cursor = '2026-10-20';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'Di-Do sichtbar, heute darunter: der Reset ist aktuell');
+
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    state.cursor = '2026-10-23';
+    syncTodayButton(root);
+    assert(btn.classList.contains('is-current') === true, 'am Desktop zeigt die Woche alle sieben Tage - heute steht darin');
+  } finally {
+    Object.assign(state, zuvor);
+    if (hadWindow) globalThis.window = previousWindow;
+    else delete globalThis.window;
+  }
+});
+
 // Schichtplan-Bloecke im Zeitraster: Ueberlappungs-Layout (#1043)
 //
 // Vorher bekam JEDER Schichtplan-Block dieselben festen Aussenraender
