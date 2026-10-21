@@ -3892,6 +3892,11 @@ Blatt so viele Zeilen, wie in den ersten Schirm passen** (bis zur Kapsel, mindes
 naechste Aufbau rechnet mit dem gemessenen Wert. Vorher ein fester Deckel von zwei Zeilen
 (gemessen 390x844: 2 von 9 Punkten, darunter Familie und Budget im ersten Schirm; jetzt 8 von 9,
 das Programm fuellt 77 % statt 29 % der Flaeche bis zur Kapsel). „+N weitere" ist Footnote 13.
+Was unter den Zeilen bleibt, zaehlt mit (R21 S7): passt die Einkaufszeile nicht mehr ueber die
+Kapsel, faltet sie mit der letzten Zeile in „+N weitere"; ein zweiter Blick nach dem Neuzeichnen
+darf nur verringern (Decke je Fensterhoehe). Drehung und Fensterhoehe messen neu
+(`createPhoneProgramFit`, ein Bild spaeter gebuendelt); ein Wechsel zwischen Telefon und breit
+baut die Uebersicht neu.
 **Geld steht ab Werk nicht auf der Uebersicht:** das Budget-Widget ist ein Opt-in
 (`DEFAULT_HIDDEN_WIDGETS`), und die Kennzahlreihe fuehrt keinen Saldo - ein Kontostand ist keine
 Kennzahl fuer den Morgen und gehoert nicht auf den Schirm, den jeder im Haushalt sieht. Die offene
