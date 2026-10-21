@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The numbers on the faces in the Overview's family card say what they count.** On a phone, a
+  bare "1" next to a face read like a notification. The badge now starts with the tasks symbol,
+  and it sits at the edge of the face so the initials stay readable.
+
 - **Red in the budget means something needs doing.** The statistics showed seven red amounts
   for categories that simply cost a little more than last month - "+25.00 €" while 25 of 80 € were
   spent. Changes against the previous month now show in grey with their sign and arrow, here and

@@ -2432,7 +2432,11 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
           <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
           </span>
-          ${open > 0 ? `<span class="family-member__count" aria-hidden="true">${esc(getNumberFormat().format(open))}</span>` : ''}
+          ${/* DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte
+                "1" am Gesicht las sich wie eine Benachrichtigung. Das Zeichen der
+                Aufgaben (wie in der Leiste) steht davor und sagt, was gezaehlt
+                ist; Name und Satz im Baum sagen es Screenreadern. */ ''}
+          ${open > 0 ? `<span class="family-member__count" aria-hidden="true"><i data-lucide="${MODULE_ICON.tasks}" class="family-member__count-icon"></i>${esc(getNumberFormat().format(open))}</span>` : ''}
         </span>
         <span class="family-member__short" aria-hidden="true">${esc(firstName)}</span>
         <span class="family-member__body">

@@ -1467,11 +1467,18 @@ test('die Uebersicht polstert am Desktop mit --page-inline-pad und kennt kein ei
  * Masthead auch neben der Karte, der Wand-Modus im Anpassen-Menue. */
 test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bleiben im Baum', async () => {
   const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   const html = __test.renderFamilyWidget([ALEX, LEO, LINDA], { memberTodayTasks: [{ user_id: 1, open_count: 2 }] });
-  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true">2<\/span>/,
-    'die Zahl offener Aufgaben steht als Marke am Gesicht');
-  assert.equal((html.match(/family-member__count/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
+  // DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte "1" am
+  // Gesicht las sich wie eine Benachrichtigung - eins wovon? Vor der Zahl
+  // steht das Zeichen der Aufgaben (MODULE_ICON.tasks), dasselbe wie in der
+  // Leiste; die Zahl allein sagte nichts.
+  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true"><i data-lucide="check-square" class="family-member__count-icon"><\/i>2<\/span>/,
+    'die Zahl offener Aufgaben steht als Marke am Gesicht, mit dem Aufgaben-Zeichen als Einheit');
+  const badge = [...eachRule(css)].filter((r) => r.selector.trim() === '.family-member__count-icon');
+  assert.ok(badge.some((r) => /inline-size:\s*var\(--icon-sm\)/.test(r.body)), 'das Zeichen hat die Groesse eines Inline-Markers');
+  assert.equal((html.match(/family-member__count"/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
   assert.match(html, /<span class="family-member__short" aria-hidden="true">Alex<\/span>/, 'der Vorname unter dem Gesicht');
   assert.match(html, /<span class="family-member__name">Alex<\/span>/, 'der volle Name bleibt der Name fuer Screenreader');
   const phone = css.slice(css.indexOf('MOBIL IST DIE FAMILIE EINE AVATAR-REIHE'));

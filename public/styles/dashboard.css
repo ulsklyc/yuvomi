@@ -4376,13 +4376,17 @@ button.today-cockpit__more--link {
     white-space: nowrap;
   }
 
+  /* Mit dem Zeichen davor ist die Marke breiter als eine Ziffer: sie haengt
+   * deshalb ueber die Kante hinaus und deckt vom Gesicht nur den Rand, nicht
+   * die Initialen (Critique R21). */
   .family-member__count {
     position: absolute;
     inset-block-start: calc(-1 * var(--space-1));
-    inset-inline-end: calc(-1 * var(--space-1));
+    inset-inline-start: calc(100% - var(--space-2));
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: var(--space-px);
     min-inline-size: var(--space-5);
     block-size: var(--space-5);
     padding-inline: var(--space-1);
@@ -4394,6 +4398,13 @@ button.today-cockpit__more--link {
     font-weight: var(--font-weight-bold);
     font-variant-numeric: tabular-nums;
     line-height: 1;
+  }
+
+  /* Die Einheit der Marke: das Aufgaben-Zeichen vor der Zahl (Critique R21). */
+  .family-member__count-icon {
+    inline-size: var(--icon-sm);
+    block-size: var(--icon-sm);
+    flex: none;
   }
 
   .family-member--more {
