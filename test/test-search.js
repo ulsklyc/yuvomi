@@ -330,6 +330,28 @@ test('ohne kommenden Termin bleibt der Treffer die Stammzeile; ein Einzeltermin 
   assert(einmal.start_datetime === '1999-06-01T09:00:00', `Einzeltermin: ${einmal.start_datetime}`);
 });
 
+test('globale Suche: kommende Termine vorn, vergangene dahinter, der juengste zuerst (Critique R21)', () => {
+  // Die Palette reihte aufsteigend nach Start: der Termin vom letzten Jahr
+  // stand vor dem von naechster Woche.
+  const ins = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+                          VALUES (?, ?, 0, NULL, ?)`);
+  ins.run('Alt Qzxdentist', '2025-03-10T09:00:00', uid);
+  ins.run('Kuerzlich Qzxdentist', '2026-09-20T09:00:00', uid);
+  ins.run('Bald Qzxdentist', '2026-10-09T09:00:00', uid);
+  ins.run('Spaeter Qzxdentist', '2027-01-15T09:00:00', uid);
+  // Heute frueh liegt der Termin vor "jetzt", aber auf dem heutigen Tag: er gilt als kommend.
+  ins.run('Heute Qzxdentist', '2026-10-02T08:00:00', uid);
+  const titel = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxdentist', uid).events.map((e) => e.title.split(' ')[0]));
+  assert(JSON.stringify(titel) === JSON.stringify(['Heute', 'Bald', 'Spaeter', 'Kuerzlich', 'Alt']),
+    `Reihenfolge: ${titel.join(', ')}`);
+  // Die Grenze ist der Tag der HAUSHALTSZONE: in Los Angeles ist um 03:00 UTC
+  // am 3. noch der 2. - "Heute" bleibt vorn; in UTC ist er gestern.
+  const la = mitUhr('2026-10-03T03:00:00Z', 'America/Los_Angeles', () => runSearch(db, 'Qzxdentist', uid).events[0].title);
+  const utc = mitUhr('2026-10-03T03:00:00Z', 'UTC', () => runSearch(db, 'Qzxdentist', uid).events.map((e) => e.title.split(' ')[0]));
+  assert(la.startsWith('Heute'), `Los Angeles: ${la}`);
+  assert(utc[0] === 'Bald' && utc[utc.length - 3] === 'Heute', `UTC: ${utc.join(', ')}`);
+});
+
 test('globale Suche löst große Anhänge auf, ohne attachment_data zu lesen', () => {
   const largeAttachment = 'A'.repeat(1024 * 1024);
   const masterId = db.prepare(`

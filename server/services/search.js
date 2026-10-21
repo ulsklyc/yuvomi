@@ -15,7 +15,7 @@ import {
 } from './calendar-events.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notBirthdayEventSql } from './household-modules.js';
-import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
+import { householdTimeZone, shiftDateKey, storedToInstantMs, todayKey } from '../utils/timezone.js';
 
 export const SEARCH_LIMIT = 5;
 // Wie viele Termin-Treffer AUFGELOEST werden, bevor die fuenf fruehesten
@@ -26,6 +26,9 @@ export const SEARCH_LIMIT = 5;
 // die Expansion klein; die Kalendersuche loest mit derselben Funktion hundert
 // Zeilen auf.
 const EVENT_SEARCH_CANDIDATES = 50;
+// Ein Einzeltermin, dessen Tag vor heute liegt (Kandidatenfolge der globalen
+// Suche; Serien zaehlen nie dazu - ihr naechster Termin kann kommen).
+const PAST_SINGLE_EVENT_SQL = "(e.recurrence_rule IS NULL AND substr(e.start_datetime, 1, 10) < @from)";
 
 /**
  * Erzeugt die ß↔ss-Schreibvarianten eines Tokens. Der FTS-Tokenizer faltet
@@ -347,6 +350,29 @@ export function resolveEventSearchRows(database, rows, from = null, to = null, o
 }
 
 /**
+ * KOMMENDES ZUERST, VERGANGENES DAHINTER (Critique R21, Palette). Die globale
+ * Suche reihte Termine aufsteigend nach Start - wer "Zahnarzt" tippte, sah den
+ * Termin vom letzten Jahr vor dem naechste Woche. Jetzt stehen die Termine ab
+ * heute (Haushaltstag, `eventSearchWindow`) aufsteigend vorn, die vergangenen
+ * danach, der juengste zuerst. Gemessen wird der Zeitpunkt in der
+ * Haushaltszone (`storedToInstantMs`), nie der Datumsteil des Texts: ein Wert
+ * mit `Z` kurz vor Mitternacht laege sonst am falschen Tag.
+ * @param {Array<{start_datetime: string}>} rows  aufsteigend nach Start
+ * @param {number} fromMs  Beginn des heutigen Haushaltstags
+ * @param {string} zone    Haushaltszone
+ */
+export function upcomingEventsFirst(rows, fromMs, zone) {
+  const upcoming = [];
+  const past = [];
+  for (const row of rows) {
+    const ms = storedToInstantMs(row.start_datetime, zone);
+    if (ms !== null && fromMs !== null && ms < fromMs) past.push(row);
+    else upcoming.push(row);
+  }
+  return [...upcoming, ...past.reverse()];
+}
+
+/**
  * Führt die Suche aus und liefert dieselbe Ergebnis-Form wie zuvor, erweitert
  * um Gesundheitsdaten: { tasks, events, notes, contacts, items, meds, activities }.
  * Pro Entität wird der FTS-Treffer auf die Quelltabelle zurückgejoined,
@@ -407,7 +433,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   if (allows('events')) {
     // Serien stehen an ihrem naechsten Termin, wie in der Kalendersuche (#1607).
     const window = eventSearchWindow(database);
-    const eventRows = resolveEventSearchRows(database, database.prepare(`
+    const eventCandidates = resolveEventSearchRows(database, database.prepare(`
       SELECT ${eventProjectionSql(database)}
       FROM search_index s
       JOIN calendar_events e ON e.id = s.entity_id
@@ -417,10 +443,18 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
           // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
           // Schalter `birthdays` - wie in der Kalendersuche (#1660).
           disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
-      ORDER BY e.start_datetime ASC
+      ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
+               CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
+               e.start_datetime DESC
       LIMIT @limit
-    `).all({ match, userId, limit: EVENT_SEARCH_CANDIDATES }), window.from, window.to, { lightweight: true })
-      // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start.
+    `).all({ match, userId, from: window.from, limit: EVENT_SEARCH_CANDIDATES }), window.from, window.to, { lightweight: true });
+    // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start; vorn steht,
+    // was ab heute kommt, danach das Vergangene (upcomingEventsFirst). Die
+    // Kandidaten holt die Abfrage schon in dieser Folge, damit fuenfzig alte
+    // Einzeltermine den kommenden nicht aus dem Fenster draengen - dort genuegt
+    // der Datumsteil, die genaue Grenze zieht upcomingEventsFirst.
+    const zone = householdTimeZone(database);
+    const eventRows = upcomingEventsFirst(eventCandidates, storedToInstantMs(window.from, zone), zone)
       .slice(0, limit);
     // Preserve the compact global-search payload. The resolver-capable
     // projection supplies linked inheritance without loading attachment bodies
