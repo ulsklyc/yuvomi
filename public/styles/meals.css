@@ -202,7 +202,6 @@
 }
 
 .day-header__date {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 

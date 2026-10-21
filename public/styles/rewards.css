@@ -214,7 +214,7 @@
   color: var(--color-text-primary);
   transition: color var(--transition-fast);
 }
-.rw-standing__points { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.rw-standing__points { color: var(--color-text-secondary); }
 /* Der Punktestand ist die Hauptaussage seiner Zeile und trägt Label-Farbe: der
  * Modulton sagte hier „Belohnungen" auf einer Seite, deren Titel und Siegel das
  * schon beantwortet haben (Herkunfts-Regel). Was die Zahl auszeichnet, ist ihr

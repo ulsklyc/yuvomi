@@ -2206,7 +2206,6 @@ button.health-med-card:hover {
 }
 
 .health-overview__stat-label {
-  font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
 
