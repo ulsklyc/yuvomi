@@ -153,6 +153,28 @@ test('(1) kein Modul rechnet die Kapselzone ein zweites Mal in sein Bodenpolster
     'die Kapselzone steht schon im Shell-Nachlauf - ein Modul polstert nur sein eigenes Ende (z.B. var(--space-6))');
 });
 
+/* DIE SAFE-AREA STEHT SCHON IN DER ZONE (Critique R21, a1). `--nav-bottom-height`
+ * (tokens.css) traegt `--safe-area-inset-bottom` als Summanden. Der Toast-Stapel
+ * (.shell-bottom-stack) rechnete ihn ein zweites Mal dazu: auf einem Telefon
+ * mit 34px Home-Indikator stand der Toast 58 statt 24px ueber der Kapsel. Keine
+ * Rechnung darf die Zone UND den Inset zugleich enthalten. */
+test('(1) wer mit der Kapselzone rechnet, rechnet den Home-Indikator nicht ein zweites Mal', () => {
+  const tokens = read('../public/styles/tokens.css');
+  const zone = tokens.match(/--nav-bottom-height:\s*([^;]+);/);
+  assert.match(zone?.[1] ?? '', /var\(--safe-area-inset-bottom\)/, 'Vorbedingung: die Zone enthaelt den Inset');
+  const offenders = [];
+  for (const { file, css } of sheets) {
+    for (const r of rules(css)) {
+      for (const d of r.body.split(';')) {
+        if (d.includes('var(--nav-bottom-height)') && d.includes('var(--safe-area-inset-bottom)')) {
+          offenders.push(`${file}: ${r.selector.trim()} { ${d.trim().replace(/\s+/g, ' ')} }`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], '--nav-bottom-height enthaelt --safe-area-inset-bottom schon');
+});
+
 test('(3) nichts im Inhalt klebt mit bottom: 0 an der Unterkante - dort liegt die Kapsel', () => {
   const offenders = [];
   for (const { file, css } of sheets) {

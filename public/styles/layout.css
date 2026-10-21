@@ -9467,7 +9467,10 @@ textarea::placeholder {
  * -------------------------------------------------------- */
 .shell-bottom-stack {
   position: fixed;
-  bottom: calc(var(--nav-bottom-height) + var(--safe-area-inset-bottom) + var(--space-4));
+  /* `--nav-bottom-height` traegt den Home-Indikator schon (tokens.css). Er stand
+   * hier ein zweites Mal: mit 34px Inset 58 statt 24px Luft zur Kapsel
+   * (Critique R21, test:mobile-chrome). */
+  bottom: calc(var(--nav-bottom-height) + var(--space-4));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -9542,7 +9545,7 @@ html:has(.app-page.is-selecting) {
  * Abstand wie auf dem Telefon, nur ohne dessen FAB-Nachlauf. */
 @media (min-width: 768px) and (max-width: 1023px) {
   .shell-bottom-stack {
-    bottom: calc(var(--nav-bottom-height) + var(--safe-area-inset-bottom) + var(--space-4));
+    bottom: calc(var(--nav-bottom-height) + var(--space-4));
   }
 }
 

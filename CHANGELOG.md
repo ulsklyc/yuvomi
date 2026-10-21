@@ -128,6 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Document previews no longer show a thin sliver next to each picture.** The file icon behind a
   loaded preview stayed on screen as a narrow strip beside it. Anything the app hides is now hidden
   everywhere, by one rule instead of one per element.
+- **Messages sit just above the tab bar on phones with a home indicator.** The space for the
+  indicator was counted twice, so a message floated about 34 px higher than on other phones.
 - **Sheets and glass controls settle sooner.** Their springy entrance kept them slightly past their
   resting place for most of the movement. In current browsers it now moves like a real spring: the
   same small overshoot and the same duration, but it comes to rest after about half the time.

@@ -1152,6 +1152,9 @@ das Verhaeltnis haelt.
   safe-area; die Bar-Zone selbst ist transparent, das Glas traegt die Kapsel), die UEBER dem
   Inhalt liegt - der Scrollport reicht bis zur Unterkante (Kopfregel mobil). Ab 1024px
   Glas-Sidebar (56px kollabiert / 220px expandiert) mit gleitender Aktiv-Pille.
+  `--nav-bottom-height` enthaelt den Home-Indikator schon; wer mit der Zone rechnet, addiert
+  `--safe-area-inset-bottom` nie ein zweites Mal (Toast-Stapel bis R21: 58 statt 24px Luft,
+  `test:mobile-chrome`).
 - **Touch-Targets:** `--target-base` 44px auf Zeigergeraeten, waechst via
   `@media (hover: none)` auf 48px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite;
   die 44pt der iOS-HIG sind ein Minimum, kein Ziel.
