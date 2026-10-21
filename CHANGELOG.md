@@ -91,7 +91,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The numbers on the faces in the Overview's family card say what they count.** On a phone, a
   bare "1" next to a face read like a notification. The badge now starts with the tasks symbol,
-  and it sits at the edge of the face so the initials stay readable.
+  and it sits at the edge of the face so the initials stay readable. With six or more people it
+  moves onto the top of the face instead of covering the next one, and when only some of the
+  family share the next event, the shortened list of names leaves room for the event itself.
 
 - **Red in the budget means something needs doing.** The statistics showed seven red amounts
   for categories that simply cost a little more than last month - "+25.00 €" while 25 of 80 € were

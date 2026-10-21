@@ -4354,16 +4354,30 @@ button.today-cockpit__more--link {
     max-inline-size: 100%;
   }
 
-  .family-member--shared .family-member__name {
+  /* NICHT ZWEIMAL VOLLE BREITE (R21 S7). Teilt nur ein Teil der Familie den
+   * Termin, steht hier statt "Alle" die Namensliste - bei sechs Personen 391px
+   * in einer 332px-Zeile: sie schob den Termin ganz hinaus und endete
+   * abgeschnitten ohne Ellipse ("... und Linda Joh"). Die Liste kuerzt mit
+   * Ellipse, der Termin daneben bleibt lesbar - er ist die Nachricht, die
+   * Namen sind ihr Absender. */
+  .family-member--shared .family-member__status {
     flex: 0 0 auto;
+    max-inline-size: 60%;
+  }
+
+  .family-member--shared .family-member__name {
+    flex: 0 1 auto;
+    min-inline-size: 0;
     color: var(--color-text-secondary);
     font-size: var(--type-caption);
     font-weight: var(--font-weight-regular);
   }
 
-  .family-member--shared .family-member__name::after {
+  /* Der Trenner steht vor dem Termin, nicht hinter dem Namen: dort kuerzte
+   * ihn die Ellipse mit weg. */
+  .family-member--shared .family-member__status::before {
     content: "·" / "";
-    margin-inline-start: var(--space-1);
+    margin-inline-end: var(--space-1);
   }
 
   .family-member__short {
@@ -4405,6 +4419,26 @@ button.today-cockpit__more--link {
     inline-size: var(--icon-sm);
     block-size: var(--icon-sm);
     flex: none;
+  }
+
+  /* AB SECHS GESICHTERN HAENGT DIE MARKE NICHT MEHR HINAUS (R21 S7). Die Zelle
+   * einer Person ist dann 52px breit, 14px breiter als ihr Gesicht; die 33px
+   * breite Marke ragte 25px ueber die Kante und lag 7x16px auf dem naechsten
+   * Gesicht (gemessen 390px, drei Mal). In einer engen Zelle sitzt sie deshalb
+   * auf der oberen Ecke des eigenen Gesichts, hoch genug, dass sie die
+   * Initialen nicht beruehrt (die beginnen 11px unter der Oberkante). Die
+   * Schwelle ist die Zellbreite, ab der der Ueberhang in die Luecke passt:
+   * Gesicht + 25px Ueberhang + 4px Luecke - 4px (die Haelfte steht schon frei). */
+  .family-member:not(.family-member--more, .family-member--shared) {
+    container: family-member / inline-size;
+  }
+
+  @container family-member (max-width: 58px) {
+    .family-member__count {
+      inset-block-start: calc(-1 * var(--space-3));
+      inset-inline-start: auto;
+      inset-inline-end: calc(-1 * var(--space-1));
+    }
   }
 
   .family-member--more {

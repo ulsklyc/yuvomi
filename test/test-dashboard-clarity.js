@@ -1491,6 +1491,29 @@ test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bl
   assert.match(block, /\.family-widget__footer \{\s*display:\s*none/, 'die Tagesbilanz steht in den Marken');
 });
 
+test('R21 S7 mobil: ab sechs Gesichtern liegt keine Marke auf dem Nachbarn, der gemeinsame Termin bleibt lesbar', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  // Gemessen 390px mit sechs Personen: Zelle 52px, die 33px-Marke ragte 25px
+  // hinaus und lag dreimal 7x16px auf dem naechsten Gesicht.
+  const cell = rules.find((r) => /\.family-member:not\(\.family-member--more, \.family-member--shared\)/.test(r.selector)
+    && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.ok(cell && /container:\s*family-member \/ inline-size/.test(cell.body), 'jede Person ist ihr eigener Container');
+  const narrow = rules.find((r) => r.selector.trim() === '.family-member__count' && r.at.some((a) => /@container family-member \(max-width: \d+px\)/.test(a)));
+  assert.ok(narrow, 'in der engen Zelle eine eigene Lage fuer die Marke');
+  assert.match(narrow.body, /inset-inline-start:\s*auto/, 'eng haengt sie nicht ueber die Kante hinaus');
+  assert.match(narrow.body, /inset-inline-end:\s*calc\(-1 \* var\(--space-1\)\)/);
+  // Teilt nur ein Teil der Familie den Termin, stehen die Namen statt "Alle":
+  // sie kuerzen, der Termin nicht.
+  const name = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__name');
+  assert.match(name.body, /flex:\s*0 1 auto/, 'die Namensliste darf schrumpfen');
+  assert.match(name.body, /min-inline-size:\s*0/);
+  const status = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__status');
+  assert.ok(status && /flex:\s*0 0 auto/.test(status.body), 'der Termin behaelt seine Breite');
+});
+
 test('R19 mobil: die Wetterzeile steht im Masthead auch neben der Karte, breit schliessen sich beide aus', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
