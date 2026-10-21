@@ -2331,6 +2331,7 @@ function openVitalModal(opts = {}) {
     : nowDateTimeValue(now);
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
     size: 'md',
     // Aus dem mobilen Detailblatt geoeffnet, fuehrt das Schliessen dorthin
@@ -3797,6 +3798,7 @@ function openMedModal(med) {
     .some((v) => v != null && String(v).trim() !== '');
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
     size: 'md',
     content: `
@@ -4572,6 +4574,7 @@ function openLabModal(report) {
     : todayKey();
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.labs.edit') : t('health.labs.add'),
     size: 'md',
     content: `
@@ -5251,6 +5254,7 @@ function openActivityModal(row, opts = {}) {
     : nowDateTimeValue(new Date());
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
     size: 'md',
     content: `
@@ -5739,6 +5743,7 @@ function openPreventionModal(row) {
     </div>`;
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.prevention.edit') : t('health.prevention.add'),
     size: 'md',
     content: `
@@ -6282,6 +6287,7 @@ function openNutritionModal(row) {
   const visibility = row?.visibility || defaultNutritionVisibility();
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.nutrition.edit') : t('health.nutrition.add'),
     size: 'md',
     content: `
@@ -9152,6 +9158,7 @@ function openPeriodModal(period) {
   const endVal = isEdit && period.end_date ? String(period.end_date).slice(0, 10) : '';
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.cycle.period.edit') : t('health.cycle.period.add'),
     size: 'sm',
     content: `

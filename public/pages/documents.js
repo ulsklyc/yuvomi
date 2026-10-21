@@ -2678,6 +2678,7 @@ function openDocumentModal(doc = null) {
         </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('documents.editTitle') : t('documents.newTitle'),
     size: 'lg',
     content: `

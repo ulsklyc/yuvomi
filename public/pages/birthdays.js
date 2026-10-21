@@ -898,6 +898,7 @@ function openBirthdayModal({ mode, birthday = null }) {
   const today = todayKey();
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('birthdays.editTitle') : t('birthdays.newTitle'),
     content: `
       <div class="birthday-modal">

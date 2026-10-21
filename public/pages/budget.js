@@ -3009,6 +3009,7 @@ function openAccountModal(account = null) {
     </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editAccount') : t('budget.newAccount'),
     content,
     size: 'sm',
@@ -4369,6 +4370,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
     </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editEntry') : t('budget.newEntry'),
     content,
     // Dieselbe Breite wie die anderen Formulardialoge (Kalender, Kontakte):
@@ -5689,6 +5691,7 @@ function openLoanModal(loan = null) {
     </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editLoan') : t('budget.newLoan'),
     content,
     // 520 statt 400 (R17, E6): achtzehn Felder, darunter Zweierreihen - im

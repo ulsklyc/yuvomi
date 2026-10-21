@@ -1178,6 +1178,7 @@ function openBonusModal() {
   const members = enrolledMembers();
   if (!members.length) { confirmModal(t('rewards.emptyOverviewAdmin'), { confirmLabel: t('rewards.gotIt') }); return; }
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('rewards.grantBonus'),
     content: `
       <form id="rw-bonus-form" novalidate>
@@ -1235,6 +1236,7 @@ function openRewardModal(item) {
   if (readOnly()) return;
   const isEdit = !!item;
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('rewards.editReward') : t('rewards.addReward'),
     content: `
       <form id="rw-reward-form" novalidate>

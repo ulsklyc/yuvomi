@@ -2045,6 +2045,7 @@ function openMealModal(opts) {
   const content = buildModalContent(opts);
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('meals.editMeal') : t('meals.addMealTitle'),
     content,
     size: 'md',

@@ -2130,6 +2130,7 @@ function openExpenseModal(expense = null, prefill = null) {
   const today = todayKey();
   const methodOption = (value, label) => `<option value="${value}" ${value === method ? 'selected' : ''}>${label}</option>`;
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('splitExpenses.editExpense') : t('splitExpenses.addExpense'),
     content: `
       <form id="split-expense-form" class="split-form">

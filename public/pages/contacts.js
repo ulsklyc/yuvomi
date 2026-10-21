@@ -1383,7 +1383,8 @@ async function openContactModal({ mode, contact = null }) {
   if (mode === 'edit') contact = await fetchFullContact(contact);
   if (!isModalContextCurrent(context)) return;
   const form = buildContactForm({ mode, contact });
-  openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire });
+  // Anlegen: Buehne zuerst, Felder nach dem ersten Bild (modal.js `staged`, R21 a6).
+  openSharedModal({ title: form.title, content: form.content, size: 'md', onSave: form.wire, staged: mode === 'create' });
 }
 
 /**

@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The add sheet answers your tap right away.** Tapping + to add a task, event, note, contact,
+  birthday, entry or any other item first dims the page and then slides the form in once it is
+  ready, with its full spring. On a slow phone the tap used to wait for the whole form: measured
+  with a four times slower processor, the screen answered after 104-176 ms; now the page dims
+  after about 70 ms and the sheet follows a frame later.
+
 - **Two rows of documents fit on a laptop screen.** Each card's preview showed the whole page in
   a tall frame, so the second row stood half below the edge. The frame is square now and the
   page still shows whole inside it; a card is about 60 pixels shorter.

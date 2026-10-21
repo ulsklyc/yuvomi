@@ -8,7 +8,9 @@
  *
  * API:
  *   openModal({ title, content, onSave, onDelete, onClose, size,
- *               initialFocus, headerAction }) → void
+ *               initialFocus, headerAction, staged }) → void
+ *               (`staged`: Buehne zuerst, Formular nach dem ersten Bild;
+ *               `content` darf dann eine Funktion sein - siehe _canStage)
  *   closeModal({ force }) → Promise<void>
  *   confirmModal(message, opts) → Promise<boolean>       (ersetzt ein offenes Modal)
  *   confirmOverModal(message, opts) → Promise<boolean>   (parkt es und gibt es zurück)
@@ -1952,14 +1954,77 @@ function _dockOverlay(overlay, dock) {
   };
 }
 
+/**
+ * DAS ERSTE BLATT IN ZWEI FRAMES: ERST DIE BUEHNE, DANN DIE FELDER (Critique
+ * R21, a6 P3 "Erstes Blatt kalt").
+ *
+ * Gemessen am Telefon (390px, 4x CPU, Seed): FAB -> "Neue Aufgabe" kostete
+ * einen Handler von 95-105 ms und eine INP von 152-176 ms; das erste Bild kam
+ * erst, als Formular, Datumsfelder und Verdrahtung fertig waren. Davon waren
+ * rund 60 ms Stil und Layout, die `showModal()` und das Lesen von
+ * `innerWidth` mitten im Aufbau erzwangen, der Rest das Formular selbst.
+ *
+ * `staged: true` teilt das Oeffnen: im Tipp steht nur die Buehne - Dialog in
+ * der Top-Layer, Abdunklung, Kopf -, die Tafel bleibt unsichtbar und ohne
+ * Einfahrt (`.modal-panel--pending`, layout.css). Nach dem ersten Bild kommen
+ * Formular, Fusszeile, Fokus, Dirty-Basis und `onSave`, und erst dann faehrt
+ * die Tafel ein - mit ihrer ganzen Feder, weil keine Arbeit mehr in ihre
+ * ersten Frames faellt. Eine leere Tafel, die waechst, zeigt sich nie.
+ *
+ * Nur fuer Aufrufer, die nach `openModal()` nicht synchron ins Formular
+ * greifen (alles Verdrahten steht in `onSave`): die FAB-Blaetter der Module.
+ * `content` darf dann eine Funktion sein, die das Markup erst im zweiten
+ * Schritt baut. Ersetzt der Aufruf ein offenes Modal (Leseansicht ->
+ * Bearbeiten) oder fehlt `requestAnimationFrame` / ist das Dokument verborgen,
+ * laeuft alles wie immer in einem Schritt.
+ */
+function _canStage() {
+  return typeof requestAnimationFrame === 'function' && typeof setTimeout === 'function'
+    && typeof document !== 'undefined' && document.visibilityState !== 'hidden';
+}
+
+/** Netz, falls nie ein Frame kommt: dann fuellt der Timer, wie frueher in einem Schritt. */
+const STAGE_FALLBACK_MS = 120;
+
+/**
+ * Laeuft nach dem naechsten Bild: rAF liegt vor dem Malen, die Aufgabe danach
+ * dahinter. `scheduler.postTask` (user-blocking) zieht sie vor andere wartende
+ * Aufgaben; ohne Scheduler-API (Safari, aeltere Browser) setTimeout 0.
+ * @param {() => void} fn
+ */
+function _afterNextPaint(fn) {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  requestAnimationFrame(() => {
+    const sched = typeof window !== 'undefined' ? window.scheduler : null;
+    if (sched && typeof sched.postTask === 'function') {
+      sched.postTask(run, { priority: 'user-blocking' }).catch(() => run());
+    } else {
+      setTimeout(run, 0);
+    }
+  });
+  setTimeout(run, STAGE_FALLBACK_MS);
+}
+
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
   initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
-  pointerDeadTime = false,
+  pointerDeadTime = false, staged = false,
 } = {}) {
   // Die Anmeldung gilt diesem Aufruf - auch wenn er gleich ein voriges Modal
   // ablöst, und auch wenn die Spalte nicht (mehr) steht.
   const dock = _takeDockIntent();
+
+  // VOR JEDER DOM-AENDERUNG LESEN. `innerWidth` nach dem Scroll-Lock und dem
+  // Einfuegen erzwang eine Stilberechnung des ganzen Dokuments (gemessen 4x
+  // CPU: 13-16 ms mitten im Tipp) - die Breite ist vorher dieselbe.
+  const narrow = window.innerWidth < 768;
+  // Zwei Schritte nur, wenn kein Modal abgeloest wird (siehe _canStage).
+  const stage = Boolean(staged) && !activeOverlay && _canStage();
 
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
@@ -1985,9 +2050,10 @@ export function openModal({
     ? `<button type="button" class="modal-panel__action" id="${esc(headerAction.id ?? 'modal-header-action')}">${esc(headerAction.label)}</button>`
     : '';
 
+  const markup = () => (typeof content === 'function' ? content() : content);
   const html = `
     <dialog class="modal-overlay" id="shared-modal-overlay" aria-labelledby="shared-modal-title">
-      <div class="modal-panel${sizeClass}">
+      <div class="modal-panel${sizeClass}${stage ? ' modal-panel--pending' : ''}">
         <div class="modal-panel__header">
           <h2 class="modal-panel__title" id="shared-modal-title">${esc(title)}</h2>
           <div class="modal-panel__header-actions">
@@ -1998,7 +2064,7 @@ export function openModal({
           </div>
         </div>
         <div class="modal-panel__body">
-          ${content}
+          ${stage ? '' : markup()}
         </div>
       </div>
     </dialog>`;
@@ -2028,7 +2094,7 @@ export function openModal({
   // Focus-Trap
   const panel = activeOverlay.querySelector('.modal-panel');
 
-  mountFooter(panel);
+  if (!stage) mountFooter(panel);
 
   // IN DIE TOP-LAYER, BEVOR DER ERSTFOKUS GEPLANT WIRD (D7). `showModal()`
   // fokussiert synchron das erste Bedienelement (das Schliessen-X); trapFocus
@@ -2051,7 +2117,7 @@ export function openModal({
     actionBtn.addEventListener('click', () => actionBtn._onAction?.());
   }
 
-  trapFocus(panel, initialFocus);
+  if (!stage) trapFocus(panel, initialFocus);
 
   // Snapshot für Dirty-Check: sofort den Ist-Zustand aufnehmen (meist die
   // leeren Vorgabewerte), sonst wertet der Dirty-Guard ein schnelles
@@ -2069,7 +2135,7 @@ export function openModal({
   _initialFormTimeout = setTimeout(_snapshotNow, 150);
 
   // Swipe-to-Close auf Mobile
-  if (window.innerWidth < 768) {
+  if (narrow) {
     _wireSheetSwipe(panel);
   }
 
@@ -2107,7 +2173,38 @@ export function openModal({
   _wireAdvancedReveal(panel);
 
   // Callback für Aufrufer
-  if (typeof onSave === 'function') onSave(panel);
+  if (!stage && typeof onSave === 'function') onSave(panel);
+
+  // Gestuft: Formular, Fusszeile, Fokus, Dirty-Basis und `onSave` nach dem
+  // ersten Bild, in derselben Reihenfolge wie oben - dann faehrt die Tafel ein.
+  // Ist der Dialog bis dahin zu oder abgeloest, bleibt es bei der Buehne.
+  if (stage) {
+    const overlay = activeOverlay;
+    _afterNextPaint(() => {
+      if (overlay !== activeOverlay || !overlay.isConnected || modalState !== 'open') return;
+      const body = panel.querySelector('.modal-panel__body');
+      body.insertAdjacentHTML('beforeend', markup());
+      if (window.lucide) window.lucide.createIcons({ el: body });
+      mountFooter(panel);
+      trapFocus(panel, 'none');
+      if (_initialFormTimeout) clearTimeout(_initialFormTimeout);
+      _snapshotNow();
+      _initialFormTimeout = setTimeout(_snapshotNow, 150);
+      // Sichtbar VOR `onSave`: wer dort selbst fokussiert, braucht eine Tafel,
+      // die Fokus annimmt. Gemalt wird ohnehin erst nach dieser Aufgabe.
+      panel.classList.remove('modal-panel--pending');
+      // Der Erstfokus kommt hier sofort, nicht 50 ms spaeter: seit dem Tipp
+      // konnte ihn niemand waehlen (die Tafel war unsichtbar), und ein spaeter
+      // Fokus erzwang Stil und Layout mitten in der Einfahrt. Was `onSave`
+      // selbst fokussiert, gilt als Wahl und bleibt (_focusInitialUnlessClaimed).
+      const planned = document.activeElement;
+      const target = initialFocus === 'none' ? null
+        : initialFocus && typeof initialFocus.focus === 'function' ? initialFocus
+          : panel.querySelector(FIRST_FIELD) ?? panel.querySelector(FOCUSABLE);
+      if (typeof onSave === 'function') onSave(panel);
+      if (target) _focusInitialUnlessClaimed(panel, target, planned);
+    });
+  }
 
   // Loading-State
   panel.addEventListener('submit', (e) => {

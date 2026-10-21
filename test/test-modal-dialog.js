@@ -104,8 +104,14 @@ function installDocument() {
   stackHome = makeNode('#app');
   stack = makeNode('.shell-bottom-stack');
   stackHome.append(stack);
-  body.insertAdjacentHTML = () => {
+  body.insertAdjacentHTML = (where, html) => {
     const panel = makeNode('.modal-panel');
+    // Der Rumpf nimmt beim gestuften Oeffnen (staged) das Formular auf.
+    const panelBody = makeNode('.modal-panel__body');
+    panelBody.inserted = [];
+    panelBody.insertAdjacentHTML = (pos, markup) => { panelBody.inserted.push(markup); };
+    panel.querySelector = (selector) => (selector === '.modal-panel__body' ? panelBody : null);
+    panel._body = panelBody;
     const overlay = makeNode('dialog.modal-overlay', { tag: 'DIALOG' });
     overlay.id = 'shared-modal-overlay';
     overlay.open = false;
@@ -125,6 +131,7 @@ function installDocument() {
       if (i !== -1) overlays.splice(i, 1);
     };
     overlay._panel = panel;
+    overlay._html = html;
     overlays.push(overlay);
   };
   const docListeners = [];
@@ -401,4 +408,162 @@ test('der gedockte Dialog zeigt mit einem Hauch, dass die Liste daneben gerade n
   assert.doesNotMatch(rule.body, /background-color:\s*transparent/, 'kein unsichtbarer Grund');
   assert.match(rule.body, /background-color:\s*color-mix\(in srgb, var\(--color-overlay-light\)/, 'der Hauch kommt aus dem Overlay-Token');
   assert.match(rule.body, /backdrop-filter:\s*none/, 'ohne Blur - die Spalte bleibt der Ort der Bearbeitung');
+});
+
+
+/**
+ * DAS ERSTE BLATT IN ZWEI FRAMES (Critique R21, a6 P3 "Erstes Blatt kalt").
+ * Gemessen 390px, 4x CPU: FAB -> "Neue Aufgabe" hielt den Tipp 95-105 ms, INP
+ * 152-176 ms, weil Formular, Datumsfelder und Verdrahtung VOR dem ersten Bild
+ * standen. `staged` legt im Tipp nur Dialog und Abdunklung in die Top-Layer;
+ * Formular, Fusszeile, Fokus und `onSave` kommen nach dem ersten Bild, und
+ * erst dann wird die Tafel sichtbar (`.modal-panel--pending`, layout.css).
+ */
+function withFrames(fn) {
+  return async () => {
+    const frames = [];
+    const saved = { raf: globalThis.requestAnimationFrame, vis: globalThis.document.visibilityState };
+    globalThis.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+    try {
+      await fn({
+        async paint() {
+          for (const cb of frames.splice(0)) cb(0);
+          await new Promise((r) => setTimeout(r, 0));
+        },
+      });
+    } finally {
+      if (saved.raf) globalThis.requestAnimationFrame = saved.raf; else delete globalThis.requestAnimationFrame;
+    }
+  };
+}
+
+test('staged: im Tipp steht nur die Buehne, Formular und onSave kommen nach dem ersten Bild', withFrames(async ({ paint }) => {
+  await fresh();
+  let built = 0;
+  let saved = 0;
+  openModal({
+    title: 'Neue Aufgabe',
+    staged: true,
+    content: () => { built += 1; return '<form id="probe-form"></form>'; },
+    onSave: () => { saved += 1; },
+  });
+  const overlay = overlays.at(-1);
+  assert.deepEqual(overlay.calls, ['showModal'], 'die Buehne (Top-Layer, Abdunklung) steht schon im Tipp');
+  assert.match(overlay._html, /class="modal-panel[^"]*\bmodal-panel--pending\b/, 'die leere Tafel bleibt bis zum Formular unsichtbar');
+  assert.doesNotMatch(overlay._html, /probe-form/, 'das Formular stand schon im ersten Bild');
+  assert.equal(built, 0, 'das Markup entstand im Tipp - das ist die Arbeit, die das erste Bild aufhielt');
+  assert.equal(saved, 0, 'onSave lief im Tipp');
+  await paint();
+  assert.equal(built, 1);
+  assert.deepEqual(overlay._panel._body.inserted, ['<form id="probe-form"></form>'], 'das Formular kommt in den Rumpf');
+  assert.equal(saved, 1, 'onSave lief nach dem ersten Bild nicht');
+  await closeModal({ force: true });
+}));
+
+test('staged: ohne Frames, mit offenem Modal oder verborgenem Dokument wie immer in einem Schritt', withFrames(async ({ paint }) => {
+  await fresh();
+  // Ein Modal, das ein offenes abloest (Leseansicht -> Bearbeiten), fuellt sofort:
+  // dazwischen stuende sonst ein Frame ohne Tafel.
+  open();
+  let saved = 0;
+  openModal({ title: 'Bearbeiten', staged: true, content: '<form></form>', onSave: () => { saved += 1; } });
+  assert.equal(saved, 1, 'die Abloesung eines offenen Modals wartete auf einen Frame');
+  await closeModal({ force: true });
+
+  await fresh();
+  globalThis.document.visibilityState = 'hidden';
+  saved = 0;
+  openModal({ title: 'Neu', staged: true, content: '<form></form>', onSave: () => { saved += 1; } });
+  assert.equal(saved, 1, 'ein verborgenes Dokument malt keinen Frame - das Formular bliebe aus');
+  delete globalThis.document.visibilityState;
+  await closeModal({ force: true });
+  await paint();
+}));
+
+test('staged: geht der Dialog vor dem ersten Bild zu, laeuft onSave nie', withFrames(async ({ paint }) => {
+  await fresh();
+  let saved = 0;
+  openModal({ title: 'Neu', staged: true, content: () => '<form></form>', onSave: () => { saved += 1; } });
+  await closeModal({ force: true });
+  await paint();
+  assert.equal(saved, 0, 'ein geschlossener Dialog wurde noch gefuellt');
+}));
+
+test('openModal liest die Breite vor dem Einfuegen - danach erzwaenge sie Stil und Layout', async () => {
+  await fresh();
+  const order = [];
+  const realInsert = globalThis.document.body.insertAdjacentHTML;
+  globalThis.document.body.insertAdjacentHTML = (...args) => { order.push('insert'); return realInsert(...args); };
+  globalThis.window = { get innerWidth() { order.push('innerWidth'); return 390; } };
+  try {
+    openModal({ title: 'Probe', content: '' });
+  } finally {
+    globalThis.window = { innerWidth: 1024 };
+  }
+  const firstInsert = order.indexOf('insert');
+  assert.ok(firstInsert > 0, 'die Probe sah kein Einfuegen');
+  assert.deepEqual(order.slice(firstInsert).filter((x) => x === 'innerWidth'), [],
+    'innerWidth nach dem Einfuegen (und dem Scroll-Lock): gemessen 13-16 ms Stilberechnung des ganzen Dokuments bei 4x CPU');
+  await closeModal({ force: true });
+});
+
+test('die wartende Tafel ist unsichtbar und faehrt erst ein, wenn das Formular steht', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const hidden = rules.find((r) => r.selector.trim() === '.modal-panel.modal-panel--pending');
+  assert.match(hidden?.body ?? '', /visibility:\s*hidden/, 'die leere Tafel waere im ersten Bild zu sehen und wuechse danach');
+  const still = rules.find((r) => r.selector.trim() === '.modal-panel.modal-panel--pending:not(.modal-panel--closing)');
+  assert.match(still?.body ?? '', /animation:\s*none/,
+    'die Einfahrt liefe schon unsichtbar ab - die Feder waere halb durch, wenn die Tafel erscheint');
+  // Die Einfahrt (glass.css, 0,2,0) verliert gegen die Wartende (0,3,0);
+  // der Ausgang (`--closing`) bleibt unberuehrt, damit animationend kommt.
+  assert.doesNotMatch(hidden.body, /animation/, 'der Ausgang einer nie gezeigten Tafel braucht sein animationend');
+});
+
+test('die FAB-Blaetter der Module oeffnen gestuft', async () => {
+  // Wer den Schalter nur im Test setzt, beweist nur, dass openModal ihn kennt.
+  const { readFileSync } = await import('node:fs');
+  const callers = [
+    ['tasks', 'openTaskModal', /staged:\s*!isEdit/],
+    ['calendar', 'openEventModal', /staged:\s*!isEdit/],
+    ['notes', 'openNoteModal', /staged:\s*!isEdit/],
+    ['contacts', 'openContactModal', /staged:\s*mode === 'create'/],
+    ['birthdays', 'openBirthdayModal', /staged:\s*!isEdit/],
+    ['budget', 'openBudgetModal', /staged:\s*!isEdit/],
+    ['budget', 'openAccountModal', /staged:\s*!isEdit/],
+    ['budget', 'openLoanModal', /staged:\s*!isEdit/],
+    ['budget-plans', 'openAddPlan', /staged:\s*true/],
+    ['subscriptions', 'openSubscriptionModal', /staged:\s*!edit/],
+    ['meals', 'openMealModal', /staged:\s*!isEdit/],
+    ['inventory', 'openItemModal', /staged:\s*mode === 'create'/],
+    ['pantry', 'openItemModal', /staged:\s*!isEdit/],
+    ['documents', 'openDocumentModal', /staged:\s*!isEdit/],
+    ['split-expenses', 'openExpenseModal', /staged:\s*!isEdit/],
+    ['recipes', 'openRecipeModal', /staged:\s*!isEdit/],
+    ['housekeeping', 'openTaskCreateModal', /staged:\s*true/],
+    ['rewards', 'openRewardModal', /staged:\s*!isEdit/],
+    ['rewards', 'openBonusModal', /staged:\s*true/],
+    ['schedule', 'openScheduleCreateModal', /staged:\s*true/],
+    ['waste', 'openTypeModal', /staged:\s*!isEdit/],
+    ['waste', 'openScheduleModal', /staged:\s*!isEdit/],
+    ['health', 'openVitalModal', /staged:\s*!isEdit/],
+    ['health', 'openMedModal', /staged:\s*!isEdit/],
+    ['health', 'openLabModal', /staged:\s*!isEdit/],
+    ['health', 'openActivityModal', /staged:\s*!isEdit/],
+    ['health', 'openPreventionModal', /staged:\s*!isEdit/],
+    ['health', 'openNutritionModal', /staged:\s*!isEdit/],
+    ['health', 'openPeriodModal', /staged:\s*!isEdit/],
+  ];
+  for (const [file, fn, expected] of callers) {
+    const src = readFileSync(new URL(`../public/pages/${file}.js`, import.meta.url), 'utf8');
+    const start = src.search(new RegExp(`(?:^|\\n)(?:export )?(?:async )?function ${fn}\\(`));
+    assert.ok(start >= 0, `${file}.js: ${fn} fehlt`);
+    const next = src.slice(start + 1).search(/\n(?:export )?(?:async )?function /);
+    const body = src.slice(start, next < 0 ? undefined : start + 1 + next);
+    const call = body.slice(body.search(/open(?:Shared)?Modal\(\{/));
+    const callText = call.slice(0, call.indexOf('\n  });') > 0 ? call.indexOf('\n  });') : call.indexOf(');') + 2);
+    assert.match(callText, expected, `${file}.js ${fn}: das Anlegen-Blatt oeffnet nicht gestuft (staged)`);
+  }
 });

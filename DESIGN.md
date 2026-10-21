@@ -1286,6 +1286,15 @@ das Verhaeltnis haelt.
   Vollhub). Der Vollhub ist entfallen, weil die Feder ihn nicht traegt: ueber die volle Hoehe
   wirft sie das Blatt sichtbar ueber seine Ruhelage. Geschlossen sind Mehr-Blatt und Suche
   durchsichtig, nehmen keinen Zeiger und sind `inert`.
+- **Das Anlegen-Blatt in zwei Frames (R21 S8):** die FAB-Blaetter der Module oeffnen gestuft
+  (`openModal({ staged: true })`): im Tipp stehen Dialog, Abdunklung und Kopf, die Tafel ist
+  unsichtbar und faehrt nicht ein (`.modal-panel--pending`); nach dem ersten Bild kommen
+  Formular, Fusszeile, Fokus und `onSave`, und erst dann beginnt die Einfahrt - mit der ganzen
+  Feder, weil keine Arbeit mehr in ihre ersten Frames faellt. Eine leere Tafel, die waechst, zeigt
+  sich nie. Gemessen 390px, 4x CPU, Aufgaben: INP 160 -> 72 ms, Abdunklung 135 -> 66 ms nach dem
+  Tipp, Tafel 135 -> 159 ms (ein Frame spaeter, dafuer ohne Luecke in der Feder). Gestuft nur fuer
+  Aufrufer, die nach `openModal()` nicht synchron ins Formular greifen; wer ein offenes Modal
+  abloest (Leseansicht -> Bearbeiten), fuellt sofort. Guard: `test:modal-dialog`.
 - **Menue-Ausgang:** Popover-Menues (`.popover-menu`, Dokument-Kontextmenue) blenden aus und
   nehmen die 4 % Wachstum zurueck (`overlay`/`display` diskret, `--duration-xs` gegen
   `--duration-md` der Einfahrt). Zwei `transition`-Deklarationen, die erste ohne

@@ -943,6 +943,7 @@ function openTaskCreateModal(content) {
             <small>${esc(templateLabel(template, 'area'))} · ${esc(t('housekeeping.everyDays', { days: template.frequency_days }))}</small>
           </button>`)).join('');
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('housekeeping.addTask'),
     size: 'md',
     content: `

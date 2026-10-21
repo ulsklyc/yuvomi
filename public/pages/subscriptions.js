@@ -1661,6 +1661,7 @@ export function openSubscriptionModal(subscription = null) {
     </form>
   `;
   openModal({
+    staged: !edit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: edit ? t('subscriptions.editTitle') : t('subscriptions.addTitle'),
     content,
     size: 'lg',

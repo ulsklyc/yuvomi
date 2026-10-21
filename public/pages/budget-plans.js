@@ -263,6 +263,7 @@ export function openAddPlan() {
   const optHtml = options.map((c) =>
     `<option value="${view.ctx.esc(c.key)}">${view.ctx.esc(view.ctx.categoryLabel(c))}</option>`).join('');
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: t('budget.planAddBudget'),
     content: `
       <div class="form-group">

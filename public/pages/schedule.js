@@ -2582,6 +2582,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('common.add')) + '</button></div></form>';
   }
   openModal({
+    staged: true, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title,
     size: 'md',
     content,

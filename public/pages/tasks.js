@@ -2323,7 +2323,10 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
   modalTags = normalizeTagList(task?.tags);
   openSharedModal({
     title: isEdit ? t('tasks.editTask') : t('tasks.newTask'),
-    content: renderModalContent({ task, users, reminder }),
+    // Erst die Buehne, dann das Formular (modal.js `staged`, Critique R21 a6):
+    // das Markup entsteht erst im zweiten Schritt.
+    content: () => renderModalContent({ task, users, reminder }),
+    staged: !isEdit,
     size: 'lg',
     // Eine neue Aufgabe startet weiterhin mit dem Fokus im Titelfeld - hier ist
     // Tippen die Absicht.

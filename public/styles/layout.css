@@ -6886,6 +6886,21 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   cursor: default;
 }
 
+/* DIE TAFEL WARTET EINEN FRAME AUF IHRE FELDER (Critique R21, a6 "Erstes
+ * Blatt kalt"; modal.js `staged`). Im Tipp stehen Dialog und Abdunklung, die
+ * Tafel ist noch leer - sie bleibt unsichtbar und faehrt nicht ein. Nach dem
+ * ersten Bild kommt das Formular, die Klasse geht, und die Einfahrt (glass.css)
+ * beginnt erst jetzt, also mit ihrer ganzen Feder. `:not(--closing)`: wird der
+ * Dialog vorher geschlossen, laeuft der Ausgang (und `animationend`) wie immer,
+ * nur unsichtbar. */
+.modal-panel.modal-panel--pending {
+  visibility: hidden;
+}
+
+.modal-panel.modal-panel--pending:not(.modal-panel--closing) {
+  animation: none;
+}
+
 @media (min-width: 768px) {
   .modal-panel {
     max-width: 520px;

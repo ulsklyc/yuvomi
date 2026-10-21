@@ -8342,6 +8342,8 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
   openSharedModal({
     title: isEdit ? t('calendar.editEvent') : t('calendar.newEvent'),
     content,
+    // Erst die Buehne, dann das Formular (modal.js `staged`, Critique R21 a6).
+    staged: !isEdit,
     size: 'md',
     // Ein neuer Termin startet weiterhin mit dem Fokus im Titelfeld: Hier ist
     // Tippen die Absicht, hier ist der Autofokus richtig.

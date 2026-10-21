@@ -1460,6 +1460,7 @@ function openItemModal(mode, item = null) {
     .join('');
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('common.editItem') : t('pantry.addItem'),
     size: 'md',
     content: `

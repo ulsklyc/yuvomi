@@ -982,6 +982,7 @@ function openNoteModal({ mode, note = null }) {
     </div>`;
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit && note.title && note.title.trim() ? note.title : (isEdit ? t('notes.viewNote') : t('notes.newNote')),
     content,
     // 'lg' statt 'md' (#826): eine Notiz ist fast nur Textflaeche und bekam

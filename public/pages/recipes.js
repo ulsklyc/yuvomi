@@ -1697,6 +1697,7 @@ function openRecipeModal(mode, recipe = null) {
   const isEdit = mode === 'edit';
 
   openSharedModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('recipes.editRecipe') : t('recipes.addRecipe'),
     size: 'md',
     content: `

@@ -2202,7 +2202,8 @@ function openItemModal(mode, item = null) {
   // „Bearbeiten" aus der Detailspalte.
   if (readOnly()) return;
   const form = buildItemForm({ mode, item });
-  openSharedModal({ title: form.title, size: 'md', content: form.content, onSave: form.wire });
+  // Anlegen: Buehne zuerst, Felder nach dem ersten Bild (modal.js `staged`, R21 a6).
+  openSharedModal({ title: form.title, size: 'md', content: form.content, onSave: form.wire, staged: mode === 'create' });
 }
 
 async function saveItem(panel, mode, item, attachments, pickedBooking, photoData) {

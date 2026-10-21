@@ -1176,6 +1176,7 @@ function openTypeModal(type = null) {
     </div>`;
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editType') : t('waste.newType'),
     content,
     // 520 statt 400: Loeschen, Archivieren, Abbrechen und Speichern brauchen
@@ -1457,6 +1458,7 @@ function openScheduleModal(type, schedule = null) {
     </div>`;
 
   openModal({
+    staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editSchedule') : t('waste.newSchedule'),
     content,
     size: 'sm',
