@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Recipe rows keep their actions in one More menu.** From a medium width up, every recipe row
+  showed edit, duplicate and a delete bin, and the detail column next to it offered the same three
+  again; on a wide screen the titles were cut to make room. The row now carries only its More
+  button at every width, with Delete as its last, red entry.
+
 - **The small line under a name reads the same in every module, and a little larger where it
   was smallest.** Dates, places, amounts and counts under a task, an entry or a contact were 12
   pixels in tasks and on the Overview and 14 pixels in budget, inventory, contacts and the

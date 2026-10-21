@@ -6565,15 +6565,15 @@ test('der Zeilenname bricht in Wörtern, nicht in Zeichen', () => {
   assert.match(recipesJs, /installPopoverMenus\(page\)/, 'das Menü muss an der stabilen Seitenwurzel verdrahtet sein');
 
   assert.match(recipes, /@container list-rows \(max-width: 30rem\)/,
-    'die Umschaltung hängt an der ZEILENbreite, wie beim Vorrats-Stepper');
-  // Die Quellreihenfolge entscheidet: `@container` erhöht die Spezifität nicht.
-  const inlineBase = recipes.indexOf('.recipe-row__inline-actions {');
+    'die Stapelung haengt an der ZEILENbreite, wie beim Vorrats-Stepper');
   const query = recipes.indexOf('@container list-rows');
-  assert.ok(inlineBase !== -1 && inlineBase < query,
-    'der Basiszustand muss VOR der Container-Query stehen, sonst gewinnt er gegen sie');
   const compact = recipes.slice(query);
-  assert.match(compact, /\.recipe-row__inline-actions\s*\{\s*display:\s*none/,
-    'die drei Inline-Aktionen müssen in der schmalen Zeile weichen');
+  // R21 (Zeilen-Endzone D10): die drei Aktionen stehen auf JEDER Breite im
+  // Ueberlaufmenue - ab 30rem standen sie sichtbar, samt Papierkorb.
+  assert.doesNotMatch(recipesJs, /recipe-row__inline-actions/, 'keine Inline-Aktionen in der Zeile');
+  assert.doesNotMatch(recipes, /recipe-row__inline-actions/, 'und keine Regel mehr fuer sie');
+  assert.match(recipes.slice(0, query), /\.recipe-row__more\s*\{\s*display:\s*flex/,
+    'der Mehr-Knopf steht im Basiszustand, nicht erst in der schmalen Zeile');
   // Die Zutatenzahl steht seit R4 im Slot `.recipe-row__sub` (zusammen mit
   // "Diese Woche geplant"); das Flex-Kind der Zeile ist damit der Slot, und ER
   // muss schmal die volle zweite Zeile nehmen.

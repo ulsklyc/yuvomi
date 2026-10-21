@@ -214,32 +214,19 @@
  *   2. Die Zutatenzahl rückt unter den Namen, damit er die Zeile allein hat.
  *
  * Danach: Textspalte 202px statt 98px, Namensbreite 186px statt 8px.
+ *
+ * SEIT R21 GILT ZUG 1 AUF JEDER BREITE (Zeilen-Endzone, DESIGN.md D10): ab
+ * 30rem standen Stift, Duplizieren und ein sichtbarer Papierkorb in der Zeile,
+ * die Detailspalte daneben trug dieselben drei. Die Zeile hat nur noch den
+ * Mehr-Knopf; die Query regelt nur noch die Stapelung von Name und Meta.
  * -------------------------------------------------------- */
 
-/* Basiszustand ZUERST: `@container` erhöht die Spezifität nicht, es entscheidet die
- * Quellreihenfolge. Standen diese beiden Regeln hinter der Query, gewannen sie -
- * und die Aktionen blieben sichtbar, obwohl die Query griff (gemessen: Textspalte
- * 46px statt 202px). */
-.recipe-row__inline-actions {
+.recipe-row__more {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-}
-
-.recipe-row__more {
-  display: none;
 }
 
 @container list-rows (max-width: 30rem) {
-  .recipe-row__inline-actions {
-    display: none;
-  }
-
-  .recipe-row__more {
-    display: flex;
-    align-items: center;
-  }
-
   /* `order`, damit die Vorlesereihenfolge Name → Zutatenzahl → Chevron bleibt. */
   .recipe-row__toggle {
     flex-wrap: wrap;

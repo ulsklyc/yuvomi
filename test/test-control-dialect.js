@@ -239,7 +239,37 @@ function rowActionsOf(src) {
     out.push({ index: m.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: icon || m[1],
       danger: m[1] !== 'rowMenuHtml' && (/\btone:\s*['"]danger['"]/.test(text) || /^trash/.test(icon)) });
   }
+  out.push(...domRowActions(src));
   return out.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * ZEILENAKTIONEN AUS DER DOM-API (R21, Critique 2026-10-21). Die Scanner oben
+ * lesen Markup in Template-Strings und die Helfer-Aufrufe - ein Knopf, den
+ * `document.createElement('button')` baut und dem erst eine Zuweisung die
+ * Klasse gibt, sahen sie nicht. So stand die Rezeptzeile mit Stift,
+ * Duplizieren und Papierkorb ab 30rem sichtbar da (recipes.js), waehrend
+ * row-danger-visible gruen meldete: ein blinder Guard. Erfasst werden hier
+ * `el.className = ...`, `el.classList.add(...)` und `setAttribute('class', ...)`
+ * mit `row-action`; destruktiv ist die Zuweisung, sobald `row-action--danger`
+ * in ihr steht - auch als Zweig einer Bedingung, denn welche Aktion den Zweig
+ * nimmt, entscheidet erst die Laufzeit.
+ */
+function domRowActions(src) {
+  const out = [];
+  const assign = /\.className\s*=\s*(`[^`]*`|'[^']*'|"[^"]*")|\.classList\.add\(([^)]*)\)|\.setAttribute\(\s*['"]class['"]\s*,\s*(`[^`]*`|'[^']*'|"[^"]*")/g;
+  let m;
+  while ((m = assign.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const cls = m[1] ?? m[2] ?? m[3] ?? '';
+    // `row-action` oder `row-action--x`, nicht der Traeger `row-actions`.
+    if (!/\brow-action(?:--[\w-]+)?(?![\w-])/.test(cls)) continue;
+    const more = /\brow-action--more\b|\bpopover-menu__trigger\b/.test(cls);
+    const reorder = /\blist-row__drag\b|__handle\b/.test(cls);
+    out.push({ index: m.index, kind: more ? 'more' : reorder ? 'reorder' : 'action', what: 'createElement',
+      danger: /\brow-action--danger\b/.test(cls) });
+  }
+  return out;
 }
 
 export function scanRowActionCount(src) {
@@ -892,6 +922,26 @@ test('Scanner: row-danger-visible faengt den sichtbaren Papierkorb und laesst de
   const good = `
     \${rowActionHtml({ icon: 'pencil', label: a })}
     \${rowMenuHtml({ id, label, items: [{ action: 'delete', icon: 'trash-2', danger: true }] })}`;
+  assert.deepEqual(scanRowDangerVisible(good), []);
+});
+
+// R21 (Critique 2026-10-21): die Rezeptzeile baute Stift, Duplizieren und
+// Papierkorb per createElement - der Scanner las nur Markup und Helfer und
+// meldete die Datei sauber.
+test('Scanner: row-danger-visible sieht auch den per DOM-API gebauten Papierkorb', () => {
+  const bad = `
+    for (const a of ROW_ACTIONS) {
+      const btn = document.createElement('button');
+      btn.className = \`row-action\${a.danger ? ' row-action--danger' : ''}\`;
+      inline.appendChild(btn);
+    }
+    del.classList.add('row-action', 'row-action--danger');
+    other.setAttribute('class', 'row-action row-action--danger');`;
+  assert.equal(scanRowDangerVisible(bad).length, 3);
+  const good = `
+    cart.className = 'row-action pantry-row__cart';
+    actions.className = 'row-actions';
+    more.className = 'row-action row-action--more';`;
   assert.deepEqual(scanRowDangerVisible(good), []);
 });
 
