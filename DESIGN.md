@@ -2591,7 +2591,13 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Treffer, das aktive gleitet per `translate` an den Anfang, die Tab-Pille blendet aus. Die Tabs
   bleiben minimiert und auf dem Rueckweg auf ihrer gemessenen Breite (`navPillGeometry`, gemessen
   an der ausgefahrenen Kapsel), beide Raender stehen explizit - kein Layout-Shift. Ein Tipp auf die
-  Pille faehrt sie aus, ohne zu navigieren.
+  Pille faehrt sie aus, ohne zu navigieren. **Seit R21 flacher per `scale`, nicht per Hoehe:** die
+  `min-height` zog die Zone mit, ihre Oberkante wanderte - gemessen doch ein Layout-Shift je Frame
+  (0,0013 je Ein- und Ausfahren, unter reduzierter Bewegung 0,017 je Wechsel). Die Kapsel behaelt
+  ihre Layout-Hoehe und staucht sich von der Unterkante (`--nav-flat-scale`, gemessen von
+  `measureNavPill` gegen einen Messfuehler fuer `--nav-height-minimized`), die Ziele strecken sich
+  zurueck (`--nav-flat-unscale`). Danach 0,00015 bzw. 0,00003. Ohne `scale` (@supports) bleibt die
+  Hoehe der Rueckfall. Guard: `test:mobile-chrome`.
 - **Die Tabs stehen in jedem Modul auf denselben Koordinaten (R19, Persona Casey).** Ohne
   FAB verteilten sich die fuenf Tabs auf die volle Kapsel (62 gegen 73px bei 390px) - ein
   Budget-Reiterwechsel nach „Statistik", Belohnungen, Haushaltshilfe oder die Einstellungen

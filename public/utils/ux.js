@@ -1666,6 +1666,45 @@ function measureNavPill(nav) {
   nav.style.setProperty('--nav-pill-shift', `${g.shift}px`);
   nav.style.setProperty('--nav-item-width', `${g.itemWidth}px`);
   for (const tab of tabs) tab.classList.toggle('nav-item--pill', tab === active);
+  // FLACHER PER `scale` (R21, layout.css): der Faktor von der ausgefahrenen
+  // auf die minimierte Hoehe und sein Kehrwert fuer die Ziele.
+  const flat = navFlatScale(items.getBoundingClientRect().height, flatCapsuleHeight(nav));
+  if (flat) {
+    nav.style.setProperty('--nav-flat-scale', String(flat.scale));
+    nav.style.setProperty('--nav-flat-unscale', String(flat.unscale));
+  }
+}
+
+/**
+ * Der Stauchfaktor der minimierten Kapsel (R21). Rein, damit der Test die
+ * Rechnung pruefen kann. Null, wenn nichts zu stauchen ist.
+ * @param {number} full  ausgefahrene Hoehe (px)
+ * @param {number} flat  minimierte Hoehe (px)
+ * @returns {{scale: number, unscale: number}|null}
+ */
+export function navFlatScale(full, flat) {
+  if (!(full > 0) || !(flat > 0) || flat >= full) return null;
+  const round = (n) => Math.round(n * 1e4) / 1e4;
+  return { scale: round(flat / full), unscale: round(full / flat) };
+}
+
+/**
+ * Die minimierte Hoehe in px - aus `--nav-height-minimized`, aufgeloest am
+ * Browser statt in JS nachgerechnet (der Token ist ein calc() aus Zielgroesse
+ * und Abstand). Ein unsichtbarer Messfuehler in der Zone, einmal je Kapsel.
+ * @param {Element} nav
+ * @returns {number}
+ */
+function flatCapsuleHeight(nav) {
+  let probe = nav.querySelector?.(':scope > .nav-bottom__probe');
+  if (!probe && nav.ownerDocument?.createElement) {
+    probe = nav.ownerDocument.createElement('span');
+    probe.className = 'nav-bottom__probe';
+    probe.setAttribute('aria-hidden', 'true');
+    nav.appendChild(probe);
+  }
+  if (!probe || typeof getComputedStyle !== 'function') return 0;
+  return parseFloat(getComputedStyle(probe).minHeight) || 0;
 }
 
 /**

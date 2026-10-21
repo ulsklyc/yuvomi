@@ -114,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The tab bar no longer nudges the page when it shrinks while you read.** Shrinking changed its
+  height, which moved its top edge a little in every frame (and in one step with reduced motion).
+  It now keeps its size and squeezes from the bottom edge, so nothing on the page shifts.
+
 - **An undo message no longer covers the top of the More sheet.** With no free spot beside the
   nearly full-height sheet, the message sat on its handle and search field. It now steps back
   while the sheet is open, its countdown paused, and returns when the sheet closes, so the undo

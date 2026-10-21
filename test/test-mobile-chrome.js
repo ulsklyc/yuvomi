@@ -715,3 +715,31 @@ test('R21: die Titelkante im Blatt steht - die erste Zeile mittig neben den Knoe
   const [close] = topLevel(layoutCss, '.modal-panel__close');
   assert.equal(decl(close.body, 'height'), 'var(--target-base)', 'die Rechnung nimmt eine andere Hoehe als der Knopf');
 });
+
+// R21 (Critique a6, gemessen 390x844): die Kapsel wurde per `min-height`
+// flacher. Sie steht unten fest, also wanderte ihre Oberkante samt Zone - ein
+// Layout-Shift je Frame (0,0013 je Ein- und Ausfahren), unter reduzierter
+// Bewegung in einem Schritt 0,017 je Wechsel. Jetzt behaelt sie ihre
+// Layout-Hoehe und staucht sich per `scale` von der Unterkante; die Ziele
+// strecken sich zurueck. Gemessen danach: 0,00015 bzw. 0,00003.
+test('R21: minimiert staucht sich die Kapsel per scale, ohne ihre Layout-Hoehe zu aendern', async () => {
+  const { navFlatScale } = await import('../public/utils/ux.js');
+  assert.deepEqual(navFlatScale(64, 56), { scale: 0.875, unscale: 1.1429 });
+  assert.equal(navFlatScale(56, 56), null, 'nichts zu stauchen');
+  assert.equal(navFlatScale(0, 56), null, 'ohne Messung kein Faktor');
+  const all = rules(layoutCss);
+  const supported = (r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && r.at.some((a) => /@supports \(translate: 0\)/.test(a));
+  const capsule = all.find((r) => supported(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-bottom__items' && decl(r.body, 'scale'));
+  assert.ok(capsule, 'die Kapsel wird wieder per Hoehe flacher');
+  assert.equal(decl(capsule.body, 'scale'), '1 var(--nav-flat-scale, 1)');
+  assert.equal(decl(capsule.body, 'transform-origin'), '50% 100%', 'die Unterkante steht nicht');
+  assert.equal(decl(capsule.body, 'min-height'), 'var(--nav-height-mobile)', 'die Layout-Hoehe aendert sich - die Zone wandert');
+  const items = all.find((r) => supported(r) && r.selector === '.nav-bottom--minimized:not(:focus-within) .nav-item' && decl(r.body, 'scale'));
+  assert.equal(items && decl(items.body, 'scale'), '1 var(--nav-flat-unscale, 1)', 'die Zeichen werden mitgestaucht');
+  const tr = all.find((r) => r.selector === '.nav-bottom .nav-bottom__items' && decl(r.body, 'transition'));
+  assert.match(decl(tr.body, 'transition'), /scale var\(--duration-md\) var\(--ease-out\)/, 'das Stauchen gleitet nicht');
+  const ux = read('../public/utils/ux.js');
+  assert.match(ux, /nav\.style\.setProperty\('--nav-flat-scale', String\(flat\.scale\)\);/, 'der Faktor wird nicht gemessen');
+  const [probe] = topLevel(layoutCss, '.nav-bottom__probe');
+  assert.equal(probe && decl(probe.body, 'min-height'), 'var(--nav-height-minimized)', 'der Messfuehler loest nicht die minimierte Hoehe auf');
+});

@@ -2629,7 +2629,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       background-color var(--transition-fast),
       box-shadow var(--transition-fast),
       min-height var(--duration-md) var(--ease-out),
-      inline-size var(--duration-md) var(--ease-out);
+      inline-size var(--duration-md) var(--ease-out),
+      scale var(--duration-md) var(--ease-out);
   }
 
   .nav-bottom .nav-item__label {
@@ -2679,7 +2680,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       color var(--transition-fast),
       opacity var(--duration-sm) var(--ease-out),
       visibility var(--duration-sm),
-      translate var(--duration-md) var(--ease-out);
+      translate var(--duration-md) var(--ease-out),
+      scale var(--duration-md) var(--ease-out);
   }
 
   /* NUR WO `translate` GILT (Review R20): Chromium kennt die Eigenschaft erst
@@ -2709,6 +2711,27 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
     .nav-bottom--minimized:not(:focus-within) .nav-item--pill {
       translate: var(--nav-pill-shift, 0px) 0;
+    }
+
+    /* FLACHER PER `scale`, NICHT PER HOEHE (Critique R21). Die Hoehe zog die
+     * Zone mit: die Kapsel steht unten fest, also wanderte ihre Oberkante -
+     * gemessen ein Layout-Shift je Frame (Quellen `.nav-bottom__items`,
+     * `.nav-bottom`), 0,0013 je Ein- und Ausfahren, unter reduzierter Bewegung
+     * in einem Schritt 0,017 je Wechsel. Jetzt behaelt die Kapsel ihre
+     * Layout-Hoehe und wird von der Unterkante aus gestaucht (Compositor, kein
+     * Layout); die Ziele strecken sich um denselben Faktor zurueck, Zeichen
+     * und Trefferflaeche bleiben 1:1. Den Faktor misst utils/ux.js
+     * (measureNavPill) an der ausgefahrenen Kapsel. Die Rundung steht dabei
+     * um 1/8 gestaucht - an einer Pille kaum zu sehen. Ohne `scale` (der
+     * @supports-Rahmen) bleibt die Hoehe der Rueckfall von oben. */
+    .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
+      min-height: var(--nav-height-mobile);
+      scale: 1 var(--nav-flat-scale, 1);
+      transform-origin: 50% 100%;
+    }
+
+    .nav-bottom--minimized:not(:focus-within) .nav-item {
+      scale: 1 var(--nav-flat-unscale, 1);
     }
 
     /* Die Tab-Pille der Leiste zeigt den Ort; in der Pille sagt es das Ziel
@@ -10918,6 +10941,16 @@ textarea.input { resize: vertical; }
  * Bar-Kante, wo ihre Rundung gekappt wurde (#569-Nachtrag). Die exakte
  * Geometrie (Höhe/Breite/Versatz) setzt positionTabIndicator() aus dem
  * Icon-Well-Rect; die Werte hier sind der Stand vor dem ersten Messen. */
+/* Messfuehler der minimierten Hoehe (utils/ux.js, flatCapsuleHeight): loest
+ * `--nav-height-minimized` im Browser auf. Nimmt keinen Platz, malt nichts. */
+.nav-bottom__probe {
+  position: absolute;
+  inline-size: 0;
+  min-height: var(--nav-height-minimized);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .nav-bottom__indicator {
   position: absolute;
   top: 0;
