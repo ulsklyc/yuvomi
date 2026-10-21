@@ -1331,7 +1331,12 @@ das Verhaeltnis haelt.
   Seitenwechsel. Reduzierte Bewegung: nur Blende (`--duration-sm`). Ohne
   `:active-view-transition-type()` faellt es auf `swapContent` zurueck. Nutzer: Einstellungen
   (Uebersicht <-> Blatt) und der Kalender-Ansichtswechsel (Richtung nach der Leiste Monat ->
-  Woche -> Tag -> Agenda; vorher eine richtungslose Blende). Die Gesundheit bleibt bei
+  Woche -> Tag -> Agenda; vorher eine richtungslose Blende). **Seit R21 wie der Seitenwechsel
+  (D1):** gibt `update` ein Promise zurueck, wartet das neue Bild darauf (hoechstens 150 ms);
+  die Gruppe schneidet nur waagerecht (`overflow: clip visible`), und ein Kopf ohne gleitende
+  Kapsel blendet per `fade` als `page-toolbar` an Ort und Stelle. Der Einstellungs-Drill zeigte
+  vorher im ersten Frame "< Einstellungen" ueber der auf zwei Zeilen gekappten Uebersicht; die
+  Marke `settings-page--leaf` setzt er jetzt erst im Wechsel. Guard: `test:motion`. Die Gesundheit bleibt bei
   `swapContent` (ihr Wechsel ist synchron in `activateArea` verankert).
 - **Druck und Hover (R18):** Zeilen und Karten, die als Ganzes ein Ziel sind, teilen EINEN
   Press-Baustein (`list-row.css`): `--color-surface-hover`, hinein `--duration-2xs`, heraus die

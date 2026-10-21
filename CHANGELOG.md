@@ -105,6 +105,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Opening a settings page on a phone no longer starts from a half-finished frame.** The first
+  frame of the slide already showed the back link and cut the settings list to its first two
+  rows. The list now stays whole while the page slides in with its content, and the title fades
+  over to the back link.
+
 - **Switching to the Overview no longer flashes the previous page's title.** For one frame at the
   end of the page fade, the title of the page you came from (for example "Tasks") stood fully
   visible over the greeting. The fading title now keeps its end state until the fade is gone.

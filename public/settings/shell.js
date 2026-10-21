@@ -1280,7 +1280,9 @@ export async function renderSettingsShell(container, {
 
   const page = shell.closest('.settings-page');
   const wasLeaf = Boolean(page?.classList.contains('settings-page--leaf'));
-  page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
+  // Die Ebene markieren (Titelhierarchie, Kopf). Beim Drill-down erst IM
+  // Wechsel (Critique R21): vorher stand die Marke schon im alten Bild.
+  const markLeaf = () => page?.classList.toggle('settings-page--leaf', Boolean(activeLeaf));
   // DRILL-DOWN MIT RICHTUNG (Critique R18, Bewegung). Ohne Seitenleiste ist die
   // Uebersicht die Seite und ein Blatt eine Ebene tiefer - der Wechsel war ein
   // harter Schnitt (gemessen mobil: 0 Animationen, der Soft-Update-Zweig des
@@ -1293,6 +1295,7 @@ export async function renderSettingsShell(container, {
   const drill = existingShell && !isSplit(shell) && wasLeaf !== Boolean(activeLeaf)
     ? (activeLeaf ? 1 : -1)
     : 0;
+  if (!drill) markLeaf();
   const toolbar = page?.querySelector(':scope > .page-toolbar');
 
   const focusDomain = view === 'domain'
@@ -1322,12 +1325,19 @@ export async function renderSettingsShell(container, {
     // hinaus - vorher kam nur das neue Bild 8px von der Seite, die alte Ebene
     // war schlagartig weg. Der synchrone Teil laeuft im Wechsel, das Laden
     // danach wie bisher.
+    //
+    // SEIT R21 OHNE ZWISCHENBILD: das neue Bild wartet auf das Blatt
+    // (hoechstens FIRST_RENDER_WAIT_MS, swapRegion), und der Kopf blendet an
+    // Ort und Stelle ueber (`fade`). Vorher stand im ersten Frame schon
+    // "< Einstellungen" ueber der auf zwei Zeilen gekappten Uebersicht.
     if (drill) {
       let loading = null;
       await swapRegion(content, () => {
+        markLeaf();
         if (toolbar) renderToolbar(toolbar, content, { activeLeaf, domain: leafDomain });
         loading = renderLeafContent(content, activeLeaf, leafDomain, user, query);
-      }, { direction: drill });
+        return loading;
+      }, { direction: drill, fade: toolbar });
       await loading;
       return;
     }
@@ -1340,8 +1350,12 @@ export async function renderSettingsShell(container, {
     hydrateIcons(content);
     if (toolbar) renderToolbar(toolbar, content, {});
   };
-  if (drill) await swapRegion(content, paintOverview, { direction: drill });
-  else paintOverview();
+  if (drill) {
+    await swapRegion(content, () => {
+      markLeaf();
+      paintOverview();
+    }, { direction: drill, fade: toolbar });
+  } else paintOverview();
   revealOverviewSection(content, focusDomain?.id);
   if (page) watchSplit(container, page, { user, domainId: focusDomain?.id ?? null });
 }

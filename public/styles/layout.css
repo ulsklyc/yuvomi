@@ -372,9 +372,14 @@ html:active-view-transition-type(region-forward, region-back, region-fade)::view
   animation: none;
 }
 
+/* NUR WAAGERECHT ZUGESCHNITTEN (Critique R21): nichts gleitet ueber
+ * Seitenleiste oder Rand - aber die Gruppe hat die Hoehe der NEUEN Ebene, und
+ * ein Blatt, das noch laedt, ist kurz. Ganz zugeschnitten stand die alte
+ * Uebersicht dann im ersten Frame auf zwei Zeilen gekappt (Einstellungs-Drill,
+ * gemessen 124px). Senkrecht laeuft das alte Bild weiter aus. */
 ::view-transition-group(region-swap) {
   animation: none;
-  overflow: clip;
+  overflow: clip visible;
 }
 
 ::view-transition-old(region-swap),

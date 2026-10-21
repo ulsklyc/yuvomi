@@ -1877,8 +1877,10 @@ const DRILL_DOWN_HOSTS = [
   ['settings/shell.js', /const drill = existingShell && !isSplit\(shell\) && wasLeaf !== Boolean\(activeLeaf\)\s*\? \(activeLeaf \? 1 : -1\)\s*: 0;/, 'Einstellungen: Uebersicht <-> Blatt, nur ohne Seitenleiste'],
   // R19: mit ALTEM Bild (swapRegion) - hinein schiebt sich das Blatt darueber,
   // zurueck schiebt es sich hinaus; der synchrone Teil laeuft im Wechsel.
-  ['settings/shell.js', /await swapRegion\(content, \(\) => \{\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*loading = renderLeafContent\(content, activeLeaf, leafDomain, user, query\);\s*\}, \{ direction: drill \}\);\s*await loading;/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
-  ['settings/shell.js', /if \(drill\) await swapRegion\(content, paintOverview, \{ direction: drill \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
+  // R21: der Wechsel wartet hoechstens FIRST_RENDER_WAIT_MS auf das Blatt
+  // (D1) - gestartet wird er weiter vor dem Laden.
+  ['settings/shell.js', /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*if \(toolbar\) renderToolbar\(toolbar, content, \{ activeLeaf, domain: leafDomain \}\);\s*loading = renderLeafContent\(content, activeLeaf, leafDomain, user, query\);\s*return loading;\s*\}, \{ direction: drill, fade: toolbar \}\);\s*await loading;/, 'Einstellungen: das Blatt gleitet mit seinem Geruest herein - vor dem Laden gestartet, nicht danach'],
+  ['settings/shell.js', /if \(drill\) \{\s*await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*paintOverview\(\);\s*\}, \{ direction: drill, fade: toolbar \}\);/, 'Einstellungen: zurueck zur Uebersicht'],
   ['pages/health.js', /const drill = !narrow \? 0 : id === HEALTH_OVERVIEW_ID \? -1 : previous === HEALTH_OVERVIEW_ID \? 1 : 0;\s*if \(previous && previous !== id\) markAreaEntering\(route, drill\);/, 'Gesundheit: Uebersicht <-> Bereich, nur schmal'],
   ['pages/health.js', /if \(panel\) swapContent\(panel, null, \{ direction \}\);/, 'Gesundheit: ueber den geteilten Helfer'],
 ];
@@ -2660,6 +2662,52 @@ test('swapRegion: altes Bild per View Transition, Richtung als Typ, Name nur fue
   } finally {
     env.restore();
   }
+});
+
+// Critique R21 (a5, Einstellungs-Drill): der erste Frame zeigte schon den Kopf
+// "< Einstellungen" (die Wurzel zeigt im Regionswechsel nur ihr neues Bild)
+// und die Uebersicht auf zwei Zeilen gekappt - die Gruppe schnitt das alte
+// Bild auf die 124px des Blatt-Geruests. Jetzt wartet der Callback auf die
+// neue Ebene (D1), und ein Kopf blendet auf Wunsch an Ort und Stelle.
+test('swapRegion D1: das neue Bild wartet auf die Ebene, der Kopf blendet an Ort und Stelle', async () => {
+  const env = regionEnv();
+  try {
+    const { swapRegion } = await import('../public/utils/content-swap.js');
+    const head = { style: {}, isConnected: true };
+    let named = null;
+    const t0 = Date.now();
+    const { finished } = await swapRegion(env.host, () => {
+      named = head.style.viewTransitionName;
+      return new Promise((r) => setTimeout(r, 40));
+    }, { direction: 1, fade: head });
+    assert.ok(Date.now() - t0 >= 35, `das neue Bild wartete nicht auf die Ebene (${Date.now() - t0} ms)`);
+    assert.equal(named, 'page-toolbar', 'der Kopf blendet nicht - im ersten Frame stuende schon der neue');
+    env.finish();
+    await finished;
+    assert.equal(head.style.viewTransitionName, '', 'danach ist der Kopfname frei');
+
+    // Ein Laden, das haengt, haelt das alte Bild hoechstens die Frist.
+    const t1 = Date.now();
+    const slow = await swapRegion(env.host, () => new Promise(() => {}), { direction: -1 });
+    assert.ok(Date.now() - t1 < 400, 'ein haengendes Blatt hielt das alte Bild ueber die Frist');
+    env.finish();
+    await slow.finished;
+  } finally {
+    env.restore();
+  }
+  // Die Einstellungen geben ihr Laden zurueck, markieren die Ebene erst im
+  // Wechsel und lassen den Kopf blenden - hinein wie zurueck.
+  const shell = stripComments(readFileSync(new URL('../public/settings/shell.js', import.meta.url), 'utf8'));
+  assert.match(shell, /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);[\s\S]*?loading = renderLeafContent\([^)]*\);\s*return loading;\s*\}, \{ direction: drill, fade: toolbar \}\);/,
+    'der Drill hinein wartet nicht auf das Blatt oder blendet den Kopf nicht');
+  assert.match(shell, /await swapRegion\(content, \(\) => \{\s*markLeaf\(\);\s*paintOverview\(\);\s*\}, \{ direction: drill, fade: toolbar \}\);/,
+    'der Drill zurueck markiert die Ebene nicht im Wechsel oder blendet den Kopf nicht');
+  assert.match(shell, /if \(!drill\) markLeaf\(\);/, 'ohne Drill wird die Ebene nicht mehr markiert');
+  // Laedt das Blatt laenger als die Frist, ist die neue Ebene kurz - die
+  // Gruppe schneidet nur waagerecht, senkrecht laeuft das alte Bild aus.
+  const group = [...eachRule(css('layout.css'))].find((r) => !r.at.length && r.selector.replace(/\s+/g, '') === '::view-transition-group(region-swap)');
+  assert.match(group?.body ?? '', /overflow:\s*clip visible/,
+    'die Gruppe schneidet die alte Ebene auf die Hoehe der neuen - im ersten Frame stuende die Uebersicht gekappt');
 });
 
 /* Review #2049, Runde 2: swapRegion und swapPage teilen `html.page-swapping`.

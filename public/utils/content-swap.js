@@ -30,7 +30,7 @@
 // Relativ importiert (wie utils/sortable.js): im Browser dieselbe Modul-URL wie
 // '/utils/ux.js', und die Unit-Tests laden die Datei ohne Loader.
 import { durationToken, easingToken } from './ux.js';
-import { holdPageSwapping } from './view-transition.js';
+import { holdPageSwapping, awaitFirstRender, holdRunningAnimations } from './view-transition.js';
 
 /** Versatz in Schrittrichtung, in px. */
 export const SWAP_SHIFT_PX = 8;
@@ -120,6 +120,8 @@ export function swapContent(host, update, { direction = 0, animate = true } = {}
 
 /** Name der Region fuer die Dauer des Wechsels (layout.css). */
 export const REGION_NAME = 'region-swap';
+/** Name eines ueberblendenden Kopfes - derselbe wie beim Seitenwechsel. */
+const FADE_NAME = 'page-toolbar';
 
 /** Ob der Browser den gerichteten Wechsel kann (Typen fuer die Richtung). */
 export function canSwapRegion() {
@@ -164,13 +166,26 @@ export function regionSwapType(direction) {
  * `update` laeuft genau einmal; mit View Transition im Callback (also einen
  * Frame spaeter), sonst sofort. Ein Fehler daraus kommt beim Aufrufer an.
  *
+ * DIE NEUE EBENE STEHT IM NEUEN BILD (Critique R21, D1 wie swapPage): gibt
+ * `update` ein Promise zurueck (die Einstellungen: das Laden des Blatts),
+ * wartet der Callback darauf, hoechstens FIRST_RENDER_WAIT_MS. Vorher zeigte
+ * das neue Bild das 124px hohe Geruest des Blatts, und die Gruppe schnitt die
+ * alte Uebersicht auf diese Hoehe: zwei Zeilen statt vierzehn im ersten Frame.
+ *
+ * `fade`: ein Kopf ueber der Region, der fuer die Dauer als `page-toolbar`
+ * an Ort und Stelle ueberblendet (dieselben Regeln wie beim Seitenwechsel).
+ * Ohne ihn zeigt die Wurzel nur ihr lebendes neues Bild - der neue Kopf
+ * stand schon im ersten Frame ("< Einstellungen" ueber der alten Liste).
+ * Nur fuer einen Kopf ohne gleitende Kapsel: die froere im alten Bild ein.
+ *
  * @param {Element|null} host            die Region, deren Inhalt wechselt
- * @param {() => (void|Promise<void>)} update tauscht den Inhalt
+ * @param {() => (void|Promise<unknown>)} update tauscht den Inhalt
  * @param {object} [opts]
  * @param {number} [opts.direction=0]    > 0 vorwaerts/weiter, < 0 zurueck, 0 Blende
+ * @param {Element|null} [opts.fade]     Kopf, der an Ort und Stelle ueberblendet
  * @returns {Promise<{ transition: boolean, finished: Promise<void> }>}
  */
-export async function swapRegion(host, update, { direction = 0 } = {}) {
+export async function swapRegion(host, update, { direction = 0, fade = null } = {}) {
   if (!host || !host.isConnected || !canSwapRegion() || regionCovered()) {
     swapContent(host, update, { direction });
     return { transition: false, finished: Promise.resolve() };
@@ -180,14 +195,25 @@ export async function swapRegion(host, update, { direction = 0 } = {}) {
   // Startet waehrenddessen ein Seitenwechsel, nimmt das Ende von diesem ihm
   // die Chrome-Namen nicht mehr weg (Review #2049, Runde 2).
   let releaseSwapping = null;
+  const fading = fade && fade !== host && fade.isConnected ? fade : null;
   const mark = (on) => {
     host.style.viewTransitionName = on ? REGION_NAME : '';
+    if (fading) fading.style.viewTransitionName = on ? FADE_NAME : '';
     if (on) releaseSwapping = holdPageSwapping();
     else releaseSwapping?.();
   };
   mark(true);
   const transition = document.startViewTransition({
-    update: () => update?.(),
+    update: async () => {
+      // Wie swapPage: waehrend des Wartens zeichnet der Browser nichts, und
+      // was laeuft, setzt danach an seiner Stelle fort.
+      const resume = holdRunningAnimations(document);
+      try {
+        await awaitFirstRender(update?.());
+      } finally {
+        resume();
+      }
+    },
     types: [regionSwapType(direction)],
   });
   transition.ready.catch(() => {});
