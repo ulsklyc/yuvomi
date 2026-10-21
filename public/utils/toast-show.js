@@ -17,6 +17,8 @@ export const TOAST_SUCCESS_MAX = 50;
 export const TOAST_RESUME_MIN_MS = 2000;
 /** So lange steht eine stille Ansage in der Live-Region, dann raeumt sie sich ab. */
 const ANNOUNCE_MS = 5000;
+/** So oft schaut eine angehaltene Frist nach, ob ihr Toast noch im Dokument steht. */
+const DETACHED_CHECK_MS = 1000;
 
 function _toastSvg(children) {
   const NS = 'http://www.w3.org/2000/svg';
@@ -49,9 +51,22 @@ const TOAST_ICONS = {
   ]),
 };
 
-export function showToast(message, type = 'default', duration = 3000, onUndo = null) {
+/**
+ * @param {string} message
+ * @param {'default'|'success'|'danger'|'warning'} [type='default']
+ * @param {number} [duration=3000]  Frist in ms
+ * @param {null | (() => void) | { label: string, onClick: () => void }} [onUndo]
+ * @param {{ onExpire?: () => void }} [opts]
+ *        `onExpire` laeuft einmal, wenn die Frist des Toasts endet, ohne dass
+ *        seine Aktion genutzt wurde (abgelaufen, weggewischt, oder aus dem
+ *        Dokument genommen, waehrend ihn ein Griff hielt). Sie steht mit der
+ *        Frist still: was an ihr haengt (das Loeschen hinter "Rueckgaengig",
+ *        scheduleUndoableDelete in utils/ux.js), laeuft mit dem Toast synchron.
+ * @returns {boolean} ob dieser Aufruf einen Toast anlegte, dessen `onExpire` noch kommt
+ */
+export function showToast(message, type = 'default', duration = 3000, onUndo = null, { onExpire = null } = {}) {
   const container = toastSurface((type === 'danger' || type === 'warning') ? 'assertive' : 'polite');
-  if (!container) return;
+  if (!container) return false;
 
   // Aktions-Button: Legacy-Undo (Funktion) oder benannte Aktion ({ label, onClick }).
   const action = typeof onUndo === 'function'
@@ -64,7 +79,7 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   // Aktions-Toasts (Undo oder benannte Aktion) sind wichtig -> nie still.
   if (type === 'success' && !action && successSurfaceSpent()) {
     announceQuietly(container, message);
-    return;
+    return false;
   }
 
   // GLEICHES STEHT EINMAL DA (Critique R21, a2): dreimal derselbe Satz
@@ -81,7 +96,7 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
     if (twin) {
       twin._toastRepeat(duration);
       announceQuietly(container, message);
-      return;
+      return false;
     }
   }
 
@@ -114,10 +129,17 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   }
 
   container.appendChild(toast);
+  let expired = false;
   const dismiss = () => {
     deadline.cancel();
     toast.classList.add('toast--out');
+    // Ein gehender Toast nimmt keinen Klick mehr: seine Frist ist um, und ein
+    // "Rueckgaengig" in der Ausfahrt liefe ins Leere (das Loeschen laeuft schon).
+    toast.inert = true;
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    if (expired) return;
+    expired = true;
+    onExpire?.();
   };
   // Die Frist pausiert unter Zeiger und Fokus (A1 P2-3, WCAG 2.2.1): wer zu
   // "Rueckgaengig" tabbt oder langsamer liest als die Frist, verliert den Toast
@@ -146,6 +168,7 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
       deadline.restart(ms);
     };
   }
+  return true;
 }
 
 
@@ -188,6 +211,13 @@ function announceQuietly(container, message) {
  * Ein Fokuswechsel INNERHALB des Toasts (Text -> Rueckgaengig) ist kein
  * Loslassen: `focusout` mit einem `relatedTarget` im Toast zaehlt nicht.
  *
+ * EIN GRIFF HAELT NUR, SOLANGE DER TOAST IM DOKUMENT STEHT. Nimmt ihn jemand
+ * heraus, waehrend er gehalten ist (der Stapel verdraengt den aeltesten, die
+ * Erinnerungen in reminders.js ebenso), kommt kein `pointerleave`, `focusout`
+ * oder `toast:release` mehr - die Frist stuende fuer immer, und mit ihr das
+ * Loeschen hinter "Rueckgaengig" (scheduleUndoableDelete). Solange sie steht,
+ * schaut sie deshalb nach; ist der Toast weg, ist sie um.
+ *
  * @param {HTMLElement} el
  * @param {() => void} onExpire
  * @param {number} duration  ms
@@ -198,24 +228,34 @@ export function pausableDeadline(el, onExpire, duration, { minRest = TOAST_RESUM
   let remaining = duration;
   let startedAt = Date.now();
   let timer = setTimeout(expire, remaining);
+  let watch = 0;
   let done = false;
   const holds = new Set();
 
   function expire() {
     if (done) return;
     done = true;
+    clearTimeout(watch);
     onExpire();
+  }
+  function watchDetached() {
+    watch = setTimeout(() => {
+      if (el.isConnected === false) expire();
+      else watchDetached();
+    }, DETACHED_CHECK_MS);
   }
   function hold(reason) {
     if (done) return;
     if (holds.size === 0) {
       clearTimeout(timer);
       remaining -= Date.now() - startedAt;
+      watchDetached();
     }
     holds.add(reason);
   }
   function release(reason) {
     if (done || !holds.delete(reason) || holds.size > 0) return;
+    clearTimeout(watch);
     remaining = Math.max(remaining, minRest);
     startedAt = Date.now();
     timer = setTimeout(expire, remaining);
@@ -237,6 +277,7 @@ export function pausableDeadline(el, onExpire, duration, { minRest = TOAST_RESUM
     cancel() {
       done = true;
       clearTimeout(timer);
+      clearTimeout(watch);
     },
     /** Die volle Frist von vorn (ein gleicher Toast kam dazu); ein Griff haelt weiter. */
     restart(ms = duration) {

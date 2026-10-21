@@ -50,6 +50,8 @@ class FakeElement {
   removeChild(child) { this.children = this.children.filter((c) => c !== child); child.parentNode = null; }
   remove() { this.parentNode?.removeChild(this); }
   contains(node) { if (node === this) return true; return this.children.some((c) => c.contains(node)); }
+  /** Im Dokument = unter einer der beiden Live-Regionen (`isRoot`). */
+  get isConnected() { let n = this; while (n.parentNode) n = n.parentNode; return n.isRoot === true; }
   addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
   removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] ?? []).filter((f) => f !== fn); }
   dispatch(type, init = {}) { for (const fn of [...(this.listeners[type] ?? [])]) fn({ type, target: this, ...init }); }
@@ -66,6 +68,8 @@ function installDom() {
   assertive.className = 'toast-container';
   assertive.setAttribute('id', 'toast-container-assertive');
   assertive.setAttribute('aria-live', 'assertive');
+  polite.isRoot = true;
+  assertive.isRoot = true;
   const byId = { 'toast-container-polite': polite, 'toast-container-assertive': assertive };
   const store = new Map();
   globalThis.document = {
@@ -138,6 +142,100 @@ test('Frist: weicht der Stapel einer Flaeche (toast:hold), steht die Frist bis t
   } finally {
     mock.timers.reset();
     removeDom();
+  }
+});
+
+/*
+ * DAS LOESCHEN LAEUFT MIT DER FRIST DES TOASTS (Review an #2142). Seit R21
+ * steht die Frist still, solange der Stapel dem Mehr-Blatt weicht
+ * (`toast:hold`). scheduleUndoableDelete (utils/ux.js) loeschte aber nach
+ * seiner eigenen Uhr: blieb das Blatt laenger offen als die Frist, war der
+ * Eintrag schon weg, und nach dem Schliessen stand ein "Rueckgaengig" da, das
+ * stillschweigend nichts tat. Geprueft wird die echte Kette:
+ * scheduleUndoableDelete -> window.yuvomi.showToast -> Toast.
+ */
+async function undoableDelete(polite, duration = 5000) {
+  const { showToast } = await import('../public/utils/toast-show.js');
+  const { scheduleUndoableDelete } = await import('../public/utils/ux.js');
+  globalThis.window = { addEventListener: () => {}, yuvomi: { showToast } };
+  const log = { commits: 0, restores: 0 };
+  scheduleUndoableDelete({
+    message: 'Eintrag geloescht',
+    duration,
+    commit: async () => { log.commits += 1; },
+    restore: () => { log.restores += 1; },
+  });
+  const [toast] = toastsIn(polite);
+  assert.ok(toast, 'kein Undo-Toast angelegt');
+  return { log, toast };
+}
+
+test('Undo-Loeschen: gehalten ueber die Frist hinaus loescht nichts, Rueckgaengig danach nimmt zurueck', async () => {
+  const { polite } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { log, toast } = await undoableDelete(polite);
+    mock.timers.tick(1000);
+    toast.dispatch('toast:hold');
+    mock.timers.tick(20000);
+    assert.equal(log.commits, 0, 'das Loeschen lief, waehrend der Toast dem Mehr-Blatt wich');
+    toast.dispatch('toast:release');
+    mock.timers.tick(1000);
+    assert.equal(leaving(toast), false, 'nach dem Schliessen steht der Toast mit seiner Restfrist');
+    const undo = toast.children.find((c) => c.className === 'toast__undo');
+    undo.dispatch('click');
+    assert.equal(log.restores, 1, 'das "Rueckgaengig" nach dem Schliessen tat nichts - ein toter Knopf');
+    assert.equal(log.commits, 0, 'nach Rueckgaengig darf kein Loeschen mehr kommen');
+    mock.timers.tick(30000);
+    assert.equal(log.commits, 0, 'nach Rueckgaengig darf kein Loeschen mehr kommen');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+    delete globalThis.window;
+  }
+});
+
+test('Undo-Loeschen: nach dem Halten loescht es mit der Restfrist, genau wenn der Toast geht', async () => {
+  const { polite } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { log, toast } = await undoableDelete(polite);
+    mock.timers.tick(1000);
+    toast.dispatch('toast:hold');
+    mock.timers.tick(20000);
+    toast.dispatch('toast:release');
+    mock.timers.tick(3999);
+    assert.equal(log.commits, 0, 'geloescht, waehrend "Rueckgaengig" noch zu sehen war');
+    assert.equal(leaving(toast), false);
+    mock.timers.tick(1);
+    assert.equal(leaving(toast), true, 'nach der Restfrist (4s) muss der Toast gehen');
+    assert.equal(log.commits, 1, 'mit dem Ende der Frist muss das Loeschen laufen');
+    assert.equal(toast.inert, true, 'ein gehender Toast nimmt keinen Klick mehr - sein Rueckgaengig liefe ins Leere');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+    delete globalThis.window;
+  }
+});
+
+// Die Kehrseite: ein Toast, der WAEHREND eines Griffs aus dem Dokument
+// verschwindet (der Stapel verdraengt den aeltesten, reminders.js ebenso),
+// bekommt kein toast:release, pointerleave oder focusout mehr. Haelt der Griff
+// trotzdem, stuende seine Frist fuer immer - und mit ihr das Loeschen.
+test('Undo-Loeschen: verschwindet der Toast, waehrend er gehalten ist, laeuft das Loeschen trotzdem', async () => {
+  const { polite } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { log, toast } = await undoableDelete(polite);
+    toast.dispatch('toast:hold');
+    mock.timers.tick(1000);
+    toast.remove();
+    mock.timers.tick(1000);
+    assert.equal(log.commits, 1, 'ein verdraengter, gehaltener Toast hielt das Loeschen fest');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+    delete globalThis.window;
   }
 });
 

@@ -802,15 +802,26 @@ export function scheduleUndoableDelete({
     }
   };
   entry.flush = () => { finish({ keepalive: true }); };
-  entry.timer = setTimeout(() => finish(), duration);
   _pendingDeletes.add(entry);
-  window.yuvomi?.showToast(message, 'default', duration, () => {
+  const undo = () => {
     if (settled) return;
     settled = true;
     _pendingDeletes.delete(entry);
     clearTimeout(entry.timer);
     restore?.();
+  };
+  // DAS LOESCHEN HAENGT AN DER FRIST DES TOASTS, nicht an einer eigenen Uhr
+  // (Review an #2142). Die Frist steht still, solange der Toast gehalten ist:
+  // unter Zeiger und Fokus, und seit R21, waehrend der Stapel dem Mehr-Blatt
+  // weicht (`toast:hold`, utils/toast-placement.js). Ein eigener Timer loeschte
+  // nach `duration` trotzdem, und nach dem Schliessen stand ein "Rueckgaengig"
+  // da, das nichts mehr zuruecknahm. Jetzt loescht das Ende der Frist
+  // (`onExpire`): mit ihr angehalten, mit ihrer Restzeit weiter. Die eigene Uhr
+  // zaehlt nur, wenn kein Toast steht, der das zusagt (keine Shell, kein Container).
+  const shown = window.yuvomi?.showToast(message, 'default', duration, undo, {
+    onExpire: () => { finish(); },
   });
+  if (shown !== true) entry.timer = setTimeout(() => finish(), duration);
 }
 
 /**
