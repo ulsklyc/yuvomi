@@ -2438,6 +2438,21 @@ describe('Contacts API - Multi-Value Fields', () => {
     // Marke. Nur die Kontaktspalte - Migration 254 fasst auch birthdays an,
     // die dieses Fixture nicht hat.
     contactsApiDb.exec('ALTER TABLE contacts ADD COLUMN birthday_year_unknown INTEGER NOT NULL DEFAULT 0');
+    // Der Weg zum Geburtstag (Critique R21, D7): CONTACT_SELECT holt
+    // `birthday_id` per Unterabfrage aus `birthdays` (Spalte contact_id seit
+    // Migration 90). Produktiv gibt es die Tabelle immer; dieses Fixture baut
+    // sein Schema von Hand, also steht sie hier in der Form, die die Abfrage
+    // liest. Die Abfrage robust gegen eine fehlende Tabelle zu machen, hiesse
+    // einen Zustand abzufangen, den keine Installation hat.
+    contactsApiDb.exec(`
+      CREATE TABLE birthdays (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL,
+        birth_date TEXT NOT NULL,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX idx_birthdays_contact_id ON birthdays(contact_id) WHERE contact_id IS NOT NULL;
+    `);
 
     // Override db.get() to use our test database
     const dbModule = await import('../server/db.js');
