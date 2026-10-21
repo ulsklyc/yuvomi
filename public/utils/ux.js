@@ -1111,7 +1111,10 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const tabs = toolbar.classList.contains('page-toolbar--dock-tabs')
       ? [...toolbar.children].find((el) => el.getAttribute('role') === 'tablist') ?? null
       : null;
-    const before = tabs ? flipSnapshotElements([...tabs.children]) : null;
+    // Gehalten wird die Leiste selbst, nicht ihre Reiter: ihr Kasten rueckt um
+    // die Breite des Titels, und ein Kasten, der ohne Transform springt, zaehlt
+    // als Layout-Shift (gemessen 0,0091 mit gehaltenen Reitern, 0 so).
+    const before = tabs ? flipSnapshotElements([tabs]) : null;
     toolbar.classList.toggle('is-docked', on);
     if (!tabs) return;
     [...tabs.children].find((tab) => tab.getAttribute('aria-selected') === 'true')

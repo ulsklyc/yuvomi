@@ -2142,3 +2142,16 @@ test('jeder Enter-Handler eines Textfelds fragt isImeComposing', () => {
   }
   assert.deepEqual(offenders, [], 'Enter ohne IME-Pruefung');
 });
+
+// R21 S7: beim Andocken rueckt die Reiter-Leiste um die Breite des Titels.
+// Gehalten wurden zuerst ihre Reiter - der Kasten der Leiste selbst sprang und
+// zaehlte als Layout-Shift (0,0091 beim Scrollen der Haushaltshilfe, 390px).
+// Die Leiste wird als Ganzes gehalten und gleitet: 0.
+test('R21 S7: angedockt gleitet die Leiste als Ganzes, nicht nur ihre Reiter', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/utils/ux.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('const setDocked = (on) => {'), src.indexOf('const onModuleCollapse'));
+  assert.match(fn, /flipSnapshotElements\(\[tabs\]\)/, 'der Kasten der Leiste wird gehalten');
+  assert.doesNotMatch(fn, /flipSnapshotElements\(\[\.\.\.tabs\.children\]\)/);
+  assert.match(fn, /holdThenGlide\(before\)/);
+});
