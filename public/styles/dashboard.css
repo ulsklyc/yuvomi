@@ -285,6 +285,14 @@
   .dashboard__grid > [data-row-fill] {
     grid-column: span var(--widget-fill-span);
   }
+
+  /* DIE KACHEL UEBER EINER FREIEN ZELLE WAECHST NACH UNTEN (R21, D5), wo von
+   * links niemand hinkommt: `columnFillSpans()` (utils/dashboard-widgets.js),
+   * gesetzt von `applyRowFill()`. Gemessen 1440px mit eingeklappter
+   * Seitenleiste: 305x185px leer unter einer 1x1-Kachel neben zwei hohen. */
+  .dashboard__grid > [data-col-fill] {
+    grid-row: span var(--widget-fill-rows);
+  }
 }
 
 /* Kein eigener 1440px-Block mehr: `repeat(auto-fill, minmax(240px, 1fr))` ab 1024px

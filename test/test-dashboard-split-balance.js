@@ -307,9 +307,11 @@ const nbsp = (text) => String(text).replace(/\s/g, ' ');
 test('Registrierung: die Kennzahlreihe kennt die geteilten Ausgaben', async () => {
   const __test = await dashboardTest();
   assert.ok(__test.METRIC_TILE_ORDER.includes('split-expenses'));
-  // Direkt hinter dem Budget: Geld zu Geld, und vor den Opt-in-Modulen, damit
-  // eine offene Forderung nicht hinter einem Punktestand verschwindet.
-  assert.equal(__test.METRIC_TILE_ORDER.indexOf('split-expenses'), __test.METRIC_TILE_ORDER.indexOf('budget') + 1);
+  // Vor den Opt-in-Modulen, damit eine offene Forderung nicht hinter einem
+  // Punktestand verschwindet. Der Saldo, hinter dem sie bis R21 stand, ist aus
+  // der Reihe (D5): direkt hinter den Cockpit-Domaenen.
+  assert.ok(!__test.METRIC_TILE_ORDER.includes('budget'));
+  assert.equal(__test.METRIC_TILE_ORDER.indexOf('split-expenses'), __test.METRIC_TILE_ORDER.indexOf('shopping') + 1);
 });
 
 test('Kachel: Netto als Wert, groesste Position plus Rest als Fussnote, Sprung in die Ausgleichs-Ansicht', async () => {

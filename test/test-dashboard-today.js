@@ -951,13 +951,15 @@ test('R20: bei knappem Platz fallen die fremden Aufgaben eines Kindes zuerst unt
 
 test('R20: die Kinder-Vorgabe der Kacheln - Punkte zuerst und sichtbar, Budget aus, nur bei gefolgter Vorgabe', async () => {
   const { childDefaultWidgetConfig, DEFAULT_WIDGET_CONFIG } = await import('../public/utils/dashboard-widgets.js');
-  const kid = childDefaultWidgetConfig(DEFAULT_WIDGET_CONFIG);
+  // Ein Haushalt, der das Budget eingeblendet hat (seit R21 ist es ab Werk aus).
+  const household = DEFAULT_WIDGET_CONFIG.map((w) => (w.id === 'budget' ? { ...w, visible: true } : w));
+  const kid = childDefaultWidgetConfig(household);
   assert.equal(kid[0].id, 'rewards');
   assert.equal(kid[0].visible, true);
   assert.equal(kid.find((w) => w.id === 'budget').visible, false);
   assert.deepEqual(kid.map((w) => w.order), kid.map((_, i) => i));
   assert.equal(kid.length, DEFAULT_WIDGET_CONFIG.length, 'keine Kachel verschwindet aus dem Anpassen-Tray');
-  assert.equal(DEFAULT_WIDGET_CONFIG.find((w) => w.id === 'budget').visible, true, 'die Eingabe bleibt unberuehrt');
+  assert.equal(household.find((w) => w.id === 'budget').visible, true, 'die Eingabe bleibt unberuehrt');
 
   assert.deepEqual(dash.childDefaultFor(DEFAULT_WIDGET_CONFIG, KIND, true), kid);
   assert.equal(dash.childDefaultFor(DEFAULT_WIDGET_CONFIG, KIND, false), DEFAULT_WIDGET_CONFIG, 'ein eigenes Layout bleibt');

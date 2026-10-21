@@ -284,9 +284,15 @@ cfgSet.run('weather_units', 'metric');
 // sind es acht Zellen: zwei volle Zeilen, kein Loch. Gemessen am gerenderten
 // Raster, nicht am Reissbrett - die Kachelbreiten stehen im CSS, die
 // Spaltenzahl aber erst im Fenster.
+//
+// SEIT R21 IST DAS BUDGET AUS, wie im Autor-Default (Critique 2026-10-21, D5
+// "Uebersicht als Briefing": kein Kontostand auf dem Schirm, den jeder im
+// Haushalt sieht). Es bleibt in der Liste, damit "Anpassen" es an seinem Platz
+// zurueckholt. Ein Loch hinterlaesst es nicht: das Raster laesst seit R21 auch
+// eine Kachel nach UNTEN in eine freie Zelle wachsen (`columnFillSpans`).
 const dashboardWidgets = [
   { id: 'family',    visible: true,  size: '1x2' },
-  { id: 'budget',    visible: true,  size: '1x2' },
+  { id: 'budget',    visible: false, size: '1x2' },
   // 1x2 wie der Autor-Default (defaultWidgetSize in public/pages/dashboard.js).
   // Auf 1x1 war die Geburtstagskachel die KURZE Karte einer Rasterzeile - und
   // damit bestimmte SIE die Zeilenhoehe, waehrend Familie und Budget daneben

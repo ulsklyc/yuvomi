@@ -798,8 +798,9 @@ test('Heute-Blatt: Freigaben sprechen nur in der Sicht "approver" (a2 x a8)', as
 test('Freigaben: die Zahl steht an genau einer Stelle - Widget > Heute-Blatt > Kennzahlkachel', async () => {
   const data = {
     upcomingEvents: [eveningEvent()],
-    // Budget und Geburtstag halten die Reihe bei mindestens zwei Kacheln.
-    budget: { entryCount: 3, balance: 100, income: 200 },
+    // Notiz und Geburtstag halten die Reihe bei mindestens zwei Kacheln (der
+    // Saldo steht seit R21 nicht mehr in ihr).
+    pinnedNotes: [{ title: 'Zettel', pinned: 1 }], pinnedNotesCount: 1,
     birthdays: [{ name: 'Oma', days_until: 5, kind: 'birthday' }],
     rewards: { view: 'approver', me: 1, standings: [], participantCount: 2, pending: 2, catalog: [] },
   };
@@ -827,7 +828,7 @@ test('Freigaben: die Zahl steht an genau einer Stelle - Widget > Heute-Blatt > K
  * Packung muss nachbestellt werden: das sagt das Blatt nicht. */
 test('Dosen: die Zahl offener Dosen steht nicht in Blatt UND Kennzahlkachel', async () => {
   const data = {
-    budget: { entryCount: 3, balance: 100, income: 200 },
+    pinnedNotes: [{ title: 'Zettel', pinned: 1 }], pinnedNotesCount: 1,
     birthdays: [{ name: 'Oma', days_until: 5, kind: 'birthday' }],
     health: { ...openDoses(), lowStockCount: 0 },
   };
@@ -3260,6 +3261,120 @@ test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es nach d
   nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill nimmt das Wachstum im Anpassen-Modus zurueck');
 });
 
+// --------------------------------------------------------
+// R21 (Critique 2026-10-21, D5): die Uebersicht als Briefing.
+// Geld-Kacheln ab Werk aus, das Raster ohne Loch bei drei und vier Spalten,
+// und auf dem Telefon so viele Programmzeilen, wie in den ersten Schirm passen.
+// --------------------------------------------------------
+
+test('R21 D5: der Saldo steht ab Werk nirgends - Budget-Widget aus, keine Saldo-Kachel', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(widgets.defaultWidgetVisible('budget'), false, 'das Budget-Widget ist ein Opt-in');
+  nodeAssert.equal(widgets.DEFAULT_WIDGET_CONFIG.find((w) => w.id === 'budget').visible, false);
+  nodeAssert.ok(!__test.METRIC_TILE_ORDER.includes('budget'), 'und die Kennzahlreihe rueckt den Saldo nicht nach');
+  // Keine Migration: ein gespeichertes Layout mit eingeblendetem Budget bleibt so.
+  const saved = widgets.normalizeDashboardConfig([{ id: 'budget', visible: true, order: 0, size: '1x2' }]);
+  nodeAssert.equal(saved.find((w) => w.id === 'budget').visible, true, 'gespeichert bleibt gespeichert');
+});
+
+/** Leere Zellen VOR der letzten Zeile nach Wachsen nach rechts und nach unten. */
+function holesAfterFill(items, columns) {
+  const wide = widgets.rowFillSpans(items, columns);
+  const widened = items.map((it) => ({ ...it, cols: wide.get(it.id) ?? it.cols }));
+  const tall = widgets.columnFillSpans(widened, columns);
+  const filled = widened.map((it) => ({ ...it, rows: tall.get(it.id) ?? it.rows }));
+  return { cells: widgets.packGrid(filled, columns), before: widgets.packGrid(items, columns), filled };
+}
+
+test('R21 D5: columnFillSpans schliesst das Loch unter einer 1x1-Kachel neben zwei hohen', () => {
+  nodeAssert.equal(typeof widgets.columnFillSpans, 'function', 'columnFillSpans fehlt in utils/dashboard-widgets.js');
+  // Der gemessene Fall (1440px, Seitenleiste eingeklappt, vier Spalten): drei
+  // hohe Kacheln und daneben Belohnungen 1x1 - darunter blieben 305x185px leer.
+  const demo = [kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
+    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1)];
+  nodeAssert.ok(widgets.gridHoleCount(widgets.packGrid(demo, 4)) > 0, 'Vorbedingung: ohne Fuellung ein Loch');
+  for (const cols of [2, 3, 4]) {
+    const { cells, before } = holesAfterFill(demo, cols);
+    nodeAssert.equal(widgets.gridHoleCount(cells), 0, `kein Loch bei ${cols} Spalten`);
+    nodeAssert.deepEqual(positions(cells), positions(before), `keine Kachel wechselt den Platz (${cols} Spalten)`);
+    nodeAssert.ok(cells.length <= before.length, 'das Raster wird nicht hoeher');
+  }
+  // Das Kinderkonto (R20: Belohnungen zuerst) bei drei Spalten: 1x1 vorn links.
+  const kind = [kachel('rewards', 1, 1), kachel('family', 1, 2), kachel('birthdays', 1, 2),
+    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('notes', 2, 1)];
+  nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(kind, 3).cells), 0, 'auch das Kinderkonto ohne Loch');
+  // Eine Kachel, die so hoch ist wie ihr Inhalt, waechst nicht.
+  const stiff = widgets.columnFillSpans([kachel('a', 1, 2), kachel('b', 1, 1, '1x1')].map((it) => (it.id === 'b' ? { ...it, grow: false } : it)), 2);
+  nodeAssert.equal(stiff.size, 0);
+});
+
+test('R21 D5: die Standardgroessen sind bei drei und vier Spalten lueckenlos', () => {
+  const sichtbar = widgets.DEFAULT_WIDGET_CONFIG.filter((w) => w.visible);
+  const span = (size) => size.split('x').map(Number);
+  // Mit und ohne Countdown (der erscheint erst, wenn jemand etwas markiert).
+  for (const withCountdown of [false, true]) {
+    const items = sichtbar.filter((w) => withCountdown || w.id !== 'countdown')
+      .map((w) => kachel(w.id, ...span(w.size)))
+      // Die Kennzahlreihe ist so hoch wie ihr Inhalt (align-self: start).
+      .map((it) => (it.id === 'metrics' ? { ...it, grow: false } : it));
+    for (const cols of [3, 4]) {
+      nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(items, cols).cells), 0,
+        `Loch bei ${cols} Spalten (${withCountdown ? 'mit' : 'ohne'} Countdown): ${items.map((i) => i.id).join(',')}`);
+    }
+  }
+});
+
+test('R21 D5: applyRowFill setzt das Wachsen nach unten als Darstellung, und CSS liest es', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], rewards: [1, 1], weather: [2, 1], metrics: [2, 1], notes: [2, 1] };
+  const tile = (id) => {
+    const props = new Map();
+    return { dataset: { widgetId: id }, style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props } };
+  };
+  const tiles = Object.keys(SPANS).map(tile);
+  const grid = { children: tiles };
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = (el) => {
+    if (el === grid) return { gridTemplateColumns: '305px 305px 305px 305px' };
+    const [cols, rows] = SPANS[el.dataset.widgetId];
+    return { display: 'flex', alignSelf: el.dataset.widgetId === 'metrics' ? 'start' : 'stretch',
+      gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  try {
+    __test.applyRowFill(grid);
+    const tiefer = tiles.filter((t) => 'colFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-rows')]);
+    nodeAssert.deepEqual(tiefer, [['rewards', '2']], 'Belohnungen fuellt die Zelle unter sich');
+    __test.applyRowFill(grid, { editing: true });
+    nodeAssert.equal(tiles.filter((t) => 'colFill' in t.dataset || t.style.props.size).length, 0,
+      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-col-fill]');
+  nodeAssert.ok(regel, 'keine Regel fuer [data-col-fill] in dashboard.css');
+  nodeAssert.match(regel.body, /grid-row:\s*span var\(--widget-fill-rows\)/);
+});
+
+test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten Schirm passen', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.programRowsThatFit, 'function', 'programRowsThatFit fehlt');
+  // Gemessen 390x844: erste Zeile bei y226, Zeilen 64px, "+N weitere" 48px,
+  // Kapsel ab y772 (minus 8px Luft). Neun Punkte an diesem Tag.
+  const phone = { fold: 764, rowsTop: 226, rowHeight: 64, trailing: 48, total: 9 };
+  nodeAssert.equal(__test.programRowsThatFit(phone), 7, 'sieben von neun statt zwei');
+  nodeAssert.equal(__test.programRowsThatFit({ ...phone, total: 5 }), 5, 'was ganz passt, steht ganz - ohne "+N weitere"');
+  nodeAssert.equal(__test.programRowsThatFit({ ...phone, fold: 420 }), __test.PROGRAM_ROW_CAP_PHONE,
+    'auf einem sehr kleinen Schirm bleiben die zwei Zeilen als Untergrenze');
+  // Verdrahtet: gemessen wird im selben Task wie das Zeichnen, vor dem Bild.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  nodeAssert.match(src, /setHtml\(shell, `[\s\S]{0,900}`\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
+    'rebuildDashboard misst direkt nach dem Zeichnen');
+  nodeAssert.match(src, /renderTodayCockpit\(data, cfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
+  nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
+});
+
+
 test('isUserOrderedConfig gibt es nicht mehr - das Raster schaltet nach keiner Reihenfolge um', () => {
   // Gegenprobe zur Entscheidung vom 2026-09-23 (immer dicht): ein Aufrufer,
   // der die Unterscheidung zurueckholen wollte, faende sie hier nicht mehr.
@@ -3333,11 +3448,13 @@ test('Kennzahlreihe wiederholt nicht, was das Cockpit schon sagt', async () => {
 test('Kennzahlreihe wiederholt nicht, was ein sichtbares Widget schon sagt', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const ohne = __test.selectMetricTiles(METRIC_DATA, 'EUR', new Set()).map((t) => t.id);
-  assert(ohne.includes('budget'), 'ohne Budget-Widget gehoert die Budget-Kachel in die Reihe');
+  assert(ohne.includes('birthdays'), 'ohne Geburtstage-Widget gehoert die Geburtstagskachel in die Reihe');
+  // R21 (D5): der Saldo steht nie in der Reihe - auch nicht, wenn das
+  // Budget-Widget fehlt, und das ist seit R21 die Vorgabe.
+  assert(!ohne.includes('budget'), 'kein Kontostand in der Kennzahlreihe');
 
-  const mit = __test.selectMetricTiles(METRIC_DATA, 'EUR', new Set(['budget', 'birthdays'])).map((t) => t.id);
-  assert(!mit.includes('budget'), 'neben einem sichtbaren Budget-Widget ist die Budget-Kachel dessen Echo');
-  assert(!mit.includes('birthdays'), 'dasselbe gilt fuer die Geburtstage');
+  const mit = __test.selectMetricTiles(METRIC_DATA, 'EUR', new Set(['birthdays'])).map((t) => t.id);
+  assert(!mit.includes('birthdays'), 'neben einem sichtbaren Geburtstage-Widget ist die Kachel dessen Echo');
 
   // ES IST EIN FILTER, KEINE ZWEITE LISTE: wer ein Widget ausblendet, bekommt
   // dessen Kachel zurueck. Ohne diese Gegenrichtung waere ein Guard gruen, der

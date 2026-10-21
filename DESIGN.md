@@ -2275,6 +2275,15 @@ Sie loest das Loch nicht allein: dazu gehoert, dass eine Listen-Kachel ihre Zeil
 ihrer HOEHE nimmt statt aus einer Konstante, die fuer eine und fuer zwei Rasterzeilen
 dieselbe war. Ueber das Standard-Board gemessen bleiben 3px Leerraum pro Karte.
 
+**Das Raster der Uebersicht hat im Normalmodus kein Loch - rechts, dann unten** (R10 L9, R21 D5).
+Nach der dichten Packung waechst jede Kachel erst nach rechts in den Rest ihrer Zeile
+(`rowFillSpans`), dann nach unten in freie Zellen, die von links niemand erreicht
+(`columnFillSpans`): eine 1x1-Kachel neben zwei hohen liess darunter 305x185px leer (1440px,
+vier Spalten) bzw. 319x201px (Kinderkonto, drei Spalten). Beides ist Darstellung
+(`data-row-fill`/`data-col-fill`), gespeichert bleibt die gewaehlte Groesse; im Anpassen-Modus
+waechst nichts. Die Kennzahlreihe (`align-self: start`) waechst nicht nach unten. Gemessen nachher:
+0 Loecher bei 2, 3 und 4 Spalten, Erwachsene und Kind (`test:dashboard`, „R21 D5").
+
 **Und eine Fusszeile ist eine Auskunft, kein Griff.** Die Tagesbilanz des Haushalts schliesst
 ihre Karte als hairline-getrennte Zeile ab, exakt wie der Fuss der Budgetkarte - ein
 getoentes Well haette dieselbe Form gehabt wie „1 zu bestaetigen" in den Belohnungen, und das
@@ -3786,6 +3795,20 @@ verlaesst das Blatt** zur Endzeit, ohne Neuladen; die Termin-Kachel behaelt es z
 darueber. **Ab 720px Blattbreite laufen die Zeilen in zwei Spalten** (spaltenweise, per
 Container-Abfrage) - ein Programm von sechs Zeilen soll auf einem breiten Schirm nicht
 halbleer eine Spalte hinunterlaufen.
+
+**Die Uebersicht ist ein Briefing, kein Kachel-Board** (R21, Critique 2026-10-21, D5). Das Blatt
+steht vor allen Kacheln und ist ihr Inhalt; die Kacheln sind Zusatz. **Auf dem Telefon traegt das
+Blatt so viele Zeilen, wie in den ersten Schirm passen** (bis zur Kapsel, mindestens zwei):
+`measurePhoneProgram` misst nach dem Zeichnen im selben Task und zeichnet nur das Blatt neu, der
+naechste Aufbau rechnet mit dem gemessenen Wert. Vorher ein fester Deckel von zwei Zeilen
+(gemessen 390x844: 2 von 9 Punkten, darunter Familie und Budget im ersten Schirm; jetzt 8 von 9,
+das Programm fuellt 77 % statt 29 % der Flaeche bis zur Kapsel). „+N weitere" ist Footnote 13.
+**Geld steht ab Werk nicht auf der Uebersicht:** das Budget-Widget ist ein Opt-in
+(`DEFAULT_HIDDEN_WIDGETS`), und die Kennzahlreihe fuehrt keinen Saldo - ein Kontostand ist keine
+Kennzahl fuer den Morgen und gehoert nicht auf den Schirm, den jeder im Haushalt sieht. Die offene
+Forderung der geteilten Ausgaben bleibt in der Reihe: sie verlangt eine Handlung. Gespeicherte
+Layouts behalten ihre Sichtbarkeit (keine Migration). Guards: `test:dashboard` („R21 D5"),
+`test:typography` („R21 S5": das Innenleben der Kacheln liest in den D4-Rollen).
 
 ### Das Wetter-Widget (Signature Component)
 

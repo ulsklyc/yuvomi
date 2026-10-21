@@ -279,8 +279,9 @@ test('Leerzustand: ein Kind bekommt keinen Knopf, den es nicht benutzen darf', (
 
 test('Kennzahlkachel: das Kind sieht den eigenen Stand, niemand einen Spitzenreiter', () => {
   global.window = { yuvomi: null };
-  // Eine Kachelreihe braucht mindestens zwei Kacheln - das Budget ist die zweite.
-  const base = { budget: { entryCount: 3, balance: 100, income: 200 }, birthdays: [], pinnedNotes: [], health: {}, housekeeping: {} };
+  // Eine Kachelreihe braucht mindestens zwei Kacheln - die Notiz ist die zweite
+  // (der Saldo steht seit R21 nicht mehr in der Reihe).
+  const base = { birthdays: [], pinnedNotes: [{ title: 'Zettel', pinned: 1 }], pinnedNotesCount: 1, health: {}, housekeeping: {} };
   const kidTile = selectMetricTiles({
     ...base, rewards: { view: 'self', me: 7, standings: [emma(45)], catalog: [KINO] },
   }, 'EUR', new Set()).find((tile) => tile.id === 'rewards');
@@ -297,7 +298,7 @@ test('Kennzahlkachel: das Kind sieht den eigenen Stand, niemand einen Spitzenrei
 
 test('Kennzahlkachel: offene Geld-Anfragen zaehlen mit - aber nur fuer den, der freigibt', () => {
   global.window = { yuvomi: null };
-  const base = { budget: { entryCount: 3, balance: 100, income: 200 }, birthdays: [], pinnedNotes: [], health: {}, housekeeping: {} };
+  const base = { birthdays: [], pinnedNotes: [{ title: 'Zettel', pinned: 1 }], pinnedNotesCount: 1, health: {}, housekeeping: {} };
   const tile = (rewards) => selectMetricTiles({ ...base, rewards }, 'EUR', new Set()).find((t) => t.id === 'rewards');
   // Eltern: Praemien- und Geld-Anfragen zusammen, auch wenn nur Geld offen ist.
   const both = tile({ view: 'approver', me: 1, standings: [leo(60), emma(30)], catalog: [KINO], pending: 1, moneyPending: 2 });

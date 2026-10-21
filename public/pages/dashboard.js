@@ -41,7 +41,7 @@ import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans, columnFillSpans,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
 } from '/utils/dashboard-widgets.js';
@@ -2660,7 +2660,14 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
  * Art Zahl, fuer die diese Reihe da ist. Vor den Opt-in-Modulen, weil eine
  * Schuld eine Handlung verlangt und ein Punktestand nicht. Ausgeglichen gibt es
  * keine Kachel (siehe metricTileFor). */
-const METRIC_TILE_ORDER = ['tasks', 'shopping', 'budget', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
+/* KEIN SALDO IN DER REIHE (R21, Critique 2026-10-21, D5). Seit das
+ * Budget-Widget in der Vorgabe aus ist (DEFAULT_HIDDEN_WIDGETS), waere sein
+ * Kontostand hier nachgerueckt - die Regel oben holt ja genau das, was kein
+ * eigenes Widget zeigt. Ein Kontostand ist aber keine Kennzahl fuer den
+ * Morgen, sondern eine Auskunft, die man sich holt: er steht im Budget-Widget,
+ * wer es einblendet. Die offene Forderung der geteilten Ausgaben bleibt - sie
+ * verlangt eine Handlung, wie eine ueberfaellige Aufgabe. */
+const METRIC_TILE_ORDER = ['tasks', 'shopping', 'split-expenses', 'birthdays', 'meals', 'notes', 'rewards', 'health', 'housekeeping'];
 const METRIC_TILE_COUNT = 4;
 
 /**
@@ -2680,7 +2687,7 @@ function shoppingSoleListRoute(data) {
 }
 
 function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
-  const route = { tasks: '/tasks', shopping: '/shopping', budget: BUDGET_MONTH_ROUTE, birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
+  const route = { tasks: '/tasks', shopping: '/shopping', birthdays: '/birthdays', meals: '/meals', notes: '/notes', rewards: '/rewards', health: '/health', housekeeping: '/housekeeping' }[id];
   switch (id) {
     case 'tasks': {
       const open = data.openTaskCount;
@@ -2701,24 +2708,6 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
         id, route, icon: widgetIcon('shopping'), label: t('nav.shopping'),
         value: t('dashboard.metricItems', { count: items }),
         note: items === 0 ? t('dashboard.metricAllBought') : t('dashboard.metricOnLists', { count: lists }),
-      };
-    }
-    case 'budget': {
-      const budget = data.budget ?? {};
-      if (!(budget.entryCount > 0)) return null;
-      const balance = budget.balance || 0;
-      // DIE VORZEICHENREGEL IST NICHT NEU - sie ist die des Budget-Widgets,
-      // Zeichen fuer Zeichen. Ein Minus allein wird bei 20px auf dem Handy
-      // ueberlesen, deshalb traegt die Farbe den zweiten Kanal; und der
-      // Sonderfall aus #504 kommt mit: wer nur Ausgaben erfasst, hat einen
-      // rechnerisch negativen Saldo, der nichts ueber seine Lage sagt, und
-      // bekommt Label-Farbe statt Rot.
-      const neutral = (budget.income || 0) === 0 && balance < 0;
-      return {
-        id, route, icon: widgetIcon('budget'), label: t('nav.budget'),
-        value: formatCurrency(balance, currency),
-        note: t('dashboard.monthlyBalance'),
-        tone: neutral ? 'balance-neutral' : balance >= 0 ? 'balance-positive' : 'balance-negative',
       };
     }
     case 'split-expenses': {
@@ -3893,14 +3882,85 @@ function renderTodayStateRow({ title, sub, icon, route }) {
 // sondern eine zweite Aufgabenliste. Der Überlauf spricht als stille Fußzeile.
 const PROGRAM_ROW_CAP = 6;
 
-/* AUF DEM TELEFON ZWEI ZEILEN (R14, A7 P2-2). Sechs Zeilen zu je 64px plus
- * Kopf und Einkauf machten das Blatt 591px hoch; das erste Widget begann bei
- * y760 von 844, hinter der Kapsel. Zwei Zeilen beantworten „was steht an?",
- * der Rest steht eine Geste entfernt hinter „+N weitere" - dort auch die
- * Einkaufszeile (renderTodayCockpit). Unter dem Deckel bleibt zuerst, was
- * offen ist (composeTodaySheet), und die Sammelzeile der Ueberfaelligen ist
- * eine davon. Gemessen danach: erstes Widget y~400 statt y760. */
+/* AUF DEM TELEFON SO VIELE ZEILEN, WIE IN DEN ERSTEN SCHIRM PASSEN (R21,
+ * Critique 2026-10-21, D5 "Uebersicht als Briefing").
+ *
+ * Hier stand ein fester Deckel von ZWEI Zeilen (R14, A7 P2-2): sechs Zeilen
+ * plus Einkauf schoben damals das erste Widget hinter die Kapsel, und das
+ * Widget galt als das, was man sehen muss. Die Critique hat die Rangfolge
+ * umgedreht: die Uebersicht ist ein Briefing, das Programm des Tages ist ihr
+ * Inhalt, die Kacheln stehen darunter. Gemessen bei 390x844 zeigte das Blatt
+ * 2 von 9 Punkten, darunter 370px Familie und Budget im ersten Schirm.
+ *
+ * Wie viele Zeilen passen, weiss erst das Layout: Gruss und Wetterzeile
+ * brechen je nach Sprache und Name um. Der erste Aufbau rechnet deshalb mit
+ * dem letzten gemessenen Wert (sonst mit dem Mindestwert), `fitPhoneProgram`
+ * misst danach im selben Task - vor dem naechsten Bild - und zeichnet nur das
+ * Blatt neu, wenn die Zahl nicht stimmt. Der Rest steht wie bisher hinter
+ * "+N weitere" (mit der Einkaufszeile); zuerst bleibt, was offen ist
+ * (composeTodaySheet), und die Sammelzeile der Ueberfaelligen ist EINE Zeile.
+ * Zwei Zeilen bleiben die Untergrenze, auch auf einem sehr kleinen Schirm. */
 const PROGRAM_ROW_CAP_PHONE = 2;
+
+/** Zuletzt gemessene Zeilenzahl je Fensterhoehe (fitPhoneProgram). */
+let phoneProgramFit = null;
+
+function phoneProgramCap() {
+  const height = globalThis.window?.innerHeight;
+  return phoneProgramFit && phoneProgramFit.height === height ? phoneProgramFit.cap : PROGRAM_ROW_CAP_PHONE;
+}
+
+/**
+ * Wie viele Programmzeilen in den ersten Schirm passen - rein, ohne DOM.
+ * @param {{ fold: number, rowsTop: number, rowHeight: number, trailing: number, total: number }} geometry
+ *   fold      Oberkante dessen, was den Schirm unten abdeckt (Kapsel), in Inhaltskoordinaten
+ *   rowsTop   Oberkante der ersten Zeile, in denselben Koordinaten
+ *   rowHeight Hoehe einer Zeile
+ *   trailing  was unter den Zeilen steht, solange es einen Ueberlauf gibt ("+N weitere")
+ *   total     Zeilen des ganzen Tages (nach der Sammelzeile)
+ * @returns {number}
+ */
+function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total }) {
+  if (!(rowHeight > 0) || !(total > 0)) return PROGRAM_ROW_CAP_PHONE;
+  const room = fold - rowsTop;
+  if (total * rowHeight <= room) return total;
+  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total, Math.floor((room - trailing) / rowHeight)));
+}
+
+/**
+ * Misst das gezeichnete Blatt auf dem Telefon und meldet die passende
+ * Zeilenzahl, wenn sie von der gezeichneten abweicht - sonst `null`.
+ * @param {Element} shell
+ * @returns {number|null}
+ */
+function measurePhoneProgram(shell) {
+  const section = shell?.querySelector?.('.today-cockpit[data-program-cap]');
+  if (!section || !onPhoneStage()) return null;
+  const rows = section.querySelector('.today-cockpit__rows:not(.today-cockpit__rows--more)');
+  const first = rows?.querySelector(':scope > .today-cockpit-card');
+  if (!rows || !first) return null;
+  const scroller = section.closest('.app-content');
+  const scrollTop = scroller?.scrollTop ?? 0;
+  const capsule = document.querySelector('.nav-bottom__items');
+  const capsuleTop = capsule?.getBoundingClientRect().top;
+  // Ohne sichtbare Kapsel (Anzeige, Querformat ohne Leiste) ist der Falz die Fensterkante.
+  const foldViewport = capsuleTop > 0 ? capsuleTop : window.innerHeight;
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-2')) || 8;
+  const rowsRect = rows.getBoundingClientRect();
+  const sectionRect = section.getBoundingClientRect();
+  const geometry = {
+    fold: foldViewport + scrollTop - gap,
+    rowsTop: rowsRect.top + scrollTop,
+    rowHeight: first.getBoundingClientRect().height,
+    trailing: Math.max(0, sectionRect.bottom - rowsRect.bottom),
+    total: Number(section.dataset.programTotal) || 0,
+  };
+  // Ein leerer Tag hat eine Zustandszeile und nichts zu deckeln.
+  if (!geometry.total) return null;
+  const cap = programRowsThatFit(geometry);
+  phoneProgramFit = { height: window.innerHeight, cap };
+  return cap === Number(section.dataset.programCap) ? null : cap;
+}
 
 /* AB ZWEI UEBERFAELLIGEN EINE SAMMELZEILE (R14, A7 P2-2). Fuenfmal rotes
  * „Ueberfaellig" untereinander ist am Morgen kein Programm, sondern ein
@@ -3983,7 +4043,7 @@ function todaySheetSpeaks(data, cfg, now = new Date()) {
 }
 
 function buildTodayCockpitModel(data, cfg = [], {
-  cap = onPhoneStage() ? PROGRAM_ROW_CAP_PHONE : PROGRAM_ROW_CAP,
+  cap = onPhoneStage() ? phoneProgramCap() : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
   isDisplay = false,
@@ -4229,8 +4289,8 @@ function wireTodayMore(root) {
   });
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen } = {}) {
-  const model = buildTodayCockpitModel(data, cfg, { now });
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, cap } = {}) {
+  const model = buildTodayCockpitModel(data, cfg, { now, ...(cap ? { cap } : {}) });
 
   /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
    * Desktop ist das Blatt 1140px breit, und eine Zeile nutzte davon ~200px
@@ -4299,8 +4359,13 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // Mobil klappt das Band im Anpassen-Modus auf diese Kopfzeile zusammen
   // (dashboard.css, `.today-cockpit--editing`): angeordnet wird dort nichts,
   // und sein Inhalt schob das erste Rasterwidget bis an den Bildschirmrand.
+  // Zeilenzahl und Tagesumfang stehen am Blatt, damit `measurePhoneProgram`
+  // nach dem Zeichnen nachrechnen kann, ohne das Modell ein zweites Mal zu bauen.
+  const fit = onPhoneStage() && !editing
+    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"`
+    : '';
   return `
-    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title">
+    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
       <div class="today-cockpit__header">
         <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
         ${hideBtn}
@@ -6953,9 +7018,14 @@ function applyRowFill(grid, { editing = false } = {}) {
   // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
   const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
   for (const el of grid.children) {
-    if (!('rowFill' in el.dataset)) continue;
-    delete el.dataset.rowFill;
-    el.style.removeProperty('--widget-fill-span');
+    if ('rowFill' in el.dataset) {
+      delete el.dataset.rowFill;
+      el.style.removeProperty('--widget-fill-span');
+    }
+    if ('colFill' in el.dataset) {
+      delete el.dataset.colFill;
+      el.style.removeProperty('--widget-fill-rows');
+    }
   }
   if (editing) return;
   const columns = gridColumnCount(grid);
@@ -6967,6 +7037,22 @@ function applyRowFill(grid, { editing = false } = {}) {
     if (!span) continue;
     item.el.dataset.rowFill = '';
     item.el.style.setProperty('--widget-fill-span', String(span));
+  }
+  /* UND WAS VON LINKS NIEMAND ERREICHT, FUELLT DIE KACHEL DARUEBER (R21, D5):
+   * `columnFillSpans`, utils/dashboard-widgets.js. Eine Kachel, die so hoch ist
+   * wie ihr Inhalt (`align-self: start`, die Kennzahlreihe), waechst nicht -
+   * gestreckt stuende die Leere nur in ihr. */
+  const widened = items.map((item) => ({
+    ...item,
+    cols: grown.get(item.id) ?? item.cols,
+    grow: getComputedStyle(item.el).alignSelf !== 'start',
+  }));
+  const taller = columnFillSpans(widened, columns);
+  for (const item of widened) {
+    const rows = taller.get(item.id);
+    if (!rows) continue;
+    item.el.dataset.colFill = '';
+    item.el.style.setProperty('--widget-fill-rows', String(rows));
   }
 }
 
@@ -7935,14 +8021,23 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // still, und unter der Seitenblende ist die Blende schon das Einblenden.
     const fromSkeleton = Boolean(shell.querySelector('.widget-skeleton'))
       && !document.documentElement.classList.contains('page-swapping');
-    swapContent(shell, () => setHtml(shell, `
+    swapContent(shell, () => {
+      setHtml(shell, `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
         ${cockpitHtml}
       </section>
       ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
-    `), { animate: fromSkeleton });
+    `);
+      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
+      // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
+      const fitted = measurePhoneProgram(shell);
+      if (fitted) {
+        shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        shell.querySelector('.today-cockpit')?.remove();
+      }
+    }, { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
     disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
@@ -8281,7 +8376,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

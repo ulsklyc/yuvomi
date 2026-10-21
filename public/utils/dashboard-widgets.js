@@ -168,7 +168,15 @@ export const COCKPIT_COVERED_WIDGETS = new Set(['tasks', 'calendar', 'shopping',
 // jeder Haushalt fuehrt Mindesthaltbarkeiten, und ein frisches Dashboard mit
 // einer Kachel „nichts laeuft ab" waere die Ueberladung, die diese Menge
 // verhindern soll.
-export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'pantry', 'clock', 'weather', 'quicklinks']);
+// `budget` steht seit R21 hier (Critique 2026-10-21, D5 "Uebersicht als
+// Briefing"): ein Saldo von 34px in Gruen war die groesste Zahl der Startseite,
+// noch vor dem, was heute ansteht - und ein Kontostand gehoert nicht auf einen
+// Schirm, den jeder im Haushalt und jeder Gast am Kuehlschrank sieht. Wer ihn
+// dort will, holt ihn ueber "Anpassen". Bestandslayouts behalten, was sie
+// gespeichert haben (keine Migration); nur wer der Vorgabe folgt oder ein
+// Layout ohne `budget` mitbringt, startet ohne. Die Kennzahlreihe fuehrt den
+// Saldo aus demselben Grund nicht mehr (METRIC_TILE_ORDER, pages/dashboard.js).
+export const DEFAULT_HIDDEN_WIDGETS = new Set([...COCKPIT_COVERED_WIDGETS, 'budget', 'rewards', 'health', 'cycle', 'fasting', 'nutrition', 'housekeeping', 'schedule', 'waste', 'pantry', 'clock', 'weather', 'quicklinks']);
 
 export function defaultWidgetVisible(id) {
   return !DEFAULT_HIDDEN_WIDGETS.has(id);
@@ -421,6 +429,60 @@ export function rowFillSpans(items, columns) {
       end += 1;
     }
     if (end > left + w) grown.set(item.id, end - left);
+  }
+  return grown;
+}
+
+/**
+ * Welche Kachel UEBER einer freien Zelle nach unten waechst (R21, Critique
+ * 2026-10-21, D5). Das Wachsen nach rechts (`rowFillSpans`) schliesst eine
+ * Zelle nur, wenn links von ihr eine Kachel steht, die in ALLEN ihren Zeilen
+ * Platz hat. Steht eine 1x1-Kachel neben zwei hohen, bleibt darunter ein Loch,
+ * das niemand von links erreicht: gemessen bei 1440px mit eingeklappter
+ * Seitenleiste (vier Spalten) 305x185px unter "Belohnungen", bei 1280px fuer
+ * ein Kinderkonto 319x201px - mitten im Raster, nicht an seinem Ende.
+ *
+ * Dieselbe Regel, um neunzig Grad gedreht: nach dem Wachsen nach rechts waechst
+ * jede Kachel nach unten ueber die Zellen, die in ALLEN ihren Spalten frei sind,
+ * bis zur naechsten belegten Zelle oder zur letzten Zeile des Rasters. Hoeher
+ * wird das Raster dadurch nie. `grow: false` nimmt eine Kachel aus (die
+ * Kennzahlreihe ist so hoch wie ihr Inhalt, gestreckt laege die Leere nur in
+ * ihr statt neben ihr).
+ *
+ * DIE AEQUIVALENZ GILT WIE OBEN: gewachsen wird nur in Zellen, die nach der
+ * vollen Packung leer sind, also findet jede Kachel bei der Neupackung mit den
+ * hoeheren Spans dieselbe erste passende Stelle (Guard in test-dashboard.js).
+ *
+ * @param {{ id: string, cols: number, rows: number, grow?: boolean }[]} items in Rangfolge,
+ *        `cols` schon nach `rowFillSpans` verbreitert
+ * @param {number} columns
+ * @returns {Map<string, number>} Id -> neue Zeilenzahl, nur fuer Kacheln, die wachsen
+ */
+export function columnFillSpans(items, columns) {
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  const grown = new Map();
+  if (cols < 2) return grown;
+  const cells = packGrid(items, cols);
+  for (const item of items) {
+    if (item.grow === false) continue;
+    let top = -1;
+    let left = -1;
+    for (let r = 0; r < cells.length && top < 0; r += 1) {
+      const c = cells[r].indexOf(item.id);
+      if (c >= 0) { top = r; left = c; }
+    }
+    if (top < 0) continue;
+    const w = Math.min(Math.max(1, item.cols | 0), cols);
+    let end = top + Math.max(1, item.rows | 0);
+    const rowFree = (r) => {
+      for (let c = left; c < left + w; c += 1) if (!cells[r] || cells[r][c]) return false;
+      return true;
+    };
+    while (end < cells.length && rowFree(end)) {
+      for (let c = left; c < left + w; c += 1) cells[end][c] = item.id;
+      end += 1;
+    }
+    if (end > top + Math.max(1, item.rows | 0)) grown.set(item.id, end - top);
   }
   return grown;
 }

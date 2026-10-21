@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The Overview opens with your day.** On a phone, "Today" now shows as many entries as fit on
+  the first screen instead of stopping after two, with the rest behind "+N more". The budget card
+  and the account balance are no longer on a new Overview - bring the card back under
+  "Customize" if you want it there; layouts you saved keep it. On wide screens the tiles close the
+  gap that was left under a small tile next to two tall ones.
+
 - **Small text on the Overview tiles reads at the sizes used everywhere else.** Counts, time
   left, amounts and the line under an empty tile were 14 pixels, the "+N more" line under every
   list tile only 12. They now use the shared sizes: 13 pixels for the small line under a name and

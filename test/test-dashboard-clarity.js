@@ -1254,20 +1254,27 @@ test('#1607: jeder Weg aus der Budget-Kachel nennt den Reiter der Monatsuebersic
   assert.deepEqual([...new Set(gefuellt)], ['/budget?tab=budget']);
 });
 
-test('#1607: die Kennzahl-Kachel „Monatssaldo" nennt denselben Reiter', () => {
+test('#1607 + R21: der Monatssaldo steht nur im Budget-Widget, und dessen Kopf nennt denselben Reiter', async () => {
+  const { readFileSync } = await import('node:fs');
   const prevWindow = global.window;
   global.window = { yuvomi: { isModuleDisabled: () => false } };
   try {
-    // Zwei Kacheln, sonst ist es keine Reihe (selectMetricTiles).
-    const tile = __test.selectMetricTiles({
+    // R21 (D5): die Kennzahlreihe fuehrt keinen Kontostand mehr - auch wenn
+    // das Budget-Widget fehlt, was seit R21 die Vorgabe ist.
+    const tiles = __test.selectMetricTiles({
       budget: { income: 100, expenses: 40, balance: 60, entryCount: 2 },
       housekeeping: { configured: true, present: false, visitsThisMonth: 4 },
-    }, 'EUR').find((entry) => entry.id === 'budget');
-    assert.ok(tile, 'Reichweite: die Budget-Kachel steht in der Reihe');
-    assert.equal(tile.route, '/budget?tab=budget');
+      birthdays: [{ name: 'Oma', days_until: 3 }],
+    }, 'EUR');
+    assert.ok(tiles.length >= 2, 'Reichweite: die Reihe steht');
+    assert.ok(!tiles.some((entry) => entry.id === 'budget'), 'kein Saldo in der Reihe');
   } finally {
     global.window = prevWindow;
   }
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(src, /const BUDGET_MONTH_ROUTE = '\/budget\?tab=budget';/);
+  assert.match(src, /widgetHeader\('budget', t\('nav\.budget'\), null, BUDGET_MONTH_ROUTE\)/,
+    'der Widget-Kopf fuehrt in den Monatsreiter');
 });
 
 test('#1607: der Reiter aus der Kachel ist einer, den das Budget kennt', async () => {
