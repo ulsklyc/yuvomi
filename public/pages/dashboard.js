@@ -156,6 +156,54 @@ function staleOnReturn({ loadedAt, loadedDay }, { now, today }) {
   return now.getTime() - loadedAt.getTime() >= RETURN_REFRESH_MIN_MS;
 }
 
+/* DER RUECKWEG ZEICHNET DEN EBEN GELADENEN STAND SOFORT (Critique R21, a1 P2).
+ *
+ * Zurueck auf der Uebersicht stand zuerst das Skelett ohne Gruss, die Blende
+ * lief hinein, und ein paar hundert Millisekunden spaeter schnitt der Inhalt
+ * hart darueber - auch wenn derselbe Stand Sekunden vorher schon dagewesen
+ * war. Ist der letzte volle Stand frisch (dieselbe Regel wie beim Zurueckkehren
+ * in den Tab, `staleOnReturn`), dasselbe Mitglied, dieselbe Sprache, und hat
+ * seitdem nichts geschrieben (api.js meldet jeden Schreibvorgang als
+ * `yuvomi:write`), zeichnet die Seite ihn sofort und fragt danach still nach
+ * (stale-while-revalidate). Gebaut wird nur neu, wenn die Antwort anders ist.
+ * Die Wand nimmt nie einen gemerkten Stand: sie fragt als Haushalt. */
+let _overviewMemo = null;
+let _overviewMemoWatched = false;
+
+function overviewMemoKey(user) {
+  return `${user?.id ?? ''}|${getLocale()}`;
+}
+
+/** Der gemerkte Stand, wenn er fuer diesen Aufbau taugt - sonst null. */
+function usableOverviewMemo(memo, { key, now, today }) {
+  if (!memo || memo.key !== key) return null;
+  if (staleOnReturn({ loadedAt: memo.at, loadedDay: memo.day }, { now, today })) return null;
+  return memo;
+}
+
+/** Ein Schreibvorgang irgendwo macht den gemerkten Stand ungueltig. Einmal je Sitzung. */
+function watchOverviewWrites() {
+  if (_overviewMemoWatched || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  _overviewMemoWatched = true;
+  // Der Name steht in api.js (WRITE_EVENT) - ausgeschrieben, weil der
+  // Test-Loader api.js stubt.
+  window.addEventListener('yuvomi:write', () => { _overviewMemo = null; });
+}
+
+/** Vergleichbarer Abdruck eines Stands; null, wenn er sich nicht fassen laesst. */
+function overviewSignature(value) {
+  if (!value || typeof value !== 'object') return null;
+  try {
+    // Oben nach Schluessel sortiert: die Slices haengen je nach Weg in anderer
+    // Reihenfolge an (Erstaufbau vs. Nachfrage), der Inhalt ist derselbe.
+    const sorted = {};
+    for (const key of Object.keys(value).sort()) sorted[key] = value[key];
+    return JSON.stringify(sorted);
+  } catch {
+    return null;
+  }
+}
+
 /* DER TAG EINES TERMINS IST DER TAG DER HAUSHALTSZONE, nicht der des Browsers.
  *
  * Hier stand `toLocalDateKey(new Date(value))`, und das las einen
@@ -6987,11 +7035,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Router bereits an der Wurzel vermerkt (utils/wall-mode.js).
   const wallMode = isWallActive();
 
+  // Ein frischer Stand von eben zeichnet sofort (`_overviewMemo`, oben) - dann
+  // gibt es kein Skelett: der Inhalt steht, bevor der Browser ein Bild malt.
+  watchOverviewWrites();
+  const memo = wallMode ? null : usableOverviewMemo(_overviewMemo, {
+    key: overviewMemoKey(user),
+    now: new Date(),
+    today: householdToday(),
+  });
+
   setHtml(container, `
     <div class="dashboard app-page app-page--dashboard${wallMode ? ' dashboard--wall' : ''}" data-composition="dashboard">
       <h1 class="sr-only">${t('dashboard.title')}</h1>
       <div class="dashboard-shell" id="dashboard-shell">
-        ${wallMode ? renderWallSurface(null, null, { loading: true }) : renderDashboardSkeleton()}
+        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton()}
       </div>
     </div>
     ${wallMode ? '' : renderFab()}
@@ -7093,15 +7150,19 @@ export async function render(container, { user, signal: routeSignal = null } = {
   const markLoaded = (day, { partial = false } = {}) => { lastLoadedAt = new Date(); if (!partial) { freshAt = lastLoadedAt; freshDay = day; } };
   try {
     const requestDay = householdToday();
-    const [dashRes, weatherRes, prefsRes, remindersRes] = await Promise.all([
-      api.get(overviewRequest(layoutHintQuery('/dashboard'))),
-      api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
-      // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
-      // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
-      // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
-      (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
-      loadPendingReminders(overviewRequest),
-    ]);
+    // Aus dem gemerkten Stand dieselben vier Antworten - samt der Slices, die
+    // er schon traegt (die ensure*-Aufrufe unten fragen dann nichts).
+    const [dashRes, weatherRes, prefsRes, remindersRes] = memo
+      ? [memo.data, memo.weatherRes, { data: memo.prefs }, memo.data.pendingReminders]
+      : await Promise.all([
+        api.get(overviewRequest(layoutHintQuery('/dashboard'))),
+        api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null })),
+        // Beim Start hat der Router dieselbe Antwort schon unterwegs und reicht
+        // sie herein (utils/start-handoff.js) - sonst zwei `/preferences` je
+        // Kaltstart. Danach gibt es nichts mehr abzuholen, und die Seite fragt selbst.
+        (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences')).catch(() => ({ data: {} })),
+        loadPendingReminders(overviewRequest),
+      ]);
     // Ueberholt oder verlassen, waehrend die Antworten unterwegs waren (#977):
     // dieser Aufbau gehoert niemandem mehr und faesst die Flaeche nicht an.
     if (signal.aborted) return;
@@ -7115,13 +7176,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * der Kalender-Kachel (`events_limit`, #1680) ist kein Filter: sie aendert
      * keine Zahl, und mit ihr als „gefiltert" holte der Router die Antwort bei
      * jedem Kaltstart ein zweites Mal (`dashboardQueryFiltersCounts`). */
-    window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
+    if (!memo) window.yuvomi?.primeModuleCountsFrom?.(dashRes, {
       filtered: dashboardQueryFiltersCounts(overviewRequest(layoutHintQuery('/dashboard'))),
     });
     // Geburtstags-Termine tragen serverseitig einen sprachneutralen Titel
     // („Birthday: <Name>"); anhand von birthday_name in die aktive Sprache
-    // übersetzen (Issue #524).
-    localizeEventLists(data);
+    // übersetzen (Issue #524). Ein gemerkter Stand ist schon uebersetzt.
+    if (!memo) localizeEventLists(data);
     setCountdownAvailability(data?.countdowns);
     weather      = weatherRes.data ?? null;
     weatherPrefs = prefsRes.data ?? null;
@@ -7144,7 +7205,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
      * saehe man kurz Termine, die man ausgeblendet hat. Die Alternative - erst
      * Praeferenzen, dann Uebersicht - kostete JEDEN Aufruf eine Rundreise, auch
      * die ohne Optionen. */
-    if (dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
+    if (!memo && dashboardQuery(widgetConfig) !== layoutHintQuery('/dashboard')) {
       try {
         const filtered = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
         if (signal.aborted) return;
@@ -7162,7 +7223,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
-    markLoaded(requestDay);
+    // Ein gemerkter Stand behaelt seine Zeit: er ist nicht frischer, weil er
+    // noch einmal gezeichnet wird.
+    if (memo) {
+      lastLoadedAt = memo.lastLoadedAt;
+      freshAt = memo.at;
+      freshDay = memo.day;
+    } else {
+      markLoaded(requestDay);
+    }
   } catch (err) {
     console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
     loadFailed = true;
@@ -7247,6 +7316,22 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Auch die Nachlade-Runden koennen von einem Verlassen oder Neuaufbau
   // ueberholt worden sein (#977).
   if (signal.aborted) return;
+
+  // Den vollen Stand fuer den Rueckweg merken (`_overviewMemo`, oben): mit den
+  // Slices, damit ein Aufbau daraus nichts mehr fragen muss.
+  const rememberOverview = () => {
+    if (wallMode || loadFailed || !freshAt) return;
+    _overviewMemo = {
+      key: overviewMemoKey(user),
+      at: freshAt,
+      day: freshDay,
+      lastLoadedAt,
+      data,
+      weatherRes: { data: weather },
+      prefs: weatherPrefs,
+    };
+  };
+  rememberOverview();
 
 
   // Einziger Persist-Pfad für Inline- UND Modal-Speichern. Legt vor dem Schreiben
@@ -7987,9 +8072,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Fehlern, wie der Wetter-Timer. Während „Anpassen" wird nicht neu gebaut -
   // ein Rebuild würde den Bearbeitungszustand wegwerfen.
   let refreshInFlight = false;
-  async function refreshDashboardData() {
+  // `onlyIfChanged`: die stille Nachfrage nach einem Aufbau aus dem gemerkten
+  // Stand (`_overviewMemo`) - gleiche Antwort, kein Neuaufbau.
+  async function refreshDashboardData({ onlyIfChanged = false } = {}) {
     if (isCustomizing || loadFailed || refreshInFlight) return;
     refreshInFlight = true;
+    const before = onlyIfChanged ? overviewSignature(data) : null;
     try {
       const requestDay = householdToday();
       const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
@@ -8016,9 +8104,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.waste = data.waste;
       fresh.pendingReminders = await loadPendingReminders(overviewRequest);
       if (signal.aborted) return;
+      const unchanged = before !== null && overviewSignature(fresh) === before;
       data = fresh;
       markLoaded(requestDay);
-      rebuildDashboard(widgetConfig);
+      rememberOverview();
+      if (!unchanged) rebuildDashboard(widgetConfig);
     } catch { /* Hintergrund-Refresh: bewusst still */ }
     finally { refreshInFlight = false; }
   }
@@ -8050,6 +8140,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // alter Stand (staleOnReturn, oben).
     if (staleOnReturn({ loadedAt: freshAt, loadedDay: freshDay }, { now: new Date(), today: householdToday() })) refreshDashboardData();
   }, { signal: signal });
+
+  // Aus dem gemerkten Stand gezeichnet: still nachfragen, und nur neu bauen,
+  // wenn sich etwas geaendert hat (ein anderes Geraet, ein anderes Mitglied).
+  if (memo) refreshDashboardData({ onlyIfChanged: true });
 
   // Der Minutentakt der Uhr traegt die Nachtabsenkung mit: um 22:00 und um
   // 06:00 muss die Flaeche umschalten, wenn es so weit ist - nicht erst beim
@@ -8183,7 +8277,11 @@ async function loadScheduleSlice(day) {
   };
 }
 
-export const __test = { childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
+export const __test = {
+  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
+  getOverviewMemo: () => _overviewMemo,
+  setOverviewMemo: (memo) => { _overviewMemo = memo; },
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

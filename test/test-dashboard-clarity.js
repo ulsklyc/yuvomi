@@ -1505,3 +1505,61 @@ test('R19 mobil: der Wand-Modus steht im Anpassen-Menue, je Breite ein Weg', asy
     'schmal ersetzt das Menue die zwei Knoepfe');
   assert.match(src, /if \(action === 'dashboard-wall'\) container\.querySelector\('#dashboard-wall-enter'\)\?\.click\(\);/);
 });
+
+// --------------------------------------------------------
+// R21: der Rueckweg zeichnet den eben geladenen Stand sofort
+// --------------------------------------------------------
+// Zurueck auf der Uebersicht stand das Skelett ohne Gruss im neuen Bild der
+// Seitenblende, der Inhalt schnitt danach hart darueber - auch wenn derselbe
+// Stand Sekunden vorher schon dagewesen war. Gemessen mobil: neues Bild bei
+// +108 ms (4x: +141) aus dem Netz, aus dem gemerkten Stand bei +26-32 ms
+// (4x: +84-87), ohne Neubau danach, wenn die Nachfrage dasselbe liefert.
+test('R21 Rueckweg: ein frischer Stand desselben Mitglieds taugt, ein alter, fremder oder gestriger nicht', () => {
+  const at = new RealDate('2026-10-21T08:00:00Z');
+  const memo = { key: '7|de', at, day: '2026-10-21' };
+  const use = (overrides = {}) => __test.usableOverviewMemo(memo, {
+    key: '7|de', now: new RealDate(at.getTime() + 5_000), today: '2026-10-21', ...overrides,
+  });
+  assert.equal(use(), memo, 'fuenf Sekunden alt, dasselbe Mitglied: sofort zeichnen');
+  assert.equal(use({ key: '8|de' }), null, 'ein anderes Mitglied bekommt nie den Stand eines anderen');
+  assert.equal(use({ key: '7|en' }), null, 'eine andere Sprache uebersetzt neu');
+  assert.equal(use({ now: new RealDate(at.getTime() + 61_000) }), null, 'aelter als eine Minute: neu laden');
+  assert.equal(use({ today: '2026-10-22' }), null, 'ein neuer Haushaltstag: "Heute" waere gestern');
+  assert.equal(__test.usableOverviewMemo(null, { key: '7|de', now: at, today: '2026-10-21' }), null);
+});
+
+test('R21 Rueckweg: ein Schreibvorgang irgendwo verwirft den gemerkten Stand', () => {
+  const prev = globalThis.window;
+  const target = new EventTarget();
+  globalThis.window = { addEventListener: target.addEventListener.bind(target) };
+  try {
+    __test.watchOverviewWrites();
+    __test.setOverviewMemo({ key: '7|de' });
+    target.dispatchEvent(new Event('yuvomi:other'));
+    assert.ok(__test.getOverviewMemo(), 'ein fremdes Ereignis verwarf den Stand');
+    // Dasselbe Ereignis, das api.js nach jedem geglueckten Schreiben meldet (test:api).
+    target.dispatchEvent(new Event('yuvomi:write'));
+    assert.equal(__test.getOverviewMemo(), null, 'nach einem Schreibvorgang zeichnete die Uebersicht den alten Stand');
+  } finally {
+    globalThis.window = prev;
+    __test.setOverviewMemo(null);
+  }
+});
+
+test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge der Slices', async () => {
+  const a = { events: [1, 2], pendingReminders: [], cycle: null, schedule: { x: 1 } };
+  const b = { cycle: null, schedule: { x: 1 }, events: [1, 2], pendingReminders: [] };
+  assert.equal(__test.overviewSignature(a), __test.overviewSignature(b));
+  assert.notEqual(__test.overviewSignature(a), __test.overviewSignature({ ...b, events: [1] }));
+  // Und render() nimmt den Stand wirklich (ohne DOM nur am Quelltext lesbar;
+  // die Wirkung misst die Browser-Sonde oben): kein Skelett, keine Anfrage
+  // davor, danach still nachfragen und nur bei Aenderung neu bauen.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  assert.match(render, /: memo \? '' : renderDashboardSkeleton\(\)/, 'mit gemerktem Stand steht wieder ein Skelett im ersten Bild');
+  assert.match(render, /= memo\s*\? \[memo\.data, memo\.weatherRes, \{ data: memo\.prefs \}, memo\.data\.pendingReminders\]\s*: await Promise\.all\(/,
+    'der gemerkte Stand wird nicht ohne Anfrage gezeichnet');
+  assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
+  assert.match(render, /if \(!unchanged\) rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
+});

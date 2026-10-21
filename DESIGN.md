@@ -1303,7 +1303,12 @@ das Verhaeltnis haelt.
   Zeitleiste steht). Der Router gibt dazu Scrollstand des Rueckwegs und Nachzuegler-FAB in
   denselben Render. Ein blendendes Bild unter einer stehenden Gruppe (`animation: none`) traegt
   `animation-fill-mode: both`, sonst steht es im letzten Frame wieder deckend (Geisterframe des
-  Kopfes, R21). Guards: `test:motion`.
+  Kopfes, R21). Guards: `test:motion`. **Rueckweg zur Uebersicht ohne Netz:** ein voller Stand,
+  der juenger als eine Minute ist (dieselbe Regel wie beim Zurueckkehren in den Tab), zeichnet
+  sofort und fragt danach still nach (stale-while-revalidate, neu gebaut nur bei anderer
+  Antwort); jeder geglueckte Schreibvorgang (`yuvomi:write` aus `api.js`) verwirft ihn, die Wand
+  nimmt nie einen. Neues Bild mobil +26-32 ms statt +108 (4x: +84 statt +141). Guards:
+  `test:dashboard-clarity`, `test:api`.
 - **Bewegung haengt an der Beruehrung, nicht am Zustand (R18):** eine Zustandsklasse
   (`--checked`, `--done`, `.is-*`) traegt Aussehen, nie eine `animation` - sie spielte bei jedem
   Neuzeichnen auf Zeilen, die niemand beruehrt hat. Die Quittung eines Hakens startet der

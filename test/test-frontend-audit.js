@@ -17512,7 +17512,8 @@ test('die Zaehler-Meldung haengt am Schreiben, nicht am Rendern (#868)', () => {
   assert.ok(fn, 'notifyCountedMutation ist nicht mehr auffindbar');
   assert.match(fn[0], /invalidateModuleCounts/,
     'die Meldung erreicht den Zaehlstand nicht');
-  assert.match(api, /if \(stateChanging\) notifyCountedMutation\(path\);/,
+  // Seit R21 im Block neben der Schreib-Meldung (`notifyWrite`).
+  assert.match(api, /if \(stateChanging\) \{[^}]*notifyCountedMutation\(path\);[^}]*\}/,
     'sie haengt nicht mehr am schreibenden Request');
 
   // Und die Render-Pfade melden NICHT mehr.
@@ -19152,7 +19153,7 @@ test('dashboard: Timer und Listener haengen am Signal des eigenen Aufbaus, nicht
   // Zwischen Kopf und Pruefung duerfen nur Zeilenkommentare stehen.
   assert.match(rebuild, /function rebuildDashboard\(cfg\) \{\n(?:\s*\/\/[^\n]*\n)*\s*if \(signal\.aborted\) return;/,
     'rebuildDashboard() prueft als Erstes, ob dieser Aufbau noch gilt');
-  for (const fn of ['async function refreshDashboardData()', 'const doAutoRefresh = async () =>', 'const doWeatherRefresh = async () =>']) {
+  for (const fn of ['async function refreshDashboardData(', 'const doAutoRefresh = async () =>', 'const doWeatherRefresh = async () =>']) {
     const at = render.indexOf(fn);
     assert.ok(at > 0, `${fn} nicht gefunden`);
     const body = render.slice(at, at + 1200);
