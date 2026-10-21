@@ -1215,12 +1215,13 @@ test('das Raster hat mobil zwei Spalten und bei 1280px drei statt zwei', () => {
   assert.match(grid.body, /gap:\s*var\(--space-4\)/);
 });
 
-test('die Karte: Blatt-Rahmen 3:4, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum, nicht gestreckt', () => {
+test('die Karte: Blatt-Rahmen mit fester Form, Titel zweizeilig, Meta einzeilig, kein Mindest-Leerraum, nicht gestreckt', () => {
   const rules = topRules(css);
   const media = rules.find((rule) => rule.selector === '.document-card__media');
-  // R18 (2026-10-07): der Rahmen ist hochkant wie das Blatt, das ganz darin
-  // liegt (vorher 4:3 mit dem oberen Drittel als Ausschnitt).
-  assert.match(media.body, /aspect-ratio:\s*3\s*\/\s*4/, 'feste Form, hochkant wie ein Blatt');
+  // R18 (2026-10-07): das Blatt liegt ganz im Rahmen (vorher 4:3 mit dem
+  // oberen Drittel als Ausschnitt). Seit R21 S7 ist der Rahmen quadratisch
+  // (zwei Reihen bei 1440x900, Test "R21 S7" unten) - das Blatt bleibt ganz.
+  assert.match(media.body, /aspect-ratio:\s*1\s*\/\s*1/, 'feste Form, das Blatt ganz darin');
   // Und die Karten einer Reihe strecken sich nicht mehr: die Aktionszeile
   // schliesst an den Text an, statt unter einem Loch zu stehen.
   assert.match(rules.find((rule) => rule.selector === '.documents-list--grid').body, /align-items:\s*start/);
@@ -2049,4 +2050,16 @@ test('jede Ablage sagt auf Touch "tippen" statt "ablegen" - zwei Fassungen, eine
     assert.match(value ?? '', /^Tippen/, `${key}: der Finger tippt`);
     assert.doesNotMatch(value, /ablegen|ziehen|klicken/, `${key}: kein Wort des Zeigers`);
   }
+});
+
+// R21 S7 (Critique a4): die Rasterkarte war 417px hoch (Rahmen 3:4), bei
+// 1440x900 stand die zweite Reihe nur halb im Bild. Quadratischer Rahmen, das
+// Blatt darin ganz (`contain`): Karte 357px, zwei Reihen (1920: 463 -> 393).
+test('R21 S7: die Vorschau der Rasterkarte hat einen quadratischen Rahmen, das Blatt bleibt ganz', () => {
+  const css = readFileSync(resolve(HERE, '../public/styles/documents.css'), 'utf8');
+  const rules = [...eachRule(css)];
+  const media = rules.find((r) => r.selector.trim() === '.document-card__media' && !r.at.length);
+  assert.match(media?.body ?? '', /aspect-ratio:\s*1 \/ 1/, 'quadratischer Rahmen');
+  const img = rules.find((r) => r.selector.trim() === '.document-thumb__img' && !r.at.length);
+  assert.match(img?.body ?? '', /object-fit:\s*contain/, 'das Blatt wird nicht beschnitten');
 });

@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Two rows of documents fit on a laptop screen.** Each card's preview showed the whole page in
+  a tall frame, so the second row stood half below the edge. The frame is square now and the
+  page still shows whole inside it; a card is about 60 pixels shorter.
+
 - **Switching a note to editing keeps the Read/Edit switch in view.** On a phone the long text
   field pulled the sheet up by about two lines when it got the cursor, and the switch slid under
   the sheet's header. Dialogs now only move a field into view when it is not already in the

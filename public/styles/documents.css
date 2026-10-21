@@ -819,12 +819,18 @@
  * ein Bild, das erst beim Scrollen ankommt, schiebt nichts mehr zur Seite.
  * Gemessen 1440px, vier Spalten: Rahmen 179 x 239px, Blatt 152 x 215px,
  * Karte 394-414px (vorher 309px mit dem 4:3-Ausschnitt) - der Preis des
- * ganzen Blatts sind rund 90px je Reihe; die dichte Sicht ist die Liste. */
+ * ganzen Blatts sind rund 90px je Reihe; die dichte Sicht ist die Liste.
+ *
+ * QUADRATISCHER RAHMEN, GANZES BLATT (R21 S7, Critique a4: "Karte 414px hoch,
+ * 1,5 Reihen"). Bei 1440x900 stand die zweite Reihe nur halb im Bild. Der
+ * Rahmen ist jetzt quadratisch, das Blatt darin bleibt ganz (`contain`,
+ * hochkant also schmaler) - kein Ausschnitt wie beim 4:3-Rahmen, aber rund 60px je
+ * Reihe weniger: zwei Reihen passen. */
 .document-card__media {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
