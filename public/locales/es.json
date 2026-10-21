@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Ajuste de ciclo guardado.",
         "healthCyclePersonalLabel": "Mostrar ciclo",
         "healthCyclePersonalHint": "Solo afecta a tu propia vista. Si lo desactivas, el ciclo sigue visible para el resto del hogar.",
+        "healthCycleSettingsHint": "La duración del ciclo, la anticoncepción, los recordatorios y el modo embarazo se ajustan en la página del ciclo.",
         "healthCyclePersonalHouseholdOff": "El ciclo está desactivado para todo el hogar, así que no aparece para nadie.",
         "healthCyclePersonalSaved": "Vista del ciclo guardada.",
         "pageRewardsModule": "Recompensas",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Ajuste de notificaciones guardado.",
         "healthVisibilityTitle": "Visibilidad predeterminada",
         "healthVisibilityHint": "Con qué valor se crean las entradas nuevas. Puedes cambiarlo en cada entrada.",
+        "healthVisibilityCaregivers": "Quien puede registrar por ti también ve tus entradas privadas, salvo el diario del ciclo. Lo define un administrador en los miembros.",
         "healthVisibilityOther": "Otras áreas",
         "healthVisibilityApply": "Cambiar también las existentes",
         "healthVisibilityApplyHint": "Guardado. ¿Cambiar también las entradas existentes de {{area}}?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Duración media del ciclo",
                 "periodLength": "Duración media del periodo",
                 "lutealLength": "Duración de la fase lútea",
+                "daysUnit": "días",
                 "trackFertility": "Mostrar ventana fértil",
-                "autoHint": "Déjalo vacío = se calcula automáticamente a partir de tu historial.",
+                "autoHint": "Si dejas uno de los dos campos vacío, Yuvomi calcula el valor a partir de los periodos que has registrado.",
                 "remindPeriodDaysBefore": "Recordatorio de periodo",
                 "remindOff": "Desactivado",
                 "remindSameDay": "El mismo día",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Elige un archivo CSV o pega texto.",
                 "error": "Error al importar."
             },
-            "discoveryHint": "Consejo: suscríbete al ciclo previsto como feed ICS en <a href=\"/settings/modules/calendar?section=personal-feeds\">Ajustes → Módulos → Calendario</a>, o muestra el widget del ciclo en el <a href=\"/\">Inicio</a> desde su modo de personalización.",
+            "feedLink": "Suscribirse al ciclo previsto en el calendario",
+            "widgetHint": "Añade la tarjeta del ciclo a {{overview}} en «{{customize}}».",
             "endBeforeStart": "El final no puede ser anterior al inicio."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "h"
         },
         "careBanner": "Estás registrando para {{name}}.",
+        "whoSees": "¿Quién lo ve?",
         "nutrition": {
             "title": "Nutrición",
             "emptyTitle": "Aún no hay registros de nutrición",

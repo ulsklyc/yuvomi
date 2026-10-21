@@ -47,6 +47,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The cycle settings are easier to find and to read.** Searching the settings for "cycle",
+  "contraception" or "pregnancy" now finds "Cycle settings", and the health settings link straight
+  into them. The dialog uses switches instead of checkboxes, puts "days" after each length, and
+  explains "leave empty to calculate" right under the two fields it is about. The tip at the end
+  of the cycle page is now one link to the cycle calendar feed, which had moved to the health
+  settings, plus a short line on adding the cycle tile to the Overview.
+
+- **Health answers "Who can see this?" where you pick the person.** The person menu in your own
+  health view ends with "Who can see this?", which opens your default visibility. That page now
+  also says that anyone allowed to record for you sees your private entries, except the cycle
+  diary, and links admins to the members page where this is set.
+
 - **A contact and its birthday lead to each other.** When a birthday was imported from a contact,
   the contact's birthday line now offers "Show in birthdays", and the birthday offers "Show contact"
   next to its date - one tap instead of switching modules and searching. The link only shows when

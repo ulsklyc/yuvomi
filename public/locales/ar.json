@@ -2087,6 +2087,7 @@
         "healthCycleSaved": "تم حفظ إعداد الدورة.",
         "healthCyclePersonalLabel": "إظهار الدورة",
         "healthCyclePersonalHint": "ينطبق على عرضك فقط. إذا أوقفته، تبقى الدورة ظاهرة لبقية أفراد الأسرة.",
+        "healthCycleSettingsHint": "طول الدورة ووسيلة منع الحمل والتذكيرات ووضع الحمل تضبطينها في صفحة الدورة.",
         "healthCyclePersonalHouseholdOff": "الدورة متوقفة حاليًا للأسرة كلها، لذلك لا تظهر لأي أحد.",
         "healthCyclePersonalSaved": "تم حفظ عرض الدورة.",
         "pageRewardsModule": "المكافآت",
@@ -3439,6 +3440,7 @@
         "healthPreventionNotifyCaregiversSaved": "تم حفظ إعداد الإشعارات.",
         "healthVisibilityTitle": "الظهور الافتراضي",
         "healthVisibilityHint": "القيمة التي تبدأ بها الإدخالات الجديدة. يمكنك تغييرها مع كل إدخال.",
+        "healthVisibilityCaregivers": "من يُسمح له بالتسجيل نيابةً عنك يرى أيضًا إدخالاتك الخاصة، باستثناء يوميات الدورة. يحدد ذلك مسؤول عند الأعضاء.",
         "healthVisibilityOther": "مجالات أخرى",
         "healthVisibilityApply": "غيّر الإدخالات الموجودة أيضاً",
         "healthVisibilityApplyHint": "تم الحفظ. هل تُغيَّر أيضاً الإدخالات الموجودة في {{area}}؟",
@@ -5834,8 +5836,9 @@
                 "cycleLength": "متوسط طول الدورة",
                 "periodLength": "متوسط مدة الدورة",
                 "lutealLength": "مدة الطور الأصفري",
+                "daysUnit": "أيام",
                 "trackFertility": "عرض نافذة الخصوبة",
-                "autoHint": "اتركيه فارغًا = يُحسب تلقائيًا من سجلّك.",
+                "autoHint": "إذا تركتِ أحد الحقلين فارغًا، يحسب Yuvomi القيمة من الدورات التي سجّلتِها.",
                 "remindPeriodDaysBefore": "تذكير بالدورة",
                 "remindOff": "إيقاف",
                 "remindSameDay": "في نفس اليوم",
@@ -5938,7 +5941,8 @@
                 "emptyError": "يرجى اختيار ملف CSV أو لصق نص.",
                 "error": "فشل الاستيراد."
             },
-            "discoveryHint": "نصيحة: يمكنك الاشتراك في الدورة المتوقعة كخلاصة ICS ضمن <a href=\"/settings/modules/calendar?section=personal-feeds\">الإعدادات ← الوحدات ← التقويم</a>، أو إظهار أداة الدورة في <a href=\"/\">لوحة التحكم</a> عبر وضع التخصيص.",
+            "feedLink": "الاشتراك في الدورة المتوقعة في التقويم",
+            "widgetHint": "تضيفين بطاقة الدورة إلى {{overview}} عبر „{{customize}}“.",
             "endBeforeStart": "لا يمكن أن تكون النهاية قبل البداية."
         },
         "duration": {
@@ -5948,6 +5952,7 @@
             "unitH": "س"
         },
         "careBanner": "أنت تسجّل نيابةً عن {{name}}.",
+        "whoSees": "من يرى هذا؟",
         "nutrition": {
             "title": "القيم الغذائية",
             "emptyTitle": "لم تُسجَّل قيم غذائية بعد",

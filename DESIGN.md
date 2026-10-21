@@ -1626,6 +1626,17 @@ Apple Health "Durchsuchen"). Jeder Bereich hat eine Pfad-Adresse `/health/<berei
 Bereichsnamen als Titel auf; ab der Split-Schwelle stehen links Uebersicht und Bereiche
 (`--layout-nav-list`), rechts der Bereich (Baustein mit `address`).
 
+**Zwei Heimaten, je ein Weg (R21, D7; Critique a5 P2).** Die Zyklusvorgaben bleiben im Dialog
+der Zyklusseite, das Gesundheitsblatt der Einstellungen fuehrt mit "Zyklus-Einstellungen"
+dorthin (`/health/cycle?open=settings` oeffnet den Dialog und verlaesst die Adresse), und die
+Suche findet den Weg ueber den Satz, der die Vorgaben aufzaehlt. Der Dialog spricht die Sprache
+der Dialoge (Zeilen im Traeger, Zahl mit "Tage" als `formCompositeHtml`-Einheit, An/Aus als
+`formSwitchRowHtml`), ein Hinweis steht unter dem Feld, das er meint. Freigaben: das Menue der
+Personenwahl endet in der eigenen Ansicht mit "Wer sieht das?" (`?option=` auf die
+Standard-Sichtbarkeit), und dort steht, dass Betreuende auch Privates sehen - fuer Admins mit dem
+Weg zu den Mitgliedern. Ein Tipp mit Ziel ist ein Link mit eigenem Text, nie HTML aus einem
+Locale-String (`test:health-cycle`, `test:settings-navigation`).
+
 **Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
 EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
 veraendert hat, die drei zuletzt gemessenen Messarten ("Seit der letzten Messung: Gewicht -0,2 kg,

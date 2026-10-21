@@ -1868,6 +1868,7 @@
         "healthCycleSaved": "Na-save ang setting ng siklo.",
         "healthCyclePersonalLabel": "Ipakita ang cycle",
         "healthCyclePersonalHint": "Para lang sa sarili mong view. Kapag pinatay mo ito, makikita pa rin ng iba sa sambahayan ang cycle.",
+        "healthCycleSettingsHint": "Ang haba ng siklo, kontrasepsyon, mga paalala at pregnancy mode ay itinatakda sa pahina ng siklo.",
         "healthCyclePersonalHouseholdOff": "Kasalukuyang nakapatay ang cycle para sa buong sambahayan, kaya walang nakakakita nito.",
         "healthCyclePersonalSaved": "Na-save ang view ng siklo.",
         "pageRewardsModule": "Mga Gantimpala",
@@ -3163,6 +3164,7 @@
         "healthPreventionNotifyCaregiversSaved": "Na-save ang setting ng notification.",
         "healthVisibilityTitle": "Default na visibility",
         "healthVisibilityHint": "Kung ano ang panimulang halaga ng bagong entry. Mababago mo pa ito sa bawat entry.",
+        "healthVisibilityCaregivers": "Ang pinapayagang magtala para sa iyo ay nakakakita rin ng iyong mga pribadong entry, maliban sa talaarawan ng siklo. Itinatakda ito ng admin sa mga miyembro.",
         "healthVisibilityOther": "Iba pang bahagi",
         "healthVisibilityApply": "Baguhin din ang mga umiiral na entry",
         "healthVisibilityApplyHint": "Nai-save. Baguhin din ba ang mga umiiral na entry sa {{area}}?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Karaniwang haba ng siklo",
                 "periodLength": "Karaniwang haba ng regla",
                 "lutealLength": "Haba ng yugtong luteal",
+                "daysUnit": "araw",
                 "trackFertility": "Ipakita ang matabang panahon",
-                "autoHint": "Iwanang blangko para awtomatikong kalkulahin mula sa iyong kasaysayan.",
+                "autoHint": "Kapag iniwang blangko ang alinman sa dalawang field, kinukuwenta ng Yuvomi ang halaga mula sa mga regla na naitala mo.",
                 "remindPeriodDaysBefore": "Paalala sa regla",
                 "remindOff": "Naka-off",
                 "remindSameDay": "Sa araw mismo",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Pumili ng CSV file o mag-paste ng teksto.",
                 "error": "Nabigo ang pag-import."
             },
-            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/modules/calendar?section=personal-feeds\">Mga Setting → Mga Modyul → Kalendaryo</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito.",
+            "feedLink": "Mag-subscribe sa inaasahang siklo sa kalendaryo",
+            "widgetHint": "Idagdag ang tile ng siklo sa {{overview}} sa “{{customize}}”.",
             "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "oras"
         },
         "careBanner": "Nagtatala ka para kay {{name}}.",
+        "whoSees": "Sino ang nakakakita nito?",
         "nutrition": {
             "title": "Nutrisyon",
             "emptyTitle": "Wala pang naitalang nutrisyon",

@@ -1868,6 +1868,7 @@
         "healthCycleSaved": "Zyklus-Einstellung gespeichert.",
         "healthCyclePersonalLabel": "Zyklus anzeigen",
         "healthCyclePersonalHint": "Gilt nur für deine eigene Ansicht. Schaltest du den Zyklus ab, bleibt er für die anderen im Haushalt sichtbar.",
+        "healthCycleSettingsHint": "Zykluslänge, Verhütung, Erinnerungen und Schwangerschafts-Modus stellst du auf der Zyklusseite ein.",
         "healthCyclePersonalHouseholdOff": "Der Zyklus ist zurzeit für den ganzen Haushalt abgeschaltet, deshalb erscheint er bei niemandem.",
         "healthCyclePersonalSaved": "Zyklus-Ansicht gespeichert.",
         "pageRewardsModule": "Belohnungen",
@@ -3163,6 +3164,7 @@
         "healthPreventionNotifyCaregiversSaved": "Benachrichtigungs-Einstellung gespeichert.",
         "healthVisibilityTitle": "Standard-Sichtbarkeit",
         "healthVisibilityHint": "Womit neue Einträge vorbelegt werden. Beim Eintragen lässt sich das jedes Mal ändern.",
+        "healthVisibilityCaregivers": "Wer für dich eintragen darf, sieht dabei auch deine privaten Einträge, nur das Zyklus-Tagebuch nicht. Das legt ein Admin bei den Mitgliedern fest.",
         "healthVisibilityOther": "Weitere Bereiche",
         "healthVisibilityApply": "Bestehende Einträge mitziehen",
         "healthVisibilityApplyHint": "Gespeichert. Sollen die vorhandenen Einträge unter {{area}} auch umgestellt werden?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Durchschnittliche Zykluslänge",
                 "periodLength": "Durchschnittliche Periodenlänge",
                 "lutealLength": "Länge der Lutealphase",
+                "daysUnit": "Tage",
                 "trackFertility": "Fruchtbares Fenster anzeigen",
-                "autoHint": "Leer lassen = automatisch aus deiner Historie berechnen.",
+                "autoHint": "Bleibt eines der beiden Felder leer, rechnet Yuvomi den Wert aus deinen eingetragenen Perioden aus.",
                 "remindPeriodDaysBefore": "Periode-Erinnerung",
                 "remindOff": "Aus",
                 "remindSameDay": "Am Tag selbst",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Bitte eine CSV-Datei auswählen oder Text einfügen.",
                 "error": "Import fehlgeschlagen."
             },
-            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/modules/calendar?section=personal-feeds\">Einstellungen → Module → Kalender</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden.",
+            "feedLink": "Vorhergesagten Zyklus im Kalender abonnieren",
+            "widgetHint": "Die Zyklus-Kachel blendest du in der {{overview}} unter „{{customize}}“ ein.",
             "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "Std."
         },
         "careBanner": "Du trägst für {{name}} ein.",
+        "whoSees": "Wer sieht das?",
         "nutrition": {
             "title": "Nährwerte",
             "emptyTitle": "Noch keine Nährwerte erfasst",

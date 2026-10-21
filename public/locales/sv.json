@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Cykelinställning sparad.",
         "healthCyclePersonalLabel": "Visa cykel",
         "healthCyclePersonalHint": "Gäller bara din egen vy. Stänger du av den förblir cykeln synlig för de andra i hushållet.",
+        "healthCycleSettingsHint": "Cykellängd, preventivmedel, påminnelser och graviditetsläge ställer du in på cykelsidan.",
         "healthCyclePersonalHouseholdOff": "Cykeln är just nu avstängd för hela hushållet, så den visas inte för någon.",
         "healthCyclePersonalSaved": "Cykelvyn sparad.",
         "pageRewardsModule": "Belöningar",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Aviseringsinställning sparad.",
         "healthVisibilityTitle": "Standardsynlighet",
         "healthVisibilityHint": "Vad nya poster börjar som. Du kan ändra det för varje post.",
+        "healthVisibilityCaregivers": "Den som får registrera åt dig ser även dina privata poster, utom cykeldagboken. En administratör bestämmer det under medlemmar.",
         "healthVisibilityOther": "Andra områden",
         "healthVisibilityApply": "Ändra även befintliga poster",
         "healthVisibilityApplyHint": "Sparat. Ska de befintliga posterna under {{area}} också ändras?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Genomsnittlig cykellängd",
                 "periodLength": "Genomsnittlig menslängd",
                 "lutealLength": "Lutealfasens längd",
+                "daysUnit": "dagar",
                 "trackFertility": "Visa fertilt fönster",
-                "autoHint": "Lämna tomt = beräknas automatiskt från din historik.",
+                "autoHint": "Lämnar du ett av de två fälten tomt räknar Yuvomi ut värdet från de mens du har registrerat.",
                 "remindPeriodDaysBefore": "Menspåminnelse",
                 "remindOff": "Av",
                 "remindSameDay": "Samma dag",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Välj en CSV-fil eller klistra in text.",
                 "error": "Importen misslyckades."
             },
-            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/modules/calendar?section=personal-feeds\">Inställningar → Moduler → Kalender</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge.",
+            "feedLink": "Prenumerera på den förväntade cykeln i kalendern",
+            "widgetHint": "Lägg till cykelrutan i {{overview}} under ”{{customize}}”.",
             "endBeforeStart": "Slutet får inte vara före början."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "tim"
         },
         "careBanner": "Du registrerar åt {{name}}.",
+        "whoSees": "Vem ser det här?",
         "nutrition": {
             "title": "Näringsvärden",
             "emptyTitle": "Inga näringsvärden registrerade än",

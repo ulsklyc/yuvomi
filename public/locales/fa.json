@@ -1868,6 +1868,7 @@
         "healthCycleSaved": "تنظیم چرخه ذخیره شد.",
         "healthCyclePersonalLabel": "نمایش چرخه",
         "healthCyclePersonalHint": "فقط برای نمای خودتان اعمال می‌شود. اگر آن را خاموش کنید، چرخه برای بقیهٔ اعضای خانوار نمایان می‌ماند.",
+        "healthCycleSettingsHint": "طول چرخه، روش پیشگیری، یادآوری‌ها و حالت بارداری را در صفحهٔ چرخه تنظیم می‌کنید.",
         "healthCyclePersonalHouseholdOff": "چرخه در حال حاضر برای کل خانوار خاموش است، بنابراین برای هیچ‌کس نمایش داده نمی‌شود.",
         "healthCyclePersonalSaved": "نمای چرخه ذخیره شد.",
         "pageRewardsModule": "پاداش‌ها",
@@ -3163,6 +3164,7 @@
         "healthPreventionNotifyCaregiversSaved": "تنظیم اعلان ذخیره شد.",
         "healthVisibilityTitle": "نمایش پیش‌فرض",
         "healthVisibilityHint": "مقداری که ورودی‌های تازه با آن آغاز می‌شوند. در هر ورودی قابل تغییر است.",
+        "healthVisibilityCaregivers": "کسی که اجازه دارد برای شما ثبت کند، ورودی‌های خصوصی شما را هم می‌بیند، به‌جز دفترچهٔ چرخه. این را یک مدیر در بخش اعضا تعیین می‌کند.",
         "healthVisibilityOther": "بخش‌های دیگر",
         "healthVisibilityApply": "ورودی‌های موجود هم تغییر کنند",
         "healthVisibilityApplyHint": "ذخیره شد. ورودی‌های موجود در {{area}} هم تغییر کنند؟",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "میانگین طول چرخه",
                 "periodLength": "میانگین طول قاعدگی",
                 "lutealLength": "طول فاز لوتئال",
+                "daysUnit": "روز",
                 "trackFertility": "نمایش پنجره باروری",
-                "autoHint": "خالی بگذارید = به‌طور خودکار از سابقه شما محاسبه می‌شود.",
+                "autoHint": "اگر یکی از این دو فیلد را خالی بگذارید، Yuvomi مقدار را از قاعدگی‌های ثبت‌شده محاسبه می‌کند.",
                 "remindPeriodDaysBefore": "یادآوری قاعدگی",
                 "remindOff": "خاموش",
                 "remindSameDay": "همان روز",
@@ -5550,7 +5553,8 @@
                 "emptyError": "لطفاً یک فایل CSV انتخاب کنید یا متنی جای‌گذاری کنید.",
                 "error": "درون‌ریزی ناموفق بود."
             },
-            "discoveryHint": "نکته: می‌توانید چرخهٔ پیش‌بینی‌شده را به‌صورت فید ICS در <a href=\"/settings/modules/calendar?section=personal-feeds\">تنظیمات ← ماژول‌ها ← تقویم</a> دنبال کنید، یا ابزارک چرخه را در <a href=\"/\">نمای کلی</a> از طریق حالت شخصی‌سازی نمایش دهید.",
+            "feedLink": "اشتراک چرخهٔ پیش‌بینی‌شده در تقویم",
+            "widgetHint": "کاشی چرخه را در {{overview}} از «{{customize}}» اضافه کنید.",
             "endBeforeStart": "پایان نمی‌تواند پیش از آغاز باشد."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "ساعت"
         },
         "careBanner": "شما برای {{name}} ثبت می‌کنید.",
+        "whoSees": "چه کسی این را می‌بیند؟",
         "nutrition": {
             "title": "ارزش غذایی",
             "emptyTitle": "هنوز ارزش غذایی ثبت نشده است",

@@ -2189,3 +2189,60 @@ test('Zyklus: der FAB-Dialog heisst "Periode nachtragen", die Heute-Aktion bleib
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   assert.match(src, /label: t\('health\.cycle\.add'\), dockLabel: t\('newLabel\.healthCycle'\), onClick: \(\) => openPeriodModal\(null\)/);
 });
+
+// ── R21 (Critique a5, clarify + D7) ───────────────────────────────────────────
+
+/* DER ZYKLUS-DIALOG SPRICHT DIE SPRACHE DER APP. Native Checkboxen zwischen
+ * Zahlenfeldern ohne Einheit, und der Hinweis "Leer lassen = automatisch"
+ * stand unter "Fruchtbares Fenster anzeigen" statt unter den Feldern, die er
+ * meint. Jetzt: Zahlenfeld mit "Tage" dahinter (form-composite wie der
+ * Messwert), der Hinweis direkt unter Zyklus- und Periodenlaenge, An/Aus als
+ * Schalterzeilen (formSwitchRowHtml) wie im Mitglieder-Dialog. */
+test('R21: der Zyklus-Dialog traegt Schalter, die Einheit Tage und den Hinweis an seinen Feldern', async () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function openCycleSettingsModal('), src.indexOf("    onSave(panel) {", src.indexOf('function openCycleSettingsModal(')));
+  assert.doesNotMatch(fn, /class="cycle-toggle"/, 'keine nativen Haken-Zeilen mehr');
+  for (const id of ['cs-fertility', 'cs-perimenopause', 'cs-show-pms', 'cs-remind-log', 'cs-pregnancy']) {
+    assert.match(fn, new RegExp(`cycleSwitchRow\\(\\{[^}]*id: '${id}'`), `${id} ist eine Schalterzeile`);
+  }
+  for (const id of ['cs-cycle', 'cs-period', 'cs-luteal']) {
+    assert.match(fn, new RegExp(`daysField\\(\\{[^}]*id: '${id}'`), `${id} traegt die Einheit Tage`);
+  }
+  assert.match(src, /function daysField\([\s\S]*?formCompositeHtml\(\{[\s\S]*?unit: t\('health\.cycle\.settings\.daysUnit'\)/, 'die Einheit als Suffix des Felds');
+  const at = (needle) => fn.indexOf(needle);
+  assert.ok(at("id: 'cs-period'") < at('id="cs-auto-hint"') && at('id="cs-auto-hint"') < at("id: 'cs-luteal'"),
+    'der Hinweis steht zwischen Perioden- und Lutealphasenlaenge - unter den Feldern, die er meint');
+});
+
+/* DER ZYKLUS-TIPP IST EIN LINK (R21). Er stand als Satz mit zwei Links aus
+ * einem Locale-String mit rohem HTML, und der erste fuehrte in ein
+ * aufgeloestes Blatt (Kalender > Feed-Abos); der Zyklus-Feed steht seit R14 im
+ * Gesundheitsblatt. Jetzt ein Link mit eigenem Text dorthin. */
+test('R21: der Zyklus-Tipp ist ein Link in den Zyklus-Feed, kein HTML aus dem Locale', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /t\('health\.cycle\.discoveryHint'\)/, 'kein Locale-HTML mehr');
+  assert.match(src, /<a class="cycle-discovery-hint__link" href="\/settings\/modules\/health\?section=feed-cycle" data-cycle-feed-link>/);
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.equal(de.health.cycle.discoveryHint, undefined);
+  assert.ok(de.health.cycle.feedLink && !/</.test(de.health.cycle.feedLink));
+});
+
+/* "WER SIEHT DAS?" AN DER PERSONENWAHL (D7, a5 P2). Freigaben standen drei
+ * Tipps tief in den Einstellungen, ohne Weg aus der Gesundheit. Das Menue der
+ * Personenwahl fuehrt in der eigenen Ansicht zur Standard-Sichtbarkeit. */
+test('R21 D7: das Menue der Personenwahl fuehrt zur Frage "Wer sieht das?"', async () => {
+  const { personSwitcherMarkup } = await import('../public/utils/health-person-switcher.js');
+  const members = [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Alex' }];
+  const own = personSwitcherMarkup(members, 1, 1, { menuId: 'm', label: 'Person' });
+  assert.match(own, /<a role="menuitem" class="popover-menu__item health-person-switcher__who" href="\/settings\/modules\/health\?option=settings\.healthVisibilityTitle" data-health-who>/);
+  assert.match(own, /health\.whoSees/);
+  const foreign = personSwitcherMarkup(members, 2, 1, { menuId: 'm', label: 'Person' });
+  assert.doesNotMatch(foreign, /data-health-who/, 'in einer fremden Ansicht nicht - die Frage gilt den eigenen Eintraegen');
+});
+
+test('R21 D7: /health/cycle?open=settings oeffnet die Zyklus-Einstellungen', () => {
+  const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('async function mountCycle('), src.indexOf('async function loadCycle('));
+  assert.match(mount, /openCycleSettingsFromQuery\(\)/);
+  assert.match(src, /function openCycleSettingsFromQuery\(\{ loc = window\.location \} = \{\}\) \{/);
+});

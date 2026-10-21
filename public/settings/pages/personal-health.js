@@ -68,7 +68,10 @@ function scopeRowHtml(row, current) {
  * wird nur gezeigt, welcher von beiden gerade das Sagen hat.
  */
 
-function renderPage(container, preferences, defaults) {
+const CYCLE_SETTINGS_HREF = '/health/cycle?open=settings';
+const MEMBERS_HREF = '/settings/admin/family';
+
+function renderPage(container, preferences, defaults, { admin = false } = {}) {
   // Der Haushalt hat den Zyklus abgeschaltet: dann ändert der persönliche
   // Schalter nichts mehr. Ihn trotzdem bedienbar zu lassen wäre eine Lüge über
   // die eigene Wirkung, also wird er gesperrt und der Grund benannt.
@@ -94,6 +97,15 @@ function renderPage(container, preferences, defaults) {
       </div>
       <p class="form-hint settings-group__footer" id="health-cycle-personal-hint">${t('settings.healthCyclePersonalHint')}</p>
       ${householdEnabled ? '' : `<p class="form-hint settings-group__footer">${t('settings.healthCyclePersonalHouseholdOff')}</p>`}
+      <!-- DIE ZWEITE HEIMAT BEKOMMT EINEN WEG (Critique R21, D7; a5 P2): Laenge,
+           Verhuetung, Erinnerungen und Schwangerschaft stehen im Dialog der
+           Zyklusseite. Hier der Weg dorthin - er oeffnet den Dialog - und der
+           Name, unter dem die Suche ihn findet (registry.js, personal-health).
+           Nur, solange der Zyklus fuer mich sichtbar ist. -->
+      <p class="form-hint settings-group__footer" id="health-cycle-settings"${householdEnabled && personalEnabled ? '' : ' hidden'}>
+        ${esc(t('settings.healthCycleSettingsHint'))}
+        <a href="${CYCLE_SETTINGS_HREF}" id="health-cycle-settings-link">${esc(t('health.cycle.settings.title'))}</a>
+      </p>
     </section>
     <section class="settings-section">
       <h2 class="settings-section__title">${t('health.tabs.prevention')}</h2>
@@ -122,16 +134,34 @@ function renderPage(container, preferences, defaults) {
         <p class="form-hint" id="hv-apply-text"></p>
         <button type="button" class="btn btn--secondary btn--sm" id="hv-apply-btn"></button>
       </div>
+      <!-- WER NOCH SIEHT (Critique R21, D7): die Betreuung (Mitglieder >
+           Bearbeiten, "Darf Gesundheitsdaten eintragen") gibt auch Privates
+           frei. Das Ziel von "Wer sieht das?" nennt sie deshalb mit - und fuer
+           Admins den Weg dorthin. -->
+      <p class="form-hint settings-group__footer" id="hv-caregivers">
+        ${esc(t('settings.healthVisibilityCaregivers'))}
+        ${admin ? `<a href="${MEMBERS_HREF}" id="health-caregivers-link">${esc(t('settings.pageFamilyRoles'))}</a>` : ''}
+      </p>
     </section>
   `);
 }
 
 function bindEvents(container) {
+  // Die zwei Wege aus dem Blatt in der App, nicht per Neuladen.
+  for (const [id, href] of [['#health-cycle-settings-link', CYCLE_SETTINGS_HREF], ['#health-caregivers-link', MEMBERS_HREF]]) {
+    container.querySelector(id)?.addEventListener('click', (event) => {
+      if (!window.yuvomi?.navigate || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      window.yuvomi.navigate(href);
+    });
+  }
+  const cycleSettings = container.querySelector('#health-cycle-settings');
   const input = container.querySelector('#health-cycle-personal');
   input?.addEventListener('change', async () => {
     input.disabled = true;
     try {
       await savePreferences({ health_cycle_enabled_user: input.checked });
+      if (cycleSettings) cycleSettings.hidden = !input.checked;
       window.yuvomi?.showToast(t('settings.healthCyclePersonalSaved'), 'success');
     } catch (error) {
       input.checked = !input.checked; // Rollback nur bei Save-Fehler
@@ -229,7 +259,6 @@ function bindVisibilityEvents(container) {
 }
 
 export async function render(container, { user }) {
-  void user;
   // Ein Ausfall der Voreinstellungen darf das Blatt nicht kosten: ohne Antwort
   // stehen alle Bereiche auf 'privat', dem ausgelieferten Wert.
   const [preferences, defaults] = await Promise.all([
@@ -238,7 +267,7 @@ export async function render(container, { user }) {
       .then((res) => res?.data?.defaults || {})
       .catch(() => ({})),
   ]);
-  renderPage(container, preferences, defaults);
+  renderPage(container, preferences, defaults, { admin: user?.role === 'admin' });
   bindEvents(container);
   bindVisibilityEvents(container);
 }

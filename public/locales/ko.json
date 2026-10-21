@@ -1868,6 +1868,7 @@
         "healthCycleSaved": "주기 설정이 저장되었습니다.",
         "healthCyclePersonalLabel": "주기 표시",
         "healthCyclePersonalHint": "내 화면에만 적용됩니다. 끄더라도 가구의 다른 구성원에게는 주기가 계속 표시됩니다.",
+        "healthCycleSettingsHint": "주기 길이, 피임, 알림, 임신 모드는 주기 페이지에서 설정합니다.",
         "healthCyclePersonalHouseholdOff": "현재 가구 전체에서 주기가 꺼져 있어 아무에게도 표시되지 않습니다.",
         "healthCyclePersonalSaved": "주기 표시를 저장했습니다.",
         "pageRewardsModule": "보상",
@@ -3163,6 +3164,7 @@
         "healthPreventionNotifyCaregiversSaved": "알림 설정이 저장되었습니다.",
         "healthVisibilityTitle": "기본 공개 범위",
         "healthVisibilityHint": "새 기록이 시작하는 값입니다. 기록마다 바꿀 수 있습니다.",
+        "healthVisibilityCaregivers": "나 대신 기록할 수 있는 사람은 주기 일기를 제외한 비공개 기록도 볼 수 있습니다. 관리자가 구성원에서 설정합니다.",
         "healthVisibilityOther": "기타 영역",
         "healthVisibilityApply": "기존 기록도 변경",
         "healthVisibilityApplyHint": "저장했습니다. {{area}}의 기존 기록도 변경할까요?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "평균 주기 길이",
                 "periodLength": "평균 생리 기간",
                 "lutealLength": "황체기 길이",
+                "daysUnit": "일",
                 "trackFertility": "가임기 표시",
-                "autoHint": "비워 두면 기록에서 자동 계산됩니다.",
+                "autoHint": "두 칸 중 하나를 비워 두면 Yuvomi가 기록한 생리 기록으로 값을 계산합니다.",
                 "remindPeriodDaysBefore": "생리 알림",
                 "remindOff": "끄기",
                 "remindSameDay": "당일",
@@ -5550,7 +5553,8 @@
                 "emptyError": "CSV 파일을 선택하거나 텍스트를 붙여넣으세요.",
                 "error": "가져오기에 실패했습니다."
             },
-            "discoveryHint": "팁: 예측된 주기는 <a href=\"/settings/modules/calendar?section=personal-feeds\">설정 → 모듈 → 캘린더</a>에서 ICS 피드로 구독할 수 있으며, 주기 위젯은 <a href=\"/\">개요</a>에서 사용자 지정 모드를 통해 표시할 수 있습니다.",
+            "feedLink": "예상 주기를 캘린더에서 구독",
+            "widgetHint": "주기 타일은 {{overview}}의 “{{customize}}”에서 추가할 수 있습니다.",
             "endBeforeStart": "종료는 시작보다 앞설 수 없습니다."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "시간"
         },
         "careBanner": "{{name}} 님의 기록을 입력하고 있습니다.",
+        "whoSees": "누가 볼 수 있나요?",
         "nutrition": {
             "title": "영양",
             "emptyTitle": "아직 영양 기록이 없습니다",

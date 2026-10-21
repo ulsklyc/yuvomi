@@ -1868,6 +1868,7 @@
         "healthCycleSaved": "Pengaturan siklus disimpan.",
         "healthCyclePersonalLabel": "Tampilkan siklus",
         "healthCyclePersonalHint": "Hanya berlaku untuk tampilanmu sendiri. Jika kamu mematikannya, siklus tetap terlihat oleh anggota rumah tangga lainnya.",
+        "healthCycleSettingsHint": "Panjang siklus, kontrasepsi, pengingat, dan mode kehamilan diatur di halaman siklus.",
         "healthCyclePersonalHouseholdOff": "Siklus saat ini dimatikan untuk seluruh rumah tangga, jadi tidak muncul untuk siapa pun.",
         "healthCyclePersonalSaved": "Tampilan siklus disimpan.",
         "pageRewardsModule": "Hadiah",
@@ -3163,6 +3164,7 @@
         "healthPreventionNotifyCaregiversSaved": "Pengaturan notifikasi disimpan.",
         "healthVisibilityTitle": "Visibilitas bawaan",
         "healthVisibilityHint": "Nilai awal untuk entri baru. Kamu masih bisa mengubahnya di tiap entri.",
+        "healthVisibilityCaregivers": "Siapa pun yang boleh mencatat untuk Anda juga melihat entri pribadi Anda, kecuali buku harian siklus. Admin mengaturnya di anggota.",
         "healthVisibilityOther": "Area lain",
         "healthVisibilityApply": "Ubah juga entri yang ada",
         "healthVisibilityApplyHint": "Tersimpan. Ubah juga entri yang ada di {{area}}?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Panjang siklus rata-rata",
                 "periodLength": "Lama menstruasi rata-rata",
                 "lutealLength": "Panjang fase luteal",
+                "daysUnit": "Hari",
                 "trackFertility": "Tampilkan masa subur",
-                "autoHint": "Kosongkan = dihitung otomatis dari riwayatmu.",
+                "autoHint": "Jika salah satu dari kedua kolom dibiarkan kosong, Yuvomi menghitung nilainya dari menstruasi yang Anda catat.",
                 "remindPeriodDaysBefore": "Pengingat menstruasi",
                 "remindOff": "Nonaktif",
                 "remindSameDay": "Pada hari-H",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Pilih file CSV atau tempel teks.",
                 "error": "Impor gagal."
             },
-            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/modules/calendar?section=personal-feeds\">Pengaturan → Modul → Kalender</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi.",
+            "feedLink": "Berlangganan siklus yang diperkirakan di kalender",
+            "widgetHint": "Tambahkan petak siklus ke {{overview}} lewat “{{customize}}”.",
             "endBeforeStart": "Akhir tidak boleh sebelum awal."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "j"
         },
         "careBanner": "Kamu mencatat untuk {{name}}.",
+        "whoSees": "Siapa yang bisa melihat ini?",
         "nutrition": {
             "title": "Gizi",
             "emptyTitle": "Belum ada catatan gizi",

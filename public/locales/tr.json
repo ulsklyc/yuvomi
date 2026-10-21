@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Döngü ayarı kaydedildi.",
         "healthCyclePersonalLabel": "Döngüyü göster",
         "healthCyclePersonalHint": "Yalnızca kendi görünümünüz için geçerlidir. Kapatırsanız döngü evdeki diğer kişilerde görünmeye devam eder.",
+        "healthCycleSettingsHint": "Döngü uzunluğu, doğum kontrolü, hatırlatıcılar ve gebelik modu döngü sayfasında ayarlanır.",
         "healthCyclePersonalHouseholdOff": "Döngü şu anda ev geneli için kapalı, bu yüzden kimsede görünmüyor.",
         "healthCyclePersonalSaved": "Döngü görünümü kaydedildi.",
         "pageRewardsModule": "Ödüller",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Bildirim ayarı kaydedildi.",
         "healthVisibilityTitle": "Varsayılan görünürlük",
         "healthVisibilityHint": "Yeni kayıtların hangi değerle başlayacağı. Her kayıtta değiştirebilirsin.",
+        "healthVisibilityCaregivers": "Senin yerine kayıt girebilen kişi, döngü günlüğü dışındaki özel kayıtlarını da görür. Bunu bir yönetici üyeler bölümünde belirler.",
         "healthVisibilityOther": "Diğer alanlar",
         "healthVisibilityApply": "Mevcut kayıtları da değiştir",
         "healthVisibilityApplyHint": "Kaydedildi. {{area}} altındaki mevcut kayıtlar da değiştirilsin mi?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Ortalama döngü uzunluğu",
                 "periodLength": "Ortalama adet süresi",
                 "lutealLength": "Luteal faz uzunluğu",
+                "daysUnit": "gün",
                 "trackFertility": "Doğurgan pencereyi göster",
-                "autoHint": "Boş bırak = geçmişinden otomatik hesaplanır.",
+                "autoHint": "İki alandan birini boş bırakırsan Yuvomi değeri kaydettiğin regl dönemlerinden hesaplar.",
                 "remindPeriodDaysBefore": "Adet hatırlatıcısı",
                 "remindOff": "Kapalı",
                 "remindSameDay": "Gününde",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
                 "error": "İçe aktarma başarısız oldu."
             },
-            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/modules/calendar?section=personal-feeds\">Ayarlar → Modüller → Takvim</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin.",
+            "feedLink": "Tahmini döngüye takviminden abone ol",
+            "widgetHint": "Döngü kutucuğunu {{overview}} içinde “{{customize}}” ile ekle.",
             "endBeforeStart": "Bitiş başlangıçtan önce olamaz."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "sa"
         },
         "careBanner": "{{name}} için kayıt giriyorsun.",
+        "whoSees": "Bunu kim görür?",
         "nutrition": {
             "title": "Besin değerleri",
             "emptyTitle": "Henüz besin değeri kaydı yok",

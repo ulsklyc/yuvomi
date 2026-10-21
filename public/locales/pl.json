@@ -2024,6 +2024,7 @@
         "healthCycleSaved": "Zapisano ustawienie cyklu.",
         "healthCyclePersonalLabel": "Pokaż cykl",
         "healthCyclePersonalHint": "Dotyczy tylko Twojego widoku. Jeśli go wyłączysz, cykl pozostanie widoczny dla pozostałych domowników.",
+        "healthCycleSettingsHint": "Długość cyklu, antykoncepcję, przypomnienia i tryb ciąży ustawisz na stronie cyklu.",
         "healthCyclePersonalHouseholdOff": "Cykl jest obecnie wyłączony dla całego gospodarstwa, więc nie pojawia się u nikogo.",
         "healthCyclePersonalSaved": "Widok cyklu zapisany.",
         "pageRewardsModule": "Nagrody",
@@ -3357,6 +3358,7 @@
         "healthPreventionNotifyCaregiversSaved": "Zapisano ustawienie powiadomień.",
         "healthVisibilityTitle": "Domyślna widoczność",
         "healthVisibilityHint": "Z czym startują nowe wpisy. Przy każdym wpisie możesz to zmienić.",
+        "healthVisibilityCaregivers": "Kto może zapisywać za ciebie, widzi też twoje prywatne wpisy, z wyjątkiem dziennika cyklu. Ustala to administrator w członkach.",
         "healthVisibilityOther": "Pozostałe obszary",
         "healthVisibilityApply": "Zmień też istniejące wpisy",
         "healthVisibilityApplyHint": "Zapisano. Czy zmienić także istniejące wpisy w obszarze {{area}}?",
@@ -5705,8 +5707,9 @@
                 "cycleLength": "Średnia długość cyklu",
                 "periodLength": "Średnia długość miesiączki",
                 "lutealLength": "Długość fazy lutealnej",
+                "daysUnit": "dni",
                 "trackFertility": "Pokaż okno płodności",
-                "autoHint": "Pozostaw puste = obliczane automatycznie z historii.",
+                "autoHint": "Jeśli zostawisz jedno z dwóch pól puste, Yuvomi obliczy wartość na podstawie zapisanych miesiączek.",
                 "remindPeriodDaysBefore": "Przypomnienie o miesiączce",
                 "remindOff": "Wyłączone",
                 "remindSameDay": "W tym samym dniu",
@@ -5808,7 +5811,8 @@
                 "emptyError": "Wybierz plik CSV lub wklej tekst.",
                 "error": "Import nie powiódł się."
             },
-            "discoveryHint": "Wskazówka: przewidywany cykl można subskrybować jako kanał ICS w <a href=\"/settings/modules/calendar?section=personal-feeds\">Ustawienia → Moduły → Kalendarz</a>, a widżet cyklu można pokazać na <a href=\"/\">Pulpicie</a> w trybie dostosowywania.",
+            "feedLink": "Subskrybuj przewidywany cykl w kalendarzu",
+            "widgetHint": "Kafelek cyklu dodasz do widoku {{overview}} w „{{customize}}”.",
             "endBeforeStart": "Koniec nie może być przed początkiem."
         },
         "duration": {
@@ -5818,6 +5822,7 @@
             "unitH": "godz."
         },
         "careBanner": "Wpisujesz dane dla {{name}}.",
+        "whoSees": "Kto to widzi?",
         "nutrition": {
             "title": "Wartości odżywcze",
             "emptyTitle": "Brak zapisanych wartości odżywczych",

@@ -4,7 +4,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
-import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
+import { personSwitcherMarkup, wireWhoSees } from '/utils/health-person-switcher.js';
 import { fastingHistoryQuery, fastingSections, fastingStatsQuery, formatFastingDuration, shouldLoadFastingStats } from '/utils/health-fasting.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -57,6 +57,7 @@ function shell(view) {
   // Pille in ihren Seiten- oder Detailkopf um (health-hoist.js), und ein am
   // Kopf delegierter Klick kaeme dort nie an.
   el.querySelector('.health-person-switcher')?.addEventListener('click', (event) => onPersonPick(view, el, event));
+  wireWhoSees(el);
   if (view.shellWired) return;
   view.shellWired = true;
   installPopoverMenus(el);

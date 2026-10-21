@@ -1930,6 +1930,7 @@
         "healthCycleSaved": "Nastavení cyklu uloženo.",
         "healthCyclePersonalLabel": "Zobrazit cyklus",
         "healthCyclePersonalHint": "Platí jen pro tvé vlastní zobrazení. Když ho vypneš, cyklus zůstane viditelný pro ostatní v domácnosti.",
+        "healthCycleSettingsHint": "Délku cyklu, antikoncepci, připomínky a režim těhotenství nastavíte na stránce cyklu.",
         "healthCyclePersonalHouseholdOff": "Cyklus je teď vypnutý pro celou domácnost, a proto se nezobrazuje nikomu.",
         "healthCyclePersonalSaved": "Zobrazení cyklu uloženo.",
         "pageRewardsModule": "Odměny",
@@ -3244,6 +3245,7 @@
         "healthPreventionNotifyCaregiversSaved": "Nastavení upozornění uloženo.",
         "healthVisibilityTitle": "Výchozí viditelnost",
         "healthVisibilityHint": "S čím nové záznamy začínají. U každého záznamu to můžeš změnit.",
+        "healthVisibilityCaregivers": "Kdo smí zapisovat za vás, vidí přitom i vaše soukromé záznamy, kromě deníku cyklu. Určuje to správce u členů.",
         "healthVisibilityOther": "Další oblasti",
         "healthVisibilityApply": "Upravit i stávající záznamy",
         "healthVisibilityApplyHint": "Uloženo. Mají se upravit i stávající záznamy v oblasti {{area}}?",
@@ -5578,8 +5580,9 @@
                 "cycleLength": "Průměrná délka cyklu",
                 "periodLength": "Průměrná délka menstruace",
                 "lutealLength": "Délka luteální fáze",
+                "daysUnit": "dny",
                 "trackFertility": "Zobrazit plodné období",
-                "autoHint": "Ponech prázdné = vypočítá se automaticky z tvé historie.",
+                "autoHint": "Když jedno z obou polí necháte prázdné, Yuvomi hodnotu spočítá ze zaznamenaných menstruací.",
                 "remindPeriodDaysBefore": "Připomenutí menstruace",
                 "remindOff": "Vypnuto",
                 "remindSameDay": "V daný den",
@@ -5680,7 +5683,8 @@
                 "emptyError": "Vyberte soubor CSV nebo vložte text.",
                 "error": "Import se nezdařil."
             },
-            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/modules/calendar?section=personal-feeds\">Nastavení → Moduly → Kalendář</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav.",
+            "feedLink": "Odebírat předpokládaný cyklus v kalendáři",
+            "widgetHint": "Dlaždici cyklu přidáte do přehledu „{{overview}}“ přes „{{customize}}“.",
             "endBeforeStart": "Konec nesmí být před začátkem."
         },
         "duration": {
@@ -5690,6 +5694,7 @@
             "unitH": "h"
         },
         "careBanner": "Zapisuješ za {{name}}.",
+        "whoSees": "Kdo to uvidí?",
         "nutrition": {
             "title": "Výživa",
             "emptyTitle": "Zatím žádné výživové údaje",

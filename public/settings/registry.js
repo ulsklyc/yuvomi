@@ -664,6 +664,11 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.pageHealthPersonalDescription',
     options: [
       'settings.healthCyclePersonalLabel',
+      // Die Zyklusvorgaben wohnen im Dialog der Zyklusseite; das Blatt fuehrt
+      // dorthin, und die Suche findet den Weg ueber den Satz davor, der die
+      // Vorgaben aufzaehlt (R21, D7). Beides steht auf dem Blatt
+      // (test:settings-copy).
+      { key: 'health.cycle.settings.title', also: ['settings.healthCycleSettingsHint'] },
       'settings.healthPreventionNotifyCaregiversLabel',
       'settings.healthVisibilityTitle',
     ],

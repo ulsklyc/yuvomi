@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "चक्र सेटिंग सहेजी गई।",
         "healthCyclePersonalLabel": "चक्र दिखाएँ",
         "healthCyclePersonalHint": "यह केवल आपके अपने दृश्य पर लागू होता है। इसे बंद करने पर चक्र घर के बाकी लोगों को दिखता रहेगा।",
+        "healthCycleSettingsHint": "चक्र की अवधि, गर्भनिरोधक, रिमाइंडर और गर्भावस्था मोड चक्र पेज पर सेट होते हैं।",
         "healthCyclePersonalHouseholdOff": "चक्र अभी पूरे घर के लिए बंद है, इसलिए यह किसी को नहीं दिखता।",
         "healthCyclePersonalSaved": "चक्र दृश्य सहेजा गया।",
         "pageRewardsModule": "पुरस्कार",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "सूचना सेटिंग सहेजी गई।",
         "healthVisibilityTitle": "डिफ़ॉल्ट दृश्यता",
         "healthVisibilityHint": "नई प्रविष्टियाँ किस मान से शुरू होती हैं। हर प्रविष्टि पर इसे बदला जा सकता है।",
+        "healthVisibilityCaregivers": "जिसे आपकी ओर से दर्ज करने की अनुमति है, वह आपकी निजी प्रविष्टियाँ भी देखता है, चक्र डायरी को छोड़कर। इसे एक एडमिन सदस्यों में तय करता है।",
         "healthVisibilityOther": "अन्य क्षेत्र",
         "healthVisibilityApply": "मौजूदा प्रविष्टियाँ भी बदलें",
         "healthVisibilityApplyHint": "सहेजा गया। क्या {{area}} की मौजूदा प्रविष्टियाँ भी बदली जाएँ?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "औसत चक्र अवधि",
                 "periodLength": "औसत माहवारी अवधि",
                 "lutealLength": "ल्यूटियल चरण की अवधि",
+                "daysUnit": "दिन",
                 "trackFertility": "उपजाऊ अवधि दिखाएँ",
-                "autoHint": "खाली छोड़ें = आपके इतिहास से स्वतः गणना।",
+                "autoHint": "दोनों में से कोई फ़ील्ड खाली छोड़ें, तो Yuvomi आपकी दर्ज की गई माहवारियों से मान निकालता है।",
                 "remindPeriodDaysBefore": "माहवारी रिमाइंडर",
                 "remindOff": "बंद",
                 "remindSameDay": "उसी दिन",
@@ -5550,7 +5553,8 @@
                 "emptyError": "कृपया एक CSV फ़ाइल चुनें या टेक्स्ट पेस्ट करें।",
                 "error": "आयात विफल रहा।"
             },
-            "discoveryHint": "सुझाव: अनुमानित चक्र को <a href=\"/settings/modules/calendar?section=personal-feeds\">सेटिंग्स → मॉड्यूल → कैलेंडर</a> में ICS फ़ीड के रूप में सब्सक्राइब करें, या चक्र विजेट को <a href=\"/\">डैशबोर्ड</a> पर उसके अनुकूलन मोड से दिखाएँ।",
+            "feedLink": "अनुमानित चक्र को कैलेंडर में सब्सक्राइब करें",
+            "widgetHint": "चक्र टाइल को {{overview}} में “{{customize}}” से जोड़ें।",
             "endBeforeStart": "अंत आरंभ से पहले नहीं हो सकता।"
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "घं"
         },
         "careBanner": "आप {{name}} के लिए दर्ज कर रहे हैं।",
+        "whoSees": "इसे कौन देख सकता है?",
         "nutrition": {
             "title": "पोषण",
             "emptyTitle": "अभी तक कोई पोषण प्रविष्टि नहीं",

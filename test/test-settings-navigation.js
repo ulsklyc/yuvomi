@@ -4974,3 +4974,24 @@ test('R21: die Sprungmarken sind Textlinks, nicht in der Optik der Auswahl-Chips
   assert.match(link, /font-size:\s*var\(--type-secondary\)/, 'Sekundaertext, nicht die Chip-Schrift');
   assert.doesNotMatch(link, /border|background/, 'keine Kapsel');
 });
+
+/* D7 (Critique R21, a5 P2): ZYKLUSVORGABEN SIND IN DER SUCHE. "zyklus" fand
+ * drei Schalter, aber nicht die Zyklus-Einstellungen selbst (Laenge,
+ * Verhuetung, Erinnerungen, Schwangerschaft) - die stehen im Dialog der
+ * Zyklusseite, eine zweite Heimat ohne Weg dorthin. Das Gesundheitsblatt
+ * fuehrt jetzt "Zyklus-Einstellungen" als Link in die Zyklusseite, die den
+ * Dialog oeffnet, und die Suche findet ihn ueber jede seiner Vorgaben. */
+test('R21 D7: die Suche findet die Zyklusvorgaben, das Blatt fuehrt in den Dialog', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  const hit = (query) => searchSettings(query, { user: member, translate })
+    .options.find((h) => h.key === 'health.cycle.settings.title');
+  for (const q of ['Zyklus', 'Zykluslänge', 'Verhütung', 'Schwangerschaft', 'Erinnerungen']) {
+    assert.ok(hit(q), `"${q}" findet die Zyklus-Einstellungen`);
+    assert.equal(hit(q).section.id, 'personal-health');
+  }
+  const page = await readFile(new URL('../public/settings/pages/personal-health.js', import.meta.url), 'utf8');
+  assert.match(page, /const CYCLE_SETTINGS_HREF = '\/health\/cycle\?open=settings';/, 'der Link oeffnet den Dialog auf der Zyklusseite');
+  assert.match(page, /<a href="\$\{CYCLE_SETTINGS_HREF\}" id="health-cycle-settings-link">/);
+  assert.match(page, /\$\{esc\(t\('health\.cycle\.settings\.title'\)\)\}/, 'er heisst wie der Dialog (Beschriftung = Suchschluessel)');
+});

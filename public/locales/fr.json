@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Réglage du cycle enregistré.",
         "healthCyclePersonalLabel": "Afficher le cycle",
         "healthCyclePersonalHint": "Ne concerne que votre propre affichage. Si vous le désactivez, le cycle reste visible pour les autres membres du foyer.",
+        "healthCycleSettingsHint": "La durée du cycle, la contraception, les rappels et le mode grossesse se règlent sur la page du cycle.",
         "healthCyclePersonalHouseholdOff": "Le cycle est actuellement désactivé pour tout le foyer, il n’apparaît donc pour personne.",
         "healthCyclePersonalSaved": "Affichage du cycle enregistré.",
         "pageRewardsModule": "Récompenses",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Paramètre de notification enregistré.",
         "healthVisibilityTitle": "Visibilité par défaut",
         "healthVisibilityHint": "Ce que sont les nouvelles entrées au départ. Tu peux le changer à chaque saisie.",
+        "healthVisibilityCaregivers": "Qui peut saisir pour vous voit aussi vos entrées privées, sauf le journal du cycle. Un administrateur le définit dans les membres.",
         "healthVisibilityOther": "Autres domaines",
         "healthVisibilityApply": "Modifier aussi les entrées existantes",
         "healthVisibilityApplyHint": "Enregistré. Faut-il aussi modifier les entrées existantes de {{area}} ?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Durée moyenne du cycle",
                 "periodLength": "Durée moyenne des règles",
                 "lutealLength": "Durée de la phase lutéale",
+                "daysUnit": "jours",
                 "trackFertility": "Afficher la fenêtre de fécondité",
-                "autoHint": "Laisser vide = calculé automatiquement à partir de votre historique.",
+                "autoHint": "Si vous laissez l’un des deux champs vide, Yuvomi calcule la valeur à partir des règles que vous avez saisies.",
                 "remindPeriodDaysBefore": "Rappel de règles",
                 "remindOff": "Désactivé",
                 "remindSameDay": "Le jour même",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Choisissez un fichier CSV ou collez du texte.",
                 "error": "Échec de l'import."
             },
-            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/modules/calendar?section=personal-feeds\">Paramètres → Modules → Calendrier</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation.",
+            "feedLink": "S’abonner au cycle prévu dans votre calendrier",
+            "widgetHint": "Ajoutez la tuile du cycle à {{overview}} via « {{customize}} ».",
             "endBeforeStart": "La fin ne peut pas précéder le début."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "h"
         },
         "careBanner": "Vous saisissez pour {{name}}.",
+        "whoSees": "Qui peut voir ceci ?",
         "nutrition": {
             "title": "Nutrition",
             "emptyTitle": "Aucune donnée nutritionnelle pour le moment",

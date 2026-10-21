@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Đã lưu cài đặt chu kỳ.",
         "healthCyclePersonalLabel": "Hiện chu kỳ",
         "healthCyclePersonalHint": "Chỉ áp dụng cho chế độ xem của bạn. Nếu tắt, chu kỳ vẫn hiển thị với những người khác trong gia đình.",
+        "healthCycleSettingsHint": "Độ dài chu kỳ, biện pháp tránh thai, nhắc nhở và chế độ mang thai được đặt trên trang chu kỳ.",
         "healthCyclePersonalHouseholdOff": "Chu kỳ hiện đang tắt cho cả gia đình nên không hiển thị với ai.",
         "healthCyclePersonalSaved": "Đã lưu hiển thị chu kỳ.",
         "pageRewardsModule": "Phần thưởng",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Đã lưu cài đặt thông báo.",
         "healthVisibilityTitle": "Hiển thị mặc định",
         "healthVisibilityHint": "Giá trị khởi đầu của mục mới. Bạn vẫn có thể đổi ở từng mục.",
+        "healthVisibilityCaregivers": "Người được phép ghi thay bạn cũng xem được các mục riêng tư của bạn, trừ nhật ký chu kỳ. Quản trị viên thiết lập điều này trong thành viên.",
         "healthVisibilityOther": "Khu vực khác",
         "healthVisibilityApply": "Đổi cả các mục hiện có",
         "healthVisibilityApplyHint": "Đã lưu. Có đổi cả các mục hiện có trong {{area}} không?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Độ dài chu kỳ trung bình",
                 "periodLength": "Độ dài kỳ kinh trung bình",
                 "lutealLength": "Độ dài giai đoạn hoàng thể",
+                "daysUnit": "ngày",
                 "trackFertility": "Hiển thị cửa sổ dễ thụ thai",
-                "autoHint": "Để trống = tự động tính từ lịch sử của bạn.",
+                "autoHint": "Nếu để trống một trong hai ô, Yuvomi sẽ tính giá trị từ các kỳ kinh bạn đã ghi.",
                 "remindPeriodDaysBefore": "Nhắc nhở kỳ kinh",
                 "remindOff": "Tắt",
                 "remindSameDay": "Vào đúng ngày",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Vui lòng chọn tệp CSV hoặc dán văn bản.",
                 "error": "Nhập không thành công."
             },
-            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/modules/calendar?section=personal-feeds\">Cài đặt → Mô-đun → Lịch</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh.",
+            "feedLink": "Đăng ký chu kỳ dự đoán trong lịch",
+            "widgetHint": "Thêm ô chu kỳ vào {{overview}} trong “{{customize}}”.",
             "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "giờ"
         },
         "careBanner": "Bạn đang ghi cho {{name}}.",
+        "whoSees": "Ai xem được?",
         "nutrition": {
             "title": "Dinh dưỡng",
             "emptyTitle": "Chưa ghi nhận dinh dưỡng nào",

@@ -1852,6 +1852,7 @@
         "healthCycleSaved": "Cycle setting saved.",
         "healthCyclePersonalLabel": "Show cycle",
         "healthCyclePersonalHint": "Applies to your own view only. Turning it off leaves the cycle visible for everyone else in the household.",
+        "healthCycleSettingsHint": "Cycle length, contraception, reminders and pregnancy mode are set on the cycle page.",
         "healthCyclePersonalHouseholdOff": "The cycle is currently switched off for the whole household, so it appears for nobody.",
         "healthCyclePersonalSaved": "Cycle view saved.",
         "pageRewardsModule": "Rewards",
@@ -3147,6 +3148,7 @@
         "healthPreventionNotifyCaregiversSaved": "Notification setting saved.",
         "healthVisibilityTitle": "Default visibility",
         "healthVisibilityHint": "What new entries start as. You can still change it on every entry.",
+        "healthVisibilityCaregivers": "Anyone allowed to record for you also sees your private entries, except the cycle diary. An admin sets this under members.",
         "healthVisibilityOther": "Other areas",
         "healthVisibilityApply": "Move existing entries too",
         "healthVisibilityApplyHint": "Saved. Should the existing entries under {{area}} be changed as well?",
@@ -5449,8 +5451,9 @@
                 "cycleLength": "Average cycle length",
                 "periodLength": "Average period length",
                 "lutealLength": "Luteal phase length",
+                "daysUnit": "days",
                 "trackFertility": "Show fertile window",
-                "autoHint": "Leave empty to calculate automatically from your history.",
+                "autoHint": "Leave either field empty and Yuvomi works out the value from the periods you have logged.",
                 "remindPeriodDaysBefore": "Period reminder",
                 "remindOff": "Off",
                 "remindSameDay": "On the day",
@@ -5550,7 +5553,8 @@
                 "emptyError": "Please choose a CSV file or paste text.",
                 "error": "Import failed."
             },
-            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/modules/calendar?section=personal-feeds\">Settings → Modules → Calendar</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode.",
+            "feedLink": "Subscribe to the predicted cycle in your calendar",
+            "widgetHint": "Add the cycle tile to the {{overview}} under “{{customize}}”.",
             "endBeforeStart": "The end can't be before the start."
         },
         "duration": {
@@ -5560,6 +5564,7 @@
             "unitH": "h"
         },
         "careBanner": "You are recording for {{name}}.",
+        "whoSees": "Who can see this?",
         "nutrition": {
             "title": "Nutrition",
             "emptyTitle": "No nutrition logged yet",

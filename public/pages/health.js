@@ -26,9 +26,9 @@ import { openModal, closeModal, captureModalContext, confirmModal, confirmOverMo
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { installPopoverMenus, pageToolsMenuHtml } from '/utils/popover-menu.js';
-import { personSwitcherMarkup } from '/utils/health-person-switcher.js';
+import { personSwitcherMarkup, wireWhoSees } from '/utils/health-person-switcher.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
   computeVitalSeries, stepVitalAnchor, VITAL_METRICS, vitalMetric,
@@ -1348,6 +1348,7 @@ function renderVitalsShell() {
  * Nachzuegler-Muster gemessen hat.
  */
 function wirePersonSwitcher(view, onSwitch) {
+  wireWhoSees(view.root);
   const menuId = view.root.querySelector('.health-person-switcher__trigger')?.getAttribute('popovertarget');
   view.root.querySelectorAll('.health-person-switcher [data-person-id]').forEach((item) =>
     item.addEventListener('click', async () => {
@@ -7322,6 +7323,28 @@ async function mountCycle() {
   }
   cycle.loaded = true;
   renderCycleShell();
+  openCycleSettingsFromQuery();
+}
+
+/**
+ * `/health/cycle?open=settings` oeffnet die Zyklus-Einstellungen (Critique R21,
+ * D7): der Weg aus dem Gesundheitsblatt der Einstellungen und aus deren Suche.
+ * Der Parameter verlaesst die Adresse vor dem Dialog, ohne eigenen Eintrag -
+ * sonst ginge der Dialog bei jedem Neuladen und Zurueck wieder auf (dieselbe
+ * Regel wie `?open=` der Geburtstage). Nur in der eigenen, beschreibbaren
+ * Ansicht: openCycleSettingsModal fragt den Riegel selbst noch einmal.
+ */
+function openCycleSettingsFromQuery({ loc = window.location } = {}) {
+  const params = new URLSearchParams(loc.search ?? '');
+  if (params.get('open') !== 'settings') return false;
+  params.delete('open');
+  const rest = params.toString();
+  // `path` zieht mit: Zurueck liest den Eintrag vor der Adresse (router.js).
+  const url = `${loc.pathname}${rest ? `?${rest}` : ''}${loc.hash ?? ''}`;
+  history.replaceState({ ...history.state, path: url }, '', url);
+  if (cycle.error || !isOwnCycleView() || !cycleCanEdit()) return false;
+  openCycleSettingsModal();
+  return true;
 }
 
 async function loadCycle() {
@@ -8993,6 +9016,22 @@ function cycleHistoryMarkup(canEdit) {
  * aerztliche Beratung) den allgemeinen - er sagt dasselbe und mehr. Er stand
  * vorher neben der Statistik, der allgemeine zusaetzlich hier.
  */
+/**
+ * DER ZYKLUS-TIPP IST EIN LINK (Critique R21, a5). Er stand als Satz mit zwei
+ * Links aus einem Locale-String mit rohem HTML ("Tipp: ... unter Einstellungen
+ * -> Module -> Kalender abonnieren; ... ueber Anpassen einblenden"), und der
+ * erste fuehrte in ein seit R14 aufgeloestes Blatt: der Zyklus-Feed steht im
+ * Gesundheitsblatt (registry.js, `feed-cycle`). Jetzt ein Link mit eigenem
+ * Text dorthin, darunter die Kachel als ruhiger Satz - ohne HTML im Locale.
+ */
+function cycleDiscoveryMarkup() {
+  return `
+    <div class="cycle-hint cycle-discovery-hint">
+      <a class="cycle-discovery-hint__link" href="/settings/modules/health?section=feed-cycle" data-cycle-feed-link>${esc(t('health.cycle.feedLink'))}</a>
+      <p class="cycle-discovery-hint__note">${esc(t('health.cycle.widgetHint', { overview: t('nav.dashboard'), customize: t('dashboard.customize') }))}</p>
+    </div>`;
+}
+
 function cycleFooterMarkup(canEdit, prediction = null) {
   const q = cycle.personId ? `?user_id=${encodeURIComponent(cycle.personId)}` : '';
   const fertilityNote = prediction?.trackFertility && prediction.hasData && !prediction.isPregnant
@@ -9006,7 +9045,7 @@ function cycleFooterMarkup(canEdit, prediction = null) {
       ${canEdit ? `<button class="btn btn--ghost btn--sm" data-action="cycle-import"><i data-lucide="upload" aria-hidden="true"></i>${esc(t('health.cycle.import.button'))}</button>` : ''}
       ${canEdit ? `<button class="btn btn--ghost btn--sm" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
     </div>
-    ${canEdit ? `<p class="cycle-hint cycle-discovery-hint">${t('health.cycle.discoveryHint')}</p>` : ''}
+    ${canEdit ? cycleDiscoveryMarkup() : ''}
     ${fertilityNote || disclaimerMarkup()}`;
 }
 
@@ -9056,6 +9095,11 @@ function wireCycle() {
   cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
   cycle.root.querySelector('[data-action="cycle-settings"]')?.addEventListener('click', () => openCycleSettingsModal());
   cycle.root.querySelector('[data-action="cycle-import"]')?.addEventListener('click', () => openCycleImportModal());
+  cycle.root.querySelector('[data-cycle-feed-link]')?.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button > 0) return;
+    event.preventDefault();
+    window.yuvomi?.navigate(event.currentTarget.getAttribute('href'));
+  });
 
   // C-1: "Heute"-Einblendung - eigene data-action-Namen (siehe cycleBubbleMarkup()),
   // ruft aber dieselben Funktionen wie die bestehende Aktionsleiste auf, keine
@@ -9633,6 +9677,29 @@ async function deleteDayLog(log) {
 // langfristige Planungserinnerung wie die eigene).
 const PARTNER_REMIND_DAYS = Object.freeze([0, 1, 2, 3, 5, 7]);
 
+/**
+ * Eine Zahl in Tagen als Zeile des Dialog-Traegers (Critique R21, a5): das
+ * Feld mit "Tage" dahinter - dieselbe Bauart wie der Messwert mit Einheit
+ * (formCompositeHtml), die Einheit beschreibt das Feld (`aria-describedby`).
+ */
+function daysField({ id, label, min, max, value = '', placeholder = null, describedBy = null }) {
+  return formRowHtml({
+    label, labelFor: id, field: true,
+    control: formCompositeHtml({
+      parts: [{
+        id, value, placeholder,
+        attrs: { type: 'number', inputmode: 'numeric', min, max, step: 1, 'aria-describedby': describedBy },
+      }],
+      unit: t('health.cycle.settings.daysUnit'),
+    }),
+  });
+}
+
+/** An/Aus im Zyklus-Dialog: die Schalterzeile der Dialoge (formSwitchRowHtml), Hinweis darunter. */
+function cycleSwitchRow({ id, label, checked = false, hint = '' }) {
+  return formSwitchRowHtml({ label, checked, hint, hintId: hint ? `${id}-hint` : null, attrs: { id } });
+}
+
 function openCycleSettingsModal() {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const s = cycle.settings || {};
@@ -9655,82 +9722,71 @@ function openCycleSettingsModal() {
     size: 'sm',
     content: `
       <form id="cycle-settings-form" class="form-stack" novalidate>
-        <div class="form-field">
-          <label class="label" for="cs-cycle">${esc(t('health.cycle.settings.cycleLength'))}</label>
-          <input class="input" id="cs-cycle" type="number" inputmode="numeric" min="15" max="60" step="1"
-            aria-describedby="cs-auto-hint"
-            placeholder="${esc(fmtNum(stats.avgCycle))}" value="${esc(val(s.cycle_length_avg))}">
-        </div>
-        <div class="form-field">
-          <label class="label" for="cs-period">${esc(t('health.cycle.settings.periodLength'))}</label>
-          <input class="input" id="cs-period" type="number" inputmode="numeric" min="1" max="15" step="1"
-            aria-describedby="cs-auto-hint"
-            placeholder="${esc(fmtNum(stats.avgPeriod))}" value="${esc(val(s.period_length_avg))}">
-        </div>
-        <div class="form-field">
-          <label class="label" for="cs-luteal">${esc(t('health.cycle.settings.lutealLength'))}</label>
-          <input class="input" id="cs-luteal" type="number" inputmode="numeric" min="8" max="18" step="1"
-            aria-describedby="cs-auto-hint"
-            value="${esc(val(s.luteal_length ?? 14))}">
-        </div>
-        <label class="cycle-toggle">
-          <input type="checkbox" id="cs-fertility" ${s.track_fertility === 0 ? '' : 'checked'}>
-          <span>${esc(t('health.cycle.settings.trackFertility'))}</span>
-        </label>
-        <p class="cycle-hint" id="cs-auto-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
-        <div class="form-field">
-          <label class="label" for="cs-contraception">${esc(t('health.cycle.settings.contraception'))}</label>
-          <select class="input" id="cs-contraception" aria-describedby="cs-contraception-hint">
-            <option value="" ${s.contraception ? '' : 'selected'}>${esc(t('health.cycle.settings.contraceptionUnset'))}</option>
-            ${CONTRACEPTION_TYPES.map((c) => `<option value="${esc(c.value)}" ${s.contraception === c.value ? 'selected' : ''}>${esc(t(c.labelKey))}</option>`).join('')}
-          </select>
-          <p class="cycle-hint" id="cs-contraception-hint">${esc(t('health.cycle.settings.contraceptionHint'))}</p>
-        </div>
-        <label class="cycle-toggle">
-          <input type="checkbox" id="cs-perimenopause" aria-describedby="cs-perimenopause-hint" ${s.perimenopause_mode ? 'checked' : ''}>
-          <span>${esc(t('health.cycle.settings.perimenopauseMode'))}</span>
-        </label>
-        <p class="cycle-hint" id="cs-perimenopause-hint">${esc(t('health.cycle.settings.perimenopauseModeHint'))}</p>
-        <label class="cycle-toggle">
-          <input type="checkbox" id="cs-show-pms" ${s.show_pms === 0 ? '' : 'checked'}>
-          <span>${esc(t('health.cycle.settings.showPms'))}</span>
-        </label>
-        <div class="form-field">
-          <label class="label" for="cs-notify-partner">${esc(t('health.cycle.settings.notifyPartner'))}</label>
-          <select class="input" id="cs-notify-partner" aria-describedby="cs-notify-partner-hint" ${eligiblePartners.length ? '' : 'disabled'}>
-            <option value="" ${s.notify_partner_user_id ? '' : 'selected'}>${esc(t('health.cycle.settings.remindOff'))}</option>
-            ${eligiblePartners.map((m) => `<option value="${m.id}" ${Number(s.notify_partner_user_id) === m.id ? 'selected' : ''}>${esc(m.display_name)}</option>`).join('')}
-          </select>
-          <p class="cycle-hint" id="cs-notify-partner-hint">${esc(eligiblePartners.length ? t('health.cycle.settings.notifyPartnerHint') : t('health.cycle.settings.notifyPartnerNoEligible'))}</p>
-        </div>
-        <div class="form-field" id="cs-notify-partner-days-field" ${s.notify_partner_user_id ? '' : 'hidden'}>
-          <label class="label" for="cs-notify-partner-days">${esc(t('health.cycle.settings.notifyPartnerDaysBefore'))}</label>
-          <select class="input" id="cs-notify-partner-days">
-            ${PARTNER_REMIND_DAYS.map((d) => `<option value="${d}" ${Number(s.notify_partner_days_before) === d ? 'selected' : ''}>${esc(d === 0 ? t('health.cycle.settings.remindSameDay') : t('health.cycle.unit.days', { value: d, count: d }))}</option>`).join('')}
-          </select>
-        </div>
+        ${/* DIE SPRACHE DER APP (Critique R21, a5 P2). Native Haken zwischen
+             Zahlenfeldern ohne Einheit, und "Leer lassen = automatisch" stand
+             unter "Fruchtbares Fenster anzeigen" statt unter den Feldern, die
+             es meint. Jetzt Zeilen im Traeger wie im Mitglieder-Dialog (R19):
+             Zahl mit "Tage" dahinter, An/Aus als Schalter, der Hinweis direkt
+             unter Zyklus- und Periodenlaenge. Die ids bleiben - onSave liest
+             dieselben Felder. */ ''}
+        ${formRowsHtml([
+          daysField({ id: 'cs-cycle', label: t('health.cycle.settings.cycleLength'), min: 15, max: 60, placeholder: fmtNum(stats.avgCycle), value: val(s.cycle_length_avg), describedBy: 'cs-auto-hint' }),
+          daysField({ id: 'cs-period', label: t('health.cycle.settings.periodLength'), min: 1, max: 15, placeholder: fmtNum(stats.avgPeriod), value: val(s.period_length_avg), describedBy: 'cs-auto-hint' }),
+        ])}
+        <p class="form-hint" id="cs-auto-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
+        ${formRowsHtml([
+          daysField({ id: 'cs-luteal', label: t('health.cycle.settings.lutealLength'), min: 8, max: 18, value: val(s.luteal_length ?? 14) }),
+          cycleSwitchRow({ id: 'cs-fertility', label: t('health.cycle.settings.trackFertility'), checked: s.track_fertility !== 0 }),
+          formRowHtml({
+            label: t('health.cycle.settings.contraception'), labelFor: 'cs-contraception',
+            description: t('health.cycle.settings.contraceptionHint'), descriptionId: 'cs-contraception-hint',
+            control: `<select class="form-input" id="cs-contraception" aria-describedby="cs-contraception-hint">
+              <option value="" ${s.contraception ? '' : 'selected'}>${esc(t('health.cycle.settings.contraceptionUnset'))}</option>
+              ${CONTRACEPTION_TYPES.map((c) => `<option value="${esc(c.value)}" ${s.contraception === c.value ? 'selected' : ''}>${esc(t(c.labelKey))}</option>`).join('')}
+            </select>`,
+          }),
+          cycleSwitchRow({ id: 'cs-perimenopause', label: t('health.cycle.settings.perimenopauseMode'), checked: Boolean(s.perimenopause_mode), hint: t('health.cycle.settings.perimenopauseModeHint') }),
+          cycleSwitchRow({ id: 'cs-show-pms', label: t('health.cycle.settings.showPms'), checked: s.show_pms !== 0 }),
+          formRowHtml({
+            label: t('health.cycle.settings.notifyPartner'), labelFor: 'cs-notify-partner',
+            description: eligiblePartners.length ? t('health.cycle.settings.notifyPartnerHint') : t('health.cycle.settings.notifyPartnerNoEligible'),
+            descriptionId: 'cs-notify-partner-hint',
+            control: `<select class="form-input" id="cs-notify-partner" aria-describedby="cs-notify-partner-hint" ${eligiblePartners.length ? '' : 'disabled'}>
+              <option value="" ${s.notify_partner_user_id ? '' : 'selected'}>${esc(t('health.cycle.settings.remindOff'))}</option>
+              ${eligiblePartners.map((m) => `<option value="${m.id}" ${Number(s.notify_partner_user_id) === m.id ? 'selected' : ''}>${esc(m.display_name)}</option>`).join('')}
+            </select>`,
+          }),
+          formRowHtml({
+            label: t('health.cycle.settings.notifyPartnerDaysBefore'), labelFor: 'cs-notify-partner-days',
+            attrs: { id: 'cs-notify-partner-days-field', hidden: !s.notify_partner_user_id },
+            control: `<select class="form-input" id="cs-notify-partner-days">
+              ${PARTNER_REMIND_DAYS.map((d) => `<option value="${d}" ${Number(s.notify_partner_days_before) === d ? 'selected' : ''}>${esc(d === 0 ? t('health.cycle.settings.remindSameDay') : t('health.cycle.unit.days', { value: d, count: d }))}</option>`).join('')}
+            </select>`,
+          }),
+        ])}
         <hr class="cycle-settings__sep">
-        <div class="form-field">
-          <label class="label" for="cs-default-visibility">${esc(t('health.cycle.settings.defaultVisibility'))}</label>
-          <select class="input" id="cs-default-visibility" aria-describedby="cs-default-visibility-hint">
-            <option value="private" ${s.default_visibility === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
-            <option value="family" ${s.default_visibility === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
-          </select>
-          <p class="cycle-hint" id="cs-default-visibility-hint">${esc(t('health.cycle.settings.defaultVisibilityHint'))}</p>
-        </div>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.cycle.settings.defaultVisibility'), labelFor: 'cs-default-visibility',
+            description: t('health.cycle.settings.defaultVisibilityHint'), descriptionId: 'cs-default-visibility-hint',
+            control: `<select class="form-input" id="cs-default-visibility" aria-describedby="cs-default-visibility-hint">
+              <option value="private" ${s.default_visibility === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
+              <option value="family" ${s.default_visibility === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
+            </select>`,
+          }),
+        ])}
         <hr class="cycle-settings__sep">
-        <div class="form-field">
-          <label class="label" for="cs-remind-days">${esc(t('health.cycle.settings.remindPeriodDaysBefore'))}</label>
-          <select class="input" id="cs-remind-days" aria-describedby="cs-remind-days-hint">
-            <option value="" ${s.remind_period_days_before == null ? 'selected' : ''}>${esc(t('health.cycle.settings.remindOff'))}</option>
-            ${[0, 1, 2, 3, 5, 7, 10, 14].map((d) => `<option value="${d}" ${Number(s.remind_period_days_before) === d ? 'selected' : ''}>${esc(d === 0 ? t('health.cycle.settings.remindSameDay') : t('health.cycle.unit.days', { value: d, count: d }))}</option>`).join('')}
-          </select>
-          <p class="cycle-hint" id="cs-remind-days-hint">${esc(t('health.cycle.settings.remindPeriodDaysBeforeHint'))}</p>
-        </div>
-        <label class="cycle-toggle">
-          <input type="checkbox" id="cs-remind-log" ${s.remind_log_daily ? 'checked' : ''}>
-          <span>${esc(t('health.cycle.settings.remindLogDaily'))}</span>
-        </label>
+        ${formRowsHtml([
+          formRowHtml({
+            label: t('health.cycle.settings.remindPeriodDaysBefore'), labelFor: 'cs-remind-days',
+            description: t('health.cycle.settings.remindPeriodDaysBeforeHint'), descriptionId: 'cs-remind-days-hint',
+            control: `<select class="form-input" id="cs-remind-days" aria-describedby="cs-remind-days-hint">
+              <option value="" ${s.remind_period_days_before == null ? 'selected' : ''}>${esc(t('health.cycle.settings.remindOff'))}</option>
+              ${[0, 1, 2, 3, 5, 7, 10, 14].map((d) => `<option value="${d}" ${Number(s.remind_period_days_before) === d ? 'selected' : ''}>${esc(d === 0 ? t('health.cycle.settings.remindSameDay') : t('health.cycle.unit.days', { value: d, count: d }))}</option>`).join('')}
+            </select>`,
+          }),
+          cycleSwitchRow({ id: 'cs-remind-log', label: t('health.cycle.settings.remindLogDaily'), checked: Boolean(s.remind_log_daily) }),
+        ])}
         <div class="form-field cycle-bulk">
           <button type="button" class="btn btn--secondary" data-action="cycle-apply-visibility"
             aria-describedby="cs-bulk-hint">${esc(t('health.cycle.settings.applyToAll'))}</button>
@@ -9744,15 +9800,14 @@ function openCycleSettingsModal() {
           </div>
         </div>
         <hr class="cycle-settings__sep">
-        <label class="cycle-toggle">
-          <input type="checkbox" id="cs-pregnancy" aria-describedby="cs-pregnancy-hint" ${s.pregnancy_mode ? 'checked' : ''}>
-          <span>${esc(t('health.cycle.settings.pregnancyMode'))}</span>
-        </label>
-        <div class="form-field" id="cs-due-field" ${s.pregnancy_mode ? '' : 'hidden'}>
-          <label class="label" for="cs-due">${esc(t('health.cycle.settings.dueDate'))}</label>
-          <yuvomi-datepicker id="cs-due" type="date" value="${esc(s.pregnancy_due_date || '')}" min="${esc(dueMin)}" max="${esc(dueMax)}"></yuvomi-datepicker>
-        </div>
-        <p class="cycle-hint" id="cs-pregnancy-hint">${esc(t('health.cycle.settings.pregnancyHint'))}</p>
+        ${formRowsHtml([
+          cycleSwitchRow({ id: 'cs-pregnancy', label: t('health.cycle.settings.pregnancyMode'), checked: Boolean(s.pregnancy_mode), hint: t('health.cycle.settings.pregnancyHint') }),
+          formRowHtml({
+            label: t('health.cycle.settings.dueDate'), labelFor: 'cs-due', field: true,
+            attrs: { id: 'cs-due-field', hidden: !s.pregnancy_mode },
+            control: `<yuvomi-datepicker id="cs-due" type="date" value="${esc(s.pregnancy_due_date || '')}" min="${esc(dueMin)}" max="${esc(dueMax)}"></yuvomi-datepicker>`,
+          }),
+        ])}
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
