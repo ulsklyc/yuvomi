@@ -1208,6 +1208,10 @@ async function openImportModal() {
       <div class="bd-import">
         <p class="bd-import__intro">${t('birthdays.importIntro')}</p>
         <span class="sr-only" role="status" aria-live="polite" id="bd-import-status"></span>
+        ${withBirthday.some((c) => !c.already_imported) ? `
+          <div class="bd-import__bar">
+            <button class="btn btn--ghost btn--sm" type="button" id="bd-import-toggle">${t('contacts.importSelectAll')}</button>
+          </div>` : ''}
         ${listHtml}
         ${withoutHtml}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -1218,8 +1222,10 @@ async function openImportModal() {
     `,
     onSave(panel) {
       const submitBtn = panel.querySelector('#bd-import-submit');
+      const toggleBtn = panel.querySelector('#bd-import-toggle');
       const status = panel.querySelector('#bd-import-status');
       const selectable = [...panel.querySelectorAll('.bd-import__list input:not(:disabled)')];
+      let submitting = false;
 
       const selectedIds = () =>
         selectable.filter((cb) => cb.checked).map((cb) => Number(cb.value));
@@ -1227,16 +1233,30 @@ async function openImportModal() {
       const refresh = (announce = false) => {
         const n = selectedIds().length;
         submitBtn.textContent = t('birthdays.importSubmit', { count: n });
-        submitBtn.disabled = n === 0;
+        submitBtn.disabled = submitting || n === 0;
+        if (toggleBtn) {
+          toggleBtn.textContent = n === selectable.length
+            ? t('contacts.importDeselectAll')
+            : t('contacts.importSelectAll');
+          toggleBtn.disabled = submitting;
+        }
+        selectable.forEach((cb) => { cb.disabled = submitting; });
         // Nur bei echter Interaktion ansagen, nicht beim initialen Öffnen.
         if (announce && status) status.textContent = t('birthdays.importSelected', { count: n });
       };
       selectable.forEach((cb) => cb.addEventListener('change', () => refresh(true)));
+      toggleBtn?.addEventListener('click', () => {
+        if (submitting) return;
+        const allChecked = selectable.every((cb) => cb.checked);
+        selectable.forEach((cb) => { cb.checked = !allChecked; });
+        refresh(true);
+      });
       refresh();
 
       panel.querySelector('#bd-import-cancel').addEventListener('click', closeModal);
 
       submitBtn.addEventListener('click', async () => {
+        if (submitting) return;
         const ids = selectedIds();
         if (ids.length === 0) {
           window.yuvomi?.showToast(t('birthdays.importNothingSelected'), 'warning');
@@ -1245,16 +1265,24 @@ async function openImportModal() {
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
         // Anfrage aufgegangen ist (#1997).
         const dialog = captureModalContext();
-        submitBtn.disabled = true;
+        submitting = true;
+        refresh();
         try {
-          const res = await api.post('/birthdays/import', { contact_ids: ids });
-          window.yuvomi?.showToast(t('birthdays.importSuccess', { count: res.data.imported }), 'success');
+          let imported = 0;
+          // Keep large selections within the API's 500-contact request limit.
+          for (let offset = 0; offset < ids.length; offset += 500) {
+            const res = await api.post('/birthdays/import', { contact_ids: ids.slice(offset, offset + 500) });
+            imported += res.data.imported;
+          }
+          window.yuvomi?.showToast(t('birthdays.importSuccess', { count: imported }), 'success');
           await reloadAfterSave(() => loadData());
           renderList({ repaint: true, motion: true });
           closeModal({ force: true, context: dialog });
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
-          submitBtn.disabled = false;
+        } finally {
+          submitting = false;
+          refresh();
         }
       });
     },
