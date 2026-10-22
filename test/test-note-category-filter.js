@@ -432,7 +432,7 @@ test('notes UI keeps the approved category filter and editor contracts', () => {
   assert.match(badgeName, /overflow-wrap:\s*anywhere/);
   assert.ok(!rules.some((rule) => rule.selector === '.notes-filter-group--categories' && /(?:overflow-x:\s*auto|flex:\s*1)/.test(rule.body)),
     'one outer scroller keeps categories reachable even when creator chips exceed the viewport');
-  assert.match(layoutCss, /html\[data-module-readonly\][^\{]*\.notes-manage-categories[^{]*\{\s*display:\s*none\s*!important/,
+  assert.match(layoutCss, /html\[data-module-readonly\][^\{]*\.notes-manage-categories[^{]*\{\s*display:\s*none\s*;/,
     'read-only Notes must not offer a category manager whose mutations will be rejected');
 });
 
