@@ -610,6 +610,8 @@ test('a region yields its most specific supported locale', () => {
   assert.equal(regionLocale('pt-PT'), 'pt');
   assert.equal(regionLocale('nb-NO'), 'nb');
   assert.equal(regionLocale('zh-Hant-TW'), 'zh-Hant');
+  assert.equal(regionLocale('zh-Hant-HK'), 'zh-Hant');
+  assert.equal(regionLocale('zh-Hant-MO'), 'zh-Hant');
   assert.equal(regionLocale('zh-CN'), 'zh');
   assert.equal(regionLocale('sr-Latn-RS'), null);
   assert.equal(regionLocale('custom'), null);

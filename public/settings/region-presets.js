@@ -80,6 +80,11 @@ export const REGION_PRESETS = {
   // Taiwan schreibt 2026/11/05 und rechnet in 12h (上午/下午) - beides CLDR
   // zh-Hant-TW. Mit Schrift-Subtag, damit regionLocale() auf zh-Hant faellt.
   'zh-Hant-TW': { currency: 'TWD', date_format: 'ymd_slash', time_format: '12h' },
+  // Hongkong und Macau schreiben 5/11/2026 und rechnen in 12h - CLDR zh-Hant-HK
+  // und zh-Hant-MO. Ohne diese beiden bekaeme ein Haushalt dort die Sprache,
+  // aber nicht seine Waehrung (dieselbe Luecke wie VND vor #297).
+  'zh-Hant-HK': { currency: 'HKD', date_format: 'dmy_slash', time_format: '12h' },
+  'zh-Hant-MO': { currency: 'MOP', date_format: 'dmy_slash', time_format: '12h' },
   'ja-JP': { currency: 'JPY', date_format: 'ymd', time_format: '24h' },
   'hi-IN': { currency: 'INR', date_format: 'dmy_slash', time_format: '12h' },
   'pt-PT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
@@ -221,7 +226,7 @@ export function regionLabel(code, locale, withLanguage = (region, language) => `
  * steht dort der volle Name. test:settings-navigation haelt die Liste: jeder
  * Name, der das Zeichenbudget reisst, braucht hier einen Eintrag.
  */
-export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'KN', 'PH', 'SA', 'TT', 'US', 'VC'];
+export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'HK', 'KN', 'MO', 'PH', 'SA', 'TT', 'US', 'VC'];
 
 /**
  * Kurzer Anzeigename einer Region - das, was in der Auswahl steht (#2151).
