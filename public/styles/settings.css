@@ -1374,7 +1374,6 @@
   .settings-overview__row,
   .settings-breadcrumb__link,
   .settings-module-row,
-  .settings-module-move,
   .settings-disclosure__icon,
   .settings-sheet-status__link {
     transition: none;
@@ -2927,13 +2926,15 @@
 /* Flächenlos: die Fläche gehört dem Träger. Kante und Radius stehen bewusst
  * nicht mehr hier - `.row-carrier > * + *` setzt die Haarlinie, und ein Radius
  * je Zeile wäre wieder die Karte, die gerade entfallen ist. */
-/* Fuenf Spalten: Griff, Pfeile, Symbol, Text, Ausblenden. Kurzzeitig waren es
-   sechs, solange der haushaltweite Schalter hier stand; seit er auf
-   `modules-active` wohnt, traegt eine Zeile genau ein Bedienelement am Ende.
-   Auf dem anderen Blatt greift `--fixed` mit seinen drei Spalten. */
+/* Drei Spalten: Symbol, Text, Endzone. Bis #2180 waren es fuenf - Griff und
+   Auf/Ab-Paar standen VOR dem Symbol, auf dem Telefon das Paar als zweite
+   Zeile unter dem Titel. Seither endet die Zeile nach DESIGN.md D10:
+   [Ausblenden][Mehr][Griff] in EINER Spalte (`__end`), rechtsbuendig, damit
+   Mehr und Griff auch in einer Zeile ohne Ausblenden (Drittmodul) in der
+   Spur der anderen stehen. Auf `modules-active` greift `--fixed`. */
 .settings-module-row {
   display: grid;
-  grid-template-columns: var(--target-base) var(--target-base) var(--target-base) minmax(0, 1fr) auto;
+  grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-4);
@@ -2948,32 +2949,32 @@
   grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
 }
 
-.settings-module-row--dragging {
-  opacity: 0.6;
+.settings-module-row__end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
-.settings-module-drag {
-  display: grid;
-  place-items: center;
-  width: var(--target-base);
-  height: var(--target-base);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: grab;
+/* Der Griff: schmal, aber hoch (`.list-row__drag`, list-row.css), hier nicht
+   ueber die ganze Zeile gestreckt - die aufgeklappte Kueche ist hoch, und der
+   Griff gehoert zur Titelzeile wie Ausblenden und Mehr. */
+.settings-module-row__handle {
+  align-self: center;
 }
 
-.settings-module-drag:hover,
-.settings-module-move:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-raised);
-  color: var(--color-text-primary);
+/* Der freigehaltene Platz von Mehr und Griff in einer Gruppe mit nur einer
+   Zeile: dieselben Boxen, nichts zu sehen, nichts zu bedienen. */
+.settings-module-row__slot {
+  visibility: hidden;
 }
 
-.settings-module-drag:disabled {
-  cursor: default;
-  opacity: 0.35;
+.settings-module-row.sortable-chosen .settings-module-row__handle {
+  cursor: grabbing;
+}
+
+.settings-module-row.sortable-ghost {
+  opacity: 0.4;
 }
 
 /* AUSBLENDEN IST EIN KNOPF, KEIN SCHALTER (#673).
@@ -3138,36 +3139,17 @@
   min-width: 0;
 }
 
-/* Der Gruppen-Knopf der Kueche fuellt die letzte Rasterspalte nicht, `auto`
-   kollabierte dort auf 0 - gemessen stand er 42px rechts der Augenspalte aller
-   anderen Zeilen. Er wird deshalb in dieselbe Spur gezwungen. */
-.settings-module-row--kitchen > .settings-module-hide {
-  grid-column: 5;
-  justify-self: center;
-}
-
-.settings-module-move-buttons {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.settings-module-move {
-  display: grid;
-  place-items: center;
-  width: var(--target-base);
-  height: var(--target-base);
-  border: var(--space-px) solid var(--color-border);
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.settings-module-move:disabled {
-  opacity: 0.35;
+/* Das aufgeklappte Feld der Kueche reicht ueber die Textspalte hinaus bis an
+   das Ende der Ausblenden-Knoepfe (Rasterluecke + Knopfbreite): so stehen die
+   vier Kind-Augen genau unter dem Auge der Elternzeile und nicht 56px davor,
+   (ohne das Polster des Aufklappfelds, sonst 16px davor),
+   und auf dem Telefon schrumpfen die Kind-Knoepfe nicht unter ein
+   Beruehrungsziel (gemessen 2026-08-16: sonst 19-24px). Mehr und Griff
+   bleiben frei. NUR auf dem Navigationsblatt (`--kitchen`): auf `Aktive
+   Module` hat die Kuechenzeile keine Endzone. */
+.settings-module-row--kitchen .settings-module-kitchen__children {
+  padding-inline-end: 0;
+  margin-inline-end: calc(-1 * (var(--space-3) + var(--target-base)));
 }
 
 .settings-module-row__icon {
@@ -3300,32 +3282,13 @@
     grid-template-columns: 1fr;
   }
 
-  .settings-module-drag {
-    display: none;
-  }
-
   .settings-module-row {
-    grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
     gap: var(--space-2) var(--space-3);
     padding: var(--space-3);
   }
 
   .settings-module-row--fixed {
     grid-template-columns: var(--target-base) minmax(0, 1fr) auto;
-  }
-
-  /* Der Ausblenden-Knopf steht auf dem Telefon vor dem Schalter, in derselben
-     Zeile wie der Titel; die Pfeile bleiben darunter. */
-  .settings-module-hide {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .settings-module-move-buttons {
-    grid-column: 3;
-    grid-row: 2;
-    display: flex;
-    justify-content: flex-end;
   }
 
   .settings-module-row__icon {
@@ -3355,41 +3318,6 @@
      nur auf dem Navigationsblatt, und das rendert seit dem Split gar keine
      Schalter. Eine Regel ohne Traeger ist keine Zusicherung, sondern eine
      Notiz; deshalb steht hier die Notiz und nicht die Regel. */
-
-  /* Die Kuechenzeile spannte ihren Text hier ueber die Steuerspalten, damit das
-     aufgeklappte Feld die volle Breite bekommt - der Gruppen-Knopf lag dadurch
-     44px DARAUF, und in der Ausweichposition neben den Pfeilen las er sich als
-     drittes Sortier-Bedienelement (beide Zustaende gemessen, 2026-08-16). Sie
-     endet jetzt wie jede andere Zeile vor der Knopfspalte: das Feld ist etwas
-     schmaler, dafuer steht das Auge der Kueche dort, wo alle Augen stehen. */
-  .settings-module-row--kitchen .settings-module-row__body {
-    grid-column: 2 / 3;
-  }
-
-  .settings-module-row--kitchen .settings-module-move-buttons {
-    grid-column: 3;
-    justify-content: flex-end;
-  }
-
-  /* Die Desktop-Regel setzt den Gruppen-Knopf in Spalte 5. Hier gibt es nur
-     drei; ohne diese Zeile erzeugte er eine implizite fuenfte und stand 48px
-     neben der Augenspalte (gemessen 2026-08-16). */
-  .settings-module-row--kitchen > .settings-module-hide {
-    grid-column: 3;
-    grid-row: 1;
-    justify-self: stretch;
-  }
-
-  /* Das aufgeklappte Feld darf die Knopfspalte mitbenutzen: sein Text endet
-     sonst nach 118px und die vier Kind-Knoepfe schrumpfen auf 19-24px, also
-     unter jedes Beruehrungsziel. Der Ausbruch ist genau eine Spalte breit.
-     NUR auf dem Navigationsblatt (`--kitchen`): auf `Aktive Module` hat die
-     Kuechenzeile keine Knopfspalte, und seit die Kinder Schalter am
-     Zeilenende tragen (2026-09-26), schob der Ausbruch sie 44px ueber den
-     Kartenrand hinaus. */
-  .settings-module-row--kitchen .settings-module-kitchen__children {
-    margin-inline-end: calc(-1 * (var(--target-base) + var(--space-3)));
-  }
 }
 
 /* ── DMS accounts ─────────────────────────────────────────── */

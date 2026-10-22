@@ -2,7 +2,8 @@
  * Test: Verwalter-Dialoge in der D10-Zeilen-Endzone (#2152)
  * Zweck: Rendert die Zeilen der Verwalter - Kategorien (geteilte Komponente
  *        fuer Budget, Aufgaben, Kontakte, Einkauf, Vorrat, Inventar, Notizen),
- *        Tags, Abo-Kategorien und Zahlungsarten, Schnelllinks, Familie - und
+ *        Tags, Abo-Kategorien und Zahlungsarten, Schnelllinks, Familie, seit
+ *        #2180 die Modulreihenfolge in Einstellungen > Navigation - und
  *        prueft am Markup, was DESIGN.md D10 verlangt:
  *          - am Zeilenende [hoechstens EINE sichtbare Handlung][Mehr][Griff],
  *            der Griff zuletzt und nur in sortierbaren Listen;
@@ -623,4 +624,186 @@ test('Schnelllinks: ein Zug zur Zeit - scheitert der erste, steht kein zweiter g
     delete globalThis.__openModal;
     delete globalThis.__apiStub;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Einstellungen > Navigation: Reihenfolge der Module (#2180)
+// ---------------------------------------------------------------------------
+
+const navigation = await import('../public/settings/pages/modules-navigation.js');
+
+function navRow(id, label, extra = {}) {
+  return { type: 'built-in', id, orderId: id, section: 'plan', label, icon: 'calendar', enabled: true, hidden: false, locked: false, sortable: true, ...extra };
+}
+
+/** Jede `<div class="settings-module-row ...">` bis zur naechsten ist eine Zeile. */
+function navRowsOf(html) {
+  const starts = [...html.matchAll(/<div class="settings-module-row[" ]/g)].map((m) => m.index);
+  return starts.map((start, i) => html.slice(start, starts[i + 1] ?? html.length));
+}
+
+/** Die Endzone der Zeile; der Ausblenden-Knopf zaehlt als ihre eine sichtbare Handlung. */
+function navEndzone(row) {
+  const at = row.indexOf('settings-module-row__end');
+  if (at === -1) return [];
+  return endzone(row.slice(at).replace(/class="settings-module-hide"/g, 'class="row-action settings-module-hide"'));
+}
+
+test('Navigation: Zeile endet [Ausblenden][Mehr][Griff], kein sichtbares Auf/Ab-Paar mehr (#2180)', () => {
+  const html = navigation.__test.sectionRowsHtml([
+    navRow('dashboard', 'Uebersicht', { locked: true, sortable: false }),
+    navRow('calendar', 'Kalender'),
+    navRow('tasks', 'Aufgaben'),
+    navRow('notes', 'Notizen'),
+  ]);
+  // Bis #2180 stand ein Paar `.settings-module-move` je Zeile, dazu ein Griff
+  // vor dem Symbol mit nativem `draggable="true"` (kein Touch, kein Tastaturweg).
+  assert.doesNotMatch(html, /settings-module-move|data-module-move|draggable="true"|settings-module-drag/);
+  const [locked, ...rows] = navRowsOf(html);
+  assert.deepEqual(navEndzone(locked), [], 'eine gesperrte Zeile hat keine Endzone');
+  rows.forEach((row, i) => {
+    const zone = navEndzone(row);
+    assertD10(zone, { sortable: true }, `Navigationszeile ${i + 1}`);
+    assert.deepEqual(zone, ['action', 'more', 'handle']);
+    assert.match(row, /class="settings-module-hide"/, 'die eine Handlung ist Ausblenden');
+    const items = menuItems(row);
+    assert.deepEqual(items.map((x) => x.action), ['module-move-up', 'module-move-down']);
+    assert.equal(items[0].disabled, i === 0, 'Nach oben in der ersten Zeile gesperrt');
+    assert.equal(items[1].disabled, i === rows.length - 1, 'Nach unten in der letzten Zeile gesperrt');
+    const handle = handleTag(row);
+    assert.match(handle, /data-module-handle/);
+    assert.match(handle, /aria-keyshortcuts="ArrowUp ArrowDown"/);
+    assert.match(handle, /shopping\.reorderHandle\{&quot;name&quot;:&quot;\w+&quot;\}, shopping\.reorderPosition\{&quot;index&quot;:\d,&quot;total&quot;:3\}/);
+    assert.equal(handle.match(/&quot;index&quot;:(\d)/)[1], String(i + 1), 'das Label nennt die Position');
+  });
+});
+
+test('Navigation: allein in der Gruppe - weder Griff noch Menue, aber der Platz bleibt (Augen in einer Spur)', () => {
+  const [row] = navRowsOf(navigation.__test.sectionRowsHtml([navRow('budget', 'Budget')]));
+  assert.deepEqual(navEndzone(row), ['action']);
+  assert.equal(menuItems(row).length, 0);
+  assert.equal((row.match(/settings-module-row__slot/g) || []).length, 2, 'Platzhalter fuer Mehr und Griff');
+});
+
+test('Navigation: ein Drittmodul ohne Ausblenden endet [Mehr][Griff]', () => {
+  const html = navigation.__test.sectionRowsHtml([
+    navRow('third-party-a', 'Alpha', { type: 'third-party', status: 'x', accent: '' }),
+    navRow('third-party-b', 'Beta', { type: 'third-party', status: 'x', accent: '' }),
+  ]);
+  const rows = navRowsOf(html);
+  assert.equal(rows.length, 2);
+  for (const row of rows) assert.deepEqual(navEndzone(row), ['more', 'handle']);
+});
+
+/** Eine Gruppe aus Attrappen: Zeilen mit Griff, Mehr-Knopf und den zwei Menue-Eintraegen. */
+function navRig(ids, { locked = [] } = {}) {
+  const focused = [];
+  const list = {
+    children: [],
+    appendChild(row) { this.remove(row); this.children.push(row); row.parentElement = this; return row; },
+    insertBefore(row, ref) {
+      this.remove(row);
+      const at = this.children.indexOf(ref);
+      this.children.splice(at < 0 ? this.children.length : at, 0, row);
+      row.parentElement = this;
+      return row;
+    },
+    remove(row) { const i = this.children.indexOf(row); if (i >= 0) this.children.splice(i, 1); },
+    order() { return this.children.map((row) => row.dataset.moduleRowId); },
+  };
+  const rows = new Map();
+  for (const id of [...locked, ...ids]) {
+    const row = { dataset: { moduleRowId: id }, querySelector: () => null };
+    if (!locked.includes(id)) {
+      row.dataset.moduleOrderId = id;
+      row.dataset.moduleName = id.toUpperCase();
+      const parts = {
+        handle: { focus: () => focused.push(`${id}:handle`), setAttribute(name, value) { this[name] = value; } },
+        more: { focus: () => focused.push(`${id}:more`) },
+        up: { dataset: { action: 'module-move-up' }, disabled: false },
+        down: { dataset: { action: 'module-move-down' }, disabled: false },
+      };
+      parts.handle.closest = (sel) => (sel === '[data-module-handle]' ? parts.handle : row);
+      parts.up.closest = () => row;
+      parts.down.closest = () => row;
+      row.querySelector = (sel) => ({
+        '[data-module-handle]': parts.handle,
+        '.row-action--more': parts.more,
+        '[data-action="module-move-up"]': parts.up,
+        '[data-action="module-move-down"]': parts.down,
+      })[sel] ?? null;
+      row.parts = parts;
+    }
+    list.appendChild(row);
+    rows.set(id, row);
+  }
+  const answers = [];
+  const lock = { saving: false, queued: false };
+  const toasts = [];
+  const reorder = navigation.createModuleReorder({
+    save: () => new Promise((resolve, reject) => { answers.push({ order: list.order().join(','), ok: resolve, fail: () => reject(new Error('offline')) }); }),
+    lock,
+    notify: (ok) => toasts.push(ok),
+  });
+  reorder.adopt(list);
+  const press = (id, key) => reorder.onKeydown({ key, target: rows.get(id).parts.handle, preventDefault() {} });
+  const pick = (id, which) => {
+    const item = rows.get(id).parts[which];
+    return reorder.onClick({ target: { closest: () => item } });
+  };
+  return { list, rows, reorder, focused, answers, lock, toasts, press, pick };
+}
+
+test('Navigation: Pfeiltaste am Griff verschiebt die Zeile, der Fokus bleibt auf dem Griff, Labels ziehen nach', { timeout: 5000 }, async () => {
+  const { list, rows, focused, answers, toasts, press } = navRig(['calendar', 'tasks', 'notes'], { locked: ['dashboard'] });
+  const run = press('tasks', 'ArrowUp');
+  assert.deepEqual(list.order(), ['dashboard', 'tasks', 'calendar', 'notes'], 'nie ueber die gesperrte Zeile hinweg');
+  assert.deepEqual(focused, ['tasks:handle']);
+  assert.equal(answers.length, 1);
+  assert.equal(answers[0].order, 'dashboard,tasks,calendar,notes');
+  answers[0].ok();
+  assert.equal(await run, true);
+  assert.deepEqual(toasts, [true]);
+  assert.match(rows.get('tasks').parts.handle['aria-label'], /reorderPosition\{"index":1,"total":3\}/);
+  assert.equal(rows.get('tasks').parts.up.disabled, true, 'oben angekommen: Nach oben gesperrt');
+  assert.equal(rows.get('calendar').parts.up.disabled, false);
+  // Am oberen Rand passiert nichts, keine Anfrage.
+  assert.equal(press('tasks', 'ArrowUp'), null);
+  assert.equal(answers.length, 1);
+});
+
+test('Navigation: Nach unten aus dem Mehr-Menue gibt den Fokus an den Mehr-Knopf der Zeile', { timeout: 5000 }, async () => {
+  const { list, focused, answers, pick } = navRig(['calendar', 'tasks']);
+  const run = pick('calendar', 'down');
+  assert.deepEqual(list.order(), ['tasks', 'calendar']);
+  assert.deepEqual(focused, ['calendar:more']);
+  answers[0].ok();
+  assert.equal(await run, true);
+});
+
+test('Navigation: ein Zug zur Zeit - waehrend des Speicherns entfaellt ein Schritt, ein Zug per Ziehen wird zurueckgenommen', { timeout: 5000 }, async () => {
+  const { list, rows, answers, press, reorder } = navRig(['a', 'b', 'c']);
+  const first = press('a', 'ArrowDown');
+  assert.deepEqual(list.order(), ['b', 'a', 'c']);
+  assert.equal(press('c', 'ArrowUp'), null, 'der zweite Schritt startet nicht');
+  assert.deepEqual(list.order(), ['b', 'a', 'c']);
+  // Waehrenddessen zieht jemand c nach oben (SortableJS haengt vor onEnd um).
+  list.insertBefore(rows.get('c'), rows.get('b'));
+  assert.equal(await reorder.persist(list), null);
+  assert.deepEqual(list.order(), ['b', 'a', 'c'], 'zurueck auf die Folge, die gerade speichert');
+  assert.equal(answers.length, 1, 'kein zweiter Schreibversuch');
+  answers[0].ok();
+  assert.equal(await first, true);
+});
+
+test('Navigation: scheitert das Speichern, steht wieder die gespeicherte Reihenfolge da', { timeout: 5000 }, async () => {
+  const { list, rows, answers, toasts, press, lock } = navRig(['a', 'b', 'c']);
+  const run = press('c', 'ArrowUp');
+  assert.deepEqual(list.order(), ['a', 'c', 'b']);
+  answers[0].fail();
+  assert.equal(await run, false);
+  assert.deepEqual(list.order(), ['a', 'b', 'c']);
+  assert.deepEqual(toasts, [false]);
+  assert.equal(lock.saving, false, 'die Sperre ist wieder frei');
+  assert.match(rows.get('c').parts.handle['aria-label'], /"index":3/, 'das Label sagt wieder die gespeicherte Position');
 });

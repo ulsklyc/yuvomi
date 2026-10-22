@@ -22,6 +22,12 @@ import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { sortableSet, restoreOrder } from '/utils/sortable.js';
+
+/** Die Sortable-Instanzen des Blatts: frei bei jedem Neuaufbau (`render`). */
+const navSortables = sortableSet();
 
 // Baut die geordnete Liste der Navigations-Rows: gesperrte, gewöhnliche, Kitchen
 // (als ein expandierbarer Eintrag) und Drittanbieter-Module — sortiert nach der
@@ -119,21 +125,56 @@ function buildRows(preferences, thirdPartyModules) {
   return sortNavigationItems(ordered, normalizedOrder);
 }
 
-function rowControlsHtml(row) {
-  if (!row.sortable) return '';
-  return `
-    <button type="button" class="settings-module-drag" aria-label="${esc(t('settings.modulesDragHandle'))}" title="${esc(t('settings.modulesDragHandle'))}">
-      <i data-lucide="grip-vertical" aria-hidden="true"></i>
-    </button>
-    <div class="settings-module-move-buttons">
-      <button type="button" class="settings-module-move" data-module-move="up" aria-label="${esc(t('settings.modulesMoveUp'))}" title="${esc(t('settings.modulesMoveUp'))}">
-        <i data-lucide="chevron-up" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="settings-module-move" data-module-move="down" aria-label="${esc(t('settings.modulesMoveDown'))}" title="${esc(t('settings.modulesMoveDown'))}">
-        <i data-lucide="chevron-down" aria-hidden="true"></i>
-      </button>
-    </div>
-  `;
+/** Das Label des Griffs: Objekt und Position, wie im Einkauf und in den Verwaltern. */
+function handleLabel(name, index, total) {
+  return `${t('shopping.reorderHandle', { name })}, ${t('shopping.reorderPosition', { index, total })}`;
+}
+
+/* D10 ZEILEN-ENDZONE (#2180, wie die Verwalter in #2152).
+ *
+ * Bis dahin stand VOR dem Symbol ein Griff, der nur mit der Maus zog (auf dem
+ * Telefon ausgeblendet), daneben ein sichtbares Auf/Ab-Paar - zwei Ziele je
+ * Zeile, die auf dem Telefon als zweite Zeile unter dem Titel standen. Jetzt
+ * endet die Zeile wie jede andere Liste der App: [Ausblenden][Mehr][Griff].
+ * Der Griff ist ein Knopf, die Pfeiltasten an ihm verschieben die Zeile;
+ * Nach oben/Nach unten stehen im Mehr-Menue (Schalter, Screenreader ohne
+ * Pfeiltasten). Eine Gruppe mit nur einer sortierbaren Zeile hat keine
+ * Reihenfolge und zeigt weder Griff noch Menue.
+ */
+function rowEndHtml(row, position) {
+  if (!row.sortable || !position) return '';
+  // Allein in ihrer Gruppe (Finanzen: nur Budget) haelt die Zeile den Platz von
+  // Mehr und Griff frei - ein leerer Platz, kein toter Knopf -, sonst stuende
+  // ihr Auge rechts neben der Augenspalte aller anderen Gruppen.
+  if (position.total < 2) {
+    return `
+      <span class="row-action settings-module-row__slot" aria-hidden="true"></span>
+      <span class="row-action list-row__drag settings-module-row__handle settings-module-row__slot" aria-hidden="true">
+        <i data-lucide="grip-vertical" class="icon-md"></i>
+      </span>`;
+  }
+  const { index, total } = position;
+  const menu = rowMenuHtml({
+    id: `module-order-menu-${row.orderId}`,
+    label: t('common.moreActionsNamed', { name: row.label }),
+    items: [
+      { action: 'module-move-up', icon: 'chevron-up', label: t('category.moveUpNamed', { name: row.label }), disabled: index === 1 },
+      { action: 'module-move-down', icon: 'chevron-down', label: t('category.moveDownNamed', { name: row.label }), disabled: index === total },
+    ],
+  });
+  return `${menu}
+      <button type="button" class="row-action list-row__drag settings-module-row__handle" data-module-handle
+              aria-label="${esc(handleLabel(row.label, index, total))}" title="${esc(t('shopping.reorderHandleHint'))}"
+              aria-keyshortcuts="ArrowUp ArrowDown">
+        <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+      </button>`;
+}
+
+/** Die Endzone als ein Block: Ausblenden (falls vorhanden), dann Mehr und Griff. */
+function endZoneHtml(row, position, hideHtml = '') {
+  const tail = rowEndHtml(row, position);
+  if (!hideHtml && !tail) return '';
+  return `<div class="settings-module-row__end">${hideHtml}${tail}</div>`;
 }
 
 /* EIN BLATT, EINE REICHWEITE (#673, nachgeschärft nach der Critique vom 2026-08-16).
@@ -207,13 +248,12 @@ function statusChipHtml(row) {
   return '';
 }
 
-function builtInRowHtml(row) {
+function builtInRowHtml(row, position) {
   const stateClass = row.enabled ? 'settings-module-row--enabled' : 'settings-module-row--disabled';
   const lockedClass = row.locked ? ' settings-module-row--locked' : '';
   const hiddenClass = row.hidden && row.enabled ? ' settings-module-row--hidden' : '';
   return `
-    <div class="settings-module-row settings-module-row--sortable ${stateClass}${lockedClass}${hiddenClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
-      ${rowControlsHtml(row)}
+    <div class="settings-module-row settings-module-row--sortable ${stateClass}${lockedClass}${hiddenClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}"` : ''}>
       <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${moduleAccentVar(row.id)}">
         ${moduleIconHTML(row.icon)}
       </div>
@@ -224,7 +264,7 @@ function builtInRowHtml(row) {
           ${statusChipHtml(row)}
         </div>
       </div>
-      ${row.locked ? '' : hideToggleHtml(row)}
+      ${endZoneHtml(row, position, row.locked ? '' : hideToggleHtml(row))}
     </div>
   `;
 }
@@ -244,12 +284,11 @@ function builtInRowHtml(row) {
  * seinen eigenen Namen, und die Spalte wird im Stylesheet erzwungen statt
  * dem Raster überlassen.
  */
-function kitchenRowHtml(row) {
+function kitchenRowHtml(row, position) {
   const stateClass = row.enabled ? 'settings-module-row--enabled' : 'settings-module-row--disabled';
   const hiddenClass = row.hidden && row.enabled ? ' settings-module-row--hidden' : '';
   return `
-    <div class="settings-module-row settings-module-row--sortable settings-module-row--kitchen ${stateClass}${hiddenClass}" data-module-row-id="${esc(row.orderId)}" draggable="true" data-module-order-id="${esc(row.orderId)}">
-      ${rowControlsHtml(row)}
+    <div class="settings-module-row settings-module-row--sortable settings-module-row--kitchen ${stateClass}${hiddenClass}" data-module-row-id="${esc(row.orderId)}" data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}">
       <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${moduleAccentVar('kitchen')}">
         ${moduleIconHTML(row.icon)}
       </div>
@@ -273,12 +312,12 @@ function kitchenRowHtml(row) {
             </div>`).join('')}
         </div>
       </div>
-      ${hideToggleHtml({ ...row, id: 'kitchen', groupLabelKey: 'settings.modulesHideKitchenForMe' })}
+      ${endZoneHtml(row, position, hideToggleHtml({ ...row, id: 'kitchen', groupLabelKey: 'settings.modulesHideKitchenForMe' }))}
     </div>
   `;
 }
 
-function thirdPartyRowHtml(row) {
+function thirdPartyRowHtml(row, position) {
   // Statuswort nur fuer die Abweichung, wie auf `modules-active` (Kanon
   // 2026-09-26): ein laufendes Drittmodul braucht kein gruenes „Aktiviert".
   const statusClass = row.hasError ? 'settings-module-status--error' : 'settings-module-status--disabled';
@@ -286,8 +325,7 @@ function thirdPartyRowHtml(row) {
   const stateClass = row.enabled ? 'settings-module-row--enabled' : 'settings-module-row--disabled';
   const errorClass = row.hasError ? ' settings-module-row--error' : '';
   return `
-    <div class="settings-module-row settings-module-row--sortable ${stateClass}${errorClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` draggable="true" data-module-order-id="${esc(row.orderId)}"` : ''}>
-      ${rowControlsHtml(row)}
+    <div class="settings-module-row settings-module-row--sortable ${stateClass}${errorClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}"` : ''}>
       <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${esc(row.accent) || DEFAULT_MODULE_ACCENT}">
         ${moduleIconHTML(row.icon)}
       </div>
@@ -299,16 +337,24 @@ function thirdPartyRowHtml(row) {
         </div>
         ${row.error ? `<p class="form-error" role="alert">${esc(row.error)}</p>` : ''}
       </div>
+      ${endZoneHtml(row, position)}
     </div>
   `;
 }
 
-function rowHtml(row) {
-  if (row.type === 'kitchen') return kitchenRowHtml(row);
+function rowHtml(row, position = null) {
+  if (row.type === 'kitchen') return kitchenRowHtml(row, position);
   // Drittanbieter-Zeilen erreichen Mitglieder nie: /modules?admin=1 wird für sie
   // gar nicht abgefragt, thirdPartyModules bleibt leer.
-  if (row.type === 'third-party') return thirdPartyRowHtml(row);
-  return builtInRowHtml(row);
+  if (row.type === 'third-party') return thirdPartyRowHtml(row, position);
+  return builtInRowHtml(row, position);
+}
+
+/** Die Zeilen einer Gruppe samt Position unter den sortierbaren (1-basiert). */
+function sectionRowsHtml(sectionRows) {
+  const total = sectionRows.filter((row) => row.sortable).length;
+  let index = 0;
+  return sectionRows.map((row) => rowHtml(row, row.sortable ? { index: ++index, total } : null)).join('');
 }
 
 function mobileCandidateRows(rows) {
@@ -351,7 +397,7 @@ function desktopGroupHtml(section, rows) {
     <section class="settings-navigation-group" data-module-section="${section}">
       <h3 class="settings-navigation-group__title">${esc(t(NAV_SECTION_LABEL_KEYS[section]))}</h3>
       <div class="row-carrier settings-modules-list settings-modules-list--sortable" data-module-list>
-        ${sectionRows.map((row) => rowHtml(row)).join('')}
+        ${sectionRowsHtml(sectionRows)}
       </div>
     </section>
   `;
@@ -478,31 +524,138 @@ async function saveNavigationState(list, unrenderedOrderIds = [], mobileOrder = 
   }
 }
 
+/**
+ * Die Reihenfolge einer Gruppe verschieben und speichern (#2180) - EIN Weg
+ * fuer Griff (Ziehen und Pfeiltasten) und Mehr-Menue.
+ *
+ * - EIN ZUG ZUR ZEIT (wie die Verwalter, Codex an #2177): solange gespeichert
+ *   wird (auch eine Ausblendung, die denselben Payload schickt), entfaellt ein
+ *   Schritt per Taste oder Menue, und ein Zug per Ziehen wird zurueckgenommen
+ *   - auf die Folge, die gerade speichert, sonst auf die gespeicherte.
+ * - SCHEITERT DAS SPEICHERN, steht wieder die gespeicherte Folge da
+ *   (`restoreOrder`), statt dass das Blatt neu gebaut wird: der Fokus bleibt
+ *   auf dem Griff oder dem Mehr-Knopf, von dem der Zug kam.
+ * - Griff-Labels (Position) und die Grenzen von Auf/Ab im Menue ziehen nach
+ *   jedem Zug nach.
+ *
+ * Die Liste je Gruppe ist `[data-module-list]`; ihre Kinder sind Zeilen mit
+ * `data-module-row-id`, die sortierbaren tragen `data-module-order-id`.
+ *
+ * @param {object} opts
+ * @param {() => Promise<void>} opts.save   - schreibt das ganze Blatt (Reihenfolge + Ausblendungen)
+ * @param {{ saving: boolean, queued: boolean }} opts.lock - die Sperre, die auch das Ausblenden nimmt
+ * @param {(ok: boolean, error?: Error) => void} [opts.notify] - Toast
+ * @param {() => Promise<void>} [opts.afterSave] - holt einen waehrenddessen gemerkten Save nach
+ */
+export function createModuleReorder({ save, lock, notify = () => {}, afterSave = async () => {} }) {
+  const committed = new Map();
+  const pending = new Map();
+  const idOf = (row) => row.dataset.moduleRowId;
+  const idsOf = (list) => [...list.children].map(idOf);
+  const sortableRows = (list) => [...list.children].filter((row) => row.dataset?.moduleOrderId);
+
+  function refresh(list) {
+    const rows = sortableRows(list);
+    rows.forEach((row, i) => {
+      row.querySelector('[data-module-handle]')
+        ?.setAttribute('aria-label', handleLabel(row.dataset.moduleName ?? '', i + 1, rows.length));
+      const up = row.querySelector('[data-action="module-move-up"]');
+      const down = row.querySelector('[data-action="module-move-down"]');
+      if (up) up.disabled = i === 0;
+      if (down) down.disabled = i === rows.length - 1;
+    });
+  }
+
+  function adopt(list) {
+    committed.set(list, idsOf(list));
+  }
+
+  async function persist(list) {
+    if (lock.saving) {
+      restoreOrder(list, pending.get(list) ?? committed.get(list) ?? idsOf(list), idOf);
+      refresh(list);
+      return null;
+    }
+    const ids = idsOf(list);
+    if (ids.join('|') === (committed.get(list) ?? []).join('|')) return null;
+    lock.saving = true;
+    pending.set(list, ids);
+    refresh(list);
+    try {
+      await save();
+    } catch (error) {
+      restoreOrder(list, committed.get(list) ?? ids, idOf);
+      refresh(list);
+      notify(false, error);
+      return false;
+    } finally {
+      lock.saving = false;
+      pending.delete(list);
+    }
+    committed.set(list, ids);
+    notify(true);
+    await afterSave();
+    return true;
+  }
+
+  /** Ein Schritt um einen Platz unter den sortierbaren Zeilen; `focus` laeuft nach dem Umhaengen. */
+  function move(row, delta, { focus } = {}) {
+    if (lock.saving) return null;
+    const list = row?.parentElement;
+    if (!list) return null;
+    const rows = sortableRows(list);
+    const target = rows[rows.indexOf(row) + delta];
+    if (!target) return null;
+    if (delta < 0) list.insertBefore(row, target);
+    else list.insertBefore(target, row);
+    // Umhaengen nimmt dem Knopf in der Zeile den Fokus: zurueck an seinen Platz.
+    focus?.();
+    return persist(list);
+  }
+
+  /** Pfeil hoch/runter am fokussierten Griff; der Fokus bleibt auf dem Griff. */
+  function onKeydown(event) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return null;
+    const handle = event.target?.closest?.('[data-module-handle]');
+    if (!handle) return null;
+    event.preventDefault();
+    const row = handle.closest('[data-module-order-id]');
+    return move(row, event.key === 'ArrowUp' ? -1 : 1, { focus: () => handle.focus() });
+  }
+
+  /** Nach oben/Nach unten aus dem Mehr-Menue; der Fokus geht an den Mehr-Knopf der Zeile. */
+  function onClick(event) {
+    const item = event.target?.closest?.('[data-action="module-move-up"], [data-action="module-move-down"]');
+    if (!item || item.disabled) return null;
+    const row = item.closest('[data-module-order-id]');
+    if (!row) return null;
+    const delta = item.dataset.action === 'module-move-up' ? -1 : 1;
+    return move(row, delta, { focus: () => row.querySelector('.row-action--more')?.focus() });
+  }
+
+  return { adopt, persist, move, refresh, onKeydown, onClick };
+}
+
 function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
   const list = container.querySelector('#module-toggles');
   if (!list) return;
-  let dragged = null;
-  let dragStartOrder = '';
 
   /* EINE SPERRE FUER BEIDE SCHREIBWEGE, UND SIE VERSCHLUCKT NICHTS.
    *
    * Sortieren und Ausblenden schicken denselben Payload aus demselben DOM
    * (`module_order` UND `hidden_modules`), also darf nicht beides gleichzeitig
    * laufen. Zwei getrennte Flags hatten das Problem nur halbiert: eine
-   * Ausblendung konnte waehrend eines Sortier-Saves starten, und ein Klick auf
-   * einen Pfeil waehrend einer Ausblendung fiel STILL heraus - die Zeile war im
-   * DOM schon verschoben, gespeichert wurde nichts, und niemand erfuhr davon
-   * (Gegenpruefung zur Review von #790).
+   * Ausblendung konnte waehrend eines Sortier-Saves starten (Gegenpruefung zur
+   * Review von #790).
    *
-   * Statt zu verwerfen wird jetzt gemerkt: wer waehrend eines laufenden Saves
-   * etwas aendert, bekommt seinen Save danach. */
-  let saving = false;
-  let queued = false;
+   * Eine Ausblendung waehrend eines laufenden Saves wird gemerkt und danach
+   * gespeichert; ein Zug waehrend eines Saves entfaellt (createModuleReorder). */
+  const lock = { saving: false, queued: false };
   let busy = false;
 
   const flush = async (toastKey) => {
-    if (saving) { queued = true; return; }
-    saving = true;
+    if (lock.saving) { lock.queued = true; return; }
+    lock.saving = true;
     try {
       await saveNavigationState(list, unrenderedOrderIds);
       window.yuvomi?.showToast(t(toastKey), 'success');
@@ -511,71 +664,47 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
       await render(container, { user });
       return;
     } finally {
-      saving = false;
+      lock.saving = false;
     }
-    if (queued) {
-      queued = false;
+    if (lock.queued) {
+      lock.queued = false;
       await flush(toastKey);
     }
   };
 
-  const saveIfChanged = async (previousOrder) => {
-    const currentOrder = collectVisibleGlobalOrder(list).join('|');
-    if (currentOrder === previousOrder) return;
-    await flush('settings.modulesOrderSaved');
-  };
-
-  list.addEventListener('dragstart', (event) => {
-    const row = event.target.closest('[data-module-order-id]');
-    if (!row) return;
-    dragged = row;
-    dragStartOrder = collectVisibleGlobalOrder(list).join('|');
-    row.classList.add('settings-module-row--dragging');
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', row.dataset.moduleOrderId);
+  const reorder = createModuleReorder({
+    save: () => saveNavigationState(list, unrenderedOrderIds),
+    lock,
+    notify: (ok, error) => {
+      if (ok) window.yuvomi?.showToast(t('settings.modulesOrderSaved'), 'success');
+      else window.yuvomi?.showToast(error?.message ?? t('common.errorGeneric'), 'danger');
+    },
+    afterSave: async () => {
+      if (!lock.queued) return;
+      lock.queued = false;
+      await flush('settings.modulesSaved');
+    },
   });
 
-  list.addEventListener('dragend', async () => {
-    const previousOrder = dragStartOrder;
-    dragged?.classList.remove('settings-module-row--dragging');
-    dragged = null;
-    dragStartOrder = '';
-    await saveIfChanged(previousOrder);
-  });
+  // Die Mehr-Menues der Zeilen: Lage, Schliessen nach der Wahl, Pfeiltasten.
+  installPopoverMenus(list);
+  navSortables.clear();
+  for (const groupList of list.querySelectorAll('[data-module-list]')) {
+    reorder.adopt(groupList);
+    // Jede Gruppe ist ihre eigene Liste: ein Zug ueber die Gruppengrenze gibt es
+    // nicht (die Reihenfolge gilt nur innerhalb der Gruppe). Gesperrte Zeilen
+    // (Uebersicht, Einstellungen) tragen keinen Griff und ziehen nicht.
+    navSortables.add(groupList, {
+      handle: '[data-module-handle]',
+      draggable: '[data-module-order-id]',
+      onEnd: () => reorder.persist(groupList),
+    }).catch(() => { /* ohne SortableJS bleiben Pfeiltasten und Menue */ });
+  }
 
-  list.addEventListener('dragover', (event) => {
-    if (!dragged) return;
-    const row = event.target.closest('[data-module-order-id]');
-    if (!row || row === dragged) return;
-    const draggedGroup = dragged.closest('[data-module-section]');
-    const targetGroup = row.closest('[data-module-section]');
-    if (!draggedGroup || draggedGroup !== targetGroup) return;
-    event.preventDefault();
-    const rect = row.getBoundingClientRect();
-    const before = event.clientY < rect.top + rect.height / 2;
-    row.parentElement.insertBefore(dragged, before ? row : row.nextSibling);
-  });
-
-  list.addEventListener('drop', (event) => {
-    if (!dragged) return;
-    event.preventDefault();
-  });
-
-  list.addEventListener('click', async (event) => {
+  list.addEventListener('keydown', (event) => { reorder.onKeydown(event); });
+  list.addEventListener('click', (event) => {
     if (event.target.closest('[data-kitchen-expand]')) return;
-    const btn = event.target.closest('[data-module-move]');
-    if (!btn || btn.disabled) return;
-    const row = btn.closest('[data-module-order-id]');
-    if (!row) return;
-    const previousOrder = collectVisibleGlobalOrder(list).join('|');
-    if (btn.dataset.moduleMove === 'up') {
-      const prev = row.previousElementSibling;
-      if (prev?.matches('[data-module-order-id]')) row.parentElement.insertBefore(row, prev);
-    } else {
-      const next = row.nextElementSibling;
-      if (next?.matches('[data-module-order-id]')) row.parentElement.insertBefore(next, row);
-    }
-    await saveIfChanged(previousOrder);
+    reorder.onClick(event);
   });
 
   /* AUSBLENDEN OHNE DEN FOKUS ZU VERLIEREN (Critique 2026-08-16, P1).
@@ -626,14 +755,14 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
     const mobileChanged = nextMobile.join('|') !== previousMobile.join('|');
 
     try {
-      if (saving) { queued = true; } else {
-        saving = true;
+      if (lock.saving) { lock.queued = true; } else {
+        lock.saving = true;
         try {
           await saveNavigationState(list, unrenderedOrderIds, mobileChanged ? nextMobile : null);
         } finally {
-          saving = false;
+          lock.saving = false;
         }
-        if (queued) { queued = false; await flush('settings.modulesOrderSaved'); }
+        if (lock.queued) { lock.queued = false; await flush('settings.modulesOrderSaved'); }
       }
       window.yuvomi?.showToast(hideToastMessage(container, previousMobile), 'success');
     } catch (error) {
@@ -857,8 +986,12 @@ export async function render(container, { user }) {
     .filter((id) => !renderedOrderIds.has(id));
   const availableMobileIds = mobileCandidateRows(rows).map((row) => row.orderId);
   const mobileOrder = resolveMobileNavOrder(preferences.mobile_nav_order, availableMobileIds);
+  navSortables.clear();
   renderPage(container, rows, mobileOrder);
   bindDisclosure(container, { triggerSelector: '[data-kitchen-expand]', panelSelector: '[data-kitchen-children]', id: 'kitchen-children-navigation' });
   bindModuleListEvents(container, user, rows, unrenderedOrderIds);
   bindMobileNavigationEvents(container, user);
 }
+
+// Die Endzone als Markup (test:manager-endzone).
+export const __test = { rowHtml, sectionRowsHtml };

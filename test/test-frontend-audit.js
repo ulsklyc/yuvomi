@@ -10282,7 +10282,9 @@ test('audited profile, birthday, navigation, and budget controls meet mobile tou
     settings,
     /@media \(max-width:\s*639px\)[\s\S]*\.settings-avatar-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/,
   );
-  assert.match(settings, /\.settings-module-move\s*\{[\s\S]*width:\s*var\(--target-base\)[\s\S]*height:\s*var\(--target-base\)/);
+  // Das Auf/Ab-Paar der Navigation (`.settings-module-move`) ist mit #2180 ins
+  // Mehr-Menue gewandert; Griff und Mehr-Knopf sind `.row-action` (unten).
+  assert.doesNotMatch(settings, /\.settings-module-move\b/);
   // Zeilen-Aktionen (Bearbeiten/Löschen in Geburtstags-/Budget-/Kontakt-Karten)
   // teilen jetzt .row-action mit 48px-Touch-Fläche (Audit F1).
   assert.match(layout, /\.row-action\s*\{[\s\S]*width:\s*var\(--target-lg\)[\s\S]*height:\s*var\(--target-lg\)/);
@@ -10509,10 +10511,9 @@ test('documents and navigation settings use progressive disclosure instead of st
   assert.match(navigationPage, /class="settings-navigation-panel"/);
   assert.doesNotMatch(navigationPage, /<div class="settings-card">/);
   assert.match(settingsCss, /\.settings-navigation-panel\s*\{[\s\S]*border-bottom:\s*var\(--space-px\)\s+solid\s+var\(--color-border-subtle\)/);
-  assert.match(
-    settingsCss,
-    /@media \(max-width:\s*639px\)[\s\S]*\.settings-module-drag\s*\{[\s\S]*display:\s*none/,
-  );
+  // Seit #2180 zieht der Griff per SortableJS auch auf dem Telefon - er wird
+  // dort nicht mehr ausgeblendet (vorher `.settings-module-drag { display: none }`).
+  assert.doesNotMatch(settingsCss, /\.settings-module-drag\b/);
 });
 
 test('birthday and navigation headings keep a sequential hierarchy', () => {

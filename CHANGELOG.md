@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every row. The handle is now a button: focus it and press the up or down arrow to move the row,
   as in the shopping list. Quick links can be reordered with the keyboard for the first time.
   Move up and Move down stay in the More menu for touch screen readers and switch control.
+- **The module order in Settings > Navigation ends its rows the same way** (#2180). Each module
+  row used to carry a visible pair of up and down arrows, on phones as a second line under the
+  name, and a drag handle that only worked with a mouse. A row now ends with Hide, the More button
+  and the drag handle. The handle works by touch too, and pressing the up or down arrow on it
+  moves the module; Move up and Move down sit in the More menu. If a move cannot be saved, the
+  saved order comes back.
 
 ### Fixed
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
