@@ -254,6 +254,10 @@
      seitlich zu verdrängen (#569). flex-shrink greift und passt sie inkl.
      margin-left in die Modalbreite ein. */
   flex-basis: 100%;
+  /* Ohne das haelt die Mindestbreite des Inhalts (Zeilen mit Mehr-Knopf und
+     Griff, das Anlegen-Formular) die Liste breiter als die Zeile, und die
+     Endzone der Unterzeilen rutscht ueber den Rand (#2152, 390px gemessen). */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -263,7 +267,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1);
+  /* Rechts ohne Innenabstand: so steht die Endzone der Unterzeile in
+     derselben Spalte wie die der Elternzeile (D10, #2152). */
+  padding: var(--space-1) 0 var(--space-1) var(--space-1);
   border-radius: var(--radius-md);
   transition: background var(--transition-fast);
 }
@@ -284,40 +290,19 @@
 
 /* --------------------------------------------------------
    Drag-and-Drop-Sortierung (SortableJS, /utils/sortable.js)
-   Drag ist nie der einzige Weg: die Auf/Ab-Buttons bleiben sichtbar und
-   tastaturbedienbar. Der Handle ist bewusst kein <button> (kein Tab-Stop,
-   keine Enter/Space-Aktion) - role="img" + aria-label machen ihn für
-   Screenreader-Nutzer:innen dennoch wahrnehmbar, ohne eine Aktion vorzutäuschen,
-   die Drag ohnehin nicht per Tastatur ausführen kann.
+   Der Griff steht seit #2152 ganz rechts in der Endzone (DESIGN.md D10) und
+   ist ein Button: `.row-action.list-row__drag` (list-row.css) gibt ihm Mass
+   und Greifzone, die Pfeiltasten am fokussierten Griff sind der Tastaturpfad.
+   Auf und Ab bleiben zusaetzlich im Mehr-Menue.
    -------------------------------------------------------- */
 
-.cat-row__handle,
-.cat-subrow__handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  /* Greifzone auf ein komfortables Touch-Ziel vergrößern: die Zeile ist durch die
-     48px-Icon-Buttons ohnehin hoch, align-self:stretch nutzt sie als volle
-     vertikale Greifhöhe (die Zieh-Achse) ohne Layout-Änderung; min-height sichert
-     ein 40px-Ziel auch in kürzeren Zeilen. Breiteres Inline-Padding gibt horizontal
-     Fläche, das negative Inline-Margin hält das Icon in Flucht mit dem Zeilenrand. */
-  align-self: stretch;
-  min-height: var(--target-md);
-  padding-inline: var(--space-2);
-  margin-inline: calc(var(--space-1) * -1);
-  border-radius: var(--radius-xs);
-  /* Tertiär statt Quaternary: interaktive Grafik braucht 3:1 (WCAG 1.4.11),
-   * Quaternary misst 2.94:1 auf dem Well. */
-  color: var(--color-text-tertiary);
-  cursor: grab;
-  touch-action: none;
-}
-
-.cat-row__handle:hover,
-.cat-subrow__handle:hover {
-  color: var(--color-text-secondary);
-  background: var(--color-surface-hover);
+/* Eine einzelne Zeile hat keine Reihenfolge: der Griff verschwindet, behaelt
+   aber seine Breite, damit der Mehr-Knopf in der Spalte der Nachbarlisten
+   bleibt (dieselbe Regel wie im Einkauf, list-row.css). In der Unterliste
+   steht hinter den Zeilen noch das Anlegen-Formular als letztes `li`. */
+.cat-list > .cat-row:only-child > .cat-row__actions > .cat-row__handle,
+.cat-sublist > .cat-subrow:first-child:nth-last-child(2) > .cat-row__actions > .cat-subrow__handle {
+  visibility: hidden;
 }
 
 .cat-row.sortable-chosen .cat-row__handle,
