@@ -515,6 +515,38 @@ test('Abos: ein Zug zur Zeit - ein Zug waehrend der Anfrage wird zurueckgenommen
   }
 });
 
+test('Abos: die Sperre gilt je Liste - ein Zahlungsart-Zug neben einem haengenden Kategorie-Zug wird nicht mit fremder Folge zurueckgenommen (Codex an #2177)', { timeout: 5000 }, async () => {
+  const saved = { categories: subscriptions.state.meta.categories, payment_methods: subscriptions.state.meta.payment_methods };
+  subscriptions.state.meta.categories = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  subscriptions.state.meta.payment_methods = [{ id: 7, name: 'Karte' }, { id: 8, name: 'Konto' }];
+  const cats = fakeList([2, 1], { id: 'subscription-category-list' });
+  const methods = fakeList([8, 7], { id: 'subscription-method-list' });
+  const answers = [];
+  globalThis.__apiStub = {
+    put: (_path, body) => new Promise((resolve, reject) => {
+      answers.push({ body, ok: () => resolve({ data: true }), fail: () => { const err = new Error('boom'); err.status = 500; err.data = {}; reject(err); } });
+    }),
+  };
+  try {
+    const catMove = subscriptions.persistMetaOrder(cats, [2, 1]);
+    const methodMove = subscriptions.persistMetaOrder(methods, [8, 7]);
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(answers.map((a) => Object.keys(a.body)[0]), ['categories', 'payment_methods'], 'die Zahlungsarten speichern neben den Kategorien');
+    assert.deepEqual(methods.order(), ['8', '7'], 'der Zahlungsart-Zug bleibt stehen, solange er speichert');
+    answers[0].fail();
+    assert.equal(await catMove, false);
+    assert.deepEqual(cats.order(), ['1', '2'], 'die Kategorien aus IHRER gespeicherten Folge');
+    assert.deepEqual(methods.order(), ['8', '7'], 'die Zahlungsarten unberuehrt');
+    answers[1].fail();
+    assert.equal(await methodMove, false);
+    assert.deepEqual(methods.order(), ['7', '8'], 'die Zahlungsarten aus IHRER gespeicherten Folge');
+  } finally {
+    delete globalThis.__apiStub;
+    subscriptions.state.meta.categories = saved.categories;
+    subscriptions.state.meta.payment_methods = saved.payment_methods;
+  }
+});
+
 test('Schnelllinks: scheitert das Speichern eines Schritts, steht wieder die gespeicherte Reihenfolge da', { timeout: 5000 }, async () => {
   const items = [{ id: 1, name: 'A', url: 'https://a.example' }, { id: 2, name: 'B', url: 'https://b.example' }];
   let onKeydown = null;
