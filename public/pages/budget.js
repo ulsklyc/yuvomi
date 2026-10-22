@@ -31,7 +31,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue, parseAmountInput, amountToInput } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -4192,8 +4192,8 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // solcher Bestandswert nicht ins Raster passt, fängt amountStep ab.
   const absAmount  = isEdit ? String(Math.abs(editAmount)) : '';
   // Angezeigt in den Stellen der Waehrung ("200.00" -> "200,00"), nur mit
-  // Nullen aufgefuellt, nie gerundet (amountFieldValue).
-  const absAmountField = amountFieldValue(absAmount, state.currency);
+  // Nullen aufgefuellt, nie gerundet (amountToInput).
+  const absAmountField = esc(amountToInput(absAmount, state.currency));
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
@@ -4261,7 +4261,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         * Angaben" - beim Bearbeiten offen, sobald eines davon einen Wert traegt. */ ''}
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
-      <input type="number" class="form-input budget-amount-input" id="bm-amount"
+      <input type="text" class="form-input budget-amount-input" id="bm-amount"
              placeholder="${amountPlaceholder(state.currency)}"
              step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
              inputmode="decimal" value="${absAmountField}" required>
@@ -4593,7 +4593,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         }
 
         const title      = panel.querySelector('#bm-title').value.trim();
-        const absVal     = parseFloat(panel.querySelector('#bm-amount').value);
+        const absVal     = parseAmountInput(panel.querySelector('#bm-amount').value);
         const category   = panel.querySelector('#bm-category').value;
         const subcategory = panel.querySelector('#bm-subcategory').value;
         const date       = panel.querySelector('#bm-date').value;
@@ -5838,9 +5838,9 @@ async function openConfirmBookingModal(id) {
     </div>
     <div class="form-group">
       <label class="form-label" for="cb-amount">${t('budget.amountLabel')}</label>
-      <input type="number" class="form-input" id="cb-amount" inputmode="decimal"
+      <input type="text" class="form-input" id="cb-amount" inputmode="decimal"
              step="${amountStep(currency, absAmount)}"
-             min="${amountMin(currency)}" value="${amountFieldValue(absAmount, currency)}">
+             min="${amountMin(currency)}" value="${esc(amountToInput(absAmount, currency))}">
     </div>
     <div class="form-group">
       <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
@@ -5860,7 +5860,7 @@ async function openConfirmBookingModal(id) {
       panel.querySelector('#cb-save').addEventListener('click', async () => {
         if (readOnly()) return;
         const amountEl = panel.querySelector('#cb-amount');
-        const value = parseFloat(amountEl.value);
+        const value = parseAmountInput(amountEl.value);
         if (!Number.isFinite(value) || value <= 0) {
           reportFieldError(amountEl, t('budget.validAmountRequired'));
           return;

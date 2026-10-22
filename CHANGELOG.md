@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   saved order comes back.
 
 ### Fixed
+- **Budget entries accept the comma on an iPhone's decimal keyboard.** (#2170) Income,
+  expenses, transfers and pending-entry confirmations accept comma or point decimals without
+  losing cents, including when the device and household use different number formats. Existing
+  amounts use the household's number format when edited. Currency precision checks still apply;
+  malformed amounts and ambiguous thousands grouping are rejected before saving.
+
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
   client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
   that more strictly than the form format and also escaped `-`, `_` and `.`, so a provider that

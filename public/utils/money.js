@@ -391,6 +391,22 @@ export function toDecimalString(value, { freeText = false } = {}) {
 }
 
 /**
+ * A decimal-keyboard amount, accepting a comma even when the device locale
+ * differs from the household's region (#2170). Keep the existing digit and
+ * grouping checks, and validate the WHOLE value: parseFloat('12,50') loses cents.
+ * Free-text quantities keep their stricter, region-specific parser.
+ */
+export function parseAmountInput(value) {
+  const decimal = toDecimalString(value);
+  // An alternate comma followed by three digits could be thousands grouping.
+  if (/,\d{3}(?!\d)/.test(decimal)) return NaN;
+  const normalized = decimal.replace(',', '.');
+  if (!/^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) return NaN;
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : NaN;
+}
+
+/**
  * Betrag in ganzen Einheiten (Cent, Yen, Fils) als Wert für ein Eingabefeld.
  *
  * Der Einkauf speichert Preise als ganze Zahl, weil die Kaufhistorie sie

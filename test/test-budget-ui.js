@@ -1296,7 +1296,7 @@ test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt
   const plans = read('../public/pages/budget-plans.js');
   const felder = [
     ['budget.js', budget, 'bm-amount', /value="\$\{absAmountField\}"/],
-    ['budget.js', budget, 'cb-amount', /value="\$\{amountFieldValue\(absAmount, currency\)\}"/],
+    ['budget.js', budget, 'cb-amount', /value="\$\{esc\(amountToInput\(absAmount, currency\)\)\}"/],
     ['budget.js', budget, 'lm-amount', /value="\$\{loan \? amountFieldValue\(loan\.total_amount, loanCurrency\) : ''\}"/],
     ['budget-plans.js', plans, 'plan-amount', /value="\$\{amountFieldValue\(value, view\.ctx\.currency\)\}"/],
     ['subscriptions.js', subscriptions, 'subscription-amount', /value="\$\{esc\(amountFieldValue\(subscription\?\.amount \?\? '', formCurrency\)\)\}"/],
@@ -1306,7 +1306,7 @@ test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt
     assert.ok(field, `${file}: #${id} nicht gefunden`);
     assert.match(field[0], value, `${file}: #${id} zeigt den Bestand ohne die Stellen der Waehrung`);
   }
-  assert.match(budget, /const absAmountField = amountFieldValue\(absAmount, state\.currency\);/);
+  assert.match(budget, /const absAmountField = esc\(amountToInput\(absAmount, state\.currency\)\);/);
   const raten = [...withoutComments(housekeeping).matchAll(/<input name="(daily_rate|hourly_rate|extras)"[^>]*>/g)];
   assert.ok(raten.length >= 4, `Raten der Haushaltshilfe nicht gefunden (${raten.length})`);
   for (const [field, name] of raten) assert.match(field, /value="\$\{esc\(amountFieldValue\(/, `housekeeping.js: ${name} ohne amountFieldValue`);

@@ -5,7 +5,7 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { todayKey, monthPeriodKeys, defaultDateInPeriod } from '/utils/date.js';
-import { amountStep, amountMin, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { amountStep, amountMin, amountIsSavable, smallestUnitLabel, parseAmountInput, amountToInput } from '/utils/money.js';
 import { budgetToggleHtml, budgetIntervalFieldsHtml, wireBudgetIntervalFields } from '/components/budget-recurrence-fields.js';
 
 export function transferFieldsHtml({ transfer = null, accounts, categories, month, currency, budgetMode }) {
@@ -20,7 +20,7 @@ export function transferFieldsHtml({ transfer = null, accounts, categories, mont
   const schedule = transfer?.series ?? transfer;
   const sourceCurrency = accounts.find(a => a.id === transfer?.from_account_id)?.currency || currency;
   return `
-    ${field('bt-amount', 'budget.amountLabel', `<input class="form-input budget-amount-input" id="bt-amount" type="number" step="${amountStep(sourceCurrency, transfer?.amount)}" min="${amountMin(sourceCurrency, transfer?.amount)}" inputmode="decimal" value="${transfer ? Math.abs(transfer.amount) : ''}">`)}
+    ${field('bt-amount', 'budget.amountLabel', `<input class="form-input budget-amount-input" id="bt-amount" type="text" step="${amountStep(sourceCurrency, transfer?.amount)}" min="${amountMin(sourceCurrency, transfer?.amount)}" inputmode="decimal" value="${transfer ? esc(amountToInput(Math.abs(transfer.amount), sourceCurrency)) : ''}">`)}
     ${field('bt-title', 'budget.titleLabel', `<input class="form-input" id="bt-title" value="${esc(transfer?.title ?? '')}">`)}
     ${field('bt-from', 'budget.transferFromAccount', `<select class="form-input" id="bt-from" required>${options(transfer?.from_account_id, 'budget.transferFromAccount')}</select>`)}
     ${field('bt-to', 'budget.transferToAccount', `<select class="form-input" id="bt-to" required>${options(transfer?.to_account_id, 'budget.transferToAccount')}</select>`)}
@@ -72,7 +72,9 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
   };
   if (transfer?.series && scope) {
     let defaults = transfer;
-    const text = (object, key) => String(key === 'amount' ? Math.abs(object.amount) : object[key] ?? '');
+    const text = (object, key) => String(key === 'amount'
+      ? amountToInput(Math.abs(object.amount), accounts.find(a => a.id === object.from_account_id)?.currency || currency)
+      : object[key] ?? '');
     scope.addEventListener('change', () => {
       const target = scope.value === 'series' ? transfer.series : transfer;
       const subcategory = panel.querySelector('#bt-subcategory').value;
@@ -94,7 +96,7 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
   return async (button = panel.querySelector('#bt-save')) => {
     if (readOnly()) return;
     const value = id => panel.querySelector('#bt-' + id).value;
-    const body = { title: value('title').trim(), amount: Number(value('amount')), category: value('category'), subcategory: value('subcategory'),
+    const body = { title: value('title').trim(), amount: parseAmountInput(value('amount')), category: value('category'), subcategory: value('subcategory'),
       date: value('date'), from_account_id: Number(value('from')), to_account_id: Number(value('to')) };
     if (!body.category) return reportFieldError(panel.querySelector('#bt-category'), t('budget.categoryRequired'));
     if (panel.querySelector('#bt-subcategory').required && !body.subcategory) return reportFieldError(panel.querySelector('#bt-subcategory'), t('budget.subcategoryRequired'));
