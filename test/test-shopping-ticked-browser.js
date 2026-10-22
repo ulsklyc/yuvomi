@@ -61,6 +61,11 @@ const pageErrors = [];
 before(async () => {
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   page = await browser.newPage();
+  // Die Sprache steht fest, bevor ein Skript der App laeuft: ohne gespeicherte
+  // Wahl faellt i18n.js auf navigator.languages zurueck, und das headless
+  // Chrome erbt die vom Rechner - auf einem englischen waren drei Sonden rot,
+  // die deutsche Texte erwarten (derselbe Weg wie #2147).
+  await page.evaluateOnNewDocument(() => localStorage.setItem('yuvomi-locale', 'de'));
   await page.setViewport({ width: 390, height: 844 });
   await page.setRequestInterception(true);
   page.on('request', async (req) => {
@@ -125,6 +130,15 @@ async function setup(items, { tickedOpen = false, pause = PAUSE, reducedMotion =
     s.updateItemsList(c);
     s.wireListContentEvents(c);
   }, items, tickedOpen, pause);
+  /* GEMESSEN WIRD, WAS GEZEICHNET IST: erst nach dem naechsten Bild.
+   * Ab der zweiten Gruppe traegt die Liste `content-visibility: auto`
+   * (shopping.css, Critique R21 S8). Bis der Browser nach einem Neuaufbau das
+   * erste Bild rechnet, ueberspringt er ihren Inhalt beim Treffertest:
+   * elementFromPoint fand in derselben Aufgabe die Gruppe statt ihres Kopfes,
+   * zwei Bilder spaeter den Kopf (gemessen 2026-10-22, je 5 von 5). Ein Finger
+   * trifft nur, was auf dem Schirm steht; ohne das Warten hing die Sonde daran,
+   * ob zwischen zwei CDP-Aufrufen zufaellig ein Bild lag (2 von 6 Laeufen rot). */
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
