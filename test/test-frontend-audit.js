@@ -13962,6 +13962,39 @@ test('die Groesse des Icon-Knopfs gehoert der Shell', () => {
 });
 
 /**
+ * REGEL (2026-10-22): Auch der Textknopf schaltet seine Hoehe nach der
+ * ZEIGERFAEHIGKEIT, nicht nach der Breite.
+ *
+ * `.btn` stand ab `@media (min-width: 1024px)` auf `--target-md` - derselbe
+ * Fehler, den der Guard darueber fuer `.btn--icon` schon festhaelt. Ein Tablet
+ * im Querformat (1180px, `hover: none`) bekam damit 40px statt `--target-lg`,
+ * jeder Knopf im Kopf und der angedockte Primaerknopf ("+ Nomen") mit ihm
+ * (gemessen in test:page-fab-docked-browser). Die 40px am Zeiger bleiben: die
+ * Regel bekommt die Zeigerfaehigkeit als zweite Bedingung, die Breite allein
+ * schaltet nichts mehr.
+ */
+test('die Hoehe des Textknopfs schaltet nach der Zeigerfaehigkeit', () => {
+  const rules = [...eachRule(read('../public/styles/layout.css'))]
+    .filter((rule) => rule.selector.split(',').some((s) => s.trim() === '.btn'))
+    .filter((rule) => /(?:^|;)\s*min-height\s*:/.test(rule.body));
+
+  const base = rules.find((rule) => rule.at.length === 0);
+  assert.ok(base, '.btn braucht eine Basisregel mit min-height in layout.css.');
+  assert.match(base.body, /min-height:\s*var\(--target-lg\)/,
+    'Die Basis ist die Fingergroesse: was nicht weiss, dass ein Zeiger da ist, bekommt 48px.');
+
+  const bare = rules
+    .filter((rule) => rule.at.length > 0)
+    .filter((rule) => !rule.at.some((at) => /\(\s*hover\s*:\s*hover\s*\)|\(\s*pointer\s*:\s*fine\s*\)/.test(at)))
+    .map((rule) => rule.at.join(' | '));
+  assert.deepEqual(bare, [],
+    'Ein Block, der die Hoehe von .btn nur nach der Breite umschaltet, gibt einem '
+    + 'Touch-Tablet ab 1024px die Zeigergroesse (40px statt 48px).');
+  assert.ok(rules.some((rule) => rule.at.length > 0 && /min-height:\s*var\(--target-md\)/.test(rule.body)),
+    'Am Zeiger bleibt .btn bei --target-md - der Guard misst nur, solange es die Stufe gibt.');
+});
+
+/**
  * REGEL (Redesign Runde 6, Phase 0): Der Modulkopf ist genau EINE
  * `.page-toolbar`, verdrahtet von der Shell. Kein Modul setzt eine eigene
  * Flex-Richtung, keine zweite Titelgroesse und kein `--page-toolbar-lead`. Eine

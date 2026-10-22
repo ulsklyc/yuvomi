@@ -5928,15 +5928,22 @@ a.popover-menu__item {
 @media (min-width: 1024px) {
   /* Der angedockte FAB IST der Toolbar-Knopf (siehe dockFabIntoToolbar in
    * router.js): dieselbe Node, dieselbe Verdrahtung, nur ohne die schwebende
-   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`. */
+   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`.
+   *
+   * NUR, WAS `.btn` NICHT SETZT. Höhe, Polster, Lücke und Schatten gehören
+   * `.btn`/`.btn--primary` - gleiche Spezifität, später in der Datei. Die
+   * eigenen Werte (44px, 4px Lücke) standen hier seit dem Andocken und griffen
+   * nie (gemessen 2026-10-22). So misst der Knopf, was jeder Knopf im Kopf
+   * misst: `--target-md` am Zeiger, `--target-lg` am Finger.
+   *
+   * `animation: none`, weil `fab-in` an `.page-fab` hängt und die Klasse
+   * bleibt. Der Kopf steht beim Seitenwechsel still (R18); die Pille darin fuhr
+   * beim Kaltstart trotzdem von halber Größe herein. */
   .page-fab--docked {
     position: static;
     width: auto;
     height: auto;
-    min-height: var(--target-base);
-    padding-inline: var(--space-4);
-    gap: var(--space-1);
-    box-shadow: var(--shadow-sm);
+    animation: none;
   }
 }
 
@@ -7900,7 +7907,11 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   white-space: nowrap;
 }
 
-@media (min-width: 1024px) {
+/* Am Zeiger die Mausgröße - nach der Zeigerfähigkeit, nicht nach der Breite
+ * allein (tokens.css, DESIGN.md). Ein Tablet im Querformat (1180px,
+ * `hover: none`) bekam hier 40px statt der Fingergröße, jeder Knopf im Kopf
+ * und der angedockte Primärknopf mit ihm (test:page-fab-docked-browser). */
+@media (min-width: 1024px) and (hover: hover) {
   .btn {
     min-height: var(--target-md);
   }

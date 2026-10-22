@@ -166,7 +166,7 @@ components:
     textColor: "{colors.ink-on-vivid}"
     rounded: "{rounded.full}"
     padding: "8px 16px"
-    height: "48px"
+    height: "48px (--target-lg); ab 1024px mit Zeiger (hover: hover) 40px (--target-md)"
   button-primary-hover:
     backgroundColor: "color-mix(in srgb, var(--color-accent) 76%, var(--neutral-950))"
   button-icon:
@@ -2238,7 +2238,12 @@ Ausnahme) - dort kann keiner wachsen, ohne den Nachbarn zu verdecken.
 schaltet damit ueber `(hover: none)`. Vorher schaltete es ueber `@media (min-width: 1024px)`,
 also nach der Breite - ein Tablet ab 1024px bekam 40px, und Aufgaben wie Abonnements hatten
 den Shell-Fehler je fuer sich lokal repariert. Derselbe Kopf-Icon-Knopf mass dadurch 40px in
-Kalender und Kontakten und 44px in Aufgaben und Dokumenten.
+Kalender und Kontakten und 44px in Aufgaben und Dokumenten. Der Textknopf `.btn` schaltete bis
+2026-10-22 noch nach der Breite: ein Tablet im Querformat (1180px, `hover: none`) bekam 40px,
+jeder Knopf im Kopf und die angedockte "+ Nomen"-Pille mit ihm. Seitdem gilt `--target-md` nur
+ab 1024px UND mit Zeiger (`hover: hover`), sonst `--target-lg` (`test:frontend-audit`,
+`test:page-fab-docked-browser`). Die Pille selbst setzt keine Groesse mehr: ihre eigenen 44px
+und 4px Luecke standen seit dem Andocken in layout.css und griffen nie.
 
 **Geprueft auf zwei Ebenen, weil es zwei Zusagen sind.** Die Zielgroessen-Regel haengt an
 Nachbarschaft und Trefferflaeche und ist nur im Dokument pruefbar (**Ebene 4**, `Sonde 4` in
