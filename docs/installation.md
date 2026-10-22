@@ -19,7 +19,7 @@ git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
 bash install.sh
 ```
 
-The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 26 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
+The script checks prerequisites, generates security keys, asks for the base URL your household will use, configures optional integrations (weather via Open-Meteo coordinates, calendars, document storage), starts the container (Docker or Podman — auto-detected), and creates your admin account. Like the web installer, it is fully localized in 27 languages and auto-detects yours from the shell environment (`LANG`/`LC_ALL`).
 
 Running it again on an existing installation is safe, in two ways:
 
