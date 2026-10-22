@@ -269,6 +269,13 @@ test('Tags: Escape im Umbenennen bricht nur die Zeile ab, nicht den Dialog', () 
   manager._open = { tag: 'b', mode: 'rename' };
   let rendered = 0;
   manager._renderList = () => { rendered += 1; };
+  // Esc waehrend einer IME-Umwandlung gehoert der Umwandlung (Codex an #2177):
+  // das Feld bleibt offen, der Name ungespeichert, aber nicht verworfen.
+  for (const composing of [{ isComposing: true }, { keyCode: 229 }]) {
+    manager._onKeydown({ key: 'Escape', ...composing, target: { closest: () => ({}) }, preventDefault() { throw new Error('nicht abfangen'); }, stopPropagation() { throw new Error('nicht abfangen'); } });
+  }
+  assert.deepEqual(manager._open, { tag: 'b', mode: 'rename' });
+  assert.equal(rendered, 0);
   let stopped = false;
   let prevented = false;
   manager._onKeydown({ key: 'Escape', target: { closest: () => ({}) }, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });

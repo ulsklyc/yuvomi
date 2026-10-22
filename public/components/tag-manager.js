@@ -24,6 +24,7 @@ import { esc } from '/utils/html.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { holdUntilStyled } from '/utils/component-style.js';
+import { isImeComposing } from '/utils/ux.js';
 
 /**
  * Haengt an die Erfolgsmeldung an, was liegen blieb (#830).
@@ -232,6 +233,9 @@ class TagManagerElement extends HTMLElement {
    */
   _onKeydown(e) {
     if (e.key !== 'Escape' || !this._open) return;
+    // Esc waehrend einer IME-Umwandlung bricht die Umwandlung ab, nicht das
+    // Umbenennen (Codex an #2177) - wie im Bearbeiten-Feld des Abo-Verwalters.
+    if (isImeComposing(e)) return;
     if (!e.target.closest?.('[data-rename], [data-cancel], [data-delete-confirm]')) return;
     e.preventDefault();
     e.stopPropagation();
