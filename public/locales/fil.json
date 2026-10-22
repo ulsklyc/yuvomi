@@ -2937,7 +2937,9 @@
             "BS": "Bahamas",
             "DO": "Dominican Rep.",
             "GB": "UK",
+            "HK": "Hong Kong",
             "KN": "St. Kitts & Nevis",
+            "MO": "Macau",
             "PH": "Pilipinas",
             "SA": "Saudi Arabia",
             "TT": "Trinidad & Tobago",
@@ -2946,7 +2948,9 @@
         },
         "languageShort": {
             "nb": "Norwegian",
-            "ptBR": "Portuges (BR)"
+            "ptBR": "Portuges (BR)",
+            "zh": "Tsino (Pinasimple)",
+            "zhHant": "Tsino (Trad.)"
         },
         "regionAdminOnly": "Mga administrator lamang ang makakapagpalit ng rehiyon at pera.",
         "formatsHouseholdHint": "Naaangkop sa buong sambahayan ang format ng petsa at oras. Maaari itong palitan ng bawat miyembro.",

@@ -2882,7 +2882,9 @@
             "BS": "Bahama’s",
             "DO": "Dominicaanse Rep.",
             "GB": "VK",
+            "HK": "Hongkong",
             "KN": "Saint Kitts",
+            "MO": "Macau",
             "PH": "Filipijnen",
             "SA": "Saoedi-Arabië",
             "TT": "Trinidad en Tobago",
@@ -2891,7 +2893,9 @@
         },
         "languageShort": {
             "nb": "Noors",
-            "ptBR": "Portugees (BR)"
+            "ptBR": "Portugees (BR)",
+            "zh": "Chinees (vereenv.)",
+            "zhHant": "Chinees (trad.)"
         },
         "regionAdminOnly": "Alleen beheerders kunnen regio en valuta wijzigen.",
         "formatsHouseholdHint": "Datum- en tijdnotatie gelden voor het hele huishouden. Elk lid kan ze wijzigen.",

@@ -2975,7 +2975,9 @@
             "BS": "Bahamy",
             "DO": "Dominikánská rep.",
             "GB": "Velká Británie",
+            "HK": "Hongkong",
             "KN": "Svatý Kryštof",
+            "MO": "Macao",
             "PH": "Filipíny",
             "SA": "Saúdská Arábie",
             "TT": "Trinidad a Tobago",
@@ -2984,7 +2986,9 @@
         },
         "languageShort": {
             "nb": "norština",
-            "ptBR": "portugalština (BR)"
+            "ptBR": "portugalština (BR)",
+            "zh": "čínština (zjedn.)",
+            "zhHant": "čínština (trad.)"
         },
         "regionAdminOnly": "Region a měnu mohou měnit pouze administrátoři.",
         "formatsHouseholdHint": "Formát data a času platí pro celou domácnost. Změnit ho může každý člen.",

@@ -2882,7 +2882,9 @@
             "BS": "Bahamas",
             "DO": "Dominikanska rep.",
             "GB": "Storbritannien",
+            "HK": "Hongkong",
             "KN": "S:t Kitts & Nevis",
+            "MO": "Macao",
             "PH": "Filippinerna",
             "SA": "Saudiarabien",
             "TT": "Trinidad & Tobago",
@@ -2891,7 +2893,9 @@
         },
         "languageShort": {
             "nb": "norska",
-            "ptBR": "portugisiska (BR)"
+            "ptBR": "portugisiska (BR)",
+            "zh": "förenkl. kinesiska",
+            "zhHant": "trad. kinesiska"
         },
         "regionAdminOnly": "Endast administratörer kan ändra region och valuta.",
         "formatsHouseholdHint": "Datum- och tidsformat gäller hela hushållet. Alla medlemmar kan ändra dem.",

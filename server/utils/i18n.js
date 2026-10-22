@@ -168,19 +168,33 @@ export function supportedLocaleFor(tag) {
   }
   const sprache = teile[0];
   const rest = teile.slice(1);
+  const treffer = matchSubtags(teile);
+  if (treffer) return treffer;
+  // Rueckfall ueber den Alias, erst nachdem der Tag selbst nichts fand.
+  if (Object.hasOwn(LANGUAGE_ALIAS, sprache)) return matchSubtags([LANGUAGE_ALIAS[sprache], ...rest]);
+  return null;
+}
+
+/**
+ * Regionen, die eine Schrift implizieren: `?lang=zh-TW` meint Traditionell,
+ * nicht das vereinfachte `zh`. Dieselbe Zuordnung wie REGION_SCRIPT in
+ * public/i18n.js, lang-init.js und beiden Installern (Review #1670); eine
+ * Schrift, die im Tag steht (`zh-Hans-HK`), schlaegt die der Region.
+ */
+const REGION_SCRIPT = Object.freeze({ TW: 'Hant', HK: 'Hant', MO: 'Hant' });
+
+/** Vom vollen Tag abwaerts die erste unterstuetzte Locale, oder null. Verbraucht `teile`. */
+function matchSubtags(teile) {
+  const traegtSchrift = teile.slice(1).some((teil) => teil.length === 4);
   while (teile.length) {
     const kandidat = teile.join('-');
     if (isSupportedLocale(kandidat)) return kandidat;
-    teile.pop();
-  }
-  // Rueckfall ueber den Alias, erst nachdem der Tag selbst nichts fand.
-  if (Object.hasOwn(LANGUAGE_ALIAS, sprache)) {
-    const alias = [LANGUAGE_ALIAS[sprache], ...rest];
-    while (alias.length) {
-      const kandidat = alias.join('-');
-      if (isSupportedLocale(kandidat)) return kandidat;
-      alias.pop();
+    const letzter = teile[teile.length - 1];
+    if (!traegtSchrift && teile.length > 1 && Object.hasOwn(REGION_SCRIPT, letzter)) {
+      const mitSchrift = `${teile[0]}-${REGION_SCRIPT[letzter]}`;
+      if (isSupportedLocale(mitSchrift)) return mitSchrift;
     }
+    teile.pop();
   }
   return null;
 }

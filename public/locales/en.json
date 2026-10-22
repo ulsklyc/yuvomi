@@ -2919,7 +2919,9 @@
             "BS": "Bahamas",
             "DO": "Dominican Republic",
             "GB": "United Kingdom",
+            "HK": "Hong Kong",
             "KN": "St. Kitts & Nevis",
+            "MO": "Macao",
             "PH": "Philippines",
             "SA": "Saudi Arabia",
             "TT": "Trinidad & Tobago",
@@ -2928,7 +2930,9 @@
         },
         "languageShort": {
             "nb": "Norwegian",
-            "ptBR": "Portuguese (BR)"
+            "ptBR": "Portuguese (BR)",
+            "zh": "Chinese (Simpl.)",
+            "zhHant": "Chinese (Trad.)"
         },
         "regionAdminOnly": "Only administrators can change region and currency.",
         "formatsHouseholdHint": "Date and time format apply to the whole household. Every member can change them.",

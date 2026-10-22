@@ -2882,7 +2882,9 @@
             "BS": "Bahamas",
             "DO": "Cộng hòa Dominica",
             "GB": "Vương quốc Anh",
+            "HK": "Hồng Kông",
             "KN": "St. Kitts và Nevis",
+            "MO": "Ma Cao",
             "PH": "Philippines",
             "SA": "Ả Rập Xê-út",
             "TT": "Trinidad và Tobago",
@@ -2891,7 +2893,9 @@
         },
         "languageShort": {
             "nb": "Tiếng Na Uy",
-            "ptBR": "Bồ Đào Nha (BR)"
+            "ptBR": "Bồ Đào Nha (BR)",
+            "zh": "Trung (Giản thể)",
+            "zhHant": "Trung (Phồn thể)"
         },
         "regionAdminOnly": "Chỉ quản trị viên mới có thể thay đổi khu vực và tiền tệ.",
         "formatsHouseholdHint": "Định dạng ngày và giờ áp dụng cho cả gia đình. Mọi thành viên đều có thể thay đổi.",

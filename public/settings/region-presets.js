@@ -77,6 +77,14 @@ export const REGION_PRESETS = {
   'be-BY': { currency: 'BYN', date_format: 'dmy', time_format: '24h' },
   'tr-TR': { currency: 'TRY', date_format: 'dmy', time_format: '24h' },
   'zh-CN': { currency: 'CNY', date_format: 'ymd', time_format: '24h' },
+  // Taiwan schreibt 2026/11/05 und rechnet in 12h (上午/下午) - beides CLDR
+  // zh-Hant-TW. Mit Schrift-Subtag, damit regionLocale() auf zh-Hant faellt.
+  'zh-Hant-TW': { currency: 'TWD', date_format: 'ymd_slash', time_format: '12h' },
+  // Hongkong und Macau schreiben 5/11/2026 und rechnen in 12h - CLDR zh-Hant-HK
+  // und zh-Hant-MO. Ohne diese beiden bekaeme ein Haushalt dort die Sprache,
+  // aber nicht seine Waehrung (dieselbe Luecke wie VND vor #297).
+  'zh-Hant-HK': { currency: 'HKD', date_format: 'dmy_slash', time_format: '12h' },
+  'zh-Hant-MO': { currency: 'MOP', date_format: 'dmy_slash', time_format: '12h' },
   'ja-JP': { currency: 'JPY', date_format: 'ymd', time_format: '24h' },
   'hi-IN': { currency: 'INR', date_format: 'dmy_slash', time_format: '12h' },
   'pt-PT': { currency: 'EUR', date_format: 'dmy_slash', time_format: '24h' },
@@ -218,7 +226,7 @@ export function regionLabel(code, locale, withLanguage = (region, language) => `
  * steht dort der volle Name. test:settings-navigation haelt die Liste: jeder
  * Name, der das Zeichenbudget reisst, braucht hier einen Eintrag.
  */
-export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'KN', 'PH', 'SA', 'TT', 'US', 'VC'];
+export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'HK', 'KN', 'MO', 'PH', 'SA', 'TT', 'US', 'VC'];
 
 /**
  * Kurzer Anzeigename einer Region - das, was in der Auswahl steht (#2151).
@@ -266,9 +274,30 @@ export function regionShortLabel(code, locale, {
  * geschlossene Auswahl passt (#2151): "Portugiesisch (Brasilien)",
  * "Norwegisch (Bokmål)". Kurzform je Sprache unter
  * `settings.languageShort.<Tag ohne Bindestrich>` ("Portugiesisch (BR)",
- * "Norwegisch" - Bokmål ist das einzige Norwegisch der App).
+ * "Norwegisch" - Bokmål ist das einzige Norwegisch der App). Die beiden
+ * Chinesisch stehen hier, weil ihre vollen Namen ("Chinesisch (vereinfacht)",
+ * "Chinesisch (traditionell)") in den meisten Sprachen das Budget reissen.
  */
-export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR'];
+export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR', 'zh', 'zh-Hant'];
+
+/**
+ * Unter welchem Tag eine UI-Sprache ihren NAMEN sucht, wenn der Code allein
+ * zu wenig sagt (D#1320). `zh` ist Vereinfacht, heisst im CLDR aber nur
+ * "Chinesisch" - neben "Chinesisch (traditionell)" las sich der unmarkierte
+ * Eintrag wie der Standard fuer alle Chinesisch Lesenden. Nur der Name folgt
+ * `zh-Hans`; Code, Datei und gespeicherter Wert bleiben `zh`.
+ */
+const LANGUAGE_LABEL_TAGS = Object.freeze({ zh: 'zh-Hans' });
+
+/** Voller Name einer UI-Sprache in `locale` (CLDR), oder der Code. */
+export function languageLabel(tag, locale) {
+  try {
+    const labelTag = Object.prototype.hasOwnProperty.call(LANGUAGE_LABEL_TAGS, tag) ? LANGUAGE_LABEL_TAGS[tag] : tag;
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(labelTag) || tag;
+  } catch {
+    return tag;
+  }
+}
 
 /** Schluessel der Kurzform einer UI-Sprache unter `settings.languageShort`. */
 export const languageShortKey = (tag) => tag.replace('-', '');
@@ -285,7 +314,7 @@ export const languageShortKey = (tag) => tag.replace('-', '');
  */
 export function languageShortLabel(tag, locale, shortName = () => null) {
   try {
-    return shortName(tag) || new Intl.DisplayNames([locale], { type: 'language' }).of(tag) || tag;
+    return shortName(tag) || languageLabel(tag, locale);
   } catch {
     return tag;
   }

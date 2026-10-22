@@ -2882,7 +2882,9 @@
             "BS": "Bahamas",
             "DO": "Rep. Dominicana",
             "GB": "Regno Unito",
+            "HK": "Hong Kong",
             "KN": "Saint Kitts",
+            "MO": "Macao",
             "PH": "Filippine",
             "SA": "Arabia Saudita",
             "TT": "Trinidad e Tobago",
@@ -2891,7 +2893,9 @@
         },
         "languageShort": {
             "nb": "norvegese",
-            "ptBR": "portoghese (BR)"
+            "ptBR": "portoghese (BR)",
+            "zh": "cinese (sempl.)",
+            "zhHant": "cinese (trad.)"
         },
         "regionAdminOnly": "Solo gli amministratori possono modificare regione e valuta.",
         "formatsHouseholdHint": "Il formato di data e ora vale per tutta la famiglia. Ogni membro può modificarlo.",

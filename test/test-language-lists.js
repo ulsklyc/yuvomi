@@ -57,7 +57,10 @@ test('Budget: Tags mit Region und fremder Schreibung finden ihre Sprache, Unbeka
   const { normalizeLang } = await import('../server/routes/budget/helpers.js');
   const faelle = [
     ['pt-BR', 'pt-BR'], ['pt_br', 'pt-BR'], ['PT-br', 'pt-BR'], ['pt-PT', 'pt'],
-    ['de-AT', 'de'], ['DE', 'de'], [' nb ', 'nb'], ['zh-Hant-TW', 'zh'], ['es-419', 'es'],
+    ['de-AT', 'de'], ['DE', 'de'], [' nb ', 'nb'], ['zh-Hant-TW', 'zh-Hant'], ['zh-CN', 'zh'], ['es-419', 'es'],
+    // Eine Region, die eine Schrift impliziert, wie in App und Installern (Review #1670);
+    // eine ausdrueckliche Schrift gewinnt.
+    ['zh-TW', 'zh-Hant'], ['zh_hk', 'zh-Hant'], ['ZH-MO', 'zh-Hant'], ['zh-Hans-HK', 'zh'], ['zh-SG', 'zh'],
     ['xx', 'en'], ['', 'en'], [undefined, 'en'], [['de'], 'en'], ['../de', 'en'], ['de/../en', 'en'],
     // `no` (Makrosprache) und `nn` (Nynorsk) meinen die norwegische Datei.
     ['no', 'nb'], ['no-NO', 'nb'], ['NO_no', 'nb'], ['nn', 'nb'], ['nn-NO', 'nb'],
@@ -192,13 +195,26 @@ test('der Listen-Detektor sieht eine Kopie und laesst Einzelwerte stehen', () =>
   assert.equal(localeRuns("['de', 'en', 'xx', 'fr', 'uk']", locales).length, 0, 'ein fremder Code bricht die Folge');
 });
 
+// Eine AUSWAHL, keine Kopie: SHORT_NAME_LANGUAGES nennt die Sprachen, deren
+// CLDR-Name die geschlossene Auswahl sprengt (#2151), und seit den beiden
+// Chinesisch (D#1320) sind es vier. Sie bleibt nicht zurueck, wenn eine Sprache
+// dazukommt - test:settings-navigation misst jeden Namen jeder Sprache und
+// verlangt fuer jeden zu langen einen Eintrag. Nur diese eine Zeile faellt aus
+// dem Scan; steht sie nicht mehr so da, wird der Test rot statt blind.
+const SELECTIONS = { 'public/settings/region-presets.js': /^export const SHORT_NAME_LANGUAGES = \[[^\]\n]*\];$/m };
+
 test('keine weitere Sprachliste in server/, public/ oder tools/', () => {
   const funde = [];
   for (const dir of ['server', 'public', 'tools']) {
     for (const file of jsFiles(path.join(ROOT, dir))) {
       const rel = path.relative(ROOT, file).split(path.sep).join('/');
       if (OWN_GUARD.has(rel)) continue;
-      for (const lauf of localeRuns(readFileSync(file, 'utf8'), APP_LOCALES)) {
+      let src = readFileSync(file, 'utf8');
+      if (SELECTIONS[rel]) {
+        assert.match(src, SELECTIONS[rel], `${rel}: die ausgenommene Auswahl steht nicht mehr so da`);
+        src = src.replace(SELECTIONS[rel], '');
+      }
+      for (const lauf of localeRuns(src, APP_LOCALES)) {
         funde.push(`${rel}: ${lauf.join(', ')}`);
       }
     }

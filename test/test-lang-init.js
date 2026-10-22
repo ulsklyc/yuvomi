@@ -214,8 +214,13 @@ test('keine der unterstuetzten Sprachen loest anders auf als bisher', () => {
   assert.equal(pickLocale(['en-US'], alle), 'en');
   assert.equal(pickLocale(['fil-PH'], alle), 'fil');
   assert.equal(pickLocale(['nb-NO'], alle), 'nb');
-  assert.equal(pickLocale(['zh-TW'], alle), 'zh',
-    'Ohne eine traditionelle Locale im Bestand bleibt `zh` die Antwort.');
+  // zh-Hant ist seit #1320 eine eigene Locale: TW, HK und MO fallen darauf,
+  // jede andere chinesische Region bleibt beim vereinfachten `zh`.
+  assert.equal(pickLocale(['zh-TW'], alle), 'zh-Hant');
+  assert.equal(pickLocale(['zh-HK'], alle), 'zh-Hant');
+  assert.equal(pickLocale(['zh-Hans-HK'], alle), 'zh');
+  assert.equal(pickLocale(['zh-CN'], alle), 'zh');
+  assert.equal(pickLocale(['zh'], alle), 'zh');
   assert.equal(pickLocale(['th-TH'], alle), 'en');
   assert.equal(pickLocale(['th-TH', 'nl-BE'], alle), 'nl');
 });

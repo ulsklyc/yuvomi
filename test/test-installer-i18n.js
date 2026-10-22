@@ -268,6 +268,19 @@ test('der Sprachumschalter bietet genau die unterstuetzten Sprachen an', () => {
     + `nur in SUPPORTED_LOCALES: ${supported.filter(l => !offered.includes(l))}`);
 });
 
+// D#1320: neben 繁體中文 las sich ein unmarkiertes 中文 wie der Standard fuer
+// alle Chinesisch Lesenden. Beide Eintraege nennen ihre Schrift, und keine zwei
+// Optionen heissen gleich.
+test('der Sprachumschalter nennt beide Chinesisch mit ihrer Schrift', () => {
+  const html = readFileSync(HTML_PATH, 'utf8');
+  const select = html.match(/<select id="lang-switch"[\s\S]*?<\/select>/);
+  const labels = Object.fromEntries([...select[0].matchAll(/<option value="([^"]+)"[^>]*>([^<]*)</g)].map(m => [m[1], m[2].trim()]));
+  assert.equal(labels.zh, '简体中文');
+  assert.equal(labels['zh-Hant'], '繁體中文');
+  const texts = Object.values(labels);
+  assert.equal(new Set(texts).size, texts.length, `zwei Optionen heissen gleich: ${texts.filter((x, i) => texts.indexOf(x) !== i)}`);
+});
+
 // Der Web-Installer loest wie die App auf: erst der volle Tag, dann die
 // Basissprache. Er nahm bisher nur den Teil vor dem ersten Bindestrich, und ein
 // brasilianischer Browser bekam `pt` (#1437).
@@ -279,6 +292,17 @@ test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
   assert.equal(resolveLocale(['de-AT']), 'de');
   assert.equal(resolveLocale(['fil-PH']), 'fil');
   assert.equal(resolveLocale(['nb-NO']), 'nb');
+  // Ein Browser meldet zh-TW, nie zh-Hant-TW (#1320).
+  assert.equal(resolveLocale(['zh-TW']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-HK']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hant']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hant-TW']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-Hans-HK']), 'zh');
+  // Eine Unicode-Erweiterung ist keine Schrift - die App liest hier zh (Review #1670).
+  assert.equal(resolveLocale(['zh-CN-u-nu-hant']), 'zh');
+  assert.equal(resolveLocale(['zh-TW-u-ca-roc']), 'zh-Hant');
+  assert.equal(resolveLocale(['zh-CN']), 'zh');
+  assert.equal(resolveLocale(['zh']), 'zh');
   assert.equal(resolveLocale(['th-TH', 'nl-BE']), 'nl');
   assert.equal(resolveLocale(['th-TH']), 'en');
 });

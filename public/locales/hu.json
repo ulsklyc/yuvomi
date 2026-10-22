@@ -2882,7 +2882,9 @@
             "BS": "Bahama-szigetek",
             "DO": "Dominikai Közt.",
             "GB": "Egyesült Királyság",
+            "HK": "Hongkong",
             "KN": "Saint Kitts",
+            "MO": "Makaó",
             "PH": "Fülöp-szk.",
             "SA": "Szaúd-Arábia",
             "TT": "Trinidad és Tobago",
@@ -2891,7 +2893,9 @@
         },
         "languageShort": {
             "nb": "norvég",
-            "ptBR": "brazíliai portugál"
+            "ptBR": "brazíliai portugál",
+            "zh": "egysz. kínai",
+            "zhHant": "hagyományos kínai"
         },
         "regionAdminOnly": "A régiót és a pénznemet csak rendszergazdák módosíthatják.",
         "formatsHouseholdHint": "A dátum- és időformátum az egész háztartásra érvényes. Minden tag módosíthatja.",

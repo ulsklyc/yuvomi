@@ -3086,7 +3086,9 @@
             "BS": "Bahamy",
             "DO": "Dominikana",
             "GB": "Wielka Brytania",
+            "HK": "Hongkong",
             "KN": "Saint Kitts",
+            "MO": "Makau",
             "PH": "Filipiny",
             "SA": "Arabia Saudyjska",
             "TT": "Trynidad i Tobago",
@@ -3095,7 +3097,9 @@
         },
         "languageShort": {
             "nb": "norweski",
-            "ptBR": "portugalski (BR)"
+            "ptBR": "portugalski (BR)",
+            "zh": "chiński uproszcz.",
+            "zhHant": "chiński tradycyjny"
         },
         "regionAdminOnly": "Tylko administratorzy mogą zmieniać region i walutę.",
         "formatsHouseholdHint": "Format daty i godziny obowiązuje w całym gospodarstwie. Każdy członek może go zmienić.",

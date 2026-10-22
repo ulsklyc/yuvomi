@@ -320,6 +320,7 @@ const APP_LOCALES = [
   '/locales/uk.json',
   '/locales/vi.json',
   '/locales/zh.json',
+  '/locales/zh-Hant.json',
 ];
 const APP_LOCALE_SET = new Set(APP_LOCALES);
 
