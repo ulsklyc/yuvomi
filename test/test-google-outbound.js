@@ -126,10 +126,27 @@ function writableCalendars(ids = ['primary'], extra = {}) {
   }]));
 }
 
-function apiError(code) {
-  const err = new Error(`HTTP ${code}`);
+/**
+ * Ein Fehler in der Form, die googleapis 185 / gaxios 7.3.1 wirft (gemessen an
+ * einem lokalen Server, #2136): `code` und `status` tragen den HTTP-Status, die
+ * `error.errors[]` der Antwort stehen als `cause.errors` und unter
+ * `response.data.error.errors`.
+ */
+function apiError(code, reason = null) {
+  const err = new Error(`HTTP ${code}${reason ? ` ${reason}` : ''}`);
   err.code = code;
+  err.status = code;
+  if (reason) {
+    const errors = [{ domain: 'global', reason, message: reason }];
+    err.cause = { code, message: reason, errors };
+    err.response = { status: code, config: {}, data: { error: { code, message: reason, errors } } };
+  }
   return err;
+}
+
+/** Eine Absage, die dem einzelnen Termin gilt und deshalb einen Versuch kostet. */
+function entryError() {
+  return apiError(403, 'forbiddenForNonOrganizer');
 }
 
 // ── Schema ──────────────────────────────────────────────────────────────────────
@@ -260,13 +277,13 @@ test('zählt einen echten Fehler hoch und lässt den Tombstone liegen', async ()
   reset();
   __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-500', target: 'primary' }));
 
-  const calendar = fakeCalendar({ onDelete: () => { throw apiError(500); } });
+  const calendar = fakeCalendar({ onDelete: () => { throw entryError(); } });
   assert.equal(await __test.processPendingDeletions(calendar), 0);
 
   const rows = tombstones();
   assert.equal(rows.length, 1, 'Tombstone muss für den nächsten Sync liegen bleiben');
   assert.equal(rows[0].attempts, 1);
-  assert.match(rows[0].last_error, /500/);
+  assert.match(rows[0].last_error, /403 forbiddenForNonOrganizer/);
 });
 
 test('gibt eine Löschung nach MAX_OUTBOUND_ATTEMPTS auf', async () => {
@@ -464,7 +481,7 @@ test('ein echter Fehler zählt hoch und lässt den Marker stehen', async () => {
 
   const calendar = fakeCalendar({
     calendars: writableCalendars(),
-    onPatch: () => { throw apiError(500); },
+    onPatch: () => { throw entryError(); },
   });
   assert.equal(await __test.processPendingUpdates(calendar, {}), 0);
 
@@ -496,7 +513,7 @@ test('gibt einen Push nach MAX_OUTBOUND_ATTEMPTS auf', async () => {
 
   const calendar = fakeCalendar({
     calendars: writableCalendars(),
-    onPatch: () => { throw apiError(500); },
+    onPatch: () => { throw entryError(); },
   });
   for (let i = 0; i < __test.MAX_OUTBOUND_ATTEMPTS; i++) {
     await __test.processPendingUpdates(calendar, {});
@@ -601,7 +618,7 @@ test('patcht nicht im alten Kalender, wenn der Umzug scheitert', async () => {
 
   const calendar = fakeCalendar({
     calendars: writableCalendars(['primary', 'fam@g']),
-    onMove: () => { throw apiError(500); },
+    onMove: () => { throw entryError(); },
   });
   assert.equal(await __test.processPendingUpdates(calendar, {}), 0);
 
@@ -1399,7 +1416,7 @@ test('ein nach dem Umzug scheiternder Patch gibt nach MAX_OUTBOUND_ATTEMPTS auf'
 
   const calendar = fakeCalendar({
     calendars: writableCalendars(['primary', 'fam@g']),
-    onPatch: () => { throw apiError(500); },
+    onPatch: () => { throw entryError(); },
   });
   await __test.processPendingUpdates(calendar, {});
   let row = reload(before.id);
@@ -1454,7 +1471,7 @@ test('eine Bearbeitung während des Umzugs bekommt beim scheiternden Patch ihre 
       await put(event.id, { title: 'Unterwegs umbenannt' });
       return { data: { id: params.eventId } };
     },
-    onPatch: () => { throw apiError(500); },
+    onPatch: () => { throw entryError(); },
   });
   await __test.processPendingUpdates(calendar, {});
 
@@ -1524,7 +1541,7 @@ for (const [label, makeError] of [['503', () => apiError(503)], ['ohne HTTP-Stat
     assert.equal(calendar.patches.length, 0);
     const row = reload(event.id);
     assert.equal(row.outbound_dirty, 1, 'die Bearbeitung hat Google nicht erreicht');
-    assert.equal(row.outbound_attempts, 1);
+    assert.equal(row.outbound_attempts, 0, 'eine Absage für das ganze Konto kostet keinen Versuch (#2136)');
 
     const next = fakeCalendar({ calendars: writableCalendars() });
     assert.equal(await __test.processPendingUpdates(next, {}), 1);
@@ -1537,7 +1554,8 @@ test('ein dauerhaft scheiternder Metadaten-Abruf gibt nach MAX_OUTBOUND_ATTEMPTS
   reset();
   const event = seedDirty({ title: 'Nie erreichbar' }, 'gev-meta-dead');
 
-  const calendar = failMeta(fakeCalendar({ calendars: writableCalendars() }), ['primary'], () => apiError(503));
+  // Ein 403 ohne Grund hängt am Kalender und zählt; 5xx und Netz warten (#2136).
+  const calendar = failMeta(fakeCalendar({ calendars: writableCalendars() }), ['primary'], () => apiError(403));
   for (let i = 0; i < __test.MAX_OUTBOUND_ATTEMPTS - 1; i++) {
     await __test.processPendingUpdates(calendar, {});
   }
@@ -1564,7 +1582,7 @@ test('ein gescheiterter Abruf des Zielkalenders lässt den Umzug vorgemerkt und 
   const row = reload(before.id);
   assert.equal(row.outbound_move_to, 'fam@g', 'der nächste Lauf versucht den Umzug erneut');
   assert.equal(row.outbound_dirty, 1);
-  assert.equal(row.outbound_attempts, 1);
+  assert.equal(row.outbound_attempts, 0, 'ein 503 kostet keinen Versuch (#2136)');
   assert.equal(__test.currentGoogleCalendarId(row), 'primary');
 });
 
@@ -1636,7 +1654,7 @@ test('eine Bearbeitung während des scheiternden Umzugs gibt ihm seine Versuche 
     calendars: writableCalendars(['primary', 'fam@g']),
     onMove: async () => {
       await put(event.id, { title: 'Unterwegs umbenannt' });
-      throw apiError(503);
+      throw entryError();
     },
   });
   await __test.processPendingUpdates(calendar, {});
@@ -2546,4 +2564,217 @@ test('#2035: wird während des Auswahl-Abgleichs erneut verbunden, bleibt die Au
 
   assert.deepEqual(__test.listSelection().map((r) => r.calendar_id).sort(), ['cal-a', 'cal-b'],
     'die Liste eines abgelösten Kontos räumt die Auswahl des aktuellen nicht ab');
+});
+
+// ── Absagen für das ganze Konto (#2136) ─────────────────────────────────────────
+// Ein Ratenlimit, ein Kontingent, ein 5xx oder ein Netzfehler sagt nichts über den
+// einen Termin. Früher kostete jede solche Absage jeden wartenden Auftrag einen
+// der fünf Versuche, und das bei jedem Sofortversuch, also je Bearbeitung: nach
+// fünf fiel die Löschung (der Termin kam beim nächsten vollen Abgleich zurück),
+// die Änderung und der Umzug erreichten Google nie. Jetzt warten sie ohne
+// Versuch, und nach der ersten solchen Absage geht in diesem Durchgang keine
+// Anfrage mehr an Google. Ein 403, der dem Termin gilt, zählt weiter.
+
+const ACCOUNT_WIDE = [
+  ['429', () => apiError(429, 'rateLimitExceeded')],
+  ['503', () => apiError(503)],
+  ['403 rateLimitExceeded', () => apiError(403, 'rateLimitExceeded')],
+  ['403 userRateLimitExceeded', () => apiError(403, 'userRateLimitExceeded')],
+  ['403 quotaExceeded', () => apiError(403, 'quotaExceeded')],
+  ['Netzfehler', networkError],
+];
+
+const PER_ENTRY = [
+  ['403 forbiddenForNonOrganizer', () => apiError(403, 'forbiddenForNonOrganizer')],
+  ['403 ohne Grund', () => apiError(403)],
+];
+
+const PASSES = __test.MAX_OUTBOUND_ATTEMPTS + 1;
+
+for (const [label, makeError] of ACCOUNT_WIDE) {
+  test(`#2136: ${label} verwirft nach ${PASSES} Durchgängen keine Löschung`, async () => {
+    reset();
+    __test.queueEventDeletion(insertGoogleEvent({ googleId: `gev-wait-del-${label}`, target: 'primary' }));
+    const calendar = fakeCalendar({ onDelete: () => { throw makeError(); } });
+    for (let i = 0; i < PASSES; i++) await __test.processPendingDeletions(calendar);
+
+    assert.equal(calendar.deletes.length, PASSES, 'jeder Durchgang fragt einmal');
+    const rows = tombstones();
+    assert.equal(rows.length, 1, 'die Löschung wartet, statt aufgegeben zu werden');
+    assert.equal(rows[0].attempts, 0);
+  });
+
+  test(`#2136: ${label} verwirft nach ${PASSES} Durchgängen keine Änderung`, async () => {
+    reset();
+    const event = seedDirty({ title: 'Wartet' }, `gev-wait-chg-${label}`);
+    const calendar = fakeCalendar({ calendars: writableCalendars(), onPatch: () => { throw makeError(); } });
+    for (let i = 0; i < PASSES; i++) await __test.processPendingUpdates(calendar, {});
+
+    assert.equal(calendar.patches.length, PASSES);
+    const row = reload(event.id);
+    assert.equal(row.outbound_dirty, 1, 'die Änderung wartet');
+    assert.equal(row.outbound_attempts, 0);
+  });
+
+  test(`#2136: ${label} verwirft nach ${PASSES} Durchgängen keinen Umzug`, async () => {
+    reset();
+    const { before } = seedMove('primary', 'fam@g', `gev-wait-move-${label}`);
+    const calendar = fakeCalendar({
+      calendars: writableCalendars(['primary', 'fam@g']), onMove: () => { throw makeError(); },
+    });
+    for (let i = 0; i < PASSES; i++) await __test.processPendingUpdates(calendar, {});
+
+    assert.equal(calendar.moves.length, PASSES);
+    const row = reload(before.id);
+    assert.equal(row.outbound_move_to, 'fam@g', 'der Umzug wartet');
+    assert.equal(row.outbound_attempts, 0);
+  });
+
+  test(`#2136: ${label} beim Metadaten-Abruf kostet keinen Versuch`, async () => {
+    reset();
+    const event = seedDirty({ title: 'Wartet auf Metadaten' }, `gev-wait-meta-${label}`);
+    const calendar = failMeta(fakeCalendar({ calendars: writableCalendars() }), ['primary'], makeError);
+    for (let i = 0; i < PASSES; i++) await __test.processPendingUpdates(calendar, {});
+
+    assert.equal(calendar.patches.length, 0);
+    const row = reload(event.id);
+    assert.equal(row.outbound_dirty, 1, 'die Änderung gilt nicht als unschreibbar');
+    assert.equal(row.outbound_attempts, 0);
+  });
+}
+
+for (const [label, makeError] of PER_ENTRY) {
+  test(`#2136: ${label} beendet Löschung, Änderung und Umzug nach dem fünften Versuch`, async () => {
+    reset();
+    __test.queueEventDeletion(insertGoogleEvent({ googleId: `gev-entry-del-${label}`, target: 'primary' }));
+    const changed = seedDirty({ title: 'Fremder Organisator' }, `gev-entry-chg-${label}`);
+    const { before: moved } = seedMove('primary', 'fam@g', `gev-entry-move-${label}`);
+    const calendar = fakeCalendar({
+      calendars: writableCalendars(['primary', 'fam@g']),
+      onDelete: () => { throw makeError(); },
+      onPatch:  () => { throw makeError(); },
+      onMove:   () => { throw makeError(); },
+    });
+    for (let i = 0; i < __test.MAX_OUTBOUND_ATTEMPTS - 1; i++) {
+      await __test.processPendingDeletions(calendar);
+      await __test.processPendingUpdates(calendar, {});
+    }
+    assert.equal(tombstones().length, 1, 'Vorbedingung: bis zum letzten Versuch bleibt die Löschung');
+    assert.equal(reload(changed.id).outbound_dirty, 1);
+    assert.equal(reload(moved.id).outbound_move_to, 'fam@g');
+
+    await __test.processPendingDeletions(calendar);
+    await __test.processPendingUpdates(calendar, {});
+    assert.equal(tombstones().length, 0, 'der fünfte Versuch beendet die Löschung');
+    assert.equal(reload(changed.id).outbound_dirty, 0, 'und die Änderung');
+    assert.equal(reload(moved.id).outbound_move_to, null, 'und den Umzug');
+  });
+}
+
+test('#2136: nach einem 429 geht keine zweite Löschung des Durchgangs hinaus', async () => {
+  reset();
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-stop-del-1', target: 'primary' }));
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-stop-del-2', target: 'primary' }));
+  const calendar = fakeCalendar({ onDelete: () => { throw apiError(429, 'rateLimitExceeded'); } });
+  await __test.processPendingDeletions(calendar);
+
+  assert.equal(calendar.deletes.length, 1, 'die zweite wartende Löschung fragt nicht mehr');
+  assert.deepEqual(tombstones().map((r) => r.attempts), [0, 0]);
+});
+
+test('#2136: nach einem 429 geht keine zweite Änderung des Durchgangs hinaus', async () => {
+  reset();
+  const first  = seedDirty({ title: 'Erste' }, 'gev-stop-chg-1');
+  const second = seedDirty({ title: 'Zweite' }, 'gev-stop-chg-2');
+  const calendar = fakeCalendar({
+    calendars: writableCalendars(), onPatch: () => { throw apiError(429, 'rateLimitExceeded'); },
+  });
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.equal(calendar.patches.length, 1, 'die zweite wartende Änderung im selben Kalender fragt nicht mehr');
+  for (const event of [first, second]) {
+    const row = reload(event.id);
+    assert.equal(row.outbound_dirty, 1);
+    assert.equal(row.outbound_attempts, 0);
+  }
+});
+
+test('#2136: nach einem 503 beim Umzug geht kein zweiter Umzug des Durchgangs hinaus', async () => {
+  reset();
+  seedMove('primary', 'fam@g', 'gev-stop-move-1');
+  seedMove('primary', 'fam@g', 'gev-stop-move-2');
+  const calendar = fakeCalendar({
+    calendars: writableCalendars(['primary', 'fam@g']), onMove: () => { throw apiError(503); },
+  });
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.equal(calendar.moves.length, 1);
+  assert.equal(calendar.patches.length, 0);
+});
+
+test('#2136: ein Ratenlimit beim Metadaten-Abruf hält auch die Termine anderer Kalender an', async () => {
+  reset();
+  seedDirty({ title: 'In primary' }, 'gev-stop-meta-1');
+  const other = insertGoogleEvent({ googleId: 'gev-stop-meta-2', target: 'fam@g' });
+  db.prepare("UPDATE calendar_events SET title = 'In fam' WHERE id = ?").run(other.id);
+  __test.markEventOutbound(other, reload(other.id));
+  const calendar = failMeta(
+    fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g']) }), ['primary'],
+    () => apiError(403, 'userRateLimitExceeded'),
+  );
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.deepEqual(calendar.metaCalls, ['primary'], 'fam@g wird in diesem Durchgang nicht mehr gefragt');
+  assert.equal(calendar.patches.length, 0);
+  assert.equal(reload(other.id).outbound_dirty, 1);
+});
+
+test('#2136: ein Umzug, dessen Ziel während der Absage wechselt, hält den Durchgang trotzdem an', async () => {
+  reset();
+  const event = seedMirrored('gev-stop-move-retarget');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+  const later = seedDirty({ title: 'Danach' }, 'gev-stop-move-later');
+  const calendar = fakeCalendar({
+    calendars: writableCalendars(['primary', 'fam@g', 'work@g']),
+    onMove: async () => {
+      await put(event.id, { target_google_calendar_id: 'work@g' });
+      throw apiError(429, 'rateLimitExceeded');
+    },
+  });
+  await __test.processPendingUpdates(calendar, {});
+
+  assert.equal(calendar.moves.length, 1);
+  assert.equal(calendar.patches.length, 0, 'die wartende Änderung danach fragt nicht mehr');
+  assert.equal(reload(later.id).outbound_dirty, 1);
+});
+
+test('#2136: der Sofortversuch teilt den Stopp zwischen Löschen und Ändern', async () => {
+  reset();
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-stop-flush-del', target: 'primary' }));
+  const changed = seedDirty({ title: 'Wartet nach der Löschung' }, 'gev-stop-flush-chg');
+  const calendar = syncCalendar({
+    calendars: writableCalendars(), onDelete: () => { throw apiError(429, 'rateLimitExceeded'); },
+  });
+  await flushOutbound({ createCalendar: () => calendar });
+
+  assert.equal(calendar.deletes.length, 1);
+  assert.equal(calendar.metaCalls.length, 0, 'nach dem 429 fragt der Durchgang Google nicht mehr');
+  assert.equal(calendar.patches.length, 0);
+  assert.equal(tombstones()[0].attempts, 0);
+  assert.equal(reload(changed.id).outbound_attempts, 0);
+});
+
+test('#2136: der Sync-Lauf teilt den Stopp zwischen Löschen und Ändern', async () => {
+  reset();
+  db.prepare('DELETE FROM google_calendar_selection').run();
+  __test.queueEventDeletion(insertGoogleEvent({ googleId: 'gev-stop-sync-del', target: 'primary' }));
+  seedDirty({ title: 'Wartet im Sync' }, 'gev-stop-sync-chg');
+  const calendar = syncCalendar({
+    calendars: writableCalendars(), onDelete: () => { throw apiError(503); },
+  });
+  await sync({ createCalendar: () => calendar });
+
+  assert.equal(calendar.deletes.length, 1);
+  assert.equal(calendar.patches.length, 0, 'nach dem 503 geht im selben Lauf keine Änderung hinaus');
+  assert.equal(tombstones()[0].attempts, 0);
 });

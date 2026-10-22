@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
   counted months for the monthly repeat options but was always labelled in weeks. The label now
   follows the selected repeat option.
+- **Google Calendar: a rate limit or an outage no longer drops pending deletions and changes**
+  (#2136). Until now every failed attempt counted against the five tries of each waiting
+  deletion, change and calendar move, including answers that concern the whole account: a rate
+  limit or exhausted quota (429, or 403 with that reason), a Google server error or a lost
+  connection. Since every edit triggers an immediate attempt, five edits during a rate limit were
+  enough: a deleted event stayed at Google and came back later, a change never reached Google.
+  Such answers now leave the work waiting without using up a try, and the rest of that pass sends
+  nothing more to Google. A 403 for the event itself, such as one the account may not change,
+  still counts, so it does not wait forever.
 
 ## [2.79.0] - 2026-10-22
 

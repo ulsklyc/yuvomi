@@ -371,16 +371,30 @@ function pendingDeletionCount() {
 }
 
 /**
+ * Fehlerregel und Stopp für die Handler in calendar-outbound.js (#2136): eine
+ * Absage für das ganze Konto (Ratenlimit, Kontingent, 5xx, Netz) verbraucht
+ * keinen Versuch und hält den Durchgang an.
+ */
+function googleRefusal(stop) {
+  return { failureAction: outbound.googleFailureAction, onWait: (refusal) => stop.trip(refusal) };
+}
+
+/**
  * Arbeitet die vorgemerkten Löschungen bei Google ab.
  * @param {import('googleapis').calendar_v3.Calendar} calendar
+ * @param {{stop?: object}} [scope] Stoppsignal des Durchgangs
+ *   (`createRefusalStop`, #2136); Löschen und Ändern teilen sich eines.
  * @returns {Promise<number>} erledigte Tombstones
  */
-async function processPendingDeletions(calendar) {
+async function processPendingDeletions(calendar, { stop = outbound.createRefusalStop() } = {}) {
   const rows = outbound.pendingDeletions('google');
   if (rows.length === 0) return 0;
 
   let done = 0;
   for (const row of rows) {
+    // Nach einer kontoweiten Absage in diesem Durchgang geht keine Anfrage
+    // mehr an Google; der Auftrag bleibt ohne Versuch für den nächsten.
+    if (stop.blocks()) continue;
     try {
       await calendar.events.delete({
         calendarId: row.calendar_external_id,
@@ -390,9 +404,10 @@ async function processPendingDeletions(calendar) {
       done++;
     } catch (err) {
       passOnRefusal(err);
-      // 404/410 zählen als erledigt (bei Google bereits weg), alles andere
-      // wandert in den Retry bis zum gemeinsamen Versuchslimit.
-      if (outbound.handleDeletionError(err, row, 'Google')
+      // 404/410 zählen als erledigt (bei Google bereits weg), eine kontoweite
+      // Absage wartet, alles andere wandert in den Retry bis zum gemeinsamen
+      // Versuchslimit.
+      if (outbound.handleDeletionError(err, row, 'Google', googleRefusal(stop))
           && outbound.classifyOutboundError(err) === 'settled') {
         done++;
       }
@@ -411,9 +426,10 @@ function pendingUpdateCount() {
  * @param {import('googleapis').calendar_v3.Calendar} calendar
  * @param {Record<string,string>} colorMap
  * @param {Map} metaCache
+ * @param {{stop?: object}} [scope] Stoppsignal des Durchgangs (#2136)
  * @returns {Promise<number>} erfolgreich gepushte Events
  */
-async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Map()) {
+async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Map(), { stop = outbound.createRefusalStop() } = {}) {
   const events = outbound.pendingUpdates('google');
   if (events.length === 0) return 0;
 
@@ -434,25 +450,43 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
   `);
 
   const handleError = (err, event, what, giveUp) =>
-    outbound.handleUpdateError(err, event, what, 'Google', giveUp);
+    outbound.handleUpdateError(err, event, what, 'Google', giveUp, googleRefusal(stop));
 
   // Ein gescheiterter Metadaten-Abruf ist kein Kalender ohne Schreibrecht:
   // calendarList.get scheitert auch an Netz, Token-Refresh oder Ratenlimit. Eine
   // deshalb verworfene Vormerkung erreichte Google nie, und kein Inbound brächte den
   // Unterschied zurück. Es gilt dieselbe Regel wie für einen gescheiterten Aufruf:
   // verworfen wird nur bei 404/410 (nicht mehr zugänglich), 400 oder verbrauchten
-  // Versuchen. `now` ist der nachgeladene Stand, dessen Zähler gilt.
+  // Versuchen. `now` ist der nachgeladene Stand, dessen Zähler gilt. Eine
+  // kontoweite Absage kommt hier nicht mehr an (`refusedForAccount`).
   // @returns {boolean} true, wenn der Termin auf den nächsten Lauf wartet
   const waitsForMeta = (now, calendarId) => {
     const err = metaFailure(metaCache, calendarId);
-    if (!err || outbound.outboundFailureAction(err, now.outbound_attempts) !== 'retry') return false;
+    if (!err || outbound.googleFailureAction(err, now.outbound_attempts) !== 'retry') return false;
     outbound.failOutbound(now.id);
     log.warn(`Calendar metadata for ${calendarId} is unavailable, outbound work for event ${now.id} stays queued (attempt ${now.outbound_attempts + 1}):`, err.message);
     return true;
   };
 
+  // Scheiterte der Metadaten-Abruf an einer Absage für das ganze Konto
+  // (Ratenlimit, 5xx, Netz), wartet der Termin ohne Versuch, und der Durchgang
+  // hält an (#2136) - gleich, ob der Termin inzwischen anders vorgemerkt ist.
+  // @returns {boolean} true, wenn der Durchgang damit anhält
+  const refusedForAccount = (calendarId, eventId) => {
+    const err = metaFailure(metaCache, calendarId);
+    if (!err || !outbound.isGoogleAccountWideRefusal(err)) return false;
+    stop.trip(err);
+    log.warn(`Calendar metadata for ${calendarId} was refused for the whole account, outbound work for event ${eventId} waits without using up an attempt:`, err.message);
+    return true;
+  };
+
   let done = 0;
   for (const event of events) {
+    // Je Termin, nicht einmal je Liste: nach der ersten kontoweiten Absage geht
+    // aus diesem Durchgang keine Anfrage mehr an Google (#2136). Jede Absage
+    // weiter unten beendet ihren Termin mit `continue`, deshalb genügt die
+    // Probe hier vor der ersten Anfrage des nächsten.
+    if (stop.blocks()) continue;
     let calendarId = googleCalendarIdForEvent(event);
     let eventId    = event.external_calendar_id;
     if (!calendarId) {
@@ -462,6 +496,7 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
     }
 
     const meta = await loadCalendarMeta(calendar, calendarId, metaCache);
+    if (!meta && refusedForAccount(calendarId, event.id)) continue;
     if (!isWritableRole(meta?.role ?? null)) {
       const now = outbound.reloadEvent(event.id);
       if (!now) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
@@ -479,6 +514,7 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
     const moveTo = event.outbound_move_to;
     if (moveTo && moveTo !== calendarId) {
       const destMeta = await loadCalendarMeta(calendar, moveTo, metaCache);
+      if (!destMeta && refusedForAccount(moveTo, event.id)) continue;
       if (!isWritableRole(destMeta?.role ?? null)) {
         const now = outbound.reloadEvent(event.id);
         if (!now) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
@@ -515,6 +551,9 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           // gewähltes Ziel ist ein neuer Umzug, der mit diesem nicht fallen darf.
           const now = outbound.reloadEvent(event.id);
           if (now?.outbound_move_to === moveTo) handleError(err, now, 'move', clearMove);
+          // Ohne Urteil über den Termin hält eine kontoweite Absage den
+          // Durchgang trotzdem an (#2136).
+          else if (outbound.isGoogleAccountWideRefusal(err)) stop.trip(err);
           continue;
         }
       }
@@ -590,9 +629,11 @@ async function runFlushOutbound(createCalendar) {
 async function runFlushWith(createCalendar, hasDeletions, hasUpdates) {
   const { calendar } = bindToConnection(createCalendar());
   await ensureAccessToken(calendar);
-  const deleted = hasDeletions ? await processPendingDeletions(calendar) : 0;
-  const updated = hasUpdates
-    ? await processPendingUpdates(calendar, await fetchEventColorMap(calendar), new Map())
+  // Ein Stoppsignal für Löschen und Ändern (#2136).
+  const stop = outbound.createRefusalStop();
+  const deleted = hasDeletions ? await processPendingDeletions(calendar, { stop }) : 0;
+  const updated = hasUpdates && !stop.blocks()
+    ? await processPendingUpdates(calendar, await fetchEventColorMap(calendar), new Map(), { stop })
     : 0;
   return { deleted, updated };
 }
@@ -1003,9 +1044,11 @@ async function runSync(createCalendar) {
   // Inbound den alten Google-Stand über sie schreiben könnte.
   // --------------------------------------------------------
   if (!isReadonly()) {
-    const removed = await processPendingDeletions(calendar);
+    // Ein Stoppsignal für Löschen und Ändern (#2136).
+    const stop = outbound.createRefusalStop();
+    const removed = await processPendingDeletions(calendar, { stop });
     if (removed) log.info(`${removed} pending deletion(s) applied at Google.`);
-    const pushed = await processPendingUpdates(calendar, eventColorMap, metaCache);
+    const pushed = await processPendingUpdates(calendar, eventColorMap, metaCache, { stop });
     if (pushed) log.info(`${pushed} local change(s) pushed to Google.`);
   }
 
