@@ -27,6 +27,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { launchBrowser } from './chrome-executable.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUB = join(ROOT, 'public');
@@ -59,7 +60,7 @@ const api = { log: [], patch: 'ok' };
 const pageErrors = [];
 
 before(async () => {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-sandbox'] });
   page = await browser.newPage();
   // Die Sprache steht fest, bevor ein Skript der App laeuft: ohne gespeicherte
   // Wahl faellt i18n.js auf navigator.languages zurueck, und das headless

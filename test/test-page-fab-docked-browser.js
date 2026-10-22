@@ -31,6 +31,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { launchBrowser } from './chrome-executable.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUB = join(ROOT, 'public');
@@ -62,7 +63,7 @@ let browser;
 const pages = {};
 
 before(async () => {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-sandbox'] });
   for (const [name, world] of Object.entries(WORLDS)) {
     const page = await browser.newPage();
     await page.setViewport(world.viewport);

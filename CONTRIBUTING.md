@@ -493,6 +493,8 @@ npm run test:document-guards > /tmp/dg.log 2>&1; echo $?
 
 A `| tail` reports the status of `tail`, not of the run. That is not a hypothetical: v2.64.0 shipped on 2 September without this handrail because the step lived only in `docs/test-suites.md` and not in the release checklist anyone actually followed.
 
+After a Puppeteer bump, install the Chrome it pins before the run: `npx puppeteer browsers install chrome`. A machine that ran the handrail before only has the previous version in `~/.cache/puppeteer` ([#2155](https://github.com/ulsklyc/yuvomi/issues/2155)). Until then every browser start falls back to an installed system Chrome and logs a warning with both versions; that run is usable, but it is not the browser Puppeteer guarantees. To force a specific Chrome, set `PUPPETEER_EXECUTABLE_PATH=/path/to/chrome`. If that path does not exist, or no Chrome is found at all, the run stops with an error that names the install command.
+
 ---
 
 ## AI Assistance

@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import puppeteer from 'puppeteer';
+import { launchBrowser } from './chrome-executable.js';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
@@ -60,7 +61,7 @@ ${['layout', 'typography', 'list-row', 'panel', 'budget'].map(name => `<link rel
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.on('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 });
 
 /** A page whose locale is fixed before any script of the app runs. */
