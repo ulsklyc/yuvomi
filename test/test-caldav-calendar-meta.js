@@ -6,11 +6,13 @@
 // der Name trug den Umbruch. Gemessen wird an jeder Stelle, die eine
 // Kalenderliste liest: CalDAV (Konto anlegen, Zugangsdaten aendern, Kalender
 // aktualisieren), Apple (Inbound und Upload) und die Erinnerungslisten.
+// Die Namen der CardDAV-Adressbuecher kommen ueber denselben tsdav-Pfad und
+// folgen derselben Regel (#2160).
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
-import { describe, it, before } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -18,6 +20,7 @@ const dbmod = await import('../server/db.js');
 const caldav = await import('../server/services/caldav-sync.js');
 const apple = await import('../server/services/apple-calendar.js');
 const { getReminderLists } = await import('../server/services/caldav-reminders-sync.js');
+const carddav = await import('../server/services/cardav-sync.js');
 const { normalizeCalColor, calendarDisplayName } = await import('../server/utils/calendar-meta.js');
 
 const db = dbmod.get();
@@ -52,7 +55,7 @@ describe('calendar-meta: die geteilten Helfer', () => {
 
   it('es gibt nur noch EINE Fassung, und keine Lesestelle umgeht sie', () => {
     // Zwei Kopien waren der Grund, warum der Fehler an zwei Stellen stand.
-    const files = ['caldav-sync.js', 'apple-calendar.js', 'caldav-reminders-sync.js', 'caldav-outbound.js'];
+    const files = ['caldav-sync.js', 'apple-calendar.js', 'caldav-reminders-sync.js', 'caldav-outbound.js', 'cardav-sync.js'];
     for (const file of files) {
       const src = readFileSync(new URL(`../server/services/${file}`, import.meta.url), 'utf8');
       assert.ok(!/function\s+normalizeCalColor\b/.test(src), `${file}: eigene Kopie von normalizeCalColor`);
@@ -160,5 +163,45 @@ describe('Apple: Kalender-Metadaten', () => {
     });
     assert.equal(uploads.length, 1, 'der Termin muss hinaufgehen, sonst misst der Fall nichts');
     assert.deepEqual({ ...row() }, { name: 'Familie', color: '#008E9E' });
+  });
+});
+
+describe('CardDAV: Adressbuchnamen (#2160)', () => {
+  const ABOOK_URL = 'https://nas.example/carddav/kontakte/';
+  const EMPTY_URL = 'https://nas.example/carddav/leer/';
+  const serverBooks = [
+    { url: ABOOK_URL, displayName: 'Kontakte\n' },
+    { url: EMPTY_URL, displayName: ' \n' },
+  ];
+  const rows = (accountId) => Object.fromEntries(
+    db.prepare('SELECT addressbook_url, addressbook_name FROM carddav_addressbook_selection WHERE account_id = ?')
+      .all(accountId).map((r) => [r.addressbook_url, r.addressbook_name])
+  );
+  const expected = { [ABOOK_URL]: 'Kontakte', [EMPTY_URL]: 'Unnamed Addressbook' };
+
+  let accountId;
+  before(async () => {
+    carddav._mockTestConnection(async () => ({ ok: true, addressbooks: serverBooks }));
+    ({ account: { id: accountId } } = await carddav.addAccount('Synology Kontakte', 'https://nas.example/carddav/', 'u', 'p'));
+  });
+  after(() => carddav._mockTestConnection(null));
+
+  it('Konto anlegen speichert den Namen getrimmt', () => {
+    assert.deepEqual(rows(accountId), expected);
+  });
+
+  it('"Adressbuecher aktualisieren" uebernimmt ihn fuer ein Bestandskonto', async () => {
+    db.prepare("UPDATE carddav_addressbook_selection SET addressbook_name = 'alt' WHERE account_id = ?").run(accountId);
+    const result = await carddav.discoverAddressbooks(accountId);
+    assert.deepEqual(rows(accountId), expected);
+    assert.equal(result.find((a) => a.url === ABOOK_URL).name, 'Kontakte');
+  });
+
+  it('die Fehlermeldung eines Adressbuchs traegt den getrimmten Namen', async () => {
+    const client = { fetchVCards: async () => { throw new Error('nicht erreichbar'); } };
+    const named = await carddav.syncAddressbook(accountId, ABOOK_URL, client, serverBooks[0]);
+    assert.equal(named.errorMessage, 'Kontakte: nicht erreichbar');
+    const blank = await carddav.syncAddressbook(accountId, EMPTY_URL, client, serverBooks[1]);
+    assert.equal(blank.errorMessage, `${EMPTY_URL}: nicht erreichbar`);
   });
 });

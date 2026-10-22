@@ -14,6 +14,7 @@ import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
 import { createCardDAVClient } from '../utils/caldav-client.js';
+import { calendarDisplayName } from '../utils/calendar-meta.js';
 
 // --------------------------------------------------------
 // Helper Functions
@@ -502,7 +503,7 @@ async function addAccount(name, cardavUrl, username, password) {
     // Insert addressbook selections (all enabled by default)
     const addressbookData = [];
     for (const abook of addressbooks) {
-      const abookName = abook.displayName || 'Unnamed Addressbook';
+      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
 
       db.get().prepare(`
         INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
@@ -673,7 +674,7 @@ async function discoverAddressbooks(accountId) {
     // UPSERT into carddav_addressbook_selection
     const result = [];
     for (const abook of addressbooks) {
-      const abookName = abook.displayName || 'Unnamed Addressbook';
+      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
 
       // Check if exists
       const existing = db.get().prepare(`
@@ -1089,7 +1090,7 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       log.error(`Failed to fetch vCards from ${addressbookUrl}:`, err.message);
       // Die Meldung wird mit zurückgegeben, damit sie der Aufrufer am Konto
       // festhalten kann - im Log allein sieht sie niemand (#534).
-      const label = serverAddressbook?.displayName || addressbookUrl;
+      const label = calendarDisplayName(serverAddressbook?.displayName, addressbookUrl);
       return { synced: 0, errors: 1, errorMessage: `${label}: ${err.message}` };
     }
 

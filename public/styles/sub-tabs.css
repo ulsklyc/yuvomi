@@ -50,9 +50,10 @@
  * Modulkopf" (layout.css) auf, die jeder `[role="tablist"]` im Kopf eine eigene
  * Zeile gibt.
  *
- * Nutzer: seit R10 (2026-09-27) keiner - die Gesundheit hat ihre Leiste gegen
- * die Übersicht als Navigation getauscht. Die Regel bleibt für die nächste
- * Leiste im Kopf. Die Küchen-Leiste bleibt eine eigene Rail - sie
+ * Nutzer: der Schichtplan (schedule.js, seit 2026-08-27; seit R19 als
+ * Titelzeile `page-toolbar--tabs-title`). Die Gesundheit hat ihre Leiste in R10
+ * (2026-09-27) gegen die Übersicht als Navigation getauscht; hier stand danach
+ * „keiner", obwohl der Schichtplan blieb. Die Küchen-Leiste bleibt eine eigene Rail - sie
  * wechselt das MODUL und steht deshalb über dem Kopf, nicht in ihm. */
 .page-toolbar > .sub-tabs-bar {
   /* relative statt static: klebt nicht (das tut der Kopf), bleibt aber der

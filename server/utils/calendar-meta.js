@@ -3,6 +3,8 @@
  * Zweck: Farbe und Name, wie tsdav sie aus PROPFIND liest, in die Form bringen,
  *        die Yuvomi speichert. Geteilt von CalDAV, Apple und den
  *        Erinnerungslisten - vorher stand normalizeCalColor zweimal da.
+ *        `calendarDisplayName` liest auch die Namen der CardDAV-Adressbuecher
+ *        (#2160): derselbe tsdav-Pfad, dieselbe Regel.
  *
  * tsdav reicht Textknoten ungetrimmt durch (#2157): Synology schickt
  * `<calendar-color>#008E9E\n</calendar-color>` und einen `displayname` mit

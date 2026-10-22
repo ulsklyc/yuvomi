@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Now the date is taken as it is written and the time is ignored. The time zone does not move it to
   another day, because a birthday is a calendar date. Contacts already synced get their birthday
   with the next sync; a vCard file has to be imported again.
+- **The tinted scrollbar of the shopping, pantry and recipe lists keeps its width on hover.** In
+  browsers that draw it through `::-webkit-scrollbar` (Safari before 26.2), hovering the thumb
+  filled the whole 10px track instead of the 4px thumb, because the hover rule reset
+  `background-clip`. Now only the tint deepens. Current Chrome, Edge, Firefox and Safari draw the
+  standard `scrollbar-color` instead and were not affected.
 - **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
   counted months for the monthly repeat options but was always labelled in weeks. The label now
   follows the selected repeat option.
@@ -44,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
   A name that is empty after trimming falls back to the usual default. Existing accounts pick up
   the colours and names with "Refresh calendars" in the CalDAV settings.
+- **CardDAV address books keep a clean name.** (#2160) Address book names come through the same
+  path as calendar names and kept a line break or surrounding spaces from the server. They are now
+  trimmed the same way, and an empty name falls back to the usual default. Existing accounts pick
+  up the clean names with "Refresh addressbooks" in the CardDAV settings.
 - **Long region and language names are no longer cut off in the appearance settings on a
   phone.** (#2151) A region such as "United Arab Emirates" or a data language such as "Brazilian
   Portuguese" ended in "…" on a narrow screen. The setting now shows a short form ("UAE",

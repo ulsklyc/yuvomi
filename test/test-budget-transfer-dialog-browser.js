@@ -4,11 +4,18 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import puppeteer from 'puppeteer';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
 const PUBLIC = fileURLToPath(new URL('../public', import.meta.url));
+// The probe page runs in English and reads its expectations from en.json (#2147):
+// without a stored locale, i18n.js falls back to navigator.languages, and headless
+// Chrome takes those from the host (["de-DE"] on a German macOS).
+const LOCALE = 'en';
+const MESSAGES = JSON.parse(readFileSync(new URL(`../public/locales/${LOCALE}.json`, import.meta.url), 'utf8'));
+const tr = key => key.split('.').reduce((node, part) => node?.[part], MESSAGES) ?? assert.fail(`missing ${LOCALE} key ${key}`);
 const dbmod = await import('../server/db.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { todayKey } = await import('../server/utils/timezone.js');
@@ -56,6 +63,13 @@ ${['layout', 'typography', 'list-row', 'panel', 'budget'].map(name => `<link rel
   browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 });
 
+/** A page whose locale is fixed before any script of the app runs. */
+async function newPage() {
+  const page = await browser.newPage();
+  await page.evaluateOnNewDocument(locale => localStorage.setItem('yuvomi-locale', locale), LOCALE);
+  return page;
+}
+
 after(async () => {
   await browser?.close();
   server?.close();
@@ -63,7 +77,7 @@ after(async () => {
 
 
 async function withTransfer(probe) {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errors = [];
   page.on('pageerror', err => errors.push(err.message));
   try {
@@ -104,7 +118,7 @@ test('a transfer save finishing after another dialog opens leaves that dialog op
   const created = await request('POST', '/transfers', { title: 'Delayed save', amount: 10, date: '2045-01-10',
     from_account_id: accounts[0], to_account_id: accounts[1] });
   assert.equal(created.status, 201);
-  const page = await browser.newPage();
+  const page = await newPage();
   try {
     await page.goto(`${baseUrl}/__budget-probe.html`);
     await page.waitForFunction(() => window.__ready === true);
@@ -222,7 +236,7 @@ test('a currency mismatch keeps the dialog open and shows the translated account
     assert.ok(await page.$('#bt-title'), 'the transfer remains editable');
     const message = await page.$eval('#bt-to', el => document.getElementById(el.getAttribute('aria-errormessage'))?.textContent
       ?? document.getElementById(el.getAttribute('aria-describedby'))?.textContent);
-    assert.equal(message, 'Choose accounts with the same currency. Currency exchange is not supported.');
+    assert.equal(message, tr('budget.transferCurrencyMismatch'));
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM budget_entries WHERE title = 'Unsupported exchange'").get().n, 0);
   });
 });
@@ -255,8 +269,8 @@ test('transfer recurrence uses the entry toggles, interval controls and shared m
   await withTransfer(async page => {
     assert.equal(await page.$eval('#bt-recurring', el => el.closest('label').className), 'toggle');
     for (const selector of ['#bt-from', '#bt-to']) {
-      assert.deepEqual(await page.$eval(selector, el => ({ required: el.required,
-        none: [...el.options].some(option => option.textContent === 'No account'), emptyEnabled: [...el.options].some(option => !option.value && !option.disabled) })),
+      assert.deepEqual(await page.$eval(selector, (el, none) => ({ required: el.required,
+        none: [...el.options].some(option => option.textContent === none), emptyEnabled: [...el.options].some(option => !option.value && !option.disabled) }), tr('budget.noAccount')),
       { required: true, none: false, emptyEnabled: false });
     }
     await page.$eval('#bt-recurring', el => el.click());
@@ -265,7 +279,7 @@ test('transfer recurrence uses the entry toggles, interval controls and shared m
     assert.equal(await page.$eval('#bt-interval-count', el => el.closest('.rrule-interval-wrap') !== null), true);
     await page.select('#bt-interval', 'weekly');
     await page.$eval('#bt-interval-count', el => { el.value = '2'; el.dispatchEvent(new Event('input', { bubbles: true })); });
-    assert.equal(await page.$eval('#bt-interval-unit', el => el.textContent), 'weeks');
+    assert.equal(await page.$eval('#bt-interval-unit', el => el.textContent), tr('rrule.unitWeeks'));
     assert.equal(await page.$eval('#bt-confirm', el => el.closest('label').className), 'toggle');
     // The ordinary entry uses the same rendered controls.
     assert.equal(await page.$eval('#bm-interval-count', el => el.max), '99');
@@ -276,7 +290,7 @@ test('the balance keeps its mobile slot, the transfer card is conditional, and t
   db.exec('DELETE FROM budget_entries');
   const date = todayKey(db);
   db.prepare("INSERT INTO budget_entries (title, amount, category, subcategory, date, account_id, created_by) VALUES ('Ordinary purchase', -20, 'food', '', ?, ?, ?)").run(date, accounts[0], A);
-  const page = await browser.newPage();
+  const page = await newPage();
   try {
     await page.setViewport({ width: 390, height: 844 });
     await page.goto(`${baseUrl}/__budget-probe.html`);
@@ -289,9 +303,9 @@ test('the balance keeps its mobile slot, the transfer card is conditional, and t
     await page.reload();
     await page.waitForFunction(() => window.__ready === true);
     const transferRow = `.budget-entry[data-id="${entry.id}"]`;
-    assert.equal(await page.$eval(`${transferRow} .budget-badge--transfer`, el => el.textContent), 'Transfer');
+    assert.equal(await page.$eval(`${transferRow} .budget-badge--transfer`, el => el.textContent), tr('budget.typeTransfer'));
     assert.equal(await page.$eval(`${transferRow} .budget-transfer-route`, el => el.textContent), 'Checking → Savings');
-    assert.match(await page.$eval(`${transferRow} .budget-entry__title`, el => el.getAttribute('aria-label')), /Transfer/);
+    assert.match(await page.$eval(`${transferRow} .budget-entry__title`, el => el.getAttribute('aria-label')), new RegExp(tr('budget.typeTransfer')));
     const badge = await page.$eval(`${transferRow} .budget-badge--transfer`, el => {
       const style = getComputedStyle(el);
       return { display: style.display, gap: parseFloat(style.columnGap), radius: parseFloat(style.borderRadius) };
@@ -324,7 +338,7 @@ test('the balance keeps its mobile slot, the transfer card is conditional, and t
     await page.$eval(`${transferRow} .budget-entry__title`, el => el.click());
     await page.waitForSelector('#bt-delete');
     await page.$eval('#bt-delete', el => el.click());
-    await page.waitForFunction(() => document.body.textContent.includes('Delete this entire transfer series?'));
+    await page.waitForFunction(text => document.body.textContent.includes(text), {}, tr('budget.transferDeleteSeriesConfirm'));
     // Cancel keeps the linked series intact.
     await page.$eval('#confirm-modal-cancel', el => el.click());
     await page.waitForSelector('#bt-delete');
@@ -401,7 +415,7 @@ test('confirming a pending transfer uses its account currency step and preserves
   const month = await request('GET', `/?month=${todayKey(db).slice(0, 7)}`);
   const occurrence = month.body.data.find(e => e.recurrence_parent_id === created.body.data.id);
   assert.ok(occurrence);
-  const page = await browser.newPage();
+  const page = await newPage();
   try {
     await page.goto(`${baseUrl}/__budget-probe.html`);
     await page.waitForFunction(() => window.__ready === true);
