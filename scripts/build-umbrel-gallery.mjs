@@ -12,6 +12,7 @@
  */
 
 import puppeteer from 'puppeteer';
+import { launchBrowser } from '../test/chrome-executable.js';
 import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -104,7 +105,7 @@ svg.wire path { fill: none; stroke: #b3a4e4; stroke-width: 3.5; stroke-dasharray
   </div>
 </body></html>`;
 
-const browser = await puppeteer.launch();
+const browser = await launchBrowser(puppeteer);
 const page = await browser.newPage();
 await page.setViewport({ width: 2160, height: 1350, deviceScaleFactor: 1 });
 for (const s of SLIDES) {

@@ -28,6 +28,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer';
+import { launchBrowser } from './chrome-executable.js';
 import { tempDir } from './tmp-dir.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,7 +82,7 @@ before(async () => {
   const file = join(tempDir('yuvomi-metric-tile-'), 'tiles.html');
   writeFileSync(file, PAGE);
   url = pathToFileURL(file).href;
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 });
 
 after(async () => {

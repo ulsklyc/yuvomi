@@ -21,10 +21,11 @@
  * und meldet den Haenger als Fehler statt selbst zu haengen.
  *
  * Der Browser scheitert ueber `PUPPETEER_EXECUTABLE_PATH` auf eine Datei, die
- * es nicht gibt - derselbe Wurf wie ein fehlender gepinnter Chrome, nur ohne
- * vom Zustand der Maschine abzuhaengen. Einen Browser braucht die Suite also
- * nicht; sie haengt trotzdem an `test:document-guards`, weil sie wie dort einen
- * eigenen Serverprozess samt Seed hochfaehrt.
+ * es nicht gibt - ein ausdruecklich gesetzter Pfad hat keinen Rueckfall
+ * (`launchBrowser()`, #2155), der Wurf haengt damit nicht vom Zustand der
+ * Maschine ab. Einen Browser braucht die Suite also nicht; sie haengt trotzdem
+ * an `test:document-guards`, weil sie wie dort einen eigenen Serverprozess samt
+ * Seed hochfaehrt.
  */
 
 import { test } from 'node:test';

@@ -32,6 +32,7 @@
  */
 
 import puppeteer from 'puppeteer';
+import { launchBrowser } from '../test/chrome-executable.js';
 import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -292,7 +293,7 @@ body::after {
 // ── Render & export ─────────────────────────────────────────────────────────
 
 async function render(outPath, finalW, finalH) {
-  const browser = await puppeteer.launch();
+  const browser = await launchBrowser(puppeteer);
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 640, deviceScaleFactor: 2 });
   await page.setContent(html(screenshotB64), { waitUntil: 'load', timeout: 120_000 });
