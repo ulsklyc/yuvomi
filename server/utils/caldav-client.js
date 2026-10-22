@@ -206,9 +206,11 @@ const NETWORK_ERROR_NAMES = new Set(['AbortError', 'TimeoutError', 'FetchError']
 /**
  * Ist der Fehler einer der Verbindung? Das `fetch` von Node meldet ihn als
  * `TypeError: fetch failed` und hängt den Systemfehler als `cause` an;
- * node-fetch trägt den Code am Fehler selbst.
+ * node-fetch trägt den Code am Fehler selbst - so auch der googleapis-Client
+ * (gaxios), dessen Netzfehler etwa `code: 'ECONNREFUSED'` ohne `status` trägt
+ * (`googleFailureAction`, calendar-outbound.js, #2136).
  */
-function isNetworkFailure(err) {
+export function isNetworkFailure(err) {
   for (let current = err, depth = 0; current && depth < 4; current = current.cause, depth++) {
     if (NETWORK_ERROR_NAMES.has(current.name)) return true;
     // Nicht jede Ursache trägt einen Code (gesperrter Port, abgerissener Body).

@@ -26,6 +26,7 @@ import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { householdTimeZone } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
+import { calendarDisplayName } from '../utils/calendar-meta.js';
 import { outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsSnapshot } from './outbound-echo.js';
 import { findObjectWithUid } from '../utils/own-uid.js';
@@ -143,7 +144,7 @@ function applyMove(eventId, source, calendarUrl, destCal, objectUrl, accountId =
 
   const calRefId = upsertExternalCalendar(
     source, calendarUrl,
-    selected?.calendar_name || known?.name || destCal.displayName || calendarUrl,
+    selected?.calendar_name || known?.name || calendarDisplayName(destCal.displayName, calendarUrl),
     selected ? selected.calendar_color : (known?.color ?? null),
   );
   conn.prepare(

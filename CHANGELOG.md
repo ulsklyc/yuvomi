@@ -27,6 +27,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
   counted months for the monthly repeat options but was always labelled in weeks. The label now
   follows the selected repeat option.
+- **Google Calendar: a rate limit or an outage no longer drops pending deletions and changes**
+  (#2136). Until now every failed attempt counted against the five tries of each waiting
+  deletion, change and calendar move, including answers that concern the whole account: a rate
+  limit or exhausted quota (429, or 403 with that reason), a Google server error or a lost
+  connection. Since every edit triggers an immediate attempt, five edits during a rate limit were
+  enough: a deleted event stayed at Google and came back later, a change never reached Google.
+  Such answers now leave the work waiting without using up a try, and the rest of that pass sends
+  nothing more to Google. A 403 for the event itself, such as one the account may not change,
+  still counts, so it does not wait forever.
+
+- **CalDAV calendars keep their own colour and a clean name, also on Synology.** (#2157, from
+  D#2146) Some servers, Synology Calendar among them, send the colour and the name of a calendar
+  with a line break at the end. Yuvomi did not recognise such a colour, so every calendar of the
+  account showed the same default blue, and the line break stayed in the name. Colour and name are
+  now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
+  A name that is empty after trimming falls back to the usual default. Existing accounts pick up
+  the colours and names with "Refresh calendars" in the CalDAV settings.
 - **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
   (#2134) A few places show their error as a dialog after a request fails, or ask a question
   built from the server's answer: deciding a reward request, closing a pocket-money account or

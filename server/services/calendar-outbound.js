@@ -31,7 +31,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { runExternalJob } from '../utils/restore-state.js';
 import { ownUid, ownUploadRowId, parseOwnUid, findObjectWithUid } from '../utils/own-uid.js';
-import { collectionUrlOf, isAccountWideRefusal } from '../utils/caldav-client.js';
+import { collectionUrlOf, isAccountWideRefusal, isNetworkFailure } from '../utils/caldav-client.js';
 import {
   noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
@@ -125,21 +125,83 @@ export function outboundFailureAction(err, attempts) {
  * oder sein Konto gelöscht wird: eine Anfrage je Lauf statt eines
  * zurückgeholten Eintrags.
  *
- * Google bleibt bei `outboundFailureAction`: dort gilt ein 403 je nach Grund
- * dem Konto (Ratenlimit) oder dem einzelnen Termin (fremder Organisator), und
- * diese Linie nähme beide als kontoweit.
+ * Google zieht mit `googleFailureAction` eine eigene Linie: dort gilt ein 403
+ * je nach Grund dem Konto (Ratenlimit) oder dem einzelnen Termin (fremder
+ * Organisator), und diese hier nähme beide als kontoweit.
  *
  * @returns {'settled'|'give-up'|'retry'|'wait'}
  */
 export function davFailureAction(err, attempts) {
+  return waitingFailureAction(err, attempts, isAccountWideRefusal);
+}
+
+/** Die Regel mit dem Ausgang `wait`, für die Positivliste eines Providers. */
+function waitingFailureAction(err, attempts, isAccountWide) {
   const action = outboundFailureAction(err, attempts);
   if (action === 'settled') return action;
-  if (isAccountWideRefusal(err)) return 'wait';
+  if (isAccountWide(err)) return 'wait';
   return action;
 }
 
 /**
- * Stoppsignal eines Durchgangs über CalDAV (#1863). Nach der ersten
+ * Gründe eines 403 von Google, die dem Konto oder dem Projekt gelten und nicht
+ * dem Termin: Raten- und Kontingentgrenzen (#2136). Ein anderer Grund
+ * (`forbiddenForNonOrganizer`, ein nur lesbarer Kalender) oder gar keiner hängt
+ * am Eintrag.
+ */
+const GOOGLE_LIMIT_REASONS = new Set([
+  'rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded',
+]);
+
+/**
+ * Die `reason`-Werte eines Google-Fehlers. Gemessen an googleapis 185 / gaxios
+ * 7.3.1: der Fehler trägt `error.errors[]` der Antwort als `cause.errors` und
+ * unverändert unter `response.data.error.errors`; ein eigenes `errors` hat er
+ * nicht mehr (ältere Fassungen setzten es, daher wird es mitgelesen).
+ */
+export function googleErrorReasons(err) {
+  const lists = [err?.errors, err?.cause?.errors, err?.response?.data?.error?.errors];
+  const reasons = [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) if (typeof entry?.reason === 'string') reasons.push(entry.reason);
+  }
+  return reasons;
+}
+
+/**
+ * Sagt Googles Absage etwas über das Konto oder Google als Ganzes statt über
+ * den einen Termin (#2136)? Positivliste wie `isAccountWideRefusal`: 429, 5xx,
+ * ein ERKANNTER Netzfehler ohne Status und ein 403 mit einem Grund aus
+ * `GOOGLE_LIMIT_REASONS`. Ein 401 fehlt bewusst: eine abgelehnte Anmeldung
+ * kommt als `invalid_grant` und wird vor den Handlern durchgereicht
+ * (`passOnRefusal`, google-calendar.js).
+ */
+export function isGoogleAccountWideRefusal(err) {
+  const status = outboundErrorStatus(err);
+  if (typeof status !== 'number') return isNetworkFailure(err);
+  if (status === 429 || (status >= 500 && status <= 599)) return true;
+  if (status === 403) return googleErrorReasons(err).some((r) => GOOGLE_LIMIT_REASONS.has(r));
+  return false;
+}
+
+/**
+ * Dieselbe Regel wie `davFailureAction` für Google (#2136): eine kontoweite
+ * Absage (`isGoogleAccountWideRefusal`) lässt den Auftrag warten, ohne einen
+ * der fünf Versuche zu verbrauchen, und hält den Durchgang an
+ * (`createRefusalStop`, ohne Collection: Googles Grenzen gelten dem Konto).
+ * Alles andere zählt wie bisher, auch ein 403 ohne Grund, damit ein Termin,
+ * den das Konto nicht ändern darf, nicht für immer wartet.
+ *
+ * @returns {'settled'|'give-up'|'retry'|'wait'}
+ */
+export function googleFailureAction(err, attempts) {
+  return waitingFailureAction(err, attempts, isGoogleAccountWideRefusal);
+}
+
+/**
+ * Stoppsignal eines Durchgangs über CalDAV (#1863) und Google (#2136, dort
+ * immer ohne Collection, also für das ganze Konto). Nach der ersten
  * kontoweiten Absage geht in diesem Durchgang keine Anfrage mehr an das
  * Konto - weder Löschen noch Ändern; die Aufträge bleiben, ohne Versuch, für
  * den nächsten. Ein 403 sperrt nur seine Collection: er kann einem einzelnen,
@@ -528,8 +590,9 @@ export function failDeletion(id, err, { counts = true } = {}) {
 
 /**
  * Fehlerbehandlung einer vorgemerkten Löschung, geteilt von allen Providern.
- * Die Wege über CalDAV geben `davFailureAction` mit und mit `onWait`, was eine
- * kontoweite Absage anhält (#1863).
+ * Die Wege über CalDAV geben `davFailureAction` mit, Google
+ * `googleFailureAction`, und mit `onWait`, was eine kontoweite Absage anhält
+ * (#1863, #2136).
  * @returns {boolean} true, wenn der Tombstone erledigt (oder aufgegeben) ist
  */
 export function handleDeletionError(err, row, provider, { failureAction = outboundFailureAction, onWait = null } = {}) {
@@ -707,8 +770,9 @@ export function failOutbound(eventId) {
  * Fehlerbehandlung einer ausgehenden Änderung, geteilt von allen Providern.
  * `giveUp` bestimmt, was beim Aufgeben fallen gelassen wird: beim Umzug nur die
  * Umzugs-Vormerkung (clearOutboundMove), beim Push alles (clearOutbound).
- * Die Wege über CalDAV geben `davFailureAction` mit und mit `onWait`, was eine
- * kontoweite Absage anhält (#1863).
+ * Die Wege über CalDAV geben `davFailureAction` mit, Google
+ * `googleFailureAction`, und mit `onWait`, was eine kontoweite Absage anhält
+ * (#1863, #2136).
  */
 export function handleUpdateError(err, event, what, provider, giveUp = clearOutbound, { failureAction = outboundFailureAction, onWait = null } = {}) {
   const action = failureAction(err, event.outbound_attempts);
