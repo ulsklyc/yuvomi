@@ -581,21 +581,27 @@ export function createModuleReorder({ save, lock, notify = () => {}, afterSave =
     lock.saving = true;
     pending.set(list, ids);
     refresh(list);
+    let ok = true;
     try {
       await save();
     } catch (error) {
+      ok = false;
       restoreOrder(list, committed.get(list) ?? ids, idOf);
       refresh(list);
       notify(false, error);
-      return false;
     } finally {
       lock.saving = false;
       pending.delete(list);
     }
-    committed.set(list, ids);
-    notify(true);
+    if (ok) {
+      committed.set(list, ids);
+      notify(true);
+    }
+    // Auch nach einem Fehlschlag: eine waehrenddessen gemerkte Ausblendung steht
+    // schon im DOM und wurde gemeldet; sie wird jetzt mit der wiederhergestellten
+    // Reihenfolge gespeichert, statt bis zum Neuladen nur angezeigt zu bleiben.
     await afterSave();
-    return true;
+    return ok;
   }
 
   /** Ein Schritt um einen Platz unter den sortierbaren Zeilen; `focus` laeuft nach dem Umhaengen. */

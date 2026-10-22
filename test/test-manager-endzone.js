@@ -740,10 +740,16 @@ function navRig(ids, { locked = [] } = {}) {
   const answers = [];
   const lock = { saving: false, queued: false };
   const toasts = [];
+  const drained = [];
   const reorder = navigation.createModuleReorder({
     save: () => new Promise((resolve, reject) => { answers.push({ order: list.order().join(','), ok: resolve, fail: () => reject(new Error('offline')) }); }),
     lock,
     notify: (ok) => toasts.push(ok),
+    afterSave: async () => {
+      if (!lock.queued) return;
+      lock.queued = false;
+      drained.push({ order: list.order().join(','), saving: lock.saving });
+    },
   });
   reorder.adopt(list);
   const press = (id, key) => reorder.onKeydown({ key, target: rows.get(id).parts.handle, preventDefault() {} });
@@ -751,7 +757,7 @@ function navRig(ids, { locked = [] } = {}) {
     const item = rows.get(id).parts[which];
     return reorder.onClick({ target: { closest: () => item } });
   };
-  return { list, rows, reorder, focused, answers, lock, toasts, press, pick };
+  return { list, rows, reorder, focused, answers, lock, toasts, drained, press, pick };
 }
 
 test('Navigation: Pfeiltaste am Griff verschiebt die Zeile, der Fokus bleibt auf dem Griff, Labels ziehen nach', { timeout: 5000 }, async () => {
@@ -806,4 +812,16 @@ test('Navigation: scheitert das Speichern, steht wieder die gespeicherte Reihenf
   assert.deepEqual(toasts, [false]);
   assert.equal(lock.saving, false, 'die Sperre ist wieder frei');
   assert.match(rows.get('c').parts.handle['aria-label'], /"index":3/, 'das Label sagt wieder die gespeicherte Position');
+});
+
+test('Navigation: eine waehrend des Sortierens gemerkte Ausblendung wird auch nach einem Fehlschlag gespeichert', { timeout: 5000 }, async () => {
+  const { list, answers, press, lock, drained } = navRig(['a', 'b', 'c']);
+  const run = press('c', 'ArrowUp');
+  // Waehrend der Sortier-Save laeuft, blendet jemand ein Modul aus: der Ausblende-Weg merkt sich das nur.
+  lock.queued = true;
+  answers[0].fail();
+  assert.equal(await run, false);
+  assert.deepEqual(list.order(), ['a', 'b', 'c']);
+  assert.deepEqual(drained, [{ order: 'a,b,c', saving: false }], 'nachgeholt, mit der gespeicherten Reihenfolge und freier Sperre');
+  assert.equal(lock.queued, false);
 });
