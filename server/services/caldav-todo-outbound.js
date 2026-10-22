@@ -1895,7 +1895,7 @@ async function carryShoppingItem(client, accountId, collection, rowId, clientFor
  * mit (#1700). Aufgerufen für das Konto des ZIELS; die Quelle kann ein anderes
  * Konto sein (`clientFor`).
  *
- * EINE ABSAGE DES ZIELS ZÄHLT (`outbound_move_attempts`),anders als beim
+ * EINE ABSAGE DES ZIELS ZÄHLT (`outbound_move_attempts`), anders als beim
  * Anlegen: ein hier angelegter Artikel hat nur diesen einen Platz und wartet
  * dort beliebig lange. Ein umgezogener hat ein Objekt, das am alten Platz
  * weiterlebt und dort von anderen Apps gesehen und geändert wird - der
@@ -1931,6 +1931,9 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
     if (stop.blocks(collection.url)) continue;
 
     for (const listed of pendingShoppingMoves(targetListId)) {
+      // Nach einer kontoweiten Absage in diesem Durchgang: keine weitere
+      // Anfrage an das Konto (#2143).
+      if (stop.blocks(collection.url)) break;
       try {
         if (await carryShoppingItem(client, accountId, collection, listed.id, sourceFor) === 'carried') done++;
       } catch (err) {
@@ -1938,7 +1941,10 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
         if (!waitsForCarryHere(now, accountId, collection.url)) continue;
 
         // Ein unerreichbarer Server ist keine Absage: er hat nicht geantwortet.
+        // Aber er ist nicht erreichbar - für weitere Artikel in diesem Durchgang
+        // auch nicht (#2143).
         if (typeof err?.status !== 'number') {
+          stop.trip(err, collection.url);
           log.warn(`Could not carry shopping item ${now.id} to ${listUrl}: ${err.message}`);
           continue;
         }

@@ -530,6 +530,44 @@ for (const status of [429, 503]) {
   });
 }
 
+// Zwei Artikel in derselben Zielliste: eine kontoweite Absage beim ersten
+// darf nicht dazu führen, dass der zweite im selben Durchgang noch einen
+// PUT schickt (#2143).
+const UID2  = 'butter-1@other-app';
+const FILE2 = 'butter-1.ics';
+for (const status of [429, 503]) {
+  test(`Zielliste antwortet kontoweit (${status}): bei zwei wartenden Umzügen in dieselbe Liste geht nur ein PUT pro Durchgang`, async () => {
+    reset();
+    const a = mirroredList('alt');
+    const b = mirroredList('neu');
+    dav.putObject(a.url, FILE, original());
+    dav.putObject(a.url, FILE2, original({ uid: UID2, summary: 'Butter' }));
+    await remindersSync.sync();
+    const item1 = rowsOf(UID)[0];
+    const item2 = rowsOf(UID2)[0];
+    assert.ok(item1 && item2, 'beide Artikel gespiegelt');
+
+    dav.refuse({ method: 'PUT', status });
+    await patch(item1.id, { list_id: b.listId });
+    await patch(item2.id, { list_id: b.listId });
+
+    // Beide Umzüge stehen, kein Versuch verbraucht.
+    assert.equal(row(item1.id).outbound_move_attempts, 0, 'Artikel 1: kein Versuch');
+    assert.equal(row(item2.id).outbound_move_attempts, 0, 'Artikel 2: kein Versuch');
+
+    const putsBefore = dav.seen('PUT').length;
+    await remindersSync.sync();
+    assert.equal(dav.seen('PUT').length - putsBefore, 1, 'ein Durchgang = ein PUT, auch bei zwei Wartenden');
+    assert.equal(row(item1.id).outbound_move_attempts, 0, 'nach Durchgang: kein Versuch verbraucht');
+    assert.equal(row(item2.id).outbound_move_attempts, 0, 'nach Durchgang: kein Versuch verbraucht');
+
+    dav.allowAll();
+    await remindersSync.sync();
+    assert.equal(row(item1.id).list_id, b.listId, 'Artikel 1 umgezogen');
+    assert.equal(row(item2.id).list_id, b.listId, 'Artikel 2 umgezogen');
+  });
+}
+
 test('Zielliste lehnt ab (403): das Original bleibt, und nach der fuenften Absage steht der Artikel wieder, wo er war', async () => {
   const { a, b, item } = await mirroredItem();
   dav.refuse({ method: 'PUT', status: 403 });
