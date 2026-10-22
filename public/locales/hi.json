@@ -5714,6 +5714,7 @@
         "weekdaySat": "शनि",
         "weekdaySun": "रवि",
         "intervalLabelWeekly": "हर N सप्ताह में",
+        "intervalLabelMonthly": "हर N महीने में",
         "anchorDateLabel": "पहला संग्रहण",
         "monthDayLabel": "महीने का दिन",
         "monthDayLastDay": "महीने का आखिरी दिन",

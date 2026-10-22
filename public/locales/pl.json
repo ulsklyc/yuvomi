@@ -5974,6 +5974,7 @@
         "weekdaySat": "sob",
         "weekdaySun": "nie",
         "intervalLabelWeekly": "Co N tygodni",
+        "intervalLabelMonthly": "Co N miesięcy",
         "anchorDateLabel": "Pierwszy odbiór",
         "monthDayLabel": "Dzień miesiąca",
         "monthDayLastDay": "Ostatni dzień miesiąca",

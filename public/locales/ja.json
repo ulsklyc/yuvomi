@@ -5714,6 +5714,7 @@
         "weekdaySat": "土",
         "weekdaySun": "日",
         "intervalLabelWeekly": "N週間ごと",
+        "intervalLabelMonthly": "Nか月ごと",
         "anchorDateLabel": "最初の収集日",
         "monthDayLabel": "毎月の日",
         "monthDayLastDay": "月末日",

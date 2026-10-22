@@ -5714,6 +5714,7 @@
         "weekdaySat": "六",
         "weekdaySun": "日",
         "intervalLabelWeekly": "每 N 周一次",
+        "intervalLabelMonthly": "每 N 个月一次",
         "anchorDateLabel": "首次收运",
         "monthDayLabel": "每月第几天",
         "monthDayLastDay": "每月最后一天",

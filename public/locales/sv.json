@@ -5714,6 +5714,7 @@
         "weekdaySat": "lör",
         "weekdaySun": "sön",
         "intervalLabelWeekly": "Var N:e vecka",
+        "intervalLabelMonthly": "Var N:e månad",
         "anchorDateLabel": "Första hämtningen",
         "monthDayLabel": "Dag i månaden",
         "monthDayLastDay": "Sista dagen i månaden",

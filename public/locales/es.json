@@ -5714,6 +5714,7 @@
         "weekdaySat": "sáb",
         "weekdaySun": "dom",
         "intervalLabelWeekly": "Cada N semanas",
+        "intervalLabelMonthly": "Cada N meses",
         "anchorDateLabel": "Primera recogida",
         "monthDayLabel": "Día del mes",
         "monthDayLastDay": "Último día del mes",

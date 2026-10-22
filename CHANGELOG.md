@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filled the whole 10px track instead of the 4px thumb, because the hover rule reset
   `background-clip`. Now only the tint deepens. Current Chrome, Edge, Firefox and Safari draw the
   standard `scrollbar-color` instead and were not affected.
+- **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
+  counted months for the monthly repeat options but was always labelled in weeks. The label now
+  follows the selected repeat option.
 
 ## [2.79.0] - 2026-10-22
 

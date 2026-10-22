@@ -5714,6 +5714,7 @@
         "weekdaySat": "T7",
         "weekdaySun": "CN",
         "intervalLabelWeekly": "Mỗi N tuần",
+        "intervalLabelMonthly": "Mỗi N tháng",
         "anchorDateLabel": "Lần thu gom đầu tiên",
         "monthDayLabel": "Ngày trong tháng",
         "monthDayLastDay": "Ngày cuối cùng của tháng",
