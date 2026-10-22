@@ -1324,6 +1324,8 @@
         "mvRemove": "Alisin ang entry",
         "birthdayLabel": "Kaarawan",
         "showBirthday": "Ipakita sa mga kaarawan",
+        "addToBirthdays": "Idagdag sa mga kaarawan",
+        "addedToBirthdays": "Naidagdag sa mga kaarawan.",
         "birthdayHint": "Lumalabas din sa kalendaryo sa pamamagitan ng pag-import ng kaarawan.",
         "phonePlaceholder": "+63 …",
         "phonePreview": "Preview: {{value}}",

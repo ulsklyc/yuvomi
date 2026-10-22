@@ -1305,6 +1305,8 @@
         "mvRemove": "Rimuovi voce",
         "birthdayLabel": "Compleanno",
         "showBirthday": "Mostra nei compleanni",
+        "addToBirthdays": "Aggiungi ai compleanni",
+        "addedToBirthdays": "Aggiunto ai compleanni.",
         "birthdayHint": "Compare anche nel calendario tramite l’importazione dei compleanni.",
         "phonePlaceholder": "+39 …",
         "phonePreview": "Anteprima: {{value}}",

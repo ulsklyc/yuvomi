@@ -1525,6 +1525,8 @@
         "mvRemove": "إزالة الإدخال",
         "birthdayLabel": "عيد الميلاد",
         "showBirthday": "عرض في أعياد الميلاد",
+        "addToBirthdays": "إضافة إلى أعياد الميلاد",
+        "addedToBirthdays": "تمت الإضافة إلى أعياد الميلاد.",
         "birthdayHint": "يظهر أيضًا في التقويم عبر استيراد أعياد الميلاد.",
         "phonePlaceholder": "+966 …",
         "phonePreview": "معاينة: {{value}}",

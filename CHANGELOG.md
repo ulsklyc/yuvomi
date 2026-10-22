@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A contact with a birthday can be added to Birthdays from its detail view** (#2149). Until now
+  only contacts whose birthday had been imported showed a way to Birthdays. A contact with a birth
+  date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same
+  linked entry as the import from contacts, and the row then shows "Show in birthdays". The button
+  only appears for members who may edit the calendar, the module Birthdays belongs to.
+
 ### Changed
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it

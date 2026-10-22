@@ -1451,6 +1451,8 @@
         "mvRemove": "Видалити запис",
         "birthdayLabel": "День народження",
         "showBirthday": "Показати в днях народження",
+        "addToBirthdays": "Додати до днів народження",
+        "addedToBirthdays": "Додано до днів народження.",
         "birthdayHint": "Через імпорт днів народження зʼявляється і в календарі.",
         "phonePlaceholder": "+380 …",
         "phonePreview": "Попередній перегляд: {{value}}",

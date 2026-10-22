@@ -1305,6 +1305,8 @@
         "mvRemove": "Ta bort post",
         "birthdayLabel": "Födelsedag",
         "showBirthday": "Visa i födelsedagar",
+        "addToBirthdays": "Lägg till i födelsedagar",
+        "addedToBirthdays": "Tillagd i födelsedagar.",
         "birthdayHint": "Visas också i kalendern via födelsedagsimporten.",
         "phonePlaceholder": "+46 …",
         "phonePreview": "Förhandsvisning: {{value}}",

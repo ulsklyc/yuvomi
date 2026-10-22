@@ -1305,6 +1305,8 @@
         "mvRemove": "Fjern oppføring",
         "birthdayLabel": "Bursdag",
         "showBirthday": "Vis i bursdager",
+        "addToBirthdays": "Legg til i bursdager",
+        "addedToBirthdays": "Lagt til i bursdager.",
         "birthdayHint": "vises også i kalenderen via bursdagsimport.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Forhåndsvisning: {{value}}",

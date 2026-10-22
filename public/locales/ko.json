@@ -1324,6 +1324,8 @@
         "mvRemove": "항목 제거",
         "birthdayLabel": "생일",
         "showBirthday": "생일에서 보기",
+        "addToBirthdays": "생일에 추가",
+        "addedToBirthdays": "생일에 추가했습니다.",
         "birthdayHint": "생일 가져오기를 통해 캘린더에도 표시됩니다.",
         "phonePlaceholder": "+82 …",
         "phonePreview": "미리보기: {{value}}",

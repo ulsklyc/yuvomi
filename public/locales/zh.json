@@ -1305,6 +1305,8 @@
         "mvRemove": "移除条目",
         "birthdayLabel": "生日",
         "showBirthday": "在生日中查看",
+        "addToBirthdays": "添加到生日",
+        "addedToBirthdays": "已添加到生日。",
         "birthdayHint": "通过生日导入也会显示在日历中。",
         "phonePlaceholder": "+86 …",
         "phonePreview": "预览：{{value}}",

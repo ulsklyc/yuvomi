@@ -1305,6 +1305,8 @@
         "mvRemove": "Remover entrada",
         "birthdayLabel": "Aniversário",
         "showBirthday": "Mostrar nos aniversários",
+        "addToBirthdays": "Adicionar aos aniversários",
+        "addedToBirthdays": "Adicionado aos aniversários.",
         "birthdayHint": "Também aparece no calendário através da importação de aniversários.",
         "phonePlaceholder": "+55 …",
         "phonePreview": "Pré-visualização: {{value}}",

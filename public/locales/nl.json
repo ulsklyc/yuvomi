@@ -1305,6 +1305,8 @@
         "mvRemove": "Item verwijderen",
         "birthdayLabel": "Verjaardag",
         "showBirthday": "Tonen bij verjaardagen",
+        "addToBirthdays": "Toevoegen aan verjaardagen",
+        "addedToBirthdays": "Toegevoegd aan verjaardagen.",
         "birthdayHint": "Verschijnt via de verjaardagsimport ook in de kalender.",
         "phonePlaceholder": "+31 …",
         "phonePreview": "Voorbeeld: {{value}}",

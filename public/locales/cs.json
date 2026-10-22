@@ -1378,6 +1378,8 @@
         "mvRemove": "Odebrat záznam",
         "birthdayLabel": "Narozeniny",
         "showBirthday": "Zobrazit v narozeninách",
+        "addToBirthdays": "Přidat do narozenin",
+        "addedToBirthdays": "Přidáno do narozenin.",
         "birthdayHint": "Přes import narozenin se zobrazí i v kalendáři.",
         "phonePlaceholder": "+420 …",
         "phonePreview": "Náhled: {{value}}",

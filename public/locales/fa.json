@@ -1324,6 +1324,8 @@
         "mvRemove": "حذف ورودی",
         "birthdayLabel": "تولد",
         "showBirthday": "نمایش در تولدها",
+        "addToBirthdays": "افزودن به تولدها",
+        "addedToBirthdays": "به تولدها افزوده شد.",
         "birthdayHint": "از طریق واردکردن تولدها در تقویم هم نمایش داده می‌شود.",
         "phonePlaceholder": "+98 …",
         "phonePreview": "پیش‌نمایش: {{value}}",

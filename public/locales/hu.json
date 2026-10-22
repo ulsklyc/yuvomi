@@ -1305,6 +1305,8 @@
         "mvRemove": "Bejegyzés eltávolítása",
         "birthdayLabel": "Születésnap",
         "showBirthday": "Megjelenítés a születésnapoknál",
+        "addToBirthdays": "Hozzáadás a születésnapokhoz",
+        "addedToBirthdays": "Hozzáadva a születésnapokhoz.",
         "birthdayHint": "A születésnap-importtal a naptárban is megjelenik.",
         "phonePlaceholder": "+36 …",
         "phonePreview": "Előnézet: {{value}}",
