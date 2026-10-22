@@ -2239,6 +2239,9 @@ function restoreMetaFocus(panel) {
 
 /** Neue Reihenfolge einer Liste speichern - Pfeiltaste, Menue und Drag-Ende teilen diesen Weg. */
 function persistMetaOrder(list, ids) {
+  // Der Riegel am Schreibweg selbst: Pfeiltaste, Menue und Drag-Ende kommen
+  // alle hier vorbei (Nur-lesen-Regel, test:budget-readonly-ui).
+  if (readOnly()) return null;
   const key = list.id.includes('category') ? 'categories' : 'payment_methods';
   return saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
 }

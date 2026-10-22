@@ -1065,6 +1065,10 @@
   font: inherit;
   text-align: start;
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
   cursor: pointer;
 }
 

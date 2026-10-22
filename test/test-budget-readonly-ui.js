@@ -1016,7 +1016,9 @@ test('der Riegel sitzt an BEIDEN Enden: jedes Speichern im offenen Dialog fragt 
   for (const [name, re] of [
     ['Kategorie anlegen', /'#subscription-add-category'\)\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
     ['Zahlungsart anlegen', /'#subscription-add-method'\)\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
-    ['verschieben', /'\[data-move\]'\)\.forEach\(\(button\) => \{\n\s*button\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
+    // Seit #2152 verschieben Menue, Pfeiltaste am Griff und Ziehen ueber EINEN
+    // Schreibweg; der Riegel sitzt dort.
+    ['verschieben', /function persistMetaOrder\(list, ids\) \{\n(?:\s*\/\/.*\n)*\s*if \(readOnly\(\)\) return null;/],
     ['umbenennen', /'\[data-act="save"\]'\)\.forEach\(\(button\) => \{\n\s*button\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
     ['loeschen', /'\[data-act="delete"\]'\)\.forEach\(\(button\) => \{\n\s*button\.addEventListener\('click', async \(\) => \{\n\s*if \(readOnly\(\)\) return;/],
   ]) assert.match(ABOS_CODE, re, `Abo-Metadaten: ${name} fragt nicht`);
