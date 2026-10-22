@@ -13,12 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same
   linked entry as the import from contacts, and the row then shows "Show in birthdays". The button
   only appears for members who may edit the calendar, the module Birthdays belongs to.
-- **Traditional Chinese as the 27th language** (#1320, translated by @TW199501). The app, the web
-  installer and the command-line installer speak Traditional Chinese (`zh-Hant`), next to the
-  existing Simplified `zh`. A browser or shell from Taiwan, Hong Kong or Macau (`zh-TW`,
-  `LANG=zh_TW.UTF-8`) picks it on its own; mainland China and Singapore keep `zh`. The new region
-  "Chinese (Traditional, Taiwan)" sets New Taiwan dollars, YYYY/MM/DD and the 12-hour clock in one
-  step, and TWD can now be picked anywhere a currency is chosen.
+- **Traditional Chinese as the 27th language** (#2172, from #1670, translated by @TW199501). The
+  app, the web installer and the command-line installer speak Traditional Chinese (`zh-Hant`),
+  written in Taiwan usage, next to the existing Simplified `zh`. A browser or shell from Taiwan,
+  Hong Kong or Macau (`zh-TW`, `LANG=zh_TW.UTF-8`) picks it on its own, and so does `?lang=zh-TW`
+  in the API; mainland China and Singapore keep `zh`. Both entries now name their script: the
+  language pickers show "Chinese (Simpl.)" and "Chinese (Trad.)" instead of a plain "Chinese", and
+  the web installer 简体中文 and 繁體中文. New regions set the currency, date format and 12-hour clock in one step: Taiwan with
+  New Taiwan dollars and YYYY/MM/DD, Hong Kong and Macau with Hong Kong dollars and patacas and
+  D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
