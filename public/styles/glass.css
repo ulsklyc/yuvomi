@@ -131,21 +131,14 @@
    *
    * Er ist dort auch kein Chrome mehr, sondern ein Knopf im Inhalt, und für
    * den gilt die Primärknopf-Form aus DESIGN.md: deckende Fläche, kein Blur,
-   * kein Sheen. Dieselbe Regel, die Glas ohnehin auf die Shell beschränkt. */
-  .page-fab--docked {
-    /* `var(--neutral-950)` und NICHT das Literal `#0E0D0B` (Critique
-     * 2026-08-13, zweite Runde). Beide sind im hellen Theme derselbe Wert -
-     * aber das Token kippt im Dunkelmodus auf `#FBFAF7`, und genau das ist
-     * hier gewollt: der angedockte Knopf soll gegen den Grund seines Themes
-     * mischen, nicht immer gegen Schwarz. Als Literal war die
-     * Theme-Abhaengigkeit beim Kopieren verlorengegangen. */
-    background-color: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950));
-    box-shadow: var(--shadow-sm);
-  }
-
-  .page-fab--docked:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 76%, var(--neutral-950));
-  }
+   * kein Sheen. Dieselbe Regel, die Glas ohnehin auf die Shell beschränkt.
+   *
+   * EINE EIGENE REGEL BRAUCHT ER DAFÜR NICHT. Fläche, Hover und Schatten
+   * kommen von `.btn--primary` (layout.css und Abschnitt 4 unten): dieselbe
+   * 88-%/76-%-Mischung gegen `--neutral-950`, das im Dunkelmodus mitkippt.
+   * Bis 2026-10-22 stand hier eine `.page-fab--docked`-Regel, die Fläche und
+   * Hover wortgleich wiederholte; ihr Schatten verlor gegen `.btn--primary` in
+   * Abschnitt 4 (test:page-fab-docked-browser). */
 }
 
 /* ================================================================

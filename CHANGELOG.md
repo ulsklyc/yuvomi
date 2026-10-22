@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   question that no longer fits is not asked; for a module that already exists, the install card
   says so. If the participants list fails to load after you moved on, nothing is shown, because
   its dialog would not open anyway.
+- **Buttons on a touch tablet in landscape are finger-sized again.** From 1024px wide, buttons
+  switched to the mouse size of 40px by window width alone, so an iPad in landscape got 40px
+  instead of 48px, including the create button in the page header ("+ Task", "+ Recipe"). They
+  now take the mouse size only where a mouse or trackpad is the pointer. With a mouse nothing
+  changes. The create button in the page header also no longer pops in from half size on first
+  load: the header stays still.
 
 ## [2.79.0] - 2026-10-22
 
