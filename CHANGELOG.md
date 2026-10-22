@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Yuvomi keeps `client_secret_basic` unless the provider's discovery document offers
   `client_secret_post` only.
 
+- **CalDAV calendars keep their own colour and a clean name, also on Synology.** (#2157, from
+  D#2146) Some servers, Synology Calendar among them, send the colour and the name of a calendar
+  with a line break at the end. Yuvomi did not recognise such a colour, so every calendar of the
+  account showed the same default blue, and the line break stayed in the name. Colour and name are
+  now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
+  A name that is empty after trimming falls back to the usual default. Existing accounts pick up
+  the colours and names with "Refresh calendars" in the CalDAV settings.
+
 ## [2.79.0] - 2026-10-22
 
 ### Added
