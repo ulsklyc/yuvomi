@@ -211,8 +211,11 @@ export const CHILD_START_PERMISSIONS = Object.freeze({
 // das Kind in seinen Einstellungen selbst umschaltet. Gemessen sah ein Kind
 // "Zyklus" und "Fasten" in der Bereichsliste, obwohl die Gesundheit selbst
 // sagt, beides sei Erwachsenensache; das Fasten nimmt schon die Capability
-// oben, der Zyklus braucht diese Zeile. Wie die Rechte: nur beim Anlegen, nie
-// rueckwirkend, und nur, wo noch nichts steht. Der Schluessel folgt
+// oben, der Zyklus braucht diese Zeile. Wie die Rechte: beim Anlegen, und nur,
+// wo noch nichts steht. Fuer Kinder von vor v2.79.0 hat Migration 258 (#2148)
+// dieselbe Zeile einmal nachgezogen, als eingefrorene Kopie - eine Aenderung
+// hier erreicht sie nicht mehr, und das Fasten blieb dort bewusst aussen vor.
+// Der Schluessel folgt
 // `userCfgKey()` (preferences.js): `<key>:user:<id>` in `sync_config`.
 export const CHILD_START_PREFERENCES = Object.freeze({ health_cycle_enabled: '0' });
 
