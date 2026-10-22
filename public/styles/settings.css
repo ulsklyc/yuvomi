@@ -3629,7 +3629,7 @@
 /* Widget-Zeilen leiser als Module (kleineres Icon, sekundäre Farbe). */
 .perm-row--widget { padding-top: var(--space-2); padding-bottom: var(--space-2); }
 .perm-row--widget .perm-row__label { color: var(--color-text-secondary); }
-.perm-row__wicon { width: 15px !important; height: 15px !important; color: var(--color-text-tertiary) !important; }
+.perm-row__wicon { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-tertiary); }
 
 /* Der Name bricht um statt abzuschneiden (R21): neben Stufen mit Wort blieb
  * "Gemeinsame Notizkategorien verwalten" bei 1280 sonst als "Gemeinsame Not..." */

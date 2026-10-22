@@ -13962,6 +13962,39 @@ test('die Groesse des Icon-Knopfs gehoert der Shell', () => {
 });
 
 /**
+ * REGEL (2026-10-22): Auch der Textknopf schaltet seine Hoehe nach der
+ * ZEIGERFAEHIGKEIT, nicht nach der Breite.
+ *
+ * `.btn` stand ab `@media (min-width: 1024px)` auf `--target-md` - derselbe
+ * Fehler, den der Guard darueber fuer `.btn--icon` schon festhaelt. Ein Tablet
+ * im Querformat (1180px, `hover: none`) bekam damit 40px statt `--target-lg`,
+ * jeder Knopf im Kopf und der angedockte Primaerknopf ("+ Nomen") mit ihm
+ * (gemessen in test:page-fab-docked-browser). Die 40px am Zeiger bleiben: die
+ * Regel bekommt die Zeigerfaehigkeit als zweite Bedingung, die Breite allein
+ * schaltet nichts mehr.
+ */
+test('die Hoehe des Textknopfs schaltet nach der Zeigerfaehigkeit', () => {
+  const rules = [...eachRule(read('../public/styles/layout.css'))]
+    .filter((rule) => rule.selector.split(',').some((s) => s.trim() === '.btn'))
+    .filter((rule) => /(?:^|;)\s*min-height\s*:/.test(rule.body));
+
+  const base = rules.find((rule) => rule.at.length === 0);
+  assert.ok(base, '.btn braucht eine Basisregel mit min-height in layout.css.');
+  assert.match(base.body, /min-height:\s*var\(--target-lg\)/,
+    'Die Basis ist die Fingergroesse: was nicht weiss, dass ein Zeiger da ist, bekommt 48px.');
+
+  const bare = rules
+    .filter((rule) => rule.at.length > 0)
+    .filter((rule) => !rule.at.some((at) => /\(\s*hover\s*:\s*hover\s*\)|\(\s*pointer\s*:\s*fine\s*\)/.test(at)))
+    .map((rule) => rule.at.join(' | '));
+  assert.deepEqual(bare, [],
+    'Ein Block, der die Hoehe von .btn nur nach der Breite umschaltet, gibt einem '
+    + 'Touch-Tablet ab 1024px die Zeigergroesse (40px statt 48px).');
+  assert.ok(rules.some((rule) => rule.at.length > 0 && /min-height:\s*var\(--target-md\)/.test(rule.body)),
+    'Am Zeiger bleibt .btn bei --target-md - der Guard misst nur, solange es die Stufe gibt.');
+});
+
+/**
  * REGEL (Redesign Runde 6, Phase 0): Der Modulkopf ist genau EINE
  * `.page-toolbar`, verdrahtet von der Shell. Kein Modul setzt eine eigene
  * Flex-Richtung, keine zweite Titelgroesse und kein `--page-toolbar-lead`. Eine
@@ -22525,7 +22558,12 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 // public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
 // Stand 2026-10-21 (D13, Critique R21): 28 - die globale `[hidden]`-Regel in
 // reset.css kam dazu, sieben Rettungsregeln mit `!important` gingen.
-const IMPORTANT_CEILING = 28;
+// Stand 2026-10-22 (#2150): 15 - die 13 Spezifitaets-Umgehungen sind weg
+// (Rueckmelde-Zustaende der Knoepfe ueber `button.` + eigenes `:hover`, die
+// Liquid-Leiste, der Nur-lesen-FAB und das Rechte-Zeilen-Icon gewannen schon
+// ohne). Uebrig sind nur gewollte: reduzierte Bewegung, Druck, die globale
+// `[hidden]`-Regel und Glas aus.
+const IMPORTANT_CEILING = 15;
 test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
   const dir = new URL('../public/styles/', import.meta.url);
   const found = [];
@@ -22536,7 +22574,7 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
       }
     }
   }
-  assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
+  assert.ok(found.length > 10, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
   assert.ok(found.length <= IMPORTANT_CEILING,
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
 });

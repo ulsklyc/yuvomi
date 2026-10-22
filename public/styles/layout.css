@@ -5928,15 +5928,22 @@ a.popover-menu__item {
 @media (min-width: 1024px) {
   /* Der angedockte FAB IST der Toolbar-Knopf (siehe dockFabIntoToolbar in
    * router.js): dieselbe Node, dieselbe Verdrahtung, nur ohne die schwebende
-   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`. */
+   * Geometrie. Die Kapsel und die Stimme kommen von `.btn--primary`.
+   *
+   * NUR, WAS `.btn` NICHT SETZT. Höhe, Polster, Lücke und Schatten gehören
+   * `.btn`/`.btn--primary` - gleiche Spezifität, später in der Datei. Die
+   * eigenen Werte (44px, 4px Lücke) standen hier seit dem Andocken und griffen
+   * nie (gemessen 2026-10-22). So misst der Knopf, was jeder Knopf im Kopf
+   * misst: `--target-md` am Zeiger, `--target-lg` am Finger.
+   *
+   * `animation: none`, weil `fab-in` an `.page-fab` hängt und die Klasse
+   * bleibt. Der Kopf steht beim Seitenwechsel still (R18); die Pille darin fuhr
+   * beim Kaltstart trotzdem von halber Größe herein. */
   .page-fab--docked {
     position: static;
     width: auto;
     height: auto;
-    min-height: var(--target-base);
-    padding-inline: var(--space-4);
-    gap: var(--space-1);
-    box-shadow: var(--shadow-sm);
+    animation: none;
   }
 }
 
@@ -7900,7 +7907,11 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   white-space: nowrap;
 }
 
-@media (min-width: 1024px) {
+/* Am Zeiger die Mausgröße - nach der Zeigerfähigkeit, nicht nach der Breite
+ * allein (tokens.css, DESIGN.md). Ein Tablet im Querformat (1180px,
+ * `hover: none`) bekam hier 40px statt der Fingergröße, jeder Knopf im Kopf
+ * und der angedockte Primärknopf mit ihm (test:page-fab-docked-browser). */
+@media (min-width: 1024px) and (hover: hover) {
   .btn {
     min-height: var(--target-md);
   }
@@ -10316,17 +10327,37 @@ html:has(.app-page.is-selecting) {
   animation: btn-shake var(--duration-xl) var(--ease-out);
 }
 
+/* DIE RUECKMELDE-ZUSTAENDE (Fehler, Erfolg, Laden) schlagen jede Variante
+ * des Knopfes, auch im Hover - ohne `!important` (#2150). Die Gegner sind
+ * `.btn--<variante>` (0,1,0), ihr `:hover` (0,2,0) und `.quick-add__btn:hover`
+ * (0,2,0) in shopping.css, das NACH layout.css laedt; Quellreihenfolge allein
+ * reicht also nicht. `button.<zustand>:is(:enabled, :disabled)` hebt ihn auf
+ * (0,2,1) und trifft trotzdem JEDEN Knopf, denn jeder ist eins von beiden.
+ * Ein eigenes `:hover` waere dieselbe Spezifitaet, stuende aber als neue
+ * ungeschuetzte Hover-Regel in der Sperrklinke von test-motion.js - und unter
+ * `(hover: hover)` verloere der Zustand auf Touch gegen das klebende Hover der
+ * Variante. Jeder Traeger ist ein <button> (btnError, btnSuccess, btnLoading,
+ * withBusy, _flashAddBtn in shopping.js). Wer einen Kontext-Selektor ab
+ * (0,2,1) auf Hintergrund oder Schrift eines Knopfes setzt, muss diese
+ * Zustaende mitdenken. */
+
 /* prefers-reduced-motion: kein Schütteln, nur Farb-Feedback */
 .btn--error-static {
-  background-color: var(--color-danger) !important;
-  color: var(--color-ink-on-vivid) !important;
   pointer-events: none;
 }
 
+button.btn--error-static:is(:enabled, :disabled) {
+  background-color: var(--color-danger);
+  color: var(--color-ink-on-vivid);
+}
+
 .btn--success {
-  background-color: var(--color-success) !important;
-  color: var(--color-ink-on-vivid) !important;
   pointer-events: none;
+}
+
+button.btn--success:is(:enabled, :disabled) {
+  background-color: var(--color-success);
+  color: var(--color-ink-on-vivid);
 }
 
 /* Button loading state: hides text, shows spinner.
@@ -10340,8 +10371,11 @@ html:has(.app-page.is-selecting) {
 
 .btn--loading {
   position: relative;
-  color: transparent !important;
   pointer-events: none;
+}
+
+button.btn--loading:is(:enabled, :disabled) {
+  color: transparent;
 }
 
 .btn--loading::after {
@@ -11072,15 +11106,15 @@ textarea.input { resize: vertical; }
 
 /* Kein statischer Hintergrund und kein Shadow-Highlight wenn Indikator aktiv */
 .nav-sidebar__items--liquid .nav-item[aria-current="page"] {
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Kein statischer Hover-Hintergrund wenn Liquid-Indikator aktiv —
  * das separate .nav-sidebar__hover-Element übernimmt die Vorschau (via router.js). */
 .nav-sidebar__items--liquid .nav-item:hover:not([aria-current="page"]) {
-  background: transparent !important;
-  box-shadow: none !important;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* DIE PILLE DES GEPINNTEN EINTRAGS (Critique 2026-10-16). Dieselbe Klasse wie
@@ -11295,7 +11329,7 @@ textarea.input { resize: vertical; }
  * (#467, Codex-Review zu PR #754) - der Knopf ist weg, der Selektor mit ihm. */
 html[data-module-readonly] .page-fab,
 html[data-module-readonly] .notes-manage-categories {
-  display: none !important;
+  display: none;
 }
 
 /* Und ohne Knopf kein Nachlauf - die Paarung aus Etappe 6 (jede
