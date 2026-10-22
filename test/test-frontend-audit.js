@@ -348,16 +348,28 @@ const LATE_MODAL_BESTAND = {
     'pages/waste.js': 0,
     'settings/pages/admin-family.js': 0,
   },
+  // #2134: confirmModal() geht durch openModal() und verdraengt genauso, was
+  // im Slot liegt - als Fehlermeldung nach einer gescheiterten Anfrage oder
+  // als Frage, die aus einer Antwort entsteht.
+  confirm: {
+    'pages/documents.js': 0,
+    'pages/rewards.js': 0,
+    'settings/pages/modules-install.js': 0,
+    'settings/pages/modules-rewards.js': 0,
+    'settings/pages/sync-calendar.js': 0,
+  },
 };
 
 const LATE_MODAL_RAT = {
   close: 'den Kontext VOR der Anfrage festhalten (captureModalContext()) und closeModal({ force: true, context }) geben',
   open: 'den Kontext VOR der Anfrage festhalten (captureOpenContext() - der neueste Oeffnungswunsch gilt) und nach der Antwort '
     + '`if (!isModalContextCurrent(context)) return;` vor openModal()',
+  confirm: 'den Kontext VOR der Anfrage festhalten und confirmModal() nur rufen, solange isModalContextCurrent(context) gilt - '
+    + 'eine Fehlermeldung geht sonst als Toast, eine Frage entfaellt (captureModalContext(), fuer eine Frage aus der Antwort captureOpenContext())',
 };
 
-test('kein neues closeModal()/openModal() mit einer Antwort ohne den Kontext des eigenen Dialogs (#1997, Ratsche)', () => {
-  const ist = { close: {}, open: {} };
+test('kein neues closeModal()/openModal()/confirmModal() mit einer Antwort ohne den Kontext des eigenen Dialogs (#1997, #2134, Ratsche)', () => {
+  const ist = { close: {}, open: {}, confirm: {} };
   let gescannt = 0;
   for (const path of walkJsFiles('../public/')) {
     if (path.includes('/vendor/') || path.endsWith('/components/modal.js')) continue;
@@ -368,8 +380,8 @@ test('kein neues closeModal()/openModal() mit einer Antwort ohne den Kontext des
     }
   }
   assert.ok(gescannt >= 100, `nur ${gescannt} Frontend-Dateien gescannt - der Scan greift nicht mehr`);
-  for (const kind of ['close', 'open']) {
-    const name = kind === 'close' ? 'closeModal()' : 'openModal()';
+  for (const kind of ['close', 'open', 'confirm']) {
+    const name = `${kind}Modal()`;
     const files = new Set([...Object.keys(ist[kind]), ...Object.keys(LATE_MODAL_BESTAND[kind])]);
     for (const file of [...files].sort()) {
       const lines = ist[kind][file] ?? [];
@@ -429,7 +441,33 @@ test('der Spaet-Dialog-Scanner erkennt das Muster, das er zaehlt', () => {
   // Ein await, das nie zum Aufruf fuehrt: der Block davor endet mit return.
   assert.deepEqual(zaehle('async function s() { if (!x) { await confirmModal("a"); return; } openModal({}); }'), []);
   assert.deepEqual(zaehle('async function s() { try { r = await api.get(1); } catch (e) { await confirmModal("a"); return; } openModal({}); }'),
-    ['open/await/offen'], 'das await im try fuehrt weiter, nur das im catch nicht');
+    ['open/await/offen', 'confirm/await/offen'],
+    'das await im try fuehrt weiter, nur das im catch nicht - und die Meldung im catch kommt selbst erst mit der Antwort');
+
+  // #2134: confirmModal() oeffnet ueber openModal() - als Meldung nach einem
+  // Fehlschlag und als Frage aus einer Antwort, auch unter einem Alias.
+  assert.deepEqual(zaehle('async function s() { try { await api.del(1); } catch (e) { await confirmModal(e.message); } }'), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`import { confirmModal as ask } from '/components/modal.js';
+    async function s() { const r = await api.get(1); if (await ask("a")) go(); }`), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`async function s() { const d = captureModalContext(); try { await api.del(1); }
+    catch (e) { if (isModalContextCurrent(d)) await confirmModal(e.message); else toast(e.message); } }`), ['confirm/await/geschuetzt']);
+  // Die Antwort auf eine Rueckfrage gibt der Nutzer im offenen Dialog: eine
+  // zweite Frage danach ist keine spaete - wohl aber, wenn davor eine Anfrage lief.
+  assert.deepEqual(zaehle('async function s() { if (!(await confirmModal("a"))) return; await confirmModal("b"); }'), []);
+  assert.deepEqual(zaehle('async function s() { await api.get(1); if (!(await confirmModal("a"))) return; await confirmModal("b"); }'),
+    ['confirm/await/offen', 'confirm/await/offen']);
+  // Ein anderer Zweig derselben Weiche erreicht den Aufruf nie; ein Zweig mit
+  // demselben Wert oder einer anderen Bedingung schon.
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.x === 'delete') { await confirmModal("a"); } }`), []);
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.y === 'delete') { await confirmModal("a"); } }`), ['confirm/await/offen']);
+  assert.deepEqual(zaehle(`async function s(a) { if (a.x === 'test') { await api.post(1); }
+    if (a.x === 'test') { await confirmModal("a"); } }`), ['confirm/await/offen']);
+  // Ein frueherer Zweig derselben if/else-Kette ebenso - hinter der Kette nicht.
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else { await confirmModal("a"); } }'), []);
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else if (b) { x(); } else { await confirmModal("a"); } }'), []);
+  assert.deepEqual(zaehle('async function s() { if (a) { await api.get(1); } else { y(); } await confirmModal("a"); }'), ['confirm/await/offen']);
 });
 
 // #2069: ist das Schreiben angekommen, gilt der Eintrag als gespeichert. Ein

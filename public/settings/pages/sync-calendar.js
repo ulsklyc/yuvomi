@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import {
   captureModalContext,
+  captureOpenContext,
   closeModal,
   confirmModal,
   isModalContextCurrent,
@@ -191,8 +192,12 @@ function bindDefaultAssigneeBackfill(container) {
   };
 
   btn.addEventListener('click', async () => {
+    // loadPage() gibt ohne seinen Kontext schon null zurueck; die Frage, die
+    // aus der Antwort entsteht, prueft ihn hier noch einmal dort, wo der
+    // Scanner aus test/late-modal-close.js ihn sieht (#2134).
+    const context = captureOpenContext();
     let page = await loadPage(null);
-    if (!page) return;
+    if (!page || !isModalContextCurrent(context)) return;
     if (page.count === 0 && page.moved.length === 0) {
       showToast(t('settings.sync.backfillNone'));
       return;

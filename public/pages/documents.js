@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -1841,6 +1841,9 @@ function folderDeleteChoice(folder, impact) {
 async function deleteFolder(folder) {
   if (readOnly()) return;
   const owner = _container;
+  // Die Frage entsteht erst aus der Vorschau (#2134): wer inzwischen einen
+  // Dialog geoeffnet oder die Seite verlassen hat, bekommt sie nicht daruebergelegt.
+  const context = captureOpenContext();
   let impact;
   try {
     const response = await api.get(`/documents/folders/${folder.id}/delete-impact`);
@@ -1849,6 +1852,7 @@ async function deleteFolder(folder) {
     reportError(err, { owner });
     return;
   }
+  if (!isModalContextCurrent(context)) return;
 
   let choice;
   if (impact.documents > 0 || !impact.can_delete_documents) {

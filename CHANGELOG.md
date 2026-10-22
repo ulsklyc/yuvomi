@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
   counted months for the monthly repeat options but was always labelled in weeks. The label now
   follows the selected repeat option.
+- **Google Calendar: a rate limit or an outage no longer drops pending deletions and changes**
+  (#2136). Until now every failed attempt counted against the five tries of each waiting
+  deletion, change and calendar move, including answers that concern the whole account: a rate
+  limit or exhausted quota (429, or 403 with that reason), a Google server error or a lost
+  connection. Since every edit triggers an immediate attempt, five edits during a rate limit were
+  enough: a deleted event stayed at Google and came back later, a change never reached Google.
+  Such answers now leave the work waiting without using up a try, and the rest of that pass sends
+  nothing more to Google. A 403 for the event itself, such as one the account may not change,
+  still counts, so it does not wait forever.
 
 - **CalDAV calendars keep their own colour and a clean name, also on Synology.** (#2157, from
   D#2146) Some servers, Synology Calendar among them, send the colour and the name of a calendar
@@ -41,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Portuguese (BR)"), and the hint below starts with the full name ("Currently United Arab
   Emirates."). Countries with a region per language show the language as a code ("Canada (FR)").
   Other names stay as they are.
+- **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
+  (#2134) A few places show their error as a dialog after a request fails, or ask a question
+  built from the server's answer: deciding a reward request, closing a pocket-money account or
+  ending its plan, loading the rewards participants, replacing an installed module, deleting a
+  document folder and updating tasks to new default points. If you had opened another dialog or
+  left the page by the time the answer came, that dialog was closed with whatever you had typed,
+  or the message opened on the next page. Now the error comes as a notification instead, and a
+  question that no longer fits is not asked; for a module that already exists, the install card
+  says so. If the participants list fails to load after you moved on, nothing is shown, because
+  its dialog would not open anyway.
 
 ## [2.79.0] - 2026-10-22
 
