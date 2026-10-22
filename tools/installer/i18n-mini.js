@@ -38,8 +38,12 @@ export function resolveLocale(languages = navigator.languages || [navigator.lang
   const stored = storedLocale();
   if (stored) return stored;
   for (const tag of languages) {
-    const [rawLang = '', ...rest] = (tag || '').split('-');
+    const [rawLang = '', ...subtags] = (tag || '').split('-');
     const lang = rawLang.toLowerCase();
+    // Ein Ein-Buchstaben-Subtag beginnt eine Erweiterung: in `zh-CN-u-nu-hant`
+    // ist `hant` kein Schrift-Subtag, und die App liest dort ebenfalls nichts.
+    const ende = subtags.findIndex((teil) => teil.length === 1);
+    const rest = ende < 0 ? subtags : subtags.slice(0, ende);
     const region = rest.find((teil) => teil.length === 2) || '';
     const script = rest.find((teil) => teil.length === 4) || '';
     const hit = matchLanguage(lang, region, script);

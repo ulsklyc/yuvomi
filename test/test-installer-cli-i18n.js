@@ -137,6 +137,26 @@ test('normalize_locale nimmt erst Sprache mit Region, dann die Basissprache', ()
   assert.equal(run('zh'), 'zh');
   assert.equal(run('C.UTF-8'), 'en');
   assert.equal(run(''), 'en');
+  // Eine Unicode-Erweiterung ist keine Schrift: `hant` hinter `-u-nu-` laesst die
+  // App bei zh, und so muss es auch der Installer (Review #1670).
+  assert.equal(run('zh-CN-u-nu-hant'), 'zh');
+});
+
+// Review #1670: die Subtags liefen ungequotet durch die Wortzerlegung und damit
+// durch die Pfadexpansion. In einem Verzeichnis mit einer Datei `Hant` wurde aus
+// `--lang 'zh-*'` zh-Hant.
+test('normalize_locale expandiert keine Muster gegen das Arbeitsverzeichnis', () => {
+  const sh = readFileSync(INSTALL_SH, 'utf8');
+  const fn = sh.slice(sh.indexOf('SUPPORTED_LOCALES=('), sh.indexOf('resolve_locale()'));
+  const dir = tempDir('yuvomi-cli-glob-');
+  try {
+    writeFileSync(join(dir, 'Hant'), '');
+    const out = execFileSync('bash', ['-c', `set -euo pipefail\n${fn}\nnormalize_locale "$1"`, 'probe', 'zh-*'],
+      { encoding: 'utf8', cwd: dir });
+    assert.equal(out, 'zh');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ── Generator-Quelle ist nicht erforderlich, aber Verzeichnis muss existieren ─

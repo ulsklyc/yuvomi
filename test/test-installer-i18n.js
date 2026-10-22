@@ -298,6 +298,9 @@ test('resolveLocale nimmt erst den vollen Tag, dann die Basissprache', () => {
   assert.equal(resolveLocale(['zh-Hant']), 'zh-Hant');
   assert.equal(resolveLocale(['zh-Hant-TW']), 'zh-Hant');
   assert.equal(resolveLocale(['zh-Hans-HK']), 'zh');
+  // Eine Unicode-Erweiterung ist keine Schrift - die App liest hier zh (Review #1670).
+  assert.equal(resolveLocale(['zh-CN-u-nu-hant']), 'zh');
+  assert.equal(resolveLocale(['zh-TW-u-ca-roc']), 'zh-Hant');
   assert.equal(resolveLocale(['zh-CN']), 'zh');
   assert.equal(resolveLocale(['zh']), 'zh');
   assert.equal(resolveLocale(['th-TH', 'nl-BE']), 'nl');

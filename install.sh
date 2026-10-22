@@ -36,12 +36,20 @@ in_array() { local needle="$1"; shift; local e; for e in "$@"; do [ "$e" = "$nee
 # substitution" ab.
 normalize_locale() {
   local raw="${1:-}" lang region="" script="" part alias=""
+  local -a parts=()
   raw="${raw%%.*}"; raw="${raw%%@*}"; raw="${raw//_/-}"
   lang="$(printf '%s' "${raw%%-*}" | tr '[:upper:]' '[:lower:]')"
   # Subtags nach der Sprache: vier Zeichen sind eine Schrift (Hant), zwei eine Region (TW).
+  # `read -a` statt einer ungequoteten Expansion: die liefe durch die Pfadexpansion,
+  # und `--lang 'zh-*'` traefe in einem Verzeichnis mit einer Datei `Hant` zh-Hant.
+  # Ein Ein-Buchstaben-Subtag beginnt eine Erweiterung (`-u-nu-hant`) und beendet
+  # die Suche - wie in der App, die dort nur Sprache, Schrift und Region liest.
   case "$raw" in
     *-*)
-      for part in $(printf '%s' "${raw#*-}" | tr '-' ' '); do
+      IFS=- read -r -a parts <<< "${raw#*-}"
+      # `${parts[@]+...}`: bash 3.2 haelt ein leeres Array unter `set -u` fuer ungebunden (`zh-`).
+      for part in ${parts[@]+"${parts[@]}"}; do
+        [ "${#part}" -eq 1 ] && break
         case "${#part}" in
           4) script="$(printf '%s' "${part:0:1}" | tr '[:lower:]' '[:upper:]')$(printf '%s' "${part:1}" | tr '[:upper:]' '[:lower:]')" ;;
           2) [ -n "$region" ] || region="$(printf '%s' "$part" | tr '[:lower:]' '[:upper:]')" ;;
