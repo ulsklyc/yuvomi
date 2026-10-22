@@ -1962,7 +1962,16 @@
   min-width: 0;
   min-height: var(--target-md);
   padding-inline: var(--space-1);
-  margin-inline: calc(-1 * var(--space-2));
+  /* Seit #2152 steht der Griff ganz rechts (D10): die Marge nimmt nur den
+   * Abstand zum Mehr-Knopf zurueck, nach aussen ragt er nicht. */
+  margin-inline-start: calc(-1 * var(--space-2));
+}
+
+/* Der freigehaltene Platz des Mehr-Knopfs in der eigenen Zeile (kein
+ * Entfernen): Bearbeiten bleibt in der Spalte der anderen Zeilen. */
+.settings-member__slot {
+  flex-shrink: 0;
+  width: var(--target-lg);
 }
 
 /* Der freigehaltene Platz einer Zeile ohne Position: dieselbe Box, nichts zu

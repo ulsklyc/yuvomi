@@ -58,6 +58,8 @@ function fakeList() {
     replaceChildren() { this.html = ''; },
     insertAdjacentHTML(_position, markup) { this.html += markup; },
     appendChild() {},
+    // Die Mehr-Menues der Zeilen (#2152) haengen sich an die Liste.
+    addEventListener() {},
   };
 }
 

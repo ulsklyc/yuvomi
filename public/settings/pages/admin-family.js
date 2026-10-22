@@ -12,6 +12,8 @@ import { AVATAR_COLORS } from '/utils/color.js';
 import { sortMembers } from '/utils/member-order.js';
 import { makeSortable } from '/utils/sortable.js';
 import { vibrate } from '/utils/ux.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
@@ -150,24 +152,6 @@ function bindAvatarPicker(container, prefix) {
 }
 
 function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {}) {
-  // Der Griff der Haushaltsreihenfolge (#1644). Ein BUTTON wie in der
-  // Einkaufsliste: er traegt den Tastaturpfad selbst (Pfeiltasten bei Fokus),
-  // statt ein Auf/Ab-Paar neben Bearbeiten und Entfernen zu stellen. Nur an
-  // Zeilen, die eine Position haben koennen - Hauspersonal, Gaeste und
-  // Ehemalige stehen in dieser Verwaltung, aber nicht in der Reihenfolge.
-  const handle = orderable ? `
-      <button type="button" class="row-action settings-member__drag" data-member-handle="${u.id}"
-              aria-label="${esc(t('shopping.reorderHandle', { name: u.display_name }))}"
-              title="${esc(t('shopping.reorderHandleHint'))}">
-        <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
-      </button>`
-    // Eine Zeile ohne Position (Personal, Gast, ehemalig) haelt den Platz des
-    // Griffs frei, solange die Liste Griffe zeigt - sonst stuende ihr Avatar
-    // links neben der Flucht der anderen. Ein leerer Platz, kein toter Knopf.
-    : aligned ? `
-      <span class="row-action settings-member__drag settings-member__drag--none" aria-hidden="true">
-        <i data-lucide="grip-vertical" class="icon-md"></i>
-      </span>` : '';
   // Konten der Haushaltshilfe sind keine Familienmitglieder: sie tragen das
   // Label ihrer Rolle statt einer Familienrolle (Audit A2-25e). Ein eigener
   // Schluessel: der Reiter im Modul nennt die Mehrzahl, der Ersatz fuer einen
@@ -186,25 +170,57 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
     // Ohne Jahr (#2095) nur Tag und Monat - nie das Platzhalterjahr.
     u.birth_date ? t('settings.memberBirthdayMeta', { date: birthDateText(u.birth_date, u.birth_year_unknown) }) : '',
   ].filter(Boolean).map(esc).join(' · ');
-  // Row-Action-Grammatik statt dauerhaft rotem Outline-Button: Löschen wird
-  // erst bei Hover/Fokus laut. Der eigene Account bekommt keine Lösch-Aktion
-  // in der Mitgliederliste (Audit A2-25d).
-  const deleteBtn = u.id === currentUserId ? '' : `
-      <button class="row-action row-action--danger" data-delete-user="${u.id}" data-name="${esc(u.display_name)}" aria-label="${esc(t('settings.removeMemberNamed', { name: u.display_name }))}" title="${esc(t('settings.removeMemberLabel'))}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-      </button>`;
   const editBtn = former ? '' : `
       <button class="row-action" data-edit-user="${u.id}" aria-label="${esc(t('common.editNamed', { name: u.display_name }))}" title="${t('settings.editMemberLabel')}">
         <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
       </button>`;
+  // D10 ZEILEN-ENDZONE (#2152): [Bearbeiten][Mehr][Griff]. Das Entfernen
+  // steht im Mehr-Knopf (`danger`), nicht mehr als dauerhaft roter Papierkorb
+  // in jeder Zeile. Der eigene Account bekommt keine Lösch-Aktion in der
+  // Mitgliederliste (Audit A2-25d); seine Zeile haelt den Platz des
+  // Mehr-Knopfs frei, damit Bearbeiten in der Spalte der anderen steht.
+  const deleteBtn = u.id === currentUserId
+    ? '<span class="settings-member__slot" aria-hidden="true"></span>'
+    : rowMenuHtml({
+      id: `settings-member-menu-${u.id}`,
+      label: t('common.moreActionsNamed', { name: u.display_name }),
+      items: [{
+        action: 'remove-member',
+        icon: 'trash-2',
+        danger: true,
+        label: t('settings.removeMemberNamed', { name: u.display_name }),
+        attrs: { 'data-delete-user': u.id, 'data-name': u.display_name },
+      }],
+    });
+  // Der Griff der Haushaltsreihenfolge (#1644), ganz rechts (D10, #2152) -
+  // und deshalb auch im Quelltext nach Bearbeiten und Mehr. Ein BUTTON wie in der
+  // Einkaufsliste: er traegt den Tastaturpfad selbst (Pfeiltasten bei Fokus),
+  // statt ein Auf/Ab-Paar neben Bearbeiten und Entfernen zu stellen. Nur an
+  // Zeilen, die eine Position haben koennen - Hauspersonal, Gaeste und
+  // Ehemalige stehen in dieser Verwaltung, aber nicht in der Reihenfolge.
+  const handle = orderable ? `
+      <button type="button" class="row-action settings-member__drag" data-member-handle="${u.id}"
+              aria-label="${esc(t('shopping.reorderHandle', { name: u.display_name }))}"
+              title="${esc(t('shopping.reorderHandleHint'))}">
+        <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+      </button>`
+    // Eine Zeile ohne Position (Personal, Gast, ehemalig) haelt den Platz des
+    // Griffs frei, solange die Liste Griffe zeigt - sonst rueckten ihr
+    // Bearbeiten und ihr Mehr-Knopf um die Griffbreite aus der Spalte der
+    // anderen (der Griff steht seit #2152 ganz rechts, D10). Ein leerer Platz,
+    // kein toter Knopf.
+    : aligned ? `
+      <span class="row-action settings-member__drag settings-member__drag--none" aria-hidden="true">
+        <i data-lucide="grip-vertical" class="icon-md"></i>
+      </span>` : '';
   return `
-    <li class="settings-member${former ? ' settings-member--former' : ''}${orderable ? ' settings-member--orderable' : ''}" data-id="${u.id}">${handle}
+    <li class="settings-member${former ? ' settings-member--former' : ''}${orderable ? ' settings-member--orderable' : ''}" data-id="${u.id}">
       ${avatarHtml(u, 'settings-avatar settings-avatar--sm')}
       <div class="settings-member__info">
         <span class="settings-member__name" data-member-name>${esc(u.display_name)}${u.id === currentUserId ? ` <span class="settings-member__self">${esc(t('settings.memberYou'))}</span>` : ''}</span>
         <span class="settings-member__meta">@${esc(u.username)} · ${esc(familyRole)}${systemRole}${formerBadge}</span>
         ${profileMeta ? `<span class="settings-member__meta">${profileMeta}</span>` : ''}
-      </div>${editBtn}${deleteBtn}
+      </div>${editBtn}${deleteBtn}${handle}
     </li>
   `;
 }
@@ -485,6 +501,7 @@ function renderMemberList(container, users, currentUserId, currentUser = null) {
     list.insertAdjacentHTML('beforeend', ordered.map((u) => memberHtml(u, currentUserId, { orderable: canOrder.has(u.id), aligned: canOrder.size > 0 })).join(''));
   }
   window.lucide?.createIcons({ el: list });
+  installPopoverMenus(list);
 }
 
 // --------------------------------------------------------
@@ -675,10 +692,18 @@ function inviteHtml(invite) {
         ${meta ? `<span class="settings-member__meta">${meta}</span>` : ''}
         <span class="settings-member__meta">${esc(t('settings.invites.expires', { date: formatDate(invite.expires_at) }))}</span>
       </div>
-      <button class="row-action row-action--danger" data-revoke-invite="${invite.id}" data-name="${esc(primary)}"
-        aria-label="${esc(primary)} ${t('settings.invites.revoke')}" title="${t('settings.invites.revoke')}">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>
-      </button>
+      ${rowMenuHtml({
+    // D10 (#2152): auch das Widerrufen ist destruktiv und steht im Mehr-Knopf.
+    id: `settings-invite-menu-${invite.id}`,
+    label: t('common.moreActionsNamed', { name: primary }),
+    items: [{
+      action: 'revoke-invite',
+      icon: 'trash-2',
+      danger: true,
+      label: t('settings.invites.revoke'),
+      attrs: { 'data-revoke-invite': invite.id, 'data-name': primary },
+    }],
+  })}
     </li>
   `;
 }
@@ -693,6 +718,7 @@ function renderInviteList(container, invites) {
     list.insertAdjacentHTML('beforeend', invites.map(inviteHtml).join(''));
   }
   window.lucide?.createIcons({ el: list });
+  installPopoverMenus(list);
 }
 
 /**
@@ -1379,4 +1405,4 @@ export async function render(container, { user } = {}) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { openEditMemberModal, openAddMemberModal, childStartHintHtml, bindChildStartHint, addMemberFormHtml, addInviteFormHtml, avatarHtml, memberHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };
+export const __test = { openEditMemberModal, openAddMemberModal, childStartHintHtml, bindChildStartHint, addMemberFormHtml, addInviteFormHtml, avatarHtml, memberHtml, inviteHtml, orderableIds, movedOrder, orderedMembers, wireMemberOrder, renderMemberList };
