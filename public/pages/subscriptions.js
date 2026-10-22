@@ -28,7 +28,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
-import { makeSortable } from '/utils/sortable.js';
+import { sortableSet } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
@@ -2224,6 +2224,9 @@ async function saveMetadata(write, goneId = null) {
  */
 let metaFocus = null;
 
+/** Die Sortable-Instanzen des Verwalten-Dialogs: frei beim Neuaufbau und beim Schliessen. */
+const metaSortables = sortableSet();
+
 function restoreMetaFocus(panel) {
   const intent = metaFocus;
   metaFocus = null;
@@ -2288,6 +2291,7 @@ function openMetadataModal() {
     title: t('subscriptions.manageMetadata'),
     content,
     size: 'xl',
+    onClose: () => metaSortables.clear(),
     onSave(panel) {
       panel.querySelector('#subscriptions-metadata-close').addEventListener('click', closeModal);
       panel.querySelector('#subscription-add-category').addEventListener('click', async () => {
@@ -2325,9 +2329,11 @@ function openMetadataModal() {
           moveMetaRow(handle.closest('li'), event.key === 'ArrowUp' ? -1 : 1, 'handle');
         });
       });
+      // Jeder Aufbau gibt die Instanzen des vorigen frei (Codex an #2177).
+      metaSortables.clear();
       for (const list of panel.querySelectorAll('#subscription-category-list, #subscription-method-list')) {
         if (list.children.length < 2) continue;
-        makeSortable(list, {
+        metaSortables.add(list, {
           handle: '[data-meta-handle]',
           onEnd: (evt) => {
             if (readOnly() || evt.oldIndex === evt.newIndex) return;

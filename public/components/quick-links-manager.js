@@ -26,7 +26,10 @@ import { prefersInkText } from '/utils/contrast.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
-import { makeSortable } from '/utils/sortable.js';
+import { sortableSet } from '/utils/sortable.js';
+
+/** Die Sortable-Instanz der Verwaltung: frei beim Neuaufbau und beim Schliessen (Codex an #2177). */
+const manageSortables = sortableSet();
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 /** Dieselben Werte wie in server/routes/quick-links.js. */
@@ -529,6 +532,7 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
   openModal({
     title: t('quickLinks.manageTitle'),
     size: 'sm',
+    onClose: () => manageSortables.clear(),
     content: `
       ${body}
       <button type="button" class="btn btn--secondary quick-link-manage-add" id="quick-link-add">
@@ -589,7 +593,8 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
         handle.focus();
         persistOrder();
       });
-      makeSortable(list, {
+      manageSortables.clear();
+      manageSortables.add(list, {
         handle: '[data-sortable-handle]',
         draggable: '.quick-link-manage-row',
         onEnd: persistOrder,

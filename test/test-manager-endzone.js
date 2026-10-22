@@ -40,7 +40,8 @@ await import('../public/components/tag-manager.js');
 const CategoryManager = defined.get('yuvomi-category-manager');
 const TagManager = defined.get('yuvomi-tag-manager');
 const { __test: subscriptions } = await import('../public/pages/subscriptions.js');
-const { __test: quickLinks } = await import('../public/components/quick-links-manager.js');
+const { __test: quickLinks, openQuickLinksManager } = await import('../public/components/quick-links-manager.js');
+const { sortableSet } = await import('../public/utils/sortable.js');
 const { __test: family } = await import('../public/settings/pages/admin-family.js');
 
 // ---------------------------------------------------------------------------
@@ -370,4 +371,54 @@ test('Familie: Einladung widerrufen steht im Mehr-Menue (danger)', () => {
   assert.deepEqual(items.map((x) => x.action), ['revoke-invite']);
   assert.ok(items[0].danger);
   assert.match(items[0].tag, /data-revoke-invite="9"/);
+});
+
+// ---------------------------------------------------------------------------
+// Sortable-Instanzen der sich neu aufbauenden Dialoge (Codex an #2177)
+// ---------------------------------------------------------------------------
+
+test('sortableSet: clear() gibt alle frei, eine nach dem Schliessen fertige Instanz stirbt sofort', async () => {
+  assert.equal(typeof sortableSet, 'function', 'utils/sortable.js exportiert sortableSet');
+  const destroyed = [];
+  let release;
+  const late = new Promise((r) => { release = r; });
+  const make = (name) => ({ name, destroy: () => destroyed.push(name) });
+  const queue = [Promise.resolve(make('erste')), late];
+  const set = sortableSet({ create: () => queue.shift() });
+  const list = { isConnected: true };
+  await set.add(list, {});
+  assert.equal(set.size(), 1);
+  const pending = set.add(list, {});
+  set.clear();
+  assert.deepEqual(destroyed, ['erste']);
+  release(make('spaet'));
+  assert.equal(await pending, null);
+  assert.deepEqual(destroyed, ['erste', 'spaet'], 'die spaete Instanz wird zerstoert statt zu verwaisen');
+  assert.equal(set.size(), 0);
+  // Eine Liste, die schon aus dem Dokument ist, bekommt keine Instanz.
+  const gone = sortableSet({ create: async () => make('weg') });
+  assert.equal(await gone.add({ isConnected: false }, {}), null);
+  assert.equal(destroyed.at(-1), 'weg');
+});
+
+test('Abos und Schnelllinks: der Verwalten-Dialog gibt seine Sortable-Instanzen beim Schliessen und Neuaufbau frei', async () => {
+  const opened = [];
+  globalThis.__openModal = (opts) => { opened.push(opts); };
+  globalThis.__apiStub = { get: async () => ({ data: [] }) };
+  try {
+    subscriptions.openMetadataModal();
+    await openQuickLinksManager();
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__apiStub;
+  }
+  assert.equal(opened.length, 2, 'beide Dialoge gehen auf');
+  for (const opts of opened) assert.equal(typeof opts.onClose, 'function', `${opts.title}: kein onClose, die Instanzen verwaisen`);
+  const { readFileSync } = await import('node:fs');
+  for (const [file, name] of [['../public/pages/subscriptions.js', 'metaSortables'], ['../public/components/quick-links-manager.js', 'manageSortables']]) {
+    const src = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.match(src, new RegExp(`onClose: \\(\\) => ${name}\\.clear\\(\\)`), `${file}: onClose gibt frei`);
+    assert.match(src, new RegExp(`${name}\\.clear\\(\\);\\n\\s*(?:for |${name}\\.add)`), `${file}: der Neuaufbau gibt erst frei`);
+    assert.doesNotMatch(src, /\bmakeSortable\(/, `${file}: keine Instanz am Merker vorbei`);
+  }
 });

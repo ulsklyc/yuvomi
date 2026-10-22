@@ -116,3 +116,44 @@ export async function makeSortable(listEl, { handle, draggable, filter, group, s
     },
   });
 }
+
+/**
+ * Die Sortable-Instanzen EINES Dialogs, der sich neu aufbaut (Codex an #2177).
+ *
+ * Ein Dialog, der bei jedem Schreiben schliesst und mit frischem Stand neu
+ * aufgeht (Abo-Verwalter, Schnelllinks), erzeugte je Aufbau neue Instanzen
+ * und gab keine frei - SortableJS haelt jede in seiner Registry, samt
+ * Listenern am Dokument. `add()` legt eine an und merkt sie sich; `clear()`
+ * gibt alle frei und macht jede noch laufende Erzeugung ungueltig: eine
+ * Instanz, deren lazy Import erst nach dem Schliessen fertig wird, wird sofort
+ * wieder zerstoert statt zu verwaisen. Aufzurufen beim Neuaufbau UND im
+ * onClose des Dialogs.
+ *
+ * @param {object} [opts]
+ * @param {Function} [opts.create] - Erzeuger (Standard: makeSortable; Tests reichen eine Attrappe)
+ * @returns {{ add: (listEl: HTMLElement, opts: object) => Promise<object|null>, clear: () => void, size: () => number }}
+ */
+export function sortableSet({ create = makeSortable } = {}) {
+  const live = new Set();
+  let generation = 0;
+  return {
+    add(listEl, opts) {
+      const own = generation;
+      return Promise.resolve(create(listEl, opts)).then((instance) => {
+        if (!instance) return null;
+        if (own !== generation || listEl?.isConnected === false) {
+          instance.destroy?.();
+          return null;
+        }
+        live.add(instance);
+        return instance;
+      });
+    },
+    clear() {
+      generation += 1;
+      for (const instance of live) instance.destroy?.();
+      live.clear();
+    },
+    size: () => live.size,
+  };
+}
