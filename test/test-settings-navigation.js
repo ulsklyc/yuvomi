@@ -5246,6 +5246,28 @@ test('#2151: jede Region und jede Sprache passt in jeder Sprache in die geschlos
   assert.deepEqual(offenders, []);
 });
 
+// D#1320: `zh` ist Vereinfacht, heisst im CLDR aber nur "Chinesisch". Neben
+// "Chinesisch (traditionell)" las sich der unmarkierte Eintrag wie der Standard.
+// Der volle Name (Hinweiszeile) nennt die Schrift, und in jeder Sprache heissen
+// die beiden Chinesisch voll wie kurz verschieden.
+test('D#1320: beide Chinesisch nennen ihre Schrift, voll und kurz, in jeder Sprache', async () => {
+  const { languageLabel, languageShortLabel, languageShortKey } = await import('../public/settings/region-presets.js');
+  assert.equal(languageLabel('zh', 'en'), 'Simplified Chinese');
+  assert.equal(languageLabel('zh-Hant', 'en'), 'Traditional Chinese');
+  assert.equal(languageLabel('zh', 'de'), 'Chinesisch (vereinfacht)');
+  assert.equal(languageLabel('de', 'en'), 'German', 'andere Sprachen bleiben beim CLDR-Namen ihres Codes');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const locales = (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+  const offenders = [];
+  for (const locale of locales) {
+    const { settings } = JSON.parse(await readFile(new URL(`${locale}.json`, dir), 'utf8'));
+    const short = (tag) => languageShortLabel(tag, locale, (x) => settings.languageShort?.[languageShortKey(x)] ?? null);
+    if (languageLabel('zh', locale) === languageLabel('zh-Hant', locale)) offenders.push(`${locale}: voll gleich`);
+    if (short('zh') === short('zh-Hant')) offenders.push(`${locale}: kurz gleich ("${short('zh')}")`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
 test('#2151: Darstellung - Region und Datensprache stehen kurz in der Auswahl, voll vorn in der Hinweiszeile', async (t) => {
   const de = (type, code) => new Intl.DisplayNames(['de'], { type }).of(code);
   globalThis.__supportedLocales = ['de', 'en', 'nb', 'pt', 'pt-BR'];

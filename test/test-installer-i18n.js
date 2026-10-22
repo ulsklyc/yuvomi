@@ -268,6 +268,19 @@ test('der Sprachumschalter bietet genau die unterstuetzten Sprachen an', () => {
     + `nur in SUPPORTED_LOCALES: ${supported.filter(l => !offered.includes(l))}`);
 });
 
+// D#1320: neben 繁體中文 las sich ein unmarkiertes 中文 wie der Standard fuer
+// alle Chinesisch Lesenden. Beide Eintraege nennen ihre Schrift, und keine zwei
+// Optionen heissen gleich.
+test('der Sprachumschalter nennt beide Chinesisch mit ihrer Schrift', () => {
+  const html = readFileSync(HTML_PATH, 'utf8');
+  const select = html.match(/<select id="lang-switch"[\s\S]*?<\/select>/);
+  const labels = Object.fromEntries([...select[0].matchAll(/<option value="([^"]+)"[^>]*>([^<]*)</g)].map(m => [m[1], m[2].trim()]));
+  assert.equal(labels.zh, '简体中文');
+  assert.equal(labels['zh-Hant'], '繁體中文');
+  const texts = Object.values(labels);
+  assert.equal(new Set(texts).size, texts.length, `zwei Optionen heissen gleich: ${texts.filter((x, i) => texts.indexOf(x) !== i)}`);
+});
+
 // Der Web-Installer loest wie die App auf: erst der volle Tag, dann die
 // Basissprache. Er nahm bisher nur den Teil vor dem ersten Bindestrich, und ein
 // brasilianischer Browser bekam `pt` (#1437).

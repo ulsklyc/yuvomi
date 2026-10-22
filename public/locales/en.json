@@ -2928,7 +2928,9 @@
         },
         "languageShort": {
             "nb": "Norwegian",
-            "ptBR": "Portuguese (BR)"
+            "ptBR": "Portuguese (BR)",
+            "zh": "Chinese (Simpl.)",
+            "zhHant": "Chinese (Trad.)"
         },
         "regionAdminOnly": "Only administrators can change region and currency.",
         "formatsHouseholdHint": "Date and time format apply to the whole household. Every member can change them.",

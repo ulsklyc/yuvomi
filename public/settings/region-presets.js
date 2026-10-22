@@ -269,9 +269,30 @@ export function regionShortLabel(code, locale, {
  * geschlossene Auswahl passt (#2151): "Portugiesisch (Brasilien)",
  * "Norwegisch (Bokmål)". Kurzform je Sprache unter
  * `settings.languageShort.<Tag ohne Bindestrich>` ("Portugiesisch (BR)",
- * "Norwegisch" - Bokmål ist das einzige Norwegisch der App).
+ * "Norwegisch" - Bokmål ist das einzige Norwegisch der App). Die beiden
+ * Chinesisch stehen hier, weil ihre vollen Namen ("Chinesisch (vereinfacht)",
+ * "Chinesisch (traditionell)") in den meisten Sprachen das Budget reissen.
  */
-export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR'];
+export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR', 'zh', 'zh-Hant'];
+
+/**
+ * Unter welchem Tag eine UI-Sprache ihren NAMEN sucht, wenn der Code allein
+ * zu wenig sagt (D#1320). `zh` ist Vereinfacht, heisst im CLDR aber nur
+ * "Chinesisch" - neben "Chinesisch (traditionell)" las sich der unmarkierte
+ * Eintrag wie der Standard fuer alle Chinesisch Lesenden. Nur der Name folgt
+ * `zh-Hans`; Code, Datei und gespeicherter Wert bleiben `zh`.
+ */
+const LANGUAGE_LABEL_TAGS = Object.freeze({ zh: 'zh-Hans' });
+
+/** Voller Name einer UI-Sprache in `locale` (CLDR), oder der Code. */
+export function languageLabel(tag, locale) {
+  try {
+    const labelTag = Object.prototype.hasOwnProperty.call(LANGUAGE_LABEL_TAGS, tag) ? LANGUAGE_LABEL_TAGS[tag] : tag;
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(labelTag) || tag;
+  } catch {
+    return tag;
+  }
+}
 
 /** Schluessel der Kurzform einer UI-Sprache unter `settings.languageShort`. */
 export const languageShortKey = (tag) => tag.replace('-', '');
@@ -288,7 +309,7 @@ export const languageShortKey = (tag) => tag.replace('-', '');
  */
 export function languageShortLabel(tag, locale, shortName = () => null) {
   try {
-    return shortName(tag) || new Intl.DisplayNames([locale], { type: 'language' }).of(tag) || tag;
+    return shortName(tag) || languageLabel(tag, locale);
   } catch {
     return tag;
   }

@@ -2909,7 +2909,9 @@
         },
         "languageShort": {
             "nb": "노르웨이어",
-            "ptBR": "포르투갈어(BR)"
+            "ptBR": "포르투갈어(BR)",
+            "zh": "중국어(간체)",
+            "zhHant": "중국어(번체)"
         },
         "regionAdminOnly": "지역과 통화는 관리자만 변경할 수 있습니다.",
         "formatsHouseholdHint": "날짜와 시간 형식은 가구 전체에 적용됩니다. 모든 구성원이 변경할 수 있습니다.",

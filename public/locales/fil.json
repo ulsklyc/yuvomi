@@ -2946,7 +2946,9 @@
         },
         "languageShort": {
             "nb": "Norwegian",
-            "ptBR": "Portuges (BR)"
+            "ptBR": "Portuges (BR)",
+            "zh": "Tsino (Pinasimple)",
+            "zhHant": "Tsino (Trad.)"
         },
         "regionAdminOnly": "Mga administrator lamang ang makakapagpalit ng rehiyon at pera.",
         "formatsHouseholdHint": "Naaangkop sa buong sambahayan ang format ng petsa at oras. Maaari itong palitan ng bawat miyembro.",

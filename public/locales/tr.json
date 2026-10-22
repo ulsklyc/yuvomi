@@ -2891,7 +2891,9 @@
         },
         "languageShort": {
             "nb": "Norveççe",
-            "ptBR": "Portekizce (BR)"
+            "ptBR": "Portekizce (BR)",
+            "zh": "Basitleşt. Çince",
+            "zhHant": "Geleneksel Çince"
         },
         "regionAdminOnly": "Bölgeyi ve para birimini yalnızca yöneticiler değiştirebilir.",
         "formatsHouseholdHint": "Tarih ve saat biçimi tüm ev için geçerlidir. Her üye değiştirebilir.",

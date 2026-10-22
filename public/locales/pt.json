@@ -2891,7 +2891,9 @@
         },
         "languageShort": {
             "nb": "norueguês",
-            "ptBR": "português (Brasil)"
+            "ptBR": "português (Brasil)",
+            "zh": "chinês simplif.",
+            "zhHant": "chinês tradicional"
         },
         "regionAdminOnly": "Apenas administradores podem alterar a região e a moeda.",
         "formatsHouseholdHint": "O formato de data e hora aplica-se a toda a casa. Qualquer membro pode alterá-lo.",

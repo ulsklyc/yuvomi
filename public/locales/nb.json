@@ -2928,7 +2928,9 @@
         },
         "languageShort": {
             "nb": "norsk",
-            "ptBR": "portugisisk (BR)"
+            "ptBR": "portugisisk (BR)",
+            "zh": "forenklet kinesisk",
+            "zhHant": "trad. kinesisk"
         },
         "regionAdminOnly": "Kun administratorer kan endre region og valuta.",
         "formatsHouseholdHint": "Dato- og tidsformat gjelder for hele husholdningen. Alle medlemmer kan endre dem.",

@@ -2984,7 +2984,9 @@
         },
         "languageShort": {
             "nb": "norština",
-            "ptBR": "portugalština (BR)"
+            "ptBR": "portugalština (BR)",
+            "zh": "čínština (zjedn.)",
+            "zhHant": "čínština (trad.)"
         },
         "regionAdminOnly": "Region a měnu mohou měnit pouze administrátoři.",
         "formatsHouseholdHint": "Formát data a času platí pro celou domácnost. Změnit ho může každý člen.",

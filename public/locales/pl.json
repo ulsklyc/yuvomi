@@ -3095,7 +3095,9 @@
         },
         "languageShort": {
             "nb": "norweski",
-            "ptBR": "portugalski (BR)"
+            "ptBR": "portugalski (BR)",
+            "zh": "chiński uproszcz.",
+            "zhHant": "chiński tradycyjny"
         },
         "regionAdminOnly": "Tylko administratorzy mogą zmieniać region i walutę.",
         "formatsHouseholdHint": "Format daty i godziny obowiązuje w całym gospodarstwie. Każdy członek może go zmienić.",

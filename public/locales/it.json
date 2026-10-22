@@ -2891,7 +2891,9 @@
         },
         "languageShort": {
             "nb": "norvegese",
-            "ptBR": "portoghese (BR)"
+            "ptBR": "portoghese (BR)",
+            "zh": "cinese (sempl.)",
+            "zhHant": "cinese (trad.)"
         },
         "regionAdminOnly": "Solo gli amministratori possono modificare regione e valuta.",
         "formatsHouseholdHint": "Il formato di data e ora vale per tutta la famiglia. Ogni membro può modificarlo.",

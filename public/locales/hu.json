@@ -2891,7 +2891,9 @@
         },
         "languageShort": {
             "nb": "norvég",
-            "ptBR": "brazíliai portugál"
+            "ptBR": "brazíliai portugál",
+            "zh": "egysz. kínai",
+            "zhHant": "hagyományos kínai"
         },
         "regionAdminOnly": "A régiót és a pénznemet csak rendszergazdák módosíthatják.",
         "formatsHouseholdHint": "A dátum- és időformátum az egész háztartásra érvényes. Minden tag módosíthatja.",

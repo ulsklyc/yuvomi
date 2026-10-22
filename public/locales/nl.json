@@ -2891,7 +2891,9 @@
         },
         "languageShort": {
             "nb": "Noors",
-            "ptBR": "Portugees (BR)"
+            "ptBR": "Portugees (BR)",
+            "zh": "Chinees (vereenv.)",
+            "zhHant": "Chinees (trad.)"
         },
         "regionAdminOnly": "Alleen beheerders kunnen regio en valuta wijzigen.",
         "formatsHouseholdHint": "Datum- en tijdnotatie gelden voor het hele huishouden. Elk lid kan ze wijzigen.",
