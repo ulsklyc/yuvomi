@@ -560,6 +560,11 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
       // `savedIds` ist der Stand des Servers - dorthin geht es zurueck, wenn
       // ein Zug nicht gespeichert werden kann (Codex an #2177).
       let savedIds = items.map((s) => s.id);
+      // EIN ZUG ZUR ZEIT (Codex an #2177): die Folge, die gerade speichert,
+      // sonst null. Ein zweiter Schritt waehrend der Anfrage entfaellt, ein
+      // gezogener wird zurueckgenommen - sonst rechnete die Ruecknahme eines
+      // gescheiterten ersten Zugs einen zweiten, schon gespeicherten weg.
+      let inflight = null;
       const persistOrder = async () => {
           // Die Reihenfolge gilt für den ganzen Haushalt, nicht pro Person: es
           // ist EINE Reihe, und zwei Mitglieder, die sie verschieden sortieren,
@@ -572,6 +577,12 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
           const ids = [...list.querySelectorAll('.quick-link-manage-row')]
             .map((li) => Number(li.dataset.id))
             .filter(Number.isInteger);
+          if (inflight) {
+            restoreOrder(list, inflight, (li) => li.dataset.id);
+            refreshHandleLabels(list);
+            return;
+          }
+          inflight = ids;
           refreshHandleLabels(list);
           try {
             await api.put('/quick-links/order', { ids });
@@ -580,6 +591,8 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
             restoreOrder(list, savedIds, (li) => li.dataset.id);
             refreshHandleLabels(list);
             return;
+          } finally {
+            inflight = null;
           }
           savedIds = ids;
           await onChange();
@@ -592,6 +605,7 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
         const handle = event.target.closest?.('[data-sortable-handle]');
         if (!handle) return;
         event.preventDefault();
+        if (inflight) return;
         const row = handle.closest('.quick-link-manage-row');
         const sibling = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
         if (!sibling) return;

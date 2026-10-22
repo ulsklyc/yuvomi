@@ -436,6 +436,8 @@ class CategoryManagerElement extends HTMLElement {
           // Nur der Drag-Pfad hat das DOM schon optimistisch umgestellt (SortableJS
           // verschiebt vor dem PATCH); ein Fehler braucht daher hier einen
           // Rollback-Render. Der Button-Pfad (_move) mutiert das DOM nie vorab.
+          // Speichert gerade ein anderer Zug, wird dieser sofort zurueckgenommen.
+          if (this._reorderBusy) { this._renderGroup(groupKey); return; }
           this._persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender: true });
         },
       }).then((instance) => this._trackSortable(instance, listEl)).catch((err) => this._warnDragUnavailable(err));
@@ -451,6 +453,7 @@ class CategoryManagerElement extends HTMLElement {
           const orderedSubKeys = Array.from(subListEl.children)
             .filter((el) => el.matches('.cat-subrow'))
             .map((el) => el.dataset.subkey);
+          if (this._reorderBusy) { this._renderSublist(parentKey); return; }
           this._persistSubOrder(parentKey, orderedSubKeys, movedSubKey, { rollbackRender: true });
         },
       }).then((instance) => this._trackSortable(instance, subListEl)).catch((err) => this._warnDragUnavailable(err));
@@ -943,6 +946,12 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _move(key, delta, { fromHandle = false } = {}) {
+    // EIN ZUG ZUR ZEIT (Codex an #2177): ein zweiter Schritt, waehrend der
+    // erste noch speichert, rechnete auf einem Stand, den der Server noch
+    // nicht bestaetigt hat - scheitert der erste, stuende eine Folge da, die
+    // es nirgends gibt. Der Schritt entfaellt; der naechste Druck nach der
+    // Antwort zaehlt wieder.
+    if (this._reorderBusy) return;
     const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
     const groupKey = this._groupOf(cat);
@@ -977,6 +986,7 @@ class CategoryManagerElement extends HTMLElement {
   // rendert bewusst NICHT (sonst Fokusverlust auf dem gerade geklickten Auf/Ab-
   // Button und Verlust ungespeicherten Texts in offenen Add-Feldern).
   async _persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender = false, focusKey = null, focusDir = null, fromHandle = false } = {}) {
+    this._reorderBusy = true;
     try {
       const body = { order: orderedKeys };
       if (groupKey) body[this._groupField] = groupKey;
@@ -994,6 +1004,8 @@ class CategoryManagerElement extends HTMLElement {
         this._renderGroup(groupKey);
         this._restoreAddInputs(inputs);
       }
+    } finally {
+      this._reorderBusy = false;
     }
   }
 
@@ -1096,6 +1108,7 @@ class CategoryManagerElement extends HTMLElement {
   }
 
   async _subMove(parent, subKey, delta, { fromHandle = false } = {}) {
+    if (this._reorderBusy) return;
     const cat = this._cats.find((c) => this._keyOf(c) === parent);
     if (!cat) return;
     const subs = (cat.subcategories || []).slice();
@@ -1114,6 +1127,7 @@ class CategoryManagerElement extends HTMLElement {
   // in _wireSortableIn rufen beide diesen Handler mit der neuen Reihenfolge auf;
   // nur der Drag-Pfad rollt bei Fehlern per rollbackRender zurück).
   async _persistSubOrder(parent, orderedSubKeys, movedSubKey, { rollbackRender = false, focusSubKey = null, focusDir = null, fromHandle = false } = {}) {
+    this._reorderBusy = true;
     try {
       const res = await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
@@ -1132,6 +1146,8 @@ class CategoryManagerElement extends HTMLElement {
         this._renderSublist(parent);
         this._restoreAddInputs(inputs);
       }
+    } finally {
+      this._reorderBusy = false;
     }
   }
 

@@ -174,15 +174,17 @@ function reorderRig(keys) {
   manager._groupsEl = { querySelector: (sel) => rows.get((sel.match(/data-key="([^"]*)"/) || [])[1])?.rowEl ?? null };
   const answers = [];
   globalThis.__apiStub = {
-    patch: (_path, body) => new Promise((resolve) => {
-      answers.push(() => resolve({ data: body.order.map((key) => ({ key, name: key.toUpperCase() })) }));
+    patch: (_path, body) => new Promise((resolve, reject) => {
+      const answer = () => resolve({ data: body.order.map((key) => ({ key, name: key.toUpperCase() })) });
+      answer.fail = () => { const err = new Error('offline'); err.status = 500; err.data = {}; reject(err); };
+      answers.push(answer);
     }),
   };
   const press = (key, arrow) => manager._onKeydown({ key: arrow, target: rows.get(key).handle, preventDefault() {} });
   return { manager, focused, answers, press };
 }
 
-test('Kategorien: Pfeiltasten am Griff verschieben die Zeile, der Fokus bleibt auf dem Griff', async () => {
+test('Kategorien: Pfeiltasten am Griff verschieben die Zeile, der Fokus bleibt auf dem Griff', { timeout: 5000 }, async () => {
   const { manager, focused, answers, press } = reorderRig(['a', 'b']);
   try {
     const run = press('b', 'ArrowUp');
@@ -207,20 +209,30 @@ test('Kategorien: Pfeiltasten am Griff verschieben die Zeile, der Fokus bleibt a
   }
 });
 
-test('Kategorien: zwei Pfeiltasten waehrend einer laufenden Anfrage - beide Schritte behalten den Griff (Codex an #2177)', async () => {
-  // Bis zum Fix lag die Herkunft "vom Griff" in einem geteilten Merker: die
-  // erste Antwort verbrauchte ihn, und die zweite gab den Fokus an Mehr.
-  const { focused, answers, press } = reorderRig(['a', 'b', 'c']);
+test('Kategorien: ein Zug zur Zeit - ein zweiter Schritt waehrend der Anfrage entfaellt, ein gezogener wird zurueckgenommen (Codex an #2177)', { timeout: 5000 }, async () => {
+  // Bis zum Fix liefen zwei Schritte nebeneinander: der zweite rechnete auf
+  // dem unbestaetigten Stand des ersten, und scheiterte der erste, stand eine
+  // Folge da, die es nirgends gab.
+  const { manager, focused, answers, press } = reorderRig(['a', 'b', 'c']);
   try {
     const first = press('a', 'ArrowDown');
     const second = press('c', 'ArrowUp');
     await new Promise((r) => setImmediate(r));
-    assert.equal(answers.length, 2, 'beide Schritte laufen');
-    answers[0]();
+    assert.equal(answers.length, 1, 'der zweite Schritt startet keine Anfrage');
+    assert.equal(manager._reorderBusy, true);
+    answers[0].fail();
     await first;
-    answers[1]();
     await second;
-    assert.deepEqual(focused, ['a:handle', 'c:handle']);
+    assert.deepEqual(manager._cats.map((c) => c.key), ['a', 'b', 'c'], 'gescheitert: der gespeicherte Stand bleibt');
+    assert.equal(manager._reorderBusy, false);
+    // Nach der Antwort zaehlt der naechste Druck wieder, und der Fokus bleibt am Griff.
+    const third = press('c', 'ArrowUp');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(answers.length, 2);
+    answers[1]();
+    await third;
+    assert.deepEqual(manager._cats.map((c) => c.key), ['a', 'c', 'b']);
+    assert.deepEqual(focused, ['c:handle']);
   } finally {
     delete globalThis.__apiStub;
   }
@@ -463,7 +475,7 @@ test('restoreOrder: haengt die Zeilen in die gespeicherte Folge zurueck', async 
   assert.deepEqual(list.order(), ['1', '2', '3']);
 });
 
-test('Abos: scheitert das Speichern eines Zugs, steht wieder die gespeicherte Reihenfolge da', async () => {
+test('Abos: scheitert das Speichern eines Zugs, steht wieder die gespeicherte Reihenfolge da', { timeout: 5000 }, async () => {
   const saved = subscriptions.state.meta.categories;
   subscriptions.state.meta.categories = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   // So steht die Liste nach dem Ziehen: SortableJS hat 2 schon vor 1 gehaengt.
@@ -479,7 +491,31 @@ test('Abos: scheitert das Speichern eines Zugs, steht wieder die gespeicherte Re
   }
 });
 
-test('Schnelllinks: scheitert das Speichern eines Schritts, steht wieder die gespeicherte Reihenfolge da', async () => {
+test('Abos: ein Zug zur Zeit - ein Zug waehrend der Anfrage wird zurueckgenommen, scheitert der erste, steht der gespeicherte Stand da (Codex an #2177)', { timeout: 5000 }, async () => {
+  const saved = subscriptions.state.meta.categories;
+  subscriptions.state.meta.categories = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
+  const list = fakeList([2, 1, 3], { id: 'subscription-category-list' });
+  const answers = [];
+  globalThis.__apiStub = {
+    put: () => new Promise((_resolve, reject) => { answers.push(() => { const err = new Error('boom'); err.status = 500; err.data = {}; reject(err); }); }),
+  };
+  try {
+    const first = subscriptions.persistMetaOrder(list, [2, 1, 3]);
+    // Waehrenddessen zieht jemand die dritte Zeile nach oben.
+    list.insertBefore(list.children[2], list.children[0]);
+    assert.equal(await subscriptions.persistMetaOrder(list, [3, 2, 1]), null);
+    assert.equal(answers.length, 1, 'kein zweiter Schreibversuch');
+    assert.deepEqual(list.order(), ['2', '1', '3'], 'der zweite Zug ist zurueckgenommen');
+    answers[0]();
+    assert.equal(await first, false);
+    assert.deepEqual(list.order(), ['1', '2', '3'], 'angezeigt ist, was gespeichert ist');
+  } finally {
+    delete globalThis.__apiStub;
+    subscriptions.state.meta.categories = saved;
+  }
+});
+
+test('Schnelllinks: scheitert das Speichern eines Schritts, steht wieder die gespeicherte Reihenfolge da', { timeout: 5000 }, async () => {
   const items = [{ id: 1, name: 'A', url: 'https://a.example' }, { id: 2, name: 'B', url: 'https://b.example' }];
   let onKeydown = null;
   const list = fakeList([1, 2], {
@@ -514,6 +550,43 @@ test('Schnelllinks: scheitert das Speichern eines Schritts, steht wieder die ges
     await done;
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(list.order(), ['1', '2'], 'nach dem Fehlschlag zurueck auf den Stand des Servers');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__apiStub;
+  }
+});
+
+test('Schnelllinks: ein Zug zur Zeit - scheitert der erste, steht kein zweiter gespeichert neben der Anzeige (Codex an #2177)', { timeout: 5000 }, async () => {
+  const items = [{ id: 1, name: 'A', url: 'https://a.example' }, { id: 2, name: 'B', url: 'https://b.example' }, { id: 3, name: 'C', url: 'https://c.example' }];
+  let onKeydown = null;
+  const list = fakeList([1, 2, 3], { addEventListener: (type, fn) => { if (type === 'keydown') onKeydown = fn; } });
+  for (const row of list.children) {
+    row.querySelector = () => null;
+    row.handle = { focus() {}, closest: (sel) => (sel === '[data-sortable-handle]' ? row.handle : row) };
+    row.closest = () => row;
+    Object.defineProperty(row, 'nextElementSibling', { get: () => list.children[list.children.indexOf(row) + 1] ?? null });
+    Object.defineProperty(row, 'previousElementSibling', { get: () => list.children[list.children.indexOf(row) - 1] ?? null });
+  }
+  const el = () => ({ addEventListener() {} });
+  const panel = { querySelector: (sel) => (sel === '#quick-link-manage-list' ? list : el()), querySelectorAll: () => [] };
+  const answers = [];
+  const sent = [];
+  globalThis.__openModal = (opts) => opts.onSave(panel);
+  globalThis.__apiStub = {
+    get: async () => ({ data: items }),
+    put: (_path, body) => new Promise((resolve, reject) => { sent.push(body.ids.join(',')); answers.push({ ok: () => resolve({ data: true }), fail: () => reject(new Error('offline')) }); }),
+  };
+  try {
+    await openQuickLinksManager();
+    const [a, , c] = list.children;
+    onKeydown({ key: 'ArrowDown', target: a.handle, preventDefault() {} });
+    onKeydown({ key: 'ArrowUp', target: c.handle, preventDefault() {} });
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(sent, ['2,1,3'], 'der zweite Schritt waehrend der Anfrage entfaellt');
+    answers[0].fail();
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(list.order(), ['1', '2', '3'], 'angezeigt ist, was gespeichert ist');
   } finally {
     delete globalThis.__openModal;
     delete globalThis.__apiStub;

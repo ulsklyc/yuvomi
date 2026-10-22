@@ -2240,13 +2240,29 @@ function restoreMetaFocus(panel) {
   (handle ?? row.querySelector('.row-action--more') ?? row.querySelector('[data-act="edit"]'))?.focus();
 }
 
+/** Der Zug, der gerade speichert (`{ ids }`), sonst null. */
+let metaOrderRun = null;
+
 /** Neue Reihenfolge einer Liste speichern - Pfeiltaste, Menue und Drag-Ende teilen diesen Weg. */
 async function persistMetaOrder(list, ids) {
   // Der Riegel am Schreibweg selbst: Pfeiltaste, Menue und Drag-Ende kommen
   // alle hier vorbei (Nur-lesen-Regel, test:budget-readonly-ui).
   if (readOnly()) return null;
   const key = list.id.includes('category') ? 'categories' : 'payment_methods';
-  const saved = await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
+  // EIN ZUG ZUR ZEIT (Codex an #2177): waehrend einer speichert, entfaellt
+  // der naechste. Ein gezogener Zug wird zurueckgenommen - die Liste zeigt
+  // dann wieder, was gerade gespeichert wird.
+  if (metaOrderRun) {
+    restoreOrder(list, metaOrderRun.ids, (li) => li.dataset.id);
+    return null;
+  }
+  metaOrderRun = { ids };
+  let saved;
+  try {
+    saved = await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
+  } finally {
+    metaOrderRun = null;
+  }
   if (!saved) {
     // GESCHEITERT, OHNE DASS DER DIALOG NEU AUFGEHT (Codex an #2177): das
     // Ziehen hat die Zeile schon umgehaengt. Zurueck auf den gespeicherten
@@ -2265,6 +2281,7 @@ function moveMetaRow(row, delta, target) {
   const index = rows.indexOf(row);
   const next = index + delta;
   if (index < 0 || next < 0 || next >= rows.length) return null;
+  if (metaOrderRun) return null;
   [rows[index], rows[next]] = [rows[next], rows[index]];
   metaFocus = { kind: row.dataset.kind, id: Number(row.dataset.id), target, index: next };
   return persistMetaOrder(list, rows.map((li) => Number(li.dataset.id)));
