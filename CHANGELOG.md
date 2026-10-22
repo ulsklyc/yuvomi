@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   linked entry as the import from contacts, and the row then shows "Show in birthdays". The button
   only appears for members who may edit the calendar, the module Birthdays belongs to.
 
+### Changed
+- **The manage dialogs end their rows like every other list** (#2152). Category, tag, subscription
+  category and payment method, quick link and family member rows now end the same way: at most one
+  visible action, then the More button, then the drag handle on the far right. Rename, edit and
+  delete moved into the More menu, with delete marked in red there instead of a red trash can in
+  every row. The handle is now a button: focus it and press the up or down arrow to move the row,
+  as in the shopping list. Quick links can be reordered with the keyboard for the first time.
+  Move up and Move down stay in the More menu for touch screen readers and switch control.
+
 ### Fixed
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
   client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
