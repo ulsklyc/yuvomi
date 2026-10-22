@@ -1310,7 +1310,7 @@ function renderListContent(container) {
 
     <!-- Artikel-Liste; Inhalt via mountItems(), damit der Leerzustand über den
          geteilten Renderer läuft statt als HTML-String hier drin. -->
-    <div class="list-scroller page-scrollport items-list" id="items-list"></div>
+    <div class="list-scroller page-scrollport items-list" data-scroll-port="shopping" id="items-list"></div>
 
     <!-- Ansage für Umsortierungen (#678), wie im Kategorie-Manager: das
          aria-label des Griffs allein ist zu leise - ob ein Screenreader die

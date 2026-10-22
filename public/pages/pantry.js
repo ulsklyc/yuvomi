@@ -361,6 +361,7 @@ export async function render(container) {
 
   const list = document.createElement('div');
   list.className = 'list-scroller page-scrollport pantry-list';
+  list.dataset.scrollPort = 'pantry';
   list.id = 'pantry-list';
   list.setAttribute('aria-busy', 'true');
   list.append(filters);

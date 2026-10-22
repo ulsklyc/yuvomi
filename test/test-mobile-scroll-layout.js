@@ -12,7 +12,11 @@ import { eachRule } from './css-rules.js';
 import {
   rememberScrollPosition,
   scrollPositionFor,
+  portPositionsFor,
   forgetScrollPositions,
+  adoptEntryKey,
+  captureScrollPorts,
+  restoreScrollPorts,
 } from '../public/utils/scroll-restore.js';
 
 const routerJs = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
@@ -179,6 +183,112 @@ test('a forward navigation opens the target page at the top, a back navigation w
   );
 });
 
+/* Attrappe eines Ports: `scrollTop` klemmt wie im Browser auf die Hoehe. */
+function fakePort(name, { height = 2000, client = 500, inert = false } = {}) {
+  let top = 0;
+  return {
+    name,
+    scrollHeight: height,
+    clientHeight: client,
+    get scrollTop() { return top; },
+    set scrollTop(v) { top = Math.max(0, Math.min(v, this.scrollHeight - this.clientHeight)); },
+    getAttribute: (attr) => (attr === 'data-scroll-port' ? name : null),
+    closest: (sel) => (sel === '[inert]' && inert ? {} : null),
+  };
+}
+function fakeRoot(ports) {
+  return {
+    ports,
+    querySelectorAll: (sel) => (sel === '[data-scroll-port]' ? ports : []),
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
+test('back restores the named INNER scroll ports, keyed per history entry (R22, D2)', () => {
+  forgetScrollPositions();
+  // Kontakte: `#main-content` steht auf 0, die Liste auf 250 (gemessen a6: 250 -> 0).
+  const list = fakePort('contacts');
+  list.scrollTop = 250;
+  const ghost = fakePort('contacts', { inert: true });
+  ghost.scrollTop = 900;
+  const ports = captureScrollPorts(fakeRoot([list, ghost]));
+  assert.deepEqual(ports, { contacts: 250 },
+    'der sichtbare Port zaehlt; ein geparkter Nachbar (inert) nicht');
+  rememberScrollPosition('entry-1', 0, ports);
+  assert.deepEqual(portPositionsFor('entry-1', { restore: true }), { contacts: 250 },
+    'Zurueck liefert den Stand des inneren Ports');
+  assert.equal(portPositionsFor('entry-1', { restore: false }), null,
+    'eine neue Navigation startet oben - auch im inneren Port');
+
+  // DERSELBE PFAD ZWEIMAL IN DER HISTORIE: zwei Eintraege, zwei Staende.
+  rememberScrollPosition('entry-2', 0, { contacts: 40 });
+  assert.deepEqual(portPositionsFor('entry-1', { restore: true }), { contacts: 250 },
+    'der erste Besuch behaelt seinen Stand, der zweite ueberschreibt ihn nicht');
+  assert.deepEqual(portPositionsFor('entry-2', { restore: true }), { contacts: 40 });
+
+  // Neuaufbau nach dem Zurueck: der Port ist ein NEUES Element, zuerst noch kurz
+  // (die Zeilen kommen nach dem Render). Gesetzt wird, was schon geht ...
+  const fresh = fakePort('contacts', { height: 600 });
+  const stop = restoreScrollPorts(fakeRoot([fresh]), { contacts: 250 }, { timeoutMs: 50 });
+  assert.equal(fresh.scrollTop, 100, 'ein zu kurzer Port klemmt erst auf sein Maximum');
+  stop();
+  // ... und ein Port, der sofort die Hoehe hat, sitzt sofort.
+  const tall = fakePort('contacts');
+  restoreScrollPorts(fakeRoot([tall]), { contacts: 250 })();
+  assert.equal(tall.scrollTop, 250);
+  forgetScrollPositions();
+});
+
+test('every history entry gets a scroll key without losing its state (R22, D2)', () => {
+  const calls = [];
+  const history = {
+    state: { path: '/contacts', overlay: false },
+    replaceState(state) { calls.push(state); this.state = state; },
+  };
+  const key = adoptEntryKey(history, '/contacts');
+  assert.match(key, /^s/, 'ein frischer Schluessel');
+  assert.equal(history.state.path, '/contacts', 'der Router liest `path` weiter');
+  assert.equal(history.state.scrollKey, key);
+  assert.equal(adoptEntryKey(history, '/contacts'), key, 'ein Eintrag behaelt seinen Schluessel');
+  assert.equal(calls.length, 1, 'nur der erste Aufruf schreibt');
+  const locked = { state: null, replaceState() { throw new Error('SecurityError'); } };
+  assert.equal(adoptEntryKey(locked, '/tasks'), '/tasks', 'gesperrte History: der Pfad bleibt Schluessel');
+});
+
+test('every page scroll port names itself for the restore (R22, D2)', () => {
+  // Die Rolle `.page-scrollport` ist das, was scrollt; der NAME ist das, woran
+  // der Router den Port nach dem Neuaufbau wiederfindet. Ein Port ohne Namen
+  // faellt beim Zurueck still auf 0 - der Befund aus sieben Modulen.
+  const dir = new URL('../public/pages/', import.meta.url);
+  const unnamed = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    for (const m of src.matchAll(/<[a-z]+\b[^<>]*\bpage-scrollport\b[^<>]*>/g)) {
+      if (!/data-scroll-port="[a-z-]+"/.test(m[0])) unnamed.push(`${file}: ${m[0].slice(0, 80)}`);
+    }
+    for (const m of src.matchAll(/^(\s*)(\w+)\.className = '[^']*\bpage-scrollport\b[^']*';\n([^\n]*)/gm)) {
+      if (!new RegExp(`${m[2]}\\.dataset\\.scrollPort = '[a-z-]+'`).test(m[3])) unnamed.push(`${file}: ${m[0].trim().split('\n')[0]}`);
+    }
+  }
+  assert.deepEqual(unnamed, [], 'jeder Port braucht data-scroll-port="<name>" (utils/scroll-restore.js)');
+  // Aufgaben setzen die Rolle erst in der Spaltenform - der Name steht am festen Markup.
+  assert.match(readFileSync(new URL('tasks.js', dir), 'utf8'), /<div id="task-list" class="split-view__list" data-scroll-port="tasks">/);
+});
+
+test('the router remembers and restores the inner ports on the way back (R22, D2)', () => {
+  assert.match(routerJs, /rememberScrollPosition\(_shownEntryKey \?\? path, top, captureScrollPorts\(main\)\)/,
+    'beim Verlassen: der Eintrag, der stand, samt seiner Ports');
+  assert.match(routerJs, /const key = restore \? \(entryKeyOf\(history\.state\) \?\? path\) : path;/,
+    'beim Zurueck: der Eintrag, auf den es geht');
+  assert.match(routerJs, /if \(scrollTarget > 0\) content\.scrollTop = scrollTarget;\s*restorePorts\(\);/,
+    'die Ports nach dem Render, wie der Hauptport');
+  assert.match(routerJs, /updateNav: updateNavForEntry,/,
+    'navigate() bekommt das updateNav, das den Eintrag festhaelt');
+  assert.match(routerJs, /function updateNavForEntry\(section\) \{\s*noteShownEntry\(\);\s*updateNav\(section\);/,
+    'der Eintrag gilt, sobald navigate() ihn geschrieben hat');
+});
+
 test('the router resets the surviving scrollport on every navigation', () => {
   // #main-content IST .app-content (renderAppShell) und überlebt jede Navigation:
   // renderPage() tauscht per replaceChildren nur seinen Inhalt. Ohne expliziten
@@ -256,9 +366,9 @@ test('the modules with an inner scroll container are the documented nine', () =>
       '.budget-page', '.calendar-page', '.contacts-page', '.health-page', '.meals-page',
       '.notes-page', '.pantry-page', '.recipes-page', '.shopping-page',
     ],
-    'Die Module mit innerem Scroller haben sich geändert. Sie sind genau die, in '
-    + 'denen Browser-Zurück NICHT an die alte Position zurückkehrt - die Liste in '
-    + 'utils/scroll-restore.js und in docs/SPEC.md (Responsive Composition) muss mit.',
+    'Die Module mit innerem Scroller haben sich geändert. Ihr Rueckweg haengt am '
+    + 'benannten Port (data-scroll-port, R22) - die Liste in utils/scroll-restore.js '
+    + 'und in docs/SPEC.md (Responsive Composition) muss mit.',
   );
 });
 

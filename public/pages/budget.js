@@ -1210,7 +1210,7 @@ function renderBody() {
   // den Monat neu und rendert danach denselben Tab.
   if (state.loadError) {
     updateTabs();
-    setHtml(body, '<div class="budget-tab-panel page-scrollport" id="budget-error-panel"></div>');
+    setHtml(body, '<div class="budget-tab-panel page-scrollport" data-scroll-port="budget" id="budget-error-panel"></div>');
     mountLoadError(body.querySelector('#budget-error-panel'), {
       title: t('budget.loadError'),
       description: t('common.loadErrorDescription'),
@@ -1229,7 +1229,7 @@ function renderBody() {
   const p    = state.prevSummary;
   updateTabs();
   if (state.activeTab === 'reports') {
-    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--reports" id="budget-reports-panel"></div>');
+    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--reports" data-scroll-port="budget" id="budget-reports-panel"></div>');
     renderStats(body.querySelector('#budget-reports-panel'), {
       user: _user, currency: state.currency,
       budgetMode: state.budgetMode, scope: state.scope,
@@ -1267,7 +1267,7 @@ function renderBody() {
     return;
   }
   if (state.activeTab === 'plan') {
-    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--reading budget-tab-panel--plan" id="budget-plan-panel"></div>');
+    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--reading budget-tab-panel--plan" data-scroll-port="budget" id="budget-plan-panel"></div>');
     renderPlans(body.querySelector('#budget-plan-panel'), {
       user: _user, currency: state.currency, month: state.month,
       budgetMode: state.budgetMode, scope: state.scope,
@@ -1298,14 +1298,14 @@ function renderBody() {
     return;
   }
   if (state.activeTab === 'subscriptions') {
-    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--subscriptions" id="budget-subscriptions-panel"></div>');
+    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--subscriptions" data-scroll-port="budget" id="budget-subscriptions-panel"></div>');
     renderSubscriptions(body.querySelector('#budget-subscriptions-panel'), { user: _user }).catch((err) => {
       console.error('[Budget] subscriptions render error:', err);
     });
     return;
   }
   if (state.activeTab === 'split-expenses') {
-    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--split-expenses" id="budget-split-expenses-panel"></div>');
+    setHtml(body, '<div class="budget-tab-panel page-scrollport budget-tab-panel--split-expenses" data-scroll-port="budget" id="budget-split-expenses-panel"></div>');
     const panel = body.querySelector('#budget-split-expenses-panel');
     // Der Titel war bisher der Modulname („Geteilte Ausgaben") und die
     // Fehlermeldung stand darunter als Beschreibung - ein Leerzustand, der
@@ -1405,7 +1405,7 @@ function renderBody() {
    * entfaellt die Seitenleiste ganz; der Leerzustand spricht allein. */
   const monthEmpty = !state.entries.length && !s.income && !s.expenses && !s.pending?.count;
   setHtml(body, `
-    <div class="budget-tab-panel page-scrollport budget-tab-panel--budget">
+    <div class="budget-tab-panel page-scrollport budget-tab-panel--budget" data-scroll-port="budget">
     <!-- EIN Scrollport (das Panel). Ab ~960px Container zwei Spalten: links die
          Buchungen als Hauptinhalt, rechts Bilanz und Kategorien, sticky. Die
          Seitenleiste steht im Markup VORN, damit Lese- und Tab-Reihenfolge
@@ -2827,7 +2827,7 @@ function renderAccountsPage() {
 
   if (!all.length) {
     return `
-      <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts">
+      <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
         ${header}
         <div class="budget-accounts">
         ${rail}
@@ -2894,7 +2894,7 @@ function renderAccountsPage() {
   }).join('');
 
   return `
-    <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts">
+    <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
       ${header}
       <div class="budget-accounts">
         ${rail}
@@ -3522,7 +3522,7 @@ function renderLoansPage() {
     // Ohne Beschreibung: sie schickte „ueber die +-Schaltflaeche" zu einem
     // Weg, den der Knopf darunter selbst ist (Critique 2026-09-25).
     const ro = readOnly();
-    return `<div class="budget-tab-panel page-scrollport budget-tab-panel--loans">
+    return `<div class="budget-tab-panel page-scrollport budget-tab-panel--loans" data-scroll-port="budget">
       ${emptyStateHTML({
     icon: 'hand-coins',
     title: t('budget.loansEmpty'),
@@ -3531,7 +3531,7 @@ function renderLoansPage() {
     </div>`;
   }
 
-  return `<div class="budget-tab-panel page-scrollport budget-tab-panel--loans">
+  return `<div class="budget-tab-panel page-scrollport budget-tab-panel--loans" data-scroll-port="budget">
     ${renderLoansDashboard()}
   </div>`;
 }

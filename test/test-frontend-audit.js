@@ -6728,7 +6728,7 @@ test('Notes follow the mobile header rule: chips inside the port, category manag
   const notesPage = read('../public/pages/notes.js');
   // Die Chipreihe stand fest zwischen Kopf und Port und kostete dauerhaft 65px
   // (A8). Sie ist jetzt das erste Kind des Ports und scrollt mit weg.
-  const port = notesPage.indexOf('<div class="notes-scroll page-scrollport">');
+  const port = notesPage.indexOf('<div class="notes-scroll page-scrollport" data-scroll-port="notes">');
   const chips = notesPage.indexOf('id="notes-filters"');
   const grid = notesPage.indexOf('<div id="notes-grid"');
   assert.ok(port > -1 && chips > port && grid > chips,

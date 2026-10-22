@@ -3479,7 +3479,7 @@ function renderMonthView(container) {
       <div class="month-weekdays" role="row">
         ${weekdayOrder(state.weekStart).map((idx) => `<div class="month-weekday" role="columnheader" aria-label="${esc(DAY_NAMES_LONG()[idx])}">${DAY_NAMES_SHORT()[idx]}</div>`).join('')}
       </div>
-      <div class="month-grid${split ? '' : ' page-scrollport'}" id="month-grid" role="rowgroup">
+      <div class="month-grid${split ? '' : ' page-scrollport'}" data-scroll-port="calendar-month" id="month-grid" role="rowgroup">
         ${Array.from({ length: weeks }, (_, w) => {
           const week = days.slice(w * 7, w * 7 + 7);
           // Baender nur am Desktop: am Telefon sagt der Punkt je Tag „hier ist
@@ -3796,7 +3796,7 @@ function monthListHtml() {
       </div>
       ${/* data-head-collapse="module": das Scrollen der Liste faltet den Kopf
             nicht selbst - er folgt dem Raster (syncMonthCollapse, D9). */ ''}
-      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows" data-head-collapse="module"></div>
+      <div class="agenda-view month-list__rows page-scrollport" id="month-list-rows" data-scroll-port="calendar-month-list" data-head-collapse="module"></div>
     </section>
   `;
 }
@@ -4649,7 +4649,7 @@ function renderWeekView(container) {
           </div>
         `).join('')}
       </div>
-      <div class="week-view__scroll page-scrollport" id="week-scroll">
+      <div class="week-view__scroll page-scrollport" data-scroll-port="calendar-week" id="week-scroll">
         <div class="week-view__body">
           <div class="week-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
@@ -5348,7 +5348,7 @@ function renderDayView(container) {
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
       </div>` : ''}
-      <div class="day-view__scroll page-scrollport" id="day-scroll">
+      <div class="day-view__scroll page-scrollport" data-scroll-port="calendar-day" id="day-scroll">
         <div class="day-view__body">
           <div class="day-view__times">
             ${Array.from({ length: 24 }, (_, h) => `
@@ -6025,7 +6025,7 @@ function renderAgendaView(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="split-view calendar-agenda-split">
-    <div class="agenda-view page-scrollport split-view__list" id="agenda-view">
+    <div class="agenda-view page-scrollport split-view__list" data-scroll-port="calendar-agenda" id="agenda-view">
       ${groups.length === 0
         ? emptyStateHTML({
           icon: 'calendar-plus',
@@ -6950,7 +6950,7 @@ function renderCalendarSearchResults(body) {
   }
 
   body.insertAdjacentHTML('beforeend', `
-    <div class="agenda-view page-scrollport cal-search-results" id="cal-search-results">
+    <div class="agenda-view page-scrollport cal-search-results" data-scroll-port="calendar-search" id="cal-search-results">
       <p class="cal-search-results__count" aria-hidden="true">${esc(calendarSearchCountLabel())}</p>
       ${groups.map(({ date, events }) => `
         <div class="agenda-day" data-date="${esc(date)}">

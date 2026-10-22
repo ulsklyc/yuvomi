@@ -1111,7 +1111,7 @@ export async function render(container, ctx = {}) {
         <div class="page-toolbar__actions"><span class="health-toolbar__tools" id="health-tools">${healthToolsHtml()}</span></div>
       </header>
       <div class="split-view health-split">
-        <div class="split-view__list page-scrollport health-browse">
+        <div class="split-view__list page-scrollport health-browse" data-scroll-port="health">
           <!-- Telefon-Uebersicht: Person, Heute faellig und Schnell erfassen
                VOR der Bereichsliste (health-hoist.js, R14 P3). Die h2 steht
                vor dem Umzugsziel, nicht darin: die Karten bringen ihre h3 mit,

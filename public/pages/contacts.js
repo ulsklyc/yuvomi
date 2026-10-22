@@ -268,7 +268,7 @@ export async function render(container, { user, signal } = {}) {
       </div>
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
       <div class="split-view contacts-split">
-        <div id="contacts-list" class="contacts-list page-scrollport split-view__list" aria-busy="true">
+        <div id="contacts-list" class="contacts-list page-scrollport split-view__list" data-scroll-port="contacts" aria-busy="true">
           <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.categoryLabel')}"></div>
           <div id="contacts-rows" class="contacts-rows">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
         </div>

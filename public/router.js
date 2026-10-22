@@ -65,7 +65,12 @@ import { syncWallMode, onWallActiveChange, isWallActive } from '/utils/wall-mode
 import {
   rememberScrollPosition,
   scrollPositionFor,
+  portPositionsFor,
   forgetScrollPositions,
+  adoptEntryKey,
+  entryKeyOf,
+  captureScrollPorts,
+  restoreScrollPorts,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal } from '/components/modal.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
@@ -379,6 +384,41 @@ function scrollPageToTop() {
   for (const el of new Set([main, port])) {
     if (el?.isConnected && main.contains(el) && el.scrollTop > 0) el.scrollTo({ top: 0, behavior });
   }
+}
+
+/**
+ * DER RUECKWEG KENNT DEN EINTRAG UND DIE INNEREN PORTS (Critique R22, D2).
+ *
+ * `_shownEntryKey` ist der Schluessel des History-Eintrags, dessen Seite
+ * gerade steht - gesetzt, sobald eine Navigation ihren Eintrag geschrieben
+ * hat (der `updateNav`-Aufruf in navigate() kommt in beiden Wegen danach,
+ * voll und weich). Beim Verlassen gilt er: nach einem Zurueck zeigt
+ * `history.state` schon auf das ZIEL, der verlassene Eintrag ist nur noch
+ * hier bekannt. `_pendingPortTargets` traegt die Port-Staende vom
+ * Scrollziel in navigate() zu renderPage(), das sie nach dem Render setzt.
+ */
+let _shownEntryKey = null;
+let _pendingPortTargets = null;
+
+function noteShownEntry() {
+  _shownEntryKey = adoptEntryKey(history, location.pathname);
+}
+
+/** updateNav() fuer navigate(): erst den Eintrag festhalten, der jetzt steht. */
+function updateNavForEntry(section) {
+  noteShownEntry();
+  updateNav(section);
+}
+
+function rememberLeavingPage(path, top) {
+  const main = document.getElementById('main-content');
+  rememberScrollPosition(_shownEntryKey ?? path, top, captureScrollPorts(main));
+}
+
+function scrollTargetFor(path, { restore = false } = {}) {
+  const key = restore ? (entryKeyOf(history.state) ?? path) : path;
+  _pendingPortTargets = portPositionsFor(key, { restore });
+  return scrollPositionFor(key, { restore });
 }
 
 /**
@@ -784,7 +824,13 @@ const navigate = createNavigate(routerState, {
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
   // zeichnet diesen Zustand in #app und versucht selbst erneut (Critique R19).
   showSessionUnreachable: (err, retry) => showSessionUnreachable(document.getElementById('app'), err, retry),
-  rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
+  // Scrollstand je History-Eintrag samt inneren Ports (R22, D2): dieselben
+  // Namen, der Router legt Eintragsschluessel und Ports darunter.
+  rememberScrollPosition: rememberLeavingPage,
+  scrollPositionFor: scrollTargetFor,
+  renderPage, adoptPageFab,
+  updateNav: updateNavForEntry,
+  topLevelSection,
   syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
   focusMainContentAfterNavigation, showToast, t,
 });
@@ -1743,6 +1789,18 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
 
     let pageWrapper = null;
     let renderPromise = null;
+    // Die inneren Ports des Rueckwegs (D2): genommen, nicht gelesen - eine
+    // weiche Navigation danach soll sie nicht erben. Gesetzt werden sie wie
+    // `scrollTarget` nach dem Render, und ein Port, dessen Zeilen erst danach
+    // kommen, wird nachgezogen (utils/scroll-restore.js).
+    const portTargets = _pendingPortTargets;
+    _pendingPortTargets = null;
+    let stopPortRestore = null;
+    const restorePorts = () => {
+      if (!portTargets || signal?.aborted) return;
+      stopPortRestore?.();
+      stopPortRestore = restoreScrollPorts(content, portTargets, { signal: _pageController?.signal ?? signal });
+    };
     // Der SYNCHRONE Teil des Wechsels: Inhalt tauschen, Scrollport zuruecksetzen,
     // alte Seite abbauen, render() starten. Er ist der Update-Callback der View
     // Transition - der Browser haelt bis zu seinem Ende das alte Bild, es gibt
@@ -1850,6 +1908,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       return Promise.resolve(renderPromise).then(() => {
         if (signal?.aborted) return;
         if (scrollTarget > 0) content.scrollTop = scrollTarget;
+        restorePorts();
         adoptPageFab();
       }, () => {});
     };
@@ -1909,6 +1968,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
     // seine volle Höhe hat. Best effort - ist die Seite kürzer als beim Verlassen
     // (gefilterte Liste, gelöschter Eintrag), klemmt der Browser auf sein Maximum.
     if (scrollTarget > 0) content.scrollTop = scrollTarget;
+    restorePorts();
 
     // Ab hier kann das Modul Soft-Navigationen bedienen (sofern es update() bietet).
     routerState._renderedModule = module;
@@ -5081,6 +5141,9 @@ window.addEventListener('popstate', (e) => {
     // ueber einem offenen Dialog meint die Geste den Dialog (#871).
     const handled = overlay || handleMasterDetailPopstate();
     if (!handled) navigate(target, false);
+    // Die Seite bleibt, der Eintrag wechselt: ab jetzt gilt SEIN Schluessel
+    // fuer das naechste Verlassen (D2).
+    else if (!overlay) noteShownEntry();
   });
 });
 

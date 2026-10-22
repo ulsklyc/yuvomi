@@ -698,7 +698,7 @@ function mealsToolsMenuHtml() {
 function mealsLayoutHtml() {
   const ro = readOnly();
   return `<div class="meals-layout${ro ? ' meals-layout--rail-hidden' : ''}">
-        <div class="week-grid page-scrollport" id="week-grid">
+        <div class="week-grid page-scrollport" data-scroll-port="meals" id="week-grid">
           <div style="grid-column:1/-1">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
         </div>
         ${ro ? '' : '<aside class="recipe-sidebar" id="recipe-sidebar"></aside>'}

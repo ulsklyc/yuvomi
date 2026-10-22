@@ -6283,7 +6283,7 @@ export async function render(container, { user, signal } = {}) {
               Liste (Re-Critique 2026-09-27, D5). */ ''}
         <div class="sr-only" role="status" aria-live="polite" id="tasks-reorder-announce"></div>
         <div class="split-view tasks-split">
-        <div id="task-list" class="split-view__list">
+        <div id="task-list" class="split-view__list" data-scroll-port="tasks">
           ${[1,2,3].map(() => `
             <div class="widget-skeleton" style="margin-bottom:var(--space-2)">
               <div class="skeleton skeleton-line skeleton-line--medium" style="height:18px;margin-bottom:var(--space-3)"></div>

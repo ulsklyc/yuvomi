@@ -3475,6 +3475,16 @@ WEGSCHNEIDET (`getBoundingClientRect` meldet die Layout-Position, nicht die Sich
 waren das drei Kuechen-Ziele bei y 721-838 hinter einem Scrollport, der bei 735,9 endet).
 Dieselbe Falle 2, die Sonde 4 an ihren Kanten beschreibt.
 
+**Der Scrollport traegt einen NAMEN (R22, D2):** `data-scroll-port="<name>"` steht an jedem
+Element mit der Rolle `.page-scrollport` (bei `className =`-Aufbau als `dataset.scrollPort`
+in der Zeile danach). Der Router merkt sich beim Verlassen jeden benannten Port mit Stand > 0
+je History-Eintrag (`scrollKey` in `history.state`) und setzt ihn nach dem Render des
+Rueckwegs wieder - ein Port, dessen Zeilen spaeter kommen, wird bis 1,5 s nachgezogen, nie
+gegen eine Eingabe. Eine neue Navigation startet oben. Ein Name je Bereich, nicht je Reiter
+(`budget` fuer alle Budget-Panels); ein geparkter Nachbar (`inert`) zaehlt nicht.
+Pruefebene: **Struktur** (`every page scroll port names itself for the restore`,
+test-mobile-scroll-layout.js) plus Einheit (Schluessel je Eintrag, Nachziehen).
+
 **Gemessen wird sie an der Sichtflaeche, nicht am Scrollport** - der Unterschied ist bei
 dieser Regel entscheidend und war zweimal die Quelle einer falschen Messung. Die App hat zwei
 Scrollport-Architekturen: in Kueche, Budget, Kalender, Notizen und Kontakten liegt der Kopf

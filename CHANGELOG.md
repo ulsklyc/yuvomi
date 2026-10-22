@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Back and forward return to where you were in every list.** Contacts, Shopping, Notes, Pantry,
+  Budget, Recipes, Meals, Health, the calendar views and the task list on a wide screen scroll a
+  list inside the page, and going back to them always started at the top. They now reopen at the
+  row you left, and a page you open anew still starts at the top. A page visited twice in a row of
+  steps keeps both positions.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.

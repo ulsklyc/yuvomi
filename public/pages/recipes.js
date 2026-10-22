@@ -478,6 +478,7 @@ export async function render(container, { signal } = {}) {
 
   const list = document.createElement('div');
   list.className = 'list-scroller page-scrollport recipes-list split-view__list';
+  list.dataset.scrollPort = 'recipes';
   list.id = 'recipes-list';
   // Lade-Skeleton bis loadRecipes() aufgelöst ist (Router blendet den Wrapper
   // bereits vor dem Daten-await ein).

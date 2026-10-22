@@ -286,7 +286,7 @@ export async function render(container, { user, signal }) {
           </div>`}
         </div>
       </div>
-      <div class="notes-scroll page-scrollport">
+      <div class="notes-scroll page-scrollport" data-scroll-port="notes">
         <!-- DIE CHIPREIHE IST DAS ERSTE KIND DES PORTS (Kopfregel mobil,
              2026-09-26). Zwischen Kopf und Port kostete sie dauerhaft 65px
              (Port ab y=179 statt 114), die auch der Kopf-Kollaps nicht
