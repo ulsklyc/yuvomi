@@ -359,6 +359,7 @@ function sanitizeNoteCategoryOptions(config, visibleCategories) {
 
 function dashboardPersonalViews(userId) {
   const ownWidgets = cfgUserGet('dashboard_widgets', userId);
+  const ownPhoneWidgets = cfgUserGet('dashboard_widgets_phone', userId);
   const ownGlance = cfgUserGet('dashboard_today_glance', userId);
   const fallback = dashboardDefaults();
   // Request-local and lazy: no catalog query for absent/empty filters, and one
@@ -379,6 +380,13 @@ function dashboardPersonalViews(userId) {
     // Folge ich der Vorgabe? Nur wer NICHTS Eigenes hinterlegt hat, tut das -
     // und nur fuer den hat "zuruecksetzen" nichts zu tun.
     dashboard_follows_default: ownWidgets === null && ownGlance === null,
+    // Telefonansicht: eigene Anordnung (order + visible, keine size), sonst null
+    // (→ folgt dem Desktop). Gespeichert wie mobile_nav_order – pro Nutzer,
+    // ohne Haushaltsvorgabe. Null signalisiert "kein eigenes Telefon-Layout".
+    dashboard_widgets_phone: ownPhoneWidgets !== null
+      ? parsePhoneWidgetConfig(ownPhoneWidgets)
+      : null,
+    dashboard_follows_phone_default: ownPhoneWidgets === null,
   };
 }
 
@@ -420,6 +428,19 @@ function parseWidgetConfig(raw) {
     return normalizeWidgetConfig(parsed) ?? [];
   } catch {
     return JSON.parse(DEFAULT_WIDGET_CONFIG);
+  }
+}
+
+// Telefon-Anordnung: nur { id, visible, order }, keine size und keine options.
+// Validation ueber normalizeWidgetConfig (kennt alle gueltigen Ids, prueft Duplikate).
+function parsePhoneWidgetConfig(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeWidgetConfig(parsed);
+    if (!normalized) return [];
+    return normalized.map(({ id, visible, order }) => ({ id, visible, order }));
+  } catch {
+    return [];
   }
 }
 
@@ -716,7 +737,7 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
@@ -943,6 +964,22 @@ router.put('/', (req, res) => {
           return res.status(400).json({ error: 'dashboard_widgets enthält ungültige Einträge', code: 400 });
         }
         cfgUserSet('dashboard_widgets', req.authUserId, JSON.stringify(normalized));
+      }
+    }
+
+    if (dashboard_widgets_phone !== undefined) {
+      if (dashboard_widgets_phone === null) {
+        cfgUserDelete('dashboard_widgets_phone', req.authUserId);
+      } else if (!Array.isArray(dashboard_widgets_phone)) {
+        return res.status(400).json({ error: 'dashboard_widgets_phone muss ein Array sein', code: 400 });
+      } else {
+        const normalized = normalizeWidgetConfig(dashboard_widgets_phone);
+        if (normalized === null) {
+          return res.status(400).json({ error: 'dashboard_widgets_phone enthält ungültige Einträge', code: 400 });
+        }
+        cfgUserSet('dashboard_widgets_phone', req.authUserId, JSON.stringify(
+          normalized.map(({ id, visible, order }) => ({ id, visible, order })),
+        ));
       }
     }
 

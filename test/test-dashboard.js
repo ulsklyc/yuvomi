@@ -3370,7 +3370,7 @@ test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
   nodeAssert.match(src, /setHtml\(shell, `[\s\S]{0,900}`\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
     'rebuildDashboard misst direkt nach dem Zeichnen');
-  nodeAssert.match(src, /renderTodayCockpit\(data, cfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
+  nodeAssert.match(src, /renderTodayCockpit\(data, displayCfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
   nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
 });
 

@@ -225,7 +225,7 @@ test('„Verwalten" am Familie-Widget fuehrt an das Familienblatt - und nur, wer
 
     // Die Verdrahtung: der echte Aufruf reicht das Ziel des angemeldeten Nutzers durch.
     assert.match(dashboardSource,
-      /renderDashboardLayout\(cfg, data, weather, currency, \{[^}]*familyManage: familyManageHref\(user\)/,
+      /renderDashboardLayout\(displayCfg, data, weather, currency, \{[^}]*familyManage: familyManageHref\(user\)/,
       'rebuildDashboard gibt familyManageHref(user) an das Raster');
   }
 });
@@ -445,7 +445,7 @@ test('R9 M7: mobil eine Kopfzeile [Abbrechen] Titel [Fertig], Reichweite als Fus
   assert.match(foot, /data-customize-publish/);
   assert.match(foot, /data-customize-reset/);
   assert.doesNotMatch(foot, /\bid="/, 'eine Id gibt es einmal - die Fussnote verdrahtet ueber Datenattribute');
-  assert.match(dashboardSource, /\$\{isCustomizing \? renderCustomizeFootnote\(\{ followsDefault, canPublish \}\) : ''\}/, 'die Fussnote steht unter dem Raster, nur im Anpassen-Modus');
+  assert.match(dashboardSource, /\$\{isCustomizing \? renderCustomizeFootnote\(\{ followsDefault, canPublish, phoneCustomize, followsPhoneDefault \}\) : ''\}/, 'die Fussnote steht unter dem Raster, nur im Anpassen-Modus');
   assert.match(dashboardSource, /querySelectorAll\('\[data-customize-publish\]'\)\.forEach/, 'beide Orte laufen durch denselben Handler');
 
   const rules = [...eachRule(css)];
@@ -796,6 +796,21 @@ test('R14 P2: Anpassen mobil ist eine kompakte Liste - Name, Griff, Auge - und d
   assert.match(body('.widget-restore__chips', phone), /flex-wrap:\s*nowrap/, 'der Vorrat oben ist eine Zeile, keine Wand');
   assert.match(body('.widget-edit-controls__caption', phone), /display:\s*block/, 'mobil steht der Name in der Zeile');
   assert.match(body('.widget-edit-controls__caption', (r) => !r.at.length), /display:\s*none/, 'breit traegt der Kachelkopf den Namen');
+});
+
+test('R14 P2: Telefon-Anpassen blendet Groesse und Optionen aus - sie werden dort nicht gespeichert', () => {
+  const cfg = [
+    { id: 'notes', visible: true, size: '1x2' },
+    { id: 'budget', visible: true, size: '1x1' },
+  ];
+  global.window ??= { yuvomi: null };
+  const desktop = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: false });
+  const phone   = renderDashboardLayout(cfg, {}, null, 'EUR', { editing: true, phoneCustomize: true });
+
+  assert.match(desktop, /widget-edit-controls__size/, 'Desktop: Groessen-Auswahl ist da');
+  assert.doesNotMatch(phone, /widget-edit-controls__size/, 'Telefon: Groessen-Auswahl fehlt');
+  assert.match(desktop, /widget-edit-controls__options/, 'Desktop: Optionen-Knopf ist da (budget hat Optionen)');
+  assert.doesNotMatch(phone, /widget-edit-controls__options/, 'Telefon: Optionen-Knopf fehlt');
 });
 
 // R14 P12 (Re-Critique 2026-09-28, A8 P3-2): die Uebersicht war der einzige
