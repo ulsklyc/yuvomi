@@ -50,6 +50,7 @@ class TagManagerElement extends HTMLElement {
     this._focusAfter = null;
     this._onClick = this._onClick.bind(this);
     this._onSubmit = this._onSubmit.bind(this);
+    this._onKeydown = this._onKeydown.bind(this);
   }
 
   connectedCallback() {
@@ -62,6 +63,7 @@ class TagManagerElement extends HTMLElement {
   disconnectedCallback() {
     this._root?.removeEventListener('click', this._onClick);
     this._root?.removeEventListener('submit', this._onSubmit);
+    this._root?.removeEventListener('keydown', this._onKeydown);
   }
 
   _renderShell() {
@@ -79,6 +81,7 @@ class TagManagerElement extends HTMLElement {
     this._announceEl = this.querySelector('#tag-manager-announce');
     this._root.addEventListener('click', this._onClick);
     this._root.addEventListener('submit', this._onSubmit);
+    this._root.addEventListener('keydown', this._onKeydown);
     // Die Mehr-Menues der Zeilen (#2152): Lage, Schliessen nach der Wahl, Pfeiltasten.
     installPopoverMenus(this._root);
   }
@@ -219,6 +222,22 @@ class TagManagerElement extends HTMLElement {
 
     const confirmDelete = e.target.closest('[data-delete-confirm]');
     if (confirmDelete) this._delete(confirmDelete.dataset.deleteConfirm);
+  }
+
+  /**
+   * Escape in einer geoeffneten Zeile (Umbenennen, Rueckfrage zum Entfernen)
+   * bricht genau diese Zeile ab, nicht den ganzen Dialog (#2152) - wie die
+   * Bearbeiten-Zeile im Abo-Verwalter. Der Fokus geht zurueck an den
+   * Mehr-Knopf der Zeile, aus dem die Handlung kam.
+   */
+  _onKeydown(e) {
+    if (e.key !== 'Escape' || !this._open) return;
+    if (!e.target.closest?.('[data-rename], [data-cancel], [data-delete-confirm]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this._focusAfter = { tag: this._open.tag, fallbackIndex: this._indexOf(this._open.tag) };
+    this._open = null;
+    this._renderList();
   }
 
   _indexOf(tag) {

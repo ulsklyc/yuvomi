@@ -214,6 +214,23 @@ test('Tags: nach Entfernen geht der Fokus an den Mehr-Knopf der Zeile an ihrem P
   assert.deepEqual(focused, ['c', 'a', 'c']);
 });
 
+test('Tags: Escape im Umbenennen bricht nur die Zeile ab, nicht den Dialog', () => {
+  const manager = new TagManager();
+  manager._tags = [{ tag: 'a', count: 1 }, { tag: 'b', count: 2 }];
+  manager._open = { tag: 'b', mode: 'rename' };
+  let rendered = 0;
+  manager._renderList = () => { rendered += 1; };
+  let stopped = false;
+  let prevented = false;
+  manager._onKeydown({ key: 'Escape', target: { closest: () => ({}) }, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+  assert.equal(manager._open, null);
+  assert.equal(rendered, 1);
+  assert.ok(stopped && prevented, 'der Dialog darunter bekommt das Escape nicht');
+  assert.deepEqual(manager._focusAfter, { tag: 'b', fallbackIndex: 1 });
+  // Ohne offene Zeile gehoert Escape dem Dialog.
+  manager._onKeydown({ key: 'Escape', target: { closest: () => ({}) }, preventDefault() { throw new Error('nicht abfangen'); }, stopPropagation() { throw new Error('nicht abfangen'); } });
+});
+
 // ---------------------------------------------------------------------------
 // Abo-Verwalter (Kategorien und Zahlungsarten)
 // ---------------------------------------------------------------------------
