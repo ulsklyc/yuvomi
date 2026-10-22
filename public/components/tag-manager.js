@@ -21,7 +21,8 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 import { holdUntilStyled } from '/utils/component-style.js';
 
 /**
@@ -43,6 +44,10 @@ class TagManagerElement extends HTMLElement {
     // Als Zustand und nicht als DOM-Abfrage, damit ein Neuzeichnen (nach einer
     // Mutation) die offene Zeile nicht stillschweigend wieder zuklappt.
     this._open = null;
+    // Wohin der Fokus nach dem naechsten Neuzeichnen geht: { tag, fallbackIndex }.
+    // Ein Neuzeichnen ersetzt die Zeile samt Knopf, auf dem der Fokus stand -
+    // ohne Ziel fiele er auf <body>, und wer per Tastatur verwaltet, sucht.
+    this._focusAfter = null;
     this._onClick = this._onClick.bind(this);
     this._onSubmit = this._onSubmit.bind(this);
   }
@@ -74,6 +79,8 @@ class TagManagerElement extends HTMLElement {
     this._announceEl = this.querySelector('#tag-manager-announce');
     this._root.addEventListener('click', this._onClick);
     this._root.addEventListener('submit', this._onSubmit);
+    // Die Mehr-Menues der Zeilen (#2152): Lage, Schliessen nach der Wahl, Pfeiltasten.
+    installPopoverMenus(this._root);
   }
 
   async load() {
@@ -99,18 +106,44 @@ class TagManagerElement extends HTMLElement {
       return;
     }
 
-    for (const { tag, count } of this._tags) {
-      this._listEl.insertAdjacentHTML('beforeend', this._rowMarkup(tag, count));
-    }
+    this._tags.forEach(({ tag, count }, index) => {
+      this._listEl.insertAdjacentHTML('beforeend', this._rowMarkup(tag, count, index));
+    });
     if (window.lucide) window.lucide.createIcons({ el: this._listEl });
 
     // Fokus in die gerade geöffnete Zeile: ohne das landet er nach dem
     // Neuzeichnen am Listenanfang, und wer per Tastatur umbenennt, sucht.
-    this.querySelector('#tag-rename-input')?.focus();
-    this.querySelector('#tag-rename-input')?.select();
+    const renameInput = this.querySelector('#tag-rename-input');
+    if (renameInput) {
+      renameInput.focus();
+      renameInput.select();
+      return;
+    }
+    // Die Rueckfrage zum Entfernen: der Fokus geht auf "Abbrechen", den
+    // ungefaehrlichen der beiden Knoepfe.
+    const cancel = this._open?.mode === 'delete' ? this._listEl.querySelector('[data-cancel]') : null;
+    if (cancel) { cancel.focus(); return; }
+    this._restoreFocus();
   }
 
-  _rowMarkup(tag, count) {
+  /**
+   * Nach Abbrechen, Umbenennen oder Entfernen: der Fokus geht an den
+   * Mehr-Knopf der Zeile, von der die Handlung kam (#2152). Gibt es die Zeile
+   * nicht mehr (entfernt, oder unter neuem Namen mit einer anderen
+   * zusammengefuehrt), an den Mehr-Knopf der Zeile, die jetzt an ihrem Platz
+   * steht, sonst an die davor - nie auf <body>.
+   */
+  _restoreFocus() {
+    const intent = this._focusAfter;
+    this._focusAfter = null;
+    if (!intent) return;
+    const rows = [...this._listEl.querySelectorAll('.cat-row[data-tag]')];
+    const own = rows.find((row) => row.dataset.tag === intent.tag);
+    const row = own ?? rows[Math.min(intent.fallbackIndex ?? 0, rows.length - 1)];
+    (row?.querySelector('.row-action--more') ?? this._listEl.querySelector('.cat-row__name'))?.focus();
+  }
+
+  _rowMarkup(tag, count, index = 0) {
     const open = this._open?.tag === tag ? this._open.mode : null;
 
     if (open === 'rename') {
@@ -139,15 +172,25 @@ class TagManagerElement extends HTMLElement {
         </li>`;
     }
 
+    // D10 ZEILEN-ENDZONE (#2152): der Name ist das Umbenennen-Ziel, am Ende
+    // steht EIN Mehr-Knopf mit Umbenennen und Entfernen. Vorher standen Stift
+    // und Papierkorb sichtbar nebeneinander - der Papierkorb dauerhaft rot in
+    // jeder Zeile. Sortieren gibt es nicht: die Liste ordnet die Haeufigkeit.
     return `
-      <li class="cat-row">
+      <li class="cat-row" data-tag="${esc(tag)}">
         <i data-lucide="tag" class="cat-row__icon" aria-hidden="true"></i>
         <button type="button" class="cat-row__name" data-rename-start="${esc(tag)}"
                 title="${esc(t('tasks.tagRenameLabel', { tag }))}">${esc(tag)}</button>
         <span class="cat-row__count">${esc(t('tasks.tagUsageCount', { count }))}</span>
-        <div class="cat-row__actions">
-          ${rowActionHtml({ icon: 'pencil', label: t('tasks.tagRenameLabel', { tag }), attrs: { 'data-rename-start': tag } })}
-          ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('tasks.tagDeleteLabel', { tag }), attrs: { 'data-delete-start': tag } })}
+        <div class="cat-row__actions row-actions">
+          ${rowMenuHtml({
+    id: `tag-row-menu-${index}`,
+    label: t('common.moreActionsNamed', { name: tag }),
+    items: [
+      { action: 'tag-rename', icon: 'pencil', label: t('tasks.tagRenameLabel', { tag }), attrs: { 'data-rename-start': tag } },
+      { action: 'tag-delete', icon: 'trash-2', danger: true, label: t('tasks.tagDeleteLabel', { tag }), attrs: { 'data-delete-start': tag } },
+    ],
+  })}
         </div>
       </li>`;
   }
@@ -168,6 +211,7 @@ class TagManagerElement extends HTMLElement {
     }
 
     if (e.target.closest('[data-cancel]')) {
+      this._focusAfter = this._open ? { tag: this._open.tag, fallbackIndex: this._indexOf(this._open.tag) } : null;
       this._open = null;
       this._renderList();
       return;
@@ -175,6 +219,10 @@ class TagManagerElement extends HTMLElement {
 
     const confirmDelete = e.target.closest('[data-delete-confirm]');
     if (confirmDelete) this._delete(confirmDelete.dataset.deleteConfirm);
+  }
+
+  _indexOf(tag) {
+    return Math.max(0, this._tags.findIndex((entry) => entry.tag === tag));
   }
 
   _onSubmit(e) {
@@ -190,6 +238,7 @@ class TagManagerElement extends HTMLElement {
     // Änderungen und meldete trotzdem Erfolg - eine Rückmeldung, die nichts
     // bedeutet. Ein reiner Wechsel der Schreibweise ist dagegen eine Änderung.
     if (!to || to === from) {
+      this._focusAfter = { tag: from, fallbackIndex: this._indexOf(from) };
       this._open = null;
       this._renderList();
       return;
@@ -197,7 +246,11 @@ class TagManagerElement extends HTMLElement {
 
     try {
       const res = await api.put(`/tasks/tags/${encodeURIComponent(from)}`, { name: to });
+      const fallbackIndex = this._indexOf(from);
       this._tags = res.data?.tags ?? this._tags;
+      // Die Zeile heisst jetzt `to` - auch dann, wenn sie mit einer
+      // vorhandenen zusammengefuehrt wurde.
+      this._focusAfter = { tag: to, fallbackIndex };
       this._open = null;
       const renamedMsg = withSkipped(t('tasks.tagsUpdated', { count: res.data?.updated ?? 0 }), res.data?.skipped);
       this._announce(renamedMsg);
@@ -212,7 +265,10 @@ class TagManagerElement extends HTMLElement {
   async _delete(tag) {
     try {
       const res = await api.delete(`/tasks/tags/${encodeURIComponent(tag)}`);
+      const fallbackIndex = this._indexOf(tag);
       this._tags = res.data?.tags ?? this._tags;
+      // Die Zeile ist weg: der Fokus geht an die, die jetzt an ihrem Platz steht.
+      this._focusAfter = { tag: null, fallbackIndex };
       this._open = null;
       const deletedMsg = withSkipped(t('tasks.tagDeleted', { count: res.data?.updated ?? 0 }), res.data?.skipped);
       this._announce(deletedMsg);
