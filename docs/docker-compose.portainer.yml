@@ -117,6 +117,10 @@ services:
       # Some IdPs (Authentik in its default setup among them) send no
       # email_verified claim; without this switch they refuse to link accounts.
       - OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=${OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM:-false}
+      # How Yuvomi authenticates at the token endpoint: client_secret_basic or
+      # client_secret_post. Empty picks automatically (basic, unless the IdP
+      # offers post only). Only change it when the IdP answers invalid_client.
+      - OIDC_TOKEN_AUTH_METHOD=${OIDC_TOKEN_AUTH_METHOD:-}
       # Set to false when the IdP serves more people than this household: an
       # SSO sign-in then never creates a new account, it only signs in and
       # links accounts that already exist.

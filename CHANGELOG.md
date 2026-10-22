@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
+  client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
+  that more strictly than the form format and also escaped `-`, `_` and `.`, so a provider that
+  does not decode the header, such as Gitea, saw `a7f39c21%2D6b84...` instead of its client ID.
+  Those characters now go out as they are; every other character stays encoded, and a provider
+  that decodes gets exactly the same values as before. For a provider that still refuses the
+  Basic header, the new `OIDC_TOKEN_AUTH_METHOD` switches to `client_secret_post`. Left unset,
+  Yuvomi keeps `client_secret_basic` unless the provider's discovery document offers
+  `client_secret_post` only.
+
 ## [2.79.0] - 2026-10-22
 
 ### Added

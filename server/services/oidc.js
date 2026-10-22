@@ -175,17 +175,105 @@ export async function getConfig() {
   if (!isOidcEnabled()) return null;
   if (_config) return _config;
 
-  // client_secret_basic explizit erzwingen — der v6-Default wäre client_secret_post,
-  // was eine stille Verhaltensänderung gegenüber v5 gewesen wäre.
+  // Vor der Discovery: ein Tippfehler im Schalter soll beim ersten SSO-Klick
+  // mit seinem Namen scheitern, nicht erst am Token-Endpunkt als invalid_client.
+  const configured = configuredTokenAuthMethod();
   _config = await client.discovery(
     new URL(process.env.OIDC_ISSUER),
     process.env.OIDC_CLIENT_ID,
     process.env.OIDC_CLIENT_SECRET,
-    client.ClientSecretBasic(process.env.OIDC_CLIENT_SECRET),
+    tokenEndpointAuth(process.env.OIDC_CLIENT_SECRET, configured),
     { [client.customFetch]: providerFetch },
   );
 
   return _config;
+}
+
+/** Die beiden Wege, auf denen sich Yuvomi am Token-Endpunkt ausweist (#2144). */
+export const TOKEN_AUTH_METHODS = Object.freeze(['client_secret_basic', 'client_secret_post']);
+
+/**
+ * Der ausdruecklich gesetzte Wert von `OIDC_TOKEN_AUTH_METHOD`, sonst `null`.
+ * Ein unbekannter Wert wirft: still auf einen Default zurueckzufallen hiesse,
+ * dass der Betreiber glaubt, umgestellt zu haben, und es nicht hat.
+ * @returns {'client_secret_basic'|'client_secret_post'|null}
+ */
+export function configuredTokenAuthMethod() {
+  const value = (process.env.OIDC_TOKEN_AUTH_METHOD ?? '').trim();
+  if (!value) return null;
+  if (!TOKEN_AUTH_METHODS.includes(value)) {
+    throw new Error(`OIDC_TOKEN_AUTH_METHOD must be one of ${TOKEN_AUTH_METHODS.join(', ')} or empty, got "${value.slice(0, 40)}".`);
+  }
+  return value;
+}
+
+/**
+ * Welche Methode gilt fuer diesen Anbieter?
+ *
+ * Ohne Schalter bleibt es `client_secret_basic` - das Verhalten jeder
+ * Bestandsinstallation und nach RFC 8414 2 der Default, wenn ein Anbieter
+ * `token_endpoint_auth_methods_supported` gar nicht nennt. Nur ein Anbieter,
+ * der ausdruecklich `client_secret_post` und NICHT `client_secret_basic`
+ * anbietet, bekommt `post`: Basic wuerde er ohnehin ablehnen.
+ *
+ * @param {object|undefined} serverMetadata  Discovery-Dokument des Anbieters
+ * @param {string|null} configured           Ergebnis von `configuredTokenAuthMethod()`
+ */
+export function resolveTokenAuthMethod(serverMetadata, configured) {
+  if (configured) return configured;
+  const supported = serverMetadata?.token_endpoint_auth_methods_supported;
+  if (Array.isArray(supported)
+    && supported.includes('client_secret_post')
+    && !supported.includes('client_secret_basic')) {
+    return 'client_secret_post';
+  }
+  return 'client_secret_basic';
+}
+
+/**
+ * Formular-Kodierung eines Werts nach application/x-www-form-urlencoded, wie
+ * RFC 6749 2.3.1 sie fuer Client-ID und Secret im Basic-Header verlangt.
+ *
+ * Bewusst NICHT `ClientSecretBasic` aus `openid-client`: `oauth4webapi`
+ * kodiert dort zusaetzlich `-`, `_`, `.`, `!`, `~`, `*`, `'`, `(` und `)`, die
+ * das Formularformat unveraendert laesst. Ein Anbieter, der den Header nicht
+ * zurueckdekodiert (Gitea, #2144), sah dadurch eine UUID-Client-ID als
+ * `a7f39c21%2D6b84...` und antwortete `invalid_client`. `URLSearchParams`
+ * implementiert genau den Serialisierer des Formats: ein Anbieter, der
+ * dekodiert, bekommt denselben Wert wie zuvor, einer, der es nicht tut, sieht
+ * IDs und Secrets aus Buchstaben, Ziffern und `-._*` jetzt woertlich.
+ * @param {string} value
+ */
+function formUrlEncode(value) {
+  return new URLSearchParams([['', value]]).toString().slice(1);
+}
+
+/**
+ * Der Authorization-Header fuer `client_secret_basic`.
+ * @param {string} clientId
+ * @param {string} clientSecret
+ */
+export function basicAuthorization(clientId, clientSecret) {
+  const credentials = `${formUrlEncode(clientId)}:${formUrlEncode(clientSecret)}`;
+  return `Basic ${Buffer.from(credentials, 'utf8').toString('base64')}`;
+}
+
+/**
+ * Die Client-Authentifizierung fuer `openid-client` (Signatur von
+ * `ClientAuth`). Die Methode wird je Anfrage aus dem Discovery-Dokument
+ * bestimmt, das die Bibliothek hereinreicht; der Schalter ist zu dem Zeitpunkt
+ * schon geprueft. Synchron, wie `ClientSecretBasic` es war: der `fetch`-Haken
+ * in `providerFetch` liest die Redirect-URI aus dem AsyncLocalStorage des
+ * Aufrufs (#1768).
+ */
+function tokenEndpointAuth(clientSecret, configured) {
+  return (as, clientMetadata, body, headers) => {
+    if (resolveTokenAuthMethod(as, configured) === 'client_secret_post') {
+      return client.ClientSecretPost(clientSecret)(as, clientMetadata, body, headers);
+    }
+    headers.set('authorization', basicAuthorization(clientMetadata.client_id, clientSecret));
+    return undefined;
+  };
 }
 
 /**

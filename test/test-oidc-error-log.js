@@ -167,12 +167,13 @@ test('was am Token-Endpunkt ankommt: Basic-Auth, redirect_uri aus der Konfigurat
   assert.equal(tokenRequest.body.get('grant_type'), 'authorization_code');
   assert.ok(tokenRequest.body.get('code_verifier'), 'PKCE-Verifier geht mit');
   assert.equal(tokenRequest.body.get('client_secret'), null, 'das Secret steht nicht im Formular (client_secret_basic)');
-  // RFC 6749 2.3.1: beide Teile werden vor dem Base64 formular-kodiert, und
-  // oauth4webapi kodiert dabei auch `-`, `_` und `.` - ein Anbieter, der das
-  // nicht zurueckdekodiert, sieht eine andere Client-ID.
+  // RFC 6749 2.3.1: beide Teile werden vor dem Base64 formular-kodiert, und das
+  // Formularformat laesst `-`, `_`, `.` und `*` stehen. oauth4webapi kodierte
+  // auch sie, und Gitea, das nicht zurueckdekodiert, sah eine andere Client-ID
+  // (#2144, Einzelfaelle in test:oidc-token-auth).
   assert.equal(
     Buffer.from(tokenRequest.authorization.replace(/^Basic /, ''), 'base64').toString(),
-    'yuvomi%2Dclient:geheim%2Dnicht%2Dins%2Dlog',
+    'yuvomi-client:geheim-nicht-ins-log',
   );
 });
 

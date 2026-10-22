@@ -192,6 +192,11 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   BACKUP_UPLOAD_LIMIT:
     'Betriebs-Feinjustage: Body-Limit fuer den Restore-Upload im Admin-UI, nur beim '
     + 'Zurueckspielen einer ueberdimensionierten Datenbank relevant.',
+  OIDC_TOKEN_AUTH_METHOD:
+    'Interop-Ausweg fuer einen Anbieter, der die automatische Wahl der Client-Authentifizierung '
+    + 'mit invalid_client beantwortet (#2144). Leer ist fuer jede neue Installation richtig, und '
+    + 'der Wizard kennt den Anbieter nicht: ein Feld waere eine Frage, die niemand vor der ersten '
+    + 'Anmeldung beantworten kann. Ein Schema-Eintrag ohne Feld verbietet der Guard weiter unten.',
   DB_ALLOW_NEWER_SCHEMA:
     'Notfallschalter, keine Installationsentscheidung: laesst eine aeltere App auf einer '
     + 'neueren Datenbank starten, obwohl das dabei Geschriebene beim naechsten Update verloren '
