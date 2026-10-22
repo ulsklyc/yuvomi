@@ -7,7 +7,9 @@
  *
  * DAS MUSTER: Es gibt einen einzigen Modal-Slot. `closeModal({ force: true })`
  * schliesst, was gerade darin liegt, und `openModal()` schliesst es ebenso,
- * bevor es den eigenen Dialog hineinlegt. Kommt der Aufruf erst mit der
+ * bevor es den eigenen Dialog hineinlegt - auch `confirmModal()`, das durch
+ * `openModal()` geht (#2134: die Meldung nach einem Fehlschlag, die Frage aus
+ * einer Antwort). Kommt der Aufruf erst mit der
  * Antwort, kann im Slot ein Dialog liegen, den der Nutzer INZWISCHEN geoeffnet
  * hat - force fragt nicht nach, die Eingaben darin sind weg -, oder der Nutzer
  * ist laengst auf einer anderen Seite, und der Dialog geht dort auf.
@@ -24,7 +26,12 @@
  *   Funktionen, die laufen nicht in diesem Ablauf). Ein `await` direkt vor dem
  *   Aufruf selbst (`await closeModal(...)`) wartet auf ihn, nicht davor. Ein
  *   `await` in einem Block, der mit `return`/`throw` endet, bevor der Aufruf
- *   kommt, fuehrt nie zu ihm (`catch { await confirmModal(...); return; }`).
+ *   kommt, fuehrt nie zu ihm (`catch { await confirmModal(...); return; }`),
+ *   ebenso eines in einem frueheren Zweig derselben if/else-Kette oder in
+ *   einem Geschwister-`if (X === 'a')`, wenn der Aufruf in `if (X === 'b')`
+ *   steht. Ein `await` auf eine Rueckfrage (`confirmModal`, `confirmOverModal`,
+ *   `promptModal`, `selectModal`) zaehlt nicht: deren Antwort gibt der Nutzer
+ *   selbst im offenen Dialog.
  * - in einem Rueckruf von `.then()`, `.catch()` oder `.finally()`, auch als
  *   Ausdruck (`.then(() => closeModal())`) oder als blosser Name
  *   (`.then(closeModal)`): der laeuft immer erst mit der Antwort.
@@ -34,8 +41,9 @@
  * innerste umschliessende FUNKTION (eine `{` hinter `=>` oder hinter einer
  * Parameterliste, die nicht zu if/for/while/switch/catch gehoert).
  *
- * GRENZEN, bewusst: Gesehen werden nur die Namen `closeModal`/`openModal` und
- * ihre Import-Aliase. Ein seiteneigener Wrapper, der fuer seine Aufrufer
+ * GRENZEN, bewusst: Gesehen werden nur die Namen `closeModal`/`openModal`/
+ * `confirmModal` und ihre Import-Aliase (`confirmOverModal` nicht: es parkt
+ * einen offenen Dialog, statt ihn zu verdraengen). Ein seiteneigener Wrapper, der fuer seine Aufrufer
  * schliesst oder oeffnet (recipes.js `reportError`, `openEventModal`), faellt
  * nicht auf, wenn ER nach einem `await` gerufen wird - das bleibt beim
  * Review. Ein Page-Owner-Check (`stillShown(owner)`, `signal.aborted`) zaehlt
@@ -128,18 +136,83 @@ function endsInExit(s, open, close) {
   return /^\s*(?:return|throw)\b/.test(inner.slice(start));
 }
 
-/** Das letzte `await` in `s[from..to)`, das den Aufruf bei `to` erreicht. */
-function lastLiveAwait(s, from, to) {
+/**
+ * Die Bedingung `X === 'wert'` des `if`, dessen Block bei `open` beginnt, als
+ * { subject, value } - sonst null. `raw` ist derselbe Text mit Literalen.
+ */
+function ifEquals(s, raw, open) {
+  const j = skipSpaceBack(s, open - 1);
+  if (s[j] !== ')') return null;
+  const p = matchingOpen(s, j, '(', ')');
+  const k = skipSpaceBack(s, p - 1);
+  if (s.slice(k - 1, k + 1) !== 'if' || /[\w$]/.test(s[k - 2] ?? '')) return null;
+  const m = /^\s*([\w$.]+)\s*===\s*(['"])([^'"\\]*)\2\s*$/.exec(raw.slice(p + 1, j));
+  return m ? { subject: m[1], value: m[3] } : null;
+}
+
+function skipSpace(s, j) {
+  while (j < s.length && /\s/.test(s[j])) j += 1;
+  return j;
+}
+
+/**
+ * Steht `to` in einem spaeteren Zweig der if/else-Kette, deren Block bei
+ * `close` endet? Dann erreicht ein `await` in diesem Block den Aufruf nie.
+ */
+function inLaterBranch(s, close, to) {
+  const j = skipSpace(s, close + 1);
+  if (!s.startsWith('else', j) || /[\w$]/.test(s[j + 4] ?? '')) return false;
+  let k = skipSpace(s, j + 4);
+  if (s.startsWith('if', k) && !/[\w$]/.test(s[k + 2] ?? '')) {
+    k = skipSpace(s, k + 2);
+    if (s[k] !== '(') return false;
+    let depth = 0;
+    for (; k < s.length; k += 1) {
+      if (s[k] === '(') depth += 1;
+      else if (s[k] === ')') { depth -= 1; if (depth === 0) break; }
+    }
+    k = skipSpace(s, k + 1);
+  }
+  if (s[k] !== '{') return false;
+  const end = matchingClose(s, k);
+  if (end < 0) return false;
+  return (to > k && to < end) || (to > end && inLaterBranch(s, end, to));
+}
+
+/** Die `if (X === 'wert')`-Bloecke, in denen der Aufruf bei `at` steht. */
+function openIfsAt(s, raw, from, at) {
+  const open = [];
+  for (let k = from; k < at; k += 1) {
+    if (s[k] === '{') open.push(k);
+    else if (s[k] === '}') open.pop();
+  }
+  return open.map((b) => ifEquals(s, raw, b)).filter(Boolean);
+}
+
+/**
+ * Das letzte `await` in `s[from..to)`, das den Aufruf bei `to` erreicht.
+ * `dialogAt(k)` sagt, ob das `await` vor k auf eine Rueckfrage wartet: deren
+ * Antwort gibt der Nutzer selbst im offenen Dialog, das ist keine spaete
+ * Antwort. `callIfs` sind die `if (X === 'wert')` um den Aufruf.
+ */
+function lastLiveAwait(s, raw, from, to, { dialogAt = () => false, callIfs = [] } = {}) {
   let last = -1;
   const blocks = []; // { open, fn }
   for (let k = from; k < to; k += 1) {
     if (s[k] === '{') blocks.push({ open: k, fn: opensFunction(s, k) });
     else if (s[k] === '}') blocks.pop();
     else if (s.startsWith('await', k) && !/[\w$]/.test(s[k - 1]) && !/[\w$]/.test(s[k + 5] ?? '')
-      && !blocks.some((b) => b.fn) && s.slice(k + 5, to).trim() !== '') {
+      && !blocks.some((b) => b.fn) && s.slice(k + 5, to).trim() !== '' && !dialogAt(k + 5)) {
       const deadEnd = blocks.some((b) => {
         b.close ??= matchingClose(s, b.open);
-        return b.close >= 0 && b.close < to && endsInExit(s, b.open, b.close);
+        if (b.close < 0 || b.close >= to) return false;
+        if (endsInExit(s, b.open, b.close)) return true;
+        // Ein frueherer Zweig derselben Kette: `if (a) { await x(); } else { aufruf(); }`.
+        if (inLaterBranch(s, b.close, to)) return true;
+        // Ein anderer Zweig derselben Weiche: `if (action === 'a') { await ... }`
+        // erreicht nie den Aufruf in `if (action === 'b') { ... }`.
+        b.cond ??= ifEquals(s, raw, b.open) ?? false;
+        return Boolean(b.cond) && callIfs.some((c) => c.subject === b.cond.subject && c.value !== b.cond.value);
       });
       if (!deadEnd) last = k;
     }
@@ -159,13 +232,17 @@ function lineOf(s, at) {
 
 /**
  * @param {string} src  Quelltext eines Frontend-Moduls
- * @returns {{ line: number, kind: 'close'|'open', via: 'await'|'then', guarded: boolean }[]}
- *   jeder closeModal-/openModal-Aufruf, der erst mit einer Antwort laeuft
+ * @returns {{ line: number, kind: 'close'|'open'|'confirm', via: 'await'|'then', guarded: boolean }[]}
+ *   jeder closeModal-/openModal-/confirmModal-Aufruf, der erst mit einer Antwort laeuft
  */
 export function lateModalCalls(src) {
   const s = withoutCommentsKeepingLines(src, { blankLiterals: true });
+  const raw = withoutCommentsKeepingLines(src);
+  const dialogs = ['confirmModal', 'confirmOverModal', 'promptModal', 'selectModal'].flatMap((base) => namesFor(s, base));
+  const dialogCall = new RegExp(`^\\s*(?:${dialogs.join('|')})\\s*\\(`);
+  const dialogAt = (k) => dialogCall.test(s.slice(k, k + 80));
   const found = [];
-  for (const [kind, base] of [['close', 'closeModal'], ['open', 'openModal']]) {
+  for (const [kind, base] of [['close', 'closeModal'], ['open', 'openModal'], ['confirm', 'confirmModal']]) {
     const names = namesFor(s, base).join('|');
     // `.then(closeModal)`: der blosse Name als Rueckruf, ohne jeden Kontext.
     for (const m of s.matchAll(new RegExp(`\\.\\s*(?:then|catch|finally)\\s*\\(\\s*(?:${names})\\s*[,)]`, 'g'))) {
@@ -200,7 +277,7 @@ export function lateModalCalls(src) {
         }
       }
       if (body < 0) continue;
-      const lastAwait = lastLiveAwait(s, body + 1, at);
+      const lastAwait = lastLiveAwait(s, raw, body + 1, at, { dialogAt, callIfs: openIfsAt(s, raw, body + 1, at) });
       if (lastAwait >= 0) {
         found.push({ line: lineOf(s, at), kind, via: 'await', guarded: withContext || checked(lastAwait) });
       } else if (isPromiseCallback(s, body)) {

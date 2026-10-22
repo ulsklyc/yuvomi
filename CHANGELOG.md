@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
   counted months for the monthly repeat options but was always labelled in weeks. The label now
   follows the selected repeat option.
+- **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
+  (#2134) A few places show their error as a dialog after a request fails, or ask a question
+  built from the server's answer: deciding a reward request, closing a pocket-money account or
+  ending its plan, loading the rewards participants, replacing an installed module, deleting a
+  document folder and updating tasks to new default points. If you had opened another dialog or
+  left the page by the time the answer came, that dialog was closed with whatever you had typed,
+  or the message opened on the next page. Now the error comes as a notification instead, and a
+  question that no longer fits is not asked; for a module that already exists, the install card
+  says so. If the participants list fails to load after you moved on, nothing is shown, because
+  its dialog would not open anyway.
 
 ## [2.79.0] - 2026-10-22
 

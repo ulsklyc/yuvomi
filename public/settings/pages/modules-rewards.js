@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
-import { confirmModal } from '/components/modal.js';
+import { captureOpenContext, confirmModal, isModalContextCurrent } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
@@ -120,6 +120,9 @@ export function bindDefaultPoints(container, preferences) {
     input.readOnly = true;
     input.setAttribute('aria-busy', 'true');
     const previous = persisted;
+    // Die Rueckfrage zum Nachziehen entsteht erst aus zwei Antworten (#2134):
+    // wer inzwischen einen Dialog geoeffnet hat, bekommt sie nicht daruebergelegt.
+    const context = captureOpenContext();
     try {
       await savePreferences({ tasks_default_points: next });
       persisted = next;
@@ -138,7 +141,7 @@ export function bindDefaultPoints(container, preferences) {
 
     // Wer das Blatt schon verlassen hat, bekommt die Rueckfrage nicht auf der
     // naechsten Seite: der neue Standard ist gespeichert, das Nachziehen optional.
-    if (input.isConnected) await offerRebase(previous, next);
+    if (input.isConnected) await offerRebase(previous, next, context);
   }
 
   // Die Handler geben das Versprechen zurueck: dem Browser ist es gleich, ein
@@ -161,7 +164,7 @@ export function bindDefaultPoints(container, preferences) {
  * bereits im Ledger gutgeschrieben sind. Die Anzahl steht im Dialog, damit der
  * Wechsel vor der Bestätigung sichtbar ist.
  */
-async function offerRebase(from, to) {
+async function offerRebase(from, to, context) {
   if (from <= 0) return; // ohne vorherigen Standard gibt es nichts nachzuziehen
 
   let count = 0;
@@ -171,7 +174,7 @@ async function offerRebase(from, to) {
   } catch {
     return; // Nachziehen ist optional — der neue Standard ist bereits gespeichert
   }
-  if (count <= 0) return;
+  if (count <= 0 || !isModalContextCurrent(context)) return;
 
   const confirmed = await confirmModal(
     t('settings.rewardsDefaultPointsRebaseTitle', { count, from, to }),

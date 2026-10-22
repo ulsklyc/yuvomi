@@ -24,7 +24,7 @@
 import { api } from '/api.js';
 import { formatUnit, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { confirmModal } from '/components/modal.js';
+import { captureOpenContext, confirmModal, isModalContextCurrent } from '/components/modal.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 import { createDisclosure, createRetryState, createStatusSummary, settingRowHtml } from '/settings/components.js';
 import { installErrorText } from '/settings/module-install-errors.js';
@@ -410,6 +410,10 @@ async function runInstall(card, source, options = {}, button = card.button) {
   clearError(card);
   card.resultEl.replaceChildren();
   setBusy(card, true, button);
+  // Die Ersetzen-Frage entsteht erst aus der Antwort (#2134): hat der Nutzer
+  // inzwischen einen Dialog geoeffnet oder die Seite verlassen, verdraengte
+  // confirmModal den Dialog oder ginge dort auf - und ein Ja ersetzte das Modul.
+  const context = captureOpenContext();
   let response;
   try {
     response = await sendInstall(source, options);
@@ -417,6 +421,11 @@ async function runInstall(card, source, options = {}, button = card.button) {
     setBusy(card, false, button);
     const reason = error?.data?.reason;
     if (error?.status === 409 && reason === 'exists' && error.data?.existing && !options.overwrite) {
+      if (!isModalContextCurrent(context)) {
+        // Keine Frage, aber der Stand an der Karte: das Modul gibt es schon.
+        showError(card, installErrorText(error));
+        return;
+      }
       const { question, detail } = replaceConfirmText(error.data);
       const ok = await confirmModal(question, {
         confirmLabel: t('settings.installModuleReplaceButton'),
@@ -573,3 +582,6 @@ export async function render(container) {
   bindZipCard(container.querySelector('[data-install-card="zip"]'), maxZipMb);
   window.lucide?.createIcons({ el: container });
 }
+
+// #2134: der Ablauf einer Karte fuer test-late-modal-open.js (die Ersetzen-Frage nach einer 409).
+export const __test = { runInstall };

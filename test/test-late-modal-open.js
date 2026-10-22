@@ -1,11 +1,12 @@
 /**
  * Tests: ein Dialog, der erst nach einer Antwort aufgeht, verdraengt keinen
- * anderen (#1997)
+ * anderen (#1997, #2134)
  * Module: public/components/budget-transfer-dialog.js,
  *         public/components/quick-links-manager.js, public/pages/birthdays.js,
- *         calendar.js, contacts.js, inventory.js, pantry.js, recipes.js,
- *         rewards.js, shopping.js, split-expenses.js, waste.js,
- *         public/settings/pages/admin-family.js, modules-health.js
+ *         calendar.js, contacts.js, documents.js, inventory.js, pantry.js,
+ *         recipes.js, rewards.js, shopping.js, split-expenses.js, waste.js,
+ *         public/settings/pages/admin-family.js, modules-health.js,
+ *         modules-install.js, modules-rewards.js
  *
  * DAS MUSTER: Viele Dialoge laden erst etwas (den vollen Kontakt, die
  * Kandidaten, den Vorrat, eine Komponente) und oeffnen dann. `openModal()`
@@ -53,6 +54,9 @@ const { __test: split } = await import('../public/pages/split-expenses.js');
 const { __test: waste } = await import('../public/pages/waste.js');
 const { __test: family } = await import('../public/settings/pages/admin-family.js');
 const { __test: health } = await import('../public/settings/pages/modules-health.js');
+const { __test: documents } = await import('../public/pages/documents.js');
+const { __test: install } = await import('../public/settings/pages/modules-install.js');
+const { bindDefaultPoints } = await import('../public/settings/pages/modules-rewards.js');
 
 /**
  * Faehrt einen Oeffner zweimal: einmal ruhig (er muss genau einmal oeffnen),
@@ -346,6 +350,170 @@ test('#1997: Vorsorge-Art speichern, die es nicht mehr gibt - geschlossen wird n
     delete globalThis.__closeModal;
     delete globalThis.__apiStub;
   }
+});
+
+// #2134: confirmModal() geht durch openModal() und verdraengt genauso, was im
+// Slot liegt. Gefahren wird jede Stelle zweimal: ruhig (die Meldung oder Frage
+// muss kommen, sonst haette der Fall den Weg nicht erreicht) und mit einem
+// Kontextwechsel, WAEHREND die Anfrage laeuft (`lauf.spaet()` im Stub). Dann
+// geht eine Fehlermeldung als Toast hinaus, und eine Frage entfaellt samt der
+// Anfrage, die an ihrer Antwort haengt.
+async function zweimal(fall) {
+  for (const wechsel of [false, true]) {
+    let kontext = 'vor-der-anfrage';
+    const lauf = {
+      wechsel, fragen: [], toasts: [], anfragen: [], geoeffnet: [], antwort: false,
+      spaet() { if (wechsel) kontext = 'ein-anderer-dialog'; },
+    };
+    globalThis.__modalContextId = () => kontext;
+    globalThis.__confirmModal = async (message, opts = {}) => { lauf.fragen.push(opts.confirmLabel ?? message); return lauf.antwort; };
+    globalThis.__openModal = (opts) => { lauf.geoeffnet.push(opts?.title); opts?.onClose?.(); };
+    const toastVorher = window.yuvomi.showToast;
+    window.yuvomi.showToast = (message, type) => { lauf.toasts.push(type); };
+    try {
+      await fall(lauf);
+    } finally {
+      delete globalThis.__modalContextId;
+      delete globalThis.__confirmModal;
+      delete globalThis.__openModal;
+      delete globalThis.__apiStub;
+      window.yuvomi.showToast = toastVorher;
+    }
+  }
+}
+
+const SERVERFEHLER = () => Object.assign(new Error('boom'), { status: 500, data: {} });
+
+/** Ruhig: genau `ruhig` gefragt; spaet: nur `spaet` gefragt und `toasts` gezeigt. */
+function erwarte(lauf, name, { ruhig, spaet, toasts = ['danger'] }) {
+  if (!lauf.wechsel) {
+    assert.deepEqual(lauf.fragen, ruhig, `${name}: ohne Wechsel kommt der Dialog nicht (${JSON.stringify(lauf.fragen)})`);
+    return;
+  }
+  assert.deepEqual(lauf.fragen, spaet,
+    `${name}: der Dialog geht nach der Antwort auf, obwohl inzwischen ein anderer Dialog offen ist - er wuerde ihn verdraengen`);
+  assert.deepEqual(lauf.toasts, toasts, `${name}: die Meldung muss als Toast hinaus (${JSON.stringify(lauf.toasts)})`);
+}
+
+test('#2134: Belohnungen - eine Anfrage entscheiden scheitert spaet', async () => {
+  await zweimal(async (lauf) => {
+    globalThis.__apiStub = { get: async () => ({ data: [] }), patch: async () => { lauf.spaet(); throw SERVERFEHLER(); } };
+    await rewards.decideRedemption(9, 'fulfill', null);
+    erwarte(lauf, 'Anfrage entscheiden', { ruhig: ['rewards.gotIt'], spaet: [] });
+  });
+});
+
+test('#2134: Belohnungen - Teilnehmende laden scheitert spaet', async () => {
+  await mitBelohnungen(() => zweimal(async (lauf) => {
+    globalThis.__apiStub = { get: async () => { lauf.spaet(); throw SERVERFEHLER(); } };
+    await rewards.openParticipantsModal();
+    // Der Dialog, zu dem die Meldung gehoert, geht dann ohnehin nicht mehr
+    // auf: der Nutzer ist weiter, die Meldung entfaellt.
+    erwarte(lauf, 'Teilnehmende', { ruhig: ['rewards.gotIt'], spaet: [], toasts: [] });
+  }));
+});
+
+test('#2134: Taschengeld - Konto schliessen scheitert spaet', async () => {
+  const user = rewards.state.user;
+  rewards.state.user = { id: 1, role: 'admin' };
+  try {
+    await mitBelohnungen(() => zweimal(async (lauf) => {
+      lauf.antwort = true;
+      globalThis.__apiStub = { get: async () => ({ data: [] }), delete: async () => { lauf.spaet(); throw SERVERFEHLER(); } };
+      await rewards.closeMoneyAccount({ id: 1, display_name: 'Ada' });
+      erwarte(lauf, 'Konto schliessen', {
+        ruhig: ['rewards.money.closeAccount', 'rewards.gotIt'],
+        spaet: ['rewards.money.closeAccount'],
+      });
+    }));
+  } finally {
+    rewards.state.user = user;
+  }
+});
+
+test('#2134: Taschengeld - Plan beenden scheitert spaet', async () => {
+  await mitBelohnungen(() => zweimal(async (lauf) => {
+    globalThis.__apiStub = { get: async () => ({ data: [] }), delete: async () => { lauf.spaet(); throw SERVERFEHLER(); } };
+    await rewards.removeMoneyPlan({ id: 1 });
+    erwarte(lauf, 'Plan beenden', { ruhig: ['rewards.gotIt'], spaet: [] });
+  }));
+});
+
+test('#2134: Modul installieren - die Ersetzen-Frage aus der 409 kommt nur im Kontext von vorher', async () => {
+  await zweimal(async (lauf) => {
+    lauf.antwort = true;
+    const exists = Object.assign(new Error('exists'), {
+      status: 409, data: { reason: 'exists', existing: { id: 'demo', version: '1.0.0' }, incoming: { id: 'demo', version: '1.1.0' } },
+    });
+    globalThis.__apiStub = {
+      post: async (path, body) => {
+        lauf.anfragen.push(body.overwrite === true ? 'ersetzen' : 'installieren');
+        if (body.overwrite) return { data: { id: 'demo', version: '1.1.0' } };
+        lauf.spaet();
+        throw exists;
+      },
+    };
+    const errorEl = { textContent: '', hidden: true };
+    const card = {
+      busy: false, button: null, errorEl,
+      resultEl: { replaceChildren() {} },
+      candidatesEl: { replaceChildren() {}, hidden: true, querySelector: () => null },
+      form: { reset() {} },
+      body: { dataset: { installCard: 'github' } },
+    };
+    await install.runInstall(card, { kind: 'github', url: 'https://github.com/a/b' });
+    if (!lauf.wechsel) {
+      assert.deepEqual(lauf.fragen, ['settings.installModuleReplaceButton'], 'ohne Wechsel wird gefragt');
+      assert.deepEqual(lauf.anfragen, ['installieren', 'ersetzen']);
+    } else {
+      assert.deepEqual(lauf.fragen, [], 'die Frage geht ueber dem Dialog auf, der inzwischen offen ist');
+      assert.deepEqual(lauf.anfragen, ['installieren'], 'ohne Frage auch kein Ersetzen');
+      assert.equal(errorEl.hidden, false, 'der Konflikt steht stattdessen an der Karte');
+    }
+  });
+});
+
+test('#2134: Ordner loeschen - die Frage aus der Vorschau kommt nur im Kontext von vorher', async () => {
+  for (const documentsInFolder of [0, 2]) {
+    await zweimal(async (lauf) => {
+      globalThis.__apiStub = {
+        get: async () => {
+          lauf.spaet();
+          return { data: { id: 3, removed_folders: 1, documents: documentsInFolder, can_delete_documents: true, linked_records: {}, snapshot: 'a'.repeat(64) } };
+        },
+      };
+      await documents.deleteFolder({ id: 3, name: 'Wohnung', parent_id: null });
+      const gefragt = [...lauf.fragen, ...lauf.geoeffnet];
+      const name = `Ordner loeschen (${documentsInFolder} Dokumente)`;
+      if (!lauf.wechsel) assert.equal(gefragt.length, 1, `${name}: ohne Wechsel wird gefragt (${JSON.stringify(gefragt)})`);
+      else assert.deepEqual(gefragt, [], `${name}: die Frage geht ueber dem Dialog auf, der inzwischen offen ist`);
+    });
+  }
+});
+
+test('#2134: Standard-Punkte - das Nachziehen wird nur im Kontext von vorher angeboten', async () => {
+  await zweimal(async (lauf) => {
+    globalThis.__apiStub = {
+      put: async () => ({ data: {} }),
+      get: async () => { lauf.spaet(); return { data: { count: 3 } }; },
+      post: async () => { lauf.anfragen.push('nachziehen'); return { data: { updated: 3 } }; },
+    };
+    const handlers = {};
+    const el = (extra = {}) => ({
+      value: '', hidden: true, readOnly: false, isConnected: true, textContent: '',
+      setAttribute() {}, removeAttribute() {}, addEventListener(type, fn) { handlers[type] = fn; }, ...extra,
+    });
+    const input = el({ value: '5' });
+    const form = el();
+    const errorEl = el();
+    const container = {
+      querySelector: (sel) => ({ '#rewards-default-points-form': form, '#rewards-default-points': input, '#rewards-default-points-error': errorEl })[sel] ?? null,
+    };
+    bindDefaultPoints(container, { tasks_default_points: 2 });
+    input.value = '5';
+    await handlers.submit({ preventDefault() {} });
+    erwarte(lauf, 'Nachziehen', { ruhig: ['settings.rewardsDefaultPointsRebaseConfirm'], spaet: [], toasts: ['success'] });
+  });
 });
 
 function makeContainer() {
