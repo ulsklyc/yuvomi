@@ -22580,6 +22580,63 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
 });
 
+/* DIE RUECKMELDE-ZUSTAENDE DER KNOEPFE BLEIBEN UEBER JEDEM HOVER (#2180, zu #2150).
+ *
+ * #2150 hat `.btn--error-static`, `.btn--success` und `.btn--loading` ihr
+ * `!important` genommen und die Farben stattdessen auf
+ * `button.<zustand>:is(:enabled, :disabled)` (0,2,1) gehoben - ueber
+ * `.btn--<variante>:hover` (0,2,0) und `.quick-add__btn:hover` (0,2,0) aus
+ * shopping.css, das NACH layout.css laedt. Ohne Guard faellt das beim
+ * naechsten "Aufraeumen" auf `.btn--success` (0,1,0) zurueck, und ein
+ * gruener Erfolgsknopf wird unter dem Zeiger wieder lila. Geprueft wird die
+ * Form UND der Vergleich gegen jede Hover-Regel einer Variante, die
+ * Hintergrund oder Schrift setzt. */
+test('Knopf-Zustaende setzen ihre Farben ueber button.<zustand>:is(:enabled, :disabled) und schlagen jedes Varianten-Hover', () => {
+  const spec = (sel) => {
+    let b = 0; let c = 0;
+    const s = sel.replace(/:(?:is|not|where)\(((?:[^()]|\([^()]*\))*)\)/g, (m, inner) => {
+      if (m.startsWith(':where')) return '';
+      const best = inner.split(',').map((x) => spec(x.trim())).sort((x, y) => x[0] - y[0] || x[1] - y[1]).pop();
+      b += best[0]; c += best[1];
+      return '';
+    });
+    b += (s.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) || []).length;
+    c += (s.match(/(?:^|[\s>+~])[a-z][\w-]*|::[\w-]+/gi) || []).length;
+    return [b, c];
+  };
+  const gt = (x, y) => x[0] > y[0] || (x[0] === y[0] && x[1] > y[1]);
+  const COLOR = /(?:^|;)\s*(?:background(?:-color)?|color)\s*:/;
+  const STATES = ['btn--error-static', 'btn--success', 'btn--loading'];
+  const dir = new URL('../public/styles/', import.meta.url);
+  const rules = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.css'))) {
+    for (const rule of eachRule(readFileSync(new URL(file, dir), 'utf8'))) {
+      for (const part of splitSelectorList(rule.selector)) rules.push({ file, part: part.trim(), body: rule.body });
+    }
+  }
+  // Die Gegner: Hover einer Knopf-Variante (oder des Schnell-Hinzufuegen-Knopfs),
+  // das Farbe setzt und keinen der Zustaende selbst nennt.
+  const rivals = rules.filter(({ part, body }) => COLOR.test(body)
+    && /:hover/.test(part)
+    && /\.(?:btn--[\w-]+|quick-add__btn)\b/.test(part)
+    && !STATES.some((st) => part.includes(`.${st}`)));
+  assert.ok(rivals.length >= 3, `Reichweite: nur ${rivals.length} Varianten-Hover gefunden - liest der Guard noch?`);
+  const strongest = rivals.map((r) => ({ ...r, s: spec(r.part) })).sort((x, y) => (gt(x.s, y.s) ? 1 : gt(y.s, x.s) ? -1 : 0)).pop();
+  for (const state of STATES) {
+    const own = rules.filter(({ part, body }) => COLOR.test(body) && new RegExp(`\\.${state}(?![\\w-])`).test(part)
+      // Das Pseudo-Element des Spinners ist ein eigenes Element, kein Knopf.
+      && !/::/.test(part));
+    assert.ok(own.length > 0, `${state}: keine Regel setzt Farbe`);
+    for (const { file, part } of own) {
+      assert.match(part, new RegExp(`^button\\.${state}:is\\(:enabled,\\s*:disabled\\)$`),
+        `${file}: "${part}" setzt die Farbe von ${state} - nur ueber button.${state}:is(:enabled, :disabled), sonst gewinnt ein Varianten-Hover (#2150)`);
+      assert.ok(!gt([2, 1], spec(part)), `${part}: Spezifitaet ${spec(part)} unter 0,2,1`);
+      assert.ok(gt(spec(part), strongest.s),
+        `${part} (0,${spec(part)}) schlaegt ${strongest.file}: "${strongest.part}" (0,${strongest.s}) nicht`);
+    }
+  }
+});
+
 /* Zugangsdaten FREMDER Dienste (CalDAV, Apple, WebDAV, DMS, SMTP, Immich,
  * Gotify, ntfy, Webhook, Rezept-Anbieter, Backup-Schluessel) duerfen nie das
  * Yuvomi-Passwort angeboten bekommen. `current-password` meint das Passwort
