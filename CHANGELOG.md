@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only appears for members who may edit the calendar, the module Birthdays belongs to.
 
 ### Changed
+- **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
+  Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
+  once for every child account that never set the switch itself and has not used the cycle yet.
+  A child who turned the tab on or off keeps that choice, a child who already logged a period, a
+  day or saved cycle settings keeps the tab, and the child can turn it on again in its own
+  settings; adults and administrators are not affected. Fasting stays as it is for existing
+  children: whether a parent ever chose it cannot be told apart, so it is still switched in the
+  permissions per member.
 - **The manage dialogs end their rows like every other list** (#2152). Category, tag, subscription
   category and payment method, quick link and family member rows now end the same way: at most one
   visible action, then the More button, then the drag handle on the far right. Rename, edit and
