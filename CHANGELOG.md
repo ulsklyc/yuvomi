@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
+  (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
+  there, all remaining items waiting for that same list are now skipped for the rest of the sync
+  pass. Previously the stop check ran only between lists, not within a single list, so if two items
+  were both waiting to move to the same list, the second PUT went out even after the first was
+  rate-limited. An unreachable server (no HTTP status) also now pauses further carry attempts for
+  that list, matching the behavior for rate-limit and outage responses.
+
+
+- **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
+  client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
+  that more strictly than the form format and also escaped `-`, `_` and `.`, so a provider that
+  does not decode the header, such as Gitea, saw `a7f39c21%2D6b84...` instead of its client ID.
+  Those characters now go out as they are; every other character stays encoded, and a provider
+  that decodes gets exactly the same values as before. For a provider that still refuses the
+  Basic header, the new `OIDC_TOKEN_AUTH_METHOD` switches to `client_secret_post`. Left unset,
+  Yuvomi keeps `client_secret_basic` unless the provider's discovery document offers
+  `client_secret_post` only.
+- **A contact birthday stored with a time of day is no longer lost.** vCard allows a birthday to
+  carry a time, as in `1953-10-15T23:10:00Z` (vCard 3.0) or `19531015T231000Z` (vCard 4.0). Until
+  now Yuvomi read such a birthday as missing, in the address book sync and in the vCard import
+  alike, and the contact was listed under "Contacts without a birthday" when importing birthdays.
+  Now the date is taken as it is written and the time is ignored. The time zone does not move it to
+  another day, because a birthday is a calendar date. Contacts already synced get their birthday
+  with the next sync; a vCard file has to be imported again.
+- **The tinted scrollbar of the shopping, pantry and recipe lists keeps its width on hover.** In
+  browsers that draw it through `::-webkit-scrollbar` (Safari before 26.2), hovering the thumb
+  filled the whole 10px track instead of the 4px thumb, because the hover rule reset
+  `background-clip`. Now only the tint deepens. Current Chrome, Edge, Firefox and Safari draw the
+  standard `scrollbar-color` instead and were not affected.
+- **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
+  counted months for the monthly repeat options but was always labelled in weeks. The label now
+  follows the selected repeat option.
+- **Google Calendar: a rate limit or an outage no longer drops pending deletions and changes**
+  (#2136). Until now every failed attempt counted against the five tries of each waiting
+  deletion, change and calendar move, including answers that concern the whole account: a rate
+  limit or exhausted quota (429, or 403 with that reason), a Google server error or a lost
+  connection. Since every edit triggers an immediate attempt, five edits during a rate limit were
+  enough: a deleted event stayed at Google and came back later, a change never reached Google.
+  Such answers now leave the work waiting without using up a try, and the rest of that pass sends
+  nothing more to Google. A 403 for the event itself, such as one the account may not change,
+  still counts, so it does not wait forever.
+
+- **CalDAV calendars keep their own colour and a clean name, also on Synology.** (#2157, from
+  D#2146) Some servers, Synology Calendar among them, send the colour and the name of a calendar
+  with a line break at the end. Yuvomi did not recognise such a colour, so every calendar of the
+  account showed the same default blue, and the line break stayed in the name. Colour and name are
+  now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
+  A name that is empty after trimming falls back to the usual default. Existing accounts pick up
+  the colours and names with "Refresh calendars" in the CalDAV settings.
+- **CardDAV address books keep a clean name.** (#2160) Address book names come through the same
+  path as calendar names and kept a line break or surrounding spaces from the server. They are now
+  trimmed the same way, and an empty name falls back to the usual default. Existing accounts pick
+  up the clean names with "Refresh addressbooks" in the CardDAV settings.
+- **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
+  (#2134) A few places show their error as a dialog after a request fails, or ask a question
+  built from the server's answer: deciding a reward request, closing a pocket-money account or
+  ending its plan, loading the rewards participants, replacing an installed module, deleting a
+  document folder and updating tasks to new default points. If you had opened another dialog or
+  left the page by the time the answer came, that dialog was closed with whatever you had typed,
+  or the message opened on the next page. Now the error comes as a notification instead, and a
+  question that no longer fits is not asked; for a module that already exists, the install card
+  says so. If the participants list fails to load after you moved on, nothing is shown, because
+  its dialog would not open anyway.
+
+## [2.79.0] - 2026-10-22
+
 ### Added
 - **A contact's own picture is shown in the list and on its card** (#2128). A contact synced from an
   address book that carried a photo stored it in `contacts.photo`, but the frontend never drew it:
