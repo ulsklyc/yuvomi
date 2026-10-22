@@ -487,7 +487,7 @@ class CategoryManagerElement extends HTMLElement {
   // Button am Listenrand nun deaktiviert, auf die Gegenrichtung ausweichen,
   // sonst auf den Umbenennen-Button (letzter Rückfall, nie <body>). Nur der
   // Button-Pfad ruft das auf — der Drag-Pfad übergibt bewusst keine Fokus-Absicht.
-  _restoreReorderFocus(rowSelector, dir, prefix = '') {
+  _restoreReorderFocus(rowSelector, dir, prefix = '', { fromHandle = false } = {}) {
     const row = this._groupsEl?.querySelector(rowSelector);
     if (!row) return;
     const pick = (action) => {
@@ -498,11 +498,13 @@ class CategoryManagerElement extends HTMLElement {
     // ist: der Fokus geht an dessen Knopf (die bewegte Zeile), nie auf <body>.
     const own = (el) => el?.closest('.cat-row, .cat-subrow') === row;
     // Kam der Schritt vom Griff (Pfeiltaste), bleibt der Fokus auf dem Griff:
-    // so laesst sich eine Zeile mit wiederholtem Druck weiterschieben.
-    const handle = this._reorderFromHandle
+    // so laesst sich eine Zeile mit wiederholtem Druck weiterschieben. Die
+    // Herkunft reist MIT DEM VORGANG (Codex an #2177): ein geteilter Merker
+    // wurde von der ersten Antwort verbraucht, wenn eine zweite Pfeiltaste
+    // waehrend der laufenden Anfrage kam, und die zweite fiel auf Mehr.
+    const handle = fromHandle
       ? [...row.querySelectorAll('[data-reorder-handle]')].find(own)
       : null;
-    this._reorderFromHandle = false;
     const more = [...row.querySelectorAll('.row-action--more')].find(own);
     const opposite = dir === 'down' ? 'up' : 'down';
     const target = handle
@@ -842,17 +844,13 @@ class CategoryManagerElement extends HTMLElement {
     if (!handle) return;
     e.preventDefault();
     const delta = e.key === 'ArrowUp' ? -1 : 1;
-    this._reorderFromHandle = true;
     const subRow = handle.closest('.cat-subrow');
     if (subRow) {
-      await this._subMove(subRow.dataset.parent, subRow.dataset.subkey, delta);
+      await this._subMove(subRow.dataset.parent, subRow.dataset.subkey, delta, { fromHandle: true });
     } else {
       const row = handle.closest('.cat-row');
-      if (row) await this._move(row.dataset.key, delta);
+      if (row) await this._move(row.dataset.key, delta, { fromHandle: true });
     }
-    // Am Listenrand bewegt sich nichts, und der Merker darf den naechsten
-    // Schritt aus dem Menue nicht auf den Griff umlenken.
-    this._reorderFromHandle = false;
   }
 
   _toggleColors(row) {
@@ -944,7 +942,7 @@ class CategoryManagerElement extends HTMLElement {
     }
   }
 
-  async _move(key, delta) {
+  async _move(key, delta, { fromHandle = false } = {}) {
     const cat = this._cats.find((c) => this._keyOf(c) === key);
     if (!cat) return;
     const groupKey = this._groupOf(cat);
@@ -964,6 +962,7 @@ class CategoryManagerElement extends HTMLElement {
     await this._persistOrder(groupKey, group.map((c) => this._keyOf(c)), key, {
       focusKey: key,
       focusDir: delta > 0 ? 'down' : 'up',
+      fromHandle,
     });
   }
 
@@ -977,7 +976,7 @@ class CategoryManagerElement extends HTMLElement {
   // State stellt die servergültige Reihenfolge wieder her. Der Button-Pfad
   // rendert bewusst NICHT (sonst Fokusverlust auf dem gerade geklickten Auf/Ab-
   // Button und Verlust ungespeicherten Texts in offenen Add-Feldern).
-  async _persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender = false, focusKey = null, focusDir = null } = {}) {
+  async _persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender = false, focusKey = null, focusDir = null, fromHandle = false } = {}) {
     try {
       const body = { order: orderedKeys };
       if (groupKey) body[this._groupField] = groupKey;
@@ -985,7 +984,7 @@ class CategoryManagerElement extends HTMLElement {
       if (Array.isArray(res?.data)) this._cats = res.data;
       else await this._fetch();
       this._renderGroup(groupKey);
-      if (focusKey) this._restoreReorderFocus(`.cat-row[data-key="${CSS.escape(focusKey)}"]`, focusDir);
+      if (focusKey) this._restoreReorderFocus(`.cat-row[data-key="${CSS.escape(focusKey)}"]`, focusDir, '', { fromHandle });
       if (movedKey) this._announceMove(movedKey, { groupKey });
       this._notifyChanged();
     } catch (err) {
@@ -1096,7 +1095,7 @@ class CategoryManagerElement extends HTMLElement {
     }
   }
 
-  async _subMove(parent, subKey, delta) {
+  async _subMove(parent, subKey, delta, { fromHandle = false } = {}) {
     const cat = this._cats.find((c) => this._keyOf(c) === parent);
     if (!cat) return;
     const subs = (cat.subcategories || []).slice();
@@ -1107,13 +1106,14 @@ class CategoryManagerElement extends HTMLElement {
     await this._persistSubOrder(parent, subs.map((s) => this._keyOf(s)), subKey, {
       focusSubKey: subKey,
       focusDir: delta > 0 ? 'down' : 'up',
+      fromHandle,
     });
   }
 
   // Sub-Pendant zu _persistOrder, gleicher Vertrag (Auf/Ab-Buttons + Drag-Ende
   // in _wireSortableIn rufen beide diesen Handler mit der neuen Reihenfolge auf;
   // nur der Drag-Pfad rollt bei Fehlern per rollbackRender zurück).
-  async _persistSubOrder(parent, orderedSubKeys, movedSubKey, { rollbackRender = false, focusSubKey = null, focusDir = null } = {}) {
+  async _persistSubOrder(parent, orderedSubKeys, movedSubKey, { rollbackRender = false, focusSubKey = null, focusDir = null, fromHandle = false } = {}) {
     try {
       const res = await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
@@ -1122,7 +1122,7 @@ class CategoryManagerElement extends HTMLElement {
       if (Array.isArray(res?.data)) this._cats = res.data;
       else await this._fetch();
       this._renderSublist(parent);
-      if (focusSubKey) this._restoreReorderFocus(`.cat-subrow[data-subkey="${CSS.escape(focusSubKey)}"]`, focusDir, 'sub-');
+      if (focusSubKey) this._restoreReorderFocus(`.cat-subrow[data-subkey="${CSS.escape(focusSubKey)}"]`, focusDir, 'sub-', { fromHandle });
       if (movedSubKey) this._announceMove(movedSubKey, { parentKey: parent });
       this._notifyChanged();
     } catch (err) {

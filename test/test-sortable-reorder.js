@@ -127,8 +127,8 @@ test('category-manager: Tastatur-Fallback (Auf/Ab-Buttons) bleibt erhalten, Drag
     assert.ok(markup(a) || viaHelper, `kein Knopf mit data-action="${a}"`);
     assert.match(comp, new RegExp(`action === '${a}'`), `der Klick-Verteiler kennt "${a}" nicht`);
   }
-  assert.match(comp, /async _move\(key, delta\)/);
-  assert.match(comp, /async _subMove\(parent, subKey, delta\)/);
+  assert.match(comp, /async _move\(key, delta[,)]/);
+  assert.match(comp, /async _subMove\(parent, subKey, delta[,)]/);
 });
 
 test('category-manager: Auf/Ab-Buttons UND Drag-Ende rufen denselben Persistenz-Pfad auf', () => {

@@ -148,33 +148,81 @@ test('Kategorien: Unterkategorien tragen dieselbe Endzone', () => {
   }
 });
 
-test('Kategorien: Pfeiltasten am Griff verschieben die Zeile, der Fokus bleibt auf dem Griff', async () => {
-  const manager = categoryManager([{ key: 'a', name: 'A' }, { key: 'b', name: 'B' }]);
-  const moves = [];
-  manager._move = async (key, delta) => {
-    moves.push([key, delta]);
-    // Was _persistOrder nach dem Speichern tut: Fokus auf die bewegte Zeile.
-    manager._restoreReorderFocus('.cat-row[data-key="b"]', delta > 0 ? 'down' : 'up');
+/**
+ * Ein Kategorien-Verwalter mit Attrappen-Zeilen: je Schluessel ein Griff und
+ * ein Mehr-Knopf, die sich ins Protokoll `focused` eintragen. Gespeichert wird
+ * ueber den echten `_move`/`_persistOrder`; die Antwort des Servers haelt der
+ * Test in der Hand (`answers`), damit er zwei Schritte ueberlappen lassen kann.
+ */
+function reorderRig(keys) {
+  const manager = categoryManager(keys.map((key) => ({ key, name: key.toUpperCase() })));
+  manager._renderGroup = () => {};
+  manager._announceMove = () => {};
+  const focused = [];
+  const rows = new Map();
+  for (const key of keys) {
+    const rowEl = { dataset: { key } };
+    const handle = { focus: () => focused.push(`${key}:handle`) };
+    const more = { focus: () => focused.push(`${key}:more`) };
+    handle.closest = (sel) => (sel === '[data-reorder-handle]' ? handle : sel === '.cat-row' ? rowEl : sel.includes('cat-row') ? rowEl : null);
+    more.closest = () => rowEl;
+    rowEl.querySelector = () => null;
+    rowEl.querySelectorAll = (sel) => (sel === '[data-reorder-handle]' ? [handle] : sel === '.row-action--more' ? [more] : []);
+    rows.set(key, { rowEl, handle });
+  }
+  manager._groupsEl = { querySelector: (sel) => rows.get((sel.match(/data-key="([^"]*)"/) || [])[1])?.rowEl ?? null };
+  const answers = [];
+  globalThis.__apiStub = {
+    patch: (_path, body) => new Promise((resolve) => {
+      answers.push(() => resolve({ data: body.order.map((key) => ({ key, name: key.toUpperCase() })) }));
+    }),
   };
-  const row = { dataset: { key: 'b' } };
-  let focused = null;
-  const handle = { closest: (sel) => (sel === '.cat-row' ? row : sel === '[data-reorder-handle]' ? handle : sel.includes('cat-row') ? rowEl : null), focus() { focused = 'handle'; } };
-  const more = { closest: () => rowEl, focus() { focused = 'more'; } };
-  const rowEl = { querySelector: () => null, querySelectorAll: (sel) => (sel === '[data-reorder-handle]' ? [handle] : sel === '.row-action--more' ? [more] : []) };
-  manager._groupsEl = { querySelector: () => rowEl };
-  let prevented = false;
-  await manager._onKeydown({ key: 'ArrowUp', target: handle, preventDefault() { prevented = true; } });
-  assert.deepEqual(moves, [['b', -1]]);
-  assert.ok(prevented, 'die Pfeiltaste scrollt nicht den Dialog');
-  assert.equal(focused, 'handle');
-  // Derselbe Schritt aus dem Menue gibt den Fokus an den Mehr-Knopf.
-  focused = null;
-  manager._restoreReorderFocus('.cat-row[data-key="b"]', 'up');
-  assert.equal(focused, 'more');
-  // Andere Tasten und andere Ziele bleiben unberuehrt.
-  await manager._onKeydown({ key: 'Enter', target: handle, preventDefault() { throw new Error('nicht abfangen'); } });
-  await manager._onKeydown({ key: 'ArrowDown', target: { closest: () => null }, preventDefault() { throw new Error('nicht abfangen'); } });
-  assert.equal(moves.length, 1);
+  const press = (key, arrow) => manager._onKeydown({ key: arrow, target: rows.get(key).handle, preventDefault() {} });
+  return { manager, focused, answers, press };
+}
+
+test('Kategorien: Pfeiltasten am Griff verschieben die Zeile, der Fokus bleibt auf dem Griff', async () => {
+  const { manager, focused, answers, press } = reorderRig(['a', 'b']);
+  try {
+    const run = press('b', 'ArrowUp');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(answers.length, 1, 'genau eine Speicheranfrage');
+    answers[0]();
+    await run;
+    assert.deepEqual(manager._cats.map((c) => c.key), ['b', 'a']);
+    assert.deepEqual(focused, ['b:handle']);
+    // Derselbe Schritt aus dem Menue gibt den Fokus an den Mehr-Knopf.
+    const menu = manager._move('b', 1);
+    await new Promise((r) => setImmediate(r));
+    answers[1]();
+    await menu;
+    assert.deepEqual(focused, ['b:handle', 'b:more']);
+    // Andere Tasten und andere Ziele bleiben unberuehrt.
+    await manager._onKeydown({ key: 'Enter', target: { closest: () => ({}) }, preventDefault() { throw new Error('nicht abfangen'); } });
+    await manager._onKeydown({ key: 'ArrowDown', target: { closest: () => null }, preventDefault() { throw new Error('nicht abfangen'); } });
+    assert.equal(answers.length, 2);
+  } finally {
+    delete globalThis.__apiStub;
+  }
+});
+
+test('Kategorien: zwei Pfeiltasten waehrend einer laufenden Anfrage - beide Schritte behalten den Griff (Codex an #2177)', async () => {
+  // Bis zum Fix lag die Herkunft "vom Griff" in einem geteilten Merker: die
+  // erste Antwort verbrauchte ihn, und die zweite gab den Fokus an Mehr.
+  const { focused, answers, press } = reorderRig(['a', 'b', 'c']);
+  try {
+    const first = press('a', 'ArrowDown');
+    const second = press('c', 'ArrowUp');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(answers.length, 2, 'beide Schritte laufen');
+    answers[0]();
+    await first;
+    answers[1]();
+    await second;
+    assert.deepEqual(focused, ['a:handle', 'c:handle']);
+  } finally {
+    delete globalThis.__apiStub;
+  }
 });
 
 // ---------------------------------------------------------------------------
