@@ -4483,7 +4483,6 @@
         "deleted": "Categoria eliminata",
         "deleteSubConfirm": "Eliminare la sottocategoria \"{{name}}\"?",
         "deleteSubConfirmDetail": "L'eliminazione è possibile solo finché la sottocategoria non è assegnata da nessuna parte, quindi le voci esistenti restano intatte. La sottocategoria non torna.",
-        "dragHandle": "Trascina per riordinare",
         "reorderAnnounce": "\"{{name}}\" è ora in posizione {{position}} di {{total}}.",
         "colorPick": "Colore",
         "colorNone": "Nessuna",

@@ -4483,7 +4483,6 @@
         "deleted": "Kategori dihapus",
         "deleteSubConfirm": "Hapus subkategori „{{name}}\"?",
         "deleteSubConfirmDetail": "Menghapus hanya bisa selama subkategori belum ditetapkan di mana pun, jadi entri yang ada tetap utuh. Subkategorinya sendiri tidak akan kembali.",
-        "dragHandle": "Seret untuk mengurutkan ulang",
         "reorderAnnounce": "\"{{name}}\" sekarang berada di posisi {{position}} dari {{total}}.",
         "colorPick": "Warna",
         "colorNone": "Tidak ada",

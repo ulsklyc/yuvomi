@@ -4483,7 +4483,6 @@
         "deleted": "Kategorie gelöscht",
         "deleteSubConfirm": "Unterkategorie „{{name}}“ löschen?",
         "deleteSubConfirmDetail": "Löschen geht nur, solange die Unterkategorie nirgends zugewiesen ist. Zugeordnete Einträge bleiben also unberührt, die Unterkategorie selbst kehrt nicht zurück.",
-        "dragHandle": "Ziehen zum Sortieren",
         "reorderAnnounce": "„{{name}}“ ist jetzt Position {{position}} von {{total}}.",
         "colorPick": "Farbe",
         "colorNone": "Keine",

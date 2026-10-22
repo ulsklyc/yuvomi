@@ -255,19 +255,22 @@ test('category-manager.css: respektiert prefers-reduced-motion', () => {
 });
 
 // --------------------------------------------------------
-// i18n: dragHandle + reorderAnnounce in allen Locales
+// i18n: reorderAnnounce in allen Locales
 // --------------------------------------------------------
 
 // Aus SUPPORTED_LOCALES statt als Liste: die Liste hier kannte 23 Sprachen,
 // `fil` (v1.78.0) und `pt-BR` (#1437) kamen dazu, ohne dass sie mitwuchs.
 const LOCALES = getSupportedLocales();
 
-test('locales: category.dragHandle und category.reorderAnnounce existieren in allen Sprachen', () => {
+// `category.dragHandle` ist seit #2177 ungelesen (der Griff heisst nach
+// `shopping.reorderHandle`) und mit #2180 aus allen Locales gegangen; der
+// Test haelt, dass er nicht als toter Key zurueckkommt.
+test('locales: category.reorderAnnounce existiert in allen Sprachen, category.dragHandle nirgends', () => {
   const missing = [];
   for (const lang of LOCALES) {
     const data = JSON.parse(read(`../public/locales/${lang}.json`));
-    if (typeof data.category?.dragHandle !== 'string' || !data.category.dragHandle.length) {
-      missing.push(`${lang}: dragHandle`);
+    if (data.category && 'dragHandle' in data.category) {
+      missing.push(`${lang}: dragHandle ist zurueck`);
     }
     if (typeof data.category?.reorderAnnounce !== 'string' || !data.category.reorderAnnounce.length) {
       missing.push(`${lang}: reorderAnnounce`);

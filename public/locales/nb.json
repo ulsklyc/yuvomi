@@ -4483,7 +4483,6 @@
         "deleted": "Kategori slettet",
         "deleteSubConfirm": "Slett underkategori \"{{name}}\"?",
         "deleteSubConfirmDetail": "Sletting fungerer bare hvis underkategorien ikke er tildelt noe sted, slik at eksisterende oppføringer forblir uberørte. Selve underkategorien kan ikke gjenopprettes.",
-        "dragHandle": "Dra for å endre rekkefølge",
         "reorderAnnounce": "\"{{name}}\" er nå på posisjon {{position}} av {{total}}.",
         "colorPick": "Farge",
         "colorNone": "Ingen",

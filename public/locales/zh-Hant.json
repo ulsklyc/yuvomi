@@ -4483,7 +4483,6 @@
         "deleted": "已刪除分類",
         "deleteSubConfirm": "刪除子分類「{{name}}」？",
         "deleteSubConfirmDetail": "只有在該子分類未被任何地方使用時才能刪除，因此現有條目不受影響。但子分類本身不會再回來。",
-        "dragHandle": "拖動以重新排序",
         "reorderAnnounce": "「{{name}}」現在位於第 {{position}} 位，共 {{total}} 項。",
         "colorPick": "顏色",
         "colorNone": "無",

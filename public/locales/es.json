@@ -4483,7 +4483,6 @@
         "deleted": "Categoría eliminada",
         "deleteSubConfirm": "¿Eliminar la subcategoría \"{{name}}\"?",
         "deleteSubConfirmDetail": "Solo se puede borrar mientras la subcategoría no esté asignada en ningún sitio, así que las entradas existentes no se tocan. La subcategoría en sí no vuelve.",
-        "dragHandle": "Arrastrar para reordenar",
         "reorderAnnounce": "«{{name}}» ahora está en la posición {{position}} de {{total}}.",
         "colorPick": "Color",
         "colorNone": "Ninguna",

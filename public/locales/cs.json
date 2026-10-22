@@ -4602,7 +4602,6 @@
         "deleted": "Kategorie smazána",
         "deleteSubConfirm": "Smazat podkategorii \"{{name}}\"?",
         "deleteSubConfirmDetail": "Smazat lze jen dokud podkategorie není nikde přiřazená, takže stávající záznamy zůstanou nedotčené. Samotná podkategorie se ale nevrátí.",
-        "dragHandle": "Přetažením seřadit",
         "reorderAnnounce": "„{{name}}“ je nyní na pozici {{position}} z {{total}}.",
         "colorPick": "Barva",
         "colorNone": "Žádná",

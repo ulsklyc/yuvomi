@@ -4483,7 +4483,6 @@
         "deleted": "Kategori borttagen",
         "deleteSubConfirm": "Ta bort underkategorin \"{{name}}\"?",
         "deleteSubConfirmDetail": "Det går bara att radera så länge underkategorin inte är tilldelad någonstans, så befintliga poster påverkas inte. Underkategorin själv kommer inte tillbaka.",
-        "dragHandle": "Dra för att ändra ordning",
         "reorderAnnounce": "\"{{name}}\" är nu på plats {{position}} av {{total}}.",
         "colorPick": "Färg",
         "colorNone": "Ingen",

@@ -4719,7 +4719,6 @@
         "deleted": "Usunięto kategorię",
         "deleteSubConfirm": "Usunąć podkategorię \"{{name}}\"?",
         "deleteSubConfirmDetail": "Usunięcie jest możliwe tylko dopóki podkategoria nie jest nigdzie przypisana, więc istniejące wpisy pozostają nietknięte. Sama podkategoria nie wróci.",
-        "dragHandle": "Przeciągnij, aby zmienić kolejność",
         "reorderAnnounce": "„{{name}}” jest teraz na pozycji {{position}} z {{total}}.",
         "colorPick": "Kolor",
         "colorNone": "Brak",

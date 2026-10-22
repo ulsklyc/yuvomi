@@ -4483,7 +4483,6 @@
         "deleted": "Natanggal ang kategorya",
         "deleteSubConfirm": "Tanggalin ang subkategoryang \"{{name}}\"?",
         "deleteSubConfirmDetail": "Gumagana lang ang pagtanggal habang hindi pa nakatalaga ang subkategorya kahit saan, kaya hindi nagagalaw ang mga umiiral na entry. Hindi na maibabalik ang subkategorya mismo.",
-        "dragHandle": "I-drag para muling ayusin",
         "reorderAnnounce": "Nasa posisyon {{position}} ng {{total}} ngayon ang \"{{name}}\".",
         "colorPick": "Kulay",
         "colorNone": "Wala",

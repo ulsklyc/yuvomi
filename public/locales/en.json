@@ -4483,7 +4483,6 @@
         "deleted": "Category deleted",
         "deleteSubConfirm": "Delete subcategory \"{{name}}\"?",
         "deleteSubConfirmDetail": "Deleting only works while the subcategory is not assigned anywhere, so existing entries stay untouched. The subcategory itself cannot be restored.",
-        "dragHandle": "Drag to reorder",
         "reorderAnnounce": "\"{{name}}\" is now position {{position}} of {{total}}.",
         "colorPick": "Color",
         "colorNone": "None",

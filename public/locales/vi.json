@@ -4483,7 +4483,6 @@
         "deleted": "Đã xóa danh mục",
         "deleteSubConfirm": "Xóa danh mục con \"{{name}}\"?",
         "deleteSubConfirmDetail": "Chỉ xoá được khi danh mục con chưa được gán ở bất kỳ đâu, nên các mục hiện có vẫn nguyên vẹn. Riêng danh mục con thì không quay lại.",
-        "dragHandle": "Kéo để sắp xếp lại",
         "reorderAnnounce": "\"{{name}}\" hiện ở vị trí {{position}} trong tổng số {{total}}.",
         "colorPick": "Màu",
         "colorNone": "Không",

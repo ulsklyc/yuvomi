@@ -4483,7 +4483,6 @@
         "deleted": "Categoria excluída",
         "deleteSubConfirm": "Excluir a subcategoria \"{{name}}\"?",
         "deleteSubConfirmDetail": "Só é possível apagar enquanto a subcategoria não estiver atribuída em lado nenhum, por isso os registos existentes ficam intactos. A subcategoria em si não volta.",
-        "dragHandle": "Arrastar para reordenar",
         "reorderAnnounce": "\"{{name}}\" está agora na posição {{position}} de {{total}}.",
         "colorPick": "Cor",
         "colorNone": "Nenhuma",

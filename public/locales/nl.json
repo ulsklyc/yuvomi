@@ -4483,7 +4483,6 @@
         "deleted": "Categorie verwijderd",
         "deleteSubConfirm": "Subcategorie \"{{name}}\" verwijderen?",
         "deleteSubConfirmDetail": "Verwijderen kan alleen zolang de subcategorie nergens is toegewezen, dus bestaande items blijven ongemoeid. De subcategorie zelf keert niet terug.",
-        "dragHandle": "Sleep om te herschikken",
         "reorderAnnounce": "\"{{name}}\" staat nu op positie {{position}} van {{total}}.",
         "colorPick": "Kleur",
         "colorNone": "Geen",

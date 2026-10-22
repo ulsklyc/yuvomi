@@ -4483,7 +4483,6 @@
         "deleted": "Catégorie supprimée",
         "deleteSubConfirm": "Supprimer la sous-catégorie \"{{name}}\" ?",
         "deleteSubConfirmDetail": "La suppression n'est possible que tant que la sous-catégorie n'est attribuée nulle part : les entrées existantes restent intactes. La sous-catégorie, elle, ne revient pas.",
-        "dragHandle": "Glisser pour réorganiser",
         "reorderAnnounce": "« {{name}} » est maintenant en position {{position}} sur {{total}}.",
         "colorPick": "Couleur",
         "colorNone": "Aucune",

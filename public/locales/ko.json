@@ -4483,7 +4483,6 @@
         "deleted": "카테고리가 삭제되었습니다",
         "deleteSubConfirm": "„{{name}}\" 하위 카테고리를 삭제할까요?",
         "deleteSubConfirmDetail": "하위 카테고리가 어디에도 지정되어 있지 않을 때만 삭제할 수 있어 기존 항목은 그대로 남습니다. 다만 하위 카테고리 자체는 돌아오지 않습니다.",
-        "dragHandle": "드래그하여 순서 변경",
         "reorderAnnounce": "\"{{name}}\"이(가) 이제 {{total}}개 중 {{position}}번째 위치입니다.",
         "colorPick": "색상",
         "colorNone": "없음",

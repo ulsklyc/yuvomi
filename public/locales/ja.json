@@ -4483,7 +4483,6 @@
         "deleted": "カテゴリーを削除しました",
         "deleteSubConfirm": "サブカテゴリー「{{name}}」を削除しますか？",
         "deleteSubConfirmDetail": "削除できるのは、そのサブカテゴリがどこにも割り当てられていない間だけです。既存の項目はそのまま残りますが、サブカテゴリ自体は戻りません。",
-        "dragHandle": "ドラッグして並べ替え",
         "reorderAnnounce": "「{{name}}」は{{total}}件中{{position}}番目になりました。",
         "colorPick": "色",
         "colorNone": "なし",
