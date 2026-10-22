@@ -1997,11 +1997,13 @@ ueber alle Module, kein Nomen); Filterblaetter (Kalender, Aufgaben) behalten die
 von `toggleRowHtml()` - ob auch dort Schalter stehen, ist offen; Auswahllisten
 `modal-actions--stack` (Serien-Umfang) sind kein Fuss.
 
-**Offen: die Optik von "Abbrechen".** Der Brief dieser Runde setzt `btn--ghost` (wie Kalender und
-Aufgaben); seit der Critique 2026-07-30 haelt `test:frontend-audit` fuer die drei geteilten
-Rueckfragen das Gegenteil fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbrechen am
-wichtigsten ist, am unauffaelligsten"), und 61 Seiten-Dialoge folgen ihm, 27 dem Kalender. Bis
-das entschieden ist, zaehlt `cancel-ghost` nur.
+**Die Optik von "Abbrechen" ist entschieden (Runde 5, 2026-09-26): `btn--secondary`, nie
+`btn--ghost`.** Der Brief dieser Runde setzte `btn--ghost` (wie Kalender und Aufgaben); seit der
+Critique 2026-07-30 hielt `test:frontend-audit` fuer die drei geteilten Rueckfragen das Gegenteil
+fest (`btn--secondary`, "im Loeschen-Confirm, wo Abbrechen am wichtigsten ist, am
+unauffaelligsten"), und 61 Seiten-Dialoge folgten ihm, 27 dem Kalender. Hier stand bis R21
+"Offen ... bis das entschieden ist, zaehlt `cancel-ghost` nur"; `test:control-dialect` fuehrt
+`cancel-ghost` laengst als Regel mit leerer Ratsche.
 
 **Gehalten als Ratchet** (`test:control-dialect`): sechzehn Scanner zaehlen je Datei die
 Abweichler; die Ausnahmeliste `PENDING` (Stand 2026-09-26, fuer die sechs Regeln der Runde 7
@@ -2256,8 +2258,9 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   (`--_seg-active-bg` #443E37 auf #37332E, 1.19:1) - mit `--color-surface` lag er im Dark
   als Mulde in seiner Bahn (R18). Die Modulton-Tinte haelt darauf AA (knappster Wert
   Gesundheit 4.51:1). Dasselbe gilt fuer den Schalterknopf: `--color-switch-knob` ist in
-  beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch
-  (`calc(var(--radius-sm) - 2px)`). Kein 3px-Akzentstreifen unter aktiven Tabs.
+  beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch:
+  `--radius-sm` (10px) im `--radius-md`-Traeger (12px) mit 2px Polster (panel.css,
+  `.segmented__item`). Kein 3px-Akzentstreifen unter aktiven Tabs.
 - **EINE BEHANDLUNG PRO KONTROLLTYP.** Der Modulton erscheint genau einmal als FLAECHE
   (aktiver Filter-Chip, getoent) und einmal als TINTE (aktives Segment). Bis 2026-08-12
   war das Segment deckend gefuellt; auf `/tasks` standen dadurch vier Gruen-Behandlungen
@@ -2275,8 +2278,10 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   ausgeschrieben; zusammengehalten wird sie vom Guard, nicht von der Kaskade.
 
 ### Chips
-- **Form:** Kapsel (`--radius-full`), Kante wie ein Bedienelement. Kalender-Layer-Chips
-  tragen die User-Farbe als Border mit ~60 % Deckung (>=3:1), nie als Textfarbe; alle
+- **Form:** Kapsel (`--radius-full`) mit 1.5px-Kante in `--color-border` (filter-chip.css).
+  Eine Nutzerfarbe steht nie als Textfarbe, sondern als Scheibe (`.filter-chip__swatch`, Personen);
+  die Kalender-Ebenen-Chips mit ~60-%-Nutzerfarbkante sind seit 2026-08-28 entfallen (ihre
+  Schalter stehen im Filterblatt, siehe die Label-Verlust-Regel). Alle
   Labels stehen inaktiv in Sekundaertext - auch der Mir-zugewiesen-Chip (Beschluss
   2026-08-17, umgesetzt 2026-08-27: seine dauerhaft getoente Schrift las sich als
   „Filter ist an"; die Farbe erscheint erst mit der Aktivierung). Ein aktiver
@@ -2303,8 +2308,11 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   Trennung leistet der Schatten, nicht eine Kante.
 - **Shadow:** shadow-sm in Ruhe; Hover-Anhebung nur fuer interaktive Karten.
 - **Inset-Grouped-Liste:** die Kernform der neuen Welt. "Heute wichtig" auf dem Dashboard ist
-  EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, getoente Icon-Kachel plus
-  Titel plus Modul-Untertitel plus trailing Count), nicht viele Einzelkarten.
+  EINE Inset-Grouped-Liste (ein Traeger, Zeilen mit Haarlinien, Vollton-Siegel plus Titel plus
+  Untertitel plus trailing Uhrzeit), nicht viele Einzelkarten. Als wichtigster Block der Seite
+  traegt der Traeger eine Stufe mehr als die Karten darunter: `--radius-xl` und `--shadow-lg`
+  (`.today-cockpit__grid`, dashboard.css). Hier stand bis R21 "getoente Icon-Kachel ... plus
+  trailing Count".
 - **Internal Padding:** 16px (`--space-4`), kompakt 12px.
 - **Gruppen-Traeger (R20):** eine Karte je Gruppe (Abfallart mit ihren Terminen) traegt
   dieselbe Haut wie `.row-carrier` - Flaeche, `--radius-lg`, shadow-sm, keine Kontur; den
@@ -2419,8 +2427,8 @@ steht statt untereinander. Guard: `row lists sit in exactly one carrier` liest A
 Stylesheets und haelt jede Haarlinien-Zeile frei von Karten-Merkmalen (Schatten, Radius,
 Surface-Fuellung).
 
-**Die Traegergrammatik steht zweimal, und sie ist nicht zweimal dieselbe (offener Befund,
-2026-08-11).** Geteilt liegt sie als `.row-carrier` (list-row.css) - genau die vier
+**Die Traegergrammatik stand zweimal, und sie war nicht zweimal dieselbe (Befund vom
+2026-08-11, aufgeloest mit #1478 und #1492, siehe den Schluss dieses Abschnitts).** Geteilt liegt sie als `.row-carrier` (list-row.css) - genau die vier
 Deklarationen oben, samt der Ausnahme, dass ein Traeger, der nur einen Leerzustand enthaelt,
 seine Karte abgibt. Daneben steht `.list-rows`, der Traeger der gruppierten Listen (Einkauf,
 Vorrat, Rezepte, Aufgaben, Agenda); `tokens.css` nennt ihn „dieselbe Grammatik plus dem
@@ -2462,6 +2470,12 @@ der die Traeger-Regel den Well vom Grouped-Grund verbannt hat. Der Guard kann es
 weil er die ZEILE prueft (sie darf keine Karte sein), nie den Traeger. Was daraus folgt -
 `.list-rows` bekommt Schatten und 16px, oder die Regel nennt zwei Traegerformen samt
 Kriterium -, ist offen und gehoert an das gerenderte Material, nicht in diesen Absatz.
+
+**Aufgeloest durch die Kanon-Runde (#1478, 2026-09-27; der letzte Rest mit #1492):** kein
+Markup traegt `.list-rows` mehr - die gruppierten Listen (Einkauf, Vorrat, Rezepte, Aufgaben,
+Agenda) stehen in `.row-carrier`, also in EINER Traegerform mit Schatten. Die Klasse lebt nur
+noch als Regel in list-row.css; die Kanon-Tabelle fuehrt sie als "laeuft aus, danach faellt
+die Regel".
 
 **Die Wischsemantik-Regel.** Dieselbe Geste bedeutet in jeder Liste dasselbe. Der
 Zeilenanfang traegt die primaere positive Aktion, das Zeilenende das Destruktive oder
@@ -2525,7 +2539,9 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   (`padding-inline-end: var(--space-8)`) plus `text-overflow: ellipsis`, damit ein langer
   Optionstext vor dem Zeichen endet. `[multiple]`/`[size]` behalten ihr natives Bild.
   Zahlfelder zeigen keine nativen Spin-Pfeile. Das ist app-weiter Kanon, kein Modul-Detail.
-- **Focus:** Akzentkante plus 3px Glow in `--color-accent-light`; interaktive Nicht-Felder
+- **Focus:** Akzentkante plus 3px Glow aus `color-mix(--color-accent, --tint-shadow)` und die
+  Glas-Innenkante `--glass-inset-input` (glass.css; die `--color-accent-light`-Fassung in
+  layout.css wird davon ueberschrieben); interaktive Nicht-Felder
   tragen den app-weiten 2px-Ring. **Der Fokus eines Feldes ist immer die eine Stimme
   (Violett), nie ein Modulton** - die Schnellzeile des Einkaufs war bis 2026-10-07 orange.
 - **Formularzeile (Entscheidung Ulas, 2026-10-07):** Ziel fuer Erfassungsdialoge und
@@ -2580,8 +2596,8 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Regel als `.pantry-form-row` in pantry.css und kopiert als `.inventory-form-row`; der
   Artikel-Dialog des Einkaufs benutzte die Vorratsklasse, deren Blatt dort nicht laedt (Dialog
   mobil 748 -> 563px). Kein Modulblatt kopiert die Zeile (`test:frontend-audit`).
-- **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (14px
-  sekundaer) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
+- **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (Footnote
+  13 medium, sekundaer; bis R21 S9b 14px) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
   `.budget-amount-input` (48px/20/600), sein Nachbar in der Zeile dieselbe Hoehe. Die Dialoge der
   Aufteilung folgen dem seit R17 (vorher `<label>Text<input class="input">`, Label 16px primaer,
   Betrag 42px/16/500, kein Stern), der Schichtplan schreibt die Kanon-Klassen. Wochentage sind
@@ -2859,7 +2875,9 @@ dort bleibt es beim Inline-Titel, wie in Apples regulaerer Groessenklasse.
 
 **Die Werkzeugzeilen-Regel (Critique 2026-08-27, P1).** Die Werkzeug-Leiste eines Modulkopfs
 (Tab-Leiste, Ansichts-Segment) ist die BAR-ZEILE: eine eigene, volle Zeile unter Titel,
-Center und Aktionen (`.page-toolbar__bar`, order 4), auf ALLEN Viewports. Der Slot stand
+Center und Aktionen (`.page-toolbar__bar`, order 4), auf allen Viewports bis auf zwei
+benannte Ausnahmen der Kopfregel mobil: die Reiter als Titelzeile zwischen 768 und 1023px
+(`page-toolbar--tabs-title`, R19) und die einzeilige Kalenderleiste ab 1024px (R21 S7). Der Slot stand
 seit Runde 6 als Zusage im Shell-Kommentar („eine Tab-Leiste im Kopf ist eine eigene,
 horizontal scrollende Zeile") - die Regel darunter gab aber nur das Scrollen, nie die Zeile,
 und die Einzeilen-Doktrin aus #882 zwang jede Leiste in die Titelzeile, wo sie ihre eigenen
@@ -3563,8 +3581,8 @@ in `@media (min-width: 1024px)` - also genau dort, wo mit der Maus gezogen wird 
 Wischgeste einspringt, und der Fade darunter galt als Ersatz. Er beantwortete eine andere
 Frage.
 
-**Drei Traeger, drei angepasste Kopien - es gibt keine gemeinsame Basis, und das ist
-benannt, nicht uebersehen:**
+**Vier Traeger, vier angepasste Kopien - es gibt keine gemeinsame Basis, und das ist
+benannt, nicht uebersehen** (hier stand bis R21 "Drei"; die Notizen-Reihe kam 2026-09-13 dazu):
 
 - `.budget-list` samt `.budget-loans__list` und den beiden Tab-Panels (budget.css) ist das
   Vorbild und stand vor der Regel da; seit #904 scrollt das Budget-Panel selbst und gehoerte
@@ -3574,17 +3592,29 @@ benannt, nicht uebersehen:**
 - `.nav-sidebar__items` (layout.css, seit #970) mischt gegen `--color-border` statt gegen
   `--module-accent`: **die Seitenleiste gehoert keinem Modul und darf nicht die Farbe des
   gerade offenen annehmen.**
+- `.notes-filters` (notes.css) ist die einzige WAAGERECHTE Kopie: die Kategorie-Reihe der
+  Notizen laeuft mit vielen Kategorien ueber, und am Desktop wischt niemand. Sie holt den
+  Balken gegen das `display: none` des Chip-Reihen-Bausteins zurueck (`display: block`,
+  `height: 10px`), sonst dieselbe Rezeptur ohne Hover.
 
 **Zwei Abweichungen teilen die Kopien nicht, und beide stehen hier ungeglaettet.** Erstens
 gibt es den Hover-Zustand nur an `.list-scroller`
 (`calc(var(--tint-hint) + var(--tint-state))`, gerechnet auf zwei bestehenden Stufen statt
 auf einer neuen Zahl): eine reine `--tint-hint`-Kante traegt laut tokens.css nie allein, ein
-Zustand auf ihr braucht denselben Bezug. Budget und Seitenleiste haben ihn nicht. Zweitens
-nennt `scrollbar-color` in Budget und Listen-Scroller den `--module-accent` in VOLLER
-Saettigung, waehrend der WebKit-Daumen daneben auf `--tint-hint` mischt - Firefox zeichnet
-den Daumen dort also kraeftiger als Chromium. Das steht in beiden Dateien zeichengleich, ist
-damit die Rezeptur und kein Ausrutscher; die Seitenleiste ist die einzige, die beide Seiten
-gleich toent.
+Zustand auf ihr braucht denselben Bezug. Budget, Seitenleiste und Notizen haben ihn nicht.
+Der Hover setzt nur `background-color`: bis R21 stand dort die Kurzschreibweise `background`,
+die `background-clip` auf `border-box` zuruecksetzt, und der Daumen wuchs unter Hover von 4
+auf die vollen 10px der Spur (gemessen auf dem `::-webkit-scrollbar`-Pfad; Guard
+`test:shopping`, "Der Listen-Scroller traegt einen duennen, getoenten Scrollbalken").
+Zweitens nennt `scrollbar-color` in Budget, Listen-Scroller und Notizen den `--module-accent`
+in VOLLER Saettigung, waehrend der WebKit-Daumen daneben auf `--tint-hint` mischt. Das steht
+in allen drei Dateien zeichengleich, ist damit die Rezeptur und kein Ausrutscher; die
+Seitenleiste ist die einzige, die beide Seiten gleich toent. **Welche Seite ein Browser
+zeichnet, entscheiden die Standard-Eigenschaften:** seit Chromium 121 und Safari 26.2 gewinnen
+`scrollbar-width`/`scrollbar-color`, und die `::-webkit-scrollbar`-Regeln greifen nicht mehr
+(gemessen in Chrome 155: mit `scrollbar-width: thin` entfaellt die 10px-Spur ganz). Den
+`--tint-hint`-Daumen samt Hover sieht heute nur noch Safari vor 26.2. Hier stand bis R21
+"Firefox zeichnet den Daumen dort also kraeftiger als Chromium" - das galt vor Chromium 121.
 
 **Offen, und bewusst nicht behauptet:** die `mask-image`-Fades liegen auf DEMSELBEN Element
 wie der Balken, und eine Maske erfasst die Elementbox samt Scrollbalken. Auf Plattformen mit
@@ -3632,7 +3662,10 @@ waere ein schneller 404 vorbei, bevor jemand zuhoert.
 
 - `.recipe-row__thumb` (recipes.css) ist das Vorbild aus der Mealie-Anbindung: `--target-md`
   (40px), `--radius-sm`, Platzhalter auf `--color-surface-2` mit Tertiaertinte. Die
-  Rezeptliste zeigt den Rahmen IMMER, notfalls als Platzhalter.
+  Rezeptliste zeigt den Rahmen, wo die Zeile ein Bild hat oder das Rezept gespiegelt ist (dort
+  notfalls als Platzhalter); ein eigenes Rezept ohne Bild bleibt eine Textzeile
+  (`rowShowsThumb()`, R16). Hier stand bis R21 "IMMER" - die Frage ist "hat es ein Bild", nicht
+  "woher kommt es".
 - `.meal-card__thumb` (meals.css): `--target-sm` (32px), `--radius-sm`, derselbe Platzhalter.
   **Nur die bebilderte Karte wird zum Grid** (`.meal-card__open--with-thumb`), jede andere
   bleibt die Spalten-Flex, die sie war. Die erste Fassung gab jeder Karte einen Bildslot und
@@ -3840,8 +3873,11 @@ Modul. Das Mehr-Sheet traegt Siegel, weil es ein VERZEICHNIS von Raeumen ist - d
 Unterschied bleibt nur lesbar, solange die Leiste keine traegt. (Entscheidung von Ulas am
 2026-08-10, am gerenderten Material getroffen.)
 
-**Zwei Groessenrollen:** Listenzeile `--sm` (24px, Icon 16px) und Modulkopf (32/24px je nach
-Rang seines Titels, siehe Modulkopf).
+**Drei Groessenrollen, dazu die Wand:** Listenzeile `--sm` (24px, Icon 16px), die Basis (32px,
+`--target-sm`, Icon 16px - die Zeilen von "Heute wichtig" und das Mehr-Blatt) und Modulkopf
+(32/24px je nach Rang seines Titels, siehe Modulkopf). Die Wand fuehrt ihr Siegel auf
+Distanz in 48px (`.wall-row__seal`, `--target-lg`, Icon `--icon-xl`). Hier stand bis R21 "Zwei
+Groessenrollen" ohne die Basis.
 
 **Das Siegel hat EIN Gesicht, und es ist der Vollton** (2026-08-17). Hier standen zwei: eine
 16-%-Toenung fuer den Regelfall und `--vivid` fuer die eine umgekehrte Flaeche (den Toast),
@@ -3884,8 +3920,8 @@ die Sprache des Nutzers. Die beiden Karten liegen beidseits der Schichtgrenze un
 Seit 2026-08-17 (Widget-Kopf-Kur, Etappe 2 der Modernisierung) ist der Kopf einer
 Dashboard-Karte eine TITELZEILE DIREKT AUF DER KARTENFLAECHE: davor das Markensiegel im
 Vollton (Ton = Flaeche, Tinte = `--color-ink-on-vivid`), Titel in
-Text-Primary, Zaehler als getoenter Badge, „Alle" als neutraler Textlink mit Ton erst im
-Hover. Kein Band, keine getoente Trennlinie, keine 2px-Oberkante: der Absender einer Karte
+Text-Primary, Zaehler als neutraler Badge (Well-Grund, Sekundaertext, `.widget__badge`),
+„Alle" als neutraler Textlink mit Ton erst im Hover. Kein Band, keine getoente Trennlinie, keine 2px-Oberkante: der Absender einer Karte
 ist GENAU EIN Element, und es traegt den Modulton zu 100 %. Die Kachelreihe
 (`metric-card--tile`) fuehrt dasselbe Siegel - zwei Siegel-Gesichter auf einem Board
 waeren zwei Wahrheiten.
@@ -3909,7 +3945,8 @@ sagen will, sagt sie im Vollton eines kleinen Elements, nicht in der Beimischung
 grossen Flaeche.**
 
 **Den Ton setzt die Karte, nicht die Seite.** Jede `.widget--*`-Klasse legt `--widget-accent`
-auf ihren Modulton (fuer Badge, Link-Hover und Fehlerkante); das Siegel selbst bekommt
+auf ihren Modulton (fuer den Link-Hover, die Aktivierung im Leerzustand und Hervorhebungen im
+Inhalt wie den naechsten Abfalltermin; der Zaehler-Badge ist neutral); das Siegel selbst bekommt
 `--seal-accent` aus dem Slug seiner Route. Der Fallback ist die Stimme. Ein
 `--active-module-accent` an dieser Stelle loeste auf dem Dashboard den Akzent der UEBERSICHT
 auf, also bekaemen alle Widgets dieselbe Farbe - ausgerechnet in dem Raster, in dem siebzehn
