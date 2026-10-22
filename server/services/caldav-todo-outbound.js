@@ -50,6 +50,7 @@ import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './ca
 import { patchICSTodo } from '../utils/ics-patch.js';
 import {
   createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
+  isAccountWideRefusal,
 } from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
@@ -1900,17 +1901,24 @@ async function carryShoppingItem(client, accountId, collection, rowId, clientFor
  * weiterlebt und dort von anderen Apps gesehen und geändert wird - der
  * Zwischenzustand darf nicht für immer stehen. Nach der fünften Absage steht
  * die Zeile wieder auf der Liste ihres Objekts (`returnShoppingMove`), wie ein
- * Termin, dessen Umzug der Server nicht annimmt. Gezählt wird nur, was der
- * Server beantwortet hat; ein unerreichbarer Server ist keine Absage.
+ * Termin, dessen Umzug der Server nicht annimmt.
+ *
+ * Gezählt wird nur, was über den EINTRAG selbst sagt (#2137): 400, 403, 409,
+ * 412, 422, 423, ein Fehler ohne Status aus dem eigenen Code. Das sagt
+ * nichts über das Konto oder den Server als Ganzes (401, 429, 5xx, ein
+ * Netzfehler) - der Umzug bleibt stehen und verbraucht keinen Versuch, und der
+ * Durchgang sendet für dieses Konto nichts mehr (`createRefusalStop`). Ein
+ * 403 zählt trotzdem: ein nur lesbares Ziel ist genau der Fall, den
+ * `returnShoppingMove` bewältigt, und einen Umzug gibt es zurück.
  *
  * @param {object} client      tsdav-Client des Zielkontos
  * @param {number} accountId
  * @param {Array<{listUrl: string, targetListId: number}>} targets  aktive Zuordnungen
  * @param {Map}    listsByUrl  Listen-URL → Collection des Servers
- * @param {{clientFor?: (accountId: number) => Promise<object|null>}} [opts]
+ * @param {{clientFor?: (accountId: number) => Promise<object|null>, stop?: ReturnType<typeof createRefusalStop>}} [opts]
  * @returns {Promise<number>} mitgenommene Objekte
  */
-export async function processPendingShoppingMoves(client, accountId, targets, listsByUrl, { clientFor } = {}) {
+export async function processPendingShoppingMoves(client, accountId, targets, listsByUrl, { clientFor, stop = createRefusalStop() } = {}) {
   const sourceFor = clientFor || (async () => null);
   let done = 0;
   for (const { listUrl, targetListId } of targets) {
@@ -1918,16 +1926,40 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
     const collection = listsByUrl.get(listUrl);
     if (!collection) continue;
 
+    // Nach einer kontoweiten Absage in diesem Durchgang: keine weitere
+    // Anfrage an das Konto (#1863, #2137).
+    if (stop.blocks(collection.url)) continue;
+
     for (const listed of pendingShoppingMoves(targetListId)) {
+      // Nach einer kontoweiten Absage in diesem Durchgang: keine weitere
+      // Anfrage an das Konto (#2143).
+      if (stop.blocks(collection.url)) break;
       try {
         if (await carryShoppingItem(client, accountId, collection, listed.id, sourceFor) === 'carried') done++;
       } catch (err) {
         const now = reloadRow('shopping', listed.id);
         if (!waitsForCarryHere(now, accountId, collection.url)) continue;
+
+        // Ein unerreichbarer Server ist keine Absage: er hat nicht geantwortet.
+        // Aber er ist nicht erreichbar - für weitere Artikel in diesem Durchgang
+        // auch nicht (#2143).
         if (typeof err?.status !== 'number') {
+          stop.trip(err, collection.url);
           log.warn(`Could not carry shopping item ${now.id} to ${listUrl}: ${err.message}`);
           continue;
         }
+
+        // Eine kontoweite Absage (401, 429, 5xx) sagt nichts über den Eintrag
+        // selbst (#2137): der Umzug bleibt stehen, verbraucht keinen Versuch,
+        // und der Durchgang sendet für dieses Konto nichts mehr. Ein 403 zählt
+        // trotzdem - ein nur lesbares Ziel ist genau der Fall, den
+        // `returnShoppingMove` bewältigt, und einen Umzug gibt es zurück.
+        if (isAccountWideRefusal(err) && err.status !== 403) {
+          stop.trip(err, collection.url);
+          log.warn(`Reminder list ${listUrl} refused shopping item ${now.id} for the whole account, its move waits without using up an attempt: ${err.message}`);
+          continue;
+        }
+
         if (now.outbound_move_attempts + 1 >= MAX_OUTBOUND_ATTEMPTS) {
           const back = returnShoppingMove(now);
           log.error(
@@ -2299,7 +2331,8 @@ async function runFlushOutbound({ createClient } = {}) {
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
       await releaseLeftoverTodoUploads(client, accountId, { clientFor });
 
-      // Ein Stoppsignal für Löschen und Ändern aller Module dieses Kontos (#1863).
+      // Ein Stoppsignal für Löschen, Ändern und Mitnahmen aller Module dieses
+      // Kontos (#1863, #2137).
       const stop = createRefusalStop();
       for (const module of modules) {
         const wanted = [
@@ -2341,7 +2374,8 @@ async function runFlushOutbound({ createClient } = {}) {
             }
             if (moves.length) {
               // Als `updated` gezählt: das Objekt ist dasselbe, nur sein Platz nicht.
-              total.updated += await processPendingShoppingMoves(client, accountId, moves, collections, { clientFor });
+              // Dasselbe Stoppsignal wie Löschen und Ändern (#1863, #2137).
+              total.updated += await processPendingShoppingMoves(client, accountId, moves, collections, { clientFor, stop });
             }
           }
         }
