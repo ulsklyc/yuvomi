@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INSTALL_COMMAND, launchBrowser, resolveChromeExecutable } from './chrome-executable.js';
+import { INSTALL_COMMAND, launchBrowser, resolveChromeExecutable } from '../scripts/lib/chrome-executable.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const PINNED = '/home/u/.cache/puppeteer/chrome/mac_arm-155.0.8059.79/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
@@ -113,9 +113,11 @@ test('launchBrowser() reicht den aufgeloesten Pfad und die Optionen an launch() 
 
 test('jede Stelle, die Puppeteer startet, geht ueber launchBrowser() - keine eigene Aufloesung', () => {
   const direct = [];
-  for (const dir of ['test', 'scripts']) {
+  // `scripts/lib/` mit: dort wohnt der Helfer seit #2180, damit Bild-Skripte
+  // nicht aus `test/` importieren - und dort darf auch kein zweiter Start entstehen.
+  for (const dir of ['test', 'scripts', 'scripts/lib']) {
     for (const name of readdirSync(join(REPO, dir))) {
-      if (!/\.(m?js)$/.test(name) || name === 'chrome-executable.js') continue;
+      if (!/\.(m?js)$/.test(name) || `${dir}/${name}` === 'scripts/lib/chrome-executable.js') continue;
       const src = readFileSync(join(REPO, dir, name), 'utf8');
       if (/\bpuppeteer\.launch\(/.test(src.replace(/^\s*(\/\/|\*).*$/gm, ''))) direct.push(`${dir}/${name}`);
     }

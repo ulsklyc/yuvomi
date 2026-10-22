@@ -22,7 +22,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import puppeteer from 'puppeteer';
-import { launchBrowser } from './chrome-executable.js';
+import { launchBrowser } from '../scripts/lib/chrome-executable.js';
 import { fileURLToPath } from 'node:url';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -1,5 +1,6 @@
 /**
- * Modul: Test-Infrastruktur - welcher Chrome startet (#2155)
+ * Modul: welcher Chrome startet (#2155; seit #2180 unter scripts/lib/, weil
+ *        Tests UND Bild-Skripte ihn importieren)
  *
  * Zweck: jede Stelle, die Puppeteer selbst startet (Harness der
  *        Dokument-Guards, die statischen Browser-Sonden, die Bild-Skripte),

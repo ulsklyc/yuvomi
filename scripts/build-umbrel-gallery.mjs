@@ -12,7 +12,7 @@
  */
 
 import puppeteer from 'puppeteer';
-import { launchBrowser } from '../test/chrome-executable.js';
+import { launchBrowser } from './lib/chrome-executable.js';
 import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';

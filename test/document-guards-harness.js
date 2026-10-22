@@ -43,7 +43,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
 import puppeteer from 'puppeteer';
-import { launchBrowser } from './chrome-executable.js';
+import { launchBrowser } from '../scripts/lib/chrome-executable.js';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { tempDir } from './tmp-dir.js';
 
