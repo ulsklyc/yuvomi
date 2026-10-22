@@ -6,6 +6,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
+import { eachRule } from './css-rules.js';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { url } from '../server/middleware/validate.js';
 import { aggregateMealIngredients, parseQuantity } from '../server/services/shopping-import.js';
@@ -739,8 +740,16 @@ test('Der Listen-Scroller traegt einen duennen, getoenten Scrollbalken (#1039)',
     'Firefox braucht scrollbar-width/scrollbar-color direkt an .list-scroller');
   assert(/\.list-scroller::-webkit-scrollbar\s*\{\s*width:\s*10px;\s*\}/.test(css),
     'WebKit/Chromium brauchen die eigene Pseudo-Element-Fassung');
-  assert(/\.list-scroller::-webkit-scrollbar-thumb:hover/.test(css),
+  const hover = [...eachRule(css)].filter((r) => r.selector.trim() === '.list-scroller::-webkit-scrollbar-thumb:hover');
+  assert(hover.length > 0,
     'eine reine --tint-hint-Kante braucht laut tokens.css einen Hover-Bezug, sonst traegt sie nicht allein');
+  // Der Hover wechselt nur die Toenung. Die Kurzschreibweise `background:` setzt
+  // background-clip auf border-box zurueck, und der Daumen fuellt dann auch den
+  // 3px-Rand: gemessen 4 -> 10px breit auf dem ::-webkit-scrollbar-Pfad (Safari vor 26.2).
+  for (const { body } of hover) {
+    assert(!/(^|[;\s])background\s*:/.test(body) || /background-clip:\s*padding-box/.test(body),
+      'der Hover des Daumens darf background-clip nicht zuruecksetzen - background-color statt background');
+  }
 });
 
 // --------------------------------------------------------

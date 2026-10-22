@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Now the date is taken as it is written and the time is ignored. The time zone does not move it to
   another day, because a birthday is a calendar date. Contacts already synced get their birthday
   with the next sync; a vCard file has to be imported again.
+- **The tinted scrollbar of the shopping, pantry and recipe lists keeps its width on hover.** In
+  browsers that draw it through `::-webkit-scrollbar` (Safari before 26.2), hovering the thumb
+  filled the whole 10px track instead of the 4px thumb, because the hover rule reset
+  `background-clip`. Now only the tint deepens. Current Chrome, Edge, Firefox and Safari draw the
+  standard `scrollbar-color` instead and were not affected.
 
 ## [2.79.0] - 2026-10-22
 

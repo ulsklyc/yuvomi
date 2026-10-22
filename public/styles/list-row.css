@@ -119,9 +119,11 @@
 /* Sichtbare Hover-Andeutung, die das Budget-Vorbild nicht kannte: eine reine
  * Kante (--tint-hint) traegt laut eigener Dokumentation nie allein - ein
  * Zustand auf ihr braucht denselben Bezug. `calc()` auf zwei bestehenden
- * Stufen statt einer neuen Zahl, wie tokens.css es fuer Abweichungen verlangt. */
+ * Stufen statt einer neuen Zahl, wie tokens.css es fuer Abweichungen verlangt.
+ * Nur `background-color`: die Kurzschreibweise setzte background-clip zurueck,
+ * und der Daumen fuellte unter Hover die ganze 10px-Spur statt seiner 4px. */
 .list-scroller::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--module-accent) calc(var(--tint-hint) + var(--tint-state)), transparent);
+  background-color: color-mix(in srgb, var(--module-accent) calc(var(--tint-hint) + var(--tint-state)), transparent);
 }
 
 /* --------------------------------------------------------
