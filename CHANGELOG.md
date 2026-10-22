@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
   A name that is empty after trimming falls back to the usual default. Existing accounts pick up
   the colours and names with "Refresh calendars" in the CalDAV settings.
+- **CardDAV address books keep a clean name.** (#2160) Address book names come through the same
+  path as calendar names and kept a line break or surrounding spaces from the server. They are now
+  trimmed the same way, and an empty name falls back to the usual default. Existing accounts pick
+  up the clean names with "Refresh addressbooks" in the CardDAV settings.
 - **An error that arrives late no longer pushes aside the dialog you opened in the meantime.**
   (#2134) A few places show their error as a dialog after a request fails, or ask a question
   built from the server's answer: deciding a reward request, closing a pocket-money account or
