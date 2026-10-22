@@ -22525,7 +22525,12 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 // public/styles. Stand 2026-10-18: 34. Wer eins entfernt, senkt die Zahl.
 // Stand 2026-10-21 (D13, Critique R21): 28 - die globale `[hidden]`-Regel in
 // reset.css kam dazu, sieben Rettungsregeln mit `!important` gingen.
-const IMPORTANT_CEILING = 28;
+// Stand 2026-10-22 (#2150): 15 - die 13 Spezifitaets-Umgehungen sind weg
+// (Rueckmelde-Zustaende der Knoepfe ueber `button.` + eigenes `:hover`, die
+// Liquid-Leiste, der Nur-lesen-FAB und das Rechte-Zeilen-Icon gewannen schon
+// ohne). Uebrig sind nur gewollte: reduzierte Bewegung, Druck, die globale
+// `[hidden]`-Regel und Glas aus.
+const IMPORTANT_CEILING = 15;
 test('!important-Sperrklinke: echte !important-Deklarationen in public/styles werden nicht mehr', () => {
   const dir = new URL('../public/styles/', import.meta.url);
   const found = [];
@@ -22536,7 +22541,7 @@ test('!important-Sperrklinke: echte !important-Deklarationen in public/styles we
       }
     }
   }
-  assert.ok(found.length > 20, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
+  assert.ok(found.length > 10, `Reichweite: nur ${found.length} Treffer - zaehlt der Scanner noch?`);
   assert.ok(found.length <= IMPORTANT_CEILING,
     `${found.length} echte !important statt hoechstens ${IMPORTANT_CEILING}. Neue Vorrangregel ueber Spezifitaet oder Quellreihenfolge loesen, nicht ueber !important:\n${found.join('\n')}`);
 });
