@@ -8,7 +8,7 @@ import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
-import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
@@ -506,6 +506,31 @@ export async function render(container, { signal } = {}) {
   page.append(...[title, toolbar, split, fab].filter(Boolean));
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/recipes');
+
+  // Suchschalter in der Leisten-Trailing-Zone: Tipp öffnet Zeile 2 und fokussiert
+  // das Suchfeld - auf Mobilgeräten ist die Zeile anfangs eingeklappt.
+  const searchToggle = document.createElement('button');
+  searchToggle.type = 'button';
+  searchToggle.className = 'btn btn--icon btn--ghost recipes-search-toggle';
+  searchToggle.setAttribute('aria-label', t('recipes.searchPlaceholder'));
+  searchToggle.insertAdjacentHTML('beforeend', '<i data-lucide="search" aria-hidden="true"></i>');
+  searchToggle.addEventListener('click', () => container.querySelector('#recipes-search')?.focus());
+  setKitchenTabsTrailing(searchToggle);
+
+  // Auf Mobilgeräten startet Zeile 2 eingeklappt: Inhalt beginnt direkt unter der
+  // Tab-Leiste. Der Router-Helfer (ux.js) setzt erst --fold-row-h per ResizeObserver,
+  // dann ergänzen wir is-collapsed. Der MutationObserver beobachtet nur die
+  // page-toolbar--fold-row-Klasse und läuft danach nicht weiter.
+  if (typeof MutationObserver !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
+    const mo = new MutationObserver(() => {
+      if (toolbar.classList.contains('page-toolbar--fold-row')) {
+        toolbar.classList.add('is-collapsed');
+        mo.disconnect();
+      }
+    });
+    mo.observe(toolbar, { attributes: true, attributeFilter: ['class'] });
+  }
+
   // Positionierung und Schliessen der Zeilen-Ueberlaufmenues. Idempotent, haengt an
   // der stabilen Seitenwurzel - die Liste darin wird bei jedem Filter neu gebaut.
   installPopoverMenus(page);

@@ -20,10 +20,10 @@ export const KITCHEN_ROUTES = Object.freeze(KITCHEN_MODULES_SOURCE.map((mod) => 
 export const KITCHEN_STORAGE_KEY = 'yuvomi-kitchen-tab';
 
 const TABS = () => [
-  { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'      },
-  { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'     },
-  { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart' },
-  { route: '/pantry',   labelKey: 'nav.pantry',   icon: 'archive'       },
+  { route: '/meals',    labelKey: 'nav.meals'    },
+  { route: '/recipes',  labelKey: 'nav.recipes'  },
+  { route: '/shopping', labelKey: 'nav.shopping' },
+  { route: '/pantry',   labelKey: 'nav.pantry'   },
 ].filter(({ route }) => !window.yuvomi?.isModuleDisabled(route.slice(1)));
 
 export function getLastKitchenRoute() {
@@ -110,6 +110,8 @@ const BADGES = [
 
 /** Aktuelle Leiste; der Zustand wird nachgeladen, nachdem sie schon steht. */
 let _bar = null;
+/** Optionale Werkzeugzone am rechten Ende der Leiste (z.B. Suchschalter). */
+let _trailing = null;
 /** Die gleitende Kapsel der stehenden Leiste - eine, nie mehr. */
 let _indicator = null;
 let _activeRoute = null;
@@ -276,7 +278,7 @@ export function renderKitchenTabsBar(container, activeRoute) {
     // abschaltbar). Die Leiste wird damit zur Navigation aus echten Links -
     // cmd-Klick öffnet den Vorrat im neuen Tab, wie überall sonst in der Shell.
     semantics: 'nav',
-    tabs: tabs.map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
+    tabs: tabs.map(({ route, labelKey }) => ({ id: route, label: t(labelKey) })),
     activeId: activeRoute,
     storageKey: KITCHEN_STORAGE_KEY,
     extraClass: 'kitchen-tabs-bar',
@@ -293,10 +295,23 @@ export function renderKitchenTabsBar(container, activeRoute) {
     onChange: onTabChosen,
   });
   _indicator = attachSegmentIndicator(_bar, { itemSelector: '.sub-tab' });
+  _trailing = document.createElement('div');
+  _trailing.className = 'kitchen-tabs-bar__trailing';
+  _bar.appendChild(_trailing);
   applyBadges(_lastSummary);
   scrollActiveSubTabIntoView(_bar);
   placeIndicator();
 
   refreshKitchenBadges();
   return _bar;
+}
+
+/**
+ * Setzt den Inhalt der Trailing-Zone der Küchenleiste.
+ * Wird von jedem Küchen-Modul aufgerufen: Rezepte und Vorrat übergeben einen
+ * Suchschalter, Mahlzeiten und Einkauf übergeben null (leert die Zone).
+ */
+export function setKitchenTabsTrailing(content) {
+  if (!_trailing) return;
+  _trailing.replaceChildren(...(content ? [content] : []));
 }
