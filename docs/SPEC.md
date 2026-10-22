@@ -5267,8 +5267,9 @@ child's personal cycle switch (`health_cycle_enabled:user:<id>` in `sync_config`
 `health_cycle_enabled_user`) - and only where no such row exists yet. A new child account starts
 without the cycle tab as it starts without fasting; it is not a right, so the child can turn the tab
 on in its own settings. Migration 258 (#2148) applied the same row once to child accounts that
-already existed, again only where none was stored, so a child's own choice stays; admins and adults
-are not touched. Fasting was not applied retroactively: a missing member row for
+already existed, again only where none was stored, so a child's own choice stays. A child with own
+rows in `cycle_periods`, `cycle_day_logs` or `cycle_settings` already uses the cycle and keeps the
+tab; admins and adults are not touched. Fasting was not applied retroactively: a missing member row for
 `health_use_fasting` is also what "inherit" and "reset" in the permission sheet leave behind, so it
 cannot tell "never changed" from a parent's choice. `resolvePermissions()` and
 `getSubjectPermissions()` read registered capability rows with `none` | `allow`; each item's own

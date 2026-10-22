@@ -5,6 +5,8 @@
  *        Kinder von vorher nach - aber nur, wo nichts steht:
  *          - Kind ohne Zeile -> '0' (Zyklus aus);
  *          - Kind mit eigener Wahl ('1' oder '0') -> bleibt;
+ *          - Kind mit Zyklusdaten (Periode, Tageslog oder Einstellungen) und
+ *            ohne Zeile -> bleibt ohne Zeile, behaelt also den Tab;
  *          - Erwachsene und Admins (auch mit Familienrolle child) -> unberuehrt;
  *          - zweiter Lauf aendert nichts;
  *          - die Fasten-Capability bleibt unberuehrt (keine Mitglied-Zeile ist
@@ -56,6 +58,14 @@ const ADMIN = addUser('mama', 'admin', 'mom');
 const ADMIN_CHILD = addUser('kind-admin', 'admin', 'child');
 setCycle(CHILD_CHOSE_ON, '1');
 setCycle(CHILD_CHOSE_OFF, '0');
+// Kinder, die den Zyklus benutzen, ohne den Schalter je angefasst zu haben -
+// je eines pro Tabelle, damit jede Ausnahme einzeln haelt.
+const CHILD_WITH_PERIOD = addUser('kind-periode', 'member', 'child');
+const CHILD_WITH_DAY_LOG = addUser('kind-tageslog', 'member', 'child');
+const CHILD_WITH_SETTINGS = addUser('kind-einstellungen', 'member', 'child');
+db.prepare("INSERT INTO cycle_periods (user_id, start_date) VALUES (?, '2026-09-01')").run(CHILD_WITH_PERIOD);
+db.prepare("INSERT INTO cycle_day_logs (user_id, log_date, flow) VALUES (?, '2026-09-02', 'light')").run(CHILD_WITH_DAY_LOG);
+db.prepare('INSERT INTO cycle_settings (user_id) VALUES (?)').run(CHILD_WITH_SETTINGS);
 
 test('Migration 258 ist die Zyklus-Vorgabe fuer bestehende Kinder', () => {
   assert.ok(migration, 'Migration 258 fehlt');
@@ -70,6 +80,12 @@ test('Kind ohne Eintrag startet ohne Zyklus', () => {
 test('eine eigene Wahl bleibt, auch das ausdrueckliche Ja', () => {
   assert.equal(cycleRow(CHILD_CHOSE_ON), '1');
   assert.equal(cycleRow(CHILD_CHOSE_OFF), '0');
+});
+
+test('ein Kind mit Zyklusdaten behaelt den Tab, auch ohne Zeile', () => {
+  assert.equal(cycleRow(CHILD_WITH_PERIOD), null, 'Periode eingetragen');
+  assert.equal(cycleRow(CHILD_WITH_DAY_LOG), null, 'Tageslog eingetragen');
+  assert.equal(cycleRow(CHILD_WITH_SETTINGS), null, 'Zyklus-Einstellungen gespeichert');
 });
 
 test('Erwachsene und Admins bleiben unberuehrt', () => {
