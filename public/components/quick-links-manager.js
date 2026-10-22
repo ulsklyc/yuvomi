@@ -445,13 +445,33 @@ function paintFaces(scope, items) {
   });
 }
 
-function listRowHtml(s, canEdit) {
+/**
+ * Das Label des Griffs: Objekt und Position (wie im Einkauf). Nach einem
+ * Schritt per Pfeiltaste zieht `refreshHandleLabels` es nach.
+ */
+function handleLabel(name, index, total) {
+  return `${t('shopping.reorderHandle', { name })}, ${t('shopping.reorderPosition', { index, total })}`;
+}
+
+/**
+ * D10 ZEILEN-ENDZONE (#2152): [Bearbeiten][Griff], der Griff ganz rechts.
+ * Bis dahin stand er als `aria-hidden`-Span VOR dem Symbol - ein Ziehziel
+ * ohne Tastaturweg: wer ohne Maus und Finger sortieren wollte, konnte es
+ * nicht. Jetzt ein Button wie `.list-row__drag` im Einkauf, die Pfeiltasten
+ * bei Fokus sind der Tastaturpfad. Eine Kachel allein hat keine Reihenfolge.
+ */
+function handleHtml(name, index, total) {
+  return `
+      <button type="button" class="row-action list-row__drag quick-link-manage-row__handle" data-sortable-handle
+              aria-label="${esc(handleLabel(name, index, total))}" title="${esc(t('shopping.reorderHandleHint'))}">
+        <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+      </button>`;
+}
+
+function listRowHtml(s, canEdit, index = 1, total = 1) {
   const host = quickLinkHost(s.url);
   return `
-    <li class="quick-link-manage-row" data-id="${s.id}">
-      <span class="quick-link-manage-row__handle" data-sortable-handle aria-hidden="true">
-        <i data-lucide="grip-vertical"></i>
-      </span>
+    <li class="quick-link-manage-row" data-id="${s.id}" data-name="${esc(s.name)}">
       <span class="quick-link-face${faceInk(s.color || TILE_COLORS[0])}" style="--quick-link-color:${esc(s.color || TILE_COLORS[0])}" data-face></span>
       <span class="quick-link-manage-row__body">
         <span class="quick-link-manage-row__name">${esc(s.name)}</span>
@@ -465,8 +485,16 @@ function listRowHtml(s, canEdit) {
     // EINE FREMDE KACHEL IST SICHTBAR, ABER NICHT BEARBEITBAR, und das steht
     // hier auch so da. Ein Knopf, den der Server mit 403 beantwortet, wäre die
     // schlechtere Auskunft als gar keiner.
-    : `<span class="quick-link-manage-row__locked">${esc(t('quickLinks.notYours'))}</span>`}
+    : `<span class="quick-link-manage-row__locked">${esc(t('quickLinks.notYours'))}</span>`}${total > 1 ? handleHtml(s.name, index, total) : ''}
     </li>`;
+}
+
+function refreshHandleLabels(list) {
+  const rows = [...list.querySelectorAll('.quick-link-manage-row')];
+  rows.forEach((row, i) => {
+    row.querySelector('[data-sortable-handle]')
+      ?.setAttribute('aria-label', handleLabel(row.dataset.name ?? '', i + 1, rows.length));
+  });
 }
 
 /**
@@ -495,7 +523,7 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
   };
 
   const body = items.length
-    ? `<ul class="quick-link-manage-list" id="quick-link-manage-list">${items.map((s) => listRowHtml(s, s.can_edit)).join('')}</ul>`
+    ? `<ul class="quick-link-manage-list" id="quick-link-manage-list">${items.map((s, i) => listRowHtml(s, s.can_edit, i + 1, items.length)).join('')}</ul>`
     : `<p class="quick-link-manage-empty">${esc(t('quickLinks.emptyManage'))}</p>`;
 
   openModal({
@@ -524,10 +552,8 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
 
       const list = panel.querySelector('#quick-link-manage-list');
       if (!list) return;
-      makeSortable(list, {
-        handle: '[data-sortable-handle]',
-        draggable: '.quick-link-manage-row',
-        onEnd: async () => {
+      // Ein Weg fuer Ziehen und Pfeiltaste: die Liste im DOM ist die Wahrheit.
+      const persistOrder = async () => {
           // Die Reihenfolge gilt für den ganzen Haushalt, nicht pro Person: es
           // ist EINE Reihe, und zwei Mitglieder, die sie verschieden sortieren,
           // hätten zwei Wahrheiten über dieselben Kacheln. Wer eine eigene
@@ -539,17 +565,38 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
           const ids = [...list.querySelectorAll('.quick-link-manage-row')]
             .map((li) => Number(li.dataset.id))
             .filter(Number.isInteger);
+          refreshHandleLabels(list);
           try {
             await api.put('/quick-links/order', { ids });
             await onChange();
           } catch {
             window.yuvomi?.showToast(t('quickLinks.orderError'), 'danger');
           }
-        },
+      };
+      // Der Tastaturpfad am Griff (#2152): Pfeil hoch/runter verschiebt die
+      // Zeile um einen Platz, der Fokus bleibt auf dem Griff - die Zeile wird
+      // verschoben, nicht neu gezeichnet.
+      list.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        const handle = event.target.closest?.('[data-sortable-handle]');
+        if (!handle) return;
+        event.preventDefault();
+        const row = handle.closest('.quick-link-manage-row');
+        const sibling = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+        if (!sibling) return;
+        if (event.key === 'ArrowUp') list.insertBefore(row, sibling);
+        else list.insertBefore(sibling, row);
+        handle.focus();
+        persistOrder();
       });
+      makeSortable(list, {
+        handle: '[data-sortable-handle]',
+        draggable: '.quick-link-manage-row',
+        onEnd: persistOrder,
+      }).catch(() => { /* ohne SortableJS bleibt der Tastaturpfad */ });
     },
   });
 }
 
 // #1997: das Formular einer Kachel, bis in seinen Speichern-Weg.
-export const __test = { openQuickLinkForm };
+export const __test = { openQuickLinkForm, listRowHtml };

@@ -7046,16 +7046,8 @@ button.today-cockpit__more--link {
   background: var(--color-surface-2);
 }
 
-.quick-link-manage-row__handle {
-  display: grid;
-  place-items: center;
-  /* Tertiär statt Quaternary: der Griff ist interaktive Grafik und braucht
-   * 3:1 (WCAG 1.4.11) - Quaternary misst 2.94:1 auf dem Well. Ruhezustand
-   * tertiär ist zugleich die sanktionierte Ruhe-Stufe der Zeilenaktionen. */
-  color: var(--color-text-tertiary);
-  cursor: grab;
-  touch-action: none;
-}
+/* Der Griff steht seit #2152 ganz rechts und ist ein Button: Mass, Farbe und
+ * Greifzone kommen aus `.row-action.list-row__drag` (layout.css, list-row.css). */
 
 .quick-link-manage-row__body {
   display: flex;
