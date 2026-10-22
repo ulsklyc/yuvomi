@@ -1606,14 +1606,12 @@ const PENDING = {
   },
   'row-text-capsule': {},
   // --- R21 (Critique 2026-10-21), D10 Zeilen-Endzone, nur nach UNTEN. ---
-  // Bestand: die VERWALTER (Auf/Ab-Paar vor Bearbeiten und Loeschen) - dieselben
-  // Listen, die row-danger-visible fuehrt. Wer einen anfasst, stellt den Griff
-  // ans Ende und senkt die Zahl. Gegen den Stand vor R21 rot gesehen: Einkauf
-  // (Griff vor dem Mehr-Knopf).
-  'row-endzone-order': {
-    'public/pages/subscriptions.js': 1,
-    'public/settings/pages/admin-family.js': 1,
-  },
+  // Leer seit #2152: die Verwalter (Abo-Kategorien und Zahlungsarten, Familie)
+  // stellen den Griff ans Ende. Kategorien- und Schnelllinks-Verwalter trugen
+  // den Griff als Span VOR der Zeile - fuer diesen Scanner unsichtbar, seit
+  // #2152 ist er dort ein `.row-action.list-row__drag` und damit gezaehlt.
+  // Gegen den Stand vor R21 rot gesehen: Einkauf (Griff vor dem Mehr-Knopf).
+  'row-endzone-order': {},
   // Bestand: dieselben Verwalter-, Formular- und Kommentarzeilen mit Stift und
   // Papierkorb wie row-danger-visible; dazu zwei benannte Ausnahmen in
   // documents.js - die Leiste der KARTE (renderActions: Auge, Herunterladen;
@@ -1621,14 +1619,14 @@ const PENDING = {
   // des Betrachters (wie row-action-count) - und housekeeping.js, wo zwei
   // Zweige einer Bedingung stehen (Profil ODER Bearbeiten, nie beide). Gegen
   // den Stand vor R21 rot gesehen: die Konten der Belohnungen (Plan + Schliessen).
+  // #2152: Tag-Verwalter und Abo-Verwalter fuehren Umbenennen und Loeschen im
+  // Mehr-Knopf.
   'row-primary-count': {
-    'public/components/tag-manager.js': 1,
     'public/components/task-detail.js': 1,
     'public/pages/documents.js': 2,
     'public/pages/health-fasting.js': 1,
     'public/pages/health.js': 1,
     'public/pages/housekeeping.js': 1,
-    'public/pages/subscriptions.js': 1,
     'public/pages/tasks.js': 1,
     'public/settings/pages/personal-calendar-subscriptions.js': 1,
   },
@@ -1645,16 +1643,15 @@ const PENDING = {
   // `rowMenuHtml()` um und senkt die Zahl.
   // 2026-10-16 (Critique D6): Notizen und Haushaltshilfe-Besuche loeschen
   // ueber ihren Mehr-Knopf. R19 Schritt 4: der Kategorien-Verwalter auch.
+  // #2152: Tag-Verwalter, Abo-Verwalter, Familie (Mitglied entfernen,
+  // Einladung widerrufen) ebenso.
   'row-danger-visible': {
-    'public/components/tag-manager.js': 1,
     'public/components/task-detail.js': 1,
     'public/pages/contacts.js': 1,
     'public/pages/health-fasting.js': 1,
     'public/pages/health.js': 2,
-    'public/pages/subscriptions.js': 1,
     'public/pages/tasks.js': 1,
     'public/settings/pages/admin-api.js': 1,
-    'public/settings/pages/admin-family.js': 2,
     'public/settings/pages/personal-calendar-subscriptions.js': 1,
     'public/utils/ingredient-row.js': 1,
   },
