@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
+  Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
+  once for every child account that never set the switch itself. A child who turned the tab on or
+  off keeps that choice, and the child can turn it on again in its own settings; adults and
+  administrators are not affected. Fasting stays as it is for existing children: whether a parent
+  ever chose it cannot be told apart, so it is still switched in the permissions per member.
+
 ### Fixed
 - **SSO sign-in with Gitea no longer fails with `invalid_client`** (#2144). Yuvomi sends the
   client ID and secret in an HTTP Basic header, form-encoded as RFC 6749 asks. The library did
