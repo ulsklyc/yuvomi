@@ -739,6 +739,7 @@
         "reorderHandleHint": "Arrastra o usa las teclas de flecha para reordenar",
         "reorderPosition": "Posición {{index}} de {{total}}",
         "priceLabel": "Precio",
+        "lastPurchased": "Última compra",
         "storeLabel": "Tienda",
         "storePlaceholder": "Elige o escribe",
         "manageStores": "Gestionar tiendas",

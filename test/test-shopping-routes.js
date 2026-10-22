@@ -910,3 +910,52 @@ test('#1909 eine Validierung, die nur ein Aufrufer der API ausloest, nennt keine
     assert.equal(r.body.reason, undefined, `${method} ${path}`);
   }
 });
+
+
+test('Kaufhistorie: abgehakter Artikel mit Preis traegt sich ein (#1003)', async () => {
+  const store = (await call('POST', '/stores', { name: 'Lidl' })).body.data;
+  const list = (await call('POST', '/', { name: 'Historieliste' })).body.data;
+  const item = (await call('POST', `/${list.id}/items`, { name: 'Bio-Eier' })).body.data;
+
+  // Noch nicht abgehakt -> keine Historie
+  await call('PATCH', `/items/${item.id}`, { price_cents: 299, store_id: store.id });
+  let hist = await call('GET', `/price-history?name=Bio-Eier`);
+  assert.equal(hist.body.data.length, 0, 'nicht abgehakt = noch kein Kauf');
+
+  // Jetzt abhaken -> Historieeintrag entsteht
+  await call('PATCH', `/items/${item.id}`, { is_checked: 1 });
+  hist = await call('GET', `/price-history?name=Bio-Eier`);
+  assert.equal(hist.body.data.length, 1);
+  assert.equal(hist.body.data[0].item_name, 'Bio-Eier');
+  assert.equal(hist.body.data[0].price_cents, 299);
+  assert.equal(hist.body.data[0].store_id, store.id);
+  assert.equal(hist.body.data[0].store_name, 'Lidl');
+
+  // Groß-/Kleinschreibung wird ignoriert
+  const lower = await call('GET', `/price-history?name=bio-eier`);
+  assert.equal(lower.body.data.length, 1, 'case-insensitive Abfrage');
+  assert.equal(lower.body.data[0].price_cents, 299);
+
+  // Preis nachträglich korrigieren aktualisiert denselben Eintrag
+  await call('PATCH', `/items/${item.id}`, { price_cents: 329 });
+  hist = await call('GET', `/price-history?name=Bio-Eier`);
+  assert.equal(hist.body.data.length, 1, 'kein Duplikat beim Korrigieren');
+  assert.equal(hist.body.data[0].price_cents, 329);
+
+  // Haken entfernen nimmt den unvollendeten Kauf zurueck
+  await call('PATCH', `/items/${item.id}`, { is_checked: 0 });
+  hist = await call('GET', `/price-history?name=Bio-Eier`);
+  assert.equal(hist.body.data.length, 0, 'Haken entfernt = Eintrag zurueckgenommen');
+
+  // Erneut abhaken und dann Liste leeren ("Remove checked")
+  await call('PATCH', `/items/${item.id}`, { is_checked: 1 });
+  assert.equal((await call('GET', `/price-history?name=Bio-Eier`)).body.data.length, 1);
+
+  const del = await call('DELETE', `/${list.id}/items/checked`);
+  assert.equal(del.status, 200);
+
+  // Nach dem Loeschen bleibt der Kauf in der Historie dauerhaft erhalten!
+  hist = await call('GET', `/price-history?name=Bio-Eier`);
+  assert.equal(hist.body.data.length, 1, 'dauerhaft erhalten nach checked clear');
+  assert.equal(hist.body.data[0].price_cents, 329);
+});

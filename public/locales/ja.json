@@ -739,6 +739,7 @@
         "reorderHandleHint": "ドラッグまたは矢印キーで並べ替え",
         "reorderPosition": "{{total}} 件中 {{index}} 番目",
         "priceLabel": "価格",
+        "lastPurchased": "前回の購入",
         "storeLabel": "店",
         "storePlaceholder": "選ぶか入力",
         "manageStores": "店を管理",

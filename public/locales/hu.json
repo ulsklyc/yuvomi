@@ -739,6 +739,7 @@
         "reorderHandleHint": "Húzza vagy használja a nyílbillentyűket a rendezéshez",
         "reorderPosition": "{{index}}. pozíció, összesen {{total}}",
         "priceLabel": "Ár",
+        "lastPurchased": "Utoljára vásárolva",
         "storeLabel": "Bolt",
         "storePlaceholder": "Válasszon vagy írjon",
         "manageStores": "Boltok kezelése",

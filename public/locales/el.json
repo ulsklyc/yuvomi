@@ -739,6 +739,7 @@
         "reorderHandleHint": "Σύρετε ή χρησιμοποιήστε τα βέλη για ταξινόμηση",
         "reorderPosition": "Θέση {{index}} από {{total}}",
         "priceLabel": "Τιμή",
+        "lastPurchased": "Τελευταία αγορά",
         "storeLabel": "Κατάστημα",
         "storePlaceholder": "Επιλέξτε ή πληκτρολογήστε",
         "manageStores": "Διαχείριση καταστημάτων",

@@ -799,6 +799,7 @@
         "reorderHandleHint": "Přetáhněte nebo použijte šipky k seřazení",
         "reorderPosition": "Pozice {{index}} z {{total}}",
         "priceLabel": "Cena",
+        "lastPurchased": "Naposledy koupeno",
         "storeLabel": "Obchod",
         "storePlaceholder": "Vyberte nebo napište",
         "manageStores": "Spravovat obchody",

@@ -757,6 +757,7 @@
         "reorderHandleHint": "Seret atau gunakan tombol panah untuk mengurutkan",
         "reorderPosition": "Posisi {{index}} dari {{total}}",
         "priceLabel": "Harga",
+        "lastPurchased": "Terakhir dibeli",
         "storeLabel": "Toko",
         "storePlaceholder": "Pilih atau ketik",
         "manageStores": "Kelola toko",

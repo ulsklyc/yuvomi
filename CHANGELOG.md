@@ -91,6 +91,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes a recurring one. Entries carry the read-only `transfer_entry_id` and, in the list,
   `transfer_account_id`; the month summary carries `transfers`.
 
+- **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
+  shopping item records the purchase: item name, price paid in cents, the shop, and the date.
+  Purchases match by item name, case-insensitively, and remain after the item is cleared.
+  The item details sheet displays the last purchase for known items.
+
 - **A device showing the wall display gets no personal push notifications** (#1904). Reminders,
   task-comment mentions, and medication doses are personal and would disturb a tablet mounted in
   the kitchen. While the wall is up, the device reports its state to the server and delivery is

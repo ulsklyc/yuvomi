@@ -739,6 +739,7 @@
         "reorderHandleHint": "Drag or use the arrow keys to reorder",
         "reorderPosition": "Position {{index}} of {{total}}",
         "priceLabel": "Price",
+        "lastPurchased": "Last purchased",
         "storeLabel": "Shop",
         "storePlaceholder": "Choose or type",
         "manageStores": "Manage shops",

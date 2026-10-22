@@ -919,6 +919,7 @@
         "reorderHandleHint": "اسحب أو استخدم مفاتيح الأسهم لإعادة الترتيب",
         "reorderPosition": "الموضع {{index}} من {{total}}",
         "priceLabel": "السعر",
+        "lastPurchased": "آخر شراء",
         "storeLabel": "المتجر",
         "storePlaceholder": "اختر أو اكتب",
         "manageStores": "إدارة المتاجر",

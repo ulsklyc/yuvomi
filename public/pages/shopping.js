@@ -1628,6 +1628,7 @@ function renderItem(item) {
 // --------------------------------------------------------
 
 let autocompleteTimeout = null;
+let autocompleteRequestId = 0;
 
 /** Gleicher Name, Gross-/Kleinschreibung egal - wie der Vorschlag selbst sucht (COLLATE NOCASE). */
 function sameName(a, b) {
@@ -1744,11 +1745,20 @@ function wireAutocomplete(container) {
   input.addEventListener('input', () => {
     clearTimeout(autocompleteTimeout);
     const q = input.value.trim();
-    if (q.length < 1) { dropdown.hidden = true; return; }
+    if (q.length < 1) {
+      autocompleteRequestId++;
+      dropdown.hidden = true;
+      return;
+    }
 
+    const currentReq = ++autocompleteRequestId;
     autocompleteTimeout = setTimeout(async () => {
       try {
         const data = await api.get(`/shopping/suggestions?q=${encodeURIComponent(q)}`);
+        if (currentReq !== autocompleteRequestId || input.value.trim() !== q || input.value.trim().length < 1) {
+          dropdown.hidden = true;
+          return;
+        }
         const suggestions = data.data ?? [];
         if (!suggestions.length) { dropdown.hidden = true; return; }
 
@@ -1769,6 +1779,7 @@ function wireAutocomplete(container) {
           el.addEventListener('mousedown', (e) => {
             e.preventDefault();
             applyAutocompleteSuggestion(container, el);
+            autocompleteRequestId++;
             dropdown.hidden = true;
           });
         });
@@ -1779,6 +1790,23 @@ function wireAutocomplete(container) {
   });
 
   input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !isImeComposing(e)) {
+      const items = dropdown.querySelectorAll('.autocomplete-item');
+      if (!dropdown.hidden && activeIdx >= 0 && !isImeComposing(e) && items[activeIdx]) {
+        e.preventDefault();
+        applyAutocompleteSuggestion(container, items[activeIdx]);
+      }
+      autocompleteRequestId++;
+      clearTimeout(autocompleteTimeout);
+      dropdown.hidden = true;
+      return;
+    }
+    if (e.key === 'Escape') {
+      autocompleteRequestId++;
+      clearTimeout(autocompleteTimeout);
+      dropdown.hidden = true;
+      return;
+    }
     if (dropdown.hidden) return;
     const items = dropdown.querySelectorAll('.autocomplete-item');
     if (!items.length) return;
@@ -1791,17 +1819,14 @@ function wireAutocomplete(container) {
       e.preventDefault();
       activeIdx = Math.max(activeIdx - 1, 0);
       items.forEach((el, i) => el.classList.toggle('autocomplete-item--active', i === activeIdx));
-    } else if (e.key === 'Enter' && activeIdx >= 0 && !isImeComposing(e)) {
-      e.preventDefault();
-      applyAutocompleteSuggestion(container, items[activeIdx]);
-      dropdown.hidden = true;
-    } else if (e.key === 'Escape') {
-      dropdown.hidden = true;
     }
   });
 
   input.addEventListener('blur', () => {
-    setTimeout(() => { dropdown.hidden = true; }, 150);
+    setTimeout(() => {
+      autocompleteRequestId++;
+      dropdown.hidden = true;
+    }, 150);
   });
 }
 
@@ -1973,6 +1998,10 @@ function wireQuickAdd(container) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    autocompleteRequestId++;
+    clearTimeout(autocompleteTimeout);
+    const dropdown = container.querySelector('#autocomplete-dropdown');
+    if (dropdown) dropdown.hidden = true;
     if (submitting) return;
     const nameInput = container.querySelector('#item-name-input');
     const qtyInput  = container.querySelector('#item-qty-input');
@@ -2009,6 +2038,9 @@ function wireQuickAdd(container) {
       }
       nameInput.value = '';
       qtyInput.value  = '';
+      clearTimeout(autocompleteTimeout);
+      const dd = container.querySelector('#autocomplete-dropdown');
+      if (dd) dd.hidden = true;
       resetQuickAddCategory(catSelect);
       // Erfolgs-Feedback auf dem +-Button (DOM-API, kein innerHTML)
       _flashAddBtn(form.querySelector('.quick-add__btn'));
@@ -2674,6 +2706,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
         ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), value: priceReadText(item.price_cents) })}
         ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), value: storeName(item) })}
+        <div id="item-details-read-last-purchased"></div>
         ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
         ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
@@ -2687,6 +2720,17 @@ function openItemReadModal(item) {
     content: itemReadHtml(item),
     onSave(panel) {
       window.lucide?.createIcons({ el: panel });
+      const target = panel.querySelector('#item-details-read-last-purchased');
+      if (target) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          if (!last) return;
+          const text = `${priceReadText(last.price_cents)}${last.store_name ? ` · ${esc(last.store_name)}` : ''}`;
+          target.insertAdjacentHTML('beforebegin', readRowHtml({ icon: 'history', label: t('shopping.lastPurchased'), value: text }));
+          target.remove();
+          window.lucide?.createIcons({ el: panel });
+        }).catch(() => {});
+      }
     },
   });
 }
@@ -2694,6 +2738,7 @@ function openItemReadModal(item) {
 function openItemDetails(itemId, container) {
   const item = state.items.find((i) => i.id === itemId);
   if (!item) return;
+
   // Der Riegel steht VOR jeder Vorbereitung: bei `read` geht die Leseansicht auf.
   if (readOnly()) {
     openItemReadModal(item);
@@ -2790,6 +2835,7 @@ function openItemDetails(itemId, container) {
             </datalist>
           </div>
         </div>
+        <div id="item-details-last-purchased" class="form-hint" style="display:none;margin-top:-0.5rem;margin-bottom:0.75rem;align-items:center;gap:0.35rem"></div>
         <div class="form-group">
           <label class="form-label" for="item-details-url">${t('shopping.urlLabel')}</label>
           <input class="form-input" type="url" id="item-details-url" inputmode="url"
@@ -2818,6 +2864,22 @@ function openItemDetails(itemId, container) {
       // `context`: das Nachladen nach "gibt es nicht mehr" schliesst genau
       // diesen Dialog, nicht einen, der inzwischen offen ist (#1997).
       _itemDialog = { id: item.id, panel, context: captureModalContext() };
+      const hint = panel.querySelector('#item-details-last-purchased');
+      if (hint) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          if (!last) return;
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'history');
+          icon.className = 'icon-sm';
+          icon.setAttribute('aria-hidden', 'true');
+          const span = document.createElement('span');
+          span.textContent = `${t('shopping.lastPurchased')}: ${priceReadText(last.price_cents)}${last.store_name ? ` · ${last.store_name}` : ''}`;
+          hint.replaceChildren(icon, span);
+          hint.style.display = 'flex';
+          window.lucide?.createIcons({ el: hint });
+        }).catch(() => {});
+      }
       const form    = panel.querySelector('#item-details-form');
       const nameEl  = panel.querySelector('#item-details-name');
       const qtyEl   = panel.querySelector('#item-details-qty');

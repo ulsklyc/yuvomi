@@ -739,6 +739,7 @@
         "reorderHandleHint": "Sleep of gebruik de pijltoetsen om te sorteren",
         "reorderPosition": "Positie {{index}} van {{total}}",
         "priceLabel": "Prijs",
+        "lastPurchased": "Laatst gekocht",
         "storeLabel": "Winkel",
         "storePlaceholder": "Kiezen of typen",
         "manageStores": "Winkels beheren",

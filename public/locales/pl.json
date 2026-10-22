@@ -877,6 +877,7 @@
         "reorderHandleHint": "Przeciągnij lub użyj strzałek, aby zmienić kolejność",
         "reorderPosition": "Pozycja {{index}} z {{total}}",
         "priceLabel": "Cena",
+        "lastPurchased": "Ostatnio kupione",
         "storeLabel": "Sklep",
         "storePlaceholder": "Wybierz lub wpisz",
         "manageStores": "Zarządzaj sklepami",
