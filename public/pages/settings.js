@@ -14,7 +14,7 @@ import {
   filterSettingsDomains,
   findSettingsLeaf,
   movedSettingsUrl,
-  readStoredSettingsDestination,
+  readStoredSettingsDestination, settingsOverviewShown, markSettingsOverviewEntry,
 } from '/settings/registry.js';
 import { renderSettingsShell } from '/settings/shell.js';
 
@@ -77,7 +77,7 @@ export async function render(container, { user } = {}) {
       // Zuletzt besuchtes Blatt wiederherstellen; ohne gespeichertes Ziel bleibt
       // es bei der Übersicht, statt den ersten Besuch wortlos in einem Formular
       // landen zu lassen (Critique 2026-07-27).
-      const destination = OVERVIEW_VIEWS.has(view)
+      const destination = OVERVIEW_VIEWS.has(view) || settingsOverviewShown(history.state)
         ? null
         : readStoredSettingsDestination(currentUser);
       if (destination) { await redirectTo(destination); return; }
@@ -90,6 +90,7 @@ export async function render(container, { user } = {}) {
         domainId: known ? domainId : null,
         query,
       });
+      markSettingsOverviewEntry();
       return;
     }
 
@@ -136,7 +137,7 @@ export async function update({ user, path, query } = {}) {
   const hasOAuthResult = search.has('sync_ok') || search.has('sync_error');
 
   if (path === SETTINGS_ROOT) {
-    if (hasOAuthResult || !OVERVIEW_VIEWS.has(view)) return false;
+    if (hasOAuthResult) return false; // sonst folgt /settings der Adresse (R22, D2)
     const domainId = view === 'domain' ? search.get('domain') : null;
     const domains = filterSettingsDomains(user);
     const resolvedView = view === 'domain' && domains.some((domain) => domain.id === domainId)
@@ -149,6 +150,7 @@ export async function update({ user, path, query } = {}) {
       query: search,
       incremental: !localeChanged,
     });
+    markSettingsOverviewEntry();
     return true;
   }
 

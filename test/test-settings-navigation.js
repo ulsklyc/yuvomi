@@ -20,6 +20,9 @@ import {
   settingsSheetSections,
   migrateLegacySettingsTab,
   readStoredSettingsDestination,
+  settingsOverviewShown,
+  withSettingsOverviewMark,
+  markSettingsOverviewEntry,
   resolveSettingsDestination,
   searchSettings,
   settingsOptionUrl,
@@ -874,6 +877,43 @@ test('der Settings-Controller rendert ohne gespeichertes Ziel die Uebersicht', a
   assert.match(source, /if \(destination\) \{ await redirectTo\(destination\); return; \}/);
   assert.match(source, /view: known \? 'domain' : 'domains'/);
   assert.doesNotMatch(source, /await redirectTo\(readStoredSettingsDestination/);
+});
+
+/* ZURUECK AUS EINEM BLATT FUEHRT AUF DIE UEBERSICHT (Critique R22, D2, a5 P1).
+ * Uebersicht -> Darstellung -> Zurueck blieb mobil auf dem Blatt: update()
+ * gab fuer ein nacktes `/settings` false zurueck, das volle Rendern stellte das
+ * zuletzt besuchte Blatt wieder her und ersetzte den Eintrag. Jetzt folgt
+ * `/settings` innerhalb der Sektion der Adresse, und ein Eintrag, der die
+ * Uebersicht zeigte, traegt einen Merker im History-State - auch ein Zurueck
+ * von aussen zeigt dort die Uebersicht. Wiederhergestellt wird nur ein frischer
+ * Einstieg. Gemessen im Browser (s1/probes/settings.mjs): vorher C =
+ * /settings/personal/appearance, nachher /settings mit Liste. */
+test('Zurueck aus einem Einstellungsblatt fuehrt auf die Uebersicht, nicht zurueck ins Blatt', async () => {
+  const source = await readFile(new URL('../public/pages/settings.js', import.meta.url), 'utf8');
+  const update = source.slice(source.indexOf('export async function update('));
+  const root = update.slice(update.indexOf('if (path === SETTINGS_ROOT) {'), update.indexOf('const leaf = findSettingsLeaf'));
+  assert.match(root, /if \(hasOAuthResult\) return false;/, 'nur das OAuth-Ergebnis braucht den vollen Weg');
+  assert.doesNotMatch(root, /!OVERVIEW_VIEWS\.has\(view\)\) return false/,
+    'ein nacktes /settings innerhalb der Sektion darf nicht ins volle Rendern samt Wiederherstellung fallen');
+  assert.match(root, /markSettingsOverviewEntry\(\);\s*return true;/, 'die weiche Uebersicht merkt ihren Eintrag');
+  assert.match(source, /const destination = OVERVIEW_VIEWS\.has\(view\) \|\| settingsOverviewShown\(history\.state\)/,
+    'ein Eintrag, der die Uebersicht zeigte, stellt kein Blatt wieder her');
+  assert.match(source, /view: known \? 'domain' : 'domains',[\s\S]{0,120}\}\);\s*markSettingsOverviewEntry\(\);/,
+    'die volle Uebersicht merkt ihren Eintrag');
+  const writes = [];
+  const hist = { state: { path: '/settings', scrollKey: 'k1' }, replaceState(st, title, url) { writes.push([st, url]); this.state = st; } };
+  markSettingsOverviewEntry(hist, { pathname: '/settings' });
+  assert.deepEqual(writes, [[{ path: '/settings', scrollKey: 'k1', settingsOverview: true }, undefined]],
+    'der Merker ergaenzt den State, die Adresse bleibt');
+  markSettingsOverviewEntry(hist, { pathname: '/settings' });
+  markSettingsOverviewEntry({ state: null, replaceState() { writes.push('blatt'); } }, { pathname: '/settings/personal/account' });
+  assert.equal(writes.length, 1, 'einmal je Eintrag, und nie auf einem Blatt (Desktop-Vorwahl)');
+  const marked = withSettingsOverviewMark({ path: '/settings', scrollKey: 'k1' });
+  assert.deepEqual(marked, { path: '/settings', scrollKey: 'k1', settingsOverview: true },
+    'path und scrollKey bleiben stehen');
+  assert.equal(settingsOverviewShown(marked), true);
+  assert.equal(settingsOverviewShown(null), false);
+  assert.equal(settingsOverviewShown({ path: '/settings' }), false);
 });
 
 test('every approved settings leaf is registered as an exact SPA route', async () => {

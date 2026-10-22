@@ -1079,6 +1079,41 @@ export function readStoredSettingsDestination(user, storage = sessionStorage) {
 }
 
 /**
+ * DIESER EINTRAG ZEIGTE DIE UEBERSICHT (Critique R22, D2). Das zuletzt
+ * besuchte Blatt wird nur beim Einstieg von aussen wiederhergestellt; ein
+ * Zurueck auf einen Eintrag, der die Uebersicht zeigte, folgt der Adresse.
+ * Vorher sprang Zurueck aus einem Blatt auf `/settings` - und die
+ * Wiederherstellung schickte sofort wieder ins Blatt: Uebersicht ->
+ * Darstellung -> Zurueck blieb auf /settings/personal/appearance (gemessen
+ * mobil, a5 P1). Der Merker steht im History-State, nicht im Speicher: er
+ * gilt genau fuer diesen Eintrag und ueberlebt ein Neuladen. Der uebrige
+ * State (`path`, `scrollKey`) bleibt.
+ */
+export const SETTINGS_OVERVIEW_MARK = 'settingsOverview';
+
+export function settingsOverviewShown(state) {
+  return Boolean(state && typeof state === 'object' && state[SETTINGS_OVERVIEW_MARK] === true);
+}
+
+export function withSettingsOverviewMark(state) {
+  return { ...(state && typeof state === 'object' ? state : {}), [SETTINGS_OVERVIEW_MARK]: true };
+}
+
+/**
+ * Merkt den laufenden Eintrag als Uebersicht - nur, solange er `/settings`
+ * IST: am Desktop hat preselectSheet() die Adresse schon auf das erste Blatt
+ * gestellt, dann ist der Eintrag keine Uebersicht mehr.
+ */
+export function markSettingsOverviewEntry(hist = globalThis.history, loc = globalThis.location) {
+  if (!hist || loc?.pathname !== '/settings' || settingsOverviewShown(hist.state)) return;
+  try {
+    hist.replaceState(withSettingsOverviewMark(hist.state), '');
+  } catch {
+    // Ohne Merker stellt ein spaeteres Zurueck wieder her - wie bisher.
+  }
+}
+
+/**
  * Vergleichsform der Suche: Kleinschreibung, Diakritika weg, damit "wetter"
  * auch "Wetter" findet und "prazdniny" auch "prázdniny".
  */
