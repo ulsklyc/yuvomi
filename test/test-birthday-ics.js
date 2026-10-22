@@ -231,5 +231,8 @@ test('a birthday without a year exports on its day, without 1604 or an invented 
   const block = calendar.split('BEGIN:VEVENT').find(b => b.includes('Yearless'));
   assert.ok(block, 'the generated event is in the calendar feed');
   assert.match(block, /DTSTART;VALUE=DATE:20000315/);
-  assert.doesNotMatch(block, /1604|15\.03\.2000|2000-03-15/);
+  // DTSTAMP traegt die Uhrzeit des Laufs (um 16:04 UTC steht dort "1604"),
+  // also nur die Zeilen pruefen, die das Datum des Geburtstags tragen.
+  const dated = block.split('\r\n').filter(line => !line.startsWith('DTSTAMP:')).join('\r\n');
+  assert.doesNotMatch(dated, /1604|15\.03\.2000|2000-03-15/);
 });
