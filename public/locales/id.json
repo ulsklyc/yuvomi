@@ -5714,6 +5714,7 @@
         "weekdaySat": "Sab",
         "weekdaySun": "Min",
         "intervalLabelWeekly": "Setiap N minggu",
+        "intervalLabelMonthly": "Setiap N bulan",
         "anchorDateLabel": "Pengambilan pertama",
         "monthDayLabel": "Tanggal dalam bulan",
         "monthDayLastDay": "Hari terakhir bulan",

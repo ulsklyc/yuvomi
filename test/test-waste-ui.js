@@ -1089,3 +1089,82 @@ test('R20: waehrend des Ladens steht die Seitenspalte nicht da (kein Sprung nach
   assert.match(src, /renderPage\(\);\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.add\('waste-page--loading'\);/, 'die Klasse steht ab dem ersten Bild');
   assert.match(src, /if \(state\.error\) \{\s*_container\.querySelector\('\.waste-page'\)\?\.classList\.remove\('waste-page--loading'\);/, 'ein Ladefehler gibt die Spalte frei');
 });
+
+// -------------------------------------------------------------------------
+// Termin-Dialog: die Beschriftung des Intervalls folgt der Wiederholung (#2138)
+// -------------------------------------------------------------------------
+// Der Server zaehlt `interval` bei beiden Monatsarten in Monaten, das Feld hiess
+// aber immer "Alle N Wochen". Gefahren wird der echte Dialog ueber den
+// Modal-Stub des Loaders: `content` ist das Markup beim Oeffnen, `onSave(panel)`
+// verdrahtet die echten Zuhoerer an einem Attrappen-Panel.
+
+function openScheduleDialog(recurrenceKind) {
+  const { openScheduleModal } = __test;
+  let opts = null;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    openScheduleModal(TYPE, {
+      id: 3, type_id: TYPE.id, recurrence_kind: recurrenceKind, anchor_date: '2026-01-05', interval: 2,
+      weekdays: recurrenceKind === 'weekly' ? 'MO' : (recurrenceKind === 'monthly_ordinal_weekday' ? 'TU' : null),
+      month_day: recurrenceKind === 'monthly_fixed_day' ? 15 : (recurrenceKind === 'monthly_ordinal_weekday' ? 2 : null),
+      valid_until: null, active: 1,
+    });
+  } finally {
+    delete globalThis.__openModal;
+  }
+  assert.ok(opts, 'der Dialog wurde geoeffnet');
+  const handlers = new Map();
+  const elements = new Map();
+  const element = (selector) => {
+    if (!elements.has(selector)) {
+      elements.set(selector, {
+        value: '', checked: false, hidden: false, textContent: '', dataset: {},
+        addEventListener(type, fn) { handlers.set(`${selector}:${type}`, fn); },
+        setAttribute() {}, removeAttribute() {}, getAttribute: () => null,
+        classList: { add() {}, remove() {}, toggle() {} },
+        querySelector: () => null, querySelectorAll: () => [],
+      });
+    }
+    return elements.get(selector);
+  };
+  element('#wsm-kind').value = recurrenceKind;
+  element('#wsm-ordinal-position').value = '2';
+  element('#wsm-ordinal-weekday').value = 'TU';
+  opts.onSave({ querySelector: element, querySelectorAll: () => [], addEventListener() {} });
+  return {
+    content: opts.content,
+    label: () => element('#wsm-interval-label').textContent,
+    chooseKind(value) {
+      element('#wsm-kind').value = value;
+      const fn = handlers.get('#wsm-kind:change');
+      assert.equal(typeof fn, 'function', '#wsm-kind hat einen change-Handler');
+      fn({});
+    },
+  };
+}
+
+const intervalLabelAtOpen = (content) => {
+  const m = content.match(/<label\b[^>]*\bfor="wsm-interval"[^>]*>([^<]*)<\/label>/);
+  assert.ok(m, 'das Intervallfeld hat ein Label');
+  return m[1];
+};
+
+for (const [kind, key] of [
+  ['weekly', 'waste.intervalLabelWeekly'],
+  ['monthly_fixed_day', 'waste.intervalLabelMonthly'],
+  ['monthly_ordinal_weekday', 'waste.intervalLabelMonthly'],
+]) {
+  test(`Termin-Dialog: eine Serie "${kind}" oeffnet mit dem Intervall-Label ${key}`, () => {
+    assert.equal(intervalLabelAtOpen(openScheduleDialog(kind).content), key);
+  });
+}
+
+test('Termin-Dialog: der Wechsel der Wiederholung tauscht das Intervall-Label mit', () => {
+  const d = openScheduleDialog('weekly');
+  d.chooseKind('monthly_fixed_day');
+  assert.equal(d.label(), 'waste.intervalLabelMonthly');
+  d.chooseKind('weekly');
+  assert.equal(d.label(), 'waste.intervalLabelWeekly');
+  d.chooseKind('monthly_ordinal_weekday');
+  assert.equal(d.label(), 'waste.intervalLabelMonthly');
+});

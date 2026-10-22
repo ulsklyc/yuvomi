@@ -5714,6 +5714,7 @@
         "weekdaySat": "Cmt",
         "weekdaySun": "Paz",
         "intervalLabelWeekly": "Her N haftada bir",
+        "intervalLabelMonthly": "Her N ayda bir",
         "anchorDateLabel": "İlk alım",
         "monthDayLabel": "Ayın günü",
         "monthDayLastDay": "Ayın son günü",

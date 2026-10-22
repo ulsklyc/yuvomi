@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Basic header, the new `OIDC_TOKEN_AUTH_METHOD` switches to `client_secret_post`. Left unset,
   Yuvomi keeps `client_secret_basic` unless the provider's discovery document offers
   `client_secret_post` only.
+- **A contact birthday stored with a time of day is no longer lost.** vCard allows a birthday to
+  carry a time, as in `1953-10-15T23:10:00Z` (vCard 3.0) or `19531015T231000Z` (vCard 4.0). Until
+  now Yuvomi read such a birthday as missing, in the address book sync and in the vCard import
+  alike, and the contact was listed under "Contacts without a birthday" when importing birthdays.
+  Now the date is taken as it is written and the time is ignored. The time zone does not move it to
+  another day, because a birthday is a calendar date. Contacts already synced get their birthday
+  with the next sync; a vCard file has to be imported again.
+- **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
+  counted months for the monthly repeat options but was always labelled in weeks. The label now
+  follows the selected repeat option.
 
 - **CalDAV calendars keep their own colour and a clean name, also on Synology.** (#2157, from
   D#2146) Some servers, Synology Calendar among them, send the colour and the name of a calendar

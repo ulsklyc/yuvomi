@@ -5714,6 +5714,7 @@
         "weekdaySat": "토",
         "weekdaySun": "일",
         "intervalLabelWeekly": "N주마다",
+        "intervalLabelMonthly": "N개월마다",
         "anchorDateLabel": "첫 수거일",
         "monthDayLabel": "매월 며칠",
         "monthDayLastDay": "매월 마지막 날",

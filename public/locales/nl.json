@@ -5714,6 +5714,7 @@
         "weekdaySat": "za",
         "weekdaySun": "zo",
         "intervalLabelWeekly": "Elke N weken",
+        "intervalLabelMonthly": "Elke N maanden",
         "anchorDateLabel": "Eerste ophaling",
         "monthDayLabel": "Dag van de maand",
         "monthDayLastDay": "Laatste dag van de maand",

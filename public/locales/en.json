@@ -5714,6 +5714,7 @@
         "weekdaySat": "Sat",
         "weekdaySun": "Sun",
         "intervalLabelWeekly": "Every N weeks",
+        "intervalLabelMonthly": "Every N months",
         "anchorDateLabel": "First pickup",
         "monthDayLabel": "Day of month",
         "monthDayLastDay": "Last day of the month",

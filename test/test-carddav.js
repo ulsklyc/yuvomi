@@ -728,6 +728,27 @@ END:VCARD`;
       assert.strictEqual(parseVCard(card('BDAY:--0230')).birthday, null, 'kein 30. Februar');
     });
 
+    // Mit Uhrzeit (RFC 2426 3.1.5 VALUE=date-time, RFC 6350 6.2.5) war der
+    // Geburtstag hier `null`. Es zaehlt das Datum, wie es dasteht, ohne
+    // Umrechnung der Zone - in UTC waere der letzte Fall der 17.
+    it('liest das Datum eines BDAY mit Uhrzeit', () => {
+      const card = (bday) => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u\r\nFN:X\r\n${bday}\r\nEND:VCARD`;
+      for (const [line, expected] of [
+        ['BDAY:1953-10-15T23:10:00Z', '1953-10-15'],
+        ['BDAY;VALUE=date-time:1987-09-27T23:30:00-06:00', '1987-09-27'],
+        ['BDAY:19531015T231000Z', '1953-10-15'],
+        ['BDAY:1990-07-18T00:00:00+02:00', '1990-07-18'],
+      ]) {
+        const parsed = parseVCard(card(line));
+        assert.strictEqual(parsed.birthday, expected, line);
+        assert.strictEqual(parsed.birthdayYearUnknown, false, line);
+      }
+
+      const yearless = parseVCard(card('BDAY:--0315T1200'));
+      assert.strictEqual(yearless.birthday, '2000-03-15');
+      assert.strictEqual(yearless.birthdayYearUnknown, true);
+    });
+
     it('should parse URL, NICKNAME, NOTE, CATEGORIES', () => {
       const vCardText = `BEGIN:VCARD
 VERSION:3.0

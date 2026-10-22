@@ -5714,6 +5714,7 @@
         "weekdaySat": "Σαβ",
         "weekdaySun": "Κυρ",
         "intervalLabelWeekly": "Κάθε N εβδομάδες",
+        "intervalLabelMonthly": "Κάθε N μήνες",
         "anchorDateLabel": "Πρώτη αποκομιδή",
         "monthDayLabel": "Ημέρα του μήνα",
         "monthDayLastDay": "Τελευταία ημέρα του μήνα",

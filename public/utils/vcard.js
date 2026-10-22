@@ -143,6 +143,10 @@ function yearlessBirthday(month, day) {
  * Ohne Jahr (#2095): Apples `BDAY;X-APPLE-OMIT-YEAR=1604:1604-03-15`, ein
  * blankes 1604 und vCard-4 `--0315` / `--03-15` liefern Tag und Monat mit dem
  * Platzhalterjahr und `yearUnknown: true`.
+ *
+ * Mit Uhrzeit: vCard 3.0 erlaubt `VALUE=date-time` (RFC 2426 3.1.5,
+ * `1953-10-15T23:10:00Z`), vCard 4 `date-and-or-time` (RFC 6350 6.2.5,
+ * `19531015T231000Z`). Es zaehlt das Datum, wie es dasteht.
  * @param {string} value - Roher BDAY-Wert (z. B. "1990-01-01", "19900101", "1990", "--0315")
  * @param {string} [params] - Parameter der Zeile ohne fuehrendes ';' (z. B. "X-APPLE-OMIT-YEAR=1604")
  * @returns {{ date: string, yearUnknown: boolean }|null} ISO-Datum oder null, wenn nicht verwertbar
@@ -150,12 +154,20 @@ function yearlessBirthday(month, day) {
 export function parseBirthdayValue(value, params = '') {
   if (!value) return null;
 
+  // Uhrzeit abschneiden, vor der Bereinigung: die haengte ihre Ziffern sonst
+  // an das Datum ("1990-07-1800000000" -> kein Muster -> null). Keine
+  // Umrechnung der Zone - ein Geburtstag ist ein Kalendertag, und
+  // `1990-07-18T00:00:00+02:00` in UTC waere der 17.
+  const trimmed = String(value).trim();
+  const dateTime = /^(\d{4}-?\d{2}-?\d{2}|--\d{2}-?\d{2})T\d/.exec(trimmed);
+  const datePart = dateTime ? dateTime[1] : trimmed;
+
   // vCard 4 ohne Jahr, vor der Bereinigung (sie liesse die Striche stehen).
-  const yearless = /^--(\d{2})-?(\d{2})$/.exec(String(value).trim());
+  const yearless = /^--(\d{2})-?(\d{2})$/.exec(datePart);
   if (yearless) return yearlessBirthday(yearless[1], yearless[2]);
 
   // Alle Zeichen ausser Ziffern und Bindestrich entfernen (TZ-Suffixe etc.)
-  const cleaned = String(value).replace(/[^\d-]/g, '');
+  const cleaned = datePart.replace(/[^\d-]/g, '');
 
   let date = null;
   // ISO (YYYY-MM-DD)

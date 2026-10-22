@@ -5714,6 +5714,7 @@
         "weekdaySat": "شنبه",
         "weekdaySun": "یکشنبه",
         "intervalLabelWeekly": "هر N هفته",
+        "intervalLabelMonthly": "هر N ماه",
         "anchorDateLabel": "اولین جمع‌آوری",
         "monthDayLabel": "روز ماه",
         "monthDayLastDay": "آخرین روز ماه",

@@ -5714,6 +5714,7 @@
         "weekdaySat": "Szo",
         "weekdaySun": "V",
         "intervalLabelWeekly": "Minden N. héten",
+        "intervalLabelMonthly": "Minden N. hónapban",
         "anchorDateLabel": "Első elszállítás",
         "monthDayLabel": "A hónap napja",
         "monthDayLastDay": "A hónap utolsó napja",

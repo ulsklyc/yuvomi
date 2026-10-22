@@ -5974,6 +5974,7 @@
         "weekdaySat": "сб",
         "weekdaySun": "вс",
         "intervalLabelWeekly": "Каждые N недель",
+        "intervalLabelMonthly": "Каждые N месяцев",
         "anchorDateLabel": "Первый вывоз",
         "monthDayLabel": "День месяца",
         "monthDayLastDay": "Последний день месяца",
