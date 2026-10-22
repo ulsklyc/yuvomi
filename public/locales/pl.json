@@ -1470,6 +1470,8 @@
         "mvRemove": "Usuń pozycję",
         "birthdayLabel": "Urodziny",
         "showBirthday": "Pokaż w urodzinach",
+        "addToBirthdays": "Dodaj do urodzin",
+        "addedToBirthdays": "Dodano do urodzin.",
         "birthdayHint": "Dzięki importowi urodzin pojawia się też w kalendarzu.",
         "phonePlaceholder": "+48 …",
         "phonePreview": "Podgląd: {{value}}",

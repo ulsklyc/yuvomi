@@ -1324,6 +1324,8 @@
         "mvRemove": "Eintrag entfernen",
         "birthdayLabel": "Geburtstag",
         "showBirthday": "In Geburtstagen anzeigen",
+        "addToBirthdays": "Zu Geburtstagen hinzufügen",
+        "addedToBirthdays": "Zu Geburtstagen hinzugefügt.",
         "birthdayHint": "Erscheint über den Geburtstags-Import auch im Kalender.",
         "phonePlaceholder": "+49 …",
         "phonePreview": "Vorschau: {{value}}",

@@ -1052,7 +1052,7 @@ const mvSubLabel = (label) => (!label || label === 'other' ? '' : label);
  * hatten in der App bislang überhaupt keine Anzeige - das Formular führt sie
  * nicht. Sie stehen hier als reine Leseinformation.
  */
-function renderContactDetail(contact) {
+function renderContactDetail(contact, { onBirthdayLinked = null } = {}) {
   // Solange der Einzelabruf läuft, speist der Legacy-Einzelwert die Gruppe -
   // besser eine Nummer sofort als drei nach dem Roundtrip.
   const phones = contact.phones?.length
@@ -1104,15 +1104,10 @@ function renderContactDetail(contact) {
       icon: 'cake',
       label: t('contacts.birthdayLabel'),
       value: birthDateText(contact.birthday, contact.birthday_year_unknown),
-      // DER WEG ZUM GEBURTSTAG (Critique R21, D7): hat der Import aus diesem
-      // Kontakt einen Geburtstag angelegt (`birthday_id`, routes/contacts.js),
-      // fuehrt die Zeile dorthin - statt Modulwechsel, Suche und Antippen.
-      action: contact.birthday_id && mayOpenBirthdays() ? {
-        id: 'contact-detail-birthday',
-        label: t('contacts.showBirthday'),
-        icon: 'cake',
-        onClick: () => leaveDetailTo(birthdayHref(contact.birthday_id)),
-      } : null,
+      // DER WEG ZUM GEBURTSTAG (Critique R21, D7; #2149): verknuepft fuehrt
+      // die Zeile dorthin, unverknuepft legt sie den Eintrag an - in derselben
+      // Folgeaktion, siehe birthdayRowAction().
+      action: birthdayRowAction(contact, onBirthdayLinked),
     },
     {
       icon: 'globe',
@@ -1155,9 +1150,19 @@ function openContactDetail(contact, { inPane = null } = {}) {
   // damit die Reihenfolge nicht stillschweigend zur Voraussetzung wird.
   let view = null;
   let card = null;
-  const ready = fetchFullContact(contact).then((loaded) => {
+  // #2149: ist der Geburtstag angelegt, zeigt dieselbe Zeile "Anzeigen" und
+  // bekommt den Fokus, den der ersetzte Knopf mitnahm.
+  const detailOptions = {
+    onBirthdayLinked: (loaded) => {
+      if (!refresh(loaded)) return;
+      const root = inPane ?? document;
+      root.querySelector?.('#contact-detail-birthday')?.focus();
+    },
+  };
+  const ready = fetchFullContact(contact).then((loaded) => { refresh(loaded); });
+  function refresh(loaded) {
     full = loaded;
-    if (!view?.update(renderContactDetail(full))) return;
+    if (!view?.update(renderContactDetail(full, detailOptions))) return false;
     // Organisation und Zweitnummern kennt erst der Einzelabruf. In der Spalte
     // steht die Karte ausserhalb der Zeilen und wird getauscht; im Blatt lag
     // sie in dem Bereich, den update() gerade neu gefuellt hat, und kommt neu.
@@ -1170,7 +1175,8 @@ function openContactDetail(contact, { inPane = null } = {}) {
       card = mountContactCard(full, null);
     }
     enhanceDetailPhones(inPane);
-  });
+    return true;
+  }
 
   const actions = [{
     id: 'contact-detail-export',
@@ -1219,7 +1225,7 @@ function openContactDetail(contact, { inPane = null } = {}) {
     key: `contact:${contact.id}`,
     size: 'md',
     pane: inPane ?? undefined,
-    sections: renderContactDetail(full),
+    sections: renderContactDetail(full, detailOptions),
     actions,
     // OHNE SCHREIBRECHT KEIN „BEARBEITEN" IM KOPF. `openDetailView` setzt die
     // Kopf-Aktion genau dann, wenn dieser Schluessel steht (detail-view.js) -
@@ -2053,6 +2059,70 @@ function birthdayHref(id) {
 }
 
 /**
+ * Die Folgeaktion der Geburtstagszeile (Critique R21 D7, #2149): EIN Platz,
+ * zwei Zustaende. Verknuepft fuehrt sie zum Eintrag, unverknuepft legt sie
+ * ihn an - genau den, den der Import aus diesem Kontakt anlegen wuerde
+ * (`POST /birthdays/import` mit einer id, server/services/birthdays.js). Nach
+ * dem Anlegen wird aus "Hinzufuegen" an derselben Stelle "Anzeigen"; eine
+ * zweite Stelle (Fuss, Karte) haette zwei Wege fuer einen Wert gebaut.
+ *
+ * Ohne Geburtsdatum gibt es keine Zeile (detailRowEl wirft sie weg) und
+ * nichts zu importieren. Angeboten wird nur, was der Server annimmt: die
+ * Frage stellt `mayOpenBirthdayImport()` mit dem Pfad, den der Knopf
+ * schreibt (`calendar: write`, Modul nicht abgeschaltet). Kontakte-Leserecht
+ * verlangt der Import auch - wer diese Ansicht sieht, hat es.
+ *
+ * @param {object} contact
+ * @param {((loaded: object) => void)|null} onLinked  bekommt den neu geladenen Kontakt
+ */
+function birthdayRowAction(contact, onLinked = null) {
+  if (contact.birthday_id) {
+    return mayOpenBirthdays() ? {
+      id: 'contact-detail-birthday',
+      label: t('contacts.showBirthday'),
+      icon: 'cake',
+      onClick: () => leaveDetailTo(birthdayHref(contact.birthday_id)),
+    } : null;
+  }
+  if (!contact.birthday || !mayOpenBirthdayImport()) return null;
+  return {
+    id: 'contact-detail-birthday-add',
+    label: t('contacts.addToBirthdays'),
+    icon: 'calendar-plus',
+    onClick: ({ button } = {}) => addContactToBirthdays(contact, { button, onLinked }),
+  };
+}
+
+/**
+ * Legt den verknuepften Geburtstag an und laedt den Kontakt neu.
+ *
+ * Gelesen wird danach der KONTAKT, nicht die Antwort des Imports: die meldet
+ * nur Zahlen, und ein `skipped` heisst auch "jemand war schneller" - dann
+ * traegt der Kontakt die `birthday_id` trotzdem, und das ist ein Erfolg. Nur
+ * ein Kontakt, der danach immer noch keinen Eintrag hat, ist ein Fehlschlag.
+ *
+ * @returns {Promise<object|null>} der neu geladene Kontakt, oder null
+ */
+async function addContactToBirthdays(contact, { button = null, onLinked = null } = {}) {
+  if (!mayOpenBirthdayImport()) return null;
+  if (button) button.disabled = true;
+  try {
+    await api.post('/birthdays/import', { contact_ids: [contact.id] });
+    const loaded = (await api.get(`/contacts/${contact.id}`)).data;
+    if (!loaded?.birthday_id) throw new Error('birthday not linked');
+    const i = state.contacts.findIndex((c) => c.id === contact.id);
+    if (i !== -1) state.contacts[i] = { ...state.contacts[i], birthday_id: loaded.birthday_id };
+    window.yuvomi?.showToast(t('contacts.addedToBirthdays'), 'success');
+    onLinked?.(loaded);
+    return loaded;
+  } catch (err) {
+    if (button?.isConnected) button.disabled = false;
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+    return null;
+  }
+}
+
+/**
  * Darf die Leseansicht zum Geburtstag springen? (Critique R21, D7) Dieselbe
  * Paarung wie beim Import unten: `/birthdays` gehoert `calendar`, und ein
  * haushaltweit abgeschaltetes Modul leitet der Router um - beides waere eine
@@ -2197,6 +2267,8 @@ export const __test = {
   openContactDetail, readOnly, state, buildContactForm,
   // R21 D7: der Weg zum Geburtstag (die Zeilen stehen unten).
   birthdayHref,
+  // #2149: unverknuepft legt dieselbe Zeile den Geburtstag an.
+  addContactToBirthdays,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,

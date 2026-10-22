@@ -1305,6 +1305,8 @@
         "mvRemove": "Remove entry",
         "birthdayLabel": "Birthday",
         "showBirthday": "Show in birthdays",
+        "addToBirthdays": "Add to birthdays",
+        "addedToBirthdays": "Added to birthdays.",
         "birthdayHint": "Also appears in the calendar via the birthday import.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Preview: {{value}}",

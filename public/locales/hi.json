@@ -1305,6 +1305,8 @@
         "mvRemove": "प्रविष्टि हटाएँ",
         "birthdayLabel": "जन्मदिन",
         "showBirthday": "जन्मदिनों में दिखाएँ",
+        "addToBirthdays": "जन्मदिनों में जोड़ें",
+        "addedToBirthdays": "जन्मदिनों में जोड़ा गया।",
         "birthdayHint": "जन्मदिन आयात के ज़रिए कैलेंडर में भी दिखता है।",
         "phonePlaceholder": "+91 …",
         "phonePreview": "पूर्वावलोकन: {{value}}",

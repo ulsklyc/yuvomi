@@ -1305,6 +1305,8 @@
         "mvRemove": "Xóa mục",
         "birthdayLabel": "Sinh nhật",
         "showBirthday": "Xem trong sinh nhật",
+        "addToBirthdays": "Thêm vào sinh nhật",
+        "addedToBirthdays": "Đã thêm vào sinh nhật.",
         "birthdayHint": "Cũng xuất hiện trong lịch qua tính năng nhập sinh nhật.",
         "phonePlaceholder": "+84 …",
         "phonePreview": "Xem trước: {{value}}",

@@ -431,14 +431,93 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
  * Geburtstagszeile der Leseansicht fuehrt dann "In Geburtstagen anzeigen" -
  * ein Schritt statt Modulwechsel, Suche und Antippen. Ohne Verknuepfung, oder
  * ohne Zugang zum Geburtstagsmodul, gibt es den Knopf nicht. */
-test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburtstag', () => {
+test('R21 D7: die Geburtstagszeile eines verknuepften Kontakts fuehrt zum Geburtstag', async () => {
   const rows = contacts.renderContactDetail({ id: 7, name: 'Tante', birthday: '1970-05-04', birthday_year_unknown: 0, birthday_id: 42 });
   const row = rows.find((r) => r.icon === 'cake');
   assert.ok(row?.action, 'die Zeile traegt eine Folgeaktion');
   assert.equal(row.action.label, 'contacts.showBirthday');
   assert.equal(contacts.birthdayHref(42), '/birthdays?open=42');
   const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
-  assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung kein Weg');
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  setPermissions({ admin: false, modules: { calendar: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    const lose = contacts.renderContactDetail({ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null });
+    assert.equal(lose.find((r) => r.icon === 'cake')?.action ?? null, null, 'ohne Verknuepfung und ohne Schreibrecht kein Weg');
+  } finally {
+    clearPermissions();
+  }
+});
+
+/* #2149: EIN KONTAKT MIT GEBURTSDATUM, ABER OHNE EINTRAG IN GEBURTSTAGE.
+ * Dieselbe Folgeaktion der Geburtstagszeile legt ihn an - den Eintrag, den
+ * der Import anlegen wuerde (`POST /birthdays/import` mit genau dieser id).
+ * Angeboten nur, wo der Server annimmt: `calendar: write` und das Modul
+ * nicht abgeschaltet. Ohne Geburtsdatum gibt es nichts anzulegen. */
+test('#2149: unverknuepft bietet die Geburtstagszeile "Zu Geburtstagen hinzufuegen" an - nur mit Schreibrecht', async () => {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const LOSE = { id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_year_unknown: 0, birthday_id: null };
+  const actionOf = (c) => contacts.renderContactDetail(c).find((r) => r.icon === 'cake')?.action ?? null;
+  const yuvomi = globalThis.window.yuvomi;
+  const savedDisabled = yuvomi.isModuleDisabled;
+  try {
+    setPermissions({ admin: false, modules: { calendar: 'write', contacts: 'read' }, widgets: {}, capabilities: {} });
+    const add = actionOf(LOSE);
+    assert.equal(add?.label, 'contacts.addToBirthdays', 'mit Schreibrecht steht der Weg in Geburtstage an der Zeile');
+    assert.equal(add.id, 'contact-detail-birthday-add');
+    assert.equal(actionOf({ ...LOSE, birthday_id: 5 })?.label, 'contacts.showBirthday', 'verknuepft bleibt es beim Anzeigen');
+    assert.equal(actionOf({ ...LOSE, birthday: null }), null, 'ohne Geburtsdatum nichts anzulegen');
+
+    setPermissions({ admin: false, modules: { calendar: 'read' }, widgets: {}, capabilities: {} });
+    assert.equal(actionOf(LOSE), null, 'calendar: read - der Import nimmt nicht an');
+    setPermissions({ admin: false, modules: { calendar: 'none' }, widgets: {}, capabilities: {} });
+    assert.equal(actionOf(LOSE), null, 'calendar: none');
+
+    setPermissions({ admin: false, modules: { calendar: 'write' }, widgets: {}, capabilities: {} });
+    yuvomi.isModuleDisabled = (key) => key === 'birthdays';
+    assert.equal(actionOf(LOSE), null, 'haushaltweit abgeschaltet - der Router leitet um');
+  } finally {
+    clearPermissions();
+    if (savedDisabled === undefined) delete yuvomi.isModuleDisabled;
+    else yuvomi.isModuleDisabled = savedDisabled;
+  }
+});
+
+test('#2149: Hinzufuegen ruft den Import mit genau diesem Kontakt und liest die Verknuepfung neu', async () => {
+  const yuvomi = globalThis.window.yuvomi;
+  const savedToast = yuvomi.showToast;
+  const calls = [];
+  const toasts = [];
+  yuvomi.showToast = (message, type) => toasts.push({ message, type });
+  let linked = 77;
+  globalThis.__apiStub = {
+    post: (path, body) => { calls.push(['POST', path, body]); return { data: { imported: 1, skipped: 0 } }; },
+    get: (path) => { calls.push(['GET', path]); return { data: { id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_id: linked } }; },
+  };
+  contacts.state.contacts = [{ id: 8, name: 'Onkel', birthday: '1968-02-01', birthday_id: null }];
+  try {
+    const seen = [];
+    const button = { disabled: false, isConnected: true };
+    const loaded = await contacts.addContactToBirthdays({ id: 8, name: 'Onkel', birthday: '1968-02-01' }, { button, onLinked: (c) => seen.push(c) });
+    assert.deepEqual(calls[0], ['POST', '/birthdays/import', { contact_ids: [8] }], 'der bestehende Import, eine id');
+    assert.deepEqual(calls[1], ['GET', '/contacts/8'], 'danach der Kontakt selbst');
+    assert.equal(loaded?.birthday_id, 77);
+    assert.equal(seen[0]?.birthday_id, 77, 'die Ansicht bekommt den Kontakt mit Verknuepfung');
+    assert.equal(contacts.state.contacts[0].birthday_id, 77, 'die Liste kennt die Verknuepfung');
+    assert.equal(toasts.at(-1)?.type, 'success');
+
+    // Kommt der Kontakt trotzdem ohne Eintrag zurueck, ist das kein Erfolg.
+    linked = null;
+    calls.length = 0;
+    const again = await contacts.addContactToBirthdays({ id: 8, name: 'Onkel', birthday: '1968-02-01' }, { button });
+    assert.equal(again, null);
+    assert.equal(toasts.at(-1)?.type, 'danger');
+    assert.equal(button.disabled, false, 'der Knopf ist wieder bedienbar');
+  } finally {
+    delete globalThis.__apiStub;
+    contacts.state.contacts = [];
+    if (savedToast === undefined) delete yuvomi.showToast;
+    else yuvomi.showToast = savedToast;
+  }
 });
 
 // R21 S7 (Critique a3): zwei Kanten im Kontakt. Im Leseblatt stand der erste

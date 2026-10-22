@@ -1305,6 +1305,8 @@
         "mvRemove": "項目を削除",
         "birthdayLabel": "誕生日",
         "showBirthday": "誕生日で表示",
+        "addToBirthdays": "誕生日に追加",
+        "addedToBirthdays": "誕生日に追加しました。",
         "birthdayHint": "誕生日のインポートでカレンダーにも表示されます。",
         "phonePlaceholder": "+81 …",
         "phonePreview": "プレビュー: {{value}}",
