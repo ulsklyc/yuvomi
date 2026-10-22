@@ -53,7 +53,7 @@
     "title": "天氣小工具",
     "subtitle": "在儀表板上顯示即時天氣 - 免費、不需帳戶、不需 API 金鑰。",
     "enable": "啟用天氣小工具",
-    "appHint": "這些值會一直生效，直到在應用程式的 設定 → 家庭 → 整合 中儲存家庭位置為止。",
+    "appHint": "這些值會一直生效，直到在應用程式的 設定 → 家庭 → 照片和天氣 中儲存家庭位置為止。",
     "latLabel": "緯度",
     "lonLabel": "經度",
     "coordHint": "在 openstreetmap.org 或 Google 地圖上查詢座標。",
@@ -130,7 +130,8 @@
     "privateNetworkWaste": "垃圾收集",
     "privateNetworkWebdav": "WebDAV 文件",
     "baseUrl": "公開位址",
-    "outlook": "Outlook 日曆"
+    "outlook": "Outlook 日曆",
+    "moduleWebInstall": "從設定中安裝模組"
   },
   "docker": {
     "title": "正在啟動 Yuvomi",
@@ -276,7 +277,9 @@
     "sectionPrivateNetwork": "存取您的家庭網路",
     "privateNetworkHint": "Yuvomi 預設會拒絕連線到您自己網路上的位址，這可以防止伺服器被誘導存取內部服務。請只啟用您家中確實在執行的服務。",
     "authPasswordLogin": "保留使用者名稱和密碼登入",
-    "authPasswordLoginHint": "關閉後 SSO 將成為唯一的入口：登入表單和密碼重設都會消失。若身分提供者無法連線，恢復的方法是修改 .env 檔案並重新啟動。"
+    "authPasswordLoginHint": "關閉後 SSO 將成為唯一的入口：登入表單和密碼重設都會消失。若身分提供者無法連線，恢復的方法是修改 .env 檔案並重新啟動。",
+    "moduleWebInstall": "允許從設定中安裝模組",
+    "moduleWebInstallHint": "允許管理員透過網頁介面（上傳 ZIP 或 GitHub 網址）將第三方模組放到伺服器上，無需存取檔案。已安裝的模組在管理員核准前保持關閉。關閉時：模組需手動複製到模組資料夾。"
   },
   "welcome": {
     "title": "您想如何設定 Yuvomi？",
