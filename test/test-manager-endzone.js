@@ -429,3 +429,93 @@ test('Abos und Schnelllinks: der Verwalten-Dialog gibt seine Sortable-Instanzen 
     assert.doesNotMatch(src, /\bmakeSortable\(/, `${file}: keine Instanz am Merker vorbei`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Ein Zug, der nicht gespeichert werden kann, nimmt sich zurueck (Codex an #2177)
+// ---------------------------------------------------------------------------
+
+/** Eine Liste, die Kinder umhaengen kann - mehr braucht der Rueckweg nicht. */
+function fakeList(ids, extra = {}) {
+  const list = {
+    children: [],
+    appendChild(row) { this.remove(row); this.children.push(row); row.parentElement = this; return row; },
+    insertBefore(row, ref) {
+      this.remove(row);
+      const at = ref ? this.children.indexOf(ref) : -1;
+      if (at < 0) this.children.push(row); else this.children.splice(at, 0, row);
+      row.parentElement = this;
+      return row;
+    },
+    remove(row) { const i = this.children.indexOf(row); if (i >= 0) this.children.splice(i, 1); },
+    querySelectorAll() { return [...this.children]; },
+    order() { return this.children.map((row) => row.dataset.id); },
+    ...extra,
+  };
+  for (const id of ids) list.appendChild({ dataset: { id: String(id) } });
+  return list;
+}
+
+test('restoreOrder: haengt die Zeilen in die gespeicherte Folge zurueck', async () => {
+  const { restoreOrder } = await import('../public/utils/sortable.js');
+  assert.equal(typeof restoreOrder, 'function', 'utils/sortable.js exportiert restoreOrder');
+  const list = fakeList([2, 1, 3]);
+  restoreOrder(list, [1, 2, 3], (row) => row.dataset.id);
+  assert.deepEqual(list.order(), ['1', '2', '3']);
+});
+
+test('Abos: scheitert das Speichern eines Zugs, steht wieder die gespeicherte Reihenfolge da', async () => {
+  const saved = subscriptions.state.meta.categories;
+  subscriptions.state.meta.categories = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
+  // So steht die Liste nach dem Ziehen: SortableJS hat 2 schon vor 1 gehaengt.
+  const list = fakeList([2, 1, 3], { id: 'subscription-category-list' });
+  globalThis.__apiStub = { put: async () => { const err = new Error('boom'); err.status = 500; err.data = {}; throw err; } };
+  try {
+    const ok = await subscriptions.persistMetaOrder(list, [2, 1, 3]);
+    assert.equal(ok, false);
+    assert.deepEqual(list.order(), ['1', '2', '3'], 'der ungespeicherte Zug ist zurueckgenommen');
+  } finally {
+    delete globalThis.__apiStub;
+    subscriptions.state.meta.categories = saved;
+  }
+});
+
+test('Schnelllinks: scheitert das Speichern eines Schritts, steht wieder die gespeicherte Reihenfolge da', async () => {
+  const items = [{ id: 1, name: 'A', url: 'https://a.example' }, { id: 2, name: 'B', url: 'https://b.example' }];
+  let onKeydown = null;
+  const list = fakeList([1, 2], {
+    addEventListener: (type, fn) => { if (type === 'keydown') onKeydown = fn; },
+    querySelectorAll() { return [...this.children]; },
+  });
+  for (const row of list.children) {
+    row.querySelector = () => null;
+    row.handle = { focus() {}, closest: (sel) => (sel === '[data-sortable-handle]' ? row.handle : row) };
+    row.closest = () => row;
+  }
+  // nextElementSibling/previousElementSibling aus der Folge der Liste.
+  for (const row of list.children) {
+    Object.defineProperty(row, 'nextElementSibling', { get: () => list.children[list.children.indexOf(row) + 1] ?? null });
+    Object.defineProperty(row, 'previousElementSibling', { get: () => list.children[list.children.indexOf(row) - 1] ?? null });
+  }
+  const el = () => ({ addEventListener() {} });
+  const panel = { querySelector: (sel) => (sel === '#quick-link-manage-list' ? list : el()), querySelectorAll: () => [] };
+  let failed;
+  const done = new Promise((r) => { failed = r; });
+  globalThis.__openModal = (opts) => opts.onSave(panel);
+  globalThis.__apiStub = {
+    get: async () => ({ data: items }),
+    put: async () => { failed(); throw new Error('offline'); },
+  };
+  try {
+    await openQuickLinksManager();
+    assert.ok(onKeydown, 'der Tastaturpfad ist verdrahtet');
+    const first = list.children[0];
+    onKeydown({ key: 'ArrowDown', target: first.handle, preventDefault() {} });
+    assert.deepEqual(list.order(), ['2', '1'], 'der Schritt haengt die Zeile sofort um');
+    await done;
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(list.order(), ['1', '2'], 'nach dem Fehlschlag zurueck auf den Stand des Servers');
+  } finally {
+    delete globalThis.__openModal;
+    delete globalThis.__apiStub;
+  }
+});

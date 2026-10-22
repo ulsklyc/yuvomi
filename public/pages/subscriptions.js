@@ -28,7 +28,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
-import { sortableSet } from '/utils/sortable.js';
+import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
@@ -2241,12 +2241,21 @@ function restoreMetaFocus(panel) {
 }
 
 /** Neue Reihenfolge einer Liste speichern - Pfeiltaste, Menue und Drag-Ende teilen diesen Weg. */
-function persistMetaOrder(list, ids) {
+async function persistMetaOrder(list, ids) {
   // Der Riegel am Schreibweg selbst: Pfeiltaste, Menue und Drag-Ende kommen
   // alle hier vorbei (Nur-lesen-Regel, test:budget-readonly-ui).
   if (readOnly()) return null;
   const key = list.id.includes('category') ? 'categories' : 'payment_methods';
-  return saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
+  const saved = await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
+  if (!saved) {
+    // GESCHEITERT, OHNE DASS DER DIALOG NEU AUFGEHT (Codex an #2177): das
+    // Ziehen hat die Zeile schon umgehaengt. Zurueck auf den gespeicherten
+    // Stand, sonst stuenden Reihenfolge, Griff-Positionen und gesperrtes
+    // Auf/Ab falsch da. Der Fokuswunsch des Schritts verfaellt mit ihm.
+    restoreOrder(list, state.meta[key].map((row) => row.id), (li) => li.dataset.id);
+    metaFocus = null;
+  }
+  return saved;
 }
 
 function moveMetaRow(row, delta, target) {
@@ -2478,7 +2487,7 @@ export const __test = {
   // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
   reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
   // #2152: die Zeilen des Verwalten-Dialogs (test:manager-endzone).
-  metadataRows,
+  metadataRows, persistMetaOrder,
   // Eine neue Instanz der Seite, wie ein render() sie anlegt.
   setContainerForTest: (target) => { container = target; pageGeneration += 1; },
 };

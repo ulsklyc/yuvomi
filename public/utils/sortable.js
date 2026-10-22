@@ -157,3 +157,28 @@ export function sortableSet({ create = makeSortable } = {}) {
     size: () => live.size,
   };
 }
+
+/**
+ * Stellt die gespeicherte Reihenfolge einer Liste wieder her, nachdem ein Zug
+ * nicht gespeichert werden konnte (Codex an #2177).
+ *
+ * SortableJS - und ein Tastaturpfad, der die Zeile vorab umhaengt - verschiebt
+ * das DOM VOR der Anfrage. Scheitert sie, stuende eine Reihenfolge da, die es
+ * nirgends gibt, samt falscher Positionen in Griff-Labels und Menue. Die
+ * Zeilen werden in der gespeicherten Folge `ids` neu angehaengt; die Liste
+ * darf dafuer nur diese Zeilen fuehren. Der Fokus bleibt, wo er war.
+ *
+ * @param {HTMLElement} listEl
+ * @param {Array<string|number>} ids  - gespeicherte Reihenfolge
+ * @param {(row: HTMLElement) => string|number} idOf
+ */
+export function restoreOrder(listEl, ids, idOf) {
+  if (!listEl) return;
+  const active = globalThis.document?.activeElement ?? null;
+  const rows = new Map([...listEl.children].map((row) => [String(idOf(row)), row]));
+  for (const id of ids) {
+    const row = rows.get(String(id));
+    if (row) listEl.appendChild(row);
+  }
+  if (active && globalThis.document?.activeElement !== active) active.focus?.();
+}

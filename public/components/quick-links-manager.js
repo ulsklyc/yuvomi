@@ -26,7 +26,7 @@ import { prefersInkText } from '/utils/contrast.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
-import { sortableSet } from '/utils/sortable.js';
+import { sortableSet, restoreOrder } from '/utils/sortable.js';
 
 /** Die Sortable-Instanz der Verwaltung: frei beim Neuaufbau und beim Schliessen (Codex an #2177). */
 const manageSortables = sortableSet();
@@ -557,6 +557,9 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
       const list = panel.querySelector('#quick-link-manage-list');
       if (!list) return;
       // Ein Weg fuer Ziehen und Pfeiltaste: die Liste im DOM ist die Wahrheit.
+      // `savedIds` ist der Stand des Servers - dorthin geht es zurueck, wenn
+      // ein Zug nicht gespeichert werden kann (Codex an #2177).
+      let savedIds = items.map((s) => s.id);
       const persistOrder = async () => {
           // Die Reihenfolge gilt für den ganzen Haushalt, nicht pro Person: es
           // ist EINE Reihe, und zwei Mitglieder, die sie verschieden sortieren,
@@ -572,10 +575,14 @@ export async function openQuickLinksManager({ onChange = () => {} } = {}) {
           refreshHandleLabels(list);
           try {
             await api.put('/quick-links/order', { ids });
-            await onChange();
           } catch {
             window.yuvomi?.showToast(t('quickLinks.orderError'), 'danger');
+            restoreOrder(list, savedIds, (li) => li.dataset.id);
+            refreshHandleLabels(list);
+            return;
           }
+          savedIds = ids;
+          await onChange();
       };
       // Der Tastaturpfad am Griff (#2152): Pfeil hoch/runter verschiebt die
       // Zeile um einen Platz, der Fokus bleibt auf dem Griff - die Zeile wird

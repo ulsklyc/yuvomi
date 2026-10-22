@@ -451,6 +451,16 @@ const STUBS = {
       clear() {},
       size: () => 0,
     });
+    // Wie das Original: gespeicherte Folge nach einem gescheiterten Zug.
+    // test:manager-endzone misst das Original UND den Weg der Seiten hierher.
+    export const restoreOrder = (listEl, ids, idOf) => {
+      if (!listEl) return;
+      const rows = new Map([...listEl.children].map((row) => [String(idOf(row)), row]));
+      for (const id of ids) {
+        const row = rows.get(String(id));
+        if (row) listEl.appendChild(row);
+      }
+    };
     export const makeSortable = async (listEl, opts) => {
       if (Array.isArray(globalThis.__sortableCalls)) {
         globalThis.__sortableCalls.push({ el: listEl, opts });
