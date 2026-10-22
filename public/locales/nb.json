@@ -2911,6 +2911,23 @@
         "regionLabel": "Region",
         "regionHint": "Angir format for valuta, tall, dato og tid for å samsvare med regionen (f.eks. Sveits: 1'234.50). Velg «Tilpass» for å konfigurere dem individuelt.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "Emiratene",
+            "AG": "Antigua og Barbuda",
+            "BS": "Bahamas",
+            "DO": "Dominikanske rep.",
+            "GB": "Storbritannia",
+            "KN": "Saint Kitts",
+            "PH": "Filippinene",
+            "SA": "Saudi-Arabia",
+            "TT": "Trinidad og Tobago",
+            "US": "USA",
+            "VC": "St. Vincent"
+        },
+        "languageShort": {
+            "nb": "norsk",
+            "ptBR": "portugisisk (BR)"
+        },
         "regionAdminOnly": "Kun administratorer kan endre region og valuta.",
         "formatsHouseholdHint": "Dato- og tidsformat gjelder for hele husholdningen. Alle medlemmer kan endre dem.",
         "regionCustom": "Tilpass",

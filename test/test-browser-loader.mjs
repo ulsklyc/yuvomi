@@ -110,7 +110,7 @@ const STUBS = {
         ...parts.slice(last + 1).map((part) => part.value),
       ].join('');
     };
-    export const getSupportedLocales = () => ['de', 'en'];
+    export const getSupportedLocales = () => globalThis.__supportedLocales ?? ['de', 'en'];
     export const formatDate = (d) => String(d);
     // Tag+Monat und volles Datum sehen im Stub gleich aus. Wer pruefen will,
     // WELCHES von beiden gerufen wurde (relativeDateLabel), setzt

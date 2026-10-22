@@ -2929,6 +2929,23 @@
         "regionLabel": "Rehiyon",
         "regionHint": "Itinatakda ang pera, numero, petsa at format ng oras ayon sa rehiyon (hal. Switzerland: 1'234.50). Piliin ang \"Custom\" para i-configure sila nang isa-isa.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "UAE",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahamas",
+            "DO": "Dominican Rep.",
+            "GB": "UK",
+            "KN": "St. Kitts & Nevis",
+            "PH": "Pilipinas",
+            "SA": "Saudi Arabia",
+            "TT": "Trinidad & Tobago",
+            "US": "Estados Unidos",
+            "VC": "St. Vincent"
+        },
+        "languageShort": {
+            "nb": "Norwegian",
+            "ptBR": "Portuges (BR)"
+        },
         "regionAdminOnly": "Mga administrator lamang ang makakapagpalit ng rehiyon at pera.",
         "formatsHouseholdHint": "Naaangkop sa buong sambahayan ang format ng petsa at oras. Maaari itong palitan ng bawat miyembro.",
         "regionCustom": "Custom",

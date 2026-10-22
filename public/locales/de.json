@@ -2929,6 +2929,23 @@
         "regionLabel": "Region",
         "regionHint": "Setzt Währung, Zahlen-, Datums- und Zeitformat passend zur Region (z. B. Schweiz: 1'234.50). Für individuelle Einstellungen „Benutzerdefiniert“ wählen.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "VAE",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahamas",
+            "DO": "Dom. Republik",
+            "GB": "UK",
+            "KN": "St. Kitts & Nevis",
+            "PH": "Philippinen",
+            "SA": "Saudi-Arabien",
+            "TT": "Trinidad & Tobago",
+            "US": "Vereinigte Staaten",
+            "VC": "St. Vincent"
+        },
+        "languageShort": {
+            "nb": "Norwegisch",
+            "ptBR": "Portugiesisch (BR)"
+        },
         "regionAdminOnly": "Region und Währung ändern nur Administratoren.",
         "formatsHouseholdHint": "Datums- und Zeitformat gelten für den ganzen Haushalt. Alle Mitglieder können sie ändern.",
         "regionCustom": "Benutzerdefiniert",

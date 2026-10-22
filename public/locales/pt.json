@@ -2874,6 +2874,23 @@
         "regionLabel": "Região",
         "regionHint": "Define a moeda e os formatos de número, data e hora de acordo com a região (por ex., Suíça: 1'234.50). Escolha «Personalizado» para configurá-los individualmente.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAU",
+            "AG": "Antígua e Barbuda",
+            "BS": "Bahamas",
+            "DO": "Rep. Dominicana",
+            "GB": "Reino Unido",
+            "KN": "São Cristóvão",
+            "PH": "Filipinas",
+            "SA": "Arábia Saudita",
+            "TT": "Trinidad e Tobago",
+            "US": "Estados Unidos",
+            "VC": "São Vicente"
+        },
+        "languageShort": {
+            "nb": "norueguês",
+            "ptBR": "português (Brasil)"
+        },
         "regionAdminOnly": "Apenas administradores podem alterar a região e a moeda.",
         "formatsHouseholdHint": "O formato de data e hora aplica-se a toda a casa. Qualquer membro pode alterá-lo.",
         "regionCustom": "Personalizado",

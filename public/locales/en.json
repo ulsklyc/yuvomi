@@ -2911,6 +2911,23 @@
         "regionLabel": "Region",
         "regionHint": "Sets currency, number, date and time format to match the region (e.g. Switzerland: 1'234.50). Choose “Custom” to configure them individually.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "UAE",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahamas",
+            "DO": "Dominican Republic",
+            "GB": "United Kingdom",
+            "KN": "St. Kitts & Nevis",
+            "PH": "Philippines",
+            "SA": "Saudi Arabia",
+            "TT": "Trinidad & Tobago",
+            "US": "United States",
+            "VC": "St. Vincent"
+        },
+        "languageShort": {
+            "nb": "Norwegian",
+            "ptBR": "Portuguese (BR)"
+        },
         "regionAdminOnly": "Only administrators can change region and currency.",
         "formatsHouseholdHint": "Date and time format apply to the whole household. Every member can change them.",
         "regionCustom": "Custom",

@@ -2874,6 +2874,23 @@
         "regionLabel": "Région",
         "regionHint": "Définit la devise et les formats de nombre, de date et d’heure selon la région (p. ex. Suisse : 1'234.50). Choisissez « Personnalisé » pour les régler individuellement.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAU",
+            "AG": "Antigua-et-Barbuda",
+            "BS": "Bahamas",
+            "DO": "Rép. dominicaine",
+            "GB": "Royaume-Uni",
+            "KN": "Saint-Christophe",
+            "PH": "Philippines",
+            "SA": "Arabie saoudite",
+            "TT": "Trinité-et-Tobago",
+            "US": "États-Unis",
+            "VC": "Saint-Vincent"
+        },
+        "languageShort": {
+            "nb": "norvégien",
+            "ptBR": "portugais (BR)"
+        },
         "regionAdminOnly": "Seuls les administrateurs peuvent modifier la région et la devise.",
         "formatsHouseholdHint": "Les formats de date et d'heure s'appliquent à tout le foyer. Chaque membre peut les modifier.",
         "regionCustom": "Personnalisé",

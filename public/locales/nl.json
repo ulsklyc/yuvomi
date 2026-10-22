@@ -2874,6 +2874,23 @@
         "regionLabel": "Regio",
         "regionHint": "Stelt valuta en getal-, datum- en tijdnotatie in op basis van de regio (bijv. Zwitserland: 1'234.50). Kies “Aangepast” om ze afzonderlijk in te stellen.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "VAE",
+            "AG": "Antigua en Barbuda",
+            "BS": "Bahama’s",
+            "DO": "Dominicaanse Rep.",
+            "GB": "VK",
+            "KN": "Saint Kitts",
+            "PH": "Filipijnen",
+            "SA": "Saoedi-Arabië",
+            "TT": "Trinidad en Tobago",
+            "US": "Verenigde Staten",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "Noors",
+            "ptBR": "Portugees (BR)"
+        },
         "regionAdminOnly": "Alleen beheerders kunnen regio en valuta wijzigen.",
         "formatsHouseholdHint": "Datum- en tijdnotatie gelden voor het hele huishouden. Elk lid kan ze wijzigen.",
         "regionCustom": "Aangepast",

@@ -2874,6 +2874,23 @@
         "regionLabel": "地区",
         "regionHint": "根据地区设置货币、数字、日期和时间格式（例如瑞士：1'234.50）。选择“自定义”可单独配置。",
         "regionWithLanguage": "{{region}}（{{language}}）",
+        "regionShort": {
+            "AE": "阿拉伯联合酋长国",
+            "AG": "安提瓜和巴布达",
+            "BS": "巴哈马",
+            "DO": "多米尼加共和国",
+            "GB": "英国",
+            "KN": "圣基茨和尼维斯",
+            "PH": "菲律宾",
+            "SA": "沙特阿拉伯",
+            "TT": "特立尼达和多巴哥",
+            "US": "美国",
+            "VC": "圣文森特"
+        },
+        "languageShort": {
+            "nb": "挪威语",
+            "ptBR": "巴西葡萄牙语"
+        },
         "regionAdminOnly": "只有管理员可以更改地区和货币。",
         "formatsHouseholdHint": "日期和时间格式适用于整个家庭。任何成员都可以更改。",
         "regionCustom": "自定义",

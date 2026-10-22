@@ -5181,3 +5181,104 @@ test('R21 S9c: Regionen heissen nach ihrem Land, mehrsprachige mit Sprache - und
   assert.equal(regionLabel('de-CH', 'de', withLanguage), 'Schweiz / Deutsch', 'die Langform setzt die Seite (t())');
   assert.equal(regionLabel('fr-CA', 'de'), 'Kanada (Französisch)');
 });
+
+// #2151 (Rest aus R21): auch nach S9c waren am Telefon Werte gekappt - eine
+// ausdruecklich gewaehlte Region mit langem Landesnamen ("Vereinigte Arabis…",
+// 9 von 72 in de, 4 in en, 8 in uk) und die Datensprachen Portugiesisch
+// (Brasilien) und Norwegisch (Bokmål). Dasselbe Muster wie S9c: der Wert ist
+// kurz ("VAE", "Kanada (FR)", "Portugiesisch (BR)", "Norwegisch"), der volle
+// Name steht vorn in der Hinweiszeile. Die R17-Zeile bleibt, wie sie ist.
+//
+// Das Budget ist eine Messung, kein Wunsch: bei 390 px hat die gedeckelte
+// Auswahl (50cqi = 179 px) 145 px Text. Gemessen in Chrome an allen 26
+// Sprachen, 2839 Regions- und Sprachnamen vor und nach #2151: in
+// Lateinschrift kappte nichts bis 18 Zeichen ("Švýcarsko (němčina)", 19, war
+// gekappt), in Kyrillisch/Griechisch bis 16 ("Саудовская Аравия", 17), in
+// Arabisch/Devanagari bis 22. In Japanisch, Chinesisch und Koreanisch zaehlt
+// ein breites Zeichen voll und ein lateinisches halb - "カナダ（フランス語）"
+// (10) war gekappt, "フィリピン（FIL）" (8,5) nicht. Mit diesen Grenzen rutschte
+// kein gekappter Name durch; einige passende fallen darueber und tragen
+// deshalb ebenfalls eine Kurzform ("Тринідад").
+const WIDE_CHAR = /[ᄀ-ᇿ⺀-鿿가-힯豈-﫿＀-￯]/;
+function selectBudget(text) {
+  if (WIDE_CHAR.test(text)) return 8.5;
+  if (/\p{Script=Cyrillic}|\p{Script=Greek}/u.test(text)) return 16;
+  if (/\p{Script=Arabic}|\p{Script=Devanagari}/u.test(text)) return 22;
+  return 18;
+}
+function selectUnits(text) {
+  if (!WIDE_CHAR.test(text)) return [...text].length;
+  return [...text].reduce((sum, c) => sum + (WIDE_CHAR.test(c) ? 1 : 0.5), 0);
+}
+const fillPlaceholders = (template, values) => template.replace(/\{\{(\w+)\}\}/g, (m, name) => values[name] ?? m);
+
+test('#2151: jede Region und jede Sprache passt in jeder Sprache in die geschlossene Auswahl - und keine zwei heissen gleich', async () => {
+  const {
+    REGION_CODES, SHORT_NAME_COUNTRIES, SHORT_NAME_LANGUAGES, regionShortLabel, languageShortLabel, languageShortKey,
+  } = await import('../public/settings/region-presets.js');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
+  const locales = files.map((f) => f.replace(/\.json$/, ''));
+  assert.ok(locales.length >= 20, 'die Locales sind da');
+  const offenders = [];
+  for (const locale of locales) {
+    const { settings } = JSON.parse(await readFile(new URL(`${locale}.json`, dir), 'utf8'));
+    for (const country of SHORT_NAME_COUNTRIES) {
+      const value = settings.regionShort?.[country];
+      if (typeof value !== 'string' || !value.trim()) offenders.push(`${locale}: settings.regionShort.${country} fehlt`);
+    }
+    for (const tag of SHORT_NAME_LANGUAGES) {
+      const value = settings.languageShort?.[languageShortKey(tag)];
+      if (typeof value !== 'string' || !value.trim()) offenders.push(`${locale}: settings.languageShort.${languageShortKey(tag)} fehlt`);
+    }
+    const regions = REGION_CODES.map((code) => regionShortLabel(code, locale, {
+      countryName: (country) => (SHORT_NAME_COUNTRIES.includes(country) ? settings.regionShort?.[country] : null),
+      withLanguage: (region, language) => fillPlaceholders(settings.regionWithLanguage, { region, language }),
+    }));
+    const languages = locales.map((tag) => languageShortLabel(tag, locale,
+      (t) => (SHORT_NAME_LANGUAGES.includes(t) ? settings.languageShort?.[languageShortKey(t)] : null)));
+    for (const label of [...regions, ...languages]) {
+      if (selectUnits(label) > selectBudget(label)) offenders.push(`${locale}: "${label}" hat ${selectUnits(label)} Zeichen, Budget ${selectBudget(label)}`);
+    }
+    if (new Set(regions).size !== regions.length) offenders.push(`${locale}: zwei Regionen heissen gleich (${regions.filter((r, i) => regions.indexOf(r) !== i).join(', ')})`);
+    if (new Set(languages).size !== languages.length) offenders.push(`${locale}: zwei Sprachen heissen gleich`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('#2151: Darstellung - Region und Datensprache stehen kurz in der Auswahl, voll vorn in der Hinweiszeile', async (t) => {
+  const de = (type, code) => new Intl.DisplayNames(['de'], { type }).of(code);
+  globalThis.__supportedLocales = ['de', 'en', 'nb', 'pt', 'pt-BR'];
+  t.after(() => { delete globalThis.__supportedLocales; });
+  const emirates = await renderAppearance({
+    ...APPEARANCE_PREFS, currency: 'AED', date_format: 'dmy_slash', time_format: '12h', region: 'ar-AE', language: 'pt-BR',
+  });
+  assert.equal(selectedOptionText(emirates, 'region-select'), 'settings.regionShort.AE', 'die Region steht in ihrer Kurzform');
+  assert.equal(textById(emirates, 'region-hint'),
+    withValues('settings.hintWithCurrent', { value: de('region', 'AE'), hint: 'settings.regionHint' }),
+    'der volle Name steht vorn in der Hinweiszeile');
+  assert.equal(selectedOptionText(emirates, 'data-language-select'), 'settings.languageShort.ptBR',
+    'Portugiesisch (Brasilien) steht in der Kurzform');
+  assert.equal(textById(emirates, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: de('language', 'pt-BR'), hint: 'settings.dataLanguageHint' }));
+
+  const canada = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'CAD', date_format: 'ymd', time_format: '24h', region: 'fr-CA', language: 'nb' });
+  assert.equal(selectedOptionText(canada, 'region-select'),
+    withValues('settings.regionWithLanguage', { region: de('region', 'CA'), language: 'FR' }), 'die Sprache einer Region steht als Kuerzel');
+  assert.equal(textById(canada, 'region-hint'), withValues('settings.hintWithCurrent', {
+    value: withValues('settings.regionWithLanguage', { region: de('region', 'CA'), language: de('language', 'fr') }), hint: 'settings.regionHint',
+  }));
+  assert.equal(selectedOptionText(canada, 'data-language-select'), 'settings.languageShort.nb', 'Bokmål in der Kurzform');
+  assert.equal(textById(canada, 'data-language-hint'),
+    withValues('settings.hintWithCurrent', { value: de('language', 'nb'), hint: 'settings.dataLanguageHint' }));
+
+  // Passt der Name, wiederholt der Hinweis ihn nicht.
+  const germany = await renderAppearance(APPEARANCE_PREFS);
+  assert.equal(textById(germany, 'region-hint'), 'settings.regionHint');
+
+  // Die Hinweiszeile folgt der Auswahl: beim Wechsel sofort und wenn die
+  // Region aus den Einzelfeldern hergeleitet wird.
+  const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(page, /regionSelect\?\.addEventListener\('change', async \(\) => \{\s*(?:\/\/[^\n]*\n\s*)*setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
+  assert.match(page, /function syncRegionSelect\([\s\S]{0,700}setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
+});

@@ -2892,6 +2892,23 @@
         "regionLabel": "Wilayah",
         "regionHint": "Menetapkan mata uang, format angka, tanggal dan waktu sesuai wilayah (mis. Swiss: 1'234.50). Untuk pengaturan individual, pilih „Kustom”.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "Uni Emirat Arab",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahama",
+            "DO": "Republik Dominika",
+            "GB": "Inggris Raya",
+            "KN": "Saint Kitts",
+            "PH": "Filipina",
+            "SA": "Arab Saudi",
+            "TT": "Trinidad & Tobago",
+            "US": "Amerika Serikat",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "Norwegia",
+            "ptBR": "Portugis (Brasil)"
+        },
         "regionAdminOnly": "Hanya administrator yang dapat mengubah wilayah dan mata uang.",
         "formatsHouseholdHint": "Format tanggal dan waktu berlaku untuk seluruh rumah tangga. Setiap anggota dapat mengubahnya.",
         "regionCustom": "Kustom",

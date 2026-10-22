@@ -2967,6 +2967,23 @@
         "regionLabel": "Region",
         "regionHint": "Nastaví měnu a formát čísel, data a času podle regionu (např. Švýcarsko: 1'234.50). Pro individuální nastavení zvolte „Vlastní“.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "SAE",
+            "AG": "Antigua a Barbuda",
+            "BS": "Bahamy",
+            "DO": "Dominikánská rep.",
+            "GB": "Velká Británie",
+            "KN": "Svatý Kryštof",
+            "PH": "Filipíny",
+            "SA": "Saúdská Arábie",
+            "TT": "Trinidad a Tobago",
+            "US": "Spojené státy",
+            "VC": "Svatý Vincenc"
+        },
+        "languageShort": {
+            "nb": "norština",
+            "ptBR": "portugalština (BR)"
+        },
         "regionAdminOnly": "Region a měnu mohou měnit pouze administrátoři.",
         "formatsHouseholdHint": "Formát data a času platí pro celou domácnost. Změnit ho může každý člen.",
         "regionCustom": "Vlastní",

@@ -2874,6 +2874,23 @@
         "regionLabel": "Regione",
         "regionHint": "Imposta valuta e formati di numero, data e ora in base alla regione (es. Svizzera: 1'234.50). Scegli «Personalizzato» per configurarli singolarmente.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAU",
+            "AG": "Antigua e Barbuda",
+            "BS": "Bahamas",
+            "DO": "Rep. Dominicana",
+            "GB": "Regno Unito",
+            "KN": "Saint Kitts",
+            "PH": "Filippine",
+            "SA": "Arabia Saudita",
+            "TT": "Trinidad e Tobago",
+            "US": "Stati Uniti",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "norvegese",
+            "ptBR": "portoghese (BR)"
+        },
         "regionAdminOnly": "Solo gli amministratori possono modificare regione e valuta.",
         "formatsHouseholdHint": "Il formato di data e ora vale per tutta la famiglia. Ogni membro può modificarlo.",
         "regionCustom": "Personalizzato",

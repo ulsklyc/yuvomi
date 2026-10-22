@@ -2874,6 +2874,23 @@
         "regionLabel": "Region",
         "regionHint": "Ställer in valuta samt tal-, datum- och tidsformat efter regionen (t.ex. Schweiz: 1'234.50). Välj ”Anpassad” för att ställa in dem individuellt.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "Arabemiraten",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahamas",
+            "DO": "Dominikanska rep.",
+            "GB": "Storbritannien",
+            "KN": "S:t Kitts & Nevis",
+            "PH": "Filippinerna",
+            "SA": "Saudiarabien",
+            "TT": "Trinidad & Tobago",
+            "US": "USA",
+            "VC": "S:t Vincent"
+        },
+        "languageShort": {
+            "nb": "norska",
+            "ptBR": "portugisiska (BR)"
+        },
         "regionAdminOnly": "Endast administratörer kan ändra region och valuta.",
         "formatsHouseholdHint": "Datum- och tidsformat gäller hela hushållet. Alla medlemmar kan ändra dem.",
         "regionCustom": "Anpassad",

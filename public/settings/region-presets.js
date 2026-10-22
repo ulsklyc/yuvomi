@@ -210,3 +210,83 @@ export function regionLabel(code, locale, withLanguage = (region, language) => `
     return code;
   }
 }
+
+/**
+ * Laender, deren CLDR-Name in mindestens einer Sprache nicht in die
+ * geschlossene Auswahl passt (#2151). Ihre Kurzform steht je Sprache unter
+ * `settings.regionShort.<Land>` - in Sprachen, in denen der volle Name passt,
+ * steht dort der volle Name. test:settings-navigation haelt die Liste: jeder
+ * Name, der das Zeichenbudget reisst, braucht hier einen Eintrag.
+ */
+export const SHORT_NAME_COUNTRIES = ['AE', 'AG', 'BS', 'DO', 'GB', 'KN', 'PH', 'SA', 'TT', 'US', 'VC'];
+
+/**
+ * Kurzer Anzeigename einer Region - das, was in der Auswahl steht (#2151).
+ * Der volle Name (`regionLabel`) steht in der Hinweiszeile, sobald er sich
+ * von diesem unterscheidet.
+ *
+ * WARUM DER WERT SELBST KURZ IST: die geschlossene Auswahl zeigt den Text der
+ * gewaehlten Option, und der ist derselbe wie in der Liste. Einen kuerzeren
+ * Wert nur fuer den geschlossenen Zustand gibt es nativ erst mit
+ * `appearance: base-select` (kein Firefox, Safari erst ab 27) - ohne es waere
+ * der Wert dort wieder gekappt. Mobil hat die Auswahl rund 145 px Text
+ * (R17: Bedienspalte 50cqi), und "Vereinigte Arabische Emirate" endete dort
+ * als "Vereinigte Arabisc…".
+ *
+ * - Land: `countryName(Land)` (die Seite liest `settings.regionShort.*`),
+ *   sonst der CLDR-Name.
+ * - Mehrsprachige Regionen tragen statt der Sprache ihr Kuerzel ("Kanada
+ *   (FR)") - die Form der Sprachwahl auf Seiten in Kanada und der Schweiz,
+ *   und in jeder Sprache gleich kurz. Mit ausgeschriebener Sprache ("Kanada
+ *   (Französisch)", "Philippinen (Englisch)") war mindestens eine dieser
+ *   Regionen in 13 von 26 Sprachen gekappt.
+ *
+ * @param {string} code Regions-Code wie "fr-CA"
+ * @param {string} locale UI-Sprache
+ * @param {object} [opts]
+ * @param {(country: string) => (string|null)} [opts.countryName]
+ * @param {(region: string, language: string) => string} [opts.withLanguage]
+ */
+export function regionShortLabel(code, locale, {
+  countryName = () => null,
+  withLanguage = (region, language) => `${region} (${language})`,
+} = {}) {
+  try {
+    const country = countryOf(code);
+    const region = countryName(country) || new Intl.DisplayNames([locale], { type: 'region' }).of(country) || code;
+    if (!regionKeepsLanguage(code)) return region;
+    return withLanguage(region, code.slice(0, code.indexOf('-')).toUpperCase());
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * UI-Sprachen, deren CLDR-Name in mindestens einer Sprache nicht in die
+ * geschlossene Auswahl passt (#2151): "Portugiesisch (Brasilien)",
+ * "Norwegisch (Bokmål)". Kurzform je Sprache unter
+ * `settings.languageShort.<Tag ohne Bindestrich>` ("Portugiesisch (BR)",
+ * "Norwegisch" - Bokmål ist das einzige Norwegisch der App).
+ */
+export const SHORT_NAME_LANGUAGES = ['nb', 'pt-BR'];
+
+/** Schluessel der Kurzform einer UI-Sprache unter `settings.languageShort`. */
+export const languageShortKey = (tag) => tag.replace('-', '');
+
+/**
+ * Kurzer Name einer UI-Sprache fuer die Sprachwahlen (#2151), aus demselben
+ * Grund kurz wie `regionShortLabel`. Der volle Name (CLDR) steht in der
+ * Hinweiszeile der Datensprache.
+ *
+ * @param {string} tag Sprach-Tag wie "pt-BR"
+ * @param {string} locale UI-Sprache
+ * @param {(tag: string) => (string|null)} [shortName] die Seite liest
+ *        `settings.languageShort.*`
+ */
+export function languageShortLabel(tag, locale, shortName = () => null) {
+  try {
+    return shortName(tag) || new Intl.DisplayNames([locale], { type: 'language' }).of(tag) || tag;
+  } catch {
+    return tag;
+  }
+}

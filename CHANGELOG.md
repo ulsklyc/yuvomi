@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now trimmed wherever a calendar list is read: CalDAV accounts, Apple Calendar and reminder lists.
   A name that is empty after trimming falls back to the usual default. Existing accounts pick up
   the colours and names with "Refresh calendars" in the CalDAV settings.
+- **Long region and language names are no longer cut off in the appearance settings on a
+  phone.** (#2151) A region such as "United Arab Emirates" or a data language such as "Brazilian
+  Portuguese" ended in "…" on a narrow screen. The setting now shows a short form ("UAE",
+  "Portuguese (BR)"), and the hint below starts with the full name ("Currently United Arab
+  Emirates."). Countries with a region per language show the language as a code ("Canada (FR)").
+  Other names stay as they are.
 
 ## [2.79.0] - 2026-10-22
 

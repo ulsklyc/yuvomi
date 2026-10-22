@@ -2874,6 +2874,23 @@
         "regionLabel": "Régió",
         "regionHint": "Beállítja a pénznemet, a szám-, dátum- és időformátumot a régióhoz igazítva (pl. Svájc: 1'234.50). Válassza az „Egyéni” lehetőséget az egyéni konfiguráláshoz.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "EAE",
+            "AG": "Antigua és Barbuda",
+            "BS": "Bahama-szigetek",
+            "DO": "Dominikai Közt.",
+            "GB": "Egyesült Királyság",
+            "KN": "Saint Kitts",
+            "PH": "Fülöp-szk.",
+            "SA": "Szaúd-Arábia",
+            "TT": "Trinidad és Tobago",
+            "US": "Egyesült Államok",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "norvég",
+            "ptBR": "brazíliai portugál"
+        },
         "regionAdminOnly": "A régiót és a pénznemet csak rendszergazdák módosíthatják.",
         "formatsHouseholdHint": "A dátum- és időformátum az egész háztartásra érvényes. Minden tag módosíthatja.",
         "regionCustom": "Egyéni",

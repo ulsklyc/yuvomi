@@ -2874,6 +2874,23 @@
         "regionLabel": "Khu vực",
         "regionHint": "Đặt tiền tệ, định dạng số, ngày và giờ theo khu vực (ví dụ: Thụy Sĩ 1'234.50). Chọn “Tùy chỉnh” để cấu hình riêng.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "UAE",
+            "AG": "Antigua & Barbuda",
+            "BS": "Bahamas",
+            "DO": "Cộng hòa Dominica",
+            "GB": "Vương quốc Anh",
+            "KN": "St. Kitts và Nevis",
+            "PH": "Philippines",
+            "SA": "Ả Rập Xê-út",
+            "TT": "Trinidad và Tobago",
+            "US": "Hoa Kỳ",
+            "VC": "St. Vincent"
+        },
+        "languageShort": {
+            "nb": "Tiếng Na Uy",
+            "ptBR": "Bồ Đào Nha (BR)"
+        },
         "regionAdminOnly": "Chỉ quản trị viên mới có thể thay đổi khu vực và tiền tệ.",
         "formatsHouseholdHint": "Định dạng ngày và giờ áp dụng cho cả gia đình. Mọi thành viên đều có thể thay đổi.",
         "regionCustom": "Tùy chỉnh",

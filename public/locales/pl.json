@@ -3078,6 +3078,23 @@
         "regionLabel": "Region",
         "regionHint": "Ustawia walutę oraz format liczb, daty i godziny odpowiednio do regionu (np. Szwajcaria: 1'234.50). Wybierz „Niestandardowy”, aby ustawić je osobno.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "ZEA",
+            "AG": "Antigua i Barbuda",
+            "BS": "Bahamy",
+            "DO": "Dominikana",
+            "GB": "Wielka Brytania",
+            "KN": "Saint Kitts",
+            "PH": "Filipiny",
+            "SA": "Arabia Saudyjska",
+            "TT": "Trynidad i Tobago",
+            "US": "Stany Zjednoczone",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "norweski",
+            "ptBR": "portugalski (BR)"
+        },
         "regionAdminOnly": "Tylko administratorzy mogą zmieniać region i walutę.",
         "formatsHouseholdHint": "Format daty i godziny obowiązuje w całym gospodarstwie. Każdy członek może go zmienić.",
         "regionCustom": "Niestandardowy",

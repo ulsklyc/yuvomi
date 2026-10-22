@@ -2874,6 +2874,23 @@
         "regionLabel": "Bölge",
         "regionHint": "Para birimini, sayı, tarih ve saat biçimini bölgeye göre ayarlar (örn. İsviçre: 1'234.50). Bunları ayrı ayrı yapılandırmak için „Özel“ seçeneğini seçin.",
         "regionWithLanguage": "{{region}} ({{language}})",
+        "regionShort": {
+            "AE": "BAE",
+            "AG": "Antigua ve Barbuda",
+            "BS": "Bahamalar",
+            "DO": "Dominik Cumh.",
+            "GB": "Birleşik Krallık",
+            "KN": "Saint Kitts",
+            "PH": "Filipinler",
+            "SA": "Suudi Arabistan",
+            "TT": "Trinidad ve Tobago",
+            "US": "ABD",
+            "VC": "Saint Vincent"
+        },
+        "languageShort": {
+            "nb": "Norveççe",
+            "ptBR": "Portekizce (BR)"
+        },
         "regionAdminOnly": "Bölgeyi ve para birimini yalnızca yöneticiler değiştirebilir.",
         "formatsHouseholdHint": "Tarih ve saat biçimi tüm ev için geçerlidir. Her üye değiştirebilir.",
         "regionCustom": "Özel",

@@ -31,6 +31,11 @@ import {
   detectRegion,
   resolveRegion,
   regionLabel,
+  regionShortLabel,
+  languageShortLabel,
+  languageShortKey,
+  SHORT_NAME_COUNTRIES,
+  SHORT_NAME_LANGUAGES,
   numberLocaleFor,
 } from '/settings/region-presets.js';
 
@@ -145,6 +150,35 @@ function timeZoneOptions(selected) {
   return auto + utc + body;
 }
 
+const withLanguage = (region, language) => t('settings.regionWithLanguage', { region, language });
+
+/** Voller Name einer Region ("Vereinigte Arabische Emirate", "Kanada (Französisch)"). */
+function regionFullName(code) {
+  return regionLabel(code, getLocale(), withLanguage);
+}
+
+/**
+ * Name einer Region in der Auswahl (#2151): kurz genug fuer die geschlossene
+ * Auswahl am Telefon ("VAE", "Kanada (FR)"). Der volle Name steht dann in der
+ * Hinweiszeile (`regionHintText`).
+ */
+export function regionShortName(code) {
+  return regionShortLabel(code, getLocale(), {
+    countryName: (country) => (SHORT_NAME_COUNTRIES.includes(country) ? t(`settings.regionShort.${country}`) : null),
+    withLanguage,
+  });
+}
+
+/**
+ * Die Hinweiszeile der Region: beginnt mit dem vollen Namen, wenn die Auswahl
+ * nur die Kurzform zeigt - dasselbe Muster wie Datensprache und Zone (R21).
+ */
+export function regionHintText(code) {
+  if (!REGION_CODES.includes(code)) return t('settings.regionHint');
+  const full = regionFullName(code);
+  return hintWithCurrent(t('settings.regionHint'), full === regionShortName(code) ? null : full);
+}
+
 function regionOptions(selectedRegion) {
   const locale = getLocale();
   // Nach dem angezeigten Namen sortieren, nicht nach der Reihenfolge in
@@ -153,7 +187,7 @@ function regionOptions(selectedRegion) {
   // über 60 - da findet man "Spanisch (Peru)" nur alphabetisch wieder.
   // detectRegion() bleibt von der Sortierung unberührt, es liest das Objekt.
   const presets = [...REGION_CODES]
-    .map((code) => ({ code, label: regionLabel(code, locale, (region, language) => t('settings.regionWithLanguage', { region, language })) }))
+    .map((code) => ({ code, label: regionShortName(code) }))
     .sort((a, b) => a.label.localeCompare(b.label, locale))
     .map(({ code, label }) => (
       `<option value="${esc(code)}"${selectedRegion === code ? ' selected' : ''}>${esc(label)}</option>`
@@ -170,12 +204,23 @@ function localeLabel(locale) {
   }
 }
 
+/**
+ * Name einer Sprache in den beiden Sprachwahlen, kurz (#2151, siehe
+ * `languageShortLabel`). Der volle Name (`localeLabel`) steht in der
+ * Hinweiszeile der Datensprache.
+ */
+export function localeShortLabel(locale) {
+  return languageShortLabel(locale, getLocale(), (tag) => (
+    SHORT_NAME_LANGUAGES.includes(tag) ? t(`settings.languageShort.${languageShortKey(tag)}`) : null
+  ));
+}
+
 function localeOptions() {
   const storedLocale = safeStorageGet('yuvomi-locale');
   return [
     `<option value="system"${storedLocale ? '' : ' selected'}>${t('settings.localeSystem')}</option>`,
     ...getSupportedLocales().map((locale) => (
-      `<option value="${esc(locale)}"${storedLocale === locale ? ' selected' : ''}>${esc(localeLabel(locale))}</option>`
+      `<option value="${esc(locale)}"${storedLocale === locale ? ' selected' : ''}>${esc(localeShortLabel(locale))}</option>`
     )),
   ].join('');
 }
@@ -188,7 +233,9 @@ function localeOptions() {
  * "Automatisch", die Hinweiszeile beginnt mit "Gerade Englisch.".
  *
  * Ohne `current` bleibt der Hinweis, wie er ist: eine ausdrücklich gewählte
- * Sprache oder Zone steht schon vollständig in der Auswahl.
+ * Sprache oder Zone steht schon vollständig in der Auswahl. Seit #2151 gilt
+ * dasselbe fuer Region und Sprache in Kurzform: "VAE" in der Auswahl,
+ * "Gerade Vereinigte Arabische Emirate." vorn im Hinweis.
  */
 export function hintWithCurrent(hint, current) {
   return current ? t('settings.hintWithCurrent', { value: current, hint }) : hint;
@@ -202,7 +249,9 @@ export function hintWithCurrent(hint, current) {
  * Automatik-Ergebnis ausgeben.
  */
 export function dataLanguageHintText(selected, auto_) {
-  return hintWithCurrent(t('settings.dataLanguageHint'), selected ? null : localeLabel(auto_ || 'en'));
+  if (!selected) return hintWithCurrent(t('settings.dataLanguageHint'), localeLabel(auto_ || 'en'));
+  const full = localeLabel(selected);
+  return hintWithCurrent(t('settings.dataLanguageHint'), full === localeShortLabel(selected) ? null : full);
 }
 
 /** Die Hinweiszeile der Haushaltszone: bei "automatisch" mit der Zone, die gilt. */
@@ -226,7 +275,7 @@ function dataLanguageOptions(selected) {
   return [
     `<option value=""${selected ? '' : ' selected'}>${esc(auto)}</option>`,
     ...getSupportedLocales().map((locale) => (
-      `<option value="${esc(locale)}"${selected === locale ? ' selected' : ''}>${esc(localeLabel(locale))}</option>`
+      `<option value="${esc(locale)}"${selected === locale ? ' selected' : ''}>${esc(localeShortLabel(locale))}</option>`
     )),
   ].join('');
 }
@@ -380,7 +429,7 @@ function renderPage(container, preferences, isAdmin) {
         ${settingRowHtml({
           label: t('settings.regionLabel'),
           labelFor: 'region-select',
-          description: t('settings.regionHint'),
+          description: regionHintText(activeRegion),
           descriptionId: 'region-hint',
           extra: '<div id="region-error" class="form-error" role="alert" hidden></div>',
           control: `<select class="form-input" id="region-select" aria-describedby="region-hint region-error">
@@ -549,6 +598,7 @@ function syncRegionSelect(container, { mayHide = true, region = null } = {}) {
     date_format: container.querySelector('#date-format-select')?.value,
     time_format: container.querySelector('#time-format-select')?.value,
   });
+  setHint(container, 'region-hint', regionHintText(regionSelect.value));
   // Die Karte muss der Anzeige folgen. Seit die Waehrung ausserhalb von ihr
   // steht (#934), kann eine Aenderung die Region auf "Benutzerdefiniert"
   // schieben, ohne dass der Nutzer die Karte je gesehen hat - stuende sie dann
@@ -839,6 +889,8 @@ function bindEvents(container, user) {
 
   const regionSelect = container.querySelector('#region-select');
   regionSelect?.addEventListener('change', async () => {
+    // Der volle Name gehoert zur Auswahl, nicht zum Speichern: er folgt sofort.
+    setHint(container, 'region-hint', regionHintText(regionSelect.value));
     if (regionSelect.value === CUSTOM_REGION) {
       applyCustomVisibility(container, CUSTOM_REGION);
       return;
