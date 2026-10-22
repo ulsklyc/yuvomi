@@ -1049,15 +1049,37 @@
   min-height: 36px;
 }
 
-/* Name behält Vorrang; die vier Icon-Buttons rutschen bei Enge (schmales
- * Mobile) in die nächste Zeile, statt den Namen auf wenige Zeichen zu quetschen. */
-.subscriptions-metadata-row__view > span {
+/* Der Name ist das Bearbeiten-Ziel der Zeile (D10, #2152): ein Button, der wie
+ * Text steht - dieselbe Haut wie der Name im Kategorien-Verwalter. Rechts davon
+ * nur noch Mehr-Knopf und Griff; der Name behaelt die ganze uebrige Breite. */
+.subscriptions-metadata-row__name {
+  appearance: none;
   flex: 1 1 7rem;
   min-width: 0;
+  min-height: var(--target-md);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.subscriptions-metadata-row__name:hover {
+  color: var(--color-accent);
+}
+
+.subscriptions-metadata-row__name:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
 }
 
 .subscriptions-metadata-row__view .subscriptions-metadata-row__actions {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .subscriptions-metadata-row__edit {

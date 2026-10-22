@@ -722,6 +722,9 @@ test('Seite: neu laden scheitert - der Satz der Seite, nie der Text des Servers'
 function verwalten(werte = {}, zeilen = {}) {
   const panel = formular(werte);
   panel.querySelectorAll = (sel) => zeilen[sel] ?? [];
+  // Die Mehr-Menues der Zeilen (#2152) haengen sich an den Dialog.
+  panel.dataset = {};
+  panel.addEventListener = () => {};
   return panel;
 }
 
@@ -729,6 +732,8 @@ function verwalten(werte = {}, zeilen = {}) {
 function zeile(kind, id, name) {
   const li = feld();
   li.dataset = { kind, id: String(id) };
+  // Die Liste, in der die Zeile steht: ihr Platz traegt den Fokus nach dem Neuaufbau (#2152).
+  li.parentElement = { children: [li] };
   const edit = feld();
   const nameInput = feld(name);
   nameInput.defaultValue = `${name}-alt`;

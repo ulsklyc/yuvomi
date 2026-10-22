@@ -26,7 +26,9 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { openDetailView } from '/components/detail-view.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
+import { makeSortable } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
@@ -2129,16 +2131,36 @@ function metadataRows(items, kind) {
     // Screenreader in jeder Zeile dieselben (Komponenten-Kanon, DESIGN.md).
     const name = isCat ? categoryLabel(item) : paymentMethodLabel(item);
     const named = (catKey, methodKey) => t(isCat ? catKey : methodKey, { name });
+    // D10 ZEILEN-ENDZONE (#2152): [Mehr-Knopf][Griff]. Bis dahin standen hier
+    // vier Icons nebeneinander - Auf, Ab, Stift und ein dauerhaft roter
+    // Papierkorb - und schoben den Namen mobil in eine zweite Zeile. Der Name
+    // oeffnet die Bearbeitung, das Menue fuehrt Bearbeiten, die zwei Schritte
+    // fuer Schalter und Screenreader ohne Pfeiltasten und das Loeschen; der
+    // Griff zieht und nimmt am Fokus die Pfeiltasten.
+    const editLabelNamed = named('subscriptions.editCategoryNamed', 'subscriptions.editPaymentMethodNamed');
+    const sortable = items.length > 1;
+    const handleLabel = `${t('shopping.reorderHandle', { name })}, ${t('shopping.reorderPosition', { index: index + 1, total: items.length })}`;
     return `
     <li data-id="${item.id}" data-kind="${kind}">
       <div class="subscriptions-metadata-row__view">
         ${isCat ? `<i style="background:${esc(item.color)}"></i>` : '<i data-lucide="credit-card" aria-hidden="true"></i>'}
-        <span>${esc(name)}</span>
+        <button type="button" class="subscriptions-metadata-row__name" data-act="edit" title="${esc(editLabelNamed)}">${esc(name)}</button>
         <div class="row-actions subscriptions-metadata-row__actions">
-          ${rowActionHtml({ icon: 'chevron-up', label: t('subscriptions.moveUpNamed', { name }), attrs: { 'data-move': '-1', 'aria-disabled': index === 0 ? 'true' : null } })}
-          ${rowActionHtml({ icon: 'chevron-down', label: t('subscriptions.moveDownNamed', { name }), attrs: { 'data-move': '1', 'aria-disabled': index === items.length - 1 ? 'true' : null } })}
-          ${rowActionHtml({ icon: 'pencil', label: named('subscriptions.editCategoryNamed', 'subscriptions.editPaymentMethodNamed'), attrs: { 'data-act': 'edit' } })}
-          ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: named('subscriptions.deleteCategoryNamed', 'subscriptions.deletePaymentMethodNamed'), attrs: { 'data-act': 'delete' } })}
+          ${rowMenuHtml({
+    id: `subscriptions-meta-menu-${kind}-${item.id}`,
+    label: t('common.moreActionsNamed', { name }),
+    items: [
+      { action: 'meta-edit', icon: 'pencil', label: editLabelNamed, attrs: { 'data-act': 'edit' } },
+      sortable && { action: 'meta-up', icon: 'chevron-up', label: t('subscriptions.moveUpNamed', { name }), disabled: index === 0, attrs: { 'data-move': '-1' } },
+      sortable && { action: 'meta-down', icon: 'chevron-down', label: t('subscriptions.moveDownNamed', { name }), disabled: index === items.length - 1, attrs: { 'data-move': '1' } },
+      { action: 'meta-delete', icon: 'trash-2', danger: true, label: named('subscriptions.deleteCategoryNamed', 'subscriptions.deletePaymentMethodNamed'), attrs: { 'data-act': 'delete' } },
+    ],
+  })}
+          ${sortable ? `<button type="button" class="row-action list-row__drag subscriptions-metadata-row__handle" data-meta-handle
+                  aria-label="${esc(handleLabel)}"
+                  title="${esc(t('shopping.reorderHandleHint'))}">
+            <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
+          </button>` : ''}
         </div>
       </div>
       <div class="subscriptions-metadata-row__edit" hidden>
@@ -2192,6 +2214,47 @@ async function saveMetadata(write, goneId = null) {
   return true;
 }
 
+/**
+ * Wohin der Fokus geht, wenn der Verwalten-Dialog nach einer Handlung neu
+ * aufgebaut ist (#2152): jede Schreibhandlung schliesst ihn und baut ihn mit
+ * dem frischen Stand neu (saveMetadata), und ohne Ziel fiele der Fokus auf den
+ * Anfang - wer per Pfeiltaste am Griff schiebt, verloere nach einem Schritt
+ * die Zeile. `{ kind, id, target: 'handle' | 'more', index }`: die Zeile
+ * selbst, sonst die, die jetzt an `index` steht.
+ */
+let metaFocus = null;
+
+function restoreMetaFocus(panel) {
+  const intent = metaFocus;
+  metaFocus = null;
+  if (!intent) return;
+  const list = panel.querySelector(intent.kind === 'categories' ? '#subscription-category-list' : '#subscription-method-list');
+  const rows = [...(list?.querySelectorAll(':scope > li') ?? [])];
+  const row = rows.find((li) => Number(li.dataset.id) === intent.id)
+    ?? rows[Math.min(intent.index ?? 0, rows.length - 1)];
+  if (!row) return;
+  const handle = intent.target === 'handle' ? row.querySelector('[data-meta-handle]') : null;
+  (handle ?? row.querySelector('.row-action--more') ?? row.querySelector('[data-act="edit"]'))?.focus();
+}
+
+/** Neue Reihenfolge einer Liste speichern - Pfeiltaste, Menue und Drag-Ende teilen diesen Weg. */
+function persistMetaOrder(list, ids) {
+  const key = list.id.includes('category') ? 'categories' : 'payment_methods';
+  return saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: ids }));
+}
+
+function moveMetaRow(row, delta, target) {
+  const list = row?.closest('ul');
+  if (!list) return null;
+  const rows = [...list.querySelectorAll(':scope > li')];
+  const index = rows.indexOf(row);
+  const next = index + delta;
+  if (index < 0 || next < 0 || next >= rows.length) return null;
+  [rows[index], rows[next]] = [rows[next], rows[index]];
+  metaFocus = { kind: row.dataset.kind, id: Number(row.dataset.id), target, index: next };
+  return persistMetaOrder(list, rows.map((li) => Number(li.dataset.id)));
+}
+
 function openMetadataModal() {
   if (readOnly()) return;
   const content = `
@@ -2241,21 +2304,35 @@ function openMetadataModal() {
         if (!name) return;
         await saveMetadata(() => api.post('/budget/subscriptions/payment-methods', { name }));
       });
+      // Die Mehr-Menues der Zeilen (#2152): Lage, Schliessen nach der Wahl, Pfeiltasten.
+      installPopoverMenus(panel);
+      // Auf/Ab im Menue: am Listenrand ist der Eintrag gesperrt (`disabled`).
       panel.querySelectorAll('[data-move]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          if (readOnly()) return;
-          // aria-disabled statt disabled: der Button bleibt fokussierbar, der
-          // No-op-Klick am Listenrand wird hier verworfen (siehe layout.css).
-          if (button.getAttribute('aria-disabled') === 'true') return;
-          const list = button.closest('ul');
-          const rows = [...list.querySelectorAll('li')];
-          const index = rows.indexOf(button.closest('li'));
-          const target = index + Number(button.dataset.move);
-          [rows[index], rows[target]] = [rows[target], rows[index]];
-          const key = list.id.includes('category') ? 'categories' : 'payment_methods';
-          await saveMetadata(() => api.put('/budget/subscriptions/meta/order', { [key]: rows.map((row) => Number(row.dataset.id)) }));
+        button.addEventListener('click', () => {
+          if (readOnly() || button.disabled) return;
+          moveMetaRow(button.closest('li'), Number(button.dataset.move), 'more');
         });
       });
+      // Der Griff: Pfeiltasten bei Fokus (wie im Einkauf) und Ziehen.
+      panel.querySelectorAll('[data-meta-handle]').forEach((handle) => {
+        handle.addEventListener('keydown', (event) => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          if (readOnly()) return;
+          moveMetaRow(handle.closest('li'), event.key === 'ArrowUp' ? -1 : 1, 'handle');
+        });
+      });
+      for (const list of panel.querySelectorAll('#subscription-category-list, #subscription-method-list')) {
+        if (list.children.length < 2) continue;
+        makeSortable(list, {
+          handle: '[data-meta-handle]',
+          onEnd: (evt) => {
+            if (readOnly() || evt.oldIndex === evt.newIndex) return;
+            persistMetaOrder(list, [...list.querySelectorAll(':scope > li')].map((li) => Number(li.dataset.id)));
+          },
+        }).catch(() => { /* ohne SortableJS bleiben Pfeiltasten und Menue */ });
+      }
+      restoreMetaFocus(panel);
 
       // Inline-Bearbeitung: die vorgerenderte Edit-Zeile ein-/ausblenden.
       panel.querySelectorAll('[data-act="edit"]').forEach((button) => {
@@ -2277,9 +2354,10 @@ function openMetadataModal() {
           if (colorInput) colorInput.value = colorInput.defaultValue;
           editRow.hidden = true;
           li.querySelector('.subscriptions-metadata-row__view').hidden = false;
-          // Fokus zurück auf den Auslöser, statt ins Leere (der Cancel-Button
-          // wird gerade versteckt) - sonst verliert die Tastatur die Position.
-          li.querySelector('[data-act="edit"]').focus();
+          // Fokus zurück, statt ins Leere (der Cancel-Button wird gerade
+          // versteckt): an den Mehr-Knopf der Zeile, aus dem "Bearbeiten" kam,
+          // sonst an den Namen, der es ebenso oeffnet.
+          (li.querySelector('.row-action--more') ?? li.querySelector('[data-act="edit"]')).focus();
         });
       });
       // Tastatur im Inline-Edit: Enter speichert, Escape bricht ab. stopPropagation
@@ -2312,6 +2390,7 @@ function openMetadataModal() {
             : typed;
           const colorInput = editRow.querySelector('.subscriptions-metadata-edit-color');
           const isCat = li.dataset.kind === 'categories';
+          metaFocus = { kind: li.dataset.kind, id, target: 'more', index: [...li.parentElement.children].indexOf(li) };
           const saved = await saveMetadata(() => (isCat
             ? api.put(`/budget/subscriptions/categories/${id}`, { name, color: colorInput.value })
             : api.put(`/budget/subscriptions/payment-methods/${id}`, { name })), id);
@@ -2346,6 +2425,9 @@ function openMetadataModal() {
             },
           );
           if (!confirmed) return;
+          // Nach dem Neuaufbau an den Mehr-Knopf der Zeile, die jetzt an
+          // ihrem Platz steht (#2152).
+          metaFocus = { kind: li.dataset.kind, id, target: 'more', index: [...li.parentElement.children].indexOf(li) };
           const owner = pageOwner();
           // Die Verwaltung ist jetzt zu. Was der Nutzer waehrend des Loeschens
           // und Ladens oeffnet, gehoert ihm: openMetadataModal() schloesse es
@@ -2386,6 +2468,8 @@ export const __test = {
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
   // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
   reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
+  // #2152: die Zeilen des Verwalten-Dialogs (test:manager-endzone).
+  metadataRows,
   // Eine neue Instanz der Seite, wie ein render() sie anlegt.
   setContainerForTest: (target) => { container = target; pageGeneration += 1; },
 };
