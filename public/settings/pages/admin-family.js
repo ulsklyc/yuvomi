@@ -17,7 +17,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
-import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
+import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
 } from '/components/user-multi-select.js';
@@ -164,21 +164,22 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
   // loescht es, sobald nichts Geteiltes mehr auf es zeigt.
   const former = Boolean(u.deactivated_at);
   const formerBadge = former ? ` · ${esc(t('settings.memberFormerBadge'))}` : '';
+  // DER GEBURTSTAG STEHT NICHT IN DER ZEILE (R22, D13): er machte jede Zeile
+  // dreizeilig (117px mobil) und kappte den Namen, obwohl er im Dialog und in
+  // den Geburtstagen steht. Telefon und Adresse bleiben: sie sind das, woran
+  // man ein Konto ohne Avatar wiedererkennt.
   const profileMeta = [
     u.phone ? t('settings.memberPhoneMeta', { value: u.phone }) : '',
     u.email || '',
-    // Ohne Jahr (#2095) nur Tag und Monat - nie das Platzhalterjahr.
-    u.birth_date ? t('settings.memberBirthdayMeta', { date: birthDateText(u.birth_date, u.birth_year_unknown) }) : '',
   ].filter(Boolean).map(esc).join(' · ');
-  const editBtn = former ? '' : `
-      <button class="row-action" data-edit-user="${u.id}" aria-label="${esc(t('common.editNamed', { name: u.display_name }))}" title="${t('settings.editMemberLabel')}">
-        <i data-lucide="edit-2" class="icon-md" aria-hidden="true"></i>
-      </button>`;
-  // D10 ZEILEN-ENDZONE (#2152): [Bearbeiten][Mehr][Griff]. Das Entfernen
-  // steht im Mehr-Knopf (`danger`), nicht mehr als dauerhaft roter Papierkorb
-  // in jeder Zeile. Der eigene Account bekommt keine Lösch-Aktion in der
+  // D10 ZEILEN-ENDZONE (#2152), SEIT R22 (D13) [Mehr][Griff]: der Tipp auf die
+  // Zeile IST Bearbeiten - wie jede Liste mit Detail in der App. Der Stift
+  // stand als dritter Knopf daneben und nahm dem Namen die Breite. Der Name
+  // ist der Knopf; seine Flaeche reicht ueber die ganze Zeile (settings.css),
+  // Mehr und Griff liegen darueber. Das Entfernen steht im Mehr-Knopf
+  // (`danger`). Der eigene Account bekommt keine Lösch-Aktion in der
   // Mitgliederliste (Audit A2-25d); seine Zeile haelt den Platz des
-  // Mehr-Knopfs frei, damit Bearbeiten in der Spalte der anderen steht.
+  // Mehr-Knopfs frei, damit der Griff in der Spalte der anderen steht.
   const deleteBtn = u.id === currentUserId
     ? '<span class="settings-member__slot" aria-hidden="true"></span>'
     : rowMenuHtml({
@@ -213,14 +214,19 @@ function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {
       <span class="row-action settings-member__drag settings-member__drag--none" aria-hidden="true">
         <i data-lucide="grip-vertical" class="icon-md"></i>
       </span>` : '';
+  const self = u.id === currentUserId ? ` <span class="settings-member__self">${esc(t('settings.memberYou'))}</span>` : '';
+  // Ehemalige lassen sich nicht bearbeiten: ihr Name bleibt Text.
+  const nameHtml = former
+    ? `<span class="settings-member__name" data-member-name>${esc(u.display_name)}${self}</span>`
+    : `<button type="button" class="settings-member__name settings-member__open" data-edit-user="${u.id}" data-member-name aria-label="${esc(t('common.editNamed', { name: u.display_name }))}">${esc(u.display_name)}${self}</button>`;
   return `
     <li class="settings-member${former ? ' settings-member--former' : ''}${orderable ? ' settings-member--orderable' : ''}" data-id="${u.id}">
       ${avatarHtml(u, 'settings-avatar settings-avatar--sm')}
       <div class="settings-member__info">
-        <span class="settings-member__name" data-member-name>${esc(u.display_name)}${u.id === currentUserId ? ` <span class="settings-member__self">${esc(t('settings.memberYou'))}</span>` : ''}</span>
+        ${nameHtml}
         <span class="settings-member__meta">@${esc(u.username)} · ${esc(familyRole)}${systemRole}${formerBadge}</span>
         ${profileMeta ? `<span class="settings-member__meta">${profileMeta}</span>` : ''}
-      </div>${editBtn}${deleteBtn}${handle}
+      </div>${deleteBtn}${handle}
     </li>
   `;
 }

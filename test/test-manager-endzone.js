@@ -361,11 +361,17 @@ const member = (id, name, extra = {}) => ({
   sort_order: 1, is_household_member: true, is_worker: false, deactivated_at: null, ...extra,
 });
 
-test('Familie: Mitgliedszeile endet [Bearbeiten][Mehr][Griff], Entfernen danger im Menue', () => {
-  const row = family.memberHtml(member(2, 'Zoe'), 1, { orderable: true, aligned: true });
+test('Familie: Mitgliedszeile endet [Mehr][Griff], der Zeilentipp bearbeitet, Entfernen danger im Menue (R22 D13)', () => {
+  const row = family.memberHtml(member(2, 'Zoe', { birth_date: '2010-04-05', phone: '0170 1', email: 'z@x.de' }), 1, { orderable: true, aligned: true });
   const zone = endzone(row);
   assertD10(zone, { sortable: true }, 'Mitglied');
-  assert.deepEqual(zone, ['action', 'more', 'handle']);
+  assert.deepEqual(zone, ['more', 'handle'], 'kein Stift neben Mehr und Griff');
+  // Der Name ist der Knopf der Zeile: er traegt Bearbeiten, seine Flaeche deckt die Zeile (settings.css).
+  assert.match(row, /<button type="button" class="settings-member__name settings-member__open" data-edit-user="2" data-member-name aria-label="[^"]*Zoe[^"]*">Zoe<\/button>/);
+  assert.doesNotMatch(row, /edit-2|pencil/, 'kein Stift-Zeichen');
+  // Der Geburtstag steht nicht in der Zeile, Telefon und Adresse schon.
+  assert.doesNotMatch(row, /05\.04|2010|memberBirthday/);
+  assert.match(row, /z@x\.de/);
   const items = menuItems(row);
   assert.deepEqual(items.map((x) => x.action), ['remove-member']);
   assert.ok(items[0].danger);
@@ -376,11 +382,13 @@ test('Familie: Mitgliedszeile endet [Bearbeiten][Mehr][Griff], Entfernen danger 
 
 test('Familie: die eigene Zeile haelt den Platz des Mehr-Knopfs frei, der Griff bleibt zuletzt', () => {
   const row = family.memberHtml(member(1, 'Mara', { role: 'admin' }), 1, { orderable: true, aligned: true });
-  assert.deepEqual(endzone(row), ['action', 'handle']);
+  assert.deepEqual(endzone(row), ['handle']);
+  assert.match(row, /data-edit-user="1"/, 'auch die eigene Zeile oeffnet per Tipp');
   assert.ok(row.indexOf('settings-member__slot') < row.indexOf('settings-member__drag'), 'der freie Platz steht vor dem Griff');
   // Ehemalig: kein Bearbeiten, der Platzhalter des Griffs am Ende.
   const former = family.memberHtml(member(3, 'Alt', { deactivated_at: '2026-01-01T00:00:00Z' }), 1, { orderable: false, aligned: true });
   assert.deepEqual(endzone(former), ['more']);
+  assert.doesNotMatch(former, /data-edit-user/, 'Ehemalige lassen sich nicht bearbeiten');
   assert.ok(former.indexOf('popover-menu__trigger') < former.indexOf('settings-member__drag--none'));
 });
 

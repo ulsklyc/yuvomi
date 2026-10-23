@@ -1938,6 +1938,8 @@
 }
 
 .settings-member {
+  /* Bezug der Trefferflaeche des Namens (`.settings-member__open`). */
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1961,6 +1963,52 @@
   display: block;
   color: var(--color-text-secondary);
   margin-top: 1px;
+}
+
+/* DER TIPP AUF DIE ZEILE IST BEARBEITEN (R22, D13). Der Name ist der Knopf,
+ * seine Trefferflaeche (`::after`) deckt die ganze Zeile; Mehr und Griff
+ * liegen darueber (`z-index`) und bleiben ihr eigenes Ziel. Die Zeile toent
+ * unter dem Zeiger und beim Druck wie jede Listenzeile (list-row.css). */
+.settings-member__open {
+  max-inline-size: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-member__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.settings-member__open:focus-visible {
+  outline: none;
+}
+
+.settings-member__open:focus-visible::after {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+  border-radius: var(--radius-sm);
+}
+
+.settings-member > .row-action,
+.settings-member > .settings-member__slot {
+  position: relative;
+  z-index: 1;
+}
+
+@media (hover: hover) {
+  .settings-member:has(> .settings-member__info > .settings-member__open:hover) {
+    background-color: var(--color-surface-hover);
+  }
+}
+
+.settings-member:has(> .settings-member__info > .settings-member__open:active) {
+  background-color: var(--color-surface-hover);
 }
 
 /* Der Griff der Haushaltsreihenfolge (#1644). Derselbe Gedanke wie der Griff
