@@ -31,7 +31,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue, currencySymbol } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -4260,7 +4260,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // fuehrt, bucht jede Ausgabe auf eines - selten ist es dann nicht mehr. Ohne
   // Konten gibt es das Feld gar nicht.
   const accountField = hasAccounts ? `
-        <div class="form-group js-entry-field">
+        <div class="form-group">
           <label class="form-label" for="bm-account">${t('budget.accountLabel')}</label>
           <select class="form-input" id="bm-account">${accountOpts}</select>
         </div>` : '';
@@ -4296,10 +4296,16 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         * Angaben" - beim Bearbeiten offen, sobald eines davon einen Wert traegt. */ ''}
     <div class="form-group js-entry-field">
       <label class="form-label" for="bm-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
-      <input type="number" class="form-input budget-amount-input" id="bm-amount"
-             placeholder="${amountPlaceholder(state.currency)}"
-             step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
-             inputmode="decimal" value="${absAmountField}" required>
+      ${/* DIE WAEHRUNG STEHT AM BETRAG (R22, D9): "200,00" ohne Einheit
+           war die einzige Zahl des Moduls ohne Waehrung. Sie steht als Suffix
+           im Feld, in Sekundaerfarbe; die Ziffern tragen das Gewicht. */ ''}
+      <div class="budget-amount-field">
+        <input type="number" class="form-input budget-amount-input" id="bm-amount"
+               placeholder="${amountPlaceholder(state.currency)}"
+               step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
+               inputmode="decimal" value="${absAmountField}" aria-describedby="bm-amount-unit" required>
+        <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(state.currency))}</span>
+      </div>
     </div>
 
     <div class="form-group js-entry-field">
@@ -4324,12 +4330,19 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <select class="form-input" id="bm-subcategory"${initialSub.required ? ' required aria-required="true"' : ''}>${subcatOpts}</select>
     </div>
 
-    <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
-      <yuvomi-datepicker type="date" id="bm-date"
-             value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
+    ${/* DATUM UND KONTO TEILEN EINE ZEILE (R22, D9): untereinander lag das
+         Konto am Telefon unter dem Fuss (390x844: Feld bei y 798, Fuss bei
+         758), obwohl es seit R21 vorne steht, weil fast jede Buchung eines
+         traegt. Zwei kurze Felder, eine Zeile; ohne Konten nimmt das Datum
+         sie allein. */ ''}
+    <div class="budget-entry-pair js-entry-field">
+      <div class="form-group">
+        <label class="form-label" for="bm-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
+        <yuvomi-datepicker type="date" id="bm-date"
+               value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
+      </div>
+      ${accountField}
     </div>
-    ${accountField}
 
     <div class="js-entry-field">
       ${advancedSection(`

@@ -40,6 +40,22 @@ export function formatMoney(amount, currency) {
 }
 
 /**
+ * Das Waehrungszeichen, wie die Zahlformatierung es an einen Betrag setzt
+ * ("€", "$", "CHF") - fuer die Einheit hinter einem Betragsfeld (R22, D9).
+ * Ohne Zeichen (unbekannte Waehrung) steht der Code.
+ * @param {string} currency  ISO-4217-Code
+ * @returns {string}
+ */
+export function currencySymbol(currency) {
+  try {
+    const part = getNumberFormat({ style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency');
+    return part?.value || String(currency ?? '');
+  } catch {
+    return String(currency ?? '');
+  }
+}
+
+/**
  * Derselbe Betrag fuer eine WERTEACHSE: ohne Nachkommastellen.
  *
  * Eine Achse beschriftet eine Skala, keinen Kontostand - die Cent sind dort

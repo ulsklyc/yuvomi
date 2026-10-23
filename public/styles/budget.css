@@ -2616,6 +2616,45 @@ button.budget-entry__title {
   font-variant-numeric: tabular-nums;
 }
 
+/* Die Waehrung als Suffix IM Feld (R22, D9): sie steht am Zeilenende des
+ * Felds, in Sekundaerfarbe und Textgroesse des Werts, und nimmt keine Zeiger -
+ * der Tipp darauf trifft das Feld. Das Feld haelt ihr den Platz frei. */
+.budget-amount-field {
+  position: relative;
+}
+
+.budget-amount-field > .budget-amount-input {
+  inline-size: 100%;
+  padding-inline-end: calc(var(--space-3) + 3ch);
+}
+
+.budget-amount-field__unit {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--space-3);
+  display: flex;
+  align-items: center;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+/* Datum und Konto in einer Zeile (budget.js openBudgetModal). Zwei Spalten,
+ * solange jede ihre ~150px hat; die Gruppen tragen ihren Abstand nicht selbst
+ * (der Zeilenabstand gehoert dem Dialog). */
+.budget-entry-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.budget-entry-pair > .form-group {
+  margin-bottom: 0;
+  min-inline-size: 0;
+}
+
 .budget-inline-modal {
   position: fixed;
   inset: 0;

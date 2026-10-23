@@ -3250,8 +3250,10 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   // DAS KONTO STEHT VORNE (Critique R21, a4): hinter „Weitere Angaben" klappte
   // es am Telefon unter den Fuss, und wer Konten fuehrt, bucht auf eines. Es
   // folgt dem Datum, vor dem Aufklapper - und schaltet mit dem Buchungstyp.
-  assert.ok(pos('id="bm-date"') < pos('    ${accountField}') && pos('    ${accountField}') < adv, 'das Konto steht zwischen Datum und „Weitere Angaben"');
-  assert.match(modal, /const accountField = hasAccounts \? `\s*<div class="form-group js-entry-field">/, 'ohne Konten kein Feld, mit Konten eines, das der Buchungstyp schaltet');
+  assert.ok(pos('id="bm-date"') < pos('      ${accountField}') && pos('      ${accountField}') < adv, 'das Konto steht zwischen Datum und „Weitere Angaben"');
+  // Seit R22 (D9) teilen Datum und Konto eine Zeile; die Zeile schaltet der Buchungstyp.
+  assert.match(modal, /const accountField = hasAccounts \? `\s*<div class="form-group">/, 'ohne Konten kein Feld, mit Konten eines');
+  assert.match(modal, /<div class="budget-entry-pair js-entry-field">[\s\S]*?id="bm-date"[\s\S]*?\$\{accountField\}\s*<\/div>/, 'die Zeile aus Datum und Konto schaltet der Buchungstyp');
   assert.doesNotMatch(modal, /entry\.account_id != null\s*\|\|/, 'ein gesetztes Konto oeffnet den Riegel nicht mehr - es steht davor');
   // Der Aufklapper traegt den Namen des Bausteins ("Weitere Angaben", D15) -
   // kein eigenes Budget-Wort daneben.
@@ -7623,4 +7625,24 @@ test('R22 D9: die Abo-Spalte beginnt an der Werkzeuglinie, ihre Karten sind so h
   assert.ok(rail, 'die Spaltenregel der Abos fehlt');
   assert.match(rail.body, /grid-auto-rows:\s*auto/);
   assert.match(rail.body, /padding-block:\s*0/);
+});
+
+// Critique R22 (D9, a4 Klein): der Betrag stand ohne Waehrung im Feld, und das
+// Konto lag am Telefon unter dem Fuss (390x844: Feld y 798, Fuss 758) -
+// nachher Datum und Konto in einer Zeile, Feld y 718 im ersten Bild.
+test('R22 D9: der Buchungsbetrag traegt seine Waehrung, Datum und Konto teilen eine Zeile', async () => {
+  const { currencySymbol } = await import('../public/utils/money.js');
+  assert.equal(currencySymbol('EUR'), '€');
+  assert.equal(currencySymbol('XYZ'), 'XYZ', 'unbekannt: der Code');
+  const html = buchungsDialog({ mode: 'edit', entry: { id: 4, title: 'REWE', amount: -40, category: 'food', subcategory: 'groceries', date: '2026-06-03', account_id: 1 } },
+    { currency: 'EUR', accounts: [{ id: 1, name: 'Giro' }] }).content;
+  assert.match(html, /<div class="budget-amount-field">\s*<input type="number" class="form-input budget-amount-input" id="bm-amount"[^>]*aria-describedby="bm-amount-unit"[^>]*>\s*<span class="budget-amount-field__unit" id="bm-amount-unit">€<\/span>/);
+  const pair = /<div class="budget-entry-pair js-entry-field">([\s\S]*?)<div class="js-entry-field">/.exec(html)?.[1] ?? '';
+  assert.match(pair, /id="bm-date"/, 'das Datum steht in der Zeile');
+  assert.match(pair, /id="bm-account"/, 'das Konto daneben');
+  const css = read('../public/styles/budget.css');
+  const unit = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-amount-field__unit');
+  assert.match(unit?.body ?? '', /pointer-events:\s*none/, 'der Tipp auf das Zeichen trifft das Feld');
+  const row = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-entry-pair');
+  assert.match(row?.body ?? '', /grid-template-columns:\s*repeat\(auto-fit/);
 });
