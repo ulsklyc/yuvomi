@@ -6788,6 +6788,62 @@ test('R21 S7: das Zeitraum-Label nimmt die kuerzere Fassung, bevor es kappt', ()
   assert(/to: formatDayMonth\(span\.to\)/.test(src), 'die kurze Spanne nennt das Ende ohne Jahr');
 });
 
+/* R22-F (F1 Punkt 5): der Aufbau des Kalenders (Monat, Woche) lag bei 4x CPU
+ * mobil bei 150 ms LoAF, knapp die Haelfte erzwungenes Stil-/Layout aus vielen
+ * kleinen Lese-nach-Schreib-Wechseln. Drei davon gehoerten dem Kalender allein:
+ * das Zeitraum-Label mass auch, wo es keine kuerzere Fassung gibt, die
+ * Seitenleiste fragte am Telefon ihre Container-Abfrage ab, und die frisch
+ * gebaute Tagesliste des Monats wurde auf scrollTop 0 gesetzt (14 ms Layout).
+ * Am Aufrufer gemessen: kein Lesezugriff mehr, wo nichts zu entscheiden ist. */
+await test('R22-F: der Kalenderaufbau liest kein Layout, wo es nichts zu entscheiden gibt', async () => {
+  const s = calendarHelpers.state;
+  const prev = { view: s.view, cursor: s.cursor, today: s.today };
+  const prevWindow = globalThis.window;
+  const prevGcs = globalThis.getComputedStyle;
+  let restoreDom = null;
+  try {
+    // Monat: keine kuerzere Fassung, also keine Messung.
+    globalThis.window = { ...(prevWindow ?? {}), matchMedia: () => ({ matches: false }) };
+    s.today = '2026-10-21';
+    s.cursor = '2026-10-21';
+    s.view = 'month';
+    let reads = 0;
+    const lbl = { textContent: 'Oktober 2026', get clientWidth() { reads += 1; return 100; }, get scrollWidth() { reads += 1; return 140; } };
+    calendarHelpers.fitPeriodLabel(lbl);
+    assert(reads === 0, `das Monatslabel misst nichts (${reads} Lesezugriffe)`);
+
+    // Seitenleiste: unter 86.25rem Fensterbreite steht sie nie - kein getComputedStyle.
+    let styleReads = 0;
+    globalThis.getComputedStyle = () => { styleReads += 1; return { display: 'flex' }; };
+    assert(calendarHelpers.sidebarShown({ hidden: false }) === false, 'am Telefon keine Seitenleiste');
+    assert(styleReads === 0, 'ohne die Container-Abfrage aufzuloesen');
+    globalThis.window = { ...(prevWindow ?? {}), matchMedia: () => ({ matches: true }) };
+    assert(calendarHelpers.sidebarShown({ hidden: false }) === true, 'breit entscheidet weiter die Box');
+
+    // Die frisch gebaute Tagesliste steht oben - kein scrollTop-Setzen.
+    restoreDom = installMiniDom();
+    let scrollWrites = 0;
+    const node = () => ({ classList: { toggle() {} }, setAttribute() {}, replaceChildren() {}, insertAdjacentHTML() {} });
+    const open = node();
+    const rows = { ...node(), set scrollTop(v) { scrollWrites += 1; }, get scrollTop() { return 0; } };
+    const list = { querySelector: (sel) => (sel === '#month-open-day' ? open : sel === '#month-list-rows' ? rows : null) };
+    calendarHelpers.renderMonthList(list, { fresh: true });
+    assert(scrollWrites === 0, 'eine eben gebaute Liste wird nicht zurueckgesetzt');
+    calendarHelpers.renderMonthList(list);
+    assert(scrollWrites === 1, 'ein anderer Tag in derselben Liste setzt zurueck');
+  } finally {
+    Object.assign(s, prev);
+    globalThis.window = prevWindow;
+    globalThis.getComputedStyle = prevGcs;
+    restoreDom?.();
+  }
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/renderMonthList\(list, \{ fresh: true \}\);/.test(src), 'wireMonthList baut die Liste als frisch');
+  const bar = src.slice(src.indexOf('function renderToolbar()'), src.indexOf('function renderToolbar()') + 4000);
+  assert(/if \(builtToolbars\.get\(bar\) === html && bar\.querySelector\('#cal-label'\)\) \{\n    updateLabel\(\);\n    return;/.test(bar),
+    'derselbe Kopf wird nicht zweimal gebaut, nur der Zeitraum nachgefuehrt');
+});
+
 /* R21 S7 (D9): die kompakte eine Zeile - Suche als Icon, Verwalten im Filterblatt. */
 test('R21 S7: die kompakte Kopfzeile faltet Suche und Verwalten, die offene Suche nimmt den Platz der Ansichtswahl', () => {
   const rules = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a))

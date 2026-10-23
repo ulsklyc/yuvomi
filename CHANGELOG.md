@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrive right after the first screen. On a wide screen the two-column view no longer lays out the
   whole list just to pick the first row. Opening a list of 260 tasks on a slow phone now holds the
   screen for about half as long.
+- **The calendar opens a little faster.** Building the month, week or agenda measured parts of the
+  page several times in the middle of drawing it: the period label even where no shorter form
+  exists, the sidebar on a phone where it never shows, and a freshly built day list. The header
+  is no longer built twice with the same content. On a slow phone (4x CPU) the longest frame of
+  opening the calendar drops from 150 to 129 ms in the month and from 165 to 147 ms in the agenda.
 - **The shopping list loads in one round.** It asked for the currency only after the stores and
   for the items only after the lists, three trips to the server before the first item showed. The
   currency now loads alongside, and the items of the list you are about to see load together with

@@ -1332,3 +1332,33 @@ test('unter der Schwelle nimmt das Schliessen des Blatts `?open=` per replaceSta
     Object.assign(global.history, original);
   }
 });
+
+// R22-F (F1 Punkt 5): `isSplit()` loeste beim Aufbau die Container-Abfrage auf
+// und erzwang mitten im Kalenderaufbau ein Layout (Agenda 390px, 4x CPU: 9 ms) -
+// am Telefon, wo die Spalte nie steht. `splitMedia` nennt die Fensterbreite,
+// unter der sie sicher fehlt (die Flaeche ist nie breiter als das Fenster).
+test('R22-F: unter splitMedia fragt der Baustein die Box nicht ab', () => {
+  const p = makePage({ split: true });
+  const savedGcs = globalThis.getComputedStyle;
+  const savedMm = globalThis.window.matchMedia;
+  let reads = 0;
+  globalThis.getComputedStyle = (el) => { reads += 1; return savedGcs(el); };
+  try {
+    globalThis.window.matchMedia = () => ({ matches: false });
+    const narrow = p.mount({ splitMedia: '(min-width: 65rem)' });
+    reads = 0;
+    assert.equal(narrow.isSplit(), false, 'unter der Fensterbreite keine Spalte');
+    assert.equal(reads, 0, 'ohne getComputedStyle');
+    narrow.destroy();
+    globalThis.window.matchMedia = () => ({ matches: true });
+    const wide = p.mount({ splitMedia: '(min-width: 65rem)' });
+    assert.equal(wide.isSplit(), true, 'breit entscheidet weiter die Box');
+    wide.destroy();
+  } finally {
+    globalThis.getComputedStyle = savedGcs;
+    globalThis.window.matchMedia = savedMm;
+  }
+  const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const agenda = cal.slice(cal.indexOf('function mountAgendaDetail('), cal.indexOf('function mountAgendaDetail(') + 1200);
+  assert.match(agenda, /splitMedia: '\(min-width: 65rem\)'/, 'die Agenda nennt die Schwelle von module-surface (layout.css)');
+});

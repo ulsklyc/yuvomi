@@ -2349,6 +2349,9 @@ function syncViewMenu(root = _container) {
   if (word) word.textContent = VIEW_LABELS()[state.view] ?? '';
 }
 
+/** Welches Markup ein Kopf zuletzt bekam (renderToolbar baut Gleiches nicht neu). */
+const builtToolbars = new WeakMap();
+
 function renderToolbar() {
   const bar = _container.querySelector('#cal-toolbar');
   if (!bar) return;
@@ -2384,8 +2387,20 @@ function renderToolbar() {
   // DAS SUCHFELD UEBERLEBT DEN NEUBAU: Wert und Fokus gehen sonst bei jedem
   // Filterwechsel verloren, waehrend die Treffer noch stehen.
   const searchHadFocus = bar.querySelector('#cal-search-input') === document.activeElement;
+  // DERSELBE KOPF WIRD NICHT ZWEIMAL GEBAUT (R22-F, F1 Punkt 5). render()
+  // baut ihn vor den Daten und danach noch einmal - meist mit demselben
+  // Markup (keine Filter, keine Warnung). Der zweite Neubau kostete beim
+  // Seitenwechsel Icons, Beobachter, Segment-Kapsel und zwei erzwungene
+  // Layouts im selben Frame. Steht schon genau dieser Kopf da, wird nur der
+  // Zeitraum nachgefuehrt: er haengt am Wochenstart aus den Praeferenzen.
+  const html = toolbarHtml({ filterCount, scheduleWarningHtml, searchValue: searchActive ? searchQuery : '' });
+  if (builtToolbars.get(bar) === html && bar.querySelector('#cal-label')) {
+    updateLabel();
+    return;
+  }
+  builtToolbars.delete(bar);
   bar.replaceChildren();
-  bar.insertAdjacentHTML('beforeend', toolbarHtml({ filterCount, scheduleWarningHtml, searchValue: searchActive ? searchQuery : '' }));
+  bar.insertAdjacentHTML('beforeend', html);
   if (dockedFab) bar.querySelector('.page-toolbar__actions')?.appendChild(dockedFab);
 
   if (window.lucide) lucide.createIcons({ el: bar });
@@ -2444,6 +2459,7 @@ function renderToolbar() {
   // dort ansetzen, wo die alte stand, statt aufzuspringen.
   attachSegmentIndicator(bar.querySelector('.cal-toolbar__views'), { key: 'calendar-views' });
   watchToolbarFit(bar);
+  builtToolbars.set(bar, html);
 }
 
 /**
@@ -2570,9 +2586,15 @@ function periodLabelFallbacks() {
 }
 
 function fitPeriodLabel(lbl) {
+  // ERST FRAGEN, OB ES EINE KUERZERE FASSUNG GIBT, DANN MESSEN (R22-F, F1
+  // Punkt 5). Die Messung erzwingt mitten im Aufbau ein Layout (4x CPU je
+  // 5-6 ms, beim Seitenwechsel zweimal); Monat und Desktop-Woche haben gar
+  // keine Ersatzfassung - dort kuerzt die Ellipse, und gemessen wurde umsonst.
+  const fallbacks = periodLabelFallbacks();
+  if (!fallbacks.length) return;
   // Ohne Layout (verborgen, Test-Umgebung) gibt es nichts zu messen.
   if (!(lbl?.clientWidth > 0) || lbl.scrollWidth <= lbl.clientWidth) return;
-  for (const text of periodLabelFallbacks()) {
+  for (const text of fallbacks) {
     lbl.textContent = text;
     if (lbl.scrollWidth <= lbl.clientWidth) return;
   }
@@ -3800,7 +3822,7 @@ function monthListHtml() {
 // "17.10.2026 Samstag", die Agenda "Heute Samstag, 17. Oktober" - derselbe Tag
 // in zwei Schreibweisen. Liste, Agenda und Suchtreffer tragen jetzt denselben
 // Kopf aus agendaDayHeadHtml (utils/day-label.js dayHeading).
-function renderMonthList(list = _container?.querySelector('#month-list')) {
+function renderMonthList(list = _container?.querySelector('#month-list'), { fresh = false } = {}) {
   if (!list) return;
   const date = state.cursor;
 
@@ -3826,7 +3848,10 @@ function renderMonthList(list = _container?.querySelector('#month-list')) {
     })
     : `<div class="agenda-day" data-date="${esc(date)}">${dayGroupHtml(group)}</div>`);
   _monthListQuietUntil = performance.now() + 250;
-  rows.scrollTop = 0;
+  // Eine eben gebaute Liste steht oben. Das Setzen erzwang sonst mitten im
+  // Aufbau das erste volle Layout der Seite (R22-F, F1 Punkt 5: 4x CPU 14 ms
+  // Layout plus 4 ms Stil); ein anderer Tag in derselben Liste setzt zurueck.
+  if (!fresh) rows.scrollTop = 0;
   if (window.lucide) lucide.createIcons({ el: list });
 }
 
@@ -3877,7 +3902,7 @@ function wireMonthList(view, list) {
   const rows = list.querySelector('#month-list-rows');
   const grid = view.querySelector('#month-grid');
   syncMonthCollapse(view, list);
-  renderMonthList(list);
+  renderMonthList(list, { fresh: true });
 
   let lastTop = 0;
   let hold = false;
@@ -5527,8 +5552,17 @@ function miniMonthWanted() {
 }
 
 /** Steht die Spalte (Container-Abfrage) - oder ist sie unter der Schwelle verborgen? */
+// Die Leiste steht erst ab dieser Breite der Kalenderseite (calendar.css,
+// `@container cal-page (min-width: 86.25rem)`). Die Seite ist nie breiter als
+// das Fenster: darunter steht sie sicher nicht.
+const SIDEBAR_MIN_MEDIA = '(min-width: 86.25rem)';
 function sidebarShown(aside) {
-  return Boolean(aside) && !aside.hidden && getComputedStyle(aside).display !== 'none';
+  if (!aside || aside.hidden) return false;
+  // ERST DAS FENSTER, DANN DIE BOX (R22-F, F1 Punkt 5). getComputedStyle
+  // muss hier die Container-Abfrage aufloesen und erzwang mitten im Aufbau
+  // ein Layout (4x CPU 5-6 ms) - auch am Telefon, wo die Leiste nie steht.
+  if (typeof window.matchMedia === 'function' && !window.matchMedia(SIDEBAR_MIN_MEDIA).matches) return false;
+  return getComputedStyle(aside).display !== 'none';
 }
 
 function miniMonthHtml() {
@@ -5974,6 +6008,8 @@ function mountAgendaDetail(container) {
   const open = new URLSearchParams(location.search).get('open');
   _agendaMd = mountMasterDetail({
     root,
+    // Die Schwelle von `module-surface` (layout.css): darunter nie eine Spalte.
+    splitMedia: '(min-width: 65rem)',
     claimInitial: !(open && /^\d+$/.test(open)),
     renderDetail: (id, body) => {
       const ev = eventForAgendaMdId(id);
@@ -7023,6 +7059,8 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  renderMonthList,
+  sidebarShown,
   alignedHourScroll,
   // R19: die Seitenleiste ab ca. 1600px - Mini-Monat, Filter aus EINER Quelle, Als Naechstes.
   miniMonthHtml, sidebarFiltersHtml, calendarFilterParts, upNextEvents,

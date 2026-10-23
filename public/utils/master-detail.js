@@ -263,13 +263,16 @@ export function setSelectionBulk(handle, spec) {
  *        zeichnet der Router); `href` baut die Adresse einer Auswahl. Mit
  *        `address` gilt `param` nicht.
  * @param {AbortSignal} [opts.signal]     Router-Signal; Abbruch baut ab.
+ * @param {string} [opts.splitMedia]      Media Query, unter der die Spalte sicher fehlt
+ *        (die Schwelle der Container-Abfrage als Fensterbreite); `isSplit()`
+ *        fragt darunter die Box nicht ab.
  * @returns {{open: Function, select: Function, clear: Function, selectedId: Function,
  *   isSplit: Function, refresh: Function, destroy: Function}}
  */
 export function mountMasterDetail({
   root, list, param = 'open', renderDetail, openNarrow, onEnter, onModeChange,
   narrow = 'sheet', deepLinkNarrow = false, claimInitial = true, onNarrowSync,
-  preselect = true, address = null, signal,
+  preselect = true, address = null, signal, splitMedia = null,
 } = {}) {
   if (!root) throw new TypeError('mountMasterDetail: root fehlt');
   const listEl = list ?? root.querySelector('.split-view__list');
@@ -321,7 +324,13 @@ export function mountMasterDetail({
   let bulkAnnounceTimer = null;
   let bulkAnnounced = '';
 
-  const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
+  // `splitMedia` (R22-F): die Fensterbreite, unter der die Spalte sicher
+  // fehlt - die Flaeche ist nie breiter als das Fenster. Darunter wird die Box
+  // nicht abgefragt: getComputedStyle loest die Container-Abfrage auf und
+  // erzwang mitten im Aufbau ein Layout (Kalender-Agenda 390px, 4x CPU: 9 ms).
+  const isSplit = () => root.isConnected
+    && !(splitMedia && typeof window.matchMedia === 'function' && !window.matchMedia(splitMedia).matches)
+    && getComputedStyle(detailEl).display !== 'none';
 
   const shown = (row) => !row.hidden && row.getClientRects().length > 0;
   const rows = () => [...listEl.querySelectorAll('[data-md-id]')].filter(shown);
