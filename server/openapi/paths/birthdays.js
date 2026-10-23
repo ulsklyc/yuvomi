@@ -23,7 +23,10 @@ export function birthdaysPaths() {
         tag: 'Birthdays',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/BirthdayCreateInput'),
-        responses: withBadRequest(201, 'Birthday created'),
+        responses: withBadRequest(201, 'Birthday created', {
+          403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'The contact is already linked to another birthday' },
+        }),
       }),
     },
     '/api/v1/birthdays/upcoming': {
@@ -85,7 +88,11 @@ export function birthdaysPaths() {
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/BirthdayUpdateInput'),
-        responses: withBadRequest(200, 'Birthday updated', { 404: { description: 'Birthday not found' } }),
+        responses: withBadRequest(200, 'Birthday updated', {
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'Birthday not found' },
+          409: { description: 'The contact is already linked to another birthday' },
+        }),
       }),
       delete: op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true }),
     },
@@ -95,8 +102,11 @@ export function birthdaysPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
 const BIRTHDAY_GONE = '`birthdays_birthday_not_found` (404, the birthday does not exist - deleted)';
+// D7 (Critique R22): POST und PUT verknuepfen per `contact_id`.
+const CONTACT_LINK = '`birthdays_contact_linked` (409, the contact is already linked to another birthday), `birthdays_contact_not_found` (400, no such contact)';
 const CASE_REASONS = {
-  '/api/v1/birthdays/{id}': { put: BIRTHDAY_GONE, delete: BIRTHDAY_GONE },
+  '/api/v1/birthdays': { post: CONTACT_LINK },
+  '/api/v1/birthdays/{id}': { put: `${BIRTHDAY_GONE}, ${CONTACT_LINK}`, delete: BIRTHDAY_GONE },
 };
 
 function withCaseReasons(paths) {

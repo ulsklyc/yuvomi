@@ -173,3 +173,137 @@ test('gemischte Token-Scopes: es braucht calendar:write UND contacts:read', asyn
     assert.equal(linkedRows(cid).length, status === 201 ? 1 : 0, `Scopes ${scopes.join(',')}: Zeilen`);
   }
 });
+
+// --------------------------------------------------------
+// Verknuepfen im Geburtstag-Dialog (Critique R22, D7): POST/PUT nehmen
+// `contact_id`. Bis R22 entstand die Verknuepfung nur ueber den Import.
+// --------------------------------------------------------
+
+async function seedBirthday(name, extra = {}) {
+  const res = await admin('POST', '/birthdays', { name, birth_date: '1980-02-03', ...extra });
+  assert.equal(res.status, 201, `Geburtstag ${name} angelegt`);
+  return res.body.data;
+}
+const linkOf = (birthdayId) => db.prepare('SELECT contact_id FROM birthdays WHERE id = ?').get(birthdayId)?.contact_id ?? null;
+
+test('D7: POST mit contact_id verknuepft, und der Kontakt fuehrt den Weg zurueck samt Datum', async () => {
+  setModules(member.id, {});
+  const contact = await admin('POST', '/contacts', { name: 'Link Ohne Datum', category: 'misc' });
+  const cid = contact.body.data.id;
+  const res = await member.as('POST', '/birthdays', { name: 'Link Ohne Datum', birth_date: '1975-07-08', contact_id: cid });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.contact_id, cid, 'die Antwort traegt die Verknuepfung');
+  const back = (await member.as('GET', `/contacts/${cid}`)).body.data;
+  assert.equal(back.birthday_id, res.body.data.id, 'der Kontakt kennt seinen Geburtstag');
+  assert.equal(back.birthday, null, 'das Datum des Kontakts bleibt unberuehrt (#2124 nicht gebaut)');
+  assert.equal(back.birthday_link_date, '1975-07-08', 'die Zeile zeigt das Datum des verknuepften Eintrags');
+});
+
+test('D7: PUT verknuepft einen bestehenden Geburtstag; derselbe Wert geht durch, null loest', async () => {
+  setModules(member.id, {});
+  const cid = await seedContact();
+  const birthday = await seedBirthday('Spaeter Verknuepft');
+  assert.equal(linkOf(birthday.id), null);
+  const linked = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  assert.equal(linked.status, 200);
+  assert.equal(linkOf(birthday.id), cid);
+  const same = await member.as('PUT', `/birthdays/${birthday.id}`, { notes: 'x', contact_id: cid });
+  assert.equal(same.status, 200, 'der gespeicherte Wert ist kein Konflikt mit sich selbst');
+  const untouched = await member.as('PUT', `/birthdays/${birthday.id}`, { notes: 'y' });
+  assert.equal(untouched.status, 200);
+  assert.equal(linkOf(birthday.id), cid, 'ohne Feld bleibt die Verknuepfung');
+  const unlinked = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: null });
+  assert.equal(unlinked.status, 200);
+  assert.equal(linkOf(birthday.id), null);
+});
+
+test('D7: ein schon verknuepfter Kontakt -> 409 mit Grund, nichts geschrieben', async () => {
+  setModules(member.id, {});
+  const cid = await seedContact();
+  const first = await seedBirthday('Erster', { contact_id: cid });
+  const second = await seedBirthday('Zweiter');
+  const res = await member.as('PUT', `/birthdays/${second.id}`, { contact_id: cid, notes: 'soll nicht landen' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'birthdays_contact_linked');
+  assert.equal(linkOf(second.id), null);
+  assert.equal(linkOf(first.id), cid, 'der erste bleibt verknuepft');
+  assert.equal(db.prepare('SELECT notes FROM birthdays WHERE id = ?').get(second.id).notes, null, 'auch die anderen Felder nicht');
+  const post = await member.as('POST', '/birthdays', { name: 'Dritter', birth_date: '1990-01-01', contact_id: cid });
+  assert.equal(post.status, 409);
+  assert.equal(post.body.reason, 'birthdays_contact_linked');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM birthdays WHERE name = 'Dritter'").get().n, 0, 'kein Eintrag angelegt');
+});
+
+test('D7: unbekannter Kontakt -> 400 birthdays_contact_not_found; keine Zahl -> 400', async () => {
+  setModules(member.id, {});
+  const birthday = await seedBirthday('Ins Leere');
+  const gone = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: 999999 });
+  assert.equal(gone.status, 400);
+  assert.equal(gone.body.reason, 'birthdays_contact_not_found');
+  const junk = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: 'abc' });
+  assert.equal(junk.status, 400);
+  assert.equal(linkOf(birthday.id), null);
+});
+
+test('D7: ohne Kontakte-Leserecht verknuepft niemand - Rolle und Token-Scope', async () => {
+  setModules(member.id, { calendar: 'write', contacts: 'none' });
+  const cid = await seedContact();
+  const birthday = await seedBirthday('Ohne Adressbuch');
+  const res = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  assert.equal(res.status, 403);
+  assert.equal(linkOf(birthday.id), null);
+  const post = await member.as('POST', '/birthdays', { name: 'Ohne Adressbuch 2', birth_date: '1990-01-01', contact_id: cid });
+  assert.equal(post.status, 403);
+  setModules(member.id, {});
+  const scoped = await mintToken(member.id, ['calendar:write'])('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  assert.equal(scoped.status, 403, 'calendar:write allein reicht nicht');
+  const both = await mintToken(member.id, ['calendar:write', 'contacts:read'])('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  assert.equal(both.status, 200);
+  assert.equal(linkOf(birthday.id), cid);
+});
+
+test('D7: Mitglieder-Geburtstage sind ausgenommen', async () => {
+  setModules(member.id, {});
+  const cid = await seedContact();
+  const id = db.prepare("INSERT INTO birthdays (name, birth_date, created_by, family_user_id) VALUES ('Mitglied', '1980-01-01', 1, ?)")
+    .run(member.id).lastInsertRowid;
+  const res = await admin('PUT', `/birthdays/${id}`, { contact_id: cid });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.reason, 'birthdays_member_not_linkable');
+  assert.equal(linkOf(id), null);
+  db.prepare('DELETE FROM birthdays WHERE id = ?').run(id);
+});
+
+test('D7: gleicher Name ohne Verknuepfung -> suggested_contact_id, nur eindeutig und nur mit Kontakte-Recht', async () => {
+  setModules(member.id, {});
+  const contact = await admin('POST', '/contacts', { name: 'Onkel Probe', category: 'misc' });
+  const birthday = await seedBirthday('onkel probe ');
+  const find = async (as) => (await as('GET', '/birthdays')).body.data.find((b) => b.id === birthday.id);
+  assert.equal((await find(member.as)).suggested_contact_id, contact.body.data.id, 'Name ohne Gross/Klein und Rand');
+
+  setModules(member.id, { contacts: 'none' });
+  assert.equal((await find(member.as)).suggested_contact_id, undefined, 'ohne Kontakte-Recht kein Hinweis');
+  setModules(member.id, {});
+
+  const twin = await admin('POST', '/contacts', { name: 'Onkel Probe', category: 'misc' });
+  assert.equal((await find(member.as)).suggested_contact_id, undefined, 'zwei gleichnamige Kontakte: kein Vorschlag');
+  await admin('DELETE', `/contacts/${twin.body.data.id}`);
+
+  await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: contact.body.data.id });
+  const linked = await find(member.as);
+  assert.equal(linked.suggested_contact_id, undefined, 'verknuepft: kein Hinweis mehr');
+  assert.equal(linked.contact_name, 'Onkel Probe', 'der Dialog kann die Auswahl beschriften');
+  setModules(member.id, { contacts: 'none' });
+  assert.equal((await find(member.as)).contact_name, undefined, 'ohne Kontakte-Recht kein Name');
+  setModules(member.id, {});
+});
+
+test('D7: die Kandidatenliste nennt auch Kontakte ohne Datum mit ihrer Verknuepfung', async () => {
+  setModules(member.id, {});
+  const contact = await admin('POST', '/contacts', { name: 'Ohne Datum Kandidat', category: 'misc' });
+  const cid = contact.body.data.id;
+  const pick = async () => (await member.as('GET', '/birthdays/import/candidates')).body.data.withoutBirthday.find((c) => c.id === cid);
+  assert.equal((await pick()).already_imported, false);
+  await seedBirthday('Kandidat Verknuepft', { contact_id: cid });
+  assert.equal((await pick()).already_imported, true);
+});

@@ -52,6 +52,11 @@ const birthdayInputProperties = {
     type: ['string', 'null'],
     enum: ['minutes', 'hours', 'days', 'weeks', '', null],
   },
+  contact_id: {
+    type: ['integer', 'null'],
+    minimum: 1,
+    description: 'Links the birthday to a contact of the household (Critique R22, D7), or null to unlink it. Linking needs read access to the `contacts` module as well (for API tokens `contacts:read`), otherwise 403. A contact can carry one birthday: one already linked elsewhere is refused with 409. Birthdays of household members cannot be linked. Linking does not copy or follow the contact\'s date. Omitted on update, the link stays; the value already stored is accepted unchanged.',
+  },
 };
 
 const calendarOccurrenceProperties = {

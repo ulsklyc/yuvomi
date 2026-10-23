@@ -570,7 +570,7 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
  * einen Geburtstag gekoppelt sind (haushaltsweit, nicht pro Nutzer).
  *
  * @param {object} database
- * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,birthday_year_unknown:boolean,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string}> }}
+ * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,birthday_year_unknown:boolean,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string,already_imported:boolean}> }}
  */
 function listBirthdayImportCandidates(database) {
   const rows = database.prepare(`
@@ -597,7 +597,9 @@ function listBirthdayImportCandidates(database) {
         already_imported: r.already_imported === 1,
       });
     } else {
-      withoutBirthday.push({ id: r.id, name: r.name });
+      // Auch ohne Datum verknuepfbar (R22, D7: der Geburtstag-Dialog bietet
+      // jeden Kontakt an, der noch keinen Eintrag traegt).
+      withoutBirthday.push({ id: r.id, name: r.name, already_imported: r.already_imported === 1 });
     }
   }
   return { withBirthday, withoutBirthday };

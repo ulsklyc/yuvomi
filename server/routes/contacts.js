@@ -466,7 +466,9 @@ const CONTACT_SELECT = `
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
          u.avatar_data   AS family_avatar_data,
-         (SELECT b.id FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_id
+         (SELECT b.id FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_id,
+         (SELECT b.birth_date FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_link_date,
+         (SELECT b.year_unknown FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_link_year_unknown
     FROM contacts
     LEFT JOIN users u ON u.id = contacts.family_user_id`;
 
@@ -480,10 +482,17 @@ const CONTACT_SELECT = `
  * Mischstelle wie der Import in die Gegenrichtung (routes/birthdays.js,
  * `contactsHidden`). Wer den Kalender nicht lesen darf, bekommt keine id:
  * sie verriete sonst, wer im Geburtstagsmodul steht.
+ *
+ * SEIT R22 (D7) VERKNUEPFT AUCH DER GEBURTSTAG-DIALOG, und dann hat der Kontakt
+ * oft selbst kein Datum: die Zeile "Geburtstag" fiele weg und mit ihr der Weg
+ * zurueck. `birthday_link_date`/`_year_unknown` sind das Datum des
+ * verknuepften Eintrags - zum ANZEIGEN, wo der Kontakt keins traegt. Das Datum
+ * des Kontakts selbst bleibt unberuehrt (#2124 bleibt eigenstaendig). Dieselbe
+ * Schranke wie die id: ohne Kalender-Leserecht nichts.
  */
 function withBirthdayLink(req, contact) {
   if (!contact || mayReadModule(req, 'calendar')) return contact;
-  return { ...contact, birthday_id: null };
+  return { ...contact, birthday_id: null, birthday_link_date: null, birthday_link_year_unknown: null };
 }
 
 /**
