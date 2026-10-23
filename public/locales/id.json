@@ -661,7 +661,10 @@
         "errorParentGone": "Tugas induk subtugas ini sudah tidak ada.",
         "errorCommentGone": "Komentar ini sudah tidak ada.",
         "kanbanShowMore": "Tampilkan {{count}} lagi",
-        "kanbanShowMore_one": "Tampilkan {{count}} lagi"
+        "kanbanShowMore_one": "Tampilkan {{count}} lagi",
+        "doneByMenuItem": "Dikerjakan oleh …",
+        "checkedDoneNamed": "\"{{title}}\" selesai.",
+        "checkedOpenNamed": "\"{{title}}\" terbuka lagi."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",

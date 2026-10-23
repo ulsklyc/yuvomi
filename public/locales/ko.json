@@ -661,7 +661,10 @@
         "errorParentGone": "이 하위 작업이 속한 작업은 더 이상 존재하지 않습니다.",
         "errorCommentGone": "이 댓글은 더 이상 존재하지 않습니다.",
         "kanbanShowMore": "{{count}}개 더 보기",
-        "kanbanShowMore_one": "{{count}}개 더 보기"
+        "kanbanShowMore_one": "{{count}}개 더 보기",
+        "doneByMenuItem": "한 사람 …",
+        "checkedDoneNamed": "'{{title}}' 완료했습니다.",
+        "checkedOpenNamed": "'{{title}}' 다시 미완료로 표시했습니다."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}}개 항목이 삭제되었습니다.",

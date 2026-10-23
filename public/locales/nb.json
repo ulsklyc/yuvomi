@@ -643,7 +643,10 @@
         "errorParentGone": "Oppgaven denne underoppgaven hører til finnes ikke lenger.",
         "errorCommentGone": "Denne kommentaren finnes ikke lenger.",
         "kanbanShowMore": "Vis {{count}} til",
-        "kanbanShowMore_one": "Vis {{count}} til"
+        "kanbanShowMore_one": "Vis {{count}} til",
+        "doneByMenuItem": "Fullført av …",
+        "checkedDoneNamed": "«{{title}}» utført.",
+        "checkedOpenNamed": "«{{title}}» er åpen igjen."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",

@@ -643,7 +643,10 @@
         "errorParentGone": "Bu alt görevin ait olduğu görev artık yok.",
         "errorCommentGone": "Bu yorum artık yok.",
         "kanbanShowMore": "{{count}} tane daha göster",
-        "kanbanShowMore_one": "{{count}} tane daha göster"
+        "kanbanShowMore_one": "{{count}} tane daha göster",
+        "doneByMenuItem": "Yapan …",
+        "checkedDoneNamed": "\"{{title}}\" tamamlandı.",
+        "checkedOpenNamed": "\"{{title}}\" yeniden açık."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",

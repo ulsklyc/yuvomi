@@ -745,7 +745,10 @@
         "kanbanShowMore": "Показати ще {{count}}",
         "kanbanShowMore_one": "Показати ще {{count}}",
         "kanbanShowMore_few": "Показати ще {{count}}",
-        "kanbanShowMore_many": "Показати ще {{count}}"
+        "kanbanShowMore_many": "Показати ще {{count}}",
+        "doneByMenuItem": "Виконав(ла) …",
+        "checkedDoneNamed": "«{{title}}» виконано.",
+        "checkedOpenNamed": "«{{title}}» знову відкрите."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",

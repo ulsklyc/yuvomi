@@ -763,7 +763,10 @@
         "kanbanShowMore": "Pokaż {{count}} więcej",
         "kanbanShowMore_one": "Pokaż {{count}} więcej",
         "kanbanShowMore_few": "Pokaż {{count}} więcej",
-        "kanbanShowMore_many": "Pokaż {{count}} więcej"
+        "kanbanShowMore_many": "Pokaż {{count}} więcej",
+        "doneByMenuItem": "Wykonał(a) …",
+        "checkedDoneNamed": "„{{title}}” zrobione.",
+        "checkedOpenNamed": "„{{title}}” znowu otwarte."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",

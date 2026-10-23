@@ -43,7 +43,7 @@ globalThis.document.documentElement.classList = {
   toggle() {}, add() {}, remove() {}, contains() { return false; },
 };
 
-const { openTaskDetail } = await import('../public/components/task-detail.js');
+const { openTaskDetail, __test: detailTest } = await import('../public/components/task-detail.js');
 
 const BASIS = { id: 7, title: 'Tisch decken', visibility: 'all', created_by: 2, subtasks: [] };
 
@@ -313,5 +313,53 @@ test('ein Eintrag der Personenwahl erledigt die Aufgabe fuer genau diese Person'
     globalThis.document.getElementById = vorher.getElementById;
     delete globalThis.__openDetailView;
     delete globalThis.__apiStub;
+  }
+});
+
+// R22 D17 (Critique 2026-10-22, a2 P3): der Personenknopf stand als Icon ohne
+// Wort hinter dem Primaerknopf „Erledigen". Er steht jetzt als erster Eintrag
+// MIT Wort im Mehr-Menue des Fusses, und die Personen gehen ueber dem
+// Mehr-Knopf auf - nicht am verborgenen Personenknopf (Rechteck 0/0).
+test('R22 D17: „Erledigt von ..." steht im Mehr-Menue und oeffnet die Personen ueber dem Mehr-Knopf', () => {
+  const node = (id = '') => ({
+    id, dataset: {}, attrs: {}, children: [], listeners: {}, disabled: false, parentElement: null,
+    classList: { list: new Set(), add(...c) { c.forEach((x) => this.list.add(x)); }, contains(c) { return this.list.has(c); } },
+    setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return this.attrs[k] ?? null; },
+    append(...n) { this.children.push(...n); }, appendChild(n) { this.children.push(n); return n; },
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    querySelector() { return null; }, set textContent(v) { this._text = v; }, get textContent() { return this._text ?? ''; },
+  });
+  const footer = { dataset: {}, addEventListener() {} };
+  const more = node('task-detail-more');
+  more.parentElement = footer;
+  more.getBoundingClientRect = () => ({ left: 700, top: 740, right: 744, bottom: 784 });
+  let menu = null;
+  more.after = (n) => { menu = n; };
+  const doer = node('task-detail-done-by');
+  doer.setAttribute('popovertarget', 'task-detail-doer-7');
+  const start = node('task-detail-start');
+  const people = { dataset: {}, opened: 0, matches: () => false, showPopover() { this.opened += 1; this.at = { ...this.dataset }; } };
+  const byId = { '#task-detail-more': more, '#task-detail-done-by': doer, '#task-detail-start': start };
+  const pane = { querySelector: (sel) => byId[sel] ?? null };
+  const vorher = { createElement: globalThis.document.createElement, getElementById: globalThis.document.getElementById };
+  globalThis.document.createElement = () => node();
+  globalThis.document.getElementById = (id) => (id === 'task-detail-doer-7' ? people : null);
+  let gestartet = 0;
+  start.click = () => { gestartet += 1; };
+  try {
+    detailTest.wireDetailMoreMenu({ id: 7, title: 'Tisch decken' }, [detailTest.DOER_BUTTON_ID, 'task-detail-start'], pane);
+    assert.ok(menu, 'das Mehr-Menue wurde gebaut');
+    const [first, second] = menu.children;
+    assert.match(first.children[1].textContent, /tasks\.doneByMenuItem|Erledigt von/, 'der erste Eintrag traegt das Wort');
+    assert.equal(first.children[0].dataset.lucide, 'user-round-check');
+    assert.ok(doer.classList.contains('task-detail__overflow'), 'der Icon-Knopf im Fuss tritt zurueck');
+    first.listeners.click[0]();
+    assert.equal(people.opened, 1, 'der Eintrag oeffnet die Personen');
+    assert.deepEqual(people.at, { anchorX: '700', anchorY: '736', anchorAbove: '' }, 'ueber dem Mehr-Knopf, an seiner Anfangskante');
+    second.listeners.click[0]();
+    assert.equal(gestartet, 1, 'die uebrigen Eintraege loesen weiter ihren Knopf aus');
+  } finally {
+    globalThis.document.createElement = vorher.createElement;
+    globalThis.document.getElementById = vorher.getElementById;
   }
 });

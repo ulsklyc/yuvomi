@@ -661,7 +661,10 @@
         "errorParentGone": "Die Aufgabe zu dieser Teilaufgabe gibt es nicht mehr.",
         "errorCommentGone": "Diesen Kommentar gibt es nicht mehr.",
         "kanbanShowMore": "{{count}} weitere anzeigen",
-        "kanbanShowMore_one": "{{count}} weitere anzeigen"
+        "kanbanShowMore_one": "{{count}} weitere anzeigen",
+        "doneByMenuItem": "Erledigt von …",
+        "checkedDoneNamed": "„{{title}}“ erledigt.",
+        "checkedOpenNamed": "„{{title}}“ wieder offen."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",

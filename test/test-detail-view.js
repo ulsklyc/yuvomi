@@ -1274,7 +1274,8 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   // weiter destruktiv gefaerbt), Bearbeiten steht als Stift vor dem vollen
   // Erledigen (Ulas 2026-10-16).
   const task = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
-  assert.match(task, /const overflowIds = \['task-detail-start', 'task-detail-archive', 'task-detail-delete'\];/);
+  // Seit R22 (D17) steht auch „Wer hat erledigt?" im Menue, als erster Eintrag.
+  assert.match(task, /const overflowIds = \[DOER_BUTTON_ID, 'task-detail-start', 'task-detail-archive', 'task-detail-delete'\];/);
   const more = task.slice(task.indexOf('function wireDetailMoreMenu('), task.indexOf('const DOER_BUTTON_ID'));
   assert.match(more, /popover-menu__item--danger/, 'Loeschen bleibt im Menue destruktiv');
   const css = await detailCss();

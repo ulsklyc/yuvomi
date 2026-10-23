@@ -188,6 +188,23 @@ test('Liste, Haken und Wisch: ohne Serie und beim Wiederoeffnen bleibt der bishe
   assert.deepEqual(toasts.map((x) => x.message), ['tasks.swipedDoneToast', 'tasks.swipedOpenToast']);
 });
 
+// R22 D17 (Critique 2026-10-22, a2 Klein): „Als erledigt markiert." nannte
+// nicht, WAS - nach einem Wisch ist die Zeile weg.
+test('Liste, Haken und Wisch: die Quittung nennt die Aufgabe, ohne Titel bleibt der alte Satz', () => {
+  tasks.state.tasks = [{ id: 7, title: 'Tisch decken' }];
+  try {
+    tasks.acknowledgeStatusToggle(null, 7, 'done', answer(null));
+    tasks.acknowledgeStatusToggle(null, 7, 'open', { data: { id: 7, status: 'open', next_due_date: null } });
+    assert.deepEqual(toasts.map((x) => x.message), [
+      `tasks.checkedDoneNamed${JSON.stringify({ title: 'Tisch decken' })}`,
+      `tasks.checkedOpenNamed${JSON.stringify({ title: 'Tisch decken' })}`,
+    ]);
+    assert.equal(typeof toasts[0].onUndo, 'function', 'Rueckgaengig bleibt angeboten');
+  } finally {
+    tasks.state.tasks = [];
+  }
+});
+
 test('Liste: Haken und Wisch reichen die ANTWORT ihres Schreibvorgangs an die Quittung', () => {
   // Der Klick-Handler und die Wischgeste haengen an echtem DOM; was sie mit der
   // Antwort tun, laesst sich hier nur lesen. Die Quittung selbst ist oben am

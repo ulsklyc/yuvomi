@@ -643,7 +643,10 @@
         "errorParentGone": "このサブタスクの親タスクはもう存在しません。",
         "errorCommentGone": "このコメントはもう存在しません。",
         "kanbanShowMore": "さらに{{count}}件表示",
-        "kanbanShowMore_one": "さらに{{count}}件表示"
+        "kanbanShowMore_one": "さらに{{count}}件表示",
+        "doneByMenuItem": "実行した人 …",
+        "checkedDoneNamed": "「{{title}}」を完了しました。",
+        "checkedOpenNamed": "「{{title}}」を未完了に戻しました。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",

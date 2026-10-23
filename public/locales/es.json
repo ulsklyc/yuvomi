@@ -643,7 +643,10 @@
         "errorParentGone": "La tarea a la que pertenece esta subtarea ya no existe.",
         "errorCommentGone": "Este comentario ya no existe.",
         "kanbanShowMore": "Mostrar {{count}} más",
-        "kanbanShowMore_one": "Mostrar {{count}} más"
+        "kanbanShowMore_one": "Mostrar {{count}} más",
+        "doneByMenuItem": "Hecho por …",
+        "checkedDoneNamed": "«{{title}}» hecho.",
+        "checkedOpenNamed": "«{{title}}» abierto de nuevo."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artículo eliminado.",

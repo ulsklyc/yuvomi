@@ -253,8 +253,12 @@ function onBeforeToggle(event) {
  * ein Oeffnen und faellt beim Schliessen weg - ein spaeterer Klick auf einen
  * sichtbaren Ausloeser rechnet wieder an dem.
  *
+ * `above`: das Menue steht UEBER dem Punkt, solange dort Platz ist - fuer
+ * einen Ausloeser im Fuss (Aufgabendetail: „Erledigt von ..." im Mehr-Menue),
+ * wo unten nie Platz ist und ein nach unten gekipptes Menue den Fuss deckte.
+ *
  * @param {HTMLElement} panel
- * @param {{x: number, y: number}} [point] Zeigerposition im Viewport.
+ * @param {{x: number, y: number, above?: boolean}} [point] Position im Viewport.
  * @returns {boolean} ob ein Panel da war.
  */
 export function showPopoverMenuAt(panel, point) {
@@ -262,6 +266,8 @@ export function showPopoverMenuAt(panel, point) {
   if (point && Number.isFinite(point.x) && Number.isFinite(point.y) && panel.dataset) {
     panel.dataset.anchorX = String(Math.round(point.x));
     panel.dataset.anchorY = String(Math.round(point.y));
+    if (point.above) panel.dataset.anchorAbove = '';
+    else delete panel.dataset.anchorAbove;
   }
   if (!panel.matches(':popover-open')) panel.showPopover();
   return true;
@@ -271,13 +277,14 @@ function anchorPointOf(panel) {
   const x = Number(panel.dataset?.anchorX);
   const y = Number(panel.dataset?.anchorY);
   if (panel.dataset?.anchorX == null || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return { x, y };
+  return { x, y, above: panel.dataset.anchorAbove != null };
 }
 
 function dropAnchorPoint(panel) {
   if (!panel.dataset) return;
   delete panel.dataset.anchorX;
   delete panel.dataset.anchorY;
+  delete panel.dataset.anchorAbove;
 }
 
 /**
@@ -381,7 +388,7 @@ function onToggle(event) {
     // nicht, kippt das Menue auf die andere Seite des Punkts - wie das
     // Kontextmenue des Systems.
     const flipX = point.x + width > window.innerWidth - 8;
-    const flipY = point.y + height > window.innerHeight - 8;
+    const flipY = point.above ? point.y - height >= 8 : point.y + height > window.innerHeight - 8;
     const left = Math.min(Math.max(8, flipX ? point.x - width : point.x), window.innerWidth - width - 8);
     const top = Math.max(8, flipY ? point.y - height : point.y);
     panel.style.left = `${Math.round(left)}px`;

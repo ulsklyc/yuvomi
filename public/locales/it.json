@@ -643,7 +643,10 @@
         "errorParentGone": "L’attività a cui appartiene questo sotto-compito non esiste più.",
         "errorCommentGone": "Questo commento non esiste più.",
         "kanbanShowMore": "Mostra {{count}} in più",
-        "kanbanShowMore_one": "Mostra {{count}} in più"
+        "kanbanShowMore_one": "Mostra {{count}} in più",
+        "doneByMenuItem": "Svolto da …",
+        "checkedDoneNamed": "«{{title}}» fatto.",
+        "checkedOpenNamed": "«{{title}}» di nuovo aperto."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} articolo eliminato.",

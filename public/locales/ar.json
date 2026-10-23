@@ -796,7 +796,10 @@
         "kanbanShowMore_one": "عرض {{count}} آخر",
         "kanbanShowMore_few": "عرض {{count}} أخرى",
         "kanbanShowMore_two": "عرض {{count}} أخرى",
-        "kanbanShowMore_many": "عرض {{count}} أخرى"
+        "kanbanShowMore_many": "عرض {{count}} أخرى",
+        "doneByMenuItem": "أنجزها …",
+        "checkedDoneNamed": "تم إنجاز «{{title}}».",
+        "checkedOpenNamed": "«{{title}}» مفتوحة مجددًا."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

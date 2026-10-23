@@ -44,7 +44,7 @@ import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -1201,7 +1201,12 @@ export function openTaskDetail({
   // am Desktop stehen sie weiter im Fuss, und dort gibt es den Knopf nicht.
   // Seit R19 auch Loeschen: mit Loeschen, Bearbeiten, Erledigen, Wer und
   // Mehr brach der Fuss auf dem Telefon wieder auf zwei Reihen.
-  const overflowIds = ['task-detail-start', 'task-detail-archive', 'task-detail-delete'];
+  // SEIT R22 (D17) AUCH „WER HAT ERLEDIGT?": der Personenknopf stand als
+  // Icon ohne Wort hinter dem Primaerknopf - ein zweites Ziel 0px neben
+  // „Erledigen", das keiner als Frage las. Im Menue steht er als erster
+  // Eintrag mit Wort („Erledigt von ..."); die Personen gehen ueber dem
+  // Mehr-Knopf auf.
+  const overflowIds = [DOER_BUTTON_ID, 'task-detail-start', 'task-detail-archive', 'task-detail-delete'];
   if (actions.some((a) => overflowIds.includes(a.id))) {
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
@@ -1265,6 +1270,7 @@ function wireDetailMoreMenu(task, overflowIds, pane = null) {
   panel.setAttribute('role', 'menu');
   for (const target of targets) {
     target.classList.add('task-detail__overflow');
+    const doer = target.id === DOER_BUTTON_ID;
     const item = document.createElement('button');
     item.type = 'button';
     // Loeschen bleibt im Menue als destruktiv erkennbar.
@@ -1272,16 +1278,25 @@ function wireDetailMoreMenu(task, overflowIds, pane = null) {
       ? 'popover-menu__item popover-menu__item--danger' : 'popover-menu__item';
     item.setAttribute('role', 'menuitem');
     const icon = document.createElement('i');
-    icon.dataset.lucide = target.querySelector('[data-lucide]')?.dataset.lucide
-      ?? target.querySelector('svg[data-lucide]')?.getAttribute('data-lucide') ?? 'circle';
+    icon.dataset.lucide = doer ? 'user-round-check'
+      : target.querySelector('[data-lucide]')?.dataset.lucide
+        ?? target.querySelector('svg[data-lucide]')?.getAttribute('data-lucide') ?? 'circle';
     icon.className = 'icon-md';
     icon.setAttribute('aria-hidden', 'true');
     const name = document.createElement('span');
-    name.textContent = target.querySelector('.btn__label')?.textContent ?? target.textContent.trim();
+    name.textContent = doer ? t('tasks.doneByMenuItem')
+      : target.querySelector('.btn__label')?.textContent ?? target.textContent.trim();
     item.append(icon, name);
     item.addEventListener('click', () => {
       panel.hidePopover?.();
-      if (!target.disabled) target.click();
+      if (target.disabled) return;
+      if (!doer) { target.click(); return; }
+      // Der Personenknopf ist verborgen (Rechteck 0/0) - an ihm gerechnet
+      // ginge das Menue in der Fensterecke auf. Es steht ueber dem Mehr-Knopf,
+      // an seiner Anfangskante, wo der Finger gerade war.
+      const rect = button.getBoundingClientRect?.();
+      const people = document.getElementById?.(target.getAttribute('popovertarget'));
+      showPopoverMenuAt(people, rect ? { x: rect.left, y: rect.top - 4, above: true } : undefined);
     });
     panel.appendChild(item);
   }
@@ -1577,4 +1592,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit };

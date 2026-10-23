@@ -661,7 +661,10 @@
         "errorParentGone": "کاری که این زیرکار به آن تعلق دارد دیگر وجود ندارد.",
         "errorCommentGone": "این دیدگاه دیگر وجود ندارد.",
         "kanbanShowMore": "نمایش {{count}} مورد دیگر",
-        "kanbanShowMore_one": "نمایش {{count}} مورد دیگر"
+        "kanbanShowMore_one": "نمایش {{count}} مورد دیگر",
+        "doneByMenuItem": "انجام‌شده توسط …",
+        "checkedDoneNamed": "«{{title}}» انجام شد.",
+        "checkedOpenNamed": "«{{title}}» دوباره باز است."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",

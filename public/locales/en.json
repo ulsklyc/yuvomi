@@ -643,7 +643,10 @@
         "errorParentGone": "The task this subtask belongs to no longer exists.",
         "errorCommentGone": "This comment no longer exists.",
         "kanbanShowMore": "Show {{count}} more",
-        "kanbanShowMore_one": "Show {{count}} more"
+        "kanbanShowMore_one": "Show {{count}} more",
+        "doneByMenuItem": "Done by …",
+        "checkedDoneNamed": "“{{title}}” done.",
+        "checkedOpenNamed": "“{{title}}” open again."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",

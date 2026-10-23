@@ -694,7 +694,10 @@
         "errorCommentGone": "Tento komentář už neexistuje.",
         "kanbanShowMore": "Zobrazit {{count}} dalších",
         "kanbanShowMore_one": "Zobrazit {{count}} další",
-        "kanbanShowMore_few": "Zobrazit {{count}} další"
+        "kanbanShowMore_few": "Zobrazit {{count}} další",
+        "doneByMenuItem": "Splnil(a) …",
+        "checkedDoneNamed": "„{{title}}“ hotovo.",
+        "checkedOpenNamed": "„{{title}}“ je znovu otevřené."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",

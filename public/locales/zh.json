@@ -643,7 +643,10 @@
         "errorParentGone": "此子任务所属的任务已不存在。",
         "errorCommentGone": "此评论已不存在。",
         "kanbanShowMore": "显示另外 {{count}} 项",
-        "kanbanShowMore_one": "显示另外 {{count}} 项"
+        "kanbanShowMore_one": "显示另外 {{count}} 项",
+        "doneByMenuItem": "完成者 …",
+        "checkedDoneNamed": "“{{title}}”已完成。",
+        "checkedOpenNamed": "“{{title}}”已重新打开。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",

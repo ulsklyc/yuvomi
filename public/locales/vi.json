@@ -643,7 +643,10 @@
         "errorParentGone": "Công việc chứa nhiệm vụ phụ này không còn tồn tại.",
         "errorCommentGone": "Bình luận này không còn tồn tại.",
         "kanbanShowMore": "Hiện thêm {{count}} mục",
-        "kanbanShowMore_one": "Hiện thêm {{count}} mục"
+        "kanbanShowMore_one": "Hiện thêm {{count}} mục",
+        "doneByMenuItem": "Do … làm",
+        "checkedDoneNamed": "Đã hoàn thành \"{{title}}\".",
+        "checkedOpenNamed": "\"{{title}}\" đang mở lại."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",

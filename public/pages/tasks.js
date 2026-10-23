@@ -1889,8 +1889,7 @@ async function toggleTaskStatus(id, currentStatus, doneByUserId = null) {
  */
 function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
   window.yuvomi.showToast(
-    seriesDoneText(response)
-      ?? t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast'),
+    seriesDoneText(response) ?? statusToggleSentence(taskId, nextStatus),
     'default',
     5000,
     async () => {
@@ -1903,6 +1902,18 @@ function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
       }
     },
   );
+}
+
+/**
+ * DIE QUITTUNG NENNT DIE AUFGABE (R22 D17). „Als erledigt markiert." sagte
+ * nicht, WAS - nach einem Wisch ist die Zeile weg, und wer zwei schnell
+ * nacheinander abhakt, sieht zwei gleiche Saetze (der zweite ersetzt den
+ * ersten, D18). Ohne Titel (Zeile schon aus dem Zustand) bleibt der alte Satz.
+ */
+function statusToggleSentence(taskId, nextStatus) {
+  const title = state.tasks.find((x) => String(x.id) === String(taskId))?.title;
+  if (title) return t(nextStatus === 'done' ? 'tasks.checkedDoneNamed' : 'tasks.checkedOpenNamed', { title });
+  return t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast');
 }
 
 /**

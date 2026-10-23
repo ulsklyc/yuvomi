@@ -643,7 +643,10 @@
         "errorParentGone": "Η εργασία στην οποία ανήκει αυτή η υποεργασία δεν υπάρχει πια.",
         "errorCommentGone": "Αυτό το σχόλιο δεν υπάρχει πια.",
         "kanbanShowMore": "Εμφάνιση {{count}} ακόμη",
-        "kanbanShowMore_one": "Εμφάνιση {{count}} ακόμη"
+        "kanbanShowMore_one": "Εμφάνιση {{count}} ακόμη",
+        "doneByMenuItem": "Το έκανε ο/η …",
+        "checkedDoneNamed": "«{{title}}» ολοκληρώθηκε.",
+        "checkedOpenNamed": "«{{title}}» ανοιχτό ξανά."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} είδος διαγράφηκε.",

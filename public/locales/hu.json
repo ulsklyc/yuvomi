@@ -643,7 +643,10 @@
         "errorParentGone": "Ennek az alfeladatnak a szülőfeladata már nem létezik.",
         "errorCommentGone": "Ez a hozzászólás már nem létezik.",
         "kanbanShowMore": "{{count}} további megjelenítése",
-        "kanbanShowMore_one": "{{count}} további megjelenítése"
+        "kanbanShowMore_one": "{{count}} további megjelenítése",
+        "doneByMenuItem": "Elvégezte: …",
+        "checkedDoneNamed": "„{{title}}” kész.",
+        "checkedOpenNamed": "„{{title}}” újra nyitott."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",

@@ -661,7 +661,10 @@
         "errorParentGone": "Wala na ang gawaing kinabibilangan ng subtask na ito.",
         "errorCommentGone": "Wala na ang komentong ito.",
         "kanbanShowMore": "Ipakita ang {{count}} pa",
-        "kanbanShowMore_one": "Ipakita ang {{count}} pa"
+        "kanbanShowMore_one": "Ipakita ang {{count}} pa",
+        "doneByMenuItem": "Ginawa ni …",
+        "checkedDoneNamed": "Tapos na ang \"{{title}}\".",
+        "checkedOpenNamed": "Bukas muli ang \"{{title}}\"."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",

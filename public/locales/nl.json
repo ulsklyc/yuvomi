@@ -643,7 +643,10 @@
         "errorParentGone": "De taak waar deze subtaak bij hoort bestaat niet meer.",
         "errorCommentGone": "Deze opmerking bestaat niet meer.",
         "kanbanShowMore": "Toon {{count}} meer",
-        "kanbanShowMore_one": "Toon {{count}} meer"
+        "kanbanShowMore_one": "Toon {{count}} meer",
+        "doneByMenuItem": "Gedaan door …",
+        "checkedDoneNamed": "‘{{title}}’ klaar.",
+        "checkedOpenNamed": "‘{{title}}’ weer open."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",

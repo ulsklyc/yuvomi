@@ -609,8 +609,17 @@ test('R22: ein Kontextmenue oeffnet am Zeiger und vergisst den Punkt beim Schlie
   assert.equal(panel.style.top, '702px');
   assert.equal(panel.style.transformOrigin, 'bottom right');
 
+  // Ein Ausloeser im Fuss (Aufgabendetail, D17): das Menue steht UEBER dem
+  // Punkt, solange dort Platz ist.
+  root.fire('toggle', { target: panel, newState: 'closed' });
+  panel.open = false;
+  showPopoverMenuAt(panel, { x: 300, y: 600, above: true });
+  assert.equal(panel.style.top, '552px', 'ueber dem Punkt: Oberkante = Punkt - Hoehe');
+  assert.equal(panel.style.transformOrigin, 'bottom left');
+
   root.fire('toggle', { target: panel, newState: 'closed' });
   assert.equal(panel.dataset.anchorX, undefined, 'geschlossen gilt wieder der Ausloeser');
+  assert.equal(panel.dataset.anchorAbove, undefined);
   panel.open = false;
   open(root, panel);
   assert.equal(panel.style.left, '100px', 'ohne Punkt rechnet das Menue wie bisher am Ausloeser');
