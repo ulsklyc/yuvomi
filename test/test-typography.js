@@ -631,8 +631,17 @@ test('lange Inhalts- und interaktive Texte verwenden mindestens die Sekundärrol
     assertTypeRole(recipes, 'recipes.css', selector, '--type-body',
       `${selector} muss die 16px-Bodyrolle verwenden`);
   }
-  assertTypeRole(calendar, 'calendar.css', '.cal-toolbar__view-btn', '--type-secondary',
-    'interaktive Kalender-Ansichtsschalter müssen mindestens 14px groß sein');
+  // Die Kalender-Ansichtswahl ist das Segment der Shell und schreibt seit R22
+  // (D8) wie jedes Segment 14px (`--text-sm` an `.segmented__item`, panel.css);
+  // die eigene 15px-Regel ist entfallen. Gehalten wird hier, dass sie nicht
+  // zurueckkommt - die Mindestgroesse steht an der Segment-Regel.
+  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
+  assertTypeRole(panel, 'panel.css', '.segmented__item', '--text-sm',
+    'Segmente schreiben ueberall 14px - die Kompakt-Interaktion, nicht kleiner');
+  const ownCalSize = [...eachRule(calendar)]
+    .filter((r) => r.selector.split(',').some((x) => /\.cal-toolbar__view-btn(?![\w-])/.test(x)) && /font-size:/.test(r.body));
+  assert.deepEqual(ownCalSize.map((r) => r.selector.trim()), [],
+    'die Kalender-Ansichtswahl setzt wieder eine eigene Schriftgroesse - Segmente schreiben ueberall 14px');
 });
 
 test('globale Toolbar- und Kartentitel folgen den semantischen Rollen', () => {

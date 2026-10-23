@@ -961,8 +961,15 @@
      * bricht seit dem Schnitt nicht mehr um (siehe .task-card__meta), damit
      * trägt die Polsterung die Höhe allein: 12px oben und unten ergaben 71px
      * je Zeile, 8px ergeben 58px - bei unveränderter Zielgröße, weil die
-     * Trefferfläche des Titels an --list-row-pad hängt und mitwandert. */
+     * Trefferfläche des Titels an --list-row-pad hängt und mitwandert.
+     *
+     * NUR SENKRECHT (R22, D8): der Takt ist eine Frage der Hoehe. Waagerecht
+     * stand die Zeile damit auf 8px Einzug, die einzige Zeilenliste der App
+     * unter den 12px der geteilten Zeile (`.list-row`) - der Haken klebte
+     * naeher an der Kartenkante als jedes Bedienelement in Einkauf, Vorrat
+     * oder Geburtstagen. */
     --list-row-pad: var(--space-2);
+    padding-inline: var(--space-3);
   }
 
   /* DER MEHR-KNOPF BLEIBT AUCH AUF DEM TELEFON (R18, D6). Hier stand bis

@@ -153,17 +153,25 @@
  * misst AUSSEN dieselben 40px - Naht 1px, Rand 1px, Segmente 36px. Mit der
  * Basis-Hoehe und 2px Naht stand es als 50px-Well in der Zeile und hob die
  * Titelzeile um 6px an. Am Finger gilt dieselbe Rechnung gegen --target-base
- * (aussen 48px wie Lupe und Filter, statt 54px auf dem Tablet). */
-.page-toolbar .segmented {
+ * (aussen 48px wie Lupe und Filter, statt 54px auf dem Tablet).
+ *
+ * DIESELBE RECHNUNG NEBEN CHIPS (R22, D8): der Status der Dokumente
+ * (Aktiv/Archiviert) steht in einer Zeile mit den kleinen Filter-Chips
+ * (`.filter-chip--sm`: 40px am Zeiger, 48px am Finger) und mass als freies
+ * Segment 50 bzw. 54px. Er nimmt die Kopf-Rechnung und misst aussen wie sie. */
+.page-toolbar .segmented,
+.segmented.documents-status {
   padding: var(--space-px);
 }
 
-.page-toolbar .segmented__item {
+.page-toolbar .segmented__item,
+.documents-status .segmented__item {
   min-height: calc(var(--target-base) - 4 * var(--space-px));
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .page-toolbar .segmented__item {
+  .page-toolbar .segmented__item,
+  .documents-status .segmented__item {
     min-height: calc(var(--target-md) - 4 * var(--space-px));
   }
 }

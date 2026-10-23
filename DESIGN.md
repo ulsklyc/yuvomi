@@ -2525,6 +2525,12 @@ die links ein BILD statt eines Bedienelements fuehrt (Kontakte). Mehr Stufen gib
 eine dritte Zahl in einem Modul-Stylesheet ist ein Nachbau, und ein Guard sagt das auch so
 („Abweichen ist erlaubt, wiederholen nicht").
 
+**Der Zeileneinzug (R22, D8).** Waagerecht steht eine Zeile auf `--space-3` (12px, `.list-row`),
+`--roomy` und Zeilen, die mit einem 16er Traeger fluchten (Dosis, Besuche), auf `--space-4`.
+Darunter gibt es nichts: Aufgaben mobil (die 8px-Polsterung des Takts galt auch waagerecht) und
+die mobile Agenda (8px rundum) stehen seit R22 auf 12. Guard: `test:frontend-audit` ("D8: keine
+Zeilenliste steht waagerecht unter dem Einzug ...").
+
 **Drei Flaechen sind AUSDRUECKLICH keine Zeilenliste**, damit sie beim naechsten Durchgang
 nicht wieder als Rueckstand gelesen werden: die Notizen (Masonry-Raster, eigener Guard), die
 Aufteilung im Budget (Karten-IA mit eigener Rechenlogik) und die Mahlzeiten-Slots (Zellen
@@ -2994,6 +3000,17 @@ Stelle; unter 640px stehen sie seit R17 (2026-09-28) in Zeile 1 neben dem Titel 
 Werkzeuge: die haben kein Label zum Anschneiden, nur ihre Trefferflaeche. Der fruehere Rail-Pad-
 Ausnahmeeintrag fuer Tab-Innenabstaende ist mit dem Subjekt-Scan des #577-Guards entfallen:
 ein Selektor, dessen letztes Compound nicht die Rail ist, polstert ein KIND der Rail.
+
+**Eine Hoehe je Zeile (R22, D8).** Bedienelemente, die in EINER Zeile stehen, teilen eine
+Hoehe: am Zeiger ab 1024px (`(min-width: 1024px) and (hover: hover)`, dieselbe Bedingung wie
+`.btn`) misst der Kopf `--target-md` (40px) - Text- und Icon-Knoepfe, Suche, Segment (aussen),
+Reiter (`.sub-tab`), Listen-Kapseln und ihr Plus, die Icon-Form der Kalender-Suche, die
+Kopfknoepfe der Uebersicht und der Abschnittskopf (`.section-toolbar`); am Finger ueberall
+`--target-base`. Vorher standen bei 1280px Reiter und Listen-Kapseln mit 44px neben 40er
+Knoepfen, die Lupe des Kalenders mit 44, die Uebersicht mit 44, und der Dokumenten-Status mass
+50 neben 40er Chips (er rechnet jetzt wie das Kopf-Segment). Segmente schreiben ueberall 14px
+(`--text-sm`; der Kalender hatte 15). Guards: `test:frontend-audit` ("D8: eine Hoehe je
+Kopfzeile ..."), `test:typography`.
 
 **Der Absender steht genau einmal, und die Shell setzt ihn.** Das Markensiegel des Moduls
 sitzt unmittelbar vor dem Seitentitel und wird von `wireCollapsingHeader` angehaengt - am

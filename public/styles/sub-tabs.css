@@ -125,6 +125,16 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* EINE HOEHE JE ZEILE (R22, D8): am Zeiger ab 1024px messen Kopf und
+ * Werkzeugzeile --target-md (40px) - Knoepfe, Suche, Segment. Die Reiter
+ * (Kuechen-Leiste, Budget, Belohnungen, Haushaltshilfe, Schichtplan) standen
+ * als einzige Kopf-Bedienelemente auf 44px. Am Finger bleibt --target-base. */
+@media (min-width: 1024px) and (hover: hover) {
+  .sub-tab {
+    height: var(--target-md);
+  }
+}
+
 .sub-tab:active {
   transform: scale(var(--press-scale-sm));
   transition-duration: var(--duration-2xs);

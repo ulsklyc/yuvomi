@@ -8245,13 +8245,18 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * Tablet im Querformat (1180px, `hover: none`) standen dadurch 40px-Icon-Knoepfe
  * und das 40px-Suchfeld neben 48px-Textknoepfen in derselben Kopfzeile. */
 @media (min-width: 1024px) and (hover: hover) {
-  .page-toolbar .btn--icon {
+  /* Der Abschnittskopf (`.section-toolbar`: Hauptbuch, Abos, Ausgleich) ist
+   * eine Werkzeugzeile wie der Seitenkopf und misst wie er (R22, D8) - Lupe
+   * und Icon-Knopf standen dort mit 44px neben 40er Textknoepfen. */
+  .page-toolbar .btn--icon,
+  .section-toolbar .btn--icon {
     min-height: var(--target-md);
     min-width: var(--target-md);
   }
 
   /* `height` dazu: Polster plus Zeilenhoehe ergaben 43px ueber der Untergrenze. */
-  .page-toolbar .page-search__input {
+  .page-toolbar .page-search__input,
+  .section-toolbar .page-search__input {
     min-height: var(--target-md);
     height: var(--target-md);
   }

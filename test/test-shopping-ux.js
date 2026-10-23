@@ -2232,8 +2232,13 @@ test('der Neu-Knopf der Listenleiste baut am Desktop nicht hoeher als die Kapsel
   assert.ok(minHeight(tab), '.list-tab nennt keine Mindesthoehe - der Test liest shopping.css nicht mehr');
   const desktop = rules.filter((r) => r.selector.trim() === '.list-tab__new'
     && r.at.some((a) => /min-width:\s*1024px/.test(a)) && minHeight(r));
-  assert.equal(desktop.length, 1, 'am Desktop (min-width: 1024px) setzt genau eine Regel die Hoehe des Neu-Knopfs');
-  assert.equal(minHeight(desktop[0]), minHeight(tab), 'Neu-Knopf und Kapsel bauen am Desktop gleich hoch');
+  assert.ok(desktop.length >= 1, 'am Desktop (min-width: 1024px) setzt keine Regel die Hoehe des Neu-Knopfs');
+  // Je Bedingung dieselbe Hoehe wie die Kapsel: ab 1024px die Basis der Kapsel,
+  // am Zeiger (R22, D8: `and (hover: hover)`) beide auf --target-md.
+  for (const r of desktop) {
+    const twin = rules.find((t) => t.selector.trim() === '.list-tab' && t.at.join() === r.at.join() && minHeight(t));
+    assert.equal(minHeight(r), minHeight(twin ?? tab), `Neu-Knopf und Kapsel bauen unter ${r.at.join(' ')} gleich hoch`);
+  }
   const base = rules.find((r) => r.selector.trim() === '.list-tab__new' && r.at.length === 0);
   assert.equal(minHeight(base), 'var(--target-lg)', 'mobil bleibt der Neu-Knopf auf der Touch-Hoehe');
 });

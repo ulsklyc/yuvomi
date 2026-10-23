@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same row. They now match the other button icons, as do the pantry filter chips and the folder
   menu in Documents. On a wide screen the three round buttons above the overview greeting are as
   tall as the buttons in every other page header.
+- **Controls in one row are one height.** On a computer, the tabs in the kitchen, budget, rewards,
+  housekeeping and shift plan headers, the shopping list tabs, the calendar search and the
+  buttons above the overview greeting stood a little taller than the buttons next to them, and
+  the Active/Archived switch in Documents was taller than the filter chips beside it. They now
+  line up, the calendar view switch uses the same text size as every other switch, and on a
+  touch tablet the header icon buttons are as large as the text buttons. On a phone, tasks and
+  the agenda keep the same distance from the card edge as every other list.
 - **Every control answers a press the same way.** Filter chips, segments, menu entries and the note
   and meal cards gave no sign when pressed, while buttons, tabs and the add button each shrank by
   their own amount. Small controls now give way a little more than wide ones such as buttons and

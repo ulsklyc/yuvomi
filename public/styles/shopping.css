@@ -82,6 +82,14 @@
   min-height: var(--target-base);
 }
 
+/* Die Listen-Kapseln stehen im Kopf neben "..." und "+ Artikel" - am Zeiger
+ * ab 1024px dieselben 40px wie ihre Nachbarn (R22, D8; vorher 44). */
+@media (min-width: 1024px) and (hover: hover) {
+  .list-tab {
+    min-height: var(--target-md);
+  }
+}
+
 .list-tab:hover:not(.list-tab--active) {
   border-color: var(--color-text-secondary);
   color: var(--color-text-primary);
@@ -145,6 +153,15 @@
 @media (min-width: 1024px) {
   .list-tab__new {
     min-height: var(--target-base);
+  }
+}
+
+/* Am Zeiger mit den Kapseln auf --target-md (R22, D8, Regel bei `.list-tab`). */
+@media (min-width: 1024px) and (hover: hover) {
+  .list-tab__new {
+    width: var(--target-md);
+    height: var(--target-md);
+    min-height: var(--target-md);
   }
 }
 

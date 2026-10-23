@@ -11764,6 +11764,68 @@ test('D8: .btn > svg misst --icon-md, Zeilenglyphe und Chip-Glyphe aus Tokens', 
     'der Vorrat setzt seine Chip-Glyphe wieder auf --icon-sm');
 });
 
+// R22 (S4, D8): BEDIENELEMENTE EINER ZEILE TEILEN EINE HOEHE. Am Zeiger ab
+// 1024px misst der Kopf --target-md (40px), am Finger --target-base. Gemessen
+// vorher bei 1280: Reiter (Kueche, Budget, Belohnungen, Haushaltshilfe,
+// Schichtplan) und Listen-Kapseln 44 neben 40er Knoepfen, die Lupe des
+// Kalenders 44, der Dokumenten-Status 50 neben 40er Chips; Kalender-Segment
+// 15px statt 14px Schrift.
+test('D8: eine Hoehe je Kopfzeile - Reiter, Listen-Kapseln, Kalender-Lupe und Status-Segment', () => {
+  const pointerDesk = (r) => r.at.some((a) => /min-width:\s*1024px\)\s*and\s*\(hover:\s*hover/.test(a));
+  const sel = (r) => r.selector.split(',').map((x) => x.replace(/\s+/g, ' ').trim());
+  const find = (file, selector, pred = () => true) => [...eachRule(read(`../public/styles/${file}`))]
+    .filter((r) => sel(r).includes(selector) && pred(r));
+  assert.ok(find('sub-tabs.css', '.sub-tab', pointerDesk).some((r) => /height:\s*var\(--target-md\)/.test(r.body)),
+    'die Reiter messen am Zeiger nicht --target-md');
+  assert.ok(find('shopping.css', '.list-tab', pointerDesk).some((r) => /min-height:\s*var\(--target-md\)/.test(r.body)),
+    'die Listen-Kapseln messen am Zeiger nicht --target-md');
+  assert.ok(find('shopping.css', '.list-tab__new', pointerDesk).some((r) => /height:\s*var\(--target-md\)/.test(r.body)),
+    'das Listen-Plus misst am Zeiger nicht --target-md');
+  const lupe = '.page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))';
+  assert.ok(find('calendar.css', lupe, pointerDesk).some((r) => /block-size:\s*var\(--target-md\)/.test(r.body)),
+    'die Icon-Form der Kalender-Suche misst am Zeiger nicht --target-md');
+  const status = [...eachRule(read('../public/styles/panel.css'))].filter((r) => sel(r).includes('.documents-status .segmented__item'));
+  assert.ok(status.some((r) => /min-height:\s*calc\(var\(--target-base\)\s*-\s*4 \* var\(--space-px\)\)/.test(r.body)),
+    'der Dokumenten-Status rechnet nicht wie das Kopf-Segment (aussen = Zielgroesse)');
+  assert.ok(status.some((r) => /--target-md/.test(r.body)), 'der Dokumenten-Status misst am Zeiger nicht die 40px der Chips');
+  // Die Icon-Knoepfe und die Suche im Kopf schalten nach Breite UND Zeiger wie `.btn`.
+  for (const s of ['.section-toolbar .btn--icon', '.section-toolbar .page-search__input']) {
+    assert.ok(find('layout.css', s, pointerDesk).some((r) => /min-height:\s*var\(--target-md\)/.test(r.body)),
+      `${s} misst am Zeiger nicht --target-md - der Abschnittskopf ist eine Werkzeugzeile wie der Seitenkopf`);
+  }
+  const head = find('layout.css', '.page-toolbar .btn--icon', (r) => r.at.length > 0);
+  assert.ok(head.length && head.every(pointerDesk), 'die 40px-Regel der Kopf-Icon-Knoepfe schaltet nur nach der Breite - am Touch-Tablet stehen sie neben 48er Textknoepfen');
+});
+
+// R22 (S4, D8): EIN ZEILENEINZUG. Die geteilte Zeile (`.list-row`) steht
+// waagerecht auf --space-3 (12px), die benannte Stufe `--roomy` und Zeilen, die
+// mit einem 16er Traeger fluchten (Dosis, Besuche), auf --space-4. Gemessen bei
+// 390px standen zwei Listen darunter auf 8px: Aufgaben (die mobile Polsterung
+// galt auch waagerecht) und Agenda (eigene Polsterung rundum).
+const ROW_CLASSES = ['list-row', 'agenda-event', 'task-card__main', 'shopping-item', 'recipe-row', 'pantry-row',
+  'contact-item', 'birthday-item', 'budget-entry', 'document-row', 'documents-folder-item', 'rw-standing',
+  'rw-ledger-row', 'health-dose', 'health-area-row', 'housekeeping-visit-row'];
+test('D8: keine Zeilenliste steht waagerecht unter dem Einzug der geteilten Zeile', () => {
+  const narrow = /var\(--space-(?:0h|1|1h|2)\)|\b0\b|\d+px/;
+  const leaf = new RegExp(`\\.(?:${ROW_CLASSES.join('|')})(?![\\w-])[^\\s>+~]*$`);
+  const offenders = [];
+  for (const { file, css } of stylesheetFiles()) {
+    for (const { selector, body, at } of eachRule(css)) {
+      if (!selector.split(',').some((x) => leaf.test(x.trim()))) continue;
+      const decl = (prop) => body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`))?.[1]?.trim();
+      const pad = decl('padding');
+      const inline = decl('padding-inline');
+      const parts = pad ? pad.split(/\s+(?![^(]*\))/) : [];
+      const padInline = parts.length === 1 ? parts[0] : parts.length >= 2 ? parts[1] : null;
+      const effective = inline ?? (pad && !/--list-row-pad/.test(pad) ? padInline : null);
+      if (effective && narrow.test(effective)) offenders.push(`${file}: ${selector.trim().slice(0, 70)} -> ${effective} ${at.join(' ')}`);
+      const rowPad = decl('--list-row-pad');
+      if (rowPad && narrow.test(rowPad) && !inline) offenders.push(`${file}: ${selector.trim().slice(0, 70)} --list-row-pad ${rowPad} gilt auch waagerecht ${at.join(' ')}`);
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
 test('Dialoge laufen über die Modal-Komponente, nicht über native Browser-Dialoge', () => {
   // window.confirm blockiert den Thread, ignoriert das Design-System, hat
   // keinen Fokus-Trap und keine Danger-Farbe. confirmModal/promptModal/

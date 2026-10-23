@@ -421,11 +421,9 @@
 /* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (.segmented, panel.css; D1, Critique
  * 2026-10-16). Hier standen ein eigenes Well (radius-sm, ohne Kante) und eine
  * eigene Aktiv-Pille - die dritte Optik derselben Bedienfrage neben dem
- * Aufgaben-Umschalter und den Dokumenten. Es bleibt die Schriftrolle der
- * Beschriftung (test:typography: mindestens 14px). */
-.cal-toolbar__view-btn {
-  font-size: var(--type-secondary);
-}
+ * Aufgaben-Umschalter und den Dokumenten. Seit R22 (D8) auch die Schrift des
+ * Segments: hier stand die 15px-Sekundaerrolle, jedes andere Segment der App
+ * schreibt 14px (`--text-sm`, panel.css). Keine eigene Regel mehr. */
 
 /* Mobiles Umbrechen kommt jetzt aus .page-toolbar--wrap (layout.css): die
  * Datums-Navigation (.cal-toolbar__month = Center-Slot) rutscht als Gruppe auf
@@ -583,6 +581,23 @@
   .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:is(:focus-within, :has(input:not(:placeholder-shown))) {
     flex: 1 1 auto;
     max-width: none;
+  }
+}
+
+/* DIE LUPE MISST WIE IHRE ZEILE (R22, D8). Am Zeiger stehen Pfeile, Filter,
+ * Segment und "+ Termin" auf --target-md (40px); die Icon-Form der Suche hielt
+ * --target-base und stand mit 44px als einziges Ziel ueber die Zeile hinaus.
+ * Am Finger (Tablet quer) bleibt --target-base, wie bei jedem Nachbarn. */
+@media (min-width: 1024px) and (hover: hover) {
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) {
+    width: var(--target-md);
+    min-width: var(--target-md);
+    max-width: var(--target-md);
+    block-size: var(--target-md);
+  }
+
+  .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input {
+    block-size: calc(var(--target-md) - 2 * 1.5px);
   }
 }
 
@@ -2377,13 +2392,12 @@
     margin-bottom: var(--space-1);
   }
 
-  /* Nur die Polsterung, und die ist eine Abweichung: 8px rundum statt der 8/12
-   * der geteilten Zeile, weil links die Farbkante steht und kein Bedienelement.
-   * Die `min-height` stand hier ein zweites Mal mit demselben Wert - sie kommt
-   * von `.list-row` und ist entfallen, nicht vergessen. */
-  .agenda-event {
-    padding: var(--space-2);
-  }
+  /* Hier stand `padding: var(--space-2)` - 8px rundum statt der 8/12 der
+   * geteilten Zeile, "weil links die Farbkante steht". Die Farbkante haengt
+   * aber am Text (`.agenda-event__body`), nicht an der Zeile, und mit 8px stand
+   * die Agenda als einzige Liste neben Einkauf, Vorrat und Kontakten auf einem
+   * eigenen Einzug (R22, D8). Die Zeile traegt jetzt die Polsterung von
+   * `.list-row`; die `min-height` kommt ebenfalls von dort. */
 
   /* Hier stand `flex-wrap: wrap` - die Erlaubnis, aus der die zweizeilige
    * Metazeile wurde. Der Abstand bleibt schmaler als auf dem Desktop, das

@@ -1255,7 +1255,8 @@ test('der Ansichtsumschalter ist das Kanon-Segment (D1) und so hoch wie Suche un
     && /(?:^|[;{\s])(?:background|box-shadow|border-radius|padding|width|height)\s*:/.test(rule.body));
   assert.deepEqual(own.map((r) => r.selector.trim()), [], 'keine eigene Pille, Flaeche oder Hoehe mehr');
   const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
-  const item = [...eachRule(panel)].find((r) => r.selector.trim() === '.page-toolbar .segmented__item' && !r.at.length);
+  // Seit R22 (D8) teilt der Dokumenten-Status die Regel (Selektorliste).
+  const item = [...eachRule(panel)].find((r) => r.selector.split(',').map((x) => x.trim()).includes('.page-toolbar .segmented__item') && !r.at.length);
   assert.match(item?.body ?? '', /min-height:\s*calc\(var\(--target-base\) - 4 \* var\(--space-px\)\)/, 'Kopf-Segment aussen so hoch wie ein Kopfknopf');
 });
 
