@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was one endless stack. Below the 50th card, "Show N more" now shows the rest of that column until
   you leave the page; the count in the column head still includes all cards, and you can still drop
   a card into the column.
+- **The budget journal scrolls smoothly under the mouse.** Every booking row the pointer passed
+  while scrolling faded its highlight in and out, and on a wide screen that cost about one frame in
+  twenty. The highlight now switches without the fade, so the list keeps pace with the wheel.
 - **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
   in the budget showed the list first and pushed it down once the figures above it arrived; the
   figures now hold their place from the first frame. On a phone, the Health area list waits in

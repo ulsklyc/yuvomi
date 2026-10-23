@@ -3077,3 +3077,15 @@ test('swapRegion CSS: vorwaerts schiebt herein, zurueck schiebt hinaus, reduzier
   const keyframes = css('layout.css');
   assert.match(keyframes, /@keyframes region-fade-in \{\s*from \{ opacity: 0; \}/, 'die Blende hat keinen Versatz');
 });
+
+// R22 (S4): Der Hover der Buchung im Budget-Journal schaltet, er blendet nicht.
+// Gemessen am 1280er Journal beim Mausrad-Scrollen mit dem Zeiger ueber der
+// Liste: mit der 150-ms-Blende der Zeile 11-22 von 300 Frames ueber 33 ms,
+// ohne sie 0. Am Zeiger traegt die Zeile deshalb keine Transition; am Finger
+// bleibt der Press-Baustein unveraendert.
+test('R22: die Buchungszeile traegt am Zeiger keine Hover-Blende', () => {
+  const rules = [...eachRule(css('budget.css'))].filter((r) => r.at.some((a) => /\(hover:\s*hover\)/.test(a))
+    && r.selector.split(',').some((s) => s.trim() === '.budget-entry.list-row'));
+  assert.ok(rules.some((r) => /(?:^|;)\s*transition:\s*none/.test(r.body)),
+    'unter @media (hover: hover) fehlt `.budget-entry.list-row { transition: none }` - jede Zeile unter dem Zeiger blendet beim Scrollen');
+});

@@ -2332,6 +2332,19 @@ button.budget-bar-row:focus-visible {
   cursor: pointer;
 }
 
+/* DER HOVER DER BUCHUNG SCHALTET, ER BLENDET NICHT (R22). Beim Mausrad-
+ * Scrollen wandert jede Zeile unter dem Zeiger durch Hover hinein und wieder
+ * heraus, und die 150-ms-Blende der Zeile (list-row.css) liess dabei laufend
+ * zwei Zeilen zugleich neu malen: 1280er Journal 11-22 von 300 Frames ueber
+ * 33 ms, ohne die Blende 0 (gleiche Laufart, Zeiger ueber der Liste). Der
+ * Wechsel bleibt derselbe Ton, nur ohne Zwischenstufen; am Finger (kein
+ * Hover) gilt die Blende des Press-Bausteins unveraendert. */
+@media (hover: hover) {
+  .budget-entry.list-row {
+    transition: none;
+  }
+}
+
 .budget-entry:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
