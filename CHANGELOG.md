@@ -262,6 +262,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Recipes on a phone say which are planned this week.** A computer showed "Planned this week"
   under a recipe's name, a phone left it out. The phone now shows it too, in the same line as the
   ingredient count; a long translation ends with an ellipsis instead of growing the row.
+- **The task list beside the detail column no longer grows while it fills in.** On a laptop the
+  list next to an open task is narrow enough that most titles take two lines, but the rows still
+  waiting to be drawn held the height of one; the list grew by up to 80px as they arrived. They
+  now hold the two-line height there.
 - **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
   that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
   as a whole: the search in a computer's page header lost its width, the collapsed budget header

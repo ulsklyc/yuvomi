@@ -353,8 +353,8 @@
  * Zeilen jeder Gruppe stehen immer (sie sind die Falz), der Rest haelt als
  * Platzhalter seine Content-Box: 85px unter 640px, 80px darueber (gemessen mit
  * Titel, Faelligkeit, Prioritaet und Kategorie: 84,6 mobil, 80 Tablet und
- * 1920; 1280/1440 mit Detailspalte 100,6 - dort steht Zeile 20 nie in der
- * Falz, und `auto` merkt sich danach die echte Hoehe). Die Zeile ist selbst
+ * 1920; 1280/1440 mit Detailspalte 100,6 - seit F4.8 traegt die schmale
+ * Bahn bis 27,5rem dafuer eine eigene Stufe, unten). Die Zeile ist selbst
  * `overflow: hidden` (Wischbuehne, layout.css) - die Paint-Containment
  * schneidet nichts ab, was nicht ohnehin geschnitten wird. Wer die Zeile
  * umbaut, misst neu (test:frontend-audit). Neu gemessen R22 S9 nach dem
@@ -383,6 +383,33 @@
   @media (min-width: 640px) {
     .task-group .row-carrier > .swipe-row:nth-child(n+20) {
       contain-intrinsic-size: auto none auto 80px;
+    }
+  }
+}
+
+/* DIE SCHMALE LISTENBAHN NEBEN DER DETAILSPALTE (Sammel-Ticket R22-F, F4.8).
+ * Ab 1280px teilt sich die Seite in Liste und Detail; die Bahn misst dann
+ * 420-520px, und bis ~440px bricht der Titel einer Aufgabe mit Personen in
+ * zwei Zeilen: Content-Box 100,6 statt 80px. Der Platzhalter blieb 80px -
+ * gemessen beim Nachzeichnen von `.row-pending` (Demo-Haushalt, 1280x800):
+ * 4 von 6 Zeilen 20,6px laenger, Sprung 82px. Die Frage gehoert der BAHN,
+ * nicht dem Fenster (Container `list-rows` an `.row-carrier`): bis 27,5rem
+ * ist die typische Zeile zweizeilig (1280: 7 von 11, 1350: 6 von 11), ab
+ * 446px einzeilig (1440: 9 von 11). Gesetzt an der Zeile und am
+ * Platzhalter selbst - ein Container fragt nur fuer seine Kinder. Unter
+ * 640px gilt die Telefonzeile (85px) und ihre eigene Rechnung. */
+@media (min-width: 640px) {
+  @container list-rows (max-width: 27.5rem) {
+    .task-group .row-carrier > .row-pending {
+      --row-pending-size: 101px;
+    }
+  }
+
+  @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+    @container list-rows (max-width: 27.5rem) {
+      .task-group .row-carrier > .swipe-row:nth-child(n+20) {
+        contain-intrinsic-size: auto none auto 101px;
+      }
     }
   }
 }

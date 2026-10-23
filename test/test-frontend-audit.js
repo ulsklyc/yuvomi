@@ -23632,3 +23632,25 @@ test('F4.2: kein :has() in einer gemischten Selektorliste (ohne :has() faellt so
   }
   assert.deepEqual(mixed, [], 'eigene Regel je :has()-Selektor oder :is()/:where() drumherum');
 });
+
+/*
+ * Sammel-Ticket R22-F, F4.8: DER PLATZHALTER DER AUFGABENZEILE NEBEN DER
+ * DETAILSPALTE. Ab 1280px misst die Listenbahn 420-520px; bis ~440px bricht der
+ * Titel einer Aufgabe mit Personen um (Content-Box 100,6 statt 80px). Gemessen
+ * beim Nachzeichnen von `.row-pending` (Demo-Haushalt, 1280x800): 4 von 6
+ * Platzhaltern 20,6px zu kurz, Sprung 82px - nachher 4 von 6 auf 0,4px genau.
+ * Die Breite der BAHN entscheidet (Container `list-rows`), nicht das Fenster;
+ * Platzhalter und `contain-intrinsic-size` tragen denselben Wert.
+ */
+test('F4.8: in der schmalen Listenbahn traegt der Aufgaben-Platzhalter die zweizeilige Zeile', () => {
+  const rules = [...eachRule(read('../public/styles/tasks.css'))];
+  const band = (r) => r.at.some((a) => /@container list-rows \(max-width: 27\.5rem\)/.test(a)) && r.at.some((a) => /@media \(min-width: 640px\)/.test(a));
+  const pending = rules.find((r) => band(r) && r.selector.trim() === '.task-group .row-carrier > .row-pending');
+  const intrinsic = rules.find((r) => band(r) && r.selector.trim() === '.task-group .row-carrier > .swipe-row:nth-child(n+20)');
+  const px = (body, re) => Number(body?.match(re)?.[1]);
+  const p = px(pending?.body, /--row-pending-size:\s*(\d+)px/);
+  const i = px(intrinsic?.body, /contain-intrinsic-size:\s*auto none auto (\d+)px/);
+  assert.equal(p, 101, 'Platzhalter neben der Detailspalte: 100,6px gemessen, nicht 80');
+  assert.equal(i, p, 'contain-intrinsic-size und Platzhalter muessen dieselbe Content-Box tragen');
+  assert.ok(intrinsic.at.some((a) => /@supports \(content-visibility: auto\)/.test(a)), 'ohne @supports greift contain-intrinsic-size auch ohne content-visibility');
+});
