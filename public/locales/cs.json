@@ -6201,7 +6201,8 @@
         "errorNotEnoughPoints": "Na to nestačí body.",
         "errorNotParticipating": "Tato osoba nesbírá body.",
         "errorMoneyAccountGone": "Tento účet už neexistuje.",
-        "errorMoneyPlanGone": "Tento plán už neexistuje."
+        "errorMoneyPlanGone": "Tento plán už neexistuje.",
+        "ownLedger": "Tvoje záznamy"
     },
     "datepicker": {
         "openCalendar": "Otevřít kalendář",

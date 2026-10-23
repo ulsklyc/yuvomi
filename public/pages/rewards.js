@@ -569,7 +569,11 @@ function renderOwnCard(member) {
           </p>
           <div class="rw-own__goal">${targetHtml}${progress}</div>
           <div class="rw-own__actions">
-            <button class="btn btn--ghost rw-own__history" type="button" data-member="${member.id}">${esc(t('rewards.tabLedger'))}</button>
+            ${/* „DEINE BUCHUNGEN", NICHT EIN DRITTES „VERLAUF" (R22 S9, Critique a2,
+                 Persona Emma): Reiter, Seitenspalte und dieser Knopf hiessen
+                 gleich, fuehrten aber an zwei Orte - der Knopf oeffnet nur die
+                 eigenen Buchungen. */ ''}
+            <button class="btn btn--ghost rw-own__history" type="button" data-member="${member.id}">${esc(t('rewards.ownLedger'))}</button>
             ${canRedeem ? `<button class="btn btn--primary rw-redeem-open" type="button" data-member="${member.id}">
               <i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}
             </button>` : ''}

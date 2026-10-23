@@ -6473,7 +6473,8 @@
         "errorNotEnoughPoints": "النقاط لا تكفي لهذا.",
         "errorNotParticipating": "هذا الشخص لا يجمع النقاط.",
         "errorMoneyAccountGone": "هذا الحساب لم يعد موجودًا.",
-        "errorMoneyPlanGone": "هذه الخطة لم تعد موجودة."
+        "errorMoneyPlanGone": "هذه الخطة لم تعد موجودة.",
+        "ownLedger": "معاملاتك"
     },
     "datepicker": {
         "openCalendar": "فتح التقويم",

@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Bunun için puan yetmiyor.",
         "errorNotParticipating": "Bu kişi puan toplamıyor.",
         "errorMoneyAccountGone": "Bu hesap artık yok.",
-        "errorMoneyPlanGone": "Bu plan artık yok."
+        "errorMoneyPlanGone": "Bu plan artık yok.",
+        "ownLedger": "Hareketlerin"
     },
     "datepicker": {
         "openCalendar": "Takvimi aç",

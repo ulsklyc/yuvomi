@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "積分不足。",
         "errorNotParticipating": "此人不累積積分。",
         "errorMoneyAccountGone": "該帳戶已不存在。",
-        "errorMoneyPlanGone": "該計劃已不存在。"
+        "errorMoneyPlanGone": "該計劃已不存在。",
+        "ownLedger": "你的紀錄"
     },
     "datepicker": {
         "openCalendar": "開啟日曆",

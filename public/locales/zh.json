@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "积分不足。",
         "errorNotParticipating": "此人不积累积分。",
         "errorMoneyAccountGone": "该账户已不存在。",
-        "errorMoneyPlanGone": "该计划已不存在。"
+        "errorMoneyPlanGone": "该计划已不存在。",
+        "ownLedger": "你的记录"
     },
     "datepicker": {
         "openCalendar": "打开日历",

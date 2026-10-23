@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Οι πόντοι δεν φτάνουν για αυτό.",
         "errorNotParticipating": "Αυτό το άτομο δεν συγκεντρώνει πόντους.",
         "errorMoneyAccountGone": "Αυτός ο λογαριασμός δεν υπάρχει πια.",
-        "errorMoneyPlanGone": "Αυτό το πλάνο δεν υπάρχει πια."
+        "errorMoneyPlanGone": "Αυτό το πλάνο δεν υπάρχει πια.",
+        "ownLedger": "Οι κινήσεις σου"
     },
     "datepicker": {
         "openCalendar": "Άνοιγμα ημερολογίου",

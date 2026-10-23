@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Daarvoor zijn er niet genoeg punten.",
         "errorNotParticipating": "Deze persoon spaart geen punten.",
         "errorMoneyAccountGone": "Deze rekening bestaat niet meer.",
-        "errorMoneyPlanGone": "Dit plan bestaat niet meer."
+        "errorMoneyPlanGone": "Dit plan bestaat niet meer.",
+        "ownLedger": "Jouw boekingen"
     },
     "datepicker": {
         "openCalendar": "Kalender openen",

@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Poengene strekker ikke til for dette.",
         "errorNotParticipating": "Denne personen samler ikke poeng.",
         "errorMoneyAccountGone": "Denne kontoen finnes ikke lenger.",
-        "errorMoneyPlanGone": "Denne planen finnes ikke lenger."
+        "errorMoneyPlanGone": "Denne planen finnes ikke lenger.",
+        "ownLedger": "Dine posteringer"
     },
     "datepicker": {
         "openCalendar": "Åpne kalender",

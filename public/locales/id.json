@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Poin tidak cukup untuk ini.",
         "errorNotParticipating": "Orang ini tidak mengumpulkan poin.",
         "errorMoneyAccountGone": "Rekening ini sudah tidak ada.",
-        "errorMoneyPlanGone": "Rencana ini sudah tidak ada."
+        "errorMoneyPlanGone": "Rencana ini sudah tidak ada.",
+        "ownLedger": "Catatanmu"
     },
     "datepicker": {
         "openCalendar": "Buka kalender",

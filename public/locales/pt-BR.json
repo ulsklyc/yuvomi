@@ -6172,7 +6172,8 @@
         "errorNotEnoughPoints": "Os pontos não são suficientes para isso.",
         "errorNotParticipating": "Esta pessoa não acumula pontos.",
         "errorMoneyAccountGone": "Esta conta não existe mais.",
-        "errorMoneyPlanGone": "Este plano não existe mais."
+        "errorMoneyPlanGone": "Este plano não existe mais.",
+        "ownLedger": "Seus lançamentos"
     },
     "schedule": {
         "title": "Turnos",

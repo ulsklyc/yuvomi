@@ -6336,7 +6336,8 @@
         "errorNotEnoughPoints": "Баллов на это не хватает.",
         "errorNotParticipating": "Этот человек не копит баллы.",
         "errorMoneyAccountGone": "Этого счёта больше нет.",
-        "errorMoneyPlanGone": "Этого плана больше нет."
+        "errorMoneyPlanGone": "Этого плана больше нет.",
+        "ownLedger": "Твои записи"
     },
     "datepicker": {
         "openCalendar": "Открыть календарь",

@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "امتیازها برای این کافی نیست.",
         "errorNotParticipating": "این شخص امتیاز جمع نمی‌کند.",
         "errorMoneyAccountGone": "این حساب دیگر وجود ندارد.",
-        "errorMoneyPlanGone": "این برنامه دیگر وجود ندارد."
+        "errorMoneyPlanGone": "این برنامه دیگر وجود ندارد.",
+        "ownLedger": "تراکنش‌های تو"
     },
     "datepicker": {
         "openCalendar": "باز کردن تقویم",

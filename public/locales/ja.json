@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "ポイントが足りません。",
         "errorNotParticipating": "この人はポイントを貯めていません。",
         "errorMoneyAccountGone": "この口座はもう存在しません。",
-        "errorMoneyPlanGone": "このプランはもう存在しません。"
+        "errorMoneyPlanGone": "このプランはもう存在しません。",
+        "ownLedger": "自分の記録"
     },
     "datepicker": {
         "openCalendar": "カレンダーを開く",

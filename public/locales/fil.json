@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Hindi sapat ang mga puntos para dito.",
         "errorNotParticipating": "Hindi nangongolekta ng puntos ang taong ito.",
         "errorMoneyAccountGone": "Wala na ang account na ito.",
-        "errorMoneyPlanGone": "Wala na ang planong ito."
+        "errorMoneyPlanGone": "Wala na ang planong ito.",
+        "ownLedger": "Iyong mga entry"
     },
     "datepicker": {
         "openCalendar": "Buksan ang kalendaryo",

@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Ehhez nem elég a pont.",
         "errorNotParticipating": "Ez a személy nem gyűjt pontokat.",
         "errorMoneyAccountGone": "Ez a számla már nem létezik.",
-        "errorMoneyPlanGone": "Ez a terv már nem létezik."
+        "errorMoneyPlanGone": "Ez a terv már nem létezik.",
+        "ownLedger": "Saját tételeid"
     },
     "datepicker": {
         "openCalendar": "Naptár megnyitása",

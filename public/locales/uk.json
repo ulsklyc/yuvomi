@@ -6336,7 +6336,8 @@
         "errorNotEnoughPoints": "Балів на це не вистачає.",
         "errorNotParticipating": "Ця людина не накопичує бали.",
         "errorMoneyAccountGone": "Цього рахунку більше немає.",
-        "errorMoneyPlanGone": "Цього плану більше немає."
+        "errorMoneyPlanGone": "Цього плану більше немає.",
+        "ownLedger": "Твої записи"
     },
     "datepicker": {
         "openCalendar": "Відкрити календар",

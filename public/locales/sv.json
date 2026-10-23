@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Poängen räcker inte till det här.",
         "errorNotParticipating": "Den här personen samlar inte poäng.",
         "errorMoneyAccountGone": "Det här kontot finns inte längre.",
-        "errorMoneyPlanGone": "Den här planen finns inte längre."
+        "errorMoneyPlanGone": "Den här planen finns inte längre.",
+        "ownLedger": "Dina poster"
     },
     "datepicker": {
         "openCalendar": "Öppna kalender",

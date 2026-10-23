@@ -399,6 +399,27 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* DAS ZIEL BEKOMMT DIE BREITE, NICHT DIE KNOEPFE (R22 S9, Critique a2). Bei
+ * 1280 mit Seitenspalte war die Karte 612px breit, und drei Spalten liessen dem
+ * Ziel 220px: „Eine Stunde zocken" brach auf zwei Zeilen, waehrend rechts zwei
+ * Knoepfe standen (1440: 720px, dasselbe). Unter 48rem Kartenbreite stehen die Handlungen deshalb
+ * unter Stand und Ziel, an der Endkante. Ohne Container-Abfragen (aeltere
+ * Browser) bleiben es drei Spalten wie bisher. */
+.rw-section--own {
+  container: rw-own / inline-size;
+}
+
+@container rw-own (max-width: 48rem) {
+  .rw-own {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .rw-own__actions {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 639px) {
   .rw-own {
     grid-template-columns: minmax(0, 1fr);

@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "Không đủ điểm cho việc này.",
         "errorNotParticipating": "Người này không tích điểm.",
         "errorMoneyAccountGone": "Tài khoản này không còn nữa.",
-        "errorMoneyPlanGone": "Kế hoạch này không còn nữa."
+        "errorMoneyPlanGone": "Kế hoạch này không còn nữa.",
+        "ownLedger": "Giao dịch của bạn"
     },
     "datepicker": {
         "openCalendar": "Mở lịch",

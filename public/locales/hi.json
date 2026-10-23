@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "इसके लिए अंक पर्याप्त नहीं हैं।",
         "errorNotParticipating": "यह व्यक्ति अंक जमा नहीं करता।",
         "errorMoneyAccountGone": "यह खाता अब मौजूद नहीं है।",
-        "errorMoneyPlanGone": "यह योजना अब मौजूद नहीं है।"
+        "errorMoneyPlanGone": "यह योजना अब मौजूद नहीं है।",
+        "ownLedger": "तुम्हारी प्रविष्टियाँ"
     },
     "datepicker": {
         "openCalendar": "कैलेंडर खोलें",

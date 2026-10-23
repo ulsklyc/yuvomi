@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "포인트가 부족합니다.",
         "errorNotParticipating": "이 사람은 포인트를 모으지 않습니다.",
         "errorMoneyAccountGone": "이 계좌는 더 이상 없습니다.",
-        "errorMoneyPlanGone": "이 계획은 더 이상 없습니다."
+        "errorMoneyPlanGone": "이 계획은 더 이상 없습니다.",
+        "ownLedger": "내 내역"
     },
     "datepicker": {
         "openCalendar": "캘린더 열기",

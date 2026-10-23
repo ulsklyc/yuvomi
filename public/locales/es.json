@@ -6064,7 +6064,8 @@
         "errorNotEnoughPoints": "No hay puntos suficientes para esto.",
         "errorNotParticipating": "Esta persona no acumula puntos.",
         "errorMoneyAccountGone": "Esta cuenta ya no existe.",
-        "errorMoneyPlanGone": "Este plan ya no existe."
+        "errorMoneyPlanGone": "Este plan ya no existe.",
+        "ownLedger": "Tus movimientos"
     },
     "datepicker": {
         "openCalendar": "Abrir calendario",

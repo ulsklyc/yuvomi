@@ -929,6 +929,10 @@ test('Belohnungen: das Kind sieht seine eigene Karte "Deine Punkte -> naechste P
     assert.match(card, /role="progressbar"[^>]*aria-valuenow="75"/, '30 von 40 - der Weg als Balken');
     assert.doesNotMatch(card, /rw-redeem-open/, '30 reicht fuer nichts: kein Einloese-Knopf');
     assert.match(card, /rw-own__history/, 'der eigene Verlauf bleibt erreichbar');
+    // R22 S9 (Persona Emma): Reiter, Seitenspalte und Knopf hiessen alle
+    // „Verlauf" und fuehrten an zwei Orte - der Knopf nennt die EIGENEN Buchungen.
+    assert.match(card, /rw-own__history"[^>]*>rewards\.ownLedger</, 'der Knopf heisst nicht wie der Reiter');
+    assert.doesNotMatch(card, />rewards\.tabLedger</, 'kein drittes „Verlauf" in der eigenen Karte');
     assert.doesNotMatch(card, /rw-standing__id/, 'keine Rangzeile in der eigenen Karte');
     assert.doesNotMatch(el.html.slice(others), /data-member="3"/, 'unten stehen nur die anderen');
 
@@ -947,4 +951,18 @@ test('Belohnungen: das Kind sieht seine eigene Karte "Deine Punkte -> naechste P
   } finally {
     Object.assign(s, vorher);
   }
+});
+
+// R22 S9 (Critique 2026-10-22, a2): bei 1280 mit Seitenspalte liessen drei
+// Spalten dem Ziel der eigenen Karte 220px - „Eine Stunde zocken" brach um,
+// rechts standen zwei Knoepfe. Unter 48rem Kartenbreite stehen sie darunter.
+test('R22: die eigene Punktekarte gibt dem Ziel die Breite, die Knoepfe ruecken unter Stand und Ziel', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/rewards.css', import.meta.url), 'utf8'))];
+  const own = rules.find((r) => r.selector.trim() === '.rw-section--own' && !r.at.length);
+  assert.match(own?.body ?? '', /container:\s*rw-own \/ inline-size/);
+  const narrow = rules.filter((r) => r.at.some((a) => /@container rw-own \(max-width: 48rem\)/.test(a)));
+  assert.match(narrow.find((r) => r.selector.trim() === '.rw-own')?.body ?? '', /grid-template-columns:\s*auto minmax\(0, 1fr\)/);
+  assert.match(narrow.find((r) => r.selector.trim() === '.rw-own__actions')?.body ?? '', /grid-column:\s*1 \/ -1/);
 });
