@@ -2092,6 +2092,14 @@ und wird keine Allowlist.
   lokale Ueberschreibungen blieben wirkungslos. `--focus-ring-offset-inset` (-2px) ist nur
   fuer Elemente an einer geclippten Kante da.
 
+- **Glyphe (R22, D8):** jede Glyphe direkt im `.btn` misst `--icon-md` (16px) - als Grundregel
+  `:where(.btn) > svg` mit Spezifitaet null, eine Groessenklasse am Zeichen gewinnt weiter. Vorher
+  zeichnete Lucide ohne Klasse 24px, und im selben Kopf standen 16er neben 24er Glyphen
+  (Zeitraum-Pfeile, Belohnungen, Haushaltshilfe, das angedockte Plus). Der schwebende FAB behaelt
+  `--icon-xl`; angedockt ist er ein Textknopf mit `--icon-md`. Zeilenaktionen (`.row-action`,
+  Notiz-Nadel, Ordner-Kebab) zeichnen mit dem Token `--icon-row` (18px, die Rolle eines Bauteils,
+  keine Stufe der Skala), Filter-Chips mit `--icon-md`. Guard: `test:frontend-audit`
+  ("D8: .btn > svg misst --icon-md ...").
 - **Klein (`.btn--sm`):** fuer dichte Aktionsreihen - Polsterung 4px 12px, Luecke 4px, die
   Hoehe bleibt die Zielgroesse der Geraetewelt (`--target-md` am Zeiger, `--target-base` am
   Finger). Klein heisst schmaler, nicht unter die Zielgroesse. Steht seit 2026-09-24 in

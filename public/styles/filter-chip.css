@@ -34,6 +34,15 @@
   min-height: var(--target-lg);
 }
 
+/* EINE GLYPHE JE CHIP (R22, D8): `--icon-md` wie jede Knopf-Glyphe. Der
+ * Vorrat zeichnete seine Status-Chips mit 12px, Kontakte, Dokumente und
+ * Entsorgung mit 16px - derselbe Chip in zwei Groessen. */
+.filter-chip > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex-shrink: 0;
+}
+
 /* Druck wie Reiter und Segment (tokens.css, Druckzustand): hinein schnell,
  * heraus mit der Dauer der Ruhe-Regel. */
 .filter-chip:active {

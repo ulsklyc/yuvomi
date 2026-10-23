@@ -5946,6 +5946,14 @@ a.popover-menu__item {
     height: auto;
     animation: none;
   }
+
+  /* Angedockt ist er ein Textknopf, und dessen Glyphe misst `--icon-md`
+   * (siehe `.btn > svg`). Das Plus trug sonst die 24px des schwebenden
+   * Kreises in die 40px-Kapsel neben "Neu" - als einziger Knopf im Kopf. */
+  .page-fab--docked > svg {
+    width: var(--icon-md);
+    height: var(--icon-md);
+  }
 }
 
 /* [hidden] durchsetzen: Klassen wie `.page-fab`/`.btn` setzen `display: flex`
@@ -7908,6 +7916,20 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   white-space: nowrap;
 }
 
+/* DIE GLYPHE IM KNOPF HAT EINE GRUNDGROESSE (R22, D8): `--icon-md`. Ohne
+ * Klasse zeichnete Lucide sein `width="24"`, und so standen im selben Kopf
+ * 16px-Glyphen neben 24px-Glyphen - Zeitraum-Pfeile in Kalender, Budget und
+ * Essensplan, "Bonus vergeben" und "Auszahlen" in den Belohnungen, "Kommen"/
+ * "Gehen" der Haushaltshilfe. `:where()` haelt die Regel auf Spezifitaet
+ * (0,0,1): eine Groessenklasse am Zeichen (`.icon-lg`, `.icon-xl`) oder eine
+ * Modulregel gewinnt weiter, nur das Fehlen einer Angabe faellt hierher.
+ * Guard: test:frontend-audit. */
+:where(.btn) > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex-shrink: 0;
+}
+
 /* Am Zeiger die Mausgröße - nach der Zeigerfähigkeit, nicht nach der Breite
  * allein (tokens.css, DESIGN.md). Ein Tablet im Querformat (1180px,
  * `hover: none`) bekam hier 40px statt der Fingergröße, jeder Knopf im Kopf
@@ -8127,7 +8149,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-text-tertiary);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .row-action:hover {
@@ -8164,8 +8186,8 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * bei gleicher Strichstaerke also sichtbar fetter und kleiner zugleich. */
 .row-action svg,
 .note-card__pin svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-row);
+  height: var(--icon-row);
 }
 
 /* Gesperrte Zeilenaktion - dieselben zwei Zustaende wie beim `.btn`, weil
@@ -8216,8 +8238,13 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * standen mit --target-base (44px) neben Segment, Filter und angedockter
  * Pille mit --target-md (40px, die `.btn`-Regel oben) - zwei Kanten in einer
  * Zeile, gemessen in 12 Modulen bei 1440. Am Zeiger ist 40px die Regel
- * (Hit-Test, ignore.md); dieselbe Grenze wie `.btn`. */
-@media (min-width: 1024px) {
+ * (Hit-Test, ignore.md); dieselbe Grenze wie `.btn`.
+ *
+ * DIESELBE GRENZE HEISST AUCH DERSELBE ZEIGER (R22, D8): die Regel schaltete
+ * nur nach der Breite, `.btn` seit 2026-10-22 nach Breite UND Zeiger. Am
+ * Tablet im Querformat (1180px, `hover: none`) standen dadurch 40px-Icon-Knoepfe
+ * und das 40px-Suchfeld neben 48px-Textknoepfen in derselben Kopfzeile. */
+@media (min-width: 1024px) and (hover: hover) {
   .page-toolbar .btn--icon {
     min-height: var(--target-md);
     min-width: var(--target-md);

@@ -454,9 +454,12 @@
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
+/* Die Zeilenglyphe wie jede Zeilenaktion (tokens.css `--icon-row`): der
+ * Ordner-Kebab zeichnete mit 16px kleiner als der Mehr-Knopf jeder anderen
+ * Zeile, obwohl er dieselbe Rolle traegt. */
 .documents-folder-item__menu svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-row);
+  height: var(--icon-row);
 }
 
 .documents-folder-item__menu:hover {

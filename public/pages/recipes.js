@@ -1215,7 +1215,7 @@ function fillRecipeDetail(detail, recipe) {
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.insertAdjacentHTML('beforeend',
-      '<i data-lucide="external-link" class="icon-sm" aria-hidden="true"></i>');
+      '<i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>');
     const linkLabel = document.createElement('span');
     linkLabel.textContent = t('recipes.openLink');
     link.appendChild(linkLabel);
@@ -1397,7 +1397,7 @@ function pantryMatchBulkEl(recipe) {
   btn.className = 'btn btn--ghost recipe-detail__match-open';
   btn.dataset.action = 'match-ingredients';
   btn.dataset.id = String(recipe.id);
-  btn.insertAdjacentHTML('beforeend', '<i data-lucide="link" class="icon-sm" aria-hidden="true"></i>');
+  btn.insertAdjacentHTML('beforeend', '<i data-lucide="link" class="icon-md" aria-hidden="true"></i>');
   const label = document.createElement('span');
   label.textContent = t('recipes.ingredientMatchOpen', { count: open.length });
   btn.appendChild(label);

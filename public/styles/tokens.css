@@ -1470,10 +1470,19 @@
    * 11b2. Icon-Größen — VIER Stufen, je Stufe genau ein Name.
    * Utility-Klassen dazu in layout.css.
    * -------------------------------------------------------- */
-  --icon-sm: 12px;   /* Inline-Marker in Fließtext, Chips */
-  --icon-md: 16px;   /* Standard: Buttons, Listenzeilen */
+  --icon-sm: 12px;   /* Inline-Marker in Fließtext */
+  --icon-md: 16px;   /* Standard: Glyphe jedes `.btn` (Grundregel), Filter-Chips, Listenzeilen */
   --icon-lg: 20px;   /* Betonte Aktionen, Toolbar */
   --icon-xl: 24px;   /* FAB, Empty-State, Dialog-Kopf */
+
+  /* DIE ZEILENGLYPHE (R22, D8): die Zeichen der Zeilenaktionen am Zeilenende
+   * (`.row-action`: Mehr, Abhaken, Warenkorb), der Notiz-Nadel und des
+   * Ordner-Menues. Sie liegen eine Stufe ueber `--icon-md`, weil sie allein in
+   * einem 48px-Kreis ohne Wort stehen und neben der 15px-Zeilenschrift mit
+   * 16px duenner wirkten als der Text. Kein Groessenschritt der Skala oben
+   * (keine `.icon-*`-Klasse), sondern die Rolle EINES Bauteils - deshalb ein
+   * eigener Name statt des 18px-Literals, das bis R22 in layout.css stand. */
+  --icon-row: 18px;
 
   /* Die STRICHSTÄRKE der Modulzeichen, in gerenderten Pixeln (das Zeichen
    * trägt dazu `vector-effect: non-scaling-stroke`, sonst skalierte der Strich

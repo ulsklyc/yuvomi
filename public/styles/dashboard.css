@@ -3199,18 +3199,28 @@ button.today-cockpit__more--link {
  * Hover kommen aus `.btn.btn--secondary.btn--icon` im Markup, wie Lupe,
  * Filter und „..." in jedem Modulkopf. Hier standen bis dahin graue Kreise
  * ohne Rahmen (eigene Flaeche --neutral-200) - die dritte Haut fuer denselben
- * Kopfknopf. Es bleibt nur, was der Uebersicht gehoert: die Groesse. */
+ * Kopfknopf.
+ *
+ * SEIT R22 (D8) AUCH DIE GROESSE DER SHELL: hier standen 48px und eine
+ * 18px-Glyphe, waehrend jeder Modulkopf am Zeiger 40px und 16px fuehrt
+ * (`.page-toolbar .btn--icon`, `.btn > svg`). Die Flaeche kommt jetzt aus
+ * `.btn--icon` (`--target-base`, am Finger 48px), am Zeiger ab 1024px aus
+ * derselben Regel wie die Modulkoepfe; die Glyphe aus der Grundregel. */
 .dashboard-icon-btn {
-  width: var(--target-lg);
-  height: var(--target-lg);
   padding: 0;
-  border-radius: var(--radius-full);
   flex: 0 0 auto;
 }
 
-.dashboard-icon-btn svg {
-  width: 18px;
-  height: 18px;
+/* Am Zeiger reichen die 40px der Desktop-Welt (--target-md, Zielgroessen-Regel
+ * in tokens.css §11b); das Kriterium ist die Zeigerfaehigkeit, nicht die
+ * Breite (2026-09-23, gemessen 40x40 am 1180er Touch-Tablet). Bis R22 setzte
+ * die Regel `width`/`height`, und das `min-height` von `.btn--icon`
+ * (--target-base, 44px) schlug sie: der Kopf mass 44 neben 40er Nachbarn. */
+@media (min-width: 1024px) and (hover: hover) {
+  .dashboard-icon-btn {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+  }
 }
 
 /* Einmaliger Erststart-Hinweis: sanfter Akzent-Puls, der zeigt, wo Widgets
@@ -3231,17 +3241,6 @@ button.today-cockpit__more--link {
   .dashboard-icon-btn--hint {
     animation: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-shadow), transparent);
-  }
-}
-
-/* Am Zeiger reichen die 40px der Desktop-Welt (--target-md, Zielgroessen-Regel
- * in tokens.css §11b). Die Regel hing bis 2026-09-23 allein an der BREITE und
- * nahm damit auch dem Touch-Tablet ab 1024px seine Fingergroesse - gemessen
- * 40x40 bei 1180px. Das Kriterium ist die Zeigerfaehigkeit, nicht die Breite. */
-@media (min-width: 1024px) and (hover: hover) {
-  .dashboard-icon-btn {
-    width: var(--target-md);
-    height: var(--target-md);
   }
 }
 
@@ -5600,11 +5599,6 @@ button.today-cockpit__more--link {
 
   .dashboard-overview__tools {
     align-items: stretch;
-  }
-
-  .dashboard-icon-btn {
-    width: var(--target-lg);
-    height: var(--target-lg);
   }
 
   .today-cockpit {

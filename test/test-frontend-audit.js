@@ -11728,6 +11728,42 @@ test('die Icon-Skala hat genau einen Namen pro Stufe', () => {
   assert.equal(new Set(values).size, values.length, 'zwei --icon-*-Tokens haben denselben px-Wert');
 });
 
+// R22 (S4, D8): DIE GLYPHE IM KNOPF HAT EINE GRUNDGROESSE. Ohne Klasse
+// zeichnete Lucide 24px, und so standen in einem Kopf 16er neben 24er Glyphen
+// (Zeitraum-Pfeile, Belohnungen "Bonus vergeben"/"Auszahlen", Haushaltshilfe
+// "Kommen"/"Gehen", das angedockte Plus). Die Zeilenglyphe ist ein Token statt
+// eines 18px-Literals, die Uebersicht fuehrt Kopfknopf und Glyphe der Shell,
+// und ein Chip zeichnet in einer Groesse.
+test('D8: .btn > svg misst --icon-md, Zeilenglyphe und Chip-Glyphe aus Tokens', () => {
+  const layout = [...eachRule(read('../public/styles/layout.css'))];
+  const sel = (r) => r.selector.split(',').map((x) => x.replace(/\s+/g, ' ').trim());
+  const base = layout.find((r) => r.at.length === 0 && sel(r).includes(':where(.btn) > svg'));
+  assert.ok(base, 'die Grundregel `:where(.btn) > svg` fehlt in layout.css - eine Glyphe ohne Klasse zeichnet 24px');
+  assert.match(base.body, /width:\s*var\(--icon-md\)/);
+  assert.match(base.body, /height:\s*var\(--icon-md\)/);
+  const docked = layout.find((r) => sel(r).includes('.page-fab--docked > svg'));
+  assert.ok(docked && /width:\s*var\(--icon-md\)/.test(docked.body), 'das angedockte Plus traegt die 24px des schwebenden Kreises in die Textkapsel');
+
+  const tokens = read('../public/styles/tokens.css');
+  assert.match(tokens, /--icon-row:\s*18px;/, '--icon-row fehlt in tokens.css');
+  const row = layout.find((r) => sel(r).includes('.row-action svg'));
+  assert.ok(row && /width:\s*var\(--icon-row\)/.test(row.body), '.row-action svg liest nicht --icon-row');
+  const folder = [...eachRule(read('../public/styles/documents.css'))].find((r) => sel(r).includes('.documents-folder-item__menu svg'));
+  assert.ok(folder && /width:\s*var\(--icon-row\)/.test(folder.body), 'der Ordner-Kebab zeichnet kleiner als jede andere Zeilenaktion');
+
+  const dash = [...eachRule(read('../public/styles/dashboard.css'))].filter((r) => sel(r).some((x) => x.startsWith('.dashboard-icon-btn')));
+  for (const r of dash) {
+    assert.doesNotMatch(r.body, /(?:^|;)\s*(?:width|height):\s*(?:18px|var\(--target-lg\))/, `Uebersicht-Kopf mit eigener Groesse: ${r.selector}`);
+  }
+  assert.ok(dash.some((r) => r.at.some((a) => /min-width:\s*1024px\)\s*and\s*\(hover:\s*hover/.test(a)) && /min-height:\s*var\(--target-md\)/.test(r.body)),
+    'der Uebersicht-Kopf misst am Zeiger nicht --target-md wie jeder Modulkopf');
+
+  const chip = [...eachRule(read('../public/styles/filter-chip.css'))].find((r) => sel(r).includes('.filter-chip > svg'));
+  assert.ok(chip && /width:\s*var\(--icon-md\)/.test(chip.body), 'die Chip-Glyphe hat keine Groesse - 12px im Vorrat, 16px in Kontakten');
+  assert.doesNotMatch(read('../public/pages/pantry.js'), /class="filter-chip[^`]*?<i data-lucide="[^"]*" class="icon-sm"/,
+    'der Vorrat setzt seine Chip-Glyphe wieder auf --icon-sm');
+});
+
 test('Dialoge laufen über die Modal-Komponente, nicht über native Browser-Dialoge', () => {
   // window.confirm blockiert den Thread, ignoriert das Design-System, hat
   // keinen Fokus-Trap und keine Danger-Farbe. confirmModal/promptModal/

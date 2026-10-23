@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was one endless stack. Below the 50th card, "Show N more" now shows the rest of that column until
   you leave the page; the count in the column head still includes all cards, and you can still drop
   a card into the column.
+- **Icons in buttons share one size.** A button icon without a size of its own was drawn at 24
+  pixels, so the arrows that step through the calendar, budget and meal plan, "Grant bonus" and
+  "Deduct" in Rewards and "Check in"/"Check out" in Housekeeping stood larger than every other icon in
+  the same row. They now match the other button icons, as do the pantry filter chips and the folder
+  menu in Documents. On a wide screen the three round buttons above the overview greeting are as
+  tall as the buttons in every other page header.
 - **Every control answers a press the same way.** Filter chips, segments, menu entries and the note
   and meal cards gave no sign when pressed, while buttons, tabs and the add button each shrank by
   their own amount. Small controls now give way a little more than wide ones such as buttons and
