@@ -33,6 +33,8 @@
  *   - Pocket money (Emma: account, monthly plan, scheduled credits, a parent bonus,
  *     an approved and an open withdrawal; Leo has no account yet)
  *   - Budget subscriptions (streaming, storage, gym - mixed billing cycles, one ending)
+ *   - Schedule (Linda rotating early/late weeks, Alex nights, on-call extras and a
+ *     vacation override in this and next week)
  *   - Household preferences (EUR, dd.mm.yyyy, 24h, weather = Dortmund)
  *
  * Login for all demo users: <username> / demo1234
@@ -226,6 +228,11 @@ const WIPE = [
   'reward_ledger', 'reward_redemptions', 'reward_participants', 'reward_catalog',
   'reward_allowances', 'reward_money_accounts',
   'budget_subscriptions',
+  // Schichtplan: Werte, Felder und Erinnerungsanker vor ihren Eintraegen, die
+  // Schichtarten zuletzt (RESTRICT von Mustertagen, Ausnahmen und Extras).
+  'schedule_custom_field_values', 'schedule_shift_type_fields', 'schedule_custom_fields',
+  'schedule_reminder_entries', 'schedule_extra_shifts', 'schedule_overrides',
+  'schedule_pattern_days', 'schedule_patterns', 'schedule_shift_types',
   'users',
 ];
 const wipe = db.transaction(() => {
@@ -1616,6 +1623,57 @@ const insertInvItem = db.prepare(`
     name, brand, model, serial, cat, loc: invLocationId[loc],
     date: daysFromNow(dayOffset), price, vendor, warranty, cond, notes, by: alexId,
   }));
+
+// ── Schedule ─────────────────────────────────────────────────────────────────
+
+console.log('Inserting schedule…');
+// DER SCHICHTPLAN STEHT IN DER LAUFENDEN WOCHE (R22, D21). Ohne ihn zeigte die
+// Demo weder die Schichten im Kalender noch das Wochenraster des Schichtplans,
+// und jede Critique legte sie erst per API an. Zwei Personen mit Plan, dazu ein
+// Tag mit vier Eintraegen (Linda Frueh + Bereitschaft, Alex Nacht +
+// Bereitschaft): der Monat zeigt dort drei Marken und „+1", die Woche die
+// Ganztagszeile mit Kuerzel und Initialen. Alles relativ zum Montag dieser
+// Woche (weekDayKey), damit jeder Seed-Tag dasselbe Bild hat.
+const insertShiftType = db.prepare(`
+  INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, icon, created_by)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+const shiftTypeId = {};
+[
+  ['early',   L('Early shift', 'Frühschicht'),   L('E', 'F'), '06:00', '14:00', '#0891B2', 'sunrise'],
+  ['late',    L('Late shift', 'Spätschicht'),    L('L', 'S'), '14:00', '22:00', '#D946EF', 'sunset'],
+  ['night',   L('Night shift', 'Nachtschicht'),  'N',         '22:00', '06:00', '#3B82F6', 'moon'],
+  ['oncall',  L('On call', 'Bereitschaft'),      L('OC', 'B'), '18:00', '22:00', '#D97706', 'phone'],
+  ['vacation', L('Vacation', 'Urlaub'),          L('V', 'U'), null,    null,    '#78808C', 'tree-palm'],
+].forEach(([key, name, code, start, end, color, icon]) => {
+  shiftTypeId[key] = insertShiftType.run(name, code, start, end, color, icon, lindaId).lastInsertRowid;
+});
+const insertPattern = db.prepare(`
+  INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, is_active)
+  VALUES (?, ?, ?, ?, ?, 1)
+`);
+const insertPatternDay = db.prepare(`
+  INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, ?, ?)
+`);
+// Linda: zwei Wochen Wechselschicht - diese Woche Frueh, die naechste Spaet,
+// Wochenende frei (eine Position ohne Zeile ist frei).
+const lindaPattern = insertPattern.run(lindaId, L('Rotating shifts', 'Wechselschicht'), weekDayKey(0), 14, weekDayKey(-56)).lastInsertRowid;
+for (let position = 0; position < 14; position++) {
+  if (position % 7 > 4) continue;
+  insertPatternDay.run(lindaPattern, position, position < 7 ? shiftTypeId.early : shiftTypeId.late);
+}
+// Alex: drei Naechte am Wochenanfang, jede Woche.
+const alexPattern = insertPattern.run(alexId, L('Night duty', 'Nachtdienst'), weekDayKey(0), 7, weekDayKey(-56)).lastInsertRowid;
+for (const position of [0, 1, 2]) insertPatternDay.run(alexPattern, position, shiftTypeId.night);
+const insertExtraShift = db.prepare(`
+  INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, created_by) VALUES (?, ?, ?, ?, ?)
+`);
+insertExtraShift.run(lindaId, weekDayKey(2), shiftTypeId.oncall, null, lindaId);
+insertExtraShift.run(alexId, weekDayKey(2), shiftTypeId.oncall, null, alexId);
+// Naechsten Montag hat Alex Urlaub statt Nacht: eine Ausnahme ohne Uhrzeit.
+db.prepare(`
+  INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?)
+`).run(alexId, weekDayKey(7), shiftTypeId.vacation, null);
 
 // ── Reminders ────────────────────────────────────────────────────────────────
 

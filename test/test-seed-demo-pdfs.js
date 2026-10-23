@@ -261,6 +261,55 @@ test('Seed: "Fast leer" ist ein Signal - hoechstens ein Viertel des Vorrats', ()
   assert.ok(low / total <= 0.25, `${low} von ${total} Artikeln sind "Fast leer" - mehr als ein Viertel`);
 });
 
+// Schichtplan (R22, D21): ohne ihn zeigte die Demo weder die Schichten im
+// Kalender noch das Wochenraster des Schichtplans, und jede Critique legte sie
+// erst per API an. Gemessen wird die AUFGELOESTE Woche, wie die App sie sieht
+// (resolveEntries), nicht die Zeilen der Tabellen.
+test('Seed (de): der Schichtplan steht in der laufenden Woche - zwei Personen, ein Tag mit vier Eintraegen', async () => {
+  const { resolveEntries } = await import('../server/services/schedule.js');
+  const { shortCodeAddsToName } = await import('../public/utils/shift-label.js');
+  const data = readSeeded('de', (db) => ({
+    types: db.prepare('SELECT * FROM schedule_shift_types').all(),
+    patterns: db.prepare('SELECT * FROM schedule_patterns').all(),
+    days: db.prepare('SELECT * FROM schedule_pattern_days').all(),
+    overrides: db.prepare('SELECT * FROM schedule_overrides').all(),
+    extras: db.prepare('SELECT * FROM schedule_extra_shifts').all(),
+  }));
+  assert.ok(data.types.length >= 4, `erwartet mehrere Schichtarten, gefunden ${data.types.length}`);
+  for (const type of data.types) {
+    assert.ok(type.short_code && shortCodeAddsToName(type.short_code, type.name), `${type.name}: ein Kuerzel, das etwas sagt`);
+  }
+  assert.ok(data.types.some((type) => !type.start_time), 'eine Schichtart ohne Uhrzeit (Ganztag)');
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const monday = new Date();
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const patternDays = new Map();
+  for (const row of data.days) {
+    const k = `${row.pattern_id}:${row.position}`;
+    patternDays.set(k, [...(patternDays.get(k) ?? []), row]);
+  }
+  const perDay = new Map();
+  const people = new Set();
+  for (const userId of new Set(data.patterns.map((p) => p.user_id))) {
+    const { entries } = resolveEntries({
+      from: key(monday), to: key(sunday), userId,
+      patterns: data.patterns.filter((p) => p.user_id === userId), patternDays,
+      overrides: data.overrides.filter((o) => o.user_id === userId),
+    });
+    for (const entry of entries.filter((e) => e.shift_type_id)) {
+      people.add(userId);
+      perDay.set(entry.date_key, (perDay.get(entry.date_key) ?? 0) + 1);
+    }
+  }
+  for (const extra of data.extras) perDay.set(extra.date_key, (perDay.get(extra.date_key) ?? 0) + 1);
+  assert.ok(people.size >= 2, `zwei Personen mit Plan in dieser Woche, gefunden ${people.size}`);
+  assert.ok(Math.max(0, ...perDay.values()) >= 4, `ein Tag mit vier Eintraegen (Monat: drei Marken und +1): ${JSON.stringify([...perDay])}`);
+});
+
 // ── Verschlüsselte Datenbank (#2114) ─────────────────────────────────────────
 // Installer-Installationen sind standardmäßig verschlüsselt. Der Seed öffnete
 // die Datei ohne Schlüssel und brach mit "file is not a database" ab - auch mit
