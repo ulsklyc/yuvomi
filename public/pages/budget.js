@@ -2743,6 +2743,11 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     // Loeschen steht in deren Blatt (#bm-delete) - an der Zeile bleibt nur die
     // Folgeaktion „Verbuchen". Der dauerhafte Papierkorb neben dem Betrag war
     // eine von drei Bedienungen im Modul und kappte den Titel.
+    /* KEIN MEHR-KNOPF AN DER BUCHUNG (R22, D9 geprueft): die Zeile hat keine
+     * zweite Handlung - sie oeffnet, Loeschen steht im Blatt (R14 P8). Ein
+     * Mehr-Knopf nur fuer "Loeschen" kostete mobil 34px Textspalte, und die
+     * Metazeile brach in 6 von 9 sichtbaren Zeilen um (390px, gemessen). D10
+     * verlangt "hoechstens EINE Handlung, dann Mehr" - nicht einen leeren Mehr. */
     const rowActions = (masked || ro) ? '' : `
           ${confirmBtn}`;
 
@@ -2886,7 +2891,7 @@ function renderAccountsPage() {
               zeigt. Jetzt liest sie Name, Typ, Saldo und Start, dann
               „Buchungen anzeigen". */ ''}
         <button class="budget-account__main" type="button" data-drill="${a.id}">
-          <span class="budget-account__icon"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
+          <span class="budget-account__icon budget-tile"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
             ${/* Am Telefon steht der Start in der Zeile der Kontoart (budget.css,

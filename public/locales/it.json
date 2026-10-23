@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Devi",
         "debtYouOwe": "Devi a {{name}}",
         "debtOwesYou": "{{name}} ti deve",
-        "debtOwes": "{{from}} deve a {{to}}"
+        "debtOwes": "{{from}} deve a {{to}}",
+        "balanced": "Saldato",
+        "balancedInGroup": "{{group}}: Saldato"
     },
     "wmo": {
         "0": "Cielo sereno",

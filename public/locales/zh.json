@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}：你应付",
         "debtYouOwe": "你欠 {{name}}",
         "debtOwesYou": "{{name}} 欠你",
-        "debtOwes": "{{from}} 欠 {{to}}"
+        "debtOwes": "{{from}} 欠 {{to}}",
+        "balanced": "已结清",
+        "balancedInGroup": "{{group}}：已结清"
     },
     "wmo": {
         "0": "晴天",

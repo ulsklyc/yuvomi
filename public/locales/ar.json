@@ -4710,7 +4710,9 @@
         "youOweInGroup": "{{group}}: عليك",
         "debtYouOwe": "أنت مدين لـ {{name}}",
         "debtOwesYou": "{{name}} مدين لك",
-        "debtOwes": "{{from}} مدين لـ {{to}}"
+        "debtOwes": "{{from}} مدين لـ {{to}}",
+        "balanced": "متسوّى",
+        "balancedInGroup": "{{group}}: متسوّى"
     },
     "wmo": {
         "0": "سماء صافية",

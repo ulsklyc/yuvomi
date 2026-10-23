@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Du schuldest",
         "debtYouOwe": "Du schuldest {{name}}",
         "debtOwesYou": "{{name}} schuldet dir",
-        "debtOwes": "{{from}} schuldet {{to}}"
+        "debtOwes": "{{from}} schuldet {{to}}",
+        "balanced": "Ausgeglichen",
+        "balancedInGroup": "{{group}}: Ausgeglichen"
     },
     "wmo": {
         "0": "Klarer Himmel",

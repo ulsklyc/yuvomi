@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Borcun",
         "debtYouOwe": "{{name}} kişisine borçlusun",
         "debtOwesYou": "{{name}} sana borçlu",
-        "debtOwes": "{{from}}, {{to}} kişisine borçlu"
+        "debtOwes": "{{from}}, {{to}} kişisine borçlu",
+        "balanced": "Hesap kapalı",
+        "balancedInGroup": "{{group}}: Hesap kapalı"
     },
     "wmo": {
         "0": "Açık",

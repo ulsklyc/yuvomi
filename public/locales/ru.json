@@ -4591,7 +4591,9 @@
         "youOweInGroup": "{{group}}: Ты должен",
         "debtYouOwe": "Ваш долг: {{name}}",
         "debtOwesYou": "Долг вам: {{name}}",
-        "debtOwes": "{{from}} должен {{to}}"
+        "debtOwes": "{{from}} должен {{to}}",
+        "balanced": "Расчёты закрыты",
+        "balancedInGroup": "{{group}}: Расчёты закрыты"
     },
     "wmo": {
         "0": "Ясное небо",

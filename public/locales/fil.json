@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: May utang ka",
         "debtYouOwe": "May utang ka kay {{name}}",
         "debtOwesYou": "May utang sa iyo si {{name}}",
-        "debtOwes": "{{from}} may utang kay {{to}}"
+        "debtOwes": "{{from}} may utang kay {{to}}",
+        "balanced": "Ayos na",
+        "balancedInGroup": "{{group}}: Ayos na"
     },
     "wmo": {
         "0": "Maaliwalas na langit",

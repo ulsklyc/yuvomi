@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Deves",
         "debtYouOwe": "Você deve a {{name}}",
         "debtOwesYou": "{{name}} deve a você",
-        "debtOwes": "{{from}} deve a {{to}}"
+        "debtOwes": "{{from}} deve a {{to}}",
+        "balanced": "Quitado",
+        "balancedInGroup": "{{group}}: Quitado"
     },
     "wmo": {
         "0": "Céu limpo",

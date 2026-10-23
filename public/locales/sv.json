@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Du är skyldig",
         "debtYouOwe": "Du är skyldig {{name}}",
         "debtOwesYou": "{{name}} är skyldig dig",
-        "debtOwes": "{{from}} är skyldig {{to}}"
+        "debtOwes": "{{from}} är skyldig {{to}}",
+        "balanced": "Kvitt",
+        "balancedInGroup": "{{group}}: Kvitt"
     },
     "wmo": {
         "0": "Klart",

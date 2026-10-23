@@ -1106,7 +1106,7 @@ function renderCard(subscription) {
              data-id="${subscription.id}" style="--subscription-color:${esc(brandColor)}">
       <button type="button" class="subscription-card__main list-row__main--interactive"
               data-action="${ro ? 'view' : 'edit'}">
-        <span class="subscription-card__brand">
+        <span class="subscription-card__brand budget-tile">
           ${subscription.logo_data
             ? `<img src="${esc(subscription.logo_data)}" alt="">`
             : `<span>${esc(subscription.name.slice(0, 2).toUpperCase())}</span>`}
@@ -1138,9 +1138,25 @@ function renderCard(subscription) {
         </span>
         ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
-      ${canRenew ? `<div class="row-actions subscription-card__actions">
-        ${rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) })}
-      </div>` : ''}
+      ${/* DIE ENDZONE WIE IN JEDEM BUDGET-REITER (R22, D9 nach R21-D10):
+           [eine Handlung][Mehr-Knopf]. Bis dahin stand am Zeiger nur der
+           Kalenderhaken und am Finger ein Wisch-Chevron - Loeschen gab es nur
+           per Geste und im Dialog. Der Mehr-Knopf traegt Verlaengern und
+           Loeschen sichtbar auf jedem Geraet; der Haken bleibt am Zeiger die
+           EINE Handlung davor, am Finger ist er das Wischen zum Zeilenanfang. */ ''}
+      ${ro ? '' : `<div class="row-actions subscription-card__actions">
+        ${canRenew ? rowActionHtml({ icon: 'calendar-check', action: 'renew', label: t('subscriptions.markRenewedNamed', { name: subscription.name }) }) : ''}
+        ${rowMenuHtml({
+          id: `subscription-menu-${subscription.id}`,
+          label: t('common.moreActionsNamed', { name: subscription.name }),
+          className: 'row-action--slim',
+          defer: true,
+          items: [
+            canRenew ? { action: 'renew', icon: 'calendar-check', label: t('subscriptions.markRenewed') } : null,
+            { action: 'delete', icon: 'trash-2', label: t('common.delete'), danger: true },
+          ],
+        })}
+      </div>`}
     </article>
     </div>
   `;

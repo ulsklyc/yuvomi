@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: 갚을 금액",
         "debtYouOwe": "{{name}}님에게 줄 금액",
         "debtOwesYou": "{{name}}님에게 받을 금액",
-        "debtOwes": "{{from}}님이 {{to}}님에게 줄 금액"
+        "debtOwes": "{{from}}님이 {{to}}님에게 줄 금액",
+        "balanced": "정산 완료",
+        "balancedInGroup": "{{group}}: 정산 완료"
     },
     "wmo": {
         "0": "맑음",

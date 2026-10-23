@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Χρωστάς",
         "debtYouOwe": "Οφείλεις σε {{name}}",
         "debtOwesYou": "{{name}} σου οφείλει",
-        "debtOwes": "{{from}} οφείλει σε {{to}}"
+        "debtOwes": "{{from}} οφείλει σε {{to}}",
+        "balanced": "Τακτοποιημένο",
+        "balancedInGroup": "{{group}}: Τακτοποιημένο"
     },
     "wmo": {
         "0": "Αίθριος καιρός",

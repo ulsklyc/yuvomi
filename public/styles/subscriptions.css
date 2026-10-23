@@ -433,29 +433,11 @@
 }
 
 /* Monogramm: die Marke trägt Fläche und Rahmen, die Schrift kommt aus dem
- * Text-Token. Vorher kamen Vorder- und Hintergrund aus DERSELBEN Markenfarbe
- * (Vollton auf aufgehelltem Ton desselben Tons) — damit hing das Kontrast-
- * verhältnis vollständig an der Datenlage: gemessen 10 AA-Verstöße über 7 Marken
- * im Seed, bis hinunter auf 1.83:1 (Critique 2026-07-30, P1). Jede helle oder
- * gesättigte Marke (Amazon-Orange, Spotify-Grün) fiel automatisch durch, und
- * kein Nutzer konnte das umgehen, außer indem er die Markenfarbe änderte. */
+ * Text-Token (Critique 2026-07-30, P1: Vorder- und Hintergrund aus derselben
+ * Markenfarbe fielen bis 1.83:1). Die Form ist seit R22 (D9) die Lead-Kachel
+ * des Budgets (`.budget-tile`, budget.css); hier steht nur die Farbe. */
 .subscription-card__brand {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--subscription-color) var(--tint-hint), transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--subscription-color) var(--tint-surface), var(--color-surface));
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
-}
-
-.subscription-card__brand img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  --tile-color: var(--subscription-color);
 }
 
 /* Die Textspalte (minmax(0, 1fr)) darf schrumpfen, der Betrag daneben nicht. */
@@ -1240,7 +1222,10 @@
    * Screenreader-Baum, und die Wischgesten sind reine `touch*`-Handler. Aus dem
    * Fluss genommen gibt die Zeile den Platz genauso frei; beim Fokus kommen sie
    * zurueck. */
-  .subscription-card__actions {
+  /* SEIT R22 (D9) NUR DER HAKEN: der Mehr-Knopf daneben bleibt sichtbar und
+   * traegt Verlaengern und Loeschen auch am Finger (Endzone R21-D10). Er steht
+   * schmal (`.row-action--slim`), die Textspalte ist hier knapp. */
+  .subscription-card__actions > .row-action:not(.row-action--more) {
     position: absolute;
     width: var(--space-px);
     height: var(--space-px);
@@ -1248,7 +1233,7 @@
     clip-path: inset(50%);
   }
 
-  .subscription-card__actions:focus-within {
+  .subscription-card__actions > .row-action:not(.row-action--more):focus-visible {
     position: static;
     width: auto;
     height: auto;
@@ -1256,11 +1241,17 @@
     clip-path: none;
   }
 
-  /* Die Reserve am Zeilenende gehört dann dem Wisch-Chevron
-     (.swipe-row::after, layout.css). */
-  .subscription-card {
+  /* Der schmale Mehr-Knopf bringt seinen Innenabstand selbst mit: ohne Luecke
+   * und Kantenabstand davor kostet er die Textspalte so viel wie vorher der
+   * Wisch-Chevron samt Reserve (28px), sonst brach "Faellig in 3 Tagen" um. */
+  .swipe-row:not(.swipe-row--static) > .subscription-card {
+    gap: 0;
+    padding-inline-end: 0;
+  }
+
+  /* Die Nur-lesen-Zeile hat keine Endzone: die Spalte faellt weg. */
+  .swipe-row--static > .subscription-card {
     grid-template-columns: minmax(0, 1fr);
-    padding-inline-end: calc(var(--space-2) + var(--space-3) + var(--space-2));
   }
 }
 

@@ -4141,8 +4141,11 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
   const summary = { html: '' };
   const slot = { html: '' };
   const vorherSplit = { ...splitGlance.state };
+  // Aufklappen gibt es seit R22 (D9) nur, wenn die Gruppe in beide Richtungen
+  // steht (zwei Waehrungen) - eine einzelne Zahl steht ohne Aufklapper.
   Object.assign(splitGlance.state, {
-    groupStatus: 'active', groups: [{ id: 1 }],
+    groupStatus: 'active', groups: [{ id: 1 }], user: { id: 1 },
+    balances: { balances: [{ user_id: 1, net: '12.00', net_minor: 1200, currency: 'EUR' }, { user_id: 1, net: '-5.00', net_minor: -500, currency: 'USD' }] },
     dashboard: { total_owed: [{ amount: 12, currency: 'EUR' }], total_owing: [] }, meta: { currencies: ['EUR'], default_currency: 'EUR' },
   });
   const el = (box) => ({ set innerHTML(v) { box.html = v; }, replaceChildren() { box.html = ''; }, insertAdjacentHTML(_p, v) { box.html += v; }, querySelector: () => null });
@@ -5110,10 +5113,10 @@ test('R16 Budget: "Darlehenstransaktionen" ist eine Ueberschrift auf der Buehne,
 
 test('R16 Aufteilung: null ist weder Gewinn noch Schuld - der Ton haengt am Betrag', () => {
   const src = read('../public/pages/split-expenses.js');
-  assert.match(src, /class="metric-card\$\{owed\.length \? ' metric-card--positive' : ''\}"/);
-  // Die Schuld traegt seit D8 (Critique R21) gar keinen Ton mehr - weder bei
-  // null noch mit Betrag (siehe "D8: eine Schuld in der Aufteilung").
-  assert.match(src, /<div class="metric-card">\s*<div class="metric-card__label">\$\{esc\(owingLabel\)\}/);
+  // Seit R22 (D9) EINE Kartenform: der Ton haengt an der Richtung der Zahl,
+  // "Du bekommst" mit Betrag gruen, Schuld und "Ausgeglichen" in Textfarbe.
+  assert.match(src, /class="metric-card\$\{tone === 'positive' \? ' metric-card--positive' : ''\}"/);
+  assert.match(src, /card\(inGroup\('splitExpenses\.youOwe', 'splitExpenses\.youOweInGroup'\), owingText, 'neutral'\)/);
   assert.doesNotMatch(src, /class="metric-card metric-card--(?:positive|negative)">\s*<div class="metric-card__label">\$\{t\('splitExpenses\.you/);
 });
 
@@ -7462,7 +7465,8 @@ test('R22 D4: Abos und Aufteilung tragen den Kennzahl-Slot ab dem ersten Bild in
     'Abos: der Kennzahl-Slot steht leer, bis die Daten kommen');
   const split = withoutCommentsKeepingLines(read('../public/pages/split-expenses.js'));
   assert.match(split, /<div id="split-glance">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\)\}<\/div>/, 'Aufteilung: die Kurzzeile steht leer, bis die Daten kommen');
-  assert.match(split, /id="split-summary">\$\{metricCardsSkeletonHtml\(2, \{ note: false, tag: 'div' \}\)\}<\/section>/, 'Aufteilung: die Kennzahlkarten stehen leer, bis die Daten kommen');
+  // EINE Karte seit R22 (D9: eine Saldo-Aussage).
+  assert.match(split, /id="split-summary">\$\{metricCardsSkeletonHtml\(1, \{ note: false, tag: 'div' \}\)\}<\/section>/, 'Aufteilung: die Kennzahlkarte steht leer, bis die Daten kommen');
   const layout = read('../public/styles/layout.css');
   const rule = [...eachRule(layout)].find((r) => r.selector.trim() === '.skeleton-text');
   assert.match(rule?.body ?? '', /color:\s*transparent/, 'der Platzhaltertext ist lesbar');
@@ -7532,4 +7536,35 @@ test('R22 D9: der Punkt einer Ausgabe traegt die Farbe ihrer Kategorie, wie Balk
   } finally {
     Object.assign(budgetUi.state, vorher);
   }
+});
+
+// Critique R22 (D9, a4 P2 "drei Dialekte am Zeilenanfang"): Konten (40px,
+// Rand, 14/45 % als Literal), Abos (40px auf deckender Flaeche) und Ausgaben
+// der Aufteilung (42px grau ohne Rand) trugen je eine eigene Kachel. Jetzt EINE
+// Bauform `.budget-tile`; die Module setzen nur noch die Farbe.
+test('R22 D9: Konto, Abo und Ausgabe der Aufteilung beginnen mit derselben Lead-Kachel', () => {
+  const css = read('../public/styles/budget.css');
+  const tile = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-tile');
+  assert.ok(tile, 'die Lead-Kachel ist EINE Regel in budget.css');
+  assert.match(tile.body, /inline-size:\s*var\(--target-md\)/);
+  assert.match(tile.body, /var\(--tile-color, var\(--color-text-tertiary\)\) var\(--tint-surface\)/, 'Flaeche aus der Toenungsstufe, neutral ohne Farbe');
+  assert.match(tile.body, /color:\s*var\(--color-text-primary\)/, 'Zeichen und Schrift aus dem Text-Token - Kontrast haengt nicht an der Datenlage');
+  const own = {
+    'budget.css': ['.budget-account__icon'],
+    'subscriptions.css': ['.subscription-card__brand'],
+    'split-expenses.css': ['.split-expense__icon', '.split-group__avatar'],
+  };
+  for (const [file, selectors] of Object.entries(own)) {
+    const rules = [...eachRule(read(`../public/styles/${file}`))];
+    for (const sel of selectors) {
+      for (const r of rules.filter((x) => x.selector.split(',').some((part) => part.trim() === sel))) {
+        assert.doesNotMatch(r.body, /\b(?:width|height|background|border)\s*:/, `${file} ${sel}: die Form gehoert der Lead-Kachel`);
+      }
+    }
+  }
+  assert.match(read('../public/pages/budget.js'), /class="budget-account__icon budget-tile"/);
+  assert.match(read('../public/pages/subscriptions.js'), /class="subscription-card__brand budget-tile"/);
+  const split = read('../public/pages/split-expenses.js');
+  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 2, 'Ausgabe und Serie tragen den Ton ihrer Kategorie');
+  assert.equal((split.match(/class="split-group__avatar budget-tile"/g) ?? []).length, 2);
 });

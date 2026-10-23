@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Du skylder",
         "debtYouOwe": "Du skylder {{name}}",
         "debtOwesYou": "{{name}} skylder deg",
-        "debtOwes": "{{from}} skylder {{to}}"
+        "debtOwes": "{{from}} skylder {{to}}",
+        "balanced": "Gjort opp",
+        "balancedInGroup": "{{group}}: Gjort opp"
     },
     "wmo": {
         "0": "Skyfri",

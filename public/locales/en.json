@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: You owe",
         "debtYouOwe": "You owe {{name}}",
         "debtOwesYou": "{{name}} owes you",
-        "debtOwes": "{{from}} owes {{to}}"
+        "debtOwes": "{{from}} owes {{to}}",
+        "balanced": "Settled up",
+        "balancedInGroup": "{{group}}: Settled up"
     },
     "wmo": {
         "0": "Clear sky",

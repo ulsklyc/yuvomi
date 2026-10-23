@@ -724,14 +724,30 @@ test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe
     render();
     assert.equal(zaehler.textContent, '2', 'der Kopf „Gruppen" traegt die Zahl');
     assert.doesNotMatch(summary.html, /split-summary-groups|splitExpenses\.activeGroups/, 'keine Kachel ueber alle Gruppen neben denen der gewaehlten');
-    assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 2, 'zwei Kacheln: bekommen und schulden');
-    assert.match(summary.html, /metric-card__label">splitExpenses\.youAreOwedInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</, 'der Name der Gruppe steht escaped im Label');
-    assert.match(summary.html, /metric-card__label">splitExpenses\.youOweInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</);
+    // R22 D9: EINE Saldo-Aussage - die Richtung, die nicht null ist. Bis dahin
+    // "Du bekommst 0,00 €" gross und "Du schuldest 24,14 €" klein daneben.
+    assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 1, 'eine Kachel: die Schuld');
+    assert.match(summary.html, /metric-card__label">splitExpenses\.youOweInGroup\{&quot;group&quot;:&quot;Haus &lt;&amp;&gt;&quot;\}</, 'der Name der Gruppe steht escaped im Label');
+    assert.doesNotMatch(summary.html, /youAreOwed/, 'keine Null-Kachel "Du bekommst"');
     // R19: die Kurzzeile (nur schmal, direkt ueber der Gruppenwahl) nennt die
     // Gruppe NICHT - mit ihr brach "Du bekommst in Haushalt" bei 390px um.
-    assert.match(glance.html, /budget-glance__label">splitExpenses\.youAreOwed</, 'die Kurzzeile sagt nur die Richtung');
-    assert.match(glance.html, /budget-glance__flow[^"]*">splitExpenses\.youOwe </);
+    assert.match(glance.html, /budget-glance__label">splitExpenses\.youOwe</, 'die Kurzzeile sagt die Richtung, die gilt');
+    assert.match(glance.html, /budget-glance__value[^"]*">24,14/);
+    assert.doesNotMatch(glance.html, /budget-glance__flow|aria-expanded/, 'eine Zahl: kein Nebenwert, kein Aufklapper');
     assert.doesNotMatch(glance.html, /InGroup/, 'kein Gruppenname in der Kurzzeile');
+    // Ohne Saldo: "Ausgeglichen", nicht "Du bekommst 0,00 €".
+    render({ balances: { balances: [] } });
+    assert.match(glance.html, /budget-glance__label">splitExpenses\.balanced</);
+    assert.match(summary.html, /metric-card__label">splitExpenses\.balancedInGroup\{/);
+    assert.doesNotMatch(summary.html, /metric-card--positive/, 'null ist kein Gewinn');
+    // Man bekommt etwas: gruen, eine Kachel.
+    render({ balances: { balances: [{ user_id: 7, net: '12.00', net_minor: 1200, currency: 'EUR' }] } });
+    assert.match(summary.html, /class="metric-card metric-card--positive">\s*<div class="metric-card__label">splitExpenses\.youAreOwedInGroup/);
+    assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 1);
+    // Beide Richtungen (zwei Waehrungen): beide Kacheln, die Kurzzeile klappt auf.
+    render({ balances: { balances: [{ user_id: 7, net: '12.00', net_minor: 1200, currency: 'EUR' }, { user_id: 7, net: '-5.00', net_minor: -500, currency: 'USD' }] } });
+    assert.equal((summary.html.match(/class="metric-card[ "]/g) ?? []).length, 2);
+    assert.match(glance.html, /aria-controls="split-summary"/);
     render({ activeGroupId: null, groups: [] });
     assert.match(summary.html, /metric-card__label">splitExpenses\.youOwe</, 'ohne Gruppe das schlichte Label');
   } finally {
@@ -781,5 +797,34 @@ test('R20: der eigene Saldo heisst "Du schuldest ..." bzw. "... schuldet dir", f
     for (const key of ['youOweInGroup', 'youAreOwedInGroup']) {
       assert.match(s[key], /^\{\{group\}\}\s?[:：]/, `${file}: ${key} fuehrt mit dem Gruppennamen (${s[key]})`);
     }
+  }
+});
+
+// Critique R22 (D9, a4 P2): die Gruppe "Haushalt" vom Typ Haushalt stand als
+// "Haushalt / Haushalt" im Kopf und "Haushalt · Haushalt · 2 Mitglieder" in der Wahl.
+test('R22 D9: der Gruppentyp faellt weg, wo er den Namen wiederholt', () => {
+  assert.equal(split.groupTypeLabel({ name: 'splitExpenses.groupType.household', type: 'household' }), '', 'gleich dem Namen: kein Typ');
+  assert.equal(split.groupTypeLabel({ name: ' SPLITEXPENSES.GROUPTYPE.HOUSEHOLD ', type: 'household' }), '', 'Gross/klein und Rand zaehlen nicht');
+  assert.equal(split.groupTypeLabel({ name: 'Italienurlaub 2026', type: 'travel' }), 'splitExpenses.groupType.travel');
+});
+
+test('R22 D9: die Summe aller Gruppen nennt nur die Richtung, die nicht null ist', () => {
+  const total = { html: '', hidden: true, replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; } };
+  const box = () => ({ html: '', replaceChildren() {}, insertAdjacentHTML() {}, querySelector: () => null });
+  const vorher = { ...split.state };
+  const run = (dashboard) => {
+    total.html = '';
+    Object.assign(split.state, { groupStatus: 'active', groups: [{ id: 1, name: 'A' }], activeGroupId: 1, user: { id: 7 },
+      balances: { balances: [] }, dashboard, meta: { currencies: ['EUR'], default_currency: 'EUR' } });
+    split.renderSummaryForTest({ querySelector: (sel) => (sel === '#split-groups-total' ? total : sel === '#split-group-count' ? { textContent: '' } : box()) });
+    return total.html;
+  };
+  try {
+    const owing = run({ total_owed: [], total_owing: [{ amount: '196.14', currency: 'EUR' }] });
+    assert.match(owing, /splitExpenses\.youOwe <strong>196,14/);
+    assert.doesNotMatch(owing, /youAreOwed/, 'keine Null in Gegenrichtung');
+    assert.match(run({ total_owed: [], total_owing: [] }), /split-groups-total__part">splitExpenses\.balanced</);
+  } finally {
+    Object.assign(split.state, vorher);
   }
 });

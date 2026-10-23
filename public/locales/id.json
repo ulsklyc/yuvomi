@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Kamu berutang",
         "debtYouOwe": "Anda berutang kepada {{name}}",
         "debtOwesYou": "{{name}} berutang kepada Anda",
-        "debtOwes": "{{from}} berutang kepada {{to}}"
+        "debtOwes": "{{from}} berutang kepada {{to}}",
+        "balanced": "Lunas",
+        "balancedInGroup": "{{group}}: Lunas"
     },
     "wmo": {
         "0": "Langit cerah",

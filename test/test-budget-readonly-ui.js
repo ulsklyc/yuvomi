@@ -474,11 +474,18 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     const html = abos.renderCard(abo());
     assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="edit">/);
     assert.match(html, /data-action="renew"/);
-    // R14 P8: Loeschen steht im Bearbeiten-Blatt (#subscription-delete), nicht an der Zeile.
-    assert.doesNotMatch(html, /data-action="delete"/);
+    // R14 P8: kein sichtbarer Papierkorb an der Zeile. Seit R22 (D9, Endzone
+    // R21-D10) steht Loeschen als Eintrag im Mehr-Knopf, wie bei Konten und
+    // Darlehensraten - nie als eigener Knopf.
+    const menu = html.indexOf('popover-menu" id="subscription-menu-');
+    assert.ok(menu > 0, 'die Zeile traegt einen Mehr-Knopf');
+    assert.ok(html.indexOf('data-action="delete"') > menu, 'Loeschen steht nur im Menue');
+    assert.match(html, /class="popover-menu__item popover-menu__item--danger"\s+data-action="delete"/);
+    assert.ok(html.indexOf('row-action--more') > html.indexOf('data-action="renew"'), 'Endzone: [Verlaengern][Mehr]');
     assert.match(html, /swipe-reveal--done/);
     assert.match(html, /common\.edit/);
-    assert.doesNotMatch(html, /swipe-row--static/, 'mit Geste bleibt der Wisch-Chevron');
+    // Der Wisch-Chevron faellt neben dem Mehr-Knopf (layout.css `:has(.row-action--more)`), die Geste bleibt.
+    assert.doesNotMatch(html, /swipe-row--static/, 'die Geste bleibt');
   });
   withAccess({ budget: 'read' }, () => {
     const html = abos.renderCard(abo());

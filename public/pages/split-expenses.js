@@ -25,6 +25,7 @@ import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { CATEGORY_SERIES_COLORS } from '/utils/budget-category-colors.js';
 
 let state = {
   meta: null,
@@ -129,6 +130,18 @@ function money(amount, currency) {
   const n = Number(amount || 0);
   if (!Number.isFinite(n)) return `${amount} ${currency}`;
   return formatMoney(n, currency);
+}
+
+/**
+ * DER TYP EINER GRUPPE, WENN ER ETWAS SAGT (R22, D9). Die Gruppe "Haushalt"
+ * vom Typ Haushalt stand als "Haushalt / Haushalt" im Kopf und als
+ * "Haushalt · Haushalt · 2 Mitglieder" in der Wahl. Gleicht der Typ dem
+ * Namen, faellt er weg; das Zeichen der Kachel sagt ihn weiter.
+ */
+function groupTypeLabel(group) {
+  const label = t(`splitExpenses.groupType.${group.type}`);
+  const same = String(group.name ?? '').trim().toLocaleLowerCase(getLocale()) === String(label).trim().toLocaleLowerCase(getLocale());
+  return same ? '' : label;
 }
 
 function groupIcon(type) {
@@ -248,7 +261,7 @@ export async function render(container, { user, embedded = false, onAddableChang
           <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
                klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
           <div id="split-glance">${/* Der Kennzahl-Slot steht ab dem ersten Bild in seiner Form (R22, D4). */ ''}${metricGlanceSkeletonHtml()}</div>
-          <section class="metric-grid budget-glance-details" id="split-summary">${metricCardsSkeletonHtml(2, { note: false, tag: 'div' })}</section>
+          <section class="metric-grid budget-glance-details" id="split-summary">${metricCardsSkeletonHtml(1, { note: false, tag: 'div' })}</section>
           <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
         </div>
       </div>${fab}
@@ -662,9 +675,14 @@ function renderGroupsTotal() {
   const owed = state.dashboard?.total_owed || [];
   const owing = state.dashboard?.total_owing || [];
   el.hidden = isArchivedView() || !state.groups.length;
+  // Dieselbe Regel wie die Kennzahl (R22, D9): nur die Richtung, die nicht
+  // null ist - "Du bekommst 0,00 €" war eine Aussage ohne Inhalt.
+  const parts = [
+    owed.length ? `<span class="split-groups-total__part">${t('splitExpenses.youAreOwed')} <strong>${totalsText(owed)}</strong></span>` : '',
+    owing.length ? `<span class="split-groups-total__part">${t('splitExpenses.youOwe')} <strong>${totalsText(owing)}</strong></span>` : '',
+  ].filter(Boolean);
   setHtml(el, `<span class="split-groups-total__label">${t('splitExpenses.allGroups')}</span>
-    <span class="split-groups-total__part">${t('splitExpenses.youAreOwed')} <strong>${totalsText(owed)}</strong></span>
-    <span class="split-groups-total__part">${t('splitExpenses.youOwe')} <strong>${totalsText(owing)}</strong></span>`);
+    ${parts.length ? parts.join('\n    ') : `<span class="split-groups-total__part">${t('splitExpenses.balanced')}</span>`}`);
 }
 
 function renderSummary() {
@@ -687,50 +705,51 @@ function renderSummary() {
   if (count) count.textContent = String(state.groups.length);
   const owedText = totalsText(owed);
   const owingText = totalsText(owing);
-  // DER BEREICH STEHT IM LABEL (Critique R19, P1 Desktop-Komposition). Die
-  // Kacheln gehoeren der gewaehlten Gruppe, die dritte Kachel „Aktive Gruppen"
-  // aber allen - nebeneinander lasen sich „Du schuldest 24,14 €" und „2" als
-  // EINE Aussage, und mobil steht die Gruppenwahl erst unter den Zahlen. Jetzt
-  // nennen beide Betraege ihre Gruppe, und die Gruppenzahl steht nur noch am
-  // Kopf der Liste, die sie zaehlt (`#split-group-count`).
+  // DER BEREICH STEHT IM LABEL (Critique R19, P1 Desktop-Komposition): die
+  // Karten nennen ihre Gruppe, die Gruppenzahl steht am Kopf der Liste, die sie
+  // zaehlt (`#split-group-count`). Die Kurzzeile (nur schmal, direkt ueber der
+  // Gruppenwahl, die den Namen traegt) nennt sie nicht (R19).
   const group = state.groups.find((g) => g.id === state.activeGroupId)?.name;
-  const owedLabel = group ? t('splitExpenses.youAreOwedInGroup', { group }) : t('splitExpenses.youAreOwed');
-  const owingLabel = group ? t('splitExpenses.youOweInGroup', { group }) : t('splitExpenses.youOwe');
+  const inGroup = (plain, scoped) => (group ? t(scoped, { group }) : t(plain));
+  /* EINE SALDO-AUSSAGE (R22, D9). Bis dahin standen beide Richtungen da, und
+   * gross die erste: mobil "Du bekommst 0,00 €" in Display-Groesse, klein
+   * daneben "Du schuldest 24,14 €", am Desktop zwei 210px-Karten, eine davon
+   * eine Null - drei Saetze fuer eine Antwort. Die Kennzahl ist jetzt die
+   * Richtung, die nicht null ist; ohne Saldo "Ausgeglichen". Nur wer in einer
+   * Gruppe in zwei Waehrungen in beide Richtungen steht, sieht beide. */
+  const both = owed.length > 0 && owing.length > 0;
+  const lead = owing.length && !owed.length
+    ? { label: 'splitExpenses.youOwe', scoped: 'splitExpenses.youOweInGroup', value: owingText, tone: 'neutral' }
+    : owed.length
+      ? { label: 'splitExpenses.youAreOwed', scoped: 'splitExpenses.youAreOwedInGroup', value: owedText, tone: 'positive' }
+      : { label: 'splitExpenses.balanced', scoped: 'splitExpenses.balancedInGroup', value: owedText, tone: 'neutral' };
   const glance = _container.querySelector('#split-glance');
   if (glance) {
     const expanded = summary?.classList?.contains('is-expanded') ?? false;
-    // DIE KURZZEILE NENNT DIE GRUPPE NICHT (R19, Critique 2026-10-16). Sie steht
-    // nur schmal, und dort direkt ueber der Gruppenwahl, die den Namen schon
-    // traegt; mit ihm brach "Du bekommst in Haushalt" bei 390px in zwei Zeilen
-    // und "Du schuldest in Haushalt 24,14 €" stand daneben gedraengt. Die
-    // Karten (breit, und aufgeklappt) behalten das Label mit Gruppe.
+    // Eine Zahl: die Kurzzeile ohne Aufklapper (metric-glance.js) - die Karte
+    // darunter wiederholte nur dieselbe Zahl mit dem Gruppennamen.
     setHtml(glance, metricGlanceHtml({
-      id: 'split-glance-more',
-      controls: 'split-summary',
-      expanded,
-      label: t('splitExpenses.youAreOwed'),
-      value: owedText,
-      tone: owed.length ? 'positive' : 'neutral',
+      ...(both ? { id: 'split-glance-more', controls: 'split-summary', expanded } : {}),
+      label: t(lead.label),
+      value: lead.value,
+      tone: lead.tone,
       // Eine offene Schuld in der Gruppe ist Alltag, kein Alarm (Critique R21,
       // D8): Textfarbe. „Du bekommst" darf gruen bleiben wie eine Einnahme.
-      flows: [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: '' }],
+      flows: both ? [{ label: t('splitExpenses.youOwe'), amount: owingText, tone: '' }] : [],
     }));
-    wireMetricGlance(glance, 'split-glance-more');
+    if (both) wireMetricGlance(glance, 'split-glance-more');
   }
-  // DER TON GILT DEM BETRAG, NICHT DER KARTE (Critique 2026-10-05, R16): „Du
-  // bekommst 0,00 €" stand in Erfolgsgruen, „Du schuldest 0,00 €" in Rot. Null
-  // ist weder Gewinn noch Schuld - die Kurzzeile darueber hielt das schon so
-  // (`tone` nur mit Betrag), die Karten jetzt auch.
-  setHtml(summary, `
-    <div class="metric-card${owed.length ? ' metric-card--positive' : ''}">
-      <div class="metric-card__label">${esc(owedLabel)}</div>
-      <div class="metric-card__value">${owedText}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-card__label">${esc(owingLabel)}</div>
-      <div class="metric-card__value">${owingText}</div>
-    </div>
-  `);
+  // DER TON GILT DEM BETRAG, NICHT DER KARTE (Critique 2026-10-05, R16): Null
+  // ist weder Gewinn noch Schuld.
+  const card = (label, value, tone) => `
+    <div class="metric-card${tone === 'positive' ? ' metric-card--positive' : ''}">
+      <div class="metric-card__label">${esc(label)}</div>
+      <div class="metric-card__value">${value}</div>
+    </div>`;
+  setHtml(summary, both
+    ? card(inGroup('splitExpenses.youAreOwed', 'splitExpenses.youAreOwedInGroup'), owedText, 'positive')
+      + card(inGroup('splitExpenses.youOwe', 'splitExpenses.youOweInGroup'), owingText, 'neutral')
+    : card(inGroup(lead.label, lead.scoped), lead.value, lead.tone));
 }
 
 /**
@@ -750,11 +769,11 @@ function syncGroupSwitch() {
   panel.classList.toggle('split-groups-panel--open', open);
   btn.setAttribute('aria-expanded', String(open));
   setHtml(btn, `
-    <span class="split-group__avatar"><i data-lucide="${group ? groupIcon(group.type) : 'users-round'}" aria-hidden="true"></i></span>
+    <span class="split-group__avatar budget-tile"><i data-lucide="${group ? groupIcon(group.type) : 'users-round'}" aria-hidden="true"></i></span>
     <span class="split-group__body">
       <span class="sr-only">${t('splitExpenses.groups')}: </span>
       <span class="split-group__name">${group ? esc(group.name) : t('splitExpenses.groups')}</span>
-      ${group ? `<span class="split-group__meta">${t(`splitExpenses.groupType.${group.type}`)} · ${group.member_count} ${t('splitExpenses.members')}${isArchivedView() ? ` · ${t('splitExpenses.statusArchived')}` : ''}</span>` : ''}
+      ${group ? `<span class="split-group__meta">${groupTypeLabel(group) ? `${esc(groupTypeLabel(group))} · ` : ''}${group.member_count} ${t('splitExpenses.members')}${isArchivedView() ? ` · ${t('splitExpenses.statusArchived')}` : ''}</span>` : ''}
     </span>
     <i data-lucide="chevron-down" class="icon-md split-group-switch__chevron" aria-hidden="true"></i>`);
   if (window.lucide) lucide.createIcons({ el: btn });
@@ -782,10 +801,10 @@ function renderGroups() {
   }
   setHtml(el, state.groups.map((group) => `
     <button class="split-group ${group.id === state.activeGroupId ? 'split-group--active' : ''}" type="button" data-group-id="${group.id}">
-      <span class="split-group__avatar"><i data-lucide="${groupIcon(group.type)}" aria-hidden="true"></i></span>
+      <span class="split-group__avatar budget-tile"><i data-lucide="${groupIcon(group.type)}" aria-hidden="true"></i></span>
       <span class="split-group__body">
         <span class="split-group__name">${esc(group.name)}</span>
-        <span class="split-group__meta">${t(`splitExpenses.groupType.${group.type}`)} · ${group.member_count} ${t('splitExpenses.members')}</span>
+        <span class="split-group__meta">${groupTypeLabel(group) ? `${esc(groupTypeLabel(group))} · ` : ''}${group.member_count} ${t('splitExpenses.members')}</span>
       </span>
     </button>
   `).join(''));
@@ -902,7 +921,7 @@ function drawMain(main) {
     <section class="split-group-header${toolsOnly ? ' split-group-header--tools-only' : ''}">
       <div class="split-group-header__text">
         <${GroupTag} class="split-group-name">${esc(group.name)}</${GroupTag}>
-        <p class="split-group-type">${t(`splitExpenses.groupType.${group.type}`)}</p>
+        ${groupTypeLabel(group) ? `<p class="split-group-type">${esc(groupTypeLabel(group))}</p>` : ''}
         ${archived ? `<p class="split-archived-badge"><i data-lucide="archive" class="icon-md" aria-hidden="true"></i>${t('splitExpenses.statusArchived')}</p>` : ''}
         <p class="split-group-desc">${esc(group.description || t('splitExpenses.groupDefaultDescription'))}</p>
         ${ro ? groupMetaHtml(group) : ''}
@@ -1086,7 +1105,7 @@ function renderExpenses(asList = false) {
       ? ` <span class="split-expense__receipt" role="img" aria-label="${esc(t('splitExpenses.receiptsAttachedLabel', { count: receiptCount }))}"><i data-lucide="paperclip" aria-hidden="true"></i></span>`
       : '';
     const body = `
-      <div class="split-expense__icon"><i data-lucide="${categoryIcon(expense.category)}" aria-hidden="true"></i></div>
+      <div class="split-expense__icon budget-tile"${categoryTone(expense.category)}><i data-lucide="${categoryIcon(expense.category)}" aria-hidden="true"></i></div>
       <div class="split-expense__body">
         <strong>${esc(expense.title)}</strong>
         <span>${t('splitExpenses.paidBy')}: ${esc(expense.payer_name || '')} · ${formatDate(expense.expense_date)}${receiptMark}</span>
@@ -1177,7 +1196,7 @@ function renderRecurring(asList = false) {
       ? `<span class="split-recurring__reason">${esc(t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`))}</span>`
       : '';
     const body = `
-      <div class="split-expense__icon"><i data-lucide="${categoryIcon(recurring.category)}" aria-hidden="true"></i></div>
+      <div class="split-expense__icon budget-tile"${categoryTone(recurring.category)}><i data-lucide="${categoryIcon(recurring.category)}" aria-hidden="true"></i></div>
       <div class="split-expense__body">
         <strong>${esc(recurring.title)}</strong>
         <span>${esc(frequencyLabel(recurring.frequency))}</span>
@@ -1509,6 +1528,20 @@ async function reverseSettlement(settlementId) {
     renderAll();
     refocusAfterRender();
   }
+}
+
+/**
+ * DIE KATEGORIE EINER AUSGABE HAT EINE FARBE (R22, D9). Die Lead-Kachel der
+ * Zeile ist getoent wie die eines Kontos oder Abos; die Farbe kommt aus der
+ * Datenreihen-Palette (tokens.css, dieselbe wie die Budget-Kategorien), fest
+ * je Kategorie in der Reihenfolge der Auswahl, damit sie sich nie verschiebt.
+ * "Allgemein" (und was unbekannt ist) bleibt neutral - der Rest der Liste
+ * sagt es ueber das Zeichen.
+ */
+const CATEGORY_TONE_ORDER = ['groceries', 'rent', 'utilities', 'baby', 'pets', 'school', 'travel', 'shopping', 'subscriptions', 'health', 'home'];
+function categoryTone(category) {
+  const i = CATEGORY_TONE_ORDER.indexOf(category);
+  return i < 0 ? '' : ` style="--tile-color:${CATEGORY_SERIES_COLORS[i % CATEGORY_SERIES_COLORS.length]}"`;
 }
 
 function categoryIcon(category) {
@@ -2802,6 +2835,8 @@ export const __test = {
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
   ownGroupBalance, groupToolsTriggerHtml,
+  // R22 D9: der Typ einer Gruppe faellt weg, wo er ihren Namen wiederholt.
+  groupTypeLabel,
   // #1997: Mitglied und Gast speichern schliessen nur ihren eigenen Dialog
   // (test-split-amount-input.js).
   openMemberModal, openGuestModal,

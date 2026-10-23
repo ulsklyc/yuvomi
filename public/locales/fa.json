@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: بدهی تو",
         "debtYouOwe": "به {{name}} بدهکارید",
         "debtOwesYou": "{{name}} به شما بدهکار است",
-        "debtOwes": "{{from}} به {{to}} بدهکار است"
+        "debtOwes": "{{from}} به {{to}} بدهکار است",
+        "balanced": "تسویه‌شده",
+        "balancedInGroup": "{{group}}: تسویه‌شده"
     },
     "wmo": {
         "0": "آسمان صاف",

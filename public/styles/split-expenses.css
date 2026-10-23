@@ -256,25 +256,14 @@
   background: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface));
 }
 
-.split-group__avatar,
-.split-expense__icon {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  /* KEIN VOLLTON, UND DAS IST DIESELBE REGEL, NICHT IHRE AUSNAHME. Die
-   * Herkunfts-Regel (DESIGN.md) laesst ein Modulzeichen an MISCHSTELLEN stehen
-   * und verbietet es als Dauer-Dekor in den Listen eines einzelnen Moduls: jede
-   * Zeile sagte hier „Geteilte Ausgaben" auf eine Seite, die genau das schon
-   * im Kopf sagt. Unterschieden werden die Eintraege ohnehin vom GLYPH, nicht
-   * vom Ton - Gruppentypen und Ausgabenkategorien fuehren keine eigenen Farben.
-   * Also neutral, bis sie welche haben; dann traegt die Marke DEREN Ton im
-   * Vollton (Vollton-Regel, erster Zweig). */
-  color: var(--color-text-secondary);
-  background: var(--color-fill-well);
-}
+/* KEIN MODULTON, sondern der Ton der KATEGORIE (R22, D9). Die Herkunfts-Regel
+ * (DESIGN.md) verbietet das Modulzeichen als Dauer-Dekor in den Listen eines
+ * Moduls - das bleibt. Seit R22 traegt jede Ausgabenkategorie eine Farbe
+ * (`--tile-color`, split-expenses.js categoryTone), und die Kachel hat die Form
+ * der Lead-Kachel des Budgets (`.budget-tile`, budget.css) wie Konto und Abo;
+ * bis dahin war sie die einzige graue 42px-Kachel ohne Kante im Modul. Das
+ * Zeichen einer Gruppe steht in derselben Kachel, neutral (Gruppentypen haben
+ * keine Farbe). */
 
 .split-group__body,
 .split-expense__body,

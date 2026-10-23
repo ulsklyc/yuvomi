@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: 支払う額",
         "debtYouOwe": "{{name}}さんに支払い",
         "debtOwesYou": "{{name}}さんから受け取り",
-        "debtOwes": "{{from}}さんから{{to}}さんへ支払い"
+        "debtOwes": "{{from}}さんから{{to}}さんへ支払い",
+        "balanced": "精算済み",
+        "balancedInGroup": "{{group}}: 精算済み"
     },
     "wmo": {
         "0": "快晴",

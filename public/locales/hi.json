@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: तुम्हें देना है",
         "debtYouOwe": "आपको {{name}} को देना है",
         "debtOwesYou": "{{name}} से आपको मिलना है",
-        "debtOwes": "{{from}} को {{to}} को देना है"
+        "debtOwes": "{{from}} को {{to}} को देना है",
+        "balanced": "हिसाब बराबर",
+        "balancedInGroup": "{{group}}: हिसाब बराबर"
     },
     "wmo": {
         "0": "साफ आकाश",

@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Bạn nợ",
         "debtYouOwe": "Bạn nợ {{name}}",
         "debtOwesYou": "{{name}} nợ bạn",
-        "debtOwes": "{{from}} nợ {{to}}"
+        "debtOwes": "{{from}} nợ {{to}}",
+        "balanced": "Đã thanh toán xong",
+        "balancedInGroup": "{{group}}: Đã thanh toán xong"
     },
     "wmo": {
         "0": "Trời quang",

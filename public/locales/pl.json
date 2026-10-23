@@ -4591,7 +4591,9 @@
         "youOweInGroup": "{{group}}: Jesteś winien",
         "debtYouOwe": "Do oddania dla {{name}}",
         "debtOwesYou": "{{name}} ma ci oddać",
-        "debtOwes": "{{from}} jest winien {{to}}"
+        "debtOwes": "{{from}} jest winien {{to}}",
+        "balanced": "Rozliczone",
+        "balancedInGroup": "{{group}}: Rozliczone"
     },
     "wmo": {
         "0": "Bezchmurnie",

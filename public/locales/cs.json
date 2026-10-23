@@ -3971,7 +3971,9 @@
         "youOweInGroup": "{{group}}: dlužíš",
         "debtYouOwe": "Dlužíte osobě {{name}}",
         "debtOwesYou": "{{name}} vám dluží",
-        "debtOwes": "{{from}} dluží {{to}}"
+        "debtOwes": "{{from}} dluží {{to}}",
+        "balanced": "Vyrovnáno",
+        "balancedInGroup": "{{group}}: Vyrovnáno"
     },
     "documents": {
         "title": "Dokumenty",

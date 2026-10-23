@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Tartozásod",
         "debtYouOwe": "Ön tartozik neki: {{name}}",
         "debtOwesYou": "{{name}} tartozik Önnek",
-        "debtOwes": "{{from}} tartozik neki: {{to}}"
+        "debtOwes": "{{from}} tartozik neki: {{to}}",
+        "balanced": "Rendezve",
+        "balancedInGroup": "{{group}}: Rendezve"
     },
     "wmo": {
         "0": "Tiszta égbolt",

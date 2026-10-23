@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Je bent schuldig",
         "debtYouOwe": "Je bent {{name}} nog schuldig",
         "debtOwesYou": "{{name}} is jou nog schuldig",
-        "debtOwes": "{{from}} is schuldig aan {{to}}"
+        "debtOwes": "{{from}} is schuldig aan {{to}}",
+        "balanced": "Vereffend",
+        "balancedInGroup": "{{group}}: Vereffend"
     },
     "wmo": {
         "0": "Heldere lucht",

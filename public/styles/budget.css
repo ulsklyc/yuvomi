@@ -702,20 +702,42 @@
   outline-offset: var(--focus-ring-offset-inset);
 }
 
-/* Konto-Kachel: dieselbe Regel wie beim Abo-Monogramm — die Kontofarbe trägt
- * Fläche und Rahmen, das Icon kommt aus dem Text-Token. Vorher kamen Icon und
- * Grund aus derselben Nutzerfarbe; das Verhältnis hing damit an der Datenlage
- * und fiel bei hellen Kontofarben unter die 3:1 für nicht-textuelle Inhalte. */
-.budget-account__icon {
+/* DIE LEAD-KACHEL: EINE BAUFORM FUER DEN ZEILENANFANG IM BUDGET (R22, D9).
+ * Konten (Kontofarbe + Kontoart-Zeichen), Abos (Marken- oder Kategoriefarbe,
+ * Logo oder Initialen als FUELLUNG der Kachel) und Ausgaben der Aufteilung
+ * (Kategorie-Zeichen) trugen drei Kacheln: 40px mit Rand und 14/45 % als
+ * Literal, 40px auf deckender Flaeche, 42px grau ohne Rand. Jetzt eine Regel:
+ * die Farbe (`--tile-color`) traegt Flaeche und Kante in den Toenungsstufen
+ * aus tokens.css, Zeichen und Schrift kommen aus dem Text-Token - so haengt der
+ * Kontrast nie an der Datenlage (helle Kontofarben fielen sonst unter 3:1).
+ * Ohne Farbe steht die Kachel neutral. Der Journal-Punkt bleibt Punkt (D9). */
+.budget-tile {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border: 1px solid color-mix(in srgb, var(--account-accent) 45%, transparent);
+  inline-size: var(--target-md);
+  block-size: var(--target-md);
+  overflow: hidden;
+  border: var(--space-px) solid color-mix(in srgb, var(--tile-color, var(--color-text-tertiary)) var(--tint-hint), transparent);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--account-accent) 14%, transparent);
+  background: color-mix(in srgb, var(--tile-color, var(--color-text-tertiary)) var(--tint-surface), transparent);
   color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.budget-tile > svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+}
+
+.budget-tile > img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.budget-account__icon {
+  --tile-color: var(--account-accent);
 }
 
 .budget-account__body {

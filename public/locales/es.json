@@ -4355,7 +4355,9 @@
         "youOweInGroup": "{{group}}: Debes",
         "debtYouOwe": "Debes a {{name}}",
         "debtOwesYou": "{{name}} te debe",
-        "debtOwes": "{{from}} debe a {{to}}"
+        "debtOwes": "{{from}} debe a {{to}}",
+        "balanced": "Saldado",
+        "balancedInGroup": "{{group}}: Saldado"
     },
     "wmo": {
         "0": "Cielo despejado",
