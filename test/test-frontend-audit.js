@@ -22558,6 +22558,19 @@ test('R22 D17: die Metazeile der Aufgabe laeuft am Desktop unter den Avatar', ()
   assert.match(avatar, /align-self:\s*start/);
 });
 
+// R22 S9 (Critique 2026-10-22, a2 Klein): Rezepte-Liste und -Detail begannen
+// 16px auseinander (141 gegen 125) - die Liste traegt den oberen Auslauf ihres
+// Scrollports, das Detail nicht.
+test('R22: das Rezept-Detail fluchtet oben mit der Liste', () => {
+  const rules = [...eachRule(read('../public/styles/recipes.css'))].filter((r) => !r.at.length);
+  const pane = rules.find((r) => r.selector.trim() === '.recipes-page .split-view__detail')?.body ?? '';
+  const list = rules.find((r) => r.selector.trim() === '.recipes-list')?.body ?? '';
+  const top = /padding-block-start:\s*(var\(--space-\d+\))/.exec(list)?.[1];
+  assert.ok(top, 'Vorbedingung: der Auslauf der Liste');
+  assert.match(pane, new RegExp(`margin-block-start:\\s*${top.replace(/[()]/g, '\\$&')}`), 'dieselbe Stufe am Detail');
+  assert.match(pane, /max-block-size:\s*calc\(100% - var\(--space-8\)\)/, 'und die Hoehe haelt beide Raender frei');
+});
+
 // R22 S9 (Critique 2026-10-22, a2 Klein): bei 1280 blieben der Kategorie der
 // Schnellzeile 116px - „Sonstig...". Sie hat eine Untergrenze.
 test('R22: die Kategorie der Einkaufs-Schnellzeile behaelt am Desktop ihr Wort', () => {

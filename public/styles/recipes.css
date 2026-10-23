@@ -629,6 +629,15 @@ button.recipe-detail__ingredient-match:hover {
  * nach der gerechneten Darstellung der Spalte (syncRowMode).
  * -------------------------------------------------------- */
 
+/* DIE SPALTE FLUCHTET MIT DER LISTE (R22 S9, Critique a2). Die Liste beginnt
+ * mit dem oberen Auslauf ihres Scrollports (`.recipes-list`, --space-4) bei
+ * y 141, das Detail stand ohne ihn bei 125 - zwei Oberkanten nebeneinander.
+ * Dieselbe Stufe oben; unten haelt die Hoehe beide Rand-Stufen frei. */
+.recipes-page .split-view__detail {
+  margin-block-start: var(--space-4);
+  max-block-size: calc(100% - var(--space-8));
+}
+
 /* Derselbe Inhalt wie der Aufklapper, aber mit dem Polster der Spalte: der
  * Aufklapper haengt unter einer Zeile und rueckt nur um die Zeilenkante ein,
  * die Spalte ist eine eigene Flaeche mit dem Polster ihres Kopfs
