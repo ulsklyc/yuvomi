@@ -2267,7 +2267,8 @@ test('ab 60rem Einkaufsflaeche stehen die Kategorien dicht gepackt in zwei Spalt
 
   // Die Huelle steht im Markup UM die Gruppen - der Scroller selbst hat eine
   // feste Hoehe, und Multicol liefe dort seitlich statt nach unten weiter.
-  assert.match(js, /insertAdjacentHTML\('beforeend', `<div class="items-lanes">\$\{renderItems\(\)\}<\/div>`\)/);
+  // Die Zeilen darin baut der erste Aufbau als Platzhalter (utils/row-fill.js).
+  assert.match(js, /insertAdjacentHTML\('beforeend', `<div class="items-lanes">\$\{renderItems\(fill\.rows\)\}<\/div>`\)/);
   const narrow = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.items-lanes');
   assert.match(narrow?.body ?? '', /display:\s*contents/, 'schmal aendert die Huelle nichts');
 

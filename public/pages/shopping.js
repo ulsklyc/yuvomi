@@ -4,6 +4,7 @@
  * Abhängigkeiten: /api.js
  */
 
+import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
 import { api } from '/api.js';
 import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
@@ -1389,15 +1390,32 @@ function mountItems(listEl, container) {
     return;
   }
 
+  // DER ERSTE AUFBAU ZEICHNET NUR, WAS IM BILD STEHT (Critique R22-F, F2.1):
+  // jede andere Zeile steht als Platzhalter in ihrer Hoehe (48px, die
+  // Spalten verteilen also schon richtig) und kommt in Happen nach
+  // (utils/row-fill.js). Jeder spaetere Aufbau zeichnet ganz.
+  const fill = beginRowFill(listEl, { group: '.list-group' });
   listEl.replaceChildren();
   // EINE HUELLE UM DIE GRUPPEN (R11 H5): sie ist die Flaeche, die am Desktop
   // in zwei Spalten packt (shopping.css, `.items-lanes`). Der Scroller selbst
   // kann das nicht - mit begrenzter Hoehe liefe Multicol seitlich ueber.
   // Mobil ist sie `display: contents` und aendert nichts.
-  listEl.insertAdjacentHTML('beforeend', `<div class="items-lanes">${renderItems()}</div>`);
+  listEl.insertAdjacentHTML('beforeend', `<div class="items-lanes">${renderItems(fill.rows)}</div>`);
+  // Nachgekommene Zeilen bekommen Zeichen und Wischgeste wie die ersten.
+  fill.start({
+    onRows: (rows) => {
+      drawRowIcons(rows);
+      if (container && !readOnly()) wireSwipeGestures(container);
+    },
+  });
 }
 
-function renderItems() {
+/**
+ * @param {(items: object[], render: (item: object) => string) => string} [rowsHtml]
+ *   baut die Zeilen einer Kategorie - der erste Aufbau setzt dort Platzhalter
+ *   (utils/row-fill.js)
+ */
+function renderItems(rowsHtml = (items, render) => items.map(render).join('')) {
   const { groups, ticked } = listSections(state.items);
   pruneCollapsedCategories(groups);
   // Geteilte Gruppen-Grammatik (styles/list-row.css): .list-group ordnet,
@@ -1427,7 +1445,7 @@ function renderItems() {
         <span class="list-group__count">${items.length}</span>
       </h2>
       <div class="row-carrier" id="${rowsId}" ${collapsed ? 'hidden' : ''}>
-        ${items.map(renderItem).join('')}
+        ${rowsHtml(items, renderItem)}
       </div>
     </div>`;
   }).join('') + renderTickedSection(ticked);
@@ -4783,6 +4801,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
  * Beim Ankommen ueber einen Link sieht dem Aufklappen ohnehin niemand zu.
  */
 function revealHighlightedItem(container, id) {
+  // Die angesteuerte Zeile muss stehen, auch wenn sie im ersten Aufbau erst
+  // spaeter gekommen waere (utils/row-fill.js).
+  flushRowFill(container.querySelector?.('#items-list') ?? null);
   const el = container.querySelector(`.shopping-item[data-item-id="${id}"]`);
   if (!el) return;
   const rowsEl = el.closest('.row-carrier');

@@ -726,6 +726,13 @@
  * der Platzhalter die echte Hoehe IST, wechselt in den Spalten keine Kategorie
  * beim Scrollen die Spalte; deshalb gilt diese Regel auch ab 60rem. Die Zeile
  * ist selbst `overflow: hidden` (Wischbuehne). */
+/* Dieselbe Content-Box traegt der Platzhalter einer Zeile, die beim ersten
+ * Aufbau erst nach dem Bild kommt (Critique R22-F, F2.1; utils/row-fill.js,
+ * list-row.css) - ohne @supports, er gilt in jedem Browser. */
+.shopping-page .items-lanes > .list-group .row-carrier {
+  --row-pending-size: 48px;
+}
+
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .shopping-page .items-lanes > .list-group .row-carrier > .swipe-row:nth-child(n+20) {
     content-visibility: auto;

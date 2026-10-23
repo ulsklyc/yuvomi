@@ -361,6 +361,19 @@
  * 12px-Einzug mobil (S4) und der Metazeile unter dem Avatar (D17), 211
  * Aufgaben: 84,6 mobil, 80 Tablet und 1920, 100,6 mit Detailspalte -
  * unveraendert. */
+/* Dieselbe Content-Box traegt der Platzhalter einer Zeile, die beim ersten
+ * Aufbau erst nach dem Bild kommt (Critique R22-F, F2.1; utils/row-fill.js,
+ * list-row.css) - ohne @supports, er gilt in jedem Browser. */
+.task-group .row-carrier {
+  --row-pending-size: 85px;
+}
+
+@media (min-width: 640px) {
+  .task-group .row-carrier {
+    --row-pending-size: 80px;
+  }
+}
+
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .task-group .row-carrier > .swipe-row:nth-child(n+20) {
     content-visibility: auto;

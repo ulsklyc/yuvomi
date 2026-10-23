@@ -835,6 +835,18 @@
   container-name: list-rows;
 }
 
+/* DER PLATZHALTER EINER ZEILE, DIE GLEICH NACHKOMMT (Critique R22-F, F2.1;
+ * utils/row-fill.js). Der erste Aufbau einer langen Liste zeichnet nur die
+ * Zeilen im Bild, die uebrigen stehen bis zu ihrem Happen als leere Box in
+ * der Hoehe ihrer Zeile: `--row-pending-size` ist dieselbe Content-Box, die
+ * das Modul als `contain-intrinsic-size` fuehrt (Guard in
+ * test:frontend-audit), die Haarlinie kommt wie bei jeder Zeile aus der
+ * Regel darueber. Ohne Modulwert die Zielhoehe einer Zeile. */
+.row-carrier > .row-pending {
+  box-sizing: content-box;
+  block-size: var(--row-pending-size, var(--target-lg));
+}
+
 /* Ein LEERZUSTAND bekommt gar keine Fläche (§2, Session 5). Trägt die Liste nur
  * ihn, gibt der Träger seine Karte ab - sonst stünde ein leerer weißer Kasten
  * da, wo gerade nichts ist. Steht hier einmal statt in jedem Modul: die

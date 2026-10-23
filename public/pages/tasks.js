@@ -8,6 +8,7 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
+import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
 import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
@@ -794,7 +795,14 @@ function wireTaskSearchReset(container, listEl) {
   });
 }
 
-function renderTaskGroups(tasks, groupMode) {
+/**
+ * @param {object[]} tasks
+ * @param {string} groupMode
+ * @param {(items: object[], render: (task: object) => string) => string} [rowsHtml]
+ *   baut die Zeilen einer Gruppe - der erste Aufbau setzt dort Platzhalter
+ *   (utils/row-fill.js, Critique R22-F F2.1)
+ */
+function renderTaskGroups(tasks, groupMode, rowsHtml = (items, render) => items.map(render).join('')) {
   if (!tasks.length) {
     // Leere Suche ≠ leeres Modul: bei aktiver Suche wäre „Noch keine Aufgaben"
     // schlicht falsch und der Anlegen-CTA die falsche Antwort (Notizen-Muster).
@@ -854,13 +862,13 @@ function renderTaskGroups(tasks, groupMode) {
         ${reorderable && groupTasks.some((x) => x.sort_order != null) ? taskResetButtonHtml(id, label) : ''}
       </h2>
       ${collapsed ? '' : `<div class="row-carrier">
-        ${sorted.map((t) => renderSwipeRow(t, renderTaskCard(t, {
+        ${rowsHtml(sorted, (t) => renderSwipeRow(t, renderTaskCard(t, {
           selecting: state.bulkSelectMode,
           selected: state.bulkSelectMode && state.selectedTaskIds.has(t.id),
           expandedSubtasks: state.subtasksExpandedByDefault,
           showCategory: groupMode !== 'category',
           reorderable,
-        }))).join('')}
+        })))}
       </div>`}
     </div>`;
   }).join('');
@@ -3966,8 +3974,16 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   // Die Reihenfolge VOR dem Neuzeichnen: verlaesst die ausgewaehlte Zeile die
   // Ansicht, rueckt die Auswahl auf ihre Nachbarin (syncPaneAfterRender).
   const orderBefore = mdRowIds(listEl);
+  // DER ERSTE AUFBAU ZEICHNET NUR, WAS IM BILD STEHT (Critique R22-F, F2.1):
+  // jede andere Zeile steht als Platzhalter in ihrer Hoehe und kommt in
+  // Happen nach (utils/row-fill.js). Mobil 4x CPU, 261 Aufgaben: der Frame des
+  // Wechsels hielt das alte Bild 276 ms. Jeder spaetere Aufbau zeichnet ganz.
+  const fill = beginRowFill(listEl, { group: '.task-group' });
   listEl.replaceChildren();
-  listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode));
+  listEl.insertAdjacentHTML('beforeend', renderTaskGroups(filteredTasks(), state.groupMode, fill.rows));
+  // Nachgekommene Zeilen bekommen Zeichen und Wischgeste wie die ersten
+  // (die Verdrahtung uebergeht Zeilen, die sie schon haben).
+  fill.start({ onRows: (rows) => { drawRowIcons(rows); wireSwipeGestures(container); } });
   drawTaskIcons(listEl);
   syncPaneAfterRender(listEl, orderBefore, { quiet: paneQuiet });
   stagger(listEl.querySelectorAll('.swipe-row, .kanban-card'), { host: listEl });
@@ -6008,7 +6024,12 @@ function syncSplitHeight(container) {
   const page = container.querySelector('.tasks-page');
   const detail = page?.querySelector('.split-view__detail');
   if (!page || !detail) return;
-  const split = getComputedStyle(detail).display !== 'none';
+  // Unter 65rem Fensterbreite gibt es die Spalte sicher nicht (die Seite ist
+  // nie breiter als das Fenster) - ohne die Abfrage loeste getComputedStyle
+  // die Container-Abfrage auf und erzwang mobil zweimal je Wechsel ein Layout
+  // (4x CPU: 13 ms, Critique R22-F F2.1).
+  const split = (typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 65rem)').matches)
+    && getComputedStyle(detail).display !== 'none';
   page.classList.toggle('tasks-page--split', split);
   // In der Spaltenform scrollt die Liste selbst, nicht mehr `.app-content` -
   // sie traegt dann die Rolle, damit der Nachlauf der Shell-Flaechen (FAB,
@@ -6030,6 +6051,9 @@ function mountTaskSplit(container, signal) {
   // beim Schliessen geht er, R22 D2); der Baustein laesst nur diese
   // Anfangsauswahl liegen, statt sie ohne Zeile zu beanspruchen.
   const initial = new URLSearchParams(location.search).get(TASK_DETAIL_PARAM);
+  // Die verlinkte Zeile muss stehen, auch wenn sie im ersten Aufbau erst
+  // spaeter gekommen waere (utils/row-fill.js).
+  if (initial) flushRowFill(container.querySelector('#task-list'));
   const sheetFor = initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`) ? initial : null;
 
   taskMd = mountMasterDetail({
@@ -6038,6 +6062,10 @@ function mountTaskSplit(container, signal) {
     signal,
     deepLinkNarrow: true,
     claimInitial: sheetFor == null,
+    // Die Spalte steht erst ab 65rem Seitenbreite (layout.css, module-surface);
+    // darunter fragt der Baustein die Box nicht ab - das erzwang mobil im
+    // Frame des Wechsels ein Layout der ganzen Liste (4x CPU: 13-18 ms).
+    splitMedia: '(min-width: 65rem)',
     renderDetail: (id, body, ctx) => renderTaskPane(id, body, ctx.signal, container),
     openNarrow: (id, _trigger, { signal }) => openTaskSheet(id, container, signal),
     // Enter auf der gewaehlten Zeile: Bearbeiten, wie der Knopf im Kopf der

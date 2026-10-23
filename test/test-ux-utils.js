@@ -2253,3 +2253,164 @@ test('R22 D22: drawIconsInSightOrder zeichnet je Zeile, der Rest folgt in eigene
     delete global.window.lucide;
   }
 });
+
+/**
+ * Critique R22-F (F2.1): LANGE LISTEN - ERST WAS IM BILD STEHT, DER REST IN
+ * HAPPEN (utils/row-fill.js). Der Wechsel in die Aufgaben mit 261 Eintraegen
+ * hielt das alte Bild 276 ms (mobil, 4x CPU), der Einkauf 216 ms, am Laptop
+ * 315 bzw. 396 ms - fast alles fuer Zeilen, die niemand sah.
+ *
+ * Gefahren wird der Baustein an einer kleinen DOM-Attrappe mit Geometrie:
+ * jede Zeile und jeder Platzhalter ist 50px hoch, das Fenster 200px - im
+ * Bild stehen also vier Zeilen, mit dem Vorlauf (ein Viertel) fuenf.
+ */
+const ROW_H = 50;
+class FakeEl {
+  constructor(attrs = {}) {
+    this.attrs = { ...attrs };
+    this.children = [];
+    this.parentNode = null;
+    this.listeners = {};
+    this.root = false;
+  }
+  get isConnected() { let n = this; while (n.parentNode) n = n.parentNode; return n.root; }
+  get className() { return this.attrs.class ?? ''; }
+  getAttribute(name) { return name in this.attrs ? this.attrs[name] : null; }
+  get previousElementSibling() { const s = this.parentNode?.children ?? []; return s[s.indexOf(this) - 1] ?? null; }
+  get nextElementSibling() { const s = this.parentNode?.children ?? []; const i = s.indexOf(this); return i < 0 ? null : s[i + 1] ?? null; }
+  get firstElementChild() { return this.children[0] ?? null; }
+  remove() { if (!this.parentNode) return; this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1); this.parentNode = null; }
+  closest() { return null; }
+  /** Nur das Markup dieser Tests: `<div a="b" ...></div>` hintereinander. */
+  insertAdjacentHTML(where, html) {
+    if (where !== 'beforebegin' && where !== 'beforeend') throw new Error(`unerwartet: ${where}`);
+    const made = [...html.matchAll(/<div ([^>]*)><\/div>/g)].map(([, a]) => {
+      const el = new FakeEl(Object.fromEntries([...a.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, k, v]) => [k, v])));
+      return el;
+    });
+    const parent = where === 'beforeend' ? this : this.parentNode;
+    const at = where === 'beforeend' ? parent.children.length : parent.children.indexOf(this);
+    for (const el of made) el.parentNode = parent;
+    parent.children.splice(at, 0, ...made);
+  }
+  all() { return this.children.flatMap((c) => [c, ...c.all()]); }
+  querySelectorAll(sel) {
+    const m = sel.match(/^\.([\w-]+)\[([\w-]+)\]$/);
+    if (!m) throw new Error(`unerwarteter Selektor: ${sel}`);
+    return this.all().filter((el) => el.className.split(' ').includes(m[1]) && m[2] in el.attrs);
+  }
+  /** Zeilen stehen untereinander, jede 50px, in DOM-Reihenfolge des Wirts. */
+  getBoundingClientRect() {
+    let host = this; while (host.parentNode && !host.root) host = host.parentNode;
+    const leaves = host.all().filter((el) => !el.children.length);
+    const i = leaves.indexOf(this);
+    const top = i < 0 ? 0 : i * ROW_H;
+    return { top, bottom: top + ROW_H, height: ROW_H };
+  }
+  addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
+  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] ?? []).filter((f) => f !== fn); }
+  fire(type) { for (const fn of [...(this.listeners[type] ?? [])]) fn({ type }); }
+}
+
+const rowFill = await import('../public/utils/row-fill.js');
+const scrollRestore = await import('../public/utils/scroll-restore.js');
+
+/** Ein Wirt mit EINEM Zeilentraeger, wie `#task-list > .task-group > .row-carrier`. */
+function fillHost() {
+  const host = new FakeEl({ id: 'liste' });
+  host.root = true;
+  host.insertAdjacentHTML('beforeend', '<div class="row-carrier"></div>');
+  return { host, carrier: host.children[0] };
+}
+
+async function withViewport(fn) {
+  const saved = { innerHeight: global.window.innerHeight, raf: global.requestAnimationFrame, doc: global.document };
+  global.window.innerHeight = 200;
+  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  global.document = { visibilityState: 'visible' };
+  try { await fn(); } finally {
+    if (saved.innerHeight === undefined) delete global.window.innerHeight; else global.window.innerHeight = saved.innerHeight;
+    if (saved.raf === undefined) delete global.requestAnimationFrame; else global.requestAnimationFrame = saved.raf;
+    if (saved.doc === undefined) delete global.document; else global.document = saved.doc;
+  }
+}
+
+const settle = async () => { for (let i = 0; i < 40; i++) await new Promise((r) => setTimeout(r, 0)); };
+const ids = (carrier) => carrier.children.map((c) => c.getAttribute('data-id') ?? 'P');
+
+test('R22-F F2.1: der erste Aufbau zeichnet nur, was im Bild steht - der Rest kommt nach dem Bild', async () => {
+  await withViewport(async () => {
+    const { host, carrier } = fillHost();
+    const items = Array.from({ length: 20 }, (_, i) => i);
+    const rendered = [];
+    const render = (i) => { rendered.push(i); return `<div class="row" data-id="${i}"></div>`; };
+    const fill = rowFill.beginRowFill(host);
+    assert.equal(fill.lazy, true, 'der erste Aufbau eines Traegers ist der aufgeschobene');
+    carrier.insertAdjacentHTML('beforeend', fill.rows(items, render));
+    assert.equal(rendered.length, 0, 'Platzhalter kosten kein Zeilen-Markup');
+    assert.equal(carrier.children.length, 20, 'jede Zeile hat ihren Platzhalter - die Laenge des Bildlaufs stimmt');
+
+    const drawn = [];
+    fill.start({ onRows: (rows) => drawn.push(...rows.map((r) => r.getAttribute('data-id'))) });
+    assert.deepEqual(ids(carrier).slice(0, 6), ['0', '1', '2', '3', '4', 'P'], 'im selben Frame: das Bild und ein Viertel darunter');
+    assert.deepEqual(drawn, ['0', '1', '2', '3', '4'], 'die neuen Zeilen gehen an onRows (Zeichen, Wischgeste)');
+
+    await settle();
+    assert.deepEqual(ids(carrier), items.map(String), 'danach in Happen der Rest, in Reihenfolge und ohne Platzhalter');
+    assert.equal(rendered.length, 20, 'jede Zeile genau einmal gebaut');
+    assert.equal(drawn.length, 20);
+    assert.deepEqual(host.listeners.pointerdown, [], 'fertig gefuellt: kein Zuhoerer bleibt haengen');
+  });
+});
+
+test('R22-F F2.1: jeder weitere Aufbau und jeder Rueckweg zeichnet ganz', async () => {
+  await withViewport(async () => {
+    const { host } = fillHost();
+    rowFill.beginRowFill(host);
+    const again = rowFill.beginRowFill(host);
+    assert.equal(again.lazy, false, 'Schreiben, Suche, Filter: die Wege danach suchen ihre Zeile sofort');
+    assert.equal(again.rows([1, 2], (i) => `<div class="row" data-id="${i}"></div>`), '<div class="row" data-id="1"></div><div class="row" data-id="2"></div>');
+
+    scrollRestore.noteRestoringScroll(true);
+    try {
+      const back = rowFill.beginRowFill(fillHost().host);
+      assert.equal(back.lazy, false, 'der Rueckweg braucht die echte Hoehe der Zeilen ueber dem Ziel (D2)');
+    } finally {
+      scrollRestore.noteRestoringScroll(false);
+    }
+    assert.equal(rowFill.beginRowFill(fillHost().host, { progressive: false }).lazy, false);
+  });
+});
+
+test('R22-F F2.1: eine Eingabe vor dem Ende fuellt sofort, ein neuer Aufbau beendet den alten', async () => {
+  await withViewport(async () => {
+    const { host, carrier } = fillHost();
+    const render = (i) => `<div class="row" data-id="${i}"></div>`;
+    const fill = rowFill.beginRowFill(host);
+    carrier.insertAdjacentHTML('beforeend', fill.rows(Array.from({ length: 12 }, (_, i) => i), render));
+    fill.start();
+    assert.ok(ids(carrier).includes('P'));
+    host.fire('pointerdown');
+    assert.deepEqual(ids(carrier), Array.from({ length: 12 }, (_, i) => String(i)), 'der Tipp findet jede Zeile');
+
+    const second = fillHost();
+    const calls = [];
+    const f2 = rowFill.beginRowFill(second.host);
+    second.carrier.insertAdjacentHTML('beforeend', f2.rows(Array.from({ length: 12 }, (_, i) => i), (i) => { calls.push(i); return render(i); }));
+    f2.start();
+    const before = calls.length;
+    // Der naechste Aufbau ersetzt die Zeilen - was der alte noch fuellen wollte, faellt weg.
+    rowFill.beginRowFill(second.host);
+    second.carrier.children.splice(0);
+    await settle();
+    assert.equal(calls.length, before, 'kein Happen nach dem neuen Aufbau');
+
+    // flushRowFill: ein Weg, der eine bestimmte Zeile braucht (Deep-Link).
+    const third = fillHost();
+    const f3 = rowFill.beginRowFill(third.host);
+    third.carrier.insertAdjacentHTML('beforeend', f3.rows(Array.from({ length: 12 }, (_, i) => i), render));
+    f3.start();
+    rowFill.flushRowFill(third.host);
+    assert.ok(!ids(third.carrier).includes('P'));
+  });
+});

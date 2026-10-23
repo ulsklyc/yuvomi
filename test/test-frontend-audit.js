@@ -23324,6 +23324,68 @@ test('R22 D4: zeilenweise erst ab Zeile 20, Platzhalter = Content-Box der Zeile'
 });
 
 /**
+ * Critique R22-F (F2.1): LANGE LISTEN ZEICHNEN BEIM ERSTEN AUFBAU NUR, WAS IM
+ * BILD STEHT (utils/row-fill.js). Der Wechsel in die Aufgaben (261 Eintraege)
+ * hielt das alte Bild mobil bei 4x CPU 276 ms, der Einkauf am Laptop 396 ms.
+ * Jede andere Zeile steht als Platzhalter in IHRER Hoehe da: dieselbe
+ * Content-Box wie der D4-Platzhalter oben, sonst wuerde der Bildlauf beim
+ * Nachfuellen laenger und im Einkauf wechselten Kategorien die Spalte.
+ */
+test('R22-F F2.1: Aufgaben und Einkauf bauen ihre Zeilen ueber row-fill, Platzhalter = Content-Box', () => {
+  const tasks = read('../public/pages/tasks.js');
+  const list = tasks.slice(tasks.indexOf('function renderTaskList('), tasks.indexOf('function activeFilterCount('));
+  assert.match(list, /const fill = beginRowFill\(listEl, \{ group: '\.task-group' \}\);/, 'Aufgaben: der Aufbau der Liste beginnt keine Fuellung');
+  assert.match(list, /renderTaskGroups\(filteredTasks\(\), state\.groupMode, fill\.rows\)/, 'Aufgaben: die Zeilen kommen nicht ueber fill.rows');
+  assert.match(list, /fill\.start\(\{ onRows: \(rows\) => \{ drawRowIcons\(rows\); wireSwipeGestures\(container\); \} \}\)/,
+    'Aufgaben: nachgekommene Zeilen brauchen Zeichen und Wischgeste');
+  assert.match(tasks, /if \(initial\) flushRowFill\(container\.querySelector\('#task-list'\)\);/, 'Aufgaben: ein Deep-Link findet seine Zeile nicht');
+
+  const shop = read('../public/pages/shopping.js');
+  const mount = shop.slice(shop.indexOf('function mountItems('), shop.indexOf('function renderItems('));
+  assert.match(mount, /const fill = beginRowFill\(listEl, \{ group: '\.list-group' \}\);/, 'Einkauf: der Aufbau der Liste beginnt keine Fuellung');
+  assert.match(mount, /renderItems\(fill\.rows\)/);
+  assert.match(mount, /fill\.start\(/);
+  assert.match(shop.slice(shop.indexOf('function revealHighlightedItem(')), /^\s*flushRowFill\(/m, 'Einkauf: die angesteuerte Zeile muss stehen');
+
+  const carrier = [...eachRule(read('../public/styles/list-row.css'))].find((r) => r.selector.trim() === '.row-carrier > .row-pending');
+  assert.match(carrier?.body ?? '', /box-sizing:\s*content-box/, 'der Platzhalter misst die Content-Box wie contain-intrinsic-size');
+  assert.match(carrier?.body ?? '', /block-size:\s*var\(--row-pending-size/);
+
+  const pending = (file, selector, media) => [...eachRule(read(file))].find((r) => r.selector.trim() === selector
+    && (media ? r.at.some((at) => at.includes(media)) : !r.at.length))?.body.match(/--row-pending-size:\s*(\d+)px/)?.[1];
+  const intrinsic = (file, selector, media) => [...eachRule(read(file))].find((r) => r.selector.trim() === selector
+    && (media ? r.at.some((at) => at.includes(media)) : !r.at.some((at) => /min-width/.test(at))))?.body.match(/contain-intrinsic-size:\s*auto none auto (\d+)px/)?.[1];
+  const tRow = '.task-group .row-carrier > .swipe-row:nth-child(n+20)';
+  assert.equal(pending('../public/styles/tasks.css', '.task-group .row-carrier'), intrinsic('../public/styles/tasks.css', tRow), 'Aufgaben schmal');
+  assert.equal(pending('../public/styles/tasks.css', '.task-group .row-carrier', 'min-width: 640px'), intrinsic('../public/styles/tasks.css', tRow, 'min-width: 640px'), 'Aufgaben ab 640px');
+  assert.equal(pending('../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group .row-carrier'),
+    intrinsic('../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group .row-carrier > .swipe-row:nth-child(n+20)'), 'Einkauf');
+  assert.ok(pending('../public/styles/tasks.css', '.task-group .row-carrier'), 'Aufgaben: kein Platzhalterwert');
+});
+
+// Was am ersten Aufbau haengt: der Rueckweg zeichnet ganz (D2 - die Zeilen ueber
+// dem Ziel brauchen ihre echte Hoehe), eine nachgekommene Zeile bekommt ihre
+// Wischgeste genau einmal, und die Spalten-Abfrage der Aufgaben laesst mobil
+// das erzwungene Layout aus (4x CPU: 13-18 ms im Frame des Wechsels).
+test('R22-F F2.1: Rueckweg ganz, Wischgeste einmal je Zeile, Spalten-Abfrage nur ab 65rem', () => {
+  const router = read('../public/router.js');
+  assert.match(router, /noteRestoringScroll\(scrollTarget > 0 \|\| Boolean\(portTargets\)\);\n\s*renderPromise = module\.render\(target, context\);/,
+    'der Router sagt den Listen nicht, dass ein Rueckweg laeuft');
+  assert.match(router, /return Promise\.resolve\(renderPromise\)\.then\(\(\) => \{\n\s*noteRestoringScroll\(false\);/);
+  assert.match(read('../public/utils/row-fill.js'), /&& !isRestoringScroll\(\)/);
+
+  const swipe = read('../public/utils/swipe-row.js');
+  assert.match(swipe, /if \(wiredRows\.has\(row\)\) return;\n\s*const cardEl = row\.querySelector\(card\);\n\s*if \(!cardEl\) return;\n\s*wiredRows\.add\(row\);/,
+    'eine Zeile bekaeme beim erneuten Verdrahten ihre Zuhoerer doppelt');
+
+  const tasks = read('../public/pages/tasks.js');
+  assert.match(tasks, /claimInitial: sheetFor == null,[\s\S]{0,400}?splitMedia: '\(min-width: 65rem\)',/, 'mountMasterDetail fragt mobil die Box ab');
+  assert.match(tasks.slice(tasks.indexOf('function syncSplitHeight(')), /const split = \(typeof window\.matchMedia !== 'function' \|\| window\.matchMedia\('\(min-width: 65rem\)'\)\.matches\)\n\s*&& getComputedStyle\(detail\)\.display !== 'none';/,
+    'syncSplitHeight erzwingt mobil ein Layout');
+});
+
+
+/**
  * R21 S8: KEIN `:has()` VOR EINEM UNIVERSALSELEKTOR ODER `::placeholder`.
  * Chrome fuehrt die Reste aller Regeln, in denen `:has()` nicht im Subjekt
  * steht, in EINER Invalidierungsmenge. Steht in einem dieser Reste `*` oder ein

@@ -71,6 +71,7 @@ import {
   entryKeyOf,
   captureScrollPorts,
   restoreScrollPorts,
+  noteRestoringScroll,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal } from '/components/modal.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
@@ -1920,6 +1921,11 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       const context = route.thirdPartyModule
         ? { user: routerState.currentUser, page: { ...route.thirdPartyModule.page }, signal: _pageController.signal }
         : { user: routerState.currentUser, signal: _pageController.signal };
+      // Ein Rueckweg mit gemerktem Stand: lange Listen zeichnen dann ganz
+      // statt in Happen (utils/row-fill.js) - die Zeilen ueber dem Ziel
+      // brauchen ihre echte Hoehe. Der synchrone Teil von render() liest es,
+      // der Rest nach seinem Daten-await; zurueck nimmt es das Setzen unten.
+      noteRestoringScroll(scrollTarget > 0 || Boolean(portTargets));
       renderPromise = module.render(target, context);
 
       // Schon jetzt umziehen, nicht erst nach den Daten: die meisten Seiten legen
@@ -1937,11 +1943,12 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Router wiederholt es unten fuer eine Seite, die die Frist verpasst.
       // Ein Fehler der Seite gehoert dem `await` unten, nicht diesem Zweig.
       return Promise.resolve(renderPromise).then(() => {
+        noteRestoringScroll(false);
         if (signal?.aborted) return;
         if (scrollTarget > 0) content.scrollTop = scrollTarget;
         restorePorts();
         adoptPageFab();
-      }, () => {});
+      }, () => { noteRestoringScroll(false); });
     };
 
     // Wird die Navigation erst NACH dem Tausch ueberholt, verliert die neue

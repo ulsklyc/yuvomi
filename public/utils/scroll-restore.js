@@ -105,6 +105,25 @@ export function portPositionsFor(key, { restore = false } = {}) {
   return ports ? { ...ports } : null;
 }
 
+/**
+ * LAEUFT GERADE EIN RUECKWEG? (Critique R22-F, F2.1). Der Router setzt das
+ * vor dem Render einer Seite, die er auf einen gemerkten Stand zurueckholt,
+ * und nimmt es zurueck, sobald der Stand gesetzt ist. Lange Listen
+ * (utils/row-fill.js) zeichnen dann ganz statt in Happen: die Zeilen ueber
+ * dem Ziel brauchen ihre echte Hoehe, sonst stuende der Rueckweg woanders.
+ */
+let _restoring = false;
+
+/** @param {boolean} on */
+export function noteRestoringScroll(on) {
+  _restoring = Boolean(on);
+}
+
+/** @returns {boolean} */
+export function isRestoringScroll() {
+  return _restoring;
+}
+
 /** Verwirft alle gemerkten Positionen (Sitzungsende, Tests). */
 export function forgetScrollPositions() {
   positions.clear();

@@ -138,6 +138,14 @@ export function expandSwipeReveals(row) {
   }
 }
 
+/**
+ * Zeilen, die ihre Geste schon haben. Lange Listen zeichnen beim ersten
+ * Aufbau nur, was im Bild steht, und den Rest in Happen (utils/row-fill.js,
+ * Critique R22-F F2.1) - die Seite verdrahtet nach jedem Happen erneut, und
+ * eine Zeile darf ihre Zuhoerer dabei nur einmal bekommen.
+ */
+const wiredRows = new WeakSet();
+
 export function wireSwipeRows(listEl, {
   card, ignore = null, leading = null, trailing = null, sidesSwapped = false,
 } = {}) {
@@ -152,8 +160,10 @@ export function wireSwipeRows(listEl, {
     : (dx < 0 ? trailing : leading));
 
   listEl.querySelectorAll('.swipe-row').forEach((row) => {
+    if (wiredRows.has(row)) return;
     const cardEl = row.querySelector(card);
     if (!cardEl) return;
+    wiredRows.add(row);
 
     let startX = 0, startY = 0;
     let dx = 0;

@@ -239,6 +239,7 @@ const APP_SHELL = [
   '/utils/router-navigate.js',
   '/utils/roving-toolbar.js',
   '/utils/row-action.js',
+  '/utils/row-fill.js',
   '/utils/schedule-tabs.js',
   '/utils/schedule-reminder-offset.js',
   '/utils/screensaver-idle.js',
