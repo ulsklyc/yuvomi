@@ -9,7 +9,15 @@ class Element {
     this.listeners = {};
     this.dataset = {};
     this.style = { setProperty() {} };
-    this.classList = { add() {} };
+    // `contains` und `matches` braucht capPersistentToasts (toast-surface.js,
+    // R22 S10): Platz macht nur eine aeltere Erinnerung, nie die Rueckmeldung.
+    this.classList = { add() {}, contains: (c) => String(this.className ?? '').split(/\s+/).includes(c) };
+  }
+  matches(selector) {
+    return selector.split(',').some((part) => {
+      const cls = part.trim().match(/^\.([\w-]+)$/)?.[1];
+      return Boolean(cls) && this.classList.contains(cls);
+    });
   }
   appendChild(child) { this.children.push(child); return child; }
   setAttribute(name, value) { this[name] = value; }
