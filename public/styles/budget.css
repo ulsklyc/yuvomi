@@ -1057,6 +1057,17 @@
   .metric-grid--quad { --summary-cards: 2; }
 }
 
+/* EINE LANGE LEITZAHL BRICHT DIE VIERERZEILE FRUEHER (R22 S10, aus S7). Am
+ * Tablet (834px) stand die Restschuld „174.644,93 €" mit 182px in einer
+ * 166px-Karte und lief in die Nachbarkarte (768px: 149px). Eine Leitzahl mit
+ * Laengenstufe (`leadStep`, ab 11 Zeichen) braucht in Title 1 bis ~200px; vier
+ * Karten geben das erst ab ~928px Zeile her. Darunter zwei mal zwei - die Zahl
+ * bleibt in ihrem Grad, statt in der Zeile zu schrumpfen. Ab 960px steht die
+ * Reihe ohnehin als Seitenspalte (unten, `.budget-loans`). */
+@container budget-page (max-width: 927px) {
+  .metric-grid--quad.metric-grid--long-lead { --summary-cards: 2; }
+}
+
 /* Kopfzeile der Monatsbilanz: Titel links, „Nur Ausgaben" rechts.
  *
  * Der Umschalter stand vorher in einer eigenen 40px-Zeile rechtsbuendig ueber

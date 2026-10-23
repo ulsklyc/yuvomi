@@ -33,7 +33,7 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
         todayKey} from '/utils/date.js';
 import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue, currencySymbol } from '/utils/money.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
-import { trendMarkup, leadCardClass } from '/utils/metric-card.js';
+import { trendMarkup, leadCardClass, leadStep } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
@@ -3250,7 +3250,7 @@ function renderLoansDashboard() {
            (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
            total: die Richtung steht im Label, nicht im Vorzeichen.
            Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
+      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''}${leadStep(cards[0]?.value) ? ' metric-grid--long-lead' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
         ${cards.map((card, i) => `
         <div class="metric-card${i === 0 ? ` ${leadCardClass(card.value)}` : ''}">
           <div class="metric-card__label">${card.label}</div>

@@ -2796,8 +2796,12 @@ test('Budgetkopf traegt page-toolbar--period: eingeklappt verlaesst der Titel da
   // ohne Pfeile muss der Knopf keine Breite fuer das laengste Wort halten.
   // R22 (D20): eingeklappt nennt der Stepper den Ort - die Caption „Kalender"
   // ueber dem Zeitraum (zwei Zeilen per Umbruch, das <h1> bleibt geklippt).
+  // R22 S10: am Tablet (640-1023px) ordnet der Center-Slot Pfeile, Label und
+  // "Heute" in ein Raster, damit die Caption ueber dem Label steht - er stellt
+  // sie nur an ihren Platz, nichts faellt weg (test:mobile-chrome).
   const ALLOWED_COLLAPSED = [/> \.page-toolbar__center$/, /\[data-collapse-fold\]/, / \.cal-toolbar__view-menu$/, / \.cal-toolbar__view-menu-sizer$/,
-    / \.cal-toolbar__stepper$/, / \.cal-toolbar__place$/, / \.cal-toolbar__stepper > \.cal-toolbar__label$/];
+    / \.cal-toolbar__stepper$/, / \.cal-toolbar__place$/, / \.cal-toolbar__stepper > \.cal-toolbar__label$/,
+    / \.cal-toolbar__stepper > \.(?:period-stepper__prev|period-stepper__next|cal-toolbar__today)$/];
   const strangers = [...eachRule(calendarCss)]
     .filter((r) => /\.is-collapsed/.test(r.selector))
     .flatMap((r) => r.selector.split(',').map((part) => part.trim()))
@@ -6177,7 +6181,14 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
     };
     const loans = budgetUi.renderLoansPage();
     assert.match(loans, /budget-glance--lead budget-glance--lead-long">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile');
-    assert.match(loans, /class="metric-grid metric-grid--led budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead metric-card--lead-long">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
+    assert.match(loans, /class="metric-grid metric-grid--led[^"]*\bmetric-grid--long-lead budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead metric-card--lead-long">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
+    // R22 S10 (aus S7): am Tablet lief „174.644,93 €" aus der Viererkarte. Die
+    // Reihe mit langer Leitzahl bricht unter ~928px Zeile in zwei mal zwei.
+    const quadRule = [...eachRule(budgetCss)].find((r) => r.at.some((a) => /@container\s+budget-page\s*\(max-width:\s*927px\)/.test(a))
+      && r.selector.trim() === '.metric-grid--quad.metric-grid--long-lead');
+    assert.match(quadRule?.body ?? '', /--summary-cards:\s*2/, 'lange Leitzahl: zwei mal zwei unter 928px');
+    budgetUi.state.loans = { loans: [{ id: 1, status: 'active' }], summary: { active_count: 1, remaining_principal: 900, paid_amount: 100 } };
+    assert.doesNotMatch(budgetUi.renderLoansPage(), /metric-grid--long-lead/, 'eine kurze Leitzahl behaelt die Viererzeile');
   } finally {
     budgetUi.state.loans = vorher.loans;
   }
