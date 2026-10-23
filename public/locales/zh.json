@@ -4957,7 +4957,7 @@
             "noMeds": "暂无药物。",
             "logTitle": "服药记录",
             "personsLabel": "成员",
-            "take": "已服用",
+            "take": "服用",
             "skip": "跳过",
             "takeNamed": "服用 {{name}}",
             "skipNamed": "跳过 {{name}}",

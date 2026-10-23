@@ -902,3 +902,22 @@ test('F4.5: Einnehmen traegt seine Tablette auf jeder Seite und bei jeder Breite
   assert.deepEqual(hides.map((r) => `${r.at.join(' ')} ${r.selector}`), [], 'eine Breite nimmt dem Knopf die Tablette - Uebersicht und Medikamente-Seite sahen verschieden aus');
   assert.match(HEALTH_JS, /health-dose__take"[^>]*><i data-lucide="pill" class="icon-md health-dose__take-icon"/, 'die geplante Dosis traegt die Tablette');
 });
+
+// Nebenbefund zu F4.5: der Knopf "Einnehmen" hiess in 26 von 27 Sprachen wie
+// der ZUSTAND danach - en "Taken", fr "Pris", ja "服用済み" -, sein Name aber
+// "Take {{name}}". Ein Knopf, der "Taken" sagt, liest sich als erledigt, und
+// das sichtbare Wort stand nicht im Namen (WCAG 2.5.3 Label in Name: wer
+// "Taken" spricht, trifft "Take Vitamin D3" nicht). Das Wort ist jetzt das
+// Verb aus dem eigenen `takeNamed` jeder Sprache.
+test('F4.5: Einnehmen ist in jeder Sprache ein Verb, und sein Wort steht im Namen (WCAG 2.5.3)', () => {
+  const dir = join(ROOT, 'public/locales');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.ok(files.length >= 27, `nur ${files.length} Sprachen`);
+  const missing = [];
+  for (const file of files) {
+    const meds = JSON.parse(readFileSync(join(dir, file), 'utf8')).health.meds;
+    const named = meds.takeNamed.replace('{{name}}', '').toLocaleLowerCase();
+    if (!named.includes(meds.take.toLocaleLowerCase())) missing.push(`${file}: "${meds.take}" / "${meds.takeNamed}"`);
+  }
+  assert.deepEqual(missing, [], 'das sichtbare Wort fehlt im Namen des Knopfs');
+});

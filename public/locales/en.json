@@ -4957,7 +4957,7 @@
             "noMeds": "No medications yet.",
             "logTitle": "Intake log",
             "personsLabel": "Person",
-            "take": "Taken",
+            "take": "Take",
             "skip": "Skip",
             "takeNamed": "Take {{name}}",
             "skipNamed": "Skip {{name}}",

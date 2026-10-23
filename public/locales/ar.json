@@ -5330,7 +5330,7 @@
             "noMeds": "لا توجد أدوية بعد.",
             "logTitle": "سجل التناول",
             "personsLabel": "الشخص",
-            "take": "تم التناول",
+            "take": "تناول",
             "skip": "تخطّي",
             "takeNamed": "تناول {{name}}",
             "skipNamed": "تخطّي {{name}}",

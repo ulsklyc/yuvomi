@@ -4957,7 +4957,7 @@
             "noMeds": "Ingen medisiner ennå.",
             "logTitle": "Inntakslogg",
             "personsLabel": "Person",
-            "take": "Tatt",
+            "take": "Ta",
             "skip": "Hopp over",
             "takeNamed": "Ta {{name}}",
             "skipNamed": "Hopp over {{name}}",

@@ -249,9 +249,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.
   Each segment is now at least as wide as its word.
-- **"Take" shows its pill on every Health page.** On a computer the button carried its pill icon
-  only on the Medications page; the overview, and every phone, showed the same button without it.
-  It now has icon and word everywhere.
+- **"Take" says "Take" and shows its pill on every Health page.** In every language but German
+  the button for a due dose read like the state after it - "Taken", "Pris", "服用済み" - while a
+  screen reader announced "Take Vitamin D3". It now names the action in all 26 languages. On a
+  computer it also carried its pill icon only on the Medications page; the overview, and every
+  phone, showed the same button without it. It now has icon and word everywhere.
 - **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
   that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
   as a whole: the search in a computer's page header lost its width, the collapsed budget header

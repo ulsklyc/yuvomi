@@ -4957,7 +4957,7 @@
             "noMeds": "هنوز دارویی نیست.",
             "logTitle": "گزارش مصرف",
             "personsLabel": "شخص",
-            "take": "مصرف‌شده",
+            "take": "مصرف",
             "skip": "رد کردن",
             "takeNamed": "مصرف {{name}}",
             "skipNamed": "رد کردن {{name}}",

@@ -4957,7 +4957,7 @@
             "noMeds": "Henüz ilaç yok.",
             "logTitle": "Alım kaydı",
             "personsLabel": "Kişi",
-            "take": "Alındı",
+            "take": "Al",
             "skip": "Atla",
             "takeNamed": "{{name}} al",
             "skipNamed": "{{name}} atla",

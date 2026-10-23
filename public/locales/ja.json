@@ -4957,7 +4957,7 @@
             "noMeds": "薬はまだありません。",
             "logTitle": "服用記録",
             "personsLabel": "人",
-            "take": "服用済み",
+            "take": "服用",
             "skip": "スキップ",
             "takeNamed": "{{name}} を服用",
             "skipNamed": "{{name}} をスキップ",

@@ -4957,7 +4957,7 @@
             "noMeds": "Ainda sem medicamentos.",
             "logTitle": "Registro de doses",
             "personsLabel": "Pessoa",
-            "take": "Tomado",
+            "take": "Tomar",
             "skip": "Ignorar",
             "takeNamed": "Tomar {{name}}",
             "skipNamed": "Pular {{name}}",

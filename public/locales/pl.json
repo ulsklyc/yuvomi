@@ -5205,7 +5205,7 @@
             "noMeds": "Brak leków.",
             "logTitle": "Dziennik przyjmowania",
             "personsLabel": "Osoba",
-            "take": "Przyjęto",
+            "take": "Przyjmij",
             "skip": "Pomiń",
             "takeNamed": "Przyjmij {{name}}",
             "skipNamed": "Pomiń {{name}}",

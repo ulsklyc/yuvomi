@@ -4957,7 +4957,7 @@
             "noMeds": "Ancora nessun farmaco.",
             "logTitle": "Registro assunzioni",
             "personsLabel": "Persona",
-            "take": "Assunto",
+            "take": "Prendi",
             "skip": "Salta",
             "takeNamed": "Prendi {{name}}",
             "skipNamed": "Salta {{name}}",

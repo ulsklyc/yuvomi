@@ -4957,7 +4957,7 @@
             "noMeds": "Aucun médicament pour l'instant.",
             "logTitle": "Journal des prises",
             "personsLabel": "Personne",
-            "take": "Pris",
+            "take": "Prendre",
             "skip": "Ignorer",
             "takeNamed": "Prendre {{name}}",
             "skipNamed": "Ignorer {{name}}",

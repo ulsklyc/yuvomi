@@ -4957,7 +4957,7 @@
             "noMeds": "Aún no hay medicamentos.",
             "logTitle": "Registro de tomas",
             "personsLabel": "Persona",
-            "take": "Tomado",
+            "take": "Tomar",
             "skip": "Omitir",
             "takeNamed": "Tomar {{name}}",
             "skipNamed": "Omitir {{name}}",

@@ -4957,7 +4957,7 @@
             "noMeds": "아직 약 없음.",
             "logTitle": "복용 기록",
             "personsLabel": "사람",
-            "take": "복용함",
+            "take": "복용",
             "skip": "건너뛰기",
             "takeNamed": "{{name}} 복용",
             "skipNamed": "{{name}} 건너뛰기",

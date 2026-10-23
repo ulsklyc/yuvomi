@@ -4957,7 +4957,7 @@
             "noMeds": "Még nincsenek gyógyszerek.",
             "logTitle": "Bevételi napló",
             "personsLabel": "Személy",
-            "take": "Bevéve",
+            "take": "Bevétel",
             "skip": "Kihagyás",
             "takeNamed": "{{name}} bevétele",
             "skipNamed": "{{name}} kihagyása",

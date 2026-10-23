@@ -4957,7 +4957,7 @@
             "noMeds": "Nog geen medicijnen.",
             "logTitle": "Innamelogboek",
             "personsLabel": "Persoon",
-            "take": "Ingenomen",
+            "take": "Innemen",
             "skip": "Overslaan",
             "takeNamed": "{{name}} innemen",
             "skipNamed": "{{name}} overslaan",

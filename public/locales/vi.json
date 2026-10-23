@@ -4957,7 +4957,7 @@
             "noMeds": "Chưa có thuốc.",
             "logTitle": "Nhật ký uống thuốc",
             "personsLabel": "Người",
-            "take": "Đã dùng",
+            "take": "Uống",
             "skip": "Bỏ qua",
             "takeNamed": "Uống {{name}}",
             "skipNamed": "Bỏ qua {{name}}",
