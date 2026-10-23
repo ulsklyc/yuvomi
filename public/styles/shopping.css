@@ -634,6 +634,18 @@
   gap: var(--space-3);
 }
 
+/* DIE ERSTE GRUPPE STEHT NICHT AN DER KANTE (R22 D15). Am Finger begann der
+ * Kopf „Obst & Gemuese" 0px unter der Haarlinie des Kuechenkopfs (121 ->
+ * 121) - halb verdeckt, waehrend Vorrat, Rezepte und Aufgaben 12-16px Luft
+ * lassen. Dieselbe Stufe wie der Gruppenabstand dieser Seite. Mit Zeiger und
+ * bei offener Schnellzeile steht diese darueber und bringt ihre Luft mit
+ * (`.quick-add`, unten --space-3). */
+@media (hover: none) {
+  .shopping-page:not(.shopping-page--adding) .list-scroller {
+    padding-block-start: var(--space-3);
+  }
+}
+
 .shopping-page .list-group {
   gap: var(--space-1);
 }

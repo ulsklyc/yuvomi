@@ -1185,6 +1185,62 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     setCollapsed(Boolean(e.detail?.collapsed), fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked']);
   };
 
+  // DIE FALTZEILE KOMMT BEIM HOCHSCROLLEN ZURUECK (R22 D15). Bis R21 kam
+  // sie erst ganz oben wieder (scrollTop < 8): wer im Einkauf mitten in der
+  // Liste die Liste wechseln oder suchen wollte, scrollte bis zum Anfang.
+  // Jetzt entscheidet die RICHTUNG - Safaris Werkzeugleiste, Apples
+  // `hidesBarsOnSwipe`: 24px abwaerts falten sie, 40px aufwaerts holen sie
+  // zurueck. Die Strecke zaehlt ab dem Wendepunkt (`dirAnchor` haelt den
+  // tiefsten bzw. hoechsten Stand seit der letzten Entscheidung), damit ein
+  // Zittern des Fingers nichts ausloest. Scroll-getrieben (CSS) geht das
+  // nicht: eine Zeitleiste kennt die Lage, nicht die Richtung.
+  // WAS DER UMBAU SELBST AUSLOEST, ZAEHLT NICHT. Faltet die Zeile, waechst
+  // der Port um ihre Hoehe; am Listenende klemmt der Browser dann scrollTop
+  // zurueck - ein Scroll „nach oben" ohne Finger, der die Zeile sofort
+  // zurueckholte und so pendelte. Aendert sich die Hoehe des Ports oder
+  // gleitet der Kopf noch, setzt das nur den Wendepunkt neu.
+  // Die 65-px-Koepfe der uebrigen Module bleiben bei der Lage-Regel unten.
+  const FOLD_DOWN_PX = 24;
+  const REVEAL_UP_PX = 40;
+  let dirPort = null;
+  let dirClient = 0;
+  let dirAnchor = 0;
+  const foldByDirection = (port, top) => {
+    const client = port.clientHeight;
+    const collapsed = toolbar.classList.contains('is-collapsed');
+    // Ein neuer Port beginnt ausgeklappt am Listenanfang: die erste Geste
+    // urteilt wie bis R21 nach der Lage (> 24px faltet).
+    if (port !== dirPort) {
+      dirPort = port;
+      dirClient = client;
+      dirAnchor = collapsed ? top : 0;
+    } else if (client !== dirClient || gliding) {
+      dirClient = client;
+      dirAnchor = top;
+      return;
+    }
+    if (top < 8) {
+      setCollapsed(false, ['is-collapsed']);
+      dirAnchor = top;
+      return;
+    }
+    if (collapsed) {
+      if (dirAnchor - top >= REVEAL_UP_PX) {
+        setCollapsed(false, ['is-collapsed']);
+        dirAnchor = top;
+      } else {
+        dirAnchor = Math.max(dirAnchor, top);
+      }
+      return;
+    }
+    if (top > 24 && top - dirAnchor >= FOLD_DOWN_PX) {
+      setCollapsed(true, ['is-collapsed']);
+      dirAnchor = top;
+    } else {
+      dirAnchor = Math.min(dirAnchor, top);
+    }
+  };
+
   // Hysterese, damit der Kopf nicht um seine eigene Schwelle flattert.
   const onInnerScroll = (e) => {
     const port = e.target;
@@ -1240,6 +1296,10 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
     if (!gestureTarget || !port.contains(gestureTarget)) return;
     const top = port.scrollTop;
+    if (fold) {
+      foldByDirection(port, top);
+      return;
+    }
     // `was-collapsed`: ab jetzt darf der Titel beim Ausklappen einblenden
     // (layout.css, `page-title-settle-back`) - nicht schon beim Seitenaufbau.
     if (top > 24) setCollapsed(true, states);

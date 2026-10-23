@@ -22532,6 +22532,17 @@ test('R22 D14: das Mehr-Blatt bleibt unter der Statusleiste, blendet die Kante u
   }
 });
 
+// R22 D15 (Critique 2026-10-22, a2 Klein): am Finger begann die erste
+// Einkaufsgruppe 0px unter der Haarlinie des Kuechenkopfs, Vorrat, Rezepte und
+// Aufgaben lassen 12-16px. Die Schnellzeile (Zeiger) bringt ihre Luft mit.
+test('R22 D15: die erste Einkaufsgruppe steht am Finger eine Stufe unter der Kopfkante', () => {
+  const rules = [...eachRule(read('../public/styles/shopping.css'))];
+  const touch = rules.find((r) => r.at.some((a) => /hover:\s*none/.test(a))
+    && r.selector.trim() === '.shopping-page:not(.shopping-page--adding) .list-scroller');
+  assert.ok(touch, 'eine Regel fuer den Port am Finger, solange die Schnellzeile zu ist');
+  assert.match(touch.body, /padding-block-start:\s*var\(--space-3\)/);
+});
+
 // R19 (Critique 2026-10-16, "Notizen-Pin-Gewichte"): die Nadel zeichnete mit
 // `icon-sm` 12px neben dem 18px-Mehr-Knopf derselben Karte - bei gleicher
 // Strichstaerke kleiner und fetter zugleich. Sie teilt jetzt die Groesse der

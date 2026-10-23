@@ -1578,6 +1578,33 @@ test('K1: die Kuechen-Kontextzeile aus reinen Werkzeugen klappt beim Andocken ei
   } finally { s.restore(); }
 });
 
+// R22 D15 (Critique 2026-10-22, a2 P2): die Faltzeile der Kueche kam erst
+// ganz oben zurueck - wer mitten im Einkauf die Liste wechseln oder suchen
+// wollte, scrollte bis zum Anfang. Sie folgt jetzt der Richtung.
+test('R22 D15: die Faltzeile kommt beim Hochscrollen zurueck, ein Zittern und ein Klemmen nicht', () => {
+  const s = kitchenFoldStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.row);
+    s.scrollTo(600);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'abwaerts faltet sie wie bisher');
+    s.scrollTo(900);
+    s.scrollTo(880);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, '20px zurueck sind ein Zittern, keine Absicht');
+    s.scrollTo(855);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, '45px aufwaerts ab dem Wendepunkt holen sie mitten in der Liste zurueck');
+    s.scrollTo(870);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false, '15px abwaerts falten noch nicht');
+    s.scrollTo(890);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, '24px abwaerts ab dem Wendepunkt falten wieder');
+    // Gefaltet waechst der Port; am Listenende klemmt der Browser scrollTop
+    // zurueck. Dieses Ereignis kommt ohne Finger und darf nichts entscheiden.
+    s.port.clientHeight += 64;
+    s.scrollTo(826);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'ein Klemmen nach dem Umbau holt die Zeile nicht zurueck');
+  } finally { s.restore(); }
+});
+
 // R17 Schritt 5 (Critique 2026-10-07): bis dahin blieben Wochenstepper
 // (Mahlzeiten) und Listen-Kapseln (Einkauf) stehen - 121px Kopf in jedem
 // Scrollstand, der Vorrat daneben 56. Jede Zeile unter der Leiste faltet.
