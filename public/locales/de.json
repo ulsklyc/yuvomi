@@ -659,7 +659,9 @@
         "kanbanArchiveDoneAction": "Archivieren",
         "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
         "errorParentGone": "Die Aufgabe zu dieser Teilaufgabe gibt es nicht mehr.",
-        "errorCommentGone": "Diesen Kommentar gibt es nicht mehr."
+        "errorCommentGone": "Diesen Kommentar gibt es nicht mehr.",
+        "kanbanShowMore": "{{count}} weitere anzeigen",
+        "kanbanShowMore_one": "{{count}} weitere anzeigen"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",

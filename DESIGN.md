@@ -1187,11 +1187,12 @@ das Verhaeltnis haelt.
   und 30 Zeilen sofort, der Rest in Happen je Task). Wer im Aufbau misst, misst nur, was er
   braucht: `getClientRects()` an einer aufgeschobenen Zeile zwingt deren Layout nach (Vorwahl
   der Spaltenform fragt deshalb nur bis zur ersten sichtbaren Zeile, utils/master-detail.js),
-  `innerWidth` erzwingt ein ausstehendes Layout (`matchMedia` nicht). Gemessen mobil 4x CPU,
+  `innerWidth` erzwingt ein ausstehendes Layout (`matchMedia` nicht). Eine Kanban-Spalte zeigt
+  hoechstens 50 Karten, darunter "N weitere anzeigen" (`KANBAN_COL_CAP`). Gemessen mobil 4x CPU,
   261 Aufgaben/259 Artikel mit je einer Gruppe von 120: Aufbau-Frame 593 -> 263 ms bzw.
-  581 -> 201 ms, Knoten 22.100 -> 11.100 bzw. 13.000 -> 7.800. Guards
+  581 -> 201 ms, Knoten 22.100 -> 11.100 bzw. 13.000 -> 7.800; Brett 290 -> 120 ms (4.100 -> 1.000 Knoten). Guards
   `test:popover-menu`, `test:task-filters`, `test:shopping-ux`, `test:ux-utils`,
-  `test:master-detail`, `test:frontend-audit`.
+  `test:master-detail`, `test:kanban-columns`, `test:frontend-audit`.
 - **Fensterhoehe in einer Rechnung:** `var(--viewport-height)`, nie `100dvh` direkt
   (#1276). Der Token steht auf `100vh` und kippt per `@supports (height: 100dvh)` auf dvh.
   Ein vh-Zwilling davor rettet nur Deklarationen OHNE `var()`/`env()`: mit `var()` gilt

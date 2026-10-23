@@ -759,7 +759,11 @@
         "kanbanArchiveDoneAction": "Zarchiwizuj",
         "errorTaskGone": "To zadanie już nie istnieje.",
         "errorParentGone": "Zadanie nadrzędne tego podzadania już nie istnieje.",
-        "errorCommentGone": "Ten komentarz już nie istnieje."
+        "errorCommentGone": "Ten komentarz już nie istnieje.",
+        "kanbanShowMore": "Pokaż {{count}} więcej",
+        "kanbanShowMore_one": "Pokaż {{count}} więcej",
+        "kanbanShowMore_few": "Pokaż {{count}} więcej",
+        "kanbanShowMore_many": "Pokaż {{count}} więcej"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",

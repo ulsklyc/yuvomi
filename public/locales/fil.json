@@ -659,7 +659,9 @@
         "kanbanArchiveDoneAction": "I-archive",
         "errorTaskGone": "Wala na ang gawaing ito.",
         "errorParentGone": "Wala na ang gawaing kinabibilangan ng subtask na ito.",
-        "errorCommentGone": "Wala na ang komentong ito."
+        "errorCommentGone": "Wala na ang komentong ito.",
+        "kanbanShowMore": "Ipakita ang {{count}} pa",
+        "kanbanShowMore_one": "Ipakita ang {{count}} pa"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",

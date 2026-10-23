@@ -791,7 +791,12 @@
         "kanbanArchiveDoneAction": "أرشفة",
         "errorTaskGone": "هذه المهمة لم تعد موجودة.",
         "errorParentGone": "المهمة التي تنتمي إليها هذه المهمة الفرعية لم تعد موجودة.",
-        "errorCommentGone": "هذا التعليق لم يعد موجودًا."
+        "errorCommentGone": "هذا التعليق لم يعد موجودًا.",
+        "kanbanShowMore": "عرض {{count}} أخرى",
+        "kanbanShowMore_one": "عرض {{count}} آخر",
+        "kanbanShowMore_few": "عرض {{count}} أخرى",
+        "kanbanShowMore_two": "عرض {{count}} أخرى",
+        "kanbanShowMore_many": "عرض {{count}} أخرى"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

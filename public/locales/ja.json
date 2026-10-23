@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "アーカイブ",
         "errorTaskGone": "このタスクはもう存在しません。",
         "errorParentGone": "このサブタスクの親タスクはもう存在しません。",
-        "errorCommentGone": "このコメントはもう存在しません。"
+        "errorCommentGone": "このコメントはもう存在しません。",
+        "kanbanShowMore": "さらに{{count}}件表示",
+        "kanbanShowMore_one": "さらに{{count}}件表示"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",

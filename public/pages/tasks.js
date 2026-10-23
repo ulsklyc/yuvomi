@@ -3251,6 +3251,33 @@ function destroyKanbanSortables() {
  * Baum, und `wireKanbanSortable` ueberspringt sie zusaetzlich, weil ein
  * unsichtbares Ziel fuer SortableJS sonst ein gueltiges bleibt.
  */
+/**
+ * EINE SPALTE ZEIGT HOECHSTENS KANBAN_COL_CAP KARTEN (Critique R22, D17/D22).
+ * "Offen" trug im Seed eines Haushalts mit Vorlauf 158 Karten untereinander -
+ * eine Spalte, durch die niemand mehr blaettert, und jede Karte kostete beim
+ * Aufbau Knoten und Zeichen. Darunter steht "N weitere anzeigen"; der Tipp
+ * zeigt die ganze Spalte, bis die Seite verlassen wird (`kanbanColsShown`).
+ * Die Zahl im Spaltenkopf zaehlt weiter alle Karten, und das Ziehen in die
+ * Spalte bleibt moeglich - die neue Karte haengt sich an.
+ */
+const KANBAN_COL_CAP = 50;
+const kanbanColsShown = new Set();
+
+function showWholeKanbanCol(status) {
+  kanbanColsShown.add(status);
+}
+
+function kanbanColCards(status, tasks) {
+  if (kanbanColsShown.has(status) || tasks.length <= KANBAN_COL_CAP) {
+    return tasks.map((task) => renderKanbanCard(task)).join('');
+  }
+  const rest = tasks.length - KANBAN_COL_CAP;
+  return tasks.slice(0, KANBAN_COL_CAP).map((task) => renderKanbanCard(task)).join('') + `
+            <button type="button" class="kanban-col__more" data-kanban-more="${status}">
+              ${esc(t('tasks.kanbanShowMore', { count: rest }))}
+            </button>`;
+}
+
 function kanbanBoardHtml(cols, grouped) {
   return `
     <div class="kanban-board">
@@ -3283,7 +3310,7 @@ function kanbanBoardHtml(cols, grouped) {
           </div>
           <div class="kanban-col__body" id="${bodyId}" data-drop-zone="${col.status}"${collapsed ? ' hidden' : ''}>
             ${grouped[col.status].length
-              ? grouped[col.status].map((task) => renderKanbanCard(task)).join('')
+              ? kanbanColCards(col.status, grouped[col.status])
               : `<div class="kanban-col__empty">
                    <span class="kanban-col__empty-idle">${t('tasks.kanbanColEmpty')}</span>
                    <span class="kanban-col__empty-drop">${t('tasks.kanbanDropHint')}</span>
@@ -3385,6 +3412,18 @@ function wireKanbanClicks(container) {
     if (colToggle) {
       toggleKanbanCol(colToggle.dataset.kanbanToggle);
       renderKanban(container);
+      return;
+    }
+
+    // Die ganze Spalte zeigen (KANBAN_COL_CAP). Der Fokus geht auf die erste
+    // nachgeladene Karte, nicht zurueck an den Anfang des Bretts: der Knopf,
+    // auf dem er stand, gibt es danach nicht mehr.
+    const more = e.target.closest('[data-kanban-more]');
+    if (more) {
+      const status = more.dataset.kanbanMore;
+      showWholeKanbanCol(status);
+      renderKanban(container);
+      container.querySelector(`.kanban-col[data-status="${CSS.escape(status)}"] .kanban-card:nth-child(${KANBAN_COL_CAP + 1}) .kanban-card__title`)?.focus();
       return;
     }
 
@@ -6158,6 +6197,8 @@ export async function render(container, { user, signal } = {}) {
   // eingehaengt hat.
   if (signal?.aborted) return;
   pageSignal = signal ?? null;
+  // Jeder Besuch beginnt mit gedeckelten Spalten (KANBAN_COL_CAP).
+  kanbanColsShown.clear();
   // Beim Verlassen gehen die Zieh-Instanzen mit (R20): sie hingen in einer
   // Modulvariablen und hielten ueber ihre Rueckrufe die ganze alte Liste fest.
   signal?.addEventListener('abort', () => { destroyTaskSortables(); destroyKanbanSortables(); }, { once: true });
@@ -6412,6 +6453,9 @@ export const __test = {
   // einmal auseinandergelaufen. `toggleKanbanCol` kommt mit, damit der
   // eingeklappte Zustand gesetzt werden kann, ohne in den Speicher zu greifen.
   kanbanBoardHtml, KANBAN_COLS, toggleKanbanCol, taskAdvancedTopics,
+  // R22 (D17): eine Spalte zeigt hoechstens KANBAN_COL_CAP Karten, bis
+  // "N weitere anzeigen" sie ganz zeigt.
+  KANBAN_COL_CAP, showWholeKanbanCol,
   // Mobil blaettert das Brett (R9 M2): die Punkte ueber den Spalten und ihr
   // Tipp, der zur Spalte fuehrt.
   kanbanPagerHtml, wireKanbanPager,

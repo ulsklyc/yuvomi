@@ -286,3 +286,32 @@ test('der Weiterschalt-Knopf einer Brettkarte nennt seine Aufgabe', () => {
   assert.doesNotMatch(tasks.renderKanbanCard(boese), /<img/, 'der Titel bricht aus dem Attribut aus');
   assert.ok(name(boese).includes('&quot;'), 'der Name traegt den Titel maskiert');
 });
+
+/**
+ * R22 (Critique a2, Persona Alex; D17/D22): EINE SPALTE HAT EINEN DECKEL.
+ * "Offen" trug 158 Karten untereinander, jede mit Knoten und Zeichen, die der
+ * Wechsel ins Brett im selben Frame baute (4x CPU: 282-338 ms, 4.100 Knoten).
+ * Ab KANBAN_COL_CAP steht darunter "N weitere anzeigen", der Spaltenkopf zaehlt
+ * weiter alle, und der Tipp zeigt die ganze Spalte.
+ */
+test('R22: eine Spalte zeigt hoechstens KANBAN_COL_CAP Karten, darunter "N weitere anzeigen"', async () => {
+  const cols = tasks.KANBAN_COLS();
+  const cap = tasks.KANBAN_COL_CAP;
+  assert.equal(cap, 50, 'der Deckel liegt bei 50 Karten (D17)');
+  const grouped = {};
+  for (const col of cols) grouped[col.status] = [];
+  for (let i = 1; i <= cap + 12; i++) grouped.open.push(AUFGABE(i, 'open'));
+  grouped.done.push(AUFGABE(900, 'done'));
+  const html = tasks.kanbanBoardHtml(cols, grouped);
+  const offen = html.match(/data-status="open"[\s\S]*?(?=<div class="kanban-col[ "])/)[0];
+  assert.equal((offen.match(/class="kanban-card /g) ?? []).length, cap, 'mehr Karten als der Deckel');
+  assert.match(offen, /<span class="kanban-col__count">62<\/span>/, 'der Spaltenkopf zaehlt alle Karten');
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.ok(de.tasks.kanbanShowMore, 'tasks.kanbanShowMore fehlt in de.json');
+  assert.match(offen, /<button type="button" class="kanban-col__more" data-kanban-more="open">/, 'ohne Knopf bleibt der Rest unerreichbar');
+  assert.doesNotMatch(html.replace(offen, ''), /kanban-col__more/, 'eine Spalte unter dem Deckel traegt keinen Knopf');
+  tasks.showWholeKanbanCol('open');
+  const ganz = tasks.kanbanBoardHtml(cols, grouped);
+  assert.equal((ganz.match(/class="kanban-card /g) ?? []).length, cap + 13, 'nach dem Tipp steht die ganze Spalte');
+  assert.doesNotMatch(ganz, /kanban-col__more/);
+});

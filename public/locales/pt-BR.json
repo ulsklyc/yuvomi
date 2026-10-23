@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Arquivar",
         "errorTaskGone": "Esta tarefa não existe mais.",
         "errorParentGone": "A tarefa à qual esta subtarefa pertence não existe mais.",
-        "errorCommentGone": "Este comentário não existe mais."
+        "errorCommentGone": "Este comentário não existe mais.",
+        "kanbanShowMore": "Mostrar mais {{count}}",
+        "kanbanShowMore_one": "Mostrar mais {{count}}"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",

@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Arkivera",
         "errorTaskGone": "Den här uppgiften finns inte längre.",
         "errorParentGone": "Uppgiften som den här deluppgiften hör till finns inte längre.",
-        "errorCommentGone": "Den här kommentaren finns inte längre."
+        "errorCommentGone": "Den här kommentaren finns inte längre.",
+        "kanbanShowMore": "Visa {{count}} till",
+        "kanbanShowMore_one": "Visa {{count}} till"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",

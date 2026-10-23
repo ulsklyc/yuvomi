@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Αρχειοθέτηση",
         "errorTaskGone": "Αυτή η εργασία δεν υπάρχει πια.",
         "errorParentGone": "Η εργασία στην οποία ανήκει αυτή η υποεργασία δεν υπάρχει πια.",
-        "errorCommentGone": "Αυτό το σχόλιο δεν υπάρχει πια."
+        "errorCommentGone": "Αυτό το σχόλιο δεν υπάρχει πια.",
+        "kanbanShowMore": "Εμφάνιση {{count}} ακόμη",
+        "kanbanShowMore_one": "Εμφάνιση {{count}} ακόμη"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} είδος διαγράφηκε.",

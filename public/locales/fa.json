@@ -659,7 +659,9 @@
         "kanbanArchiveDoneAction": "بایگانی",
         "errorTaskGone": "این کار دیگر وجود ندارد.",
         "errorParentGone": "کاری که این زیرکار به آن تعلق دارد دیگر وجود ندارد.",
-        "errorCommentGone": "این دیدگاه دیگر وجود ندارد."
+        "errorCommentGone": "این دیدگاه دیگر وجود ندارد.",
+        "kanbanShowMore": "نمایش {{count}} مورد دیگر",
+        "kanbanShowMore_one": "نمایش {{count}} مورد دیگر"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",

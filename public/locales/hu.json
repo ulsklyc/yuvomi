@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Archiválás",
         "errorTaskGone": "Ez a feladat már nem létezik.",
         "errorParentGone": "Ennek az alfeladatnak a szülőfeladata már nem létezik.",
-        "errorCommentGone": "Ez a hozzászólás már nem létezik."
+        "errorCommentGone": "Ez a hozzászólás már nem létezik.",
+        "kanbanShowMore": "{{count}} további megjelenítése",
+        "kanbanShowMore_one": "{{count}} további megjelenítése"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",

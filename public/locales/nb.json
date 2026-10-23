@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Arkiver",
         "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
         "errorParentGone": "Oppgaven denne underoppgaven hører til finnes ikke lenger.",
-        "errorCommentGone": "Denne kommentaren finnes ikke lenger."
+        "errorCommentGone": "Denne kommentaren finnes ikke lenger.",
+        "kanbanShowMore": "Vis {{count}} til",
+        "kanbanShowMore_one": "Vis {{count}} til"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",

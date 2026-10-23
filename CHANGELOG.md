@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   currency now loads alongside, and the items of the list you are about to see load together with
   the lists when it is already known - from the address, from your last visit or from the last time
   on this device. On a slow connection the items appear up to a second sooner.
+- **The task board shows the first 50 cards of a column.** A column with hundreds of open tasks
+  was one endless stack. Below the 50th card, "Show N more" now shows the rest of that column until
+  you leave the page; the count in the column head still includes all cards, and you can still drop
+  a card into the column.
 - **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
   in the budget showed the list first and pushed it down once the figures above it arrived; the
   figures now hold their place from the first frame. On a phone, the Health area list waits in

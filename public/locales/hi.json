@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "संग्रहित करें",
         "errorTaskGone": "यह कार्य अब मौजूद नहीं है।",
         "errorParentGone": "जिस कार्य का यह उपकार्य है वह अब मौजूद नहीं है।",
-        "errorCommentGone": "यह टिप्पणी अब मौजूद नहीं है।"
+        "errorCommentGone": "यह टिप्पणी अब मौजूद नहीं है।",
+        "kanbanShowMore": "{{count}} और दिखाएं",
+        "kanbanShowMore_one": "{{count}} और दिखाएं"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",

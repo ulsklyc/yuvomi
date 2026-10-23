@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Arşivle",
         "errorTaskGone": "Bu görev artık yok.",
         "errorParentGone": "Bu alt görevin ait olduğu görev artık yok.",
-        "errorCommentGone": "Bu yorum artık yok."
+        "errorCommentGone": "Bu yorum artık yok.",
+        "kanbanShowMore": "{{count}} tane daha göster",
+        "kanbanShowMore_one": "{{count}} tane daha göster"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",

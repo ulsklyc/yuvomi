@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Archiver",
         "errorTaskGone": "Cette tâche n’existe plus.",
         "errorParentGone": "La tâche dont dépend cette sous-tâche n’existe plus.",
-        "errorCommentGone": "Ce commentaire n’existe plus."
+        "errorCommentGone": "Ce commentaire n’existe plus.",
+        "kanbanShowMore": "Afficher {{count}} de plus",
+        "kanbanShowMore_one": "Afficher {{count}} de plus"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",

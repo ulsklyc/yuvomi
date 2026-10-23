@@ -741,7 +741,11 @@
         "kanbanArchiveDoneAction": "Архівувати",
         "errorTaskGone": "Цього завдання більше немає.",
         "errorParentGone": "Батьківського завдання цього підзавдання більше немає.",
-        "errorCommentGone": "Цього коментаря більше немає."
+        "errorCommentGone": "Цього коментаря більше немає.",
+        "kanbanShowMore": "Показати ще {{count}}",
+        "kanbanShowMore_one": "Показати ще {{count}}",
+        "kanbanShowMore_few": "Показати ще {{count}}",
+        "kanbanShowMore_many": "Показати ще {{count}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",

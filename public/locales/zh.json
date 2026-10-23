@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "归档",
         "errorTaskGone": "此任务已不存在。",
         "errorParentGone": "此子任务所属的任务已不存在。",
-        "errorCommentGone": "此评论已不存在。"
+        "errorCommentGone": "此评论已不存在。",
+        "kanbanShowMore": "显示另外 {{count}} 项",
+        "kanbanShowMore_one": "显示另外 {{count}} 项"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",

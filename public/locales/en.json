@@ -641,7 +641,9 @@
         "kanbanArchiveDoneAction": "Archive",
         "errorTaskGone": "This task no longer exists.",
         "errorParentGone": "The task this subtask belongs to no longer exists.",
-        "errorCommentGone": "This comment no longer exists."
+        "errorCommentGone": "This comment no longer exists.",
+        "kanbanShowMore": "Show {{count}} more",
+        "kanbanShowMore_one": "Show {{count}} more"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",

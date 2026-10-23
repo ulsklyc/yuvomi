@@ -1805,6 +1805,35 @@
  * stummen Lücke (Audit P3). Beim Ziehen einer Karte wird die Spalte zur sichtbaren
  * Ablagefläche ("Hierher ziehen"), damit auch leere Spalten als Ziel erkennbar
  * sind - die icon-only-Statusbuttons bleiben die tastaturfreundliche Alternative. */
+/* "N WEITERE ANZEIGEN" AM ENDE EINER GEDECKELTEN SPALTE (R22, D17;
+ * tasks.js KANBAN_COL_CAP). Eine ruhige Textzeile in Kartenbreite, keine
+ * Karte: sie ist eine Handlung, kein Objekt - deshalb ohne Flaeche und
+ * Schatten, in der Sekundaerfarbe, getoent erst unter dem Zeiger. Touch-Ziel
+ * wie jede Zeile (`--target-base`). */
+.kanban-col__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  min-block-size: var(--target-base);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .kanban-col__more:hover {
+    background-color: var(--color-surface-2);
+  }
+}
+
 .kanban-col__empty {
   display: flex;
   align-items: center;

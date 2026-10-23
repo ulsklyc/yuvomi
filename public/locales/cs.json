@@ -691,7 +691,10 @@
         "kanbanArchiveDoneAction": "Archivovat",
         "errorTaskGone": "Tento úkol už neexistuje.",
         "errorParentGone": "Nadřazený úkol tohoto podúkolu už neexistuje.",
-        "errorCommentGone": "Tento komentář už neexistuje."
+        "errorCommentGone": "Tento komentář už neexistuje.",
+        "kanbanShowMore": "Zobrazit {{count}} dalších",
+        "kanbanShowMore_one": "Zobrazit {{count}} další",
+        "kanbanShowMore_few": "Zobrazit {{count}} další"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
