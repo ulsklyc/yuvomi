@@ -889,3 +889,21 @@ test('setPageFabAction: der Titel mit dem Kuerzel zieht mit dem aria-label mit, 
   setPageFabAction(plain, { label: 'Notiz hinzufuegen', dockLabel: 'Notiz' });
   assert.equal(plain.getAttribute('title'), null, 'ohne angesagtes Kuerzel kein "(n)" im Titel');
 });
+
+// Sammel-Ticket R22-F, F4.7: am Telefon fehlte "Diese Woche geplant" - unter
+// 26rem Zeilenbreite blendete eine Regel vom 27.08. die Angabe aus, als die
+// Zutatenzahl schmal noch neben dem Namen um ihren Platz rang. Seit dem Slot
+// (#1477) steht beides in einer zweiten Zeile; Desktop zeigte die Angabe, das
+// Telefon nicht. Jetzt ueberall, und die zweite Zeile bleibt EINE Zeile: lange
+// Sprachen enden mit Auslassung (gemessen 320/390/834px in sechs Sprachen,
+// Zeile 64px wie vorher; ohne Auslassung ru/el 103px).
+test('F4.7: "Diese Woche geplant" steht auch am Telefon, die zweite Zeile bleibt einzeilig', () => {
+  const css = readFileSync(new URL('../public/styles/recipes.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const hides = rules.filter((r) => /\.recipe-row__planned/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.deepEqual(hides.map((r) => `${r.at.join(' ')} ${r.selector}`), [], 'eine Breite blendet die Planungsangabe aus');
+  const narrow = rules.find((r) => r.selector.trim() === '.recipe-row__sub' && r.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)));
+  assert.match(narrow?.body ?? '', /white-space:\s*nowrap/, 'die zweite Zeile bricht in langen Sprachen um');
+  assert.match(narrow?.body ?? '', /text-overflow:\s*ellipsis/);
+  assert.match(narrow?.body ?? '', /overflow:\s*hidden/);
+});

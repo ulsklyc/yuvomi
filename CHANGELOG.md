@@ -259,6 +259,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   area it stands in. Japanese, Korean, Chinese, Vietnamese and Indonesian, which use one word for
   a medication and medications, now name the area after taking them (for example 服薬, 用药,
   복약); Ukrainian, Italian, Norwegian and Swedish name the object.
+- **Recipes on a phone say which are planned this week.** A computer showed "Planned this week"
+  under a recipe's name, a phone left it out. The phone now shows it too, in the same line as the
+  ingredient count; a long translation ends with an ellipsis instead of growing the row.
 - **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
   that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
   as a whole: the search in a computer's page header lost its width, the collapsed budget header
