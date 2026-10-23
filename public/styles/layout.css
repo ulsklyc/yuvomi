@@ -1863,7 +1863,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  padding: var(--space-1h) var(--space-1);
+  /* Ohne Innenrand in der Breite (R22 S10, aus S9): bei 375px blieben dem
+   * Wort 69px, „Einstellungen" braucht in 11px rund 72 - es brach als
+   * „Einstel-lungen". Die Spalte selbst ist der Abstand (Raster-Gap); die
+   * Druckflaeche bleibt so breit wie die Spalte. Unter ~360px trennt das Wort
+   * weiter an der Silbe, wie die Modulkacheln darueber. */
+  padding: var(--space-1h) 0;
   /* Konzentrisch zum Blatt: die Systemzeile schliesst es unten ab, dort
    * stehen 16px Polster - 26px minus 16px. */
   border-radius: calc(var(--radius-xl) - var(--space-4));
