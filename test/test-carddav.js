@@ -2464,13 +2464,16 @@ describe('Contacts API - Multi-Value Fields', () => {
     // Migration 90). Produktiv gibt es die Tabelle immer; dieses Fixture baut
     // sein Schema von Hand, also steht sie hier in der Form, die die Abfrage
     // liest. Die Abfrage robust gegen eine fehlende Tabelle zu machen, hiesse
-    // einen Zustand abzufangen, den keine Installation hat.
+    // einen Zustand abzufangen, den keine Installation hat. Seit R22 (D7)
+    // liest sie auch Datum und "Jahr unbekannt" des verknuepften Eintrags
+    // (`birthday_link_date`, Migration 254 fuer year_unknown).
     contactsApiDb.exec(`
       CREATE TABLE birthdays (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        name       TEXT NOT NULL,
-        birth_date TEXT NOT NULL,
-        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT NOT NULL,
+        birth_date   TEXT NOT NULL,
+        year_unknown INTEGER NOT NULL DEFAULT 0,
+        contact_id   INTEGER REFERENCES contacts(id) ON DELETE SET NULL
       );
       CREATE UNIQUE INDEX idx_birthdays_contact_id ON birthdays(contact_id) WHERE contact_id IS NOT NULL;
     `);
