@@ -2604,6 +2604,8 @@ test('Compare/Overview tab: Werkzeugzeile und Tageskoepfe kleben unter dem anged
   assert.match(dock?.body ?? '', /position:\s*sticky;/);
   assert.match(dock.body, /top:\s*var\(--schedule-dock-top, 0px\);/, 'die Klebekante ist die Unterkante des angedockten Kopfs');
   assert.match(dock.body, /background-color:\s*var\(--color-bg\);/, 'must not scroll transparently over passing hour lines/entries');
+  const joint = [...eachRule(scheduleCss)].find((r) => r.selector.trim() === '.schedule-content > .schedule-overview');
+  assert.match(joint?.body ?? '', /gap:\s*0/, 'Kopfzeile und Raster stossen aneinander, ohne den Abstand der Reiter-Abschnitte');
 
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /data-action="overview-view-mode" data-mode="week"/, 'the week/day density toggle is legitimate mutually-exclusive state and must remain a segmented control');

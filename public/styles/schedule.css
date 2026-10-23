@@ -774,6 +774,11 @@
    * wenn mehrere Personen zusammen das Minimum ueberschreiten. */
   --schedule-lane-min: 7rem;
   --schedule-columns: var(--cal-gutter-width) repeat(var(--schedule-days, 7), minmax(calc(var(--schedule-lanes, 1) * var(--schedule-lane-min)), 1fr));
+}
+
+/* Kopfzeile und Raster stossen aneinander wie im Kalender: der Abstand der
+ * Reiter-Abschnitte (`.schedule-content > section`) gilt hier nicht. */
+.schedule-content > .schedule-overview {
   gap: 0;
 }
 
