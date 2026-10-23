@@ -466,8 +466,11 @@
   .quick-add__form {
     /* Das Namensfeld behaelt die Haelfte, Menge und Kategorie teilen sich den
      * Rest wieder 2:3. Hier stand fuer die Menge eine feste Spur von 80px: der
-     * Platzhalter passte in 12 von 24 Sprachen nicht hinein („Quantit", #1372). */
-    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
+     * Platzhalter passte in 12 von 24 Sprachen nicht hinein („Quantit", #1372).
+     * DIE KATEGORIE BEHAELT IHR WORT (R22 S9, Critique a2): in der ersten der
+     * zwei Spalten (1280) blieben ihr 116px, „Sonstig..." - die Untergrenze
+     * 8.5rem traegt „Sonstiges" samt Chevron, das Namensfeld gibt dafuer nach. */
+    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(8.5rem, 3fr) var(--target-base);
   }
 
   .quick-add__input-wrap {

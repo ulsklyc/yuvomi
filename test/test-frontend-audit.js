@@ -7260,7 +7260,10 @@ test('#1372 quick-add fields stretch with their row, and no translated field get
   // EINE Grammatik fuer Format-Gate und Wert: `5`, `0.5` und `.5`. Ein Leser,
   // der nur `\d+(?:\.\d+)?` kennt, nimmt aus `.5fr` die 5 und dreht den
   // Vergleich Kategorie > Menge still um.
-  const FLEX_TRACK = /^minmax\(0,\s*(\d+(?:\.\d+)?|\.\d+)fr\)$/;
+  // Eine UNTERGRENZE in rem ist keine feste Spur (R22 S9): sie waechst mit dem
+  // fr-Anteil weiter und kuerzt hoechstens das Namensfeld - die Kategorie
+  // behaelt bei 1280 „Sonstiges" statt „Sonstig...".
+  const FLEX_TRACK = /^minmax\((?:0|\d+(?:\.\d+)?rem),\s*(\d+(?:\.\d+)?|\.\d+)fr\)$/;
   const frOf = (track) => Number(FLEX_TRACK.exec(track)?.[1] ?? NaN);
 
   const templates = rules
@@ -22553,6 +22556,14 @@ test('R22 D17: die Metazeile der Aufgabe laeuft am Desktop unter den Avatar', ()
   const avatar = body('.task-card__main > .avatar-stack');
   assert.match(avatar, /grid-row:\s*1 \/ span 2/, 'der Stapel liegt ueber beiden Zeilen - in Zeile 1 allein streckte er sie um 1px');
   assert.match(avatar, /align-self:\s*start/);
+});
+
+// R22 S9 (Critique 2026-10-22, a2 Klein): bei 1280 blieben der Kategorie der
+// Schnellzeile 116px - „Sonstig...". Sie hat eine Untergrenze.
+test('R22: die Kategorie der Einkaufs-Schnellzeile behaelt am Desktop ihr Wort', () => {
+  const rules = [...eachRule(read('../public/styles/shopping.css'))]
+    .filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)) && r.selector.trim() === '.quick-add__form');
+  assert.match(rules.map((r) => r.body).join(';'), /grid-template-columns:\s*minmax\(0, 5fr\) minmax\(0, 2fr\) minmax\(8\.5rem, 3fr\)/);
 });
 
 // R22 D15 (Critique 2026-10-22, a2 Klein): am Finger begann die erste
