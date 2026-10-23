@@ -97,14 +97,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inventory's wording, "Needs attention 0" is a plain figure instead of a button, and a search
   result opens the item's sheet on a phone too. The demo household's inventory now shows a linked
   receipt, a due vehicle inspection, a mileage and a service entry.
-- **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
-  in the budget showed the list first and pushed it down once the figures above it arrived; the
-  figures now hold their place from the first frame. On a phone, the Health area list waits in
-  place until the "Today" cards above it are complete instead of sliding down under your finger.
-- **Settings pages no longer jump while they load.** Opening a settings page such as Members or
-  a module page showed its sections as they arrived, and each finished section pushed the ones
-  below it down. A section now appears once it is complete and everything above it is in place;
-  until then a placeholder holds the spot below the last finished section.
+- **Budget tabs, Health and Settings no longer jump while they load.** The figures above
+  Subscriptions and Split hold their place from the first frame instead of pushing the list down
+  when they arrive. On a phone, the Health area list waits in place until the "Today" cards above
+  it are complete. A settings page such as Members shows a section once it and everything above
+  it is in place, with a placeholder below the last finished one, instead of pushing finished
+  sections down as new ones arrive.
 - **Back and forward return to where you were in every list.** Contacts, Shopping, Notes, Pantry,
   Budget, Recipes, Meals, Health, the calendar views and the task list on a wide screen scroll a
   list inside the page, and going back to them always started at the top. They now reopen at the
@@ -137,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two "Undo" buttons stood on top of each other, and a "Task done - Undo" followed you into
   Shopping. A new message now replaces the one on screen, which takes effect as if its time had
   run out, and switching to another module ends it. On a wide screen with a detail column the
-  message now appears at the bottom of the list it belongs to instead of over the detail.
+  message now appears at the bottom of the list it belongs to instead of over the detail. A
+  reminder that comes due stands beside the message and never takes its place or its Undo.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.
@@ -175,6 +174,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shift and name in full.
 - **Hovering the calendar week or day marks one hour.** The whole day column used to tint under
   the pointer; now only the hour a double click would create is marked.
+- **Month titles on a laptop keep more of their words.** Where a month cell is narrow, the repeat
+  mark of a series gives way to the title, so 9 instead of 28 of 40 demo titles end in "…"; an
+  icon chosen for the event stays.
 - **Settings rows and pages say less and lead further.** Tapping a member row opens the member;
   the row ends in More and the reorder grip, and the birthday left the row, so a name is no longer
   cut short. Wall tablets and API access open with one or two sentences, the rest sits behind
@@ -189,11 +191,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   period or fast sits at the history. The as-needed dose says "Take" like the scheduled one and
   keeps the word at every width, and its name gets its own line before it breaks. The capture
   form draws one line between every row. On a computer the area header starts level with the list
-  and stays there while scrolling, without cards showing through around it.
+  and stays there while scrolling, without cards showing through around it. In German the add
+  button in Prevention says "Untersuchung" instead of repeating the area's name.
 - **The More sheet shows that it scrolls.** On a phone with a notch the sheet started under the
   status bar, and the modules below its edge looked like they were not there. It now stays below
   the status bar, its lower edge fades while there is more, and Budget stands under "Finance"
-  instead of looking like part of People.
+  instead of looking like part of People. On a small phone "Settings" in its bottom row is no
+  longer split by a hyphen.
 - **The kitchen tool row comes back when you scroll up.** Week, lists and search under the kitchen
   tabs folded away while scrolling and only came back at the very top; scrolling up a little now
   brings them back anywhere in the list. The first shopping group no longer touches the header
@@ -201,7 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section.
 - **The overview's today sheet reads column by column.** On a wide screen its lines no longer
   run through both columns, an odd last entry spans the width, and the shopping line comes before
-  "+N more today". A child's own rewards card keeps its pending request right under the goal. The
+  "+N more today". A child's own rewards card keeps its pending request right under the goal and,
+  where its row leaves room, lists the points earned last. The
   empty search shows the places you visited last and a few things to create instead of a tile for
   every section, and in customize mode the options of a hidden widget sit in a menu on its chip.
 - **Tasks keep their details in view.** On a computer the line with priority, due date and tags
@@ -295,9 +300,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A shift code no longer repeats the shift's name.** The templates "24-hour shift" and the
   school periods read "24 · 24-hour shift" and "1 · 1st period" in the schedule, the calendar, the
   overview and the today sheet. The code is now left out wherever the name already starts with it.
-- **The docked calendar header on a phone names the calendar again.** Scrolled, the header showed
-  only the period and the view; "Calendar" now stands small above the period. The period no longer
-  shrinks while the header docks, so the list below moves less.
+- **The docked calendar header names the calendar again.** Scrolled, the header on a phone or
+  tablet showed only the period and the views; "Calendar" now stands small above the period. On a
+  phone the period no longer shrinks while the header docks, so the list below moves less.
+- **The remaining loan balance stays in its card on a tablet.** In the row of four loan figures a
+  long amount such as 174,644.93 ran into the next card; with a long amount the four now stand two
+  by two until there is room for all of them in one row.
 
 ## [2.79.0] - 2026-10-22
 
