@@ -14,6 +14,38 @@
  * `resolveHouseholdLocale(database)` in server/utils/i18n.js.
  */
 
+/*
+ * EIN FORMATIERER JE ZONE, NICHT EINER JE AUFRUF. `new Intl.DateTimeFormat()`
+ * ist teuer (ICU laedt Zone und Muster), `formatToParts()` dagegen billig. Die
+ * Serien-Expansion liest seit #2034 je Vorkommen bis zu fuenf Offsets ueber
+ * utcToWall - mit einem neuen Formatierer je Aufruf brauchte /dashboard bei
+ * einem Haushalt mit synchronisierten Kalendern 1,6 s auf einem schnellen
+ * Rechner, und der Profiler fand 85 % davon im Konstruktor. Ein Formatierer
+ * haelt keinen Zustand zwischen zwei Aufrufen, er darf also geteilt werden. Eine
+ * ungueltige Zone wirft weiter beim Anlegen und wird nicht gemerkt.
+ */
+const NUMERIC_PARTS = {
+  year: 'numeric', month: 'numeric', day: 'numeric',
+  hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+};
+const TWO_DIGIT_PARTS = {
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+};
+const NUMERIC_FORMATTERS = new Map();
+const TWO_DIGIT_FORMATTERS = new Map();
+
+function cachedFormatter(cache, tzid, parts) {
+  // Ohne Zone gilt die des Prozesses, und die kann sich (TZ in Tests) aendern.
+  if (!tzid) return new Intl.DateTimeFormat('en-US', { timeZone: tzid, ...parts });
+  let formatter = cache.get(tzid);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', { timeZone: tzid, ...parts });
+    cache.set(tzid, formatter);
+  }
+  return formatter;
+}
+
 /**
  * Ist `zone` eine von dieser Node-/ICU-Version gekannte IANA-Zone?
  * @param {unknown} zone
@@ -338,10 +370,7 @@ export function localToUTC(localStr, tzid) {
     if (isNaN(fakeUTC.getTime())) return localStr;
     // Der Offset wird an der ganzen Sekunde gelesen (siehe wholeSecondMs).
     const wholeMs = wholeSecondMs(fakeUTC.getTime());
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tzid, year: 'numeric', month: 'numeric', day: 'numeric',
-      hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-    }).formatToParts(new Date(wholeMs));
+    const parts = cachedFormatter(NUMERIC_FORMATTERS, tzid, NUMERIC_PARTS).formatToParts(new Date(wholeMs));
     const get = (type) => {
       const part = parts.find((p) => p.type === type);
       const v = part ? part.value : '0';
@@ -507,10 +536,7 @@ export function utcToWall(iso, tzid) {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return null;
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tzid, year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    }).formatToParts(d);
+    const parts = cachedFormatter(TWO_DIGIT_FORMATTERS, tzid, TWO_DIGIT_PARTS).formatToParts(d);
     const g = (t) => { const p = parts.find((x) => x.type === t); return p ? p.value : '00'; };
     let hh = g('hour'); if (hh === '24') hh = '00'; // Mitternacht '24' → '00'
     return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${hh}:${g('minute')}:${g('second')}` };
