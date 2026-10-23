@@ -2466,13 +2466,16 @@ describe('Contacts API - Multi-Value Fields', () => {
     // liest. Die Abfrage robust gegen eine fehlende Tabelle zu machen, hiesse
     // einen Zustand abzufangen, den keine Installation hat. Seit R22 (D7)
     // liest sie auch Datum und "Jahr unbekannt" des verknuepften Eintrags
-    // (`birthday_link_date`, Migration 254 fuer year_unknown).
+    // (`birthday_link_date`, Migration 254 fuer year_unknown). Und der Hinweis
+    // "Ein Geburtstag heisst genauso" (`suggested_birthday_id`, GET/PUT /:id)
+    // laesst Mitglieder-Geburtstage aus: `family_user_id`.
     contactsApiDb.exec(`
       CREATE TABLE birthdays (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         name         TEXT NOT NULL,
         birth_date   TEXT NOT NULL,
         year_unknown INTEGER NOT NULL DEFAULT 0,
+        family_user_id INTEGER,
         contact_id   INTEGER REFERENCES contacts(id) ON DELETE SET NULL
       );
       CREATE UNIQUE INDEX idx_birthdays_contact_id ON birthdays(contact_id) WHERE contact_id IS NOT NULL;

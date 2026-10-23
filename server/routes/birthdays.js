@@ -15,6 +15,7 @@ import {
   placeholderBirthDate,
   birthDateInput,
   validateYearUnknown,
+  sameNameKey,
 } from '../services/birthdays.js';
 
 const log = createLogger('Birthdays');
@@ -244,7 +245,7 @@ function isContactLinkConflict(err) {
 function withContactLinks(req, birthdays) {
   if (contactsHidden(req)) return birthdays;
   const rows = db.get().prepare(`
-    SELECT c.id, c.name, lower(trim(c.name)) AS key,
+    SELECT c.id, c.name,
            EXISTS (SELECT 1 FROM birthdays b WHERE b.contact_id = c.id) AS linked
       FROM contacts c
      WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = c.family_user_id)
@@ -253,12 +254,14 @@ function withContactLinks(req, birthdays) {
   const byName = new Map();
   for (const row of rows) {
     if (row.linked) continue;
-    byName.set(row.key, byName.has(row.key) ? null : row.id);
+    // Ein Schluessel fuer beide Seiten (sameNameKey, services/birthdays.js).
+    const key = sameNameKey(row.name);
+    byName.set(key, byName.has(key) ? null : row.id);
   }
   return birthdays.map((b) => {
     if (b.contact_id) return names.has(b.contact_id) ? { ...b, contact_name: names.get(b.contact_id) } : b;
     if (b.family_user_id) return b;
-    const id = byName.get(String(b.name ?? '').trim().toLowerCase());
+    const id = byName.get(sameNameKey(b.name));
     return id ? { ...b, suggested_contact_id: id } : b;
   });
 }

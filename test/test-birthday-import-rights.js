@@ -352,6 +352,52 @@ test('D7: gleicher Name ohne Verknuepfung -> suggested_contact_id, nur eindeutig
   setModules(member.id, {});
 });
 
+test('D7: der Hinweis steht auch im Kontakt - suggested_birthday_id, nur eindeutig, nur mit Kalender-Recht', async () => {
+  setModules(member.id, {});
+  const contact = await admin('POST', '/contacts', { name: 'Tante Gegenprobe', category: 'misc' });
+  const cid = contact.body.data.id;
+  const birthday = await seedBirthday(' tante gegenprobe');
+  const read = async () => (await member.as('GET', `/contacts/${cid}`)).body.data;
+  assert.equal((await read()).suggested_birthday_id, birthday.id, 'Name ohne Gross/Klein und Rand');
+  // Beide Seiten nennen dasselbe Paar.
+  const fromBirthday = (await member.as('GET', '/birthdays')).body.data.find((b) => b.id === birthday.id);
+  assert.equal(fromBirthday.suggested_contact_id, cid);
+  // Die Antwort auf das Speichern traegt ihn auch: die Ansicht zeichnet danach neu.
+  const saved = await admin('PUT', `/contacts/${cid}`, { name: 'Tante Gegenprobe', category: 'misc', notes: 'x' });
+  assert.equal(saved.body.data.suggested_birthday_id, birthday.id);
+
+  setModules(member.id, { calendar: 'none' });
+  assert.equal((await read()).suggested_birthday_id, undefined, 'ohne Kalender-Recht kein Hinweis');
+  setModules(member.id, {});
+
+  const twin = await seedBirthday('Tante Gegenprobe');
+  assert.equal((await read()).suggested_birthday_id, undefined, 'zwei gleichnamige Geburtstage: kein Vorschlag');
+  await admin('DELETE', `/birthdays/${twin.id}`);
+
+  const memberDay = db.prepare("INSERT INTO birthdays (name, birth_date, created_by, family_user_id) VALUES ('Tante Gegenprobe', '1980-01-01', 1, ?)")
+    .run(member.id).lastInsertRowid;
+  assert.equal((await read()).suggested_birthday_id, birthday.id, 'ein Mitglieder-Geburtstag zaehlt nicht mit');
+  db.prepare('DELETE FROM birthdays WHERE id = ?').run(memberDay);
+
+  await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  const linked = await read();
+  assert.equal(linked.suggested_birthday_id, undefined, 'verknuepft: kein Hinweis mehr');
+  assert.equal(linked.birthday_id, birthday.id);
+});
+
+test('D7: gleicher Name mit Umlaut am Anfang - beide Seiten finden das Paar', async () => {
+  // SQLite senkt nur ASCII: "Özlem" und "özlem" waren fuer den Geburtstag zwei
+  // Namen, solange der Kontaktname in SQL verglichen wurde. Dazu NFC: CardDAV
+  // liefert ein "é" auch zerlegt.
+  setModules(member.id, {});
+  const contact = await admin('POST', '/contacts', { name: 'ÖZLEM René', category: 'misc' });
+  const cid = contact.body.data.id;
+  const birthday = await seedBirthday('özlem Rene\u0301');
+  const fromBirthday = (await member.as('GET', '/birthdays')).body.data.find((b) => b.id === birthday.id);
+  assert.equal(fromBirthday.suggested_contact_id, cid, 'der Geburtstag findet den Kontakt');
+  assert.equal((await member.as('GET', `/contacts/${cid}`)).body.data.suggested_birthday_id, birthday.id, 'und umgekehrt');
+});
+
 test('D7: die Kandidatenliste nennt auch Kontakte ohne Datum mit ihrer Verknuepfung', async () => {
   setModules(member.id, {});
   const contact = await admin('POST', '/contacts', { name: 'Ohne Datum Kandidat', category: 'misc' });
