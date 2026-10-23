@@ -245,6 +245,9 @@ test('Essensplan bei `read`: die Karte oeffnet die Leseansicht und traegt keine 
     assert.match(voll, new RegExp(`data-action="${erwartet}"`), `Gegenfall: ${erwartet} steht mit Schreibrecht da`);
   }
   assert.match(voll, /meal-card__drag/, 'Gegenfall: der Ziehgriff');
+  // R22 S9 (Critique a2): die Zeichen der Karte nennen sich unter dem Zeiger.
+  assert.match(voll, /data-action="transfer-meal"[^>]*title="common\.toShoppingList"/, 'der Wagen sagt, was er tut');
+  assert.match(html, /data-action="open-recipe"[\s\S]{0,300}?title="meals\.openRecipe"/, 'das Rezept-Zeichen ebenso');
   assert.doesNotMatch(voll, /common\.showDetails|meal-details/);
 });
 

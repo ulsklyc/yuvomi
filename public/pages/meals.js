@@ -1289,11 +1289,16 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
               aria-label="${esc(t('meals.dragHandle', { title: meal.title }))}">
           <i data-lucide="grip-vertical" class="icon-md" aria-hidden="true"></i>
         </span>`}
+        ${/* DIE ZEICHEN NENNEN SICH UNTER DEM ZEIGER (R22 S9, Critique a2): Kochmuetze
+             und Wagen standen ohne Wort auf jeder Karte - ein Wort passt in die
+             148px-Spalte nicht neben zwei Ziele, also traegt `title` den Namen,
+             den `aria-label` dem Vorleser schon gab. */ ''}
         <div class="meal-card__actions">
           ${meal.recipe_id && recipesReachable() ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-linked-recipe"
             href="/recipes?open=${encodeURIComponent(meal.recipe_id)}"
             aria-label="${esc(t('meals.viewRecipeNamed', { title: meal.title }))}"
+            title="${esc(t('meals.openRecipe'))}"
           ><i data-lucide="chef-hat" class="icon-md" aria-hidden="true"></i></a>`
           : externalHref(meal.recipe_url) ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-recipe"
@@ -1301,11 +1306,13 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="${esc(t('meals.openRecipeNamed', { title: meal.title }))}"
+            title="${esc(t('meals.openRecipe'))}"
           ><i data-lucide="link" class="icon-md" aria-hidden="true"></i></a>` : ''}
           ${canTransfer ? `<button class="meal-card__action-btn meal-card__action-btn--shopping"
             data-action="transfer-meal"
             data-meal-id="${meal.id}"
             aria-label="${esc(t('common.toShoppingListNamed', { title: meal.title }))}"
+            title="${esc(t('common.toShoppingList'))}"
           ><i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i></button>` : ''}
 ${/* KEIN PAPIERKORB AUF DER KARTE (Entscheidung 2026-10-07, benannte
                Ausnahme vom Mehr-Knopf): 27 Karten trugen als einziges
