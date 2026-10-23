@@ -234,6 +234,60 @@ test('D7: ein schon verknuepfter Kontakt -> 409 mit Grund, nichts geschrieben', 
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM birthdays WHERE name = 'Dritter'").get().n, 0, 'kein Eintrag angelegt');
 });
 
+/*
+ * DER WETTLAUF UEBER DEN INDEX. Die Vorabpruefung (`checkContactLink`) und das
+ * Schreiben liegen ohne await hintereinander - im selben Prozess kommt kein
+ * Request dazwischen. Ein zweiter Prozess an derselben Datei (oder ein Weg,
+ * der die Vorabpruefung umgeht) kann den Kontakt aber zwischen Pruefen und
+ * Schreiben verknuepfen; dann haelt nur der eindeutige Index aus Migration 90,
+ * und die Route muss aus SQLITE_CONSTRAINT_UNIQUE dieselbe 409 machen statt
+ * einer 500.
+ *
+ * Nachgestellt mit einem TEMP-Trigger auf der Verbindung des Servers: er
+ * verknuepft den Rivalen im selben Augenblick, in dem die Route schreibt -
+ * NACH ihrer Pruefung, VOR dem Index. Die Pruefung sah den Kontakt frei.
+ */
+function withRivalLink(sql, fn) {
+  db.exec(sql);
+  return Promise.resolve().then(fn).finally(() => db.exec('DROP TRIGGER IF EXISTS temp.race_link'));
+}
+
+test('D7: Wettlauf - der Index faengt den Doppelgriff bei POST, Antwort 409 statt 500', async () => {
+  setModules(member.id, {});
+  const cid = await seedContact();
+  const rival = await seedBirthday('Rivale POST');
+  const res = await withRivalLink(`
+    CREATE TEMP TRIGGER race_link BEFORE INSERT ON main.birthdays WHEN NEW.contact_id = ${Number(cid)}
+    BEGIN UPDATE main.birthdays SET contact_id = NEW.contact_id WHERE id = ${Number(rival.id)}; END;
+  `, () => member.as('POST', '/birthdays', { name: 'Zu Spaet POST', birth_date: '1990-01-01', contact_id: cid }));
+  assert.equal(res.status, 409, `Index-Konflikt wird 409, nicht ${res.status}`);
+  assert.equal(res.body.reason, 'birthdays_contact_linked');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM birthdays WHERE name = 'Zu Spaet POST'").get().n, 0, 'kein Eintrag angelegt');
+  // Gegenprobe: ohne den Rivalen geht derselbe Aufruf durch - der Trigger,
+  // nicht die Vorabpruefung, hat die 409 ausgeloest.
+  const free = await member.as('POST', '/birthdays', { name: 'Rechtzeitig POST', birth_date: '1990-01-01', contact_id: cid });
+  assert.equal(free.status, 201);
+});
+
+test('D7: Wettlauf - der Index faengt den Doppelgriff bei PUT, Antwort 409, nichts geschrieben', async () => {
+  setModules(member.id, {});
+  const cid = await seedContact();
+  const rival = await seedBirthday('Rivale PUT');
+  const target = await seedBirthday('Ziel PUT');
+  const res = await withRivalLink(`
+    CREATE TEMP TRIGGER race_link BEFORE UPDATE OF contact_id ON main.birthdays
+      WHEN NEW.contact_id = ${Number(cid)} AND NEW.id = ${Number(target.id)}
+    BEGIN UPDATE main.birthdays SET contact_id = NEW.contact_id WHERE id = ${Number(rival.id)}; END;
+  `, () => member.as('PUT', `/birthdays/${target.id}`, { contact_id: cid, notes: 'soll nicht landen' }));
+  assert.equal(res.status, 409, `Index-Konflikt wird 409, nicht ${res.status}`);
+  assert.equal(res.body.reason, 'birthdays_contact_linked');
+  assert.equal(linkOf(target.id), null);
+  assert.equal(db.prepare('SELECT notes FROM birthdays WHERE id = ?').get(target.id).notes, null, 'auch die anderen Felder nicht');
+  const free = await member.as('PUT', `/birthdays/${target.id}`, { contact_id: cid });
+  assert.equal(free.status, 200);
+  assert.equal(linkOf(target.id), cid);
+});
+
 test('D7: unbekannter Kontakt -> 400 birthdays_selected_contact_not_found; keine Zahl -> 400', async () => {
   setModules(member.id, {});
   const birthday = await seedBirthday('Ins Leere');
