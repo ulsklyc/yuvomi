@@ -7540,7 +7540,7 @@ test('R22 D9: der Punkt einer Ausgabe traegt die Farbe ihrer Kategorie, wie Balk
     const html = budgetUi.renderEntries();
     const punkt = (id) => new RegExp(`data-id="${id}">\\s*<div class="budget-entry__indicator ([^"]+)"([^>]*)>`).exec(html);
     const index = colors.categoryColorIndex(budgetUi.state.summary.byCategory, cats.map((c) => c.key));
-    assert.match(punkt(1)[2], new RegExp(`style="--entry-color:${colors.categoryColor(index, 'housing').replace(/[()]/g, '\\$&')}"`), 'Miete in der Farbe von Wohnen');
+    assert.match(punkt(1)[2], new RegExp(`style="--entry-color:${colors.categoryColor(index, 'housing').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`), 'Miete in der Farbe von Wohnen');
     assert.doesNotMatch(punkt(1)[2], /data-texture/);
     assert.equal(colors.categoryTexture(index, 'shop'), 'hatch', 'Vorbedingung: Stelle 6 ist eine schraffierte Serie');
     assert.match(punkt(2)[2], /data-texture="hatch"/, 'die schraffierte Serie traegt ihre Textur auch im Punkt');
