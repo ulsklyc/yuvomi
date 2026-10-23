@@ -3616,21 +3616,67 @@ async function loadCategories({ keepOnError = false } = {}) {
  * (der Preis laesst sich trotzdem eintragen), ohne Waehrung gilt EUR. Ein
  * Einkaufszettel, der wegen eines Nebenfeldes gar nicht aufgeht, waere der
  * schlechtere Tausch. */
+//
+// NEBENEINANDER, NICHT NACHEINANDER (Critique R22, D22): die Waehrung wartete
+// auf die Laeden, obwohl sie nichts von ihnen braucht - eine ganze Runde mehr
+// vor den Artikeln (400 ms Latenz: Artikel erst nach 2,1 s).
 async function loadStores({ keepOnError = false } = {}) {
-  try {
-    const data   = await api.get('/shopping/stores');
-    state.stores = data.data ?? [];
-  } catch {
-    if (!keepOnError) state.stores = [];
-  }
-  try {
-    const prefs    = await api.get('/preferences');
-    state.currency = prefs.data?.currency ?? 'EUR';
-  } catch { /* EUR bleibt */ }
+  const [stores, prefs] = await Promise.allSettled([api.get('/shopping/stores'), api.get('/preferences')]);
+  if (stores.status === 'fulfilled') state.stores = stores.value.data ?? [];
+  else if (!keepOnError) state.stores = [];
+  if (prefs.status === 'fulfilled') state.currency = prefs.value.data?.currency ?? 'EUR';
 }
 
-async function loadItems(listId) {
+/**
+ * DIE ARTIKEL LAUFEN MIT DER LISTE LOS, WENN IHRE ID SCHON BEKANNT IST
+ * (Critique R22, D22). Der Aufbau wartete auf `/shopping`, um die erste Liste
+ * zu kennen, und fragte erst dann nach ihren Artikeln - eine Runde mehr als
+ * die Aufgaben. Bekannt ist die Id aus `?list=`, aus dem letzten Besuch in
+ * dieser Sitzung oder, nach einem Neuladen, aus dem Merker des Geraets
+ * (`firstListStorageKey`). Die Anfrage beginnt in der Ladeordnung wie jede
+ * andere (`beginLoad`); `loadItems` nimmt sie, wenn die Liste die gewaehlte
+ * ist, sonst laeuft sie ins Leere und schliesst nur ihre Nummer ab
+ * (`dropItemsPrefetch`). Die Wahl der Liste selbst aendert sich nicht.
+ */
+const FIRST_LIST_VERSION = 1;
+
+function firstListStorageKey(userId) {
+  return `yuvomi:shopping:firstList:v${FIRST_LIST_VERSION}:${userId ?? 'anon'}`;
+}
+
+function rememberedFirstList(userId) {
+  try {
+    return parseInt(localStorage.getItem(firstListStorageKey(userId)), 10) || null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberFirstList(userId, listId) {
+  try {
+    if (listId) localStorage.setItem(firstListStorageKey(userId), String(listId));
+    else localStorage.removeItem(firstListStorageKey(userId));
+  } catch { /* Privatmodus: dann eben eine Runde mehr */ }
+}
+
+function prefetchItems(listId) {
+  if (!listId) return null;
   const startedAt = beginLoad();
+  const response = api.getWithSource(`/shopping/${listId}/items`);
+  // Wer sie nie abholt, soll keine unbehandelte Ablehnung hinterlassen.
+  response.catch(() => {});
+  return { listId, startedAt, response };
+}
+
+function dropItemsPrefetch(prefetched) {
+  if (!prefetched) return;
+  const done = () => endLoad(prefetched.startedAt);
+  prefetched.response.then(done, done);
+}
+
+async function loadItems(listId, { prefetched = null } = {}) {
+  const own = prefetched?.listId === listId ? prefetched : null;
+  const startedAt = own ? own.startedAt : beginLoad();
   // try/finally um den ganzen Rundlauf: die Ladeordnung schliesst ihn ab, ob
   // er angewandt, verworfen oder gescheitert ist (siehe `endLoad`).
   try {
@@ -3638,7 +3684,7 @@ async function loadItems(listId) {
     // Workers steht (`API_CACHE_WHITELIST` in sw.js): faellt das Netz aus, kommt
     // die zuletzt gecachte Antwort mit Status 200 zurueck, und die ist von einer
     // frischen sonst nicht zu unterscheiden.
-    const { data, fromCache } = await api.getWithSource(`/shopping/${listId}/items`);
+    const { data, fromCache } = await (own ? own.response : api.getWithSource(`/shopping/${listId}/items`));
     // Ein Rundlauf kann von einem Listenwechsel ueberholt werden. Alle sechs
     // Aufrufer laden die GERADE aktive Liste - `switchList` setzt
     // `state.activeListId` sogar vor dem Warten -, die Antworten kommen aber in
@@ -4551,6 +4597,46 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
 // Haupt-Render
 // --------------------------------------------------------
 
+/**
+ * Die Daten des Seitenaufbaus: Kategorien, Laeden samt Waehrung und Listen
+ * nebeneinander, die Artikel der gewaehlten Liste - und, wenn deren Id schon
+ * bekannt ist, ebenfalls gleich mit (`prefetchItems`). Eigene Funktion, damit
+ * die Reihenfolge der Anfragen ohne Seitenaufbau pruefbar ist
+ * (test:shopping-gone-reload, R22).
+ */
+async function loadPageData() {
+  state.itemsError = null;
+  try {
+    // loadCategories() und loadLists() fangen selbst; der äußere catch ist das
+    // Netz für alles Unerwartete und bildet es auf denselben Fehlerzustand ab,
+    // statt die Ausnahme in den globalen Fehlerbildschirm laufen zu lassen.
+    const listParam = parseInt(new URLSearchParams(window.location.search).get('list'), 10) || null;
+    const prefetched = prefetchItems(listParam ?? state.lists[0]?.id ?? rememberedFirstList(state.currentUserId));
+    await Promise.all([loadCategories(), loadStores(), loadLists()]);
+    if (!state.listsError) rememberFirstList(state.currentUserId, state.lists[0]?.id);
+    if (!state.listsError && state.lists.length) {
+      const target = listParam && state.lists.find((l) => l.id === listParam);
+      state.activeListId = target ? target.id : state.lists[0].id;
+      state.collapsedCategories = loadCollapsedCategories(state.currentUserId, state.activeListId);
+      state.tickedOpen = loadTickedOpen(state.currentUserId, state.activeListId);
+      if (prefetched?.listId !== state.activeListId) dropItemsPrefetch(prefetched);
+      try {
+        await loadItems(state.activeListId, { prefetched });
+      } catch (err) {
+        console.error('[Shopping] loadItems Fehler:', err);
+        clearItems();
+        state.activeList = state.lists.find((l) => l.id === state.activeListId) ?? null;
+        state.itemsError = err;
+      }
+    } else {
+      dropItemsPrefetch(prefetched);
+    }
+  } catch (err) {
+    console.error('[Shopping] Ladefehler:', err);
+    state.listsError = err;
+  }
+}
+
 export async function render(container, { user, signal: routeSignal = null } = {}) {
   state.currentUserId = user?.id ?? null;
   _routeSignal = routeSignal;
@@ -4595,31 +4681,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // beim Wechsel Mahlzeiten -> Einkauf aus und sprang nach dem Laden zurueck,
   // statt zu stehen wie in den drei Geschwister-Tabs (Integration Runde 3).
   const kitchenBar = renderKitchenTabsBar(container, '/shopping');
-  state.itemsError = null;
-  try {
-    // loadCategories() und loadLists() fangen selbst; der äußere catch ist das
-    // Netz für alles Unerwartete und bildet es auf denselben Fehlerzustand ab,
-    // statt die Ausnahme in den globalen Fehlerbildschirm laufen zu lassen.
-    await Promise.all([loadCategories(), loadStores(), loadLists()]);
-    if (!state.listsError && state.lists.length) {
-      const listParam = parseInt(new URLSearchParams(window.location.search).get('list'), 10) || null;
-      const target = listParam && state.lists.find((l) => l.id === listParam);
-      state.activeListId = target ? target.id : state.lists[0].id;
-      state.collapsedCategories = loadCollapsedCategories(state.currentUserId, state.activeListId);
-      state.tickedOpen = loadTickedOpen(state.currentUserId, state.activeListId);
-      try {
-        await loadItems(state.activeListId);
-      } catch (err) {
-        console.error('[Shopping] loadItems Fehler:', err);
-        clearItems();
-        state.activeList = state.lists.find((l) => l.id === state.activeListId) ?? null;
-        state.itemsError = err;
-      }
-    }
-  } catch (err) {
-    console.error('[Shopping] Ladefehler:', err);
-    state.listsError = err;
-  }
+  await loadPageData();
 
   // Alles ausser der Leiste abraeumen: sie bleibt eingehaengt, damit ihre
   // Kapsel weitergleitet und der waagrechte Scrollstand nicht zurueckspringt.
@@ -4767,8 +4829,10 @@ export const __test = {
   toggleShoppingItem,
   listToolsItems,
   loadItems,
-  // R22 (D22): die Zeichen der Liste in Sicht-Reihenfolge.
-  drawItemIcons, ICON_ROWS_NOW,
+  // R22 (D22): die Anfragen des Seitenaufbaus - Waehrung neben den Laeden,
+  // Artikel mit der schon bekannten Listen-Id neben den Listen - und die
+  // Zeichen der Liste in Sicht-Reihenfolge.
+  loadPageData, firstListStorageKey, drawItemIcons, ICON_ROWS_NOW,
   deleteItemUndoable,
   clearCheckedUndoable,
   // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
@@ -4821,6 +4885,7 @@ export const __test = {
   // global, und eine Wasserstandsmarke aus einem frueheren Fall verwirft die
   // Auffrischung des naechsten. Aufraeumen gehoert an den ANFANG jedes Falls.
   clearItems,
+  loadsInFlightForTest: () => _loadsInFlight.size,
   resetLoadOrderForTest: () => { _appliedLoad.clear(); settledAt.clear(); _loadsInFlight.clear(); _itemsListId = null; _appliedListsLoad = 0; },
   // Live-Aktualisierung: der Plan ist reine Logik (Serverstand vorher/nachher),
   // das Nachladen und die Verdrahtung laufen ueber den api-Stub.

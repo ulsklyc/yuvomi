@@ -12664,7 +12664,7 @@ test('der Einkaufs-Handler schreibt nicht in einen abgehaengten Container', () =
 // ab (auch `switchList` und den Laden-Manager, die aelter sind als #1066).
 test('shopping: eine ueberholte Artikel-Antwort fasst den Stand nicht mehr an', () => {
   const src = read('../public/pages/shopping.js');
-  const fn  = src.match(/async function loadItems\(listId\)[\s\S]*?\n\}/)?.[0] ?? '';
+  const fn  = src.match(/async function loadItems\(listId[^)]*\)[\s\S]*?\n\}/)?.[0] ?? '';
   assert.ok(fn, 'loadItems nicht gefunden');
   // Vor JEDER Zuweisung an den geteilten Stand, nicht irgendwo in der Funktion.
   const wache = fn.indexOf('if (state.activeListId !== listId) return;');

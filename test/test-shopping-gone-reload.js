@@ -1020,3 +1020,90 @@ for (const [name, serverStand] of [
     }
   });
 }
+
+/**
+ * R22 (Critique a2 P2 "Einkauf laedt in 3 Runden", D22): DER SEITENAUFBAU
+ * FRAGT IN EINER RUNDE, WENN DIE LISTE SCHON BEKANNT IST. Die Waehrung
+ * (`/preferences`) wartete auf die Laeden, und die Artikel warteten auf alle
+ * drei - bei 400 ms Latenz standen sie erst nach 2,1 s da, die Aufgaben nach
+ * einer Runde. Gemessen wird, welche Anfragen losgehen, BEVOR irgendeine
+ * Antwort da ist: Waehrung immer, die Artikel mit der Id aus `?list=`, aus dem
+ * letzten Besuch oder aus dem Merker des Geraets. Raet der Merker falsch,
+ * zaehlen die Artikel der richtigen Liste, und die falsche Antwort fasst den
+ * Stand nicht an.
+ */
+function langsamerServer({ lists = LISTEN() } = {}) {
+  const gets = [];
+  const offen = [];
+  const antwort = (path) => {
+    if (path === '/shopping') return { data: lists };
+    if (path === '/shopping/categories') return { data: KATEGORIEN() };
+    if (path === '/shopping/stores') return { data: [] };
+    if (path === '/preferences') return { data: { currency: 'CHF' } };
+    const m = /^\/shopping\/(\d+)\/items$/.exec(path);
+    if (m) return { data: [item({ id: 100 + Number(m[1]), list_id: Number(m[1]), name: `Artikel ${m[1]}` })], list: lists.find((l) => l.id === Number(m[1])), version: 3 };
+    throw new Error(`kein Stub fuer GET ${path}`);
+  };
+  const lese = (path) => new Promise((resolve) => { gets.push(path); offen.push(() => resolve(antwort(path))); });
+  return {
+    gets,
+    alleAntworten: async () => { while (offen.length) { offen.shift()(); await new Promise((r) => setImmediate(r)); } },
+    stub: { get: lese, getWithSource: async (path) => ({ data: await lese(path), fromCache: false }) },
+  };
+}
+
+async function seitenaufbau({ search = '', vorher = [], merker = null } = {}) {
+  zustand({ lists: vorher, items: [], activeListId: null, activeList: null, currentUserId: 7 });
+  speicher.delete(shopping.firstListStorageKey(7));
+  if (merker != null) speicher.set(shopping.firstListStorageKey(7), String(merker));
+  const srv = langsamerServer();
+  const window0 = globalThis.window.location;
+  globalThis.window.location = { search };
+  globalThis.__apiStub = srv.stub;
+  try {
+    const lauf = shopping.loadPageData();
+    await new Promise((r) => setImmediate(r));
+    const ersteRunde = [...srv.gets];
+    await srv.alleAntworten();
+    await lauf;
+    await srv.alleAntworten();
+    return { ersteRunde, alle: srv.gets };
+  } finally {
+    delete globalThis.__apiStub;
+    globalThis.window.location = window0;
+  }
+}
+
+test('R22 D22: Waehrung und Laeden laufen nebeneinander, nicht nacheinander', async () => {
+  const { ersteRunde } = await seitenaufbau();
+  assert.ok(ersteRunde.includes('/preferences'), `die Waehrung wartet auf die Laeden: ${ersteRunde.join(', ')}`);
+  assert.equal(shopping.state.currency, 'CHF');
+});
+
+test('R22 D22: mit bekannter Liste laufen die Artikel in der ersten Runde mit', async () => {
+  for (const [fall, opts, id] of [
+    ['?list=2', { search: '?list=2' }, 2],
+    ['letzter Besuch', { vorher: LISTEN() }, 1],
+    ['Merker des Geraets', { merker: 1 }, 1],
+  ]) {
+    const { ersteRunde, alle } = await seitenaufbau(opts);
+    assert.ok(ersteRunde.includes(`/shopping/${id}/items`), `${fall}: die Artikel warten auf die Listen (${ersteRunde.join(', ')})`);
+    assert.equal(alle.filter((p) => p.endsWith('/items')).length, 1, `${fall}: die Artikel werden zweimal geholt`);
+    assert.equal(shopping.state.activeListId, id);
+    assert.deepEqual(shopping.state.items.map((i) => i.id), [100 + id]);
+  }
+  assert.equal(speicher.get(shopping.firstListStorageKey(7)), '1', 'der Merker haelt die erste Liste fuer den naechsten Kaltstart');
+});
+
+test('R22 D22: ohne bekannte Liste zwei Runden; ein falscher Merker zaehlt nicht', async () => {
+  const kalt = await seitenaufbau();
+  assert.ok(!kalt.ersteRunde.some((p) => p.endsWith('/items')), 'ohne Id gibt es nichts vorzuholen');
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [101]);
+
+  const falsch = await seitenaufbau({ merker: 2 });
+  assert.ok(falsch.ersteRunde.includes('/shopping/2/items'), 'der Merker wird vorgeholt');
+  assert.ok(falsch.alle.includes('/shopping/1/items'), 'die gewaehlte (erste) Liste wird danach geholt');
+  assert.equal(shopping.state.activeListId, 1, 'der Merker waehlt keine Liste');
+  assert.deepEqual(shopping.state.items.map((i) => i.id), [101], 'die Artikel der falschen Liste stehen nicht unter der richtigen');
+  assert.equal(shopping.loadsInFlightForTest?.() ?? 0, 0, 'die verworfene Anfrage schliesst ihre Ladenummer ab');
+});

@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrive right after the first screen. On a wide screen the two-column view no longer lays out the
   whole list just to pick the first row. Opening a list of 260 tasks on a slow phone now holds the
   screen for about half as long.
+- **The shopping list loads in one round.** It asked for the currency only after the stores and
+  for the items only after the lists, three trips to the server before the first item showed. The
+  currency now loads alongside, and the items of the list you are about to see load together with
+  the lists when it is already known - from the address, from your last visit or from the last time
+  on this device. On a slow connection the items appear up to a second sooner.
 - **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
   in the budget showed the list first and pushed it down once the figures above it arrived; the
   figures now hold their place from the first frame. On a phone, the Health area list waits in
