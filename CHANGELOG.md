@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appointment now opens its sheet over the overview too, with "Open in calendar" to edit it there.
   Today's meal opens its sheet in the meal plan, an open dose leads to Medications and a birthday
   today to its entry, instead of the start of each module.
+- **One message at a time, and it stays with its page.** Up to three messages could stack, so
+  two "Undo" buttons stood on top of each other, and a "Task done - Undo" followed you into
+  Shopping. A new message now replaces the one on screen, which takes effect as if its time had
+  run out, and switching to another module ends it. On a wide screen with a detail column the
+  message now appears at the bottom of the list it belongs to instead of over the detail.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.

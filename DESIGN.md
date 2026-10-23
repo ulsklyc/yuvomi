@@ -1808,10 +1808,15 @@ waehlt deshalb die erste passende Lage: dort, wo er steht; ueber dem Dialog; dar
 seinem Platz ueber reinem Inhalt; im Dialog direkt ueber der unteren Leiste; die naechste
 freie Kante. Als Leiste zaehlen `.modal-panel__header/__footer`, `.modal-actions`,
 `[data-dialog-actions]` UND jeder sichtbare Knopf und Link des Dialogs, dazu das gerade
-fokussierte Feld (WCAG 2.4.11). Als Flaeche zaehlt ausserdem die Detailspalte von
-Liste+Detail (`.split-view__detail`, ihr Kopf und Fuss als Leiste; R16, 2026-09-28 - der Toast
-lag bei 1280x800 auf "Loeschen"), aber nur ohne offenen Dialog; die Erinnerung weicht ihr nicht
-ganz, nur ihrem Fuss. Findet sich kein Platz, zeigt der Stapel nur den juengsten
+fokussierte Feld (WCAG 2.4.11). **Die Detailspalte von Liste+Detail ist eine Sperrzone, kein
+Dialog (R22, D18):** ohne offenen Dialog steht der Stapel unten in der LISTENSPALTE, in deren
+Breite und Mitte (`listColumnDock`), Spalte samt Kopf und Fuss bleiben frei; die Erinnerung
+weicht ihr nicht. Vorher richtete er sich an der Spalte aus wie an einem Dialog und stand mittig
+ueber ihrem Inhalt (Aufgaben 1440: y 371-424 in x 883-1263). **Hoechstens EINE Rueckmeldung
+(R22, D18):** ein neuer Toast ersetzt den stehenden, fuer den alten gilt seine Handlung (sein
+`onExpire` laeuft wie nach der Frist); beim Modulwechsel endet sie ebenso (`endFeedbackToasts`,
+die Kueche zaehlt als ein Modul). Dauerhafte Toasts (Erinnerungen) sind keine Rueckmeldung und
+bleiben. Pruefebene: test:toast-show, test:toast-placement. Findet sich kein Platz, zeigt der Stapel nur den juengsten
 Toast, die uebrigen stehen `inert` als `.toast--tucked` bereit. Ein Dialog mit eigener
 Kopf- oder Fusszeile zeichnet sie mit `data-dialog-actions` aus; das Register dazu fuehrt
 `test:toast-placement`. Im Wand-Modus steht der Stapel ohne offenen Dialog OBEN statt unten

@@ -362,14 +362,60 @@ test('Gleiches steht einmal da: dieselbe Meldung zaehlt mit, statt sich zu stape
     assert.equal(leaving(toasts[0]), false, 'die Frist begann mit der letzten Wiederholung von vorn');
     mock.timers.tick(600);
     assert.equal(leaving(toasts[0]), true);
-    // Anderer Text, anderer Typ oder eine Aktion: einzeln wie bisher.
-    showToast('Gespeichert', 'default', 3000);
+    // Eine Aktion wird nie zusammengezaehlt: jedes "Rueckgaengig" meint etwas
+    // anderes. Seit R22 (D18) ERSETZT der neue den alten (Test unten).
     showToast('Geloescht', 'default', 3000, () => {});
+    const [first] = toastsIn(polite);
     showToast('Geloescht', 'default', 3000, () => {});
-    assert.equal(toastsIn(polite).filter((x) => x.textContent.startsWith('Geloescht')).length, 2,
-      'Toasts mit Rueckgaengig bleiben einzeln');
+    const [second] = toastsIn(polite);
+    assert.notEqual(first, second, 'ein zweites Rueckgaengig ist ein eigener Toast, kein Zaehler');
   } finally {
     mock.timers.reset();
     removeDom();
   }
+});
+
+/* HOECHSTENS EINE RUECKMELDUNG (Critique R22, D18, a2 Casey). Bis hierher
+ * stapelten sich bis zu drei Toasts, zwei "Rueckgaengig" standen uebereinander.
+ * Jetzt ersetzt der neue den alten, und fuer den alten gilt seine Handlung: sein
+ * `onExpire` laeuft (das Loeschen hinter seinem Rueckgaengig). Gemessen im
+ * Browser (s1/probes/toast.mjs): vorher sichtbar ["Erster","Zweiter"], nachher
+ * ["Zweiter"], abgelaufen ["Erster"]. */
+test('D18: ein neuer Toast ersetzt den stehenden, dessen Handlung gilt; Erinnerungen bleiben', async () => {
+  const { polite, assertive } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { showToast, endFeedbackToasts } = await import('../public/utils/toast-show.js');
+    const reminder = document.createElement('div');
+    reminder.className = 'toast toast--reminder';
+    polite.appendChild(reminder);
+    const ended = [];
+    showToast('Aufgabe erledigt', 'default', 5000, () => ended.push('undo-1'), { onExpire: () => ended.push('erledigt') });
+    showToast('Artikel geloescht', 'default', 5000, () => {}, { onExpire: () => ended.push('geloescht') });
+    showToast('Konnte nicht speichern', 'danger', 5000);
+    const feedback = [...toastsIn(polite), ...toastsIn(assertive)].filter((x) => !x.classList.contains('toast--reminder'));
+    assert.deepEqual(feedback.map((x) => x.textContent), ['Konnte nicht speichern'],
+      'genau eine Rueckmeldung steht da - auch ueber beide Live-Regionen');
+    assert.deepEqual(ended, ['erledigt', 'geloescht'], 'die Ersetzten enden wie nach ihrer Frist, ihr Rueckgaengig nie');
+    assert.ok(polite.children.includes(reminder), 'die dauerhafte Erinnerung bleibt');
+    // Modulwechsel (router.js): alles, was eine Rueckmeldung ist, endet.
+    showToast('Gespeichert', 'default', 5000, () => {}, { onExpire: () => ended.push('gespeichert') });
+    endFeedbackToasts();
+    assert.equal([...toastsIn(polite), ...toastsIn(assertive)].filter((x) => !x.classList.contains('toast--reminder')).length, 0);
+    assert.deepEqual(ended.slice(-1), ['gespeichert']);
+    mock.timers.tick(10000);
+    assert.equal(ended.filter((e) => e === 'gespeichert').length, 1, 'onExpire laeuft genau einmal');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+  }
+});
+
+test('D18: die Rueckmeldung endet beim Modulwechsel, zwischen den Kuechen-Reitern nicht (router.js)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /if \(moduleSectionOf\(previousPath\) !== moduleSectionOf\(route\.path\)\) endFeedbackToasts\(\);/,
+    'der Seitentausch beendet die Rueckmeldung des alten Moduls');
+  assert.match(router, /function moduleSectionOf\(path\) \{\s*if \(!path\) return null;\s*return isKitchenRoute\(path\) \? '\/kitchen' : topLevelSection\(path\);/,
+    'die Kueche zaehlt als ein Modul, Einstellungen/Gesundheit/Schichtplan ueber topLevelSection');
 });

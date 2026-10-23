@@ -100,9 +100,13 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
     }
   }
 
-  // Max. 3 gleichzeitige Toasts (global): ältesten entfernen falls Limit erreicht
-  const existing = document.querySelectorAll('.toast-container .toast');
-  if (existing.length >= 3) existing[0].remove();
+  // HOECHSTENS EINE RUECKMELDUNG STEHT DA (Critique R22, D18). Bis hierher
+  // stapelten sich bis zu drei, und zwei "Rueckgaengig" uebereinander liessen
+  // offen, welches welche Handlung meint (a2, Casey). Die neue ersetzt die alte,
+  // und fuer die alte gilt ihre Handlung: sie endet wie nach ihrer Frist
+  // (`onExpire` - das Loeschen hinter ihrem "Rueckgaengig" laeuft). Dauerhafte
+  // Toasts (die faellige Erinnerung) sind keine Rueckmeldung und bleiben.
+  endFeedbackToasts();
 
   const toast = document.createElement('div');
   toast.className = `toast ${type !== 'default' ? `toast--${type}` : ''}`;
@@ -141,6 +145,15 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
     expired = true;
     onExpire?.();
   };
+  // Sofort weg, ohne Ausfahrt (ersetzt oder Modulwechsel, D18): eine gehende
+  // Rueckmeldung neben der neuen waere fuer ihre Ausfahrt wieder zwei.
+  toast._toastEnd = () => {
+    deadline.cancel();
+    toast.remove();
+    if (expired) return;
+    expired = true;
+    onExpire?.();
+  };
   // Die Frist pausiert unter Zeiger und Fokus (A1 P2-3, WCAG 2.2.1): wer zu
   // "Rueckgaengig" tabbt oder langsamer liest als die Frist, verliert den Toast
   // nicht unter der Hand.
@@ -171,6 +184,17 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   return true;
 }
 
+
+/**
+ * Beendet jede stehende Rueckmeldung (Critique R22, D18): beim naechsten Toast
+ * und beim Modulwechsel (router.js). Wie nach ihrer Frist - ihre Handlung gilt,
+ * `onExpire` laeuft. Dauerhafte Toasts (Erinnerungen) bleiben.
+ */
+export function endFeedbackToasts() {
+  for (const toast of document.querySelectorAll('.toast-container .toast')) {
+    if (typeof toast._toastEnd === 'function') toast._toastEnd();
+  }
+}
 
 /**
  * Zaehlt einen Erfolg und sagt, ob die sichtbare Flaeche verbraucht ist.

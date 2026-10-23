@@ -17,7 +17,7 @@ import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { inertOutside } from '/utils/background-inert.js';
-import { showToast } from '/utils/toast-show.js';
+import { showToast, endFeedbackToasts } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
@@ -669,6 +669,12 @@ function topLevelSection(path) {
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
   return path ?? '/';
+}
+
+/** Das Modul einer Adresse fuer die Toast-Regel (D18): die Kueche zaehlt als eines. */
+function moduleSectionOf(path) {
+  if (!path) return null;
+  return isKitchenRoute(path) ? '/kitchen' : topLevelSection(path);
 }
 
 function getAppName() {
@@ -1853,6 +1859,11 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // Und die Filter-Popover (Aufgaben, Kalender): sie haengen an
       // `document.body` und schliessen nur per Light-Dismiss von selbst.
       dismissFilterPopovers();
+      // DIE RUECKMELDUNG ENDET MIT IHREM MODUL (Critique R22, D18): der Toast
+      // "Aufgabe erledigt - Rueckgaengig" wanderte in den Einkauf mit (a2,
+      // Casey). Ihre Handlung gilt (utils/toast-show.js); zwischen den Reitern
+      // der Kueche bleibt sie - die Kueche ist EIN Modul der Navigation.
+      if (moduleSectionOf(previousPath) !== moduleSectionOf(route.path)) endFeedbackToasts();
       style.cleanup();
       // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
       // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die

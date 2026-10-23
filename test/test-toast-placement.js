@@ -26,7 +26,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  chooseToastPlacement, persistentToastMustYield, placeToastStack, KEEPOUT_SELECTOR,
+  chooseToastPlacement, persistentToastMustYield, placeToastStack, KEEPOUT_SELECTOR, listColumnDock,
 } from '../public/utils/toast-placement.js';
 import { PERSISTENT_TOAST_SELECTOR } from '../public/utils/toast-surface.js';
 import { eachRule } from './css-rules.js';
@@ -660,12 +660,13 @@ function splitViewScene({ reminder = false } = {}) {
     .add(deleteBtn, new FakeEl('button', { cls: 'btn btn--primary', rect: box(730, 1100, 120, 40) }));
   pane.add(head, content, footer);
   const list = new FakeEl('div', { cls: 'split-view__list', rect: box(140, 280, 376, 644) });
-  body.add(list, pane);
+  const split = new FakeEl('div', { cls: 'split-view', rect: box(140, 280, 976, 644) }).add(list, pane);
+  body.add(split);
 
   const toast = new FakeEl('div', { cls: reminder ? 'toast toast--reminder' : 'toast', rect: box(710, 560, 380, 66) });
   const stack = new FakeEl('div', { cls: 'shell-bottom-stack', rect: box(710, 560, 380, 66) }).add(toast);
   body.add(stack);
-  return { body, pane, footer, deleteBtn, stack, toast };
+  return { body, pane, list, footer, deleteBtn, stack, toast };
 }
 
 function withDom(scene, fn, viewport = { clientWidth: 1280, clientHeight: 800 }) {
@@ -691,20 +692,29 @@ function withDom(scene, fn, viewport = { clientWidth: 1280, clientHeight: 800 })
   }
 }
 
-test('A3 P1-1: in Liste+Detail weicht der Stapel dem Fuss der Detailspalte (1280x800)', () => {
+/* SEIT R22 (D18) STEHT ER UNTEN IN DER LISTENSPALTE. Die Detailspalte ist eine
+ * Sperrzone, kein Dialog: ausgerichtet an ihr stand der Stapel mittig ueber
+ * ihrem Inhalt (gemessen Aufgaben 1440: x 883-1263 in der Spalte 738-1408, y
+ * 371). Er gehoert zur Liste, deren Handlung er meldet. */
+test('A3 P1-1 + R22 D18: in Liste+Detail steht der Stapel unten in der Listenspalte, Spalte und Fuss bleiben frei', () => {
   const scene = splitViewScene();
   const decision = withDom(scene, () => placeToastStack(scene.stack));
-  assert.ok(decision, 'der Stapel blieb auf "Loeschen" stehen - die Detailspalte zaehlte nicht als Flaeche');
+  assert.ok(decision, 'der Stapel blieb auf "Loeschen" stehen - die Detailspalte zaehlte nicht');
   assert.equal(scene.stack.dataset.dock, 'placed');
   const width = parseFloat(scene.stack.props.get('--toast-dock-width'));
   const center = parseFloat(scene.stack.props.get('--toast-dock-center'));
   const placed = box(decision.top, center - width / 2, width, 66);
-  const footer = scene.footer.getBoundingClientRect();
-  assert.ok(!intersects(placed, footer), `der Stapel ${placed.top}..${placed.bottom} liegt auf dem Fuss ab ${footer.top}`);
+  const list = scene.list.getBoundingClientRect();
+  assert.ok(!intersects(placed, scene.pane.getBoundingClientRect()), 'nichts von der Detailspalte liegt unter dem Stapel');
   assert.ok(!intersects(placed, scene.deleteBtn.getBoundingClientRect()), '"Loeschen" bleibt frei');
-  assert.ok(placed.bottom <= footer.top && placed.top >= 212,
-    'er steht in der Spalte ueber ihrem Fuss, nicht ueber dem Seitenkopf');
-  assert.ok(placed.left >= 680 && placed.right <= 1256, 'ausgerichtet an der Detailspalte');
+  assert.ok(placed.left >= list.left && placed.right <= list.right, `in der Listenspalte (${placed.left}..${placed.right})`);
+  assert.equal(placed.bottom, 776, 'unten an seinem Platz, nicht mitten in der Liste');
+});
+
+test('R22 D18: listColumnDock nimmt Breite und Mitte der Listenspalte, nie breiter als sie', () => {
+  assert.deepEqual(listColumnDock({ stack: { width: 380 }, list: { left: 252, width: 462 }, gap: 12 }), { width: 380, center: 483 });
+  assert.deepEqual(listColumnDock({ stack: { width: 380 }, list: { left: 0, width: 300 }, gap: 12 }), { width: 276, center: 150 },
+    'eine schmale Spalte macht den Stapel schmaler, statt ihn ueber die Detailspalte ragen zu lassen');
 });
 
 test('A3 P1-1: die Erinnerung weicht der Detailspalte nicht ganz - nur ihrem Fuss', () => {
