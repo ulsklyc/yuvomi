@@ -1448,7 +1448,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 .more-sheet__search:active {
   border-color: var(--color-accent);
-  transform: scale(0.985);
+  transform: scale(var(--press-scale-lg));
 }
 
 .more-sheet__search:focus-visible {
@@ -1857,7 +1857,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 
 .more-action:active {
   background-color: var(--color-surface-hover);
-  transform: scale(0.96);
+  transform: scale(var(--press-scale-sm));
 }
 
 /* Aktives System-Ziel (z. B. Einstellungen offen) markieren. */
@@ -2651,7 +2651,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 }
 
 .nav-bottom .nav-item:active .nav-item__icon-well {
-  transform: translateY(var(--space-px)) scale(0.96);
+  transform: translateY(var(--space-px)) scale(var(--press-scale-sm));
   opacity: var(--opacity-glass-elevated);
 }
 
@@ -2952,7 +2952,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 }
 
 .page-fab:active {
-  transform: scale(0.92);
+  transform: scale(var(--press-scale-sm));
 }
 
 /* AUSNAHME vom Fokusring-Token (tokens.css §7b), und die einzige mit einer
@@ -5480,13 +5480,21 @@ html.fab-steady .page-fab {
   /* --target-md, nicht --target-lg: die Einträge stehen in einer Liste mit
    * Trennung durch Abstand, nicht als isolierte Ziele in einer Zeile. */
   min-height: var(--target-md);
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 @media (hover: none) {
   .popover-menu__item {
     min-height: var(--target-lg);
   }
+}
+
+/* Der Eintrag quittiert den Druck mit der kleinen Stufe (tokens.css,
+ * Druckzustand) - vorher stand nur die Hover-Flaeche, und am Finger gibt es
+ * die nicht. Ein gesperrter Eintrag gibt nicht nach. */
+.popover-menu__item:active:not(:disabled, [aria-disabled="true"]) {
+  transform: scale(var(--press-scale-sm));
+  transition-duration: var(--duration-2xs);
 }
 
 /* Ein Eintrag darf ein Link sein (Budget: CSV-Export) - dann ohne Unterstrich,
@@ -6685,7 +6693,7 @@ a.popover-menu__item {
 }
 
 .card--interactive:active {
-  transform: scale(0.98);
+  transform: scale(var(--press-scale-lg));
   background-color: var(--color-surface-3);
   box-shadow: var(--shadow-sm);
 }
@@ -7911,7 +7919,13 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(var(--press-scale-lg));
+}
+
+/* Der Icon-Knopf ist ein kompaktes Ziel und gibt die kleine Stufe nach
+ * (tokens.css, Druckzustand); der Textknopf daneben die grosse. */
+.btn--icon:active {
+  transform: scale(var(--press-scale-sm));
 }
 
 .btn:focus-visible {
@@ -8122,7 +8136,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 }
 
 .row-action:active {
-  transform: scale(0.94);
+  transform: scale(var(--press-scale-sm));
 }
 
 .row-action:focus-visible {
@@ -9927,7 +9941,7 @@ html:has(.app-page.is-selecting) {
 
 .toast__undo:active,
 .list-bulkbar__action:active {
-  transform: scale(0.94);
+  transform: scale(var(--press-scale-sm));
   opacity: 1;
 }
 

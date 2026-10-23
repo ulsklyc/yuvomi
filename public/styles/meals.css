@@ -486,6 +486,14 @@
   /* cursor bleibt auf der Karte: auch außerhalb des Titel-Buttons ist sie
    * per Pointer greifbar (Drag & Drop, wireDragDrop). */
   cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+/* Druck wie jede Karte (tokens.css, Druckzustand). Ein Knopf IN der Karte
+ * (Einkauf, Kochen, Mehr) drueckt sie nicht mit - ausser ihrer Titelflaeche. */
+.meal-card:active:not(:has(button:not(.meal-card__open):active)) {
+  transform: scale(var(--press-scale-lg));
+  transition-duration: var(--duration-2xs);
 }
 
 .meal-card + .meal-card {

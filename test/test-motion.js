@@ -3089,3 +3089,58 @@ test('R22: die Buchungszeile traegt am Zeiger keine Hover-Blende', () => {
   assert.ok(rules.some((r) => /(?:^|;)\s*transition:\s*none/.test(r.body)),
     'unter @media (hover: hover) fehlt `.budget-entry.list-row { transition: none }` - jede Zeile unter dem Zeiger blendet beim Scrollen');
 });
+
+// R22 (S4, D8): DER DRUCKZUSTAND HAT ZWEI STUFEN. Vorher standen sechs
+// Literale (0.92 FAB, 0.94 Zeilenaktion, 0.96 Reiter, 0.98 Knopf und Karte,
+// 0.985 Suchfeld im Mehr-Blatt), und Chips, Segmente, Menueeintraege, Notiz-
+// und Mahlzeitkarte quittierten den Druck gar nicht.
+const PRESS_SCALE = { '--press-scale-sm': '0.95', '--press-scale-lg': '0.98' };
+// [Datei, Selektor der :active-Regel (Anfang), Stufe]
+const PRESSABLE = [
+  ['filter-chip.css', '.filter-chip:active', 'sm'],
+  ['panel.css', '.segmented__item:active', 'sm'],
+  ['sub-tabs.css', '.sub-tab:active', 'sm'],
+  ['layout.css', '.popover-menu__item:active', 'sm'],
+  ['layout.css', '.btn--icon:active', 'sm'],
+  ['layout.css', '.row-action:active', 'sm'],
+  ['layout.css', '.page-fab:active', 'sm'],
+  ['layout.css', '.btn:active', 'lg'],
+  ['layout.css', '.card--interactive:active', 'lg'],
+  ['panel.css', '.metric-card--tile:active', 'lg'],
+  ['notes.css', '.note-card:active', 'lg'],
+  ['meals.css', '.meal-card:active', 'lg'],
+];
+
+test('R22: die zwei Druckstufen stehen als Token in tokens.css', () => {
+  const tokens = css('tokens.css');
+  for (const [name, value] of Object.entries(PRESS_SCALE)) {
+    assert.match(tokens, new RegExp(`${name}:\\s*${value.replace('.', '\\.')};`), `${name} fehlt oder traegt nicht ${value}`);
+  }
+});
+
+test('R22: kein :active setzt eine Skala als Literal - nur ueber --press-scale-sm/-lg', () => {
+  const offenders = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      if (!/:active(?!-view-transition)/.test(rule.selector)) continue;
+      const transform = rule.body.match(/(?:^|;)\s*transform:\s*([^;]+)/)?.[1] ?? '';
+      for (const m of transform.matchAll(/scale\(([^()]*(?:\([^()]*\))?[^()]*)\)/g)) {
+        if (!/^\s*var\(--press-scale-(?:sm|lg)\)\s*$/.test(m[1])) offenders.push(`${file}: ${rule.selector.replace(/\s+/g, ' ').slice(0, 80)} -> scale(${m[1]})`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'));
+});
+
+test('R22: Chips, Segmente, Menueeintraege und Karten quittieren den Druck mit ihrer Stufe', () => {
+  const failures = [];
+  for (const [file, start, step] of PRESSABLE) {
+    const rule = [...eachRule(css(file))].find((r) => r.at.length === 0
+      && r.selector.split(',').some((s) => s.trim().startsWith(start)));
+    if (!rule) { failures.push(`${file}: keine :active-Regel fuer ${start}`); continue; }
+    if (!new RegExp(`transform:[^;]*scale\\(var\\(--press-scale-${step}\\)\\)`).test(rule.body)) {
+      failures.push(`${file}: ${start} gibt nicht die Stufe ${step} nach`);
+    }
+  }
+  assert.deepEqual(failures, [], failures.join('\n'));
+});

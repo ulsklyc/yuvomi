@@ -681,7 +681,7 @@
 }
 
 .housekeeping-task__check:active::after {
-  transform: scale(0.92);
+  transform: scale(var(--press-scale-sm));
 }
 
 /* Die Quittung des Tipps (completeTask()), dieselbe wie beim Abhaken einer

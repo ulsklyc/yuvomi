@@ -258,6 +258,14 @@
   box-shadow: var(--shadow-md);
 }
 
+/* Die Karte quittiert den Tipp mit der grossen Stufe (tokens.css,
+ * Druckzustand); am Finger gab es bisher gar kein Zeichen. Nadel und Mehr
+ * druecken sie nicht mit - nur die Oeffnen-Flaeche. */
+.note-card:active:not(:has(button:not(.note-card__open):active, [role="button"]:active)) {
+  transform: scale(var(--press-scale-lg));
+  transition-duration: var(--duration-2xs);
+}
+
 /* EINE KARTENHAUT (Critique 2026-10-16). Angepinnt trug die Karte einen
  * 2px-Ring, den staerkeren Schatten und eine Nadel auf eigener Scheibe - eine
  * zweite Haut neben der normalen. Den Zustand sagen jetzt die Nadel in voller

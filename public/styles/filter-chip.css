@@ -29,9 +29,16 @@
   color: var(--color-text-secondary);
   /* Benannt statt `all`: der Chip wechselt auf Hover und im Aktivzustand genau
    * diese drei. `all` zieht implizit auch Layout-Properties mit (Critique
-   * 2026-07-30). */
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+   * 2026-07-30). Dazu der Druck (R22): er gibt die kleine Stufe nach. */
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   min-height: var(--target-lg);
+}
+
+/* Druck wie Reiter und Segment (tokens.css, Druckzustand): hinein schnell,
+ * heraus mit der Dauer der Ruhe-Regel. */
+.filter-chip:active {
+  transform: scale(var(--press-scale-sm));
+  transition-duration: var(--duration-2xs);
 }
 
 .filter-chip:hover:not(.filter-chip--active) {

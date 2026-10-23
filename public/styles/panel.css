@@ -114,11 +114,17 @@
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .segmented__item:hover:not(.is-active) {
   color: var(--color-text-primary);
+}
+
+/* Druck wie der Reiter (sub-tabs.css): die kleine Stufe, hinein schnell. */
+.segmented__item:active {
+  transform: scale(var(--press-scale-sm));
+  transition-duration: var(--duration-2xs);
 }
 
 /* Aktiv = erhabene Surface-Pille im Well, Modulton nur in der Tinte - die eine
@@ -290,7 +296,7 @@
 }
 
 .metric-card--tile:active {
-  transform: scale(0.98);
+  transform: scale(var(--press-scale-lg));
 }
 
 .metric-card__tile-head {

@@ -2221,7 +2221,7 @@
 }
 
 .event-icon-picker__trigger:active {
-  transform: scale(0.98);
+  transform: scale(var(--press-scale-sm));
 }
 
 .event-icon-picker__trigger i,

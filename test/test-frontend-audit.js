@@ -3288,7 +3288,8 @@ test('mobile navigation Quiet Precision keeps state feedback stable and accessib
   assert.match(focusWellRule, /outline:\s*var\(--focus-ring-width\)\s+solid\s+var\(--focus-ring-color\)/);
   assert.match(focusWellRule, /outline-offset:\s*var\(--focus-ring-offset\)/);
   assert.match(focusWellRule, /--focus-ring-color:\s*var\(--color-accent\)/);
-  assert.match(pressedWellRule, /transform:\s*translateY\(var\(--space-px\)\) scale\(0\.96\)/);
+  // Die Stufe kommt seit R22 aus dem Druckzustand-Token (tokens.css), kein Literal.
+  assert.match(pressedWellRule, /transform:\s*translateY\(var\(--space-px\)\) scale\(var\(--press-scale-sm\)\)/);
   assert.doesNotMatch(layout, /(^|\n)\.nav-item:active\s*\{[\s\S]*?transform:/);
   assert.doesNotMatch(layout, /\.nav-bottom \.nav-item:active\s*\{[\s\S]*?transform:/);
   // EINE Tint-Schicht: der Akzent-Fill sitzt am Indikator selbst; das ::before

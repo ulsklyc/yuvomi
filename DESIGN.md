@@ -1501,6 +1501,13 @@ das Verhaeltnis haelt.
   Wischzeile sieht nicht gedrueckt aus, zurueckgenommene Zeilen behalten ihre Flaeche. Die
   Hover-Flaechen der geteilten Bausteine stehen unter `@media (hover: hover)` - auf Touch klebt
   `:hover` nach dem Tipp; fuer alle uebrigen haelt `test:motion` einen Ratchet.
+- **Zwei Druckstufen (R22, D8):** was beim Druck nachgibt, nimmt `--press-scale-sm` (0.95: Chips,
+  Segmente, Reiter, Icon-Knoepfe, Zeilenaktionen, Menueeintraege, FAB) oder `--press-scale-lg`
+  (0.98: Textknoepfe, Karten, Suchfeld im Mehr-Blatt) aus tokens.css - vorher sechs Literale von
+  0.92 bis 0.985, und Chips, Segmente, Menueeintraege, Notiz- und Mahlzeitkarte quittierten gar
+  nicht. Hinein `--duration-2xs`, heraus die Dauer der Ruhe-Regel; ein Knopf in einer Karte
+  drueckt die Karte nicht mit. Die Zeilen des Press-Bausteins bleiben ohne Bewegung (oben). Guard:
+  `test:motion` (kein :active-Skalenliteral, die Liste der Bausteine mit ihrer Stufe).
 - **Blatt-Geste zu Ende gefuehrt (R18):** der Tipp- und Esc-Ausgang bleibt der kurze Hub. Nach
   einer Zieh-Geste faehrt das Blatt von der Lage des Fingers aus dem Bild
   (`utils/sheet-drag.js`, Web Animations API auf `translate`): Dauer = Reststrecke /

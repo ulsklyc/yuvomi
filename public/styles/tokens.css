@@ -1841,6 +1841,20 @@
    * UND Auslauf (Critique 2026-09-26, Runde 3). */
   --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 
+  /* DRUCKZUSTAND: ZWEI STUFEN (R22, D8). Was gedrueckt wird, gibt um eine
+   * von zwei Stufen nach - vorher standen sechs Literale (0.92 FAB, 0.94
+   * Zeilenaktion, 0.96 Reiter, 0.98 Knopf, 0.985 Suchfeld), und Chips,
+   * Segmente, Menueeintraege und Karten quittierten den Druck gar nicht.
+   *   sm: kleine, kompakte Ziele - Chips, Segmente, Reiter, Icon-Knoepfe,
+   *       Zeilenaktionen, Menueeintraege, FAB. 5 % sind an 40px zwei Pixel.
+   *   lg: breite Flaechen - Textknoepfe, Karten, Zeilen, Suchfeld. Auf 300px
+   *       waeren 5 % ein Sprung von 15px; 2 % sind dieselben sechs.
+   * Listenzeilen des Press-Bausteins (list-row.css) druecken bewusst ohne
+   * Bewegung (R18) - fuer sie gilt die Flaeche, nicht die Stufe.
+   * `test:motion` haelt: kein :active setzt eine Skala ausser ueber diese zwei. */
+  --press-scale-sm: 0.95;
+  --press-scale-lg: 0.98;
+
   /* --------------------------------------------------------
    * 15. Z-Indizes
    * -------------------------------------------------------- */
