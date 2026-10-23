@@ -3368,11 +3368,27 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   Kategorie y 292 -> 186, Haushaltshilfe erste Besuchszeile y 475 -> 418. Eine Kennzahl mit
   dem Wert 0 entfaellt in der Zeile und mobil auch aufgeklappt (`metric-card--empty`); ein
   aktiver Kachel-Filter (Inventar „Braucht Aufmerksamkeit") haelt die Zeile aufgeklappt.
-- **Filter und Zeitraum eines Reiters sind hoechstens zwei Zeilen.** Schichtplan/Vergleich:
-  Ansicht und Personen in Zeile 1 (die Personen als EINE waagerecht scrollende Chipreihe),
-  der Stepper in Zeile 2 (263 -> 110px). Auswertung: Person und Zeitraum nebeneinander ohne
+- **Filter und Zeitraum eines Reiters sind hoechstens zwei Zeilen.** Schichtplan/Uebersicht
+  seit R22 (D6) EINE Werkzeugzeile: Zeitraum (der Reset liegt mobil auf dem Wert), Woche/Tag
+  und die Personen als ein Knopf mit den Gesichtern der Gewaehlten (`renderAvatarStack`), der
+  das Personenblatt des Kalenders oeffnet (`openFilterSheet`) - bis R21 Ansicht und Chipreihe
+  in Zeile 1, der Stepper in Zeile 2. Auswertung: Person und Zeitraum nebeneinander ohne
   Kartenflaeche, die Aktionen darunter (257 -> 104px). Feld-Labels, die dabei weichen,
   bleiben im Baum (geclippt), nie `display: none`.
+- **EIN Wochenraster: Schichtplan auf dem Raster des Kalenders (R22, D6; Critique a3 P2).**
+  Tageskopf („MO 19" nebeneinander, mittig, heute im Akzentkreis), 24-Stunden-Achse in
+  `--cal-hour-height`, Stundenlinien, Jetzt-Linie und der Scroll zur laufenden Stunde
+  (`alignedHourScroll`, morgens ab 07:00 bzw. ab der ersten frueheren Schicht) kommen aus EINEM
+  Baustein: `utils/time-grid.js` + `styles/time-grid.css` (per `@import` in calendar.css und
+  schedule.css, `PAGE_STYLE_IMPORTS` im Router). Die verdichtete Stundenskala des Schichtplans
+  (nur belegte Stunden) ist entfallen. Die Uebersicht scrollt mit der SEITE: der Kopf dockt wie
+  in jedem Modul auf seine 65px-Leiste, Werkzeugzeile und Tageskoepfe kleben darunter
+  (`.schedule-overview__dock`, Klebekante = Unterkante des angedockten Kopfs,
+  `syncOverviewDock()`); waagerecht rollt nur das Raster, die Kopfzeile folgt. Je Tag eine
+  Spur je Person (Mindestbreite `--schedule-lane-min`), Kopf der Spur ohne den geteilten
+  Nachnamen; Eintraege ohne Uhrzeit stehen in der Ganztagszone unter dem Tageskopf. Gemessen
+  390px: Raster ab y 315 -> 198, Inhalt 53 -> 77 %. Guard `test:schedule` (R22 D6),
+  `test:calendar`.
 - **Schichtplan: der Plan zuerst (R17, E1).** "Vergleich" ist erster Reiter und Startreiter,
   die eigene Person vorgewaehlt; ohne Schichtart oder Plan traegt er den Leerzustand, der das
   Fehlende anlegt, statt Personenwahl und Stepper ueber einem leeren Raster. "Heute" ist EINE
@@ -3424,6 +3440,11 @@ und nur unter dieser Klasse loest calendar.css die Bar-Zeile auf (`display: cont
 aufloest, und laesst sie nur mit der Klasse durch; die Klasse selbst nur in den Modulen,
 die dieser Absatz nennt. Ein zweites Modul mit Zeitraum-Titel kommt hier dazu, nicht in
 eine Ausnahmekarte.
+**Angedockt nennt er den Ort (R22, D20):** eingeklappt verlaesst der Titel das Bild; ueber dem
+Zeitraum steht dann „Kalender" als Caption in derselben 65px-Zeile (`.cal-toolbar__place`,
+aria-hidden - das <h1> bleibt der Seitentitel), zwei Zeilen per Umbruch, nicht per
+`flex-direction` (die Richtung des Kopfs gehoert der Shell). Der Stepper behaelt beim Andocken
+48px (vorher 48 -> 24px). Guard `test:calendar` "R22 D20".
 **Der Kopf steht vor den Daten (R21):** render() baut ihn im synchronen Teil, bis zum ersten
 Laden `inert` - kam die Zeitraum-Zeile mit den Daten, rutschte die Flaeche 52px (CLS 0,057
 mobil, 0,026 laptop -> 0). **Der Ansichtsknopf ist so breit wie sein laengstes Wort (R21):** alle
@@ -3933,6 +3954,20 @@ vibriert fuer Webseiten nicht, ohne ihn sah man bis zum Loslassen nichts. Nur De
 reduzierter Bewegung ohne Einblenden. Der sichtbare Weg bleibt „+ Termin" und das Kuerzel n;
 der Leerzustand des Tages nennt die Geste des Zeigers. Die Monatsansicht legt per Einzelklick
 nie an und blieb, wie sie war. Umsetzung: `wireTimeGridCreate` in `pages/calendar.js`.
+**Der Hover toent das Band, nicht die Spalte (R22, D20):** mit echtem Zeiger steht unter dem
+Zeiger die Stunde, die ein Doppelklick anlegt (`.cal-hover-slot`, dieselbe Zeit wie der
+Platzhalter); vorher faerbte `:hover` die ganze Tagesspalte (548 x 960px). Guard `test:calendar`.
+
+**Schichten im Kalender (R22, D5; Critique a3 P1).** Woche/Tag: der Ganztags-Chip heisst
+„<Kuerzel> · <Initialen>" („F · LJ") VOR der Uhrzeit; die Uhrzeit steht ganz oder gar nicht
+(der Chip ist eine Zeile hoch und bricht um, was nicht daneben passt - gemessen an der
+Breite, nicht an einer Zahl). Der volle Text ist der Name des Chips und steht im Detail beim
+Tipp. Monat: keine Terminzeile mehr, sondern bis zu drei Striche in der Schichtfarbe am
+Tageskopf und „+N" (`.month-day__shifts`; am Telefon zwischen Ziffer und Punkten); „+N
+weitere" zaehlt nur Termine, Aufgaben und Feiertage, der Name der Zelle zaehlt die Schichten
+weiter. Die Agenda und die Tagesliste nennen Schicht UND Person ausgeschrieben. Das Kuerzel
+doppelt den Namen nie: `shiftTypeLabel()` (utils/shift-label.js) laesst es weg, wo der Name
+damit beginnt („24-Stunden-Schicht", „1. Stunde"). Guard `test:calendar`, `test:schedule`.
 
 ### Das Markensiegel (Signature Component)
 Yuvomis eigene Ausweisform und die Antwort auf "Health hat die Ringe, was hat Yuvomi?" - die

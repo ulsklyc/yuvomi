@@ -127,6 +127,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the drag handle. The handle works by touch too, and pressing the up or down arrow on it
   moves the module; Move up and Move down sit in the More menu. If a move cannot be saved, the
   saved order comes back.
+- **The schedule overview is drawn on the calendar's week grid.** The overview had its own week:
+  a left-aligned day head, an hour scale that skipped empty hours, no line for the current time,
+  and it opened at midnight inside a box of its own, so the page header never docked and on a
+  phone the grid began halfway down the screen. It now uses the calendar's day heads (today in
+  the accent circle), its 24-hour axis and current-time line, and opens at the current hour or at
+  the first early shift. The page scrolls through the hours, the header docks like in every
+  section, and the period, Week/Day and the people stay in one row above the days. The people
+  are one button showing the faces of everyone compared; it opens the same people sheet as the
+  calendar. Tapping a day opens it as a day.
+- **Shifts in the calendar take less room.** In week and day, a shift reads "F · LJ" (code and
+  initials) before its time, and the time drops out where it no longer fits; the full shift and
+  person are read out and shown on tap. In the month, shifts are up to three short marks next to
+  the day number instead of a line above the appointments. The agenda and the day list keep
+  shift and name in full.
+- **Hovering the calendar week or day marks one hour.** The whole day column used to tint under
+  the pointer; now only the hour a double click would create is marked.
 
 ### Fixed
 - **Contacts no longer jump when the list opens.** The rows below the screen held a placeholder
@@ -200,6 +216,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now take the mouse size only where a mouse or trackpad is the pointer. With a mouse nothing
   changes. The create button in the page header also no longer pops in from half size on first
   load: the header stays still.
+- **A shift code no longer repeats the shift's name.** The templates "24-hour shift" and the
+  school periods read "24 · 24-hour shift" and "1 · 1st period" in the schedule, the calendar, the
+  overview and the today sheet. The code is now left out wherever the name already starts with it.
+- **The docked calendar header on a phone names the calendar again.** Scrolled, the header showed
+  only the period and the view; "Calendar" now stands small above the period. The period no longer
+  shrinks while the header docks, so the list below moves less.
 
 ## [2.79.0] - 2026-10-22
 
