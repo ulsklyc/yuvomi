@@ -40,6 +40,7 @@ import { MODULE_ICON } from '/nav-icons.js';
 import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { housekeepingSinceLabel } from '/utils/day-label.js';
 import { pantryExpiryPhrase } from '/utils/pantry-status.js';
+import { shiftTypeLabel } from '/utils/shift-label.js';
 
 /** Zeitlose Plaetze im Tag - dieselben drei Stufen, die das Programm schon kennt. */
 export const SORT_DUE_NOW = '00:00';
@@ -282,7 +283,7 @@ export const TODAY_SHEET_SOURCES = [
           objectId: type.id ?? null,
           sortKey: start ?? SORT_ALL_DAY,
           timeLabel: start && end ? `${formatTime(start)} - ${formatTime(end)}` : '',
-          title: type.short_code ? `${type.short_code} · ${type.name}` : type.name,
+          title: shiftTypeLabel(type),
           sub: t('nav.schedule'),
           icon: MODULE_ICON.schedule,
           tone: 'schedule',

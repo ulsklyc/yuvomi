@@ -72,6 +72,7 @@ import { wireNoteCategoryOverflow } from '/utils/note-category-overflow.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { nextRewardGoal } from '/utils/reward-goal.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { shiftTypeLabel } from '/utils/shift-label.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
@@ -2393,7 +2394,7 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     const myShift = scheduleEntriesToday.find((entry) => Number(entry.user_id) === Number(u.id) && entry.shift_type);
     if (myShift) {
       const type = myShift.shift_type;
-      parts.push(esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name));
+      parts.push(esc(shiftTypeLabel(type)));
     }
     const open = openByUser.get(u.id) ?? 0;
     if (open > 0) parts.push(esc(t('dashboard.memberOpenTasks', { count: open })));
@@ -3534,7 +3535,7 @@ function renderScheduleWidget(schedule, users, size) {
       ? `<img src="${esc(user.avatar_data)}" alt="" loading="lazy">`
       : esc(initials(user?.display_name ?? ''));
     const shiftLabel = type
-      ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name)
+      ? esc(shiftTypeLabel(type))
       : esc(t('schedule.freeDay'));
     const swatchColor = type ? type.color : 'var(--color-border)';
     // Eigene Punkt-Klasse statt `.schedule-swatch` (schedule.css): router.js

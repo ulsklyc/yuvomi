@@ -3527,3 +3527,36 @@ test('R21 S7: Segment in Inhaltsbreite, Nebenabschnitte ohne Eintrag als ruhige 
   assert.match(row?.body ?? '', /flex-direction:\s*row/, 'Satz und Aktion nebeneinander');
   assert.match(row.body, /text-align:\s*start/, 'buendig wie eine Zeile, nicht mittig');
 });
+
+// R22 (Critique a3 Klein, D5): "24 · 24-Stunden-Schicht" und "1 · 1. Stunde" -
+// das Kuerzel wiederholte den Namen. EIN Etikett (utils/shift-label.js) fuer
+// Schichtplan, Kalender, Uebersicht und Heute-Blatt; das Kuerzel steht nur, wo
+// es etwas sagt, was der Name nicht schon sagt.
+test('R22 D5: das Kuerzel doppelt den Namen nicht, und kein Ort schreibt das Etikett selbst', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  __test.setOwnerContext({ users: [{ id: 7, display_name: 'Ada' }], me: 7 });
+  const st = __test.scheduleState();
+  const before = { entries: st.entries };
+  try {
+    const type = (short_code, name) => ({ id: 9, name, short_code, color: '#d97706', start_time: '10:00', end_time: '10:00', fields: [] });
+    st.entries = [
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: type('24', '24-Stunden-Schicht') },
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: type('1', '1. Stunde') },
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: type('F', 'Frühschicht') },
+      { user_id: 7, date_key: '2026-10-07', source: 'pattern', shift_type: type('N', 'n') },
+    ];
+    const html = __test.renderToday();
+    assert.doesNotMatch(html, /24 · 24-Stunden-Schicht/, 'die 24-Stunden-Schicht nennt ihre 24 einmal');
+    assert.match(html, /schedule-today__name">24-Stunden-Schicht</);
+    assert.match(html, /schedule-today__name">1\. Stunde</, 'die erste Stunde ebenso');
+    assert.match(html, /schedule-today__name">F · Frühschicht</, 'ein Buchstabe vor einem Wort sagt weiter etwas');
+    assert.match(html, /schedule-today__name">n</, 'ein Kuerzel gleich dem Namen faellt weg');
+  } finally {
+    Object.assign(st, before);
+    __test.setOwnerContext({});
+  }
+  for (const file of ['pages/schedule.js', 'pages/calendar.js', 'pages/dashboard.js', 'utils/today-sheet.js']) {
+    const src = readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /short_code\}? ?(?:\+ ' · ' \+|· \$\{)/, `${file}: das Etikett kommt aus shiftTypeLabel()`);
+  }
+});

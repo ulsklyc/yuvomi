@@ -261,6 +261,7 @@ const APP_SHELL = [
   '/utils/reload-after-save.js',
   '/utils/background-inert.js',
   '/utils/today-sheet.js',
+  '/utils/shift-label.js',
   '/utils/unknown-route.js',
   '/utils/page-mount.js',
   '/utils/ux.js',

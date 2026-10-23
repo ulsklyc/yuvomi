@@ -17,6 +17,7 @@ import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapRegion } from '/utils/content-swap.js';
 import { initials } from '/utils/initials.js';
+import { shiftTypeLabel } from '/utils/shift-label.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
          isWeekendKey } from '/utils/date.js';
@@ -4391,7 +4392,7 @@ function scheduleEntryOriginLabel(entry) {
 
 function renderScheduleEntryDetailContent(entry) {
   const type = entry.shift_type;
-  const label = esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name);
+  const label = esc(shiftTypeLabel(type));
   const time = esc(scheduleTimeLabel(type));
   const owner = scheduleOwnerName(entry);
   const overlayFields = (type.fields ?? []).filter((field) => entry.field_values?.[field.id]);

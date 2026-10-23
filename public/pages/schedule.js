@@ -5,6 +5,7 @@ import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } f
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
+import { shiftTypeLabel } from '/utils/shift-label.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
@@ -678,7 +679,7 @@ function statisticsRows(items, valueFor, magnitudeOf, emptyLabel) {
   return '<div class="schedule-stat-list">' + items.map((item) => {
     const scale = Math.max(0.03, magnitudeOf(item) / max).toFixed(3);
     const color = esc(item.type.color);
-    const name = esc(item.type.short_code ? item.type.short_code + ' · ' + item.type.name : item.type.name);
+    const name = esc(shiftTypeLabel(item.type));
     return '<div class="schedule-stat-row">'
       + '<div class="schedule-stat-row__head">'
       + '<span class="schedule-swatch" style="--schedule-color:' + color + '"></span>'
@@ -835,7 +836,7 @@ async function refreshOverview() {
 
 function typeOptions(selected, includeFree = true) {
   const free = includeFree ? option('', t('schedule.freeDay'), selected == null || selected === '') : '';
-  return `${free}${state.types.map((type) => option(type.id, type.short_code ? `${type.short_code} · ${type.name}` : type.name, Number(selected) === Number(type.id))).join('')}`;
+  return `${free}${state.types.map((type) => option(type.id, shiftTypeLabel(type), Number(selected) === Number(type.id))).join('')}`;
 }
 
 function shiftPresetLabel(key) {
@@ -1072,7 +1073,7 @@ function shiftTypeListHtml(types = state.types) {
 function shiftTypeRow(type) {
   const editable = canEditType(type);
   const icon = type.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
-  const name = type.short_code ? `${type.short_code} · ${type.name}` : type.name;
+  const name = shiftTypeLabel(type);
   const owner = editable || readOnly() ? '' : (type?.created_by == null
     ? t('schedule.typeOrphaned')
     : t('schedule.typeOwnedBy', { user: userName(type.created_by) }));
@@ -1381,7 +1382,7 @@ function overrideRows() {
   return '<div class="row-carrier">' + groups.map((group) => {
     const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
     const swatchColor = type ? type.color : 'var(--color-border)';
-    const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+    const typeLabel = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
     const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
     const actions = canWrite(group.user_id)
@@ -1452,7 +1453,7 @@ function extraRows() {
   return '<div class="row-carrier">' + groups.map((group) => {
     const type = state.types.find((item) => Number(item.id) === Number(group.shift_type_id));
     const swatchColor = type ? type.color : 'var(--color-border)';
-    const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : '';
+    const typeLabel = type ? (shiftTypeLabel(type)) : '';
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
     const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
     const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
@@ -1733,7 +1734,7 @@ function renderScheduleEntryDetailContent(entry) {
   const type = entry.shift_type;
   const swatchColor = type ? type.color : 'var(--color-border)';
   const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
-  const label = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
+  const label = type ? esc(shiftTypeLabel(type)) : esc(t('schedule.freeDay'));
   const time = type ? esc(clockLabel(type)) : '';
   const fieldRows = (type?.fields ?? [])
     .filter((field) => entry.field_values?.[field.id])
@@ -1766,7 +1767,7 @@ function renderToday() {
   return state.entries.map((entry) => {
     const type = entry.shift_type;
     const swatchColor = type ? type.color : 'var(--color-border)';
-    const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
+    const name = type ? esc(shiftTypeLabel(type)) : esc(t('schedule.freeDay'));
     const base = type ? `${esc(userName(entry.user_id))} · ${esc(clockLabel(type))}` : esc(userName(entry.user_id));
     const overlay = overlayMeta(entry);
     const meta = overlay ? `${base} · ${esc(overlay)}` : base;
@@ -1951,7 +1952,7 @@ function collapsedMinutes(minutesOfDay, activeHours) {
 function overviewEntryBlock(entry, activeHours) {
   const type = entry.shift_type;
   const overlay = overlayMeta(entry);
-  const label = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+  const label = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
   // S-17: read-only Detailansicht bei Klick/Enter/Space - dieselbe Aktion wie
   // renderToday()'s Zeilen, derselbe zusammengesetzte Schluessel
   // (scheduleEntryMatchKey()) findet den Eintrag wieder unabhaengig davon, ob
@@ -1983,7 +1984,7 @@ function overviewEntryBlock(entry, activeHours) {
 
 function scheduleOverviewEntryTitle(entry) {
   const type = entry.shift_type;
-  const base = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+  const base = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
   const overlay = overlayMeta(entry);
   return overlay ? `${base} · ${overlay}` : base;
 }
@@ -2721,7 +2722,7 @@ async function saveCreatedSchedule(event) {
           await api.put('/schedule/overrides/' + encodeURIComponent(data.range_from), { user_id: userId, shift_type_id: shiftTypeId, note: data.note, field_values: fieldValues });
         } else {
           const type = state.types.find((item) => Number(item.id) === shiftTypeId);
-          const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+          const typeLabel = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
           // confirmOverModal statt confirmModal: dieser Aufruf laeuft WAEHREND
           // das Anlege-Formular noch offen ist. confirmModal haengt an
           // openModal, und das schliesst ein bereits offenes Modal mit
@@ -2762,7 +2763,7 @@ async function saveCreatedSchedule(event) {
       const userId = Number(data.user_id);
       const shiftTypeId = data.shift_type_id ? Number(data.shift_type_id) : null;
       const type = state.types.find((item) => Number(item.id) === shiftTypeId);
-      const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+      const typeLabel = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
       const fieldValues = collectFieldValues(form);
       // Gleicher Grund wie im "replace"-Zweig oben: das Editier-Formular ist
       // beim Speichern noch offen, confirmOverModal parkt es statt es beim
