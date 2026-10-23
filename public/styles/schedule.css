@@ -1059,6 +1059,15 @@
   color: var(--color-text-secondary);
 }
 
+/* Der Titel bleibt an der SICHTBAREN Oberkante seines Blocks, wie im Kalender
+ * (`.week-event__title`): beginnt die Schicht ueber der Klebekante, ruecken
+ * Titel und Zeit um `--title-shift` nach unten, innerhalb des Blocks. Den
+ * Versatz rechnet pinOverviewTitles() (schedule.js) - `position: sticky`
+ * haftete hier am waagerechten Scroller, der senkrecht nie rollt. */
+.schedule-overview__lane > .schedule-overview__block > * {
+  transform: translateY(var(--title-shift, 0px));
+}
+
 @media print {
   /* Die ganze Filterkarte, nicht nur ihre Felder: eine Karte, deren Inhalt
    * komplett ausgeblendet ist, druckt trotzdem ihren eigenen Rahmen als leere

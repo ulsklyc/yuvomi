@@ -166,7 +166,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first early shift. The page scrolls through the hours, the header docks like in every
   section, and the period, Week/Day and the people stay in one row above the days. The people
   are one button showing the faces of everyone compared; it opens the same people sheet as the
-  calendar. Tapping a day opens it as a day.
+  calendar. Tapping a day opens it as a day. A shift that began above the visible hours keeps its
+  name and time at the top of what you see, inside its block, as in the calendar.
 - **Shifts in the calendar take less room.** In week and day, a shift reads "F · LJ" (code and
   initials) before its time, and the time drops out where it no longer fits; the full shift and
   person are read out and shown on tap. In the month, shifts are up to three short marks next to

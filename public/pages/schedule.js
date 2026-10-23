@@ -2094,6 +2094,74 @@ function wireOverviewScroll(body) {
 }
 
 /**
+ * DER TITEL EINER SCHICHT BLEIBT IM BILD (R22-F, F1 Punkt 2). Seit die Seite
+ * beim Oeffnen auf die laufende Stunde rollt (D6), beginnt eine laufende
+ * Schicht meist UEBER dem Bild: gemessen mobil 06:00-14:00 um 10 Uhr - eine
+ * 210px hohe Flaeche ohne ein Zeichen, Name und Zeit standen hinter der
+ * klebenden Werkzeugzeile. Im Kalender haelt `position: sticky` den Titel an
+ * der sichtbaren Oberkante (calendar.css, `.week-event__title`); hier geht
+ * das nicht: senkrecht rollt die SEITE, waagerecht das Raster
+ * (`.schedule-overview__scroll`), und ein Element mit `overflow-x: auto` ist
+ * in beiden Achsen ein Scroll-Container - der klebende Titel haftete an ihm,
+ * der senkrecht nie rollt. Deshalb rechnet die Seite den Versatz selbst: so
+ * weit, dass der Titel unter der Klebekante steht, und nie tiefer, als der
+ * Block Platz hat (Titel, Zeit und das Polster oben bleiben innerhalb).
+ * @param {{ top: number, height: number, edge: number, content: number, inset?: number }} m
+ *        top/height: der Block im Fenster; edge: Unterkante des Klebebereichs;
+ *        content: Unterkante von Titel und Zeit im Block; inset: Polster oben.
+ * @returns {number} Versatz in px, 0 wenn der Block nicht unter der Kante beginnt
+ */
+function pinnedTitleShift({ top, height, edge, content, inset = 0 }) {
+  if (!(top < edge) || !(top + height > edge)) return 0;
+  const room = Math.max(0, height - content - inset);
+  return Math.round(Math.min(edge - top, room));
+}
+
+let overviewPinFrame = 0;
+let overviewPinPort = null;
+
+/** Ein Lesedurchgang ueber alle Bloecke, dann ein Schreibdurchgang. */
+function pinOverviewTitles() {
+  overviewPinFrame = 0;
+  const section = root?.querySelector('.schedule-overview');
+  const dock = section?.querySelector('.schedule-overview__dock');
+  if (!dock) return;
+  const edge = dock.getBoundingClientRect().bottom;
+  const shifts = [...section.querySelectorAll('.schedule-overview__lane > .schedule-overview__block')].map((block) => {
+    const rect = block.getBoundingClientRect();
+    const title = block.querySelector('.schedule-overview__block-title');
+    const last = block.lastElementChild;
+    const inset = title?.offsetTop ?? 0;
+    const content = last ? last.offsetTop + last.offsetHeight : 0;
+    return [block, pinnedTitleShift({ top: rect.top, height: rect.height, edge, content, inset })];
+  });
+  for (const [block, shift] of shifts) {
+    const value = shift ? `${shift}px` : '';
+    if (block.style.getPropertyValue('--title-shift') === value) continue;
+    if (value) block.style.setProperty('--title-shift', value);
+    else block.style.removeProperty('--title-shift');
+  }
+}
+
+/** Einmal je Scrollport; nach einem Seitenwechsel haengt sich der Hoerer selbst ab. */
+function wireOverviewTitlePins() {
+  const port = document.getElementById('main-content');
+  if (!port || overviewPinPort === port) return;
+  overviewPinPort = port;
+  const onScroll = () => {
+    if (!root?.isConnected || !root.querySelector('.schedule-overview__dock')) {
+      if (!root?.isConnected) {
+        port.removeEventListener('scroll', onScroll);
+        if (overviewPinPort === port) overviewPinPort = null;
+      }
+      return;
+    }
+    if (!overviewPinFrame) overviewPinFrame = requestAnimationFrame(pinOverviewTitles);
+  };
+  port.addEventListener('scroll', onScroll, { passive: true });
+}
+
+/**
  * Die Seite auf die laufende Stunde stellen - dieselbe Regel wie die Woche des
  * Kalenders (alignedHourScroll): morgens ab 07:00, sonst so, dass die laufende
  * Stunde ganz unter der klebenden Werkzeugzeile steht. Gemessen am Raster,
@@ -2394,6 +2462,10 @@ function renderPage() {
   if (activeView === 'overview' && overviewAlignPending && root.querySelector('.schedule-overview__grid')) {
     alignOverviewToNow();
     if (!overview.loading) overviewAlignPending = false;
+  }
+  if (activeView === 'overview' && root.querySelector('.schedule-overview__grid')) {
+    wireOverviewTitlePins();
+    pinOverviewTitles();
   }
 }
 
@@ -3722,4 +3794,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, syncOverviewDock, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, renderToday, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, syncOverviewDock, pinnedTitleShift, pinOverviewTitles, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

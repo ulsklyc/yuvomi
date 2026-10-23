@@ -3489,7 +3489,11 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   Spur je Person (Mindestbreite `--schedule-lane-min`), Kopf der Spur ohne den geteilten
   Nachnamen; Eintraege ohne Uhrzeit stehen in der Ganztagszone unter dem Tageskopf. Gemessen
   390px: Raster ab y 315 -> 198, Inhalt 53 -> 77 %. Guard `test:schedule` (R22 D6),
-  `test:calendar`.
+  `test:calendar`. **Der Titel einer Schicht steht an der SICHTBAREN Oberkante ihres Blocks**
+  wie im Kalender, aber gerechnet statt `sticky` (der waagerechte Scroller ist in beiden Achsen
+  Scroll-Container): `pinOverviewTitles()` setzt `--title-shift` bis an die Klebekante, nie
+  tiefer, als der Block Platz hat (R22-F; Titel y -24 -> 200 bei Kante 198, mobil;
+  `test:schedule` "R22-F").
 - **Schichtplan: der Plan zuerst (R17, E1).** "Vergleich" ist erster Reiter und Startreiter,
   die eigene Person vorgewaehlt; ohne Schichtart oder Plan traegt er den Leerzustand, der das
   Fehlende anlegt, statt Personenwahl und Stepper ueber einem leeren Raster. "Heute" ist EINE

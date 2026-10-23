@@ -1442,6 +1442,53 @@ test('R22 D6: die Seite steht beim Oeffnen auf der laufenden Stunde, der Morgen 
   assert.match(src, /if \(view === 'overview'\) \{\n    if \(step === null\) overviewAlignPending = true;/, 'beim Oeffnen, nicht beim Blaettern');
 });
 
+// R22-F (F1 Punkt 2): nach dem Ladebildlauf beginnt eine laufende Schicht ueber
+// dem Bild, ihr Titel stand hinter der klebenden Werkzeugzeile (gemessen mobil
+// Titel y -24 bei Klebekante 198, Desktop 78 bei 244). `position: sticky`
+// haftete am waagerechten Scroller - der Versatz kommt aus der Seite.
+test('R22-F: der Titel einer Schicht steht unter der Klebekante und bleibt in seinem Block', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const { pinnedTitleShift } = __test;
+  assert.equal(pinnedTitleShift({ top: 300, height: 400, edge: 198, content: 30, inset: 2 }), 0, 'beginnt der Block unter der Kante, bleibt der Titel oben');
+  assert.equal(pinnedTitleShift({ top: -26, height: 446, edge: 198, content: 30, inset: 2 }), 224, 'beginnt er darueber, rueckt der Titel bis an die Kante');
+  assert.equal(pinnedTitleShift({ top: -226, height: 446, edge: 198, content: 30, inset: 2 }), 414, 'nie tiefer als der Block Platz hat');
+  assert.equal(pinnedTitleShift({ top: -500, height: 400, edge: 198, content: 30, inset: 2 }), 0, 'ein Block ganz ueber der Kante bleibt unberuehrt');
+
+  // Am Aufrufer: die Bloecke des Rasters bekommen ihren Versatz als Stil.
+  const style = () => {
+    const props = new Map();
+    return { props, getPropertyValue: (k) => props.get(k) ?? '', setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) };
+  };
+  const block = (top, height) => {
+    const title = { offsetTop: 2, offsetHeight: 16 };
+    const time = { offsetTop: 18, offsetHeight: 12 };
+    return { style: style(), getBoundingClientRect: () => ({ top, height, bottom: top + height }), querySelector: () => title, lastElementChild: time };
+  };
+  const running = block(-26, 446);
+  const later = block(400, 100);
+  const dock = { getBoundingClientRect: () => ({ bottom: 198 }) };
+  const section = {
+    querySelector: (sel) => (sel === '.schedule-overview__dock' ? dock : null),
+    querySelectorAll: (sel) => (sel === '.schedule-overview__lane > .schedule-overview__block' ? [running, later] : []),
+  };
+  __test.setRootForTest({ querySelector: (sel) => (sel === '.schedule-overview' ? section : null) });
+  try {
+    __test.pinOverviewTitles();
+  } finally {
+    __test.setRootForTest(null);
+  }
+  assert.equal(running.style.getPropertyValue('--title-shift'), '224px', 'die laufende Schicht nennt sich unter der Kante');
+  assert.equal(later.style.getPropertyValue('--title-shift'), '', 'eine spaetere Schicht bleibt, wie sie ist');
+
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('function renderPage()'), src.indexOf('function renderPage()') + 9000);
+  assert.match(render, /wireOverviewTitlePins\(\);\n    pinOverviewTitles\(\);/, 'renderPage haengt den Hoerer an und rechnet sofort');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const { eachRule } = await import('./css-rules.js');
+  const rule = [...eachRule(css)].find((r) => r.selector === '.schedule-overview__lane > .schedule-overview__block > *');
+  assert.match(rule?.body ?? '', /transform:\s*translateY\(var\(--title-shift, 0px\)\)/, 'Titel und Zeit ruecken um den Versatz');
+});
+
 test('normalizeOverviewSelection() drops ids no longer eligible, without throwing', async () => {
   const { __test } = await import('../public/pages/schedule.js');
   assert.deepEqual(__test.normalizeOverviewSelection([1, 2, 3], [1, 3]), [1, 3], 'a since-demoted/removed id is silently dropped');
