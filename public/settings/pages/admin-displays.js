@@ -15,7 +15,7 @@ import { api, auth } from '/api.js';
 import { formatDate, formatTime, getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
-import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSeen(value) {
@@ -148,14 +148,19 @@ function renderPage(container) {
            (test:typography haelt das fest). settings.displaysTitle traegt
            weiterhin den Namen in der Navigation. -->
       <div class="settings-card">
-        <div style="margin-bottom:var(--space-3)">
-        <p class="form-hint">${esc(t('settings.displaysHint'))}</p>
-        <!-- Zweiter Absatz desselben Hinweises (#1808). Er kommt mit der Liste:
-             WELCHE Bereiche ein Tablett zeigt, weiss nur der Server
-             (DISPLAY_SCOPES), und eine zweite Handliste hier bliebe beim
-             naechsten Scope stehen. Bis dahin leer und versteckt. -->
-        <p class="form-hint" id="display-areas-hint" style="margin-top:var(--space-2)" hidden></p>
-        </div>
+        ${/* Kern vorn, der Rest aufklappbar (R22, D13). Der Absatz zu den
+             Bereichen (#1808) kommt mit der Liste: WELCHE Bereiche ein Tablett
+             zeigt, weiss nur der Server (DISPLAY_SCOPES), und eine zweite
+             Handliste hier bliebe beim naechsten Scope stehen. Bis dahin
+             leer und versteckt. Der Weg zum Wand-Modus dieses Geraets
+             steht am Ende (D13: Wand an zwei Orten, gegenseitig verwiesen). */ ''}
+        ${hintFoldHtml({
+          lead: t('settings.displaysLead'),
+          moreHtml: `<p class="form-hint">${esc(t('settings.displaysMore'))}</p>
+            <p class="form-hint" id="display-areas-hint" hidden></p>
+            <p class="form-hint" id="display-wall-mode">${esc(t('settings.displaysWallModeLinkHint'))}
+              <a href="/settings/personal/device" id="display-wall-mode-link">${esc(t('settings.pageDevice'))}</a></p>`,
+        })}
         <ul class="settings-cards" id="display-list"></ul>
         <form id="display-form" class="settings-form" autocomplete="off" novalidate>
           ${/* displayDeviceNameLabel, NICHT displayNameLabel: der zweite heisst

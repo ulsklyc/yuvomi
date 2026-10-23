@@ -751,6 +751,13 @@ function renderDeviceDisplay(container, options = {}) {
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionDeviceDisplay')}</h2>
       <div class="row-carrier settings-group">${deviceDisplayRowsHtml(options)}</div>
+      ${/* WAND AN ZWEI ORTEN, GEGENSEITIG VERWIESEN (R22, D13): der Modus
+           dieses Geraets hier, das eigene Konto eines Wandtabletts unter
+           "Wandtabletts" - das darf nur ein Admin anlegen. */ ''}
+      ${options.isAdmin ? `<p class="form-hint settings-group__footer" id="wall-displays">
+        ${esc(t('settings.wallDisplaysLinkHint'))}
+        <a href="/settings/admin/displays" id="wall-displays-link">${esc(t('settings.pageDisplays'))}</a>
+      </p>` : ''}
     </section>`);
   bindDeviceDisplay(container);
   window.lucide?.createIcons({ el: container });

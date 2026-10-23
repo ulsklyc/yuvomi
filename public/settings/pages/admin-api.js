@@ -3,7 +3,7 @@ import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
-import { createRetryState, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { createRetryState, hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 
@@ -164,8 +164,10 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
       <h2 class="settings-section__title">${t('settings.apiTokensTitle')}</h2>
       <div class="settings-card">
         <h3 class="settings-card__title">${t('settings.apiTokensCardTitle')}</h3>
-        <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensHint')}</p>
-        <p class="form-hint" style="margin-bottom:var(--space-3)">${t('settings.apiTokensMcpHint')}</p>
+        ${hintFoldHtml({
+          lead: t('settings.apiTokensHint'),
+          moreHtml: `<p class="form-hint">${esc(t('settings.apiTokensMcpHint'))}</p>`,
+        })}
         <ul class="settings-members row-divided" id="api-token-list"></ul>
         <form id="api-token-form" class="settings-form" autocomplete="off" novalidate>
           ${/* EIN FORMULAR-DIALEKT (R19, Einstellungen B7): Name, Person,

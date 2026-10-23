@@ -5392,3 +5392,115 @@ test('R22 D4: Abschnitte erscheinen ganz und in der Reihenfolge des Blatts - nic
   assert.match(pendingRule.selector, /\.settings-scope\[data-pending\]/, 'der Reichweitenblock wartet nicht mit');
   for (const decl of [/position:\s*absolute/, /visibility:\s*hidden/, /inset-inline:\s*0/]) assert.match(pendingRule.body, decl);
 });
+
+// ── R22 S8 (Critique a5, D13): Einstellungen ───────────────────────────────
+
+test('R22 D13: lange Erklaerungen vor dem ersten Feld - Kern vorn, der Rest hinter "Mehr dazu"', async () => {
+  const { hintFoldHtml } = await import('../public/settings/components.js');
+  const html = hintFoldHtml({ lead: 'Kern <b>', moreHtml: '<p class="form-hint">Rest</p>' });
+  assert.match(html, /<p class="form-hint">Kern &lt;b&gt;<\/p>/, 'der Kern steht als Hinweis da, escapt');
+  assert.match(html, /<details class="settings-hint-fold__more">\s*<summary class="settings-hint-fold__summary">[^<]+<i data-lucide="chevron-down"/,
+    'der Rest liegt in einem nativen details, der summary zuerst, mit Richtungspfeil');
+  assert.match(html, /<div class="settings-hint-fold__body"><p class="form-hint">Rest<\/p><\/div>/);
+
+  const displays = await readFile(new URL('../public/settings/pages/admin-displays.js', import.meta.url), 'utf8');
+  assert.match(displays, /hintFoldHtml\(\{\s*lead: t\('settings\.displaysLead'\),\s*moreHtml: `<p class="form-hint">\$\{esc\(t\('settings\.displaysMore'\)\)\}<\/p>\s*<p class="form-hint" id="display-areas-hint" hidden><\/p>/,
+    'Wandtabletts: zwei Saetze vorn, Uebersicht/Wand-Modus und die Bereiche im Aufklapper');
+  assert.doesNotMatch(displays, /displaysHint|style="margin/, 'kein Sieben-Zeilen-Absatz und keine Inline-Abstaende mehr');
+  const api = await readFile(new URL('../public/settings/pages/admin-api.js', import.meta.url), 'utf8');
+  assert.match(api, /hintFoldHtml\(\{\s*lead: t\('settings\.apiTokensHint'\),\s*moreHtml: `<p class="form-hint">\$\{esc\(t\('settings\.apiTokensMcpHint'\)\)\}<\/p>`/,
+    'API-Zugriff: der MCP-Absatz liegt im Aufklapper');
+  assert.doesNotMatch(api, /form-hint" style=/);
+
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  for (const key of ['displaysLead', 'apiTokensHint']) {
+    const sentences = de.settings[key].split(/(?<=[.!?])\s+/).length;
+    assert.ok(sentences <= 2, `${key}: ${sentences} Saetze vor dem ersten Feld`);
+  }
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const summary = [...eachRule(css)].find((r) => r.selector.trim() === '.settings-hint-fold__summary');
+  assert.ok(summary, 'der Ausloeser hat eine Regel');
+  assert.match(summary.body, /min-block-size:\s*var\(--target-base\)/, 'Zielgroesse der Geraetewelt');
+  assert.match(summary.body, /list-style:\s*none/);
+});
+
+test('R22 D13: Wetter und Wand verweisen gegenseitig auf ihren zweiten Ort (nur Wege, kein Zusammenlegen)', async () => {
+  const read = (p) => readFile(new URL(`../public/settings/pages/${p}`, import.meta.url), 'utf8');
+  const personalWeather = await read('personal-weather.js');
+  assert.match(personalWeather, /\$\{admin \? `<p class="form-hint settings-group__footer" id="pweather-household">\s*\$\{esc\(t\('settings\.weatherHouseholdLinkHint'\)\)\}\s*<a href="\/settings\/admin\/integrations\?section=admin-weather" id="pweather-household-link">\$\{esc\(t\('settings\.pageIntegrations'\)\)\}<\/a>/,
+    'Mein Wetter -> Fotos und Wetter (Abschnitt Wetter), nur fuer Admins');
+  assert.match(personalWeather, /renderPage\(container, prefs, \{ admin: user\?\.role === 'admin' \}\)/);
+  const adminWeather = await read('admin-weather.js');
+  assert.match(adminWeather, /<a href="\/settings\/personal\/weather" id="weather-personal-link">\$\{esc\(t\('settings\.pageWeather'\)\)\}<\/a>/,
+    'Fotos und Wetter -> Mein Wetter');
+  const appearance = await read('personal-appearance.js');
+  assert.match(appearance, /\$\{options\.isAdmin \? `<p class="form-hint settings-group__footer" id="wall-displays">\s*\$\{esc\(t\('settings\.wallDisplaysLinkHint'\)\)\}\s*<a href="\/settings\/admin\/displays" id="wall-displays-link">/,
+    'Dieses Geraet (Wand-Modus) -> Wandtabletts, nur fuer Admins');
+  const displays = await read('admin-displays.js');
+  assert.match(displays, /<a href="\/settings\/personal\/device" id="display-wall-mode-link">\$\{esc\(t\('settings\.pageDevice'\)\)\}<\/a>/,
+    'Wandtabletts -> Dieses Geraet (Wand-Modus)');
+  // Die Ziele sind echte Blaetter bzw. ein echter Abschnitt.
+  const integrations = findSettingsLeaf('/settings/admin/integrations', { role: 'admin' });
+  assert.ok(settingsSheetSections(integrations, { role: 'admin' }).some((s) => s.id === 'admin-weather'));
+  for (const path of ['/settings/personal/weather', '/settings/personal/device', '/settings/admin/displays']) {
+    assert.ok(findSettingsLeaf(path, { role: 'admin' }), path);
+  }
+  // Ein Weg im Hinweis ist als Weg zu sehen: reset.css nimmt Links Farbe und Unterstrich.
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const link = [...eachRule(css)].find((r) => !r.at.length && r.selector.trim() === ".settings-page :is(.form-hint, .settings-card-description) a:not([class*='btn'])");
+  assert.match(link?.body ?? '', /color:\s*var\(--color-accent\)/, 'der Verweis steht in Akzenttinte, nicht grau im Satz');
+});
+
+test('R22 D13: das Siegel steht am Blatt-Titel, nicht neben "< Einstellungen"', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /seal\.className = 'module-seal settings-leaf-header__seal';\s*seal\.setAttribute\('aria-hidden', 'true'\);\s*seal\.insertAdjacentHTML\('beforeend', moduleIconHTML\(MODULE_ICON\.settings\)\);\s*heading\.append\(seal, settingsLeafLabel\(leaf, t\)\);/);
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const below = (sel) => rules.find((r) => r.at.some((a) => /\(max-width:\s*1023px\)/.test(a)) && r.selector.trim() === sel);
+  assert.match(below(".settings-shell-header[data-mode='leaf'] > .module-seal--head")?.body ?? '', /display:\s*none/,
+    'unter 1024px traegt der Kopf eines Blatts kein Siegel mehr');
+  assert.match(below('.settings-leaf-header__seal')?.body ?? '', /width:\s*var\(--target-sm\)/, 'Large-Title-Rang wie im Gesundheitsbereich');
+  assert.match(below('.settings-leaf-header__seal')?.body ?? '', /--seal-accent:\s*var\(--module-settings\)/, 'das Siegel nennt seine Herkunft (die Kopfrolle baut nur die Shell)');
+  const wide = rules.find((r) => r.at.some((a) => /\(min-width:\s*1024px\)/.test(a)) && r.selector.trim() === '.settings-leaf-header__seal');
+  assert.match(wide?.body ?? '', /display:\s*none/, 'ab 1024px traegt der Kopf das Siegel mit dem Modulnamen');
+});
+
+test('R22 D13: die Sprungmarken zeigen den Ueberlauf mit dem geteilten Anriss', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const fn = shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function syncJumpLabels('));
+  assert.match(fn, /nav\.appendChild\(list\);[\s\S]*wireScrollFade\(list\);\s*return nav;/);
+  assert.match(shell, /import \{ wireScrollFade \} from '\/utils\/ux\.js';/);
+});
+
+test('R22 D13: die Seitenleiste zeigt ihre Gruppen als Weg, solange sie ueberlaeuft', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /navigation\.appendChild\(createNavigationIndex\(navigation, domains\)\);/);
+  const fn = shell.slice(shell.indexOf('function createNavigationIndex('), shell.indexOf('function revealActiveNavigationLink('));
+  assert.match(fn, /index\.setAttribute\('role', 'group'\)/);
+  assert.match(fn, /button\.type = 'button';/, 'Knoepfe, keine Hash-Links (die Adresse bleibt beim Blatt)');
+  assert.match(fn, /settings-shell__navigation--overflowing', now\)/);
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const shown = rules.find((r) => r.selector.trim() === '.settings-shell__navigation--overflowing .settings-shell__navigation-index');
+  assert.match(shown?.body ?? '', /position:\s*sticky/);
+  assert.match(shown?.body ?? '', /bottom:\s*calc\(-1 \* var\(--space-3\)\)/);
+  const hidden = rules.find((r) => r.selector.trim() === '.settings-shell__navigation-index');
+  assert.match(hidden?.body ?? '', /display:\s*none/, 'ohne Ueberlauf keine Zeile');
+  assert.ok(rules.some((r) => /navigation-results:not\(\[hidden\]\)\) \.settings-shell__navigation-index/.test(r.selector)), 'beim Suchen keine Zeile');
+  const item = rules.find((r) => r.selector.trim() === '.settings-shell__navigation-index-item');
+  assert.match(item?.body ?? '', /min-block-size:\s*var\(--target-md\)/);
+});
+
+test('R22 D13: der aktive Eintrag bleibt ueber der Bereichszeile sichtbar', async () => {
+  const { __test } = await import('/settings/shell.js');
+  const rect = (top, bottom) => ({ top, bottom, height: bottom - top });
+  const link = { getBoundingClientRect: () => rect(660, 694) };
+  const index = { getClientRects: () => [1], getBoundingClientRect: () => rect(650, 700) };
+  const navigation = {
+    scrollHeight: 1400, clientHeight: 600, offsetHeight: 600, scrollTop: 0,
+    getBoundingClientRect: () => rect(100, 700),
+    querySelector: (sel) => (sel.includes('--active') ? link : sel.includes('navigation-index') ? index : null),
+  };
+  __test.revealActiveNavigationLink(navigation);
+  assert.equal(navigation.scrollTop, 44, 'der Eintrag rueckt ueber die klebende Zeile (694 - 650)');
+});

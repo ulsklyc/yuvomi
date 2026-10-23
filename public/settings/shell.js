@@ -3,6 +3,8 @@ import { moduleAccentVar } from '/utils/module-accent.js';
 import { renderSkeletonList, placeSkeletonUntilContent } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { swapRegion } from '/utils/content-swap.js';
+import { wireScrollFade } from '/utils/ux.js';
+import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { createRetryState } from './components.js';
 import { watchLeafForms } from './dirty-guard.js';
 import { KITCHEN_CHILD_IDS } from './module-order.js';
@@ -288,7 +290,65 @@ function createNavigation(domains, user, activeLeaf) {
 
   createNavigationSearch(navigation, domains, user, activeLeaf);
   navigation.prepend(createSheetSkipLink());
+  navigation.appendChild(createNavigationIndex(navigation, domains));
   return navigation;
+}
+
+/**
+ * DIE BEREICHE ALS WEG, WENN DIE LISTE UEBERLAEUFT (R22, D13; Critique a5).
+ * 29 Eintraege in drei Gruppen: bei 1280x800 stand "Module" unter der Falz,
+ * und die Leiste scrollt fuer sich ohne sichtbaren Balken - sie sah aus wie
+ * vollstaendig. Kein Umbau der Liste: am unteren Rand klebt eine Zeile mit
+ * den drei Gruppennamen, ein Tipp scrollt die Leiste zur Gruppe, die Gruppe
+ * am oberen Rand ist markiert. Nur, solange die Liste ueberlaeuft und nicht
+ * gesucht wird (settings.css, `--overflowing`).
+ */
+function createNavigationIndex(navigation, domains) {
+  const index = document.createElement('div');
+  index.className = 'settings-shell__navigation-index';
+  index.setAttribute('role', 'group');
+  index.setAttribute('aria-label', t('search.goTo'));
+  const buttons = domains.map((domain) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'settings-shell__navigation-index-item';
+    button.dataset.domainId = domain.id;
+    button.textContent = t(domain.labelKey);
+    button.addEventListener('click', () => {
+      const group = navigation.querySelector(`.settings-shell__navigation-group[data-domain-id="${domain.id}"]`);
+      if (!group) return;
+      const search = navigation.querySelector('.settings-shell__navigation-search');
+      const covered = search ? search.getBoundingClientRect().bottom - navigation.getBoundingClientRect().top : 0;
+      navigation.scrollTop += group.getBoundingClientRect().top - navigation.getBoundingClientRect().top - Math.max(0, covered);
+    });
+    return button;
+  });
+  index.append(...buttons);
+
+  // Welche Gruppe steht oben? Die letzte, deren Kopf die Suchkante erreicht hat.
+  const markCurrent = () => {
+    const search = navigation.querySelector('.settings-shell__navigation-search');
+    const edge = (search ?? navigation).getBoundingClientRect().bottom + 1;
+    let current = null;
+    for (const group of navigation.querySelectorAll('.settings-shell__navigation-group')) {
+      if (group.getBoundingClientRect().top <= edge || !current) current = group.dataset.domainId;
+    }
+    for (const button of buttons) button.classList.toggle('is-current', button.dataset.domainId === current);
+  };
+  const syncOverflow = () => {
+    if (!navigation.isConnected) return;
+    const was = navigation.classList.contains('settings-shell__navigation--overflowing');
+    const now = navigation.scrollHeight > navigation.clientHeight + 2;
+    navigation.classList.toggle('settings-shell__navigation--overflowing', now);
+    // Erscheint die Zeile, verdeckt sie unten eine Zeile: der aktive Eintrag
+    // bleibt sichtbar.
+    if (now && !was) revealActiveNavigationLink(navigation);
+    markCurrent();
+  };
+  navigation.addEventListener('scroll', markCurrent, { passive: true });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(syncOverflow).observe(navigation);
+  requestAnimationFrame(syncOverflow);
+  return index;
 }
 
 /**
@@ -355,8 +415,13 @@ function revealActiveNavigationLink(navigation) {
   // einer skalierenden Eintrittsanimation weichen die beiden voneinander ab.
   const scale = (view.height > 0 && navigation.offsetHeight > 0) ? view.height / navigation.offsetHeight : 1;
   const top = view.top + covered;
+  // Unten klebt die Bereichszeile (createNavigationIndex), solange die Liste
+  // ueberlaeuft: was sie verdeckt, zaehlt wie die Suche oben.
+  const index = navigation.querySelector('.settings-shell__navigation-index');
+  const indexBox = index && index.getClientRects().length ? index.getBoundingClientRect() : null;
+  const bottom = indexBox ? Math.min(view.bottom, indexBox.top) : view.bottom;
   if (box.top < top) navigation.scrollTop -= (top - box.top) / scale;
-  else if (box.bottom > view.bottom) navigation.scrollTop += (box.bottom - view.bottom) / scale;
+  else if (box.bottom > bottom) navigation.scrollTop += (box.bottom - bottom) / scale;
 }
 
 // Aktualisiert nur den Aktivzustand der bestehenden Navigation, ohne die Links
@@ -678,7 +743,20 @@ function createLeafHeader(leaf, user) {
 
   const heading = document.createElement('h1');
   heading.className = 'settings-leaf-header__title';
-  heading.textContent = settingsLeafLabel(leaf, t);
+  // DAS SIEGEL STEHT AM TITEL, NICHT AM RUECKWEG (R22, D13; Critique a5).
+  // Mobil stand das Zahnrad im Kopf neben "< Einstellungen" - der Kopf
+  // blendet dort den Modulnamen aus, und das Siegel haengte an einem Wort,
+  // das nicht mehr stand. Wie im Gesundheitsbereich ("< Gesundheit", darunter
+  // Siegel + Large Title) traegt es jetzt der Blatt-Titel; settings.css zeigt
+  // es nur dort, wo der Kopf es nicht traegt (unter 1024px). Die Kopfrolle
+  // (`module-seal--head`) baut nur die Shell; dieses Siegel nennt seine
+  // Herkunft (settings.css) und hat den Large-Title-Rang. Dekor: der
+  // Titel daneben und der Rueckweg nennen das Modul schon.
+  const seal = document.createElement('span');
+  seal.className = 'module-seal settings-leaf-header__seal';
+  seal.setAttribute('aria-hidden', 'true');
+  seal.insertAdjacentHTML('beforeend', moduleIconHTML(MODULE_ICON.settings));
+  heading.append(seal, settingsLeafLabel(leaf, t));
 
   header.appendChild(heading);
   // Extension sheets without a manifest description get no empty paragraph.
@@ -909,6 +987,12 @@ function createSheetJump(leaf, user, leafContainer, headingId) {
     list.appendChild(item);
   }
   nav.appendChild(list);
+  // DIE ZEILE ZEIGT, DASS ES WEITERGEHT (R22, D13; Critique a5 P3): mobil
+  // scrollt sie ohne Leiste - im Gesundheitsblatt 540px Marken in 366px, und
+  // die Kante schnitt das letzte Wort ab, als sei die Zeile zu Ende. Der
+  // geteilte Anriss (wireScrollFade, wie Tab-Leisten); ab 768px
+  // bricht die Zeile um und laeuft nicht ueber, dort bleibt er aus.
+  wireScrollFade(list);
   return nav;
 }
 

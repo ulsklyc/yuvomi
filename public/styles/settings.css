@@ -193,6 +193,37 @@
   color: var(--color-text-primary);
 }
 
+/* DAS SIEGEL AM BLATT-TITEL (R22, D13; shell.js createLeafHeader). Unter
+ * 1024px nennt der Kopf das Modul nicht (nur "< Einstellungen"), also steht
+ * das Siegel dort am Titel - im Large-Title-Rang wie im Gesundheitsbereich
+ * (layout.css, --seal-head-size am Kopf). Ab 1024px traegt es der Kopf mit
+ * dem Modulnamen, am Titel faellt es weg; der Kopf eines Blatts zeigt unter
+ * 1024px keines mehr. */
+@media (max-width: 1023px) {
+  .settings-leaf-header__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .settings-leaf-header__seal {
+    --seal-accent: var(--module-settings);
+    --seal-icon: var(--icon-lg);
+    width: var(--target-sm);
+    height: var(--target-sm);
+  }
+
+  .settings-shell-header[data-mode='leaf'] > .module-seal--head {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .settings-leaf-header__seal {
+    display: none;
+  }
+}
+
 /* Nach der Leaf-Navigation erhält der Titel programmatisch den Fokus
  * (tabIndex=-1 + focus()), damit Screenreader/Tastatur in die neue Seite
  * springen. Er ist ein Region-Fokus-Ziel, kein interaktives Element — daher
@@ -1106,6 +1137,81 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
+/* EIN WEG IM HINWEIS IST ALS WEG ZU SEHEN (R22, D13). reset.css nimmt
+ * Links Farbe und Unterstrich; in den Fussnoten der Blaetter (Zyklus-
+ * Einstellungen, Mitglieder, die Wetter- und Wand-Verweise) stand das Ziel
+ * deshalb grau im Satz, als waere es Text. Akzenttinte wie die Sprungmarken,
+ * der Unterstrich unter dem Zeiger. */
+.settings-page :is(.form-hint, .settings-card-description) a:not([class*='btn']) {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .settings-page :is(.form-hint, .settings-card-description) a:not([class*='btn']):hover {
+    text-decoration: underline;
+  }
+}
+
+.settings-page :is(.form-hint, .settings-card-description) a:not([class*='btn']):focus-visible {
+  text-decoration: underline;
+}
+
+/* ERKLAERUNG: KERN VORN, DER REST AUFKLAPPBAR (R22, D13; settings/components.js
+ * hintFoldHtml). Der Ausloeser ist ein Textknopf in Akzenttinte auf der
+ * Hinweisstufe, der Pfeil zeigt die Richtung (natives `<details>`, Marker
+ * aus). Die Trefferflaeche haelt die Zielgroesse ihrer Geraetewelt
+ * (--target-base liefert 40 am Zeiger, 48 am Finger), ohne die Zeile
+ * optisch aufzublaehen. */
+.settings-hint-fold {
+  margin-block-end: var(--space-3);
+}
+
+.settings-hint-fold__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: var(--target-base);
+  color: var(--color-accent);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-hint-fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-hint-fold__summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.settings-hint-fold__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.settings-hint-fold__more[open] .settings-hint-fold__icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-hint-fold__icon {
+    transition: none;
+  }
+}
+
+.settings-hint-fold__body {
+  display: grid;
+  gap: var(--space-2);
+}
+
 /* ORTSSUCHE IM STANDORTFORMULAR (R20, settings/weather-location.js). Feld und
  * Knopf teilen eine Zeile, die Treffer stehen als Liste darunter: Name in
  * Primaerfarbe, Region und Land als Sekundaerzeile - wie die Ortsauswahl in
@@ -1366,6 +1472,62 @@
     margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3);
     padding: var(--space-3);
     background: var(--color-surface-raised);
+  }
+
+  /* DIE BEREICHE ALS WEG (R22, D13; shell.js createNavigationIndex): klebt
+   * am unteren Rand, solange die Liste ueberlaeuft - derselbe Streifen im
+   * Grund der Leiste wie die Suche oben, ueber den Polsterrand gezogen. */
+  .settings-shell__navigation-index {
+    display: none;
+  }
+
+  .settings-shell__navigation--overflowing .settings-shell__navigation-index {
+    position: sticky;
+    bottom: calc(-1 * var(--space-3));
+    z-index: 1;
+    display: flex;
+    gap: var(--space-1);
+    margin: var(--space-3) calc(-1 * var(--space-3)) calc(-1 * var(--space-3));
+    padding: var(--space-1) var(--space-3);
+    border-block-start: var(--space-px) solid var(--color-border-subtle);
+    background: var(--color-surface-raised);
+  }
+
+  .settings-shell__navigation:has(> .settings-shell__navigation-results:not([hidden])) .settings-shell__navigation-index {
+    display: none;
+  }
+
+  .settings-shell__navigation-index-item {
+    min-block-size: var(--target-md);
+    padding-inline: var(--space-2);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+
+  .settings-shell__navigation-index-item.is-current {
+    color: var(--color-accent);
+  }
+
+  .settings-shell__navigation-index-item:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset-inset);
+  }
+
+  @media (hover: hover) {
+    .settings-shell__navigation-index-item:hover {
+      background: var(--color-surface-hover);
+      color: var(--color-text-primary);
+    }
+  }
+
+  .settings-shell__navigation-index-item:active {
+    transform: scale(var(--press-scale-sm));
   }
 
   /* Der Ort steht links markiert - der Breadcrumb waere derselbe Weg ein
