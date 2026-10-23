@@ -945,6 +945,44 @@ test('wireCollapsingHeader R21: ein Versatz mit Bruchteil wird nach dem Gleiten 
   }
 });
 
+// R22-F (F1 Punkt 4): der FLIP hielt nur die direkten Kinder des Kopfes. Beim
+// Einklappen rueckt aber auch IN einer Zeile etwas - im Kalender der Zeitraum
+// (x 64 -> 16) und die Ansichtswahl (x 282 -> 186), zwei, drei Ebenen tief:
+// gemessen CLS 0,0047 je Umschalten in der Agenda, Tablet 0,051 je Scroll.
+test('wireCollapsingHeader R22-F: auch ein Teil IN einer Zeile des Kopfes gleitet statt zu springen', () => {
+  const s = collapsingStub();
+  const frames = [];
+  const savedRaf = global.requestAnimationFrame;
+  global.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  try {
+    const titleRow = s.toolbar.children[0];
+    const label = new s.FakeEl('label');
+    label.namespaceURI = 'http://www.w3.org/1999/xhtml';
+    label.tagName = 'SPAN';
+    Object.defineProperty(label, 'rect', {
+      get: () => (s.toolbar.classList.contains('is-collapsed') ? { top: 8, bottom: 32, left: 16 } : { top: 8, bottom: 32, left: 64 }),
+      set: () => {},
+    });
+    label.animate = () => ({ ready: Promise.resolve() });
+    titleRow.append(label);
+    const glyph = new s.FakeEl('glyph', { rect: { top: 8, bottom: 20, left: 0 } });
+    glyph.namespaceURI = 'http://www.w3.org/2000/svg';
+    glyph.tagName = 'svg';
+    glyph.animate = () => ({ ready: Promise.resolve() });
+    titleRow.append(glyph);
+    s.toolbar.querySelectorAll = (sel) => (/:scope > \* > \*/.test(sel) ? [label, glyph] : []);
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 120);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true);
+    assert.equal(label.style.transform, 'translate(48px, 0px)', 'der Zeitraum steht im Umschalt-Frame nicht an seiner alten Lage - er springt');
+    assert.equal(glyph.style.transform, undefined, 'ein Zeichen geht mit seinem Knopf, es wird nicht selbst gehalten');
+  } finally {
+    global.requestAnimationFrame = savedRaf;
+    s.restore();
+  }
+});
+
 test('wireCollapsingHeader: ein Ansichtswechsel haelt den eingeklappten Kopf, wo der neue Port ihn tragen kann', () => {
   const s = collapsingStub();
   try {

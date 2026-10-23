@@ -1448,6 +1448,10 @@ das Verhaeltnis haelt.
   gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
   Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
   utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
+  **Auch IN einer Zeile (R22-F):** gehalten werden neben den Zeilen ihre Teile auf Ebene zwei
+  und drei (`nestedHeadParts`; ohne Zeichen und ohne Verborgenes), in Dokumentreihenfolge hinter
+  ihren Vorfahren - jedes Kind haelt dann nur seinen eigenen Weg in der Zeile. Kalender Agenda
+  390px 0,0098 -> 0,0003, Tablet 0,051 -> 0,0005 je Scroll (`test:ux-utils` "R22-F").
   **Die Faltzeile folgt der Richtung (R22, D15):** 24px abwaerts falten sie, 40px aufwaerts ab
   dem Wendepunkt holen sie mitten in der Liste zurueck (vorher erst bei scrollTop < 8); was der
   Umbau selbst ausloest (der Browser klemmt am Listenende), setzt nur den Wendepunkt

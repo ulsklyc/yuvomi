@@ -487,6 +487,31 @@ function glideThenClose(items, { duration, easing }) {
  * Gruppe schiebt auch die Gruppen darunter). Gedeckelt - weiter unten liegt,
  * was ohnehin niemand sieht.
  */
+/**
+ * DIE TEILE IN DEN ZEILEN DES KOPFES GLEITEN MIT (R22-F, F1 Punkt 4). Der
+ * FLIP beim Ein- und Ausklappen hielt nur die direkten Kinder des Kopfes -
+ * aber beim Umordnen rueckt auch IN einer Zeile etwas: im Kalender der
+ * Zeitraum (x 64 -> 16, die Pfeile treten zurueck) und die Ansichtswahl
+ * (x 282 -> 186), beide zwei, drei Ebenen tief. Gemessen mobil in der Agenda
+ * CLS 0,0047 je Umschalten. Die Ebenen zwei und drei gleiten jetzt mit; sie
+ * stehen in Dokumentreihenfolge HINTER ihren Vorfahren, und holdThenGlide
+ * misst jedes Element erst, nachdem sein Vorfahr schon gehalten ist - der
+ * Versatz eines Kindes ist damit nur noch sein eigener Weg in der Zeile, und
+ * beide laufen mit derselben Kurve, also ist die Summe der alte Weg.
+ * Nur was gerade gezeichnet ist (ein verborgenes Element hat keine alte Lage)
+ * und keine Zeichen (SVG, `<i>`): sie gehen mit ihrem Knopf, und ein Zeichen
+ * mit eigener `transform`-Transition (der Pfeil der Ansichtswahl) liefe sonst
+ * ueber die Transition statt zu springen - gemessen schlechter (0,0001).
+ * @param {Element} toolbar
+ * @returns {Element[]}
+ */
+function nestedHeadParts(toolbar) {
+  if (typeof toolbar?.querySelectorAll !== 'function') return [];
+  return [...toolbar.querySelectorAll(':scope > * > *, :scope > * > * > *')]
+    .filter((el) => el.namespaceURI === 'http://www.w3.org/1999/xhtml' && el.tagName !== 'I'
+      && el.getClientRects().length > 0);
+}
+
 function followingNeighbours(el, limit = 60) {
   const out = [];
   let node = el;
@@ -1135,7 +1160,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   let gliding = null;
   const setCollapsed = (on, states) => {
     if (states.every((c) => toolbar.classList.contains(c) === on)) return;
-    const moving = [...toolbar.children, ...followingNeighbours(toolbar)];
+    const moving = [...toolbar.children, ...nestedHeadParts(toolbar), ...followingNeighbours(toolbar)];
     const before = flipSnapshotElements(moving);
     if (on) toolbar.classList.add(...states, 'was-collapsed');
     else toolbar.classList.remove(...states);
