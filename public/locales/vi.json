@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "Tổng quan",
             "vitals": "Chỉ số sinh tồn",
-            "meds": "Thuốc",
+            "meds": "Dùng thuốc",
             "prevention": "Phòng ngừa",
             "labs": "Xét nghiệm",
             "activity": "Hoạt động",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "Thuốc",
+            "title": "Dùng thuốc",
             "emptyTitle": "Chưa có thuốc",
             "emptyDesc": "Thuốc kèm lịch và nhắc nhở sẽ hiển thị ở đây.",
             "add": "Thêm thuốc",

@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "概覽",
             "vitals": "生命體徵",
-            "meds": "藥物",
+            "meds": "用藥",
             "prevention": "預防",
             "labs": "化驗值",
             "activity": "活動",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "藥物",
+            "title": "用藥",
             "emptyTitle": "還沒有藥物",
             "emptyDesc": "帶用藥計劃和提醒的藥物將顯示在這裡。",
             "add": "新增藥物",

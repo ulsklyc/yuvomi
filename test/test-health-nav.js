@@ -737,11 +737,24 @@ test('R14 P6: die Kopf-Pille nennt je Bereich ihr Objekt', () => {
   // R22 S10 (D12, „Bereichsname nicht dreifach"): am Desktop stand „Vorsorge"
   // in der Bereichsliste, im Detailkopf UND in der Kopf-Pille („+ Vorsorge").
   // Die Pille nennt das Objekt, nicht den Bereich - wie en „Checkup", sv
-  // „Undersökning". Geprueft an der Referenz-Locale; Sprachen ohne Numerus
-  // (ja „薬" fuer Bereich und Objekt) teilen das Wort von Natur aus.
-  const tabs = JSON.parse(read('public/locales/de.json')).health.tabs;
+  // „Undersökning".
+  // Sammel-Ticket R22-F, F4.6: in JEDER Sprache, nicht nur an der Referenz.
+  // Zehn Sprachen wiederholten den Bereich: Medikamente in id/ja/ko/uk/vi/zh/
+  // zh-Hant (ohne Numerus: Bereich und Objekt ein Wort - der Bereich heisst
+  // dort jetzt nach der Einnahme, ja „服薬", zh „用药", ko „복약", vi „Dùng
+  // thuốc", id „Obat-obatan"; uk nennt das Objekt „Препарат"), it Zyklus,
+  // nb Aktivitaet, sv Laborwerte.
   const areaOf = { healthVitals: 'vitals', healthCycle: 'cycle', healthMeds: 'meds', healthPrevention: 'prevention', healthLabs: 'labs', healthActivity: 'activity', healthNutrition: 'nutrition' };
-  for (const k of keys) assert.notEqual(de[k], tabs[areaOf[k]], `de ${k}: die Pille wiederholt den Bereichsnamen „${tabs[areaOf[k]]}"`);
+  const repeats = [];
+  for (const file of readdirSync(join(ROOT, 'public/locales')).filter((f) => f.endsWith('.json'))) {
+    const locale = JSON.parse(read(`public/locales/${file}`));
+    for (const k of keys) {
+      const area = locale.health.tabs[areaOf[k]];
+      if (locale.newLabel[k].toLocaleLowerCase() === area.toLocaleLowerCase()) repeats.push(`${file} ${k}: „${area}"`);
+    }
+    assert.equal(locale.health.meds.title, locale.health.tabs.meds, `${file}: Medikamente heissen in Liste und Detailkopf verschieden`);
+  }
+  assert.deepEqual(repeats, [], 'die Pille wiederholt den Bereichsnamen');
 });
 
 /* R18 (Ursache zu #1770): DIE "HEUTE"-REGION SPRINGT NICHT INS BILD.

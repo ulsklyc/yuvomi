@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "개요",
             "vitals": "생체 신호",
-            "meds": "약",
+            "meds": "복약",
             "prevention": "예방",
             "labs": "검사 결과",
             "activity": "활동",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "약",
+            "title": "복약",
             "emptyTitle": "아직 약 없음",
             "emptyDesc": "복용 계획과 알림이 있는 약이 여기에 표시됩니다.",
             "add": "약 추가",

@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "概要",
             "vitals": "バイタル",
-            "meds": "薬",
+            "meds": "服薬",
             "prevention": "予防",
             "labs": "検査値",
             "activity": "アクティビティ",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "薬",
+            "title": "服薬",
             "emptyTitle": "まだ薬がありません",
             "emptyDesc": "スケジュールとリマインダー付きの薬がここに表示されます。",
             "add": "薬を追加",

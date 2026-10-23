@@ -254,6 +254,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen reader announced "Take Vitamin D3". It now names the action in all 26 languages. On a
   computer it also carried its pill icon only on the Medications page; the overview, and every
   phone, showed the same button without it. It now has icon and word everywhere.
+- **The add button in Health names the new entry, not the area, in every language.** In ten
+  languages "+ Medications", "+ Cycle", "+ Activity" or "+ Lab values" repeated the name of the
+  area it stands in. Japanese, Korean, Chinese, Vietnamese and Indonesian, which use one word for
+  a medication and medications, now name the area after taking them (for example 服薬, 用药,
+  복약); Ukrainian, Italian, Norwegian and Swedish name the object.
 - **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
   that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
   as a whole: the search in a computer's page header lost its width, the collapsed budget header

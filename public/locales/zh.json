@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "概览",
             "vitals": "生命体征",
-            "meds": "药物",
+            "meds": "用药",
             "prevention": "预防",
             "labs": "化验值",
             "activity": "活动",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "药物",
+            "title": "用药",
             "emptyTitle": "还没有药物",
             "emptyDesc": "带用药计划和提醒的药物将显示在这里。",
             "add": "添加药物",

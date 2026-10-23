@@ -4810,7 +4810,7 @@
         "tabs": {
             "overview": "Ringkasan",
             "vitals": "Tanda vital",
-            "meds": "Obat",
+            "meds": "Obat-obatan",
             "prevention": "Pencegahan",
             "labs": "Hasil lab",
             "activity": "Aktivitas",
@@ -4936,7 +4936,7 @@
         },
         "meds": {
             "doseQty": "{{count}}×",
-            "title": "Obat",
+            "title": "Obat-obatan",
             "emptyTitle": "Belum ada obat",
             "emptyDesc": "Obat dengan jadwal minum dan pengingat muncul di sini.",
             "add": "Tambah obat",
