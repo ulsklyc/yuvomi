@@ -38,7 +38,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
 import { rowMenuHtml } from '/utils/row-action.js';
-import { categoryColorIndex, categoryColor, categoryTexture } from '/utils/budget-category-colors.js';
+import { categoryColorIndex, categoryColor, categoryTexture, categoryPaint } from '/utils/budget-category-colors.js';
 import { metricGlanceHtml, wireMetricGlance, glanceLeadClass } from '/utils/metric-glance.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
@@ -2575,16 +2575,36 @@ function statementCreditLimitHtml() {
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
+/**
+ * Farbe und Textur des Punkts einer Ausgabe (R22, D9): die Farbe der Kategorie
+ * aus derselben Zuordnung wie Balken, Ring und Plan (utils/budget-category-colors.js).
+ * Schraffierte Serien (Tritanopie-Zweitkanal) stehen als Ring mit Kern - ein
+ * 8px-Punkt traegt keine Schraffur. Liefert eine Funktion, damit die Zuordnung
+ * je Liste einmal entsteht, nicht je Zeile.
+ * @returns {(category: string) => string} Attribute fuer den Punkt
+ */
+function entryPaint() {
+  const index = categoryColors(state.summary?.byCategory);
+  const catalog = expenseCategories().map((c) => c.key);
+  return (category) => {
+    const { color, texture } = categoryPaint(index, category, catalog);
+    if (!color) return '';
+    return ` style="--entry-color:${color}"${texture ? ` data-texture="${texture}"` : ''}`;
+  };
+}
+
 function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
   const ro = readOnly();
   // In einem Prognose-Monat liegt JEDE Zeile nach heute - dort sagt es der
   // Titel der Bilanz, und ein Symbol in jeder Metazeile waere Wiederholung.
   const markUpcoming = !isForecastMonth(state.month);
+  const paint = entryPaint();
   return list.map((e) => {
     const isIncome  = e.amount > 0;
     const isTransfer = Boolean(e.transfer_entry_id);
     const amtClass  = isTransfer ? 'budget-entry__amount--transfer' : isIncome ? 'budget-entry__amount--income' : 'budget-entry__amount--expenses';
     const indClass  = isTransfer ? 'budget-entry__indicator--transfer' : isIncome ? 'budget-entry__indicator--income' : 'budget-entry__indicator--expenses';
+    const indPaint  = isTransfer || isIncome ? '' : paint(e.category);
     // Rolle `flow`: eine einzelne Kontobewegung trägt immer ein Vorzeichen, und
     // das Vorzeichen kommt aus dem Zahlformat (signDisplay), nicht aus einem
     // vorangestellten '+' - sonst steht es in RTL-Locales auf der falschen Seite.
@@ -2728,7 +2748,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
 
     return `
       <div class="list-row budget-entry${pending ? ' budget-entry--pending' : ''}${upcoming ? ' budget-entry--upcoming' : ''}${masked ? ' budget-entry--masked' : ''}${rowClass ? ` ${rowClass}` : ''}" ${rowInteraction}>
-        <div class="budget-entry__indicator ${indClass}"></div>
+        <div class="budget-entry__indicator ${indClass}"${indPaint}></div>
         <div class="list-row__main">
           ${titleCell}
           ${/* DIE ZEICHEN STEHEN AM DATUM (R21 S9b, Critique a4). Am Ende der
@@ -3491,7 +3511,7 @@ function renderLoanPaymentEntry(loan, payment, { more = false } = {}) {
 
   return `
     <div class="list-row budget-entry budget-entry--loan${more ? ' budget-entry--more' : ''}" data-loan-payment-id="${payment.id}" data-loan-id="${loan.id}" ${entry ? `data-entry-id="${entry.id}"` : ''}>
-      <div class="budget-entry__indicator budget-entry__indicator--${flow}"></div>
+      <div class="budget-entry__indicator budget-entry__indicator--${flow}"${flow === 'expenses' && entry ? entryPaint()(entry.category) : ''}></div>
       <div class="list-row__main">
         <div class="list-row__name budget-entry__title">${esc(rowTitle)}</div>
         <div class="list-row__meta budget-entry__meta">${meta}</div>

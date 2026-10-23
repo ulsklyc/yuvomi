@@ -2357,11 +2357,23 @@ button.budget-bar-row:focus-visible {
   flex-shrink: 0;
 }
 
-/* Einnahmen duerfen gruen leuchten, Ausgaben sind der Normalfall und stehen
- * neutral (C1). Der Punkt ist Zweitkanal - das Vorzeichen am Betrag sagt die
- * Richtung auch ohne Farbe. */
+/* DER PUNKT TRAEGT DIE FARBE DER KATEGORIE (R22, D9). Bis dahin sagte er das
+ * Vorzeichen, das der Betrag schon traegt (C1: Einnahmen gruen, Ausgaben grau);
+ * dieselbe Kategorie stand im Ring und in den Balken in ihrer Farbe und im
+ * Journal grau. Jetzt kommt die Farbe einer Ausgabe aus derselben Zuordnung
+ * (`--entry-color`, budget.js entryPaint); ohne Katalogkategorie bleibt der
+ * Punkt neutral. Einnahmen haben keine Serienfarbe und bleiben gruen. */
 .budget-entry__indicator--income   { background-color: var(--color-success); }
-.budget-entry__indicator--expenses { background-color: var(--color-text-tertiary); }
+.budget-entry__indicator--expenses { background-color: var(--entry-color, var(--color-text-tertiary)); }
+
+/* Schraffierte Serien (Tritanopie-Zweitkanal, budget-category-colors.js) tragen
+ * im 8px-Punkt keine Schraffur, sondern Ring und Kern - eine Form, die der
+ * hohle Ring einer kommenden Buchung (unten) nicht hat. Erwartet (Streifen)
+ * und kommend (hohler Ring) sagen ihren Zustand vor der Textur. */
+.budget-entry:not(.budget-entry--pending):not(.budget-entry--upcoming) .budget-entry__indicator--expenses[data-texture="hatch"] {
+  background: radial-gradient(closest-side, var(--entry-color) 50%, transparent 56%);
+  box-shadow: inset 0 0 0 var(--space-px) var(--entry-color);
+}
 
 /* Noch nicht passiert (Datum nach heute): der Punkt wird zum Ring - Form statt
  * Farbe, der Betrag behaelt seinen Ton (#1230 fuer erwartete Buchungen). */
@@ -2371,7 +2383,7 @@ button.budget-bar-row:focus-visible {
 }
 
 .budget-entry--upcoming .budget-entry__indicator--income   { color: var(--color-success); }
-.budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--color-text-tertiary); }
+.budget-entry--upcoming .budget-entry__indicator--expenses { color: var(--entry-color, var(--color-text-tertiary)); }
 
 /* Der Titel ist ein BUTTON (Tastatur-/SR-Zugang der Edit-Fläche; role=button
  * auf der Zeile war axe nested-interactive, siehe budget.js). Optisch bleibt

@@ -7493,3 +7493,43 @@ test('R22 D10: Bearbeiten einer Buchung am Finger setzt keinen Feldfokus, Anlege
     if (vorher === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = vorher;
   }
 });
+
+// Critique R22 (D9, a4 P2): der Journal-Punkt sagte das Vorzeichen
+// (`--expenses` immer grau), waehrend dieselbe Kategorie in Balken und Ring
+// ihre Farbe trug. Jetzt kommt sie aus derselben Zuordnung; schraffierte
+// Serien tragen die Textur als Ring mit Kern, Einnahmen bleiben gruen.
+test('R22 D9: der Punkt einer Ausgabe traegt die Farbe ihrer Kategorie, wie Balken und Ring', async () => {
+  const colors = await import('../public/utils/budget-category-colors.js');
+  const vorher = { ...budgetUi.state };
+  const cats = ['housing', 'food', 'c3', 'c4', 'c5', 'shop', 'c7'].map((key) => ({ key, name: key }));
+  try {
+    Object.assign(budgetUi.state, {
+      month: '2000-01', responsibleFilterId: null, groupByResponsible: false, ledgerQuery: '', ledgerResults: null,
+      plannedExpandedMonth: null, categoryFilter: null, accounts: [],
+      meta: { ...vorher.meta, expenseCategories: cats, incomeCategories: [{ key: 'salary', name: 'Gehalt' }] },
+      summary: { byCategory: [{ category: 'housing', expenses: -900 }, { category: 'shop', expenses: -50 }] },
+      entries: [
+        zeile({ id: 1, title: 'Miete', amount: -900, category: 'housing', date: '2000-01-02' }),
+        zeile({ id: 2, title: 'Schuhe', amount: -50, category: 'shop', date: '2000-01-03' }),
+        zeile({ id: 3, title: 'Lohn', amount: 2000, category: 'salary', date: '2000-01-04' }),
+        // Suchtreffer aus einem anderen Monat: keine Ausgabe im Zeitraum, Farbe aus der Katalogstelle.
+        zeile({ id: 4, title: 'Brot', amount: -3, category: 'food', date: '2000-01-05' }),
+      ],
+    });
+    const html = budgetUi.renderEntries();
+    const punkt = (id) => new RegExp(`data-id="${id}">\\s*<div class="budget-entry__indicator ([^"]+)"([^>]*)>`).exec(html);
+    const index = colors.categoryColorIndex(budgetUi.state.summary.byCategory, cats.map((c) => c.key));
+    assert.match(punkt(1)[2], new RegExp(`style="--entry-color:${colors.categoryColor(index, 'housing').replace(/[()]/g, '\\$&')}"`), 'Miete in der Farbe von Wohnen');
+    assert.doesNotMatch(punkt(1)[2], /data-texture/);
+    assert.equal(colors.categoryTexture(index, 'shop'), 'hatch', 'Vorbedingung: Stelle 6 ist eine schraffierte Serie');
+    assert.match(punkt(2)[2], /data-texture="hatch"/, 'die schraffierte Serie traegt ihre Textur auch im Punkt');
+    assert.match(punkt(3)[1], /--income/);
+    assert.equal(punkt(3)[2], '', 'eine Einnahme hat keine Serienfarbe');
+    assert.match(punkt(4)[2], /--entry-color:var\(--chart-series-2\)/, 'ohne Ausgabe im Zeitraum: die Farbe der Katalogstelle');
+    const css = readFileSync(new URL('../public/styles/budget.css', import.meta.url), 'utf8');
+    const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-entry__indicator--expenses');
+    assert.match(rule?.body ?? '', /background-color:\s*var\(--entry-color,\s*var\(--color-text-tertiary\)\)/, 'der Punkt malt die Kategoriefarbe');
+  } finally {
+    Object.assign(budgetUi.state, vorher);
+  }
+});

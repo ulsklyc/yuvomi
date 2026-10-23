@@ -100,3 +100,25 @@ export function categoryTexture(index, category) {
   const i = index?.get(category);
   return i != null && TEXTURED_SERIES.indexOf(i) >= 0 ? 'hatch' : null;
 }
+
+/**
+ * DER JOURNAL-PUNKT TRAEGT DIE FARBE DER KATEGORIE (R22, D9). Bis dahin sagte
+ * er das Vorzeichen (gruen Einnahme, grau Ausgabe) - eine zweite Kodierung neben
+ * dem Betrag, waehrend dieselbe Kategorie in Balken, Ring und Plan ihre Farbe
+ * trug. Farbe und Textur kommen aus derselben Zuordnung wie im Diagramm; eine
+ * Kategorie, die im gezeigten Zeitraum keine Ausgabe hat (ein Suchtreffer aus
+ * einem anderen Monat), nimmt die bevorzugte Farbe ihrer Katalogstelle. Was der
+ * Katalog nicht kennt, bleibt ohne Farbe (`null`, der Punkt steht neutral).
+ * @param {Map<string, number>} index - aus categoryColorIndex()
+ * @param {string} category
+ * @param {string[]} [catalog]  Schluessel der Ausgabenkategorien in Katalog-Reihenfolge
+ * @returns {{ color: string|null, texture: 'hatch'|null }}
+ */
+export function categoryPaint(index, category, catalog = []) {
+  const color = categoryColor(index, category);
+  if (color != null) return { color, texture: categoryTexture(index, category) };
+  const position = (catalog ?? []).indexOf(category);
+  if (position < 0) return { color: null, texture: null };
+  const i = position % CATEGORY_SERIES_COLORS.length;
+  return { color: CATEGORY_SERIES_COLORS[i], texture: TEXTURED_SERIES.indexOf(i) >= 0 ? 'hatch' : null };
+}
