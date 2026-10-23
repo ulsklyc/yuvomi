@@ -78,6 +78,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The budget journal scrolls smoothly under the mouse.** Every booking row the pointer passed
   while scrolling faded its highlight in and out, and on a wide screen that cost about one frame in
   twenty. The highlight now switches without the fade, so the list keeps pace with the wheel.
+- **The budget tabs speak one language.** Accounts, subscriptions and split expenses begin each
+  row with the same tinted tile, and a booking's dot in the journal takes the colour its category
+  has in the bars, the ring and the plan. A subscription row ends like an account row, with a More
+  button that holds renew and delete on every device, and its dialog is flat like the booking
+  dialog instead of grey boxes. "Expenses only" is a regular chip as tall as the search beside it.
+  The Split tab states one balance, the direction that is not zero or "Settled up", instead of
+  "You get 0.00" in large type, and a group named like its type no longer reads it twice. A loan
+  card leads with its amount, and the note of tabs without a month stands where the month stands.
+- **A booking shows its currency, and tapping it on a phone no longer opens the keyboard.** The
+  amount field carries the currency sign, date and account share a row so the account is in view
+  on a phone, and editing a tapped booking on a touch screen starts without focusing a field.
+- **Documents open as a list.** Without a saved choice the documents page shows the list on every
+  device; the grid stays one tap away with smaller previews. On a phone each row shows date and
+  size, the document viewer keeps its previous/next arrows together as a pair, the add button
+  shows a plus, and only admins see where new files are stored.
+- **Inventory items are edited under their own name.** The dialog says "Edit item" in the
+  inventory's wording, "Needs attention 0" is a plain figure instead of a button, and a search
+  result opens the item's sheet on a phone too. The demo household's inventory now shows a linked
+  receipt, a due vehicle inspection, a mileage and a service entry.
 - **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
   in the budget showed the list first and pushed it down once the figures above it arrived; the
   figures now hold their place from the first frame. On a phone, the Health area list waits in
