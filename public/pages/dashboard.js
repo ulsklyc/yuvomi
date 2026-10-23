@@ -3119,6 +3119,24 @@ function renderRewardsSelf(me, rewards, spans) {
   // Praemien- und Geld-Anfragen (#1734) zusammen: der Server fuehrt sie
   // getrennt, die Kachel sagt, wie viele warten.
   const pending = (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0);
+  // DIE KLEINE KACHEL FUELLT NUR, WAS IHR DIE REIHE SCHENKT (R22 S10, aus S9).
+  // 1x1 neben Familie und Geburtstagen streckt die Reihe sie auf deren Hoehe,
+  // und unter Ziel und Anfrage stand leere Flaeche. Der Verlauf steht deshalb
+  // auch hier - aber in einer Flaeche ohne eigene Hoehe (dashboard.css,
+  // `.rewards-recent--fill`): er nimmt nur den Ueberschuss, ganze Zeilen oder
+  // keine. In einer Reihe kurzer Kacheln bleibt die Kachel so kurz wie bisher.
+  const fill = recentCap === 0
+    ? (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, 3)
+    : [];
+  const fillHTML = fill.length ? `
+      <ul class="rewards-recent rewards-recent--fill" aria-label="${esc(t('dashboard.rewardsRecent'))}">
+        ${fill.map((row, i) => `
+          <li class="rewards-recent__row"${i === 0 ? ` data-recent-title="${esc(t('dashboard.rewardsRecent'))}"` : ''}>
+            <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
+            <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
+            <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
+          </li>`).join('')}
+      </ul>` : '';
   return `
     <div class="widget__body rewards-widget rewards-widget--self">
       <div class="rewards-self">
@@ -3129,6 +3147,7 @@ function renderRewardsSelf(me, rewards, spans) {
         ${recentHTML}
       </div>
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsOwnPending', { count: pending })) : ''}
+      ${fillHTML}
     </div>`;
 }
 

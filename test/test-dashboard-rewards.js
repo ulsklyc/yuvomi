@@ -23,6 +23,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import express from 'express';
+import { eachRule } from './css-rules.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'dashboard-rewards-test-secret';
@@ -252,9 +253,25 @@ test('Groessen: die Kachel entscheidet, wie viel davon steht', () => {
   const recent = [1, 2, 3].map((n) => ({ delta: n, reason: `R${n}`, type: 'earn', created_at: '2026-09-01T08:00:00Z' }));
   const kid = (size) => renderRewardsWidget({ view: 'self', me: 7, standings: [emma(45)], catalog: [KINO], recent }, size);
   const rowsOf = (html) => (html.match(/rewards-recent__row"/g) || []).length;
-  assert.equal(rowsOf(kid('1x1')), 0, '1x1 traegt nur den Weg zum Ziel');
+  // R22 S10: 1x1 traegt den Weg zum Ziel - und den Verlauf nur als Fuellung
+  // dessen, was die Reihe der Kachel schenkt (`.rewards-recent--fill`, ohne
+  // eigene Hoehe). Breit und hoch steht er wie bisher in `.rewards-self__recent`.
+  const fillOf = (html) => html.match(/<ul class="rewards-recent rewards-recent--fill"[\s\S]*?<\/ul>/)?.[0] ?? '';
+  const small = kid('1x1');
+  assert.doesNotMatch(small, /rewards-self__recent/, '1x1 hat keinen eigenen Verlaufsblock');
+  assert.equal(rowsOf(fillOf(small)), 3, 'der Verlauf fuellt hoechstens drei Zeilen');
+  assert.match(fillOf(small), /<li class="rewards-recent__row" data-recent-title="dashboard\.rewardsRecent">/, 'die erste Zeile traegt die Ueberschrift');
   assert.equal(rowsOf(kid('2x1')), 2);
   assert.equal(rowsOf(kid('1x2')), 3);
+  assert.equal(fillOf(kid('2x1')) + fillOf(kid('1x2')), '', 'breit und hoch keine Fuellung');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const fill = rules.find((r) => r.selector.trim() === '.dashboard .rewards-widget--self > .rewards-recent--fill');
+  assert.match(fill?.body ?? '', /flex:\s*1 1 0/, 'die Fuellung hat keine eigene Hoehe');
+  assert.match(fill?.body ?? '', /flex-wrap:\s*wrap/, 'was nicht ganz passt, bricht aus der Flaeche');
+  assert.match(fill?.body ?? '', /overflow:\s*hidden/);
+  assert.match(fill?.body ?? '', /margin-block-start:\s*calc\(-1 \* var\(--space-3\)\)/, 'die leere Liste nimmt den Spaltenabstand zurueck (sonst +12px)');
+  assert.ok(rules.some((r) => r.selector.trim() === '.rewards-recent--fill::before' && /block-size:\s*0/.test(r.body)), 'ein leerer Halter fuer die erste Spalte');
   assert.equal(progressValue(kid('1x1')), 75, 'der Balken bleibt auf jeder Groesse');
 
   const kids = ['Anna', 'Ben', 'Carla'].map((name, i) => ({ id: 20 + i, display_name: name, balance: 10 }));
