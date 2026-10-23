@@ -1173,9 +1173,12 @@ das Verhaeltnis haelt.
   (kompakte Hoehe, siehe „Die Chrome-Regel"). Komponenten-interne Umbrueche gehoeren in
   @container-Queries, nicht in neue Viewport-Breakpoints.
 - **Lange Listen rechnen nur, was in Sicht ist (`content-visibility: auto`):** Aufgaben (ab der
-  zweiten Gruppe), Kontakte und Rezepte (je Zeile) seit R20, seit R21 S8 auch die Agenda (ab dem
-  zweiten Tag), Vorrat und Inventar (ab der zweiten Gruppe), die Buchungen des Budgets (je
-  Zeile) und der Einkauf in der einen Spalte. Immer unter `@supports` mit
+  zweiten Gruppe), Kontakte und Rezepte seit R20, seit R21 S8 auch die Agenda (ab dem
+  zweiten Tag), Vorrat und Inventar (ab der zweiten Gruppe), die Buchungen des Budgets und der
+  Einkauf in der einen Spalte. Zeilenweise gilt es seit R22 (D4) erst ab der zwanzigsten Zeile
+  (`:nth-child(n+20)`), und der Platzhalter ist die Content-Box der echten Zeile (Kontakte 48,
+  Buchungen 45, Rezepte 64px) - mit "je Zeile" ab der ersten sprang die Liste beim Aufbau
+  (Kontakte CLS 0,098 -> 0). Immer unter `@supports` mit
   `contain-intrinsic-size: auto none auto <gemessene Hoehe>` (sonst springt der Bildlaufbalken),
   und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
   Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
@@ -1405,7 +1408,7 @@ das Verhaeltnis haelt.
   (Guard `test:budget-ui`). Gesundheit mobil: solange die Heute-Region wartet, steht die
   Bereichsliste unsichtbar an ihrem Platz (`visibility: hidden`, hoechstens
   `PRIORITY_WAIT_MS`), 0,023 -> 0 (Guard `test:health-nav`). Zeilenweise `content-visibility`
-  erst ab `:nth-child(n+20)`, `contain-intrinsic-size` = Content-Box (`test:frontend-audit`).
+  siehe „Lange Listen" (ab Zeile 20, Platzhalter = Content-Box, `test:frontend-audit`).
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
   (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
   `swapContent(host, update, { direction })`: Blende ab 0,4 Deckkraft (kein leerer Frame),
@@ -1474,10 +1477,10 @@ das Verhaeltnis haelt.
   Seit R18 traegt die KAPSEL den Namen `nav-bottom` selbst (nicht ihr Elternknoten: der wurde
   zur Backdrop Root, das Glas fiel fuer die Dauer der Blende aus), ihre Pille und der
   schwebende FAB haben eigene Namen und stehen. `fab-in` ist die Ankunft EINES FAB, nicht jeder
-  Seite: es spielt nur, wenn die Vorseite keinen hatte (`html.fab-steady`). Unter der Blende
-  staffelt keine Liste (`stagger` schweigt waehrend `html.page-swapping`). Ein Tipp waehrend der
-  Blende bricht sie ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
-  seinen `click` dort an und reicht ihn nach dem Ende der Blende und der Navigation an das
+  Seite: es spielt nur, wenn die Vorseite keinen hatte (`html.fab-steady`). Waehrend des
+  Tauschs staffelt keine Liste (`stagger` schweigt waehrend `html.page-swapping`). Ein Tipp
+  waehrend des Tauschs bricht ihn ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
+  seinen `click` dort an und reicht ihn nach dem Ende des Tauschs und der Navigation an das
   Element an derselben Stelle (vorher ging er verloren, gemessen 0 von 12 Doppeltipps).
   **Das neue Bild zeigt den Inhalt, nicht das Skelett (R21, D1):** der Update-Callback wartet
   auf den Render der Zielseite, hoechstens `FIRST_RENDER_WAIT_MS` (150 ms); so lange steht das
@@ -1800,7 +1803,9 @@ Inhalt ist die ruhige Zeile `cardEmptyRowHtml` (Satz + Erfassen, wo es etwas zu 
 ausserhalb einer Karte mit eigener Flaeche `--surface`). Nie ein nackter grauer Satz, nie eine
 Auswahl ohne Auswahl ("Waehle einen Befund" ohne Befund). Wo der Inhalt die Hauptaktion traegt
 (Zyklus: "Periode gestartet", Fasten: "Fasten starten"), entfaellt die Kopf-Aktion; Nachtragen
-steht am Verlauf und im Leerzustand. "Einnehmen" heisst bei geplanter und Bedarfsdosis gleich und
+steht am Verlauf und im Leerzustand. Der Bereichsname steht hoechstens zweimal (Liste und
+Detailkopf); die Kopf-Pille nennt das OBJEKT, nie den Bereich (de „+ Untersuchung" statt
+„+ Vorsorge", R22 S10; `test:health-nav` "R14 P6" an der Referenz-Locale). "Einnehmen" heisst bei geplanter und Bedarfsdosis gleich und
 gibt bei Enge nur die Tablette ab, nie das Wort. Der Detailkopf am Desktop beginnt auf der Hoehe
 der Bereichsliste und klebt dort (`top` = Abstand) auf einem Grundstreifen im Seitengrund
 (Ring `--space-2` um die Ecken, nach oben versetzt bis zur Spaltenkante). Das Erfassen-Formular
@@ -1907,7 +1912,13 @@ ueber ihrem Inhalt (Aufgaben 1440: y 371-424 in x 883-1263). **Hoechstens EINE R
 (R22, D18):** ein neuer Toast ersetzt den stehenden, fuer den alten gilt seine Handlung (sein
 `onExpire` laeuft wie nach der Frist); beim Modulwechsel endet sie ebenso (`endFeedbackToasts`,
 die Kueche zaehlt als ein Modul). Dauerhafte Toasts (Erinnerungen) sind keine Rueckmeldung und
-bleiben. Pruefebene: test:toast-show, test:toast-placement. Findet sich kein Platz, zeigt der Stapel nur den juengsten
+bleiben. **Erinnerungen sind ein eigener Kanal (R22, S10):** zeitgebunden, 30 s, mit eigenem
+Verwerfen - sie stehen im selben Stapel neben der einen Rueckmeldung, nie auf ihr (gemessen
+390, 1280 mit Detailspalte, 1440: keine Ueberlappung, die Rueckmeldung behaelt ihre Lage).
+Zusammen stehen hoechstens drei Toasts; Platz macht nur eine aeltere Erinnerung
+(`capPersistentToasts`, utils/toast-surface.js), nie die Rueckmeldung samt Rueckgaengig - bis
+R22 nahm die Erinnerung den aeltesten Toast der Flaeche, gleich welchen.
+Pruefebene: test:toast-show, test:toast-placement. Findet sich kein Platz, zeigt der Stapel nur den juengsten
 Toast, die uebrigen stehen `inert` als `.toast--tucked` bereit. Ein Dialog mit eigener
 Kopf- oder Fusszeile zeichnet sie mit `data-dialog-actions` aus; das Register dazu fuehrt
 `test:toast-placement`. Im Wand-Modus steht der Stapel ohne offenen Dialog OBEN statt unten
@@ -2840,7 +2851,11 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
   Haarlinie laeuft ueber beide; bei ungerader Zahl spannt die letzte Zeile unter beiden
   (`.today-cockpit-card--span`). Die Einkaufszeile schliesst das SICHTBARE Programm und steht vor
   „+N weitere heute". Im Kindkonto steht die eigene Belohnungskachel oben (die Anfrage folgt dem
-  Ziel statt `margin-block-start: auto`). Guard: `test:dashboard-today` ("R22 D16").
+  Ziel statt `margin-block-start: auto`). Was die Reihe der 1x1-Kachel ueber ihren Inhalt hinaus
+  gibt, fuellt der Verlauf (bis drei Zeilen) in einer Flaeche ohne eigene Hoehe: ganze Zeilen
+  oder keine (umbrechende Spalte, `.rewards-recent--fill`), in einer Reihe kurzer Kacheln bleibt
+  sie 0px (R22 S10; 1440: 206px Inhalt in 427px Kachel, jetzt drei Zeilen). Guards:
+  `test:dashboard-today` ("R22 D16"), `test:dashboard-rewards` ("Groessen").
 - **Anpassen: Optionen am Chip (R22, D16):** ein ausgeblendetes Widget mit Optionen ist ein
   geteilter Knopf - links einblenden (ein Tipp), rechts am selben Pill der Pfeil ins Menue
   „<Kachel> einblenden" / „Optionen fuer <Kachel>"; kein freier Regler-Kreis ohne Wort.
@@ -3001,6 +3016,8 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Koerper traegt die Kantenblende der Seitenleiste (`wireScrollFade(body, { axis: 'y' })`,
   `.more-sheet__body.has-fade-*`, Blende `--space-6`), und im Blatt traegt JEDE Sektion ihren
   Namen - auch Budget allein unter „Finanzen" (`navSectionLabelKey(..., { standalone: true })`).
+  Die vier Ziele der Systemreihe haben keinen Innenrand in der Breite (der Raster-Gap trennt):
+  „Einstellungen" steht ab 360px ganz, bei 375px brach es als „Einstel-lungen" (R22 S10).
   Guards: `test:mobile-chrome`, `test:frontend-audit` ("R22 D14"), `test:settings-navigation`.
 - **Navigations-Ordnung (R19, Ulas 2026-10-16):** Planen = Kalender, Aufgaben, Belohnungen,
   Notizen, Schichtplan; Haushalt = Kueche, Haushaltshilfe, Entsorgung, Dokumente, Inventar;
@@ -3528,7 +3545,11 @@ eine Ausnahmekarte.
 Zeitraum steht dann „Kalender" als Caption in derselben 65px-Zeile (`.cal-toolbar__place`,
 aria-hidden - das <h1> bleibt der Seitentitel), zwei Zeilen per Umbruch, nicht per
 `flex-direction` (die Richtung des Kopfs gehoert der Shell). Der Stepper behaelt beim Andocken
-48px (vorher 48 -> 24px). Guard `test:calendar` "R22 D20".
+48px (vorher 48 -> 24px). Zwischen 640 und 1023px loest sich der Stepper auf und die Pfeile
+bleiben; dort ordnet der Zeitraum-Slot ein Raster - Caption in der Spalte des Labels darueber,
+Pfeile und „Heute" ueber beide Zeilen, die Zeile bleibt 48px (R22 S10). Eingeklappt FALTEN
+(weglassen) darf nur der Telefonkopf, ab 640px wird nur geordnet. Guards `test:calendar`
+"R22 D20", `test:mobile-chrome` "R17".
 **Der Kopf steht vor den Daten (R21):** render() baut ihn im synchronen Teil, bis zum ersten
 Laden `inert` - kam die Zeitraum-Zeile mit den Daten, rutschte die Flaeche 52px (CLS 0,057
 mobil, 0,026 laptop -> 0). **Der Ansichtsknopf ist so breit wie sein laengstes Wort (R21):** alle
@@ -4047,7 +4068,9 @@ Platzhalter); vorher faerbte `:hover` die ganze Tagesspalte (548 x 960px). Guard
 (der Chip ist eine Zeile hoch und bricht um, was nicht daneben passt - gemessen an der
 Breite, nicht an einer Zahl). Der volle Text ist der Name des Chips und steht im Detail beim
 Tipp. Monat: keine Terminzeile mehr, sondern bis zu drei Striche in der Schichtfarbe am
-Tageskopf und „+N" (`.month-day__shifts`; am Telefon zwischen Ziffer und Punkten); „+N
+Tageskopf und „+N" (`.month-day__shifts`, absolut in der Zelle; den Bezugsrahmen gibt die Klasse
+`month-day--shifts` aus dem Renderer, kein `:has()` - ohne `:has()` stuenden alle Striche an
+derselben Ecke des Rasters; am Telefon zwischen Ziffer und Punkten); „+N
 weitere" zaehlt nur Termine, Aufgaben und Feiertage, der Name der Zelle zaehlt die Schichten
 weiter. Die Agenda und die Tagesliste nennen Schicht UND Person ausgeschrieben. Das Kuerzel
 doppelt den Namen nie: `shiftTypeLabel()` (utils/shift-label.js) laesst es weg, wo der Name
@@ -4498,8 +4521,11 @@ Liste weisse Zeile mit 8px-Farbpunkt. Die Monatsbalken sind die Referenz, alle a
   einen Baustein (`eventGlyphsHtml()`), 12px im Block, 16px in der Listenzeile. Die Glyphen
   tragen die Tinte des Titels (`currentColor`), nie den Vollton der Terminfarbe: Amber auf
   hellem Amber ist der Textfall, den die User-Farben-Regel verbietet, und die Farbe steht schon
-  in der Kante. Einzige Ausnahme: die Titelfassung des Telefon-Monats (~44px Spalte, der Titel
-  hat sieben Zeichen) laesst die Glyphen weg; die Tagesliste darunter zeigt sie.
+  in der Kante. Zwei Ausnahmen: die Titelfassung des Telefon-Monats (~44px Spalte, der Titel
+  hat sieben Zeichen) laesst die Glyphen weg; die Tagesliste darunter zeigt sie. Und im
+  einzeiligen Monatsbalken ab 1024px weicht unter 9rem Balkenbreite NUR die Serienmarke dem
+  Titel (`@container month-chip`, R22 S10: bei 1280 endeten 28 von 40 Titeln mit Ellipse, ohne
+  die Marke 9); das gewaehlte Terminicon ist Inhalt und bleibt (`test:calendar` "R22 S10").
 - **Ein Zeitformat.** Jede Spanne geht durch `timeSpanText()`: „17:00 - 18:30", der Trenner
   aus `calendar.dayRangeLabel`, die Uhrzeiten aus `formatTime()` (12 Stunden, Ziffern der
   Locale), das Suffix der Locale („Uhr") EINMAL am Ende. Im Raster ohne Suffix (der Block steht
@@ -4681,8 +4707,14 @@ vergebener Kontakt ist 409, der Dialog bleibt offen und laedt die Auswahl neu
 (`test:birthday-import-rights`, `test:inventory-notes-errors`, `test:module-readonly-ui`).
 **Der Notiz-Lesedialog bleibt ein Modal, sein Fuss folgt aber diesem Kanon** (R22, D20):
 Loeschen `danger-ghost` am Anfang, Bearbeiten gefuellt mit Stift am Ende; im Editor wechselt
-derselbe Knopf auf `danger-outline` (Dialogfuss). Einen Anfangsrand per Inline-Stil gibt es in
-Notizen, Kontakten und Geburtstagen nicht mehr (`test:control-dialect`).
+derselbe Knopf auf `danger-outline` (Dialogfuss).
+**Kein Dialogfuss traegt einen Inline-Stil (R22, D9/D12/D20, S10 app-weit):** den Anfangsrand
+von Loeschen gibt `.modal-panel__delete` (gesetzt von `decorateFooterDelete`, modal.js), einen
+anderen Anfangsknopf ("Gast anlegen") `.modal-panel__footer-start`, Abbrechen + Primaer
+gruppiert `.modal-panel__footer-group` (`--tight` fuer Loeschen + Icon-Knopf). Der Schub am
+Loeschen-Knopf steht in einer Regel OHNE `:has()` - in einer gemischten Selektorliste verwarf
+ihn ein Browser an der Mindestversion ganz; nur die Gruppe mit Loeschen haengt an `:has()`.
+Guard `test:control-dialect` ("R22 S10", jedes Skript der App).
 
 
 **Im Formular eines Leseblatts gibt es EINEN Rueckweg (R19, Critique 2026-10-16, Heuristik 3).**
@@ -4972,7 +5004,9 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   meldet sich mit `--metric-rail: ;`), in einer Reihe mit mehreren Karten treten die uebrigen
   eine Stufe zurueck und verlieren das Fett (`.metric-grid--led`). Die Stufe folgt der LAENGE
   des Werts (`leadStep()` in utils/metric-card.js: bis 10, 13, 17 Zeichen) - "175.444,93 €" und
-  "CHF 175'444.93" brechen bei 390px nicht um. Display-Stufen bleiben Anzeigewerten
+  "CHF 175'444.93" brechen bei 390px nicht um. In einer VIERERZEILE (Darlehen) traegt eine
+  Leitzahl mit Laengenstufe `.metric-grid--long-lead` und steht unter 928px Zeile zwei mal zwei:
+  am Tablet lief "174.644,93 €" sonst 13px aus ihrer Karte (R22 S10, `test:budget-ui`). Display-Stufen bleiben Anzeigewerten
   vorbehalten; eine Ueberschrift endet weiter bei Large Title.
 - **Do** das LABEL einer Kennzahl in Satzschreibung setzen (Caption 1, medium), nicht als
   gesperrte Versalzeile: es benennt EINEN Wert und wiederholt sich nicht ueber eine Liste, und
@@ -5143,3 +5177,10 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   den Stil des ganzen Dokuments neu (gemessen /tasks 1x, Einfuegen + Stil 2,7 -> 1,3 ms).
   Die Kinder beim Namen (`> :is(.a, .b)`), eine Bedingung, die sich selbst erfuellt, oder
   das `:has()` ins Subjekt. Guard `test:frontend-audit`.
+- **Don't** Funktion, Lage oder Lesbarkeit an `:has()` haengen (R22 S10). Die Mindestversion
+  (Chrome 87, Safari 14.1, docs/installation.md) kennt es nicht und verwirft jede Regel damit;
+  verloren gehen darf so nur Verfeinerung (Druck, Hover, eine engere Spalte, ein ruhigerer
+  Sprung). Haengt ein Bezugsrahmen daran, setzt der Renderer eine Klasse (`month-day--shifts`).
+  Und nie `:has()` in eine Selektorliste mit Teilen ohne `:has()`: der alte Browser verwirft
+  die GANZE Liste, auch die Teile, die er kennt (Loeschen-Schub im Dialogfuss, getrennt seit
+  R22 S10; im Bestand stehen noch elf solche Listen, Ticket).
