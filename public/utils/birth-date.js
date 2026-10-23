@@ -127,8 +127,9 @@ export function birthDateControlHtml({ id, value = '', yearUnknown = false, max 
           ${dayOptionsHtml(unknown ? month : '', unknown ? day : '')}
         </select>
       </div>
-      <label class="form-check birth-date-field__toggle">
-        <input type="checkbox" id="${esc(id)}-year-unknown"${unknown ? ' checked' : ''}>
+      <label class="toggle birth-date-field__toggle">
+        <input type="checkbox" role="switch" id="${esc(id)}-year-unknown"${unknown ? ' checked' : ''}>
+        <span class="toggle__track" aria-hidden="true"></span>
         <span>${esc(t('birthdays.yearUnknown'))}</span>
       </label>
     </div>`;

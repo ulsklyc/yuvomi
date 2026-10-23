@@ -284,6 +284,9 @@ test('der Editor zeigt ohne Jahr Monat und Tag statt des Datumswaehlers', () => 
   assert.match(yearless, /value="02" selected/);
   assert.match(yearless, /value="29" selected/, 'der 29.02. ist waehlbar');
   assert.match(yearless, /id="bd-birth-date-year-unknown" checked/);
+  // R22 D20: "Jahr unbekannt" ist ein Schalter (an/aus), kein Haken in einer Auswahl.
+  assert.match(yearless, /<label class="toggle birth-date-field__toggle">\s*<input type="checkbox" role="switch" id="bd-birth-date-year-unknown" checked>\s*<span class="toggle__track" aria-hidden="true"><\/span>/);
+  assert.doesNotMatch(yearless, /form-check/, 'die native Checkbox ist weg');
 
   const known = birthDateFieldHtml({ id: 'bd-birth-date', label: 'L', value: '1990-03-15' });
   assert.match(known, /value="1990-03-15"/);

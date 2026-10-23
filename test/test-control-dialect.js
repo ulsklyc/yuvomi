@@ -1828,6 +1828,33 @@ test('Dialog-Fussleisten schieben mit logischem Rand: kein Inline-Stil setzt mar
   assert.deepEqual(offenders, []);
 });
 
+test('R22 D20: die Formular-Fuesse von Notizen, Kontakten und Geburtstagen tragen keinen Inline-Stil', () => {
+  // Den Anfangsrand des Loeschen-Knopfs haelt seit R16 EINE Regel an
+  // `.modal-panel__delete` (layout.css, gesetzt von decorateFooterDelete) -
+  // das `style="margin-inline-end:auto"` je Modul war ein Rest davon. Die
+  // drei Module dieses Schritts sind frei; die uebrigen (Budget, Abos,
+  // Gesundheit, Entsorgung, Schnelllinks) folgen in ihren Schritten.
+  const offenders = [];
+  for (const { file, src } of JS) {
+    if (!/pages\/(notes|contacts|birthdays)\.js$/.test(file)) continue;
+    src.split('\n').forEach((line, i) => {
+      if (/<button[^>]*(?:modal-delete|cm-delete|bd-delete)[^>]*style="/.test(line)
+        || /btn--danger-outline"[^>]*style="/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.equal(JS.filter(({ file }) => /pages\/(notes|contacts|birthdays)\.js$/.test(file)).length, 3, 'Vorbedingung: der Scanner sieht die drei Seiten');
+  assert.deepEqual(offenders, []);
+});
+
+test('R22 D20: der Notiz-Lesedialog wechselt das Gewicht von Loeschen mit der Ansicht (Detail-Fuss-Kanon)', () => {
+  // Leseansicht wie das Leseblatt der Kontakte (danger-ghost), Editor wie
+  // jeder Dialogfuss (danger-outline) - derselbe Knopf, syncFooter() schaltet.
+  const notes = JS.find(({ file }) => file.endsWith('pages/notes.js')).src;
+  const sync = notes.slice(notes.indexOf('function syncFooter(view)'), notes.indexOf('function animatePane('));
+  assert.match(sync, /classList\.toggle\('btn--danger-ghost', view === 'read'\)/);
+  assert.match(sync, /classList\.toggle\('btn--danger-outline', view !== 'read'\)/);
+});
+
 test('Auswahlkreis: EIN Baustein in der Shell (layout.css), jede Mehrfachauswahl nutzt ihn (R8 H14)', () => {
   // Aufgaben (R7), Kontakte und Dokumente (R8) waehlen per `.select-circle`.
   // Modul-CSS laedt nur auf seiner Route - stuende der Kreis dort, braeuchte

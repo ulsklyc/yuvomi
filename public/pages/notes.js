@@ -972,12 +972,14 @@ function openNoteModal({ mode, note = null }) {
       </div>
 
       <div class="modal-panel__footer modal-panel__footer--plain note-modal__footer">
-        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="note-modal-delete" style="margin-inline-end:auto">
+        ${isEdit ? `<button type="button" class="btn ${initialView === 'read' ? 'btn--danger-ghost' : 'btn--danger-outline'}" id="note-modal-delete">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
         </button>` : ''}
         <button type="button" class="btn btn--secondary" id="note-modal-cancel" data-editor-only>${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="note-modal-save" data-editor-only>${isEdit ? t('common.save') : t('common.add')}</button>
-        ${isEdit ? `<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>${t('common.edit')}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>
+          <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i><span class="btn__label">${t('common.edit')}</span>
+        </button>` : ''}
       </div>
     </div>`;
 
@@ -1017,9 +1019,17 @@ function openNoteModal({ mode, note = null }) {
       const viewContent = panel.querySelector('#note-content');
       const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+      // DER FUSS FOLGT DEM DETAIL-FUSS-KANON (Critique R22, D20): in der
+      // Leseansicht wie das Leseblatt der Kontakte - Loeschen leise
+      // (`danger-ghost`) am Anfang, Bearbeiten gefuellt mit Stift am Ende; im
+      // Editor wie jeder Dialogfuss - Loeschen umrandet, Abbrechen, Speichern.
+      // Der Knopf bleibt derselbe (Fokus, Verdrahtung), nur sein Gewicht wechselt.
+      const deleteBtn = panel.querySelector('#note-modal-delete');
       function syncFooter(view) {
         editorOnly.forEach((el) => { el.style.display = view === 'read' ? 'none' : ''; });
         readerOnly.forEach((el) => { el.style.display = view === 'read' ? '' : 'none'; });
+        deleteBtn?.classList.toggle('btn--danger-ghost', view === 'read');
+        deleteBtn?.classList.toggle('btn--danger-outline', view !== 'read');
       }
 
       function animatePane(pane) {

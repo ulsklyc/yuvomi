@@ -5374,8 +5374,19 @@ html.fab-steady .page-fab {
   min-height: var(--target-base);
 }
 
+/* "JAHR UNBEKANNT" IST EIN SCHALTER (Critique R22, D20): ein Zustand an/aus,
+ * kein Haken in einer Auswahl - dieselbe `.toggle`-Bahn wie "Angeheftet" im
+ * Notiz-Dialog, mit `role="switch"`. Die Trefferflaeche sitzt am Label wie
+ * bei `.form-check`, das sie vorher trug: 40px am Zeiger, 48px auf Touch. */
 .birth-date-field__toggle {
   margin-top: var(--space-1);
+  min-height: var(--target-md);
+}
+
+@media (hover: none) {
+  .birth-date-field__toggle {
+    min-height: var(--target-lg);
+  }
 }
 
 /* --------------------------------------------------------

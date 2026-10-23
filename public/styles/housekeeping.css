@@ -466,17 +466,19 @@
   background-position: left var(--space-3) center;
 }
 
-/* Der Haken "Jahr unbekannt" (utils/birth-date.js, #2095) ist kein Textfeld:
- * die Feldregel oben machte ihn sonst zeilenbreit und 44px hoch. */
+/* Der Schalter "Jahr unbekannt" (utils/birth-date.js, #2095, seit R22 eine
+ * `.toggle`-Bahn) ist kein Textfeld: das Label erbt sonst das Feldgewicht. */
 .housekeeping-field .birth-date-field__toggle {
   font-weight: var(--font-weight-regular);
 }
 
+/* Die Feldregel oben machte die verborgene Schalter-Checkbox zeilenbreit und
+ * 48px hoch - sie bleibt der 1px-Traeger, den `.toggle input` vorsieht. */
 .housekeeping-field .birth-date-field__toggle input[type="checkbox"] {
-  width: var(--space-5);
-  height: var(--space-5);
+  width: 1px;
   min-height: 0;
   padding: 0;
+  border: 0;
 }
 
 .housekeeping-field textarea {
