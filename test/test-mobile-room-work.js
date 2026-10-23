@@ -123,6 +123,13 @@ test('M1: die Metazeile endet mit Ellipse statt mit einem Schnitt', () => {
   assert.equal(label['white-space'], 'nowrap');
   const due = declarations(tasksCss, '.task-card__meta > .due-date');
   assert.equal(due['min-width'], '0', 'ohne min-width 0 schrumpft der Flex-Chip nie und die Zeile klippt');
+  // Summe der Schrumpffaktoren unter 1 verteilt nur diesen Bruchteil des
+  // Ueberlaufs: mit 0.01 nahm die Faelligkeit allein 1 % auf, der Rest schnitt
+  // die Bueroklammer ab (R22-Sichtpruefung, 184px Inhalt in 178px).
+  assert.ok(Number(due['flex-shrink']) >= 1, `die Faelligkeit muss den Ueberlauf allein aufnehmen koennen (flex-shrink ${due['flex-shrink']})`);
+  assert.equal(declarations(tasksCss, '.task-card__meta > .task-card__docs')['flex-shrink'], '0', 'die Bueroklammer schrumpft nie');
+  const tagShrink = Number(declarations(tasksCss, '.task-card__meta > .task-tag').flex?.split(/\s+/)[1]);
+  assert.ok(tagShrink > Number(due['flex-shrink']), 'das Etikett gibt zuerst nach, dann die Faelligkeit');
 });
 
 // --------------------------------------------------------------------------

@@ -903,7 +903,9 @@
  * Auskunft. Der Marker selbst schrumpft nie - er ist zwei bis drei Zeichen breit
  * und ist genau die Stelle, an der steht, dass etwas fehlt. */
 .task-card__meta > .task-tag {
-  flex: 0 1 auto;
+  /* 100: das Etikett gibt zuerst nach, bis an seine Mindestbreite, bevor die
+   * Faelligkeit (Faktor 1, unten) ihre Ellipse zeigt. */
+  flex: 0 100 auto;
   /* 24px, WEIL DIE ZEILE PLATZ HAT. Ein Etikett, das anfassbar ist (der
    * Filter-Tag setzt den Filter), darf die Spacing-Ausnahme von WCAG 2.5.8 nur
    * nehmen, wenn es sie BRAUCHT - sitzt es in einer Zeile, die ihm die vollen
@@ -1183,10 +1185,22 @@
  * nie (`flex-shrink: 0` oben), und `text-overflow` greift am Flex-Chip nicht.
  * Jetzt gibt sie nach - mit winzigem Gewicht, damit ein Etikett daneben
  * zuerst bis auf seine Mindestbreite nachgibt (die Rangfolge von oben bleibt)
- * - und ihr Label traegt die Ellipse. */
+ * - und ihr Label traegt die Ellipse.
+ *
+ * DAS GEWICHT IST 1, NICHT 0.01 (R22-Sichtpruefung). Ist die Summe der
+ * Schrumpffaktoren kleiner als 1, verteilt Flexbox nur diesen Bruchteil des
+ * Ueberlaufs: steht die Faelligkeit allein (mobil ohne Etikett, oder das
+ * Etikett schon an seiner Mindestbreite), nahm sie 1 % auf, und der Rest
+ * schnitt das Ende der Zeile ab - gemessen 184px Inhalt in 178px, die
+ * Bueroklammer halb. Die Rangfolge traegt jetzt das Etikett mit Faktor 100
+ * (oben), und die Bueroklammer ist ein Zeichen mit Zahl, das nie schrumpft. */
 .task-card__meta > .due-date {
-  flex-shrink: 0.01;
+  flex-shrink: 1;
   min-width: 0;
+}
+
+.task-card__meta > .task-card__docs {
+  flex-shrink: 0;
 }
 
 .due-date__label {
