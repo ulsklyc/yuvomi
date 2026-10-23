@@ -286,6 +286,45 @@ export function authPaths() {
         },
       }),
     },
+    '/api/v1/auth/reset-password/check': {
+      post: op({
+        summary: 'Check a password-reset token without using it',
+        tag: 'Auth',
+        auth: false,
+        description: 'Public bootstrap endpoint for the /reset-password page. Shares the rate limit of POST /reset-password and never consumes the token. Unknown, expired and already used tokens, and tokens of an account that can no longer reset its password, all return valid: false, so the endpoint reveals nothing beyond whether the token can still be used. The token travels in the body, not the URL, so it stays out of access logs.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token'],
+                properties: { token: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Whether the token can still set a new password.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'object',
+                      properties: { valid: { type: 'boolean' } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/auth/invites': {
       get: op({
         summary: 'List pending invitations',

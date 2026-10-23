@@ -470,3 +470,99 @@ test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeil
   const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((r) => r.sid);
   assert.deepEqual(left, ['bob-1', 'broken']);
 });
+
+// --- Vorabpruefung (Critique R22, D19) ------------------------------------
+// Die Seite "Neues Passwort" fragt vor dem Formular, ob der Link noch gilt.
+// Die Pruefung darf den Token nicht verbrauchen, haengt am Limiter des Resets
+// und gibt fuer jeden toten Link dieselbe Antwort.
+
+async function issuedToken(db) {
+  const made = await makeAuthApp(db);
+  await callJson(made.app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
+  return { ...made, token: made.sent[0].html.match(/token=([a-f0-9]+)/)[1] };
+}
+
+test('reset-password/check meldet einen gueltigen Token und verbraucht ihn nicht', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  for (let i = 0; i < 2; i += 1) {
+    const { status, json } = await callJson(app, 'POST', '/auth/reset-password/check', { token });
+    assert.equal(status, 200);
+    assert.deepEqual(json, { data: { valid: true } });
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 1);
+  // Der Token taugt danach noch zum Einloesen.
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
+  assert.equal(status, 200);
+});
+
+test('reset-password/check antwortet fuer unbekannt, abgelaufen, eingeloest und fehlend gleich', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  const answers = [];
+  const ask = async (body) => {
+    const { status, json } = await callJson(app, 'POST', '/auth/reset-password/check', body);
+    answers.push({ status, json });
+  };
+  await ask({ token: 'f'.repeat(64) });                        // unbekannt
+  await ask({});                                                // fehlend
+  await ask({ token: 42 });                                     // kein Text
+  db.prepare('UPDATE password_resets SET expires_at = 1').run();
+  await ask({ token });                                         // abgelaufen
+  db.prepare('UPDATE password_resets SET expires_at = ?').run(Date.now() + 3_600_000);
+  assert.equal((await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' })).status, 200);
+  await ask({ token });                                         // eingeloest
+  for (const a of answers) assert.deepEqual(a, { status: 200, json: { data: { valid: false } } });
+});
+
+test('reset-password/check: ein Konto, das keinen Reset mehr annimmt, gilt als toter Link - der Token bleibt', async () => {
+  for (const block of [
+    (db) => db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = 1").run(),
+    (db) => db.prepare("UPDATE users SET password_hash = '$oidc$' WHERE id = 1").run(),
+  ]) {
+    const db = makeDb();
+    seedContactsAndEmail(db);
+    const { app, token } = await issuedToken(db);
+    block(db);
+    const { json } = await callJson(app, 'POST', '/auth/reset-password/check', { token });
+    assert.deepEqual(json, { data: { valid: false } });
+    // Verbraucht wird erst beim Einloesen, das dieselbe Antwort gibt.
+    assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 1);
+    assert.equal((await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' })).status, 400);
+  }
+});
+
+test('reset-password/check zaehlt im selben Limiter wie das Einloesen', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const seen = [];
+  const { buildResetRoutes } = await import('../server/auth.js');
+  const app = express();
+  app.use(express.json());
+  const router = express.Router();
+  buildResetRoutes(router, {
+    database: db,
+    emailService: { isConfigured: () => true, sendMail: async () => {} },
+    resetService: createPasswordResetService({ db }),
+    baseUrl: 'https://oikos.test',
+    limiter: (req, _res, next) => { seen.push(req.path); next(); },
+  });
+  app.use('/auth', router);
+  await callJson(app, 'POST', '/auth/reset-password/check', { token: 'x' });
+  await callJson(app, 'POST', '/auth/reset-password', { token: 'x', password: 'longenough' });
+  assert.deepEqual(seen, ['/reset-password/check', '/reset-password']);
+});
+
+test('reset-password/check: der echte Router haengt die Pruefung an den Reset-Limiter', async () => {
+  // Der Test oben reicht seinen Limiter selbst hinein und belegt damit nur,
+  // dass die Fabrik ihn nimmt. Hier der Quelltext des echten Aufrufs: dieselbe
+  // Fabrik, derselbe Standard-Limiter fuer beide Routen.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../server/auth.js', import.meta.url), 'utf8');
+  assert.match(src, /targetRouter\.post\('\/reset-password\/check', limiter,/);
+  assert.match(src, /targetRouter\.post\('\/reset-password', limiter,/);
+  assert.match(src, /limiter = passwordResetLimiter,\n\s*defer = /);
+  assert.match(src, /^buildResetRoutes\(router\);$/m);
+});

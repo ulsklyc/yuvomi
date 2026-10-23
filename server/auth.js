@@ -1922,6 +1922,51 @@ export function buildResetRoutes(targetRouter, {
     }
   });
 
+  /**
+   * Darf das Konto hinter einem gueltigen Token sein Passwort jetzt noch neu
+   * setzen?
+   *
+   * Zwischen dem Ausstellen des Tokens und dem Einloesen kann der Admin das
+   * Konto auf SSO umgestellt oder die eingebaute Anmeldung abgeschaltet haben
+   * (#847). Ein noch gueltiger Token darf diese Entscheidung nicht ueberholen.
+   * Dasselbe fuer ein Konto, das zwischen Ausstellen und Einloesen deaktiviert
+   * wurde (#1381). Das Deaktivieren loescht seine Reset-Tokens; diese Pruefung
+   * haelt es auch fuer eines, das danach noch auftaucht. Geteilt von Einloesen
+   * und Vorabpruefung, damit beide dieselbe Antwort geben.
+   */
+  function accountAcceptsReset(userId) {
+    return (isPasswordLoginEnabled(getDb()) || isSplitExpenseGuest(userId, getDb()))
+      && hasResettablePassword(userId)
+      && isActiveAccount(userId, { db: getDb() });
+  }
+
+  /**
+   * Vorabpruefung fuer die Seite "Neues Passwort" (Critique R22, D19): gilt
+   * der Link noch? Sonst zeigte sie ein Formular, dessen Absenden erst sagt,
+   * dass alles Eingetippte umsonst war.
+   *
+   * - Verbraucht den Token NIE, auch nicht fuer ein Konto, das keinen Reset
+   *   mehr annimmt - das bleibt dem Einloesen vorbehalten.
+   * - Dieselbe Ratenbegrenzung wie das Einloesen (`limiter`, gleicher Topf):
+   *   die Pruefung ist kein zweiter, freier Weg, Tokens durchzuprobieren.
+   * - Eine Antwort fuer unbekannt, abgelaufen, eingeloest und "Konto nimmt
+   *   keinen Reset an": `valid: false`, kein Name, kein Grund. Die Seite
+   *   braucht nur die eine Unterscheidung, und mehr gaebe dem Inhaber eines
+   *   Links Auskunft ueber ein Konto, die das Einloesen auch nicht gibt.
+   * - POST statt GET: der Token steht im Koerper, nicht in einer URL, die in
+   *   Zugriffslogs oder einem Cache landet.
+   */
+  targetRouter.post('/reset-password/check', limiter, (req, res) => {
+    try {
+      const { token } = req.body || {};
+      const userId = typeof token === 'string' && token ? resetService.verifyToken(token) : null;
+      res.json({ data: { valid: !!userId && accountAcceptsReset(userId) } });
+    } catch (err) {
+      log.error('reset-password check error:', err.message);
+      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    }
+  });
+
   targetRouter.post('/reset-password', limiter, async (req, res) => {
     try {
       const { token, password } = req.body || {};
@@ -1935,17 +1980,9 @@ export function buildResetRoutes(targetRouter, {
       if (!userId) {
         return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
       }
-      // Zwischen dem Ausstellen des Tokens und dem Einloesen kann der Admin das
-      // Konto auf SSO umgestellt oder die eingebaute Anmeldung abgeschaltet
-      // haben (#847). Ein noch gueltiger Token darf diese Entscheidung nicht
-      // ueberholen. Bewusst dieselbe Meldung wie ein ungueltiger Token: der
-      // Unterschied ginge sonst an jemanden, der das Konto nicht besitzt.
-      // Dasselbe fuer ein Konto, das zwischen Ausstellen und Einloesen
-      // deaktiviert wurde (#1381). Das Deaktivieren loescht seine Reset-Tokens;
-      // diese Zeile haelt es auch fuer eines, das danach noch auftaucht.
-      if ((!isPasswordLoginEnabled(getDb()) && !isSplitExpenseGuest(userId, getDb()))
-          || !hasResettablePassword(userId)
-          || !isActiveAccount(userId, { db: getDb() })) {
+      // Bewusst dieselbe Meldung wie ein ungueltiger Token: der Unterschied
+      // ginge sonst an jemanden, der das Konto nicht besitzt.
+      if (!accountAcceptsReset(userId)) {
         resetService.consumeToken(token);
         return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
       }
