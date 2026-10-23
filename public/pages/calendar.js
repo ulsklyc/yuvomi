@@ -4097,7 +4097,10 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   // damit "+N" auch die nicht gerenderten Überzähligen mitzählt. Reihenfolge
   // Feiertag -> Schichtplan -> Waste -> Termin -> Aufgabe. Waste bleibt wie der
   // Schichtplan ungekappt (typischerweise 0-2 Abholungen je Tag).
-  const total     = dayHols.length + daySchedule.length + dayWaste.length + evs.length + dayTasks.length;
+  // Die Schichten zaehlen fuer den Namen der Zelle, nicht fuer „+N weitere":
+  // sie stehen als Streifen am Kopf, nicht als Zeile (D5, monthShiftMarksHtml).
+  const labelTotal = dayHols.length + daySchedule.length + dayWaste.length + evs.length + dayTasks.length;
+  const total     = labelTotal - daySchedule.length;
   const holShown  = dayHols.slice(0, MONTH_DAY_MAX_CHIPS);
   const evShown   = chipEvs.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length));
   const taskShown = dayTasks.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length - evShown.length));
@@ -4108,7 +4111,7 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
     </div>
   `).join('');
 
-  const scheduleHtml = daySchedule.map((entry) => `<div class="month-day__holiday schedule-entry" style="--holi-color:${esc(entry.shift_type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span></div>`).join("");
+  const scheduleHtml = monthShiftMarksHtml(daySchedule);
 
   const wasteHtml = dayWaste.map((occ) => renderWasteChip(occ, { className: 'month-day__holiday', icon: false })).join('');
 
@@ -4142,12 +4145,12 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   return `
     <div class="${classes}" data-date="${date}" data-total="${total}"
          role="gridcell" tabindex="${focusable ? '0' : '-1'}"${isToday ? ' aria-current="date"' : ''}${split ? ` aria-selected="${selected ? 'true' : 'false'}"` : ''}>
-      <span class="sr-only month-day__label">${esc(monthDayAriaLabel(date, total, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}</span>
+      <span class="sr-only month-day__label">${esc(monthDayAriaLabel(date, labelTotal, evs, { tasks: dayTasks, others: [...dayHols.map((h) => h.name), ...daySchedule.map(scheduleEntryLabel)], isToday }))}</span>
       <div class="month-day__visual" aria-hidden="true">
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
+      ${scheduleHtml}
       ${band?.depth ? `<div class="month-day__lanes" style="--lanes:${band.depth}"></div>` : ''}
       ${holHtml}
-      ${scheduleHtml}
       ${wasteHtml}
       ${evHtml}
       ${taskHtml}
@@ -4270,6 +4273,19 @@ function scheduleEntryLabel(entry) {
   return owner ? shift + " · " + owner : shift;
 }
 
+/**
+ * DIE GANZTAGSZEILE NENNT KUERZEL UND INITIALEN (Critique R22, a3 P1, D5).
+ * „F · Linda Johnson" plus „06:00 - 14:00" passte in keine Spalte der Woche:
+ * bei 1280 stand vom Etikett 0 px, sichtbar blieb „10:00 - 10:00 +1 · 2...".
+ * Jetzt „F · LJ" - wer, steht in den Initialen wie in jedem Avatar der App,
+ * der volle Text im zugaenglichen Namen und im Detail beim Tipp.
+ */
+function scheduleEntryShortLabel(entry) {
+  const shift = entry.shift_type.short_code || entry.shift_type.name;
+  const owner = scheduleOwnerName(entry);
+  return owner ? shift + " · " + initials(owner) : shift;
+}
+
 // Note plus jedes ueberlagerungssichtbare eigene Feld mit einem Wert (Migration
 // 181) - dieselbe Berechnung wie schedule.js' overlayMeta(), hier eigenstaendig
 // nachgebaut statt importiert: diese Datei haelt schon fuer jede andere
@@ -4330,16 +4346,36 @@ function scheduleEntryMatchKey(entry) {
 // `clickable` haengt die Detail-Modal-Ausloesung an (role=button + Schluessel) -
 // nur Woche/Tag, Monat behaelt sein Navigieren-zum-Tag, Agenda bleibt inert
 // (ausserhalb des Umfangs dieser Aenderung).
+// D5 (R22): in Woche und Tag (`clickable`) traegt der Chip die Kurzform
+// „F · LJ" vor der Uhrzeit; die Uhrzeit faellt weg, wo sie nicht ganz passt
+// (calendar.css, Umbruch in eine abgeschnittene zweite Zeile). Der volle
+// Text steht im zugaenglichen Namen. Die Agenda nennt die Person ausgeschrieben.
 function renderScheduleChip(entry, className = 'allday-holiday', { showFullRange = false, clickable = false } = {}) {
   const type = entry.shift_type;
-  const label = scheduleEntryLabel(entry);
+  const label = clickable ? scheduleEntryShortLabel(entry) : scheduleEntryLabel(entry);
   const start = type.start_time
     ? '<small class="schedule-entry__start">' + esc(showFullRange ? scheduleTimeLabel(type, { suffix: false }) : formatTime(type.start_time)) + '</small>'
     : '';
   const detailAttrs = clickable
-    ? ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"`
+    ? ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}" aria-label="${esc(scheduleEntryTitle(entry))}"`
     : '';
-  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"${detailAttrs}><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
+  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"${detailAttrs}><span class="schedule-entry__label">${esc(label)}${scheduleEntryExtraBadge(entry)}</span>${start}</div>`;
+}
+
+/**
+ * DIE SCHICHT IM MONAT IST EIN STREIFEN AM TAGESKOPF, KEINE TERMINZEILE
+ * (Critique R22, a3 P1, D5). „F · Linda Johnson" stand als erste Zeile in
+ * jeder Werktagszelle, und die Termine des Tages rutschten hinter „+4
+ * weitere". Jetzt traegt der Kopf der Zelle bis zu drei kurze Striche in der
+ * Farbe der Schicht und „+N" fuer den Rest; wer welche Schicht hat, sagt die
+ * Tagesliste (Telefon) bzw. der Tag (Tipp), und der Name der Zelle nennt sie.
+ */
+const MONTH_SHIFT_MARKS = 3;
+function monthShiftMarksHtml(entries) {
+  if (!entries.length) return '';
+  const shown = entries.slice(0, MONTH_SHIFT_MARKS);
+  const rest = entries.length - shown.length;
+  return `<div class="month-day__shifts">${shown.map((entry) => `<span class="month-day__shift" style="--holi-color:${esc(entry.shift_type.color)}"></span>`).join('')}${rest > 0 ? `<span class="month-day__shifts-more">+${rest}</span>` : ''}</div>`;
 }
 
 /**
@@ -4877,9 +4913,47 @@ function wireTimeGridCreate(surface, {
       vibrate(15);
     }, GRID_PRESS_MS);
   });
+  // DER HOVER TOENT DAS BAND, NICHT DIE SPALTE (Critique R22, a3 P3, D20).
+  // `:hover` an der Spalte faerbte den ganzen Tag (548 x 960 px) - ein
+  // Zeiger ueber 10 Uhr sagte nichts ueber 10 Uhr. Jetzt steht unter dem
+  // Zeiger genau die Stunde, die ein Doppelklick anlegt (clickedTime(), wie
+  // der Platzhalter des langen Drucks). Nur mit echtem Zeiger; je Frame
+  // hoechstens eine Messung.
+  const hoverable = typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
+  let band = null;
+  let hoverEvent = null;
+  let hoverFrame = 0;
+  const hideBand = () => {
+    if (hoverFrame) cancelAnimationFrame(hoverFrame);
+    hoverFrame = 0;
+    hoverEvent = null;
+    band?.remove();
+  };
+  const paintBand = () => {
+    hoverFrame = 0;
+    const e = hoverEvent;
+    hoverEvent = null;
+    const slot = e ? slotAt(e) : null;
+    if (!slot?.col || typeof document === 'undefined') { band?.remove(); return; }
+    if (!band) {
+      band = document.createElement('div');
+      band.className = 'cal-hover-slot';
+      band.setAttribute('aria-hidden', 'true');
+      band.style.height = hourOffset(60);
+    }
+    const [hour, minute] = slot.time.split(':').map(Number);
+    const top = hourOffset(hour * 60 + minute);
+    if (band.parentElement !== slot.col) slot.col.append(band);
+    if (band.style.top !== top) band.style.top = top;
+  };
   surface.addEventListener('pointermove', (e) => {
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > GRID_PRESS_SLOP) clear();
+    if (!hoverable || e.pointerType !== 'mouse') return;
+    hoverEvent = e;
+    if (!hoverFrame) hoverFrame = requestAnimationFrame(paintBand);
   });
+  surface.addEventListener('pointerleave', hideBand);
+  scroller?.addEventListener('scroll', hideBand, { passive: true });
   surface.addEventListener('pointerup', () => {
     const slot = press?.armed ? press.slot : null;
     clear();

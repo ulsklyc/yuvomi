@@ -1737,6 +1737,44 @@ test('matchesRRuleByday filtert nicht, wo UTC- und Ortsdatum auseinanderfallen',
     'mit Zonenhinweis nicht - lieber ein Vorkommen zu viel als eines lautlos verloren');
 });
 
+// R22 (Critique a3 P1, D5): in der Woche stand vom Etikett 0 px ("10:00 -
+// 10:00 +1 · 2..."), im Monat war jede Schicht eine Terminzeile und schob die
+// Termine hinter "+4 weitere". Woche/Tag: "F · LJ" vor der Uhrzeit, der volle
+// Text im Namen. Monat: Striche am Tageskopf, hoechstens drei und "+N".
+test('R22 D5: Woche/Tag nennen "F · LJ" vor der Uhrzeit, der Monat zeigt Striche statt Zeilen', () => {
+  const { renderScheduleChip, renderMonthDay, state } = calendarHelpers;
+  const saved = { users: state.users, userDirectory: state.userDirectory, scheduleEntries: state.scheduleEntries, layerSchedule: state.layerSchedule, people: state.people, assignedToMe: state.assignedToMe, events: state.events, tasks: state.tasks };
+  const type = (code, color) => ({ name: `${code}-Schicht`, short_code: code, color, start_time: '06:00', end_time: '14:00' });
+  try {
+    state.users = [{ id: 1, display_name: 'Linda Johnson' }, { id: 2, display_name: 'Alex Johnson' }];
+    state.userDirectory = state.users;
+    const entry = { user_id: 1, date_key: '2026-10-21', source: 'pattern', pattern_day_id: 4, shift_type: type('F', '#0891b2') };
+    const chip = renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true });
+    assert(/<span class="schedule-entry__label">F · LJ<\/span><small class="schedule-entry__start">/.test(chip), `Kuerzel und Initialen VOR der Uhrzeit: ${chip}`);
+    assert(/aria-label="F-Schicht · Linda Johnson · /.test(chip), 'der volle Text ist der Name des Chips');
+    const agenda = renderScheduleChip(entry, 'agenda-holiday');
+    assert(agenda.includes('F · Linda Johnson'), 'die Agenda nennt die Person ausgeschrieben');
+
+    state.layerSchedule = true;
+    state.people = new Set();
+    state.assignedToMe = false;
+    state.scheduleEntries = [
+      entry,
+      { ...entry, user_id: 2, source: 'extra', extra_id: 1, shift_type: type('B', '#d97706') },
+      { ...entry, user_id: 2, pattern_day_id: 5, shift_type: type('N', '#3b82f6') },
+      { ...entry, source: 'extra', extra_id: 2, shift_type: type('B', '#d97706') },
+    ];
+    const cell = renderMonthDay('2026-10-21', true, { focusable: true });
+    assert(!/month-day__holiday schedule-entry/.test(cell), 'keine Schicht als Zeile in der Monatszelle');
+    assert((cell.match(/class="month-day__shift"/g) || []).length === 3, 'hoechstens drei Striche');
+    assert(/class="month-day__shifts-more">\+1</.test(cell), 'der Rest als +N');
+    assert(/data-total="0"/.test(cell), '"+N weitere" zaehlt nur Termine, Aufgaben und Feiertage');
+    assert(/4 /.test(cell.match(/month-day__label">([^<]*)/)?.[1] ?? '') || /monthDayEntries/.test(cell), 'der Name der Zelle zaehlt die Schichten weiter');
+  } finally {
+    Object.assign(state, saved);
+  }
+});
+
 test('scheduleEntriesOnDay() respektiert den Personenfilter und den "Mir zugewiesen"-Filter wie Termine/Aufgaben (#1018)', () => {
   const { scheduleEntriesOnDay, state } = calendarHelpers;
   const savedEntries = state.scheduleEntries;
@@ -6093,8 +6131,14 @@ await test('Re-Kritik: Personen-Chips ohne geteilten Nachnamen; heute ist im Min
   assert(!/background-color/.test(cursor?.body ?? ''), 'der gewaehlte Tag ist keine zweite Scheibe');
   const mini = rules.filter((r) => r.selector.includes('.cal-mini__day'));
   assert(mini.every((r) => !/--module-accent/.test(r.body)), 'kein Azur im Mini-Monat');
-  const hover = rules.find((r) => r.selector.split(',').some((x) => x.trim() === '.week-view__col:hover'));
-  assert(/var\(--color-accent\)/.test(hover?.body ?? '') && !/--module-accent/.test(hover?.body ?? ''), 'die Spalte unter dem Zeiger im Akzent');
+  // R22 (D20): getoent wird das Band unter dem Zeiger, nicht die Spalte.
+  const hover = rules.find((r) => r.selector.trim() === '.cal-hover-slot');
+  assert(/var\(--color-accent\)/.test(hover?.body ?? '') && !/--module-accent/.test(hover?.body ?? ''), 'das Band unter dem Zeiger im Akzent');
+  assert(!rules.some((r) => r.selector.split(',').some((x) => /^\.(?:week|day)-view__col:hover$/.test(x.trim()))), 'keine Spalte toent sich als Ganzes');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const wire = src.slice(src.indexOf('function wireTimeGridCreate('), src.indexOf('function scrollToHour('));
+  assert(/band\.className = 'cal-hover-slot'/.test(wire) && /matchMedia\('\(hover: hover\) and \(pointer: fine\)'\)/.test(wire), 'das Band entsteht nur mit echtem Zeiger');
+  assert(/const slot = e \? slotAt\(e\) : null;[\s\S]*?const \[hour, minute\] = slot\.time\.split/.test(wire), 'das Band steht auf der Zeit, die ein Doppelklick anlegt');
 });
 
 test('Seitenleiste: der Mini-Monat zeigt sechs Wochen ab dem Wochenstart, markiert heute, Auswahl und den gezeigten Zeitraum', () => {
