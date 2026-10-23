@@ -761,7 +761,7 @@ test('showToast verdrahtet die Geste über den geteilten Helfer', () => {
   // der Router reicht sie nur weiter. Beide duerfen keinen Zwilling halten.
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const toastShow = readFileSync(new URL('../public/utils/toast-show.js', import.meta.url), 'utf8');
-  assert.match(router, /import \{ showToast \} from '\/utils\/toast-show\.js'/,
+  assert.match(router, /import \{ showToast(?:, \w+)* \} from '\/utils\/toast-show\.js'/,
     'der Router muss showToast aus utils/toast-show.js beziehen, sonst lebt ein Zwilling');
   assert.ok(
     toastShow.includes('wireSwipeToDismiss(toast'),
