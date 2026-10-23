@@ -229,6 +229,18 @@
   display: flex;
 }
 
+/* DIE BEREICHSLISTE ERSCHEINT AN IHREM ORT (Critique R22, D4). Das Skelett
+ * kennt die Hoehe des Inhalts erst ab dem zweiten Aufruf; beim ersten fehlte
+ * ihm die Kurzzeile (`.health-brief`, 50px + Abstand), und die Liste rutschte
+ * mit den Daten von y=577 auf y=639 (CLS 0,023 bei 390x844, 4x CPU) - bei
+ * einem Konto ohne Kurzzeile und mit weniger Faelligem umgekehrt nach oben.
+ * Solange die Region wartet, haelt die Liste ihren Platz unsichtbar; sie
+ * erscheint, wenn ueber ihr nichts mehr waechst. Ein Ladefehler nimmt die
+ * Marke ebenfalls weg (health.js), die Liste bleibt also nie verborgen. */
+.health-priority-region[data-health-priority-pending] ~ .health-areas {
+  visibility: hidden;
+}
+
 .health-priority-skeleton__pill {
   inline-size: 12rem;
   block-size: var(--target-base);

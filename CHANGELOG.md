@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrived. The old page now stays until the new one has drawn, then the two swap in one frame
   together with the highlight. Going into a page and back out (settings, health areas) still
   slides as before.
+- **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
+  in the budget showed the list first and pushed it down once the figures above it arrived; the
+  figures now hold their place from the first frame. On a phone, the Health area list waits in
+  place until the "Today" cards above it are complete instead of sliding down under your finger.
 - **Settings pages no longer jump while they load.** Opening a settings page such as Members or
   a module page showed its sections as they arrived, and each finished section pushed the ones
   below it down. A section now appears once it is complete and everything above it is in place;

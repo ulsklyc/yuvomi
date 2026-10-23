@@ -798,3 +798,22 @@ test('R18: kein Bereich laedt mehr mit dem Wort "Lade..." - jeder traegt ein Ske
   assert.match(fn, /renderSkeletonList\(\{ rows: 3, lines: 2 \}\)/);
   assert.match(HEALTH_JS, /import \{ renderSkeletonList, renderSkeletonChart \} from '\/utils\/skeleton\.js';/);
 });
+
+// Critique R22 (D4, a6): das Skelett der Heute-Region kennt die Hoehe des
+// Inhalts erst ab dem zweiten Aufruf. Beim ersten fehlte ihm die Kurzzeile, und
+// die Bereichsliste rutschte mit den Daten von y=577 auf y=639 (CLS 0,023 bei
+// 390x844, 4x CPU); ein Konto mit weniger Faelligem zog sie hoch. Solange die
+// Region wartet, haelt die Liste ihren Platz unsichtbar - und ein haengender
+// Abruf verbirgt sie hoechstens PRIORITY_WAIT_MS lang.
+test('R22 D4: die Bereichsliste erscheint erst, wenn ueber ihr nichts mehr waechst - nie dauerhaft verborgen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))].filter((r) => !r.at.length);
+  const wait = rules.find((r) => /\.health-priority-region\[data-health-priority-pending\]\s*~\s*\.health-areas/.test(r.selector));
+  assert.ok(wait, 'die Liste steht waehrend des Wartens sichtbar - sie rutscht mit den Daten');
+  assert.match(wait.body, /visibility:\s*hidden/, 'verborgen, aber an ihrem Platz (kein display: none - sonst springt sie beim Erscheinen)');
+  assert.doesNotMatch(wait.body, /display:/);
+  const render = HEALTH_JS.slice(HEALTH_JS.indexOf('export async function render('));
+  assert.match(HEALTH_JS, /const PRIORITY_WAIT_MS = \d+;/);
+  assert.match(render, /if \(_priorityPending\) \{\s*const giveUp = setTimeout\(\(\) => \{\s*if \(!_priorityPending\) return;\s*_priorityPending = false;\s*syncPriorityRegion\(\);\s*\}, PRIORITY_WAIT_MS\);\s*signal\?\.addEventListener\('abort', \(\) => clearTimeout\(giveUp\)/,
+    'ohne Frist verbirgt ein haengender Abruf die Navigation');
+});

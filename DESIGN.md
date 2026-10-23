@@ -1359,7 +1359,13 @@ das Verhaeltnis haelt.
   (`revealSectionsInOrder`, shell.js); bis dahin liegt sein Traeger ausserhalb des Flusses
   (`[data-pending]`, settings.css), das Skelett steht an der Kante. Kaltstart mobil Mitglieder
   0,25 -> 0, Modulblatt Kalender 0,53 -> 0, Gesundheit 0,20 -> 0 (Desktop 0,13/0,10 -> 0). Guard:
-  `test:settings-navigation`.
+  `test:settings-navigation`. Budget-Reiter Abos und Aufteilung: der Kennzahl-Slot steht ab dem
+  ersten Bild in Zielform (`metricGlanceSkeletonHtml`/`metricCardsSkeletonHtml`, dasselbe Markup
+  mit `.skeleton-text`), nach dem Reiterwechsel mobil 0,0996/0,060 -> 0, Laptop 0,025 -> 0
+  (Guard `test:budget-ui`). Gesundheit mobil: solange die Heute-Region wartet, steht die
+  Bereichsliste unsichtbar an ihrem Platz (`visibility: hidden`, hoechstens
+  `PRIORITY_WAIT_MS`), 0,023 -> 0 (Guard `test:health-nav`). Zeilenweise `content-visibility`
+  erst ab `:nth-child(n+20)`, `contain-intrinsic-size` = Content-Box (`test:frontend-audit`).
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
   (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
   `swapContent(host, update, { direction })`: Blende ab 0,4 Deckkraft (kein leerer Frame),

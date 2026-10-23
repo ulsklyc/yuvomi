@@ -741,6 +741,12 @@ function markAreaEntering(route, direction = 0) {
  * Landmarke), und nach einem Ladefehler faellt die Marke ebenfalls. */
 let _priorityPending = false;
 let _priorityHeight = 0;
+/**
+ * So lange haelt die Region hoechstens ihre Marke. Solange sie wartet, steht
+ * die Bereichsliste unsichtbar an ihrem Platz (health.css, R22 D4) - ein
+ * haengender Abruf duerfte die Navigation nicht verbergen.
+ */
+const PRIORITY_WAIT_MS = 4000;
 
 function prioritySkeletonMarkup() {
   return `<div class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true">
@@ -1167,6 +1173,14 @@ export async function render(container, ctx = {}) {
   if (window.lucide) window.lucide.createIcons({ el: container });
 
   const signal = ctx.signal;
+  if (_priorityPending) {
+    const giveUp = setTimeout(() => {
+      if (!_priorityPending) return;
+      _priorityPending = false;
+      syncPriorityRegion();
+    }, PRIORITY_WAIT_MS);
+    signal?.addEventListener('abort', () => clearTimeout(giveUp), { once: true });
+  }
   wireAreasNav(signal);
   md = mountMasterDetail({
     root: container.querySelector('.health-split'),
