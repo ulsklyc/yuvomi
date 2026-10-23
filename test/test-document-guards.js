@@ -443,6 +443,13 @@ test('save confirmations preserve the same editor across repeated gates and keep
 // Seitenleisten-Tipps 30 und 110ms nach dem Wechsel alle. swapPage bricht die
 // Blende beim ersten pointerdown ab: der erste Tipp bleibt verloren (sein Ziel
 // war schon <html>), der zweite erreicht die neue Seite.
+//
+// Seit R22 (D1) schneidet der Wechsel: die Transition haelt nur noch das alte
+// Bild, bis die Zielseite gerendert hat - hoechstens FIRST_RENDER_WAIT_MS.
+// Gegen den lokalen Seed rendert /tasks schneller als die 30 ms bis zur
+// Vorbedingung. Die Sonde haelt deshalb die Aufgaben-Antwort zurueck, damit
+// das Fenster so lange steht wie bei einer langsamen Verbindung - in genau
+// diesem Fenster landet ein Zeiger weiter auf <html>.
 test('ein zweiter Tipp waehrend des Seitenwechsels erreicht die Seitenleiste', async () => {
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {
@@ -452,8 +459,19 @@ test('ein zweiter Tipp waehrend des Seitenwechsels erreicht die Seitenleiste', a
     };
     await page.evaluate(() => window.yuvomi.navigate('/calendar'));
     await page.waitForFunction(() => location.pathname === '/calendar' && !document.documentElement.classList.contains('navigating'));
-    await page.evaluate(() => window.yuvomi.navigate('/tasks'));
-    await new Promise((r) => setTimeout(r, 30));
+    await page.evaluate(() => {
+      const fetchNow = window.fetch;
+      window.fetch = (input, init) => (String(input?.url ?? input).includes('/api/v1/tasks')
+        ? new Promise((resolve) => setTimeout(resolve, 600)).then(() => fetchNow(input, init))
+        : fetchNow(input, init));
+    });
+    // NICHT auf navigate() warten: das Versprechen loest erst nach dem Wechsel
+    // auf. Gewartet wird auf seinen Beginn, nicht auf eine feste Zeit - das
+    // Laden des Seitenmoduls liegt davor (gemessen 36 ms bis `navigating`), und
+    // das gehaltene Fenster dahinter ist nur noch ~200 ms lang.
+    await page.evaluate(() => { window.yuvomi.navigate('/tasks'); });
+    await page.waitForFunction(() => document.documentElement.classList.contains('navigating'),
+      { polling: 'mutation', timeout: 2000 }).catch(() => {});
     assert.equal(await page.evaluate(() => document.documentElement.classList.contains('navigating')), true,
       'Vorbedingung: der Wechsel laeuft noch als View Transition - sonst misst die Sonde nichts');
     await tapNotes();
@@ -1218,7 +1236,8 @@ const SHAPE_EXEMPT = new Map([
   // 1. Zustandsschalter
   ['item-check', 'Zustandsschalter: Checkbox der Einkaufsliste'],
   ['group-toggle__btn', 'Zustandsschalter: Segment der Aufgaben-Gruppierung'],
-  ['cal-toolbar__view-btn', 'Zustandsschalter: Segment der Kalender-Ansicht'],
+  // `.cal-toolbar__view-btn` stand hier, bis das Kalender-Segment in R22 (D8)
+  // ganz auf `.segmented__item` lief - seine eigene Regel ist entfallen.
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
   // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
@@ -1423,6 +1442,12 @@ async function measureTargets(page, min) {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
       if (el.closest('.sr-only, [aria-hidden="true"], yuvomi-install-prompt')) continue;
+      // Was nicht gezeichnet wird, ist kein Ziel - wie `display: none` oben.
+      // Der Inhalt eines geschlossenen `<details>` (R22: "Mehr dazu" der
+      // Settings-Hinweise) liegt in einem Slot mit `content-visibility: hidden`;
+      // getBoundingClientRect legt ihn trotzdem aus, auf den Inhalt darunter,
+      // und die Sonde meldete den Link darin als "verdeckt".
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) continue;
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
       els.push(el);
