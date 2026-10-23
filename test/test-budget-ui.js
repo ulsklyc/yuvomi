@@ -1704,9 +1704,13 @@ test('„Nur Ausgaben" steht in der Kopfzeile der Bilanz und trifft voll', () =>
   assert.match(head[0], /id="budget-expenses-only"/);
   assert.doesNotMatch(budget, /budget-summary-bar/);
   assert.doesNotMatch(budgetCss, /\.budget-summary-bar\b/);
-  const hit = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-expenses-toggle::before');
-  assert.ok(hit, 'die Pille dehnt ihre Treffflaeche nicht aus');
-  assert.match(hit.body, /height:\s*var\(--target-base\)/);
+  // R22 (D9, D8): der geteilte Chip `--sm` - 40px am Zeiger wie die 40px-
+  // Werkzeugzeile des Journals daneben, 48px am Finger. Die eigene 32px-Pille
+  // (12px Schrift, Treffflaeche per ::before) ist weg.
+  assert.match(head[0], /<button class="filter-chip filter-chip--sm budget-expenses-toggle\$\{expensesOnly \? ' filter-chip--active' : ''\}"/);
+  assert.ok(![...eachRule(budgetCss)].some(({ selector }) => /\.budget-expenses-toggle(?:::before|--active)/.test(selector)), 'keine eigene Pillenform mehr');
+  const own = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-expenses-toggle');
+  assert.doesNotMatch(own?.body ?? '', /min-height|padding|font-size|border/, 'Hoehe und Form kommen vom Chip');
   const row = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-summary-head');
   assert.match(row.body, /min-height:\s*var\(--target-base\)/, 'die Kopfzeile muss die Treffflaeche fassen');
   assert.match(row.body, /max-width:\s*var\(--page-measure/, 'der Umschalter endet an der Bahn');
@@ -7567,4 +7571,43 @@ test('R22 D9: Konto, Abo und Ausgabe der Aufteilung beginnen mit derselben Lead-
   const split = read('../public/pages/split-expenses.js');
   assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 2, 'Ausgabe und Serie tragen den Ton ihrer Kategorie');
   assert.equal((split.match(/class="split-group__avatar budget-tile"/g) ?? []).length, 2);
+});
+
+// Critique R22 (aus S2 gemessen, a4 Klein): der Kopf-Slot wuchs fuer die Notiz
+// der Reiter ohne Zeitraum auf die freie Zeile (mobil 192 -> 206px, Tablet 240 ->
+// 642px) - der Reiterwechsel schob ihn (0,0005 / 0,012). Und am Desktop stand
+// "Alle Darlehen" mittig im 780px-Slot statt dort, wo der Monat beginnt.
+test('R22: die Kopfnotiz haelt die Breite des Steppers und beginnt am Desktop am Slot-Anfang', () => {
+  const NOTE_SLOT = '.page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .budget-nav__month:has(.budget-nav__note:not([hidden]))';
+  const rules = [...eachRule(budgetCss)].filter((r) => r.selector.trim() === NOTE_SLOT);
+  const tablet = rules.find((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)) && /flex:/.test(r.body));
+  assert.ok(tablet, 'die Tablet-Regel des Notiz-Slots fehlt');
+  assert.match(tablet.body, /flex:\s*0 0 auto/, 'der Slot waechst nicht in die freie Zeile');
+  assert.match(tablet.body, /inline-size:\s*calc\(var\(--target-base\) \* 2 \+ var\(--space-12\) \* 3\)/, 'so breit wie Pfeil + 144px-Label + Pfeil');
+  const phone = rules.find((r) => r.at.some((a) => /max-width:\s*767px/.test(a)));
+  assert.match(phone?.body ?? '', /inline-size:\s*calc\(var\(--target-base\) \* 2 \+ var\(--space-12\) \* 2\)/, 'mobil so breit wie das 96px-Label');
+  assert.ok(rules.indexOf(phone) > rules.indexOf(tablet), 'die Telefonregel steht nach der Tablet-Regel');
+  const note = [...eachRule(budgetCss)].find((r) => r.selector.trim() === '.budget-nav__note' && !r.at.length);
+  assert.match(note.body, /text-align:\s*start/, 'am Desktop beginnt die Notiz, wo der Monat beginnt');
+});
+
+// Critique R22 (D9, a4 Klein "Darlehen Restschuld doppelt"): die Karte eines
+// verzinsten Darlehens begann mit dem Versal-Eyebrow "RESTSCHULD" ueber der
+// Zahl - direkt neben der Kennzahl "Restschuld" der Seitenleiste. Jetzt zuerst
+// die Zahl, das Etikett leise am Anfang der Bezugszeile.
+test('R22 D9: die Darlehenskarte fuehrt mit der Zahl, "Restschuld" steht in der Bezugszeile', () => {
+  const karte = budgetUi.renderLoanCard({
+    id: 3, title: 'Haus', borrower: 'Bank', direction: 'borrowed', status: 'active',
+    total_amount: 250000, remaining_amount: 230000, remaining_principal: 174644.93, paid_amount: 12915,
+    paid_installments: 14, installment_count: 312, next_due_month: '2026-10', is_settled: 0, payments: [],
+    interest: { principal: 180000, monthly_payment: 922.5, mode: 'fixed', fixed_rate: 3.65 },
+  });
+  const amounts = /<div class="budget-loan-card__amounts">([\s\S]*?)<\/div>/.exec(karte)[1];
+  const zahl = amounts.indexOf('<strong>');
+  const etikett = amounts.indexOf('budget-loan-card__amount-label');
+  assert.ok(zahl >= 0 && etikett > zahl, 'die Zahl steht vor dem Etikett');
+  assert.match(amounts, /<span><span class="budget-loan-card__amount-label">budget\.loanRemainingPrincipal<\/span> · budget\.loanRemainingOf/, 'Etikett und Bezugsgroesse in EINER Zeile');
+  const rule = [...eachRule(budgetCss)].find((r) => r.selector.includes('.budget-loan-card__amount-label'));
+  assert.doesNotMatch(rule?.body ?? '', /text-transform|letter-spacing/, 'kein Versal-Eyebrow');
+  assert.match(rule?.body ?? '', /display:\s*inline/, 'im Fluss der Bezugszeile (`.budget-loan-card__amounts span` ist sonst block)');
 });

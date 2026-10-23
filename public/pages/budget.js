@@ -1419,11 +1419,16 @@ function renderBody() {
          deren Kopf statt in einer eigenen Zeile ueber der Seite. -->
     <div class="budget-summary-head">
       <h2 class="u-section-title" id="budget-summary-title">${t(forecast ? 'budget.summaryTitleForecast' : 'budget.summaryTitle')}</h2>
-      <button class="budget-expenses-toggle${expensesOnly ? ' budget-expenses-toggle--active' : ''}"
+      ${/* DER GETEILTE CHIP (R22, D9): bis dahin eine eigene 32px-Pille mit
+           12px-Schrift neben der 40px hohen Werkzeugzeile des Journals
+           (Suche, Mehr). `.filter-chip--sm` ist am Zeiger 40, am Finger 48px
+           hoch - eine Hoehe je Zeile (D8) - und traegt den Aktivzustand der
+           Chipreihen. */ ''}
+      <button class="filter-chip filter-chip--sm budget-expenses-toggle${expensesOnly ? ' filter-chip--active' : ''}"
               id="budget-expenses-only" type="button" role="switch"
               aria-checked="${expensesOnly ? 'true' : 'false'}"
               title="${t('budget.expensesOnlyHint')}">
-        <i data-lucide="receipt" class="icon-sm" aria-hidden="true"></i>
+        <i data-lucide="receipt" aria-hidden="true"></i>
         <span>${t('budget.expensesOnly')}</span>
       </button>
     </div>
@@ -3919,9 +3924,14 @@ function renderLoanCard(loan) {
         ${loan.interest ? `<div class="budget-loan-card__meta budget-loan-card__interest">${esc(loanInterestMeta(loan.interest, loan))}</div>` : ''}
       </div>
       <div class="budget-loan-card__amounts">
-        ${interest ? `<span class="budget-loan-card__amount-label">${t(isBorrowedLoan(loan) ? 'budget.loanRemainingPrincipal' : 'budget.loanOwedToYou')}</span>` : ''}
+        ${/* DIE ZAHL ZUERST, DAS ETIKETT IN DER BEZUGSZEILE (R22, D9). Als
+             Versal-Eyebrow ueber dem Betrag stand "RESTSCHULD" direkt neben der
+             Kennzahl "Restschuld" der Seitenleiste - dasselbe Wort zweimal
+             uebereinander, und die Karte begann mit einem Etikett statt mit
+             ihrer Zahl. Gesagt werden muss es weiter (Restschuld ist nicht die
+             Summe der Restraten), jetzt leise vor der Bezugsgroesse. */ ''}
         <strong>${formatLoanAmount(leadAmount, loan)}</strong>
-        <span>${t('budget.loanRemainingOf', { total: formatLoanAmount(leadTotal, loan) })}</span>
+        <span>${interest ? `<span class="budget-loan-card__amount-label">${t(isBorrowedLoan(loan) ? 'budget.loanRemainingPrincipal' : 'budget.loanOwedToYou')}</span> · ` : ''}${t('budget.loanRemainingOf', { total: formatLoanAmount(leadTotal, loan) })}</span>
         ${loan.is_foreign_currency
           ? `<span class="budget-loan-card__converted">${loanBudgetEquivalent(leadAmount, loan)}</span>`
           : ''}
