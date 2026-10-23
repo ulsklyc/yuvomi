@@ -1899,6 +1899,26 @@ async function loadUsers() {
   state.userDirectory = directory;
 }
 
+/**
+ * Was das Terminformular aus den Praeferenzen liest: Wochenstart, Dauer,
+ * Erinnerungen, "mir zuweisen", Sync-Ziel und der Speicherort fuer Anhaenge.
+ * Die Kalenderseite holt sie beim Aufbau; ein Termin, der UEBER einer anderen
+ * Seite bearbeitet wird (openEventById), holt sie selbst (loadAwayFormContext).
+ */
+function applyEventFormPreferences(prefs = {}, documentOptions = {}) {
+  state.holidayPrefs  = prefs ?? {};
+  state.weekStart     = weekStartIndex(prefs?.week_start);
+  state.defaultDuration = Number(prefs?.calendar_default_duration) || 60;
+  // Standardwerte für neue Termine (#497/#498).
+  state.defaultReminders = Array.isArray(prefs?.calendar_default_reminders)
+    ? prefs.calendar_default_reminders.map(Number)
+    : [];
+  state.defaultAssignMe  = !!prefs?.calendar_default_assign_me;
+  // Standard-Sync-Ziel für eigene neue Termine (#620).
+  state.defaultSyncTarget = prefs?.calendar_default_target || '';
+  state.documentUploadBackend = documentOptions?.active_upload_backend ?? 'local';
+}
+
 // --------------------------------------------------------
 // Entry Point
 // --------------------------------------------------------
@@ -2017,17 +2037,7 @@ export async function render(container, { user, signal } = {}) {
     api.get('/documents/meta/options').catch(() => ({ data: {} })),
   ]);
   toolbarEl.inert = false;
-  state.holidayPrefs  = prefsRes.data ?? {};
-  state.weekStart     = weekStartIndex(prefsRes.data?.week_start);
-  state.defaultDuration = Number(prefsRes.data?.calendar_default_duration) || 60;
-  // Standardwerte für neue Termine (#497/#498).
-  state.defaultReminders = Array.isArray(prefsRes.data?.calendar_default_reminders)
-    ? prefsRes.data.calendar_default_reminders.map(Number)
-    : [];
-  state.defaultAssignMe  = !!prefsRes.data?.calendar_default_assign_me;
-  // Standard-Sync-Ziel für eigene neue Termine (#620).
-  state.defaultSyncTarget = prefsRes.data?.calendar_default_target || '';
-  state.documentUploadBackend = documentOptionsRes.data?.active_upload_backend ?? 'local';
+  applyEventFormPreferences(prefsRes.data, documentOptionsRes.data);
   state.layerHolidays = localStorage.getItem(LAYER_HOLIDAYS_KEY) !== 'false';
   state.layerSchool   = localStorage.getItem(LAYER_SCHOOL_KEY)   !== 'false';
   state.layerBirthdays = localStorage.getItem(LAYER_BIRTHDAYS_KEY) !== 'false';
@@ -7491,27 +7501,39 @@ function renderEventDetail(ev, reminders = []) {
 }
 
 /**
- * Der einzige Einstieg in einen bestehenden Termin. Ohne Anker (Deep-Link,
- * Suchtreffer) wird daraus ein Sheet, mit Anker am Desktop ein Popover.
- */
-/**
  * DER TERMIN UEBER DER UEBERSICHT (Critique R22, D3). Die Zeilen des
  * Heute-Blatts und der Termin-Kachel fuehrten auf `/calendar?open=..` - der
  * Tipp verliess die Uebersicht, waehrend eine Aufgabe in derselben Liste ihr
  * Blatt ueber ihr oeffnete (`openTaskById`). Jetzt geht auch der Termin als
- * Leseblatt ueber der Seite auf, aus der getippt wurde: dieselben Renderer wie
- * im Kalender (Kopf, Zeilen, Ort mit Kartenaktion, Erinnerungen), aber ohne
- * Formular und Loeschen - die haengen am Zustand der Kalenderseite (Kalender,
- * Mitglieder, Neuladen der Ansicht). "Im Kalender oeffnen" fuehrt zum selben
- * Termin im Kalender, wo Bearbeiten steht.
+ * Blatt ueber der Seite auf, aus der getippt wurde (mit Anker am Desktop als
+ * Popover) - dieselbe Ansicht wie im Kalender (openEventDetail).
+ *
+ * BEARBEITEN UND LOESCHEN BLEIBEN DORT (R22-F, F1 Punkt 1). Bis dahin trug
+ * das Blatt nur "Im Kalender oeffnen": Formular und Loeschen hingen am
+ * Zustand der Kalenderseite (Mitglieder, Kalender, Praeferenzen, Neuzeichnen
+ * der Ansicht), und Bearbeiten hiess, die Uebersicht zu verlassen. Jetzt holt
+ * das Blatt, was das Formular braucht, selbst (loadAwayFormContext, neben dem
+ * Oeffnen her - die Leseansicht wartet nicht darauf), und nach Speichern,
+ * Zuruecksetzen oder Loeschen meldet es sich bei der Seite darunter
+ * (`onChanged`) statt eine Kalenderansicht neu zu zeichnen, die nicht steht.
+ * Beim Loeschen blendet `onRemoving` die Zeilen des Termins fuer die
+ * Rueckgaengig-Frist aus, wie der Kalender seinen Chip. Der Fuss ist damit
+ * derselbe wie im Kalender ([Loeschen] ... [Bearbeiten]); "Im Kalender
+ * oeffnen" daneben entfiel - es war der Umweg zum Bearbeiten, und als dritter
+ * Knopf brach es den Fuss im Popover (286px) in drei Zeilen.
  *
  * Ein Vorkommen einer Serie kommt aus dem Tag (`date`), wie beim Deep-Link
  * des Kalenders (findDeepLinkedOccurrence): ohne es zeigte das Blatt den
  * Serienstart.
  * @param {string|number} id
- * @param {{ date?: string|null, anchor?: HTMLElement|null }} [options]
+ * @param {{ date?: string|null, anchor?: HTMLElement|null, user?: object|null,
+ *           onChanged?: () => (void|Promise<void>),
+ *           onRemoving?: (scope: object, removing: boolean) => void }} [options]
  */
-export async function openEventById(id, { date = null, anchor = null } = {}) {
+export async function openEventById(id, { date = null, anchor = null, user = null, onChanged = null, onRemoving = null } = {}) {
+  // Steht die Kalenderseite, gehoert der Zustand ihr; sonst holt das Blatt
+  // ihn selbst, und zwar sofort - parallel zum Termin.
+  const away = hostedHere() ? null : { onChanged, onRemoving, ready: loadAwayFormContext(user).catch(() => {}) };
   const res = await api.get(`/calendar/${encodeURIComponent(String(id))}`);
   if (!res?.data) throw new Error(t('calendar.loadError'));
   const base = localizeBirthdayEvent(res.data);
@@ -7528,27 +7550,56 @@ export async function openEventById(id, { date = null, anchor = null } = {}) {
     window.yuvomi.navigate(`/housekeeping?editVisit=${ev.housekeeping_visit_id}`);
     return;
   }
-  const reminders = await loadReminderForEvent(reminderOwnerId(ev));
-  const target = `/calendar?${new URLSearchParams({ open: String(ev.id), date: day || '' }).toString()}`;
-  openDetailView({
-    title: ev.title,
-    head: eventDetailHead(ev),
-    anchor,
-    sections: renderEventDetail(ev, reminders),
-    actions: [{
-      id: 'detail-open-calendar',
-      label: t('calendar.openInCalendar'),
-      icon: 'calendar',
-      variant: 'primary',
-      // Ohne eigenes Schliessen: navigate() raeumt das Blatt ab und setzt die
-      // Seite an die Stelle seines History-Eintrags (consumeOverlayMarker) -
-      // ein close() davor liefe mit seinem back() gegen das pushState.
-      onClick: () => window.yuvomi?.navigate(target),
-    }],
-  });
+  _away = away;
+  await openEventDetail(ev, anchor, { formReady: away?.ready });
 }
 
-async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
+/**
+ * Das Blatt eines Termins ueber einer fremden Seite (openEventById), oder
+ * null. Gesetzt beim Oeffnen; gelesen wird es nur, solange die Kalenderseite
+ * NICHT steht (hostedHere) - steht sie, gilt ihr eigener Weg.
+ * @type {null | { onChanged: Function|null, onRemoving: Function|null, ready: Promise<void> }}
+ */
+let _away = null;
+
+/** Steht die Kalenderseite gerade im Dokument? */
+function hostedHere() {
+  return Boolean(_container?.isConnected);
+}
+
+/** Der Termin ist geschrieben: die Seite darunter frischt auf. */
+async function notifyAwayChanged() {
+  if (hostedHere() || !_away?.onChanged) return;
+  try { await _away.onChanged(); } catch (err) { console.warn('[Calendar] Seite unter dem Blatt nicht aufgefrischt:', err); }
+}
+
+/**
+ * Was das Terminformular braucht, ohne dass die Kalenderseite stand:
+ * Mitglieder (Zuweisung, Sichtbarkeit), eigene Kalender, die Praeferenzen und
+ * der Speicherort fuer Anhaenge - dieselben vier Aufrufe wie render().
+ */
+async function loadAwayFormContext(user) {
+  state.today = todayKey();
+  if (user) {
+    state.currentUserId = user.id ?? null;
+    state.user = user;
+  }
+  const [,, prefsRes, documentOptionsRes] = await Promise.all([
+    loadUsers(),
+    loadLocalCalendars(),
+    api.get('/preferences').catch(() => ({ data: {} })),
+    api.get('/documents/meta/options').catch(() => ({ data: {} })),
+  ]);
+  applyEventFormPreferences(prefsRes?.data, documentOptionsRes?.data);
+}
+
+/**
+ * Der einzige Einstieg in einen bestehenden Termin. Ohne Anker (Deep-Link,
+ * Suchtreffer) wird daraus ein Sheet, mit Anker am Desktop ein Popover.
+ * `formReady`: das Formular wartet zusaetzlich darauf (Termin ueber einer
+ * fremden Seite, openEventById).
+ */
+async function openEventDetail(ev, anchor = null, { pane = null, formReady: formReadyExtra = null } = {}) {
   // Haushaltshilfe-Besuche werden in ihrem eigenen Modul bearbeitet; der Umweg
   // über eine Detailansicht führte sonst ins Leere. (In der Detailspalte der
   // Agenda stehen sie gar nicht erst zur Wahl - agendaMdId().)
@@ -7564,6 +7615,9 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
   // nach. Die Sync-Ziele braucht nur das Formular, die lädt erst dessen mount().
   let reminders = [];
   const remindersReady = loadReminderForEvent(reminderOwnerId(ev)).then((r) => { reminders = r; });
+  // Das Formular braucht beides: die Erinnerungen und - ueber einer fremden
+  // Seite - Mitglieder, Kalender und Praeferenzen (openEventById).
+  const formReady = Promise.all([remindersReady, formReadyExtra]);
 
   // LOESCHEN, ZURUECKSETZEN UND BEARBEITEN FALLEN WEG, DIE KARTE BLEIBT (#467).
   // "In Karte oeffnen" ist der einzige Eintrag dieser Fusszeile, der nichts
@@ -7605,7 +7659,8 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
           // nach dem Verwerfen von Änderungen, die der Reset ohnehin
           // zurückgenommen hat (#625).
           await close({ force: true });
-          await reloadAfterSave(() => reloadForView());
+          if (hostedHere()) await reloadAfterSave(() => reloadForView());
+          else await notifyAwayChanged();
           window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
         } catch (err) {
           // Server-Meldung bevorzugen (nutzerorientiert), sonst lokalisierter
@@ -7639,7 +7694,7 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
       // diese Sperre baute ein sofortiger Klick auf „Bearbeiten" das Formular
       // ohne Erinnerungszeilen auf - und saveEvent löscht die Erinnerungen des
       // Termins, wenn es keine Zeile findet.
-      ready: remindersReady,
+      ready: formReady,
       mount: (panel, pane) => {
         pane.insertAdjacentHTML('beforeend', buildEventModalContent({ mode: 'edit', event: ev, reminder: reminders }));
         wireEventForm(panel, { mode: 'edit', event: ev, reminder: reminders });
@@ -7649,7 +7704,7 @@ async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
         // Wer waehrend des Wartens einen anderen Dialog oeffnet oder die
         // Seite verlaesst, bekommt das Formular nicht darueber gelegt (#1997).
         const context = captureOpenContext();
-        await remindersReady;
+        await formReady;
         if (!isModalContextCurrent(context)) return;
         openEventModal({ mode: 'edit', event: ev, reminder: reminders });
       },
@@ -9633,7 +9688,10 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     }
     if (savedEventId) refreshReminders();
 
-    if (reloadAfter) {
+    // Ueber einer fremden Seite (openEventById) gibt es keine Ansicht, die
+    // neu zu laden waere: die Seite darunter frischt sich selbst auf.
+    const hosted = hostedHere();
+    if (reloadAfter && hosted) {
       const reload = await reloadAfterSave(() => reloadCalendarEventsOnly());
       // Scheitert das Neuladen oder kommt es aus dem Cache, kennt der Zustand
       // die neue Serie nicht. Dann steht sie wie vor dem Neuladen als
@@ -9645,7 +9703,8 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     }
 
     closeModal({ force: true, context: dialog });
-    renderView();
+    if (hosted) renderView();
+    else await notifyAwayChanged();
     window.yuvomi?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
   } catch (err) {
     // Server-Validierungsmeldung bevorzugen, sonst lokalisierter Fallback; der
@@ -9657,17 +9716,51 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   }
 }
 
+/**
+ * Wer nach einem Loeschen neu zeichnet. Steht die Kalenderseite, ihre Ansicht
+ * (wie bisher). Ueber einer fremden Seite (openEventById) gibt es keine: der
+ * erste Aufruf von `render` (optimistisch, sofort) blendet die Zeilen des
+ * Termins dort aus (`onRemoving`), jeder spaetere (Rueckgaengig) holt sie
+ * zurueck; nach dem Schreiben frischt die Seite sich auf (`onChanged`) - ihre
+ * neuen Zeilen kennen den Termin dann nicht mehr.
+ * @param {object} deleteScope  dieselbe Angabe wie fuer den Kalenderzustand
+ */
+function deleteViewHooks(deleteScope) {
+  const away = _away;
+  if (hostedHere() || !away) {
+    return {
+      isViewActive: () => Boolean(_container?.isConnected),
+      reloadEvents: reloadCalendarRangeAfterDelete,
+      keepFocus: renderKeepingFocus,
+      refocusAfterUndo: refocusAfterRender,
+      render: renderView,
+    };
+  }
+  let removed = false;
+  return {
+    isViewActive: () => !hostedHere(),
+    reloadEvents: notifyAwayChanged,
+    keepFocus: (renderNow) => renderNow(),
+    refocusAfterUndo: () => {},
+    render: () => {
+      try { away.onRemoving?.(deleteScope, !removed); } catch { /* die Seite darunter ist weg */ }
+      removed = true;
+    },
+  };
+}
+
 async function deleteEvent(event) {
   const target = event?.series_id
     ? calendarOccurrenceDeleteTarget(event, 'series')
     : { method: 'delete', path: `/calendar/${event.id}` };
+  const deleteScope = {
+    eventId: event.id,
+    seriesId: event?.series_id ?? event.id,
+    scope: 'all',
+  };
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: {
-      eventId: event.id,
-      seriesId: event?.series_id ?? event.id,
-      scope: 'all',
-    },
+    deleteScope,
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
     requestDelete: async ({ keepalive }) => {
@@ -9680,15 +9773,11 @@ async function deleteEvent(event) {
       await api.delete(target.path, { keepalive });
       if (!keepalive) refreshReminders();
     },
-    isViewActive: () => Boolean(_container?.isConnected),
-    reloadEvents: reloadCalendarRangeAfterDelete,
-    keepFocus: renderKeepingFocus,
-    refocusAfterUndo: refocusAfterRender,
+    ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
-    render: renderView,
   });
 }
 
@@ -9896,28 +9985,25 @@ async function requestDeleteEvent(event) {
  * das erste der Serie, verschwindet sie ganz. Optimistisch + Undo.
  */
 async function deleteThisAndFollowing(event) {
+  const deleteScope = {
+    eventId: event.id,
+    seriesId: event.series_id,
+    scope: 'following',
+    recurrenceId: event.recurrence_id,
+  };
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: {
-      eventId: event.id,
-      seriesId: event.series_id,
-      scope: 'following',
-      recurrenceId: event.recurrence_id,
-    },
+    deleteScope,
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
     requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
       api, event, scope: 'following', keepalive,
     }),
-    isViewActive: () => Boolean(_container?.isConnected),
-    reloadEvents: reloadCalendarRangeAfterDelete,
-    keepFocus: renderKeepingFocus,
-    refocusAfterUndo: refocusAfterRender,
+    ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
       occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
-    render: renderView,
   });
 }
 
@@ -9926,27 +10012,24 @@ async function deleteThisAndFollowing(event) {
  * Entfernung und Undo-Toast wie beim regulären Löschen.
  */
 async function deleteSingleOccurrence(event) {
+  const deleteScope = {
+    eventId: event.id,
+    seriesId: event.series_id,
+    scope: 'this',
+    occurrenceDate: event.start_datetime.slice(0, 10),
+  };
   scheduleCalendarDeleteWithUndo({
     state,
-    deleteScope: {
-      eventId: event.id,
-      seriesId: event.series_id,
-      scope: 'this',
-      occurrenceDate: event.start_datetime.slice(0, 10),
-    },
+    deleteScope,
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
     requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
       api, event, scope: 'this', keepalive,
     }),
-    isViewActive: () => Boolean(_container?.isConnected),
-    reloadEvents: reloadCalendarRangeAfterDelete,
-    keepFocus: renderKeepingFocus,
-    refocusAfterUndo: refocusAfterRender,
+    ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
       occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
       'danger',
     ),
-    render: renderView,
   });
 }

@@ -1352,8 +1352,7 @@
         "localCalendarEventCount_other": "{{count}} wydarzeń",
         "sidebarLabel": "Pasek boczny kalendarza",
         "upNextTitle": "Następne",
-        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni.",
-        "openInCalendar": "Otwórz w kalendarzu"
+        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni."
     },
     "noteCategories": {
         "categories": "Kategorie",

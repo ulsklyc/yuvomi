@@ -838,11 +838,18 @@ test('every calendar delete passes the focus keeper to the scheduler (#1083)', (
   const calls = src.split('scheduleCalendarDeleteWithUndo({').slice(1)
     .map((part) => part.slice(0, part.indexOf('\n  });')));
   assert.ok(calls.length >= 3, `expected the three delete paths, found ${calls.length}`);
+  // Since R22-F the view hooks come from ONE place (deleteViewHooks): on the
+  // calendar page its own view, over another page (openEventById) the page
+  // below. Every call takes them from there, and the calendar branch keeps both.
   for (const call of calls) {
-    assert.match(call, /\n\s*keepFocus: renderKeepingFocus,/,
-      'without it the default keeps no focus, and the commit render drops it to body');
-    assert.match(call, /\n\s*refocusAfterUndo: refocusAfterRender,/,
-      'without it a keyboard Undo leaves focus on body - the toast removed its button first');
+    assert.match(call, /\n\s*\.\.\.deleteViewHooks\(deleteScope\),/,
+      'every delete path takes the view hooks from deleteViewHooks()');
   }
+  const hooks = src.slice(src.indexOf('function deleteViewHooks('), src.indexOf('async function deleteEvent('));
+  const hosted = hooks.slice(0, hooks.indexOf('let removed'));
+  assert.match(hosted, /\n\s*keepFocus: renderKeepingFocus,/,
+    'without it the default keeps no focus, and the commit render drops it to body');
+  assert.match(hosted, /\n\s*refocusAfterUndo: refocusAfterRender,/,
+    'without it a keyboard Undo leaves focus on body - the toast removed its button first');
   assert.match(src, /import \{[^}]*\brenderKeepingFocus\b[^}]*\} from '\/components\/modal\.js'/);
 });

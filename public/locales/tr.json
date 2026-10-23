@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve ardından Apple Takvim üzerinden iCloud'a yüklenir. Dışa aktarma bağlantısı artık çalışmaz.",
         "sidebarLabel": "Takvim kenar çubuğu",
         "upNextTitle": "Sıradaki",
-        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok.",
-        "openInCalendar": "Takvimde aç"
+        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok."
     },
     "noteCategories": {
         "categories": "Kategoriler",

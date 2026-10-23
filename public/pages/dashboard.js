@@ -6975,15 +6975,42 @@ export function eventLinkOf(route) {
 }
 
 /**
- * DER TERMIN OEFFNET UEBER DER UEBERSICHT (Critique R22, D3), wie die
- * Aufgabe daneben (openTaskFromOverview): das Leseblatt des Kalenders, die
- * Uebersicht bleibt stehen. Scheitert das Laden, fuehrt die Zeile wie bisher
- * in den Kalender - ein Fehler soll den Weg nicht verschliessen.
+ * Ob eine Zeile der Uebersicht zu einem Termin gehoert, den das Blatt gerade
+ * loescht (R22-F). `scope` ist die Angabe des Kalenders
+ * (scheduleCalendarDeleteWithUndo): ein Einzeltermin oder die ganze Serie
+ * nimmt alle seine Zeilen mit, "nur dieser" den einen Tag, "dieser und
+ * folgende" alle Tage ab dem Vorkommen.
  */
-async function openEventFromOverview(link, anchor) {
+export function eventRowRemovedBy(link, scope) {
+  if (!link || !scope) return false;
+  const ids = [scope.eventId, scope.seriesId].filter((id) => id != null).map(String);
+  if (!ids.includes(String(link.id))) return false;
+  if (scope.scope === 'this') return !link.date || link.date === scope.occurrenceDate;
+  if (scope.scope === 'following') {
+    const from = String(scope.recurrenceId ?? '').slice(0, 10);
+    return !link.date || !from || link.date >= from;
+  }
+  return true;
+}
+
+/**
+ * DER TERMIN OEFFNET UEBER DER UEBERSICHT (Critique R22, D3), wie die
+ * Aufgabe daneben (openTaskFromOverview): das Blatt des Kalenders, die
+ * Uebersicht bleibt stehen. Seit R22-F wird dort auch bearbeitet und
+ * geloescht: danach zeichnet sich die Uebersicht neu (`rerender`), und
+ * waehrend der Rueckgaengig-Frist sind die Zeilen des Termins ausgeblendet.
+ * Scheitert das Laden, fuehrt die Zeile wie bisher in den Kalender - ein
+ * Fehler soll den Weg nicht verschliessen.
+ */
+async function openEventFromOverview(link, anchor, { container = null, rerender = null, user = null } = {}) {
+  const onRemoving = (scope, removing) => {
+    container?.querySelectorAll('[data-route]').forEach((row) => {
+      if (eventRowRemovedBy(eventLinkOf(row.dataset.route), scope)) row.hidden = removing;
+    });
+  };
   try {
     const { openEventById } = await import('/pages/calendar.js');
-    await openEventById(link.id, { date: link.date, anchor });
+    await openEventById(link.id, { date: link.date, anchor, user, onChanged: rerender, onRemoving });
   } catch (err) {
     console.error('[Dashboard] Termin konnte nicht geöffnet werden:', err);
     const params = new URLSearchParams({ open: link.id });
@@ -7020,7 +7047,7 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
     // Mittelklick auf einen Link behalten unten ihren neuen Tab.
     const eventLink = editing ? null : eventLinkOf(el.dataset.route);
     const go = eventLink
-      ? () => openEventFromOverview(eventLink, el)
+      ? () => openEventFromOverview(eventLink, el, { container, rerender, user })
       : () => window.yuvomi.navigate(el.dataset.route);
     if (el.tagName === 'A') {
       el.addEventListener('click', (e) => {

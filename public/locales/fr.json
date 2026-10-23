@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, puis envoyés vers iCloud via Apple Calendar. Son lien d’export cessera de fonctionner.",
         "sidebarLabel": "Barre latérale du calendrier",
         "upNextTitle": "À venir",
-        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines.",
-        "openInCalendar": "Ouvrir dans le calendrier"
+        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines."
     },
     "noteCategories": {
         "categories": "Catégories",

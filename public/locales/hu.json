@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "A naptár eseményei az alapértelmezett naptárba kerülnek, majd az Apple Naptár kapcsolaton keresztül feltöltődnek az iCloudba. Az exportálási hivatkozása többé nem fog működni.",
         "sidebarLabel": "Naptár oldalsáv",
         "upNextTitle": "Következik",
-        "upNextEmpty": "A következő három hétben nincs semmi.",
-        "openInCalendar": "Megnyitás a naptárban"
+        "upNextEmpty": "A következő három hétben nincs semmi."
     },
     "noteCategories": {
         "categories": "Kategóriák",

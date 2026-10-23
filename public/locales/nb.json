@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "Hendelsene flyttes til standardkalenderen og lastes deretter opp til iCloud via Apple Kalender. Eksportlenken slutter å virke.",
         "sidebarLabel": "Kalenderens sidepanel",
         "upNextTitle": "Neste",
-        "upNextEmpty": "Ingenting de neste tre ukene.",
-        "openInCalendar": "Åpne i kalenderen"
+        "upNextEmpty": "Ingenting de neste tre ukene."
     },
     "noteCategories": {
         "categories": "Kategorier",

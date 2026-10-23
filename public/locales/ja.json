@@ -1188,8 +1188,7 @@
         "localCalendarEventCount_one": "{{count}}件の予定",
         "sidebarLabel": "カレンダーのサイドバー",
         "upNextTitle": "次の予定",
-        "upNextEmpty": "今後3週間の予定はありません。",
-        "openInCalendar": "カレンダーで開く"
+        "upNextEmpty": "今後3週間の予定はありません。"
     },
     "noteCategories": {
         "categories": "カテゴリー",

@@ -1188,8 +1188,7 @@
         "localCalendarEventCount_one": "{{count}} sự kiện",
         "sidebarLabel": "Thanh bên lịch",
         "upNextTitle": "Sắp tới",
-        "upNextEmpty": "Không có gì trong ba tuần tới.",
-        "openInCalendar": "Mở trong lịch"
+        "upNextEmpty": "Không có gì trong ba tuần tới."
     },
     "noteCategories": {
         "categories": "Danh mục",

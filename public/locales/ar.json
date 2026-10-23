@@ -1408,8 +1408,7 @@
         "localCalendarEventCount_many": "{{count}} حدثًا",
         "sidebarLabel": "الشريط الجانبي للتقويم",
         "upNextTitle": "التالي",
-        "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة.",
-        "openInCalendar": "فتح في التقويم"
+        "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة."
     },
     "noteCategories": {
         "categories": "الفئات",

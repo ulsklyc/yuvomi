@@ -128,7 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field is marked as wrong and focused, and a link leads back to login.
 - **Appointments open over the overview.** Tapping an appointment in "Today" or the calendar tile
   left the overview for the calendar, while a task in the same list opened its sheet on top. An
-  appointment now opens its sheet over the overview too, with "Open in calendar" to edit it there.
+  appointment now opens its sheet over the overview too, and is edited and deleted right there;
+  the overview shows the change without leaving the page.
   Today's meal opens its sheet in the meal plan, an open dose leads to Medications and a birthday
   today to its entry, instead of the start of each module.
 - **One message at a time, and it stays with its page.** Up to three messages could stack, so

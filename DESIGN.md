@@ -2840,8 +2840,12 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
   (`childDefaultWidgetConfig`): Belohnungen zuerst und sichtbar, Budget aus. Im Heute-Blatt
   ruecken Aufgaben, die nur anderen gehoeren, ans Ende und fallen zuerst unter „+N weitere".
 - **Ein Objekt der Uebersicht oeffnet sich UEBER ihr (R22, D3).** Aufgabe (`openTaskById`) und
-  Termin (`openEventById`, calendar.js: Leseblatt, mit Anker am Desktop als Popover, Fuss „Im
-  Kalender oeffnen") gehen als Blatt ueber der Uebersicht auf; jede Zeile mit
+  Termin (`openEventById`, calendar.js: dieselbe Ansicht wie im Kalender, mit Anker am Desktop als
+  Popover, Fuss [Loeschen] ... [Bearbeiten]) gehen als Blatt ueber der Uebersicht auf und werden
+  dort bearbeitet und geloescht (R22-F): das Blatt holt Mitglieder, Kalender und Praeferenzen
+  selbst (`loadAwayFormContext`), nach dem Schreiben zeichnet sich die Uebersicht neu
+  (`onChanged`), waehrend der Rueckgaengig-Frist sind die Zeilen des Termins aus
+  (`onRemoving`, `eventRowRemovedBy`); jede Zeile mit
   `/calendar?open=<id>` (Heute-Blatt, Termin-Kachel, Countdown) nimmt diesen Weg (`eventLinkOf`).
   Wo es kein wiederverwendbares Blatt gibt, nennt die Zeile ihr Objekt im Modul: Mahlzeit
   `/meals?open=<id>` (Karte ins Bild, ihr Blatt geht auf), Dosis `/health/meds`, Geburtstag

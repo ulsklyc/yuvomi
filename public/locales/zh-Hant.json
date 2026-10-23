@@ -1188,8 +1188,7 @@
         "localCalendarEventCount_one": "{{count}} 個活動",
         "sidebarLabel": "日曆側邊欄",
         "upNextTitle": "接下來",
-        "upNextEmpty": "未來三週沒有安排。",
-        "openInCalendar": "在日曆中開啟"
+        "upNextEmpty": "未來三週沒有安排。"
     },
     "noteCategories": {
         "categories": "分類",

@@ -881,10 +881,10 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const wire = dash.slice(dash.indexOf('function wireLinks('), dash.indexOf('function reorderWidgetConfig('));
   assert.match(wire, /const eventLink = editing \? null : eventLinkOf\(el\.dataset\.route\);/);
-  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
+  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, rerender, user \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
   assert.match(dash, /const \{ openEventById \} = await import\('\/pages\/calendar\.js'\);/, 'nachgeladen wie die Aufgabe');
   const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null \} = \{\}\)/);
+  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null \} = \{\}\)/);
 
   const { buildTodayProgram } = __test;
   // Jede Tageszeit belegt: selectTodayMeal waehlt nach der Uhr, gefunden wird immer id 16.
@@ -900,6 +900,97 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   assert.equal(doses[0].route, '/health/meds', 'die Dosis fuehrt in den Bereich, in dem eingenommen wird');
   const birthdays = TODAY_SHEET_SOURCES.find((s) => s.id === 'birthdays').collect({ birthdays: [{ id: 4, name: 'Oma', days_until: 0 }] }, ctx);
   assert.equal(birthdays[0].route, '/birthdays?open=4', 'der Geburtstag nennt sich selbst');
+});
+
+// R22-F (F1 Punkt 1): das Blatt eines Termins ueber der Uebersicht trug nur
+// "Im Kalender oeffnen" - Bearbeiten hiess, die Uebersicht zu verlassen
+// (gemessen 390/1440: Fuss ["Im Kalender oeffnen"], kein Bearbeiten). Jetzt
+// bietet es Loeschen und Bearbeiten wie im Kalender, holt Mitglieder, Kalender
+// und Praeferenzen fuer das Formular selbst und meldet sich nach dem
+// Schreiben bei der Uebersicht. Am echten Aufrufer: openEventById mit den
+// Stubs aus test-browser-loader.mjs (Detailansicht, API, Rueckgaengig).
+test('R22-F: ein Termin wird ueber der Uebersicht bearbeitet und geloescht, die Uebersicht frischt auf', async () => {
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  globalThis.ResizeObserver ??= class { observe() {} disconnect() {} };
+  const priorYuvomi = globalThis.window.yuvomi;
+  const navigated = [];
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: (to) => navigated.push(to) };
+  const event = { id: 7, title: 'Sportfest', start_datetime: '2026-10-23', end_datetime: '2026-10-23', all_day: 1, assigned_users: [], external_source: 'local' };
+  const calls = [];
+  let opened = null;
+  let undo = null;
+  globalThis.__apiStub = {
+    get: async (path) => {
+      calls.push(`GET ${path}`);
+      if (path === '/calendar/7') return { data: event };
+      if (path === '/family/members') return { data: [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Alex' }] };
+      if (path === '/calendar/calendars') return { data: [{ id: 3, name: 'Familie', is_default: 1 }] };
+      if (path === '/preferences') return { data: { calendar_default_duration: 45 } };
+      return { data: [] };
+    },
+    delete: async (path) => { calls.push(`DELETE ${path}`); return { data: null }; },
+  };
+  globalThis.__openDetailView = (opts) => { opened = opts; };
+  globalThis.__undoStub = (opts) => { undo = opts; };
+  const changed = [];
+  const removing = [];
+  try {
+    const { openEventById, __test: cal } = await import('../public/pages/calendar.js');
+    await openEventById(7, {
+      date: '2026-10-23',
+      user: { id: 1, role: 'admin' },
+      onChanged: () => { changed.push('rerender'); },
+      onRemoving: (scope, on) => removing.push([scope.eventId, on]),
+    });
+    assert.ok(opened, 'das Blatt geht auf');
+    const ids = (opened.actions ?? []).map((a) => a.id);
+    assert.ok(ids.includes('detail-delete'), `Loeschen steht im Fuss: ${ids}`);
+    assert.ok(!ids.includes('detail-open-calendar'), 'kein Umweg in den Kalender mehr');
+    assert.equal(typeof opened.edit?.mount, 'function', 'Bearbeiten steht im Blatt');
+    await opened.edit.ready;
+    assert.deepEqual(cal.state.users.map((u) => u.display_name), ['Linda', 'Alex'], 'die Mitglieder fuer die Zuweisung sind geladen');
+    assert.equal(cal.state.localCalendars.length, 1, 'die eigenen Kalender sind geladen');
+    assert.equal(cal.state.defaultDuration, 45, 'die Praeferenzen sind angewandt');
+    assert.equal(navigated.length, 0, 'kein Modulwechsel');
+
+    // Loeschen: die Zeile geht sofort, Rueckgaengig holt sie zurueck.
+    await opened.actions.find((a) => a.id === 'detail-delete').onClick({ close: async () => {} });
+    assert.deepEqual(removing, [[7, true]], 'die Zeilen des Termins sind ausgeblendet');
+    assert.ok(undo, 'Loeschen mit Rueckgaengig');
+    undo.restore();
+    assert.deepEqual(removing, [[7, true], [7, false]], 'Rueckgaengig blendet sie wieder ein');
+
+    // Noch einmal, jetzt bis zum Schreiben: danach frischt die Uebersicht auf.
+    undo = null;
+    await opened.actions.find((a) => a.id === 'detail-delete').onClick({ close: async () => {} });
+    await undo.commit({ keepalive: false });
+    assert.ok(calls.includes('DELETE /calendar/7'), 'der Termin ist geloescht');
+    assert.deepEqual(changed, ['rerender'], 'die Uebersicht frischt nach dem Schreiben auf');
+    assert.equal(navigated.length, 0, 'auch danach kein Modulwechsel');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+    delete globalThis.__undoStub;
+    globalThis.window.yuvomi = priorYuvomi;
+  }
+
+  // Speichern: ohne Kalenderseite zeichnet es keine Ansicht, es meldet sich.
+  const { readFileSync } = await import('node:fs');
+  const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const save = cal.slice(cal.indexOf('async function saveEvent('), cal.indexOf('async function deleteEvent('));
+  assert.match(save, /if \(hosted\) renderView\(\);\n    else await notifyAwayChanged\(\);/, 'Speichern frischt die Seite unter dem Blatt auf');
+  assert.match(save, /if \(reloadAfter && hosted\)/, 'und laedt keine Kalenderansicht, die nicht steht');
+
+  // Welche Zeilen der Uebersicht ein Loeschen mitnimmt.
+  const { eventRowRemovedBy } = await import('../public/pages/dashboard.js');
+  const row = (id, date) => ({ id: String(id), date });
+  assert.equal(eventRowRemovedBy(row(7, '2026-10-23'), { eventId: 7, seriesId: 7, scope: 'all' }), true);
+  assert.equal(eventRowRemovedBy(row(8, '2026-10-23'), { eventId: 7, seriesId: 7, scope: 'all' }), false, 'ein anderer Termin bleibt');
+  assert.equal(eventRowRemovedBy(row(7, '2026-10-24'), { eventId: 7, seriesId: 7, scope: 'this', occurrenceDate: '2026-10-23' }), false, 'nur dieser Tag');
+  assert.equal(eventRowRemovedBy(row(7, '2026-10-23'), { eventId: 7, seriesId: 7, scope: 'this', occurrenceDate: '2026-10-23' }), true);
+  assert.equal(eventRowRemovedBy(row(7, '2026-10-22'), { eventId: 7, seriesId: 7, scope: 'following', recurrenceId: '2026-10-23' }), false, 'vor dem Vorkommen bleibt');
+  assert.equal(eventRowRemovedBy(row(7, '2026-10-30'), { eventId: 7, seriesId: 7, scope: 'following', recurrenceId: '2026-10-23' }), true, 'danach geht mit');
 });
 
 // R22 D16 (Critique 2026-10-22, a1 P3): neben vier Chips der Ablage stand ein

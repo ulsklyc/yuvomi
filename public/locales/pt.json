@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "Os eventos deste calendário serão movidos para o calendário predefinido e depois carregados para o iCloud através do Apple Calendar. A respetiva ligação de exportação deixará de funcionar.",
         "sidebarLabel": "Barra lateral do calendário",
         "upNextTitle": "A seguir",
-        "upNextEmpty": "Nada nas próximas três semanas.",
-        "openInCalendar": "Abrir no calendário"
+        "upNextEmpty": "Nada nas próximas três semanas."
     },
     "noteCategories": {
         "categories": "Categorias",

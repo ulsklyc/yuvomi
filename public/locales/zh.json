@@ -1188,8 +1188,7 @@
         "localCalendarEventCount_one": "{{count}} 个事件",
         "sidebarLabel": "日历侧边栏",
         "upNextTitle": "接下来",
-        "upNextEmpty": "未来三周没有安排。",
-        "openInCalendar": "在日历中打开"
+        "upNextEmpty": "未来三周没有安排。"
     },
     "noteCategories": {
         "categories": "分类",

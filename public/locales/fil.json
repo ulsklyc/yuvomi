@@ -1206,8 +1206,7 @@
         "localCalendarDeleteDetailIcloud": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo at pagkatapos ay ia-upload sa iCloud sa pamamagitan ng Apple Calendar. Hindi na gagana ang export link nito.",
         "sidebarLabel": "Sidebar ng kalendaryo",
         "upNextTitle": "Susunod",
-        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo.",
-        "openInCalendar": "Buksan sa kalendaryo"
+        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo."
     },
     "noteCategories": {
         "categories": "Mga kategorya",

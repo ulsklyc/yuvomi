@@ -1206,8 +1206,7 @@
         "localCalendarEventCount_one": "일정 {{count}}개",
         "sidebarLabel": "캘린더 사이드바",
         "upNextTitle": "다음 일정",
-        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다.",
-        "openInCalendar": "캘린더에서 열기"
+        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다."
     },
     "noteCategories": {
         "categories": "카테고리",

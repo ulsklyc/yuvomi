@@ -1206,8 +1206,7 @@
         "localCalendarDeleteDetailIcloud": "Termine aus diesem Kalender werden in den Standardkalender verschoben und danach über Apple Calendar zu iCloud hochgeladen. Sein Exportlink funktioniert danach nicht mehr.",
         "sidebarLabel": "Seitenleiste des Kalenders",
         "upNextTitle": "Als Nächstes",
-        "upNextEmpty": "In den nächsten drei Wochen steht nichts an.",
-        "openInCalendar": "Im Kalender öffnen"
+        "upNextEmpty": "In den nächsten drei Wochen steht nichts an."
     },
     "noteCategories": {
         "categories": "Kategorien",

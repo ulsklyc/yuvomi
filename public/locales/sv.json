@@ -1188,8 +1188,7 @@
         "localCalendarDeleteDetailIcloud": "Händelser från den här kalendern flyttas till standardkalendern och laddas sedan upp till iCloud via Apple Calendar. Exportlänken slutar att fungera.",
         "sidebarLabel": "Kalenderns sidofält",
         "upNextTitle": "Härnäst",
-        "upNextEmpty": "Inget de närmaste tre veckorna.",
-        "openInCalendar": "Öppna i kalendern"
+        "upNextEmpty": "Inget de närmaste tre veckorna."
     },
     "noteCategories": {
         "categories": "Kategorier",

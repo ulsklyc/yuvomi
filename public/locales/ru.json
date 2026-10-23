@@ -1334,8 +1334,7 @@
         "localCalendarEventCount_other": "{{count}} событий",
         "sidebarLabel": "Боковая панель календаря",
         "upNextTitle": "Далее",
-        "upNextEmpty": "В ближайшие три недели ничего нет.",
-        "openInCalendar": "Открыть в календаре"
+        "upNextEmpty": "В ближайшие три недели ничего нет."
     },
     "noteCategories": {
         "categories": "Категории",

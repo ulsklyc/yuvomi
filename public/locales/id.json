@@ -1206,8 +1206,7 @@
         "localCalendarEventCount_one": "{{count}} acara",
         "sidebarLabel": "Bilah sisi kalender",
         "upNextTitle": "Berikutnya",
-        "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan.",
-        "openInCalendar": "Buka di kalender"
+        "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan."
     },
     "noteCategories": {
         "categories": "Kategori",
