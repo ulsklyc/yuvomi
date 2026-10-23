@@ -35,7 +35,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
 import { makeSortable } from '/utils/sortable.js';
-import { mountMasterDetail, splitViewDetailHtml, setSelectionBulk } from '/utils/master-detail.js';
+import { mountMasterDetail, splitViewDetailHtml, setSelectionBulk, releaseAddressOnClose } from '/utils/master-detail.js';
 import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
@@ -5974,8 +5974,9 @@ function mountTaskSplit(container, signal) {
 
   // Ein Deep-Link auf eine Aufgabe, die in dieser Liste nicht steht (erledigt,
   // abgelegt, weggefiltert - die globale Suche findet alle): keine Auswahl
-  // ohne Zeile, sondern das Sheet wie bisher. Der Link BLEIBT in der Adresse
-  // (Kopieren, Neuladen, Vor - Codex an #1477); der Baustein laesst nur diese
+  // ohne Zeile, sondern das Sheet wie bisher. Der Link BLEIBT in der Adresse,
+  // solange das Blatt offen ist (Kopieren, Neuladen, Vor - Codex an #1477;
+  // beim Schliessen geht er, R22 D2); der Baustein laesst nur diese
   // Anfangsauswahl liegen, statt sie ohne Zeile zu beanspruchen.
   const initial = new URLSearchParams(location.search).get(TASK_DETAIL_PARAM);
   const sheetFor = initial && !root.querySelector(`[data-md-id="${CSS.escape(initial)}"]`) ? initial : null;
@@ -6020,7 +6021,11 @@ function mountTaskSplit(container, signal) {
   chosen?.scrollIntoView?.({ block: 'nearest' });
   // Mit dem Signal der Seite: verlaesst der Nutzer sie waehrend der Anfragen,
   // geht kein Blatt ueber der Zielseite auf.
-  if (sheetFor) openTaskSheet(sheetFor, container, signal);
+  if (sheetFor) {
+    openTaskSheet(sheetFor, container, signal);
+    // Das Blatt schliesst - `?open=` geht mit ihm (R22, D2).
+    releaseAddressOnClose(TASK_DETAIL_PARAM, sheetFor, { signal });
+  }
 }
 
 /**

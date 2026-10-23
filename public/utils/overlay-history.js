@@ -110,9 +110,36 @@ let closing = false;
  * hier (`whenHistorySettled`), bis der Abgleich durch ist. */
 const settledWaiters = [];
 
+/* Wer wissen will, wann das letzte Overlay zu ist (`onceOverlaysClosed`).
+ * Gemeldet wird nur der UEBERGANG offen -> zu, nach dem Abgleich: dann steht
+ * der Browser wieder auf dem Eintrag unter dem Marker, und ein `replaceState`
+ * trifft die Seite, nicht den Marker. */
+const closedWatchers = new Set();
+let hadOverlay = false;
+
 function flushSettled() {
   if (stack.length > 0 || markerActive || syncScheduled || pendingSelfPops > 0) return;
   for (const resolve of settledWaiters.splice(0)) resolve();
+  if (!hadOverlay) return;
+  hadOverlay = false;
+  for (const watcher of [...closedWatchers]) {
+    closedWatchers.delete(watcher);
+    watcher();
+  }
+}
+
+/**
+ * Ruft `cb` EINMAL, sobald nach einem offenen Overlay wieder keines offen ist
+ * und die History abgeglichen ist (Critique R22, D2: `?open=` geht mit dem
+ * Blatt). Ein Signal meldet den Wunsch vorher ab.
+ * @param {() => void} cb
+ * @param {{ signal?: AbortSignal|null }} [options]
+ */
+export function onceOverlaysClosed(cb, { signal = null } = {}) {
+  if (signal?.aborted) return;
+  const watcher = () => cb();
+  closedWatchers.add(watcher);
+  signal?.addEventListener('abort', () => closedWatchers.delete(watcher), { once: true });
 }
 
 function historyState() {
@@ -178,6 +205,7 @@ function syncMarker() {
 export function pushOverlay(close) {
   const token = ++seq;
   stack.push({ token, close });
+  hadOverlay = true;
   syncMarker();
   return token;
 }

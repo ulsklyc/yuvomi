@@ -1245,3 +1245,64 @@ test('die ausgewaehlte Zeile der Spaltenform traegt den Modulton, nicht den Akze
     .find((r) => r.selector.trim() === '.filter-chip--active' && !r.at.length);
   assert.match(chip.body, /var\(--module-accent/, 'der aktive Filter-Chip spricht ebenfalls im Modulton');
 });
+
+/* `?open=` GEHT MIT DEM BLATT (Critique R22, D2, a6 P2). Unter der Schwelle
+ * nennt die Adresse das offene Blatt; nach dem Schliessen blieb sie stehen
+ * (gemessen mobil: Aufgaben, Kontakte, Rezepte, Kalender), und ein Neuladen
+ * oeffnete es wieder. Das Blatt hier ist ein echtes Overlay im Register
+ * (overlay-history), die History eine kleine Attrappe mit Stapel, damit der
+ * Marker des Blatts wirklich zurueckgegeben wird. */
+test('unter der Schwelle nimmt das Schliessen des Blatts `?open=` per replaceState weg', async () => {
+  const ov = await import('../public/utils/overlay-history.js');
+  const original = { ...global.history };
+  const stack = [];
+  Object.assign(global.history, {
+    pushState(state, _t, path) { stack.push(location.href); historyLog.push(['push', path]); this.state = state; setUrl(path); },
+    back() {
+      historyLog.push(['back']);
+      setTimeout(() => { setUrl(stack.pop()); ov.handleBackNavigation(); }, 0);
+    },
+  });
+  try {
+    const p = makePage({ path: '/contacts?open=2', split: false });
+    const handle = p.mount({ deepLinkNarrow: true });
+    assert.deepEqual(p.calls.narrow, ['2'], 'der Deep-Link oeffnet schmal sein Blatt');
+    const sheet = ov.pushOverlay(() => {});
+    await tick();
+    const edit = ov.pushOverlay(() => {});
+    await tick();
+    ov.dropOverlay(edit);
+    await tick(); await tick();
+    assert.equal(location.search, '?open=2', 'ein Dialog UEBER dem Blatt nimmt die Adresse nicht mit');
+    historyLog.length = 0;
+    ov.dropOverlay(sheet);
+    await tick(); await tick(); await tick();
+    assert.equal(location.search, '', 'das Blatt ist zu - die Adresse nennt es nicht mehr');
+    assert.deepEqual(historyLog.filter(([kind]) => kind !== 'back'), [['replace', '/contacts']],
+      'ersetzt, kein neuer Schritt fuer die Zurueck-Taste');
+    assert.equal(handle.selectedId(), null, 'und keine gemerkte Auswahl, die beim Verbreitern aufginge');
+    handle.destroy();
+
+    // In der Spalte ist die Adresse die Auswahl: ein Dialog darueber geht zu, sie bleibt.
+    const q = makePage({ path: '/contacts?open=3', split: true });
+    const h2 = q.mount();
+    const dialog = ov.pushOverlay(() => {});
+    await tick();
+    ov.dropOverlay(dialog);
+    await tick(); await tick(); await tick();
+    assert.equal(location.search, '?open=3', 'die Spalte behaelt ihre Auswahl');
+    h2.destroy();
+
+    // Eine Seite, die ihren Link selbst einloest (Kalender, Rezepte).
+    setUrl('/calendar?open=7&date=2026-10-23');
+    md.releaseAddressOnClose('open', '7');
+    const popover = ov.pushOverlay(() => {});
+    await tick();
+    ov.dropOverlay(popover);
+    await tick(); await tick(); await tick();
+    assert.equal(location.pathname + location.search, '/calendar?date=2026-10-23',
+      'nur `open` geht, der Tag bleibt');
+  } finally {
+    Object.assign(global.history, original);
+  }
+});

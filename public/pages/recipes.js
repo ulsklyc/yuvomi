@@ -23,7 +23,7 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { mealTypeList, ensureMealTypeNames } from '/utils/meal-types.js';
 import { recipeThumbEl, recipeHeroEl } from '/utils/recipe-thumb.js';
 import { navModuleAccess } from '/permissions.js';
-import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl } from '/utils/master-detail.js';
+import { mountMasterDetail, splitViewDetailHtml, detailPaneHeaderEl, releaseAddressOnClose } from '/utils/master-detail.js';
 import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from '/components/detail-view.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -368,7 +368,11 @@ function openRecipeFromQuery() {
   if (_md?.isSplit()) return;
 
   const recipe = state.recipes.find((r) => r.id === id);
-  if (recipe && row.querySelector('[data-action="open-detail"]')) openRecipeSheet(recipe);
+  if (recipe && row.querySelector('[data-action="open-detail"]')) {
+    openRecipeSheet(recipe);
+    // Das Leseblatt schliesst - `?open=` geht mit ihm (R22, D2).
+    releaseAddressOnClose('open', raw);
+  }
 }
 
 /**

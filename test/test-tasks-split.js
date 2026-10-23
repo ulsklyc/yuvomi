@@ -328,8 +328,11 @@ test('der Rueckfall fuer ?open= auf eine Aufgabe ausserhalb der Liste haengt am 
   const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
   const mount = src.slice(src.indexOf('function mountTaskSplit('));
   const body = mount.slice(0, mount.indexOf('\n}\n'));
-  assert.match(body, /if \(sheetFor\) openTaskSheet\(sheetFor, container, signal\)/,
+  assert.match(body, /if \(sheetFor\) \{\s*openTaskSheet\(sheetFor, container, signal\);/,
     'mountTaskSplit reicht das Signal der Seite an den Rueckfall weiter');
+  // R22, D2: das Blatt schliesst - `?open=` geht mit ihm, ebenfalls am Seiten-Signal.
+  assert.match(body, /releaseAddressOnClose\(TASK_DETAIL_PARAM, sheetFor, \{ signal \}\);/,
+    'der Link bleibt, solange das Blatt offen ist, und geht mit ihm');
 });
 
 test('Wiederholen nach dem Ladefehler baut mit dem Seiten-Signal neu auf', () => {

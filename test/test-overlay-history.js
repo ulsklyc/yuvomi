@@ -656,3 +656,45 @@ test('whenHistorySettled: wer nach einer Rueckfrage die Adresse zuruecklegt, war
   await settle();
   assert.equal(done, true, 'ohne offenes Overlay loest es sofort auf');
 });
+
+// --------------------------------------------------------
+// Critique R22, D2: wer wissen will, wann das letzte Overlay zu ist
+// --------------------------------------------------------
+
+test('onceOverlaysClosed meldet den Uebergang offen -> zu einmal, nach dem Abgleich', async () => {
+  const { pushOverlay, dropOverlay, onceOverlaysClosed, history } = await freshModule();
+  history.pushState({ path: '/contacts' }, '', '/contacts?open=2');
+  const calls = [];
+  onceOverlaysClosed(() => calls.push(history.href));
+  await settle();
+  assert.deepEqual(calls, [], 'ohne offenes Overlay meldet sich nichts');
+
+  const sheet = pushOverlay(() => {});
+  const edit = pushOverlay(() => {});
+  await settle();
+  dropOverlay(edit);
+  await settle();
+  assert.deepEqual(calls, [], 'das Blatt darunter ist noch offen');
+
+  dropOverlay(sheet);
+  await settle();
+  await settle();
+  assert.deepEqual(calls, ['/contacts?open=2'],
+    'einmal, und erst wenn der Marker zurueckgegeben ist - die Adresse ist die der Seite');
+
+  pushOverlay(() => {});
+  await settle();
+  assert.equal(calls.length, 1, 'einmal heisst einmal');
+
+  const { pushOverlay: push2, dropOverlay: drop2, onceOverlaysClosed: once2 } = await freshModule();
+  const ctrl = new AbortController();
+  let fired = false;
+  once2(() => { fired = true; }, { signal: ctrl.signal });
+  const tok = push2(() => {});
+  await settle();
+  ctrl.abort();
+  drop2(tok);
+  await settle();
+  await settle();
+  assert.equal(fired, false, 'ein abgebrochener Wunsch meldet sich nicht mehr');
+});

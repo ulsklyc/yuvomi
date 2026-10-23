@@ -1494,7 +1494,12 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
   bewegt sie, Enter oeffnet, Esc im Detail fuehrt zur Zeile zurueck und in der Liste hebt es
   die Auswahl auf. Nennt die Adresse keine Auswahl, ist am Desktop die erste Zeile gewaehlt
   (`replaceState`, kein History-Eintrag, kein Fokuswechsel), mobil nie; ein unbekannter
-  Deep-Link bleibt ein ruhiger Leerzustand. Einstellungen und Gesundheit fuehren die Auswahl
+  Deep-Link bleibt ein ruhiger Leerzustand. **Unter der Schwelle geht `?open=` mit dem Blatt
+  (R22, D2):** ist das letzte Overlay zu und nennt die Adresse noch diesen Eintrag, nimmt
+  `replaceState` den Parameter weg - ein Neuladen oeffnet nichts wieder; Seiten, die den Link
+  selbst einloesen (Kalender, Rezepte, Aufgaben ausserhalb der Liste), rufen
+  `releaseAddressOnClose()`. Pruefebene: Verhalten (test:master-detail, test:overlay-history).
+  Einstellungen und Gesundheit fuehren die Auswahl
   als Pfad (`/settings/<bereich>/<blatt>`, `/health/<bereich>`, Option `address` des
   Bausteins) statt als `?open=`. Vorbild ist Apples Mail. Umsetzung:
   `.app-page--list-detail` an der Seitenwurzel (Container `module-surface`) plus der Baustein

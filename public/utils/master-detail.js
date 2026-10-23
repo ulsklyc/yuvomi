@@ -38,6 +38,7 @@ import { t } from '/i18n.js';
 import { swapContent } from '/utils/content-swap.js';
 import { setBulkPill, clearBulkPill, setBulkPane } from '/utils/bulk-pill.js';
 import { dockNextModal } from '/components/modal.js';
+import { onceOverlaysClosed } from '/utils/overlay-history.js';
 
 /** Wie lange die Ansage der Auswahlzahl wartet: schnelles Tippen sagt nur die letzte Zahl. */
 const BULK_ANNOUNCE_MS = 400;
@@ -481,7 +482,22 @@ export function mountMasterDetail({
   function callNarrow(id, trigger) {
     abortNarrow();
     narrowAbort = new AbortController();
-    openNarrow?.(String(id), trigger, { signal: narrowAbort.signal });
+    const narrowSignal = narrowAbort.signal;
+    openNarrow?.(String(id), trigger, { signal: narrowSignal });
+    // `?open=` GEHT MIT DEM BLATT (Critique R22, D2). Unter der Schwelle nennt
+    // die Adresse das offene Blatt; nach dem Schliessen blieb sie stehen, und
+    // ein Neuladen oeffnete es wieder (gemessen mobil: Aufgaben, Kontakte).
+    // Ist das letzte Overlay zu und nennt die Adresse noch DIESEN Eintrag,
+    // nimmt `replaceState` die Auswahl weg - kein neuer Schritt. In der Spalte
+    // ist die Adresse die Auswahl und bleibt (der Wechsel bricht das Signal ab).
+    if (narrow !== 'sheet') return;
+    const shown = String(id);
+    onceOverlaysClosed(() => {
+      if (narrowSignal.aborted || active !== handle || isSplit()) return;
+      if (readAddress() !== shown) return;
+      selected = null;
+      writeHistory('replace', hrefFor, null);
+    }, { signal: narrowSignal });
   }
 
   /**
@@ -770,6 +786,27 @@ export function mountMasterDetail({
   tryPreselect();
 
   return handle;
+}
+
+/**
+ * `?<param>=<value>` geht, sobald das Blatt dazu zu ist (Critique R22, D2) -
+ * fuer Seiten, die ihren Deep-Link SELBST einloesen (Kalender `?open=<id>`,
+ * Rezepte unter der Schwelle). Dieselbe Regel wie im Baustein: erst wenn das
+ * letzte Overlay zu ist, nur wenn die Adresse noch genau diesen Wert nennt,
+ * nie in der Spalte (dort ist sie die Auswahl), per `replaceState`.
+ * @param {string} param
+ * @param {string|number} value
+ * @param {{ signal?: AbortSignal|null }} [options] - das Seitensignal
+ */
+export function releaseAddressOnClose(param, value, { signal = null } = {}) {
+  const pathname = location.pathname;
+  const wanted = String(value);
+  onceOverlaysClosed(() => {
+    if (signal?.aborted || location.pathname !== pathname) return;
+    if (new URLSearchParams(location.search).get(param) !== wanted) return;
+    if (active?._root.isConnected && active._pathname === pathname && active.isSplit()) return;
+    writeHistory('replace', (id) => urlWith(param, id), null);
+  }, { signal });
 }
 
 /**

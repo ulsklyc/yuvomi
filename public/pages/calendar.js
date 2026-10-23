@@ -10,7 +10,7 @@ import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModa
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
-import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
+import { mountMasterDetail, splitViewDetailHtml, releaseAddressOnClose } from '/utils/master-detail.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
@@ -2132,6 +2132,9 @@ export async function render(container, { user, signal } = {}) {
       // Deep-Link landet trotzdem in der Leseansicht, nur ohne Verankerung.
       openEventDetail(occurrence);
     }
+    // Die Leseansicht schliesst - `?open=` geht mit ihr (R22, D2); in der
+    // Agenda-Spalte ist die Adresse die Auswahl und bleibt.
+    releaseAddressOnClose('open', params.get('open'), { signal });
   }
 }
 

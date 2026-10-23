@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overview into a page such as Appearance and back stayed on Appearance, because the overview
   reopened the last page you had visited. That page now only comes back when you enter Settings
   from somewhere else; back always shows the overview where it was.
+- **A closed sheet no longer comes back on reload.** A task, contact, recipe or appointment
+  opened from search or the overview on a phone kept its `?open=` in the address after the sheet
+  was closed, so reloading the page or sharing the address opened it again. Closing the sheet now
+  removes it without adding a step to the back button. In the two-column layout the address still
+  names the selected row.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.
