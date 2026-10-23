@@ -1825,7 +1825,8 @@ Auswahl ohne Auswahl ("Waehle einen Befund" ohne Befund). Wo der Inhalt die Haup
 steht am Verlauf und im Leerzustand. Der Bereichsname steht hoechstens zweimal (Liste und
 Detailkopf); die Kopf-Pille nennt das OBJEKT, nie den Bereich (de „+ Untersuchung" statt
 „+ Vorsorge", R22 S10; `test:health-nav` "R14 P6" an der Referenz-Locale). "Einnehmen" heisst bei geplanter und Bedarfsdosis gleich und
-gibt bei Enge nur die Tablette ab, nie das Wort. Der Detailkopf am Desktop beginnt auf der Hoehe
+traegt auf jeder Seite und Breite Tablette UND Wort (R22-F, F4.5: die Stufe ohne Tablette unter 26rem
+ist entfallen; gemessen 320-1920px ohne Ueberlauf; `test:health-nav`). Der Detailkopf am Desktop beginnt auf der Hoehe
 der Bereichsliste und klebt dort (`top` = Abstand) auf einem Grundstreifen im Seitengrund
 (Ring `--space-2` um die Ecken, nach oben versetzt bis zur Spaltenkante). Das Erfassen-Formular
 steht in EINEM `.form-rows`-Traeger (die Wertefelder als Glied darin). Die Bereichsliste fuehrt

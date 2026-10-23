@@ -872,7 +872,7 @@ test('R22 D12: Einnehmen heisst ueberall so und behaelt sein Wort - auch die Bed
   const prn = HEALTH_JS.slice(HEALTH_JS.indexOf('function prnRowMarkup('), HEALTH_JS.indexOf('function prnListMarkup('));
   assert.match(prn, /<span class="health-prn__take-label">\$\{esc\(t\('health\.meds\.take'\)\)\}<\/span>/, 'dasselbe Verb wie die geplante Dosis');
   assert.match(prn, /aria-label="\$\{esc\(t\('health\.meds\.takeNamed', \{ name: med\.name \}\)\)\}"/, 'der Name beginnt mit dem sichtbaren Wort');
-  assert.match(prn, /class="icon-md health-dose__take-icon"/, 'die Tablette weicht bei Enge wie bei der geplanten Dosis');
+  assert.match(prn, /class="icon-md health-dose__take-icon"/, 'dieselbe Tablette wie bei der geplanten Dosis');
   const rules = [...eachRule(read('public/styles/health.css'))];
   const hidesWord = rules.filter((r) => /\.health-(?:dose|prn)__take-label/.test(r.selector) && /display:\s*none/.test(r.body));
   assert.deepEqual(hidesWord.map((r) => `${r.at.join(' ')} ${r.selector}`), [], 'keine Breite nimmt dem Knopf sein Wort');
@@ -889,4 +889,16 @@ test('R22 D12: das Erfassen-Formular steht in EINEM Traeger, der Tag-Titel brich
   assert.match(fn, /formRowsHtml\(\[\s*formRowHtml\(\{\s*label: t\('health\.vitals\.field\.type'\)[\s\S]*?`<div class="form-rows" id="vital-value-fields">/,
     'die Werte stehen als Glied in der Gruppe');
   assert.match(HEALTH_JS, /title: `\$\{t\('health\.cycle\.dayLog\.title'\)\}\\u00A0· \$\{formatDate\(key\)\}`/, 'geschuetztes Leerzeichen vor dem Trenner');
+});
+
+// Sammel-Ticket R22-F, F4.5: der Einnehmen-Knopf trug seine Tablette am Desktop
+// nur auf der Medikamente-Seite - unter 26rem Zeilenbreite (Uebersicht 300-380px,
+// jedes Telefon) fiel sie weg. Gemessen mit Tablette 320-1920px in sechs Sprachen:
+// kein Ueberlauf, gleiche Zeilenhoehe. Keine Breite nimmt sie mehr.
+test('F4.5: Einnehmen traegt seine Tablette auf jeder Seite und bei jeder Breite', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const hides = [...eachRule(read('public/styles/health.css'))]
+    .filter((r) => /\.health-dose__take-icon/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.deepEqual(hides.map((r) => `${r.at.join(' ')} ${r.selector}`), [], 'eine Breite nimmt dem Knopf die Tablette - Uebersicht und Medikamente-Seite sahen verschieden aus');
+  assert.match(HEALTH_JS, /health-dose__take"[^>]*><i data-lucide="pill" class="icon-md health-dose__take-icon"/, 'die geplante Dosis traegt die Tablette');
 });
