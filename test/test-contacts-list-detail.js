@@ -323,14 +323,54 @@ test('Kontaktfilter: nur belegte Kategorien, die aktive bleibt, und mit einer Ka
   }
 });
 
-test('Kontaktfilter: die Gruppe heisst nach ihrer Frage, und am Zeigergeraet bricht die Reihe um', () => {
+test('Kontaktfilter: die Gruppe heisst nach ihrer Frage, und die Reihe bleibt EINE Reihe - auch am Zeigergeraet (R22 D20)', () => {
   const js = read('../public/pages/contacts.js');
   assert.match(js, /id="contacts-filters" role="group" aria-label="\$\{t\('contacts\.categoryLabel'\)\}"/,
     'die Gruppe hiess „Alle" - der Name des ersten Chips, nicht der Frage');
   const css = read('../public/styles/contacts.css');
-  const wrap = [...eachRule(css)].find((r) => r.selector.trim() === '.contacts-filters'
-    && r.at.some((a) => /hover:\s*hover/.test(a) && /pointer:\s*fine/.test(a)));
-  assert.ok(wrap && /flex-wrap:\s*wrap/.test(wrap.body), 'eine Maus hat keine waagerechte Geste');
+  const wrap = [...eachRule(css)].filter((r) => /\.contacts-filters\b/.test(r.selector)
+    && (/flex-wrap:\s*wrap/.test(r.body) || /overflow-x:\s*visible/.test(r.body)));
+  assert.deepEqual(wrap.map((r) => r.selector), [],
+    'am Desktop brach die Reihe in zwei um (1280: rund 48px mehr Kopf) - sie scrollt jetzt mit Fade wie mobil');
+  assert.match(js, /wireScrollFade\(_container\.querySelector\('#contacts-filters'\)\);\s*wireWheelToRow\(_container\.querySelector\('#contacts-filters'\)\)/,
+    'Fade an der Kante und das Mausrad bewegt die Reihe');
+});
+
+test('R22 D20: das Mausrad bewegt die Chipreihe waagerecht, bis sie am Ende ist - dann scrollt die Seite', () => {
+  let handler = null;
+  const row = {
+    scrollLeft: 0, scrollWidth: 900, clientWidth: 400,
+    addEventListener(type, fn, opts) { if (type === 'wheel') { handler = fn; assert.equal(opts?.passive, false, 'sonst greift preventDefault nicht'); } },
+  };
+  Object.defineProperty(row, 'scrollLeft', {
+    get() { return this._x ?? 0; },
+    set(v) { this._x = Math.max(0, Math.min(v, this.scrollWidth - this.clientWidth)); },
+  });
+  contacts.wireWheelToRow(row);
+  assert.ok(handler, 'die Reihe hoert auf das Rad');
+  const rad = (over) => {
+    const e = { deltaX: 0, deltaY: 100, ctrlKey: false, prevented: false, preventDefault() { this.prevented = true; }, ...over };
+    handler(e);
+    return e.prevented;
+  };
+  assert.equal(rad({}), true, 'senkrechtes Rad bewegt die Reihe');
+  assert.equal(row.scrollLeft, 100);
+  row.scrollLeft = 500;
+  assert.equal(rad({}), false, 'am Ende geht das Rad an die Seite weiter - nie fest');
+  assert.equal(rad({ deltaX: 30 }), false, 'eine echte Waagerecht-Geste bleibt beim Browser');
+  assert.equal(rad({ ctrlKey: true }), false, 'Strg+Rad zoomt');
+  row.scrollWidth = 300;
+  row.scrollLeft = 0;
+  assert.equal(rad({}), false, 'ohne Ueberlauf nichts zu bewegen');
+});
+
+test('R22 D7: ein ueber den Geburtstag verknuepfter Kontakt ohne eigenes Datum zeigt das verknuepfte - und den Weg', () => {
+  const rows = contacts.renderContactDetail({ id: 9, name: 'Mike', birthday: null, birthday_id: 4, birthday_link_date: '1985-11-02', birthday_link_year_unknown: 0 });
+  const row = rows.find((r) => r.icon === 'cake');
+  assert.ok(row?.value, 'ohne Wert fiele die Zeile weg und mit ihr der Rueckweg');
+  assert.equal(row.action?.label, 'contacts.showBirthday');
+  const eigen = contacts.renderContactDetail({ id: 9, name: 'Mike', birthday: '1985-11-03', birthday_id: 4, birthday_link_date: '1985-11-02' });
+  assert.match(eigen.find((r) => r.icon === 'cake').value, /03|3/, 'das eigene Datum des Kontakts geht vor');
 });
 
 test('Neuer Kontakt ist nicht als „Arzt" vorbelegt: aktive Filterkategorie, sonst misc (Re-Critique 2026-09-28 P2-5)', () => {

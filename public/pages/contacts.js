@@ -416,6 +416,7 @@ export async function render(container, { user, signal } = {}) {
   // Kategorie-Filter: Rand-Fade-Affordanz für die scrollende Chipzeile
   // (geteilte has-fade-*-Konvention, Audit F-06 — Scrollbalken ist versteckt).
   wireScrollFade(_container.querySelector('#contacts-filters'));
+  wireWheelToRow(_container.querySelector('#contacts-filters'));
   _container.querySelector('#contacts-filters').addEventListener('click', (e) => {
     const chip = e.target.closest('[data-cat]');
     if (!chip) return;
@@ -1103,7 +1104,12 @@ function renderContactDetail(contact, { onBirthdayLinked = null } = {}) {
     {
       icon: 'cake',
       label: t('contacts.birthdayLabel'),
-      value: birthDateText(contact.birthday, contact.birthday_year_unknown),
+      // Ohne eigenes Datum zeigt die Zeile das des verknuepften Geburtstags
+      // (R22, D7: der Geburtstag-Dialog verknuepft auch Kontakte ohne Datum) -
+      // sonst fiele die Zeile weg und mit ihr der Weg dorthin.
+      value: contact.birthday
+        ? birthDateText(contact.birthday, contact.birthday_year_unknown)
+        : birthDateText(contact.birthday_link_date, contact.birthday_link_year_unknown),
       // DER WEG ZUM GEBURTSTAG (Critique R21, D7; #2149): verknuepft fuehrt
       // die Zeile dorthin, unverknuepft legt sie den Eintrag an - in derselben
       // Folgeaktion, siehe birthdayRowAction().
@@ -1546,7 +1552,7 @@ function buildContactForm({ mode, contact = null }) {
     ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
 
     <div class="modal-panel__footer contact-modal__footer">
-      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete" style="margin-inline-end:auto">
+      ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">
@@ -2053,6 +2059,26 @@ function openImportSelectionModal(named, skipped) {
   });
 }
 
+/**
+ * DIE CHIPREIHE BLEIBT EINE REIHE, AUCH AM DESKTOP (Critique R22, D20). Bis
+ * dahin brach sie am Zeigergeraet in zwei Reihen um (R10 L8: "eine Maus hat
+ * keine waagerechte Geste") und kostete 1280/1440 rund 48px Hoehe ueber der
+ * Liste. Jetzt scrollt sie wie mobil mit Fade an der Kante (`wireScrollFade`),
+ * und das Mausrad, das nur senkrecht dreht, bewegt sie waagerecht - solange
+ * es in seiner Richtung noch etwas zu zeigen gibt. Am Ende der Reihe (und
+ * mit Strg zum Zoomen, oder einer echten Waagerecht-Geste vom Trackpad) geht
+ * das Rad an die Seite weiter; die Seite scrollt also nie fest.
+ * @param {HTMLElement|null} row
+ */
+function wireWheelToRow(row) {
+  row?.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.deltaX !== 0 || e.deltaY === 0 || row.scrollWidth <= row.clientWidth) return;
+    const before = row.scrollLeft;
+    row.scrollLeft = before + e.deltaY;
+    if (row.scrollLeft !== before) e.preventDefault();
+  }, { passive: false });
+}
+
 /** Die Adresse eines Geburtstags: dieselbe wie aus der Suche (`?open=`). */
 function birthdayHref(id) {
   return `/birthdays?open=${encodeURIComponent(String(id))}`;
@@ -2287,4 +2313,6 @@ export const __test = {
   setContainerForTest(container) { _container = container; },
   // R21 S9b: Liste und Detail zeigen eine Nummer gleich.
   enhancePhones,
+  // R22 D20: die Chipreihe und das Mausrad.
+  wireWheelToRow,
 };

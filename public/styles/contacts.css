@@ -58,17 +58,11 @@
   display: none;
 }
 
-/* AM ZEIGERGERAET BRICHT DIE REIHE UM (R10 L8, A5 P2-6). Eine Maus hat keine
- * waagerechte Geste: in der 424px-Listenspur standen bei 1440 nur vier von
- * zehn Chips sichtbar, der Rest hinter einem Scroller ohne Balken. Mit nur
- * belegten Kategorien (contacts.js) sind es wenige, und die passen in zwei
- * Reihen. Am Finger bleibt der Querscroller - dort ist Wischen die Geste. */
-@media (hover: hover) and (pointer: fine) {
-  .contacts-filters {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-}
+/* EINE REIHE IN JEDER BREITE (Critique R22, D20). Am Zeigergeraet brach sie
+ * seit R10 L8 in zwei Reihen um (1280/1440: rund 48px mehr Kopf ueber der
+ * Liste). Jetzt scrollt sie wie mobil: Fade an der Kante (`wireScrollFade`),
+ * das Mausrad bewegt sie waagerecht (`wireWheelToRow` in contacts.js), die
+ * Tastatur holt den fokussierten Chip ins Bild. `test:contacts-list-detail`. */
 
 /* Die Reihe endet an der Lesekante wie die Gruppen darunter: im Port ist sie
  * so breit wie der Port (1156px bei 1440), die Traeger aber kappen aufs
