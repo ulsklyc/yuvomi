@@ -281,6 +281,8 @@ const PLURAL_EXCEPTIONS = {
   'shopping.clearChecked': 'PARENTHETICAL',
   'contacts.importSubmit': 'PARENTHETICAL',
   'health.cycle.settings.applyToAllDone': 'PARENTHETICAL',
+  // R22 (D6): "Personen vergleichen (2)" - der Name des Personenknopfs im Schichtplan.
+  'schedule.overviewPeopleCount': 'PARENTHETICAL',
 
   // --- numerusneutrale Abkuerzung ----------------------------------------
   'settings.calendarDurationMinutes': 'ABBREV',
