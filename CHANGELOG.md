@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same
   linked entry as the import from contacts, and the row then shows "Show in birthdays". The button
   only appears for members who may edit the calendar, the module Birthdays belongs to.
+- **A birthday can be linked to a contact by hand.** Until now a birthday knew its contact only
+  if it had been imported from it, so an entry typed in by hand stayed alone even when the same
+  person was in Contacts. The birthday dialog now has "Link to contact" under "More details", and
+  a birthday whose name matches exactly one unlinked contact shows a quiet "Link" in its detail.
+  Linked, both sides lead to each other; a contact without its own date shows the birthday's date.
+  The date itself is not copied or kept in step. In the API, `POST` and `PUT /birthdays` take
+  `contact_id`; a contact that already belongs to another birthday is refused with 409.
 - **Traditional Chinese as the 27th language** (#2172, from #1670, translated by @TW199501). The
   app, the web installer and the command-line installer speak Traditional Chinese (`zh-Hant`),
   written in Taiwan usage, next to the existing Simplified `zh`. A browser or shell from Taiwan,
@@ -24,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
+  row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
+  instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
+  the start and a filled Edit with its pencil at the end. "Year unknown" at a birth date is a
+  switch. The birthday detail labels its upper date "Next birthday on", so it no longer reads like
+  a second birth date, and the import from contacts shows a person icon instead of a download.
 - **Switching between sections is instant.** Tapping another section in the tab bar, the
   sidebar, the More sheet, the command palette or between the kitchen tabs used to cross-fade the
   old and the new page for a fifth of a second, while the highlight in the navigation had already
