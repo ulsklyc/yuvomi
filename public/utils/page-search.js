@@ -27,7 +27,11 @@ import { esc } from '/utils/html.js';
 export function renderPageSearch({ id, label, placeholder, value = '', clearLabel = '', className = '' } = {}) {
   const ph = placeholder ?? label ?? '';
   const lbl = label ?? placeholder ?? '';
-  const cls = ['page-search', className].filter(Boolean).join(' ');
+  // `is-filled` traegt den Stand "Begriff steht" fuer Browser ohne `:has()`
+  // (wirePageSearch haelt ihn nach): die Icon-Form der Suche fragt sonst
+  // `:has(input:not(:placeholder-shown))` - ohne `:has()` faellt die ganze
+  // Regel weg, und die Suche bliebe ein Feld (calendar.css, R22-F).
+  const cls = ['page-search', className, value ? 'is-filled' : ''].filter(Boolean).join(' ');
   return `
     <label class="${cls}" for="${esc(id)}">
       <span class="page-search__label sr-only">${esc(lbl)}</span>
@@ -60,7 +64,11 @@ export function wirePageSearch(container, { id, onQuery, delay = 200 } = {}) {
   if (!input) return null;
   const control = input.closest('.page-search__control');
   const clearBtn = control?.querySelector('[data-page-search-clear]');
-  const syncClear = () => { if (clearBtn) clearBtn.hidden = !input.value; };
+  const root = input.closest('.page-search');
+  const syncClear = () => {
+    if (clearBtn) clearBtn.hidden = !input.value;
+    root?.classList.toggle('is-filled', Boolean(input.value));
+  };
   let timer;
   input.addEventListener('input', () => {
     syncClear();

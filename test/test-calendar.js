@@ -6804,6 +6804,45 @@ test('R21 S7: die kompakte Kopfzeile faltet Suche und Verwalten, die offene Such
   assert(/data-filter-manage-calendars/.test(src), 'Verwalten steht im Filterblatt');
 });
 
+/* R22-F (F1 Punkt 6): ohne `:has()` fiel jede Icon-Form-Regel oben als Ganzes
+ * weg (`:not(:has(...))` ist kein vergebender Selektor) - die kompakte Suche
+ * blieb ein Feld. Gemessen 1280 mit nachgestelltem Browser ohne `:has()`
+ * (Regeln mit `:has()` entfernt, `@supports not selector(:has(*))` aktiv):
+ * 70x40 Feld -> 40x40 Lupe. Die Rueckfallform liest den Stand "Begriff steht"
+ * aus der Klasse `is-filled`, die utils/page-search.js nachhaelt. */
+await test('R22-F: die kompakte Kalendersuche wird auch ohne :has() zur Lupe', async () => {
+  const fallback = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /^@supports not selector\(:has\(\*\)\)/.test(a.trim())));
+  const icon = fallback.find((r) => /label\.page-search:not\(:focus-within\):not\(\.is-filled\)$/.test(r.selector.trim())
+    && !r.at.some((a) => /hover/.test(a)));
+  assert(icon && /width:\s*var\(--target-base\)/.test(icon.body) && /border-radius:\s*var\(--radius-full\)/.test(icon.body),
+    'ohne :has() steht die Suche als Lupe in Zielgroesse');
+  assert(icon.at.some((a) => /min-width:\s*1024px/.test(a)), 'im selben Rahmen wie die Regel mit :has()');
+  const pointer = fallback.find((r) => /label\.page-search:not\(:focus-within\):not\(\.is-filled\)$/.test(r.selector.trim())
+    && r.at.some((a) => /hover/.test(a)));
+  assert(pointer && /width:\s*var\(--target-md\)/.test(pointer.body), 'am Zeiger misst sie wie ihre Zeile (D8)');
+  assert(fallback.every((r) => !/:has\(/.test(r.selector)), 'der Rueckfall selbst kommt ohne :has() aus');
+
+  // Der Stand kommt aus dem Feld: Markup mit Wert und jede Eingabe.
+  const { renderPageSearch, wirePageSearch } = await import('../public/utils/page-search.js');
+  assert(/class="page-search cal-toolbar__search is-filled"/.test(renderPageSearch({ id: 's', label: 'Suchen', value: 'Arzt', className: 'cal-toolbar__search' })),
+    'ein Begriff aus der Adresse steht schon im ersten Markup');
+  assert(!/is-filled/.test(renderPageSearch({ id: 's', label: 'Suchen', className: 'cal-toolbar__search' })), 'leer ohne Klasse');
+  const classes = new Set();
+  const root = { classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } };
+  const listeners = {};
+  const input = {
+    value: '',
+    closest: (sel) => (sel === '.page-search__control' ? null : sel === '.page-search' ? root : null),
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+  };
+  const handle = wirePageSearch({ querySelector: () => input }, { id: 's', onQuery: () => {}, delay: 0 });
+  input.value = 'Zahnarzt';
+  listeners.input();
+  assert(classes.has('is-filled'), 'eine Eingabe setzt den Stand');
+  handle.clear();
+  assert(!classes.has('is-filled'), 'Leeren nimmt ihn zurueck');
+});
+
 /* R21 S7 (a3): bei 1920 doppelte der Mini-Monat neben dem Monat das Raster. */
 test('R21 S7: im Monat steht kein Mini-Monat in der Seitenleiste', () => {
   const s = calendarHelpers.state;

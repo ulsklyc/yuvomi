@@ -588,6 +588,45 @@
     flex: 1 1 auto;
     max-width: none;
   }
+
+  /* OHNE `:has()` (Safari < 15.4, Firefox < 121) fiel jede Regel oben, die
+   * `:not(:has(...))` traegt, als Ganzes weg: die Suche blieb ein Feld in
+   * voller Breite, und die eine Zeile, fuer die der kompakte Kopf da ist,
+   * brach um. Hier traegt dieselbe Icon-Form den Stand "Begriff steht" als
+   * Klasse (`is-filled`, utils/page-search.js haelt sie nach). Die
+   * Ansichtswahl bleibt daneben stehen - sie auszublenden braucht den
+   * Elternselektor; das aufgeklappte Feld teilt sich dann die Zeile. */
+  @supports not selector(:has(*)) {
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled) {
+      flex: 0 0 auto;
+      width: var(--target-base);
+      min-width: var(--target-base);
+      max-width: var(--target-base);
+      block-size: var(--target-base);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-full);
+    }
+
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled) .page-search__input {
+      min-height: 0;
+      block-size: calc(var(--target-base) - 2 * 1.5px);
+      padding-inline: 0;
+      border-color: transparent;
+      background: transparent;
+      color: transparent;
+    }
+
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled) .page-search__icon {
+      inset-inline: 0;
+      margin-inline: auto;
+      color: var(--color-accent);
+    }
+
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search.is-filled {
+      flex: 1 1 auto;
+      max-width: none;
+    }
+  }
 }
 
 /* DIE LUPE MISST WIE IHRE ZEILE (R22, D8). Am Zeiger stehen Pfeile, Filter,
@@ -604,6 +643,19 @@
 
   .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown))) .page-search__input {
     block-size: calc(var(--target-md) - 2 * 1.5px);
+  }
+
+  @supports not selector(:has(*)) {
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled) {
+      width: var(--target-md);
+      min-width: var(--target-md);
+      max-width: var(--target-md);
+      block-size: var(--target-md);
+    }
+
+    .page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled) .page-search__input {
+      block-size: calc(var(--target-md) - 2 * 1.5px);
+    }
   }
 }
 

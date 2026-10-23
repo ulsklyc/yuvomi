@@ -8527,6 +8527,8 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // R21 S7 (D9): die kompakte eine Kopfzeile des Kalenders ab 1024px nimmt
     // dieselbe Icon-Form (calendar.css, `cal-toolbar--compact`).
     ['.page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(:has(input:not(:placeholder-shown)))', 'Icon-Form der Kalendersuche in der kompakten Kopfzeile; derselbe Knopf'],
+    // Ihr Rueckfall ohne `:has()` (R22-F): Stand "Begriff steht" als Klasse.
+    ['.page-toolbar.cal-toolbar--compact .page-toolbar__tools > label.page-search:not(:focus-within):not(.is-filled)', 'Icon-Form der Kalendersuche ohne :has(); derselbe Knopf'],
     ['.search-overlay__header', 'Kopf des Such-Overlays; Trennlinie zur Trefferliste'],
     // `.search-overlay__panel` stand hier bis R18 (2026-10-07): die Palette traegt
     // seither die Glaskante der schwebenden Flaechen (--glass-border), keine
