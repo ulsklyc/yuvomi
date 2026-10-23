@@ -48,10 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a card into the column.
 - **Icons in buttons share one size.** A button icon without a size of its own was drawn at 24
   pixels, so the arrows that step through the calendar, budget and meal plan, "Grant bonus" and
-  "Deduct" in Rewards and "Check in"/"Check out" in Housekeeping stood larger than every other icon in
-  the same row. They now match the other button icons, as do the pantry filter chips and the folder
-  menu in Documents. On a wide screen the three round buttons above the overview greeting are as
-  tall as the buttons in every other page header.
+  "Deduct" in Rewards and "Check in"/"Check out" in Housekeeping stood larger than every other
+  icon in the same row. They now match the other button icons, as do the pantry filter chips, the
+  buttons above the overview greeting and the folder menu in Documents.
 - **Controls in one row are one height.** On a computer, the tabs in the kitchen, budget, rewards,
   housekeeping and shift plan headers, the shopping list tabs, the calendar search and the
   buttons above the overview greeting stood a little taller than the buttons next to them, and
