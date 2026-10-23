@@ -190,8 +190,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the word at every width, and its name gets its own line before it breaks. The capture
   form draws one line between every row. On a computer the area header starts level with the list
   and stays there while scrolling, without cards showing through around it.
+- **The More sheet shows that it scrolls.** On a phone with a notch the sheet started under the
+  status bar, and the modules below its edge looked like they were not there. It now stays below
+  the status bar, its lower edge fades while there is more, and Budget stands under "Finance"
+  instead of looking like part of People.
+- **The kitchen tool row comes back when you scroll up.** Week, lists and search under the kitchen
+  tabs folded away while scrolling and only came back at the very top; scrolling up a little now
+  brings them back anywhere in the list. The first shopping group no longer touches the header
+  line, and on a computer the kitchen tabs show their names without icons, like every other
+  section.
+- **The overview's today sheet reads column by column.** On a wide screen its lines no longer
+  run through both columns, an odd last entry spans the width, and the shopping line comes before
+  "+N more today". A child's own rewards card keeps its pending request right under the goal. The
+  empty search shows the places you visited last and a few things to create instead of a tile for
+  every section, and in customize mode the options of a hidden widget sit in a menu on its chip.
+- **Tasks keep their details in view.** On a computer the line with priority, due date and tags
+  now runs under the person's avatar instead of stopping beside it. "Who did it?" moved into the
+  More menu of an open task as "Done by …", the confirmation after ticking a task names it, and
+  "New task" puts due date and time side by side on a phone.
+- **Smaller kitchen and rewards details.** The quick-add category on a computer keeps its full
+  word, an open recipe starts level with the list, and the recipe and shopping icons on a meal card
+  name themselves under the pointer. A child's points card gives the next reward the room it needs,
+  and its button says "Your entries" instead of a third "History". The welcome tour shows modules
+  in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **The "Who did it?" menu of a task opens where you clicked.** On a computer a right click on a
+  task opened the menu beside the list, over the sidebar. It now opens at the pointer, a long
+  press at the finger, and the menu key below the start of the row.
 - **The wall display on a portrait tablet shows whole titles.** Held upright, a tablet showed
   "Order birthday cake…" and the weather place cut off above a third of empty screen. In portrait
   a program title and the weather line now take two lines; in landscape they keep one.

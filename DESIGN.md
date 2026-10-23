@@ -1177,7 +1177,25 @@ das Verhaeltnis haelt.
   nach Hoehe verteilen (Notizen; Einkauf ab 60rem): Platzhalterhoehen liessen Gruppen beim
   Scrollen die Spalte wechseln. Guard `test:frontend-audit`. Seit R22 (D22) auch IN der Gruppe:
   Aufgaben und Einkauf schieben Zeilen ab `:nth-child(n+20)` auf (Content-Box 85/80px bzw.
-  48px; der Einkauf in jeder Breite, weil der Platzhalter die echte Zeile ist).
+  48px; der Einkauf in jeder Breite, weil der Platzhalter die echte Zeile ist). Neu gemessen in
+  S9 nach dem 12px-Einzug und der Metazeile unter dem Avatar: 84,6 / 80 / 100,6 (Detailspalte),
+  unveraendert.
+- **Die Metazeile der Aufgabe laeuft unter den Avatar (R22, D17):** ab 640px ist eine Zeile mit
+  Personenstapel ein Raster wie mobil - der Stapel steht neben dem Titel und liegt ueber beiden
+  Zeilen (`align-self: start`, sonst streckte er die Titelzeile um 1px und der Platzhalter
+  stimmte nicht), die Metazeile spannt bis unter ihn (1280: 194 -> 230px, keine abgeschnittene
+  Faelligkeit mehr). Im Detail steht „Wer hat erledigt?" als erster Eintrag des Mehr-Menues
+  („Erledigt von ..."), nicht als Icon hinter „Erledigen"; die Quittung nach Haken oder Wisch
+  nennt die Aufgabe. „Neue Aufgabe": Faelligkeit und Uhrzeit teilen eine Zeile (`.form-pair`),
+  erst bei 320px untereinander. Guards: `test:frontend-audit` ("R22 D17"),
+  `test:task-detail-finish`, `test:task-series-feedback`, `test:people-pickers`.
+- **Ein Kontextmenue geht am Zeiger auf (R22 S9):** ein Menue ohne sichtbaren Ausloeser
+  (Personenauswahl der Aufgabenzeile per Rechtsklick/Long-Press, „Erledigt von ..." aus dem
+  Mehr-Menue des Detail-Fusses) oeffnet ueber `showPopoverMenuAt(panel, { x, y, above })`
+  (utils/popover-menu.js): linke obere Ecke am Punkt, kippt auf die andere Seite, wo kein Platz
+  ist; `above` stellt es ueber einen Ausloeser im Fuss. Der Punkt gilt fuer ein Oeffnen. Vorher
+  rechnete das Menue am unsichtbaren Knopf und hing am Laptop ueber der Seitenleiste.
+  Guards: `test:popover-menu`, `test:people-pickers`, `test:task-detail-finish` ("R22").
 - **Eine Zeile baut nur, was man sieht (R22, D22):** Zeilenmenues (Mehr, "Wer hat erledigt?")
   legen ihre Eintraege per `popoverMenuHtml({ defer: true })` / `rowMenuHtml({ defer: true })`
   in ein `<template>`, das `beforetoggle` beim Oeffnen einhaengt (die Wurzel braucht
@@ -1422,6 +1440,11 @@ das Verhaeltnis haelt.
   gestartete Compositor-Animation zaehlt die Layout-Shift-Messung nicht. Gemessen 390px: CLS
   Kalender 0,061 -> 0,001, Budget 0,059 -> 0, Einkauf 0,058 -> 0,001 (`holdThenGlide`,
   utils/ux.js). Unter reduzierter Bewegung steht der Wechsel; der Titel blendet (`--motion-blend`).
+  **Die Faltzeile folgt der Richtung (R22, D15):** 24px abwaerts falten sie, 40px aufwaerts ab
+  dem Wendepunkt holen sie mitten in der Liste zurueck (vorher erst bei scrollTop < 8); was der
+  Umbau selbst ausloest (der Browser klemmt am Listenende), setzt nur den Wendepunkt
+  (`foldByDirection`, utils/ux.js; `test:ux-utils` "R22 D15"). Die 65-px-Koepfe der uebrigen
+  Module bleiben bei der Lage-Regel.
   **Gemessen wird nach dem Gleiten (R21):** der ResizeObserver mass die Zeilen sonst an ihrer
   gehaltenen alten Lage, nahm dem Kopf die Lead-Zone, und er klappte nach dem ersten Ausklappen
   nie wieder ein. **Ein Modul kann den Kopf mit seiner Flaeche falten (R21, D9):** ein Port mit
@@ -1976,7 +1999,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Icon stylen | auf `svg` (oder eine Klasse) zielen - Lucide ersetzt `<i data-lucide>` durch `<svg>` | - | Regeln auf `... i`: sie trafen nie (38 entfernt) |
 | **D1 Kopf-Werkzeug-Slot** (Critique 2026-10-16, "die Werkzeugebene spricht drei bis vier Dialekte") | Feste Reihenfolge rechts im Kopf: **Suche · Ansicht · Filter · Mehr**, dahinter am Desktop die "+ Nomen"-Pille. EINE Haut fuer jeden Kopf-Icon-Knopf: `btn btn--secondary btn--icon` (Ring `--color-border`, Tinte Akzent) - auch die Lupe in ihrer Icon-Form, die Kreise der Uebersicht, das "..." der Entsorgung, "Kalender verwalten". Ansichtswahl IMMER `.segmented` (Icon-Variante `--icons` erlaubt) mit `attachSegmentIndicator`; im Kopf misst sie aussen so viel wie ein Kopfknopf. Suche am Desktop als Feld (`renderPageSearch`, Center-Slot oder `.page-toolbar__tools`), mobil als Lupe an ERSTER Stelle der Werkzeuggruppe in der Titelzeile. Mobil stehen die Werkzeuge in der Titelzeile (`page-toolbar--title-tools`); passt eine Ansichtswahl nicht daneben, steht sie im Menue (Einfachauswahl) bzw. - bei vier Ansichten - als Pop-up-Knopf mit dem WORT der Ansicht und festem Auf/Ab-Zeichen (Kalender). Kalender am Desktop EINE Zeile (125 -> 69px), Tablet zwei (182 -> 135px), Aufgaben mobil 120 -> 65px | `popoverMenuHtml()` (Standard-Ausloeser), `pageToolsMenuHtml()`, `renderPageSearch()`, `.segmented` + `.page-toolbar .segmented*` (panel.css), `.page-toolbar__tools` (page-search.css); `test:popover-menu`, `test:dashboard-a11y`, `test:calendar`, `test:documents-ux`, `test:mobile-chrome` (Lupe, Traegerliste) | `.group-toggle` als Ansichtswahl, runde Eigen-Pille der Dokumente, eigenes Well des Kalenders, `btn--ghost` als Menue-Ausloeser, graue Kreise ohne Rand, nackte Lupe, Suchknopf, der eine Leiste unter dem Kopf aufdeckt, Ansichts-Glyphe, die mit der Ansicht wechselt, Werkzeuge in einer eigenen zweiten Zeile |
 | **D2 Filter** | Eine Dimension mit hoechstens sechs Werten = Chipzeile inline, Chips immer `--sm`. Mehrere Dimensionen = EIN Filterblatt: Personen und Kategorien als Chips, Ebenen und Ansichtsschalter als Schalter (`.switch`), EIN Reset-Text (vorhandenen Key wiederverwenden). Ausloeser = Kopf-Icon-Knopf mit Zaehler-Badge, kein Wort "Filter" | `filterButtonHtml()` ohne `showLabel`, `openFilterSheet()` (utils/filter-sheet.js), `.filter-chip--sm` | Text-Pille "Filter (n)", 48px-Chips in Kontakten und Vorrat, Checkbox-Blatt, zwei Reset-Texte |
-| **D3 Unternavigation** | Hoechstens sieben Bereiche = Text-Reiter (`.sub-tab`, OHNE Icons); mehr = Liste mit Drill-down | `renderSubTabs({ indicator })` | Icon-Reiter, eigene Bereichsspalte, Segment + Chips als Navigation |
+| **D3 Unternavigation** | Hoechstens sieben Bereiche = Text-Reiter (`.sub-tab`, OHNE Icons; seit R22 S9 auch die Kuechen-Reiter am Desktop); mehr = Liste mit Drill-down | `renderSubTabs({ indicator })`; `test:frontend-audit` "D3: die Unternavigation der Module ist Text" | Icon-Reiter, eigene Bereichsspalte, Segment + Chips als Navigation |
 | **D4 Formulare** | Zwei Dialekte nach ZWECK: Label-ueber-Feld fuer Text und Stammdaten, Inset-Zeile fuer Messwerte. Datum/Uhrzeit sieht in beiden wie ein Feld aus. Pflichtfeld/Name zuerst und fokussiert, Seltenes hinter "Weitere Angaben" | `.form-group`/`.form-input`, `<yuvomi-datepicker>` | Dialekt nach Modul, nacktes Datum als Text |
 | **D5 Anlegen** | Der FAB ist der eine Weg (benannte Ausnahme: Quick-Add im Einkauf, Felder in Kapsel+Fill wie die Suche). Ein Leerzustand neben dem FAB hat keine zweite Primaeraktion; das Planer-"+" nur in leeren Zellen. **Abschnittsaktion:** genau EINE `btn--secondary btn--sm` (Icon + Wort) rechts neben dem Abschnittstitel; seltene Nebenaktionen hinter einem `btn--secondary btn--icon btn--sm <modul>-section-tools popover-menu__trigger` (kein `pageToolsMenuHtml`). Guard: `test:control-dialect` `section-action` | `createPageFab()` (utils/fab.js); `popoverMenuHtml({ triggerClass: 'btn btn--secondary btn--icon btn--sm <modul>-section-tools' })` (utils/popover-menu.js) | `btn--primary` im Leerzustand neben dem FAB; mehr als eine `btn--secondary btn--sm` im Abschnittskopf; `btn--ghost` neben `btn--secondary` |
 | **D6 Zeilen** (R18; seit R21 geschaerft durch D10) | Alles Weitere hinter EINEM sichtbaren Mehr-Knopf (`ellipsis`), auch auf Touch; Zeilenkoerper oeffnet, Chevron nur bei Navigation. Wie viel sichtbar bleibt und in welcher Reihenfolge, sagt D10 | `rowMenuHtml()`; `test:control-dialect` | Aktion nur per Geste oder Hover, Stift neben oeffnendem Koerper |
@@ -2807,8 +2830,25 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
   Wo es kein wiederverwendbares Blatt gibt, nennt die Zeile ihr Objekt im Modul: Mahlzeit
   `/meals?open=<id>` (Karte ins Bild, ihr Blatt geht auf), Dosis `/health/meds`, Geburtstag
   `/birthdays?open=<id>`; die Haushaltshilfe bleibt `/housekeeping`. Pruefebene: test:dashboard-a11y.
+- **Das zweispaltige Heute-Blatt liest sich spaltenweise (R22, D16):** ab 720px Containerbreite
+  traegt jede Spalte eigene, eingerueckte Trenner (`::before`, `inset-inline: --space-4`), keine
+  Haarlinie laeuft ueber beide; bei ungerader Zahl spannt die letzte Zeile unter beiden
+  (`.today-cockpit-card--span`). Die Einkaufszeile schliesst das SICHTBARE Programm und steht vor
+  „+N weitere heute". Im Kindkonto steht die eigene Belohnungskachel oben (die Anfrage folgt dem
+  Ziel statt `margin-block-start: auto`). Guard: `test:dashboard-today` ("R22 D16").
+- **Anpassen: Optionen am Chip (R22, D16):** ein ausgeblendetes Widget mit Optionen ist ein
+  geteilter Knopf - links einblenden (ein Tipp), rechts am selben Pill der Pfeil ins Menue
+  „<Kachel> einblenden" / „Optionen fuer <Kachel>"; kein freier Regler-Kreis ohne Wort.
+  Guard: `test:dashboard-a11y` ("R22 D16").
+- **Die leere Befehlspalette (R22, D16):** „Zuletzt besucht" (jeder Modulbesuch, hoechstens
+  fuenf, der offene Ort nicht, lokal je Konto, nur Ziel und Modul) und bis zu fuenf
+  Anlege-Befehle, beides als Zeilen mit Modulsiegel in der Bauart der Treffer; ohne Besuch die
+  ersten Ziele als „Gehe zu". Keine Kachel je Navigationsziel mehr (vorher 19).
+  Guard: `test:search-palette` ("R22 D16").
 - **Die eigene Karte auf /rewards** (`.rw-own`): Stand im Large-Title-Grad, das naechste Ziel
-  mit Zeichen, Name und Preis ueber dem Balken, „Verlauf" leise und „Anfragen" primaer erst,
+  mit Zeichen, Name und Preis ueber dem Balken (unter 48rem Kartenbreite stehen die Handlungen
+  darunter, R22), „Deine Buchungen" leise (seit R22 nicht mehr ein drittes „Verlauf" neben
+  Reiter und Seitenspalte) und „Anfragen" primaer erst,
   wenn der Stand reicht. Opak und randlos wie die Praemienkarte, der Modulton nur im Zeichen
   des Ziels - kein Spiel-Look.
 - **Anlegen und Einladen** nennen die Startrechte unter der Familienrolle, nur bei Kind
@@ -2951,13 +2991,18 @@ Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboar
   Hilfe, Neuigkeiten und Abmelden sind immer zu sehen (vorher bei 390x844 unter dem Blattende).
   Das Blatt traegt den **gruppierten Grund** (`--color-bg`), die Listen ihre Flaeche
   (`--sheet-tile-bg`) ohne Schatten - keine Karte auf einer Karte (R21 S7, Detektor nested-cards).
-  Guard: `test:mobile-chrome`.
+  **Seit R22 (D14):** die Oberkante bleibt unter der Statusleiste (`max-block-size` zieht
+  `max(--space-8, --safe-area-inset-top + --space-2)` ab; 390x844 mit 59px Zone: y 32 -> 67), der
+  Koerper traegt die Kantenblende der Seitenleiste (`wireScrollFade(body, { axis: 'y' })`,
+  `.more-sheet__body.has-fade-*`, Blende `--space-6`), und im Blatt traegt JEDE Sektion ihren
+  Namen - auch Budget allein unter „Finanzen" (`navSectionLabelKey(..., { standalone: true })`).
+  Guards: `test:mobile-chrome`, `test:frontend-audit` ("R22 D14"), `test:settings-navigation`.
 - **Navigations-Ordnung (R19, Ulas 2026-10-16):** Planen = Kalender, Aufgaben, Belohnungen,
   Notizen, Schichtplan; Haushalt = Kueche, Haushaltshilfe, Entsorgung, Dokumente, Inventar;
   Menschen = Kontakte, Geburtstage, Gesundheit; Budget. **Eine Sektion mit nur einem Eintrag
   hat keinen Kopf** (`navSectionLabelKey`, settings/module-order.js) - Budget steht ohne
-  „Finanzen" mit der Luft einer Gruppe (`.nav-item--headerless`); Seitenleiste und Mehr-Blatt
-  lesen dieselbe Regel, gezaehlt wird in der Seitenleiste. Eine eigene `module_order` sortiert
+  „Finanzen" mit der Luft einer Gruppe (`.nav-item--headerless`); gezaehlt wird in der
+  Seitenleiste. Das Mehr-Blatt nennt seit R22 (D14) jede Sektion (siehe dort). Eine eigene `module_order` sortiert
   weiter innerhalb der Sektionen. Der Schichtplan zeichnet `briefcase-business` (Lucide) statt
   einer zweiten Kalenderform. Guard: `test:settings-navigation`.
 - **Der FAB sitzt konzentrisch in der Kapsel:** hinten derselbe Abstand wie oben und unten
