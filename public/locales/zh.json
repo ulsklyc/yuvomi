@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "这笔账目已关联。",
         "errorLocationExists": "此处已有同名位置。请换一个名称。",
         "errorLocationGone": "这个位置已不存在。",
-        "errorCategoryGone": "这个类别已不存在。"
+        "errorCategoryGone": "这个类别已不存在。",
+        "editItem": "编辑物品"
     },
     "documentAttach": {
         "label": "附件",

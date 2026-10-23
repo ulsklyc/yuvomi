@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Naka-link na ang transaksyong ito.",
         "errorLocationExists": "Umiiral na ang lokasyong ito rito. Pumili ng ibang pangalan.",
         "errorLocationGone": "Wala na ang lokasyong ito.",
-        "errorCategoryGone": "Wala na ang kategoryang ito."
+        "errorCategoryGone": "Wala na ang kategoryang ito.",
+        "editItem": "I-edit ang gamit"
     },
     "documentAttach": {
         "label": "Mga kalakip",

@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Deze boeking is al gekoppeld.",
         "errorLocationExists": "Deze locatie bestaat hier al. Kies een andere naam.",
         "errorLocationGone": "Deze locatie bestaat niet meer.",
-        "errorCategoryGone": "Deze categorie bestaat niet meer."
+        "errorCategoryGone": "Deze categorie bestaat niet meer.",
+        "editItem": "Voorwerp bewerken"
     },
     "documentAttach": {
         "label": "Bijlagen",

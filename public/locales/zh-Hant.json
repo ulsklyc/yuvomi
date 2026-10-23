@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "這筆帳目已連結。",
         "errorLocationExists": "此處已有同名位置。請換一個名稱。",
         "errorLocationGone": "這個位置已不存在。",
-        "errorCategoryGone": "這個類別已不存在。"
+        "errorCategoryGone": "這個類別已不存在。",
+        "editItem": "編輯物品"
     },
     "documentAttach": {
         "label": "附件",

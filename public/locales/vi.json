@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Giao dịch này đã được liên kết.",
         "errorLocationExists": "Vị trí này đã có ở đây. Hãy chọn tên khác.",
         "errorLocationGone": "Vị trí này không còn tồn tại.",
-        "errorCategoryGone": "Danh mục này không còn tồn tại."
+        "errorCategoryGone": "Danh mục này không còn tồn tại.",
+        "editItem": "Sửa món đồ"
     },
     "documentAttach": {
         "label": "Tệp đính kèm",

@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "この取引はすでに関連付けられています。",
         "errorLocationExists": "この場所はすでにここにあります。別の名前を選んでください。",
         "errorLocationGone": "この場所はもう存在しません。",
-        "errorCategoryGone": "このカテゴリーはもう存在しません。"
+        "errorCategoryGone": "このカテゴリーはもう存在しません。",
+        "editItem": "持ち物を編集"
     },
     "documentAttach": {
         "label": "添付",

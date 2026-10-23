@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Bu işlem zaten bağlı.",
         "errorLocationExists": "Bu konum burada zaten var. Başka bir ad seçin.",
         "errorLocationGone": "Bu konum artık yok.",
-        "errorCategoryGone": "Bu kategori artık yok."
+        "errorCategoryGone": "Bu kategori artık yok.",
+        "editItem": "Eşyayı düzenle"
     },
     "documentAttach": {
         "label": "Ekler",

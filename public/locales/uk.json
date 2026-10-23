@@ -6611,7 +6611,8 @@
         "errorBookingAlreadyLinked": "Ця операція вже пов'язана.",
         "errorLocationExists": "Таке місце тут уже є. Виберіть іншу назву.",
         "errorLocationGone": "Цього місця більше немає.",
-        "errorCategoryGone": "Цієї категорії більше немає."
+        "errorCategoryGone": "Цієї категорії більше немає.",
+        "editItem": "Редагувати предмет"
     },
     "documentAttach": {
         "label": "Вкладення",

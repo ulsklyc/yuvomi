@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "این تراکنش قبلاً مرتبط شده است.",
         "errorLocationExists": "این محل از قبل اینجا وجود دارد. نام دیگری انتخاب کنید.",
         "errorLocationGone": "این محل دیگر وجود ندارد.",
-        "errorCategoryGone": "این دسته دیگر وجود ندارد."
+        "errorCategoryGone": "این دسته دیگر وجود ندارد.",
+        "editItem": "ویرایش وسیله"
     },
     "documentAttach": {
         "label": "پیوست‌ها",

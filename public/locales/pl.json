@@ -6611,7 +6611,8 @@
         "errorBookingAlreadyLinked": "Ta transakcja jest już powiązana.",
         "errorLocationExists": "To miejsce już tu istnieje. Wybierz inną nazwę.",
         "errorLocationGone": "To miejsce już nie istnieje.",
-        "errorCategoryGone": "Ta kategoria już nie istnieje."
+        "errorCategoryGone": "Ta kategoria już nie istnieje.",
+        "editItem": "Edytuj przedmiot"
     },
     "documentAttach": {
         "label": "Załączniki",

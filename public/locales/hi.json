@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "यह लेन-देन पहले से जुड़ा हुआ है।",
         "errorLocationExists": "यह स्थान यहाँ पहले से मौजूद है। कोई दूसरा नाम चुनें।",
         "errorLocationGone": "यह स्थान अब मौजूद नहीं है।",
-        "errorCategoryGone": "यह श्रेणी अब मौजूद नहीं है।"
+        "errorCategoryGone": "यह श्रेणी अब मौजूद नहीं है।",
+        "editItem": "चीज़ संपादित करें"
     },
     "documentAttach": {
         "label": "अनुलग्नक",

@@ -546,3 +546,33 @@ test('Inventar-Dialog: Kauf, Garantie, Foto, Dokumente hinter „Weitere Angaben
   const filters = [...eachRule(css)].find((r) => !r.at.length && r.selector.trim() === '.inventory-filters');
   assert.match(filters?.body ?? '', /padding-block:\s*var\(--space-3\);/, 'Abstand oben UND unten');
 });
+
+// Critique R22 (a4 P3/Klein): angelegt wurde ein "Gegenstand", bearbeitet ein
+// "Artikel" (das Wort des Einkaufs); und "Braucht Aufmerksamkeit 0" stand als
+// Akzent-Knopf da, der einen leeren Filter versprach.
+test('R22: der Gegenstand heisst beim Bearbeiten so wie beim Anlegen, null Fristen sind kein Knopf', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /t\('common\.editItem'\)/, 'kein Artikel-Titel im Inventar');
+  assert.equal((src.match(/t\('inventory\.editItem'\)/g) ?? []).length, 2, 'Dialog und Bearbeiten aus der Detailansicht');
+  for (const f of ['de', 'en']) {
+    const d = JSON.parse(readFileSync(new URL(`../public/locales/${f}.json`, import.meta.url), 'utf8'));
+    assert.ok(d.inventory.editItem, `${f}: inventory.editItem fehlt`);
+  }
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.equal(de.inventory.editItem, 'Gegenstand bearbeiten');
+  const metrics = src.slice(src.indexOf('function renderMetrics('), src.indexOf('function groupItemsByCategory('));
+  assert.match(metrics, /\$\{attentionEmpty \? `<div class="metric-card metric-card--empty">/, 'ohne Frist eine ruhige Kennzahl');
+  assert.match(metrics, /: `<button type="button" class="metric-card metric-card--select/, 'mit Frist der Schalter');
+});
+
+// Critique R22 (aus S1): die globale Suche fuehrt mit `/inventory?open=<id>`
+// ins Inventar; unter der Schwelle blieb der Treffer zu (Probe 390x844:
+// Blatt offen nein -> ja, nach dem Schliessen `/inventory` ohne Parameter).
+test('R22: `?open=` oeffnet auch am Telefon das Blatt des Gegenstands', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const mount = src.slice(src.indexOf('_md = mountMasterDetail({'), src.indexOf('onModeChange: onInventoryModeChange'));
+  assert.match(mount, /deepLinkNarrow: true,/);
+  assert.match(mount, /openNarrow: openItemNarrow,/, 'das Blatt, das der Link oeffnet');
+});

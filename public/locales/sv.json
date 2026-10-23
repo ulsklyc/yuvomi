@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Den här transaktionen är redan kopplad.",
         "errorLocationExists": "Den här platsen finns redan här. Välj ett annat namn.",
         "errorLocationGone": "Den här platsen finns inte längre.",
-        "errorCategoryGone": "Den här kategorin finns inte längre."
+        "errorCategoryGone": "Den här kategorin finns inte längre.",
+        "editItem": "Redigera föremål"
     },
     "documentAttach": {
         "label": "Bilagor",

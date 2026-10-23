@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Ez a tétel már kapcsolva van.",
         "errorLocationExists": "Ez a hely már létezik itt. Válassz másik nevet.",
         "errorLocationGone": "Ez a hely már nem létezik.",
-        "errorCategoryGone": "Ez a kategória már nem létezik."
+        "errorCategoryGone": "Ez a kategória már nem létezik.",
+        "editItem": "Tárgy szerkesztése"
     },
     "documentAttach": {
         "label": "Mellékletek",

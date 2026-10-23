@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Denne bestillingen er allerede koblet.",
         "errorLocationExists": "Denne lokasjonen finnes allerede her. Velg et annet navn.",
         "errorLocationGone": "Denne lokasjonen finnes ikke lenger.",
-        "errorCategoryGone": "Denne kategorien finnes ikke lenger."
+        "errorCategoryGone": "Denne kategorien finnes ikke lenger.",
+        "editItem": "Rediger element"
     },
     "documentAttach": {
         "label": "Vedlegg",

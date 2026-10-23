@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Diese Buchung ist bereits verknüpft.",
         "errorLocationExists": "Diesen Ort gibt es hier schon. Wähle einen anderen Namen.",
         "errorLocationGone": "Diesen Ort gibt es nicht mehr.",
-        "errorCategoryGone": "Diese Kategorie gibt es nicht mehr."
+        "errorCategoryGone": "Diese Kategorie gibt es nicht mehr.",
+        "editItem": "Gegenstand bearbeiten"
     },
     "documentAttach": {
         "label": "Anhänge",

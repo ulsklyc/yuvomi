@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Transaksi ini sudah ditautkan.",
         "errorLocationExists": "Lokasi ini sudah ada di sini. Pilih nama lain.",
         "errorLocationGone": "Lokasi ini sudah tidak ada.",
-        "errorCategoryGone": "Kategori ini sudah tidak ada."
+        "errorCategoryGone": "Kategori ini sudah tidak ada.",
+        "editItem": "Ubah barang"
     },
     "documentAttach": {
         "label": "Lampiran",

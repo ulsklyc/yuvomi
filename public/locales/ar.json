@@ -6765,7 +6765,8 @@
         "errorBookingAlreadyLinked": "هذه المعاملة مرتبطة بالفعل.",
         "errorLocationExists": "هذا الموقع موجود هنا بالفعل. اختر اسمًا آخر.",
         "errorLocationGone": "هذا الموقع لم يعد موجودًا.",
-        "errorCategoryGone": "هذه الفئة لم تعد موجودة."
+        "errorCategoryGone": "هذه الفئة لم تعد موجودة.",
+        "editItem": "تعديل الغرض"
     },
     "documentAttach": {
         "label": "المرفقات",

@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Este movimento já está associado.",
         "errorLocationExists": "Esta localização já existe aqui. Escolha outro nome.",
         "errorLocationGone": "Esta localização já não existe.",
-        "errorCategoryGone": "Esta categoria já não existe."
+        "errorCategoryGone": "Esta categoria já não existe.",
+        "editItem": "Editar objeto"
     },
     "documentAttach": {
         "label": "Anexos",

@@ -6463,7 +6463,8 @@
         "errorBookingAlreadyLinked": "Tato transakce už je propojená.",
         "errorLocationExists": "Toto místo tu již existuje. Zvolte jiný název.",
         "errorLocationGone": "Toto místo už neexistuje.",
-        "errorCategoryGone": "Tato kategorie už neexistuje."
+        "errorCategoryGone": "Tato kategorie už neexistuje.",
+        "editItem": "Upravit věc"
     },
     "documentAttach": {
         "label": "Přílohy",

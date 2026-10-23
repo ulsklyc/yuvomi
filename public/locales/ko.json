@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "이 거래는 이미 연결되어 있습니다.",
         "errorLocationExists": "이 위치는 여기에 이미 있습니다. 다른 이름을 선택하세요.",
         "errorLocationGone": "이 위치는 더 이상 존재하지 않습니다.",
-        "errorCategoryGone": "이 카테고리는 더 이상 존재하지 않습니다."
+        "errorCategoryGone": "이 카테고리는 더 이상 존재하지 않습니다.",
+        "editItem": "물건 편집"
     },
     "documentAttach": {
         "label": "첨부",

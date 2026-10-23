@@ -468,11 +468,18 @@ function renderMetrics() {
         <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
         <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
       </div>
-      <button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}${attentionEmpty ? ' metric-card--empty' : ''}"
+      ${/* NULL IST KEIN WEG (R22, a4 Klein): "Braucht Aufmerksamkeit 0" stand
+           in Akzenttinte als Knopf da und versprach einen Filter, der eine
+           leere Liste zeigt. Ohne Frist und ohne aktiven Filter ist die Zeile
+           eine ruhige Kennzahl; mit Fristen (oder eingeschaltet) der Schalter. */ ''}
+      ${attentionEmpty ? `<div class="metric-card metric-card--empty">
+        <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
+        <div class="metric-card__value">${needsAttention}</div>
+      </div>` : `<button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}"
               data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
         <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
         <div class="metric-card__value">${needsAttention}</div>
-      </button>
+      </button>`}
     </div>`;
 }
 
@@ -1350,7 +1357,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
     }],
     edit: ro ? null : {
       label: t('common.edit'),
-      title: t('common.editItem'),
+      title: t('inventory.editItem'),
       // Bearbeiten steht als Hauptaktion unten (detail-view.js,
       // withPrimaryEdit); Loeschen bleibt zurueckgenommen am Anfang und fragt
       // weiter nach (removeItem), wie im Kalender (#1460, #1463).
@@ -2193,7 +2200,9 @@ function buildItemForm({ mode, item = null }) {
     if (window.lucide) window.lucide.createIcons({ el: panel });
   }
 
-  return { title: isEdit ? t('common.editItem') : t('inventory.addItem'), content, wire };
+  // EIN NOMEN FUER BEIDE WEGE (R22, a4 P3): angelegt wird ein "Gegenstand",
+  // bearbeitet wurde ein "Artikel" (`common.editItem`, das Wort des Einkaufs).
+  return { title: isEdit ? t('inventory.editItem') : t('inventory.addItem'), content, wire };
 }
 
 function openItemModal(mode, item = null) {
@@ -2534,6 +2543,12 @@ export async function render(container, { signal } = {}) {
       root: split,
       signal,
       address: mdAddress,
+      // `?open=` AUCH AM TELEFON (R22, aus S1): die globale Suche fuehrt mit
+      // `/inventory?open=<id>` hierher, und unter der Schwelle stand dann nur
+      // die Liste - der Treffer blieb zu. Wie in den Kontakten oeffnet der
+      // Link jetzt das Leseblatt (openItemNarrow); Schliessen nimmt den
+      // Parameter wieder aus der Adresse (Baustein, narrow 'sheet').
+      deepLinkNarrow: true,
       renderDetail: (id, body, ctx) => {
         const item = state.items.find((i) => String(i.id) === id);
         if (!item) return false;

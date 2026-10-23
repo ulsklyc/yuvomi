@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Cette écriture est déjà liée.",
         "errorLocationExists": "Cet emplacement existe déjà ici. Choisissez un autre nom.",
         "errorLocationGone": "Cet emplacement n’existe plus.",
-        "errorCategoryGone": "Cette catégorie n’existe plus."
+        "errorCategoryGone": "Cette catégorie n’existe plus.",
+        "editItem": "Modifier l’objet"
     },
     "documentAttach": {
         "label": "Pièces jointes",

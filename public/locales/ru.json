@@ -6611,7 +6611,8 @@
         "errorBookingAlreadyLinked": "Эта операция уже связана.",
         "errorLocationExists": "Такое место здесь уже есть. Выберите другое название.",
         "errorLocationGone": "Этого места больше нет.",
-        "errorCategoryGone": "Этой категории больше нет."
+        "errorCategoryGone": "Этой категории больше нет.",
+        "editItem": "Изменить предмет"
     },
     "documentAttach": {
         "label": "Вложения",

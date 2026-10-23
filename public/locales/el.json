@@ -6305,7 +6305,8 @@
         "errorBookingAlreadyLinked": "Αυτή η κίνηση είναι ήδη συνδεδεμένη.",
         "errorLocationExists": "Αυτή η τοποθεσία υπάρχει ήδη εδώ. Επιλέξτε άλλο όνομα.",
         "errorLocationGone": "Αυτή η τοποθεσία δεν υπάρχει πια.",
-        "errorCategoryGone": "Αυτή η κατηγορία δεν υπάρχει πια."
+        "errorCategoryGone": "Αυτή η κατηγορία δεν υπάρχει πια.",
+        "editItem": "Επεξεργασία αντικειμένου"
     },
     "documentAttach": {
         "label": "Συνημμένα",
