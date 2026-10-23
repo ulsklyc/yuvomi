@@ -1765,6 +1765,22 @@ Achsenwert ("120 mmHg", `chartGridMarkup({ unit })`), der Puls auf eigener Achse
 nennt Minuten; eine fehlende Bewertung im Laborbefund bleibt eine leere Zelle statt "-".
 Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
 
+**Ein Leerzustand je Ebene, ein Verb je Aktion (R22, D12; Critique a5).** Ein leerer BEREICH
+zeigt `areaEmptyHtml`: Glyphe des Bereichs, Titel, Satz und die Anlege-Aktion (sekundaer -
+FAB bzw. Kopf-Pille tragen dasselbe Verb violett); ein leerer ABSCHNITT in einem Bereich mit
+Inhalt ist die ruhige Zeile `cardEmptyRowHtml` (Satz + Erfassen, wo es etwas zu erfassen gibt;
+ausserhalb einer Karte mit eigener Flaeche `--surface`). Nie ein nackter grauer Satz, nie eine
+Auswahl ohne Auswahl ("Waehle einen Befund" ohne Befund). Wo der Inhalt die Hauptaktion traegt
+(Zyklus: "Periode gestartet", Fasten: "Fasten starten"), entfaellt die Kopf-Aktion; Nachtragen
+steht am Verlauf und im Leerzustand. "Einnehmen" heisst bei geplanter und Bedarfsdosis gleich und
+gibt bei Enge nur die Tablette ab, nie das Wort. Der Detailkopf am Desktop beginnt auf der Hoehe
+der Bereichsliste und klebt dort (`top` = Abstand) auf einem Grundstreifen im Seitengrund
+(Ring `--space-2` um die Ecken, nach oben versetzt bis zur Spaltenkante). Das Erfassen-Formular
+steht in EINEM `.form-rows`-Traeger (die Wertefelder als Glied darin). Die Bereichsliste fuehrt
+ihre Glyphen ohne Kachel in Modultinte (Muster Apple Health "Durchsuchen") - bewusst anders als
+die getoenten Kacheln der Seitenleiste, die Module nennen. Guards: `test:health-nav` ("R22 D12"),
+`test:health-cycle`, `test:control-dialect` (Dialogfuesse ohne Inline-Stil).
+
 Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in
 dieser Tabelle, keine Kernseite fuehrt `data`, eine Lesemass-Seite fuehrt `reading`/`form`, eine
 Liste-+-Detail-Seite haengt den Baustein ein (Ausnahmeliste, die nur schrumpft, bis die Module
@@ -2021,6 +2037,17 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   Abschnitts ist nur der Rueckfall und bleibt der Suchbegriff. Gesundheit mobil: nach
   der Bereichsliste zwei Vitalkennzahlen (Titel = Weg zu allen) und EINE Zeile "Alle Werte
   anzeigen"; der CSV-Export ist ein Knopf im Kopf. Startseite 2711 -> 1394px.
+  Laeuft die Zeile mobil ueber, traegt sie den geteilten Anriss (`wireScrollFade`, R22).
+- **Einstellungen sagen weniger und fuehren weiter (R22, D13).** Vor dem ersten Feld stehen
+  hoechstens zwei Saetze, der Rest hinter "Mehr dazu" (`hintFoldHtml`, natives `<details>`).
+  Eine Mitgliederzeile oeffnet per Tipp (der Name ist der Knopf, seine Flaeche deckt die
+  Zeile) und endet in [Mehr][Griff]; der Geburtstag steht nicht in der Zeile. Was an zwei Orten
+  wohnt (Wetter: Mein Wetter / Fotos und Wetter; Wand: Dieses Geraet / Wandtabletts), verweist
+  gegenseitig per Satz + Link - kein Zusammenlegen. Links in Hinweisen tragen Akzenttinte. Das
+  Siegel steht unter 1024px am Blatt-Titel (der Kopf zeigt dort nur "< Einstellungen"), ab
+  1024px im Kopf mit dem Modulnamen. Laeuft die Seitenleiste ueber, klebt an ihrem unteren Rand
+  eine Zeile mit den drei Gruppen als Weg (`createNavigationIndex`). Guard:
+  `test:settings-navigation` ("R22 D13"), `test:manager-endzone`.
 
 **Die Zeilenregel in der Kueche (R16, Critique 2026-10-05).** In Abhak-Listen des Einkaufs
 hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester Ort am Desktop.
@@ -4691,9 +4718,11 @@ Anti-Referenz ist die Smart-Home-Dashboard-Optik: Kacheln voller Messwerte, Ring
 ohne Anlass. Die Uhr ist deshalb keine Kachel, sondern der Kopf der Flaeche: kein Surface, kein
 Rahmen, linksbuendig wie jeder Seitenkopf.
 
-**Eine Zeile, nicht zwei.** Auf zwei Metern erkennt man einen Eintrag an seinem Anfang; ein
+**Eine Zeile, nicht zwei - quer.** Auf zwei Metern erkennt man einen Eintrag an seinem Anfang; ein
 Umbruch kostet die Hoehe einer ganzen weiteren Zeile, und die Flaeche hat sechs davon, bevor
-sie scrollen muesste. Die Zaehler an den Gesichtern sind aus derselben Rechnung keine
+sie scrollen muesste. Hochkant (`orientation: portrait`) ist die Hoehe da und die Breite nicht:
+Programmtitel und Wetterzeile tragen dort zwei Zeilen (R22; 834x1112 zeigte "Geburtstagstorte..."
+ueber einem Drittel leerer Flaeche). Guard: `test:frontend-audit` ("hochkant ..."). Die Zaehler an den Gesichtern sind aus derselben Rechnung keine
 Mikro-Badges, sondern volle Marken mit Kante - eine 13px-Marke an einem 56px-Gesicht waere aus
 zwei Metern Dekoration.
 

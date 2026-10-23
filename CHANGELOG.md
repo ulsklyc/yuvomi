@@ -175,8 +175,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shift and name in full.
 - **Hovering the calendar week or day marks one hour.** The whole day column used to tint under
   the pointer; now only the hour a double click would create is marked.
+- **Settings rows and pages say less and lead further.** Tapping a member row opens the member;
+  the row ends in More and the reorder grip, and the birthday left the row, so a name is no longer
+  cut short. Wall tablets and API access open with one or two sentences, the rest sits behind
+  "Learn more". My weather and Photos and weather, This device and Wall tablets point to each
+  other, and links in the notes under a setting are coloured as links. On a phone the settings
+  seal stands at the page title instead of next to "< Settings", the jump links at the top fade
+  where they continue, and on a computer the sidebar shows Account, Household and Modules as a
+  row at its bottom edge while the list is longer than the window.
+- **Health speaks one way per question.** An empty area shows its symbol, a sentence and its add
+  button; an empty part of a filled area is a quiet row. Cycle and Fasting no longer carry a
+  second add button in the header next to "Period started" and "Start fasting"; adding a past
+  period or fast sits at the history. The as-needed dose says "Take" like the scheduled one and
+  keeps the word at every width, and its name gets its own line before it breaks. The capture
+  form draws one line between every row. On a computer the area header starts level with the list
+  and stays there while scrolling, without cards showing through around it.
 
 ### Fixed
+- **The wall display on a portrait tablet shows whole titles.** Held upright, a tablet showed
+  "Order birthday cake…" and the weather place cut off above a third of empty screen. In portrait
+  a program title and the weather line now take two lines; in landscape they keep one.
 - **Contacts no longer jump when the list opens.** The rows below the screen held a placeholder
   height that was taller than a real row, so the groups at the bottom of the screen slid up a
   moment after the list appeared. The first rows of every group now always render, and the
