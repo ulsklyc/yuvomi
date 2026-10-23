@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrived. The old page now stays until the new one has drawn, then the two swap in one frame
   together with the highlight. Going into a page and back out (settings, health areas) still
   slides as before.
+- **Settings pages no longer jump while they load.** Opening a settings page such as Members or
+  a module page showed its sections as they arrived, and each finished section pushed the ones
+  below it down. A section now appears once it is complete and everything above it is in place;
+  until then a placeholder holds the spot below the last finished section.
 - **Back and forward return to where you were in every list.** Contacts, Shopping, Notes, Pantry,
   Budget, Recipes, Meals, Health, the calendar views and the task list on a wide screen scroll a
   list inside the page, and going back to them always started at the top. They now reopen at the

@@ -153,7 +153,12 @@ test('placeSkeletonUntilContent: ersetzt der Abschnitt den Traeger, bleibt nur s
 
 test('die Einstellungs-Shell legt ihr Skelett ueber placeSkeletonUntilContent', () => {
   const shell = readFileSync(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
-  const timer = shell.slice(shell.indexOf('const skeletonTimer'), shell.indexOf('SKELETON_DELAY_MS);', shell.indexOf('const skeletonTimer')));
-  assert.match(timer, /placeSkeletonUntilContent\(host, renderSkeletonList/);
-  assert.doesNotMatch(timer, /insertAdjacentHTML/, 'die Shell legt das Skelett wieder selbst ab - es raeumt sich dann nicht');
+  // Seit R22 (D4) steht waehrend des Ladens EIN Skelett an der Kante zum
+  // ersten wartenden Abschnitt (revealSectionsInOrder raeumt es bei jedem
+  // Schritt und am Ende); ein Abschnitt, der die Frist reisst, bekommt sein
+  // eigenes, und das raeumt sich ueber placeSkeletonUntilContent.
+  const reveal = shell.slice(shell.indexOf('function revealSectionsInOrder('), shell.indexOf('/**', shell.indexOf('function revealSectionsInOrder(')));
+  assert.match(reveal, /if \(skeletons && !finished\.has\(host\)\) placeSkeletonUntilContent\(host, renderSkeletonList/);
+  assert.match(reveal, /const frontier = \(\) => \{\s*skeleton\?\.remove\(\);/, 'das Skelett an der Kante geht nicht vor jedem Schritt');
+  assert.match(reveal, /all\(\{ skeletons = false \} = \{\}\) \{\s*skeletonDue = false;\s*frontier\(\);/, 'am Ende bleibt das Skelett an der Kante stehen');
 });

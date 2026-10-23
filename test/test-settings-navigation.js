@@ -1371,7 +1371,7 @@ test('der Blattwechsel zeigt einen Ladezustand statt eines leeren Kastens', asyn
   const body = source.slice(source.indexOf('async function renderLeafContent'), source.indexOf('function isSplit('));
   // Seit 2026-09-28 wartet die Shell hoechstens SECTION_WAIT_MS (A7 P1-2); das
   // Fertig-Stueck `finishLeaf` laeuft trotzdem genau einmal nach ALLEN.
-  assert.match(body, /await awaitSections\(\s*hosts\.map\(\(\[host, section\]\) => renderSheetSection\([^)]*\)\),\s*finishLeaf,\s*\)/,
+  assert.match(body, /await awaitSections\(\s*hosts\.map\(\(\[host, section\]\) => renderSheetSection\([^)]*\)(?:\.finally\(\(\) => reveal\.done\(host\)\))?\),\s*finishLeaf,\s*\)/,
     'die Abschnitte laufen durch awaitSections, das Fertig-Stueck haengt daran');
   assert.match(body, /const finishLeaf = \(\) => \{\s*clearTimeout\(skeletonTimer\);[\s\S]*?leafContainer\.removeAttribute\('aria-busy'\);/,
     'aria-busy muss nach allen Abschnitten entfernt werden, auch wenn einer scheitert');
@@ -5343,4 +5343,52 @@ test('#2151: Darstellung - Region und Datensprache stehen kurz in der Auswahl, v
   const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
   assert.match(page, /regionSelect\?\.addEventListener\('change', async \(\) => \{\s*(?:\/\/[^\n]*\n\s*)*setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
   assert.match(page, /function syncRegionSelect\([\s\S]{0,700}setHint\(container, 'region-hint', regionHintText\(regionSelect\.value\)\);/);
+});
+
+// Critique R22 (D4, a5 P1): die Traeger eines Blatts standen leer und fuellten
+// sich in der Reihenfolge ihrer Daten - jeder fertige Abschnitt schob die
+// darunter weg. Kaltstart gemessen: mobil Mitglieder CLS 0,25, Kalender 0,53,
+// Gesundheit 0,20; Desktop Kalender 0,13, Gesundheit 0,10. Jetzt erscheint ein
+// Abschnitt erst, wenn er fertig ist UND alle darueber stehen; bis dahin liegt
+// er ausserhalb des Flusses, und das Skelett steht an der Kante.
+test('R22 D4: Abschnitte erscheinen ganz und in der Reihenfolge des Blatts - nichts Sichtbares rueckt', async () => {
+  const { __test } = await import('/settings/shell.js');
+  const leafContainer = { dataset: {} };
+  const group = { dataset: { pending: '' }, parentElement: leafContainer };
+  const placed = [];
+  const fake = (parentElement) => ({
+    dataset: { pending: '' },
+    parentElement,
+    insertAdjacentHTML(position, html) {
+      assert.equal(position, 'beforebegin');
+      const node = { html, removed: false, remove() { this.removed = true; } };
+      placed.push(node);
+      this.previousElementSibling = node;
+    },
+  });
+  const [a, b, c] = [fake(leafContainer), fake(group), fake(group)];
+  group.insertAdjacentHTML = a.insertAdjacentHTML;
+  const reveal = __test.revealSectionsInOrder([a, b, c], leafContainer);
+  const pending = () => [a, b, c].map((h) => 'pending' in h.dataset);
+
+  reveal.done(b);
+  assert.deepEqual(pending(), [true, true, true], 'ein Abschnitt unter einem wartenden erschien zuerst - der darueber schoebe ihn spaeter weg');
+  assert.ok('pending' in group.dataset, 'der Reichweitenblock steht vor seinem ersten Traeger');
+  reveal.placeSkeleton();
+  assert.equal(placed.length, 1, 'kein Skelett an der Kante');
+  reveal.done(a);
+  assert.deepEqual(pending(), [false, false, true], 'fertige Abschnitte in Reihenfolge erscheinen gemeinsam');
+  assert.ok(!('pending' in group.dataset), 'der Block erscheint mit seinem ersten Traeger');
+  assert.equal(placed[0].removed, true, 'das alte Skelett rueckte mit, statt zu gehen');
+  assert.equal(placed.length, 2, 'die Kante zum naechsten wartenden Traeger traegt ein NEUES Skelett');
+  reveal.all();
+  assert.deepEqual(pending(), [false, false, false], 'nach dem Ende steht jeder Abschnitt im Fluss');
+  assert.equal(placed[1].removed, true, 'ein Skelett blieb stehen');
+
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const { eachRule } = await import('./css-rules.js');
+  const pendingRule = [...eachRule(css)].find((r) => !r.at.length && /\.settings-sheet-section\[data-pending\]/.test(r.selector));
+  assert.ok(pendingRule, 'keine Regel nimmt den wartenden Traeger aus dem Fluss');
+  assert.match(pendingRule.selector, /\.settings-scope\[data-pending\]/, 'der Reichweitenblock wartet nicht mit');
+  for (const decl of [/position:\s*absolute/, /visibility:\s*hidden/, /inset-inline:\s*0/]) assert.match(pendingRule.body, decl);
 });

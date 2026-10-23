@@ -536,6 +536,22 @@
 
 .settings-leaf {
   min-width: 0;
+  /* Bezug der wartenden Traeger (unten). */
+  position: relative;
+}
+
+/* EIN ABSCHNITT ERSCHEINT GANZ UND IN REIHENFOLGE (Critique R22, D4;
+ * shell.js revealSectionsInOrder). Bis er fertig ist und alle darueber stehen,
+ * liegt sein Traeger (und ein Reichweitenblock bis zu seinem ersten Traeger)
+ * ausserhalb des Flusses: unsichtbar, ohne Treffer, voll breit, damit er sich
+ * beim Aufbau misst wie spaeter im Fluss. So schiebt kein fertiger Abschnitt
+ * einen sichtbaren weg. Guard: test:settings-navigation. */
+.settings-sheet-section[data-pending],
+.settings-scope[data-pending] {
+  position: absolute;
+  inset-inline: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* DER BLATTWECHSEL BLENDET (R14, A7 P3; shell.js renderLeafContent). Nur

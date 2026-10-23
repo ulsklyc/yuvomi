@@ -1352,6 +1352,14 @@ das Verhaeltnis haelt.
   das per `transform` gleitet (vorher `background-position`: Paint je Frame). Die Uebersicht
   blendet vom Skelett zum Inhalt ueber `swapContent`. `stagger` laeuft seit R19 ueber Web
   Animations mit `delay` und `fill: backwards` statt ueber Timer und Inline-Werte.
+  **Kein Sprung beim Aufbau (R22, D4):** was nach dem ersten Bild kommt, darf nichts
+  Sichtbares verschieben - auch nicht nach einer Eingabe (Reiterwechsel), wo CLS den Sprung
+  ueber `hadRecentInput` verschweigt; die Sonden zaehlen deshalb alle `layout-shift`-Eintraege.
+  Einstellungsblaetter: ein Abschnitt erscheint ganz und in der Reihenfolge des Blatts
+  (`revealSectionsInOrder`, shell.js); bis dahin liegt sein Traeger ausserhalb des Flusses
+  (`[data-pending]`, settings.css), das Skelett steht an der Kante. Kaltstart mobil Mitglieder
+  0,25 -> 0, Modulblatt Kalender 0,53 -> 0, Gesundheit 0,20 -> 0 (Desktop 0,13/0,10 -> 0). Guard:
+  `test:settings-navigation`.
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
   (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
   `swapContent(host, update, { direction })`: Blende ab 0,4 Deckkraft (kein leerer Frame),

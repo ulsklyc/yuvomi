@@ -1051,6 +1051,7 @@ async function renderLeafContent(content, leaf, domain, user, query) {
       title.id = `settings-scope-${leaf.id}-${scope}`;
       title.textContent = t(scope === 'mine' ? 'settings.scopeMine' : 'settings.scopeHousehold');
       group.setAttribute('aria-labelledby', title.id);
+      group.dataset.pending = '';
       group.appendChild(title);
       leafContainer.appendChild(group);
       parent = group;
@@ -1060,6 +1061,7 @@ async function renderLeafContent(content, leaf, domain, user, query) {
       host.className = 'settings-sheet-section';
       host.id = sheetSectionId(section.id);
       host.dataset.sectionId = section.id;
+      host.dataset.pending = '';
       if (section.props?.part) host.dataset.part = section.props.part;
       parent.appendChild(host);
       hosts.push([host, section]);
@@ -1073,12 +1075,12 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   // wenn der Abschnitt seinen Inhalt HINTER das Skelett haengt, statt den
   // Traeger zu ersetzen (Critique R19, placeSkeletonUntilContent).
   leafContainer.setAttribute('aria-busy', 'true');
-  const skeletonTimer = setTimeout(() => {
-    for (const [host] of hosts) placeSkeletonUntilContent(host, renderSkeletonList({ rows: 2, lines: 3 }));
-  }, SKELETON_DELAY_MS);
+  const reveal = revealSectionsInOrder(hosts.map(([host]) => host), leafContainer);
+  const skeletonTimer = setTimeout(reveal.placeSkeleton, SKELETON_DELAY_MS);
 
   const finishLeaf = () => {
     clearTimeout(skeletonTimer);
+    reveal.all();
     // Kam das Blatt erst nach einem Wechsel zu Ende, steht schon ein anderes:
     // dann weder Fokus noch Formularwache fuer ein abgehaengtes Blatt.
     if (!leafContainer.isConnected) return;
@@ -1103,12 +1105,74 @@ async function renderLeafContent(content, leaf, domain, user, query) {
   // Nicht blockierend: ein haengender Abschnitt haelt weder die Shell noch die
   // Navigationssperre des Routers (siehe SECTION_WAIT_MS).
   await awaitSections(
-    hosts.map(([host, section]) => renderSheetSection(host, section, user, query)),
+    hosts.map(([host, section]) => renderSheetSection(host, section, user, query).finally(() => reveal.done(host))),
     finishLeaf,
   );
   // Nach der Frist stehen die Marken in jedem Fall, notfalls mit dem
-  // Rueckfallnamen eines Abschnitts, der noch laedt.
+  // Rueckfallnamen eines Abschnitts, der noch laedt - und jeder Abschnitt
+  // steht im Fluss, ein haengender mit seinem eigenen Skelett.
+  clearTimeout(skeletonTimer);
+  reveal.all({ skeletons: true });
   jump?.classList.remove('settings-sheet-jump--pending');
+}
+
+/**
+ * EIN ABSCHNITT ERSCHEINT GANZ UND IN DER REIHENFOLGE DES BLATTS (Critique R22,
+ * D4). Die Traeger standen leer im Blatt und fuellten sich, wie ihre Daten
+ * kamen: jeder fertige Abschnitt schob die darunter weg (Kaltstart mobil
+ * Mitglieder CLS 0,25, Kalender 0,53, Gesundheit 0,20; Desktop Kalender 0,13).
+ * Jetzt liegt ein Traeger, bis sein render() fertig ist UND alle darueber
+ * stehen, ausserhalb des Flusses (`[data-pending]`, settings.css: absolut,
+ * unsichtbar, voll breit - er misst sich beim Aufbau wie im Fluss). Erscheinen
+ * kann so nur, was unter allem Sichtbaren liegt, und nichts Sichtbares rueckt.
+ * Ein Reichweitenblock folgt seinem ersten Traeger. Das Skelett steht an der
+ * Kante zum ersten wartenden Traeger und ist bei jedem Schritt ein NEUER Knoten
+ * - ein verschobenes Skelett waere selbst ein Sprung.
+ *
+ * @param {HTMLElement[]} hosts  Traeger in Dokumentreihenfolge
+ * @param {HTMLElement} leafContainer
+ */
+function revealSectionsInOrder(hosts, leafContainer) {
+  const finished = new Set();
+  let next = 0;
+  let skeleton = null;
+  let skeletonDue = false;
+  const show = (host) => {
+    delete host.dataset.pending;
+    const group = host.parentElement;
+    if (group && group !== leafContainer) delete group.dataset.pending;
+  };
+  const frontier = () => {
+    skeleton?.remove();
+    skeleton = null;
+    const host = hosts[next];
+    if (!skeletonDue || !host) return;
+    const group = host.parentElement;
+    const anchor = group && group !== leafContainer && group.dataset.pending !== undefined ? group : host;
+    anchor.insertAdjacentHTML('beforebegin', renderSkeletonList({ rows: 2, lines: 3 }));
+    skeleton = anchor.previousElementSibling;
+  };
+  return {
+    done(host) {
+      finished.add(host);
+      if (hosts[next] !== host) return;
+      while (next < hosts.length && finished.has(hosts[next])) show(hosts[next++]);
+      frontier();
+    },
+    placeSkeleton() {
+      skeletonDue = true;
+      frontier();
+    },
+    all({ skeletons = false } = {}) {
+      skeletonDue = false;
+      frontier();
+      for (; next < hosts.length; next += 1) {
+        const host = hosts[next];
+        show(host);
+        if (skeletons && !finished.has(host)) placeSkeletonUntilContent(host, renderSkeletonList({ rows: 2, lines: 3 }));
+      }
+    },
+  };
 }
 
 /**
@@ -1363,4 +1427,4 @@ export async function renderSettingsShell(container, {
 }
 
 /** Nur fuer Tests (test-settings-navigation.js). */
-export const __test = { awaitSections, SECTION_WAIT_MS, revealActiveNavigationLink, renderLeafContent };
+export const __test = { awaitSections, SECTION_WAIT_MS, revealActiveNavigationLink, renderLeafContent, revealSectionsInOrder };
