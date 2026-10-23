@@ -2917,8 +2917,10 @@ button.today-cockpit__more--link {
 }
 
 /* Die aufgeklappten verdeckten Zeilen (Codex an #1485) setzen die Liste fort:
- * dieselbe Haarlinie zur letzten sichtbaren Zeile. */
-.today-cockpit__rows + .today-cockpit__rows--more {
+ * dieselbe Haarlinie zur letzten sichtbaren Zeile - seit R22 (D16) auch, wenn
+ * die Einkaufszeile vor dem Aufklapper steht. */
+.today-cockpit__rows + .today-cockpit__rows--more,
+.today-cockpit-card + .today-cockpit__rows--more {
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -2939,13 +2941,42 @@ button.today-cockpit__more--link {
   }
 
   .today-cockpit__rows--split > .today-cockpit-card--col2 {
-    border-left: 1px solid var(--color-border-subtle);
+    border-inline-start: 1px solid var(--color-border-subtle);
   }
 
-  /* Die erste Zeile der rechten Spalte steht oben am Traeger - dort gehoert
-   * keine Haarlinie hin, auch wenn sie im Markup auf eine Zeile folgt. */
-  .today-cockpit__rows--split > .today-cockpit-card--col-start {
+  /* DIE SPALTE TRENNT, NICHT DIE ZEILE (R22 D16). Die Haarlinien liefen ueber
+   * beide Spalten durch - drei durchgehende Linien bei 1440, das Blatt las
+   * sich zeilenweise (links, rechts, links ...), obwohl es spaltenweise
+   * gefuellt ist. Jetzt traegt jede Spalte ihre eigenen, eingerueckten
+   * Trenner (das Polster der Zeile, --space-4), und am Spaltentrenner bleibt
+   * eine Luecke: zwei Listen nebeneinander, keine Tabelle. */
+  .today-cockpit__rows--split > .today-cockpit-card + .today-cockpit-card {
     border-top: none;
+  }
+
+  .today-cockpit__rows--split > .today-cockpit-card {
+    position: relative;
+  }
+
+  .today-cockpit__rows--split > .today-cockpit-card:not(:first-child):not(.today-cockpit-card--col-start)::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--space-4);
+    block-size: 1px;
+    background-color: var(--color-border-subtle);
+    pointer-events: none;
+  }
+
+  /* Die letzte Zeile einer ungeraden Zahl spannt unter beiden Spalten; ihre
+   * Linie laeuft ueber die volle Breite, weil sie beide Spalten abschliesst. */
+  .today-cockpit__rows--split > .today-cockpit-card--span {
+    grid-column: 1 / -1;
+    grid-row: calc(var(--today-rows-per-column, 1) + 1);
+  }
+
+  .today-cockpit__rows--split > .today-cockpit-card--span::before {
+    inset-inline: 0;
   }
 }
 
@@ -3853,6 +3884,16 @@ button.today-cockpit__more--link {
 .dashboard .rewards-widget__footer,
 .dashboard .family-widget__footer {
   margin-block-start: auto;
+}
+
+/* DIE EIGENE BELOHNUNGSKACHEL STEHT OBEN (R22 D16). Im Kindkonto ist sie die
+ * erste Kachel neben Familie und Geburtstagen und wird so hoch wie die beiden:
+ * die Fussregel darueber schob die Freigabe-Zeile 230px unter Punkte und
+ * Balken (1440), dazwischen stand leere Flaeche, und die Zeile las sich als
+ * Fuss einer anderen Kachel. Die Anfrage gehoert zum Ziel, das sie betrifft:
+ * sie folgt dem Inhalt, der Rest der Kachel bleibt unten frei. */
+.dashboard .rewards-widget--self > .rewards-widget__footer {
+  margin-block-start: 0;
 }
 
 .dashboard .widget__empty {

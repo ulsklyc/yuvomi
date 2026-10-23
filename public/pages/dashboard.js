@@ -4378,17 +4378,31 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // Die Sammelzeile gibt es nur auf dem Telefon; dort teilt sich die Liste nie.
   const grouped = model.rows.some((row) => row.kind === 'overdue');
   const split = model.rows.length >= 2 && !grouped;
-  const perColumn = Math.ceil(model.rows.length / 2);
+  // BEI UNGERADER ZAHL SPANNT DIE LETZTE ZEILE (R22 D16). Mit `ceil` blieb
+  // rechts unten eine leere Zelle, und die Haarlinie darueber endete im Nichts.
+  // Jetzt teilen sich die ersten 2k Zeilen die Spalten, die letzte steht ueber
+  // die volle Breite darunter - gelesen wird links, rechts, dann „und zuletzt".
+  const perColumn = Math.floor(model.rows.length / 2);
+  const columnClass = (index) => {
+    if (!split) return '';
+    if (index >= perColumn * 2) return ' today-cockpit-card--span';
+    if (index < perColumn) return '';
+    return ` today-cockpit-card--col2${index === perColumn ? ' today-cockpit-card--col-start' : ''}`;
+  };
   listRows.push(...model.rows.map((row, index) => (row.kind === 'overdue'
     ? renderTodayOverdueGroup(row, overdueOpen)
-    : renderTodayRow(row, split && index >= perColumn
-      ? ` today-cockpit-card--col2${index === perColumn ? ' today-cockpit-card--col-start' : ''}`
-      : ''))));
+    : renderTodayRow(row, columnClass(index)))));
   const parts = [];
   const foldShopping = Boolean(model.shopping) && model.overflow > 0 && !model.moreRoute && onPhoneStage();
   if (listRows.length) {
     parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
   }
+  // DER EINKAUF STEHT VOR DEM AUFKLAPPER (R22 D16). Er folgte „+4 weitere
+  // heute" und las sich wie eine der verdeckten Zeilen, die schon aufgeklappt
+  // ist. Er ist die zeitlose Schlusszeile des SICHTBAREN Programms; der
+  // Aufklapper schliesst das Blatt ab. Auf dem Telefon klappt er weiter mit
+  // (`foldShopping`, R14).
+  if (model.shopping && !foldShopping) parts.push(renderTodayRow(model.shopping));
   if (model.overflow > 0 && model.moreRoute) {
     const moreText = esc(t('dashboard.todayMore', { count: model.overflow }));
     parts.push(`<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link" data-route="${esc(model.moreRoute)}">
@@ -4410,7 +4424,6 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
           <span>${esc(moreOpen ? lessText : moreText)}</span><i data-lucide="chevron-down" class="icon-sm today-cockpit__more-icon" aria-hidden="true"></i>
         </button>`);
   }
-  if (model.shopping && !foldShopping) parts.push(renderTodayRow(model.shopping));
   if (model.coda) parts.push(`<div class="today-cockpit__coda">${esc(model.coda)}</div>`);
 
   // Deckt der Nutzer alle vier Domänen über Widgets ab, wäre das Cockpit leer —

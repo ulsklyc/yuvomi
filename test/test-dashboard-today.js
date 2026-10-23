@@ -975,3 +975,45 @@ test('R20: die Seite setzt den Betrachter, den das Heute-Blatt fragt', () => {
   assert.match(src, /viewer = dashboardViewer,\n\} = \{\}\) \{/, 'buildTodayCockpitModel faellt auf den gesetzten Betrachter zurueck');
   assert.match(src, /buildTodayProgram\(data, \{ includeTasks, includeCalendar, includeMeals, now, viewer \}\)/);
 });
+
+// R22 D16 (Critique 2026-10-22, a1 P2): das zweispaltige Blatt liess bei
+// ungerader Zahl rechts unten eine leere Zelle, und die Einkaufszeile stand
+// hinter „+N weitere heute", als waere sie eine der verdeckten Zeilen.
+test('R22 D16: ungerade Zahl - die letzte Zeile spannt; der Einkauf steht vor dem Aufklapper', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const events = Array.from({ length: 9 }, (_, i) => ev(i + 1, `T${i + 1}`,
+    `2026-09-24T${String(11 + i).padStart(2, '0')}:00`, `2026-09-24T${String(11 + i).padStart(2, '0')}:30`));
+  const sheet = dash.renderTodayCockpit({ upcomingEvents: events, urgentTasks: [], users: [], shoppingOpenCount: 3 }, [], false,
+    { now: new Date(), cap: 5, moreOpen: false });
+  assert.match(sheet, /today-cockpit__rows--split" style="--today-rows-per-column:2"/, 'fuenf Zeilen: zwei je Spalte');
+  const classes = [...sheet.matchAll(/class="today-cockpit-card today-cockpit-card--event([^"]*)"/g)].slice(0, 5).map((m) => m[1].trim());
+  assert.deepEqual(classes, ['', '', 'today-cockpit-card--col2 today-cockpit-card--col-start', 'today-cockpit-card--col2', 'today-cockpit-card--span'],
+    'links zwei, rechts zwei, die fuenfte ueber die volle Breite');
+  const shopping = sheet.indexOf('today-cockpit-card--shopping');
+  const more = sheet.indexOf('class="today-cockpit__more');
+  assert.ok(shopping > 0 && more > 0, 'Vorbedingung: Einkauf und „+N weitere heute" stehen im Blatt');
+  assert.ok(shopping < more, 'der Einkauf schliesst das sichtbare Programm, der Weg zu den uebrigen das Blatt');
+
+  const even = dash.renderTodayCockpit({ upcomingEvents: events.slice(0, 4), urgentTasks: [], users: [] }, [], false, { now: new Date(), cap: 5 });
+  assert.doesNotMatch(even, /today-cockpit-card--span/, 'gerade Zahl: nichts spannt');
+}));
+
+test('R22 D16: die Spalte trennt, nicht die Zeile - eingerueckte Trenner je Spalte', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))]
+    .filter((r) => r.at.some((a) => /today-cockpit \(min-width: 720px\)/.test(a)));
+  const body = (sel) => rules.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(body('.today-cockpit__rows--split > .today-cockpit-card + .today-cockpit-card'), /border-top:\s*none/,
+    'keine Haarlinie ueber beide Spalten');
+  const inset = body('.today-cockpit__rows--split > .today-cockpit-card:not(:first-child):not(.today-cockpit-card--col-start)::before');
+  assert.match(inset, /inset-inline:\s*var\(--space-4\)/, 'der Trenner endet vor dem Spaltentrenner');
+  assert.match(body('.today-cockpit__rows--split > .today-cockpit-card--span'), /grid-column:\s*1 \/ -1/);
+});
+
+test('R22 D16: die eigene Belohnungskachel (Kindkonto) steht oben, die Anfrage folgt dem Ziel', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))].filter((r) => !r.at.length);
+  const own = rules.find((r) => r.selector.trim() === '.dashboard .rewards-widget--self > .rewards-widget__footer');
+  assert.match(own?.body ?? '', /margin-block-start:\s*0/, 'kein margin-block-start: auto unter Punkten und Balken');
+});
