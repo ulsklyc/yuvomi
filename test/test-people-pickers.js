@@ -136,6 +136,22 @@ test('tasks: the dialog asks when, who and how important before the free-text no
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'title, due, assignee, priority, note, more settings');
 });
 
+// R22 D17 (Critique 2026-10-22, a2 Klein): `modal-grid--2` fiel unter 480px
+// Modalbreite einspaltig - Faelligkeit und Uhrzeit standen am Telefon in zwei
+// vollen Zeilen. Sie teilen sich eine Zeile, solange zwei 8rem-Spalten passen.
+test('tasks: due date and time share one row that only stacks when two columns no longer fit', () => {
+  setHouseholdSize(2);
+  const html = taskDialog({ task: null, users: [ANNA, CLARA] });
+  const date = html.indexOf('id="task-due-date"');
+  const row = html.lastIndexOf('<div class="', html.lastIndexOf('<div class="form-group">', date) - 1);
+  const cls = html.slice(row, html.indexOf('>', row));
+  assert.match(cls, /\bform-pair\b/, 'the pair measures its columns, not the window');
+  assert.doesNotMatch(cls, /modal-grid--2/, 'no longer the grid that stacks below 480px');
+  const time = html.indexOf('id="task-due-time"');
+  const rowEnd = html.indexOf('task_assigned');
+  assert.ok(time > date && time < rowEnd, 'time follows in the same pair, before the people');
+});
+
 test('tasks: an empty recurrence and an empty reminder wait behind "more settings"', () => {
   setHouseholdSize(2);
   const html = taskDialog({ task: null, users: [ANNA, CLARA] });

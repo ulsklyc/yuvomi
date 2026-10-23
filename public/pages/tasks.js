@@ -1353,7 +1353,15 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
         </div>
       </div>
 
-      <div class="modal-grid modal-grid--2">
+      ${/* FAELLIGKEIT UND UHRZEIT IN EINER ZEILE, AUCH AM TELEFON (R22 D17).
+          * `modal-grid--2` fiel unter 480px Modalbreite einspaltig: zwei volle
+          * Zeilen fuer ein Datum und eine Uhrzeit, und die Personen rutschten
+          * unter die Falz. `.form-pair` misst die Spalten (8rem passen zweimal
+          * ins 364px-Sheet) und faellt erst einspaltig, wenn das nicht mehr
+          * geht. `modal-grid` bleibt fuer seinen Rhythmus (die Gruppen darin
+          * ohne eigenen Rand, layout.css); die Spalten setzt `.form-pair`, das
+          * im Blatt danach steht. */ ''}
+      <div class="modal-grid form-pair">
         <div class="form-group">
           <label class="label" for="task-due-date">${t('tasks.dueDateLabel')}</label>
           <yuvomi-datepicker type="date" id="task-due-date" name="due_date"
