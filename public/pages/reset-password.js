@@ -45,12 +45,25 @@ export async function render(container) {
   // Bewusst eine Auskunft und kein `navigate('/login')`: der Router verwirft
   // eine Navigation, die aus einem laufenden `render()` heraus startet
   // (`isNavigating`), und zurueck bliebe eine leere Seite.
-  if (!(await auth.passwordLoginEnabled())) {
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  // Gilt der Link noch? Der Server sagt es vorab, ohne ihn einzuloesen
+  // (Critique R22, D19) - parallel zur Frage nach dem Anmeldeweg, damit die
+  // Seite gleich im richtigen Zustand steht statt ein Formular zu zeigen und
+  // es wieder wegzunehmen. Nur `valid: false` heisst "tot". Ein voller
+  // Limiter (429), ein Netz- oder Serverfehler laesst das Formular stehen:
+  // das Absenden fragt den Server ohnehin noch einmal, und wer bei einem
+  // Aussetzer "Link ungueltig" liest, wirft einen intakten Link weg.
+  const [loginEnabled, tokenAlive] = await Promise.all([
+    auth.passwordLoginEnabled(),
+    token
+      ? auth.checkResetToken(token).then((r) => r?.data?.valid !== false, () => true)
+      : false,
+  ]);
+  if (!loginEnabled) {
     renderUnavailable(container);
     return;
   }
 
-  const token = new URLSearchParams(window.location.search).get('token') || '';
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
@@ -101,8 +114,9 @@ export async function render(container) {
   // gueltiger Token" stehen der Satz mit dem naechsten Schritt und der Weg
   // dorthin, betont wie die Anmeldung auf /join (join.js).
   // Seit R22 (D19) wie die tote Einladung: der Titel nennt den ungueltigen
-  // Link, "Neuen Link anfordern" ist der Primaerknopf. Ob ein Link gilt, sagt
-  // erst das Absenden - der Server hat keine Vorab-Pruefung fuer Reset-Links.
+  // Link, "Neuen Link anfordern" ist der Primaerknopf. Die Vorabpruefung oben
+  // faengt den toten Link vor dem Tippen; das Absenden bleibt die zweite
+  // Stelle, weil er in der Zwischenzeit ablaufen oder eingeloest werden kann.
   const dead = (msg) => {
     container.querySelector('#reset-title').textContent = t('resetPassword.invalidTitle');
     show(errorEl, msg);
@@ -113,6 +127,7 @@ export async function render(container) {
   };
 
   if (!token) { dead(t('resetPassword.missingToken')); return; }
+  if (!tokenAlive) { dead(t('resetPassword.invalidToken')); return; }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

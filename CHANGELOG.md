@@ -133,7 +133,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offered only a small text link; a dead reset link kept "Set new password". Both pages now name
   the invalid link in the title, say once what to do and offer the way out as the main button:
   "Go to login" for the invitation, "Request a new link" for the reset. The way back to login on
-  these pages is now styled as a link.
+  these pages is now styled as a link. A reset link that has expired or was already used is
+  recognised as soon as the page opens, no longer only after a new password was typed and sent.
+  In the API, `POST /auth/reset-password/check` tells whether a reset token still works without
+  using it; it shares the rate limit of the reset and gives the same answer for every dead link.
 - **Pairing a wall tablet points at the code field.** A wrong pairing code showed an English
   server sentence in a banner below the form. The message now stands under the code field, the
   field is marked as wrong and focused, and a link leads back to login.

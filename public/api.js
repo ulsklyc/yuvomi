@@ -464,6 +464,11 @@ const auth = {
   forgotPassword: (identifier) => api.post('/auth/forgot-password', { identifier }),
   resetPassword: (token, password) => api.post('/auth/reset-password', { token, password }),
   /**
+   * Gilt dieser Reset-Link noch? Fragt, ohne ihn einzuloesen (Critique R22,
+   * D19). Der Token geht im Koerper, nicht in der URL. `{ data: { valid } }`.
+   */
+  checkResetToken: (token) => api.post('/auth/reset-password/check', { token }),
+  /**
    * Kann dieser Server einen Passwort-Reset ueberhaupt durchfuehren?
    *
    * Zwei Gruende sprechen dagegen und beide fuehren zu derselben Sackgasse:
