@@ -50,3 +50,27 @@ export function toastSurface(urgency = 'polite') {
  * nicht kennen.
  */
 export const PERSISTENT_TOAST_SELECTOR = '.toast--reminder, [data-toast-persistent]';
+
+/**
+ * PLATZ FUER EINEN NEUEN DAUERHAFTEN TOAST: HOECHSTENS `max` TOASTS STEHEN,
+ * UND WEICHEN DARF NUR EIN DAUERHAFTER (R22 S10).
+ *
+ * Erinnerungen sind ein eigener Kanal neben der einen Rueckmeldung (D18): sie
+ * sind zeitgebunden und bleiben 30 s, die Rueckmeldung ersetzt nur sich selbst.
+ * Bis hierher machte die Erinnerung Platz, indem sie den AELTESTEN Toast der
+ * Flaeche entfernte - war das die Rueckmeldung, verschwand ihr "Rueckgaengig"
+ * vor der Frist. Jetzt weicht die aelteste Erinnerung; die Zahl der Toasts
+ * insgesamt bleibt bei `max` (mit dem neuen).
+ * @param {HTMLElement|null} container
+ * @param {number} [max=3]
+ */
+export function capPersistentToasts(container, max = 3) {
+  const toasts = Array.from(container?.children ?? []).filter((el) => el.classList?.contains('toast'));
+  const persistent = toasts.filter((el) => el.matches?.(PERSISTENT_TOAST_SELECTOR));
+  let count = toasts.length;
+  while (count >= max && persistent.length) {
+    persistent.shift().remove();
+    count -= 1;
+  }
+}
+
