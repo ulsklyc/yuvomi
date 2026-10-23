@@ -7468,3 +7468,28 @@ test('R22 D4: Abos und Aufteilung tragen den Kennzahl-Slot ab dem ersten Bild in
   assert.match(rule?.body ?? '', /color:\s*transparent/, 'der Platzhaltertext ist lesbar');
   assert.doesNotMatch(rule?.body ?? '', /display:/, 'der Platzhalter bleibt inline - sonst aendert er die Zeilenbox');
 });
+
+// Critique R22 (D10, a4 P2): der Tipp auf eine Buchung oeffnete das Bearbeiten
+// mit dem Fokus im Betrag - am Telefon fuhr die Tastatur hoch, obwohl man die
+// Buchung meist nur ansehen wollte. Ohne schwebenden Zeiger kommt das Blatt ohne
+// Feldfokus (der Titel traegt ihn); am Zeiger und beim Anlegen bleibt der Betrag.
+test('R22 D10: Bearbeiten einer Buchung am Finger setzt keinen Feldfokus, Anlegen und Zeiger schon', () => {
+  const entry = { id: 4, title: 'REWE', amount: -40, category: 'food', subcategory: 'groceries', date: '2026-06-03' };
+  const vorher = globalThis.matchMedia;
+  try {
+    globalThis.matchMedia = (q) => ({ matches: q === '(hover: none)' });
+    const touch = buchungsDialog({ mode: 'edit', entry });
+    assert.equal(touch.initialFocus, 'none', 'am Finger holt der Tipp auf die Zeile keine Tastatur');
+    // Was der Dialog selbst fokussiert: den Titel des Blatts.
+    const heading = { attrs: {}, hasAttribute(n) { return n in this.attrs; }, setAttribute(n, v) { this.attrs[n] = v; }, focused: false, focus() { this.focused = true; } };
+    const panel = { querySelector: (sel) => (sel === '.modal-panel__title' ? heading : null), querySelectorAll: () => [] };
+    try { touch.onSave(panel); } catch { /* der Rest der Verdrahtung braucht ein echtes Panel */ }
+    assert.ok(heading.focused, 'der Titel des Blatts traegt den Fokus');
+    assert.equal(heading.attrs.tabindex, '-1');
+    assert.equal(buchungsDialog({ mode: 'create' }).initialFocus, 'first-field', 'Anlegen beginnt am Finger im Betrag');
+    globalThis.matchMedia = () => ({ matches: false });
+    assert.equal(buchungsDialog({ mode: 'edit', entry }).initialFocus, 'first-field', 'am Zeiger bleibt der Betrag');
+  } finally {
+    if (vorher === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = vorher;
+  }
+});
