@@ -828,7 +828,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1 / 1;
+  /* SEIT R22 (D11) QUER: das Raster ist nicht mehr der Default, und wer es
+   * waehlt, will Vorschauen, nicht Blattflaechen. 4:3 statt 1:1 nimmt jeder
+   * Reihe ein Viertel der Rahmenhoehe (200px-Spalte: 176 -> 132px), das Blatt
+   * steht weiter ganz darin. */
+  aspect-ratio: 4 / 3;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
@@ -1082,9 +1086,21 @@
  * Container-Regel weiter oben in der Datei war wirkungslos - gemessen blieb
  * `display: flex` an der Stats-Spalte, obwohl der Träger mit 22,4rem klar
  * unter der Grenze lag. */
+/* Die Fassung von Datum und Groesse in der Metazeile steht nur schmal
+ * (R22, D11) - breit traegt sie die Spalte rechts. */
+.document-row__meta > .document-row__meta-stats {
+  display: none;
+}
+
 @container list-rows (max-width: 30rem) {
   .document-row__stats {
     display: none;
+  }
+
+  .document-row__meta > .document-row__meta-stats {
+    display: inline-flex;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* DER WEG INS DOKUMENT BLEIBT. Hier stand `[data-action="view"]` mit in der
@@ -1730,27 +1746,37 @@
 }
 
 /* VOR UND ZURUECK (Critique R21): ein Paar am Anfang der Leiste, durch
- * eine Haarlinie von den Handlungen getrennt. Am Rand der Liste haelt eine
- * Luecke die Stelle des fehlenden Pfeils, damit der andere nicht springt. */
+ * eine Haarlinie von den Handlungen getrennt. Seit R22 (D11) ein eigenes
+ * Kind der Meta-Zeile vor den Handlungen (es schiebt sich selbst an den
+ * Zeilenrand) und am Rand der Liste ein gedimmter Pfeil statt einer Luecke:
+ * das Paar bleibt als Paar lesbar, und keiner springt. */
 .document-viewer__pager {
   display: inline-flex;
   align-items: center;
+  margin-inline-start: auto;
   padding-inline-end: var(--space-2);
   margin-inline-end: var(--space-1);
   border-inline-end: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
 }
 
-.document-viewer__pager-gap {
-  width: var(--target-lg);
-  flex-shrink: 0;
+.document-viewer__pager-edge {
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
 }
 
 .document-viewer__actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-left: auto;
+  margin-inline-start: auto;
   flex-shrink: 0;
+}
+
+.document-viewer__pager + .document-viewer__actions {
+  margin-inline-start: 0;
 }
 
 /* Eine Zeile unter den Meta-Angaben, die sagt, warum Teilen hier nicht geht
@@ -2540,12 +2566,25 @@
     display: none;
   }
 
+  /* Schmal steht das Paar in der Zeile des Kategorie-Knopfs (an deren Ende),
+   * die Handlungen brechen darunter um und stehen rechts (R22, D11). Die
+   * Haarlinie zu den Handlungen faellt: sie stehen nicht mehr daneben. */
+  .document-viewer__pager {
+    padding-inline-end: 0;
+    margin-inline-end: 0;
+    border-inline-end: none;
+  }
+
+  .document-viewer__pager + .document-viewer__actions {
+    margin-inline-start: auto;
+  }
+
   .document-viewer__meta {
     padding-block: var(--space-1);
     gap: var(--space-2);
   }
 
-  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.doc-badge),
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.document-viewer__pager):not(.doc-badge),
   .document-viewer:not(.document-viewer--info-open) .document-viewer__note,
   .document-viewer:not(.document-viewer--info-open) .document-viewer__details {
     display: none;

@@ -255,13 +255,13 @@ let state = {
   currentUserId: null,
   dmsAccounts: [],
   activeUploadBackend: 'local',
-  // Mobil ist die kompakte LISTE der Default: die Grid-Karte kostet bei 375px
-  // ~260px je Dokument (~1,5 Dokumente je Schirm), die Listenzeile traegt
-  // dieselben Angaben auf einem Bruchteil (Critique 2026-08-27, P2). Die
-  // gespeicherte Wahl gewinnt auf jedem Geraet; 640px ist die kanonische
-  // Mobile-Grenze (tokens.css §11c).
-  view: localStorage.getItem('yuvomi-documents-view')
-    || (typeof matchMedia !== 'undefined' && matchMedia('(max-width: 639px)').matches ? 'list' : 'grid'),
+  // DIE LISTE IST DER DEFAULT, AUCH AM DESKTOP (R22, D11). Mobil seit der
+  // Critique 2026-08-27 (P2: die Grid-Karte kostete bei 375px ~260px je
+  // Dokument). Am Desktop zeigte das Raster bei 1280px rund fuenf Dokumente
+  // mit 190px-Vorschauen leerer A4-Blaetter (Critique a4) - die Liste traegt
+  // Typ-Zeichen, Datum und Groesse in einer Zeile. Das Raster bleibt waehlbar,
+  // und die gespeicherte Wahl gewinnt auf jedem Geraet.
+  view: localStorage.getItem('yuvomi-documents-view') || 'list',
   sort: readStoredSort(),
   sortDirection: readStoredSortDirection(readStoredSort()),
   status: 'active',
@@ -490,8 +490,11 @@ export async function render(container, context = {}) {
           <div id="documents-list" class="${listClasses()}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
         </div>
       </div>
+      ${/* "+" WIE JEDER ANLEGEN-KNOPF (R22, D11): der Pfeil nach oben war der
+           einzige FAB ohne Plus - das Nomen "Dokument" sagt, was entsteht;
+           das Hochladen sagt der Dialog. */ ''}
       <button class="page-fab" id="fab-new-document" aria-label="${t('documents.addButton')}" data-dock-label="${t('newLabel.documents')}">
-        <i data-lucide="upload" class="icon-xl" aria-hidden="true"></i>
+        <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
       </button>
     </div>
   `);
@@ -1978,7 +1981,7 @@ async function handleFolderDeleteError(err, folder, { delayed = false, owner = n
 
 // `showSize` aus, wenn die Ansicht die Größe bereits in einer eigenen Spalte
 // führt (Listenzeile) — sonst stünde sie doppelt in derselben Zeile.
-function renderMeta(doc, { showSize = true } = {}) {
+function renderMeta(doc, { showSize = true, stats = '' } = {}) {
   const labels = categoryLabels();
   const categoryLabel = labels[doc.category] || doc.category;
   // Der Ordner-Chip entfaellt, wenn der Ordner die Kategorie wiederholt, und im
@@ -1992,6 +1995,7 @@ function renderMeta(doc, { showSize = true } = {}) {
   // letztere nur, wenn sie vom Standard abweicht (showsVisibility).
   return `
     ${expiryChipHtml(doc)}
+    ${stats}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
     ${folderChip ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
     ${hidesPrivacyControls('documents') || !showsVisibility(doc.visibility) ? '' : `<span><i data-lucide="${doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
@@ -2302,7 +2306,14 @@ function renderListItem(doc) {
       ${state.selectMode && mayManage(doc) ? renderSelectBox(doc) : renderRowGlyph(doc)}
       <div class="list-row__main document-row__body">
         <h2 class="list-row__name document-row__title">${esc(doc.name)}</h2>
-        <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false })}</div>
+        ${/* DATUM UND GROESSE AUCH SCHMAL (R22, D11): unter 30rem faellt die
+             Spalte rechts (documents.css), und die Zeile trug nur noch
+             Kategorie und Ordner. Dieselben zwei Angaben stehen dann in der
+             Metazeile hinter dem Ablauf und VOR der Kategorie: die nennt das
+             Zeichen am Zeilenanfang schon, sie darf als Erste weichen (bei
+             "Versicherung" fiel sonst das Datum aus der Zeile). Breit ist
+             diese Fassung aus dem Baum. */ ''}
+        <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false, stats: `<span class="document-row__meta-stats">${formatDate(doc.updated_at)} · ${formatFileSize(doc.file_size)}</span>` })}</div>
       </div>
       <div class="document-row__stats">
         <span class="document-row__date">${formatDate(doc.updated_at)}</span>
@@ -2755,13 +2766,17 @@ function openDocumentModal(doc = null) {
             <p class="document-form__hint" id="document-size-hint">${t('documents.fileHint', { size: effectiveUploadMb() })}</p>
             <button type="button" class="document-folder-link" id="document-folder-choice" hidden>${t('documents.folderUpload.chooseFolder')}</button>
           </div>
-          <p class="document-storage-target">
+          ${/* DER SPEICHERORT IST EINE AUSKUNFT FUER ADMINS (R22, D11). "Neue
+               Dateien werden gespeichert in: Lokal" stand fuer jedes Mitglied
+               im Dialog - eine Angabe, an der niemand ausser dem Admin etwas
+               aendern kann (Critique a4); fuer ihn fuehrt sie zur Einstellung. */ ''}
+          ${state.isAdmin ? `<p class="document-storage-target">
             <i data-lucide="${uploadTargetIcon(state.activeUploadBackend)}" aria-hidden="true"></i>
             <span>${t('documents.activeUploadTarget', {
               target: uploadBackendLabel(state.activeUploadBackend),
             })}</span>
-            ${state.isAdmin ? `<a class="document-storage-target__link" href="/settings/modules/documents?section=documents-storage" data-nav>${t('documents.storageSettingsLink')}</a>` : ''}
-          </p>
+            <a class="document-storage-target__link" href="/settings/modules/documents?section=documents-storage" data-nav>${t('documents.storageSettingsLink')}</a>
+          </p>` : ''}
           <section class="folder-upload-preview" id="document-folder-upload-preview" aria-live="polite" hidden></section>
         </div>`;
 
@@ -4110,12 +4125,19 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
           ${doc.folder_name && !folderRepeatsCategory(doc.folder_name, categoryLabel) ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
+          ${/* DAS PAAR STEHT ALS PAAR (R22, D11). Am Rand der Liste hielt eine
+                leere Luecke die Stelle des fehlenden Pfeils; mobil brach die
+                Leiste unter den Kategorie-Knopf, und dort stand "  >" allein
+                am Zeilenanfang - ein Pfeil ohne Gegenueber. Jetzt zeigt der
+                fehlende Pfeil sich gedimmt (Zeichen, kein Knopf), und das Paar
+                steht mobil in der Zeile der Kategorie, die Handlungen darunter.
+                Am Desktop bleibt es vor den Handlungen (documents.css). */ ''}
+          ${prevDoc || nextDoc ? `
+          <span class="document-viewer__pager">
+            ${prevDoc ? rowActionHtml({ icon: 'chevron-left', action: 'viewer-prev', label: t('documents.viewerPrevNamed', { name: prevDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.prev, title: t('documents.viewerPrevNamed', { name: prevDoc.name }) } }) : '<span class="row-action document-viewer__pager-edge" aria-hidden="true"><i data-lucide="chevron-left" class="icon-md"></i></span>'}
+            ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="row-action document-viewer__pager-edge" aria-hidden="true"><i data-lucide="chevron-right" class="icon-md"></i></span>'}
+          </span>` : ''}
           <span class="document-viewer__actions">
-            ${prevDoc || nextDoc ? `
-            <span class="document-viewer__pager">
-              ${prevDoc ? rowActionHtml({ icon: 'chevron-left', action: 'viewer-prev', label: t('documents.viewerPrevNamed', { name: prevDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.prev, title: t('documents.viewerPrevNamed', { name: prevDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
-              ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="document-viewer__pager-gap" aria-hidden="true"></span>'}
-            </span>` : ''}
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>

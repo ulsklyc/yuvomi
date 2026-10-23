@@ -200,7 +200,8 @@ test('die Listenansicht trägt Datum und Größe als eigene Spalten', () => {
   // Vorher zeigte die Zeile kein Datum — der Wechsel Raster→Liste nahm Information weg.
   assert.match(page, /document-row__stats/);
   assert.match(page, /document-row__date/);
-  assert.match(page, /renderMeta\(doc, \{ showSize: false \}\)/);
+  // Seit R22 (D11) reicht die Zeile Datum und Groesse zusaetzlich als schmale Fassung mit.
+  assert.match(page, /renderMeta\(doc, \{ showSize: false, stats: /);
   assert.match(css, /\.document-row__stats\s*\{/);
 });
 
@@ -354,7 +355,10 @@ test('nicht konfigurierte Upload-Ziele sind nicht auswählbar', () => {
 test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Admins', () => {
   // Seit R10 (2026-09-27) ein Abschnitt im Modulblatt Dokumente; der Link
   // zielt direkt dorthin, nicht ueber die Umleitung der Alt-Adresse.
-  assert.match(page, /state\.isAdmin \? `<a class="document-storage-target__link" href="\/settings\/modules\/documents\?section=documents-storage"/);
+  // Seit R22 (D11) gehoert die ganze Auskunft dem Admin, nicht nur der Link:
+  // "Neue Dateien werden gespeichert in: Lokal" stand fuer jedes Mitglied da.
+  assert.match(page, /\$\{state\.isAdmin \? `<p class="document-storage-target">[\s\S]*?<a class="document-storage-target__link" href="\/settings\/modules\/documents\?section=documents-storage" data-nav>[\s\S]*?<\/p>` : ''\}/);
+  assert.equal((page.match(/class="document-storage-target"/g) ?? []).length, 1, 'kein zweiter Weg zur Auskunft');
   const routes = read('../server/routes/documents.js');
   assert.match(routes, /is_admin: isAdminRequest\(req\)/);
 });
@@ -1222,7 +1226,7 @@ test('die Karte: Blatt-Rahmen mit fester Form, Titel zweizeilig, Meta einzeilig,
   // R18 (2026-10-07): das Blatt liegt ganz im Rahmen (vorher 4:3 mit dem
   // oberen Drittel als Ausschnitt). Seit R21 S7 ist der Rahmen quadratisch
   // (zwei Reihen bei 1440x900, Test "R21 S7" unten) - das Blatt bleibt ganz.
-  assert.match(media.body, /aspect-ratio:\s*1\s*\/\s*1/, 'feste Form, das Blatt ganz darin');
+  assert.match(media.body, /aspect-ratio:\s*4\s*\/\s*3/, 'feste Form (seit R22 D11 quer), das Blatt ganz darin');
   // Und die Karten einer Reihe strecken sich nicht mehr: die Aktionszeile
   // schliesst an den Text an, statt unter einem Loch zu stehen.
   assert.match(rules.find((rule) => rule.selector === '.documents-list--grid').body, /align-items:\s*start/);
@@ -1959,8 +1963,8 @@ test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter d
   assert.ok(hidden && /display:\s*none/.test(hidden.body), 'eingeklappt blendet der Meta-Block aus');
   assert.match(hidden.selector, /\.document-viewer__note/, 'samt Teilen-Hinweis');
   assert.match(hidden.selector, /\.document-viewer__details/, 'und Lesezeilen');
-  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.doc-badge\)/,
-    'die Aktionen und ein Ablauf in Warnfarbe bleiben stehen');
+  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.document-viewer__pager\):not\(\.doc-badge\)/,
+    'die Aktionen, das Vor/Zurueck-Paar (R22) und ein Ablauf in Warnfarbe bleiben stehen');
   // Die Regeln stehen NACH den Grundregeln des Betrachters (gleiche Spezifitaet).
   assert.ok(css.lastIndexOf('.document-viewer__pdf {') > css.indexOf('height: 65vh'), 'die schmale Regel folgt der Grundregel');
 
@@ -2111,11 +2115,12 @@ test('jede Ablage sagt auf Touch "tippen" statt "ablegen" - zwei Fassungen, eine
 // R21 S7 (Critique a4): die Rasterkarte war 417px hoch (Rahmen 3:4), bei
 // 1440x900 stand die zweite Reihe nur halb im Bild. Quadratischer Rahmen, das
 // Blatt darin ganz (`contain`): Karte 357px, zwei Reihen (1920: 463 -> 393).
-test('R21 S7: die Vorschau der Rasterkarte hat einen quadratischen Rahmen, das Blatt bleibt ganz', () => {
+// R22 (D11): das Raster ist nicht mehr Standard, die Vorschau kleiner - 4:3.
+test('R21 S7 / R22 D11: die Vorschau der Rasterkarte hat einen festen queren Rahmen, das Blatt bleibt ganz', () => {
   const css = readFileSync(resolve(HERE, '../public/styles/documents.css'), 'utf8');
   const rules = [...eachRule(css)];
   const media = rules.find((r) => r.selector.trim() === '.document-card__media' && !r.at.length);
-  assert.match(media?.body ?? '', /aspect-ratio:\s*1 \/ 1/, 'quadratischer Rahmen');
+  assert.match(media?.body ?? '', /aspect-ratio:\s*4 \/ 3/, 'querer Rahmen, kleiner als das Quadrat aus R21');
   const img = rules.find((r) => r.selector.trim() === '.document-thumb__img' && !r.at.length);
   assert.match(img?.body ?? '', /object-fit:\s*contain/, 'das Blatt wird nicht beschnitten');
 });
@@ -2153,4 +2158,18 @@ test('R21 S8: der Betrachter zeigt sofort das Poster der Kachel und ein Ladezeic
     'nach dem Laden tritt das Poster zurueck (ein Bild mit Transparenz liesse es sonst durchscheinen)');
   const status = rules.find((r) => r.selector.trim() === '.document-viewer__stage:not([data-stage-loading]) > .document-viewer__stage-status');
   assert.match(status?.body ?? '', /display:\s*none/);
+});
+
+// Critique R22 (D11, a4): Desktop-Standard ist die Liste, mobil traegt die Zeile
+// Datum und Groesse, und der FAB zeigt "+" wie jeder Anlegen-Knopf.
+test('R22 D11: Liste als Standard, Datum und Groesse auch schmal, FAB mit Plus', () => {
+  assert.match(page, /view: localStorage\.getItem\('yuvomi-documents-view'\) \|\| 'list',/, 'ohne gespeicherte Wahl die Liste - auf jedem Geraet');
+  assert.match(page, /id="fab-new-document"[^>]*>\s*<i data-lucide="plus"/);
+  assert.match(page, /renderMeta\(doc, \{ showSize: false, stats: `<span class="document-row__meta-stats">\$\{formatDate\(doc\.updated_at\)\} · \$\{formatFileSize\(doc\.file_size\)\}<\/span>` \}\)/);
+  const meta = page.slice(page.indexOf('function renderMeta('), page.indexOf('function docSupportsThumbnail('));
+  assert.ok(meta.indexOf('${stats}') < meta.indexOf('${categoryLabel}</span>'), 'Datum und Groesse stehen vor der Kategorie (die nennt das Zeichen)');
+  const css = read('../public/styles/documents.css');
+  const rules = [...eachRule(css)].filter((r) => r.selector.trim() === '.document-row__meta > .document-row__meta-stats');
+  assert.ok(rules.some((r) => !r.at.length && /display:\s*none/.test(r.body)), 'breit aus dem Baum');
+  assert.ok(rules.some((r) => r.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)) && /display:\s*inline-flex/.test(r.body)), 'schmal sichtbar');
 });

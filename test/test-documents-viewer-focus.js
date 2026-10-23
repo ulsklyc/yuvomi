@@ -237,11 +237,18 @@ test('Betrachter: Vor/Zurueck nennt das Ziel, die Pfeile blaettern durch die sic
     const count = opened.length;
     assert.equal(key('ArrowRight', element('feld', { closest: (sel) => (/input/.test(sel) ? {} : null) })), false, 'aus einem Feld heraus nicht');
     assert.equal(opened.length, count);
-    // Am Rand der Liste: kein Pfeil ins Leere, eine Luecke haelt die Stelle.
+    // Am Rand der Liste: kein Pfeil ins Leere. Seit R22 (D11) steht der
+    // fehlende Pfeil gedimmt als Zeichen (kein Knopf, aus dem Baum), damit das
+    // Paar als Paar lesbar bleibt - vorher stand mobil "  >" allein in der Zeile.
     opened.length = 0;
     documentsPage.openDocumentViewer(B);
     assert.doesNotMatch(opened[0].content, /data-action="viewer-next"/);
-    assert.match(opened[0].content, /document-viewer__pager-gap/);
+    assert.match(opened[0].content, /<span class="row-action document-viewer__pager-edge" aria-hidden="true"><i data-lucide="chevron-right"/);
+    assert.doesNotMatch(opened[0].content, /document-viewer__pager-gap/);
+    // Das Paar ist ein eigenes Kind der Meta-Zeile, VOR den Handlungen.
+    const html2 = opened[0].content;
+    assert.ok(html2.indexOf('class="document-viewer__pager"') < html2.indexOf('class="document-viewer__actions"'));
+    assert.doesNotMatch(html2.slice(html2.indexOf('class="document-viewer__actions"')), /document-viewer__pager"/, 'nicht mehr in der Handlungsleiste');
   } finally {
     globalThis.__openModal = previous;
     documentsPage.state.documents = [];
