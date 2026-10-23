@@ -697,11 +697,16 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
     const underStack = await page.evaluate((fields) => {
       const stack = document.querySelector('.shell-bottom-stack').getBoundingClientRect();
       const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
-      return [...panel.querySelectorAll(fields)].filter((el) => {
+      // Schluessel je ELEMENT: `id || name || type` hiess fuer jede Checkbox der
+      // Personenwahl "checkbox", und die Schleife unten brach beim zweiten Chip
+      // ab ("schon gesehen") - die Chips der zweiten Reihe, die unter dem
+      // Toast liegen, bekam die Sonde nie zu fassen.
+      const all = [...panel.querySelectorAll(fields)];
+      return all.filter((el) => {
         const r = el.getBoundingClientRect();
         return r.width > 0 && r.height > 0
           && r.left < stack.right && r.right > stack.left && r.top < stack.bottom && r.bottom > stack.top;
-      }).map((el) => el.id || el.name || el.type);
+      }).map((el) => `${el.id || el.name || el.type}#${all.indexOf(el)}`);
     }, FIELDS);
     assert.ok(underStack.length >= 1, 'beim Oeffnen liegt kein Feld unter dem Stapel - so misst die Sonde nichts');
 
@@ -710,6 +715,24 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
     // im Fokusstil (Checkbox) hat nur diesen einen Anlass (Gegenprobe ohne den
     // Listener: gruen, solange Uebergaenge liefen).
     await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
+    // DIE SONDE BISS NICHT (Sammel-Ticket R22-F, F4.3): ohne den `focusin`-
+    // Listener der Platzierung blieb sie gruen, auch auf main c859f24f6. Die
+    // Ursache war der Schluessel (oben): die Schleife endete am zweiten Chip,
+    // bevor der Fokus die verdeckte zweite Reihe erreichte. Dazu haengt sie
+    // den Tastatur-Helfer des Dialogs ab (modal.js `onInputFocus`): er rollt
+    // ein Feld der unteren Haelfte 300ms nach dem Fokus in die Mitte, und der
+    // Scroll misst ueber `onScroll` neu - eine langsamere Messung saehe dann
+    // seinen Scroll statt `focusin`. Er gehoert der Bildschirmtastatur, nicht
+    // dem Toast. Gegenprobe ohne den Listener: rot an checkbox#6 (Chip der
+    // zweiten Reihe unter dem Toast).
+    const detached = await page.evaluate(() => {
+      const panel = [...document.querySelectorAll('.modal-overlay:not([inert]) .modal-panel')].at(-1);
+      if (!panel?._onInputFocus) return false;
+      panel.removeEventListener('focusin', panel._onInputFocus);
+      return true;
+    });
+    assert.ok(detached, 'der Tastatur-Helfer des Dialogs fehlt - die Sonde saehe seinen Scroll statt focusin');
 
     const covered = [];
     const seen = new Set();
@@ -725,7 +748,7 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
         if (r.width === 0 || r.height === 0) return null;
         const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
         return {
-          field: el.id || el.name || el.type,
+          field: `${el.id || el.name || el.type}#${[...panel.querySelectorAll(fields)].indexOf(el)}`,
           free: Boolean(hit) && (el === hit || el.contains(hit) || Boolean(el.labels?.[0]?.contains(hit))),
           hit: hit?.closest('.toast')?.className || hit?.className || String(hit),
         };
@@ -736,6 +759,8 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
       if (!probe.free) covered.push(probe);
     }
     assert.ok(seen.size >= 3, `zu wenige Felder per Tab erreicht (${[...seen].join(', ')})`);
+    assert.ok(underStack.some((field) => seen.has(field)),
+      `kein Feld, das beim Oeffnen unter dem Stapel lag, bekam den Fokus (${underStack.join(', ')} / ${[...seen].join(', ')})`);
     const measured = await measureDialog(page, { controlSelector: `${MODAL_CONTROLS}, .settings-form-actions button`, toastSelector: PROBE_TOAST });
     assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
     assert.deepEqual(covered, [], `ein fokussiertes Feld liegt unter dem Stapel (beim Oeffnen darunter: ${underStack.join(', ')})`);
