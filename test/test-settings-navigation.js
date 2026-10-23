@@ -1545,6 +1545,15 @@ test('navigation sections match the grouped desktop information architecture', (
 // Kopf - "Finanzen" stand ueber Budget allein. Die Kueche zaehlt als ein
 // Eintrag, die Uebersicht hat nie einen Kopf. Seitenleiste und Mehr-Blatt
 // lesen dieselbe Regel.
+// R22 D14: im Mehr-Blatt stand Budget namenlos am Ende des Scrollers und las
+// als vierter Eintrag von "Menschen". Dort traegt jede Sektion ihren Namen.
+test('R22 D14: im Mehr-Blatt traegt auch eine Sektion mit einem Eintrag ihren Namen', async () => {
+  const { navSectionLabelKey } = await import('../public/settings/module-order.js');
+  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1, { standalone: true }), 'nav.sectionFinance');
+  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1), null, 'die Seitenleiste bleibt bei der R19-Regel');
+  assert.equal(navSectionLabelKey(NAV_SECTION.overview, 1, { standalone: true }), null, 'die Uebersicht bleibt die Wurzel');
+});
+
 test('R19: eine Sektion mit nur einem Eintrag hat keinen Namen in der Navigation', async () => {
   const { navSectionLabelKey, navSectionEntryCounts } = await import('../public/settings/module-order.js');
   assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1), null, 'Budget allein: kein "Finanzen"');
@@ -1565,7 +1574,8 @@ test('R19: eine Sektion mit nur einem Eintrag hat keinen Namen in der Navigation
   assert.match(sidebar, /navSectionLabelKey\(section, entryCounts\.get\(section\)\)/, 'die Seitenleiste fragt die Regel');
   assert.doesNotMatch(router, /const NAV_SECTION_LABEL_KEYS = /, 'keine Abschrift der Namen-Tabelle im Router');
   const sheet = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
-  assert.match(sheet, /navSectionLabelKey\(section, labelCounts\.get\(section\)\)/, 'das Mehr-Blatt fragt dieselbe Regel');
+  assert.match(sheet, /navSectionLabelKey\(section, labelCounts\.get\(section\), \{ standalone: true \}\)/,
+    'das Mehr-Blatt fragt dieselbe Tabelle - und nennt seit R22 D14 auch eine Sektion mit einem Eintrag');
   const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('function renderPage('));
   assert.match(body, /navSectionEntryCounts\(navItems\(\)/, 'gezaehlt wird in der Seitenleiste, nicht im Blatt ohne Favoriten');
 });

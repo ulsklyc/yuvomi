@@ -1306,7 +1306,11 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
    * auf die man tippt, um es zu schliessen. dvh statt vh, weil die mobile
    * Adressleiste die Hoehe waehrend der Sitzung aendert - ueber den Token, weil
    * die Rechnung var() traegt und ein vh-Zwilling dann nichts rettet (#1276). */
-  max-block-size: calc(var(--viewport-height) - var(--nav-bottom-height) - var(--space-8));
+  /* DIE OBERKANTE BLEIBT UNTER DER STATUSLEISTE (R22 D14). Gemessen bei
+   * 390x844 mit safe-area-inset-top 59px stand das Blatt bei y 32 - Griff und
+   * Suche unter Uhr und Dynamic Island. Der Streifen darueber ist mindestens
+   * --space-8 und mindestens die Sicherheitszone plus --space-2. */
+  max-block-size: calc(var(--viewport-height) - var(--nav-bottom-height) - max(var(--space-8), var(--safe-area-inset-top) + var(--space-2)));
   /* EIN BLATT, EINE BEWEGUNG (R16): das Mehr-Blatt kommt wie das Dialog-Sheet
    * - `--sheet-lift` Hub + Blende, `--sheet-in`/`--sheet-out` (tokens.css).
    * Vorher fuhr es den vollen Weg (`translateY(100% + Leiste)`, 250ms) und
@@ -1355,6 +1359,26 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * Liste (--space-3 gegen --space-1): der Name gehoert zu SEINER Liste. Eine
  * Gruppe ohne Namen (eine Sektion mit nur einem Eintrag, navSectionLabelKey)
  * steht mit derselben Luft da, nur ohne Kopf. */
+/* DIE KANTE SAGT „ES GEHT WEITER" (R22 D14): wireScrollFade (router.js,
+ * buildMoreSheetBody) setzt has-fade-start/-end, solange ueber oder unter dem
+ * Sichtfenster Module liegen. Dieselbe Blende wie die Seitenleiste, eine
+ * Stufe kuerzer (--space-6): die Zeilen sind 48px hoch, und eine Blende ueber
+ * zwei Drittel der letzten sichtbaren Zeile nimmt ihr den Namen. */
+.more-sheet__body.has-fade-end {
+  mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+}
+
+.more-sheet__body.has-fade-start {
+  mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-6));
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-6));
+}
+
+.more-sheet__body.has-fade-start.has-fade-end {
+  mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+}
+
 .more-sheet__group + .more-sheet__group {
   margin-block-start: var(--space-3);
 }

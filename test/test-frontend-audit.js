@@ -22515,6 +22515,23 @@ test('Mehr-Blatt: die Module stehen als Zeilenliste in den Sektionen der Seitenl
   assert.match(router, /chevron\.dataset\.lucide = 'chevron-right'/, 'der Pfeil am Zeilenende sagt: fuehrt weiter');
 });
 
+// R22 D14 (Critique 2026-10-22, a1 P1/P2): bei 390x844 mit Sicherheitszone
+// 59px stand das Blatt bei y 32 unter der Statusleiste, 97px Module lagen ohne
+// Hinweis unter der Kante, und Budget stand namenlos am Ende unter "Menschen".
+test('R22 D14: das Mehr-Blatt bleibt unter der Statusleiste, blendet die Kante und nennt jede Sektion', () => {
+  const router = read('../public/router.js');
+  const fn = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
+  assert.match(fn, /navSectionLabelKey\(section, labelCounts\.get\(section\), \{ standalone: true \}\)/, 'im Blatt bekommt jede Sektion ihren Kopf');
+  const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('\n}\n', router.indexOf('function buildMoreSheetBody()')));
+  assert.match(body, /wireScrollFade\(body, \{ axis: 'y' \}\)/, 'der Koerper meldet verborgene Module ueber die Kantenblende');
+  const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length);
+  const rule = (sel) => layout.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(rule('.more-sheet'), /max-block-size:[^;]*var\(--safe-area-inset-top\)/, 'die Obergrenze zieht die Sicherheitszone oben ab');
+  for (const sel of ['.more-sheet__body.has-fade-end', '.more-sheet__body.has-fade-start', '.more-sheet__body.has-fade-start.has-fade-end']) {
+    assert.match(rule(sel), /(?:^|[;\s])mask-image:\s*linear-gradient\(to bottom/, `${sel}: Blende an der Kante`);
+  }
+});
+
 // R19 (Critique 2026-10-16, "Notizen-Pin-Gewichte"): die Nadel zeichnete mit
 // `icon-sm` 12px neben dem 18px-Mehr-Knopf derselben Karte - bei gleicher
 // Strichstaerke kleiner und fetter zugleich. Sie teilt jetzt die Groesse der

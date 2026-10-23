@@ -110,12 +110,20 @@ export function navSectionEntryCounts(items = []) {
  * Die Einstellungsblaetter, die ALLE Module samt abgeschalteten auflisten,
  * sind keine Navigation und benutzen weiter NAV_SECTION_LABEL_KEYS direkt.
  *
+ * DAS MEHR-BLATT NENNT JEDE SEKTION (`standalone`, R22 D14). Dort steht die
+ * letzte Gruppe am Ende eines Scrollers; ohne Kopf las Budget als Eintrag von
+ * „Menschen" darueber. Die Seitenleiste ist ganz zu sehen und bleibt bei der
+ * Regel oben.
+ *
  * @param {number} section
  * @param {number} entryCount  Eintraege der Sektion in DERSELBEN Liste
+ * @param {{standalone?: boolean}} [opts]  true: auch ein einzelner Eintrag
+ *        bekommt seinen Namen (Mehr-Blatt).
  * @returns {string|null} Locale-Key
  */
-export function navSectionLabelKey(section, entryCount) {
-  if (section === NAV_SECTION.overview || !(entryCount >= 2)) return null;
+export function navSectionLabelKey(section, entryCount, { standalone = false } = {}) {
+  if (section === NAV_SECTION.overview) return null;
+  if (!standalone && !(entryCount >= 2)) return null;
   return NAV_SECTION_LABEL_KEYS[section] ?? null;
 }
 

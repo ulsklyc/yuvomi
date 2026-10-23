@@ -1562,7 +1562,12 @@ function moreSheetSections(modules, labelCounts) {
       list.className = 'more-sheet__list';
       const group = document.createElement('div');
       group.className = 'more-sheet__group';
-      const labelKey = section == null ? null : navSectionLabelKey(section, labelCounts.get(section));
+      // IM BLATT TRAEGT AUCH EINE SEKTION MIT NUR EINEM EINTRAG IHREN NAMEN
+      // (R22 D14). In der Seitenleiste haengt sich Budget ohne Kopf an, sie ist
+      // ganz zu sehen. Im Blatt stand die Zeile namenlos UNTER „Menschen", am
+      // Ende eines Scrollers, der bei 390x844 97px verbarg - sie las als
+      // vierter Eintrag der Gruppe davor, oder sie fehlte ganz.
+      const labelKey = section == null ? null : navSectionLabelKey(section, labelCounts.get(section), { standalone: true });
       if (labelKey) {
         group.setAttribute('role', 'group');
         const labelId = `more-section-${section}`;
@@ -1691,6 +1696,11 @@ function buildMoreSheetBody() {
   foot.appendChild(system);
 
   body.append(...nodes);
+  // DER KOERPER SAGT, DASS ER WEITERGEHT (R22 D14). Bei 390x844 lagen 97px,
+  // bei 375x667 287px Module unter der Kante - mit Haarlinie und fester
+  // Systemreihe darunter sah das Blatt vollstaendig aus. Dieselbe Kantenblende
+  // wie die Seitenleiste (has-fade-start/-end, layout.css).
+  wireScrollFade(body, { axis: 'y' });
   return [body, foot];
 }
 
