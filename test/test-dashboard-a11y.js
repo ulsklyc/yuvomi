@@ -901,3 +901,25 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   const birthdays = TODAY_SHEET_SOURCES.find((s) => s.id === 'birthdays').collect({ birthdays: [{ id: 4, name: 'Oma', days_until: 0 }] }, ctx);
   assert.equal(birthdays[0].route, '/birthdays?open=4', 'der Geburtstag nennt sich selbst');
 });
+
+// R22 D16 (Critique 2026-10-22, a1 P3): neben vier Chips der Ablage stand ein
+// freier Regler-Kreis ohne Wort. Die Optionen stehen jetzt AM Chip - ein
+// geteilter Knopf, dessen Pfeil ein Menue mit Wort oeffnet.
+test('R22 D16: die Optionen einer ausgeblendeten Kachel stehen am Chip, in einem Menue mit Wort', async () => {
+  global.window ??= { yuvomi: null };
+  const html = renderDashboardLayout([
+    { id: 'notes', visible: true, size: '1x1' },
+    { id: 'tasks', visible: false, size: '1x1' },
+    { id: 'clock', visible: false, size: '1x1' },
+  ], {}, null, 'EUR', { editing: true });
+  const tray = html.slice(html.indexOf('class="widget-restore"'), html.indexOf('id="dashboard-widget-grid"'));
+  assert.ok(tray.length > 0, 'Reichweite: die Ablage steht da');
+  assert.doesNotMatch(tray, /widget-restore-chip__options/, 'kein freier Regler-Kreis mehr');
+  const split = tray.slice(tray.indexOf('widget-restore-chip-group--split'));
+  assert.match(split, /data-widget-show="tasks"/, 'der Chip blendet weiter mit einem Tipp ein');
+  assert.match(split, /class="widget-restore-chip__more popover-menu__trigger"[^>]*aria-haspopup="menu"/, 'am Chip der Pfeil ins Menue');
+  assert.match(split, /role="menuitem"[\s\S]*?data-widget-show="tasks"[\s\S]*?role="menuitem"[\s\S]*?data-widget-options="tasks"/,
+    'das Menue nennt beide Handlungen mit Wort');
+  const clock = tray.slice(tray.indexOf('data-widget-show="clock"') - 200, tray.indexOf('data-widget-show="clock"'));
+  assert.doesNotMatch(clock, /--split/, 'ohne Optionen bleibt es ein einfacher Chip');
+});

@@ -5336,22 +5336,36 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
    * Seite: das Cockpit und das Kopfband sprechen ueber dieselben Aufgaben.
    * Ohne diesen Knopf muesste man die Kachel erst einblenden, um einzustellen,
    * was die Kachel gar nicht zeigt. Deshalb eine Gruppe statt eines Chips: ein
-   * Knopf im Knopf waere kein gueltiges Markup. */
-  const chips = glanceChip + hidden.map((w) => `
-    <div class="widget-restore-chip-group">
+   * Knopf im Knopf waere kein gueltiges Markup.
+   *
+   * DIE OPTIONEN STEHEN AM CHIP, IN EINEM MENUE MIT WORT (R22 D16). Bis R21
+   * stand neben vier der Chips ein freier Regler-Kreis ohne Wort - 17 Chips
+   * und vier unbeschriftete Knoepfe, die keiner einem Chip zuordnete. Jetzt
+   * ist der Chip ein geteilter Knopf: links „einblenden" mit einem Tipp wie
+   * bisher, rechts am selben Pill ein Pfeil mit dem Menue „<Kachel>
+   * einblenden" und „Optionen fuer <Kachel>". */
+  const chips = glanceChip + hidden.map((w) => {
+    const label = widgetLabel(w.id);
+    const menu = widgetHasOptions(w.id) ? popoverMenuHtml({
+      id: `widget-restore-menu-${w.id}`,
+      label: t('common.moreActionsNamed', { name: label }),
+      icon: 'chevron-down',
+      triggerClass: 'widget-restore-chip__more',
+      items: [
+        { action: 'widget-show', icon: 'plus', label: t('dashboard.customizeShow', { widget: label }), attrs: { 'data-widget-show': w.id } },
+        { action: 'widget-options', icon: 'sliders-horizontal', label: t('dashboard.optionsFor', { widget: label }), attrs: { 'data-widget-options': w.id } },
+      ],
+    }) : '';
+    return `
+    <div class="widget-restore-chip-group${menu ? ' widget-restore-chip-group--split' : ''}">
       <button type="button" class="widget-restore-chip" data-widget-show="${esc(w.id)}"
-              aria-label="${esc(t('dashboard.customizeShow', { widget: widgetLabel(w.id) }))}">
+              aria-label="${esc(t('dashboard.customizeShow', { widget: label }))}">
         <i data-lucide="${widgetIcon(w.id)}" class="widget-restore-chip__icon" aria-hidden="true"></i>
-        <span class="widget-restore-chip__label">${esc(widgetLabel(w.id))}</span>
+        <span class="widget-restore-chip__label">${esc(label)}</span>
         <i data-lucide="plus" class="widget-restore-chip__add" aria-hidden="true"></i>
-      </button>
-      ${widgetHasOptions(w.id) ? `
-      <button type="button" class="widget-restore-chip__options" data-widget-options="${esc(w.id)}"
-              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
-              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-      </button>` : ''}
-    </div>`).join('');
+      </button>${menu}
+    </div>`;
+  }).join('');
   return `
     <section class="widget-restore" aria-label="${t('dashboard.customizeHiddenTitle')}">
       <h3 class="widget-restore__title">${t('dashboard.customizeHiddenTitle')}</h3>

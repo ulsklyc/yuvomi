@@ -2127,7 +2127,8 @@ test('die Widget-Optionen sind auch am ausgeblendeten Widget erreichbar (#814)',
   // Die Ablage der ausgeblendeten Widgets traegt den Knopf.
   const tray = source.match(/function renderHiddenWidgetsTray[\s\S]*?\n}/);
   assert.ok(tray, 'renderHiddenWidgetsTray nicht gefunden');
-  assert.match(tray[0], /data-widget-options=/,
+  // Seit R22 (D16) als Eintrag im Menue am Chip (`'data-widget-options': w.id`).
+  assert.match(tray[0], /data-widget-options=|'data-widget-options': w\.id/,
     'die Ablage bietet keine Optionen an - am ausgeblendeten Widget waeren sie unerreichbar');
 
   // Und sie werden auch verdrahtet: die Ablage liegt AUSSERHALB des Grids, ein

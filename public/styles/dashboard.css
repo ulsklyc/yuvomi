@@ -2308,40 +2308,63 @@ svg.weather-forecast__icon {
   color: var(--color-accent);
 }
 
-/* Chip plus Optionen-Knopf (#814): zwei Knoepfe, die zusammengehoeren, aber
- * nicht ineinander liegen duerfen. Die Gruppe haelt sie im Umbruch beisammen. */
+/* Chip plus Menue (#814, seit R22 D16 ein geteilter Knopf): zwei Knoepfe, die
+ * zusammengehoeren, aber nicht ineinander liegen duerfen. Die Gruppe haelt sie
+ * im Umbruch beisammen; geteilt teilen sie EINE Pille - links einblenden, rechts
+ * der Pfeil ins Menue mit „einblenden" und „Optionen fuer ...", getrennt durch
+ * die gemeinsame Kante. Vorher stand der Regler als freier Kreis daneben. */
 .widget-restore-chip-group {
   display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
+  align-items: stretch;
 }
 
-.widget-restore-chip__options {
+.widget-restore-chip-group--split > .widget-restore-chip {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  padding-inline-end: var(--space-2);
+}
+
+.widget-restore-chip__more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--target-md);
-  height: var(--target-md);
+  min-width: var(--target-md);
+  min-height: var(--target-md);
+  padding-inline: var(--space-2);
+  margin-inline-start: -1px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-start-end-radius: var(--radius-full);
+  border-end-end-radius: var(--radius-full);
   background: var(--color-surface-elevated);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.widget-restore-chip__options:hover {
+.widget-restore-chip__more > svg {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.widget-restore-chip__more:hover,
+.widget-restore-chip__more[aria-expanded="true"] {
   background: var(--color-surface-elevated-hover);
   border-color: var(--color-accent);
 }
 
-.widget-restore-chip__options:focus-visible {
+.widget-restore-chip__more:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }
 
+.widget-restore-chip__more:active {
+  transform: scale(var(--press-scale-sm));
+}
+
 @media (pointer: coarse) {
-  .widget-restore-chip__options {
+  .widget-restore-chip__more {
     min-width: var(--target-base);
     min-height: var(--target-base);
   }
