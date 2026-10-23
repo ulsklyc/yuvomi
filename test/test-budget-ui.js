@@ -6818,8 +6818,11 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   const hides = panel.find((r) => /display:\s*none/.test(r.body)
     && r.selector.includes('.budget-glance--fold .budget-glance__balance[aria-expanded="false"] .budget-glance__flows'));
   assert.ok(hides, 'eingeklappt keine Ein/Aus-Zeile');
-  assert.match(hides.selector, /\.budget-glance--fold:has\(\.budget-glance__balance\[aria-expanded="false"\]\) \.budget-glance__categories/,
-    'eingeklappt keine Kategorien-Zeile');
+  // Eigene Regel (F4.2): in der Liste mit der Ein/Aus-Zeile verwarf ein
+  // Browser ohne :has() beide.
+  const hidesCats = panel.find((r) => /display:\s*none/.test(r.body)
+    && /\.budget-glance--fold:has\(\.budget-glance__balance\[aria-expanded="false"\]\) \.budget-glance__categories/.test(r.selector));
+  assert.ok(hidesCats, 'eingeklappt keine Kategorien-Zeile');
   const lead = panel.find((r) => r.selector.trim() === '.budget-glance--fold.budget-glance--lead .budget-glance__lead');
   assert.match(lead?.body ?? '', /flex-direction:\s*row/, 'Etikett und Saldo in EINER Zeile');
 

@@ -160,8 +160,14 @@
     box-shadow: var(--shadow-sm);
   }
 
-  .split-groups-panel .split-groups:has(> .empty-state),
   .split-groups-panel .split-groups:empty {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  /* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+   * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
+  .split-groups-panel .split-groups:has(> .empty-state) {
     background-color: transparent;
     box-shadow: none;
   }

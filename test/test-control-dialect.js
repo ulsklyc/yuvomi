@@ -1792,7 +1792,10 @@ test('Kopfsuche: EINE Breite als Token und EINE Stelle, beides in page-search.cs
   assert.match(desk.body, /max-width:\s*var\(--page-search-width\)/);
   assert.match(desk.body, /flex:\s*0 1 var\(--page-search-width\)/);
   assert.match(desk.body, /margin-inline-start:\s*0/, 'keine Suche am Zeilenende (Notizen, Einstellungen)');
-  assert.match(desk.selector, /\.page-toolbar__center:has\(> label\.page-search:only-child\)/, 'ein Wrapper-Slot nur mit der Suche ist dieselbe Stelle');
+  // Eigene Regel (F4.2): in einer Liste mit dem :has() fiel ohne :has() auch die Suche selbst.
+  const slot = [...eachRule(css)].find((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)) && /\.page-toolbar__center:has\(> label\.page-search:only-child\)/.test(r.selector));
+  assert.ok(slot, 'ein Wrapper-Slot nur mit der Suche ist dieselbe Stelle');
+  assert.equal(slot.body.replace(/\s+/g, ' '), desk.body.replace(/\s+/g, ' '), 'Slot und Suche teilen dieselbe Breite');
 });
 
 test('jedes Suchfeld aus renderPageSearch ist verdrahtet: wirePageSearch mit derselben id in derselben Datei', () => {

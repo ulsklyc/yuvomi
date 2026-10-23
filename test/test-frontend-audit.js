@@ -23576,3 +23576,59 @@ test('F4.1 Dialog-Feldtakt: jeder Gap-Behaelter, der Felder umschliesst, steht i
   }
   assert.deepEqual(missing, [], 'Gap-Behaelter mit Feldern ohne Eintrag in layout.css "EIN FELDTAKT IM DIALOG": Luecke + Marge doppeln den Abstand');
 });
+
+/*
+ * Sammel-Ticket R22-F, F4.2: KEIN `:has()` IN EINER GEMISCHTEN SELEKTORLISTE.
+ * `:has()` ist unvergebend: ein Browser ohne `:has()` (Chrome < 105, Firefox
+ * < 121, Firefox ESR 115) verwirft die GANZE Liste `.a, .b:has(.c)`, also auch
+ * `.a`, das er kennt. Im Bestand standen neun solche Listen (Budget-Kopf,
+ * Dokument-Betrachter, Haushaltshilfe, Inventar, Werkzeugzeile, Suche,
+ * Budget-Blick, Schichtplan-Formular, Aufteilung). Eine eigene Regel je
+ * `:has()`-Selektor - oder das `:has()` in `:is()`/`:where()`, deren Liste
+ * vergebend ist.
+ */
+function bareHas(selector) {
+  let out = '';
+  for (let i = 0; i < selector.length; i += 1) {
+    if (selector.startsWith(':is(', i) || selector.startsWith(':where(', i)) {
+      let depth = 0;
+      let j = selector.indexOf('(', i);
+      for (; j < selector.length; j += 1) {
+        if (selector[j] === '(') depth += 1;
+        if (selector[j] === ')') { depth -= 1; if (depth === 0) break; }
+      }
+      i = j;
+      continue;
+    }
+    out += selector[i];
+  }
+  return out.includes(':has(');
+}
+
+function walkCssFiles(dir) {
+  const entries = readdirSync(new URL(dir, import.meta.url), { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    const path = `${dir}${entry.name}`;
+    if (entry.isDirectory()) return entry.name === 'vendor' ? [] : walkCssFiles(`${path}/`);
+    return entry.isFile() && entry.name.endsWith('.css') ? [path] : [];
+  });
+}
+
+test('F4.2: kein :has() in einer gemischten Selektorliste (ohne :has() faellt sonst die ganze Regel)', () => {
+  assert.equal(bareHas('.a:has(.b)'), true);
+  assert.equal(bareHas(':is(.a:has(.b))'), false, ':is() ist vergebend');
+  assert.equal(bareHas('.a:not(:has(.b))'), true, ':not() ist es nicht');
+  const mixed = [];
+  const files = walkCssFiles('../public/');
+  assert.ok(files.length > 30, `nur ${files.length} Stylesheets gefunden`);
+  for (const file of files) {
+    for (const rule of eachRule(read(file))) {
+      const parts = splitSelectorList(rule.selector);
+      const withHas = parts.filter(bareHas);
+      if (withHas.length && withHas.length < parts.length) {
+        mixed.push(`${file.replace('../public/', '')}: ${rule.selector.replace(/\s+/g, ' ').trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(mixed, [], 'eigene Regel je :has()-Selektor oder :is()/:where() drumherum');
+});

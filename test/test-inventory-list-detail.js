@@ -486,7 +486,9 @@ test('E3: das Detail setzt kurze Angaben zweispaltig, wenn die SPALTE es traegt'
   assert.match(grid.body, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   const wide = pane.find(({ selector }) => /detail-row--multiline/.test(selector));
   assert.ok(wide && /grid-column:\s*1\s*\/\s*-1/.test(wide.body), 'Notizen, Fristen, Belege und Verlauf nehmen beide Spalten');
-  assert.match(wide.selector, /\.detail-row__value:not\(span\)/, 'ein Knoten statt eines kurzen Werts nimmt die Zeile');
+  // Eigene Regel (F4.2): in der Liste mit --multiline verwarf ein Browser ohne :has() beide.
+  const node = pane.find(({ selector }) => /\.detail-row__value:not\(span\)/.test(selector));
+  assert.ok(node && /grid-column:\s*1\s*\/\s*-1/.test(node.body), 'ein Knoten statt eines kurzen Werts nimmt die Zeile');
 });
 
 test('E3: die Garantie-Zeile heisst „Garantie" und nennt Dauer UND Stand', async () => {

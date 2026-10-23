@@ -1314,7 +1314,12 @@ svg.chart {
   font-size: var(--text-xl);
 }
 
-.budget-glance--fold .budget-glance__balance[aria-expanded="false"] .budget-glance__flows,
+.budget-glance--fold .budget-glance__balance[aria-expanded="false"] .budget-glance__flows {
+  display: none;
+}
+
+/* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+ * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
 .budget-glance--fold:has(.budget-glance__balance[aria-expanded="false"]) .budget-glance__categories {
   display: none;
 }

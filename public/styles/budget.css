@@ -229,8 +229,13 @@
    * Notiz statt Stepper ist eine Bildunterschrift - sie weicht, und die
    * Leiste nimmt die ganze Zeile. Ebenso die Wippe "Mein Budget / Haushalt":
    * oben kommt beides wieder. */
-  .page-toolbar.budget-nav.page-toolbar--capped.is-collapsed > .budget-nav__month:has(.budget-nav__note:not([hidden])),
   .page-toolbar.budget-nav.page-toolbar--capped.is-collapsed > .budget-scope {
+    display: none;
+  }
+
+  /* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+   * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
+  .page-toolbar.budget-nav.page-toolbar--capped.is-collapsed > .budget-nav__month:has(.budget-nav__note:not([hidden])) {
     display: none;
   }
 }

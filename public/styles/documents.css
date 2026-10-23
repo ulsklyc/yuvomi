@@ -2594,7 +2594,12 @@
     padding-bottom: var(--space-3);
   }
 
-  .document-viewer__body,
+  .document-viewer__body {
+    padding-top: 0;
+  }
+
+  /* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+   * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
   .document-viewer__body:has(.document-viewer__pdf-pages) {
     padding-top: 0;
   }

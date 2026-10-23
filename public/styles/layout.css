@@ -5032,8 +5032,13 @@ html.fab-steady .page-fab {
    * damit Spezifität 0,3,0. Ein schlichtes `.page-toolbar` (0,1,0) verlor
    * gegen sie lautlos - gemessen blieb `flex-wrap: wrap` auf allen zehn
    * Köpfen stehen, und der Kalender baute weiter vier Zeilen. */
-  .page-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title),
   .page-toolbar:not(.page-toolbar--in-group) {
+    flex-wrap: nowrap;
+  }
+
+  /* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+   * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
+  .page-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
     flex-wrap: nowrap;
   }
 

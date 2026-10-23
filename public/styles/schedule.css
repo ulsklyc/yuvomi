@@ -159,8 +159,13 @@
 .schedule-form > h2,
 .schedule-form > button,
 .schedule-form > .schedule-actions,
-.schedule-form > .form-field:has(input[name="name"]),
 .schedule-form > .schedule-active-field {
+  grid-column: 1 / -1;
+}
+
+/* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+ * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
+.schedule-form > .form-field:has(input[name="name"]) {
   grid-column: 1 / -1;
 }
 

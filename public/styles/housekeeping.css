@@ -857,8 +857,14 @@
 }
 
 .housekeeping-staff-row[data-select-worker]:hover,
-.housekeeping-staff-row:has(> .housekeeping-staff-row__select:focus-visible),
 .housekeeping-staff-row--active {
+  border-color: var(--module-accent);
+  background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface-hover));
+}
+
+/* Eigene Regel: ein `:has()` in einer Selektorliste verwirft ohne
+ * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
+.housekeeping-staff-row:has(> .housekeeping-staff-row__select:focus-visible) {
   border-color: var(--module-accent);
   background-color: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface-hover));
 }

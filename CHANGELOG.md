@@ -245,6 +245,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
+  that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
+  as a whole: the search in a computer's page header lost its width, the collapsed budget header
+  kept its scope switch, the budget overview kept its in/out line when folded, the hover tint of
+  a housekeeping helper row and the full-width notes in an inventory item were missing, and on a
+  phone held sideways the page header could wrap into a second row. Each `:has()` now stands in a
+  rule of its own.
 - **The "Who did it?" menu of a task opens where you clicked.** On a computer a right click on a
   task opened the menu beside the list, over the sidebar. It now opens at the pointer, a long
   press at the finger, and the menu key below the start of the row.
