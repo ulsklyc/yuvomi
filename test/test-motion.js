@@ -591,6 +591,32 @@ test('swapPage R20: was ausfaehrt, steht vor dem alten Bild am Ende - kein Mehr-
     'settleClosingOverlays beendet die Ausfahrt von Mehr-Blatt und Abdunklung nicht');
 });
 
+/**
+ * Critique R22-F (F2.1): DER FRAME DES WECHSELS RECHNET NUR, WAS ER BRAUCHT.
+ * Gemessen im Frame jedes Wechsels (mobil, 4x CPU): `getAnimations()` am
+ * Mehr-Blatt 16-20 ms Stil auch ohne Blatt, die verborgene Seitenleiste bzw.
+ * Tab-Leiste 7-8 ms Layout fuer einen Indikator ohne Geometrie, und
+ * `createIcons` ueber `#app` klonte jedes schon gezeichnete Zeichen des
+ * neuen Skeletts noch einmal (lucide-scope.js waehlt `[data-lucide]`).
+ */
+test('R22-F F2.1: Seitenwechsel ohne Ausfahrt-Stil, ohne verborgene Indikatoren, ohne zweites Zeichnen', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const settle = router.slice(router.indexOf('function settleClosingOverlays()'), router.indexOf('// Modul-Cache'));
+  assert.match(settle, /if \(performance\.now\(\) - _sheetClosingSince > SHEET_SETTLE_WINDOW_MS\) return;\n\s*document\.querySelectorAll\('\.more-sheet, \.more-backdrop'\)/,
+    'settleClosingOverlays fragt getAnimations() auch ohne fahrendes Blatt');
+  assert.match(router.slice(router.indexOf('function closeSheet(')), /setOverlayInteractive\(sheet, false\);\n\s*_sheetClosingSince = performance\.now\(\);/,
+    'das Schliessen merkt sich nicht, wann die Ausfahrt begann');
+  const fn = (name) => router.slice(router.indexOf(`function ${name}(`), router.indexOf('\n}\n', router.indexOf(`function ${name}(`)));
+  assert.match(fn('positionSidebarIndicator'), /^function positionSidebarIndicator\(instant = false\) \{[\s\S]*?if \(!isDesktopViewport\(\)\) return;\n\s*const container/,
+    'die Seitenleiste misst auch unter 1024px');
+  assert.match(fn('positionTabIndicator'), /^function positionTabIndicator\(instant = false\) \{[\s\S]*?if \(isDesktopViewport\(\)\) return;\n\s*const nav/,
+    'die Tab-Leiste misst auch ab 1024px');
+  const nav = fn('updateNav');
+  assert.match(nav, /for \(const node of navRoot\.querySelectorAll\('i\[data-lucide\]'\)\) window\.lucide\.createIcons\(\{ el: node \}\);/,
+    'updateNav zeichnet mehr als die offenen Platzhalter');
+  assert.doesNotMatch(nav, /createIcons\(navRoot \? \{ el: navRoot \}/);
+});
+
 // Critique R21 (D1): das neue Bild zeigte das Skelett - 0 von 6 Wechseln mit
 // Inhalt im neuen Bild, der echte Inhalt sprang 45-123 ms (4x CPU 139-245 ms)
 // spaeter mitten in die Blende. Der Callback wartet jetzt auf den Render der

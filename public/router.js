@@ -442,7 +442,18 @@ const PAGE_LEFT = new DOMException('The page was left.', 'AbortError');
  * Ausfahrt ist eine CSS-Transition; `finish()` setzt sie auf ihren Endwert,
  * und `getAnimations()` holt eine noch nicht gestartete vorher in den Stil.
  */
+/**
+ * Wann das Mehr-Blatt zuletzt zu fahren begann. NUR DANN gibt es eine
+ * Ausfahrt zu beenden (Critique R22-F, F2.1): `getAnimations()` holt den Stil
+ * des ganzen Dokuments nach, und das kostete bei JEDEM Seitenwechsel 16-20 ms
+ * im Frame des Tauschs (4x CPU) - auch ueber die Tab-Leiste, wo kein Blatt
+ * offen war. Die Ausfahrt dauert `--sheet-out`; die Frist laesst Luft.
+ */
+let _sheetClosingSince = -Infinity;
+const SHEET_SETTLE_WINDOW_MS = 1000;
+
 function settleClosingOverlays() {
+  if (performance.now() - _sheetClosingSince > SHEET_SETTLE_WINDOW_MS) return;
   document.querySelectorAll('.more-sheet, .more-backdrop').forEach((el) => {
     el.getAnimations?.().forEach((anim) => anim.finish());
   });
@@ -3534,6 +3545,7 @@ function initMoreSheet(container, openSearch) {
       dropOverlay(token);
     }
     setOverlayInteractive(sheet, false);
+    _sheetClosingSince = performance.now();
     releaseSheetBackground?.();
     releaseSheetBackground = null;
     sheet.removeEventListener('keydown', moreSheetTrap);
@@ -4738,6 +4750,13 @@ function startGlideAt(pill, y) {
  * Positioniert den morphenden Indikator in der Sidebar auf dem aktiven Nav-Item.
  */
 function positionSidebarIndicator(instant = false) {
+  // NUR DIE SICHTBARE LEISTE MISST (Critique R22-F, F2.1): unter 1024px ist
+  // die Seitenleiste `display: none` und ihr Indikator ohne Geometrie - das
+  // Messen zwang trotzdem Stil und Layout der ganzen neuen Seite in den Frame
+  // des Wechsels (Aufgaben mobil 4x CPU: 7-8 ms, je Aufruf). Wer die Schwelle
+  // ueberquert, platziert ueber `resize`; placeNavIndicator markiert ohnehin
+  // nur Gezeichnetes.
+  if (!isDesktopViewport()) return;
   const container = document.querySelector('.nav-sidebar__items');
   const indicator = container?.querySelector('.nav-sidebar__indicator');
   if (!indicator) return;
@@ -4802,6 +4821,8 @@ const TAB_INDICATOR_MAX_WIDTH = 64;
  * an die Bar-Kante läuft.
  */
 function positionTabIndicator(instant = false) {
+  // Dasselbe umgekehrt: ab 1024px ist die Tab-Leiste verborgen (layout.css).
+  if (isDesktopViewport()) return;
   const nav = document.querySelector('.nav-bottom');
   const indicator = nav?.querySelector('.nav-bottom__indicator');
   if (!indicator || !nav) return;
@@ -5014,9 +5035,18 @@ function updateNav(rawPath, opts) {
     setMoreButtonState(moreBtn, activeSecondary);
   }
 
+  // NUR, WAS NOCH NICHT GEZEICHNET IST (Critique R22-F, F2.1). Der Lauf ueber
+  // `#app` nahm jedes schon gezeichnete `<svg data-lucide>` noch einmal
+  // (lucide-scope.js waehlt `[data-lucide]`) - im Seitentausch also auch das
+  // ganze Skelett der neuen Seite, Zeichen fuer Zeichen geklont. Gezeichnet
+  // werden muessen nur die Platzhalter `<i>`, die die Navigation neu setzt.
   if (window.lucide) {
     const navRoot = document.getElementById('app');
-    window.lucide.createIcons(navRoot ? { el: navRoot } : undefined);
+    if (navRoot) {
+      for (const node of navRoot.querySelectorAll('i[data-lucide]')) window.lucide.createIcons({ el: node });
+    } else {
+      window.lucide.createIcons();
+    }
   }
 
   // IM TAUSCH SPRINGT DIE PILLE (Critique R22, D1): dort ruft der Seitenwechsel
