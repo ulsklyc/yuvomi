@@ -701,27 +701,33 @@
   gap: var(--space-3);
 }
 
-/* Formularabschnitt im Sheet: Inset-Well statt Kasten (tokens.css). */
+/* FLACH GRUPPIERT WIE BUCHUNG UND INVENTAR (R22, D9). Die Abschnitte waren
+ * graue Wells mit eigenem Innenabstand und einem Modulton-Zeichen am Titel -
+ * der einzige Dialog des Moduls in Kaesten. Jetzt stehen die Felder auf der
+ * Flaeche des Blatts; ein Abschnitt beginnt mit einer Haarlinie und einem
+ * leisen Titel (Sekundaertext, ohne Zeichen). */
 .subscription-form__section {
-  padding: var(--space-4);
+  padding: 0;
   border: none;
-  border-radius: var(--radius-md);
-  background: var(--color-fill-well);
+  background: none;
 }
 
-.subscription-form__section > h3 {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
+.subscription-form__section + .subscription-form__section {
+  padding-block-start: var(--space-4);
+  border-block-start: var(--space-px) solid var(--color-border-subtle);
+}
+
+/* Der Schalter "Zahlungserinnerung" flucht mit den Feldern: ohne Well
+ * stand sein Zeileneinzug als 12px-Versatz allein. */
+.subscription-form__section > .toggle-row {
+  padding-inline: 0;
+}
+
+.subscription-form__title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
-}
-
-.subscription-form__section > h3 svg {
-  width: 17px;
-  height: 17px;
-  color: var(--module-budget);
 }
 
 .subscription-form__identity {

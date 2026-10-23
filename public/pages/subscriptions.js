@@ -1532,7 +1532,7 @@ export function openSubscriptionModal(subscription = null) {
 
   const advancedFieldsHtml = `
       <section class="subscription-form__section">
-        <h3><i data-lucide="tags" aria-hidden="true"></i>${t('subscriptions.organizationDetails')}</h3>
+        <h3 class="subscription-form__title">${t('subscriptions.organizationDetails')}</h3>
         <div class="subscription-form__organization-grid">
           ${metaComboboxMarkup('subscription-category', subscription?.category_id || '')}
           ${metaComboboxMarkup('subscription-method', subscription?.payment_method_id || '')}
@@ -1544,7 +1544,7 @@ export function openSubscriptionModal(subscription = null) {
       </section>
 
       <section class="subscription-form__section">
-        <h3><i data-lucide="panel-top" aria-hidden="true"></i>${t('subscriptions.serviceDetails')}</h3>
+        <h3 class="subscription-form__title">${t('subscriptions.serviceDetails')}</h3>
         <div class="form-group">
           <label class="form-label" for="subscription-account">${t('subscriptions.accountUsernameLabel')}</label>
           <input class="form-input" type="text" id="subscription-account" maxlength="200"
@@ -1597,7 +1597,7 @@ export function openSubscriptionModal(subscription = null) {
       </section>
 
       <section class="subscription-form__section">
-        <h3><i data-lucide="receipt-text" aria-hidden="true"></i>${t('subscriptions.billingDetails')}</h3>
+        <h3 class="subscription-form__title">${t('subscriptions.billingDetails')}</h3>
         <div class="subscription-form__billing-grid">
           <div class="form-group">
             <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}${REQUIRED_MARK}</label>
@@ -1630,7 +1630,7 @@ export function openSubscriptionModal(subscription = null) {
       </section>
 
       <section class="subscription-form__section">
-        <h3><i data-lucide="calendar-clock" aria-hidden="true"></i>${t('subscriptions.renewalDetails')}</h3>
+        <h3 class="subscription-form__title">${t('subscriptions.renewalDetails')}</h3>
         ${toggleRowHtml({
           label: t('subscriptions.reminderEnabledLabel'), control: 'switch',
           checked: subscription?.reminder_enabled !== false,

@@ -7646,3 +7646,18 @@ test('R22 D9: der Buchungsbetrag traegt seine Waehrung, Datum und Konto teilen e
   const row = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-entry-pair');
   assert.match(row?.body ?? '', /grid-template-columns:\s*repeat\(auto-fit/);
 });
+
+// Critique R22 (D9, a4 P2 "drei Dialekte ... Dialoge"): der Abo-Dialog stand
+// in grauen Wells mit Modulton-Zeichen an jedem Abschnittstitel - Buchung und
+// Inventar flach. Jetzt flach: Haarlinie zwischen Abschnitten, leiser Titel.
+test('R22 D9: der Abo-Dialog ist flach gruppiert wie Buchung und Inventar', () => {
+  const css = read('../public/styles/subscriptions.css');
+  const section = [...eachRule(css)].find((r) => r.selector.trim() === '.subscription-form__section');
+  assert.doesNotMatch(section?.body ?? '', /background:\s*var\(--color-fill-well\)/, 'kein Well');
+  assert.match(section?.body ?? '', /padding:\s*0/);
+  const next = [...eachRule(css)].find((r) => r.selector.trim() === '.subscription-form__section + .subscription-form__section');
+  assert.match(next?.body ?? '', /border-block-start:\s*var\(--space-px\) solid var\(--color-border-subtle\)/, 'eine Haarlinie trennt die Abschnitte');
+  const src = read('../public/pages/subscriptions.js');
+  assert.doesNotMatch(src, /<h3><i data-lucide=/, 'kein Zeichen am Abschnittstitel');
+  assert.equal((src.match(/<h3 class="subscription-form__title">/g) ?? []).length, 4);
+});
