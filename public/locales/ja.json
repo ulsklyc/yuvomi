@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "必要時",
-                "take": "今すぐ服用",
-                "takeFor": "{{medication}} を今すぐ服用",
                 "nextAt": "最短で {{time}}",
                 "remainingHm": "あと {{hours}} 時間 {{minutes}} 分",
                 "remainingM": "あと {{minutes}} 分",

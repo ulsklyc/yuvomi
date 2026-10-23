@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Sesuai kebutuhan",
-                "take": "Minum sekarang",
-                "takeFor": "Minum {{medication}} sekarang",
                 "nextAt": "Paling cepat {{time}}",
                 "remainingHm": "sisa {{hours}} j {{minutes}} mnt",
                 "remainingM": "sisa {{minutes}} mnt",

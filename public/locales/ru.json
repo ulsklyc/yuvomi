@@ -5288,8 +5288,6 @@
             },
             "prn": {
                 "title": "По потребности",
-                "take": "Принять сейчас",
-                "takeFor": "Принять {{medication}} сейчас",
                 "nextAt": "Не раньше {{time}}",
                 "remainingHm": "осталось {{hours}} ч {{minutes}} мин",
                 "remainingM": "осталось {{minutes}} мин",

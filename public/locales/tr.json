@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Gerektiğinde",
-                "take": "Şimdi al",
-                "takeFor": "{{medication}} şimdi alınsın",
                 "nextAt": "En erken {{time}}",
                 "remainingHm": "{{hours}} sa {{minutes}} dk kaldı",
                 "remainingM": "{{minutes}} dk kaldı",

@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "در صورت نیاز",
-                "take": "اکنون مصرف کن",
-                "takeFor": "اکنون {{medication}} را مصرف کن",
                 "nextAt": "زودترین زمان {{time}}",
                 "remainingHm": "{{hours}} ساعت و {{minutes}} دقیقه مانده",
                 "remainingM": "{{minutes}} دقیقه مانده",

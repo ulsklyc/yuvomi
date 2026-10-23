@@ -411,8 +411,23 @@
   .health-split > .split-view__detail .split-view__detail-head {
     border-radius: var(--radius-lg);
     border-block-end-color: transparent;
-    box-shadow: var(--shadow-sm);
     margin-block-end: var(--space-3);
+    /* DER KOPF FLUCHTET MIT DER LISTE UND KLEBT MIT ABSTAND (R22, D12;
+     * Critique a5 P2). Er stand bei y=69 direkt unter dem Modulkopf, die
+     * Bereichsliste daneben bei 85, und beim Scrollen liefen Kacheln durch
+     * den Spalt darueber und unter seinen runden Ecken durch. Jetzt beginnt
+     * er auf der Hoehe der Liste und klebt dort (`top` = Abstand), und ein
+     * Grundstreifen im Seitengrund liegt hinter ihm: ein Ring von --space-2
+     * deckt die Ecken, derselbe nach oben versetzt den Spalt bis zur Kante
+     * der Spalte. Zuerst der eigene Schatten, damit er ueber dem Streifen
+     * liegt. Der Ring bleibt unter der Luft zum Inhalt (--space-3), in Ruhe
+     * verdeckt er nichts. */
+    margin-block-start: var(--space-4);
+    top: var(--space-4);
+    box-shadow:
+      var(--shadow-sm),
+      0 0 0 var(--space-2) var(--color-bg),
+      0 calc(-1 * var(--space-4)) 0 var(--space-2) var(--color-bg);
   }
 
   .health-areas__overview {
@@ -904,28 +919,24 @@
  * einem Modul, das Medikamente fuehrt, ist eine unerreichbare Aktion der
  * teuerste Fehler - beide bleiben erreichbar, beide mit Namen. */
 
-/* EINNEHMEN BEHAELT SEIN WORT (Re-Critique 2026-09-28, A6 P2-3). Hier fiel es
+/* EINNEHMEN BEHAELT SEIN WORT - IMMER (R22, D12). Bis dahin fiel es unter
+ * 17rem (geplante Dosis) bzw. 21rem (Bedarf: in der Uebersicht am Laptop ein
+ * Icon-Kreis neben "Ibuprofen"). Schmal steht der Name seit R17 in einer
+ * eigenen Zeile, die zweite traegt Uhrzeit und Knopf - dort ist fuer das
+ * Wort Platz. Der Knopf gibt bei Enge die Tablette ab, nie das Wort; die
+ * Regel gilt fuer beide Knoepfe (`.health-dose__take-icon`).
+ *
+ * Vorgeschichte (Re-Critique 2026-09-28, A6 P2-3): hier fiel es
  * bis dahin schon unter 21rem - also auf jedem 390px-Telefon (Container 324px) -,
  * und was blieb, war ein gefuellter violetter Kreis mit Haken: die Grammatik der
  * Erinnerungen fuer ERLEDIGT, auf einem Knopf, der erst etwas tun soll. Jetzt
  * gibt der Knopf zuerst sein Icon ab und bleibt eine Kapsel mit Wort; die
  * Rechnung geht auf, weil das Wort ohne Icon 24px schmaler ist und der Name
  * seinen Boden schon in der Stufe darueber abgegeben hat.
- *
- * Erst unter 17rem (272px Container, also Telefone unter ~340px) faellt auch
- * das Wort - dann traegt die Tablette, nicht ein Haken. */
+ * Die fruehere dritte Stufe (unter 17rem nur die Tablette) ist seit R22
+ * entfallen. */
 @container list-rows (max-width: 26rem) {
   .health-dose__take-icon {
-    display: none;
-  }
-}
-
-@container list-rows (max-width: 17rem) {
-  .health-dose__take-icon {
-    display: inline-block;
-  }
-
-  .health-dose__take-label {
     display: none;
   }
 }
@@ -1086,6 +1097,25 @@
   margin-inline-start: var(--space-2);
 }
 
+/* DIE BEDARFSZEILE BRICHT FRUEHER UM ALS DIE GEPLANTE DOSIS (R22, Critique a5).
+ * Sie fuehrt neben Name und Knopf eine Statusangabe; bei 1920 stand die Karte
+ * "Bei Bedarf" bei 27rem Zeilenbreite - ueber der Grenze der Dosiszeile (26rem)
+ * -, und "Ibuprofen · 400 / mg" brach in der Einheit, waehrend daneben
+ * "Noch nicht geno..." abgeschnitten stand. Bis 32rem steht der Name deshalb
+ * allein in der ersten Zeile, Status und Knopf in der zweiten. */
+@container list-rows (max-width: 32rem) {
+  .health-prn {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .health-prn > .health-dose__name {
+    order: -1;
+    flex: 1 0 100%;
+    min-width: 0;
+  }
+}
+
 /* DIESELBEN ZWEI STUFEN WIE BEI DER GEPLANTEN DOSIS - und aus demselben Grund:
  * `.list-row` setzt `flex-wrap: nowrap`, die Zeile fuehrt Name, zwei Angaben
  * und einen Knopf. Zuerst faellt die Restdauer (die Uhrzeit daneben sagt
@@ -1102,9 +1132,6 @@
   .health-prn:not(.is-waiting) .health-prn__lead { display: none; }
 }
 
-@container list-rows (max-width: 21rem) {
-  .health-prn__take-label { display: none; }
-}
 
 /* Die Adhärenz-Karte ist seit Block 2 die geteilte Kennzahlkarte
  * (.metric-card, panel.css): Meta-Zeile, Wert, __progress als Balken. */
@@ -2136,12 +2163,19 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
 }
 
-.health-vitals__empty-row {
-  grid-column: 1 / -1;
+/* DIESELBE ZEILE AUF EIGENER FLAECHE (R22, D12): wo sie nicht in einer
+ * Karte steht ("Heute faellig" im Medikamentenbereich, eine leere Woche der
+ * Aktivitaet), traegt sie die Flaeche einer Karte selbst. */
+.health-overview__empty-row--surface {
   padding: var(--space-2) var(--space-4);
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+}
+
+/* Der Leerzustand der Vitalwerte steht im Kachelraster und nimmt die Zeile. */
+.health-vitals__empty {
+  grid-column: 1 / -1;
 }
 
 .health-overview__card {
@@ -3535,6 +3569,21 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .cycle-history { margin-top: var(--space-6); }
 
+/* Titel und "Periode nachtragen" in einer Zeile (R22, D12): das Nachtragen
+ * steht an der Liste der vergangenen Perioden, nicht im Kopf der Seite. */
+.cycle-history__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+}
+
+.cycle-history__head > .cycle-section__title {
+  margin: 0;
+  margin-inline-end: auto;
+}
+
 /* VERLAUFSLISTEN STEHEN AUF EINEM TRAEGER (R14 P8, A6 P2-6). Zyklus-Verlauf
  * und Trainings-Liste lagen nackt auf der Buehne, waehrend „Letzte Messungen"
  * und Labor in Karten stehen. Die Flaeche ist die der Bereichsliste
@@ -3966,7 +4015,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero--idle .u-section-title { margin-block-end: var(--space-3); }
 .fasting-history-more { display: grid; justify-items: center; gap: var(--space-2); padding-block-start: var(--space-3); }
 .fasting-card__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-3); flex-wrap: wrap; }
-.fasting-card__heading .u-section-title { margin: 0; }
+.fasting-card__heading .u-section-title { margin: 0; margin-inline-end: auto; }
 .fasting-history { list-style: none; margin: 0; padding: 0; }
 .fasting-history__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); padding-block: var(--space-4); }
 .fasting-history__row + .fasting-history__row { border-top: 1px solid var(--color-border-subtle); }

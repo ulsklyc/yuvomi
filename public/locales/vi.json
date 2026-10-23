@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Khi cần",
-                "take": "Uống ngay",
-                "takeFor": "Uống {{medication}} ngay",
                 "nextAt": "Sớm nhất lúc {{time}}",
                 "remainingHm": "còn {{hours}} giờ {{minutes}} phút",
                 "remainingM": "còn {{minutes}} phút",

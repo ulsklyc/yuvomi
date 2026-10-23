@@ -2183,13 +2183,20 @@ test('R17: die Heute-Karte steht schmal vor den Kennzahlen, breit bleibt sie unt
  * gestartet" lasen sich wie dieselbe Handlung. "Periode gestartet" neben
  * "Heute" erfasst heute mit einem Tipp; der Dialog hinter dem FAB ist fuer
  * Daten - also heisst er "Periode nachtragen", als Aktion und als Titel. */
-test('Zyklus: der FAB-Dialog heisst "Periode nachtragen", die Heute-Aktion bleibt der eine Tipp (Critique R21)', () => {
+test('Zyklus: "Periode nachtragen" steht am Verlauf und im Leerzustand, die Heute-Aktion bleibt der eine Tipp (Critique R21, R22 D12)', () => {
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).health.cycle;
   assert.equal(de.add, 'Periode nachtragen');
   assert.equal(de.period.add, de.add, 'Knopf und Dialogtitel sagen dasselbe');
   assert.notEqual(de.add, de.today.startPeriod, 'und etwas anderes als die Heute-Aktion');
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
-  assert.match(src, /label: t\('health\.cycle\.add'\), dockLabel: t\('newLabel\.healthCycle'\), onClick: \(\) => openPeriodModal\(null\)/);
+  // R22 D12: kein FAB, keine Kopf-Pille - "+ Periode" stand neben "Periode gestartet".
+  const fab = src.slice(src.indexOf("case '/health/cycle':"), src.indexOf("case '/health/meds':"));
+  assert.match(fab, /setPageFabAction\(_fab, \{ hidden: true, dockLabel: t\('newLabel\.healthCycle'\) \}\)/);
+  assert.doesNotMatch(fab, /openPeriodModal/);
+  const hist = src.slice(src.indexOf('function cycleHistoryMarkup('), src.indexOf('function cycleDiscoveryMarkup('));
+  assert.match(hist, /data-action="cycle-add-period"><i data-lucide="plus" aria-hidden="true"><\/i>\$\{esc\(t\('health\.cycle\.add'\)\)\}/, 'das Nachtragen steht am Verlauf');
+  assert.match(src, /action: darf \? \{ label: t\('health\.cycle\.add'\), icon: 'plus', attrs: \{ 'data-action': 'cycle-add-period' \} \} : undefined/, 'und im leeren Bereich');
+  assert.match(src, /querySelectorAll\('\[data-action="cycle-add-period"\]'\)\.forEach\(\(btn\) =>\s*btn\.addEventListener\('click', \(\) => openPeriodModal\(null\)\)\)/);
 });
 
 // ── R21 (Critique a5, clarify + D7) ───────────────────────────────────────────

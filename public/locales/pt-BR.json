@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Conforme necessário",
-                "take": "Tomar agora",
-                "takeFor": "Tomar {{medication}} agora",
                 "nextAt": "No mínimo às {{time}}",
                 "remainingHm": "faltam {{hours}} h {{minutes}} min",
                 "remainingM": "faltam {{minutes}} min",

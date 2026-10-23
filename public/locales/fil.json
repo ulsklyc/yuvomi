@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Kapag kailangan",
-                "take": "Inumin ngayon",
-                "takeFor": "Inumin ang {{medication}} ngayon",
                 "nextAt": "Pinakamaaga sa {{time}}",
                 "remainingHm": "{{hours}} oras {{minutes}} min pa",
                 "remainingM": "{{minutes}} min pa",

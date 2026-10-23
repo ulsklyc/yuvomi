@@ -1868,6 +1868,25 @@ test('R22 D9: die Dialog-Fuesse von Budget, Plan und Abos tragen keinen Inline-S
   assert.deepEqual(offenders, []);
 });
 
+test('R22 D12: die Dialog-Fuesse der Gesundheit und ihres Einstellungsblatts tragen keinen Inline-Stil', () => {
+  // Dieselbe Regel wie D9/D20: den Anfangsrand des Loeschen-Knopfs haelt
+  // `.modal-panel__delete` (layout.css, decorateFooterDelete). Neun Dialoge der
+  // Gesundheit (Messung, Einnahme, Medikament, Befund, Training, Vorsorge,
+  // Naehrwerte, Periode, Tag) und die Vorsorge-Art im Einstellungsblatt
+  // schoben ihn noch je selbst weg.
+  const PAGES = /(pages\/health(?:-fasting)?\.js|settings\/pages\/modules-health\.js)$/;
+  const offenders = [];
+  for (const { file, src } of JS) {
+    if (!PAGES.test(file)) continue;
+    src.split('\n').forEach((line, i) => {
+      if (/btn--danger-outline"[^>]*style="/.test(line)
+        || /style="[^"]*margin-inline-end\s*:\s*auto/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.equal(JS.filter(({ file }) => PAGES.test(file)).length, 3, 'Vorbedingung: der Scanner sieht die drei Dateien');
+  assert.deepEqual(offenders, []);
+});
+
 test('R22 D20: der Notiz-Lesedialog wechselt das Gewicht von Loeschen mit der Ansicht (Detail-Fuss-Kanon)', () => {
   // Leseansicht wie das Leseblatt der Kontakte (danger-ghost), Editor wie
   // jeder Dialogfuss (danger-outline) - derselbe Knopf, syncFooter() schaltet.

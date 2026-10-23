@@ -103,6 +103,51 @@ function mountAreaLoadError(area, name, onRetry) {
   });
 }
 
+/*
+ * EIN LEERZUSTAND JE EBENE (R22, D12; Critique a5 P2). Die Gesundheit sprach
+ * vier Dialekte fuer "hier ist noch nichts": Glyphe mit Titel und Satz
+ * (Vorsorge), eine graue Fussnote (Medikamente), eine Zeile mit Knopf neben
+ * dem FAB (Vitalwerte) und einen nackten Satz (Labor, "Wähle einen Befund"
+ * ohne Befund). Jetzt zwei Bauformen, je Ebene eine:
+ *
+ *   BEREICH (nichts im ganzen Bereich): `areaEmptyHtml` - Glyphe des
+ *     Bereichs, Titel, Satz und die Anlege-Aktion, die geteilte
+ *     `.empty-state`-Komposition (utils/empty-state.js).
+ *   KARTE (ein Abschnitt in einem Bereich mit Inhalt): `cardEmptyRowHtml` -
+ *     die ruhige Zeile mit dem Satz und, wo es etwas zu erfassen gibt, der
+ *     Erfassen-Aktion (`.health-overview__empty-row`, seit R21 D6 der
+ *     Vitalwerte-Karte der Uebersicht).
+ *
+ * Die Aktion ist ein Knopf mit `data-action`; der Bereich verdrahtet ihn nach
+ * dem Einhaengen (emptyStateHTML ist eine Zeichenkette).
+ */
+function areaEmptyHtml(route, { action = null, className = '' } = {}) {
+  const panel = PANELS().find((p) => p.route === route);
+  return emptyStateHTML({
+    icon: panel.icon,
+    title: t(panel.emptyTitleKey),
+    description: t(panel.emptyDescKey),
+    // Sekundaer: in jedem Bereich mit Leerzustand steht der FAB (mobil) bzw.
+    // die Kopf-Pille (Desktop) mit demselben Verb - zwei violette Knoepfe
+    // fuer eine Frage waren der Befund von D5 (2026-10-16).
+    action: action ? { label: action.label, icon: 'plus', tone: 'secondary', attrs: { 'data-action': action.id } } : undefined,
+    className: ['health-area-empty', className].filter(Boolean).join(' '),
+  });
+}
+
+function cardEmptyRowHtml(text, { action = null, className = '' } = {}) {
+  const button = action
+    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="${esc(action.id)}">
+        <i data-lucide="plus" aria-hidden="true"></i>${esc(action.label)}
+      </button>`
+    : '';
+  return `
+    <div class="health-overview__empty-row${className ? ` ${esc(className)}` : ''}">
+      <span class="health-overview__empty-text">${esc(text)}</span>
+      ${button}
+    </div>`;
+}
+
 // Sichtbarkeit des Zyklus-Tabs. Zwei Schalter greifen ineinander: der Haushalt
 // erlaubt ihn (Settings → Module → Gesundheit, Admin), und jede Person kann ihn
 // für sich abwählen (Settings → Persönlich → Gesundheit, #760). `_effective` ist
@@ -534,7 +579,12 @@ function updateHealthFab(activeRoute) {
     case '/health/vitals':
       setPageFabAction(_fab, { hidden: !canEditFor(vitals.personId, vitals.meId), label: t('health.vitals.add'), dockLabel: t('newLabel.healthVitals'), onClick: () => openVitalModal() }); break;
     case '/health/cycle':
-      setPageFabAction(_fab, { hidden: !cycleCanEdit(), label: t('health.cycle.add'), dockLabel: t('newLabel.healthCycle'), onClick: () => openPeriodModal(null) }); break;
+      // EIN VERB JE AKTION (R22, D12; Critique a5 P2): "+ Periode" im Kopf
+      // stand neben "Periode gestartet" in der Heute-Karte - zwei Knoepfe fuer
+      // dieselbe Frage. Die Hauptaktion traegt der Inhalt (Heute-Karte, im
+      // Leerzustand "Periode nachtragen"), das Nachtragen steht am Verlauf
+      // (cycleHistoryMarkup). Kein FAB, keine Kopf-Pille.
+      setPageFabAction(_fab, { hidden: true, dockLabel: t('newLabel.healthCycle') }); break;
     case '/health/meds':
       setPageFabAction(_fab, { hidden: !canEditFor(meds.personId, meds.meId), label: t('health.meds.add'), dockLabel: t('newLabel.healthMeds'), onClick: () => openMedModal(null) }); break;
     case '/health/prevention':
@@ -546,12 +596,12 @@ function updateHealthFab(activeRoute) {
     case '/health/nutrition':
       setPageFabAction(_fab, { hidden: !canEditFor(nutrition.personId, nutrition.meId), label: t('health.nutrition.add'), dockLabel: t('newLabel.healthNutrition'), onClick: () => openNutritionModal(null) }); break;
     case '/health/fasting':
-      // EIN WEG JE BEREICH (Critique 2026-10-16, D5): ein abgeschlossenes
-      // Fasten trug man ueber einen Knopf im Leerzustand ODER im Kopf des
-      // Verlaufs nach, ohne FAB. Jetzt ist es der FAB wie in jedem Bereich
-      // (am Desktop die Pille „+ Fasten"). Der Timer bleibt, was er ist: ein
-      // Bedienelement des laufenden Fastens, kein Anlege-Weg.
-      setPageFabAction(_fab, { hidden: !_fastingCreate, label: t('health.fasting.backfill'), dockLabel: t('health.fasting.title'), onClick: () => _fastingCreate?.() }); break;
+      // DER INHALT TRAEGT DIE HAUPTAKTION (R22, D12; Critique a5 P2). Der FAB
+      // (D5, 2026-10-16) stand als "+ Fasten" neben "Fasten starten" - zwei
+      // Wege, die beide nach Anlegen aussahen. Jetzt steht "Fasten starten"
+      // allein vorn; das Nachtragen eines abgeschlossenen Fastens ist die
+      // Aktion des Leerzustands bzw. ein Knopf am Verlauf (health-fasting.js).
+      setPageFabAction(_fab, { hidden: true, dockLabel: t('health.fasting.title') }); break;
     default:
       // Das Nomen bleibt stehen: der Router dockt den Knopf am Desktop nur beim
       // Seitenaufbau an und nur mit `data-dock-label`. Wer auf der Uebersicht
@@ -1567,18 +1617,14 @@ function renderCards() {
   renderMoreMetrics(empty);
 }
 
-/** Die ruhige Zeile der Vitalwerte ohne jede Messung - mit dem Weg zum Erfassen. */
+/** Ohne jede Messung ist der BEREICH leer (R22, D12): der Leerzustand der
+ * Bereiche mit dem Weg zum Erfassen; "Weitere Messwerte" bleibt darunter. */
 function vitalsEmptyRowMarkup() {
-  const action = canEditFor(vitals.personId, vitals.meId) && !readOnly()
-    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="vitals-add-first">
-        <i data-lucide="plus" aria-hidden="true"></i>${esc(t('health.vitals.addShort'))}
-      </button>`
-    : '';
-  return `
-    <div class="health-overview__empty-row health-vitals__empty-row">
-      <span class="health-overview__empty-text">${esc(t('health.vitals.emptyTitle'))}</span>
-      ${action}
-    </div>`;
+  const canAdd = canEditFor(vitals.personId, vitals.meId) && !readOnly();
+  return areaEmptyHtml('/health/vitals', {
+    action: canAdd ? { id: 'vitals-add-first', label: t('health.vitals.add') } : null,
+    className: 'health-vitals__empty',
+  });
 }
 
 /* EINE ZEILE FUER DIE LEEREN METRIKEN (M3). „Groesse" und „Kopfumfang" ohne
@@ -2357,14 +2403,19 @@ function openVitalModal(opts = {}) {
              links, Wert rechts. Reihenfolge, ids und Verhalten der Felder
              sind die alten - Art, Wert, Zeitpunkt, Sichtbarkeit, Notiz. Die
              Notiz bleibt ein freies Feld ohne Zeilenraster. */ ''}
-        ${formRowsHtml(formRowHtml({
-          label: t('health.vitals.field.type'),
-          labelFor: 'vital-type',
-          control: `<select class="form-input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>`,
-        }))}
-        <div class="form-rows" id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>
-        <p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden></p>
+        ${/* EIN TRAEGER, DURCHGEHENDE HAARLINIEN (R22, D12; Critique a5 P2):
+             Art, Werte, Zeitpunkt und Sichtbarkeit standen in drei Traegern -
+             zwischen Art und Wert und zwischen Puls und "Gemessen am" fehlte
+             die Linie, die sonst jede Zeile trennt. Die Werte bleiben ihr
+             eigener Wirt (sie wechseln mit der Art) und stehen als Glied der
+             Gruppe darin. */ ''}
         ${formRowsHtml([
+          formRowHtml({
+            label: t('health.vitals.field.type'),
+            labelFor: 'vital-type',
+            control: `<select class="form-input" id="vital-type"${isEdit ? ' disabled' : ''}>${typeOptions}</select>`,
+          }),
+          `<div class="form-rows" id="vital-value-fields">${valueFieldsMarkup(currentType, row)}</div>`,
           formRowHtml({
             label: t('health.vitals.field.measuredAt'),
             labelFor: 'vital-measured-at',
@@ -2381,13 +2432,14 @@ function openVitalModal(opts = {}) {
             </select>`,
           }),
         ])}
+        <p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden></p>
         <div class="form-field">
           <label class="form-label" for="vital-note">${esc(t('health.vitals.field.note'))}</label>
           <textarea class="form-input" id="vital-note" rows="2" maxlength="2000">${esc(isEdit && row.note ? row.note : '')}</textarea>
         </div>
         ${disclaimerMarkup(true)}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="vital-delete" data-delete-name="${esc(t(VITAL_METRICS.find((m) => m.type === currentType)?.labelKey ?? 'common.delete'))}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="vital-delete" data-delete-name="${esc(t(VITAL_METRICS.find((m) => m.type === currentType)?.labelKey ?? 'common.delete'))}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -2983,6 +3035,23 @@ function renderMedsShell() {
     return;
   }
 
+  // OHNE MEDIKAMENT IST DER BEREICH LEER (R22, D12): kein "Heute ist nichts
+  // faellig", keine Einnahmetreue ohne Dosen und kein "Noch keine
+  // Medikamente." unter "Alle Medikamente" - der Leerzustand des Bereichs.
+  if (!meds.list.length) {
+    const canAdd = canEditFor(meds.personId, meds.meId) && !readOnly();
+    meds.root.insertAdjacentHTML('beforeend', `
+      ${personSwitcherMarkup(meds.members, meds.personId, meds.meId,
+        { menuId: 'health-person-menu-meds', label: t('health.meds.personsLabel') })}
+      ${readOnlyBannerMarkup(meds.members, meds.personId, canEditFor(meds.personId, meds.meId), meds.meId)}
+      ${areaEmptyHtml('/health/meds', { action: canAdd ? { id: 'meds-add-first', label: t('health.meds.add') } : null })}`);
+    if (window.lucide) window.lucide.createIcons({ el: meds.root });
+    wireMeds();
+    meds.root.querySelector('[data-action="meds-add-first"]')?.addEventListener('click', () => openMedModal(null));
+    refreshHealthFab();
+    return;
+  }
+
   meds.root.insertAdjacentHTML('beforeend', `
     ${personSwitcherMarkup(meds.members, meds.personId, meds.meId,
       { menuId: 'health-person-menu-meds', label: t('health.meds.personsLabel') })}
@@ -3011,7 +3080,8 @@ function dueTodayMarkup() {
   const today = todayKey();
   const due = computeDueDoses(allSchedules(), { from: today, to: today });
   if (!due.length) {
-    return emptyHintHTML(t('health.meds.dueToday.empty'));
+    // Ein Abschnitt in einem Bereich mit Inhalt: die ruhige Zeile (R22, D12).
+    return cardEmptyRowHtml(t('health.meds.dueToday.empty'), { className: 'health-overview__empty-row--surface' });
   }
   const rows = due.map((dose) => {
     const med = meds.list.find((m) => m.id === dose.medicationId);
@@ -3186,12 +3256,17 @@ function prnRowMarkup(med, scope, own) {
     ? t('health.meds.doseQty', { count: fmtNum(med.prn_dose_qty) })
     : med.dosage_text || '';
 
+  // EIN VERB, IMMER MIT WORT (R22, D12; Critique a5 P2): die Bedarfsdosis
+  // hiess "Jetzt nehmen", die geplante "Einnehmen", und unter 21rem blieb von
+  // ihr nur ein Icon-Kreis (Uebersicht am Laptop). Jetzt derselbe Knopf wie
+  // bei der geplanten Dosis: Tablette und "Einnehmen", schmal gibt er zuerst
+  // die Tablette ab, nie das Wort (health.css).
   const action = own
     ? `<button type="button" class="btn btn--sm ${state.allowed ? 'btn--primary' : 'btn--ghost'} health-prn__take"
                data-prn-take data-prn-scope="${esc(scope)}" data-med-id="${esc(med.id)}"
-               aria-label="${esc(t('health.meds.prn.takeFor', { medication: med.name }))}">
-         <i data-lucide="pill" class="icon-sm" aria-hidden="true"></i>
-         <span class="health-prn__take-label">${esc(t('health.meds.prn.take'))}</span>
+               aria-label="${esc(t('health.meds.takeNamed', { name: med.name }))}">
+         <i data-lucide="pill" class="icon-md health-dose__take-icon" aria-hidden="true"></i>
+         <span class="health-prn__take-label">${esc(t('health.meds.take'))}</span>
        </button>`
     : '';
 
@@ -3556,7 +3631,7 @@ function openMedLogModal(logId) {
         <p class="form-hint">${esc(isScheduled ? t('health.meds.log.scheduledHint') : t('health.meds.log.adhocHint'))}</p>
 
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isScheduled ? '' : `<button type="button" class="btn btn--danger-outline" data-action="medlog-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>`}
+          ${isScheduled ? '' : `<button type="button" class="btn btn--danger-outline" data-action="medlog-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>`}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>
@@ -3914,7 +3989,7 @@ function openMedModal(med) {
         </div>`, { open: moreOpen })}
 
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -4241,6 +4316,22 @@ function renderLabsShell() {
 
   if (labs.error) {
     mountAreaLoadError(labs, 'labs', mountLabs);
+    return;
+  }
+
+  // OHNE BEFUND IST DER BEREICH LEER (R22, D12): "Noch keine Befunde." und
+  // darunter "Waehle einen Befund" - eine Auswahl ohne etwas zu waehlen.
+  if (!labs.reports.length) {
+    const canAdd = canEditFor(labs.personId, labs.meId) && !readOnly();
+    labs.root.insertAdjacentHTML('beforeend', `
+      ${personSwitcherMarkup(labs.members, labs.personId, labs.meId,
+        { menuId: 'health-person-menu-labs', label: t('health.labs.personsLabel') })}
+      ${readOnlyBannerMarkup(labs.members, labs.personId, canEditFor(labs.personId, labs.meId), labs.meId)}
+      ${areaEmptyHtml('/health/labs', { action: canAdd ? { id: 'labs-add-first', label: t('health.labs.add') } : null })}`);
+    if (window.lucide) window.lucide.createIcons({ el: labs.root });
+    wireLabs();
+    labs.root.querySelector('[data-action="labs-add-first"]')?.addEventListener('click', () => openLabModal(null));
+    refreshHealthFab();
     return;
   }
 
@@ -4641,7 +4732,7 @@ function openLabModal(report) {
 
         ${disclaimerMarkup(true)}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="lab-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="lab-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -5023,6 +5114,21 @@ function renderActivityShell() {
     return;
   }
 
+  const canAdd = canEditFor(activity.personId, activity.meId) && !readOnly();
+  // NOCH NIE EINE EINHEIT: DER BEREICH IST LEER (R22, D12) - ohne Wochen-
+  // Stepper, der durch leere Wochen blaettert.
+  if (!activity.rows.length) {
+    activity.root.insertAdjacentHTML('beforeend', `
+      ${personSwitcherMarkup(activity.members, activity.personId, activity.meId,
+        { menuId: 'health-person-menu-activity', label: t('health.activity.personsLabel') })}
+      ${readOnlyBannerMarkup(activity.members, activity.personId, canEditFor(activity.personId, activity.meId), activity.meId)}
+      ${areaEmptyHtml('/health/activity', { action: canAdd ? { id: 'activity-add', label: t('health.activity.add') } : null })}`);
+    if (window.lucide) window.lucide.createIcons({ el: activity.root });
+    wireActivity();
+    refreshHealthFab();
+    return;
+  }
+
   const summary = weekSummary(activity.rows, { anchor: activity.anchor, weekStartsOn: 1 });
   const weekRows = activityWeekRows(summary);
   const totals = activityTotals(weekRows);
@@ -5042,7 +5148,11 @@ function renderActivityShell() {
       </div>
     </div>
     ${totals.count === 0 ? '' : `<div class="health-activity__summary">${activityStatsMarkup(totals)}</div>`}
-    <div class="health-activity__chart">${activityChartMarkup(summary)}</div>
+    ${/* EINE LEERE WOCHE IST EINE KARTE OHNE INHALT (R22, D12): die ruhige
+         Zeile mit der Erfassen-Aktion statt eines grauen Satzes im Diagramm. */ ''}
+    ${totals.count === 0
+      ? cardEmptyRowHtml(t('health.activity.noData'), { action: canAdd ? { id: 'activity-add', label: t('health.activity.addShort') } : null, className: 'health-overview__empty-row--surface' })
+      : `<div class="health-activity__chart">${activityChartMarkup(summary)}</div>`}
     ${totals.count === 0 ? '' : `<div class="health-activity__log">${activityLogMarkup(weekRows)}</div>`}
   `);
   if (window.lucide) window.lucide.createIcons({ el: activity.root });
@@ -5251,6 +5361,8 @@ function wireActivity() {
   // Der Riegel vor der einen schreibenden Verdrahtung dieses Tabs (#1265).
   if (readOnly()) return;
 
+  activity.root.querySelectorAll('[data-action="activity-add"]').forEach((btn) =>
+    btn.addEventListener('click', () => openActivityModal(null)));
   activity.root.querySelectorAll('[data-activity-edit]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.activityEdit);
@@ -5352,7 +5464,7 @@ function openActivityModal(row, opts = {}) {
           <textarea class="input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -5592,18 +5704,17 @@ function renderPreventionShell() {
     ${preventionDueSectionMarkup()}
     ${groups.length
       ? `<div class="health-prevention__records">${groups.map((rows) => preventionGroupMarkup(rows, own)).join('')}</div>`
-      // EIN LEERZUSTAND, DER SAGT, WAS HIER ERSCHEINT (R14 P4, A6 P2-7) -
-      // OHNE ZWEITEN ANLEGE-KNOPF (Critique 2026-10-16, D5): der FAB
-      // „+ Vorsorge" ist der eine Weg, hier stand er ein zweites Mal als
-      // Primaerknopf direkt daneben.
-      : emptyStateHTML({
-        icon: 'syringe',
-        title: t('health.prevention.emptyTitle'),
-        description: t('health.prevention.emptyDesc'),
+      // DER LEERZUSTAND DER BEREICHE (R22, D12): Glyphe, Titel, Satz und
+      // die Anlege-Aktion - ruhig (sekundaer), der FAB bleibt der Weg mit
+      // Inhalt. Bis R22 ohne Aktion (D5, 2026-10-16), als einziger Bereich
+      // neben Naehrwerten mit Glyphe; jetzt sprechen alle leeren Bereiche so.
+      : areaEmptyHtml('/health/prevention', {
+        action: own && !readOnly() ? { id: 'prevention-add-first', label: t('health.prevention.add') } : null,
       })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: prevention.root });
   wirePrevention();
+  prevention.root.querySelector('[data-action="prevention-add-first"]')?.addEventListener('click', () => openPreventionModal(null));
   refreshHealthFab();
 }
 
@@ -5824,7 +5935,7 @@ function openPreventionModal(row) {
         </div>
         ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -6073,16 +6184,14 @@ function renderNutritionShell() {
     ${entries.length
       ? `<h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
       <ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
-      // EIN LEERZUSTAND (R14 P4, A6 P2-7) statt Titel plus Hinweiszeile -
-      // ohne zweiten Anlege-Knopf neben dem FAB „+ Mahlzeit" (D5, 2026-10-16).
-      : emptyStateHTML({
-        icon: 'salad',
-        title: t('health.nutrition.emptyTitle'),
-        description: t('health.nutrition.emptyDesc'),
+      // DER LEERZUSTAND DER BEREICHE (R22, D12) mit der Anlege-Aktion.
+      : areaEmptyHtml('/health/nutrition', {
+        action: own && !readOnly() ? { id: 'nutrition-add-first', label: t('health.nutrition.add') } : null,
       })}
   `);
   if (window.lucide) window.lucide.createIcons({ el: nutrition.root });
   wireNutrition();
+  nutrition.root.querySelector('[data-action="nutrition-add-first"]')?.addEventListener('click', () => openNutritionModal(null));
   refreshHealthFab();
 }
 
@@ -6366,7 +6475,7 @@ function openNutritionModal(row) {
           </select>`,
         }))}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="nutrition-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="nutrition-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -6858,7 +6967,8 @@ function overviewDueMarkup() {
   const today = todayKey();
   const due = computeDueDoses(overviewAllSchedules(), { from: today, to: today });
   if (!due.length) {
-    return emptyHintHTML(t('health.meds.dueToday.empty'));
+    // Die Karte "Heute faellig" ohne Dosis: die ruhige Zeile der Karten (R22, D12).
+    return cardEmptyRowHtml(t('health.meds.dueToday.empty'));
   }
   const own = canEditFor(overview.personId, overview.meId);
   const rows = due.map((dose) => {
@@ -7103,7 +7213,7 @@ function overviewUpcomingMarkup() {
   const nowTime = `${p2(now.hour)}:${p2(now.minute)}`;
   const up = upcomingDoses(overviewAllSchedules(), overviewAllLogs(), { today, nowTime, limit: 5 });
   if (!up.length) {
-    return `<div class="health-overview__reminders-empty">${esc(t('health.overview.reminders.empty'))}</div>`;
+    return cardEmptyRowHtml(t('health.overview.reminders.empty'));
   }
   const rows = up.map((dose) => {
     const med = overview.meds.find((m) => m.id === dose.medicationId);
@@ -7291,10 +7401,6 @@ function maybeMountCycle(activeRoute) {
   mountCycle();
 }
 
-// Der Nachtrag des Fastens, wie ihn das Fasten-Modul freigibt (nur in der
-// eigenen Ansicht mit Schreibrecht) - `null` heisst: kein FAB.
-let _fastingCreate = null;
-
 function maybeMountFasting(activeRoute) {
   if (activeRoute !== '/health/fasting' || !fastingEnabled) return;
   const root = _container?.querySelector('[data-fasting-root]');
@@ -7302,7 +7408,6 @@ function maybeMountFasting(activeRoute) {
   root.dataset.fastingMounted = 'true';
   import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, {
     userId: vitals.meId,
-    onCreateAction: (fn) => { _fastingCreate = fn; refreshHealthFab(); },
   })).catch((error) => {
     // Die Ueberschrift ist der Satz. `error.message` ist der Text des Browsers
     // oder des Servers, unuebersetzt (#1909) - er gehoert in die Konsole.
@@ -7494,8 +7599,10 @@ function renderCycleShell() {
     icon: 'droplet',
     title: t('health.cycle.emptyTitle'),
     description: t('health.cycle.emptyDesc'),
-    // KEIN ZWEITER ANLEGE-KNOPF (Critique 2026-10-16, D5): „Erste Periode
-    // erfassen" oeffnete denselben Dialog wie der FAB „+ Periode" daneben.
+    // DER LEERZUSTAND TRAEGT DIE AKTION (R22, D12): Glyphe, Titel, Satz,
+    // Aktion - wie jeder leere Bereich. Seit der FAB hier fehlt, ist sie der
+    // einzige Anlege-Weg und kein zweiter.
+    action: darf ? { label: t('health.cycle.add'), icon: 'plus', attrs: { 'data-action': 'cycle-add-period' } } : undefined,
   })}`);
     if (window.lucide) window.lucide.createIcons({ el: cycle.root });
     wireCycle();
@@ -9005,6 +9112,11 @@ function cycleHistoryMarkup(canEdit) {
   const rows = [...asc].reverse();
 
   if (!rows.length) return '';
+  // DAS NACHTRAGEN STEHT AM VERLAUF (R22, D12): eine vergangene Periode
+  // gehoert in die Liste der vergangenen, nicht in den Kopf der Seite.
+  const addBtn = canEdit
+    ? `<button type="button" class="btn btn--ghost btn--sm" data-action="cycle-add-period"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('health.cycle.add'))}</button>`
+    : '';
 
   // B-2: dieselbe avgPeriod wie der Kalender/die Vorhersage - eine offene
   // (laufende) Periode nutzt sie für periodFlowSummary()s Spannenberechnung
@@ -9013,7 +9125,10 @@ function cycleHistoryMarkup(canEdit) {
 
   return `
     <section class="cycle-history">
-      <h3 class="cycle-section__title u-section-title">${esc(t('health.cycle.history.title'))}</h3>
+      <div class="cycle-history__head">
+        <h3 class="cycle-section__title u-section-title">${esc(t('health.cycle.history.title'))}</h3>
+        ${addBtn}
+      </div>
       <ul class="cycle-history__list">${rows.map((p) => {
         const start = String(p.start_date).slice(0, 10);
         const end = p.end_date ? String(p.end_date).slice(0, 10) : null;
@@ -9134,6 +9249,8 @@ function wireCycle() {
       if (p) openPeriodModal(p);
     }));
 
+  cycle.root.querySelectorAll('[data-action="cycle-add-period"]').forEach((btn) =>
+    btn.addEventListener('click', () => openPeriodModal(null)));
   cycle.root.querySelector('[data-action="cycle-start-period"]')?.addEventListener('click', () => cycleStartPeriodToday());
   cycle.root.querySelector('[data-action="cycle-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
   cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
@@ -9219,7 +9336,7 @@ function openPeriodModal(period) {
           <textarea class="input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
         </div>
@@ -9554,7 +9671,10 @@ function openDayLogModal(dateKey) {
 `;
 
   openModal({
-    title: `${t('health.cycle.dayLog.title')} · ${formatDate(key)}`,
+    // DER PUNKT HAENGT AM TITEL (R22, Critique a5): im schmalen Blatt brach
+    // die Zeile vor dem Trenner, und die zweite begann mit "· 22.10.2026".
+    // Das geschuetzte Leerzeichen davor laesst den Umbruch nur NACH ihm zu.
+    title: `${t('health.cycle.dayLog.title')}\u00A0· ${formatDate(key)}`,
     size: 'md',
     // A-2: kein Autofokus auf das erste Formularfeld (das waere ohne dieses
     // Flag die Basaltemperatur weiter unten, siehe FIRST_FIELD in modal.js) -
@@ -9594,7 +9714,7 @@ function openDayLogModal(dateKey) {
         </div>
         ${advancedSection(moreFieldsHtml, { hint: moreHint, open: moreOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${existing ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-log" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+          ${existing ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-log"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
           <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
         </div>

@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Szükség szerint",
-                "take": "Bevétel most",
-                "takeFor": "{{medication}} bevétele most",
                 "nextAt": "Legkorábban {{time}}",
                 "remainingHm": "még {{hours}} ó {{minutes}} p",
                 "remainingM": "még {{minutes}} p",

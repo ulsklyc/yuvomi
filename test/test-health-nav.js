@@ -631,32 +631,55 @@ test('R14 P3: vor den hochgezogenen Karten steht eine Ueberschrift eine Ebene da
 // R14 P4 (A6 P2-7): „Noch keine Eintraege." zentriert oben, ohne Weg - in der
 // 676px-Detailspalte 21 % genutzt. Jetzt der geteilte Leerzustand mit Titel,
 // Satz und dem Anlege-Weg (nur mit Schreibrecht).
-test('R14 P4 + D5: Vorsorge, Naehrwerte und Zyklus leer = EIN Leerzustand, der FAB ist der eine Anlege-Weg', () => {
+test('R22 D12: ein Leerzustand je Ebene - der leere Bereich mit Aktion, die leere Karte als ruhige Zeile', () => {
   const fnBody = (name) => {
     const start = HEALTH_JS.indexOf(`function ${name}(`);
     assert.ok(start >= 0, `${name} fehlt`);
     return HEALTH_JS.slice(start, HEALTH_JS.indexOf('\n}\n', start));
   };
-  const prev = fnBody('renderPreventionShell');
-  assert.doesNotMatch(prev, /emptyHintHTML\(t\('health\.prevention\.noRecords'\)\)/, 'Vorsorge: keine nackte Hinweiszeile mehr');
-  assert.match(prev, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.prevention\.emptyTitle'\)/, 'Vorsorge: Leerzustand mit Titel');
-  // D5 (Critique 2026-10-16): der Leerzustand stand mit einem violetten
-  // „Eintrag hinzufuegen" direkt neben dem FAB, der dasselbe oeffnet.
-  assert.doesNotMatch(HEALTH_JS, /health-prevention-empty-add|health-nutrition-empty-add|data-action': 'cycle-first'/,
-    'kein zweiter Anlege-Knopf neben dem FAB');
-  const fab = fnBody('updateHealthFab');
-  for (const [route, opener] of [['prevention', 'openPreventionModal'], ['nutrition', 'openNutritionModal'], ['cycle', 'openPeriodModal']]) {
-    const at = fab.indexOf(`case '/health/${route}':`);
-    assert.ok(at >= 0 && fab.slice(at, fab.indexOf('break;', at)).includes(`${opener}(null)`), `${route}: der FAB legt an`);
+  // BEREICH: Glyphe, Titel, Satz, Aktion - eine Bauform fuer alle leeren Bereiche.
+  const area = fnBody('areaEmptyHtml');
+  assert.match(area, /icon: panel\.icon,\s*title: t\(panel\.emptyTitleKey\),\s*description: t\(panel\.emptyDescKey\)/);
+  assert.match(area, /tone: 'secondary'/, 'neben dem FAB mit demselben Verb ruhig, nicht ein zweiter violetter Knopf (D5)');
+  for (const [fn, route, id] of [
+    ['vitalsEmptyRowMarkup', 'vitals', 'vitals-add-first'],
+    ['renderMedsShell', 'meds', 'meds-add-first'],
+    ['renderLabsShell', 'labs', 'labs-add-first'],
+    ['renderActivityShell', 'activity', 'activity-add'],
+    ['renderPreventionShell', 'prevention', 'prevention-add-first'],
+    ['renderNutritionShell', 'nutrition', 'nutrition-add-first'],
+  ]) {
+    const body = fnBody(fn);
+    assert.match(body, new RegExp(`areaEmptyHtml\\('/health/${route}'`), `${route}: der Leerzustand der Bereiche`);
+    assert.match(body, new RegExp(`id: '${id}'`), `${route}: mit der Anlege-Aktion`);
   }
-  assert.match(fab, /case '\/health\/fasting':[\s\S]*?hidden: !_fastingCreate[\s\S]*?dockLabel: t\('health\.fasting\.title'\)/,
-    'Fasten: der Nachtrag ist der FAB (am Desktop „+ Fasten"), nur wo er erlaubt ist');
+  assert.match(HEALTH_JS, /querySelector\('\[data-action="meds-add-first"\]'\)\?\.addEventListener\('click', \(\) => openMedModal\(null\)\)/);
+  assert.match(HEALTH_JS, /querySelector\('\[data-action="labs-add-first"\]'\)\?\.addEventListener\('click', \(\) => openLabModal\(null\)\)/);
+  assert.match(fnBody('renderLabsShell'), /if \(!labs\.reports\.length\) \{[\s\S]*?return;\s*\}/, 'Labor: ohne Befund keine Auswahl "Waehle einen Befund"');
+  assert.match(fnBody('renderMedsShell'), /if \(!meds\.list\.length\) \{[\s\S]*?return;\s*\}/, 'Medikamente: ohne Medikament kein "Heute ist nichts faellig"');
+  // KARTE: die ruhige Zeile, nie ein nackter grauer Satz.
+  for (const fn of ['dueTodayMarkup', 'overviewDueMarkup', 'overviewUpcomingMarkup']) {
+    const body = HEALTH_JS.slice(HEALTH_JS.indexOf(`function ${fn}(`), HEALTH_JS.indexOf('\n}\n', HEALTH_JS.indexOf(`function ${fn}(`)));
+    assert.match(body, /cardEmptyRowHtml\(/, `${fn}: die ruhige Zeile`);
+    assert.doesNotMatch(body, /emptyHintHTML\(|reminders-empty/, `${fn}: kein nackter Satz`);
+  }
+  assert.match(fnBody('renderActivityShell'), /cardEmptyRowHtml\(t\('health\.activity\.noData'\), \{ action: canAdd/, 'leere Woche: Zeile mit Erfassen');
+  // EIN VERB JE AKTION: Zyklus und Fasten ohne Kopf-Aktion, der Inhalt traegt sie.
+  const fab = fnBody('updateHealthFab');
+  for (const route of ['cycle', 'fasting']) {
+    const at = fab.indexOf(`case '/health/${route}':`);
+    assert.match(fab.slice(at, fab.indexOf('break;', at)), /hidden: true/, `${route}: keine Kopf-Aktion neben der des Inhalts`);
+  }
+  for (const [route, opener] of [['prevention', 'openPreventionModal'], ['nutrition', 'openNutritionModal']]) {
+    const at = fab.indexOf(`case '/health/${route}':`);
+    assert.ok(fab.slice(at, fab.indexOf('break;', at)).includes(`${opener}(null)`), `${route}: der FAB legt weiter an`);
+  }
   const fasting = readFileSync(new URL('../public/pages/health-fasting.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(fasting, /data-fasting-backfill/, 'Fasten: kein Nachtragen-Knopf mehr in Leerzustand und Verlaufskopf');
-  assert.match(fasting, /view\.onCreateAction\?\.\(\(\) => void creator\(true\)\);/, 'Fasten: gibt seinen Nachtrag an den FAB');
-  const nut = fnBody('renderNutritionShell');
-  assert.doesNotMatch(nut, /emptyHintHTML\(t\('health\.nutrition\.noEntries'\)\)/, 'Naehrwerte: keine nackte Hinweiszeile mehr');
-  assert.match(nut, /emptyStateHTML\(\{[\s\S]*?title: t\('health\.nutrition\.emptyTitle'\)/);
+  assert.match(fasting, /action: writable \? \{ label: t\('health\.fasting\.backfill'\), icon: 'plus', tone: 'secondary', attrs: \{ 'data-fasting-backfill': '' \} \} : undefined/,
+    'Fasten: der Nachtrag ist die Aktion des Leerzustands');
+  assert.match(fasting, /<h3 class="u-section-title">\$\{esc\(t\('health\.fasting\.history'\)\)\}<\/h3>\$\{writable \? `<button type="button" class="btn btn--ghost btn--sm" data-fasting-backfill>/,
+    'Fasten: und ein Knopf im Kopf des Verlaufs');
+  assert.doesNotMatch(fasting, /onCreateAction/, 'Fasten: kein Nachtrag mehr ueber den FAB');
 });
 
 // R14 P8 (A6 P2-5): die Vorsorge trug zwei native Datumsfelder, direkt neben
@@ -816,4 +839,46 @@ test('R22 D4: die Bereichsliste erscheint erst, wenn ueber ihr nichts mehr waech
   assert.match(HEALTH_JS, /const PRIORITY_WAIT_MS = \d+;/);
   assert.match(render, /if \(_priorityPending\) \{\s*const giveUp = setTimeout\(\(\) => \{\s*if \(!_priorityPending\) return;\s*_priorityPending = false;\s*syncPriorityRegion\(\);\s*\}, PRIORITY_WAIT_MS\);\s*signal\?\.addEventListener\('abort', \(\) => clearTimeout\(giveUp\)/,
     'ohne Frist verbirgt ein haengender Abruf die Navigation');
+});
+
+// ── R22 S8 (Critique a5, D12): Gesundheit ──────────────────────────────────
+
+// Gemessen 1280x800 vorher: Detailkopf y=69 (klebte bei top 0 direkt unter dem
+// Modulkopf), Bereichsliste daneben y=85; beim Scrollen liefen Kacheln durch den
+// Spalt und unter den runden Ecken durch. Nachher: Kopf y=85 in Ruhe UND beim
+// Kleben, ein Grundstreifen im Seitengrund dahinter.
+test('R22 D12: der Detailkopf fluchtet mit der Bereichsliste und klebt mit Abstand auf einem Grundstreifen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const head = rules.find((r) => r.selector.trim() === '.health-split > .split-view__detail .split-view__detail-head');
+  assert.ok(head, 'Regel fehlt');
+  assert.match(head.body, /margin-block-start:\s*var\(--space-4\)/, 'in Ruhe auf der Hoehe der Liste');
+  assert.match(head.body, /top:\s*var\(--space-4\)/, 'klebt mit demselben Abstand');
+  assert.match(head.body, /box-shadow:\s*var\(--shadow-sm\),\s*0 0 0 var\(--space-2\) var\(--color-bg\),\s*0 calc\(-1 \* var\(--space-4\)\) 0 var\(--space-2\) var\(--color-bg\)/,
+    'Grundstreifen: Ring um die Ecken und der Spalt bis zur Spaltenkante, der eigene Schatten zuoberst');
+  assert.match(head.body, /margin-block-end:\s*var\(--space-3\)/, 'der Ring (--space-2) bleibt unter der Luft zum Inhalt');
+});
+
+test('R22 D12: Einnehmen heisst ueberall so und behaelt sein Wort - auch die Bedarfsdosis', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const prn = HEALTH_JS.slice(HEALTH_JS.indexOf('function prnRowMarkup('), HEALTH_JS.indexOf('function prnListMarkup('));
+  assert.match(prn, /<span class="health-prn__take-label">\$\{esc\(t\('health\.meds\.take'\)\)\}<\/span>/, 'dasselbe Verb wie die geplante Dosis');
+  assert.match(prn, /aria-label="\$\{esc\(t\('health\.meds\.takeNamed', \{ name: med\.name \}\)\)\}"/, 'der Name beginnt mit dem sichtbaren Wort');
+  assert.match(prn, /class="icon-md health-dose__take-icon"/, 'die Tablette weicht bei Enge wie bei der geplanten Dosis');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const hidesWord = rules.filter((r) => /\.health-(?:dose|prn)__take-label/.test(r.selector) && /display:\s*none/.test(r.body));
+  assert.deepEqual(hidesWord.map((r) => `${r.at.join(' ')} ${r.selector}`), [], 'keine Breite nimmt dem Knopf sein Wort');
+  // Bei 1920 brach "Ibuprofen · 400 / mg" neben "Noch nicht geno...": bis 32rem steht der Name allein.
+  const wrap = rules.find((r) => r.at.some((a) => /list-rows \(max-width:\s*32rem\)/.test(a)) && r.selector.trim() === '.health-prn > .health-dose__name');
+  assert.match(wrap?.body ?? '', /flex:\s*1 0 100%/);
+  assert.equal(read('public/locales/de.json').includes('"takeFor"'), false, 'der zweite Wortlaut ist weg');
+});
+
+test('R22 D12: das Erfassen-Formular steht in EINEM Traeger, der Tag-Titel bricht nicht vor dem Punkt', () => {
+  const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function openVitalModal('), HEALTH_JS.indexOf('onSave(panel) {', HEALTH_JS.indexOf('function openVitalModal(')));
+  const groups = fn.match(/formRowsHtml\(/g) ?? [];
+  assert.equal(groups.length, 1, 'Art, Werte, Zeitpunkt und Sichtbarkeit in einem Traeger - durchgehende Haarlinien');
+  assert.match(fn, /formRowsHtml\(\[\s*formRowHtml\(\{\s*label: t\('health\.vitals\.field\.type'\)[\s\S]*?`<div class="form-rows" id="vital-value-fields">/,
+    'die Werte stehen als Glied in der Gruppe');
+  assert.match(HEALTH_JS, /title: `\$\{t\('health\.cycle\.dayLog\.title'\)\}\\u00A0· \$\{formatDate\(key\)\}`/, 'geschuetztes Leerzeichen vor dem Trenner');
 });

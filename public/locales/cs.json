@@ -5165,8 +5165,6 @@
             },
             "prn": {
                 "title": "Podle potřeby",
-                "take": "Užít nyní",
-                "takeFor": "Užít {{medication}} nyní",
                 "nextAt": "Nejdříve v {{time}}",
                 "remainingHm": "zbývá {{hours}} h {{minutes}} min",
                 "remainingM": "zbývá {{minutes}} min",

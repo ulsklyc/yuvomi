@@ -5413,8 +5413,6 @@
             },
             "prn": {
                 "title": "عند الحاجة",
-                "take": "تناول الآن",
-                "takeFor": "تناول {{medication}} الآن",
                 "nextAt": "في أقرب وقت {{time}}",
                 "remainingHm": "بقي {{hours}} س {{minutes}} د",
                 "remainingM": "بقي {{minutes}} د",

@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "आवश्यकतानुसार",
-                "take": "अभी लें",
-                "takeFor": "{{medication}} अभी लें",
                 "nextAt": "जल्दी से जल्दी {{time}}",
                 "remainingHm": "{{hours}} घं {{minutes}} मि शेष",
                 "remainingM": "{{minutes}} मि शेष",

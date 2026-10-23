@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "按需",
-                "take": "立即服用",
-                "takeFor": "立即服用 {{medication}}",
                 "nextAt": "最早 {{time}}",
                 "remainingHm": "還有 {{hours}} 小時 {{minutes}} 分鐘",
                 "remainingM": "還有 {{minutes}} 分鐘",

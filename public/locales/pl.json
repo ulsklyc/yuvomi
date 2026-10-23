@@ -5288,8 +5288,6 @@
             },
             "prn": {
                 "title": "W razie potrzeby",
-                "take": "Przyjmij teraz",
-                "takeFor": "Przyjmij {{medication}} teraz",
                 "nextAt": "Najwcześniej o {{time}}",
                 "remainingHm": "jeszcze {{hours}} godz. {{minutes}} min",
                 "remainingM": "jeszcze {{minutes}} min",

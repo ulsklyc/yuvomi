@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Vid behov",
-                "take": "Ta nu",
-                "takeFor": "Ta {{medication}} nu",
                 "nextAt": "Tidigast {{time}}",
                 "remainingHm": "{{hours}} tim {{minutes}} min kvar",
                 "remainingM": "{{minutes}} min kvar",

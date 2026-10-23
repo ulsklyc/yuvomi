@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "필요 시",
-                "take": "지금 복용",
-                "takeFor": "{{medication}} 지금 복용",
                 "nextAt": "빨라도 {{time}}",
                 "remainingHm": "{{hours}}시간 {{minutes}}분 남음",
                 "remainingM": "{{minutes}}분 남음",

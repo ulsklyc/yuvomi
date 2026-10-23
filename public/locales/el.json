@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Κατ' ανάγκη",
-                "take": "Λήψη τώρα",
-                "takeFor": "Λήψη {{medication}} τώρα",
                 "nextAt": "Το νωρίτερο στις {{time}}",
                 "remainingHm": "απομένουν {{hours}} ώ {{minutes}} λ",
                 "remainingM": "απομένουν {{minutes}} λ",

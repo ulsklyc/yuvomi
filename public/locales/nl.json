@@ -5040,8 +5040,6 @@
             },
             "prn": {
                 "title": "Zo nodig",
-                "take": "Nu innemen",
-                "takeFor": "{{medication}} nu innemen",
                 "nextAt": "Op zijn vroegst om {{time}}",
                 "remainingHm": "nog {{hours}} u {{minutes}} min",
                 "remainingM": "nog {{minutes}} min",
