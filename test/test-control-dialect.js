@@ -1824,7 +1824,10 @@ test('Dialog-Fussleisten schieben mit logischem Rand: kein Inline-Stil setzt mar
       if (/style="[^"]*margin-(?:left|right)\s*:\s*auto/.test(line)) offenders.push(`${file}:${i + 1}`);
     });
   }
-  assert.ok(JS.some(({ src }) => /style="[^"]*margin-inline-end\s*:\s*auto/.test(src)), 'Vorbedingung: der Scanner sieht Inline-Stile');
+  // Seit R22 (S10) traegt kein Fuss mehr einen Inline-Rand (Guard weiter
+  // unten); die Vorbedingung ist deshalb nur noch, dass der Scanner Inline-Stile
+  // ueberhaupt sieht.
+  assert.ok(JS.some(({ src }) => /style="[^"]*margin[\w-]*\s*:/.test(src)), 'Vorbedingung: der Scanner sieht Inline-Stile');
   assert.deepEqual(offenders, []);
 });
 
@@ -1866,6 +1869,32 @@ test('R22 D9: die Dialog-Fuesse von Budget, Plan und Abos tragen keinen Inline-S
   }
   assert.equal(JS.filter(({ file }) => PAGES.test(file)).length, 3, 'Vorbedingung: der Scanner sieht die drei Seiten');
   assert.deepEqual(offenders, []);
+});
+
+test('R22 S10: kein Dialogfuss der App schiebt oder gruppiert per Inline-Stil', () => {
+  // Der Rest nach D9/D12/D20: Entsorgung, Schnelllinks, Aufteilung, Einkauf,
+  // Aufgaben, Mahlzeit, Rezept und Kalender trugen noch je ein
+  // `style="margin-inline-end:auto"` am Loeschen-Knopf oder ein
+  // `style="display:flex;gap:..."` um Abbrechen und Speichern. Den Anfangsrand
+  // geben `.modal-panel__delete` und `.modal-panel__footer-start`, die Gruppe
+  // `.modal-panel__footer-group` (layout.css) - jetzt in JEDEM Skript der App.
+  const offenders = [];
+  for (const { file, src } of JS) {
+    if (!/^public\/(pages|settings|components|utils)\//.test(file)) continue;
+    src.split('\n').forEach((line, i) => {
+      if (/style="[^"]*margin-inline-end\s*:\s*auto/.test(line)
+        || /style="display:flex;gap:var\(--space-\d\)/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.ok(JS.filter(({ file }) => /^public\/pages\//.test(file)).length > 20, 'Vorbedingung: der Scanner sieht die Seiten');
+  assert.deepEqual(offenders, []);
+  const layout = CSS.find(({ file }) => file === 'public/styles/layout.css')?.src ?? '';
+  const push = [...eachRule(layout)].find((r) => /\.modal-panel__footer > \.modal-panel__footer-start/.test(r.selector));
+  assert.ok(push && /margin-inline-end:\s*auto/.test(push.body), '.modal-panel__footer-start schiebt den Rest ans Ende');
+  // Ohne `:has()` (Chrome 87) verwirft der Browser eine Selektorliste ganz:
+  // der Schub am Loeschen-Knopf steht deshalb in einer Regel ohne `:has()`.
+  const del = [...eachRule(layout)].find((r) => /\.modal-panel__footer > \.modal-panel__delete(?![\w-])/.test(r.selector) && /margin-inline-end:\s*auto/.test(r.body));
+  assert.ok(del && !/:has\(/.test(del.selector), `der Schub am Loeschen-Knopf haengt an keiner :has()-Liste: ${del?.selector}`);
 });
 
 test('R22 D12: die Dialog-Fuesse der Gesundheit und ihres Einstellungsblatts tragen keinen Inline-Stil', () => {

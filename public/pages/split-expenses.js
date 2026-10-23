@@ -2196,7 +2196,7 @@ function openExpenseModal(expense = null, prefill = null) {
           icon: 'receipt',
         })}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-expense" style="margin-inline-end:auto">
+          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-expense">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
           </button>` : ''}
           <div class="split-form__footer-actions">
@@ -2446,7 +2446,7 @@ function openRecurringModal(recurring = null) {
         <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
         ${isEdit ? `<p class="form-hint">${t('splitExpenses.recurring.editHint')}</p>` : ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-recurring" style="margin-inline-end:auto">
+          ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-recurring">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
           </button>` : ''}
           <div class="split-form__footer-actions">
@@ -2718,7 +2718,7 @@ async function openMemberModal() {
         <label class="form-field"><span class="form-label">${t('splitExpenses.member')}</span><select class="form-input" name="member_ref">${memberCandidateOptions(candidates)}</select></label>
         <label class="form-field"><span class="form-label">${t('splitExpenses.role')}</span><select class="form-input" name="role"><option value="guest">${t('splitExpenses.roleGuest')}</option><option value="admin">${t('splitExpenses.roleAdmin')}</option></select></label>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          <button class="btn btn--secondary" type="button" id="split-new-guest" style="margin-inline-end:auto">${t('splitExpenses.createGuest')}</button>
+          <button class="btn btn--secondary modal-panel__footer-start" type="button" id="split-new-guest">${t('splitExpenses.createGuest')}</button>
           <div class="split-form__footer-actions">
             <button class="btn btn--secondary" type="button" id="split-cancel-member">${t('common.cancel')}</button>
             <button class="btn btn--primary" type="submit" id="split-save-member">${t('common.add')}</button>

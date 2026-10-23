@@ -9234,7 +9234,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       ${isEdit ? `<button class="btn btn--danger-outline" id="modal-delete">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button type="button" class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>

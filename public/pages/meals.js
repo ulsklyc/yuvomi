@@ -2680,7 +2680,7 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
         * Mahlzeit sonst nur ueber den Papierkorb der Karte loeschbar. Es geht
         * denselben Weg wie dort (`deleteMeal`: Serienabfrage, Rueckgaengig). */ ''}
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="modal-delete" data-delete-name="${esc(meal.title)}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="modal-delete" data-delete-name="${esc(meal.title)}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
       <button class="btn btn--secondary" id="modal-cancel">${t('common.cancel')}</button>
       <button class="btn btn--primary" id="modal-save">${isEdit ? t('common.save') : t('common.add')}</button>
     </div>`;

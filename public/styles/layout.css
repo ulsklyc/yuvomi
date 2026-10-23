@@ -7633,8 +7633,19 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * `style="margin-inline-end:auto"` an ihren Knopf, drei vergassen es. Jetzt
  * EINE Regel am Knopf, den modal.js ohnehin erkennt (`decorateFooterDelete`
  * setzt `.modal-panel__delete`), und an der Gruppe, in der er steht (Konto:
- * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst. */
+ * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst.
+ *
+ * Zwei Regeln statt einer Liste (R22 S10): ein Browser ohne `:has()` (die
+ * Mindestversion ist Chrome 87) verwirft eine Selektorliste GANZ, und mit ihr
+ * den Anfangsrand jedes Loeschen-Knopfs. Getrennt verliert er nur die Gruppe.
+ * `.modal-panel__footer-start` ist derselbe Schub fuer einen Knopf, der kein
+ * Loeschen ist und trotzdem am Anfang steht ("Gast anlegen" im Mitgliederdialog
+ * der Aufteilung). */
 .modal-panel__footer > .modal-panel__delete,
+.modal-panel__footer > .modal-panel__footer-start {
+  margin-inline-end: auto;
+}
+
 .modal-panel__footer > :has(> .modal-panel__delete) {
   margin-inline-end: auto;
 }

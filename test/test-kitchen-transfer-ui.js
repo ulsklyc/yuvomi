@@ -360,9 +360,11 @@ function loeschenStehtLinks(fuss, id, abbrechenId) {
   assert.ok(loeschen >= 0, 'Loeschen steht im Dialogfuss');
   assert.ok(loeschen < fuss.indexOf(`id="${abbrechenId}"`), 'links vor Abbrechen und Primaer');
   // Weitere Attribute dazwischen sind erlaubt (R9: `data-delete-name` nennt
-  // dem mobilen Icon-Knopf sein Objekt) - geprueft wird Klasse und Schub.
-  assert.match(fuss, new RegExp(`class="btn btn--danger-outline" id="${id}"[^>]*\\sstyle="margin-inline-end:auto"`),
-    'als danger-outline, das den Rest nach rechts schiebt');
+  // dem mobilen Icon-Knopf sein Objekt). Den Schub nach links gibt seit R22
+  // (S10) die Regel an `.modal-panel__delete` (layout.css, decorateFooterDelete),
+  // kein Inline-Stil mehr.
+  assert.match(fuss, new RegExp(`class="btn btn--danger-outline" id="${id}"`), 'als danger-outline');
+  assert.doesNotMatch(fuss, /style="/, 'ohne Inline-Stil');
 }
 
 test('Mahlzeit bearbeiten: Loeschen steht links im Dialogfuss, beim Anlegen nicht (R8 H10)', async () => {

@@ -1430,7 +1430,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `
           <button type="button" class="btn btn--danger-outline" data-action="delete-task"
-                  data-id="${task.id}" style="margin-inline-end:auto">
+                  data-id="${task.id}">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
           </button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>

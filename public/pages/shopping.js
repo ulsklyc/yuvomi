@@ -2813,7 +2813,7 @@ function openItemDetails(itemId, container) {
             * bei Mahlzeit und Rezept, und derselbe Weg wie Wisch und Knopf
             * (`deleteItemUndoable`: sofort weg, fuenf Sekunden Rueckgaengig). */ ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
-          <button type="button" class="btn btn--danger-outline" id="item-details-delete" data-delete-name="${esc(item.name)}" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>
+          <button type="button" class="btn btn--danger-outline" id="item-details-delete" data-delete-name="${esc(item.name)}"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>
           <button type="button" class="btn btn--secondary" id="item-details-cancel">${t('common.cancel')}</button>
           <button type="submit" class="btn btn--primary">${t('common.save')}</button>
         </div>

@@ -1165,11 +1165,11 @@ function openTypeModal(type = null) {
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `
-      <div style="display:flex;gap:var(--space-1);margin-inline-end:auto">
+      <div class="modal-panel__footer-group modal-panel__footer-group--tight">
           <button type="button" class="btn btn--danger-outline" id="wtm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
           <button type="button" class="btn btn--secondary btn--icon" id="wtm-archive" aria-label="${esc(type.archived ? t('waste.restoreAction') : t('waste.archiveAction'))}"><i data-lucide="${type.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i></button>
       </div>` : ''}
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button type="button" class="btn btn--secondary" id="wtm-cancel">${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="wtm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -1450,8 +1450,8 @@ function openScheduleModal(type, schedule = null) {
       </label>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
-      <div style="display:flex;gap:var(--space-3)">
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
+      <div class="modal-panel__footer-group">
         <button type="button" class="btn btn--secondary" id="wsm-cancel">${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="wsm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -1578,8 +1578,8 @@ function openPickupModal(pickup = null) {
       <textarea class="form-input" id="wpm-note" maxlength="500">${esc(pickup?.note ?? '')}</textarea>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wpm-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
-      <div style="display:flex;gap:var(--space-3)">
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wpm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
+      <div class="modal-panel__footer-group">
         <button type="button" class="btn btn--secondary" id="wpm-cancel">${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="wpm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -1798,7 +1798,7 @@ function openImportWizard(source = null) {
     <div class="form-error" id="wiz-error" role="alert" hidden></div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="wiz-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="wiz-preview">${t('waste.importPreviewAction')}</button>
         <button class="btn btn--primary" id="wiz-commit" hidden>${t('waste.importCommitAction')}</button>
@@ -1997,7 +1997,7 @@ function openMappingProfileImportModal(source) {
       <div id="wmp-entries">${preview.entries.map(mappingProfileEntryRowHtml).join('')}</div>
       <div class="modal-panel__footer modal-panel__footer--plain">
         <div></div>
-        <div style="display:flex;gap:var(--space-3)">
+        <div class="modal-panel__footer-group">
           <button class="btn btn--secondary" id="wmp-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" id="wmp-apply"${preview.applicable_count ? '' : ' disabled'}>${t('waste.mappingProfileApplyAction')}</button>
         </div>
@@ -2063,8 +2063,8 @@ function openSourceModal(source) {
     </h3>
     <div id="wsrc-mappings">${source.mappings.map(sourceMappingRowHtml).join('')}</div>
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <button type="button" class="btn btn--danger-outline" id="wsrc-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
-      <div style="display:flex;gap:var(--space-3)">
+      <button type="button" class="btn btn--danger-outline" id="wsrc-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>
+      <div class="modal-panel__footer-group">
         <button type="button" class="btn btn--secondary" id="wsrc-reimport">${t(primaryActionKey)}</button>
         <button type="button" class="btn btn--secondary" id="wsrc-cancel">${t('common.cancel')}</button>
         <button type="button" class="btn btn--primary" id="wsrc-save">${t('common.save')}</button>
@@ -2252,7 +2252,7 @@ function openUrlSourceWizard() {
     <div class="form-error" id="wurl-error" role="alert" hidden></div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="wurl-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="wurl-save">${t('common.add')}</button>
       </div>
@@ -2346,7 +2346,7 @@ async function openReminderSettingsModal() {
     content: `${content}
       <div class="modal-panel__footer modal-panel__footer--plain">
         <div></div>
-        <div style="display:flex;gap:var(--space-3)">
+        <div class="modal-panel__footer-group">
           <button class="btn btn--secondary" id="rem-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" id="rem-save">${t('common.save')}</button>
         </div>
@@ -2408,7 +2408,7 @@ async function moveOccurrence(occurrenceKey) {
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="wmm-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="wmm-save">${t('common.save')}</button>
       </div>

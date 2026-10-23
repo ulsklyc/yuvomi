@@ -1683,7 +1683,7 @@ function recipeModalFooterHtml(isEdit, recipe) {
   const canDelete = isEdit && recipe?.source === 'native';
   return `
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${canDelete ? `<button type="button" class="btn btn--danger-outline" id="recipe-delete" style="margin-inline-end:auto"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
+        ${canDelete ? `<button type="button" class="btn btn--danger-outline" id="recipe-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button class="btn btn--secondary" id="recipe-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="recipe-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>`;
