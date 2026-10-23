@@ -6880,7 +6880,8 @@
         "errorCustomFieldGone": "Цього поля більше немає.",
         "errorSelectedCustomFieldGone": "Одного з вибраних полів більше немає.",
         "errorPatternGone": "Цього циклу змін більше немає.",
-        "errorEntryGone": "Цього запису більше немає."
+        "errorEntryGone": "Цього запису більше немає.",
+        "overviewPeopleCount": "Порівняти людей ({{count}})"
     },
     "pairDisplay": {
         "title": "Підключення планшета",

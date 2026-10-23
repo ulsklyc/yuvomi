@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Dit veld bestaat niet meer.",
         "errorSelectedCustomFieldGone": "Een van de gekozen velden bestaat niet meer.",
         "errorPatternGone": "Dit roosterpatroon bestaat niet meer.",
-        "errorEntryGone": "Deze vermelding bestaat niet meer."
+        "errorEntryGone": "Deze vermelding bestaat niet meer.",
+        "overviewPeopleCount": "Personen vergelijken ({{count}})"
     },
     "pairDisplay": {
         "title": "Tablet koppelen",

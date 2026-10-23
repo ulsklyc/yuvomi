@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Αυτό το πεδίο δεν υπάρχει πια.",
         "errorSelectedCustomFieldGone": "Ένα από τα επιλεγμένα πεδία δεν υπάρχει πια.",
         "errorPatternGone": "Αυτός ο κύκλος βαρδιών δεν υπάρχει πια.",
-        "errorEntryGone": "Αυτή η καταχώριση δεν υπάρχει πια."
+        "errorEntryGone": "Αυτή η καταχώριση δεν υπάρχει πια.",
+        "overviewPeopleCount": "Σύγκριση ατόμων ({{count}})"
     },
     "pairDisplay": {
         "title": "Σύζευξη tablet",

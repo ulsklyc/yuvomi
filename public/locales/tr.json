@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Bu alan artık yok.",
         "errorSelectedCustomFieldGone": "Seçilen alanlardan biri artık yok.",
         "errorPatternGone": "Bu vardiya düzeni artık yok.",
-        "errorEntryGone": "Bu kayıt artık yok."
+        "errorEntryGone": "Bu kayıt artık yok.",
+        "overviewPeopleCount": "Kişileri karşılaştır ({{count}})"
     },
     "pairDisplay": {
         "title": "Tableti eşleştir",

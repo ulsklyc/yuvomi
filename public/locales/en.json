@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "This field no longer exists.",
         "errorSelectedCustomFieldGone": "One of the chosen fields no longer exists.",
         "errorPatternGone": "This schedule plan no longer exists.",
-        "errorEntryGone": "This entry no longer exists."
+        "errorEntryGone": "This entry no longer exists.",
+        "overviewPeopleCount": "Compare people ({{count}})"
     },
     "pairDisplay": {
         "title": "Pair tablet",

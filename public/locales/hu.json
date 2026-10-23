@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Ez a mező már nem létezik.",
         "errorSelectedCustomFieldGone": "Az egyik kiválasztott mező már nem létezik.",
         "errorPatternGone": "Ez a műszakciklus már nem létezik.",
-        "errorEntryGone": "Ez a bejegyzés már nem létezik."
+        "errorEntryGone": "Ez a bejegyzés már nem létezik.",
+        "overviewPeopleCount": "Személyek összehasonlítása ({{count}})"
     },
     "pairDisplay": {
         "title": "Táblagép párosítása",

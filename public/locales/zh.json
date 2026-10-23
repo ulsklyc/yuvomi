@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "此字段已不存在。",
         "errorSelectedCustomFieldGone": "所选字段中有一个已不存在。",
         "errorPatternGone": "此排班周期已不存在。",
-        "errorEntryGone": "此条目已不存在。"
+        "errorEntryGone": "此条目已不存在。",
+        "overviewPeopleCount": "比较成员 ({{count}})"
     },
     "pairDisplay": {
         "title": "配对平板",

@@ -6880,7 +6880,8 @@
         "errorCustomFieldGone": "To pole już nie istnieje.",
         "errorSelectedCustomFieldGone": "Jedno z wybranych pól już nie istnieje.",
         "errorPatternGone": "Ten cykl zmian już nie istnieje.",
-        "errorEntryGone": "Ten wpis już nie istnieje."
+        "errorEntryGone": "Ten wpis już nie istnieje.",
+        "overviewPeopleCount": "Porównaj osoby ({{count}})"
     },
     "pairDisplay": {
         "title": "Sparuj tablet",

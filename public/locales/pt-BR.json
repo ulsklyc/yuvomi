@@ -6344,7 +6344,8 @@
         "errorCustomFieldGone": "Este campo não existe mais.",
         "errorSelectedCustomFieldGone": "Um dos campos escolhidos não existe mais.",
         "errorPatternGone": "Esta escala não existe mais.",
-        "errorEntryGone": "Esta entrada não existe mais."
+        "errorEntryGone": "Esta entrada não existe mais.",
+        "overviewPeopleCount": "Comparar pessoas ({{count}})"
     },
     "waste": {
         "title": "Coleta de lixo",

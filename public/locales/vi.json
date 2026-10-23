@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Trường này không còn tồn tại.",
         "errorSelectedCustomFieldGone": "Một trong các trường đã chọn không còn tồn tại.",
         "errorPatternGone": "Chu kỳ ca này không còn tồn tại.",
-        "errorEntryGone": "Mục này không còn tồn tại."
+        "errorEntryGone": "Mục này không còn tồn tại.",
+        "overviewPeopleCount": "So sánh mọi người ({{count}})"
     },
     "pairDisplay": {
         "title": "Ghép nối máy tính bảng",

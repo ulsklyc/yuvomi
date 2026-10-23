@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Este campo já não existe.",
         "errorSelectedCustomFieldGone": "Um dos campos escolhidos já não existe.",
         "errorPatternGone": "Esta escala já não existe.",
-        "errorEntryGone": "Esta entrada já não existe."
+        "errorEntryGone": "Esta entrada já não existe.",
+        "overviewPeopleCount": "Comparar pessoas ({{count}})"
     },
     "pairDisplay": {
         "title": "Emparelhar tablet",

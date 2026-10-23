@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "यह फ़ील्ड अब मौजूद नहीं है।",
         "errorSelectedCustomFieldGone": "चुने गए फ़ील्ड में से एक अब मौजूद नहीं है।",
         "errorPatternGone": "यह शिफ़्ट चक्र अब मौजूद नहीं है।",
-        "errorEntryGone": "यह प्रविष्टि अब मौजूद नहीं है।"
+        "errorEntryGone": "यह प्रविष्टि अब मौजूद नहीं है।",
+        "overviewPeopleCount": "लोगों की तुलना करें ({{count}})"
     },
     "pairDisplay": {
         "title": "टैबलेट जोड़ें",

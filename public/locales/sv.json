@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Det här fältet finns inte längre.",
         "errorSelectedCustomFieldGone": "Ett av de valda fälten finns inte längre.",
         "errorPatternGone": "Den här skiftcykeln finns inte längre.",
-        "errorEntryGone": "Den här posten finns inte längre."
+        "errorEntryGone": "Den här posten finns inte längre.",
+        "overviewPeopleCount": "Jämför personer ({{count}})"
     },
     "pairDisplay": {
         "title": "Parkoppla platta",

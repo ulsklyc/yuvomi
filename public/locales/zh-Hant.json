@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "此欄位已不存在。",
         "errorSelectedCustomFieldGone": "所選欄位中有一個已不存在。",
         "errorPatternGone": "此排班週期已不存在。",
-        "errorEntryGone": "此條目已不存在。"
+        "errorEntryGone": "此條目已不存在。",
+        "overviewPeopleCount": "比較成員 ({{count}})"
     },
     "pairDisplay": {
         "title": "配對平板",

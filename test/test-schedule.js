@@ -1361,68 +1361,80 @@ test('overviewFetchRange() fetches Schedule entries from one day before the visi
   );
 });
 
-// Kurskorrektur nach Live-Test (2026-09-04): eine gemeinsame, durchgehende
-// 24h-Skala zwang eine 45-Minuten-Schulstunde und eine 8-Stunden-Schicht auf
-// denselben Massstab. computeActiveHours() traegt nur noch Stunden, die
-// irgendjemand aus der Auswahl tatsaechlich belegt.
-test('computeActiveHours() drops hours nobody selected occupies, and falls back with no timed entries at all', async () => {
+// R22 (Critique a3 P2 "zwei Wochenraster", D6): die Uebersicht steht auf dem
+// Raster des Kalenders. Die verdichtete Skala (computeActiveHours/
+// collapsedMinutes, Live-Test 2026-09-04) ist entfallen: ein Block steht auf
+// der vollen 24-Stunden-Achse an seiner Uhrzeit, gerechnet gegen dieselbe
+// Stundenhoehe wie die Woche des Kalenders (hourOffset, utils/time-grid.js).
+test('R22 D6: ein Block steht an seiner Uhrzeit auf der vollen Achse, eine Nachtschicht in zwei Haelften', async () => {
   const { __test } = await import('../public/pages/schedule.js');
-  assert.deepEqual(__test.computeActiveHours([]), Array.from({ length: 14 }, (_, i) => i + 6), 'fallback band with nothing timed');
-  const school = [{ shift_type: { start_time: '08:00', end_time: '08:45' } }, { shift_type: { start_time: '12:30', end_time: '13:15' } }];
-  assert.deepEqual(__test.computeActiveHours(school), [8, 12, 13], '09-11 has nothing in it and is dropped entirely');
-  // Beide Haelften einer Nachtschicht zaehlen (Fix 2026-09-04) - sonst haette
-  // eine Fortsetzungszeile auf dem Folgetag keine aktive Stunde zum Andocken.
-  const overnight = [{ shift_type: { start_time: '22:00', end_time: '06:00' } }];
-  assert.deepEqual(__test.computeActiveHours(overnight), [0, 1, 2, 3, 4, 5, 22, 23], 'both the before- and after-midnight hours count as active');
+  const { hourOffset } = await import('../public/utils/time-grid.js');
+  const type = (start_time, end_time) => ({ id: 1, name: 'Frueh', short_code: 'F', color: '#0891b2', start_time, end_time, fields: [] });
+  const early = __test.overviewEntryBlock({ user_id: 7, date_key: '2026-10-19', source: 'pattern', shift_type: type('06:00', '14:00') });
+  assert.ok(early.includes(`top:${hourOffset(6 * 60)};height:calc(${hourOffset(8 * 60)} - 2px)`), `06-14 steht ab 06:00, acht Stunden hoch: ${early}`);
+  assert.match(early, /data-start="360"/, 'der Beginn steht am Block - der Morgen der Ansicht richtet sich nach ihm');
+  const lesson = __test.overviewEntryBlock({ user_id: 7, date_key: '2026-10-19', source: 'pattern', shift_type: type('08:00', '08:45') });
+  assert.ok(lesson.includes(`height:calc(${hourOffset(45)} - 2px)`), 'eine Schulstunde ist so hoch wie ihre 45 Minuten');
+  const night = { user_id: 7, date_key: '2026-10-19', source: 'pattern', shift_type: type('22:00', '06:00') };
+  const first = __test.overviewEntryBlock(night);
+  assert.ok(first.includes(`top:${hourOffset(22 * 60)};height:calc(${hourOffset(2 * 60)} - 2px)`), 'die erste Haelfte endet an Mitternacht');
+  const tail = __test.overviewEntryBlock({ ...night, __continuation: true });
+  assert.ok(tail.includes(`top:${hourOffset(0)};height:calc(${hourOffset(6 * 60)} - 2px)`), 'die Fortsetzung beginnt um 00:00 und endet um 06:00');
+  assert.doesNotMatch(tail, /data-start=/, 'eine Fortsetzung zaehlt nicht als Beginn des Morgens');
+  const free = __test.overviewEntryBlock({ user_id: 7, date_key: '2026-10-19', source: 'pattern', shift_type: null });
+  assert.match(free, /schedule-overview__block--allday/, 'ohne Uhrzeit steht der Eintrag in der Ganztagszone');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /computeActiveHours|collapsedMinutes|OVERVIEW_HOUR_PX/, 'keine zweite, verdichtete Skala neben der des Kalenders');
 });
 
-// Review-Fund 2026-09-05 (#1022): activeHours filterte strikt nach
-// visibleDateKeys, ohne eine Nachtschicht des Vortags zu beruecksichtigen,
-// deren Fortsetzung auf einen sichtbaren Tag faellt. In der Tagesansicht
-// direkt nach einer Nachtschicht war visibleDateKeys dann genau EIN Tag, der
-// Originaleintrag (datiert auf den Vortag) fiel durchs Sieb, und
-// computeActiveHours() sah gar keinen bezeiteten Eintrag - obwohl
-// buildOverviewLanes() die Fortsetzung selbst unabhaengig davon zeigt.
-test('touchesVisibleDay() counts a previous day\'s overnight shift when its continuation lands on a visible day', async () => {
+test('R22 D6: die Uebersicht baut Kopf, Achse und Jetzt-Linie aus dem geteilten Zeitraster', async () => {
   const { __test } = await import('../public/pages/schedule.js');
-  const night = { date_key: '2026-09-11', shift_type: { start_time: '22:00', end_time: '06:00' } };
-  const dayShift = { date_key: '2026-09-11', shift_type: { start_time: '08:00', end_time: '16:00' } };
-
-  assert.equal(__test.touchesVisibleDay(night, new Set(['2026-09-11'])), true, 'an entry on a visible day always counts');
-  assert.equal(
-    __test.touchesVisibleDay(night, new Set(['2026-09-12'])), true,
-    'day view of 12 Sept alone must still see the night shift that started on the 11th',
-  );
-  assert.equal(
-    __test.touchesVisibleDay(dayShift, new Set(['2026-09-12'])), false,
-    'a plain (non-overnight) shift on a day that is not visible must not count',
-  );
-  assert.equal(
-    __test.touchesVisibleDay(night, new Set(['2026-09-13'])), false,
-    'the continuation only lands on the immediate next day - it does not reach two days out',
-  );
+  const { todayKey } = await import('../public/utils/date.js');
+  __test.setOwnerContext({ users: [{ id: 7, display_name: 'Ada Lovelace' }, { id: 8, display_name: 'Bo Lovelace' }], people: [{ id: 7, display_name: 'Ada Lovelace' }, { id: 8, display_name: 'Bo Lovelace' }], patterns: [{ id: 1 }], me: 7 });
+  const st = __test.scheduleState();
+  const before = { types: st.types };
+  const priorSurname = globalThis.__sharedSurname;
+  globalThis.__sharedSurname = (await import('../public/components/user-multi-select.js')).sharedSurname;
+  try {
+    st.types = [{ id: 1, name: 'Frueh', short_code: 'F', color: '#0891b2', start_time: '06:00', end_time: '14:00', fields: [] }];
+    __test.setOverviewForTest({ selectedIds: [7, 8], weekCursor: todayKey(), viewMode: 'week', entries: [], holidays: [], loading: false, error: false });
+    const html = __test.renderOverview();
+    assert.equal((html.match(/class="week-view__day-header/g) || []).length, 7, 'sieben Tageskoepfe in der Form des Kalenders');
+    assert.equal((html.match(/week-view__day-num--today/g) || []).length, 1, 'der heutige Tag im Heute-Kreis');
+    assert.equal((html.match(/class="week-view__time-slot"/g) || []).length, 24, 'die volle Stundenachse');
+    assert.equal((html.match(/class="week-view__now-line"/g) || []).length, 1, 'eine Jetzt-Linie in der Spalte von heute');
+    assert.match(html, /data-action="overview-open-day"/, 'der Tageskopf fuehrt in den Tag, wie im Kalender');
+    assert.match(html, /style="--schedule-days:7;--schedule-lanes:2"/, 'Kopf und Raster teilen ein Spaltenmass');
+    assert.match(html, /schedule-overview__lane-name">Ada<span class="sr-only"> Lovelace<\/span>/, 'der geteilte Nachname steht nicht in jeder Spur');
+    assert.equal((html.match(/class="schedule-overview__toolbar section-toolbar"/g) || []).length, 1, 'EINE Werkzeugzeile');
+    assert.match(html, /data-action="overview-people"[^>]*aria-label="schedule\.overviewPeopleCount/, 'die Personenwahl ist ein Knopf, ihre Zahl im Namen');
+    assert.doesNotMatch(html, /user-ms|data-ms-input/, 'keine Chipreihe mehr ueber der Woche');
+  } finally {
+    globalThis.__sharedSurname = priorSurname;
+    Object.assign(st, before);
+    __test.setOwnerContext({});
+  }
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{[^}]*timeGridDayHeadHtml[^}]*\} from '\/utils\/time-grid\.js'/, 'der Kopf kommt aus dem Zeitraster');
+  const calendar = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert.match(calendar, /import \{[^}]*timeGridDayHeadHtml[^}]*\} from '\/utils\/time-grid\.js'/, 'derselbe Kopf im Kalender');
+  for (const sheet of ['calendar.css', 'schedule.css']) {
+    const css = readFileSync(new URL(`../public/styles/${sheet}`, import.meta.url), 'utf8');
+    assert.match(css, /@import url\('\/styles\/time-grid\.css'\);/, `${sheet} bindet das geteilte Zeitraster ein`);
+  }
 });
 
-test('computeActiveHours() sees a full-height continuation in a single-day view right after a night shift, not the default fallback', async () => {
-  const { __test } = await import('../public/pages/schedule.js');
-  const night = { date_key: '2026-09-11', shift_type: { start_time: '22:00', end_time: '06:00' } };
-  const visibleDateKeys = new Set(['2026-09-12']); // day view showing only the day AFTER the shift started
-  const selected = [night].filter((entry) => __test.touchesVisibleDay(entry, visibleDateKeys));
-  assert.deepEqual(
-    __test.computeActiveHours(selected), [0, 1, 2, 3, 4, 5, 22, 23],
-    'the night shift counts even though its own date_key (11th) is not the visible day (12th) - ' +
-    'without this the axis fell back to the default 06-19 band and the continuation collapsed to 18px',
-  );
-});
-
-test('collapsedMinutes() maps clock time onto the collapsed scale, and puts an exact-hour end at the end of the PRECEDING hour', async () => {
-  const { __test } = await import('../public/pages/schedule.js');
-  const activeHours = [8, 12, 13]; // 09-11 dropped, matching the fixture above
-  assert.equal(__test.collapsedMinutes(8 * 60, activeHours), 0, 'start of the first active hour is the very top');
-  assert.equal(__test.collapsedMinutes(8 * 60 + 45, activeHours), 45, 'still inside hour 8, no jump yet');
-  assert.equal(__test.collapsedMinutes(12 * 60, activeHours), 60, 'hour 12 starts right after hour 8 ends - 09-11 contribute nothing');
-  assert.equal(__test.collapsedMinutes(9 * 60, activeHours), 60, 'an entry ending exactly at 09:00 (a dropped hour) belongs to the end of hour 8s row, not a hour that contributes nothing');
-  assert.equal(__test.collapsedMinutes(13 * 60 + 15, activeHours), 135, '13 is itself active, so 13:15 is a plain lookup - no boundary special-case needed');
+test('R22 D6: die Seite steht beim Oeffnen auf der laufenden Stunde, der Morgen beginnt mit der ersten Schicht', async () => {
+  const { alignedHourScroll } = await import('../public/utils/time-grid.js');
+  const h = 56;
+  assert.equal(alignedHourScroll({ hour: 15, hourHeight: h, max: 24 * h, visible: 13 * h }), 7 * h, 'Kalender-Regel: morgens ab 07:00');
+  assert.equal(alignedHourScroll({ hour: 15, hourHeight: h, max: 24 * h, visible: 13 * h, morning: 6 }), 6 * h, 'eine Fruehschicht um 06:00 steht ganz da');
+  assert.equal(alignedHourScroll({ hour: 15, hourHeight: h, max: 24 * h, visible: 13 * h, morning: 9 }), 7 * h, 'nie spaeter als 07:00');
+  assert.equal(alignedHourScroll({ hour: 22, hourHeight: h, max: 24 * h, visible: 10 * h, morning: 6 }), 13 * h, 'abends steht die laufende Stunde unten im Bild');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const align = src.slice(src.indexOf('function alignOverviewToNow()'), src.indexOf('function openOverviewPeople()'));
+  assert.match(align, /alignedHourScroll\(\{ hour: nowFields\(\)\.hour,/, 'gerechnet mit der Uhr des Haushalts');
+  assert.match(src, /if \(view === 'overview'\) \{\n    if \(step === null\) overviewAlignPending = true;/, 'beim Oeffnen, nicht beim Blaettern');
 });
 
 test('normalizeOverviewSelection() drops ids no longer eligible, without throwing', async () => {
@@ -2585,16 +2597,19 @@ test('Shift types quick-start: plain buttons replace the misused `.segmented` co
   assert.match(shiftsPanel, /visibleQuickstartTemplates\(\)\.map\(\(\[template, key\]\)/);
 });
 
-test('Compare/Overview tab: the day-head is sticky on the block axis while the week/day density toggle stays a real segmented control', () => {
+test('Compare/Overview tab: Werkzeugzeile und Tageskoepfe kleben unter dem angedockten Kopf; Woche/Tag bleibt ein Segment', async () => {
+  const { eachRule } = await import('./css-rules.js');
   const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
-  const rule = scheduleCss.slice(scheduleCss.indexOf('.schedule-overview__day-head {'), scheduleCss.indexOf('.schedule-overview__day-head {') + 400);
-  assert.match(rule, /position:\s*sticky;/);
-  assert.match(rule, /top:\s*0;/);
-  assert.match(rule, /background:\s*var\(--color-surface\);/, 'must not scroll transparently over passing hour lines/entries');
+  const dock = [...eachRule(scheduleCss)].find((r) => r.selector.trim() === '.schedule-overview__dock' && !r.at.length);
+  assert.match(dock?.body ?? '', /position:\s*sticky;/);
+  assert.match(dock.body, /top:\s*var\(--schedule-dock-top, 0px\);/, 'die Klebekante ist die Unterkante des angedockten Kopfs');
+  assert.match(dock.body, /background-color:\s*var\(--color-bg\);/, 'must not scroll transparently over passing hour lines/entries');
 
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /data-action="overview-view-mode" data-mode="week"/, 'the week/day density toggle is legitimate mutually-exclusive state and must remain a segmented control');
-  assert.match(schedulePage, /class="segmented"[^>]*>\s*\n\s*<button type="button" class="segmented__item\$\{overview\.viewMode === 'week'/);
+  assert.match(schedulePage, /class="segmented schedule-overview__mode"[^>]*>\s*\n\s*<button type="button" class="segmented__item\$\{overview\.viewMode === 'week'/);
+  const sync = schedulePage.slice(schedulePage.indexOf('function syncOverviewDock()'), schedulePage.indexOf('function wireOverviewScroll('));
+  assert.match(sync, /head\.offsetHeight \+ top/, 'Hoehe plus negatives top: die sichtbare Leiste des angedockten Kopfs');
 });
 
 test('Shift types grid: the section head and the empty state span both desktop columns, so the first card starts in column 1', async () => {
@@ -2626,9 +2641,11 @@ test('Compare tab on phones: the section track and the week nav may shrink below
   // explicit column the implicit track is `auto` (max-content) and the
   // toolbar's natural width (441px at 390) sets the whole section's width.
   assert.match(bodyOf('.schedule-overview'), /grid-template-columns:\s*minmax\(0,\s*1fr\)/, 'the compare section needs a shrinkable column');
-  const nav = bodyOf('.schedule-overview__week-nav');
-  assert.match(nav, /flex-wrap:\s*wrap/, 'toggle, arrows and the range label must wrap instead of running off screen');
-  assert.match(nav, /min-width:\s*0/, 'the nav must be allowed to shrink inside the wrapping toolbar');
+  const stepper = bodyOf('.schedule-overview__stepper');
+  assert.match(stepper, /min-width:\s*0/, 'the stepper must be allowed to shrink inside the one tool row');
+  const phone = [...eachRule(scheduleCss)].filter((rule) => rule.at.some((a) => /max-width:\s*767px/.test(a)));
+  const label = phone.find((rule) => rule.selector.trim() === '.schedule-overview__stepper > .schedule-overview__week-label');
+  assert.match(label?.body ?? '', /text-overflow:\s*ellipsis/, 'the range label shortens instead of pushing the row sideways');
 });
 
 // R9 M11 (Re-Critique 2026-09-27, A2 P2): the statistics range scrolled
@@ -2941,25 +2958,29 @@ test('P12: the comparison fits seven days of one person into the desktop width',
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const rules = [...eachRule(css)].filter((r) => !r.at.length);
   const sel = (r, s) => r.selector.split(',').some((x) => x.trim() === s);
-  const overview = schedulePage.slice(schedulePage.indexOf('function renderOverview()'), schedulePage.indexOf('function renderScheduleWarnings()'));
+  const overview = schedulePage.slice(schedulePage.indexOf('function renderOverview()'), schedulePage.indexOf('function syncOverviewDock()'));
   assert.doesNotMatch(overview, /minmax\(220px/, 'keine feste 220px-Spur im Markup');
-  assert.match(overview, /minmax\(var\(--schedule-lane-min\),1fr\)/, 'die Spurbreite kommt aus EINER Variable');
   const minRule = rules.find((r) => sel(r, '.schedule-overview') && /--schedule-lane-min\s*:/.test(r.body));
   const rem = Number(/--schedule-lane-min\s*:\s*([\d.]+)rem/.exec(minRule?.body ?? '')?.[1]);
   assert.ok(rem > 0, 'die Mindestbreite ist in rem gesetzt');
+  // Seit R22 (D6) EIN Spaltenmass fuer Kopf und Raster: Zeitspalte des
+  // Kalenders, dann je Tag die Spuren - mindestens ihre Mindestbreite, sonst
+  // ein Anteil am Rest.
+  assert.match(minRule.body, /--schedule-columns:\s*var\(--cal-gutter-width\) repeat\(var\(--schedule-days, 7\), minmax\(calc\(var\(--schedule-lanes, 1\) \* var\(--schedule-lane-min\)\), 1fr\)\)/);
   // 1440 abzueglich Seitenleiste und Rand: 1156px Inhaltsbreite (A2-Messung).
-  const oneLaneWeek = 44 + 8 + 7 * rem * 16 + 6 * 12;
+  const oneLaneWeek = 64 + 7 * rem * 16;
   assert.ok(oneLaneWeek <= 1156, `eine Person, 7 Tage: ${oneLaneWeek}px passen in 1156px`);
   assert.ok(!rules.some((r) => sel(r, '.schedule-overview__lane') && /min-width\s*:\s*220px/.test(r.body)), 'keine 220px-Spur im CSS');
-  assert.ok(rules.some((r) => sel(r, '.schedule-overview__day:not(.schedule-overview__gutter)') && /flex\s*:\s*1 1 0/.test(r.body)),
-    'die Tage teilen sich die Breite statt auf ihrer Mindestbreite zu stehen');
+  for (const s2 of ['.schedule-overview__head-row', '.schedule-overview__grid']) {
+    assert.ok(rules.some((r) => sel(r, s2) && /grid-template-columns:\s*var\(--schedule-columns\)/.test(r.body)), `${s2} nimmt das eine Spaltenmass`);
+  }
 });
 
 /* R16 (Critique 2026-10-05, P1 mobil): BEDIENFLAECHE VOR DEM INHALT. Vergleich
  * 263px (Personenwahl in drei Chipreihen, Ansicht + Stepper + Label auf zwei
  * Zeilen), Auswertung 257px (Formularkarte, je Feld eine Zeile). Beide sind
  * mobil zwei Zeilen: gemessen 110 bzw. 104px, Inhalt ab y=248 bzw. 242. */
-test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () => {
+test('R16/R22: Uebersicht mobil EINE Werkzeugzeile, Auswertung zwei Bedienzeilen', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
   const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
@@ -2968,27 +2989,22 @@ test('R16: Vergleich und Auswertung tragen mobil zwei Bedienzeilen', async () =>
   const phone = at(/max-width:\s*767px/);
   const body = (list, sel) => list.filter((r) => r.selector === sel).map((r) => r.body).join(';');
 
-  // Der Stepper ist EIN Rasterkind: ohne den Kasten fielen Pfeile und Label einzeln ins Raster.
-  // Seit R16 Schritt 2 in der Reihenfolge des Zeitraum-Kopfs: zurueck, Wert,
-  // vor, dahinter der Reset - im Markup, nicht per `order` (Tab-Folge).
-  // Seit R16 Schritt 2b kommt das Markup aus dem geteilten Baustein
-  // (utils/period-stepper.js); "Heute" verbirgt sich, wenn heute zu sehen ist.
-  assert.match(src, /<div class="schedule-overview__stepper">\$\{periodStepperHtml\(\{[\s\S]*?'data-direction': 'prev'[\s\S]*?schedule-overview__week-label[\s\S]*?'data-direction': 'next'[\s\S]*?current: showsToday[\s\S]*?'data-direction': 'today'[\s\S]*?<\/div>/);
+  // Seit R22 (D6) EINE Werkzeugzeile: Zeitraum, Woche/Tag, Personen. Die
+  // Reihenfolge des Zeitraum-Kopfs steht im Markup (zurueck, Wert, vor, dahinter
+  // der Reset; utils/period-stepper.js), "Heute" verbirgt sich, wenn heute zu
+  // sehen ist, und liegt mobil AUF dem Wert wie im Kalender.
+  assert.match(src, /<div class="schedule-overview__stepper" role="group"[^>]*>\$\{periodStepperHtml\(\{[\s\S]*?'data-direction': 'prev'[\s\S]*?schedule-overview__week-label[\s\S]*?'data-direction': 'next'[\s\S]*?current: showsToday[\s\S]*?'data-direction': 'today'[\s\S]*?<\/div>/);
   assert.match(src, /const showsToday = weekDays\.includes\(todayKey\(\)\);/);
-  const stepper = src.match(/<div class="schedule-overview__stepper">[\s\S]*?<\/div>/)[0];
+  const stepper = src.match(/<div class="schedule-overview__stepper"[\s\S]*?<\/div>/)[0];
   assert.doesNotMatch(stepper, /calendar\.back|calendar\.forward/, 'die Pfeile nennen ihr Objekt (Woche/Tag), nicht nur die Richtung');
   assert.match(stepper, /calendar\.prevWeek[\s\S]*calendar\.nextWeek/);
-  assert.doesNotMatch(body(phone, '.schedule-overview__stepper > [data-direction="today"]'), /order:/, 'keine zweite Reihenfolge im Stylesheet');
-  assert.match(body(phone, '.schedule-overview__toolbar'), /grid-template-areas:\s*"view people"\s*"step step"/);
-  assert.match(body(phone, '.schedule-overview__week-nav'), /display:\s*contents/);
-  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /flex-wrap:\s*nowrap/,
-    'die Personen sind EINE scrollende Reihe');
-  assert.match(body(phone, '.schedule-overview__toolbar > .user-ms > .user-ms__options'), /overflow-x:\s*auto/);
-  // Die mobile Regel muss NACH der Basisregel stehen (gleiche Spezifitaet): davor verlor sie still.
+  assert.doesNotMatch(body(phone, '.schedule-overview__toolbar'), /grid-template-areas/, 'keine zweite Bedienzeile mehr');
+  assert.match(body(phone, '.schedule-overview__stepper > .period-stepper__reset'), /position:\s*absolute/, 'Heute liegt auf dem Wert');
+  assert.match(body(phone, '.schedule-overview__stepper > .period-stepper__reset'), /color:\s*transparent/);
   const order = all.map((r, i) => [r, i]).filter(([r]) => r.selector === '.schedule-overview__toolbar');
   const baseAt = order.find(([r]) => r.at.length === 0)?.[1];
   const phoneAt = order.find(([r]) => r.at.some((a) => /max-width:\s*767px/.test(a)))?.[1];
-  assert.ok(baseAt >= 0 && phoneAt > baseAt, 'die mobile Bedienflaeche steht hinter ihrer Basisregel');
+  assert.ok(baseAt >= 0 && phoneAt > baseAt, 'die mobile Werkzeugzeile steht hinter ihrer Basisregel');
 
   const narrow = at(/max-width:\s*639px/);
   assert.match(body(narrow, '.schedule-stat-filters'), /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,

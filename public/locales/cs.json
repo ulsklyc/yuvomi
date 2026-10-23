@@ -6727,7 +6727,8 @@
         "errorCustomFieldGone": "Toto pole už neexistuje.",
         "errorSelectedCustomFieldGone": "Jedno z vybraných polí už neexistuje.",
         "errorPatternGone": "Tento cyklus směn už neexistuje.",
-        "errorEntryGone": "Tento záznam už neexistuje."
+        "errorEntryGone": "Tento záznam už neexistuje.",
+        "overviewPeopleCount": "Porovnat osoby ({{count}})"
     },
     "pairDisplay": {
         "title": "Spárovat tablet",

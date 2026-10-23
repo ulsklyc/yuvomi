@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "이 필드는 더 이상 존재하지 않습니다.",
         "errorSelectedCustomFieldGone": "선택한 필드 중 하나는 더 이상 존재하지 않습니다.",
         "errorPatternGone": "이 근무 패턴은 더 이상 존재하지 않습니다.",
-        "errorEntryGone": "이 항목은 더 이상 존재하지 않습니다."
+        "errorEntryGone": "이 항목은 더 이상 존재하지 않습니다.",
+        "overviewPeopleCount": "사람 비교 ({{count}})"
     },
     "pairDisplay": {
         "title": "태블릿 페어링",

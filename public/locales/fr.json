@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Ce champ n’existe plus.",
         "errorSelectedCustomFieldGone": "L’un des champs choisis n’existe plus.",
         "errorPatternGone": "Ce roulement n’existe plus.",
-        "errorEntryGone": "Cette entrée n’existe plus."
+        "errorEntryGone": "Cette entrée n’existe plus.",
+        "overviewPeopleCount": "Comparer des personnes ({{count}})"
     },
     "pairDisplay": {
         "title": "Appairer la tablette",

@@ -7039,7 +7039,8 @@
         "errorCustomFieldGone": "هذا الحقل لم يعد موجودًا.",
         "errorSelectedCustomFieldGone": "أحد الحقول المختارة لم يعد موجودًا.",
         "errorPatternGone": "دورة المناوبات هذه لم تعد موجودة.",
-        "errorEntryGone": "هذا الإدخال لم يعد موجودًا."
+        "errorEntryGone": "هذا الإدخال لم يعد موجودًا.",
+        "overviewPeopleCount": "مقارنة الأشخاص ({{count}})"
     },
     "pairDisplay": {
         "title": "اقتران الجهاز اللوحي",

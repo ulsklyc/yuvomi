@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "この項目はもう存在しません。",
         "errorSelectedCustomFieldGone": "選択した項目の一つはもう存在しません。",
         "errorPatternGone": "このシフトパターンはもう存在しません。",
-        "errorEntryGone": "この項目はもう存在しません。"
+        "errorEntryGone": "この項目はもう存在しません。",
+        "overviewPeopleCount": "メンバーを比較 ({{count}})"
     },
     "pairDisplay": {
         "title": "タブレットをペアリング",

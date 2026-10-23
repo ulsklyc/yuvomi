@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Wala na ang field na ito.",
         "errorSelectedCustomFieldGone": "Wala na ang isa sa mga napiling field.",
         "errorPatternGone": "Wala na ang pattern ng shift na ito.",
-        "errorEntryGone": "Wala na ang entry na ito."
+        "errorEntryGone": "Wala na ang entry na ito.",
+        "overviewPeopleCount": "Ikumpara ang mga tao ({{count}})"
     },
     "pairDisplay": {
         "title": "Ipares ang tablet",

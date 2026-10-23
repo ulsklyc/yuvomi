@@ -219,9 +219,11 @@ export function openFilterSheet({
         ${g.html}
       </details>`;
       }
+      // Ohne Ueberschrift steht die Gruppe allein unter dem Blatt-Titel - wo
+      // der Titel die Gruppe schon nennt (Personen im Schichtplan-Vergleich).
       return `
       <section class="${cls}">
-        <h3 class="filter-sheet__heading">${esc(g.heading)}</h3>
+        ${g.heading ? `<h3 class="filter-sheet__heading">${esc(g.heading)}</h3>` : ''}
         ${g.html}
       </section>`;
     })

@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Questo campo non esiste più.",
         "errorSelectedCustomFieldGone": "Uno dei campi scelti non esiste più.",
         "errorPatternGone": "Questa rotazione non esiste più.",
-        "errorEntryGone": "Questa voce non esiste più."
+        "errorEntryGone": "Questa voce non esiste più.",
+        "overviewPeopleCount": "Confronta persone ({{count}})"
     },
     "pairDisplay": {
         "title": "Associa tablet",

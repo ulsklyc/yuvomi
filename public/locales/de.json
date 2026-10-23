@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Dieses Feld gibt es nicht mehr.",
         "errorSelectedCustomFieldGone": "Ein gewähltes Feld gibt es nicht mehr.",
         "errorPatternGone": "Diesen Schichtplan gibt es nicht mehr.",
-        "errorEntryGone": "Diesen Eintrag gibt es nicht mehr."
+        "errorEntryGone": "Diesen Eintrag gibt es nicht mehr.",
+        "overviewPeopleCount": "Personen vergleichen ({{count}})"
     },
     "pairDisplay": {
         "title": "Tablet koppeln",

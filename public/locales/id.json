@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Bidang ini sudah tidak ada.",
         "errorSelectedCustomFieldGone": "Salah satu bidang yang dipilih sudah tidak ada.",
         "errorPatternGone": "Pola shift ini sudah tidak ada.",
-        "errorEntryGone": "Entri ini sudah tidak ada."
+        "errorEntryGone": "Entri ini sudah tidak ada.",
+        "overviewPeopleCount": "Bandingkan orang ({{count}})"
     },
     "pairDisplay": {
         "title": "Pasangkan tablet",

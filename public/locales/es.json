@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Este campo ya no existe.",
         "errorSelectedCustomFieldGone": "Uno de los campos elegidos ya no existe.",
         "errorPatternGone": "Esta rotación ya no existe.",
-        "errorEntryGone": "Esta entrada ya no existe."
+        "errorEntryGone": "Esta entrada ya no existe.",
+        "overviewPeopleCount": "Comparar personas ({{count}})"
     },
     "pairDisplay": {
         "title": "Vincular tableta",

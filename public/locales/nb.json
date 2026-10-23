@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "Dette feltet finnes ikke lenger.",
         "errorSelectedCustomFieldGone": "Ett av de valgte feltene finnes ikke lenger.",
         "errorPatternGone": "Denne planen finnes ikke lenger.",
-        "errorEntryGone": "Denne oppføringen finnes ikke lenger."
+        "errorEntryGone": "Denne oppføringen finnes ikke lenger.",
+        "overviewPeopleCount": "Sammenlign personer ({{count}})"
     },
     "pairDisplay": {
         "title": "Par nettbrett",

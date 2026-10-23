@@ -6564,7 +6564,8 @@
         "errorCustomFieldGone": "این فیلد دیگر وجود ندارد.",
         "errorSelectedCustomFieldGone": "یکی از فیلدهای انتخاب‌شده دیگر وجود ندارد.",
         "errorPatternGone": "این چرخه شیفت دیگر وجود ندارد.",
-        "errorEntryGone": "این مورد دیگر وجود ندارد."
+        "errorEntryGone": "این مورد دیگر وجود ندارد.",
+        "overviewPeopleCount": "مقایسه افراد ({{count}})"
     },
     "pairDisplay": {
         "title": "جفت‌سازی تبلت",
