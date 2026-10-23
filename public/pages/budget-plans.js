@@ -273,7 +273,7 @@ export function openAddPlan() {
       ${amountFieldHtml('')}
       <div class="modal-panel__footer modal-panel__footer--plain">
         <div></div>
-        <div style="display:flex;gap:var(--space-3)">
+        <div class="modal-panel__footer-group">
           <button class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
           <button class="btn btn--primary" id="plan-save">${t('common.add')}</button>
         </div>
@@ -301,10 +301,10 @@ function openPlanEditor({ category, savings = false }) {
       ${savings ? `<p class="form-hint" style="margin-bottom:var(--space-3)">${t('budget.planSavingsHint')}</p>` : ''}
       ${amountFieldHtml(hasCurrent ? current : '')}
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${hasCurrent ? `<button type="button" class="btn btn--danger-outline" id="plan-delete" style="margin-inline-end:auto">
+        ${hasCurrent ? `<button type="button" class="btn btn--danger-outline" id="plan-delete">
           <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
         </button>` : '<div></div>'}
-        <div style="display:flex;gap:var(--space-3)">
+        <div class="modal-panel__footer-group">
           <button class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
           <button class="btn btn--primary" id="plan-save">${t('common.save')}</button>
         </div>

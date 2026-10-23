@@ -3001,7 +3001,7 @@ function openAccountModal(account = null) {
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
-      <div style="display:flex;gap:var(--space-1);margin-inline-end:auto">
+      <div class="modal-panel__footer-group modal-panel__footer-group--tight">
       ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="am-delete">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>
@@ -3011,7 +3011,7 @@ function openAccountModal(account = null) {
         <i data-lucide="${account.archived ? 'archive-restore' : 'archive'}" class="icon-md" aria-hidden="true"></i>
       </button>` : '<div></div>'}
       </div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="am-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="am-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -3730,8 +3730,8 @@ function openLoanReport(loan) {
       <button class="btn btn--primary" id="loan-report-close">${t('common.close')}</button>
     </div>` : `<div class="modal-panel__footer">
       <button type="button" class="btn btn--danger-outline" id="loan-report-delete"
-              aria-label="${esc(t('common.deleteNamed', { name: loan.title }))}" style="margin-inline-end:auto">
-        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i><span>${esc(t('common.delete'))}</span>
+              aria-label="${esc(t('common.deleteNamed', { name: loan.title }))}">
+        <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}
       </button>
       <button type="button" class="btn btn--secondary" id="loan-report-close">${t('common.close')}</button>
       <button type="button" class="btn btn--primary" id="loan-report-edit">${esc(t('common.edit'))}</button>
@@ -4372,10 +4372,10 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
-      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bm-delete" aria-label="${esc(t('budget.deleteLabel', { title: entry.title }))}" style="margin-inline-end:auto">
+      ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bm-delete" aria-label="${esc(t('budget.deleteLabel', { title: entry.title }))}">
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="bm-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="bm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
@@ -5696,7 +5696,7 @@ function openLoanModal(loan = null) {
     ${loanFormFieldsHtml(loan, { startMonth: todayKey().slice(0, 7) })}
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div></div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div class="modal-panel__footer-group">
         <button class="btn btn--secondary" id="lm-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="lm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>

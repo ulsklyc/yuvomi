@@ -7641,6 +7641,21 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   flex-wrap: wrap;
 }
 
+/* DIE GRUPPE IM FUSS IST EINE KLASSE, KEIN INLINE-STIL (R22, D9). Abbrechen
+ * und Speichern (bzw. Loeschen und Archivieren im Kontodialog) standen im
+ * Budget je in einem `style="display:flex;gap:..."` - vier Kopien derselben
+ * Zeile mit zwei Abstaenden. `--tight` haelt das Paar Loeschen + Icon-Knopf
+ * enger zusammen; den Anfangsrand gibt die Regel unten (`:has(> .modal-panel__delete)`). */
+.modal-panel__footer-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.modal-panel__footer-group--tight {
+  gap: var(--space-1);
+}
+
 /* LOESCHEN STEHT AM ANFANG, ABBRECHEN UND PRIMAER AM ENDE (Re-Critique
  * 2026-09-28, A2 P1-2). Der Fuss ist rechtsbuendig; wer Loeschen nicht selbst
  * wegschob, stand mit ihm neben Abbrechen - im Termindialog, dem Vorbild des

@@ -1846,6 +1846,28 @@ test('R22 D20: die Formular-Fuesse von Notizen, Kontakten und Geburtstagen trage
   assert.deepEqual(offenders, []);
 });
 
+test('R22 D9: die Dialog-Fuesse von Budget, Plan und Abos tragen keinen Inline-Stil', () => {
+  // Wie die drei Module aus D20: den Anfangsrand haelt `.modal-panel__delete`
+  // (layout.css), die Gruppe Abbrechen/Speichern `.modal-panel__footer-group`.
+  // Ein `<span>` um das Wort am Loeschen-Knopf blieb mobil sichtbar, weil
+  // decorateFooterDelete nur loses Wort und `.btn__label` zur Wortspanne macht.
+  const PAGES = /pages\/(budget|budget-plans|subscriptions)\.js$/;
+  const offenders = [];
+  for (const { file, src } of JS) {
+    if (!PAGES.test(file)) continue;
+    src.split('\n').forEach((line, i) => {
+      if (/btn--danger-outline"[^>]*style="/.test(line)
+        || /style="[^"]*margin-inline-end\s*:\s*auto/.test(line)
+        || /style="display:flex;gap:var\(--space-\d\)/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+    for (const m of src.matchAll(/btn--danger-outline"[^>]*>\s*<i data-lucide="trash-2"[^>]*><\/i><span>/g)) {
+      offenders.push(`${file}: <span> am Loeschen-Wort (${m.index})`);
+    }
+  }
+  assert.equal(JS.filter(({ file }) => PAGES.test(file)).length, 3, 'Vorbedingung: der Scanner sieht die drei Seiten');
+  assert.deepEqual(offenders, []);
+});
+
 test('R22 D20: der Notiz-Lesedialog wechselt das Gewicht von Loeschen mit der Ansicht (Detail-Fuss-Kanon)', () => {
   // Leseansicht wie das Leseblatt der Kontakte (danger-ghost), Editor wie
   // jeder Dialogfuss (danger-outline) - derselbe Knopf, syncFooter() schaltet.

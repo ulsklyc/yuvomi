@@ -1656,8 +1656,8 @@ export function openSubscriptionModal(subscription = null) {
       ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
       <div class="modal-panel__footer subscriptions-modal-footer">
         ${edit ? `<button type="button" class="btn btn--danger-outline" id="subscription-delete"
-                aria-label="${esc(t('common.deleteNamed', { name: subscription.name }))}" style="margin-inline-end:auto">
-          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i><span>${esc(t('common.delete'))}</span>
+                aria-label="${esc(t('common.deleteNamed', { name: subscription.name }))}">
+          <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}
         </button>` : ''}
         <button class="btn btn--secondary" type="button" id="subscription-cancel">${t('common.cancel')}</button>
         <button class="btn btn--primary" type="submit">${edit ? t('common.save') : t('common.add')}</button>
