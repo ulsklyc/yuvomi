@@ -329,12 +329,18 @@ test('R17 Z1: nur der markierte Zeitraum-Kopf loest seine Bar-Zeile in die Titel
 // R20 6c: seitdem falten die Pfeile, Filter und Wort der Ansicht bleiben.
 test('R17: der Kalenderkopf ist eingeklappt EINE Zeile, und was weicht, kommt im Menue wieder', () => {
   const calendarCss = read('../public/styles/calendar.css');
-  const collapsed = rules(calendarCss).filter((r) => /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/.test(r.selector));
+  const collapsedAll = rules(calendarCss).filter((r) => /\.cal-toolbar\.page-toolbar--capped\.is-collapsed/.test(r.selector));
+  const phoneOnly = (r) => r.at.some((a) => /max-width:\s*639px/.test(a)) && !r.at.some((a) => /min-width/.test(a));
+  const collapsed = collapsedAll.filter(phoneOnly);
   assert.ok(collapsed.length >= 2, 'calendar.css traegt die Regeln fuer den eingeklappten Kopf');
-  for (const r of collapsed) {
-    assert.ok(r.at.some((a) => /max-width:\s*639px/.test(a)),
-      `"${r.selector}" gilt nur, wo das Ansichtsmenue steht (unter 640px) - darueber gibt es kein Menue, in das gefaltet wird`);
+  for (const r of collapsedAll) {
     assert.match(r.selector, /\.page-toolbar--period-title/, 'nur im markierten Zeitraum-Kopf');
+    // Gefaltet wird nur, wo das Ansichtsmenue steht (unter 640px) - darueber
+    // gibt es kein Menue, in das gefaltet wird. Ab 640px darf der eingeklappte
+    // Kopf ordnen (S10: Ort ueber dem Zeitraum am Tablet), aber nichts weglassen.
+    if (phoneOnly(r)) continue;
+    assert.ok(decl(r.body, 'display') !== 'none' && !/data-collapse-fold/.test(r.selector),
+      `"${r.selector}" faltet ausserhalb des Telefons - darueber gibt es kein Menue, in das gefaltet wird`);
   }
   const center = collapsed.find((r) => /> \.page-toolbar__center$/.test(r.selector));
   assert.equal(center && decl(center.body, 'order'), '0', 'der Zeitraum rueckt in Zeile 1, vor die Werkzeuge');

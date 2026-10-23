@@ -1813,6 +1813,14 @@ test('R22 D20: der angedockte Telefonkopf nennt den Ort, der Stepper behaelt sei
   assert(/display:\s*none/.test(base?.body ?? ''), 'ausgeklappt und am Desktop nennt der Titel den Ort');
   const stepper = phone.find((r) => r.selector.trim() === '.cal-toolbar__stepper');
   assert(/min-height:\s*var\(--target-base\)/.test(stepper?.body ?? ''), 'der Stepper bleibt beim Andocken 48px hoch (vorher 48 -> 24)');
+  // S10: zwischen 640 und 1023px nannte der angedockte Kopf den Ort nicht. Der
+  // Stepper loest sich dort auf; der Zeitraum-Slot stellt die Caption in die
+  // Spalte des Labels, darueber, ohne dass die Zeile waechst.
+  const tablet = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /min-width:\s*640px\)\s*and\s*\(max-width:\s*1023px/.test(a)));
+  const tabletPlace = tablet.find((r) => r.selector.trim() === '.page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place');
+  assert(/display:\s*block/.test(tabletPlace?.body ?? '') && /grid-area:\s*1\s*\/\s*2/.test(tabletPlace?.body ?? ''), 'am Tablet steht der Ort angedockt ueber dem Zeitraum');
+  const tabletLabel = tablet.find((r) => /is-collapsed .cal-toolbar__stepper > .cal-toolbar__label$/.test(r.selector.trim()));
+  assert(/grid-area:\s*2\s*\/\s*2/.test(tabletLabel?.body ?? ''), 'der Zeitraum steht darunter in derselben Spalte');
 });
 
 test('scheduleEntriesOnDay() respektiert den Personenfilter und den "Mir zugewiesen"-Filter wie Termine/Aufgaben (#1018)', () => {

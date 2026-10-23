@@ -825,13 +825,6 @@
     display: block;
     flex: 0 0 100%;
     max-inline-size: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-2xs);
-    font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-tight);
-    color: var(--color-text-secondary);
   }
 
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__label {
@@ -860,6 +853,60 @@
    * (320px, Tag: 92 -> 118px). Die Platzhalter verlassen nur den Fluss. */
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__view-menu-sizer {
     position: absolute;
+  }
+}
+
+/* NIE EIN KOPF OHNE ORT, AUCH AM TABLET (R22 S10, aus S5 offen). Zwischen 640
+ * und 1023px nannte der angedockte Kopf Suche, Filter, Zeitraum und Ansichten,
+ * aber nicht den Ort. Der Stepper loest sich dort auf (`display: contents`,
+ * oben), die Pfeile bleiben stehen; deshalb ordnet hier der Zeitraum-Slot
+ * selbst: „Kalender" als Caption in der Spalte des Zeitraums ueber dem Label,
+ * Pfeile und „Heute" ueber beide Zeilen. Caption und Label (13 + 24px) passen
+ * in die 48px der Zeile - der Kopf waechst nicht. Die Schrift der Caption gilt
+ * fuer Telefon und Tablet (unten). */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed > .page-toolbar__center {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    align-content: center;
+    align-items: center;
+    row-gap: 0;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place {
+    display: block;
+    grid-area: 1 / 2;
+    text-align: center;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__label {
+    grid-area: 2 / 2;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__prev {
+    grid-area: 1 / 1 / 3 / 2;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__next {
+    grid-area: 1 / 3 / 3 / 4;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__today {
+    grid-area: 1 / 4 / 3 / 5;
+  }
+}
+
+/* Die Caption des Orts im angedockten Kopf, Telefon und Tablet. */
+@media (max-width: 1023px) {
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    color: var(--color-text-secondary);
   }
 }
 
