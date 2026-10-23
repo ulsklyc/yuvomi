@@ -1775,6 +1775,23 @@ test('R22 D5: Woche/Tag nennen "F · LJ" vor der Uhrzeit, der Monat zeigt Strich
   }
 });
 
+// R22 (Critique a1 Klein, D20): eingeklappt nannte der Telefonkopf nur den
+// Zeitraum und die Ansicht - kein Wort, wo man ist (DESIGN.md "Nie ein Kopf
+// ohne Ortsangabe"). Und der Stepper fiel beim Andocken von 48 auf 24px, die
+// Zeile sprang (Agenda-Scroll-CLS, handoff-2).
+test('R22 D20: der angedockte Telefonkopf nennt den Ort, der Stepper behaelt seine Hoehe', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const bar = src.slice(src.indexOf('function toolbarHtml('), src.indexOf('function toolbarHtml(') + 2400);
+  assert(/<div class="cal-toolbar__stepper"><span class="cal-toolbar__place" aria-hidden="true">\$\{esc\(t\('calendar\.title'\)\)\}<\/span>/.test(bar), 'der Ort steht im Stepper, fuer Hilfstechnik bleibt das <h1>');
+  const phone = [...eachRule(calendarCss)].filter((r) => r.at.some((a) => /max-width:\s*639px/.test(a)));
+  const collapsedPlace = phone.find((r) => r.selector.trim() === '.page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place');
+  assert(/display:\s*block/.test(collapsedPlace?.body ?? ''), 'eingeklappt steht der Ort sichtbar ueber dem Zeitraum');
+  const base = [...eachRule(calendarCss)].find((r) => !r.at.length && r.selector.trim() === '.cal-toolbar__place');
+  assert(/display:\s*none/.test(base?.body ?? ''), 'ausgeklappt und am Desktop nennt der Titel den Ort');
+  const stepper = phone.find((r) => r.selector.trim() === '.cal-toolbar__stepper');
+  assert(/min-height:\s*var\(--target-base\)/.test(stepper?.body ?? ''), 'der Stepper bleibt beim Andocken 48px hoch (vorher 48 -> 24)');
+});
+
 test('scheduleEntriesOnDay() respektiert den Personenfilter und den "Mir zugewiesen"-Filter wie Termine/Aufgaben (#1018)', () => {
   const { scheduleEntriesOnDay, state } = calendarHelpers;
   const savedEntries = state.scheduleEntries;

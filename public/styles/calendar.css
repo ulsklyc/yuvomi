@@ -472,6 +472,11 @@
   display: contents;
 }
 
+/* Der Ort steht nur im angedockten Telefonkopf (unten, D20). */
+.cal-toolbar__place {
+  display: none;
+}
+
 /* Die Ansichtswahl als Pop-up gibt es nur mobil (R9 M5) - darueber waehlt das Segment. */
 .cal-toolbar__view-menu {
   display: none;
@@ -712,6 +717,7 @@
     align-items: center;
     flex: 1 1 0;
     min-width: 0;
+    min-height: var(--target-base);
     contain: inline-size;
     position: relative;
   }
@@ -799,6 +805,35 @@
     order: 0;
     flex: 1 1 0;
     min-width: 0;
+  }
+
+  /* NIE EIN KOPF OHNE ORT (DESIGN.md, Kopfregel 1; Critique R22, a1, D20).
+   * Eingeklappt verliess der Titel das Bild, und die Zeile nannte nur noch
+   * „22.10. - 21.11.2026" und „Agenda" - kein Wort, wo man ist. Jetzt steht
+   * „Kalender" als Caption ueber dem Zeitraum, in derselben Zeile; der Stepper
+   * behaelt dabei seine 48px (vorher 48 -> 24px beim Andocken, die Zeile
+   * sprang: Agenda-Scroll-CLS 0,006-0,012). */
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place {
+    display: block;
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-2xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    color: var(--color-text-secondary);
+  }
+
+  .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__label {
+    flex: 0 0 auto;
+    max-inline-size: 100%;
   }
 
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__prev[data-collapse-fold],

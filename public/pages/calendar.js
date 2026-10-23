@@ -2189,7 +2189,10 @@ function toolbarHtml({ filterCount = 0, scheduleWarningHtml = '', searchValue = 
   return `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
     <div class="page-toolbar__center cal-toolbar__month">
-      <div class="cal-toolbar__stepper">${periodNavHtml()}</div>
+      ${/* Der Ort im angedockten Kopf (R22, D20): eingeklappt geht der Titel
+            aus dem Bild, und das Telefon nennt „Kalender" klein ueber dem
+            Zeitraum. Dekor fuer Sehende - das <h1> bleibt der Seitentitel. */ ''}
+      <div class="cal-toolbar__stepper"><span class="cal-toolbar__place" aria-hidden="true">${esc(t('calendar.title'))}</span>${periodNavHtml()}</div>
       ${viewMenuHtml()}
     </div>
     ${/* Der Aktions-Slot traegt die Ueberlappungswarnung, "Kalender verwalten"
