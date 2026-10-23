@@ -22465,6 +22465,12 @@ test('D3: die Unternavigation der Module ist Text, keine Icon-Reiter', () => {
     assert.match(src, /class="[^"]*\bsub-tab\b/, `Vorbedingung: ${page} rendert Reiter`);
     assert.doesNotMatch(src, /sub-tab__icon/, `${page}: Reiter tragen nur ihr Wort`);
   }
+  // R22 S9 (Critique 2026-10-22, a2 P3): die Kueche trug am Desktop als
+  // einzige Leiste eine Glyphe vor jedem Reiter-Wort.
+  const kitchen = read('../public/utils/kitchen-tabs.js');
+  const tabs = kitchen.slice(kitchen.indexOf('const TABS = () => ['), kitchen.indexOf('].filter', kitchen.indexOf('const TABS = () => [')));
+  assert.match(tabs, /labelKey: 'nav\.pantry'/, 'Vorbedingung: die Kuechen-Reiter');
+  assert.doesNotMatch(tabs, /icon:/, 'kitchen: Reiter tragen nur ihr Wort');
 });
 
 // D5 (Critique 2026-10-16): Quick-Add im Einkauf ist die benannte Ausnahme vom

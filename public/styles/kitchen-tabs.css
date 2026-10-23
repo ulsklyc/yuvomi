@@ -128,22 +128,8 @@
    * Regel: die Leiste traegt nur Tabs mit ihren Zahlen, jedes Werkzeug steht
    * in der Kontextzeile seines Tabs (der Kopf der Seite unter der Leiste).
    * Traegt diese Zeile NUR Werkzeuge (Rezepte, Vorrat), faltet sie angedockt
-   * ein und kommt oben wieder (R17 K1) - erkannt von wireCollapsingHeader
+   * ein und kommt beim Hochscrollen wieder (R17 K1, R22 D15) - erkannt von wireCollapsingHeader
    * (utils/ux.js), gefaltet in layout.css ("DIE FALTZEILE"), nicht hier. */
-  /* Mobil weicht das Icon, nicht das Label. Vier Tabs teilen sich auf 393px
-   * ~90px pro Stück; „Mahlzeiten" allein braucht 73px Label + 16px Icon + die
-   * Abstände, also ~95px - beides passt nicht nebeneinander. Das Wort ist der
-   * bessere Anker: die Bottom-Nav trägt dieselben Icons bereits, und ein auf
-   * „Mahlz…" gekürztes Label kostet mehr Orientierung als ein fehlendes
-   * Piktogramm. Gilt im ganzen 640er-Breakpoint statt ab einer eigenen
-   * 480er-Schwelle - der Breakpoint-Kontrakt (tokens.css §11c) lässt nur
-   * 640/768/1024/1440 zu, und ein einheitlicher Mobilzustand ist ohnehin
-   * leichter zu lesen als drei Stufen. Das ellipsis oben bleibt als
-   * Sicherheitsnetz für noch schmalere Geräte und lange Übersetzungen. */
-  .kitchen-tabs-bar .sub-tab__icon,
-  .kitchen-tabs-bar .sub-tab > svg {
-    display: none;
-  }
 }
 
 /* Mahlzeiten + Rezepte: Viewport-Höhe um Tab-Leiste reduzieren (Mobile).

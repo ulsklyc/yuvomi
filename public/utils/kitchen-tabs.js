@@ -19,11 +19,16 @@ export { KITCHEN_MODULES } from '/utils/module-accent.js';
 export const KITCHEN_ROUTES = Object.freeze(KITCHEN_MODULES_SOURCE.map((mod) => `/${mod}`));
 export const KITCHEN_STORAGE_KEY = 'yuvomi-kitchen-tab';
 
+// TEXT-REITER OHNE ZEICHEN (R22 S9, DESIGN.md D3). Am Desktop trug die Kueche
+// als einzige Unternavigation eine Glyphe vor jedem Wort - Budget,
+// Belohnungen, Haushaltshilfe und Schichtplan fuehren nur das Wort, und mobil
+// wich das Zeichen hier ohnehin schon. Die Modulzeichen stehen in Seitenleiste
+// und Tab-Leiste; die Reiter benennen nur die Station.
 const TABS = () => [
-  { route: '/meals',    labelKey: 'nav.meals',    icon: 'utensils'      },
-  { route: '/recipes',  labelKey: 'nav.recipes',  icon: 'book-text'     },
-  { route: '/shopping', labelKey: 'nav.shopping', icon: 'shopping-cart' },
-  { route: '/pantry',   labelKey: 'nav.pantry',   icon: 'archive'       },
+  { route: '/meals',    labelKey: 'nav.meals'    },
+  { route: '/recipes',  labelKey: 'nav.recipes'  },
+  { route: '/shopping', labelKey: 'nav.shopping' },
+  { route: '/pantry',   labelKey: 'nav.pantry'   },
 ].filter(({ route }) => !window.yuvomi?.isModuleDisabled(route.slice(1)));
 
 export function getLastKitchenRoute() {
@@ -283,7 +288,7 @@ export function renderKitchenTabsBar(container, activeRoute) {
     // abschaltbar). Die Leiste wird damit zur Navigation aus echten Links -
     // cmd-Klick öffnet den Vorrat im neuen Tab, wie überall sonst in der Shell.
     semantics: 'nav',
-    tabs: tabs.map(({ route, labelKey, icon }) => ({ id: route, label: t(labelKey), icon })),
+    tabs: tabs.map(({ route, labelKey }) => ({ id: route, label: t(labelKey) })),
     activeId: activeRoute,
     storageKey: KITCHEN_STORAGE_KEY,
     extraClass: 'kitchen-tabs-bar',
