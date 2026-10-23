@@ -23384,6 +23384,27 @@ test('R22-F F2.1: Rueckweg ganz, Wischgeste einmal je Zeile, Spalten-Abfrage nur
     'syncSplitHeight erzwingt mobil ein Layout');
 });
 
+/**
+ * Critique R22-F (F2.2): DIE SPALTEN DES EINKAUFS RECHNEN NUR, WAS IN SICHT
+ * IST. Ab 60rem fehlte die Gruppenregel (geschaetzte Platzhalter liessen
+ * Kategorien die Spalte wechseln) - jede Aenderung legte beide Spalten ganz
+ * neu (Laptop 4x CPU: 26 ms je kleinem Anlass, 35-46 ms je Happen). Jetzt
+ * merkt sich jede Kategorie ihre gezeichnete Hoehe (`auto`), und aufgeschoben
+ * wird erst ab `is-sized`, das shopping.js nach dem ersten Bild setzt.
+ */
+test('R22-F F2.2: Einkaufsspalten schieben erst nach dem ersten Bild auf, mit gemerkter Hoehe', () => {
+  const rules = [...eachRule(read('../public/styles/shopping.css'))];
+  const wide = (r) => r.at.some((at) => at === '@container shopping-surface (min-width: 60rem)');
+  const remember = rules.find((r) => wide(r) && r.selector.trim() === '.shopping-page .items-lanes > .list-group' && /contain-intrinsic-size/.test(r.body));
+  assert.match(remember?.body ?? '', /contain-intrinsic-size:\s*auto none auto \d+px/, 'ohne `auto` gilt der Schaetzwert - Kategorien wechselten die Spalte');
+  assert.doesNotMatch(remember.body, /content-visibility/, 'aufgeschoben vor dem ersten Bild: es gaebe keine gemerkte Hoehe');
+  const lazy = rules.find((r) => wide(r) && /content-visibility:\s*auto/.test(r.body));
+  assert.equal(lazy?.selector.trim(), '.shopping-page .items-lanes.is-sized > .list-group + .list-group');
+  const shop = read('../public/pages/shopping.js');
+  const mount = shop.slice(shop.indexOf('function mountItems('), shop.indexOf('function renderItems('));
+  assert.match(mount, /afterNextPaint\(\)\.then\(\(\) => \{ if \(lanes\?\.isConnected\) lanes\.classList\.add\('is-sized'\); \}\);/,
+    'die Huelle bekommt is-sized nicht nach dem ersten Bild');
+});
 
 /**
  * R21 S8: KEIN `:has()` VOR EINEM UNIVERSALSELEKTOR ODER `::placeholder`.

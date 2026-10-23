@@ -4,7 +4,7 @@
  * Abhängigkeiten: /api.js
  */
 
-import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
+import { beginRowFill, drawRowIcons, flushRowFill, afterNextPaint } from '/utils/row-fill.js';
 import { api } from '/api.js';
 import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
@@ -1401,6 +1401,11 @@ function mountItems(listEl, container) {
   // kann das nicht - mit begrenzter Hoehe liefe Multicol seitlich ueber.
   // Mobil ist sie `display: contents` und aendert nichts.
   listEl.insertAdjacentHTML('beforeend', `<div class="items-lanes">${renderItems(fill.rows)}</div>`);
+  // DIE SPALTEN SCHIEBEN AUF, WAS NICHT IN SICHT IST - erst nachdem jede
+  // Kategorie einmal ganz gelegt ist und sich ihre Hoehe gemerkt hat
+  // (shopping.css, `.items-lanes.is-sized`; Critique R22-F F2.2).
+  const lanes = listEl.querySelector('.items-lanes');
+  afterNextPaint().then(() => { if (lanes?.isConnected) lanes.classList.add('is-sized'); });
   // Nachgekommene Zeilen bekommen Zeichen und Wischgeste wie die ersten.
   fill.start({
     onRows: (rows) => {

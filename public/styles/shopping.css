@@ -758,6 +758,30 @@
     margin-block-end: var(--space-3);
   }
 
+  /* IN DEN SPALTEN RECHNET NUR, WAS IN SICHT IST - MIT DER ECHTEN HOEHE
+   * (Critique R22-F, F2.2). Die Gruppenregel der einen Spalte (oben) fehlt
+   * hier, weil ein geschaetzter Platzhalter Kategorien beim Scrollen die Spalte
+   * wechseln liess. So rechnete jede Aenderung die ganzen Spalten neu: gemessen
+   * am Laptop bei 4x CPU 26 ms je kleinem Anlass, 35-46 ms je Happen beim
+   * Aufbau, 370-400 ms der Wechsel in den Einkauf.
+   *
+   * Jetzt merkt sich jede Kategorie ihre GEZEICHNETE Hoehe (`auto`, die Zahl
+   * dahinter gilt nie: sie ist vor dem Aufschieben schon einmal ganz gelegt),
+   * und aufgeschoben wird erst, wenn die Huelle `is-sized` traegt - shopping.js
+   * setzt das nach dem ersten gezeichneten Bild jedes Aufbaus. Gemessen: Lage
+   * und Spalte jeder Kategorie unveraendert, auch ueber den ganzen Bildlauf,
+   * und 13 statt 26 ms je kleinem Anlass. */
+  .shopping-page .items-lanes > .list-group {
+    contain-intrinsic-size: auto none auto 125px;
+  }
+
+  @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+    .shopping-page .items-lanes.is-sized > .list-group + .list-group {
+      content-visibility: auto;
+      overflow-clip-margin: var(--space-2);
+    }
+  }
+
   /* Die Eingabezeile endet mit der ersten Spalte statt mitten in der zweiten. */
   .shopping-page .quick-add {
     max-width: calc((100% - var(--space-5)) / 2);
