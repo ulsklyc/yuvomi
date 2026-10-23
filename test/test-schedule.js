@@ -1434,6 +1434,11 @@ test('R22 D6: die Seite steht beim Oeffnen auf der laufenden Stunde, der Morgen 
   const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const align = src.slice(src.indexOf('function alignOverviewToNow()'), src.indexOf('function openOverviewPeople()'));
   assert.match(align, /alignedHourScroll\(\{ hour: nowFields\(\)\.hour,/, 'gerechnet mit der Uhr des Haushalts');
+  // R22-Sichtpruefung, im Browser gemessen (390x844): heute lag rechts
+  // ausserhalb (scrollLeft 0, x 560), die laufende Stunde hinter der Tab-Leiste.
+  assert.match(align, /\.schedule-overview__day\[data-date="\$\{todayKey\(\)\}"\]/, 'waagerecht auf heute');
+  assert.match(align, /scroller\.scrollLeft = /, 'das Raster rollt auf heute');
+  assert.match(align, /scrollPaddingBottom/, 'die Tab-Leiste zaehlt nicht als sichtbar');
   assert.match(src, /if \(view === 'overview'\) \{\n    if \(step === null\) overviewAlignPending = true;/, 'beim Oeffnen, nicht beim Blaettern');
 });
 

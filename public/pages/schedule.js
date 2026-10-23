@@ -2108,7 +2108,9 @@ function alignOverviewToNow() {
   if (!port || !grid || !dock || !axis) return;
   const hourHeight = axis.getBoundingClientRect().height / 24;
   const stuck = (parseFloat(section.style.getPropertyValue('--schedule-dock-top')) || 0) + dock.offsetHeight;
-  const visible = port.clientHeight - stuck;
+  // Unten zieht die Tab-Leiste ab (mobil 80px, als scroll-padding des Ports):
+  // sonst stand die laufende Stunde "ganz im Bild" hinter ihr.
+  const visible = port.clientHeight - stuck - (parseFloat(getComputedStyle(port).scrollPaddingBottom) || 0);
   // Der Morgen beginnt mit der ersten Schicht, wenn sie frueher liegt als
   // 07:00 (eine Fortsetzung von gestern zaehlt nicht - sie beginnt um 00:00).
   const starts = [...section.querySelectorAll('.schedule-overview__block[data-start]')].map((el) => Number(el.dataset.start));
@@ -2116,6 +2118,19 @@ function alignOverviewToNow() {
   const offset = alignedHourScroll({ hour: nowFields().hour, hourHeight, max: 24 * hourHeight - visible, visible, morning });
   const gridTop = grid.getBoundingClientRect().top - port.getBoundingClientRect().top + port.scrollTop;
   port.scrollTop = Math.max(0, Math.round(gridTop + offset - stuck));
+  // Und waagerecht auf heute (R22-Sichtpruefung): mobil passen keine sieben
+  // Tage ins Bild, die Woche stand auf Montag und heute lag rechts ausserhalb.
+  // Heute steht gleich hinter der klebenden Stundenachse; Kopfzeile und Raster
+  // rollen gemeinsam (wireOverviewScroll), der Kopf wird hier gleich mitgesetzt.
+  const scroller = section.querySelector('.schedule-overview__scroll');
+  const head = section.querySelector('.schedule-overview__head');
+  const todayColumn = grid.querySelector(`.schedule-overview__day[data-date="${todayKey()}"]`);
+  if (scroller && todayColumn && scroller.scrollWidth > scroller.clientWidth) {
+    const left = todayColumn.getBoundingClientRect().left - scroller.getBoundingClientRect().left
+      + scroller.scrollLeft - axis.getBoundingClientRect().width;
+    scroller.scrollLeft = Math.max(0, Math.round(left));
+    if (head) head.scrollLeft = scroller.scrollLeft;
+  }
 }
 
 function openOverviewPeople() {
