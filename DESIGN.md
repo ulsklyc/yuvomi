@@ -14,6 +14,11 @@ colors:
   surface-elevated: "#FBFAF7"
   surface-elevated-hover: "#EDEAE3"
   bg-dark: "#191816"
+  # Dark-Gegenstuecke von Kante und Sekundaertext (tokens.css, Dark-Block):
+  # stehen hier, weil die Offline-Seite (public/offline.html) sie als Literal
+  # spiegelt - sie laedt kein tokens.css (R22, Detektor-Rest).
+  border-dark: "#47423B"
+  text-secondary-dark: "#B4AEA5"
   label: "#1D1B17"
   text-secondary: "#63615B"
   text-tertiary: "#6B675F"

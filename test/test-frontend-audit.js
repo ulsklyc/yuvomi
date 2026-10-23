@@ -15812,6 +15812,27 @@ test('the status bar colour is the page background, in both themes', () => {
 });
 
 /**
+ * Die Offline-Seite spricht nur Farben, die DESIGN.md kennt.
+ *
+ * `offline.html` laedt kein tokens.css (der Service Worker liefert sie ohne
+ * Netz aus) und spiegelt deshalb ihre Token als Literale. Der Detektor liest die
+ * Palette aus dem `colors:`-Kopf von DESIGN.md; fehlte dort ein Dark-Wert, meldete
+ * er ihn bei jedem Lauf als Drift (R22: #47423B, #B4AEA5). Geprueft werden die
+ * Deklarationen, nicht die Kommentare - dort stehen bewusst die alten Werte.
+ */
+test('offline.html declares only colours named in the DESIGN.md palette', () => {
+  const design = read('../DESIGN.md');
+  const head = design.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
+  const palette = new Set([...head.matchAll(/^\s+[\w-]+:\s*"(#[0-9A-Fa-f]{6})"/gm)].map((m) => m[1].toUpperCase()));
+  assert.ok(palette.size > 20, `der colors:-Kopf von DESIGN.md liess sich nicht lesen (${palette.size} Werte)`);
+  const offline = withoutBlockComments(read('../public/offline.html'));
+  const declared = [...offline.matchAll(/--[\w-]+\s*:\s*(#[0-9A-Fa-f]{6})\s*;/g)].map((m) => m[1].toUpperCase());
+  assert.ok(declared.length >= 10, `offline.html: erwartet die gespiegelten Token, gefunden ${declared.length}`);
+  const missing = [...new Set(declared.filter((hex) => !palette.has(hex)))];
+  assert.deepEqual(missing, [], `offline.html deklariert Farben ausserhalb des DESIGN.md-Kopfs: ${missing.join(', ')}`);
+});
+
+/**
  * Ein Zeilenkoerper, der den ganzen Zeileninhalt umschliesst, traegt kein
  * aria-label.
  *
