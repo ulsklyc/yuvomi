@@ -1312,6 +1312,8 @@
         "showBirthday": "Megjelenítés a születésnapoknál",
         "addToBirthdays": "Hozzáadás a születésnapokhoz",
         "addedToBirthdays": "Hozzáadva a születésnapokhoz.",
+        "birthdaySuggestValue": "Egy születésnap ugyanezt a nevet viseli, de nincs összekapcsolva.",
+        "linkedToBirthday": "Összekapcsolva a születésnappal.",
         "birthdayHint": "A születésnap-importtal a naptárban is megjelenik.",
         "phonePlaceholder": "+36 …",
         "phonePreview": "Előnézet: {{value}}",

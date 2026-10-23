@@ -1312,6 +1312,8 @@
         "showBirthday": "Afficher dans les anniversaires",
         "addToBirthdays": "Ajouter aux anniversaires",
         "addedToBirthdays": "Ajouté aux anniversaires.",
+        "birthdaySuggestValue": "Un anniversaire porte le même nom, mais n’est pas lié.",
+        "linkedToBirthday": "Lié à l’anniversaire.",
         "birthdayHint": "Apparaît aussi dans le calendrier via l'import des anniversaires.",
         "phonePlaceholder": "+33 …",
         "phonePreview": "Aperçu : {{value}}",

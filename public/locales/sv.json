@@ -1312,6 +1312,8 @@
         "showBirthday": "Visa i födelsedagar",
         "addToBirthdays": "Lägg till i födelsedagar",
         "addedToBirthdays": "Tillagd i födelsedagar.",
+        "birthdaySuggestValue": "En födelsedag har samma namn men är inte kopplad.",
+        "linkedToBirthday": "Kopplad till födelsedagen.",
         "birthdayHint": "Visas också i kalendern via födelsedagsimporten.",
         "phonePlaceholder": "+46 …",
         "phonePreview": "Förhandsvisning: {{value}}",

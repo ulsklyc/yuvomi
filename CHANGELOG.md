@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   if it had been imported from it, so an entry typed in by hand stayed alone even when the same
   person was in Contacts. The birthday dialog now has "Link to contact" under "More details", and
   a birthday whose name matches exactly one unlinked contact shows a quiet "Link" in its detail.
+  The contact shows the same hint the other way round, for exactly one unlinked birthday of its
+  name, and then offers no "Add to birthdays" that would create a second entry for the same
+  person. Names match regardless of case, also when they start with an umlaut or accent.
   Linked, both sides lead to each other; a contact without its own date shows the birthday's date.
   The date itself is not copied or kept in step. In the API, `POST` and `PUT /birthdays` take
-  `contact_id`; a contact that already belongs to another birthday is refused with 409.
+  `contact_id`; a contact that already belongs to another birthday is refused with 409, and
+  `GET /contacts/:id` carries `suggested_birthday_id`.
 - **Traditional Chinese as the 27th language** (#2172, from #1670, translated by @TW199501). The
   app, the web installer and the command-line installer speak Traditional Chinese (`zh-Hant`),
   written in Taiwan usage, next to the existing Simplified `zh`. A browser or shell from Taiwan,

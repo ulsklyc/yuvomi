@@ -1312,6 +1312,8 @@
         "showBirthday": "Tonen bij verjaardagen",
         "addToBirthdays": "Toevoegen aan verjaardagen",
         "addedToBirthdays": "Toegevoegd aan verjaardagen.",
+        "birthdaySuggestValue": "Een verjaardag heeft dezelfde naam, maar is niet gekoppeld.",
+        "linkedToBirthday": "Gekoppeld aan de verjaardag.",
         "birthdayHint": "Verschijnt via de verjaardagsimport ook in de kalender.",
         "phonePlaceholder": "+31 …",
         "phonePreview": "Voorbeeld: {{value}}",

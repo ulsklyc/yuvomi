@@ -522,6 +522,82 @@ test('#2149: unverknuepft bietet die Geburtstagszeile "Zu Geburtstagen hinzufueg
   }
 });
 
+/* R22 D7: DER HINWEIS "HEISST GENAUSO" AUCH IM KONTAKT. Der Geburtstag zeigte
+ * ihn (birthdays.js, contactSuggestionRow), der Kontakt nicht. Jetzt traegt
+ * der Kontakt `suggested_birthday_id` (routes/contacts.js), und die Ansicht
+ * zeigt dieselbe ruhige Zeile mit "Verknuepfen" - nur mit Schreibrecht auf
+ * Geburtstage, und dann ohne "Hinzufuegen" an der Datumszeile: das legte
+ * einen zweiten Geburtstag fuer denselben Menschen an. */
+test('R22 D7: gleichnamiger Geburtstag - der Kontakt zeigt den Hinweis mit "Verknuepfen"', async () => {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const SAME = { id: 9, name: 'Tante', birthday: '1970-05-04', birthday_year_unknown: 0, birthday_id: null, suggested_birthday_id: 31 };
+  const hintOf = (c) => contacts.renderContactDetail(c).find((r) => r?.action?.id === 'contact-detail-birthday-link') ?? null;
+  const yuvomi = globalThis.window.yuvomi;
+  const savedDisabled = yuvomi.isModuleDisabled;
+  try {
+    setPermissions({ admin: false, modules: { calendar: 'write', contacts: 'read' }, widgets: {}, capabilities: {} });
+    const hint = hintOf(SAME);
+    assert.ok(hint, 'die Zeile steht da');
+    assert.equal(hint.value, 'contacts.birthdaySuggestValue');
+    assert.equal(hint.action.label, 'birthdays.linkContact', 'dasselbe Wort wie auf der Geburtstagsseite');
+    assert.equal(hint.action.icon, 'link');
+    const dateRow = contacts.renderContactDetail(SAME).find((r) => r?.icon === 'cake' && r.label === 'contacts.birthdayLabel');
+    assert.equal(dateRow?.action ?? null, null, 'kein "Hinzufuegen" neben dem Hinweis - es legte einen zweiten Geburtstag an');
+    assert.ok(hintOf({ ...SAME, birthday: null }), 'auch ohne eigenes Datum');
+    assert.equal(hintOf({ ...SAME, suggested_birthday_id: undefined }), null, 'ohne Vorschlag keine Zeile');
+    assert.equal(hintOf({ ...SAME, birthday_id: 31 }), null, 'verknuepft keine Zeile');
+
+    setPermissions({ admin: false, modules: { calendar: 'read' }, widgets: {}, capabilities: {} });
+    assert.equal(hintOf(SAME), null, 'calendar: read - nichts zu tun, also keine Zeile');
+    setPermissions({ admin: false, modules: { calendar: 'write' }, widgets: {}, capabilities: {} });
+    yuvomi.isModuleDisabled = (key) => key === 'birthdays';
+    assert.equal(hintOf(SAME), null, 'haushaltweit abgeschaltet');
+  } finally {
+    clearPermissions();
+    if (savedDisabled === undefined) delete yuvomi.isModuleDisabled;
+    else yuvomi.isModuleDisabled = savedDisabled;
+  }
+});
+
+test('R22 D7: Verknuepfen schreibt den Geburtstag und liest den Kontakt neu', async () => {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const yuvomi = globalThis.window.yuvomi;
+  const savedToast = yuvomi.showToast;
+  const calls = [];
+  const toasts = [];
+  yuvomi.showToast = (message, type) => toasts.push({ message, type });
+  let linked = 31;
+  globalThis.__apiStub = {
+    put: (path, body) => { calls.push(['PUT', path, body]); return { data: { id: 31, contact_id: 9 } }; },
+    get: (path) => { calls.push(['GET', path]); return { data: { id: 9, name: 'Tante', birthday_id: linked } }; },
+  };
+  contacts.state.contacts = [{ id: 9, name: 'Tante', birthday_id: null }];
+  setPermissions({ admin: false, modules: { calendar: 'write', contacts: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    const seen = [];
+    const button = { disabled: false, isConnected: true };
+    const loaded = await contacts.linkContactToBirthday({ id: 9, name: 'Tante' }, 31, { button, onLinked: (c) => seen.push(c) });
+    assert.deepEqual(calls[0], ['PUT', '/birthdays/31', { contact_id: 9 }], 'der Geburtstag bekommt den Kontakt');
+    assert.deepEqual(calls[1], ['GET', '/contacts/9']);
+    assert.equal(loaded?.birthday_id, 31);
+    assert.equal(seen[0]?.birthday_id, 31, 'die Ansicht zeichnet mit Verknuepfung neu');
+    assert.equal(contacts.state.contacts[0].birthday_id, 31);
+    assert.deepEqual(toasts.at(-1), { message: 'contacts.linkedToBirthday', type: 'success' });
+
+    linked = null;
+    const again = await contacts.linkContactToBirthday({ id: 9, name: 'Tante' }, 31, { button });
+    assert.equal(again, null);
+    assert.equal(toasts.at(-1)?.type, 'danger');
+    assert.equal(button.disabled, false);
+  } finally {
+    clearPermissions();
+    delete globalThis.__apiStub;
+    contacts.state.contacts = [];
+    if (savedToast === undefined) delete yuvomi.showToast;
+    else yuvomi.showToast = savedToast;
+  }
+});
+
 test('#2149: Hinzufuegen ruft den Import mit genau diesem Kontakt und liest die Verknuepfung neu', async () => {
   const yuvomi = globalThis.window.yuvomi;
   const savedToast = yuvomi.showToast;

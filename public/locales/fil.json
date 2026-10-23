@@ -1331,6 +1331,8 @@
         "showBirthday": "Ipakita sa mga kaarawan",
         "addToBirthdays": "Idagdag sa mga kaarawan",
         "addedToBirthdays": "Naidagdag sa mga kaarawan.",
+        "birthdaySuggestValue": "May kaarawan na kapareho ng pangalan pero hindi naka-link.",
+        "linkedToBirthday": "Na-link sa kaarawan.",
         "birthdayHint": "Lumalabas din sa kalendaryo sa pamamagitan ng pag-import ng kaarawan.",
         "phonePlaceholder": "+63 …",
         "phonePreview": "Preview: {{value}}",

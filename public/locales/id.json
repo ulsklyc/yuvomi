@@ -1331,6 +1331,8 @@
         "showBirthday": "Tampilkan di ulang tahun",
         "addToBirthdays": "Tambahkan ke ulang tahun",
         "addedToBirthdays": "Ditambahkan ke ulang tahun.",
+        "birthdaySuggestValue": "Ada ulang tahun dengan nama yang sama, tetapi belum ditautkan.",
+        "linkedToBirthday": "Ditautkan ke ulang tahun.",
         "birthdayHint": "Juga muncul di kalender lewat impor ulang tahun.",
         "phonePlaceholder": "+62 …",
         "phonePreview": "Pratinjau: {{value}}",

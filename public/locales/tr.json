@@ -1312,6 +1312,8 @@
         "showBirthday": "Doğum günlerinde göster",
         "addToBirthdays": "Doğum günlerine ekle",
         "addedToBirthdays": "Doğum günlerine eklendi.",
+        "birthdaySuggestValue": "Aynı ada sahip bir doğum günü var ama bağlı değil.",
+        "linkedToBirthday": "Doğum gününe bağlandı.",
         "birthdayHint": "Doğum günü içe aktarımıyla takvimde de görünür.",
         "phonePlaceholder": "+90 …",
         "phonePreview": "Önizleme: {{value}}",

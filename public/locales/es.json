@@ -1312,6 +1312,8 @@
         "showBirthday": "Ver en cumpleaños",
         "addToBirthdays": "Añadir a cumpleaños",
         "addedToBirthdays": "Añadido a cumpleaños.",
+        "birthdaySuggestValue": "Un cumpleaños tiene el mismo nombre, pero no está vinculado.",
+        "linkedToBirthday": "Vinculado al cumpleaños.",
         "birthdayHint": "También aparece en el calendario mediante la importación de cumpleaños.",
         "phonePlaceholder": "+34 …",
         "phonePreview": "Vista previa: {{value}}",

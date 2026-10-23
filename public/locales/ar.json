@@ -1535,6 +1535,8 @@
         "showBirthday": "عرض في أعياد الميلاد",
         "addToBirthdays": "إضافة إلى أعياد الميلاد",
         "addedToBirthdays": "تمت الإضافة إلى أعياد الميلاد.",
+        "birthdaySuggestValue": "يوجد عيد ميلاد بالاسم نفسه لكنه غير مرتبط.",
+        "linkedToBirthday": "تم الربط بعيد الميلاد.",
         "birthdayHint": "يظهر أيضًا في التقويم عبر استيراد أعياد الميلاد.",
         "phonePlaceholder": "+966 …",
         "phonePreview": "معاينة: {{value}}",

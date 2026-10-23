@@ -1312,6 +1312,8 @@
         "showBirthday": "Vis i bursdager",
         "addToBirthdays": "Legg til i bursdager",
         "addedToBirthdays": "Lagt til i bursdager.",
+        "birthdaySuggestValue": "En bursdag har samme navn, men er ikke koblet.",
+        "linkedToBirthday": "Koblet til bursdagen.",
         "birthdayHint": "vises også i kalenderen via bursdagsimport.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Forhåndsvisning: {{value}}",

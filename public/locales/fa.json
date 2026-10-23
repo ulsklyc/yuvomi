@@ -1331,6 +1331,8 @@
         "showBirthday": "نمایش در تولدها",
         "addToBirthdays": "افزودن به تولدها",
         "addedToBirthdays": "به تولدها افزوده شد.",
+        "birthdaySuggestValue": "تولدی با همین نام هست، اما پیوند ندارد.",
+        "linkedToBirthday": "به تولد پیوند داده شد.",
         "birthdayHint": "از طریق واردکردن تولدها در تقویم هم نمایش داده می‌شود.",
         "phonePlaceholder": "+98 …",
         "phonePreview": "پیش‌نمایش: {{value}}",

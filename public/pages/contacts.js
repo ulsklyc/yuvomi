@@ -1115,6 +1115,7 @@ function renderContactDetail(contact, { onBirthdayLinked = null } = {}) {
       // Folgeaktion, siehe birthdayRowAction().
       action: birthdayRowAction(contact, onBirthdayLinked),
     },
+    birthdaySuggestionRow(contact, onBirthdayLinked),
     {
       icon: 'globe',
       label: t('contacts.websiteLabel'),
@@ -2110,13 +2111,74 @@ function birthdayRowAction(contact, onLinked = null) {
       onClick: () => leaveDetailTo(birthdayHref(contact.birthday_id)),
     } : null;
   }
-  if (!contact.birthday || !mayOpenBirthdayImport()) return null;
+  // Heisst schon ein Geburtstag so (Hinweis unten), legte "Hinzufuegen" einen
+  // zweiten fuer denselben Menschen an - dann ist "Verknuepfen" der Weg.
+  if (!contact.birthday || contact.suggested_birthday_id || !mayOpenBirthdayImport()) return null;
   return {
     id: 'contact-detail-birthday-add',
     label: t('contacts.addToBirthdays'),
     icon: 'calendar-plus',
     onClick: ({ button } = {}) => addContactToBirthdays(contact, { button, onLinked }),
   };
+}
+
+/**
+ * Der ruhige Hinweis auch im Kontakt (Critique R22, D7): der Geburtstag zeigt
+ * "Ein Kontakt heisst genauso" (birthdays.js, contactSuggestionRow), und
+ * dasselbe Paar steht jetzt auch hier - `suggested_birthday_id` liefert der
+ * Server nur mit Kalender-Leserecht und nur fuer genau einen unverknuepften
+ * Geburtstag dieses Namens. Eine Zeile wie jede andere der Ansicht, mit
+ * "Verknuepfen" als Folgeaktion (dieselben Worte wie dort). Ohne das Recht,
+ * den Geburtstag zu schreiben, gibt es nichts zu tun, also auch keine Zeile.
+ *
+ * @param {object} contact
+ * @param {((loaded: object) => void)|null} onLinked
+ */
+function birthdaySuggestionRow(contact, onLinked = null) {
+  if (!contact.suggested_birthday_id || contact.birthday_id || !mayLinkBirthday()) return null;
+  return {
+    icon: 'cake',
+    label: t('nav.birthdays'),
+    value: t('contacts.birthdaySuggestValue'),
+    action: {
+      id: 'contact-detail-birthday-link',
+      label: t('birthdays.linkContact'),
+      icon: 'link',
+      onClick: ({ button } = {}) => linkContactToBirthday(contact, contact.suggested_birthday_id, { button, onLinked }),
+    },
+  };
+}
+
+/** Darf der Hinweis verknuepfen? `PUT /birthdays/:id` gehoert `calendar`. */
+function mayLinkBirthday() {
+  return !globalThis.window?.yuvomi?.isModuleDisabled?.('birthdays') && mayWritePath('/birthdays');
+}
+
+/**
+ * Verknuepft den gleichnamigen Geburtstag mit diesem Kontakt und laedt den
+ * Kontakt neu - danach traegt die Geburtstagszeile "In Geburtstagen anzeigen"
+ * (samt Datum des Eintrags, wo der Kontakt keins hat), und der Hinweis ist weg.
+ * Wie beim Anlegen zaehlt der neu gelesene Kontakt, nicht die Antwort.
+ *
+ * @returns {Promise<object|null>} der neu geladene Kontakt, oder null
+ */
+async function linkContactToBirthday(contact, birthdayId, { button = null, onLinked = null } = {}) {
+  if (!mayLinkBirthday()) return null;
+  if (button) button.disabled = true;
+  try {
+    await api.put(`/birthdays/${birthdayId}`, { contact_id: contact.id });
+    const loaded = (await api.get(`/contacts/${contact.id}`)).data;
+    if (!loaded?.birthday_id) throw new Error('birthday not linked');
+    const i = state.contacts.findIndex((c) => c.id === contact.id);
+    if (i !== -1) state.contacts[i] = { ...state.contacts[i], birthday_id: loaded.birthday_id };
+    window.yuvomi?.showToast(t('contacts.linkedToBirthday'), 'success');
+    onLinked?.(loaded);
+    return loaded;
+  } catch (err) {
+    if (button?.isConnected) button.disabled = false;
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+    return null;
+  }
 }
 
 /**
@@ -2295,6 +2357,8 @@ export const __test = {
   birthdayHref,
   // #2149: unverknuepft legt dieselbe Zeile den Geburtstag an.
   addContactToBirthdays,
+  // R22 D7: der Hinweis "Ein Geburtstag heisst genauso" und sein Verknuepfen.
+  linkContactToBirthday,
   // Der Import-Toast und sein Sprung (#1348): die Aussage ist ein Aufruf von
   // `showToast` und ein Flag in der sessionStorage, kein Markup.
   showImportResult, openBirthdayImport,

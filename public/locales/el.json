@@ -1312,6 +1312,8 @@
         "showBirthday": "Εμφάνιση στα γενέθλια",
         "addToBirthdays": "Προσθήκη στα γενέθλια",
         "addedToBirthdays": "Προστέθηκε στα γενέθλια.",
+        "birthdaySuggestValue": "Ένα γενέθλιο έχει το ίδιο όνομα, αλλά δεν είναι συνδεδεμένο.",
+        "linkedToBirthday": "Συνδέθηκε με τα γενέθλια.",
         "birthdayHint": "Εμφανίζεται και στο ημερολόγιο μέσω της εισαγωγής γενεθλίων.",
         "phonePlaceholder": "+30 …",
         "phonePreview": "Προεπισκόπηση: {{value}}",

@@ -1312,6 +1312,8 @@
         "showBirthday": "Mostra nei compleanni",
         "addToBirthdays": "Aggiungi ai compleanni",
         "addedToBirthdays": "Aggiunto ai compleanni.",
+        "birthdaySuggestValue": "Un compleanno ha lo stesso nome, ma non è collegato.",
+        "linkedToBirthday": "Collegato al compleanno.",
         "birthdayHint": "Compare anche nel calendario tramite l’importazione dei compleanni.",
         "phonePlaceholder": "+39 …",
         "phonePreview": "Anteprima: {{value}}",

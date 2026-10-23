@@ -1312,6 +1312,8 @@
         "showBirthday": "Show in birthdays",
         "addToBirthdays": "Add to birthdays",
         "addedToBirthdays": "Added to birthdays.",
+        "birthdaySuggestValue": "A birthday has the same name but is not linked.",
+        "linkedToBirthday": "Linked to the birthday.",
         "birthdayHint": "Also appears in the calendar via the birthday import.",
         "phonePlaceholder": "+1 …",
         "phonePreview": "Preview: {{value}}",

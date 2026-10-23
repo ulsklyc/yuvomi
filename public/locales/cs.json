@@ -1386,6 +1386,8 @@
         "showBirthday": "Zobrazit v narozeninách",
         "addToBirthdays": "Přidat do narozenin",
         "addedToBirthdays": "Přidáno do narozenin.",
+        "birthdaySuggestValue": "Narozeniny se stejným jménem nejsou propojené.",
+        "linkedToBirthday": "Propojeno s narozeninami.",
         "birthdayHint": "Přes import narozenin se zobrazí i v kalendáři.",
         "phonePlaceholder": "+420 …",
         "phonePreview": "Náhled: {{value}}",

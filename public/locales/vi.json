@@ -1312,6 +1312,8 @@
         "showBirthday": "Xem trong sinh nhật",
         "addToBirthdays": "Thêm vào sinh nhật",
         "addedToBirthdays": "Đã thêm vào sinh nhật.",
+        "birthdaySuggestValue": "Có một sinh nhật trùng tên nhưng chưa được liên kết.",
+        "linkedToBirthday": "Đã liên kết với sinh nhật.",
         "birthdayHint": "Cũng xuất hiện trong lịch qua tính năng nhập sinh nhật.",
         "phonePlaceholder": "+84 …",
         "phonePreview": "Xem trước: {{value}}",

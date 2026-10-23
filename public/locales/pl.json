@@ -1479,6 +1479,8 @@
         "showBirthday": "Pokaż w urodzinach",
         "addToBirthdays": "Dodaj do urodzin",
         "addedToBirthdays": "Dodano do urodzin.",
+        "birthdaySuggestValue": "Urodziny o tej samej nazwie nie są połączone.",
+        "linkedToBirthday": "Połączono z urodzinami.",
         "birthdayHint": "Dzięki importowi urodzin pojawia się też w kalendarzu.",
         "phonePlaceholder": "+48 …",
         "phonePreview": "Podgląd: {{value}}",

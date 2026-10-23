@@ -1312,6 +1312,8 @@
         "showBirthday": "जन्मदिनों में दिखाएँ",
         "addToBirthdays": "जन्मदिनों में जोड़ें",
         "addedToBirthdays": "जन्मदिनों में जोड़ा गया।",
+        "birthdaySuggestValue": "इसी नाम का एक जन्मदिन है, पर जुड़ा नहीं है।",
+        "linkedToBirthday": "जन्मदिन से जोड़ दिया गया।",
         "birthdayHint": "जन्मदिन आयात के ज़रिए कैलेंडर में भी दिखता है।",
         "phonePlaceholder": "+91 …",
         "phonePreview": "पूर्वावलोकन: {{value}}",

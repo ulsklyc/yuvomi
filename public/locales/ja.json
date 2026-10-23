@@ -1312,6 +1312,8 @@
         "showBirthday": "誕生日で表示",
         "addToBirthdays": "誕生日に追加",
         "addedToBirthdays": "誕生日に追加しました。",
+        "birthdaySuggestValue": "同じ名前の誕生日がありますが、リンクされていません。",
+        "linkedToBirthday": "誕生日とリンクしました。",
         "birthdayHint": "誕生日のインポートでカレンダーにも表示されます。",
         "phonePlaceholder": "+81 …",
         "phonePreview": "プレビュー: {{value}}",

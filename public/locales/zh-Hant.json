@@ -1312,6 +1312,8 @@
         "showBirthday": "在生日中檢視",
         "addToBirthdays": "新增到生日",
         "addedToBirthdays": "已新增到生日。",
+        "birthdaySuggestValue": "有一個同名生日，但尚未連結。",
+        "linkedToBirthday": "已連結到生日。",
         "birthdayHint": "透過生日匯入也會顯示在日曆中。",
         "phonePlaceholder": "+86 …",
         "phonePreview": "預覽：{{value}}",

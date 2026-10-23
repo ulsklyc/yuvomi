@@ -1331,6 +1331,8 @@
         "showBirthday": "In Geburtstagen anzeigen",
         "addToBirthdays": "Zu Geburtstagen hinzufügen",
         "addedToBirthdays": "Zu Geburtstagen hinzugefügt.",
+        "birthdaySuggestValue": "Ein Geburtstag heißt genauso, ist aber nicht verknüpft.",
+        "linkedToBirthday": "Mit dem Geburtstag verknüpft.",
         "birthdayHint": "Erscheint über den Geburtstags-Import auch im Kalender.",
         "phonePlaceholder": "+49 …",
         "phonePreview": "Vorschau: {{value}}",
