@@ -813,14 +813,17 @@
    * „Kalender" als Caption ueber dem Zeitraum, in derselben Zeile; der Stepper
    * behaelt dabei seine 48px (vorher 48 -> 24px beim Andocken, die Zeile
    * sprang: Agenda-Scroll-CLS 0,006-0,012). */
+  /* Zwei Zeilen im Stepper per Umbruch, nicht per Richtung: die Richtung im
+   * Kopf gehoert der Shell (test-frontend-audit, "der Modulkopf gehoert der
+   * Shell"). Der Ort nimmt die ganze erste Zeile, der Zeitraum steht darunter. */
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
+    flex-wrap: wrap;
+    align-content: center;
   }
 
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__place {
     display: block;
+    flex: 0 0 100%;
     max-inline-size: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -832,8 +835,8 @@
   }
 
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .cal-toolbar__label {
-    flex: 0 0 auto;
-    max-inline-size: 100%;
+    flex: 0 1 auto;
+    text-align: start;
   }
 
   .page-toolbar--period-title.cal-toolbar.page-toolbar--capped.is-collapsed .cal-toolbar__stepper > .period-stepper__prev[data-collapse-fold],
