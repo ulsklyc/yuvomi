@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "जन्मदिन का दिन",
         "yearlessMonthPlaceholder": "महीना",
         "yearlessDayPlaceholder": "दिन",
-        "yearlessIncomplete": "जन्मदिन का महीना और दिन दोनों चुनें।"
+        "yearlessIncomplete": "जन्मदिन का महीना और दिन दोनों चुनें।",
+        "nextBirthdayOn": "अगला जन्मदिन {{date}} को",
+        "contactLinkLabel": "संपर्क से जोड़ें",
+        "contactLinkNone": "कोई नहीं",
+        "contactLinkHint": "तब दोनों प्रविष्टियाँ एक-दूसरे तक ले जाती हैं। तारीख अलग रहती है।",
+        "contactSuggestLabel": "संपर्क",
+        "contactSuggestValue": "इसी नाम का एक संपर्क है, पर जुड़ा नहीं है।",
+        "linkContact": "जोड़ें",
+        "linkedToast": "संपर्क से जोड़ दिया गया।",
+        "errorContactLinked": "यह संपर्क पहले से किसी दूसरे जन्मदिन से जुड़ा है।"
     },
     "reminders": {
         "sectionTitle": "अनुस्मारक",

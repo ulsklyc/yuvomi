@@ -103,7 +103,7 @@ export function birthdaysPaths() {
 // englischen `error` - je Operation der Satz, der sie nennt.
 const BIRTHDAY_GONE = '`birthdays_birthday_not_found` (404, the birthday does not exist - deleted)';
 // D7 (Critique R22): POST und PUT verknuepfen per `contact_id`.
-const CONTACT_LINK = '`birthdays_contact_linked` (409, the contact is already linked to another birthday), `birthdays_contact_not_found` (400, no such contact)';
+const CONTACT_LINK = '`birthdays_contact_linked` (409, the contact is already linked to another birthday), `birthdays_selected_contact_not_found` (400, no such contact)';
 const CASE_REASONS = {
   '/api/v1/birthdays': { post: CONTACT_LINK },
   '/api/v1/birthdays/{id}': { put: `${BIRTHDAY_GONE}, ${CONTACT_LINK}`, delete: BIRTHDAY_GONE },

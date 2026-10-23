@@ -3534,7 +3534,16 @@
         "yearlessDayLabel": "Birthday day",
         "yearlessMonthPlaceholder": "Month",
         "yearlessDayPlaceholder": "Day",
-        "yearlessIncomplete": "Select both the month and day of the birthday."
+        "yearlessIncomplete": "Select both the month and day of the birthday.",
+        "nextBirthdayOn": "Next birthday on {{date}}",
+        "contactLinkLabel": "Link to contact",
+        "contactLinkNone": "None",
+        "contactLinkHint": "Both entries then lead to each other. The date stays separate.",
+        "contactSuggestLabel": "Contact",
+        "contactSuggestValue": "A contact has the same name but is not linked.",
+        "linkContact": "Link",
+        "linkedToast": "Linked to the contact.",
+        "errorContactLinked": "This contact is already linked to another birthday."
     },
     "recipes": {
         "mealTypeNone": "No meal",

@@ -263,6 +263,9 @@ const SERVER_REASONS = [
   'inventory_location_exists', 'inventory_location_not_found', 'inventory_category_not_found',
   'notes_note_not_found', 'notes_selected_category_not_found',
   'contacts_contact_not_found', 'contacts_selected_category_not_found', 'birthdays_birthday_not_found',
+  // Verknuepfen im Geburtstag-Dialog (R22, D7); die echte Antwort misst
+  // test:birthday-import-rights.
+  'birthdays_contact_linked', 'birthdays_selected_contact_not_found',
   // Das abgewiesene Feld (#1909, vor allem der vCard-Import); die echte Antwort
   // misst test:contacts-routes.
   'contacts_name_too_long', 'contacts_phone_too_long', 'contacts_email_too_long',
@@ -886,4 +889,88 @@ test('#1997: Erfolg nach Dialogwechsel - Inventar, Kontakte und Geburtstage schl
       delete globalThis.__modalContextId;
     }
   }
+});
+
+
+// ---------------------------------------------------------------------------
+// R22, D7: Geburtstag und Kontakt verknuepfen - der Dialog und der Hinweis
+// ---------------------------------------------------------------------------
+
+/** Der Geburtstag-Dialog, gespeichert mit einer Kontaktwahl; liefert den PUT-Rumpf. */
+async function speichereMitKontakt(birthday, { wahl, kandidaten = [], put } = {}) {
+  const panel = formular({ '#bd-name': birthday.name, '#bd-birth-date': birthday.birth_date, '#bd-contact': birthday.contact_id ? String(birthday.contact_id) : '' });
+  const bodies = [];
+  const lauf = await mit({
+    put: put ?? (async (_path, body) => { bodies.push(body); return { data: birthday }; }),
+    get: (path) => (path === '/birthdays/import/candidates'
+      ? { data: { withBirthday: [], withoutBirthday: kandidaten } }
+      : { data: [birthday] }),
+  }, async () => {
+    await oeffne(panel, () => birthdays.openBirthdayModal({ mode: 'edit', birthday }));
+    if (wahl !== undefined) panel.querySelector('#bd-contact').value = wahl;
+    await panel.querySelector('#bd-save').handlers.click();
+  });
+  return { ...lauf, bodies, select: panel.querySelector('#bd-contact') };
+}
+
+test('D7 Dialog: die Kontaktwahl geht nur geaendert mit - als Zahl, "Keiner" als null', async () => {
+  await mitGeburtstagen(async () => {
+    const frei = { id: 5, name: 'Ada', birth_date: '1990-01-01', contact_id: null };
+    const kandidaten = [{ id: 12, name: 'Ada', already_imported: false }];
+    const gewaehlt = await speichereMitKontakt(frei, { wahl: '12', kandidaten });
+    assert.equal(gewaehlt.bodies[0].contact_id, 12, 'die Wahl geht als Zahl');
+    const unberuehrt = await speichereMitKontakt(frei, { kandidaten });
+    assert.equal('contact_id' in unberuehrt.bodies[0], false, 'nur oeffnen und speichern schreibt keine Verknuepfung');
+    const verknuepft = { ...frei, contact_id: 4, contact_name: 'Ada K.' };
+    const geloest = await speichereMitKontakt(verknuepft, { wahl: '', kandidaten });
+    assert.equal(geloest.bodies[0].contact_id, null, '"Keiner" loest die Verknuepfung');
+  });
+});
+
+test('D7 Dialog: ein vergebener oder verschwundener Kontakt laesst den Dialog offen und laedt die Auswahl neu', async () => {
+  for (const [reason, satz] of [
+    ['birthdays_contact_linked', 'birthdays.errorContactLinked'],
+    ['birthdays_selected_contact_not_found', 'contacts.errorContactGone'],
+  ]) {
+    await mitGeburtstagen(async () => {
+      const birthday = { id: 5, name: 'Ada', birth_date: '1990-01-01', contact_id: null };
+      const { closed, calls, select } = await speichereMitKontakt(birthday, {
+        wahl: '12',
+        // Beim Neuladen ist 12 vergeben - nur 13 ist noch frei.
+        kandidaten: [{ id: 12, name: 'Ada', already_imported: true }, { id: 13, name: 'Bea', already_imported: false }],
+        put: async () => { throw fehler(reason === 'birthdays_contact_linked' ? 409 : 400, reason); },
+      });
+      assert.deepEqual(toasts, [[satz, 'danger']], reason);
+      assertNoServerText();
+      assert.equal(closed.length, 0, `${reason}: der Dialog bleibt offen`);
+      const geladen = calls.filter(([verb, path]) => verb === 'GET' && path === '/birthdays/import/candidates').length;
+      assert.equal(geladen, 2, `${reason}: die Auswahl kommt nach der Absage frisch`);
+      assert.equal(select.value, '', `${reason}: die vergebene Wahl faellt auf "Keiner"`);
+    });
+  }
+});
+
+test('D7 Hinweis: "Verknuepfen" schreibt die vorgeschlagene id und zeigt danach den frischen Eintrag', async () => {
+  await mitGeburtstagen(async () => {
+    const birthday = { id: 5, name: 'Ada', birth_date: '1990-01-01', contact_id: null, suggested_contact_id: 12 };
+    birthdays.state.birthdays = [birthday];
+    const row = birthdays.birthdayPaneSections(birthday).find((r) => r?.action?.id === 'birthday-detail-link');
+    assert.ok(row, 'der Hinweis steht als Zeile mit Folgeaktion');
+    assert.equal(row.value, 'birthdays.contactSuggestValue');
+    const bodies = [];
+    let frisch = null;
+    await mit({
+      put: async (path, body) => { bodies.push([path, body]); return { data: {} }; },
+      get: () => ({ data: [{ ...birthday, contact_id: 12, suggested_contact_id: undefined, contact_name: 'Ada' }] }),
+    }, () => birthdays.linkBirthdayToContact(birthday, 12, { onLinked: (b) => { frisch = b; } }));
+    assert.deepEqual(bodies, [['/birthdays/5', { contact_id: 12 }]]);
+    assert.deepEqual(toasts, [['birthdays.linkedToast', 'success']]);
+    assert.equal(frisch?.contact_id, 12, 'die Ansicht bekommt den neu geladenen Eintrag');
+    const danach = birthdays.birthdayPaneSections(frisch);
+    assert.equal(danach.some((r) => r?.action?.id === 'birthday-detail-link'), false, 'verknuepft: der Hinweis ist weg');
+    // Und die Absage sagt ihren Satz.
+    await mit({ put: async () => { throw fehler(409, 'birthdays_contact_linked'); } },
+      () => birthdays.linkBirthdayToContact(birthday, 12));
+    assert.deepEqual(toasts, [['birthdays.errorContactLinked', 'danger']]);
+  });
 });

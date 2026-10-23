@@ -3828,7 +3828,16 @@
         "yearlessDayLabel": "День народження (число)",
         "yearlessMonthPlaceholder": "Місяць",
         "yearlessDayPlaceholder": "День",
-        "yearlessIncomplete": "Виберіть місяць і день народження."
+        "yearlessIncomplete": "Виберіть місяць і день народження.",
+        "nextBirthdayOn": "Наступний день народження {{date}}",
+        "contactLinkLabel": "Пов’язати з контактом",
+        "contactLinkNone": "Немає",
+        "contactLinkHint": "Тоді обидва записи вестимуть один до одного. Дата залишається окремою.",
+        "contactSuggestLabel": "Контакт",
+        "contactSuggestValue": "Контакт із таким самим іменем не пов’язаний.",
+        "linkContact": "Пов’язати",
+        "linkedToast": "Пов’язано з контактом.",
+        "errorContactLinked": "Цей контакт уже пов’язаний з іншим днем народження."
     },
     "onboarding": {
         "step1Title": "Ласкаво просимо до {{name}}",

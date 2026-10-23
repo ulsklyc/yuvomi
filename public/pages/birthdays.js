@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
@@ -651,7 +651,9 @@ function importActionHtml() {
     id: 'birthdays-tools-menu',
     label: t('common.moreActions'),
     items: [
-      { action: 'import-contacts', label: t('birthdays.importButton'), icon: 'download' },
+      // `user-plus` statt `download` (Critique R22, D7): der Eintrag holt
+      // Menschen aus dem Adressbuch, er laedt keine Datei herunter.
+      { action: 'import-contacts', label: t('birthdays.importButton'), icon: 'user-plus' },
     ],
   });
 }
@@ -895,6 +897,140 @@ function openBirthdayReadModal(birthday) {
   });
 }
 
+/**
+ * DARF DER DIALOG MIT EINEM KONTAKT VERKNUEPFEN? (Critique R22, D7)
+ *
+ * Die Auswahl listet das Adressbuch, und der Server verlangt dafuer das
+ * Leserecht auf `contacts` (routes/birthdays.js `checkContactLink`) - ohne es
+ * gaebe es nur "Keiner" und ein 403. Ein haushaltweit abgeschaltetes Modul
+ * hat keine Kontakte, die man verknuepfen wollte. Mitglieder-Geburtstage
+ * haengen am Konto (`family_user_id`), nicht an einem Kontakt.
+ */
+/** Absagen, nach denen die Kontaktauswahl des Dialogs neu geladen wird. */
+const CONTACT_CHOICE_REFUSALS = new Set(['birthdays_contact_linked', 'birthdays_selected_contact_not_found']);
+
+function mayLinkContacts(birthday) {
+  if (birthday?.family_user_id) return false;
+  return moduleAccess('contacts') !== 'none' && !window.yuvomi?.isModuleDisabled?.('contacts');
+}
+
+/**
+ * "Mit Kontakt verknuepfen": eine Auswahl wie die Erinnerung darunter. Sie
+ * steht sofort mit dem verknuepften Kontakt (`contact_name` liefert der
+ * Server mit), die freien Kontakte reicht `fillContactLinkOptions` nach.
+ * Der Hinweis sagt, was die Verknuepfung tut und was nicht: das Datum folgt
+ * dem Kontakt NICHT (#2124 bleibt eigenstaendig).
+ */
+function contactLinkFieldHtml(birthday) {
+  const current = birthday?.contact_id
+    ? `<option value="${esc(String(birthday.contact_id))}" selected>${esc(birthday.contact_name || t('birthdays.contactSuggestLabel'))}</option>`
+    : '';
+  return `
+    <div class="form-group" id="bd-contact-group">
+      <label class="form-label" for="bd-contact">${t('birthdays.contactLinkLabel')}</label>
+      <select class="form-input birthday-modal__select" id="bd-contact" aria-describedby="bd-contact-hint">
+        <option value="">${t('birthdays.contactLinkNone')}</option>
+        ${current}
+      </select>
+      <p class="form-hint" id="bd-contact-hint">${t('birthdays.contactLinkHint')}</p>
+    </div>`;
+}
+
+/**
+ * Reicht die verknuepfbaren Kontakte nach: jeder, der noch keinen Geburtstag
+ * traegt, dazu der eigene. Die Kandidatenliste des Imports kennt beides
+ * (`already_imported`, auch fuer Kontakte ohne Datum). Nachgereichte
+ * Optionen sind keine Eingabe - der Tausch laeuft deshalb ueber
+ * `swapFieldsKeepingDirtyBase`, sonst fragte das Schliessen nach Aenderungen,
+ * die niemand gemacht hat. Gibt es nichts zu verknuepfen, faellt das Feld weg.
+ * Ein Fehler beim Laden laesst die Auswahl stehen, wie sie ist.
+ */
+async function fillContactLinkOptions(panel, select, birthday) {
+  let candidates;
+  try {
+    candidates = (await api.get('/birthdays/import/candidates')).data ?? {};
+  } catch {
+    return;
+  }
+  if (!select.isConnected) return;
+  const current = birthday?.contact_id ?? null;
+  const linkable = [...(candidates.withBirthday ?? []), ...(candidates.withoutBirthday ?? [])]
+    .filter((c) => !c.already_imported || c.id === current)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), getLocale(), { sensitivity: 'base' }));
+  swapFieldsKeepingDirtyBase(panel, () => {
+    if (!linkable.length && !current) {
+      select.closest('#bd-contact-group')?.remove();
+      return;
+    }
+    // Die Wahl bleibt, solange es sie noch gibt - nach einer Absage (409,
+    // Kontakt weg) faellt sie auf "Keiner".
+    const keep = select.value;
+    const stillThere = keep === '' || linkable.some((c) => String(c.id) === keep);
+    const option = (value, label) => {
+      const node = document.createElement('option');
+      node.value = value;
+      node.textContent = label;
+      return node;
+    };
+    select.replaceChildren(option('', t('birthdays.contactLinkNone')), ...linkable.map((c) => option(String(c.id), c.name)));
+    select.value = stillThere ? keep : '';
+  });
+}
+
+/**
+ * Verknuepft einen Geburtstag mit einem Kontakt (D7) - die Folgeaktion des
+ * ruhigen Hinweises "Ein Kontakt heisst genauso". Danach steht an der
+ * Datumszeile "Kontakt anzeigen", und der Fokus geht dorthin: der Knopf, auf
+ * dem er stand, ist mit dem Hinweis weg.
+ *
+ * @param {object} birthday
+ * @param {number} contactId
+ * @param {{ button?: HTMLButtonElement|null, onLinked?: ((fresh: object) => void)|null }} [opts]
+ */
+async function linkBirthdayToContact(birthday, contactId, { button = null, onLinked = null } = {}) {
+  if (readOnly()) return;
+  if (button) button.disabled = true;
+  const owner = _container;
+  try {
+    await api.put(`/birthdays/${birthday.id}`, { contact_id: contactId });
+    window.yuvomi?.showToast(t('birthdays.linkedToast'), 'success');
+    await reloadAfterSave(() => loadData());
+    if (_container !== owner) return;
+    renderList({ repaint: true });
+    const fresh = state.birthdays.find((b) => b.id === birthday.id);
+    if (fresh) onLinked?.(fresh);
+    // Die Spalte zeichnet ihr Detail einen Mikrotakt spaeter (master-detail.js
+    // `paint` wartet auf den Renderer) - der Fokus folgt im naechsten Bild.
+    const nextFrame = globalThis.requestAnimationFrame ?? ((fn) => setTimeout(fn, 0));
+    nextFrame(() => document.getElementById('birthday-detail-contact')?.focus());
+  } catch (err) {
+    if (button?.isConnected) button.disabled = false;
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+  }
+}
+
+/**
+ * Der ruhige Hinweis (D7): ein unverknuepfter Geburtstag, dessen Name genau
+ * einem unverknuepften Kontakt gleicht (`suggested_contact_id`, vom Server
+ * nur mit Kontakte-Leserecht). Eine Zeile wie jede andere der Ansicht, mit
+ * "Verknuepfen" als Folgeaktion - kein Banner, keine Farbe. Ohne Schreibrecht
+ * gibt es nichts zu tun, also auch keine Zeile.
+ */
+function contactSuggestionRow(birthday, onLinked) {
+  if (!birthday.suggested_contact_id || birthday.contact_id || readOnly()) return null;
+  return {
+    icon: 'book-user',
+    label: t('birthdays.contactSuggestLabel'),
+    value: t('birthdays.contactSuggestValue'),
+    action: {
+      id: 'birthday-detail-link',
+      label: t('birthdays.linkContact'),
+      icon: 'link',
+      onClick: ({ button } = {}) => linkBirthdayToContact(birthday, birthday.suggested_contact_id, { button, onLinked }),
+    },
+  };
+}
+
 function openBirthdayModal({ mode, birthday = null }) {
   // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
   // bestehender Geburtstag geht als Leseansicht auf (Muster aus notes.js).
@@ -942,16 +1078,17 @@ function openBirthdayModal({ mode, birthday = null }) {
           </div>
         </div>
         ${advancedSection(`
+          ${mayLinkContacts(birthday) ? contactLinkFieldHtml(birthday) : ''}
           ${renderNameDayField(birthday)}
           <div class="form-group">
             <label class="form-label" for="bd-notes">${t('birthdays.notesLabel')}</label>
             <textarea class="form-input" id="bd-notes" rows="3" placeholder="${t('birthdays.notesPlaceholder')}">${esc(birthday?.notes || '')}</textarea>
           </div>
           ${renderBirthdayReminderSection(birthday)}`,
-          { open: isEdit && (!!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
+          { open: isEdit && (!!birthday?.contact_id || !!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
         <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
         <div class="modal-panel__footer modal-panel__footer--plain">
-          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete" style="margin-inline-end:auto">
+          ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
           </button>` : '<div></div>'}
           <div class="birthday-modal__footer-actions">
@@ -1015,6 +1152,12 @@ function openBirthdayModal({ mode, birthday = null }) {
       });
 
       const birthDateField = wireBirthDateField(panel, 'bd-birth-date');
+
+      // Die Auswahl steht mit dem, was der Geburtstag schon weiss (verknuepft:
+      // sein Kontakt, sonst "Keiner"); die uebrigen Kontakte kommen nach.
+      const contactSelect = panel.querySelector('#bd-contact');
+      const contactAsOpened = contactSelect?.value ?? '';
+      if (contactSelect) fillContactLinkOptions(panel, contactSelect, birthday);
 
       const reminderOffset = panel.querySelector('#bd-reminder-offset');
       const reminderCustom = panel.querySelector('#bd-reminder-custom');
@@ -1101,6 +1244,11 @@ function openBirthdayModal({ mode, birthday = null }) {
         // Geprueft wird nur, was mitgeht: eine gespeicherte Anzahl ausserhalb
         // 1-999, die niemand angefasst hat, laesst eine Namensaenderung nicht
         // scheitern - der Server nimmt sie unveraendert zurueck (#1384).
+        // Die Verknuepfung geht nur mit, wenn sie sich geaendert hat - wie die
+        // Erinnerung. Ein neuer Geburtstag ohne Auswahl schickt nichts.
+        if (contactSelect && contactSelect.value !== contactAsOpened) {
+          body.contact_id = contactSelect.value === '' ? null : Number(contactSelect.value);
+        }
         const { reminder, invalid } = reminderToSave(readReminder());
         const reminderChanged = !isEdit
           || Object.keys(reminder).some((key) => reminder[key] !== reminderAsOpened[key]);
@@ -1136,6 +1284,11 @@ function openBirthdayModal({ mode, birthday = null }) {
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
           saveBtn.disabled = false;
+          // Der gewaehlte Kontakt ist inzwischen vergeben oder weg (D7): der
+          // Dialog bleibt offen und bietet die Kontakte an, die es jetzt gibt.
+          if (contactSelect && CONTACT_CHOICE_REFUSALS.has(err?.data?.reason)) {
+            fillContactLinkOptions(panel, contactSelect, birthday);
+          }
           // Den Geburtstag gibt es nicht mehr (#1909): das Formular geht zu,
           // solange es das offene ist, und der Eintrag faellt aus der Liste.
           if (isEdit && isAlreadyDeleted(err, 'birthdays_birthday_not_found')) {
@@ -1334,7 +1487,7 @@ function mayOpenContacts() {
  * und wie alt. Gebaut aus den Zeilen der geteilten Leseansicht
  * (components/detail-view.js), damit die Spalte aussieht wie in Kontakten.
  */
-function birthdayPaneSections(birthday) {
+function birthdayPaneSections(birthday, { onLinked = null } = {}) {
   const nameDay = nameDayReadText(birthday.name_day);
   const nameDayNext = nameDay && Number.isInteger(birthday.name_day_days_until)
     ? `${nameDay} · ${countdownLabel(birthday.name_day_days_until)}` : nameDay;
@@ -1359,10 +1512,11 @@ function birthdayPaneSections(birthday) {
         onClick: () => leaveDetailTo(contactHref(birthday.contact_id)),
       } : null,
     },
+    contactSuggestionRow(birthday, onLinked),
     { icon: 'calendar-heart', label: t('birthdays.nameDay'), value: nameDayNext },
     { icon: 'align-left', label: t('birthdays.notesLabel'), value: birthday.notes || '', multiline: true },
     { icon: 'bell', label: t('reminders.offsetLabel'), value: reminderReadText(birthday) },
-  ];
+  ].filter(Boolean);
 }
 
 /**
@@ -1381,7 +1535,9 @@ function birthdayDetailHead(birthday) {
     media,
     // Das Datum des naechsten Geburtstags, einmal: unter dem Bild, ueber Alter
     // und Abstand (vorher zusaetzlich als erste Zeile darunter, R19).
-    subtitle: birthday.next_birthday ? formatDate(birthday.next_birthday) : '',
+    // Mit Etikett (Critique R22, a3 Klein): ohne stand "02.11.2026" ueber
+    // der Zeile "Geburtsdatum 02.11.1985" - zwei Daten, eins davon namenlos.
+    subtitle: birthday.next_birthday ? t('birthdays.nextBirthdayOn', { date: formatDate(birthday.next_birthday) }) : '',
     facts: [
       birthday.next_age != null ? t('birthdays.turnsAge', { age: birthday.next_age }) : '',
       Number.isInteger(days) ? countdownLabel(days) : '',
@@ -1441,12 +1597,20 @@ function renderBirthdayPane(id, body) {
  */
 function openBirthdaySheet(birthday) {
   if (readOnly()) { openBirthdayModal({ mode: 'edit', birthday }); return; }
-  openDetailView({
+  // Nach dem Verknuepfen (D7) steht das Blatt mit dem frischen Eintrag neu:
+  // der Hinweis geht, "Kontakt anzeigen" kommt, und Bearbeiten oeffnet den
+  // Editor mit der Verknuepfung statt mit dem Stand beim Oeffnen.
+  let current = birthday;
+  const onLinked = (fresh) => {
+    current = fresh;
+    view?.update(birthdayPaneSections(fresh, { onLinked }));
+  };
+  const view = openDetailView({
     title: birthday.name,
     key: `birthday:${birthday.id}`,
     head: birthdayDetailHead(birthday),
     size: 'md',
-    sections: birthdayPaneSections(birthday),
+    sections: birthdayPaneSections(birthday, { onLinked }),
     actions: [{
       id: 'birthday-detail-delete',
       label: t('common.delete'),
@@ -1467,7 +1631,7 @@ function openBirthdaySheet(birthday) {
         // Der Editor merkt sich beim Oeffnen, wo der Fokus steht - das muss
         // die Zeile sein, nicht <body> zwischen zwei Dialogen.
         _container?.querySelector(`[data-open="${birthday.id}"]`)?.focus();
-        openBirthdayModal({ mode: 'edit', birthday });
+        openBirthdayModal({ mode: 'edit', birthday: current });
       },
     }],
   });
@@ -1593,6 +1757,8 @@ export const __test = {
   birthdayPreviewHtml,
   // R10 L5: die Detailspalte.
   birthdayPaneSections, birthdayDetailHead, renderBirthdayPane, contactHref,
+  // R22 D7: verknuepfen im Dialog und aus dem Hinweis.
+  contactLinkFieldHtml, fillContactLinkOptions, linkBirthdayToContact, mayLinkContacts, openBirthdaySheet,
   // #1821: `?open=` unter der Spaltenschwelle.
   openBirthdayFromQueryNarrow,
   // #1909: Speichern, Loeschen und Import, wenn der Server ablehnt.

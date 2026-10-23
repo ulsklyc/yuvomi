@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "生日日期",
         "yearlessMonthPlaceholder": "月份",
         "yearlessDayPlaceholder": "日期",
-        "yearlessIncomplete": "請選擇生日的月份和日期。"
+        "yearlessIncomplete": "請選擇生日的月份和日期。",
+        "nextBirthdayOn": "下次生日：{{date}}",
+        "contactLinkLabel": "連結聯絡人",
+        "contactLinkNone": "無",
+        "contactLinkHint": "兩個項目將可互相跳轉。日期仍各自獨立。",
+        "contactSuggestLabel": "聯絡人",
+        "contactSuggestValue": "有一位同名聯絡人，但尚未連結。",
+        "linkContact": "連結",
+        "linkedToast": "已連結到聯絡人。",
+        "errorContactLinked": "這位聯絡人已連結到另一個生日。"
     },
     "reminders": {
         "sectionTitle": "提醒",

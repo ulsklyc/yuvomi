@@ -179,7 +179,7 @@ function sortHydrated(rows) {
  *   - wer Kontakte nicht lesen darf, erfuehre ueber das Ergebnis, welche ids
  *     es gibt: 403 wie beim Import (`contactsHidden`, Mischstelle);
  *   - der Kontakt muss sichtbar sein wie in GET /contacts (kein Kontakt einer
- *     Haushaltshilfe): sonst 400 `birthdays_contact_not_found`;
+ *     Haushaltshilfe): sonst 400 `birthdays_selected_contact_not_found`;
  *   - traegt er schon einen anderen Geburtstag: 409 `birthdays_contact_linked`.
  *     Der eindeutige Index aus Migration 90 haelt dasselbe in der DB.
  *
@@ -218,7 +218,7 @@ function refuseContactLink(res, refused) {
     case 'hidden':
       return res.status(403).json({ error: 'Contact access is required to link a birthday to a contact.', code: 403, reason: 'cross_module_access' });
     case 'unknown':
-      return res.status(400).json({ error: 'Contact not found.', code: 400, reason: 'birthdays_contact_not_found' });
+      return res.status(400).json({ error: 'Contact not found.', code: 400, reason: 'birthdays_selected_contact_not_found' });
     case 'taken':
       return res.status(409).json({ error: 'This contact is already linked to another birthday.', code: 409, reason: 'birthdays_contact_linked' });
     default:

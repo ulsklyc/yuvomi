@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "Doğum gününün günü",
         "yearlessMonthPlaceholder": "Ay",
         "yearlessDayPlaceholder": "Gün",
-        "yearlessIncomplete": "Doğum gününün ayını ve gününü seçin."
+        "yearlessIncomplete": "Doğum gününün ayını ve gününü seçin.",
+        "nextBirthdayOn": "Sonraki doğum günü {{date}}",
+        "contactLinkLabel": "Kişiye bağla",
+        "contactLinkNone": "Hiçbiri",
+        "contactLinkHint": "İki kayıt böylece birbirine yönlendirir. Tarih ayrı kalır.",
+        "contactSuggestLabel": "Kişi",
+        "contactSuggestValue": "Aynı ada sahip bir kişi var ama bağlı değil.",
+        "linkContact": "Bağla",
+        "linkedToast": "Kişiye bağlandı.",
+        "errorContactLinked": "Bu kişi zaten başka bir doğum gününe bağlı."
     },
     "reminders": {
         "sectionTitle": "Hatırlatıcı",

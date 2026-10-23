@@ -3552,7 +3552,16 @@
         "yearlessDayLabel": "روز تولد",
         "yearlessMonthPlaceholder": "ماه",
         "yearlessDayPlaceholder": "روز",
-        "yearlessIncomplete": "ماه و روزِ تولد را انتخاب کنید."
+        "yearlessIncomplete": "ماه و روزِ تولد را انتخاب کنید.",
+        "nextBirthdayOn": "تولد بعدی در {{date}}",
+        "contactLinkLabel": "پیوند با مخاطب",
+        "contactLinkNone": "هیچ‌کدام",
+        "contactLinkHint": "آن‌گاه هر دو مورد به یکدیگر راه می‌برند. تاریخ جدا می‌ماند.",
+        "contactSuggestLabel": "مخاطب",
+        "contactSuggestValue": "مخاطبی با همین نام هست، اما پیوند ندارد.",
+        "linkContact": "پیوند",
+        "linkedToast": "به مخاطب پیوند داده شد.",
+        "errorContactLinked": "این مخاطب از قبل به تولد دیگری پیوند دارد."
     },
     "recipes": {
         "mealTypeNone": "بدون وعده",

@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "Dia do aniversário",
         "yearlessMonthPlaceholder": "Mês",
         "yearlessDayPlaceholder": "Dia",
-        "yearlessIncomplete": "Selecione o mês e o dia do aniversário."
+        "yearlessIncomplete": "Selecione o mês e o dia do aniversário.",
+        "nextBirthdayOn": "Próximo aniversário a {{date}}",
+        "contactLinkLabel": "Ligar a um contacto",
+        "contactLinkNone": "Nenhum",
+        "contactLinkHint": "Assim as duas entradas remetem uma para a outra. A data mantém-se separada.",
+        "contactSuggestLabel": "Contacto",
+        "contactSuggestValue": "Um contacto tem o mesmo nome, mas não está ligado.",
+        "linkContact": "Ligar",
+        "linkedToast": "Ligado ao contacto.",
+        "errorContactLinked": "Este contacto já está ligado a outro aniversário."
     },
     "reminders": {
         "sectionTitle": "Lembrete",

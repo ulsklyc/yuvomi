@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "Ημέρα γενεθλίων",
         "yearlessMonthPlaceholder": "Μήνας",
         "yearlessDayPlaceholder": "Ημέρα",
-        "yearlessIncomplete": "Επιλέξτε μήνα και ημέρα γενεθλίων."
+        "yearlessIncomplete": "Επιλέξτε μήνα και ημέρα γενεθλίων.",
+        "nextBirthdayOn": "Επόμενα γενέθλια στις {{date}}",
+        "contactLinkLabel": "Σύνδεση με επαφή",
+        "contactLinkNone": "Καμία",
+        "contactLinkHint": "Οι δύο καταχωρίσεις οδηγούν τότε η μία στην άλλη. Η ημερομηνία μένει ξεχωριστή.",
+        "contactSuggestLabel": "Επαφή",
+        "contactSuggestValue": "Μια επαφή έχει το ίδιο όνομα, αλλά δεν είναι συνδεδεμένη.",
+        "linkContact": "Σύνδεση",
+        "linkedToast": "Συνδέθηκε με την επαφή.",
+        "errorContactLinked": "Αυτή η επαφή είναι ήδη συνδεδεμένη με άλλα γενέθλια."
     },
     "reminders": {
         "sectionTitle": "Υπενθύμιση",

@@ -3894,7 +3894,16 @@
         "yearlessDayLabel": "يوم عيد الميلاد",
         "yearlessMonthPlaceholder": "الشهر",
         "yearlessDayPlaceholder": "اليوم",
-        "yearlessIncomplete": "اختر شهر ويوم عيد الميلاد."
+        "yearlessIncomplete": "اختر شهر ويوم عيد الميلاد.",
+        "nextBirthdayOn": "عيد الميلاد القادم في {{date}}",
+        "contactLinkLabel": "ربط بجهة اتصال",
+        "contactLinkNone": "لا شيء",
+        "contactLinkHint": "عندها يقود كل من الإدخالين إلى الآخر. يبقى التاريخ منفصلًا.",
+        "contactSuggestLabel": "جهة الاتصال",
+        "contactSuggestValue": "توجد جهة اتصال بالاسم نفسه لكنها غير مرتبطة.",
+        "linkContact": "ربط",
+        "linkedToast": "تم الربط بجهة الاتصال.",
+        "errorContactLinked": "جهة الاتصال هذه مرتبطة بالفعل بعيد ميلاد آخر."
     },
     "reminders": {
         "sectionTitle": "تذكير",

@@ -231,6 +231,11 @@ export const CASE_MESSAGES = new Map([
   ['contacts_contact_not_found', 'contacts.errorContactGone'],
   // Geburtstage (#1909), ebenso.
   ['birthdays_birthday_not_found', 'birthdays.errorBirthdayGone'],
+  // Verknuepfen im Geburtstag-Dialog (R22, D7): der GEWAEHLTE Kontakt hat
+  // inzwischen einen anderen Geburtstag, oder es gibt ihn nicht mehr - der
+  // Dialog bleibt offen und frischt die Auswahl auf.
+  ['birthdays_contact_linked', 'birthdays.errorContactLinked'],
+  ['birthdays_selected_contact_not_found', 'contacts.errorContactGone'],
   // Die im Kontaktformular GEWAEHLTE Kategorie gibt es nicht mehr: das
   // Formular bleibt offen und bietet die aktuellen Kategorien an.
   ['contacts_selected_category_not_found', 'contacts.errorSelectedCategoryGone'],
@@ -459,6 +464,9 @@ export const GONE_REASONS = new Set([
   'notes_selected_category_not_found',
   'contacts_contact_not_found',
   'birthdays_birthday_not_found',
+  // Der im Geburtstag-Dialog GEWAEHLTE Kontakt (R22, D7): der Dialog bleibt
+  // offen und bietet die aktuellen an.
+  'birthdays_selected_contact_not_found',
   'contacts_selected_category_not_found',
   'inventory_location_not_found',
   'inventory_category_not_found',

@@ -4353,7 +4353,16 @@
         "yearlessDayLabel": "Den narozenin",
         "yearlessMonthPlaceholder": "Měsíc",
         "yearlessDayPlaceholder": "Den",
-        "yearlessIncomplete": "Vyberte měsíc i den narozenin."
+        "yearlessIncomplete": "Vyberte měsíc i den narozenin.",
+        "nextBirthdayOn": "Příští narozeniny: {{date}}",
+        "contactLinkLabel": "Propojit s kontaktem",
+        "contactLinkNone": "Žádný",
+        "contactLinkHint": "Oba záznamy pak vedou jeden k druhému. Datum zůstává oddělené.",
+        "contactSuggestLabel": "Kontakt",
+        "contactSuggestValue": "Kontakt se stejným jménem není propojený.",
+        "linkContact": "Propojit",
+        "linkedToast": "Propojeno s kontaktem.",
+        "errorContactLinked": "Tento kontakt je už propojený s jinými narozeninami."
     },
     "rrule": {
         "freqNone": "Bez opakování",

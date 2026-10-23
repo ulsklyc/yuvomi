@@ -3534,7 +3534,16 @@
         "yearlessDayLabel": "Dag van de verjaardag",
         "yearlessMonthPlaceholder": "Maand",
         "yearlessDayPlaceholder": "Dag",
-        "yearlessIncomplete": "Selecteer de maand en dag van de verjaardag."
+        "yearlessIncomplete": "Selecteer de maand en dag van de verjaardag.",
+        "nextBirthdayOn": "Volgende verjaardag op {{date}}",
+        "contactLinkLabel": "Koppelen aan contact",
+        "contactLinkNone": "Geen",
+        "contactLinkHint": "Beide items verwijzen dan naar elkaar. De datum blijft apart.",
+        "contactSuggestLabel": "Contact",
+        "contactSuggestValue": "Een contact heeft dezelfde naam, maar is niet gekoppeld.",
+        "linkContact": "Koppelen",
+        "linkedToast": "Gekoppeld aan het contact.",
+        "errorContactLinked": "Dit contact is al gekoppeld aan een andere verjaardag."
     },
     "recipes": {
         "mealTypeNone": "Geen maaltijd",

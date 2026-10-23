@@ -3552,7 +3552,16 @@
         "yearlessDayLabel": "Araw ng kaarawan",
         "yearlessMonthPlaceholder": "Buwan",
         "yearlessDayPlaceholder": "Araw",
-        "yearlessIncomplete": "Piliin ang buwan at araw ng kaarawan."
+        "yearlessIncomplete": "Piliin ang buwan at araw ng kaarawan.",
+        "nextBirthdayOn": "Susunod na kaarawan sa {{date}}",
+        "contactLinkLabel": "I-link sa contact",
+        "contactLinkNone": "Wala",
+        "contactLinkHint": "Magtuturo na ang dalawang entry sa isa't isa. Hiwalay pa rin ang petsa.",
+        "contactSuggestLabel": "Contact",
+        "contactSuggestValue": "May contact na kapareho ng pangalan pero hindi naka-link.",
+        "linkContact": "I-link",
+        "linkedToast": "Na-link sa contact.",
+        "errorContactLinked": "Naka-link na ang contact na ito sa ibang kaarawan."
     },
     "recipes": {
         "mealTypeNone": "Walang pagkain",

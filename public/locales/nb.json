@@ -3534,7 +3534,16 @@
         "yearlessDayLabel": "Bursdagsdag",
         "yearlessMonthPlaceholder": "Måned",
         "yearlessDayPlaceholder": "Dag",
-        "yearlessIncomplete": "Velg både måned og dag for bursdagen."
+        "yearlessIncomplete": "Velg både måned og dag for bursdagen.",
+        "nextBirthdayOn": "Neste bursdag {{date}}",
+        "contactLinkLabel": "Koble til kontakt",
+        "contactLinkNone": "Ingen",
+        "contactLinkHint": "Da leder begge oppføringene til hverandre. Datoen holdes atskilt.",
+        "contactSuggestLabel": "Kontakt",
+        "contactSuggestValue": "En kontakt har samme navn, men er ikke koblet.",
+        "linkContact": "Koble",
+        "linkedToast": "Koblet til kontakten.",
+        "errorContactLinked": "Denne kontakten er allerede koblet til en annen bursdag."
     },
     "recipes": {
         "mealTypeNone": "Intet måltid",

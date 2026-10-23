@@ -234,12 +234,12 @@ test('D7: ein schon verknuepfter Kontakt -> 409 mit Grund, nichts geschrieben', 
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM birthdays WHERE name = 'Dritter'").get().n, 0, 'kein Eintrag angelegt');
 });
 
-test('D7: unbekannter Kontakt -> 400 birthdays_contact_not_found; keine Zahl -> 400', async () => {
+test('D7: unbekannter Kontakt -> 400 birthdays_selected_contact_not_found; keine Zahl -> 400', async () => {
   setModules(member.id, {});
   const birthday = await seedBirthday('Ins Leere');
   const gone = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: 999999 });
   assert.equal(gone.status, 400);
-  assert.equal(gone.body.reason, 'birthdays_contact_not_found');
+  assert.equal(gone.body.reason, 'birthdays_selected_contact_not_found');
   const junk = await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: 'abc' });
   assert.equal(junk.status, 400);
   assert.equal(linkOf(birthday.id), null);

@@ -3787,7 +3787,16 @@
         "yearlessDayLabel": "День рождения (число)",
         "yearlessMonthPlaceholder": "Месяц",
         "yearlessDayPlaceholder": "День",
-        "yearlessIncomplete": "Выберите месяц и день рождения."
+        "yearlessIncomplete": "Выберите месяц и день рождения.",
+        "nextBirthdayOn": "Следующий день рождения {{date}}",
+        "contactLinkLabel": "Связать с контактом",
+        "contactLinkNone": "Нет",
+        "contactLinkHint": "Тогда обе записи будут вести друг к другу. Дата остаётся отдельной.",
+        "contactSuggestLabel": "Контакт",
+        "contactSuggestValue": "Контакт с таким же именем не связан.",
+        "linkContact": "Связать",
+        "linkedToast": "Связано с контактом.",
+        "errorContactLinked": "Этот контакт уже связан с другим днём рождения."
     },
     "reminders": {
         "sectionTitle": "Напоминание",

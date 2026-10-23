@@ -3534,7 +3534,16 @@
         "yearlessDayLabel": "A születésnap napja",
         "yearlessMonthPlaceholder": "Hónap",
         "yearlessDayPlaceholder": "Nap",
-        "yearlessIncomplete": "Válaszd ki a születésnap hónapját és napját."
+        "yearlessIncomplete": "Válaszd ki a születésnap hónapját és napját.",
+        "nextBirthdayOn": "Következő születésnap: {{date}}",
+        "contactLinkLabel": "Összekapcsolás névjeggyel",
+        "contactLinkNone": "Nincs",
+        "contactLinkHint": "A két bejegyzés ezután egymásra mutat. A dátum külön marad.",
+        "contactSuggestLabel": "Névjegy",
+        "contactSuggestValue": "Egy névjegy ugyanezt a nevet viseli, de nincs összekapcsolva.",
+        "linkContact": "Összekapcsolás",
+        "linkedToast": "Összekapcsolva a névjeggyel.",
+        "errorContactLinked": "Ez a névjegy már egy másik születésnaphoz van kapcsolva."
     },
     "recipes": {
         "mealTypeNone": "Nincs étkezés",

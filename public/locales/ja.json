@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "誕生日の日",
         "yearlessMonthPlaceholder": "月",
         "yearlessDayPlaceholder": "日",
-        "yearlessIncomplete": "誕生日の月と日を選択してください。"
+        "yearlessIncomplete": "誕生日の月と日を選択してください。",
+        "nextBirthdayOn": "次の誕生日は{{date}}",
+        "contactLinkLabel": "連絡先とリンク",
+        "contactLinkNone": "なし",
+        "contactLinkHint": "2つの項目が互いにたどれるようになります。日付は別々のままです。",
+        "contactSuggestLabel": "連絡先",
+        "contactSuggestValue": "同じ名前の連絡先がありますが、リンクされていません。",
+        "linkContact": "リンク",
+        "linkedToast": "連絡先とリンクしました。",
+        "errorContactLinked": "この連絡先はすでに別の誕生日とリンクされています。"
     },
     "reminders": {
         "sectionTitle": "リマインダー",

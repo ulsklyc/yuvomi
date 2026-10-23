@@ -3552,7 +3552,16 @@
         "yearlessDayLabel": "Tanggal ulang tahun",
         "yearlessMonthPlaceholder": "Bulan",
         "yearlessDayPlaceholder": "Hari",
-        "yearlessIncomplete": "Pilih bulan dan tanggal ulang tahun."
+        "yearlessIncomplete": "Pilih bulan dan tanggal ulang tahun.",
+        "nextBirthdayOn": "Ulang tahun berikutnya pada {{date}}",
+        "contactLinkLabel": "Tautkan ke kontak",
+        "contactLinkNone": "Tidak ada",
+        "contactLinkHint": "Kedua entri lalu saling mengarah. Tanggalnya tetap terpisah.",
+        "contactSuggestLabel": "Kontak",
+        "contactSuggestValue": "Ada kontak dengan nama yang sama, tetapi belum ditautkan.",
+        "linkContact": "Tautkan",
+        "linkedToast": "Ditautkan ke kontak.",
+        "errorContactLinked": "Kontak ini sudah ditautkan ke ulang tahun lain."
     },
     "recipes": {
         "mealTypeNone": "Tanpa waktu makan",

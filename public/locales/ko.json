@@ -3552,7 +3552,16 @@
         "yearlessDayLabel": "생일 일",
         "yearlessMonthPlaceholder": "월",
         "yearlessDayPlaceholder": "일",
-        "yearlessIncomplete": "생일의 월과 일을 모두 선택하세요."
+        "yearlessIncomplete": "생일의 월과 일을 모두 선택하세요.",
+        "nextBirthdayOn": "다음 생일: {{date}}",
+        "contactLinkLabel": "연락처와 연결",
+        "contactLinkNone": "없음",
+        "contactLinkHint": "두 항목이 서로 이어집니다. 날짜는 따로 유지됩니다.",
+        "contactSuggestLabel": "연락처",
+        "contactSuggestValue": "같은 이름의 연락처가 있지만 연결되어 있지 않습니다.",
+        "linkContact": "연결",
+        "linkedToast": "연락처와 연결했습니다.",
+        "errorContactLinked": "이 연락처는 이미 다른 생일과 연결되어 있습니다."
     },
     "recipes": {
         "mealTypeNone": "식사 없음",

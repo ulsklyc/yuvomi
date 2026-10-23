@@ -350,7 +350,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
     'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
-    'contacts_contact_not_found', 'birthdays_birthday_not_found',
+    'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',
     'contacts_selected_category_not_found', 'inventory_location_not_found', 'inventory_category_not_found',
     'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found',
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',

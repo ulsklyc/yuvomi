@@ -3534,7 +3534,16 @@
         "yearlessDayLabel": "Ngày sinh nhật",
         "yearlessMonthPlaceholder": "Tháng",
         "yearlessDayPlaceholder": "Ngày",
-        "yearlessIncomplete": "Chọn cả tháng và ngày sinh nhật."
+        "yearlessIncomplete": "Chọn cả tháng và ngày sinh nhật.",
+        "nextBirthdayOn": "Sinh nhật tiếp theo vào {{date}}",
+        "contactLinkLabel": "Liên kết với liên hệ",
+        "contactLinkNone": "Không",
+        "contactLinkHint": "Khi đó hai mục sẽ dẫn đến nhau. Ngày vẫn tách riêng.",
+        "contactSuggestLabel": "Liên hệ",
+        "contactSuggestValue": "Có một liên hệ trùng tên nhưng chưa được liên kết.",
+        "linkContact": "Liên kết",
+        "linkedToast": "Đã liên kết với liên hệ.",
+        "errorContactLinked": "Liên hệ này đã được liên kết với một sinh nhật khác."
     },
     "recipes": {
         "mealTypeNone": "Không có bữa ăn",

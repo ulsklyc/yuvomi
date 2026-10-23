@@ -3552,7 +3552,16 @@
         "yearlessDayLabel": "Tag des Geburtstags",
         "yearlessMonthPlaceholder": "Monat",
         "yearlessDayPlaceholder": "Tag",
-        "yearlessIncomplete": "Bitte Monat und Tag des Geburtstags auswählen."
+        "yearlessIncomplete": "Bitte Monat und Tag des Geburtstags auswählen.",
+        "nextBirthdayOn": "Nächster Geburtstag am {{date}}",
+        "contactLinkLabel": "Mit Kontakt verknüpfen",
+        "contactLinkNone": "Keiner",
+        "contactLinkHint": "Beide Einträge führen dann zueinander. Das Datum bleibt getrennt.",
+        "contactSuggestLabel": "Kontakt",
+        "contactSuggestValue": "Ein Kontakt heißt genauso, ist aber nicht verknüpft.",
+        "linkContact": "Verknüpfen",
+        "linkedToast": "Mit dem Kontakt verknüpft.",
+        "errorContactLinked": "Dieser Kontakt ist schon mit einem anderen Geburtstag verknüpft."
     },
     "recipes": {
         "mealTypeNone": "Keine Mahlzeit",

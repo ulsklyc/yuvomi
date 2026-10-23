@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "Jour de l’anniversaire",
         "yearlessMonthPlaceholder": "Mois",
         "yearlessDayPlaceholder": "Jour",
-        "yearlessIncomplete": "Sélectionnez le mois et le jour de l’anniversaire."
+        "yearlessIncomplete": "Sélectionnez le mois et le jour de l’anniversaire.",
+        "nextBirthdayOn": "Prochain anniversaire le {{date}}",
+        "contactLinkLabel": "Lier à un contact",
+        "contactLinkNone": "Aucun",
+        "contactLinkHint": "Les deux fiches renvoient alors l’une à l’autre. La date reste distincte.",
+        "contactSuggestLabel": "Contact",
+        "contactSuggestValue": "Un contact porte le même nom, mais n’est pas lié.",
+        "linkContact": "Lier",
+        "linkedToast": "Lié au contact.",
+        "errorContactLinked": "Ce contact est déjà lié à un autre anniversaire."
     },
     "reminders": {
         "sectionTitle": "Rappel",

@@ -3575,7 +3575,16 @@
         "yearlessDayLabel": "Dag för födelsedagen",
         "yearlessMonthPlaceholder": "Månad",
         "yearlessDayPlaceholder": "Dag",
-        "yearlessIncomplete": "Välj månad och dag för födelsedagen."
+        "yearlessIncomplete": "Välj månad och dag för födelsedagen.",
+        "nextBirthdayOn": "Nästa födelsedag {{date}}",
+        "contactLinkLabel": "Koppla till kontakt",
+        "contactLinkNone": "Ingen",
+        "contactLinkHint": "Då leder båda posterna till varandra. Datumet hålls separat.",
+        "contactSuggestLabel": "Kontakt",
+        "contactSuggestValue": "En kontakt har samma namn men är inte kopplad.",
+        "linkContact": "Koppla",
+        "linkedToast": "Kopplad till kontakten.",
+        "errorContactLinked": "Den här kontakten är redan kopplad till en annan födelsedag."
     },
     "reminders": {
         "sectionTitle": "Påminnelse",
