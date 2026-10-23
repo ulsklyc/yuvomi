@@ -27,7 +27,7 @@ import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
-import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem } from '/utils/popover-menu.js';
+import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
 import { toggleRowHtml } from '/settings/components.js';
@@ -5444,11 +5444,20 @@ function doerPanelOf(card) {
   return card?.querySelector?.(`.popover-menu[id^="${DOER_PANEL_PREFIX}"]`) ?? null;
 }
 
-function openDoerMenu(card) {
-  const panel = doerPanelOf(card);
-  if (!panel || typeof panel.showPopover !== 'function') return false;
-  if (!panel.matches(':popover-open')) panel.showPopover();
-  return true;
+/**
+ * DAS MENUE GEHT DORT AUF, WO DIE ZEILE ANGEFASST WURDE (R22 S9). Sein Knopf
+ * steht unsichtbar am Zeilenanfang; an ihm gerechnet hing es am Laptop ueber
+ * der Seitenleiste neben der Liste. Die Menue-Taste liefert keinen Zeiger
+ * (0/0) - dann steht es unter dem Zeilenanfang, wo der Fokusring ist.
+ */
+function doerMenuPoint(card, e) {
+  if (e && (e.clientX || e.clientY)) return { x: e.clientX, y: e.clientY };
+  const rect = card?.getBoundingClientRect?.();
+  return rect ? { x: rect.left + 12, y: rect.bottom } : null;
+}
+
+function openDoerMenu(card, point) {
+  return showPopoverMenuAt(doerPanelOf(card), point);
 }
 
 function wireDoerContextMenu(listEl) {
@@ -5458,7 +5467,7 @@ function wireDoerContextMenu(listEl) {
     if (press?.timer) clearTimeout(press.timer);
     press = null;
   };
-  const openAfterRelease = (card, primary) => {
+  const openAfterRelease = (card, primary, point) => {
     // Der Klick, der dem Loslassen folgt, gehoert zum Druck und nicht zur
     // Zeile - sonst hakte er ab oder oeffnete das Detail. Nur fuer die
     // Primaertaste: ein Rechtsklick erzeugt keinen `click`, und ein stehen
@@ -5467,7 +5476,7 @@ function wireDoerContextMenu(listEl) {
       swallowClick = true;
       setTimeout(() => { swallowClick = false; }, LONG_PRESS_MS);
     }
-    setTimeout(() => openDoerMenu(card), 0);
+    setTimeout(() => openDoerMenu(card, point), 0);
   };
 
   listEl.addEventListener('pointerdown', (e) => {
@@ -5495,13 +5504,13 @@ function wireDoerContextMenu(listEl) {
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > LONG_PRESS_SLOP) clear();
   });
   listEl.addEventListener('pointerup', () => {
-    if (press?.armed) openAfterRelease(press.card, press.primary);
+    if (press?.armed) openAfterRelease(press.card, press.primary, { x: press.x, y: press.y });
     clear();
   });
   // Der Browser uebernimmt die Geste (Scrollen, Systemmenue): war der Druck
   // schon erkannt, steht die Frage trotzdem - sonst verpuffte er.
   listEl.addEventListener('pointercancel', () => {
-    if (press?.armed) openAfterRelease(press.card, false);
+    if (press?.armed) openAfterRelease(press.card, false, { x: press.x, y: press.y });
     clear();
   });
   listEl.addEventListener('contextmenu', (e) => {
@@ -5517,7 +5526,7 @@ function wireDoerContextMenu(listEl) {
       press.armed = true;
       return;
     }
-    openDoerMenu(card);
+    openDoerMenu(card, doerMenuPoint(card, e));
   });
   listEl.addEventListener('click', (e) => {
     if (!swallowClick) return;

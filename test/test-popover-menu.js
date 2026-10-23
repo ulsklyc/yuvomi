@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // `panel instanceof HTMLElement` steht als Typwaechter in onToggle.
 global.HTMLElement = class HTMLElement {};
 
-const { installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml } = await import('../public/utils/popover-menu.js');
+const { installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml, showPopoverMenuAt } = await import('../public/utils/popover-menu.js');
 
 /** Kleinstes Element, das die Selektorwege des Moduls bedient. */
 function el(selector, attrs = {}) {
@@ -581,4 +581,48 @@ test('R22 D22: ein aufgeschobenes Menue baut seine Eintraege erst beim Oeffnen',
   } finally {
     delete global.window.lucide;
   }
+});
+
+// R22 S9: die Personenauswahl der Aufgabenzeile hat keinen sichtbaren
+// Ausloeser - ihr Knopf steht unsichtbar am Zeilenanfang. Rechtsbuendig an ihm
+// gerechnet hing das Menue am Laptop 148px links vom Rechtsklick ueber der
+// Seitenleiste. Ein Kontextmenue geht am Zeiger auf, und der Punkt gilt nur
+// fuer dieses eine Oeffnen.
+test('R22: ein Kontextmenue oeffnet am Zeiger und vergisst den Punkt beim Schliessen', () => {
+  const root = makeRoot();
+  const panel = makeMenu();
+  panel.dataset = {};
+  panel.open = false;
+  panel.matches = (sel) => (sel === ':popover-open' ? panel.open : sel === '.popover-menu');
+  panel.showPopover = () => { panel.open = true; open(root, panel); };
+
+  assert.equal(showPopoverMenuAt(panel, { x: 452, y: 356 }), true);
+  assert.equal(panel.style.left, '452px', 'die linke Kante steht am Zeiger, nicht rechtsbuendig am Ausloeser (100px)');
+  assert.equal(panel.style.top, '356px');
+  assert.equal(panel.style.transformOrigin, 'top left', 'es waechst aus der Ecke am Zeiger');
+
+  // Rechts und unten kein Platz: es kippt auf die andere Seite des Punkts.
+  root.fire('toggle', { target: panel, newState: 'closed' });
+  panel.open = false;
+  showPopoverMenuAt(panel, { x: 1000, y: 750 });
+  assert.equal(panel.style.left, '800px');
+  assert.equal(panel.style.top, '702px');
+  assert.equal(panel.style.transformOrigin, 'bottom right');
+
+  root.fire('toggle', { target: panel, newState: 'closed' });
+  assert.equal(panel.dataset.anchorX, undefined, 'geschlossen gilt wieder der Ausloeser');
+  panel.open = false;
+  open(root, panel);
+  assert.equal(panel.style.left, '100px', 'ohne Punkt rechnet das Menue wie bisher am Ausloeser');
+});
+
+test('R22: ohne Panel oeffnet nichts, und ein Punkt ohne Zahl faellt auf den Ausloeser zurueck', () => {
+  assert.equal(showPopoverMenuAt(null, { x: 1, y: 1 }), false);
+  const root = makeRoot();
+  const panel = makeMenu();
+  panel.dataset = {};
+  panel.matches = (sel) => sel === '.popover-menu';
+  panel.showPopover = () => open(root, panel);
+  showPopoverMenuAt(panel, { x: Number.NaN, y: 4 });
+  assert.equal(panel.style.left, '100px');
 });

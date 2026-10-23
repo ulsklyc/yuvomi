@@ -241,6 +241,46 @@ function onBeforeToggle(event) {
 }
 
 /**
+ * EIN KONTEXTMENUE GEHT AM ZEIGER AUF, NICHT AM AUSLOESER (R22 S9).
+ *
+ * Manche Menues haben keinen sichtbaren Ausloeser: die Personenauswahl der
+ * Aufgabenzeile oeffnet per Rechtsklick und Long-Press, ihr Knopf steht
+ * unsichtbar am Zeilenanfang (tasks.css). Rechtsbuendig an diesem Knopf
+ * gerechnet hing das Menue am Laptop links neben der Zeile ueber der
+ * Seitenleiste - 148px vom Rechtsklick entfernt, an keiner Stelle, die der
+ * Nutzer angefasst hat. macOS und iOS oeffnen ein Kontextmenue dort, wo der
+ * Finger oder Zeiger ist; dieser Weg tut dasselbe. Der Punkt gilt fuer genau
+ * ein Oeffnen und faellt beim Schliessen weg - ein spaeterer Klick auf einen
+ * sichtbaren Ausloeser rechnet wieder an dem.
+ *
+ * @param {HTMLElement} panel
+ * @param {{x: number, y: number}} [point] Zeigerposition im Viewport.
+ * @returns {boolean} ob ein Panel da war.
+ */
+export function showPopoverMenuAt(panel, point) {
+  if (!panel || typeof panel.showPopover !== 'function') return false;
+  if (point && Number.isFinite(point.x) && Number.isFinite(point.y) && panel.dataset) {
+    panel.dataset.anchorX = String(Math.round(point.x));
+    panel.dataset.anchorY = String(Math.round(point.y));
+  }
+  if (!panel.matches(':popover-open')) panel.showPopover();
+  return true;
+}
+
+function anchorPointOf(panel) {
+  const x = Number(panel.dataset?.anchorX);
+  const y = Number(panel.dataset?.anchorY);
+  if (panel.dataset?.anchorX == null || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+function dropAnchorPoint(panel) {
+  if (!panel.dataset) return;
+  delete panel.dataset.anchorX;
+  delete panel.dataset.anchorY;
+}
+
+/**
  * Der Ausloeser eines Menues. EIN Menue darf ZWEI Ausloeser haben, von denen
  * je Breite einer steht (Aufteilung, R17: das Gruppen-Werkzeug im Gruppenkopf
  * am Desktop, in der Salden-Zeile am Telefon) - `popovertarget` erlaubt das,
@@ -327,12 +367,27 @@ function onToggle(event) {
 
   if (event.newState !== 'open') {
     unwatchScroll(panel);
+    dropAnchorPoint(panel);
     panel.style.opacity = '';
     panel.style.transform = '';
     return;
   }
 
-  if (trigger) {
+  const point = anchorPointOf(panel);
+  if (point) {
+    const width = panel.offsetWidth || 200;
+    const height = panel.offsetHeight || 48;
+    // Die linke obere Ecke am Zeiger; reicht der Platz rechts oder unten
+    // nicht, kippt das Menue auf die andere Seite des Punkts - wie das
+    // Kontextmenue des Systems.
+    const flipX = point.x + width > window.innerWidth - 8;
+    const flipY = point.y + height > window.innerHeight - 8;
+    const left = Math.min(Math.max(8, flipX ? point.x - width : point.x), window.innerWidth - width - 8);
+    const top = Math.max(8, flipY ? point.y - height : point.y);
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+    panel.style.transformOrigin = `${flipY ? 'bottom' : 'top'} ${flipX ? 'right' : 'left'}`;
+  } else if (trigger) {
     const rect = trigger.getBoundingClientRect();
     const width = panel.offsetWidth || 200;
     const height = panel.offsetHeight || 48;
