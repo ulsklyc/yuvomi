@@ -16986,6 +16986,27 @@ test('Wand-Leser: jede Hoehen-Einheit ist eine Skala, nur die Bildschirmhoehe ni
   assert.equal(hits('--wall-gap: 3vmax'), 0);
 });
 
+// R22 S8 (Critique a5): hochkant (834x1112) standen zwei Programmtitel und die
+// Wetterzeile abgeschnitten ueber einem Drittel leerer Flaeche. Hochkant ist
+// die Hoehe da: zwei Titelzeilen, die Wetterzeile bricht um. Quer bleibt es bei
+// einer Zeile. Die Wetterregel muss NACH der Grundregel stehen (gleiche
+// Spezifitaet), sonst gewinnt deren `nowrap` - so stand sie im ersten Wurf.
+test('hochkant tragen die Wandzeilen zwei Titelzeilen, die Wetterzeile bricht um', () => {
+  const rules = [...eachRule(read('../public/styles/dashboard.css'))];
+  const portrait = (sel) => rules.filter((r) => r.at.some((a) => /\(orientation:\s*portrait\)/.test(a)) && r.selector.trim() === sel);
+  const [title] = portrait('.wall-row__title');
+  assert.ok(title, 'keine Hochkant-Regel fuer den Programmtitel');
+  assert.match(title.body, /line-clamp:\s*2/);
+  const [desc] = portrait('.wall-weather__desc');
+  assert.ok(desc, 'keine Hochkant-Regel fuer die Wetterzeile');
+  assert.match(desc.body, /white-space:\s*normal/);
+  assert.match(desc.body, /line-clamp:\s*2/);
+  const baseIdx = rules.findIndex((r) => !r.at.length && r.selector.trim() === '.wall-weather__desc');
+  assert.ok(rules.indexOf(desc) > baseIdx, 'die Hochkant-Regel steht vor der Grundregel und verliert gegen deren nowrap');
+  const base = rules.find((r) => !r.at.length && r.selector.trim() === '.wall-row__title');
+  assert.match(base.body, /line-clamp:\s*1/, 'quer bleibt es bei einer Zeile');
+});
+
 test('die Distanzskala der Wand haengt an der KNAPPEN Seite, nicht an der Hoehe', () => {
   // GEMESSEN, NICHT GERATEN. Mit `vh` in der Mitte des clamp() wurden die
   // Zeilen auf einem Tablet im HOCHFORMAT (768x1024) groesser - dort ist Hoehe

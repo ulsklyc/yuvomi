@@ -5924,6 +5924,21 @@ button.today-cockpit__more--link {
   }
 }
 
+/* HOCHKANT IST DIE HOEHE DA, DIE BREITE NICHT (R22, Critique a5). Ein Tablett
+ * hochkant (834x1112) traegt zwei Spalten, die Programmspalte ist 470px breit,
+ * und bei 33px Titelgroesse standen "Geburtstagstorte..." und
+ * "Buechereiausweise..." abgeschnitten - ueber einem Drittel leerer Flaeche.
+ * Quer bleibt es bei einer Zeile (dort rechnet die Hoehe oben); hochkant
+ * reichen vier Zeilen mit je zwei Titelzeilen weit in den freien Raum. Die
+ * Wetterzeile bricht dort ebenfalls um (unter `.wall-weather__desc`). */
+@media (orientation: portrait) {
+  .wall-row__title {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-wrap: balance;
+  }
+}
+
 /* AUCH DIE UNTERZEILE BLEIBT EINE ZEILE (#1698). Bis dahin stand dort ein
  * Wort aus der App („Termin", „Aufgabe"); seit sie den Namen des Kalenders
  * traegt, steht dort Nutzereingabe - „Familienkalender Schule und Vereine"
@@ -6267,6 +6282,18 @@ button.today-cockpit__more--link {
   white-space: nowrap;
   font-size: var(--wall-row-sub);
   color: var(--color-text-secondary);
+}
+
+/* Hochkant zwei Zeilen statt "Leichter Nieselregen · Dortmun..." in 240px
+ * (R22, siehe `.wall-row__title`). */
+@media (orientation: portrait) {
+  .wall-weather__desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
 }
 
 .wall-weather__forecast {
