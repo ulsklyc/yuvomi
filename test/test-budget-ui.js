@@ -7611,3 +7611,16 @@ test('R22 D9: die Darlehenskarte fuehrt mit der Zahl, "Restschuld" steht in der 
   assert.doesNotMatch(rule?.body ?? '', /text-transform|letter-spacing/, 'kein Versal-Eyebrow');
   assert.match(rule?.body ?? '', /display:\s*inline/, 'im Fluss der Bezugszeile (`.budget-loan-card__amounts span` ist sonst block)');
 });
+
+// Critique R22 (D9, a4 Klein): die Kennzahl-Spalte der Abos begann 12px unter
+// der Werkzeuglinie der Liste (padding-block der Kennzahl-Zeile) und streckte
+// ihre Karten per 1fr auf gleiche Hoehe. Gemessen 1280: Karten y 141 -> 129,
+// Hoehen 110/110/110 -> 110/85/85 - wie die Spalte der Darlehen.
+test('R22 D9: die Abo-Spalte beginnt an der Werkzeuglinie, ihre Karten sind so hoch wie ihr Inhalt', () => {
+  const css = read('../public/styles/subscriptions.css');
+  const rail = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-page .subscriptions-summary > .metric-grid'
+    && r.at.some((a) => /min-width:\s*960px/.test(a)));
+  assert.ok(rail, 'die Spaltenregel der Abos fehlt');
+  assert.match(rail.body, /grid-auto-rows:\s*auto/);
+  assert.match(rail.body, /padding-block:\s*0/);
+});

@@ -58,9 +58,16 @@
     grid-row: 1;
   }
 
+  /* WIE DIE SPALTE DER DARLEHEN (R22, D9; budget.css `.budget-loans >
+   * .metric-grid`): die Spalte beginnt an der Werkzeuglinie der Liste (vorher
+   * 12px darunter, das `padding-block` der Kennzahl-Zeile), und jede Karte ist
+   * so hoch wie ihr Inhalt - `1fr` streckte "Jahresprognose" auf die Hoehe der
+   * Karte mit Fortschrittsbalken, eine Spalte stapelt, sie reiht nicht. */
   .budget-page .subscriptions-summary > .metric-grid {
     --summary-cards: 1;
     --metric-value-size: var(--text-3xl);
+    grid-auto-rows: auto;
+    padding-block: 0;
   }
 
   .budget-page .subscriptions-list-section {
