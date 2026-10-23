@@ -2158,14 +2158,16 @@ button.budget-bar-row:focus-visible {
 
 /* LANGE LISTEN RECHNEN NUR, WAS IN SICHT IST (Critique R21 S8; dieselbe Regel
  * wie Kontakte und Rezepte, je Zeile): ein Monat mit vielen Buchungen haelt
- * sonst jede Zeile im Stil- und Layoutlauf, auch die weit unter der Falz. Die
- * Zeile ist 62px hoch (gemessen 390 und 1280px); ihre Trennlinie ist ihr
- * eigener Rand und bleibt, der Fokusring darf ueber die Kante. */
+ * sonst jede Zeile im Stil- und Layoutlauf, auch die weit unter der Falz. Ihre
+ * Trennlinie ist ihr eigener Rand und bleibt, der Fokusring darf ueber die
+ * Kante. Seit R22 (D4) wie die Kontakte: erst ab Zeile 20, und der Platzhalter
+ * ist die Content-Box (45px, gemessen 390 und 1280px) - die 62px der ganzen
+ * Zeile lagen mit Polster und Rand als 79 statt 61 da. */
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
-  .budget-list > .list-row,
-  .budget-ledger-section__rows > .list-row {
+  .budget-list > .list-row:nth-child(n+20),
+  .budget-ledger-section__rows > .list-row:nth-child(n+20) {
     content-visibility: auto;
-    contain-intrinsic-size: auto none auto 62px;
+    contain-intrinsic-size: auto none auto 45px;
     overflow-clip-margin: var(--space-1);
   }
 }

@@ -50,9 +50,11 @@
 
 /* Lange Listen rechnen nur, was in Sicht ist - dieselbe Regel wie bei den
  * Kontakten (contacts.css, Modern-Web-Guidance-Audit Befund 18). 300 Rezepte:
- * 460 ms am Stueck bei 4x CPU, mit der Regel 357 ms. Zeile 64px, gemessen. */
+ * 460 ms am Stueck bei 4x CPU, mit der Regel 357 ms. Zeile 64px, gemessen -
+ * sie hat kein Polster, Content-Box und Zeile sind gleich hoch. Seit R22 (D4)
+ * erst ab Zeile 20: die Falz steht immer. */
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
-  .recipes-list .recipe-row-item {
+  .recipes-list .recipe-row-item:nth-child(n+20) {
     content-visibility: auto;
     contain-intrinsic-size: auto none auto 64px;
   }

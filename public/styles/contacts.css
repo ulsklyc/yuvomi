@@ -176,14 +176,22 @@
  * Befund 18; Guide defer-rendering-heavy-content). 500 Kontakte sind 22.000
  * Knoten; der Wechsel nach /contacts hielt die Seite bei 4x CPU 781 ms am
  * Stueck, mit dieser Regel 568 ms. Zeilen ausserhalb der Sicht ueberspringt
- * der Browser, bis sie in die Naehe kommen; die Hoehe (65px, gemessen) steht
- * als Platzhalter da, `auto` merkt sich danach die echte - der Bildlaufbalken
- * springt nicht. Fokusringe liegen in der Zeile innen und bleiben ganz
- * (im Browser geprueft). Ohne Unterstuetzung bleibt alles, wie es war. */
+ * der Browser, bis sie in die Naehe kommen; `auto` merkt sich danach die
+ * echte Hoehe - der Bildlaufbalken springt nicht. Fokusringe liegen in der
+ * Zeile innen und bleiben ganz (im Browser geprueft). Ohne Unterstuetzung
+ * bleibt alles, wie es war.
+ *
+ * ERST AB ZEILE 20, UND DER PLATZHALTER IST DIE CONTENT-BOX (Critique R22, D4).
+ * `contain-intrinsic-size` gilt der Content-Box; hier standen die 65px der
+ * ganzen Zeile, die mit 16px Polster als 81 statt 64 lag. Beim Aufbau
+ * schrumpften die Zeilen an der Falz in den ersten Frames und zogen die
+ * Gruppen darunter hoch: CLS 0,098 mobil bei 4x CPU, 0,018 am Desktop. Die
+ * ersten 19 Zeilen einer Gruppe stehen immer (sie sind die Falz), der Rest
+ * haelt seine echte Content-Hoehe (48px, gemessen 390 und 1280px). */
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
-  .contact-group__list > .contact-item {
+  .contact-group__list > .contact-item:nth-child(n+20) {
     content-visibility: auto;
-    contain-intrinsic-size: auto none auto 65px;
+    contain-intrinsic-size: auto none auto 48px;
   }
 }
 

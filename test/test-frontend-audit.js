@@ -23035,8 +23035,8 @@ test('router: every page sheet @import is preloaded alongside its sheet', () => 
  */
 test('long contact and recipe lists skip rendering rows out of view', () => {
   const expect = [
-    ['../public/styles/contacts.css', '.contact-group__list > .contact-item'],
-    ['../public/styles/recipes.css', '.recipes-list .recipe-row-item'],
+    ['../public/styles/contacts.css', '.contact-group__list > .contact-item:nth-child(n+20)'],
+    ['../public/styles/recipes.css', '.recipes-list .recipe-row-item:nth-child(n+20)'],
   ];
   for (const [file, selector] of expect) {
     const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
@@ -23052,6 +23052,33 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
       `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
   }
   assert.ok(![...eachRule(read('../public/styles/notes.css'))].some((r) => /content-visibility/.test(r.body)), 'Notizen bleiben ohne (Masonry-Spalten)');
+});
+
+/**
+ * R22 D4 (a3/a6 P2 Kontakte): KEIN SPRUNG DURCH DEN PLATZHALTER. Zeilenweise
+ * aufgeschoben wird erst ab Zeile 20 - die Falz steht immer -, und
+ * `contain-intrinsic-size` ist die CONTENT-Box, nicht die Zeile: die Kontakte
+ * trugen 65px, die mit 16px Polster als 81 statt 64 lagen, und beim Aufbau
+ * zogen die schrumpfenden Zeilen die Gruppen darunter hoch (CLS 0,098 mobil
+ * bei 4x CPU, 0,018 am Desktop; Budget 62 statt 45). Die Zahlen sind gemessen
+ * (390 und 1280px); wer die Zeile umbaut, misst neu.
+ */
+test('R22 D4: zeilenweise erst ab Zeile 20, Platzhalter = Content-Box der Zeile', () => {
+  const rows = [
+    ['../public/styles/contacts.css', '.contact-group__list > .contact-item', 48],
+    ['../public/styles/recipes.css', '.recipes-list .recipe-row-item', 64],
+    ['../public/styles/budget.css', '.budget-list > .list-row', 45],
+  ];
+  for (const [file, row, contentBox] of rows) {
+    const rules = [...eachRule(read(file))].filter((r) => /content-visibility:\s*auto/.test(r.body));
+    const rule = rules.find((r) => r.selector.split(',').some((sel) => sel.replace(/\s+/g, ' ').trim().startsWith(row)));
+    assert.ok(rule, `${file}: keine aufgeschobene Zeile ${row}`);
+    for (const sel of rule.selector.split(',')) {
+      assert.match(sel.trim(), /:nth-child\(n\+20\)$/, `${sel.trim()}: auch Zeilen in der Falz werden aufgeschoben - sie springen beim Aufbau`);
+    }
+    const size = Number(rule.body.match(/contain-intrinsic-size:\s*auto none auto (\d+)px/)?.[1]);
+    assert.equal(size, contentBox, `${row}: der Platzhalter ist nicht die Content-Box (${contentBox}px gemessen)`);
+  }
 });
 
 /**
@@ -23110,7 +23137,7 @@ test('R21 S8: Agenda, Vorrat, Inventar, Budget und Einkauf rechnen nur, was in S
     ['../public/styles/calendar.css', '.agenda-day + .agenda-day'],
     ['../public/styles/pantry.css', '.pantry-group + .pantry-group'],
     ['../public/styles/inventory.css', '.inventory-list > .list-group + .list-group'],
-    ['../public/styles/budget.css', '.budget-list > .list-row, .budget-ledger-section__rows > .list-row'],
+    ['../public/styles/budget.css', '.budget-list > .list-row:nth-child(n+20), .budget-ledger-section__rows > .list-row:nth-child(n+20)'],
     ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group + .list-group'],
   ];
   for (const [file, selector] of expect) {
