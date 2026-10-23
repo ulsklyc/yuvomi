@@ -30,7 +30,7 @@ import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -383,7 +383,9 @@ export async function render(target, { user } = {}) {
            Liste, waehrend "Transaktionen" und "Kategorie-Budgets" nebenan
            ueber ihrem Traeger stehen. Jetzt h2.u-section-title mit den
            Werkzeugen rechts, darunter der Zeilentraeger (.row-carrier). -->
-      <div class="subscriptions-summary" id="subscriptions-summary"></div>
+      <div class="subscriptions-summary" id="subscriptions-summary">${/* Der Kennzahl-Slot steht ab dem ersten Bild in seiner Form (R22, D4). */ ''}${metricGlanceSkeletonHtml({ lead: true })}
+        <section class="metric-grid metric-grid--led budget-glance-details" aria-hidden="true">${metricCardsSkeletonHtml(3)}</section>
+      </div>
       <section class="subscriptions-list-section" aria-labelledby="subscriptions-list-title">
         <div class="subscriptions-section-head section-toolbar">
           <div class="subscriptions-section-head__lead">

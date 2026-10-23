@@ -94,3 +94,59 @@ export function wireMetricGlance(root, id, onChange) {
     onChange?.(expanded);
   });
 }
+
+/**
+ * DER KENNZAHL-SLOT STEHT AB DEM ERSTEN BILD (Critique R22, D4). Abos und
+ * Aufteilung bauten Kurzzeile und Kennzahlkarten erst mit den Daten; bis dahin
+ * war der Slot leer, und die Liste darunter rutschte beim Eintreffen um ihre
+ * Hoehe nach unten - gemessen nach dem Reiterwechsel mobil 0,0996 (Abos) und
+ * 0,060 (Aufteilung), am Laptop 0,025. CLS verschweigt das, weil der Sprung
+ * einer Eingabe folgt (`hadRecentInput`).
+ *
+ * Das Skelett ist dasselbe Markup wie die echte Zeile und die echten Karten,
+ * nur mit Platzhaltertext in `.skeleton-text` (durchsichtig, Schimmer): die
+ * Hoehen kommen aus denselben Regeln, nicht aus nachgerechneten Zahlen.
+ *
+ * @param {object} [o]
+ * @param {boolean} [o.lead]      wie `metricGlanceHtml` - die Zahl fuehrt
+ * @param {boolean} [o.controls]  die echte Zeile klappt auf (Pfeil)
+ * @param {number}  [o.flows]     Zahl der Nebenwerte (0-2)
+ * @returns {string}
+ */
+export function metricGlanceSkeletonHtml({ lead = false, controls = true, flows = 1 } = {}) {
+  const bar = (text) => `<span class="skeleton skeleton-text">${text}</span>`;
+  const side = Math.max(0, Math.min(2, flows));
+  const flowsHtml = side ? `
+        <span class="budget-glance__flows">${Array.from({ length: side }, () => `
+          <span class="budget-glance__flow">${bar('0000000 00,00')}</span>`).join('')}
+        </span>` : '';
+  return `
+    <div class="row-carrier budget-glance${lead ? ` ${glanceLeadClass('000,00')}` : ''}" aria-hidden="true">
+      <div class="budget-glance__row${controls ? ' budget-glance__balance' : ' budget-glance__row--static'}">
+        <span class="budget-glance__lead">
+          <span class="budget-glance__label">${bar('0000000000')}</span>
+          <span class="budget-glance__value budget-glance__value--neutral">${bar('000,00')}</span>
+        </span>${flowsHtml}${controls ? `
+        <span class="budget-glance__chevron icon-sm"></span>` : ''}
+      </div>
+    </div>`;
+}
+
+/**
+ * Kennzahlkarten als Skelett in ihrer Form (siehe oben): Beschriftung, Wert
+ * und auf Wunsch eine Fussnote je Karte.
+ * @param {number} [count]
+ * @param {object} [o]
+ * @param {boolean} [o.note]  die echten Karten tragen eine Fussnote
+ * @param {string} [o.tag]    Element der echten Karte (`article` oder `div`)
+ * @returns {string}
+ */
+export function metricCardsSkeletonHtml(count = 3, { note = true, tag = 'article' } = {}) {
+  const bar = (text) => `<span class="skeleton skeleton-text">${text}</span>`;
+  return Array.from({ length: Math.max(1, count) }, () => `
+    <${tag} class="metric-card" aria-hidden="true">
+      <div class="metric-card__label">${bar('0000000000')}</div>
+      <div class="metric-card__value">${bar('000,00')}</div>${note ? `
+      <div class="metric-card__note">${bar('0000000000')}</div>` : ''}
+    </${tag}>`).join('');
+}

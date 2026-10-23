@@ -7372,7 +7372,7 @@ test('R21 S7: Aufteilung - Gruppenwahl zuerst, die Kennzahl in der Spalte der Gr
   const layout = src.indexOf('<div class="split-layout">');
   const panel = src.indexOf('<aside class="split-groups-panel">');
   const column = src.indexOf('<div class="split-main-column">');
-  const glance = src.indexOf('<div id="split-glance"></div>');
+  const glance = src.indexOf('<div id="split-glance">');
   const summary = src.indexOf('id="split-summary"');
   const main = src.indexOf('<div class="split-main" id="split-main"');
   assert.ok(layout >= 0 && layout < panel && panel < column, 'die Gruppenwahl steht vorn');
@@ -7433,4 +7433,35 @@ test('Zeitraum-Stepper: Links/Rechts loesen den Pfeil aus, RTL gespiegelt, mit M
   const budget = read('../public/pages/budget.js');
   assert.match(budget, /wirePeriodArrowKeys\(_container\.querySelector\('#budget-prev'\)\?\.parentElement \?\? null\)/);
   assert.match(budget, /prev: \{ id: 'budget-prev', label: t\('budget\.prevMonth'\), keys: keys\.prev \}/);
+});
+
+// Critique R22 (D4, a4 P2 Reiter-Skelett): Abos und Aufteilung bauten Kurzzeile
+// und Kennzahlkarten erst mit den Daten; der leere Slot liess die Liste beim
+// Eintreffen nach unten rutschen - nach dem Reiterwechsel gemessen mobil 0,0996
+// (Abos) und 0,060 (Aufteilung), Laptop 0,025; CLS schweigt dazu, weil der
+// Sprung einer Eingabe folgt. Der Slot steht jetzt ab dem ersten Bild in seiner
+// Form: dasselbe Markup, Platzhaltertext in `.skeleton-text`.
+test('R22 D4: Abos und Aufteilung tragen den Kennzahl-Slot ab dem ersten Bild in Zielform', async () => {
+  const { metricGlanceHtml, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } = await import('../public/utils/metric-glance.js');
+  const classesOf = (html) => [...html.matchAll(/class="([^"]+)"/g)].map((m) => m[1].split(/\s+/).filter((c) => !/^(skeleton|skeleton-text|icon-sm)$/.test(c)).join(' ')).filter(Boolean);
+  // Dieselben Bauteile wie die echte Zeile - die Hoehe kommt aus denselben Regeln.
+  const real = metricGlanceHtml({ id: 'x', controls: 'y', expanded: false, label: 'a', value: '113,60 €', lead: true, flows: [{ label: 'b' }] });
+  const skeleton = metricGlanceSkeletonHtml({ lead: true });
+  for (const cls of ['row-carrier budget-glance budget-glance--lead', 'budget-glance__lead', 'budget-glance__label', 'budget-glance__flows', 'budget-glance__flow']) {
+    assert.ok(classesOf(real).includes(cls), `Gegenprobe: die echte Zeile traegt ${cls} nicht mehr`);
+    assert.ok(classesOf(skeleton).includes(cls), `das Skelett der Kurzzeile hat ${cls} nicht`);
+  }
+  assert.match(skeleton, /aria-hidden="true"/);
+  assert.equal((metricCardsSkeletonHtml(2, { note: false, tag: 'div' }).match(/<div class="metric-card"/g) ?? []).length, 2);
+
+  const subs = withoutCommentsKeepingLines(read('../public/pages/subscriptions.js'));
+  assert.match(subs, /<div class="subscriptions-summary" id="subscriptions-summary">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\{ lead: true \}\)\}\s*<section class="metric-grid metric-grid--led budget-glance-details" aria-hidden="true">\$\{metricCardsSkeletonHtml\(3\)\}<\/section>/,
+    'Abos: der Kennzahl-Slot steht leer, bis die Daten kommen');
+  const split = withoutCommentsKeepingLines(read('../public/pages/split-expenses.js'));
+  assert.match(split, /<div id="split-glance">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\)\}<\/div>/, 'Aufteilung: die Kurzzeile steht leer, bis die Daten kommen');
+  assert.match(split, /id="split-summary">\$\{metricCardsSkeletonHtml\(2, \{ note: false, tag: 'div' \}\)\}<\/section>/, 'Aufteilung: die Kennzahlkarten stehen leer, bis die Daten kommen');
+  const layout = read('../public/styles/layout.css');
+  const rule = [...eachRule(layout)].find((r) => r.selector.trim() === '.skeleton-text');
+  assert.match(rule?.body ?? '', /color:\s*transparent/, 'der Platzhaltertext ist lesbar');
+  assert.doesNotMatch(rule?.body ?? '', /display:/, 'der Platzhalter bleibt inline - sonst aendert er die Zeilenbox');
 });

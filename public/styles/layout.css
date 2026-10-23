@@ -9248,6 +9248,15 @@ textarea::placeholder {
   border-radius: var(--radius-xs);
 }
 
+/* Platzhaltertext in der Form des echten Markups (R22, D4; metric-glance.js):
+ * die Zeile behaelt ihre Hoehe aus Schrift und Zeilenhoehe, der Text ist
+ * unsichtbar, die Flaeche schimmert. Inline, damit die Zeilenbox dieselbe
+ * bleibt wie mit echtem Text. */
+.skeleton-text {
+  color: transparent;
+  user-select: none;
+}
+
 .skeleton-line--title  { height: 18px; width: 45%; }
 .skeleton-line--short  { width: 35%; }
 .skeleton-line--medium { width: 60%; }

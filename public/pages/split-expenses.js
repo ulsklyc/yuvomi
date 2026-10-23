@@ -23,7 +23,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
-import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 
 let state = {
@@ -247,8 +247,8 @@ export async function render(container, { user, embedded = false, onAddableChang
         <div class="split-main-column">
           <!-- Mobil EINE Zeile statt drei Karten (R14 P1): die Glance-Zeile
                klappt die Kennzahl-Zeile auf (metric-glance.js, budget.css). -->
-          <div id="split-glance"></div>
-          <section class="metric-grid budget-glance-details" id="split-summary"></section>
+          <div id="split-glance">${/* Der Kennzahl-Slot steht ab dem ersten Bild in seiner Form (R22, D4). */ ''}${metricGlanceSkeletonHtml()}</div>
+          <section class="metric-grid budget-glance-details" id="split-summary">${metricCardsSkeletonHtml(2, { note: false, tag: 'div' })}</section>
           <div class="split-main" id="split-main" aria-busy="true">${renderSkeletonList({ rows: 5, lines: 2 })}</div>
         </div>
       </div>${fab}
