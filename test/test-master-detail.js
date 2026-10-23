@@ -742,6 +742,32 @@ test('Vorwahl: in der Spalte ohne Adress-Auswahl steht die erste sichtbare Zeile
   handle.destroy();
 });
 
+/**
+ * R22 (Critique a2/a6 LoAF, D22): DIE VORWAHL FRAGT NUR BIS ZUR ERSTEN
+ * SICHTBAREN ZEILE. `getClientRects()` an einer Zeile in einer aufgeschobenen
+ * Gruppe (`content-visibility: auto`) zwingt deren Layout nach; die Vorwahl
+ * fragte beim Aufbau JEDE Zeile und hob die Regel am Desktop auf (261
+ * Aufgaben: 162 ms erzwungenes Layout bei 4x CPU, im Frame des Wechsels).
+ */
+test('R22 D22: die Vorwahl misst nur bis zur ersten sichtbaren Zeile', async () => {
+  const p = makePage();
+  p.rows[0].hidden = true;
+  const asked = [];
+  for (const row of p.rows) {
+    const own = row.getClientRects.bind(row);
+    row.getClientRects = () => { asked.push(row.getAttribute('data-md-id')); return own(); };
+  }
+  const handle = md.mountMasterDetail({
+    root: p.root,
+    renderDetail: (id, into) => { p.calls.render.push(id); into.content = [`detail:${id}`]; },
+    openNarrow: (id) => p.calls.narrow.push(id),
+  });
+  await tick();
+  assert.equal(handle.selectedId(), '2', 'die erste SICHTBARE Zeile ist gewaehlt');
+  assert.deepEqual(asked.filter((id) => id > '2'), [], `Zeilen nach der ersten sichtbaren gemessen: ${asked.join(',')}`);
+  handle.destroy();
+});
+
 test('Vorwahl: nie unter der Schwelle, nie gegen ?open=, nie mit preselect:false', () => {
   let p = makePage({ split: false });
   let handle = p.mount({ preselect: true });

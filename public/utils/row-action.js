@@ -102,9 +102,11 @@ export function rowActionEl({ icon, label, action = '', tone = '', className: ex
  * @param {string} opts.label   Name MIT Objekt (`t('common.moreActionsNamed', { name })`)
  * @param {Array}  opts.items   Eintraege wie bei `popoverMenuHtml`; leere/falsche fallen heraus
  * @param {string} [opts.className] zusaetzliche Klasse(n) am Ausloeser
+ * @param {boolean} [opts.defer] Eintraege erst beim Oeffnen einhaengen (lange
+ *        Listen, `popoverMenuHtml`); die Wurzel braucht `installPopoverMenus`
  * @returns {string} leer, wenn kein Eintrag bleibt
  */
-export function rowMenuHtml({ id, label, items = [], className: extra = '' } = {}) {
+export function rowMenuHtml({ id, label, items = [], className: extra = '', defer = false } = {}) {
   const entries = items.filter(Boolean);
   if (!entries.length) return '';
   return popoverMenuHtml({
@@ -112,5 +114,6 @@ export function rowMenuHtml({ id, label, items = [], className: extra = '' } = {
     label,
     items: entries,
     triggerClass: ['row-action', 'row-action--more', extra].filter(Boolean).join(' '),
+    defer,
   });
 }

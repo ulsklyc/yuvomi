@@ -323,8 +323,18 @@ export function mountMasterDetail({
 
   const isSplit = () => root.isConnected && getComputedStyle(detailEl).display !== 'none';
 
-  const rows = () => [...listEl.querySelectorAll('[data-md-id]')]
-    .filter((row) => !row.hidden && row.getClientRects().length > 0);
+  const shown = (row) => !row.hidden && row.getClientRects().length > 0;
+  const rows = () => [...listEl.querySelectorAll('[data-md-id]')].filter(shown);
+  // DIE VORWAHL FRAGT NUR BIS ZUR ERSTEN SICHTBAREN ZEILE (Critique R22, D22).
+  // `getClientRects()` an einer Zeile in einer aufgeschobenen Gruppe
+  // (`content-visibility: auto`) zwingt deren ganzes Layout nach - `rows()`
+  // tat das beim Aufbau fuer JEDE Zeile und hob die Regel am Desktop auf: 261
+  // Aufgaben, 162 ms erzwungenes Layout bei 4x CPU, im Frame des Wechsels.
+  // Die Pfeiltasten fragen weiter alle (dann zaehlt die Reihenfolge).
+  const firstRow = () => {
+    for (const row of listEl.querySelectorAll('[data-md-id]')) if (shown(row)) return row;
+    return null;
+  };
   const rowFor = (id) => listEl.querySelector(`[data-md-id="${CSS.escape(String(id))}"]`);
   const focusTarget = (row) => row?.querySelector('[data-md-focus]') ?? row;
 
@@ -533,7 +543,9 @@ export function mountMasterDetail({
     // Nennt die Adresse eine Auswahl (auch eine, die die Seite selbst
     // einloest - Aufgaben mit `claimInitial: false`), gilt die.
     if (readAddress() != null) return;
-    const ids = rows().map((row) => row.dataset.mdId).filter((id) => id != null && id !== '');
+    const ids = typeof preselect === 'function'
+      ? rows().map((row) => row.dataset.mdId).filter((id) => id != null && id !== '')
+      : [firstRow()?.dataset.mdId].filter((id) => id != null && id !== '');
     if (!ids.length) return;
     const id = typeof preselect === 'function' ? preselect(ids) : ids[0];
     if (id == null || id === '') return;

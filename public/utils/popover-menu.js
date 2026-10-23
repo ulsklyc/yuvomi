@@ -74,7 +74,7 @@ function itemAttrs(attrs) {
 // graues Ghost-Icon neben beringten Knoepfen anderer Module - eine dritte
 // Haut fuer denselben Kopfknopf. Zeilen- und Sonderknoepfe geben ihre Klasse
 // ohnehin selbst mit (rowMenuHtml, Erledigt-von-Wahl).
-export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--secondary btn--icon', icon = 'ellipsis' }) {
+export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--secondary btn--icon', icon = 'ellipsis', defer = false }) {
   const entry = (item, index) => {
     if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';
     // EINE GRUPPE MIT NAMEN (Critique 2026-10-05, R16): `{ group, items }`.
@@ -111,7 +111,33 @@ export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn
             aria-label="${esc(label)}" title="${esc(label)}">
       <i data-lucide="${esc(icon)}" class="icon-md" aria-hidden="true"></i>
     </button>
-    <div class="popover-menu" id="${esc(id)}" popover role="menu">${entries}</div>`;
+    <div class="popover-menu" id="${esc(id)}" popover role="menu">${defer ? `<template ${DEFERRED_ATTR}>${entries}</template>` : entries}</div>`;
+}
+
+/**
+ * EIN ZEILENMENUE ENTSTEHT ERST, WENN ES AUFGEHT (Critique R22, D22).
+ *
+ * Jede Aufgabe trug zwei Menues (Mehr, "Wer hat erledigt?") samt ihrer
+ * Eintraege und Zeichen im Baum: 39 von 83 Knoten je Zeile, 161 Aufgaben
+ * 13.700 Knoten, und jedes Zeichen darin ersetzte Lucide beim Seitenaufbau
+ * einzeln - der Aufbau hielt die Seite bei 4x CPU ueber 300 ms am Stueck.
+ * Geoeffnet wird davon fast nie eines.
+ *
+ * `defer: true` legt die Eintraege in ein `<template>` im Panel: der Parser
+ * baut sie als losen Inhalt, der weder im Dokument steht noch Stil, Layout
+ * oder Zeichen kostet. Das Panel selbst, sein Ausloeser mit `popovertarget`
+ * und alle Attribute bleiben, wie sie sind - dieselbe Zeichenkette, dieselben
+ * `data-action`s. `beforetoggle` haengt die Eintraege direkt vor dem Oeffnen
+ * ein und zeichnet ihre Zeichen (`installPopoverMenus`); wer ein Menue vorher
+ * lesen muss, ruft `expandPopoverMenu`.
+ */
+const DEFERRED_ATTR = 'data-popover-entries';
+
+export function expandPopoverMenu(panel) {
+  const tpl = panel?.querySelector?.(`:scope > template[${DEFERRED_ATTR}]`);
+  if (!tpl) return;
+  tpl.replaceWith(tpl.content);
+  window.lucide?.createIcons?.({ el: panel });
 }
 
 /**
@@ -204,7 +230,7 @@ export function syncPopoverMenuItem(root, action, checked) {
 function onBeforeToggle(event) {
   const panel = event.target;
   if (!(panel instanceof HTMLElement) || !panel.matches('.popover-menu')) return;
-  if (event.newState === 'open') { panel.style.opacity = '0'; return; }
+  if (event.newState === 'open') { expandPopoverMenu(panel); panel.style.opacity = '0'; return; }
   // SCHLIESSEN: die Inline-Werte gehen JETZT, nicht erst im `toggle` danach.
   // Der Ausgang (layout.css: `overlay`/`display` diskret, Blende, Schrumpfen)
   // beginnt mit dem Schliessen; blieben Deckkraft und Groesse bis zum spaeter

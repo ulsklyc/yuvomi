@@ -2390,3 +2390,100 @@ test('R20: die Kapseln der Sammel-Pille haben am Finger eine 48px-Trefferflaeche
   const host = coarse.find((r) => r.selector.split(',').some((s) => s.trim() === '.list-bulkbar__action') && /position:\s*relative/.test(r.body));
   assert.ok(host, 'die Kapsel ist der Bezug des Saums');
 });
+
+// --------------------------------------------------------------------------
+// R22 (Critique a2 P2 "lange Listen", D22): eine Zeile baut nur, was man
+// sieht, und die Zeichen kommen in Sicht-Reihenfolge.
+// --------------------------------------------------------------------------
+
+const { expandSwipeReveals, deferredRevealHtml, wireSwipeRows, maybeShowSwipeHint } = await import('../public/utils/swipe-row.js');
+
+test('R22 D22: Mehr-Menue und Aufdeck-Flaechen einer Einkaufszeile entstehen erst bei Bedarf', () => {
+  resetShoppingState();
+  const html = __test.renderItem({ id: 9, name: 'Milch', quantity: '1', category: 'Sonstiges', is_checked: 0, tags: [] });
+  const outside = html.replace(/<template[\s\S]*?<\/template>/g, '');
+  assert.match(html, /role="menu"><template data-popover-entries>[\s\S]*data-action="item-details"[\s\S]*data-action="delete-item"/,
+    'die Eintraege des Mehr-Menues stehen im Baum');
+  assert.equal((html.match(/class="swipe-reveal [^"]*" aria-hidden="true"><template data-swipe-reveal>/g) ?? []).length, 2,
+    'die Aufdeck-Flaechen tragen ihren Inhalt im Baum');
+  assert.doesNotMatch(outside, /popover-menu__item|data-lucide="(?:trash-2|pencil)"/, 'ausserhalb der Templates steht noch ein Eintrag');
+  assert.equal((outside.match(/data-lucide=/g) ?? []).length, 3, 'Haken, Mehr-Knopf und Griff - mehr Zeichen braucht die Zeile nicht');
+});
+
+/** Zeile mit zwei aufgeschobenen Flaechen; zeichnet mit, was eingehaengt wird. */
+function deferredRow() {
+  const listeners = {};
+  const swapped = [];
+  const flaeche = (name) => {
+    const host = { name };
+    host.tpl = { parentElement: host, content: { of: name }, replaceWith(node) { swapped.push(node.of); host.tpl = null; } };
+    return host;
+  };
+  const flaechen = [flaeche('done'), flaeche('delete')];
+  const row = {
+    classList: { add() {}, remove() {} },
+    addEventListener(type, handler) { (listeners[type] ??= []).push(handler); },
+    querySelector: (sel) => (sel === '.shopping-item' ? { style: {} } : null),
+    querySelectorAll: (sel) => (sel === ':scope > .swipe-reveal > template[data-swipe-reveal]' ? flaechen.map((f) => f.tpl).filter(Boolean) : []),
+  };
+  return { row, swapped, fire: (type, e) => listeners[type]?.forEach((h) => h(e)) };
+}
+
+test('R22 D22: der Inhalt der Aufdeck-Flaechen entsteht mit der Beruehrung, nicht mit der Zeile', () => {
+  assert.equal(deferredRevealHtml('<i data-lucide="check"></i>'), '<template data-swipe-reveal><i data-lucide="check"></i></template>');
+  const icons = [];
+  global.window.lucide = { createIcons: ({ el }) => icons.push(el.name) };
+  const doc = global.document.getElementById;
+  try {
+    const z = deferredRow();
+    wireSwipeRows({ querySelectorAll: () => [z.row] }, { card: '.shopping-item', leading: { reveal: '.swipe-reveal--done', run() {} } });
+    assert.deepEqual(z.swapped, [], 'das Verdrahten haengt nichts ein');
+    z.fire('touchstart', { target: {}, touches: [{ clientX: 10, clientY: 10 }] });
+    assert.deepEqual(z.swapped, ['done', 'delete'], 'die Beruehrung haengt beide Flaechen ein');
+    assert.deepEqual(icons, ['done', 'delete'], 'und zeichnet ihre Zeichen');
+    expandSwipeReveals(z.row);
+    assert.equal(z.swapped.length, 2, 'ein zweites Mal baut nichts nach');
+  } finally {
+    delete global.window.lucide;
+    global.document.getElementById = doc;
+  }
+});
+
+test('R22 D22: die Zeichen der Einkaufsliste kommen in Sicht-Reihenfolge, nicht alle im Frame des Wechsels', () => {
+  const calls = [];
+  globalThis.__iconStub = (listEl, opts) => calls.push([listEl, opts]);
+  try {
+    const listEl = { id: 'items-list' };
+    __test.drawItemIcons(listEl);
+    assert.deepEqual(calls, [[listEl, { rowSelector: '.swipe-row', rowsNow: __test.ICON_ROWS_NOW }]],
+      'die Liste zeichnet ueber den geteilten Baustein, je Zeile');
+    const src = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+    const fn = src.match(/function updateItemsList\(container\) \{[\s\S]*?\n\}/)[0];
+    assert.match(fn, /drawItemIcons\(listEl\);/);
+    assert.doesNotMatch(fn, /createIcons\(\{ el: listEl \}\)/, 'alle Zeichen im Frame des Wechsels');
+  } finally {
+    delete globalThis.__iconStub;
+  }
+});
+
+test('R22 D22: der Wisch-Hinweis liest den Viewport per Medienabfrage und zeigt seine Flaeche', () => {
+  // `innerWidth` zwingt mitten im Aufbau ein Layout nach (gemessen 11 ms bei
+  // 1x CPU); die Medienabfrage liest nur den Viewport.
+  let gelesen = 0;
+  Object.defineProperty(global.window, 'innerWidth', { configurable: true, get() { gelesen += 1; return 390; } });
+  const location0 = global.location;
+  global.location = { pathname: '/r22-hinweis' };
+  const icons = [];
+  global.window.lucide = { createIcons: ({ el }) => icons.push(el.name) };
+  try {
+    const z = deferredRow();
+    z.row.addEventListener = () => {};
+    maybeShowSwipeHint({ querySelector: (sel) => (sel === '.swipe-row' ? z.row : null) });
+    assert.equal(gelesen, 0, 'innerWidth erzwingt ein Layout im Aufbau');
+    assert.deepEqual(z.swapped, ['done', 'delete'], 'der Hinweis zeigt die Flaeche mit Inhalt');
+  } finally {
+    delete global.window.innerWidth;
+    delete global.window.lucide;
+    global.location = location0;
+  }
+});

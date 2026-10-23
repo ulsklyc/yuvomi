@@ -347,6 +347,30 @@
   }
 }
 
+/* UND IN DER GRUPPE ERST AB ZEILE 20 (Critique R22, D4/D22). Die Gruppenregel
+ * oben laesst die erste Gruppe ganz stehen - eine Gruppe mit 150 Aufgaben
+ * ("Ohne Datum", eine Kategorie) rechnete jede ihrer Zeilen. Die ersten 19
+ * Zeilen jeder Gruppe stehen immer (sie sind die Falz), der Rest haelt als
+ * Platzhalter seine Content-Box: 85px unter 640px, 80px darueber (gemessen mit
+ * Titel, Faelligkeit, Prioritaet und Kategorie: 84,6 mobil, 80 Tablet und
+ * 1920; 1280/1440 mit Detailspalte 100,6 - dort steht Zeile 20 nie in der
+ * Falz, und `auto` merkt sich danach die echte Hoehe). Die Zeile ist selbst
+ * `overflow: hidden` (Wischbuehne, layout.css) - die Paint-Containment
+ * schneidet nichts ab, was nicht ohnehin geschnitten wird. Wer die Zeile
+ * umbaut, misst neu (test:frontend-audit). */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .task-group .row-carrier > .swipe-row:nth-child(n+20) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 85px;
+  }
+
+  @media (min-width: 640px) {
+    .task-group .row-carrier > .swipe-row:nth-child(n+20) {
+      contain-intrinsic-size: auto none auto 80px;
+    }
+  }
+}
+
 /* --------------------------------------------------------
  * Swipe-Wrapper - Task-spezifische Styles
  * Basis-Styles (.swipe-row, .swipe-reveal und alle drei Reveal-Rollen)

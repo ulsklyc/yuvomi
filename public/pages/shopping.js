@@ -5,8 +5,8 @@
  */
 
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing } from '/utils/ux.js';
-import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
+import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -1331,8 +1331,12 @@ function renderListContent(container) {
   updateItemsList(container);
 
   // Für den ganzen Inhalt, nicht nur die Liste: Quick-Add und Kopfzeile tragen
-  // eigene Icons. Der Lauf in updateItemsList hat die Zeilen schon ersetzt.
-  if (window.lucide) window.lucide.createIcons({ el: content });
+  // eigene Icons. Die Zeilen zeichnet updateItemsList in Sicht-Reihenfolge
+  // (`drawItemIcons`) - ein Lauf ueber den ganzen Inhalt holte die
+  // aufgeschobenen sofort nach.
+  if (window.lucide) {
+    for (const el of content.children) if (el.id !== 'items-list') window.lucide.createIcons({ el });
+  }
   wireAutocomplete(container);
   wireQuickAdd(container);
   syncQuickAddDisclosure(container, false);
@@ -1567,13 +1571,13 @@ function renderItem(item) {
   const ro = readOnly();
   return `
     <div class="swipe-row${ro ? ' swipe-row--static' : ''}" data-swipe-id="${item.id}" data-swipe-checked="${checkedOf(item)}">
-      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+      ${ro ? '' : `<div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">${deferredRevealHtml(`
         <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}" class="icon-xl" aria-hidden="true"></i>
-        <span>${isDone ? t('shopping.swipeBack') : t('shopping.swipeCheck')}</span>
+        <span>${isDone ? t('shopping.swipeBack') : t('shopping.swipeCheck')}</span>`)}
       </div>
-      <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">${deferredRevealHtml(`
         <i data-lucide="trash-2" class="icon-xl" aria-hidden="true"></i>
-        <span>${t('shopping.swipeDelete')}</span>
+        <span>${t('shopping.swipeDelete')}</span>`)}
       </div>`}
       <div class="list-row shopping-item ${isDone ? 'shopping-item--checked' : ''}${ro ? ' shopping-item--static' : ''}"
            data-item-id="${item.id}">
@@ -1601,6 +1605,7 @@ function renderItem(item) {
           ${rowMenuHtml({
             id: `shopping-item-menu-${item.id}`,
             label: t('common.moreActionsNamed', { name: item.name }),
+            defer: true,
             items: [
               { action: 'item-details', id: item.id, icon: 'pencil', label: t('common.edit') },
               { action: 'delete-item', id: item.id, icon: 'trash-2', label: t('common.delete'), danger: true },
@@ -2569,12 +2574,13 @@ function updateItemRow(container, item) {
 
   // Swipe-Affordance (links) spiegelt den neuen Status
   const reveal = row.querySelector('.swipe-reveal--done');
+  // Bleibt aufgeschoben, wie die Zeile sie gebaut hat (`deferredRevealHtml`):
+  // erst die naechste Geste haengt sie ein.
   if (reveal) {
     reveal.replaceChildren();
-    reveal.insertAdjacentHTML('beforeend', `
+    reveal.insertAdjacentHTML('beforeend', deferredRevealHtml(`
       <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}" class="icon-xl" aria-hidden="true"></i>
-      <span>${isDone ? t('shopping.swipeBack') : t('shopping.swipeCheck')}</span>`);
-    if (window.lucide) window.lucide.createIcons({ el: reveal });
+      <span>${isDone ? t('shopping.swipeBack') : t('shopping.swipeCheck')}</span>`));
   }
 }
 
@@ -2956,6 +2962,20 @@ function dropHiddenRows(listEl, before) {
   }
 }
 
+/** So viele Zeilen bekommen ihre Zeichen sofort - mehr stehen auf keinem Bildschirm. */
+const ICON_ROWS_NOW = 30;
+
+/**
+ * DIE ZEICHEN DER LISTE KOMMEN IN SICHT-REIHENFOLGE (Critique R22, D22; der
+ * Baustein ist `drawIconsInSightOrder` in utils/ux.js, wie bei den Aufgaben).
+ * Jede Zeile traegt Haken, Mehr-Knopf und Griff als Lucide-Platzhalter; bei
+ * 259 Artikeln ersetzte `createIcons` rund 800 davon im Frame des Wechsels
+ * (100 ms bei 4x CPU am Laptop).
+ */
+function drawItemIcons(listEl) {
+  drawIconsInSightOrder(listEl, { rowSelector: '.swipe-row', rowsNow: ICON_ROWS_NOW });
+}
+
 function updateItemsList(container) {
   const listEl = container.querySelector('#items-list');
   if (listEl) {
@@ -2969,7 +2989,7 @@ function updateItemsList(container) {
     // nachgelagerte #empty-cta-shopping-Listener entfällt damit.
     mountItems(listEl, container);
     flipPlay(listEl, '.swipe-row[data-swipe-id]', 'data-swipe-id', before);
-    if (window.lucide) window.lucide.createIcons({ el: listEl });
+    drawItemIcons(listEl);
     stagger(listEl.querySelectorAll('.shopping-item'), { host: listEl });
     // Regel 3 in utils/module-access.js: Wischen und Ziehen haben kein Markup,
     // das man wegnehmen koennte - bei `read` bleibt die VERDRAHTUNG aus. Ein
@@ -4747,6 +4767,8 @@ export const __test = {
   toggleShoppingItem,
   listToolsItems,
   loadItems,
+  // R22 (D22): die Zeichen der Liste in Sicht-Reihenfolge.
+  drawItemIcons, ICON_ROWS_NOW,
   deleteItemUndoable,
   clearCheckedUndoable,
   // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen

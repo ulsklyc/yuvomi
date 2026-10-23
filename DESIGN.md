@@ -1175,7 +1175,23 @@ das Verhaeltnis haelt.
   und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
   Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
   nach Hoehe verteilen (Notizen; Einkauf ab 60rem): Platzhalterhoehen liessen Gruppen beim
-  Scrollen die Spalte wechseln. Guard `test:frontend-audit`.
+  Scrollen die Spalte wechseln. Guard `test:frontend-audit`. Seit R22 (D22) auch IN der Gruppe:
+  Aufgaben und Einkauf schieben Zeilen ab `:nth-child(n+20)` auf (Content-Box 85/80px bzw.
+  48px; der Einkauf in jeder Breite, weil der Platzhalter die echte Zeile ist).
+- **Eine Zeile baut nur, was man sieht (R22, D22):** Zeilenmenues (Mehr, "Wer hat erledigt?")
+  legen ihre Eintraege per `popoverMenuHtml({ defer: true })` / `rowMenuHtml({ defer: true })`
+  in ein `<template>`, das `beforetoggle` beim Oeffnen einhaengt (die Wurzel braucht
+  `installPopoverMenus`); Aufdeck-Flaechen tragen ihren Inhalt als `deferredRevealHtml()`,
+  eingehaengt mit `touchstart` bzw. dem Wisch-Hinweis (utils/swipe-row.js). Lucide-Zeichen einer
+  langen Liste kommen je ZEILE in Sicht-Reihenfolge (`drawIconsInSightOrder`, utils/ux.js: Kopf
+  und 30 Zeilen sofort, der Rest in Happen je Task). Wer im Aufbau misst, misst nur, was er
+  braucht: `getClientRects()` an einer aufgeschobenen Zeile zwingt deren Layout nach (Vorwahl
+  der Spaltenform fragt deshalb nur bis zur ersten sichtbaren Zeile, utils/master-detail.js),
+  `innerWidth` erzwingt ein ausstehendes Layout (`matchMedia` nicht). Gemessen mobil 4x CPU,
+  261 Aufgaben/259 Artikel mit je einer Gruppe von 120: Aufbau-Frame 593 -> 263 ms bzw.
+  581 -> 201 ms, Knoten 22.100 -> 11.100 bzw. 13.000 -> 7.800. Guards
+  `test:popover-menu`, `test:task-filters`, `test:shopping-ux`, `test:ux-utils`,
+  `test:master-detail`, `test:frontend-audit`.
 - **Fensterhoehe in einer Rechnung:** `var(--viewport-height)`, nie `100dvh` direkt
   (#1276). Der Token steht auf `100vh` und kippt per `@supports (height: 100dvh)` auf dvh.
   Ein vh-Zwilling davor rettet nur Deklarationen OHNE `var()`/`env()`: mit `var()` gilt

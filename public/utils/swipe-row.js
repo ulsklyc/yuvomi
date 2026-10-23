@@ -110,6 +110,34 @@ function noticeSwappedSides() {
  *                                                   Geste, und zwar andersherum. Nur sie
  *                                                   darf den Umlern-Hinweis auslösen.
  */
+/**
+ * DIE AUFDECK-FLAECHEN ENTSTEHEN ERST MIT DER GESTE (Critique R22, D22).
+ *
+ * Jede Zeile traegt zwei Flaechen mit grossem Zeichen und Wort, gesehen werden
+ * sie nur waehrend eines Wischens - am Zeiger nie. Bei 161 Aufgaben waren das
+ * 322 Zeichen, die Lucide beim Seitenaufbau einzeln ersetzte. Die Flaeche
+ * selbst bleibt im Baum (Lage, Rolle, Farbe, `aria-hidden`); nur ihr Inhalt
+ * liegt als `<template>` darin, bis `touchstart` ihn einhaengt. Der Hinweis
+ * auf der ersten Zeile (`maybeShowSwipeHint`) haengt ihn ebenso vorher ein.
+ *
+ * @param {string} html  Zeichen und Wort der Flaeche
+ * @returns {string}
+ */
+const REVEAL_ATTR = 'data-swipe-reveal';
+
+export function deferredRevealHtml(html) {
+  return `<template ${REVEAL_ATTR}>${html}</template>`;
+}
+
+export function expandSwipeReveals(row) {
+  const templates = row?.querySelectorAll?.(`:scope > .swipe-reveal > template[${REVEAL_ATTR}]`) ?? [];
+  for (const tpl of templates) {
+    const host = tpl.parentElement;
+    tpl.replaceWith(tpl.content);
+    window.lucide?.createIcons?.({ el: host });
+  }
+}
+
 export function wireSwipeRows(listEl, {
   card, ignore = null, leading = null, trailing = null, sidesSwapped = false,
 } = {}) {
@@ -172,6 +200,7 @@ export function wireSwipeRows(listEl, {
       // liefe beim Hochziehen einer Zeile das seitliche Wackeln als Wischweg mit
       // und die Karte rutschte unter dem Finger in ihre Aktion.
       if (ignore && e.target.closest?.(ignore)) { locked = 'scroll'; return; }
+      expandSwipeReveals(row);
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       dx = 0;
@@ -278,7 +307,11 @@ export function wireSwipeRows(listEl, {
 let hintShownForPath = null;
 
 export function maybeShowSwipeHint(container) {
-  if (window.innerWidth >= 1024) return;
+  // `matchMedia` statt `innerWidth` (R22, D22): `innerWidth` zwingt ein
+  // ausstehendes Layout sofort nach - hier steht der Aufruf mitten im Aufbau
+  // einer langen Liste, und das Layout lief danach ein zweites Mal (gemessen
+  // 11 ms je Lauf bei 1x CPU). Die Medienabfrage liest nur den Viewport.
+  if (window.matchMedia?.('(min-width: 1024px)').matches) return;
   if (hintShownForPath === location.pathname) return;
 
   // try/catch wie in noticeSwappedSides: bei blockiertem Storage (Safari privat)
@@ -293,6 +326,7 @@ export function maybeShowSwipeHint(container) {
   const firstRow = container.querySelector('.swipe-row');
   if (!firstRow) return;
 
+  expandSwipeReveals(firstRow);
   firstRow.classList.add('swipe-row--hint');
   firstRow.addEventListener('animationend', () => {
     firstRow.classList.remove('swipe-row--hint');

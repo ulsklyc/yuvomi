@@ -686,6 +686,21 @@
   }
 }
 
+/* UND IN DER KATEGORIE ERST AB ZEILE 20 (Critique R22, D4/D22): die erste
+ * Kategorie steht oben ganz, und am Desktop (Spalten) gilt die Gruppenregel
+ * gar nicht - 150 Artikel rechneten dort jede Zeile. Die ersten 19 Zeilen einer
+ * Kategorie stehen immer; der Rest haelt seine Content-Box (48px in jeder
+ * Breite gemessen, 390 bis 1920 - die Haarlinie ist der Rand der Zeile). Weil
+ * der Platzhalter die echte Hoehe IST, wechselt in den Spalten keine Kategorie
+ * beim Scrollen die Spalte; deshalb gilt diese Regel auch ab 60rem. Die Zeile
+ * ist selbst `overflow: hidden` (Wischbuehne). */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .shopping-page .items-lanes > .list-group .row-carrier > .swipe-row:nth-child(n+20) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 48px;
+  }
+}
+
 @container shopping-surface (min-width: 60rem) {
   /* Die Kategorie kappt weiter ueber `--page-measure` (list-row.css) - hier
    * ist das Mass die Spalte selbst, wie im Liste-+-Detail-Baustein. */

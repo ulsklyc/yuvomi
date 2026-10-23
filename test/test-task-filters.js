@@ -1030,6 +1030,33 @@ test('R20: lange Listen - Gruppen unter der Falz rechnen erst in Sicht, Zeichen 
   assert.doesNotMatch(list, /lucide\.createIcons\(\{ el: listEl \}\)/);
 });
 
+/**
+ * R22 (Critique a2 P2 "lange Listen", D22): EINE ZEILE BAUT NUR, WAS MAN
+ * SIEHT. 161 Aufgaben waren 13.700 Knoten (83 je Zeile): Mehr-Menue und
+ * "Wer hat erledigt?" samt Eintraegen und Zeichen, dazu zwei Aufdeck-Flaechen
+ * mit grossem Zeichen - geoeffnet bzw. gewischt wird fast nie. Eintraege und
+ * Flaecheninhalt liegen jetzt als `<template>` im Panel bzw. in der Flaeche
+ * (popover-menu.js `defer`, swipe-row.js `deferredRevealHtml`); ausserhalb
+ * stehen nur noch Haken, die beiden Ausloeser und der Griff als Zeichen.
+ */
+test('R22 D22: Menues und Aufdeck-Flaechen einer Aufgabenzeile entstehen erst bei Bedarf', () => {
+  const prev = { users: tasks.state.users, groupMode: tasks.state.groupMode, viewMode: tasks.state.viewMode };
+  tasks.state.users = [{ id: 1, display_name: 'Linda' }, { id: 2, display_name: 'Leo' }];
+  try {
+    const html = tasks.renderTaskGroups([
+      { id: 5, title: 'Muell rausbringen', status: 'open', priority: 'none', category: 'household', visibility: 'all', tags: [], subtasks: [], assigned_users: [] },
+    ], 'category');
+    const outside = html.replace(/<template[\s\S]*?<\/template>/g, '');
+    assert.match(html, /<div class="popover-menu" id="task-menu-5" popover role="menu"><template data-popover-entries>[\s\S]*data-action="edit-task"/, 'die Eintraege des Mehr-Menues stehen im Baum');
+    assert.match(html, /role="menu"><template data-popover-entries>[\s\S]*data-action="pick-doer"/, 'die Personenauswahl steht im Baum');
+    assert.equal((html.match(/class="swipe-reveal [^"]*" aria-hidden="true"><template data-swipe-reveal>/g) ?? []).length, 2, 'die Aufdeck-Flaechen tragen ihren Inhalt im Baum');
+    assert.doesNotMatch(outside, /popover-menu__item|data-lucide="(?:eye|pencil|archive|user-round)"/, 'ausserhalb der Templates steht noch ein Eintrag');
+    assert.ok((outside.match(/data-lucide=/g) ?? []).length <= 5, `zu viele Zeichen je Zeile: ${(outside.match(/data-lucide="[^"]+"/g) ?? []).join(' ')}`);
+  } finally {
+    Object.assign(tasks.state, prev);
+  }
+});
+
 function revealEnv({ rowFor = () => true } = {}) {
   const env = { expanded: [], scrolled: [], selected: [] };
   const row = { dataset: { swipeId: '9' }, scrollIntoView: (opts) => env.scrolled.push(opts) };

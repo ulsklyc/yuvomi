@@ -33,6 +33,43 @@ function commonHost(els) {
 }
 
 /**
+ * DIE ZEICHEN EINER LANGEN LISTE KOMMEN IN SICHT-REIHENFOLGE (R20 Aufgaben,
+ * seit R22 geteilt mit dem Einkauf, D22). Jede Zeile traegt Lucide-Platzhalter;
+ * `createIcons` ueber die ganze Liste ersetzte bei 260 Zeilen rund tausend im
+ * Frame des Wechsels. Was nicht in einer Zeile steht (Gruppenkoepfe,
+ * Leerzustand) und die ersten `rowsNow` Zeilen bekommen ihre Zeichen sofort,
+ * der Rest danach in Happen je Task, sodass ein Tipp dazwischen drankommt.
+ * JE ZEILE, NICHT JE GRUPPE: eine Gruppe mit 120 Aufgaben war vorher ein
+ * einziger Happen im Frame des Wechsels. Ein neueres Zeichnen derselben Liste
+ * bricht den Rest ab; was nicht mehr im Dokument haengt, bleibt liegen.
+ *
+ * @param {Element} listEl
+ * @param {object} opts
+ * @param {string} opts.rowSelector  Selektor einer Zeile
+ * @param {number} [opts.rowsNow=30] so viele Zeilen sofort - mehr stehen auf keinem Bildschirm
+ * @param {number} [opts.chunk=120]  so viele Zeichen je Nachlauf-Task
+ */
+const iconRuns = new WeakMap();
+
+export function drawIconsInSightOrder(listEl, { rowSelector, rowsNow = 30, chunk = 120 } = {}) {
+  if (!window.lucide || !listEl) return;
+  const run = (iconRuns.get(listEl) ?? 0) + 1;
+  iconRuns.set(listEl, run);
+  const later = new Set([...listEl.querySelectorAll(rowSelector)].slice(rowsNow));
+  const rest = [];
+  for (const node of listEl.querySelectorAll('i[data-lucide]')) {
+    if (later.size && later.has(node.closest(rowSelector))) rest.push(node);
+    else window.lucide.createIcons({ el: node });
+  }
+  const next = () => {
+    if (iconRuns.get(listEl) !== run) return;
+    for (const node of rest.splice(0, chunk)) if (node.isConnected) window.lucide.createIcons({ el: node });
+    if (rest.length) setTimeout(next, 0);
+  };
+  if (rest.length) setTimeout(next, 0);
+}
+
+/**
  * Gestaffeltes Einblenden einer NodeList oder eines Arrays von Elementen -
  * EINMAL je Listentraeger (siehe `staggeredHosts`).
  * Maximal MAX_STAGGER Elemente werden verzögert, der Rest sofort eingeblendet.

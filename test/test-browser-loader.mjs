@@ -372,6 +372,9 @@ const STUBS = {
     export const requestHeadCollapse = (toolbar, collapsed) => { globalThis.__headCollapse?.(toolbar, collapsed); };
     // Reine Pruefung ohne DOM - der Stub rechnet wie das Original.
     export const isImeComposing = (event) => Boolean(event?.isComposing || event?.keyCode === 229);
+    // Zeichen in Sicht-Reihenfolge (R22): wer sehen will, WIE eine Seite
+    // zeichnen laesst, setzt globalThis.__iconStub; das Original haelt test:ux-utils.
+    export const drawIconsInSightOrder = (listEl, opts) => { globalThis.__iconStub?.(listEl, opts); };
   `,
   // Inhaltswechsel und Listenbewegung (R16): ohne Layout gibt es nichts zu
   // bewegen - der Tausch selbst muss trotzdem laufen, genau einmal und

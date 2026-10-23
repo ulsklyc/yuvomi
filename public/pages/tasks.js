@@ -8,8 +8,8 @@ import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
 import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
-import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing } from '/utils/ux.js';
-import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
+import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
+import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
@@ -352,13 +352,13 @@ function renderSwipeRow(task, innerHtml) {
   const isDone = task.status === 'done';
   return `
     <div class="swipe-row" data-swipe-id="${task.id}" data-swipe-status="${task.status}">
-      <div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">
+      <div class="swipe-reveal swipe-reveal--done swipe-reveal--leading" aria-hidden="true">${deferredRevealHtml(`
         <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}" class="icon-xl" aria-hidden="true"></i>
-        <span>${isDone ? t('tasks.swipeOpen') : t('tasks.swipeDone')}</span>
+        <span>${isDone ? t('tasks.swipeOpen') : t('tasks.swipeDone')}</span>`)}
       </div>
-      <div class="swipe-reveal swipe-reveal--edit swipe-reveal--trailing" aria-hidden="true">
+      <div class="swipe-reveal swipe-reveal--edit swipe-reveal--trailing" aria-hidden="true">${deferredRevealHtml(`
         <i data-lucide="eye" class="icon-xl" aria-hidden="true"></i>
-        <span>${t('tasks.swipeView')}</span>
+        <span>${t('tasks.swipeView')}</span>`)}
       </div>
       ${innerHtml}
     </div>`;
@@ -665,6 +665,7 @@ function renderTaskCard(task, opts = {}) {
           id: `task-menu-${task.id}`,
           label: t('common.moreActionsNamed', { name: task.title }),
           className: 'task-card__inline-action',
+          defer: true,
           items: [
             { action: 'edit-task', id: task.id, icon: 'pencil', label: t('common.edit') },
             !archived && !task.parent_task_id
@@ -3562,6 +3563,9 @@ function renderDoerPicker(task, isDone, archived) {
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
     })),
+    // Je Zeile ein Menue, geoeffnet fast nie: die Eintraege entstehen erst
+    // beim Oeffnen (R22, D22; popover-menu.js `defer`).
+    defer: true,
   });
 }
 
@@ -3845,39 +3849,19 @@ async function loadHistory(container, { append = false, afterWrite = false, quie
 
 /** So viele Zeilen bekommen ihre Zeichen sofort - mehr stehen auf keinem Bildschirm. */
 const ICON_ROWS_NOW = 30;
-let iconRun = 0;
 
 /**
  * DIE ZEICHEN DER LISTE KOMMEN IN SICHT-REIHENFOLGE (R20, Re-Critique
  * 2026-10-17 a6 P2). Jede Zeile traegt mehrere Lucide-Platzhalter; bei 200
  * Aufgaben ersetzte `createIcons` rund tausend davon im Frame des Wechsels
  * (210 ms bei 4x CPU). Die ersten ICON_ROWS_NOW Zeilen - der Bildschirm und
- * mehr - bekommen ihre Zeichen sofort, die uebrigen Gruppen danach je eine
- * pro Task, sodass ein Tipp dazwischen drankommt. Ein neueres Neuzeichnen
- * bricht den Rest ab (seine Gruppen haengen dann ohnehin nicht mehr).
+ * mehr - bekommen ihre Zeichen sofort, der Rest danach in Happen je Task.
+ * Seit R22 (D22) je ZEILE statt je Gruppe und als geteilter Baustein
+ * (`drawIconsInSightOrder`, utils/ux.js): eine Gruppe mit 120 Aufgaben war
+ * sonst ein einziger Happen im Frame des Wechsels.
  */
 function drawTaskIcons(listEl) {
-  if (!window.lucide) return;
-  const run = ++iconRun;
-  const groups = [...listEl.querySelectorAll(':scope > .task-group')];
-  let rows = 0;
-  let i = 0;
-  while (i < groups.length && rows < ICON_ROWS_NOW) {
-    window.lucide.createIcons({ el: groups[i] });
-    rows += groups[i].querySelectorAll('.swipe-row').length;
-    i += 1;
-  }
-  // Was ausserhalb der Gruppen steht (Leerzustand, Such-Ruecksetzer), sofort.
-  for (const el of listEl.children) if (!el.classList.contains('task-group')) window.lucide.createIcons({ el });
-  const rest = groups.slice(i);
-  const next = () => {
-    if (run !== iconRun) return;
-    const group = rest.shift();
-    if (!group) return;
-    if (group.isConnected) window.lucide.createIcons({ el: group });
-    setTimeout(next, 0);
-  };
-  if (rest.length) setTimeout(next, 0);
+  drawIconsInSightOrder(listEl, { rowSelector: '.swipe-row', rowsNow: ICON_ROWS_NOW });
 }
 
 function renderTaskList(container, { paneQuiet = false } = {}) {

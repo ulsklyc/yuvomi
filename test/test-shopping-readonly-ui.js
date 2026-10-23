@@ -40,6 +40,13 @@ installMiniDom();
 // Der Einkauf ruft `window.yuvomi.showToast` ohne `?.`.
 globalThis.window.yuvomi = { showToast() {}, ...globalThis.window.yuvomi };
 globalThis.window.innerWidth = 1280;
+// Ein Desktop-Fenster auch fuer die Medienabfrage: der Wisch-Hinweis fragt
+// seit R22 `matchMedia('(min-width: 1024px)')` statt `innerWidth` (swipe-row.js).
+const matchMedia0 = globalThis.window.matchMedia;
+globalThis.window.matchMedia = (query) => {
+  const min = /min-width:\s*(\d+)px/.exec(query);
+  return min ? { matches: globalThis.window.innerWidth >= Number(min[1]), addEventListener() {}, removeEventListener() {} } : matchMedia0(query);
+};
 
 // Die echte Sammel-Pille (utils/bulk-pill.js) setzt Klassen ueber `classList`;
 // der Mini-DOM kennt nur das Attribut. Ein duenner Aufsatz darauf, damit das

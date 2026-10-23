@@ -13003,7 +13003,9 @@ test('Render-Funktionen mit mehreren Aufrufern materialisieren ihre Icons selbst
 
     for (const [name, body] of fns) {
       if (!/\.(insertAdjacentHTML|replaceChildren)\s*\(/.test(body)) continue;
-      if (!/data-lucide=/.test(body)) continue;
+      // Was in ein `<template>` geht (R22, swipe-row.js `deferredRevealHtml`),
+      // materialisiert erst, wer es einhaengt - hier waere es ein Leerlauf.
+      if (!/data-lucide=/.test(body.replace(/deferredRevealHtml\(`[\s\S]*?`\)/g, ''))) continue;
       if (materialises(body)) continue;
       if (/document\.createElement\(/.test(body) && /\breturn\b/.test(body)) continue; // Element-Fabrik
 
@@ -23068,6 +23070,10 @@ test('R22 D4: zeilenweise erst ab Zeile 20, Platzhalter = Content-Box der Zeile'
     ['../public/styles/contacts.css', '.contact-group__list > .contact-item', 48],
     ['../public/styles/recipes.css', '.recipes-list .recipe-row-item', 64],
     ['../public/styles/budget.css', '.budget-list > .list-row', 45],
+    // R22 S3 (D22): Aufgaben und Einkauf auch IN der Gruppe - eine Gruppe mit
+    // 120 Zeilen rechnete jede. Content-Box gemessen 390-1920px.
+    ['../public/styles/tasks.css', '.task-group .row-carrier > .swipe-row', 85],
+    ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group .row-carrier > .swipe-row', 48],
   ];
   for (const [file, row, contentBox] of rows) {
     const rules = [...eachRule(read(file))].filter((r) => /content-visibility:\s*auto/.test(r.body));
@@ -23079,6 +23085,14 @@ test('R22 D4: zeilenweise erst ab Zeile 20, Platzhalter = Content-Box der Zeile'
     const size = Number(rule.body.match(/contain-intrinsic-size:\s*auto none auto (\d+)px/)?.[1]);
     assert.equal(size, contentBox, `${row}: der Platzhalter ist nicht die Content-Box (${contentBox}px gemessen)`);
   }
+  // Ab 640px steht die Aufgabenzeile einzeilig in der Metazeile: 80px.
+  const wide = [...eachRule(read('../public/styles/tasks.css'))].find((r) => r.selector.trim() === '.task-group .row-carrier > .swipe-row:nth-child(n+20)'
+    && r.at.some((at) => /min-width:\s*640px/.test(at)));
+  assert.match(wide?.body ?? '', /contain-intrinsic-size:\s*auto none auto 80px/, 'Aufgaben ab 640px: Platzhalter 80px (gemessen 834 und 1920)');
+  // Der Einkauf in JEDER Breite: am Desktop gilt die Gruppenregel nicht, und
+  // weil der Platzhalter die echte Zeile ist, wechselt keine Kategorie die Spalte.
+  const shopRow = [...eachRule(read('../public/styles/shopping.css'))].find((r) => /\.row-carrier > \.swipe-row:nth-child/.test(r.selector));
+  assert.ok(!shopRow.at.some((at) => /@container/.test(at)), 'Einkaufszeilen: auch ab 60rem aufschieben');
 });
 
 /**

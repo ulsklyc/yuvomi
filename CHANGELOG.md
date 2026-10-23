@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrived. The old page now stays until the new one has drawn, then the two swap in one frame
   together with the highlight. Going into a page and back out (settings, health areas) still
   slides as before.
+- **Long task and shopping lists open faster.** Every row used to carry its More menu, the
+  "Who did it?" menu and both swipe panels with all their entries and icons, although they are
+  rarely opened; with a few hundred rows that was half of the page. They are now built when you
+  open or swipe them. Rows further down a long group are drawn when they come near, and their icons
+  arrive right after the first screen. On a wide screen the two-column view no longer lays out the
+  whole list just to pick the first row. Opening a list of 260 tasks on a slow phone now holds the
+  screen for about half as long.
 - **Budget tabs and Health no longer jump while they load.** Switching to Subscriptions or Split
   in the budget showed the list first and pushed it down once the figures above it arrived; the
   figures now hold their place from the first frame. On a phone, the Health area list waits in

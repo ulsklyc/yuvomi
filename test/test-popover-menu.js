@@ -547,3 +547,38 @@ test('#2041: ein aus dem DOM genommenes Menue raeumt seinen Listener beim naechs
     assert.equal(doc.scrollListeners().length, 0, 'der Listener des abgehaengten Panels bleibt haengen');
   });
 });
+
+/**
+ * R22 (Critique a2 P2 "lange Listen", D22): EIN ZEILENMENUE ENTSTEHT ERST
+ * BEIM OEFFNEN. Jede Aufgabe trug zwei Menues samt Eintraegen und Zeichen im
+ * Baum (39 von 83 Knoten je Zeile); `defer: true` legt die Eintraege in ein
+ * `<template>`, und `beforetoggle` haengt sie vor dem Oeffnen ein - samt
+ * ihrer Zeichen. Ohne `defer` bleibt alles, wie es war.
+ */
+test('R22 D22: ein aufgeschobenes Menue baut seine Eintraege erst beim Oeffnen', () => {
+  const items = [{ action: 'edit-task', id: 7, label: 'Bearbeiten', icon: 'pencil' }];
+  const html = popoverMenuHtml({ id: 'task-menu-7', label: 'Mehr', items, defer: true });
+  const panelHtml = html.slice(html.indexOf('<div class="popover-menu"')).trim();
+  assert.match(panelHtml, /^<div class="popover-menu" id="task-menu-7" popover role="menu"><template data-popover-entries>[\s\S]*data-action="edit-task" data-id="7"[\s\S]*<\/template><\/div>$/,
+    'die Eintraege stehen nicht im Template - sie kosten jede Zeile Knoten und Zeichen');
+  assert.match(html, /popovertarget="task-menu-7"/, 'der Ausloeser bleibt, wie er war');
+  assert.doesNotMatch(popoverMenuHtml({ id: 'm', label: 'Mehr', items }), /<template/, 'ohne defer bleibt das Menue sofort gebaut');
+
+  const root = makeRoot();
+  const content = { fragment: true };
+  const swapped = [];
+  const icons = [];
+  const tpl = { content, replaceWith(node) { swapped.push(node); } };
+  const panel = el('.popover-menu');
+  panel.querySelector = (sel) => (/^:scope > template\[data-popover-entries\]$/.test(sel) && !swapped.length ? tpl : null);
+  global.window.lucide = { createIcons: ({ el: scope }) => icons.push(scope) };
+  try {
+    root.fire('beforetoggle', { target: panel, newState: 'open' });
+    assert.deepEqual(swapped, [content], 'beim Oeffnen haengt das Template seine Eintraege ein');
+    assert.deepEqual(icons, [panel], 'die Zeichen der Eintraege entstehen mit, im Panel');
+    root.fire('beforetoggle', { target: panel, newState: 'open' });
+    assert.equal(swapped.length, 1, 'ein zweites Oeffnen baut nichts nach');
+  } finally {
+    delete global.window.lucide;
+  }
+});

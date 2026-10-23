@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, requestHeadCollapse, HEAD_COLLAPSE_EVENT, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, requestHeadCollapse, HEAD_COLLAPSE_EVENT, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing, drawIconsInSightOrder } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -2155,4 +2155,36 @@ test('R21 S7: angedockt gleitet die Leiste als Ganzes, nicht nur ihre Reiter', a
   assert.match(fn, /flipSnapshotElements\(\[tabs\]\)/, 'der Kasten der Leiste wird gehalten');
   assert.doesNotMatch(fn, /flipSnapshotElements\(\[\.\.\.tabs\.children\]\)/);
   assert.match(fn, /holdThenGlide\(before\)/);
+});
+
+/**
+ * R22 (Critique a2 P2 "lange Listen", D22): DIE ZEICHEN KOMMEN JE ZEILE IN
+ * SICHT-REIHENFOLGE. Die Aufgaben zeichneten je GRUPPE (R20): eine Gruppe mit
+ * 120 Aufgaben bekam alle Zeichen im Frame des Wechsels, und der Einkauf
+ * ersetzte gleich alle. Sofort: was ausserhalb der Zeilen steht und die ersten
+ * `rowsNow` Zeilen; der Rest in eigenen Tasks, ein neueres Zeichnen bricht ab.
+ */
+test('R22 D22: drawIconsInSightOrder zeichnet je Zeile, der Rest folgt in eigenen Tasks', async () => {
+  const replaced = [];
+  global.window.lucide = { createIcons: ({ el }) => replaced.push(el.id) };
+  try {
+    const rows = Array.from({ length: 40 }, (_, i) => ({ i }));
+    const nodes = [{ id: 'kopf', closest: () => null },
+      ...rows.map((row) => ({ id: `z${row.i}`, isConnected: row.i !== 39, closest: (sel) => (sel === '.swipe-row' ? row : null) }))];
+    const listEl = { querySelectorAll: (sel) => (sel === '.swipe-row' ? rows : sel === 'i[data-lucide]' ? nodes : []) };
+    drawIconsInSightOrder(listEl, { rowSelector: '.swipe-row', rowsNow: 30, chunk: 4 });
+    assert.equal(replaced.length, 31, 'im selben Frame: der Kopf und die ersten 30 Zeilen, auch wenn sie in EINER Gruppe stehen');
+    assert.ok(replaced.includes('kopf') && !replaced.includes('z30'));
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(replaced.length, 40, 'der Rest folgt in Happen; was nicht mehr haengt, bleibt liegen');
+    assert.ok(!replaced.includes('z39'));
+
+    replaced.length = 0;
+    drawIconsInSightOrder(listEl, { rowSelector: '.swipe-row', rowsNow: 30, chunk: 4 });
+    drawIconsInSightOrder(listEl, { rowSelector: '.swipe-row', rowsNow: 30, chunk: 4 });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(replaced.filter((id) => id === 'z31').length, 1, 'ein neueres Zeichnen bricht den alten Nachlauf ab');
+  } finally {
+    delete global.window.lucide;
+  }
 });
