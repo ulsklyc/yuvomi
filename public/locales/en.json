@@ -3628,7 +3628,7 @@
         "resultCountMany": "{{count}} results",
         "goTo": "Go to",
         "newSection": "Create new",
-        "recentLabel": "Recently opened",
+        "recentLabel": "Recently visited",
         "createTaskNamed": "Create “{{title}}” as a task",
         "hintMove": "Select",
         "hintOpen": "Open"

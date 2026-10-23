@@ -3628,7 +3628,7 @@
         "resultCountMany": "{{count}} találat",
         "goTo": "Ugrás ide",
         "newSection": "Új létrehozása",
-        "recentLabel": "Legutóbb megnyitott",
+        "recentLabel": "Legutóbb meglátogatott",
         "createTaskNamed": "„{{title}}” létrehozása feladatként",
         "hintMove": "Kijelölés",
         "hintOpen": "Megnyitás"

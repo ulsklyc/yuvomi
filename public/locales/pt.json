@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} resultados",
         "goTo": "Ir para",
         "newSection": "Criar novo",
-        "recentLabel": "Abertos recentemente",
+        "recentLabel": "Visitados recentemente",
         "createTaskNamed": "Criar «{{title}}» como tarefa",
         "hintMove": "Selecionar",
         "hintOpen": "Abrir"

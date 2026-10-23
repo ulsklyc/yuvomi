@@ -3503,7 +3503,7 @@
         "resultCountMany": "{{count}} výsledků",
         "goTo": "Přejít na",
         "newSection": "Vytvořit nové",
-        "recentLabel": "Nedávno otevřené",
+        "recentLabel": "Nedávno navštívené",
         "createTaskNamed": "Vytvořit „{{title}}“ jako úkol",
         "hintMove": "Vybrat",
         "hintOpen": "Otevřít"

@@ -184,7 +184,7 @@
         "resultCountMany": "{{count}} wyników",
         "goTo": "Przejdź do",
         "newSection": "Utwórz nowe",
-        "recentLabel": "Ostatnio otwierane",
+        "recentLabel": "Ostatnio odwiedzane",
         "createTaskNamed": "Utwórz „{{title}}” jako zadanie",
         "hintMove": "Zaznacz",
         "hintOpen": "Otwórz"

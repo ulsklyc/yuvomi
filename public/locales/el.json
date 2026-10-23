@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} αποτελέσματα",
         "goTo": "Μετάβαση σε",
         "newSection": "Νέα δημιουργία",
-        "recentLabel": "Άνοιξαν πρόσφατα",
+        "recentLabel": "Επισκέφθηκες πρόσφατα",
         "createTaskNamed": "Δημιουργία «{{title}}» ως εργασίας",
         "hintMove": "Επιλογή",
         "hintOpen": "Άνοιγμα"

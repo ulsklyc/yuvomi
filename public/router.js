@@ -40,7 +40,7 @@ import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import {
   SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands, paletteStatusText,
-  readRecent, rememberRecent, visibleRecent, forgetAllRecent,
+  readRecent, rememberRecent, visibleRecent, forgetAllRecent, RECENT_MAX,
 } from '/utils/search-sections.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1991,6 +1991,7 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
     // Ab hier kann das Modul Soft-Navigationen bedienen (sofern es update() bietet).
     routerState._renderedModule = module;
     routerState._renderedModuleName = route.module;
+    rememberVisitedPlace(route);
 
     wirePageToolbars();
 
@@ -3670,55 +3671,45 @@ function initSearch(container) {
     setStatus('');
     results.appendChild(emptyHintEl(t('search.emptyHint')));
 
-    // ZULETZT GEOEFFNET (R19): was zuletzt aus der Palette geoeffnet wurde,
-    // steht vor den Kacheln - die Palette ist fuer den Wiederholer da. Nur,
-    // was heute noch erreichbar ist (visibleRecent); leer heisst: kein Kopf.
-    const recent = visibleRecent(readRecent(safeLocalStorage(), routerState.currentUser?.id), recentPlace(navItems()));
-    if (recent.length) {
-      results.appendChild(paletteRowsSection(t('search.recentLabel'), recent, {
+    // ZULETZT BESUCHT UND NEU ANLEGEN STATT 19 KACHELN (R22 D16). Die leere
+    // Palette zeigte jedes Ziel der Seitenleiste als Kachel - dieselbe Liste
+    // ein zweites Mal, 442px am Laptop, 771px am Telefon. Die Palette ist fuer
+    // den Wiederholer da: oben die zuletzt besuchten Orte (hoechstens fuenf,
+    // lokal je Konto, der offene Ort nicht), darunter die haeufigsten
+    // Anlege-Befehle. Beides als Zeilen in der Bauart der Treffer
+    // (paletteRowsSection), mit dem Siegel ihres Moduls. Noch nichts besucht
+    // (erste Sitzung): die ersten Ziele der Navigation, als „Gehe zu".
+    const targets = navItems();
+    const here = routerState._renderedModuleName;
+    const recent = visibleRecent(readRecent(safeLocalStorage(), routerState.currentUser?.id), recentPlace(targets))
+      .filter((item) => item.module !== here)
+      .slice(0, RECENT_MAX);
+    const fallback = recent.length ? [] : targets
+      .filter((item) => item.module !== 'dashboard' && item.module !== here)
+      .slice(0, RECENT_MAX)
+      .map((item) => ({ label: item.label, route: item.navHref ?? item.path, module: item.module }));
+    const close = () => closeSearch({ restoreFocus: false });
+    if (recent.length || fallback.length) {
+      results.appendChild(paletteRowsSection(t(recent.length ? 'search.recentLabel' : 'search.goTo'), recent.length ? recent : fallback, {
         title: (item) => item.label,
         meta: (item) => item.context || '',
         go: (item) => navigate(item.route),
-      }, () => closeSearch({ restoreFocus: false })));
+      }, close));
     }
-
-    const scopes = document.createElement('div');
-    scopes.className = 'search-scopes';
-    const scopesHeading = document.createElement('h3');
-    scopesHeading.className = 'search-section__heading';
-    scopesHeading.textContent = t('search.scopesLabel');
-    scopes.appendChild(scopesHeading);
-    const list = document.createElement('div');
-    list.className = 'search-scopes__list';
-    // ALLE SICHTBAREN ZIELE, nicht die durchsuchten Module: "Direkt oeffnen"
-    // kannte Schichtplan, Haushaltshilfe, Belohnungen und Mahlzeiten nicht,
-    // weil die Suche dort keine Daten hat (Re-Critique 2026-09-28, A1 P2-1).
-    navItems().forEach((item) => {
-      const scope = { label: item.label, route: item.navHref ?? item.path };
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'search-scope';
-      // Markensiegel (Herkunfts-Regel, Block 2): die Kachel benennt ihr
-      // Zielmodul ueber Familienton + Icon.
-      const seal = document.createElement('span');
-      seal.className = 'module-seal module-seal--sm search-scope__seal';
-      seal.setAttribute('aria-hidden', 'true');
-      const accent = item.accent ? `var(--${item.accent}, var(--color-accent))` : moduleAccentVar(item.module);
-      if (accent) seal.style.setProperty('--seal-accent', accent);
-      seal.appendChild(moduleIconEl(item.icon));
-      const label = document.createElement('span');
-      label.textContent = scope.label;
-      btn.append(seal, label);
-      btn.addEventListener('click', () => {
-        closeSearch({ restoreFocus: false });
-        navigate(scope.route);
-      });
-      list.appendChild(btn);
-    });
-    scopes.appendChild(list);
-    results.appendChild(scopes);
-    // Die Kacheln sind per Pfeil erreichbar, aber nichts ist vorgewaehlt:
-    // Enter auf ein leeres Feld oeffnet keine Kachel.
+    const visible = new Set(targets.map((item) => item.module));
+    const actions = NEW_ACTIONS
+      .filter((action) => visible.has(action.module) && navModuleAccess(action.module) === 'write')
+      .slice(0, PALETTE_EMPTY_ACTIONS)
+      .map((action) => ({ label: t(action.labelKey), route: action.route, module: action.module }));
+    if (actions.length) {
+      results.appendChild(paletteRowsSection(t('search.newSection'), actions, {
+        title: (item) => item.label,
+        go: async (item) => { await navigate(item.route); triggerPageFab(); },
+        remember: false,
+      }, close));
+    }
+    // Die Zeilen sind per Pfeil erreichbar, aber nichts ist vorgewaehlt:
+    // Enter auf ein leeres Feld oeffnet keine.
     combo.refresh({ preselect: false });
     // Auch aus dem input-Handler (< 2 Zeichen) aufgerufen, wo openSearch die
     // Icons nicht nachzieht — daher hier selbst rendern.
@@ -3856,6 +3847,25 @@ function initSearch(container) {
   return openSearch;
 }
 
+/** Wie viele Anlege-Befehle die leere Palette zeigt (R22 D16: vier bis sechs). */
+const PALETTE_EMPTY_ACTIONS = 5;
+
+/**
+ * ZULETZT BESUCHT (R22 D16): jeder Modulbesuch landet in der Liste der leeren
+ * Palette, nicht nur ein Ort, der aus ihr geoeffnet wurde. Gemerkt wird das
+ * Navigationsziel (der Eintrag der Seitenleiste), nie ein `?open=` oder ein
+ * Datensatz - dieselbe Zusage wie in R19: nur Ziel und Modul. Die Uebersicht
+ * ist der Ausgangspunkt, kein Ziel; Einstellungen merkt sich das Blatt selbst
+ * ueber die Palette.
+ */
+function rememberVisitedPlace(route) {
+  if (!route?.module || route.module === 'dashboard' || route.module === 'settings') return;
+  const target = navItems().find((nav) => nav.module === route.module);
+  if (!target) return;
+  const item = { route: target.navHref ?? target.path, module: target.module };
+  rememberRecent(safeLocalStorage(), routerState.currentUser?.id, { route: item.route, module: item.module });
+}
+
 /** localStorage, oder null, wo schon der Zugriff wirft (Safari privat, Policy). */
 function safeLocalStorage() {
   try { return window.localStorage; } catch { return null; }
@@ -3885,7 +3895,7 @@ function recentPlace(targets) {
  * (`.search-section` + `.search-result`), damit Combobox, Pfeiltasten und
  * Haut dieselben sind (utils/palette-combobox.js zaehlt `.search-result`).
  */
-function paletteRowsSection(label, items, { title, meta, go }, onClose) {
+function paletteRowsSection(label, items, { title, meta, go, remember = true }, onClose) {
   const section = document.createElement('div');
   section.className = 'search-section';
   const heading = document.createElement('h3');
@@ -3897,6 +3907,16 @@ function paletteRowsSection(label, items, { title, meta, go }, onClose) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'search-result';
+    // Das Siegel des Ziels, wie unter „Gehe zu" (R20): die Gruppe mischt Module.
+    if (item.module && MODULE_ICON[item.module]) {
+      btn.classList.add('search-result--sealed');
+      const sealEl = document.createElement('span');
+      sealEl.className = 'module-seal module-seal--sm search-result__seal';
+      sealEl.setAttribute('aria-hidden', 'true');
+      sealEl.style.setProperty('--seal-accent', moduleAccentVar(item.module));
+      sealEl.appendChild(moduleIconEl(MODULE_ICON[item.module]));
+      btn.appendChild(sealEl);
+    }
     const titleEl = document.createElement('span');
     titleEl.className = 'search-result__title';
     titleEl.textContent = title(item);
@@ -3910,7 +3930,7 @@ function paletteRowsSection(label, items, { title, meta, go }, onClose) {
     }
     btn.addEventListener('click', () => {
       onClose();
-      rememberRecent(safeLocalStorage(), routerState.currentUser?.id, { route: item.route, module: item.module });
+      if (remember) rememberRecent(safeLocalStorage(), routerState.currentUser?.id, { route: item.route, module: item.module });
       go(item);
     });
     rows.appendChild(btn);

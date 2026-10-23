@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} sonuç",
         "goTo": "Git",
         "newSection": "Yeni oluştur",
-        "recentLabel": "Son açılanlar",
+        "recentLabel": "Son ziyaret edilenler",
         "createTaskNamed": "“{{title}}” görevini oluştur",
         "hintMove": "Seç",
         "hintOpen": "Aç"

@@ -176,7 +176,7 @@
         "resultCountMany": "결과 {{count}}개",
         "goTo": "이동",
         "newSection": "새로 만들기",
-        "recentLabel": "최근에 연 항목",
+        "recentLabel": "최근 방문",
         "createTaskNamed": "“{{title}}”을(를) 할 일로 만들기",
         "hintMove": "선택",
         "hintOpen": "열기"

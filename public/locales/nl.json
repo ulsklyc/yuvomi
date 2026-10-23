@@ -3628,7 +3628,7 @@
         "resultCountMany": "{{count}} resultaten",
         "goTo": "Ga naar",
         "newSection": "Nieuw aanmaken",
-        "recentLabel": "Recent geopend",
+        "recentLabel": "Recent bezocht",
         "createTaskNamed": "„{{title}}” als taak aanmaken",
         "hintMove": "Selecteren",
         "hintOpen": "Openen"

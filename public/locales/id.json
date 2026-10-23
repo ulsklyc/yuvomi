@@ -176,7 +176,7 @@
         "resultCountMany": "{{count}} hasil",
         "goTo": "Buka",
         "newSection": "Buat baru",
-        "recentLabel": "Baru dibuka",
+        "recentLabel": "Baru dikunjungi",
         "createTaskNamed": "Buat “{{title}}” sebagai tugas",
         "hintMove": "Pilih",
         "hintOpen": "Buka"

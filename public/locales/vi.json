@@ -3628,7 +3628,7 @@
         "resultCountMany": "{{count}} kết quả",
         "goTo": "Đi tới",
         "newSection": "Tạo mới",
-        "recentLabel": "Mở gần đây",
+        "recentLabel": "Đã xem gần đây",
         "createTaskNamed": "Tạo “{{title}}” thành việc cần làm",
         "hintMove": "Chọn",
         "hintOpen": "Mở"

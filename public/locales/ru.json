@@ -3719,7 +3719,7 @@
         "resultCountMany": "{{count}} результатов",
         "goTo": "Перейти к",
         "newSection": "Создать",
-        "recentLabel": "Недавно открытые",
+        "recentLabel": "Недавно посещённые",
         "createTaskNamed": "Создать «{{title}}» как задачу",
         "hintMove": "Выбрать",
         "hintOpen": "Открыть"

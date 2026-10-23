@@ -8528,8 +8528,8 @@ test('Feldkanten tragen --color-border-control und halten 3:1 auf jedem Feldgrun
     // seither die Glaskante der schwebenden Flaechen (--glass-border), keine
     // Kartenkante mehr.
     ['.search-result + .search-result', 'Trennlinie zwischen zwei Treffern'],
-    ['.search-scope', 'Bereichs-Chip in der Suche; ein Knopf, kein Feld'],
-    ['.search-scope:hover', 'Hover desselben Chips'],
+    // `.search-scope` stand hier bis R22 (D16): die Kacheln der leeren Palette
+    // sind Zeilen geworden.
     ['.rrule-fields', 'Gruppe der Wiederholungsfelder; Gruppenkante, die Felder darin tragen ihre eigene'],
     ['.schedule-day-row-fields', 'Gruppe der Felder eines Wochentags; linke Gruppenlinie'],
     ['.note-category-selection', 'Chip der gewaehlten Notiz-Kategorie; Knopf, kein Feld'],

@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} परिणाम",
         "goTo": "यहाँ जाएँ",
         "newSection": "नया बनाएँ",
-        "recentLabel": "हाल ही में खोले गए",
+        "recentLabel": "हाल ही में देखे गए",
         "createTaskNamed": "“{{title}}” को कार्य के रूप में बनाएँ",
         "hintMove": "चुनें",
         "hintOpen": "खोलें"

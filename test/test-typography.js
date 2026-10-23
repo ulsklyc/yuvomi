@@ -804,7 +804,6 @@ const BREAKS_WITHOUT_HYPHENS = {
   '.health-dose__name': 'LEGACY',
   '.health-nutrition-progress__label': 'LEGACY',
   '.health-nutrition-row__title': 'LEGACY',
-  '.search-scope': 'LEGACY',
   '.split-view__detail-title': 'LEGACY',
   '.note-card__title': 'LEGACY',
   '.note-category-badge__name': 'LEGACY',

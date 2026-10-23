@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} 個結果",
         "goTo": "前往",
         "newSection": "新建",
-        "recentLabel": "最近開啟",
+        "recentLabel": "最近造訪",
         "createTaskNamed": "將「{{title}}」建立為任務",
         "hintMove": "選擇",
         "hintOpen": "開啟"

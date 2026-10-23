@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} resultat",
         "goTo": "Gå till",
         "newSection": "Skapa ny",
-        "recentLabel": "Nyligen öppnade",
+        "recentLabel": "Nyligen besökta",
         "createTaskNamed": "Skapa ”{{title}}” som uppgift",
         "hintMove": "Välj",
         "hintOpen": "Öppna"

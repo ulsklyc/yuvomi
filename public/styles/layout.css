@@ -2071,6 +2071,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   margin-bottom: var(--space-5);
 }
 
+/* Im Leerzustand folgt die erste Gruppe dem Hinweis mit derselben Luft wie
+ * eine Gruppe der naechsten (R22 D16; vorher trugen die Kacheln sie). */
+.search-overlay__results > .empty-state + .search-section {
+  margin-top: var(--space-5);
+}
+
 .search-result__meta {
   display: block;
   margin-top: var(--space-0h);
@@ -2163,81 +2169,20 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
  * ausgewaehlte Zeile von Liste+Detail und die Aktiv-Pille der Seitenleiste -
  * "das ist gemeint". Im Kontrastmodus traegt ein Rahmen die Markierung, weil
  * dort keine Hintergrundfarbe durchkommt. */
-.search-result[aria-selected="true"],
-.search-scope[aria-selected="true"] {
+.search-result[aria-selected="true"] {
   background-color: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-surface));
 }
 
-.search-scope[aria-selected="true"] {
-  border-color: var(--color-accent);
-}
-
 @media (forced-colors: active) {
-  .search-result[aria-selected="true"],
-  .search-scope[aria-selected="true"] {
+  .search-result[aria-selected="true"] {
     outline: var(--focus-ring-width) solid Highlight;
     outline-offset: var(--focus-ring-offset-inset);
   }
 }
 
-/* Scope-Launcher im Leerzustand: „Direkt öffnen"-Kacheln, die zugleich zeigen,
- * was durchsucht wird, und ins jeweilige Modul springen (Critique P1). */
-.search-scopes {
-  margin-top: var(--space-5);
-}
-
-.search-scopes__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.search-scope {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  /* Grid-Item: ohne min-width:0 sprengen lange Labels (andere Locales) die
-   * Kachel statt umzubrechen. */
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  text-align: left;
-  overflow-wrap: break-word;
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-  -webkit-tap-highlight-color: transparent;
-}
-
-@media (hover: hover) {
-  /* Wie .more-sheet__search: erhoehte Ruheflaeche, also die Stufe darueber. */
-  .search-scope:hover {
-    background-color: var(--color-surface-elevated-hover);
-    border-color: var(--color-border);
-  }
-}
-
-.search-scope:active {
-  background-color: var(--color-surface-hover);
-}
-
-/* Scope-Kacheln sind eine Mischstelle: das Siegel traegt den Familienton
- * des Zielmoduls (--seal-accent setzt der Aufbau in router.js).
- *
- * HIER STAND `--seal-base: var(--color-surface-elevated)`, und der Grund war
- * eine Messung: die Kachel steht nicht auf --color-surface, und ohne den
- * Parameter mischte die 16-%-Toenung gegen den falschen Grund (im Dark
- * 1,02-1,15:1 gegen den echten Untergrund, health 1,02). Mit dem Vollton
- * mischt das Siegel gar nicht mehr - die Zeile ist mit ihrer Ursache
- * entfallen, nicht vergessen worden. */
-.search-scope__seal {
-  flex-shrink: 0;
-}
+/* Die „Direkt öffnen"-Kacheln des Leerzustands (Critique P1) sind seit R22
+ * (D16) entfallen: die leere Palette zeigt „Zuletzt besucht" und „Neu
+ * anlegen" als Zeilen in der Bauart der Treffer (router.js, renderSearchHint). */
 
 /* ── Such-Overlay: Desktop-Command-Palette (≥768px) ──
  * Aus dem Mobile-Vollbild-Sheet wird eine zentrierte, oben verankerte Glas-

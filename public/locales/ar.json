@@ -3825,7 +3825,7 @@
         "resultCountMany": "{{count}} نتائج",
         "goTo": "انتقل إلى",
         "newSection": "إنشاء جديد",
-        "recentLabel": "فُتح مؤخرًا",
+        "recentLabel": "زرتها مؤخرًا",
         "createTaskNamed": "إنشاء „{{title}}“ كمهمة",
         "hintMove": "تحديد",
         "hintOpen": "فتح"

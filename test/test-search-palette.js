@@ -276,20 +276,21 @@ test('A1 P1-1: Enter im Feld oeffnet den ersten Treffer, Pfeile bewegen nur die 
   assert.equal(input.key('Enter'), false, 'ohne Zeile bleibt Enter beim Feld');
 });
 
-test('A1 P1-1: im Leerzustand ist nichts vorgewaehlt, die Kacheln erreicht der Pfeil', async () => {
+test('A1 P1-1: im Leerzustand ist nichts vorgewaehlt, die Zeilen erreicht der Pfeil', async () => {
   const { wirePaletteCombobox } = await import('../public/utils/palette-combobox.js');
   const input = new Stub('', { id: 'search-input' });
   const results = new Stub('', { id: 'search-results' });
   const hint = new Stub('empty-state');
-  const tiles = [new Stub('search-scope'), new Stub('search-scope')];
-  results.append(hint, new Stub('search-scopes').append(new Stub('search-section__heading'), new Stub('search-scopes__list').append(...tiles)));
+  // Seit R22 (D16): „Zuletzt besucht" und „Neu anlegen" als Zeilen, keine Kacheln.
+  const tiles = [new Stub('search-result'), new Stub('search-result')];
+  results.append(hint, new Stub('search-section').append(new Stub('search-section__heading'), new Stub('search-section__rows').append(...tiles)));
   const combo = wirePaletteCombobox({ input, listbox: results });
   combo.refresh({ preselect: false });
   assert.equal(input.getAttribute('aria-activedescendant'), null, 'Enter auf ein leeres Feld oeffnet keine Kachel');
   assert.equal(input.key('Enter'), false);
   assert.equal(hint.getAttribute('role'), 'none', 'eine Listbox besitzt nur Gruppen und Optionen');
   input.key('ArrowDown');
-  assert.equal(input.getAttribute('aria-activedescendant'), tiles[0].id, '"Direkt oeffnen" ist per Pfeil erreichbar');
+  assert.equal(input.getAttribute('aria-activedescendant'), tiles[0].id, '"Zuletzt besucht" ist per Pfeil erreichbar');
   input.key('Enter');
   assert.equal(tiles[0].clicks, 1);
 });
@@ -298,7 +299,7 @@ test('A1 P1-1: router.js verdrahtet die Combobox nach jedem Rendern der Palette'
   const init = body('function initSearch(', 'return openSearch;');
   assert.match(init, /wirePaletteCombobox\(\{ input, listbox: results \}\)/, 'das Suchfeld wird zur Combobox');
   const hint = body('function renderSearchHint(', '// Der Marker der Zurueck-Geste');
-  assert.match(hint, /combo\.refresh\(\{ preselect: false \}\)/, 'die Kacheln zaehlen als Zeilen, ohne Vorwahl');
+  assert.match(hint, /combo\.refresh\(\{ preselect: false \}\)/, 'die Zeilen des Leerzustands zaehlen mit, ohne Vorwahl');
   const input = body("input.addEventListener('input'", 'return openSearch;');
   const renders = input.match(/renderSearchResults\(/g).length;
   const refreshes = input.match(/combo\.refresh\(/g)?.length ?? 0;
@@ -360,12 +361,12 @@ test('R19: beim Abmelden gehen alle Listen, nur diese', async () => {
   assert.match(forget, /forgetAllRecent\(safeLocalStorage\(\)\)/, 'forgetSessionState (Abmelden, abgelaufene Sitzung) leert sie');
 });
 
-test('R19: die leere Palette zeigt "Zuletzt geoeffnet", gemerkt werden nur Orte, ohne Namen', () => {
-  const hint = router.slice(router.indexOf('function renderSearchHint()'), router.indexOf("const scopes = document.createElement('div');", router.indexOf('function renderSearchHint()')));
-  assert.match(hint, /visibleRecent\(readRecent\(safeLocalStorage\(\), routerState\.currentUser\?\.id\), recentPlace\(navItems\(\)\)\)/,
+test('R19/R22: die leere Palette zeigt "Zuletzt besucht", gemerkt werden nur Orte, ohne Namen', () => {
+  const hint = router.slice(router.indexOf('function renderSearchHint()'), router.indexOf('// Der Marker der Zurueck-Geste', router.indexOf('function renderSearchHint()')));
+  assert.match(hint, /visibleRecent\(readRecent\(safeLocalStorage\(\), routerState\.currentUser\?\.id\), recentPlace\(targets\)\)/,
     'gelesen je Konto, Namen frisch aus Navigation und Einstellungen');
-  assert.match(hint, /paletteRowsSection\(t\('search\.recentLabel'\)/, 'eine benannte Gruppe in der Bauart der Treffer');
-  assert.equal(de.search.recentLabel, 'Zuletzt geöffnet');
+  assert.match(hint, /paletteRowsSection\(t\(recent\.length \? 'search\.recentLabel' : 'search\.goTo'\)/, 'eine benannte Gruppe in der Bauart der Treffer');
+  assert.equal(de.search.recentLabel, 'Zuletzt besucht');
   for (const call of router.match(/rememberRecent\([^;]*\);/g) ?? []) {
     assert.match(call, /\{ route: item\.route, module: item\.module \}/, `nur Ziel und Modul: ${call}`);
   }
@@ -485,4 +486,26 @@ test('R20: ohne Treffer nennt die Ansage die Zeile „als Aufgabe anlegen" und z
   assert.match(input, /const \{ count, createLabel \} = renderSearchResults\(results, data,/);
   assert.match(input, /announceCount\(count, \{ createLabel \}\)/, 'die Ansage bekommt die Zeile');
   assert.match(router, /const announceCount = \(count, opts\) => setStatus\(paletteStatusText\(count, opts, t\)\)/);
+});
+
+// R22 D16 (Critique 2026-10-22, a1 P3): die leere Palette zeigte 19 Kacheln -
+// dieselbe Liste wie die Seitenleiste, 442px am Laptop, 771px am Telefon.
+// Jetzt: zuletzt besuchte Orte (jeder Modulbesuch zaehlt, hoechstens fuenf,
+// der offene Ort nicht) und bis zu fuenf Anlege-Befehle, beides als Zeilen.
+test('R22 D16: die leere Palette zeigt besuchte Orte und Anlege-Befehle als Zeilen, keine Kacheln', () => {
+  const hint = router.slice(router.indexOf('function renderSearchHint()'), router.indexOf('// Der Marker der Zurueck-Geste', router.indexOf('function renderSearchHint()')));
+  assert.doesNotMatch(hint, /search-scope|navItems\(\)\.forEach/, 'keine Kachel je Navigationsziel mehr');
+  assert.match(hint, /\.filter\(\(item\) => item\.module !== here\)/, 'der offene Ort steht nicht in der Liste');
+  assert.match(hint, /\.slice\(0, RECENT_MAX\)/, 'hoechstens fuenf');
+  assert.match(hint, /paletteRowsSection\(t\('search\.newSection'\), actions/, 'die Anlege-Befehle als zweite Gruppe');
+  assert.match(hint, /\.slice\(0, PALETTE_EMPTY_ACTIONS\)/);
+  assert.match(router, /const PALETTE_EMPTY_ACTIONS = [4-6];/, 'vier bis sechs Befehle');
+  assert.match(hint, /navModuleAccess\(action\.module\) === 'write'/, 'nur wo der Betrachter schreiben darf');
+  const visit = router.slice(router.indexOf('function rememberVisitedPlace('), router.indexOf('function safeLocalStorage('));
+  assert.match(visit, /route\.module === 'dashboard'/, 'die Uebersicht ist kein Ziel');
+  assert.match(visit, /navItems\(\)\.find/, 'gemerkt wird das Navigationsziel, nie ein ?open= oder Datensatz');
+  assert.match(router, /routerState\._renderedModuleName = route\.module;\n\s*rememberVisitedPlace\(route\);/, 'nach jedem fertigen Seitenaufbau');
+  const rows = router.slice(router.indexOf('function paletteRowsSection('), router.indexOf('/** Text mit markierten Fundstellen'));
+  assert.match(rows, /search-result--sealed/, 'mit dem Siegel ihres Moduls');
+  assert.match(rows, /if \(remember\) rememberRecent/, 'ein Anlege-Befehl ist kein Ort und wird nicht gemerkt');
 });

@@ -34,8 +34,10 @@
  * echten Handler mit einem kleinen Stub faehrt.
  */
 
-const OPTION_SELECTOR = '.search-result, .search-scope';
-const GROUP_SELECTOR = '.search-section, .search-scopes';
+// Seit R22 (D16) traegt auch der Leerzustand nur Zeilen (`.search-result`) in
+// Gruppen (`.search-section`) - die Kacheln (`.search-scope`) sind entfallen.
+const OPTION_SELECTOR = '.search-result';
+const GROUP_SELECTOR = '.search-section';
 const HEADING_SELECTOR = '.search-section__heading';
 
 let idCounter = 0;

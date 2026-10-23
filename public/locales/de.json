@@ -176,7 +176,7 @@
         "resultCountMany": "{{count}} Ergebnisse",
         "goTo": "Gehe zu",
         "newSection": "Neu anlegen",
-        "recentLabel": "Zuletzt geöffnet",
+        "recentLabel": "Zuletzt besucht",
         "createTaskNamed": "„{{title}}“ als Aufgabe anlegen",
         "hintMove": "Auswählen",
         "hintOpen": "Öffnen"

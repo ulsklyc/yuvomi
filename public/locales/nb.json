@@ -3628,7 +3628,7 @@
         "resultCountMany": "{{count}} resultater",
         "goTo": "Gå til",
         "newSection": "Ny",
-        "recentLabel": "Nylig åpnet",
+        "recentLabel": "Nylig besøkt",
         "createTaskNamed": "Opprett «{{title}}» som oppgave",
         "hintMove": "Velg",
         "hintOpen": "Åpne"

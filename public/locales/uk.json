@@ -3760,7 +3760,7 @@
         "resultCountMany": "{{count}} результатів",
         "goTo": "Перейти до",
         "newSection": "Створити",
-        "recentLabel": "Нещодавно відкриті",
+        "recentLabel": "Нещодавно відвідані",
         "createTaskNamed": "Створити «{{title}}» як завдання",
         "hintMove": "Вибрати",
         "hintOpen": "Відкрити"

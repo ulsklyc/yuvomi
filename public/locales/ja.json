@@ -3509,7 +3509,7 @@
         "resultCountMany": "{{count}} 件の結果",
         "goTo": "移動",
         "newSection": "新規作成",
-        "recentLabel": "最近開いた項目",
+        "recentLabel": "最近開いた場所",
         "createTaskNamed": "「{{title}}」をタスクとして作成",
         "hintMove": "選択",
         "hintOpen": "開く"
