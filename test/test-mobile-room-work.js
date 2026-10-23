@@ -306,6 +306,21 @@ test('M13: mobil ist die Karte kompakt - drei Zeilen Vorschau, Fusszeile ohne Kr
     'der Mehr-Knopf haengt seine volle Trefflaeche in die Polsterung statt die Zeile zu strecken');
 });
 
+// Critique R22-F (F2.3): mobil standen bei 390x844 drei Notizen ganz im ersten
+// Bild (Karte 158px: Titel plus drei Zeilen Vorschau), die vierte lief unter
+// die Tab-Leiste. Eine Karte zeigt mobil drei TEXTzeilen: mit Titel zwei
+// Zeilen Vorschau, ohne Titel drei - 133px, vier Notizen ganz im Bild.
+test('R22-F F2.3: mobil drei Textzeilen je Karte - mit Titel zwei Zeilen Vorschau', () => {
+  const titled = declarations(notesCss, '.note-card__title + .note-card__content', { media: MOBILE });
+  assert.equal(titled['-webkit-line-clamp'], '2', 'mit Titel: zwei Zeilen Vorschau');
+  assert.equal(titled['line-clamp'], '2');
+  assert.equal(declarations(notesCss, '.note-card__content', { media: MOBILE })['-webkit-line-clamp'], '3', 'ohne Titel bleibt es bei drei');
+  assert.equal(declarations(notesCss, '.note-card__title + .note-card__content')['-webkit-line-clamp'], undefined, 'nur mobil');
+  // Die Regel greift nur, wenn der Inhalt dem Titel unmittelbar folgt.
+  const html = notes.renderNoteCard({ id: 6, title: 'Einkauf', content: 'Milch', color: '#ffcc00', pinned: 0 });
+  assert.match(html, /<\/h2>\s*<div class="note-card__content">/, 'zwischen Titel und Vorschau steht nichts');
+});
+
 // Re-Critique 2026-09-28 (P8 / A3 P3-2): mobil brach der Detail-Fuss einer
 // Aufgabe auf zwei Reihen (Loeschen/Erledigen/Person, dann Starten/
 // Archivieren - gemessen 133px, "Aufgabe archivieren" allein 188px breit).

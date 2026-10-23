@@ -658,6 +658,20 @@
     line-clamp: 3;
   }
 
+  /* DREI TEXTZEILEN JE KARTE, NICHT VIER (Critique R22-F, F2.3). Mit Titel
+   * trug die Karte Titel plus drei Zeilen Vorschau, 158px - im ersten Bild
+   * standen bei 390x844 drei Notizen ganz, die vierte lief unter die
+   * Tab-Leiste. Eine Karte mit Titel zeigt mobil zwei Zeilen Vorschau (der
+   * Titel ist die dritte), eine ohne Titel weiter drei: 133px, vier Notizen
+   * ganz im ersten Bild. Das Raster bleibt, wie es ist; die ganze Notiz steht
+   * einen Tipp entfernt. Checklisten zaehlen nicht mit - sie sind auf der
+   * Karte bedienbar und werden nicht gekappt (line-clamp greift in
+   * Flex-Zeilen nicht). */
+  .note-card__title + .note-card__content {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
   .note-card__footer {
     margin-top: var(--space-1);
     padding-top: var(--space-1);
