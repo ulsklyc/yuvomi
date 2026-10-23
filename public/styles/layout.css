@@ -8499,6 +8499,11 @@ textarea::placeholder {
 .form-hint {
   font-size: var(--type-caption);
   color: var(--color-text-secondary);
+  /* Hinweise brechen ueber zwei, drei Zeilen um, und ein einzelnes Wort in
+   * der letzten Zeile las sich wie ein abgerissener Rest (Detektor
+   * `straggler`, R22: Fuss der Konto-Seite). `pretty` verteilt die letzten
+   * Zeilen; ohne Unterstuetzung bricht der Text wie bisher. */
+  text-wrap: pretty;
 }
 
 /* Tonlagen für Hinweistexte. Vorher setzte `admin-backup.js` die Farbe des

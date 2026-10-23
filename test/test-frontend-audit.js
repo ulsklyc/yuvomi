@@ -12121,6 +12121,17 @@ for (const { cls, props } of SHARED_CLASSES) {
   });
 }
 
+// R22 (S4): Hinweistexte brechen ohne Waise. `.form-hint` steht in fast jedem
+// Modul und unter jeder Einstellungsgruppe (`.settings-group__footer` traegt
+// die Klasse mit); der Detektor meldete im Fuss der Konto-Seite ein einzelnes
+// Wort in der letzten Zeile.
+test('.form-hint bricht seine letzten Zeilen mit text-wrap: pretty', () => {
+  const base = [...eachRule(read('../public/styles/layout.css'))]
+    .find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim()).includes('.form-hint'));
+  assert.ok(base, '.form-hint hat keine Basisregel in layout.css');
+  assert.match(base.body, /text-wrap:\s*pretty/, 'der Hinweis bricht wie Fliesstext ohne Ausgleich - ein Wort bleibt allein in der letzten Zeile');
+});
+
 // KLEIN HEISST SCHMALER, NICHT UNTER DIE ZIELGROESSE (2026-09-24). Der kleine
 // Knopf stand in rewards.css auf `--target-sm` (32px, laut tokens.css „kein
 // Touch-Target"); global haette das die Einnehmen-Knoepfe der Gesundheit, die
