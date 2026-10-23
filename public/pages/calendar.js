@@ -18,6 +18,7 @@ import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-st
 import { swapRegion } from '/utils/content-swap.js';
 import { initials } from '/utils/initials.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
+import { hourOffset, alignedHourScroll, hourGutterLabel, compactHourLabel, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
          isWeekendKey } from '/utils/date.js';
@@ -282,21 +283,12 @@ const HOLIDAY_SCHOOL_FALLBACK = '#34C759';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/* DIE STUNDENHOEHE STEHT IN tokens.css UND NUR DORT.
- *
- * Sie stand hier als `HOUR_HEIGHT = 56` und dort als `--cal-hour-height: 56px`:
- * zwei Schreibweisen desselben Werts, von denen eine still veralten kann - wer
- * das Token anfasst, verschiebt die Stundenlinien und laesst die Termine
- * stehen, ohne dass ein Test das sieht. Positionen werden deshalb als calc()
- * gegen den Token-Namen ausgedrueckt; wer die Hoehe wirklich in Pixeln braucht
- * (Klick auf eine Uhrzeit, Scroll zur aktuellen Stunde), misst sie am Element.
- *
- * Es bleibt EIN Variablenname. Die Tagesansicht ist dichter (40px statt 56px),
- * aber sie sagt das in ihrem eigenen CSS - `.day-view` ueberschreibt
- * --cal-hour-height mit --cal-hour-height-day, und alles darin (Zeitspalte,
- * Stundenlinien, Termine, Now-Linie) folgt automatisch. JS kennt die Dichte
- * gar nicht, es kennt nur den Bezug. */
-const HOUR_VAR = '--cal-hour-height';
+/* DIE STUNDENHOEHE STEHT IN tokens.css UND NUR DORT - `hourOffset()` und die
+ * Scroll-Regel zur laufenden Stunde kommen aus dem geteilten Zeitraster
+ * (utils/time-grid.js), das auch der Schichtplan nutzt. Die Tagesansicht ist
+ * dichter (40px statt 56px), aber sie sagt das in ihrem eigenen CSS -
+ * `.day-view` ueberschreibt --cal-hour-height mit --cal-hour-height-day, und
+ * alles darin folgt automatisch. JS kennt die Dichte gar nicht. */
 
 /**
  * Darf dieser Nutzer in den Kalender schreiben? (#467)
@@ -315,11 +307,6 @@ const HOUR_VAR = '--cal-hour-height';
  */
 function readOnly() {
   return isNavModuleReadOnly('calendar');
-}
-
-/** Vertikaler Versatz einer Minutenzahl als calc() gegen die Stundenhoehe. */
-function hourOffset(minutes) {
-  return `calc(var(${HOUR_VAR}) * ${Math.round((minutes / 60) * 1e4) / 1e4})`;
 }
 
 /** Gemessene Stundenhoehe einer 24-Stunden-Spalte (Klick- und Scroll-Mathematik). */
@@ -729,27 +716,8 @@ function formatDate(dateStr, { long = false, weekday = false } = {}) {
   return formatPreferredDate(dateStr);
 }
 
-/**
- * Die Beschriftung der Stundenspalte - volle Stunden, also ohne „:00" im
- * 12-Stunden-Format („8 AM" statt „8:00 AM").
- *
- * Die Spalte ist mobil 44px breit (--cal-gutter-width, Critique 2026-09-24:
- * 64px von 375 waren ein Sechstel der Breite fuer eine Beschriftung).
- * „12:00 PM" braucht bei 12px rund 50px und passt dort nicht hinein; „12 PM"
- * ist die Form, die Apple Kalender und Fantastical in ihrer Stundenleiste
- * fuehren. Im 24-Stunden-Format bleibt es bei formatTime: „08:00" passt, und
- * die Schreibweise der Locale (Punkt in `id`, persische Ziffern in `fa`)
- * kommt nur von dort.
- */
-function hourGutterLabel(hour) {
-  return compactHourLabel(formatTime(`${pad(hour)}:00`));
-}
-
-/** „8:00 AM" -> „8 AM"; alles andere (24-Stunden-Schreibweisen) bleibt. */
-function compactHourLabel(full) {
-  const twelve = String(full).match(/^(\d{1,2}):00 ([AP]M)$/);
-  return twelve ? `${twelve[1]} ${twelve[2]}` : full;
-}
+// hourGutterLabel()/compactHourLabel(): die Beschriftung der Stundenachse
+// steht im geteilten Zeitraster (utils/time-grid.js).
 
 function formatDateTime(datetimeStr) {
   if (!datetimeStr) return '';
@@ -4625,11 +4593,14 @@ function renderWeekView(container) {
         ${days.map((d) => {
           const dt = new Date(d + 'T00:00:00');
           // Der Kopf fuehrt in den Tag - als Knopf, nicht nur als Klickflaeche.
-          return `<div class="week-view__day-header" data-date="${d}" role="button" tabindex="0"
-               aria-label="${esc(t('calendar.monthOpenDay', { date: formatDate(d, { long: true, weekday: true }) }))}"${d === state.today ? ' aria-current="date"' : ''}>
-            <div class="week-view__day-name">${DAY_NAMES_SHORT()[dt.getDay()]}</div>
-            <div class="week-view__day-num ${d === state.today ? 'week-view__day-num--today' : ''}">${dt.getDate()}</div>
-          </div>`;
+          // Die Form (Kuerzel, Ziffer, Heute-Kreis) ist die des geteilten
+          // Zeitrasters (utils/time-grid.js), dieselbe wie im Schichtplan.
+          return timeGridDayHeadHtml({
+            dayName: DAY_NAMES_SHORT()[dt.getDay()],
+            dayNum: dt.getDate(),
+            isToday: d === state.today,
+            attrs: { 'data-date': d, role: 'button', tabindex: '0', 'aria-label': t('calendar.monthOpenDay', { date: formatDate(d, { long: true, weekday: true }) }) },
+          });
         }).join('')}
       </div>
       <!-- Ganztägige Ereignisse -->
@@ -4655,25 +4626,17 @@ function renderWeekView(container) {
       </div>
       <div class="week-view__scroll page-scrollport" data-scroll-port="calendar-week" id="week-scroll">
         <div class="week-view__body">
-          <div class="week-view__times">
-            ${Array.from({ length: 24 }, (_, h) => `
-              <div class="week-view__time-slot">
-                <span class="week-view__time-label">${h === 0 ? '' : hourGutterLabel(h)}</span>
-              </div>
-            `).join('')}
+          <div class="week-view__times">${timeGridHoursHtml(hourGutterLabel)}
           </div>
           <div class="week-view__columns" id="week-cols"
                style="display:grid;grid-template-columns:repeat(${colCount},1fr);">
             ${days.map((d, i) => `
-              <div class="week-view__col" data-date="${d}">
-                ${Array.from({ length: 24 }, (_, h) => `
-                  <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
-                `).join('')}
+              <div class="week-view__col" data-date="${d}">${timeGridHourLinesHtml()}
                 ${chronological([
                   ...scheduleBlocks[i].map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'week-event', scheduleLayouts[i].get(entry)) })),
                   ...timedEvs[i].map((ev) => ({ range: timeRangeForEvent(ev, d), html: () => renderWeekEvent(ev, layouts[i].get(ev), d) })),
                 ])}
-                ${d === state.today ? `<div class="week-view__now-line" id="now-line" style="top:${hourOffset(nowMinutes())};"></div>` : ''}
+                ${d === state.today ? timeGridNowLineHtml(nowMinutes(), { id: 'now-line' }) : ''}
               </div>
             `).join('')}
           </div>
@@ -4956,51 +4919,8 @@ function scrollToHour(scroll, body) {
   });
 }
 
-/** Ab dieser Stunde zeigt das Zeitraster den Tag, wenn jetzt dabei Platz hat. */
-const MORNING_HOUR = 7;
-/** Ab dieser Stunde ist es frueher Morgen, nicht mehr Nacht: das Raster zeigt
- * schon den kommenden Tag ab MORNING_HOUR (Re-Kritik 2026-10-17). */
-const EARLY_HOUR = MORNING_HOUR - 2;
-
-/**
- * DIE ERSTE SICHTBARE STUNDE STEHT GANZ DA (R19, Critique 2026-10-16). Der
- * Raster-Scroller sprang auf "jetzt minus 80px" - mitten in eine Stunde, und
- * am Abend auf das Scrollende, das genauso mitten in einer Stunde liegt: mobil
- * stand die Reihe 14/15 Uhr halb unter der Ganztagszone, ihre Uhrzeit und
- * Terminkoepfe angeschnitten. Jetzt rundet der Startpunkt auf die volle
- * Stunde ab, auch dort, wo das Scrollende ihn deckelt.
- *
- * DER MORGEN STEHT DA, WO JETZT DANEBEN PLATZ HAT (R19, Critique 2026-10-16).
- * "Eine gute Stunde vor jetzt" liess am Desktop den Vormittag unsichtbar: um
- * 15 Uhr begann die Woche bei 13 Uhr, obwohl das Raster 18 Stunden fasst.
- * Mit `visible` (Hoehe des Scrollers) beginnt die Ansicht um MORNING_HOUR,
- * solange die laufende Stunde darunter noch ganz hineinpasst; sonst so spaet
- * wie noetig, damit sie unten steht. Ohne `visible` bleibt es bei "eine gute
- * Stunde vor jetzt".
- *
- * FRUEH AM MORGEN ZEIGT SIE DEN TAG, NICHT DIE NACHT (Re-Kritik 2026-10-17):
- * um 05:49 begann die Woche bei 04:00 und zeigte bis 15:30 - drei Stunden
- * leere Nacht vor dem ersten Termin. Ab EARLY_HOUR (zwei Stunden vor dem
- * Morgen) beginnt sie um MORNING_HOUR; die laufende Stunde liegt dann knapp
- * darueber, der Tag, der gleich beginnt, steht ganz da. Tief in der Nacht
- * (Nachtschicht, Wickeln) bleibt es bei einer Stunde vor jetzt.
- * @param {{hour: number, hourHeight: number, max: number, visible?: number}} opts
- * @returns {number} scrollTop in px, ein Vielfaches der Stundenhoehe
- */
-function alignedHourScroll({ hour, hourHeight, max, visible }) {
-  if (!(hourHeight > 0)) return 0;
-  let wanted;
-  if (visible > 0) {
-    const fits = Math.floor(visible / hourHeight + 1e-6);
-    const night = hour < EARLY_HOUR ? Math.max(0, hour - 1) : MORNING_HOUR;
-    const topHour = Math.max(hour + 1 - fits, Math.min(MORNING_HOUR, night));
-    wanted = Math.max(0, topHour) * hourHeight;
-  } else {
-    wanted = Math.max(0, hour * hourHeight - 80);
-  }
-  const capped = Math.min(wanted, Math.max(0, max));
-  return Math.floor(capped / hourHeight + 1e-6) * hourHeight;
-}
+// MORNING_HOUR, EARLY_HOUR und alignedHourScroll() stehen im geteilten
+// Zeitraster (utils/time-grid.js): dieselbe Regel gilt im Schichtplan.
 
 /**
  * EIN ZEITFORMAT FUER DEN GANZEN KALENDER (Critique 2026-09-24, P2).
@@ -5354,17 +5274,9 @@ function renderDayView(container) {
       </div>` : ''}
       <div class="day-view__scroll page-scrollport" data-scroll-port="calendar-day" id="day-scroll">
         <div class="day-view__body">
-          <div class="day-view__times">
-            ${Array.from({ length: 24 }, (_, h) => `
-              <div class="week-view__time-slot">
-                <span class="week-view__time-label">${h === 0 ? '' : hourGutterLabel(h)}</span>
-              </div>
-            `).join('')}
+          <div class="day-view__times">${timeGridHoursHtml(hourGutterLabel)}
           </div>
-          <div class="day-view__col" data-date="${state.cursor}" id="day-col">
-            ${Array.from({ length: 24 }, (_, h) => `
-              <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
-            `).join('')}
+          <div class="day-view__col" data-date="${state.cursor}" id="day-col">${timeGridHourLinesHtml()}
             ${chronological([
               ...scheduleBlocks.map((entry) => ({ range: scheduleBlockTimeRange(entry), html: () => renderScheduleTimeBlock(entry, 'day-event', scheduleLayout.get(entry)) })),
               ...timed.map((ev) => ({ range: timeRangeForEvent(ev, state.cursor), html: () => renderDayEvent(ev, layout.get(ev), state.cursor) })),

@@ -56,6 +56,16 @@ export function* eachRule(css) {
       continue;
     }
 
+    // Ein Semikolon ausserhalb eines Blocks schliesst eine Anweisungs-Regel
+    // (`@import url(...);`, `@charset`) - sie ist kein Teil des Selektors der
+    // folgenden Regel. Ohne das hiess die erste Regel nach einem @import
+    // "@import url('/styles/time-grid.css'); .calendar-page" (R22).
+    if (char === ';') {
+      index += 1;
+      start = index;
+      continue;
+    }
+
     if (char !== '{') {
       index += 1;
       continue;

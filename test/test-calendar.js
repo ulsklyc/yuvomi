@@ -955,7 +955,11 @@ test('clickedTime: eine Spalte ohne messbare Höhe legt nichts Falsches an', () 
  *
  * Geprüft wird über eachRule() (der EINE Regelscanner), nicht über ein eigenes
  * Regex: das alte Muster war dreimal blind und jedes Mal war der Guard grün. */
-const calendarCss = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8');
+// Das Zeitraster (Kopf, Stundenachse, Jetzt-Linie) steht seit R22 (D6) im
+// geteilten Blatt time-grid.css, das calendar.css einbindet - die Regeln des
+// Kalenders sind beide Dateien zusammen.
+const calendarCss = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../public/styles/time-grid.css', import.meta.url), 'utf8');
 
 test('Wochenraster: Kopf, Ganztagszeile und Stunden verwenden dieselbe Zeitspaltenbreite', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
@@ -3941,7 +3945,8 @@ test('Stundenleiste: volle Stunden, im 12-Stunden-Format ohne „:00"', () => {
   assert(calendarHelpers.compactHourLabel('08.00') === '08.00', 'die Locale-Schreibweise (id) bleibt unveraendert');
   // Und die Stundenleiste benutzt sie - in Woche UND Tag.
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  const uses = src.match(/<span class="week-view__time-label">\$\{h === 0 \? '' : hourGutterLabel\(h\)\}<\/span>/g) ?? [];
+  // Die Achse baut das geteilte Zeitraster (utils/time-grid.js) aus genau dieser Beschriftung.
+  const uses = src.match(/timeGridHoursHtml\(hourGutterLabel\)/g) ?? [];
   assert(uses.length === 2, `Woche und Tag muessen hourGutterLabel verwenden, gefunden: ${uses.length}`);
 });
 

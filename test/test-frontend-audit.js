@@ -7631,7 +7631,8 @@ test('phase 6 shared sub-tabs support keyboard tab navigation', () => {
 // --------------------------------------------------------
 
 test('calendar week-view time labels use a readable text token, not the disabled token', () => {
-  const calendar = read('../public/styles/calendar.css');
+  // Die Stundenachse steht seit R22 (D6) im geteilten Zeitraster.
+  const calendar = read('../public/styles/time-grid.css');
   const body = cssRuleBody(calendar, '.week-view__time-label');
 
   assert.match(body, /color:\s*var\(--color-text-tertiary\)/, 'time labels must use --color-text-tertiary for WCAG AA contrast');
@@ -8136,16 +8137,14 @@ test('calendar draws its gutter from the shared page token and compacts weekday 
     /\.calendar-page\s*\{[^}]*padding(-inline)?:\s*var\(--space-/,
     'calendar must not reintroduce a module-specific page gutter (#577)',
   );
-  assert.match(
-    calendar,
-    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-header\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center/,
-    'desktop weekday and date should sit side by side',
-  );
-  assert.match(
-    calendar,
-    /@media \(min-width:\s*1024px\)[\s\S]*?\.week-view__day-num\s*\{[\s\S]*?width:\s*var\(--target-sm\);[\s\S]*?height:\s*var\(--target-sm\)/,
-    'desktop date markers should use the compact touch-size token',
-  );
+  // Der Tageskopf ist seit R22 (D6) das geteilte Zeitraster (time-grid.css),
+  // EINE Form auf jeder Breite (seit 2026-09-24): Kuerzel und Ziffer nebeneinander.
+  const grid = read('../public/styles/time-grid.css');
+  assert.match(cssRuleBody(grid, '.week-view__day-header'), /display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?justify-content:\s*center/,
+    'weekday and date should sit side by side');
+  assert.match(cssRuleBody(grid, '.week-view__day-num'), /width:\s*var\(--target-sm\);[\s\S]*?height:\s*var\(--target-sm\)/,
+    'date markers should use the compact touch-size token');
+  assert.match(calendar, /^@import url\('\/styles\/time-grid\.css'\);/m, 'calendar.css bindet das Zeitraster ein');
 });
 
 // Bis Block 2 (2026-08-10) verglich dieser Guard genau zwei Namen
