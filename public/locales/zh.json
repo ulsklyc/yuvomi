@@ -1183,7 +1183,8 @@
         "localCalendarEventCount_one": "{{count}} 个事件",
         "sidebarLabel": "日历侧边栏",
         "upNextTitle": "接下来",
-        "upNextEmpty": "未来三周没有安排。"
+        "upNextEmpty": "未来三周没有安排。",
+        "openInCalendar": "在日历中打开"
     },
     "noteCategories": {
         "categories": "分类",
@@ -4421,7 +4422,8 @@
         "tooShort": "密码至少需要 8 个字符。",
         "invalidToken": "此重置链接无效或已过期 - 请重新申请一个。",
         "missingToken": "此重置链接不完整 - 请重新申请一个。",
-        "requestNew": "申请新链接"
+        "requestNew": "申请新链接",
+        "invalidTitle": "链接无效"
     },
     "email": {
         "host": "SMTP 主机",
@@ -6322,13 +6324,14 @@
         "mismatch": "两次输入的密码不一致。",
         "tooShort": "密码至少需要 8 个字符。",
         "invalidToken": "此邀请无效、已过期或已被使用 - 请索取新链接。",
-        "missingToken": "此邀请链接无效或已过期 - 请索取新链接。",
         "usernameRequired": "请选择一个用户名。",
         "usernameInvalid": "用户名需为 3 到 64 个字符，且只能包含字母、数字、点、连字符和下划线。",
         "usernameTaken": "该用户名已被占用。",
         "error": "无法创建账户，请重试。",
         "displayNameTooLong": "显示名称最多 128 个字符。",
-        "previewFailed": "目前无法检查该邀请，请稍后重新加载页面。"
+        "previewFailed": "目前无法检查该邀请，请稍后重新加载页面。",
+        "invalidTitle": "邀请无效",
+        "toLogin": "前往登录"
     },
     "newLabel": {
         "tasks": "任务",

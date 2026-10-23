@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Os eventos deste calendário serão movidos para o calendário predefinido e depois carregados para o iCloud através do Apple Calendar. A respetiva ligação de exportação deixará de funcionar.",
         "sidebarLabel": "Barra lateral do calendário",
         "upNextTitle": "A seguir",
-        "upNextEmpty": "Nada nas próximas três semanas."
+        "upNextEmpty": "Nada nas próximas três semanas.",
+        "openInCalendar": "Abrir no calendário"
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -4421,7 +4422,8 @@
         "tooShort": "A palavra-passe tem de ter pelo menos 8 caracteres.",
         "invalidToken": "Esta ligação de reposição é inválida ou expirou - peça uma nova.",
         "missingToken": "Esta ligação de reposição está incompleta - peça uma nova.",
-        "requestNew": "Pedir uma nova ligação"
+        "requestNew": "Pedir uma nova ligação",
+        "invalidTitle": "Ligação inválida"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "As palavras-passe não coincidem.",
         "tooShort": "A palavra-passe tem de ter pelo menos 8 caracteres.",
         "invalidToken": "Este convite é inválido, expirou ou já foi utilizado - peça uma nova ligação.",
-        "missingToken": "Esta ligação de convite é inválida ou expirou - peça uma nova.",
         "usernameRequired": "Escolhe um nome de utilizador.",
         "usernameInvalid": "O nome de utilizador tem de ter entre 3 e 64 caracteres e só pode conter letras, números, pontos, hífenes e sublinhados.",
         "usernameTaken": "Este nome de utilizador já está em uso.",
         "error": "Não foi possível criar a conta. Tenta novamente.",
         "displayNameTooLong": "O nome apresentado pode ter no máximo 128 caracteres.",
-        "previewFailed": "Não foi possível verificar o convite neste momento. Volta a carregar a página daqui a pouco."
+        "previewFailed": "Não foi possível verificar o convite neste momento. Volta a carregar a página daqui a pouco.",
+        "invalidTitle": "Convite inválido",
+        "toLogin": "Ir para o início de sessão"
     },
     "newLabel": {
         "tasks": "Tarefa",

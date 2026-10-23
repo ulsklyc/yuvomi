@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Händelser från den här kalendern flyttas till standardkalendern och laddas sedan upp till iCloud via Apple Calendar. Exportlänken slutar att fungera.",
         "sidebarLabel": "Kalenderns sidofält",
         "upNextTitle": "Härnäst",
-        "upNextEmpty": "Inget de närmaste tre veckorna."
+        "upNextEmpty": "Inget de närmaste tre veckorna.",
+        "openInCalendar": "Öppna i kalendern"
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -4421,7 +4422,8 @@
         "tooShort": "Lösenordet måste vara minst 8 tecken långt.",
         "invalidToken": "Den här återställningslänken är ogiltig eller har gått ut - begär en ny.",
         "missingToken": "Den här återställningslänken är ofullständig - begär en ny.",
-        "requestNew": "Begär en ny länk"
+        "requestNew": "Begär en ny länk",
+        "invalidTitle": "Ogiltig länk"
     },
     "email": {
         "host": "SMTP-värd",
@@ -6322,13 +6324,14 @@
         "mismatch": "Lösenorden stämmer inte överens.",
         "tooShort": "Lösenordet måste vara minst 8 tecken långt.",
         "invalidToken": "Inbjudan är ogiltig, har gått ut eller har redan använts - be om en ny länk.",
-        "missingToken": "Den här inbjudningslänken är ogiltig eller har gått ut - be om en ny.",
         "usernameRequired": "Välj ett användarnamn.",
         "usernameInvalid": "Användarnamnet måste vara 3 till 64 tecken långt och får bara innehålla bokstäver, siffror, punkter, bindestreck och understreck.",
         "usernameTaken": "Användarnamnet är redan taget.",
         "error": "Kontot kunde inte skapas. Försök igen.",
         "displayNameTooLong": "Visningsnamnet får vara högst 128 tecken långt.",
-        "previewFailed": "Inbjudan kunde inte kontrolleras just nu. Ladda om sidan om en stund."
+        "previewFailed": "Inbjudan kunde inte kontrolleras just nu. Ladda om sidan om en stund.",
+        "invalidTitle": "Ogiltig inbjudan",
+        "toLogin": "Till inloggningen"
     },
     "newLabel": {
         "tasks": "Uppgift",

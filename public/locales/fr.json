@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, puis envoyés vers iCloud via Apple Calendar. Son lien d’export cessera de fonctionner.",
         "sidebarLabel": "Barre latérale du calendrier",
         "upNextTitle": "À venir",
-        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines."
+        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines.",
+        "openInCalendar": "Ouvrir dans le calendrier"
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -4421,7 +4422,8 @@
         "tooShort": "Le mot de passe doit comporter au moins 8 caractères.",
         "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré - demandez-en un nouveau.",
         "missingToken": "Ce lien de réinitialisation est incomplet - demandez-en un nouveau.",
-        "requestNew": "Demander un nouveau lien"
+        "requestNew": "Demander un nouveau lien",
+        "invalidTitle": "Lien invalide"
     },
     "email": {
         "host": "Hôte SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "Les mots de passe ne correspondent pas.",
         "tooShort": "Le mot de passe doit comporter au moins 8 caractères.",
         "invalidToken": "Cette invitation est invalide, expirée ou déjà utilisée - demandez un nouveau lien.",
-        "missingToken": "Ce lien d'invitation est invalide ou a expiré - demandez-en un nouveau.",
         "usernameRequired": "Veuillez choisir un nom d'utilisateur.",
         "usernameInvalid": "Le nom d'utilisateur doit comporter de 3 à 64 caractères et ne peut contenir que des lettres, des chiffres, des points, des tirets et des tirets bas.",
         "usernameTaken": "Ce nom d'utilisateur est déjà pris.",
         "error": "Le compte n'a pas pu être créé. Veuillez réessayer.",
         "displayNameTooLong": "Le nom affiché ne peut pas dépasser 128 caractères.",
-        "previewFailed": "L'invitation n'a pas pu être vérifiée pour le moment. Rechargez la page dans un instant."
+        "previewFailed": "L'invitation n'a pas pu être vérifiée pour le moment. Rechargez la page dans un instant.",
+        "invalidTitle": "Invitation invalide",
+        "toLogin": "Aller à la connexion"
     },
     "newLabel": {
         "tasks": "Tâche",

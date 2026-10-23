@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en daarna via Apple Agenda naar iCloud geüpload. De exportlink werkt daarna niet meer.",
         "sidebarLabel": "Zijbalk van de agenda",
         "upNextTitle": "Hierna",
-        "upNextEmpty": "Niets gepland in de komende drie weken."
+        "upNextEmpty": "Niets gepland in de komende drie weken.",
+        "openInCalendar": "Openen in agenda"
     },
     "noteCategories": {
         "categories": "Categorieën",
@@ -4421,7 +4422,8 @@
         "tooShort": "Het wachtwoord moet minstens 8 tekens lang zijn.",
         "invalidToken": "Deze resetlink is ongeldig of verlopen - vraag een nieuwe aan.",
         "missingToken": "Deze resetlink is onvolledig - vraag een nieuwe aan.",
-        "requestNew": "Nieuwe link aanvragen"
+        "requestNew": "Nieuwe link aanvragen",
+        "invalidTitle": "Link ongeldig"
     },
     "email": {
         "host": "SMTP-host",
@@ -6322,13 +6324,14 @@
         "mismatch": "De wachtwoorden komen niet overeen.",
         "tooShort": "Het wachtwoord moet minstens 8 tekens lang zijn.",
         "invalidToken": "Deze uitnodiging is ongeldig, verlopen of al gebruikt - vraag om een nieuwe link.",
-        "missingToken": "Deze uitnodigingslink is ongeldig of verlopen - vraag om een nieuwe.",
         "usernameRequired": "Kies een gebruikersnaam.",
         "usernameInvalid": "De gebruikersnaam moet 3 tot 64 tekens lang zijn en mag alleen letters, cijfers, punten, streepjes en underscores bevatten.",
         "usernameTaken": "Deze gebruikersnaam is al in gebruik.",
         "error": "Het account kon niet worden aangemaakt. Probeer het opnieuw.",
         "displayNameTooLong": "De weergavenaam mag maximaal 128 tekens lang zijn.",
-        "previewFailed": "De uitnodiging kon nu niet worden gecontroleerd. Laad de pagina zo meteen opnieuw."
+        "previewFailed": "De uitnodiging kon nu niet worden gecontroleerd. Laad de pagina zo meteen opnieuw.",
+        "invalidTitle": "Uitnodiging ongeldig",
+        "toLogin": "Naar inloggen"
     },
     "newLabel": {
         "tasks": "Taak",

@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Gli eventi di questo calendario verranno spostati nel calendario predefinito e poi caricati su iCloud tramite Apple Calendar. Il suo link di esportazione smetterà di funzionare.",
         "sidebarLabel": "Barra laterale del calendario",
         "upNextTitle": "Prossimi",
-        "upNextEmpty": "Niente in programma nelle prossime tre settimane."
+        "upNextEmpty": "Niente in programma nelle prossime tre settimane.",
+        "openInCalendar": "Apri nel calendario"
     },
     "noteCategories": {
         "categories": "Categorie",
@@ -4421,7 +4422,8 @@
         "tooShort": "La password deve contenere almeno 8 caratteri.",
         "invalidToken": "Questo link di reimpostazione non è valido o è scaduto - richiedine uno nuovo.",
         "missingToken": "Questo link di reimpostazione è incompleto - richiedine uno nuovo.",
-        "requestNew": "Richiedi un nuovo link"
+        "requestNew": "Richiedi un nuovo link",
+        "invalidTitle": "Link non valido"
     },
     "email": {
         "host": "Host SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "Le password non coincidono.",
         "tooShort": "La password deve contenere almeno 8 caratteri.",
         "invalidToken": "Questo invito non è valido, è scaduto o è già stato usato - chiedi un nuovo link.",
-        "missingToken": "Questo link di invito non è valido o è scaduto - chiedine uno nuovo.",
         "usernameRequired": "Scegli un nome utente.",
         "usernameInvalid": "Il nome utente deve avere da 3 a 64 caratteri e può contenere solo lettere, numeri, punti, trattini e trattini bassi.",
         "usernameTaken": "Questo nome utente è già in uso.",
         "error": "Non è stato possibile creare l'account. Riprova.",
         "displayNameTooLong": "Il nome visualizzato può contenere al massimo 128 caratteri.",
-        "previewFailed": "Non è stato possibile verificare l'invito in questo momento. Ricarica la pagina tra un istante."
+        "previewFailed": "Non è stato possibile verificare l'invito in questo momento. Ricarica la pagina tra un istante.",
+        "invalidTitle": "Invito non valido",
+        "toLogin": "Vai al login"
     },
     "newLabel": {
         "tasks": "Compito",

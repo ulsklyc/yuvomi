@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was closed, so reloading the page or sharing the address opened it again. Closing the sheet now
   removes it without adding a step to the back button. In the two-column layout the address still
   names the selected row.
+- **A dead invitation or reset link says so in its title.** An invitation that is no longer valid
+  kept the title "Set up account", said it in two different sentences depending on the link, and
+  offered only a small text link; a dead reset link kept "Set new password". Both pages now name
+  the invalid link in the title, say once what to do and offer the way out as the main button:
+  "Go to login" for the invitation, "Request a new link" for the reset. The way back to login on
+  these pages is now styled as a link.
+- **Pairing a wall tablet points at the code field.** A wrong pairing code showed an English
+  server sentence in a banner below the form. The message now stands under the code field, the
+  field is marked as wrong and focused, and a link leads back to login.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.

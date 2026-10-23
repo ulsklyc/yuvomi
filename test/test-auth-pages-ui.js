@@ -23,7 +23,10 @@ const selectors = [...eachRule(css)].map((r) => r.selector).join('\n');
 test('jedes Karten- und Hero-Element der Auth-Seiten hat eine Regel in auth.css', () => {
   const rendered = new Set();
   for (const page of PAGES) {
-    for (const [cls] of read(`../public/pages/${page}.js`).matchAll(/\bauth-(?:card|hero)__[\w-]+/g)) rendered.add(cls);
+    // Seit R22 auch die Formular-Teile: `auth-form__forgot` (der Rueckweg zur
+    // Anmeldung) hatte keine Regel und stand als schwarzer Fliesstext dicht
+    // unter dem Knopf, sobald er nicht betont war (/pair, /reset-password).
+    for (const [cls] of read(`../public/pages/${page}.js`).matchAll(/\bauth-(?:card|hero|form)__[\w-]+/g)) rendered.add(cls);
   }
   assert.ok(rendered.has('auth-card__title'), 'die Seiten rendern keinen Kartentitel mehr - Test veraltet');
   assert.ok(rendered.size >= 3, `nur ${rendered.size} Elemente gefunden - der Leser ist kaputt`);
@@ -285,24 +288,51 @@ test('Befund 15: die Eingabe in ein markiertes Feld blendet die Meldung aus', as
  * kein naechster Schritt, und der Weg zur Anmeldung als unscheinbare Zeile.
  * Jetzt sagt der Satz, was zu tun ist (um einen neuen Link bitten), und die
  * Anmeldung steht betont wie nach falschen Zugangsdaten (login.js). */
-test('/join ohne gueltige Einladung: der Satz nennt den naechsten Schritt, die Anmeldung steht betont (Critique R21)', async () => {
+test('/join ohne gueltige Einladung: der Titel nennt sie, EIN Satz, "Zur Anmeldung" als Primaerknopf (R21, R22 D19)', async () => {
   const { readdirSync } = await import('node:fs');
   const join = read('../public/pages/join.js');
-  assert.match(join, /<p class="auth-form__forgot" id="join-login"><a href="\/login" data-link>/, 'der Weg zur Anmeldung hat einen Namen');
-  const dead = join.slice(join.indexOf('const dead = '), join.indexOf("if (!token)"));
-  assert.match(dead, /querySelector\('#join-login'\)\?\.classList\.add\('auth-form__forgot--emphasis'\)/,
-    'eine tote Einladung betont die Anmeldung');
-  assert.match(css, /\.auth-form__forgot--emphasis a \{/, 'die Betonung hat ihre Regel');
+  assert.match(join, /<a class="btn btn--primary auth-form__submit" id="join-to-login" href="\/login" data-link hidden>\$\{esc\(t\('join\.toLogin'\)\)\}<\/a>/,
+    'der Weg zur Anmeldung ist ein Primaerknopf, kein Textlink');
+  const dead = join.slice(join.indexOf('const dead = '), join.indexOf('const unknown = '));
+  assert.match(dead, /querySelector\('#join-title'\)\.textContent = t\('join\.invalidTitle'\)/,
+    'der Titel nennt die ungueltige Einladung statt "Konto einrichten"');
+  assert.match(dead, /show\(errorEl, t\('join\.invalidToken'\)\)/, 'EIN Satz fuer fehlenden und ungueltigen Link');
+  assert.match(dead, /toLogin\.hidden = false;\s*toLogin\.focus\(\);/, 'der Knopf erscheint und bekommt den Fokus');
+  assert.match(dead, /querySelector\('#join-login'\)\.hidden = true/, 'kein zweiter Weg zur Anmeldung daneben');
+  assert.doesNotMatch(join, /join\.missingToken/, 'kein zweiter Satz fuer dieselbe Lage');
+  assert.match(join, /if \(!token\) \{ dead\(\); return; \}/);
+  assert.match(join, /if \(!preview\?\.valid\) \{ dead\(\); return; \}/);
+  // Voruebergehend ist nicht tot: Titel und Rueckweg bleiben (429, Netz).
+  assert.match(join, /unknown\(t\('join\.previewFailed'\)\)/);
+  assert.match(css, /\.auth-form__forgot--emphasis a \{/, 'die Betonung des voruebergehenden Falls hat ihre Regel');
 
   const de = JSON.parse(read('../public/locales/de.json')).join;
-  for (const key of ['missingToken', 'invalidToken']) {
-    assert.match(de[key], /bitte um einen neuen/, `join.${key} nennt den naechsten Schritt`);
-  }
+  assert.match(de.invalidToken, /bitte um einen neuen/, 'join.invalidToken nennt den naechsten Schritt');
   const dir = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
     const { join: j } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
-    assert.doesNotMatch(j.missingToken, /token/i, `${file}: kein "Token" in der Meldung`);
+    assert.doesNotMatch(j.invalidToken, /token/i, `${file}: kein "Token" in der Meldung`);
+    assert.ok(j.invalidTitle && j.toLogin, `${file}: Titel und Knopf der toten Einladung`);
+    assert.equal(j.missingToken, undefined, `${file}: join.missingToken ist weg`);
   }
+});
+
+/* /pair: DER FEHLER STEHT AM FELD, UND ES GIBT EINEN WEG ZURUECK (Critique R22,
+ * D19). Die Meldung stand als Banner unter dem Formular, das Feld zeigte keinen
+ * Fehlerzustand, ein falscher Code kam als englischer Servertext an, und von der
+ * Seite fuehrte kein Weg weg. */
+test('/pair: Fehler am Codefeld, uebersetzter Satz, Weg zur Anmeldung (R22 D19)', () => {
+  const page = read('../public/pages/pair-display.js');
+  const group = page.slice(page.indexOf('<input class="form-input" type="text" id="pair-code"'), page.indexOf('id="pair-label"'));
+  assert.match(group, /<div id="pair-error" class="form-error" role="alert" tabindex="-1" hidden><\/div>/,
+    'die Meldung steht in der Gruppe des Codefelds');
+  assert.match(page, /if \(err\?\.status === 400\) flagField\(codeEl, errorEl\);/, 'ein falscher Code markiert das Feld');
+  assert.match(page, /err\?\.status === 400 \? t\('pairDisplay\.failed'\) : errorSentence\(err\)/,
+    'nie der englische Text des Servers');
+  assert.doesNotMatch(page, /err\.message \|\|/);
+  assert.match(page, /<p class="auth-form__forgot"><a href="\/login" data-link>\$\{esc\(t\('forgotPassword\.backToLogin'\)\)\}<\/a><\/p>/,
+    'der Weg zurueck zur Anmeldung');
+  assert.match(page, /wireLinks\(container\);/, 'der Link navigiert in der App');
 });
 
 /* KEINE SACKGASSE AUF /reset-password (Critique R21, Persona Inge; D15).
@@ -313,7 +343,8 @@ test('/join ohne gueltige Einladung: der Satz nennt den naechsten Schritt, die A
 test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu einem neuen Link (Critique R21)', async () => {
   const { readdirSync } = await import('node:fs');
   const page = read('../public/pages/reset-password.js');
-  assert.match(page, /<a href="\/forgot-password" data-link>\$\{esc\(t\('resetPassword\.requestNew'\)\)\}<\/a>/, 'der Weg zu einem neuen Link steht auf der Seite');
+  assert.match(page, /<a class="btn btn--primary auth-form__submit" id="reset-request-new" href="\/forgot-password" data-link hidden>\$\{esc\(t\('resetPassword\.requestNew'\)\)\}<\/a>/,
+    'der Weg zu einem neuen Link steht als Primaerknopf auf der Seite (R22 D19)');
   const dead = page.slice(page.indexOf('const dead = '), page.indexOf('if (!token)'));
   assert.match(dead, /form\.hidden = true/, 'ein toter Link nimmt das Formular weg');
   // Ein 400 gilt als toter Link - das stimmt nur, wenn das Formular die Laenge
@@ -322,6 +353,8 @@ test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu
     'die Laengenpruefung zaehlt NFC wie der Server, sonst wird ein gueltiger Link fuer tot erklaert');
   assert.match(read('../server/auth.js'), /if \(normalizePassword\(password\)\.length < 8\)/, 'und der Server zaehlt NFC');
   assert.match(dead, /reset-request-new/, 'und betont den Weg zu einem neuen Link');
+  assert.match(dead, /querySelector\('#reset-title'\)\.textContent = t\('resetPassword\.invalidTitle'\)/,
+    'der Titel nennt den ungueltigen Link (R22 D19)');
   const de = JSON.parse(read('../public/locales/de.json')).resetPassword;
   for (const key of ['missingToken', 'invalidToken']) {
     assert.match(de[key], /fordere einen neuen an/, `resetPassword.${key} nennt den naechsten Schritt`);

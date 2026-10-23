@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "A naptár eseményei az alapértelmezett naptárba kerülnek, majd az Apple Naptár kapcsolaton keresztül feltöltődnek az iCloudba. Az exportálási hivatkozása többé nem fog működni.",
         "sidebarLabel": "Naptár oldalsáv",
         "upNextTitle": "Következik",
-        "upNextEmpty": "A következő három hétben nincs semmi."
+        "upNextEmpty": "A következő három hétben nincs semmi.",
+        "openInCalendar": "Megnyitás a naptárban"
     },
     "noteCategories": {
         "categories": "Kategóriák",
@@ -4421,7 +4422,8 @@
         "tooShort": "A jelszónak legalább 8 karakter hosszúnak kell lennie.",
         "invalidToken": "Ez a visszaállító link érvénytelen vagy lejárt - kérjen egy újat.",
         "missingToken": "Ez a visszaállító link hiányos - kérjen egy újat.",
-        "requestNew": "Új link kérése"
+        "requestNew": "Új link kérése",
+        "invalidTitle": "Érvénytelen link"
     },
     "email": {
         "host": "SMTP-kiszolgáló",
@@ -6322,13 +6324,14 @@
         "mismatch": "A jelszavak nem egyeznek.",
         "tooShort": "A jelszónak legalább 8 karakter hosszúnak kell lennie.",
         "invalidToken": "Ez a meghívó érvénytelen, lejárt vagy már felhasználták - kérjen új linket.",
-        "missingToken": "Ez a meghívólink érvénytelen vagy lejárt - kérjen egy újat.",
         "usernameRequired": "Válassz felhasználónevet.",
         "usernameInvalid": "A felhasználónév 3 és 64 karakter közötti lehet, és csak betűket, számokat, pontot, kötőjelet és aláhúzást tartalmazhat.",
         "usernameTaken": "Ez a felhasználónév már foglalt.",
         "error": "A fiókot nem sikerült létrehozni. Próbáld újra.",
         "displayNameTooLong": "A megjelenő név legfeljebb 128 karakter lehet.",
-        "previewFailed": "A meghívót most nem sikerült ellenőrizni. Töltsd újra az oldalt egy pillanat múlva."
+        "previewFailed": "A meghívót most nem sikerült ellenőrizni. Töltsd újra az oldalt egy pillanat múlva.",
+        "invalidTitle": "Érvénytelen meghívó",
+        "toLogin": "Tovább a bejelentkezéshez"
     },
     "newLabel": {
         "tasks": "Feladat",

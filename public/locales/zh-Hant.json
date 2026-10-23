@@ -1183,7 +1183,8 @@
         "localCalendarEventCount_one": "{{count}} 個活動",
         "sidebarLabel": "日曆側邊欄",
         "upNextTitle": "接下來",
-        "upNextEmpty": "未來三週沒有安排。"
+        "upNextEmpty": "未來三週沒有安排。",
+        "openInCalendar": "在日曆中開啟"
     },
     "noteCategories": {
         "categories": "分類",
@@ -4421,7 +4422,8 @@
         "tooShort": "密碼至少需要 8 個字元。",
         "invalidToken": "此重設連結無效或已過期 - 請重新申請一個。",
         "missingToken": "此重設連結不完整 - 請重新申請一個。",
-        "requestNew": "申請新連結"
+        "requestNew": "申請新連結",
+        "invalidTitle": "連結無效"
     },
     "email": {
         "host": "SMTP 主機",
@@ -6322,13 +6324,14 @@
         "mismatch": "兩次輸入的密碼不一致。",
         "tooShort": "密碼至少需要 8 個字元。",
         "invalidToken": "此邀請無效、已過期或已被使用 - 請索取新連結。",
-        "missingToken": "此邀請連結無效或已過期 - 請索取新連結。",
         "usernameRequired": "請選擇一個使用者名稱。",
         "usernameInvalid": "使用者名稱需為 3 到 64 個字元，且只能包含字母、數字、點、連字元和下劃線。",
         "usernameTaken": "該使用者名稱已被佔用。",
         "error": "無法建立帳戶，請重試。",
         "displayNameTooLong": "顯示名稱最多 128 個字元。",
-        "previewFailed": "目前無法檢查該邀請，請稍後重新載入頁面。"
+        "previewFailed": "目前無法檢查該邀請，請稍後重新載入頁面。",
+        "invalidTitle": "邀請無效",
+        "toLogin": "前往登入"
     },
     "newLabel": {
         "tasks": "任務",

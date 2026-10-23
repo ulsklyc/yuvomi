@@ -28,7 +28,7 @@ export async function render(container) {
     <main class="auth-page" id="main-content">
       ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
-        <h1 class="auth-card__title">${esc(t('join.title'))}</h1>
+        <h1 class="auth-card__title" id="join-title">${esc(t('join.title'))}</h1>
         <p class="auth-card__intro" id="join-intro">${esc(t('join.intro'))}</p>
         ${authErrorHtml('join-error')}
         <div class="form-success" id="join-success" role="status" aria-live="polite" hidden></div>
@@ -60,6 +60,7 @@ export async function render(container) {
             ${esc(t('join.submit'))}
           </button>
         </form>
+        <a class="btn btn--primary auth-form__submit" id="join-to-login" href="/login" data-link hidden>${esc(t('join.toLogin'))}</a>
         <p class="auth-form__forgot" id="join-login"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
       </div>
     </main>
@@ -89,14 +90,32 @@ export async function render(container) {
   // und der Weg hinaus. KEINE SACKGASSE (Critique R21, a1; D15): die Meldung
   // sagt, was zu tun ist ("bitte um einen neuen"), und wer schon ein Konto hat,
   // findet die Anmeldung betont wie nach falschen Zugangsdaten (login.js).
-  const dead = (msg) => {
+  //
+  // DIE TOTE EINLADUNG IST DER ZUSTAND DER SEITE (Critique R22, D19). Der
+  // Titel sagte weiter "Konto einrichten", der Ausweg war eine Textzeile, und
+  // ein fehlender und ein ungueltiger Link sprachen zwei verschiedene Saetze
+  // fuer dieselbe Lage. Jetzt nennt der Titel die ungueltige Einladung, EIN
+  // Satz sagt, was zu tun ist, und "Zur Anmeldung" ist der Primaerknopf.
+  const dead = () => {
+    container.querySelector('#join-title').textContent = t('join.invalidTitle');
+    show(errorEl, t('join.invalidToken'));
+    form.hidden = true;
+    intro.hidden = true;
+    container.querySelector('#join-login').hidden = true;
+    const toLogin = container.querySelector('#join-to-login');
+    toLogin.hidden = false;
+    toLogin.focus();
+  };
+  // Voruebergehend (429, Netz, Server): die Einladung kann gelten - Titel und
+  // Rueckweg bleiben, nur das Formular ist zu, bis die Vorschau antwortet.
+  const unknown = (msg) => {
     fail(msg);
     form.hidden = true;
     intro.hidden = true;
     container.querySelector('#join-login')?.classList.add('auth-form__forgot--emphasis');
   };
 
-  if (!token) { dead(t('join.missingToken')); return; }
+  if (!token) { dead(); return; }
 
   // Bis die Vorschau da ist, steht noch nicht fest, ob und mit welchen Vorgaben
   // die Einladung gilt.
@@ -109,10 +128,10 @@ export async function render(container) {
     // Serverfehler oder eine abgerissene Verbindung sind vorübergehend, und wer
     // dann "Einladung ungültig" liest, wirft einen intakten Link weg. Das
     // Formular bleibt trotzdem zu: ohne Vorschau sind die Vorgaben unbekannt.
-    dead(t('join.previewFailed'));
+    unknown(t('join.previewFailed'));
     return;
   }
-  if (!preview?.valid) { dead(t('join.invalidToken')); return; }
+  if (!preview?.valid) { dead(); return; }
   btn.disabled = false;
 
   // Was die Einladung vorgibt, steht fest: der Server nimmt ohnehin ihre Werte.
@@ -186,7 +205,7 @@ export async function render(container) {
       // nicht dieselbe Wirkung haben wie ein abgelaufener Link.
       if (err?.status === 400) {
         const stillValid = await auth.previewInvite(token).then((r) => r?.data?.valid).catch(() => true);
-        if (!stillValid) { dead(t('join.invalidToken')); return; }
+        if (!stillValid) { dead(); return; }
       }
       fail(t('join.error'));
       btn.disabled = false;

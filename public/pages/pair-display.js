@@ -19,6 +19,12 @@ import { clearApiCache } from '/sw-register.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { flagField } from '/utils/auth-ui.js';
+import { errorSentence } from '/utils/friendly-error.js';
+
+function wireLinks(container) {
+  container.querySelectorAll('a[data-link]').forEach((a) =>
+    a.addEventListener('click', (e) => { e.preventDefault(); window.yuvomi.navigate(a.getAttribute('href')); }));
+}
 
 export async function render(container) {
   container.replaceChildren();
@@ -34,21 +40,28 @@ export async function render(container) {
                    autocapitalize="characters" autocorrect="off" spellcheck="false"
                    inputmode="text" maxlength="14" />
             <p class="form-hint">${esc(t('pairDisplay.codeHint'))}</p>
+            ${/* DER FEHLER STEHT AM FELD (Critique R22, D19): beide Meldungen
+                  meinen den Code - sie standen als Banner unter dem Formular,
+                  und das Feld selbst zeigte keinen Fehler. */ ''}
+            <div id="pair-error" class="form-error" role="alert" tabindex="-1" hidden></div>
           </div>
           <div class="form-group">
             <label class="form-label" for="pair-label">${esc(t('pairDisplay.labelLabel'))}</label>
             <input class="form-input" type="text" id="pair-label" maxlength="120" />
             <p class="form-hint">${esc(t('pairDisplay.labelHint'))}</p>
           </div>
-          <div id="pair-error" class="form-error" role="alert" hidden></div>
           <button type="submit" class="btn btn--primary auth-form__submit">${esc(t('pairDisplay.submit'))}</button>
         </form>
+        ${/* Der Weg zurueck (D19): wer hier ohne Code landet oder ein
+              Mitglieds-Geraet meint, kam bisher nur ueber die Adresszeile weg. */ ''}
+        <p class="auth-form__forgot"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
       </div>
     </main>
   `);
 
   const form = container.querySelector('#pair-form');
   const errorEl = container.querySelector('#pair-error');
+  wireLinks(container);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -86,10 +99,15 @@ export async function render(container) {
       window.location.href = '/';
     } catch (err) {
       // Der Server unterscheidet unbekannt, abgelaufen und schon benutzt
-      // bewusst nicht - diese Seite tut es also auch nicht.
-      errorEl.textContent = err.message || t('pairDisplay.failed');
+      // bewusst nicht - diese Seite tut es also auch nicht. Ein 400 ist der
+      // Code; alles andere (Bremse, Netz, Server) ist nicht seine Schuld und
+      // bekommt seinen eigenen Satz - nie den englischen Text des Servers.
+      const codeEl = container.querySelector('#pair-code');
+      if (err?.status === 400) flagField(codeEl, errorEl);
+      errorEl.textContent = err?.status === 400 ? t('pairDisplay.failed') : errorSentence(err);
       errorEl.hidden = false;
       btn.disabled = false;
+      (err?.status === 400 ? codeEl : errorEl).focus();
     }
   });
 }

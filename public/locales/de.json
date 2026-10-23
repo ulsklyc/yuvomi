@@ -1201,7 +1201,8 @@
         "localCalendarDeleteDetailIcloud": "Termine aus diesem Kalender werden in den Standardkalender verschoben und danach über Apple Calendar zu iCloud hochgeladen. Sein Exportlink funktioniert danach nicht mehr.",
         "sidebarLabel": "Seitenleiste des Kalenders",
         "upNextTitle": "Als Nächstes",
-        "upNextEmpty": "In den nächsten drei Wochen steht nichts an."
+        "upNextEmpty": "In den nächsten drei Wochen steht nichts an.",
+        "openInCalendar": "Im Kalender öffnen"
     },
     "noteCategories": {
         "categories": "Kategorien",
@@ -4421,7 +4422,8 @@
         "tooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
         "invalidToken": "Dieser Link zum Zurücksetzen ist ungültig oder abgelaufen - fordere einen neuen an.",
         "missingToken": "Dieser Link zum Zurücksetzen ist unvollständig - fordere einen neuen an.",
-        "requestNew": "Neuen Link anfordern"
+        "requestNew": "Neuen Link anfordern",
+        "invalidTitle": "Link ungültig"
     },
     "email": {
         "host": "SMTP-Host",
@@ -6322,13 +6324,14 @@
         "mismatch": "Die Passwörter stimmen nicht überein.",
         "tooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
         "invalidToken": "Diese Einladung ist ungültig, abgelaufen oder schon eingelöst - bitte um einen neuen Link.",
-        "missingToken": "Dieser Einladungslink ist ungültig oder abgelaufen - bitte um einen neuen.",
         "usernameRequired": "Bitte wähle einen Benutzernamen.",
         "usernameInvalid": "Der Benutzername muss 3 bis 64 Zeichen lang sein und darf nur Buchstaben, Zahlen, Punkt, Bindestrich und Unterstrich enthalten.",
         "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
         "error": "Das Konto konnte nicht erstellt werden. Bitte versuche es noch einmal.",
         "displayNameTooLong": "Der Anzeigename darf höchstens 128 Zeichen lang sein.",
-        "previewFailed": "Die Einladung konnte gerade nicht geprüft werden. Bitte lade die Seite in einem Moment neu."
+        "previewFailed": "Die Einladung konnte gerade nicht geprüft werden. Bitte lade die Seite in einem Moment neu.",
+        "invalidTitle": "Einladung ungültig",
+        "toLogin": "Zur Anmeldung"
     },
     "newLabel": {
         "tasks": "Aufgabe",

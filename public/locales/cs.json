@@ -1255,7 +1255,8 @@
         "localCalendarDeleteDetailIcloud": "Události z tohoto kalendáře se přesunou do výchozího kalendáře a poté se přes Apple Calendar nahrají do iCloudu. Jeho odkaz pro export přestane fungovat.",
         "sidebarLabel": "Postranní panel kalendáře",
         "upNextTitle": "Následuje",
-        "upNextEmpty": "V příštích třech týdnech nic není."
+        "upNextEmpty": "V příštích třech týdnech nic není.",
+        "openInCalendar": "Otevřít v kalendáři"
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -4540,7 +4541,8 @@
         "tooShort": "Heslo musí mít alespoň 8 znaků.",
         "invalidToken": "Tento odkaz pro obnovení je neplatný nebo vypršel - vyžádejte si nový.",
         "missingToken": "Tento odkaz pro obnovení je neúplný - vyžádejte si nový.",
-        "requestNew": "Vyžádat nový odkaz"
+        "requestNew": "Vyžádat nový odkaz",
+        "invalidTitle": "Neplatný odkaz"
     },
     "email": {
         "host": "SMTP server",
@@ -6480,13 +6482,14 @@
         "mismatch": "Hesla se neshodují.",
         "tooShort": "Heslo musí mít alespoň 8 znaků.",
         "invalidToken": "Tato pozvánka je neplatná, vypršela nebo už byla použita - požádejte o nový odkaz.",
-        "missingToken": "Tento odkaz s pozvánkou je neplatný nebo vypršel - požádejte o nový.",
         "usernameRequired": "Zvol si uživatelské jméno.",
         "usernameInvalid": "Uživatelské jméno musí mít 3 až 64 znaků a smí obsahovat pouze písmena, číslice, tečky, pomlčky a podtržítka.",
         "usernameTaken": "Toto uživatelské jméno je již obsazené.",
         "error": "Účet se nepodařilo vytvořit. Zkus to prosím znovu.",
         "displayNameTooLong": "Zobrazované jméno může mít nejvýše 128 znaků.",
-        "previewFailed": "Pozvánku se teď nepodařilo ověřit. Za chvíli stránku načti znovu."
+        "previewFailed": "Pozvánku se teď nepodařilo ověřit. Za chvíli stránku načti znovu.",
+        "invalidTitle": "Neplatná pozvánka",
+        "toLogin": "Přejít na přihlášení"
     },
     "newLabel": {
         "tasks": "Úkol",

@@ -1183,7 +1183,8 @@
         "localCalendarEventCount_one": "{{count}} sự kiện",
         "sidebarLabel": "Thanh bên lịch",
         "upNextTitle": "Sắp tới",
-        "upNextEmpty": "Không có gì trong ba tuần tới."
+        "upNextEmpty": "Không có gì trong ba tuần tới.",
+        "openInCalendar": "Mở trong lịch"
     },
     "noteCategories": {
         "categories": "Danh mục",
@@ -4421,7 +4422,8 @@
         "tooShort": "Mật khẩu phải dài ít nhất 8 ký tự.",
         "invalidToken": "Liên kết đặt lại này không hợp lệ hoặc đã hết hạn - hãy yêu cầu liên kết mới.",
         "missingToken": "Liên kết đặt lại này không đầy đủ - hãy yêu cầu liên kết mới.",
-        "requestNew": "Yêu cầu liên kết mới"
+        "requestNew": "Yêu cầu liên kết mới",
+        "invalidTitle": "Liên kết không hợp lệ"
     },
     "email": {
         "host": "Máy chủ SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "Mật khẩu không khớp.",
         "tooShort": "Mật khẩu phải dài ít nhất 8 ký tự.",
         "invalidToken": "Lời mời này không hợp lệ, đã hết hạn hoặc đã được dùng - hãy xin liên kết mới.",
-        "missingToken": "Liên kết mời này không hợp lệ hoặc đã hết hạn - hãy xin liên kết mới.",
         "usernameRequired": "Hãy chọn một tên đăng nhập.",
         "usernameInvalid": "Tên đăng nhập phải dài từ 3 đến 64 ký tự và chỉ gồm chữ cái, chữ số, dấu chấm, dấu gạch ngang và gạch dưới.",
         "usernameTaken": "Tên đăng nhập này đã được dùng.",
         "error": "Không tạo được tài khoản. Vui lòng thử lại.",
         "displayNameTooLong": "Tên hiển thị dài tối đa 128 ký tự.",
-        "previewFailed": "Hiện chưa kiểm tra được lời mời. Vui lòng tải lại trang sau giây lát."
+        "previewFailed": "Hiện chưa kiểm tra được lời mời. Vui lòng tải lại trang sau giây lát.",
+        "invalidTitle": "Lời mời không hợp lệ",
+        "toLogin": "Đến đăng nhập"
     },
     "newLabel": {
         "tasks": "Nhiệm vụ",

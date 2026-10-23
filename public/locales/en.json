@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Events from this calendar move to the default calendar and are then uploaded to iCloud through Apple Calendar. Its export link will stop working.",
         "sidebarLabel": "Calendar sidebar",
         "upNextTitle": "Up next",
-        "upNextEmpty": "Nothing coming up in the next three weeks."
+        "upNextEmpty": "Nothing coming up in the next three weeks.",
+        "openInCalendar": "Open in calendar"
     },
     "noteCategories": {
         "categories": "Categories",
@@ -4421,7 +4422,8 @@
         "tooShort": "The password must be at least 8 characters long.",
         "invalidToken": "This reset link is invalid or has expired - request a new one.",
         "missingToken": "This reset link is incomplete - request a new one.",
-        "requestNew": "Request a new link"
+        "requestNew": "Request a new link",
+        "invalidTitle": "Link not valid"
     },
     "email": {
         "host": "SMTP host",
@@ -6322,13 +6324,14 @@
         "mismatch": "The passwords do not match.",
         "tooShort": "The password must be at least 8 characters long.",
         "invalidToken": "This invitation is invalid, has expired or was already used - ask for a new link.",
-        "missingToken": "This invitation link is invalid or has expired - ask for a new one.",
         "usernameRequired": "Please choose a username.",
         "usernameInvalid": "The username must be 3 to 64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.",
         "usernameTaken": "This username is already taken.",
         "error": "The account could not be created. Please try again.",
         "displayNameTooLong": "The display name may be at most 128 characters long.",
-        "previewFailed": "The invitation could not be checked right now. Please reload the page in a moment."
+        "previewFailed": "The invitation could not be checked right now. Please reload the page in a moment.",
+        "invalidTitle": "Invitation not valid",
+        "toLogin": "Go to login"
     },
     "newLabel": {
         "tasks": "Task",

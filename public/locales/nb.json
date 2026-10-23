@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Hendelsene flyttes til standardkalenderen og lastes deretter opp til iCloud via Apple Kalender. Eksportlenken slutter å virke.",
         "sidebarLabel": "Kalenderens sidepanel",
         "upNextTitle": "Neste",
-        "upNextEmpty": "Ingenting de neste tre ukene."
+        "upNextEmpty": "Ingenting de neste tre ukene.",
+        "openInCalendar": "Åpne i kalenderen"
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -4421,7 +4422,8 @@
         "tooShort": "Passordet må være minst 8 tegn langt.",
         "invalidToken": "Denne tilbakestillingslenken er ugyldig eller utløpt - be om en ny.",
         "missingToken": "Denne tilbakestillingslenken er ufullstendig - be om en ny.",
-        "requestNew": "Be om en ny lenke"
+        "requestNew": "Be om en ny lenke",
+        "invalidTitle": "Ugyldig lenke"
     },
     "email": {
         "host": "SMTP-vert",
@@ -6322,13 +6324,14 @@
         "mismatch": "Passordene stemmer ikke overens.",
         "tooShort": "Passordet må være minst 8 tegn langt.",
         "invalidToken": "Denne invitasjonen er ugyldig, utløpt eller allerede brukt - be om en ny lenke.",
-        "missingToken": "Denne invitasjonslenken er ugyldig eller utløpt - be om en ny.",
         "usernameRequired": "Vennligst velg et brukernavn.",
         "usernameInvalid": "Brukernavnet må være mellom 3 og 64 tegn langt og kan bare inneholde bokstaver, tall, punktum, bindestrek og understrek.",
         "usernameTaken": "Dette brukernavnet er allerede i bruk.",
         "error": "Kontoen kunne ikke opprettes. Vennligst prøv igjen.",
         "displayNameTooLong": "Visningsnavnet kan være maksimalt 128 tegn langt.",
-        "previewFailed": "Invitasjonen kunne ikke kontrolleres akkurat nå. Vennligst last inn siden på nytt om et øyeblikk."
+        "previewFailed": "Invitasjonen kunne ikke kontrolleres akkurat nå. Vennligst last inn siden på nytt om et øyeblikk.",
+        "invalidTitle": "Ugyldig invitasjon",
+        "toLogin": "Gå til pålogging"
     },
     "newLabel": {
         "tasks": "Oppgave",

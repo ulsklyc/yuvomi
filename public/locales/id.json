@@ -1201,7 +1201,8 @@
         "localCalendarEventCount_one": "{{count}} acara",
         "sidebarLabel": "Bilah sisi kalender",
         "upNextTitle": "Berikutnya",
-        "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan."
+        "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan.",
+        "openInCalendar": "Buka di kalender"
     },
     "noteCategories": {
         "categories": "Kategori",
@@ -4421,7 +4422,8 @@
         "tooShort": "Kata sandi harus minimal 8 karakter.",
         "invalidToken": "Tautan atur ulang ini tidak valid atau sudah kedaluwarsa - minta yang baru.",
         "missingToken": "Tautan atur ulang ini tidak lengkap - minta yang baru.",
-        "requestNew": "Minta tautan baru"
+        "requestNew": "Minta tautan baru",
+        "invalidTitle": "Tautan tidak valid"
     },
     "email": {
         "host": "Host SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "Kata sandi tidak cocok.",
         "tooShort": "Kata sandi harus minimal 8 karakter.",
         "invalidToken": "Undangan ini tidak valid, kedaluwarsa, atau sudah dipakai - minta tautan baru.",
-        "missingToken": "Tautan undangan ini tidak valid atau sudah kedaluwarsa - minta yang baru.",
         "usernameRequired": "Pilih nama pengguna.",
         "usernameInvalid": "Nama pengguna harus 3 sampai 64 karakter dan hanya boleh berisi huruf, angka, titik, tanda hubung, dan garis bawah.",
         "usernameTaken": "Nama pengguna ini sudah dipakai.",
         "error": "Akun tidak dapat dibuat. Silakan coba lagi.",
         "displayNameTooLong": "Nama tampilan paling banyak 128 karakter.",
-        "previewFailed": "Undangan tidak dapat diperiksa saat ini. Silakan muat ulang halaman sebentar lagi."
+        "previewFailed": "Undangan tidak dapat diperiksa saat ini. Silakan muat ulang halaman sebentar lagi.",
+        "invalidTitle": "Undangan tidak valid",
+        "toLogin": "Ke halaman masuk"
     },
     "newLabel": {
         "tasks": "Tugas",

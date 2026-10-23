@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve ardından Apple Takvim üzerinden iCloud'a yüklenir. Dışa aktarma bağlantısı artık çalışmaz.",
         "sidebarLabel": "Takvim kenar çubuğu",
         "upNextTitle": "Sıradaki",
-        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok."
+        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok.",
+        "openInCalendar": "Takvimde aç"
     },
     "noteCategories": {
         "categories": "Kategoriler",
@@ -4421,7 +4422,8 @@
         "tooShort": "Parola en az 8 karakter olmalı.",
         "invalidToken": "Bu sıfırlama bağlantısı geçersiz veya süresi dolmuş - yenisini isteyin.",
         "missingToken": "Bu sıfırlama bağlantısı eksik - yenisini isteyin.",
-        "requestNew": "Yeni bağlantı iste"
+        "requestNew": "Yeni bağlantı iste",
+        "invalidTitle": "Geçersiz bağlantı"
     },
     "email": {
         "host": "SMTP sunucusu",
@@ -6322,13 +6324,14 @@
         "mismatch": "Parolalar eşleşmiyor.",
         "tooShort": "Parola en az 8 karakter olmalı.",
         "invalidToken": "Bu davet geçersiz, süresi dolmuş ya da zaten kullanılmış - yeni bir bağlantı isteyin.",
-        "missingToken": "Bu davet bağlantısı geçersiz veya süresi dolmuş - yenisini isteyin.",
         "usernameRequired": "Bir kullanıcı adı seç.",
         "usernameInvalid": "Kullanıcı adı 3 ile 64 karakter arasında olmalı ve yalnızca harf, rakam, nokta, tire ve alt çizgi içerebilir.",
         "usernameTaken": "Bu kullanıcı adı zaten alınmış.",
         "error": "Hesap oluşturulamadı. Lütfen tekrar dene.",
         "displayNameTooLong": "Görünen ad en fazla 128 karakter olabilir.",
-        "previewFailed": "Davet şu anda denetlenemedi. Lütfen birazdan sayfayı yeniden yükle."
+        "previewFailed": "Davet şu anda denetlenemedi. Lütfen birazdan sayfayı yeniden yükle.",
+        "invalidTitle": "Geçersiz davet",
+        "toLogin": "Girişe git"
     },
     "newLabel": {
         "tasks": "Görev",

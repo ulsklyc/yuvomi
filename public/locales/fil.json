@@ -1201,7 +1201,8 @@
         "localCalendarDeleteDetailIcloud": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo at pagkatapos ay ia-upload sa iCloud sa pamamagitan ng Apple Calendar. Hindi na gagana ang export link nito.",
         "sidebarLabel": "Sidebar ng kalendaryo",
         "upNextTitle": "Susunod",
-        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo."
+        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo.",
+        "openInCalendar": "Buksan sa kalendaryo"
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -4421,7 +4422,8 @@
         "tooShort": "Dapat may hindi bababa sa 8 karakter ang password.",
         "invalidToken": "Hindi wasto o expired na ang reset link na ito - humiling ng bago.",
         "missingToken": "Kulang ang reset link na ito - humiling ng bago.",
-        "requestNew": "Humiling ng bagong link"
+        "requestNew": "Humiling ng bagong link",
+        "invalidTitle": "Hindi wastong link"
     },
     "email": {
         "host": "SMTP host",
@@ -6322,13 +6324,14 @@
         "mismatch": "Hindi magkatugma ang mga password.",
         "tooShort": "Dapat may hindi bababa sa 8 karakter ang password.",
         "invalidToken": "Hindi wasto, expired na, o nagamit na ang imbitasyong ito - humingi ng bagong link.",
-        "missingToken": "Hindi wasto o expired na ang invitation link na ito - humingi ng bago.",
         "usernameRequired": "Pumili ng username.",
         "usernameInvalid": "Dapat may 3 hanggang 64 na karakter ang username at maaari lamang maglaman ng mga titik, numero, tuldok, gitling at underscore.",
         "usernameTaken": "Nagamit na ang username na ito.",
         "error": "Hindi nagawa ang account. Pakisubukang muli.",
         "displayNameTooLong": "Dapat hindi hihigit sa 128 karakter ang pangalang ipapakita.",
-        "previewFailed": "Hindi masuri ang imbitasyon sa ngayon. Pakireload ang pahina maya-maya."
+        "previewFailed": "Hindi masuri ang imbitasyon sa ngayon. Pakireload ang pahina maya-maya.",
+        "invalidTitle": "Hindi wastong imbitasyon",
+        "toLogin": "Pumunta sa pag-log in"
     },
     "newLabel": {
         "tasks": "Gawain",

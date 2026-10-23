@@ -1345,7 +1345,8 @@
         "localCalendarEventCount_other": "{{count}} wydarzeń",
         "sidebarLabel": "Pasek boczny kalendarza",
         "upNextTitle": "Następne",
-        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni."
+        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni.",
+        "openInCalendar": "Otwórz w kalendarzu"
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -4657,7 +4658,8 @@
         "tooShort": "Hasło musi mieć co najmniej 8 znaków.",
         "invalidToken": "Ten link do resetowania jest nieprawidłowy lub wygasł - poproś o nowy.",
         "missingToken": "Ten link do resetowania jest niepełny - poproś o nowy.",
-        "requestNew": "Poproś o nowy link"
+        "requestNew": "Poproś o nowy link",
+        "invalidTitle": "Nieprawidłowy link"
     },
     "email": {
         "host": "Host SMTP",
@@ -6628,13 +6630,14 @@
         "mismatch": "Hasła nie są zgodne.",
         "tooShort": "Hasło musi mieć co najmniej 8 znaków.",
         "invalidToken": "To zaproszenie jest nieprawidłowe, wygasło lub zostało już wykorzystane - poproś o nowy link.",
-        "missingToken": "Ten link z zaproszeniem jest nieprawidłowy lub wygasł - poproś o nowy.",
         "usernameRequired": "Wybierz nazwę użytkownika.",
         "usernameInvalid": "Nazwa użytkownika musi mieć od 3 do 64 znaków i może zawierać wyłącznie litery, cyfry, kropki, myślniki i podkreślenia.",
         "usernameTaken": "Ta nazwa użytkownika jest już zajęta.",
         "error": "Nie udało się utworzyć konta. Spróbuj ponownie.",
         "displayNameTooLong": "Nazwa wyświetlana może mieć najwyżej 128 znaków.",
-        "previewFailed": "Nie udało się teraz sprawdzić zaproszenia. Odśwież stronę za chwilę."
+        "previewFailed": "Nie udało się teraz sprawdzić zaproszenia. Odśwież stronę za chwilę.",
+        "invalidTitle": "Nieprawidłowe zaproszenie",
+        "toLogin": "Przejdź do logowania"
     },
     "newLabel": {
         "tasks": "Zadanie",

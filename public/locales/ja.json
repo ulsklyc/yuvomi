@@ -1183,7 +1183,8 @@
         "localCalendarEventCount_one": "{{count}}件の予定",
         "sidebarLabel": "カレンダーのサイドバー",
         "upNextTitle": "次の予定",
-        "upNextEmpty": "今後3週間の予定はありません。"
+        "upNextEmpty": "今後3週間の予定はありません。",
+        "openInCalendar": "カレンダーで開く"
     },
     "noteCategories": {
         "categories": "カテゴリー",
@@ -4421,7 +4422,8 @@
         "tooShort": "パスワードは8文字以上にしてください。",
         "invalidToken": "このリセット用リンクは無効か期限切れです - 新しいリンクをリクエストしてください。",
         "missingToken": "このリセット用リンクは不完全です - 新しいリンクをリクエストしてください。",
-        "requestNew": "新しいリンクをリクエスト"
+        "requestNew": "新しいリンクをリクエスト",
+        "invalidTitle": "リンクが無効です"
     },
     "email": {
         "host": "SMTP ホスト",
@@ -6322,13 +6324,14 @@
         "mismatch": "パスワードが一致しません。",
         "tooShort": "パスワードは8文字以上にしてください。",
         "invalidToken": "この招待は無効か、期限切れか、すでに使用されています - 新しいリンクを依頼してください。",
-        "missingToken": "この招待リンクは無効か期限切れです - 新しいリンクを依頼してください。",
         "usernameRequired": "ユーザー名を選んでください。",
         "usernameInvalid": "ユーザー名は3〜64文字で、英数字、ドット、ハイフン、アンダースコアのみ使用できます。",
         "usernameTaken": "このユーザー名はすでに使われています。",
         "error": "アカウントを作成できませんでした。もう一度お試しください。",
         "displayNameTooLong": "表示名は128文字までです。",
-        "previewFailed": "招待をいま確認できませんでした。しばらくしてからページを再読み込みしてください。"
+        "previewFailed": "招待をいま確認できませんでした。しばらくしてからページを再読み込みしてください。",
+        "invalidTitle": "招待が無効です",
+        "toLogin": "ログインへ"
     },
     "newLabel": {
         "tasks": "タスク",

@@ -56,7 +56,7 @@ export async function render(container) {
     <main class="auth-page" id="main-content">
       ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
-        <h1 class="auth-card__title">${esc(t('resetPassword.title'))}</h1>
+        <h1 class="auth-card__title" id="reset-title">${esc(t('resetPassword.title'))}</h1>
         <!-- Beide Meldungen stehen außerhalb des Formulars: der Erfolgsfall
              blendet das Formular aus, und ein Kind davon wäre mit ihm weg. -->
         ${authErrorHtml('reset-error')}
@@ -79,7 +79,7 @@ export async function render(container) {
         </form>
         <!-- Der Weg zu einem neuen Link steht nur, wenn dieser hier tot ist
              (dead() unten); sonst reicht der Rueckweg zur Anmeldung. -->
-        <p class="auth-form__forgot" id="reset-request-new" hidden><a href="/forgot-password" data-link>${esc(t('resetPassword.requestNew'))}</a></p>
+        <a class="btn btn--primary auth-form__submit" id="reset-request-new" href="/forgot-password" data-link hidden>${esc(t('resetPassword.requestNew'))}</a>
         <p class="auth-form__forgot"><a href="/login" data-link>${esc(t('forgotPassword.backToLogin'))}</a></p>
       </div>
     </main>
@@ -100,12 +100,16 @@ export async function render(container) {
   // das Formular sinnlos. Statt eines gesperrten Formulars unter "kein
   // gueltiger Token" stehen der Satz mit dem naechsten Schritt und der Weg
   // dorthin, betont wie die Anmeldung auf /join (join.js).
+  // Seit R22 (D19) wie die tote Einladung: der Titel nennt den ungueltigen
+  // Link, "Neuen Link anfordern" ist der Primaerknopf. Ob ein Link gilt, sagt
+  // erst das Absenden - der Server hat keine Vorab-Pruefung fuer Reset-Links.
   const dead = (msg) => {
+    container.querySelector('#reset-title').textContent = t('resetPassword.invalidTitle');
     show(errorEl, msg);
     form.hidden = true;
     const again = container.querySelector('#reset-request-new');
     again.hidden = false;
-    again.classList.add('auth-form__forgot--emphasis');
+    again.focus();
   };
 
   if (!token) { dead(t('resetPassword.missingToken')); return; }

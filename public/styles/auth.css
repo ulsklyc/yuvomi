@@ -250,6 +250,31 @@
   color: var(--color-warning);
 }
 
+/* Der Rueckweg unter dem Formular ("Zurueck zur Anmeldung", "Passwort
+ * vergessen?"). Er hatte keine Regel (Critique R22, D19): als Fliesstext in
+ * Textfarbe klebte er an der Unterkante des Primaerknopfs und las sich nicht
+ * als Link. Jetzt ein leiser Link in Akzentfarbe, mittig, mit Abstand zum
+ * Knopf und einer Tippflaeche in voller Zielhoehe. */
+.auth-form__forgot {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.auth-form__forgot a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target-base);
+  padding-inline: var(--space-2);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.auth-form__forgot a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
 /* Nach falschen Zugangsdaten wird der Recovery-Link betont, damit der Nutzer
  * einen Ausweg sieht statt es blind erneut zu versuchen. */
 .auth-form__forgot--emphasis a {

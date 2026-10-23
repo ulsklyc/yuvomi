@@ -1201,7 +1201,8 @@
         "localCalendarEventCount_one": "일정 {{count}}개",
         "sidebarLabel": "캘린더 사이드바",
         "upNextTitle": "다음 일정",
-        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다."
+        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다.",
+        "openInCalendar": "캘린더에서 열기"
     },
     "noteCategories": {
         "categories": "카테고리",
@@ -4421,7 +4422,8 @@
         "tooShort": "비밀번호는 최소 8자 이상이어야 합니다.",
         "invalidToken": "이 재설정 링크는 유효하지 않거나 만료되었습니다 - 새 링크를 요청하세요.",
         "missingToken": "이 재설정 링크는 불완전합니다 - 새 링크를 요청하세요.",
-        "requestNew": "새 링크 요청"
+        "requestNew": "새 링크 요청",
+        "invalidTitle": "유효하지 않은 링크"
     },
     "email": {
         "host": "SMTP 호스트",
@@ -6322,13 +6324,14 @@
         "mismatch": "비밀번호가 일치하지 않습니다.",
         "tooShort": "비밀번호는 8자 이상이어야 합니다.",
         "invalidToken": "이 초대는 유효하지 않거나 만료되었거나 이미 사용되었습니다 - 새 링크를 요청하세요.",
-        "missingToken": "이 초대 링크는 유효하지 않거나 만료되었습니다 - 새 링크를 요청하세요.",
         "usernameRequired": "사용자 이름을 정하세요.",
         "usernameInvalid": "사용자 이름은 3~64자여야 하며 문자, 숫자, 점, 하이픈, 밑줄만 쓸 수 있습니다.",
         "usernameTaken": "이미 사용 중인 사용자 이름입니다.",
         "error": "계정을 만들지 못했습니다. 다시 시도하세요.",
         "displayNameTooLong": "표시 이름은 최대 128자까지 가능합니다.",
-        "previewFailed": "지금은 초대를 확인할 수 없습니다. 잠시 후 페이지를 새로 고쳐 주세요."
+        "previewFailed": "지금은 초대를 확인할 수 없습니다. 잠시 후 페이지를 새로 고쳐 주세요.",
+        "invalidTitle": "유효하지 않은 초대",
+        "toLogin": "로그인으로 이동"
     },
     "newLabel": {
         "tasks": "할 일",

@@ -1183,7 +1183,8 @@
         "localCalendarDeleteDetailIcloud": "Los eventos de este calendario se moverán al calendario predeterminado y después se subirán a iCloud a través de Apple Calendar. Su enlace de exportación dejará de funcionar.",
         "sidebarLabel": "Barra lateral del calendario",
         "upNextTitle": "A continuación",
-        "upNextEmpty": "Nada en las próximas tres semanas."
+        "upNextEmpty": "Nada en las próximas tres semanas.",
+        "openInCalendar": "Abrir en el calendario"
     },
     "noteCategories": {
         "categories": "Categorías",
@@ -4421,7 +4422,8 @@
         "tooShort": "La contraseña debe tener al menos 8 caracteres.",
         "invalidToken": "Este enlace para restablecer no es válido o ha caducado - solicita uno nuevo.",
         "missingToken": "Este enlace para restablecer está incompleto - solicita uno nuevo.",
-        "requestNew": "Solicitar un enlace nuevo"
+        "requestNew": "Solicitar un enlace nuevo",
+        "invalidTitle": "Enlace no válido"
     },
     "email": {
         "host": "Servidor SMTP",
@@ -6322,13 +6324,14 @@
         "mismatch": "Las contraseñas no coinciden.",
         "tooShort": "La contraseña debe tener al menos 8 caracteres.",
         "invalidToken": "Esta invitación no es válida, ha caducado o ya se ha utilizado - pide un enlace nuevo.",
-        "missingToken": "Este enlace de invitación no es válido o ha caducado - pide uno nuevo.",
         "usernameRequired": "Elige un nombre de usuario.",
         "usernameInvalid": "El nombre de usuario debe tener entre 3 y 64 caracteres y solo puede contener letras, números, puntos, guiones y guiones bajos.",
         "usernameTaken": "Ese nombre de usuario ya está en uso.",
         "error": "No se ha podido crear la cuenta. Inténtalo de nuevo.",
         "displayNameTooLong": "El nombre visible puede tener como máximo 128 caracteres.",
-        "previewFailed": "No se ha podido comprobar la invitación en este momento. Vuelve a cargar la página en unos instantes."
+        "previewFailed": "No se ha podido comprobar la invitación en este momento. Vuelve a cargar la página en unos instantes.",
+        "invalidTitle": "Invitación no válida",
+        "toLogin": "Ir al inicio de sesión"
     },
     "newLabel": {
         "tasks": "Tarea",
