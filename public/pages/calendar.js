@@ -9592,6 +9592,12 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       }
     }
 
+    // Angehaengt oder an alter Stelle ersetzt steht der Termin sonst am Ende
+    // seines Tages: die Tageslisten folgen der Reihenfolge von state.events,
+    // die nur der Server sortiert hatte (ORDER BY start_datetime und danach
+    // localeCompare in expandAndResolveEventRows). Gleicher Schluessel wie dort.
+    state.events.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
+
     closeModal({ force: true, context: dialog });
     renderView();
     window.yuvomi?.showToast(mode === 'create' ? t('calendar.createdToast') : t('calendar.savedToast'), 'success');
