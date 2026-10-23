@@ -1146,7 +1146,8 @@
     display: contents;
   }
 
-  .task-card__main:has(> .avatar-stack) > :is(.task-status-btn, .select-circle) {
+  .task-card__main:has(> .avatar-stack) > .task-status-btn,
+  .task-card__main:has(> .avatar-stack) > .select-circle {
     grid-column: 1;
     grid-row: 1 / span 2;
   }
