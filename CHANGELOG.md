@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the start and a filled Edit with its pencil at the end. "Year unknown" at a birth date is a
   switch. The birthday detail labels its upper date "Next birthday on", so it no longer reads like
   a second birth date, and the import from contacts shows a person icon instead of a download.
+  On a phone a note card shows three lines of text - with a title two lines of preview - so four
+  notes fit the first screen instead of three; checklists stay whole.
 - **Switching between sections is instant.** Tapping another section in the tab bar, the
   sidebar, the More sheet, the command palette or between the kitchen tabs used to cross-fade the
   old and the new page for a fifth of a second, while the highlight in the navigation had already
@@ -49,7 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   open or swipe them. Rows further down a long group are drawn when they come near, and their icons
   arrive right after the first screen. On a wide screen the two-column view no longer lays out the
   whole list just to pick the first row. Opening a list of 260 tasks on a slow phone now holds the
-  screen for about half as long.
+  screen for about half as long. A long list now draws the rows on screen together with the page
+  and the rest in short steps right after it, every row keeping its height from the start, and the
+  two shopping columns on a wide screen only lay out what is in view. Switching to 260 tasks on a
+  slow phone (4x CPU) holds the old screen 96 instead of 276 ms, to 260 shopping items 91 instead
+  of 216 ms, and on a laptop 114 and 125 instead of 315 and 396 ms.
 - **The calendar opens a little faster.** Building the month, week or agenda measured parts of the
   page several times in the middle of drawing it: the period label even where no shorter form
   exists, the sidebar on a phone where it never shows, and a freshly built day list. The header

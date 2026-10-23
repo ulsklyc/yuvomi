@@ -1187,7 +1187,22 @@ das Verhaeltnis haelt.
   Aufgaben und Einkauf schieben Zeilen ab `:nth-child(n+20)` auf (Content-Box 85/80px bzw.
   48px; der Einkauf in jeder Breite, weil der Platzhalter die echte Zeile ist). Neu gemessen in
   S9 nach dem 12px-Einzug und der Metazeile unter dem Avatar: 84,6 / 80 / 100,6 (Detailspalte),
-  unveraendert.
+  unveraendert. **Seit R22-F (F2.2) auch der Einkauf ab 60rem je Kategorie**, aber erst nach dem
+  ersten gezeichneten Bild (`.items-lanes.is-sized`): bis dahin legt jede Kategorie einmal ganz
+  und merkt sich ihre Hoehe (`contain-intrinsic-size: auto`), danach wechselt keine die Spalte.
+- **Der erste Aufbau einer langen Liste zeichnet nur, was im Bild steht (R22-F, F2.1):**
+  Aufgaben und Einkauf bauen ihre Zeilen ueber `utils/row-fill.js` - jede Zeile ausserhalb des
+  Bildes (plus ein Viertel Bildschirm) steht als `.row-pending` in der Hoehe ihrer Zeile
+  (`--row-pending-size` = dieselbe Content-Box wie das `contain-intrinsic-size` des Moduls) und
+  kommt in Happen nach dem naechsten Bild. Ganz gezeichnet wird bei jedem weiteren Aufbau, auf
+  dem Rueckweg mit gemerktem Scrollstand (D2), bei einem Deep-Link und bei jeder Eingabe in die
+  Liste. Neue lange Listen nutzen denselben Baustein; nachgekommene Zeilen bekommen Zeichen und
+  Wischgeste ueber `onRows`. 4x CPU, Frame des Wechsels: Aufgaben 276 -> 96 ms, Einkauf
+  216 -> 91 ms (mobil), Laptop 315 -> 114 und 396 -> 125 ms. Guards `test:ux-utils`, `test:frontend-audit`.
+- **Eine Notizkarte zeigt mobil drei Textzeilen (R22-F, F2.3):** mit Titel zwei Zeilen
+  Vorschau, ohne Titel drei (`.note-card__title + .note-card__content`); Checklisten bleiben
+  ungekappt, weil sie auf der Karte bedienbar sind. 390x844: vier statt drei Notizen ganz im
+  ersten Bild. Guard `test:mobile-room-work`.
 - **Die Metazeile der Aufgabe laeuft unter den Avatar (R22, D17):** ab 640px ist eine Zeile mit
   Personenstapel ein Raster wie mobil - der Stapel steht neben dem Titel und liegt ueber beiden
   Zeilen (`align-self: start`, sonst streckte er die Titelzeile um 1px und der Platzhalter
