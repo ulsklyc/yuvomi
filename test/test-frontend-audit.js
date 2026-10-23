@@ -3042,7 +3042,7 @@ test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht 
     const body = functionBody(source, name);
     assert.ok(body, `${name} fehlt`);
     assert.match(body, /placeNavIndicator\(indicator,/, `${name} platziert ueber placeNavIndicator`);
-    assert.doesNotMatch(body.replace(/placeNavIndicator\(indicator, \(\) => \{[\s\S]*?\n  \}\);/, ''), /indicator\.style\.transform =/, `${name} setzt transform nur in placeNavIndicator`);
+    assert.doesNotMatch(body.replace(/placeNavIndicator\(indicator, \(\) => \{[\s\S]*?\n  \}(?:, instant)?\);/, ''), /indicator\.style\.transform =/, `${name} setzt transform nur in placeNavIndicator`);
   }
   // Ein FLIP-Start (startGlideAt) ist ein Gleiten als Antwort auf einen
   // Wechsel - erlaubt nur fuer einen schon PLATZIERTEN Indikator, sonst kaeme

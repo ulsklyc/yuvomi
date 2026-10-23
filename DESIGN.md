@@ -1397,11 +1397,20 @@ das Verhaeltnis haelt.
   `data-head-collapse="module"` urteilt nicht selbst, das Modul ruft `requestHeadCollapse()` -
   der Telefon-Monat faltet ihn mit dem Raster (Guard `test:ux-utils` "R21").
 - **Seitenwechsel:** Kontinuitaet vor Effekt - Navigation, Kopf und Tab-Leisten STEHEN, nur
-  der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`):
-  Wurzel-Blende 200ms `--ease-out`, Seitenleiste und Kapsel zeigen nur ihr lebendes Bild,
-  `.page-toolbar` blendet an Ort und Stelle, die Kuechen-Leiste ist vorher und nachher derselbe
-  Knoten und ihre Auswahl-Kapsel gleitet zum Ziel. Ohne API eine reine Blende, nie Versatz
-  oder Feder auf Inhalt. Ausgaenge (Sheet, Dialog, Overlay) laufen auf jeder Breite und
+  der Inhalt wechselt. Der Router tauscht per View Transition (`utils/view-transition.js`).
+  **Seit R22 (D1) schneidet der Wechsel zwischen gleichrangigen Zielen** (Tab-Leiste,
+  Seitenleiste, Mehr-Blatt, Befehlspalette/Suche, Kuechen-Reiter): das alte Bild steht, bis die
+  Zielseite gezeichnet hat (hoechstens `FIRST_RENDER_WAIT_MS`, danach ihr Skelett), dann ein
+  harter Tausch ohne Blende in Wurzel und Kopf (`html.page-cut`, layout.css). Pille,
+  Aktivzustand und Kuechen-Kapsel wechseln im Tausch selbst und springen (`onSwap` in
+  `renderPage`, `updateNav(path, { instant })`, Kuechen-Leiste `markOnNavigate: false`) - im
+  Frame des neuen Inhalts; den Tipp quittiert bis dahin der Druckzustand, nach
+  `NAV_ACK_MS` (150 ms) ohne Tausch zieht die Navigation vorab nach. Gemessen vorher 13-15
+  Frames Doppelbelichtung, Pille 100-250 ms vor dem deckenden Inhalt (mobil 294-353 ms,
+  Laptop 294-394 ms bis deckend); nachher 0 Blendframes, Pille und Inhalt im selben Frame
+  (77-125 ms nach dem Tipp, 4x CPU 159-293 ms). Gerichtet bewegt sich nur der Weg in die
+  Hierarchie und zurueck (Drill-down unten). Reduzierte Bewegung und Browser ohne API: derselbe
+  Schnitt. Nie Versatz oder Feder auf Inhalt. Ausgaenge (Sheet, Dialog, Overlay) laufen auf jeder Breite und
   schlagen ihre Einfahrt per Spezifitaet, nicht per Ladereihenfolge (Guard `test:motion`).
   Seit R18 traegt die KAPSEL den Namen `nav-bottom` selbst (nicht ihr Elternknoten: der wurde
   zur Backdrop Root, das Glas fiel fuer die Dauer der Blende aus), ihre Pille und der
@@ -1411,7 +1420,7 @@ das Verhaeltnis haelt.
   Blende bricht sie ab UND kommt an (R19): Chromium trifft ihn auf `<html>`, `swapPage` haelt
   seinen `click` dort an und reicht ihn nach dem Ende der Blende und der Navigation an das
   Element an derselben Stelle (vorher ging er verloren, gemessen 0 von 12 Doppeltipps).
-  **Die Blende laeuft in den Inhalt, nicht ins Skelett (R21, D1):** der Update-Callback wartet
+  **Das neue Bild zeigt den Inhalt, nicht das Skelett (R21, D1):** der Update-Callback wartet
   auf den Render der Zielseite, hoechstens `FIRST_RENDER_WAIT_MS` (150 ms); so lange steht das
   alte Bild. Vorher zeigte das neue Bild 0 von 6 Mal Inhalt, der echte Inhalt sprang 45-123 ms
   (4x CPU: bis 245 ms) spaeter mitten in die Blende; jetzt 6 von 6 auf 390 und 1280, 1x und 4x.
@@ -1436,8 +1445,8 @@ das Verhaeltnis haelt.
 - **Drill-down hat eine Richtung (R18):** wo eine Ebene die andere ERSETZT (Einstellungen ohne
   Seitenleiste: Uebersicht <-> Blatt; Gesundheit schmal: Uebersicht <-> Bereich), laeuft der
   Wechsel ueber `swapContent` mit `direction` +1 hinein, -1 zurueck. Das ist die benannte
-  Ausnahme zur Regel "Seiteninhalt blendet nur": die gilt dem Tab-Wechsel zwischen
-  Geschwistern. Neben einer Seitenleiste bzw. in der Split-Ansicht bleibt es bei der Blende.
+  Ausnahme zur Regel "Seiteninhalt bewegt sich nicht": der Wechsel zwischen Geschwistern
+  schneidet (R22, D1). Neben einer Seitenleiste bzw. in der Split-Ansicht bleibt es bei der Blende.
   **Seit R19 mit altem Bild (`swapRegion(host, update, { direction })`, utils/content-swap.js):**
   eine View Transition mit Typ `region-forward`/`region-back`/`region-fade` (Regeln in
   layout.css, Name `region-swap` nur fuer die Dauer). Vorwaerts schiebt sich die neue Ebene von
@@ -2975,8 +2984,9 @@ in dessen 8px Polster) - 12px Luft ums Wort, 16px zwischen zwei Worten, und die 
 bei 375px weiter ohne Scrollen. Der Zaehler steht 4px neben dem Wort mit 4px Innenpolster.
 Andere Leisten setzen die Eigenschaften nicht und messen den Eintrag wie bisher. Zwischen zwei
 Kuechen-Reitern blendet nur der Koerper (Typ `kitchen` am Seitenwechsel): die Kontextzeile
-wechselt mit dem Tipp, statt doppelt belichtet zu blenden. Guards: `test:kitchen-tabs`,
-`test:motion`.
+wechselt mit dem Tipp, statt doppelt belichtet zu blenden; seit R22 (D1) schneidet dort wie
+ueberall der ganze Wechsel, und die Kapsel springt im Frame des neuen Koerpers an ihr Ziel.
+Guards: `test:kitchen-tabs`, `test:motion`.
 
 **Andocken kann nur ein Kopf mit Lead-Zone** - und eine hat nur, wessen Inhalt auf mehr als
 einer Zeile steht. Wo keine ist, traegt die Leiste ihre Linie durchgehend und markiert

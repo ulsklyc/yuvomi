@@ -132,19 +132,15 @@ test('cold dashboard load does not transform the scroll surface', () => {
     /const shouldAnimate = Boolean\(previousPath\);/,
     'the router must distinguish a cold load from an in-app navigation',
   );
-  // Seit 2026-09-26 blendet der Wechsel per View Transition; nur der Rueckfall
-  // ohne API setzt noch eine Klasse, und auch die nur nach einer bestehenden
-  // Route. Eine Blende ohne Versatz transformiert ohnehin nichts (test-motion.js).
+  // Seit 2026-09-26 tauscht der Wechsel per View Transition, seit R22 (D1)
+  // schneidet er hart - auch ohne API gibt es keine Rueckfall-Klasse mehr, die
+  // die Scrollflaeche animieren koennte.
   assert.match(
     routerJs,
     /animate: shouldAnimate,/,
     'the view transition must only run after an existing route',
   );
-  assert.match(
-    routerJs,
-    /if \(shouldAnimate && !transition\) \{\s*pageWrapper\.classList\.add\('page-transition--in'\);/,
-    'the fallback fade must only be applied after an existing route',
-  );
+  assert.doesNotMatch(routerJs, /page-transition--in/, 'no fallback fade on the page wrapper (R22, D1)');
 });
 
 test('a forward navigation opens the target page at the top, a back navigation where it was', () => {
@@ -285,7 +281,7 @@ test('the router remembers and restores the inner ports on the way back (R22, D2
     'die Ports nach dem Render, wie der Hauptport');
   assert.match(routerJs, /updateNav: updateNavForEntry,/,
     'navigate() bekommt das updateNav, das den Eintrag festhaelt');
-  assert.match(routerJs, /function updateNavForEntry\(section\) \{\s*noteShownEntry\(\);\s*updateNav\(section\);/,
+  assert.match(routerJs, /function updateNavForEntry\(section, opts\) \{\s*noteShownEntry\(\);\s*updateNav\(section, opts\);/,
     'der Eintrag gilt, sobald navigate() ihn geschrieben hat');
 });
 

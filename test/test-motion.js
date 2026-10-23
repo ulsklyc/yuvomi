@@ -689,42 +689,91 @@ test('swapPage D1: was laeuft, setzt nach dem Warten dort fort, wo das alte Bild
   }
 });
 
-// Critique R21 (D11): zwischen zwei Kuechen-Reitern blendete die Kontextzeile
-// (Wochenschritt <-> Suche) 200ms doppelt belichtet mit der Seite. Sie wechselt
-// jetzt mit dem Tipp, nur der Koerper blendet - ueber den Typ `kitchen`.
-test('swapPage D11: zwischen Kuechen-Reitern blendet nur der Koerper (Typ kitchen)', async () => {
+// Critique R22 (D1, a1 P2): der Wechsel zwischen gleichrangigen Zielen blendete
+// 200ms - gemessen 13-15 Frames Doppelbelichtung, die Pille stand nach rund
+// 120ms am Ziel, der Inhalt erst nach 294-394ms deckend. Jetzt haelt die
+// Transition nur das alte Bild bis zum ersten Render und schneidet dann; der
+// eigene Typ `kitchen` (R21 D11, nur der Koerper blendete) ist darin aufgegangen.
+test('swapPage D1: der Seitenwechsel schneidet - html.page-cut fuer die Dauer, keine Blende in Wurzel und Kopf', async () => {
   const { swapPage } = await import('../public/utils/view-transition.js');
-  for (const supported of [true, false]) {
-    const env = stubDocument();
-    const start = env.doc.startViewTransition;
-    let arg = null;
-    env.doc.startViewTransition = (a) => { arg = a; return start(typeof a === 'function' ? a : a.update); };
-    globalThis.document = env.doc;
-    globalThis.matchMedia = () => ({ matches: false });
-    globalThis.CSS = { supports: (q) => supported && /active-view-transition-type/.test(q) };
-    try {
-      let swapped = false;
-      const { finished } = await swapPage(() => { swapped = true; }, { content: env.content, from: '/meals', animate: true, types: ['kitchen'] });
-      assert.equal(swapped, true, 'der Tausch lief nicht');
-      if (supported) assert.deepEqual(arg?.types, ['kitchen'], 'der Typ erreicht die Transition nicht');
-      else assert.equal(typeof arg, 'function', 'ohne Typen-Unterstuetzung laeuft der Wechsel wie bisher');
-      env.finish();
-      await finished;
-    } finally {
-      delete globalThis.document;
-      delete globalThis.matchMedia;
-      delete globalThis.CSS;
-    }
+  const classes = new Set();
+  const env = stubDocument();
+  const start = env.doc.startViewTransition;
+  env.doc.documentElement = { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) } };
+  const atStart = [];
+  env.doc.startViewTransition = (a) => { atStart.push(classes.has('page-cut')); return start(a); };
+  globalThis.document = env.doc;
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    const first = await swapPage(() => {}, { content: env.content, from: '/tasks', animate: true });
+    assert.deepEqual(atStart, [true], 'page-cut steht nicht, wenn der Browser das alte Bild aufnimmt');
+    const finishFirst = env.finish;
+    // Ein zweiter Wechsel vor dem Ende des ersten: das Ende des ersten nimmt
+    // dem zweiten den Schnitt nicht weg.
+    const env2 = stubDocument();
+    env.doc.startViewTransition = (a) => { atStart.push(classes.has('page-cut')); return env2.doc.startViewTransition(a); };
+    const second = await swapPage(() => {}, { content: env.content, from: '/notes', animate: true });
+    finishFirst();
+    await first.finished;
+    assert.ok(classes.has('page-cut'), 'das Ende des ueberholten Wechsels nahm dem laufenden den Schnitt');
+    env2.finish();
+    await second.finished;
+    assert.ok(!classes.has('page-cut'), 'page-cut bleibt nach dem Wechsel stehen - auch Theme-Wechsel schnitten dann');
+  } finally {
+    delete globalThis.document;
+    delete globalThis.matchMedia;
   }
-  const rules = [...eachRule(css('layout.css'))].filter((r) => !r.at.length);
-  const body = (sel) => rules.find((r) => r.selector.replace(/\s+/g, '') === sel)?.body ?? '';
-  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar)'), /display:\s*none/,
-    'die alte Kontextzeile blendet weiter doppelt belichtet');
-  assert.match(body('html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar)'), /animation:\s*none/,
-    'die neue Kontextzeile steht nicht mit dem Tipp');
+
+  const rules = [...eachRule(css('layout.css'))];
+  const plain = rules.filter((r) => !r.at.length);
+  const bodiesOf = (sel) => plain.filter((r) => selectorList(r.selector).some((x) => x.replace(/\s+/g, '') === sel)).map((r) => r.body).join(';');
+  for (const img of ['old(root)', 'old(page-toolbar)']) {
+    assert.match(bodiesOf(`html.page-cut::view-transition-${img}`), /display:\s*none/, `${img}: das alte Bild blendet weiter aus - Doppelbelichtung`);
+  }
+  for (const img of ['new(root)', 'new(page-toolbar)', 'group(root)']) {
+    assert.match(bodiesOf(`html.page-cut::view-transition-${img}`), /animation:\s*none/, `${img}: das neue Bild blendet weiter ein`);
+  }
+  // Der Schnitt ist eine Klasse, kein Typ: er gilt auch, wo der Browser
+  // `:active-view-transition-type()` nicht kennt.
+  assert.deepEqual(rules.filter((r) => /active-view-transition-type\(kitchen\)/.test(r.selector)).map((r) => r.selector), [],
+    'der Typ kitchen ist im Schnitt aufgegangen');
+  assert.deepEqual(rules.filter((r) => /\.page-transition--in/.test(r.selector)).map((r) => r.selector), [],
+    'kein Rueckfall blendet die Seite ohne View Transition');
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-  assert.match(router, /await swapPage\(swap, \{[^}]*types: isKitchenRoute\(previousPath\) && isKitchenRoute\(route\.path\) \? \['kitchen'\] : \[\],/,
-    'der Router setzt den Typ nicht fuer einen Wechsel innerhalb der Kueche');
+  assert.doesNotMatch(router, /types: isKitchenRoute/, 'der Router setzt noch einen eigenen Typ fuer die Kueche');
+});
+
+// Critique R22 (D1): Pille und Inhalt wechseln im selben Frame. Der Tausch
+// selbst setzt die Navigation (`onSwap` im Update-Callback), die Pille springt;
+// vorher setzte navigate() sie vor dem Laden und sie glitt 100-250ms vor dem
+// Inhalt ans Ziel.
+test('navigate D1: die Navigation wechselt im Tausch und springt - vorab nur, wenn das Laden die Frist reisst', async () => {
+  const { createNavigateHarness } = await import('./router-navigate-harness.js');
+  const { NAV_ACK_MS } = await import('../public/utils/router-navigate.js');
+  const { FIRST_RENDER_WAIT_MS } = await import('../public/utils/view-transition.js');
+  assert.equal(NAV_ACK_MS, FIRST_RENDER_WAIT_MS, 'die Frist der Quittung und die des alten Bildes laufen auseinander');
+
+  const user = { id: 1, role: 'admin' };
+  const fast = createNavigateHarness({ user });
+  await fast.navigate('/', true);
+  fast.setShell(true);
+  const before = fast.log.nav.length;
+  await fast.navigate('/tasks', true);
+  const started = fast.log.renderStarted.at(-1);
+  assert.equal(started.nav, before, 'die Navigation zeigte das Ziel, bevor die Seite getauscht war');
+  const swapNav = fast.log.nav[before];
+  assert.deepEqual(swapNav, { path: '/tasks', instant: true }, 'im Tausch springt die Pille nicht an ihr Ziel');
+
+  // Ein langsames Seitenmodul (erster Besuch, langsames Netz): nach der Frist
+  // quittiert die Navigation vorab, gleitend - und der Tausch setzt sie nicht doppelt.
+  const slow = createNavigateHarness({ user, onRender: (route) => (route.path === '/budget' ? new Promise((r) => setTimeout(r, NAV_ACK_MS + 120)) : null) });
+  await slow.navigate('/', true);
+  slow.setShell(true);
+  const mark = slow.log.nav.length;
+  await slow.navigate('/budget', true);
+  const during = slow.log.nav.slice(mark).filter((n) => n.path === '/budget');
+  assert.equal(during[0]?.instant, false, 'ein Laden ueber die Frist laesst den Tipp ohne Antwort');
+  assert.ok(!during.slice(1).some((n) => n.instant), 'der Tausch setzt die schon quittierte Navigation noch einmal');
 });
 
 test('swapPage: ein zweiter Wechsel vor dem Ende des ersten behaelt den Kopfnamen', async () => {
@@ -844,7 +893,7 @@ test('View Transition: ein Bild, das unter einer stehenden Gruppe blendet, haelt
   }
 });
 
-test('reduzierte Bewegung: der Seitenwechsel blendet - die Gruppen stehen, die Bilder blenden kurz', async () => {
+test('reduzierte Bewegung: Theme-Wechsel und Regionen blenden - die Gruppen stehen, die Bilder blenden kurz', async () => {
   const { swapPage, swapTheme } = await import('../public/utils/view-transition.js');
   for (const [name, run] of [['swapPage', (env) => swapPage(() => {}, { content: env.content })], ['swapTheme', () => swapTheme(() => {})]]) {
     const env = stubDocument();

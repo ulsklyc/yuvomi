@@ -233,7 +233,7 @@
 }
 
 /* --------------------------------------------------------
- * Seiten-Übergang (Rückfall-Blende und View Transition)
+ * Seiten-Übergang (View Transition, harter Schnitt)
  * -------------------------------------------------------- */
 /* Basis: unsichtbar vor Animation */
 .page-transition {
@@ -256,29 +256,20 @@
   height: 100%;
 }
 
-/* RUECKFALL ohne View Transitions: eine reine Blende, kein Versatz, keine
- * Feder (Critique 2026-09-26, P2-1). Hier stand ein 20px-Slide nach
- * Nav-Reihenfolge, den glass.css zusaetzlich mit der Glas-Feder ueberschwingen
- * liess - Feder gehoert dem Glas, nicht dem Inhalt. Wo der Browser View
- * Transitions kann, sieht man diese Klasse nie; der Wechsel steht unten. */
-.page-transition--in {
-  opacity: 1;
-  animation: page-fade-in var(--duration-md) var(--ease-out);
-}
-
-@keyframes page-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+/* Ohne View Transitions gibt es keinen Rueckfall mehr: der Seitenwechsel
+ * schneidet auch dort (Critique R22, D1). Bis dahin blendete hier
+ * `.page-transition--in` (vorher ein 20px-Slide mit Glas-Feder). Sichtbar
+ * macht den Wrapper der Router per Inline-Deckkraft im Tausch. */
 
 /* --------------------------------------------------------
  * Seitenwechsel als View Transition (utils/view-transition.js)
  *
  * Grundsatz: Kontinuitaet vor Effekt. Navigation, Kopf und Tab-Leisten
  * STEHEN, nur der Inhalt wechselt - wie Apples Tab-Wechsel, der gar nicht
- * gleitet. Das Wurzelbild blendet 200ms mit `--ease-out` ueber; der Browser
- * haelt dabei das alte Bild, bis das neue steht - der leere Frame zwischen
- * altem und neuem Inhalt ist damit weg.
+ * gleitet. Der Browser haelt das alte Bild, bis das neue steht - der leere
+ * Frame zwischen altem und neuem Inhalt ist damit weg. Der Seitenwechsel
+ * schneidet dann hart (`html.page-cut`, R22 D1, unten); die Blenden hier
+ * gelten dem Theme-Wechsel und den Regionen.
  *
  * Was steht, traegt einen Namen und faellt aus dem Wurzelbild heraus:
  *   - `nav-sidebar`, `nav-bottom` (die Kapsel), `nav-bottom-indicator` (ihre
@@ -413,17 +404,26 @@ html.page-swapping .fab-layer .page-fab {
   animation: none;
 }
 
-/* ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21, D11).
- * Die Leiste steht (`kitchen-tabs`, lebendes Bild), ihre Kapsel gleitet - aber
- * die Kontextzeile darunter (`page-toolbar`: Wochenschritt, Suche, Listen)
- * blendete 200ms doppelt belichtet mit der Seite: zwei verschiedene
- * Bedienzeilen uebereinander. Sie gehoert zum Bedienelement und wechselt mit
- * dem Tipp; nur der Inhalt darunter blendet. Typ aus swapPage (router.js). */
-html:active-view-transition-type(kitchen)::view-transition-old(page-toolbar) {
+/* ZWISCHEN GLEICHRANGIGEN ZIELEN EIN HARTER TAUSCH (Critique R22, D1).
+ * Tab-Leiste, Seitenleiste, Mehr-Blatt, Befehlspalette, Kuechen-Reiter: der
+ * Wechsel blendete 200ms, alter und neuer Inhalt standen 13-15 Frames doppelt
+ * belichtet uebereinander, und die Pille stand dabei schon am Ziel. Jetzt haelt
+ * die Transition nur noch das alte Bild, bis die Zielseite gezeichnet hat
+ * (hoechstens FIRST_RENDER_WAIT_MS, danach ihr Skelett) - und schneidet dann:
+ * das alte Bild faellt weg, das neue steht sofort, Kopf und Wurzel blenden
+ * nicht. Gerichtet gleitet nur der Weg in die Hierarchie hinein und zurueck
+ * (`region-*` unten). Unter reduzierter Bewegung derselbe Schnitt; er ist
+ * keine Bewegung. `html.page-cut` setzt swapPage fuer die Dauer des Wechsels.
+ * Der Schnitt gilt auch zwischen zwei Kuechen-Reitern (vorher blendete dort
+ * der Koerper, R21 D11). Guard: test:motion. */
+html.page-cut::view-transition-old(root),
+html.page-cut::view-transition-old(page-toolbar) {
   display: none;
 }
 
-html:active-view-transition-type(kitchen)::view-transition-new(page-toolbar) {
+html.page-cut::view-transition-new(root),
+html.page-cut::view-transition-new(page-toolbar),
+html.page-cut::view-transition-group(root) {
   animation: none;
 }
 
@@ -541,20 +541,13 @@ html:active-view-transition-type(region-fade)::view-transition-new(region-swap) 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-transition--in {
-    animation: none;
-    opacity: 1;
-  }
   #main-content {
     transition: none;
   }
-  /* BEWEGUNG FAELLT WEG, UEBERBLENDEN BLEIBT - auch beim Seitenwechsel
-   * (Critique 2026-10-16, A5). Bis dahin startete utils/view-transition.js
-   * unter reduzierter Bewegung gar keine Transition, und der Rueckfall
-   * `.page-transition--in` war eine Animation, die reset.css auf 0s setzt:
-   * Mehr-Blatt und Popover blendeten, der Seitenwechsel schnitt hart. Jetzt
-   * laeuft die Transition, nur die GRUPPEN stehen (sie tragen Lage und
-   * Groesse, also Bewegung); die Bilder blenden kurz ueber. */
+  /* BEWEGUNG FAELLT WEG, UEBERBLENDEN BLEIBT (Critique 2026-10-16, A5) - fuer
+   * Theme-Wechsel und Regionen. Die GRUPPEN stehen (sie tragen Lage und
+   * Groesse, also Bewegung); die Bilder blenden kurz ueber. Der Seitenwechsel
+   * schneidet ohnehin, hier wie ueberall (`html.page-cut`, R22 D1). */
   ::view-transition-group(*) {
     animation: none !important;
   }

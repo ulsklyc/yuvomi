@@ -482,3 +482,22 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   assert.ok(numeric >= badgeMin, 'der Zaehler bleibt eine Pille');
   assert.ok(tabPad >= tok('space-1'), 'die Kapsel des aktiven Tabs laesst dem Wort weiter 4px je Seite');
 });
+
+// --------------------------------------------------------
+// Critique R22 (D1): Kapsel und Koerper wechseln im selben Frame. Die Kapsel
+// glitt seit dem Tipp (Auswahl beim Klick + Beobachter + placeIndicator) und
+// stand am Ziel, bevor der Koerper wechselte. Jetzt bleibt die Auswahl beim
+// Klick stehen, und die naechste Kuechen-Seite zieht sie beim Wiedereinhaengen
+// nach - synchron und ohne Gleiten, im Update-Callback des Seitenwechsels.
+// --------------------------------------------------------
+test('Kueche D1: die Auswahl wechselt erst mit dem Inhalt - nicht beim Tipp, und dann ohne Gleiten', () => {
+  const kitchen = readSrc('../public/utils/kitchen-tabs.js');
+  const subTabs = readSrc('../public/utils/sub-tabs.js');
+  assert.match(kitchen, /markOnNavigate: false,\s*onChange: onTabChosen,/, 'die Kuechen-Leiste markiert den Reiter weiter beim Tipp');
+  const chosen = kitchen.slice(kitchen.indexOf('function onTabChosen('), kitchen.indexOf('export function renderKitchenTabsBar('));
+  assert.doesNotMatch(chosen.replace(/\/\/.*$/gm, ''), /placeIndicator|applyBadges|_activeRoute =/, 'der Tipp bewegt Kapsel oder Zahlen vor dem Inhalt');
+  const reuse = kitchen.slice(kitchen.indexOf('if (_bar && isKitchenRoute(navigationFrom())'), kitchen.indexOf('// Eine frische Leiste'));
+  assert.match(reuse, /selectSubTab\(_bar, activeRoute\);[\s\S]*placeIndicator\(\);/, 'die wiedereingehaengte Leiste zieht die Kapsel nicht synchron nach');
+  assert.doesNotMatch(reuse, /placeIndicator\(\{ glide: true \}\)/, 'im Tausch gleitet die Kapsel noch - sie stuende erst nach dem Inhalt am Ziel');
+  assert.match(subTabs, /if \(isNav && !markOnNavigate\) \{\s*onChange\(tabId\);\s*return;\s*\}/, 'renderSubTabs ehrt markOnNavigate nicht');
+});

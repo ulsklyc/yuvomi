@@ -68,7 +68,7 @@ export function createNavigateHarness({
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
-  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [], forgotten: 0 };
+  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [], forgotten: 0, nav: [], renderStarted: [] };
   let shell = false;
 
   const env = {
@@ -141,13 +141,18 @@ export function createNavigateHarness({
     // ── Seite ──
     rememberScrollPosition: () => {},
     scrollPositionFor: () => 0,
-    renderPage: async (route, _previousPath, _scrollTarget, { signal = null } = {}) => {
+    renderPage: async (route, _previousPath, _scrollTarget, { signal = null, onSwap = null } = {}) => {
+      // Wie viele Navigationsstaende vor dem Laden schon gesetzt waren (R22, D1).
+      log.renderStarted.push({ path: route.path, nav: log.nav.length });
       if (onRender) await onRender(route);
       // Wie renderPage(): ein waehrend des Ladens ueberholtes Ziel rendert
       // nichts mehr (R19, letzter Tipp gewinnt) und meldet das mit `false`.
       if (signal?.aborted) return false;
       // Wie der catch in renderPage(): Fehler in den Inhalt, die Shell bleibt.
       if (failRender?.(route)) return undefined;
+      // Wie renderPage(): der Tausch ruft `onSwap` - dort setzt die
+      // Navigation ihre Pille (R22, D1).
+      onSwap?.();
       // Wie renderPage(): die Shell - und mit ihr die Toast-Flaeche - gibt es
       // nur auf Seiten mit Anmeldung.
       shell = route.requiresAuth;
@@ -162,7 +167,7 @@ export function createNavigateHarness({
       return true;
     },
     adoptPageFab: () => {},
-    updateNav: () => {},
+    updateNav: (path, opts) => { log.nav.push({ path, instant: Boolean(opts?.instant) }); },
     topLevelSection: (path) => path,
     syncWallMode: () => {},
     applyModuleAccentForRoute: () => {},

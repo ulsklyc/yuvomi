@@ -1,8 +1,8 @@
 /**
  * Modul: Seitenwechsel als View Transition
- * Zweck: Der Router tauscht den Seiteninhalt in EINEM Schritt, und das Bild
- *        dazwischen macht der Browser - alter Inhalt blendet in den neuen, das
- *        Chrome steht.
+ * Zweck: Der Router tauscht den Seiteninhalt in EINEM Schritt; der Browser
+ *        haelt das alte Bild, bis die Zielseite gezeichnet hat, dann schneidet
+ *        der Wechsel hart (R22, D1). Das Chrome steht.
  *
  * WARUM (Critique 2026-09-26, P2-1): der Router ersetzte den alten Inhalt
  * sofort und startete den neuen bei `opacity: 0`. Dazwischen stand ein leerer
@@ -15,8 +15,8 @@
  * Wurzelbild herausgeloest (Regeln in layout.css, Abschnitt Seiten-Uebergang):
  *   - Seitenleiste und untere Kapsel: per CSS unter `html.page-swapping`, und
  *     NUR fuer die Dauer des Wechsels. Sie zeigen dort nur ihr LEBENDES neues
- *     Bild - die Pille der Kapsel gleitet schon seit dem Tipp (updateNav in
- *     router.js), ein eingefrorenes altes Bild darueber waere ein Geisterbild.
+ *     Bild - die Pille springt im Tausch an ihr Ziel (updateNav in router.js,
+ *     R22 D1), ein eingefrorenes altes Bild darueber waere ein Geisterbild.
  *     Dauerhaft darf der Name nicht stehen (Re-Critique 2026-09-28, A1 P1-1):
  *     er macht die Leiste zur Backdrop Root, und der `backdrop-filter` der
  *     Kapsel darin sah nur noch den transparenten Elternknoten - Schrift lief
@@ -30,20 +30,29 @@
  *     zweiten Kopf (`.page-toolbar--in-group` unter der Kuechen-Leiste).
  *     Sein Inhalt blendet ueber, der Kopf selbst gleitet nicht.
  *
- * OHNE API (oder im verdeckten Tab) tauscht der Router direkt; der Rueckfall
- * ist eine reine Blende ohne Versatz (`.page-transition--in` in layout.css).
+ * DER SEITENWECHSEL SCHNEIDET (Critique R22, D1): zwischen gleichrangigen
+ * Zielen blendet nichts mehr, weder Wurzel noch Kopf (`html.page-cut` in
+ * layout.css). Die Transition bleibt, weil sie das alte Bild haelt, bis der
+ * erste echte Render steht (`FIRST_RENDER_WAIT_MS`) - das ist der Deckel
+ * zwischen altem Inhalt und Skelett. Gerichtet bewegt sich nur der Weg in die
+ * Hierarchie und zurueck (swapRegion, utils/content-swap.js). Unter
+ * reduzierter Bewegung derselbe Schnitt.
  *
- * UNTER REDUZIERTER BEWEGUNG LAEUFT DIE TRANSITION (Critique 2026-10-16, A5):
- * sie ist eine Blende, keine Bewegung - und "Bewegung faellt weg, Ueberblenden
- * bleibt" (reset.css). Bis dahin tauschte der Router dort direkt, der
- * Rueckfall war eine Animation, die reset.css auf 0s setzt, und der Wechsel
- * schnitt hart, waehrend Mehr-Blatt und Popover blendeten. Die Gruppen (Lage,
- * Groesse) stehen dort per CSS still, die Bilder blenden `--duration-sm`.
+ * OHNE API (oder im verdeckten Tab) tauscht der Router direkt, ebenfalls ohne
+ * Blende - nur ohne gehaltenes altes Bild.
  */
 
 const TOOLBAR_NAME = 'page-toolbar';
 /** Klasse an <html>, unter der Seitenleiste und Kapsel ihren Namen tragen. */
 const SWAPPING_CLASS = 'page-swapping';
+
+/**
+ * Klasse an <html> fuer die Dauer eines SEITENwechsels: er schneidet hart
+ * (Critique R22, D1, Regeln in layout.css). Eigene Klasse und kein Typ der
+ * Transition: der Schnitt soll auch dort gelten, wo der Browser
+ * `:active-view-transition-type()` nicht kennt - sonst blendete er dort.
+ */
+const CUT_CLASS = 'page-cut';
 
 /** So lange nach der Blende wartet ein abgebrochener Tipp noch auf sein `click`. */
 const LOST_TAP_WINDOW_MS = 1000;
@@ -272,6 +281,7 @@ export async function swapPage(update, { content, from = null, animate = true, w
   // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
   // und ohne Namen blendete die Leiste dort mit der Wurzel.
   const releaseSwapping = holdPageSwapping();
+  document.documentElement?.classList?.add(CUT_CLASS);
   let oldToolbar = nameToolbar(content);
   let newToolbar = null;
   const callback = async () => {
@@ -360,6 +370,7 @@ export async function swapPage(update, { content, from = null, animate = true, w
       // `finished` auf, bevor der zweite sein altes Bild aufnimmt - und derselbe
       // Kopf-Knoten traegt dann schon dessen Namen.
       if (generation !== _generation) return;
+      document.documentElement?.classList?.remove(CUT_CLASS);
       if (newToolbar) newToolbar.style.viewTransitionName = '';
     });
   // Wirft, wenn `update` wirft - der Router faengt es in seinem catch.

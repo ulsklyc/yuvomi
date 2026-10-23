@@ -69,6 +69,15 @@ export function prefetchPathOf(dataset) {
   return target.split(/[?#]/)[0] || null;
 }
 
+/**
+ * So lange wartet die Navigation hoechstens auf den Tausch, bevor sie den
+ * Tipp vorab quittiert (Critique R22, D1) - dieselbe Frist, die das alte Bild
+ * auf den ersten Render wartet (`FIRST_RENDER_WAIT_MS` in
+ * utils/view-transition.js; dieses Modul importiert nichts, test:motion haelt
+ * beide gleich).
+ */
+export const NAV_ACK_MS = 150;
+
 /** Grund eines ueberholten Seitenaufbaus - einmal erzeugt, ohne Stapel der Navigation. */
 const NAVIGATION_SUPERSEDED = typeof DOMException === 'function'
   ? new DOMException('A newer navigation took over.', 'AbortError')
@@ -622,18 +631,39 @@ export function createNavigate(state, deps) {
       // tokens.css, Wortlaut bei moduleAccentToken().
       applyModuleAccentForRoute(route);
 
-      // Optimistisches Chrome-Feedback: aktive Nav-Markierung + Indikator-Pille und
-      // Statusbar-Farbe schon VOR dem Modul-Render setzen, sobald die Shell existiert.
-      // So quittiert der Tap sofort (Pille gleitet, Akzent wechselt), während Modul-
-      // CSS und -Daten noch laden - statt erst nach Abschluss des Renders. Beim aller-
-      // ersten Laden wird die Shell erst in renderPage gebaut; dann greift allein die
-      // autoritative Aktualisierung danach.
-      if (document.querySelector('.nav-bottom')) {
-        updateNav(topLevelSection(basePath));
+      // Beim allerersten Laden wird die Shell erst in renderPage gebaut; dann
+      // greift allein die autoritative Aktualisierung nach dem Render.
+      //
+      // PILLE UND INHALT WECHSELN IM SELBEN FRAME (Critique R22, D1). Die Pille
+      // glitt seit dem Tipp und stand nach rund 120 ms am Ziel, der Inhalt kam
+      // 80-165 ms nach dem Tipp und blendete danach noch 200 ms - die Leiste
+      // meldete einen Ort, den der Inhalt noch nicht zeigte. Jetzt setzt der
+      // Tausch selbst die Navigation (`onSwap`, im Update-Callback der View
+      // Transition, also im Frame des neuen Inhalts), und die Pille springt.
+      // Quittiert ist der Tipp bis dahin durch den Druckzustand des Ziels. Laedt
+      // das Seitenmodul laenger als die Frist des alten Bildes (erster Besuch
+      // ueber ein langsames Netz), zieht die Navigation nach der Frist vorab
+      // nach - ein Tipp ohne sichtbare Antwort wirkt sonst wie ein Haenger.
+      const hasShell = Boolean(document.querySelector('.nav-bottom'));
+      let navShown = false;
+      const showNav = ({ instant = false } = {}) => {
+        clearTimeout(navAck);
+        if (navShown || run.signal.aborted) return;
+        navShown = true;
+        updateNav(topLevelSection(basePath), { instant });
         updateThemeColorForRoute(route);
-      }
+      };
+      const navAck = hasShell ? setTimeout(() => showNav(), NAV_ACK_MS) : null;
 
-      const shown = await renderPage(route, previousPath, scrollTarget, { signal: run.signal });
+      let shown;
+      try {
+        shown = await renderPage(route, previousPath, scrollTarget, {
+          signal: run.signal,
+          onSwap: hasShell ? () => showNav({ instant: true }) : null,
+        });
+      } finally {
+        clearTimeout(navAck);
+      }
       if (run.signal.aborted) {
         // Ueberholt. Hat renderPage() nichts gezeichnet (`false`), gilt die
         // Seite, die zu sehen ist, und der Eintrag dieser Navigation gehoert dem

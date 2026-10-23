@@ -758,7 +758,7 @@ test('jedes woertliche navigate()-Ziel in public/ ist eine Route', async () => {
 test('renderPage: ein ueberholtes Ziel rendert nach dem Laden nichts, sein Blatt geht wieder', () => {
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const render = router.slice(router.indexOf('async function renderPage('));
-  assert.match(render, /^async function renderPage\(route, previousPath = null, scrollTarget = 0, \{ signal = null \} = \{\}\)/);
+  assert.match(render, /^async function renderPage\(route, previousPath = null, scrollTarget = 0, \{ signal = null, onSwap = null \} = \{\}\)/);
   // Seit Review #2049 endet schon das Warten auf Modul und Blatt mit dem
   // Abbruch (unlessAborted), nicht erst die Frage danach.
   assert.match(render, /style\.ready,\s*\]\);[\s\S]{0,600}?const loaded = await unlessAborted\(loading, signal\);\s*if \(!loaded \|\| signal\?\.aborted\) \{\s*style\.abandon\(\);\s*return false;\s*\}/,

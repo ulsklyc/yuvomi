@@ -48,6 +48,11 @@
  * @param {Function}    [opts.sealIcon]        - nur bei 'nav': Icon-Fabrik (moduleIconEl) für das
  *                                               Absender-Siegel links des Titels. Siehe unten.
  * @param {InsertPosition} [opts.insertPosition='afterbegin']
+ * @param {boolean}     [opts.markOnNavigate=true] - nur bei 'nav': false laesst die Auswahl
+ *                                               beim Klick stehen; die Leiste wechselt
+ *                                               erst, wenn der Router sie mit dem neuen
+ *                                               Inhalt nachzieht (selectSubTab) - Kapsel
+ *                                               und Inhalt im selben Frame (R22, D1)
  * @param {boolean|{key?: string}} [opts.indicator] - die gleitende Auswahl-Kapsel
  *                                               (utils/segment-indicator.js). `{ key }`
  *                                               fuer Module, die die Leiste bei jedem
@@ -74,6 +79,7 @@ export function renderSubTabs(anchorEl, {
   sealIcon,
   insertPosition = 'afterbegin',
   indicator = false,
+  markOnNavigate = true,
 }) {
   if (semantics !== 'nav' && semantics !== 'tabs') {
     throw new Error(`renderSubTabs: semantics muss 'nav' oder 'tabs' sein (bekam: ${semantics}).`);
@@ -227,6 +233,10 @@ export function renderSubTabs(anchorEl, {
 
   const activateTab = (tabId, { focus = false } = {}) => {
     if (!tabId || tabId === current) return;
+    if (isNav && !markOnNavigate) {
+      onChange(tabId);
+      return;
+    }
     markTab(tabId, { focus });
     onChange(current);
   };

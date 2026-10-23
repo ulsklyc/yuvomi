@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Switching between sections is instant.** Tapping another section in the tab bar, the
+  sidebar, the More sheet, the command palette or between the kitchen tabs used to cross-fade the
+  old and the new page for a fifth of a second, while the highlight in the navigation had already
+  arrived. The old page now stays until the new one has drawn, then the two swap in one frame
+  together with the highlight. Going into a page and back out (settings, health areas) still
+  slides as before.
 - **Back and forward return to where you were in every list.** Contacts, Shopping, Notes, Pantry,
   Budget, Recipes, Meals, Health, the calendar views and the task list on a wide screen scroll a
   list inside the page, and going back to them always started at the top. They now reopen at the

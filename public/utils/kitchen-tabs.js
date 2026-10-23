@@ -193,8 +193,13 @@ export function refreshKitchenBadges() {
  *      Seitentausch bricht eine CSS-Transition ab, eine Script-Animation laeuft
  *      weiter.
  *
- * Die Bewegung beginnt schon beim Tipp (onChange), nicht erst, wenn die neue
- * Seite steht - wie die Pille der unteren Kapsel (updateNav in router.js).
+ * DIE KAPSEL STEHT IM FRAME DES NEUEN INHALTS AM ZIEL (Critique R22, D1).
+ * Bis dahin begann sie beim Tipp zu gleiten und war am Ziel, bevor der Koerper
+ * wechselte. Jetzt bleibt die Auswahl beim Tipp stehen (`markOnNavigate:
+ * false`), und die naechste Seite zieht sie beim Wiedereinhaengen nach - im
+ * Update-Callback des Seitenwechsels, ohne Gleiten. Wie die Pille der unteren
+ * Kapsel (updateNav in router.js). Quittiert ist der Tipp durch den
+ * Druckzustand des Reiters.
  *
  * Die Kapsel selbst ist seit der Re-Critique 2026-09-27 der geteilte Baustein
  * aller Segment-Leisten (utils/segment-indicator.js): Messen, Gleiten,
@@ -233,11 +238,11 @@ function syncToLocation() {
   placeIndicator({ glide: true });
 }
 
-/** Tipp auf einen Tab: Zahlen und Kapsel ziehen sofort, die Seite folgt. */
+/**
+ * Tipp auf einen Tab: die Seite wechselt, und mit ihr Auswahl, Zahlen und
+ * Kapsel (renderKitchenTabsBar, D1).
+ */
 function onTabChosen(route) {
-  _activeRoute = route;
-  applyBadges(_lastSummary);
-  placeIndicator({ glide: true });
   // Abgelehnt loest das Promise sofort auf, angenommen nach dem Render - beide
   // Male steht danach fest, wo die App ist.
   Promise.resolve(window.yuvomi?.navigate(route)).finally(syncToLocation);
@@ -257,7 +262,9 @@ export function renderKitchenTabsBar(container, activeRoute) {
     applyBadges(_lastSummary);
     // Das Wiedereinhaengen setzt den waagrechten Scrollstand zurueck.
     scrollActiveSubTabIntoView(_bar);
-    placeIndicator({ glide: true });
+    // Ohne Gleiten und SYNCHRON: der Beobachter der Kapsel faende danach
+    // dieselbe Lage vor und gliede nicht mehr los (D1).
+    placeIndicator();
     refreshKitchenBadges();
     return _bar;
   }
@@ -290,6 +297,7 @@ export function renderKitchenTabsBar(container, activeRoute) {
     // Bottom-Nav für „Küche" führt (kitchenNavButtonEl in router.js).
     sealIcon: () => moduleIconEl(MODULE_ICON.kitchen),
     insertPosition: 'afterbegin',
+    markOnNavigate: false,
     onChange: onTabChosen,
   });
   _indicator = attachSegmentIndicator(_bar, { itemSelector: '.sub-tab' });

@@ -405,9 +405,9 @@ function noteShownEntry() {
 }
 
 /** updateNav() fuer navigate(): erst den Eintrag festhalten, der jetzt steht. */
-function updateNavForEntry(section) {
+function updateNavForEntry(section, opts) {
   noteShownEntry();
-  updateNav(section);
+  updateNav(section, opts);
 }
 
 function rememberLeavingPage(path, top) {
@@ -1697,8 +1697,11 @@ function buildMoreSheetBody() {
  * @param {{ path: string, page: string }} route
  * @param {string|null} previousPath - Pfad vor der Navigation (null beim Kaltstart)
  * @param {number} scrollTarget - Scrollstand der Zielseite (0 vorwärts, gemerkt bei popstate)
+ * @param {{ signal?: AbortSignal|null, onSwap?: (() => void)|null }} [opts]
+ *   `onSwap` laeuft im Tausch selbst - die Navigation setzt dort ihre Pille,
+ *   im selben Frame wie den neuen Inhalt (Critique R22, D1)
  */
-async function renderPage(route, previousPath = null, scrollTarget = 0, { signal = null } = {}) {
+async function renderPage(route, previousPath = null, scrollTarget = 0, { signal = null, onSwap = null } = {}) {
   const app = document.getElementById('app');
 
   // Den Ladebildschirm (#app-loading) blendet hier bewusst nichts aus: er steht
@@ -1877,6 +1880,11 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       _pageController?.abort(PAGE_LEFT);
       _pageController = new AbortController();
 
+      // DIE NAVIGATION ZEIGT DEN ORT IM FRAME SEINES INHALTS (Critique R22, D1):
+      // Pille, Aktivzustand und Statusleiste wechseln hier, im Update-Callback
+      // der View Transition, und erscheinen mit dem neuen Bild.
+      onSwap?.();
+
       // Teardown abgeschlossen: ein evtl. gemerktes Soft-Update-Ziel ist jetzt
       // ungültig, bis das neue Modul erfolgreich gerendert hat.
       routerState._renderedModule = null;
@@ -1936,29 +1944,16 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // solange `isNavigating` steht.
       whenSettled: navigationIdle,
       settle: settleClosingOverlays,
-      // ZWISCHEN ZWEI KUECHEN-REITERN BLENDET NUR DER KOERPER (Critique R21,
-      // D11): Leiste und Kontextzeile sind das Bedienelement, die Zeile wechselt
-      // mit dem Tipp statt doppelt belichtet zu blenden (layout.css, `kitchen`).
-      types: isKitchenRoute(previousPath) && isKitchenRoute(route.path) ? ['kitchen'] : [],
+      // Zwischen zwei Kuechen-Reitern schneidet der Wechsel wie ueberall
+      // (R22, D1) - der eigene Typ `kitchen` (R21, D11: nur der Koerper blendet)
+      // ist darin aufgegangen.
     });
 
-    // Mit View Transition macht der Browser die Blende - seit 2026-10-16 auch
-    // unter reduzierter Bewegung (utils/view-transition.js). Ohne sie (keine
-    // API, verdeckter Tab) eine reine Blende ohne Versatz und ohne Feder:
-    // `.page-transition--in`.
-    if (shouldAnimate && !transition) {
-      pageWrapper.classList.add('page-transition--in');
-
-      // navigating-Klasse nach Ende der Einblend-Animation entfernen.
-      // Fallback-Timeout falls animationend nicht feuert (z.B. prefers-reduced-motion).
-      const navEndTimeout = setTimeout(() => {
-        document.documentElement.classList.remove('navigating');
-      }, 300);
-      pageWrapper.addEventListener('animationend', () => {
-        clearTimeout(navEndTimeout);
-        document.documentElement.classList.remove('navigating');
-      }, { once: true });
-    } else if (transition) {
+    // DER WECHSEL SCHNEIDET (Critique R22, D1): mit View Transition haelt der
+    // Browser nur das alte Bild bis zum ersten Render; ohne sie (keine API,
+    // verdeckter Tab) steht die neue Seite sofort - keine Blende, auch nicht
+    // als Rueckfall.
+    if (transition) {
       // Die Transition haelt das Bild bis zu ihrem Ende; erst dann darf das
       // Glas im Inhalt zurueck.
       finished.then(() => document.documentElement.classList.remove('navigating'));
@@ -4662,9 +4657,12 @@ function replaceNavIcon(container, selector, lucideIconName) {
  * ausgeblendet, die Tab-Leiste darueber; der jeweils verborgene Indikator hat
  * keine Geometrie. Wurde er trotzdem markiert, glitt er beim Drehen eines
  * Tablets ueber die Schwelle aus der Nullposition herein (Codex-Review zu #2025).
+ *
+ * `instant` springt auch einen platzierten Indikator: im Seitentausch steht er
+ * im Frame des neuen Inhalts am Ziel (Critique R22, D1).
  */
-function placeNavIndicator(indicator, apply) {
-  const first = indicator.dataset.placed !== '1';
+function placeNavIndicator(indicator, apply, instant = false) {
+  const first = instant || indicator.dataset.placed !== '1';
   if (first) indicator.style.transition = 'none';
   apply();
   if (!first) return;
@@ -4679,9 +4677,9 @@ function placeNavIndicator(indicator, apply) {
  * mit dem Uebergang der Pille (layout.css, reduced-motion schaltet ihn ab)
  * zurueck auf null. `fromTop` null heisst: ohne Weg einblenden.
  */
-function glidePillFrom(pill, fromTop) {
+function glidePillFrom(pill, fromTop, instant = false) {
   if (pill.style.opacity !== '0') return;
-  if (fromTop != null) {
+  if (fromTop != null && !instant) {
     pill.style.opacity = '';
     startGlideAt(pill, fromTop - pill.getBoundingClientRect().top);
   }
@@ -4700,7 +4698,7 @@ function startGlideAt(pill, y) {
 /**
  * Positioniert den morphenden Indikator in der Sidebar auf dem aktiven Nav-Item.
  */
-function positionSidebarIndicator() {
+function positionSidebarIndicator(instant = false) {
   const container = document.querySelector('.nav-sidebar__items');
   const indicator = container?.querySelector('.nav-sidebar__indicator');
   if (!indicator) return;
@@ -4713,7 +4711,7 @@ function positionSidebarIndicator() {
     if (pinnedPill?.parentElement?.getAttribute('aria-current') === 'page') {
       const from = indicator.style.opacity !== '0' && indicator.getClientRects().length
         ? indicator.getBoundingClientRect().top : null;
-      glidePillFrom(pinnedPill, from);
+      glidePillFrom(pinnedPill, from, instant);
     }
     indicator.style.opacity = '0';
     return;
@@ -4723,7 +4721,7 @@ function positionSidebarIndicator() {
   // herauf - dieselbe Bewegung in die Gegenrichtung.
   // Nur ein schon platzierter Indikator gleitet - die erste Platzierung
   // springt weiter (placeNavIndicator).
-  if (pinnedPill && pinnedPill.style.opacity !== '0' && indicator.dataset.placed === '1') {
+  if (!instant && pinnedPill && pinnedPill.style.opacity !== '0' && indicator.dataset.placed === '1') {
     startGlideAt(indicator, pinnedPill.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop);
   }
   if (pinnedPill) pinnedPill.style.opacity = '0';
@@ -4747,7 +4745,7 @@ function positionSidebarIndicator() {
   placeNavIndicator(indicator, () => {
     indicator.style.transform = `translateY(${top + centerOffset}px)`;
     indicator.style.opacity = '';
-  });
+  }, instant);
 }
 
 // Seitliche Luft zur Slot-Kante und Maximalbreite der Aktiv-Kapsel. Eine
@@ -4764,7 +4762,7 @@ const TAB_INDICATOR_MAX_WIDTH = 64;
  * die Label-Grundlinie frei bleibt und die Kapsel weder in die Safe-Area noch
  * an die Bar-Kante läuft.
  */
-function positionTabIndicator() {
+function positionTabIndicator(instant = false) {
   const nav = document.querySelector('.nav-bottom');
   const indicator = nav?.querySelector('.nav-bottom__indicator');
   if (!indicator || !nav) return;
@@ -4792,7 +4790,7 @@ function positionTabIndicator() {
     indicator.style.height = `${wr.height}px`;
     indicator.style.transform = `translate(${left}px, ${top}px)`;
     indicator.style.opacity = '';
-  });
+  }, instant);
 }
 
 function sidebarKitchenEl() {
@@ -4916,7 +4914,7 @@ function setMoreButtonState(moreBtn, activeSecondary) {
   replaceNavIcon(moreBtn, '.nav-item__icon', 'more-horizontal');
 }
 
-function updateNav(rawPath) {
+function updateNav(rawPath, opts) {
   // Ein neuer Ort beginnt oben - mit ausgefahrener Kapsel (R19).
   navMinimizer?.expand();
   // EINE SEKTION JE ZIEL, an jedem Aufruf (Critique R19). Die Navigation
@@ -4982,6 +4980,15 @@ function updateNav(rawPath) {
     window.lucide.createIcons(navRoot ? { el: navRoot } : undefined);
   }
 
+  // IM TAUSCH SPRINGT DIE PILLE (Critique R22, D1): dort ruft der Seitenwechsel
+  // updateNav auf, und der neue Inhalt steht im naechsten gezeichneten Frame.
+  // Ein rAF liefe erst in diesem Frame und die Pille glitte danach noch; sie
+  // gehoert aber an ihr Ziel, wenn der Inhalt da ist - nicht vorher, nicht danach.
+  if (opts?.instant) {
+    positionSidebarIndicator(true);
+    positionTabIndicator(true);
+    return;
+  }
   requestAnimationFrame(() => {
     positionSidebarIndicator();
     positionTabIndicator();
