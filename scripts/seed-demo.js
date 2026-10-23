@@ -211,6 +211,9 @@ const WIPE = [
   // inventory_categories fehlt aus demselben Grund wie pantry_locations und
   // shopping_categories - es ist Referenzdatum aus Migration 145, nicht Demo-Inhalt.
   // inventory_locations dagegen legt keine Migration an, die kommen aus diesem Seed.
+  // Fristen und Wartungsheft (R22, D21) stehen vor den Gegenstaenden aus
+  // demselben Grund.
+  'inventory_item_service_log', 'inventory_item_dates',
   'inventory_item_documents', 'inventory_items', 'inventory_locations',
   'reminders',
   'event_assignments', 'task_assignments', 'task_tags', 'task_documents', 'calendar_events', 'tasks',
@@ -1030,6 +1033,9 @@ const documents = [
   [L('Receipt - Weekly Groceries', 'Kassenbon - Wocheneinkauf'), L('REWE - week 1',                        'REWE - KW 1'),                         'finance',     'family',     'receipts',  'receipt_rewe.jpg',        'image/jpeg',      92000,  lindaId],
   [L('Invoice - Electricity',      'Rechnung - Strom'),          L('Monthly instalment',                   'Monatlicher Abschlag'),                'finance',     'family',     'receipts',  'invoice_electricity.pdf', 'application/pdf', 71000,  alexId],
   [L('Receipt - Football Boots',   'Kassenbon - Fußballschuhe'), L('Sports shop - size 35',                'Sportgeschäft - Größe 35'),            'finance',     'family',     'receipts',  'receipt_boots.jpg',       'image/jpeg',      68000,  lindaId],
+  // Der Beleg zur Waschmaschine im Inventar (R22, D21) - die Notiz des
+  // Gegenstands sagt "Beleg in Dokumenten", jetzt haengt er dort auch dran.
+  [L('Invoice - Washing Machine',  'Rechnung - Waschmaschine'),  L('Miele WWD660 - ten-year warranty',     'Miele WWD660 - zehn Jahre Garantie'),  'finance',     'family',     'receipts',  'invoice_washing_machine.pdf', 'application/pdf', 88000, alexId],
 ];
 const documentIdByName = {};
 for (const [name, description, category, visibility, folder, original, mime, size, created_by] of documents) {
@@ -1593,6 +1599,7 @@ const insertInvItem = db.prepare(`
   VALUES (@name, @brand, @model, @serial, @cat, @loc, @date, @price, 'EUR', @vendor,
           @warranty, @cond, 'active', @notes, @by)
 `);
+const invItemId = {};
 // Die Mischung ist absichtlich: ein Posten mit laufender Garantie, einer mit
 // abgelaufener, ein teures Fahrzeug und ein billiges Werkzeug. Genau daran
 // haengt der Nutzen des Moduls - Kaufpreis, Garantie und Ort an einem Ort -
@@ -1608,7 +1615,7 @@ const insertInvItem = db.prepare(`
    L('Ten-year warranty, receipt in Documents', 'Zehn Jahre Garantie, Beleg in Dokumenten')],
   [L('Family car', 'Familienauto'), 'Škoda', 'Octavia Combi', 'TMBJJ7NE0J0123456', 'vehicles', 'garage',
    -1250, 18900.00, L('Dealership', 'Autohaus'), 24, 'good',
-   L('Next inspection in spring', 'Nächste HU im Frühjahr')],
+   L('Winter tyres in the basement', 'Winterreifen im Keller')],
   [L("Emma's bike", 'Emmas Fahrrad'), 'Cube', 'Acid 240', 'CU240-77120', 'sports', 'garage',
    -300, 449.00, L('Bike shop', 'Fahrradladen'), 24, 'good', null],
   [L('Cordless drill', 'Akkuschrauber'), 'Bosch', 'GSR 18V-55', '3601JJ2000', 'household', 'basement',
@@ -1618,11 +1625,42 @@ const insertInvItem = db.prepare(`
    L('Warranty expired', 'Garantie abgelaufen')],
   [L('Monitor', 'Monitor'), 'Dell', 'U2723QE', 'CN-0M4H2X', 'electronics', 'office',
    -95, 549.00, 'Dell', 36, 'new', null],
-].forEach(([name, brand, model, serial, cat, loc, dayOffset, price, vendor, warranty, cond, notes]) =>
-  insertInvItem.run({
+].forEach(([name, brand, model, serial, cat, loc, dayOffset, price, vendor, warranty, cond, notes]) => {
+  invItemId[serial] = insertInvItem.run({
     name, brand, model, serial, cat, loc: invLocationId[loc],
     date: daysFromNow(dayOffset), price, vendor, warranty, cond, notes, by: alexId,
-  }));
+  }).lastInsertRowid;
+});
+
+/* DAS INVENTAR ZEIGT SEIN ZUSAMMENSPIEL (R22, D21; Critique a4 P3). Bis dahin
+ * standen acht Gegenstaende ohne einen Beleg, ohne Frist und ohne Wartung da -
+ * "Braucht Aufmerksamkeit 0", und keine Detailansicht zeigte, wozu das Modul
+ * Dokumente, Fristen und das Wartungsheft verbindet. Jetzt:
+ * - die Waschmaschine traegt ihre Rechnung aus den Dokumenten,
+ * - das Familienauto eine Hauptuntersuchung in drei Wochen (alle 24 Monate) -
+ *   die eine Frist, die "Braucht Aufmerksamkeit" auf 1 setzt -, einen
+ *   Kilometerstand und eine Inspektion im Wartungsheft. */
+const washingMachineReceipt = documentIdByName[L('Invoice - Washing Machine', 'Rechnung - Waschmaschine')];
+if (washingMachineReceipt) {
+  db.prepare('INSERT INTO inventory_item_documents (item_id, document_id, created_by) VALUES (?, ?, ?)')
+    .run(invItemId['31-4471902'], washingMachineReceipt, alexId);
+}
+const carId = invItemId.TMBJJ7NE0J0123456;
+db.prepare("UPDATE inventory_items SET odometer = ?, odometer_unit = 'km', odometer_on = ? WHERE id = ?")
+  .run(48300, daysFromNow(-12), carId);
+db.prepare(`
+  INSERT INTO inventory_item_dates (item_id, label, date, reminder_offset_days, interval_months, created_by)
+  VALUES (?, ?, ?, 30, 24, ?)
+`).run(carId, L('Vehicle inspection', 'Hauptuntersuchung'), daysFromNow(21), alexId);
+db.prepare(`
+  INSERT INTO inventory_item_dates (item_id, label, date, reminder_offset_days, interval_months, created_by)
+  VALUES (?, ?, ?, 30, 12, ?)
+`).run(carId, L('Service', 'Inspektion'), daysFromNow(185), alexId);
+db.prepare(`
+  INSERT INTO inventory_item_service_log (item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`).run(carId, null, L('Service', 'Inspektion'), daysFromNow(-180), 41200, L('Dealership', 'Autohaus'),
+  L('Oil change, brake fluid, wiper blades', 'Ölwechsel, Bremsflüssigkeit, Wischerblätter'), alexId);
 
 // ── Schedule ─────────────────────────────────────────────────────────────────
 

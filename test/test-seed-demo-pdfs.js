@@ -450,3 +450,30 @@ test('Erzeuger: dieselbe Eingabe ergibt dieselben Bytes', () => {
   const input = { title: 'Mietvertrag', subtitle: 'Unterschrieben', lines: ['a', 'b'], footer: 'f' };
   assert.ok(buildDemoPdf(input).equals(buildDemoPdf(input)));
 });
+
+// Critique R22 (D21, a4 P3): das Inventar stand ohne Beleg, Frist und Wartung
+// da - item_documents/_dates/_service_log 0 Zeilen, "Braucht Aufmerksamkeit 0".
+test('Seed (de): das Inventar zeigt Beleg, Frist, Kilometerstand und Wartung - und braucht einmal Aufmerksamkeit', async () => {
+  const data = readSeeded('de', (db) => ({
+    items: db.prepare('SELECT * FROM inventory_items').all(),
+    docs: db.prepare(`SELECT i.name AS item, d.name AS doc, d.mime_type FROM inventory_item_documents x
+      JOIN inventory_items i ON i.id = x.item_id JOIN family_documents d ON d.id = x.document_id`).all(),
+    dates: db.prepare('SELECT * FROM inventory_item_dates').all(),
+    log: db.prepare('SELECT * FROM inventory_item_service_log').all(),
+  }));
+  assert.ok(data.docs.some((r) => r.item === 'Waschmaschine' && /Waschmaschine/.test(r.doc)), 'die Waschmaschine traegt ihren Beleg');
+  const car = data.items.find((i) => i.name === 'Familienauto');
+  assert.ok(car?.odometer > 0 && car.odometer_unit === 'km', 'das Auto hat einen Kilometerstand');
+  assert.ok(data.dates.some((d) => d.item_id === car.id && d.interval_months), 'eine wiederkehrende Frist am Auto');
+  assert.ok(data.log.some((l) => l.item_id === car.id && l.odometer > 0), 'ein Eintrag im Wartungsheft');
+  const pad = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const soon = new Date(now);
+  soon.setDate(soon.getDate() + 30);
+  const until = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
+  // Die Regel der Kennzahl (utils/inventory-warranty.js) zaehlt eine Frist in
+  // den naechsten 30 Tagen; genau ein Gegenstand traegt eine.
+  const due = new Set(data.dates.filter((d) => d.date >= today && d.date <= until).map((d) => d.item_id));
+  assert.deepEqual([...due], [car.id], '"Braucht Aufmerksamkeit" steht auf 1 - das Auto');
+});
