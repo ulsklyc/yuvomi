@@ -1637,3 +1637,19 @@ test('R21 Rueckweg: die stille Nachfrage holt jeden eigenen Slice neu, bevor sie
     assert.ok(stamp > carry, `${slice}: der Stand wird neu gestempelt, bevor der Slice neu ist`);
   }
 });
+
+// R22 S9 (Critique 2026-10-22, a1 Klein): Schritt 2 trug den Lucide-Ortungspfeil
+// (`navigation`) zu einem Text ueber Leiste und Module, Schritt 3 versprach das
+// Wischen fuer alle Listeneintraege - es gibt es in Aufgaben, Einkauf, Vorrat.
+test('R22: der Rundgang zeigt in Schritt 2 Module und verspricht das Wischen nur, wo es geht', async () => {
+  const { readFileSync } = await import('node:fs');
+  const dashboard = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const steps = dashboard.slice(dashboard.indexOf('function getOnboardingSteps'), dashboard.indexOf('function showOnboarding'));
+  assert.match(steps, /icon: 'layout-grid',\s+title: t\('onboarding\.step2Title'\)/);
+  assert.doesNotMatch(steps, /icon: 'navigation'/, 'kein Ortungspfeil');
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).onboarding.step3Body;
+  assert.match(de, /In Aufgaben, Einkauf und Vorrat wischst du/);
+  assert.doesNotMatch(de, /Wische Listeneinträge/);
+  const en = JSON.parse(readFileSync(new URL('../public/locales/en.json', import.meta.url), 'utf8')).onboarding.step3Body;
+  assert.match(en, /In Tasks, Shopping and Pantry/);
+});

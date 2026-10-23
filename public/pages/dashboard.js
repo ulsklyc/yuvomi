@@ -411,9 +411,13 @@ function getOnboardingSteps() {
   // Leiste und Plus-Knopf nur in Worten. Schritt 1 traegt jetzt das Zeichen
   // (utils/brand-mark.js), Schritt 2 und 3 zeigen auf das Bedienelement, das
   // der Text nennt (`target`, siehe placeSpotlight in showOnboarding).
+  // SCHRITT 2 ZEIGT MODULE, KEINEN KOMPASS (R22 S9, Critique a1): `navigation`
+  // ist in Lucide der Ortungspfeil - er las sich als „Standort", der Text
+  // spricht von Leiste und Modulen. Schritt 3 verspricht das Wischen nur dort,
+  // wo es Zeilen gibt, die es koennen (Aufgaben, Einkauf, Vorrat).
   return [
     { mark: true,           title: t('onboarding.step1Title', { name: appName }), body: t('onboarding.step1Body') },
-    { icon: 'navigation',   title: t('onboarding.step2Title'), body: t(desktop ? 'onboarding.step2BodyDesktop' : 'onboarding.step2Body'),
+    { icon: 'layout-grid',  title: t('onboarding.step2Title'), body: t(desktop ? 'onboarding.step2BodyDesktop' : 'onboarding.step2Body'),
       target: () => document.querySelector(desktop ? '.nav-sidebar' : '.nav-bottom__items') },
     { icon: 'plus-circle',  title: t('onboarding.step3Title'), body: t(desktop ? 'onboarding.step3BodyDesktop' : 'onboarding.step3Body'),
       target: () => [...document.querySelectorAll('.page-fab')].find(isShownOnScreen) ?? null },
