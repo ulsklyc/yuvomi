@@ -1228,7 +1228,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
            haengt deshalb an der Aufgabe und nicht an einem dritten Objekt.
            Ausgeschaltet steht er seit R19 hinter dem Aufklapper, dessen Zeile
            ihn nennt (countdownTucked oben). -->
-      <div class="form-group" style="margin-top:var(--space-4)">
+      <div class="form-group">
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="task-countdown" name="countdown" aria-describedby="task-countdown-hint"
                  ${task?.countdown ? 'checked' : ''}>
@@ -1262,7 +1262,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
         </div>
       </div>
 
-      <div class="form-group task-tags-field" style="margin-top:var(--space-4)">
+      <div class="form-group task-tags-field">
         <label class="label" for="task-tag-input">${t('tasks.tagsLabel')}</label>
         <div class="task-tags-editor" id="task-tags-editor">
           <div class="task-tags-editor__chips" id="task-tags-chips"></div>
@@ -1282,7 +1282,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
            Schritte - anlegen, wieder oeffnen, umstellen. Die Vorauswahl bleibt
            der erste Status, damit ein Anlegen, das das Feld nicht beruehrt,
            sich genau wie vorher verhaelt. -->
-      <div class="form-group" style="margin-top:var(--space-4)">
+      <div class="form-group">
         <label class="label" for="task-status">${t('tasks.statusLabel')}</label>
         <select class="input" id="task-status" name="status">
           ${STATUSES().map((s) =>
@@ -1307,7 +1307,7 @@ ${syncTargetFieldHtml(task)}
            users.length-Bedingung; die Solo-Regel sagt ausdruecklich, dass sie
            keine Daten aendert (utils/household.js), also muss der Knoten
            stehenbleiben. Dokumente machen es an ihrer Stelle genauso. -->
-      <div class="form-group" style="margin-top:var(--space-4)"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
+      <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         <label class="label" for="task-visibility">${t('common.visibility.label')}</label>
         <select class="input" id="task-visibility" name="visibility">
           <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
@@ -1323,7 +1323,7 @@ ${syncTargetFieldHtml(task)}
            Frage beantworten - wer darf hier was. Sichtbarkeit regelt das Sehen,
            die Sperre das Aendern. In einem Ein-Personen-Haushalt sagen beide
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
-      <div class="form-group" style="margin-top:var(--space-4)"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
+      <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
                  ${task?.locked ? 'checked' : ''}>
@@ -1342,7 +1342,7 @@ ${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : 
 ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
   return `
-    <form id="task-form" novalidate>
+    <form id="task-form" class="form-stack" novalidate>
       <input type="hidden" id="task-id" value="${task?.id ?? ''}">
 
       <div class="form-group">
@@ -1386,7 +1386,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
            und „- Niemand -" (Critique 2026-08-10). Das Feld bleibt im DOM und
            behaelt seinen Wert, es wird nur verborgen - der Absende-Pfad liest
            es unveraendert (utils/household.js). -->
-      <div class="form-group" style="margin-top:var(--space-4)"${isSoloHousehold() && assigneePeople.length <= 1 ? ' hidden' : ''}>
+      <div class="form-group"${isSoloHousehold() && assigneePeople.length <= 1 ? ' hidden' : ''}>
         ${renderUserMultiSelect(assigneePeople, selectedIds, 'task_assigned', 'tasks.assignedLabel')}
       </div>
 
@@ -1396,7 +1396,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
           * Die Liste ist standardmaessig nach Kategorie gruppiert; wer sie
           * hinter „Weitere Einstellungen" nicht fand, landete unter
           * „Sonstiges", und „Wichtig" suchte man dort gar nicht erst. */ ''}
-      <div class="modal-grid modal-grid--2 task-form__prio-cat" style="margin-top:var(--space-4)">
+      <div class="modal-grid modal-grid--2 task-form__prio-cat">
         <div class="form-group">
           <label class="label" for="task-priority">${t('tasks.priorityLabel')}</label>
           <select class="input" id="task-priority" name="priority">
@@ -1418,7 +1418,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
            bleibt sie trotzdem: eine Zusammenfassung kann Freitext nicht
            tragen (#731), hinter den Aufklapper gehoert sie nicht. Die Leiste
            erscheint erst mit dem Fokus im Feld (utils/markdown-toolbar.js). -->
-      <div class="form-group" style="margin-top:var(--space-4)">
+      <div class="form-group">
         <label class="label" for="task-description">${t('tasks.descriptionLabel')}</label>
         ${renderMarkdownToolbar()}
         <textarea class="input" id="task-description" name="description"
@@ -2094,7 +2094,7 @@ function renderReminderSection(task = null, reminder = null) {
       </div>
       ${locked ? `<p class="task-field-hint">${t('reminders.readOnlyNotice')}</p>` : ''}
       <div id="reminder-fields" class="reminder-fields" ${hasReminder ? '' : 'style="display:none"'}>
-        <div class="form-group" style="margin:0">
+        <div class="form-group">
           <label class="label" for="reminder-offset">${t('reminders.offsetLabel')}</label>
           <select class="input" id="reminder-offset"${off}>
             <option value="offset_none">${t('reminders.offsetNone')}</option>
@@ -2112,11 +2112,11 @@ function renderReminderSection(task = null, reminder = null) {
           <input type="hidden" id="reminder-stored-at" value="${esc(reminder?.remind_at ?? '')}"${off}>
         </div>
         <div class="modal-grid modal-grid--2" id="reminder-custom-fields" style="${showCustom ? '' : 'display:none'};margin-top:var(--space-3)">
-          <div class="form-group" style="margin:0">
+          <div class="form-group">
             <label class="label" for="reminder-custom-amount">${t('reminders.customAmountLabel')}</label>
             <input class="input" type="number" min="1" step="1" id="reminder-custom-amount" value="${resolved.amount}"${off}>
           </div>
-          <div class="form-group" style="margin:0">
+          <div class="form-group">
             <label class="label" for="reminder-custom-unit">${t('reminders.customUnitLabel')}</label>
             <select class="input" id="reminder-custom-unit"${off}>
               <option value="minutes" ${resolved.unit === 'minutes' ? 'selected' : ''}>${t('reminders.customMinutes')}</option>

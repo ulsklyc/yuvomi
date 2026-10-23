@@ -2658,7 +2658,6 @@ button.budget-entry__title {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 .budget-entry-pair > .form-group {

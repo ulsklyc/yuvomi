@@ -413,10 +413,12 @@
 /* Vor- und Nachname sind ein Feldpaar (#535): die Legende trägt die
    Pflicht-Markierung für beide zusammen ("Name *"), die Einzel-Labels bleiben
    unmarkiert - Pflicht ist die Gruppe, nicht jedes Feld. */
+/* Ohne eigene Marge: der Dialog-Rumpf setzt den Feldtakt per `gap` (layout.css,
+   "EIN FELDTAKT IM DIALOG"); die 16px hier standen darauf - 32px am Desktop. */
 .contact-modal__name-group {
   border: none;
   padding: 0;
-  margin: 0 0 var(--space-4);
+  margin: 0;
   min-width: 0;
 }
 
@@ -441,8 +443,10 @@
     gap: var(--space-1);
   }
 
+  /* 24px wie gedacht: Rumpf-Luecke (--space-4) plus --space-2. Die alte
+     --space-6 stand auf der Luecke und ergab 40px. */
   .contact-modal__name-group {
-    margin-bottom: var(--space-6);
+    margin-bottom: var(--space-2);
   }
 }
 

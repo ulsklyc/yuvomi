@@ -8144,11 +8144,11 @@ function reminderRowHtml({ offset = '0', amount = 1, unit = 'days', storedAt = n
       </div>
       ${afterStart ? `<p class="form-hint field-hint--warn js-reminder-after-start-hint" role="status"><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('reminders.afterStartHint', { when: esc(when) })}</span></p>` : ''}
       <div class="modal-grid modal-grid--2 reminder-custom js-reminder-custom" ${isCustom ? '' : 'hidden'}>
-        <div class="form-group" style="margin:0">
+        <div class="form-group">
           <label class="form-label">${t('reminders.customAmountLabel')}</label>
           <input class="form-input js-reminder-custom-amount" type="number" min="1" max="999" value="${amount}">
         </div>
-        <div class="form-group" style="margin:0">
+        <div class="form-group">
           <label class="form-label">${t('reminders.customUnitLabel')}</label>
           <select class="form-input js-reminder-custom-unit">
             <option value="minutes" ${unit === 'minutes' ? 'selected' : ''}>${t('reminders.customMinutes')}</option>

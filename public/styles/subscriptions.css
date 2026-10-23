@@ -739,7 +739,8 @@
 
 .subscription-form__identity-fields {
   display: grid;
-  gap: var(--space-3);
+  /* Feldtakt des Dialogs (layout.css "EIN FELDTAKT IM DIALOG"). */
+  gap: var(--space-4);
 }
 
 .subscription-logo-picker {

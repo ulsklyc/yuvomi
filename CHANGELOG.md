@@ -86,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line up, the calendar view switch uses the same text size as every other switch, and on a
   touch tablet the header icon buttons are as large as the text buttons. On a phone, tasks and
   the agenda keep the same distance from the card edge as every other list.
+- **Fields in a dialog sit at one distance.** Two fields stood 32px apart in the meal, budget,
+  contact, pantry and waste dialogs, 28px in the inventory and subscription dialogs and 16px in
+  the task dialog, and a group of fields could leave an empty band before the next one. Every
+  dialog now keeps 16px between two fields, and the last field of a dialog no longer adds space
+  under itself.
 - **Every control answers a press the same way.** Filter chips, segments, menu entries and the note
   and meal cards gave no sign when pressed, while buttons, tabs and the add button each shrank by
   their own amount. Small controls now give way a little more than wide ones such as buttons and

@@ -268,7 +268,8 @@
 
 .shopping-import-meals-form {
   display: grid;
-  gap: var(--space-3);
+  /* Feldtakt des Dialogs (layout.css "EIN FELDTAKT IM DIALOG"). */
+  gap: var(--space-4);
 }
 
 /* Der mobile Kopf und seine vierte Ausbaustufe eines Umbruch-Managements sind

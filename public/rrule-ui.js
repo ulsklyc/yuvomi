@@ -340,7 +340,7 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
 
       <div class="rrule-details" id="${prefix}-rrule-details" ${parsed.freq ? '' : 'hidden'}>
         <div class="rrule-row">
-          <div class="form-group" style="margin-bottom:0">
+          <div class="form-group">
             <label class="label form-label" for="${prefix}-rrule-interval">${t('rrule.labelEvery')}</label>
             <div class="rrule-interval-wrap">
               <input class="input form-input" type="number" id="${prefix}-rrule-interval"
@@ -348,7 +348,7 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
               <span class="rrule-interval-unit" id="${prefix}-rrule-unit">${intervalUnitLabel(parsed.freq, parsed.interval)}</span>
             </div>
           </div>
-          <div class="form-group" style="margin-bottom:0">
+          <div class="form-group">
             <label class="label form-label" for="${prefix}-rrule-end">${t('rrule.labelEnds')}</label>
             <select class="input form-input" id="${prefix}-rrule-end">
               ${endOpts}
@@ -357,12 +357,12 @@ export function renderRRuleFields(prefix, existingRule, opts = {}) {
         </div>
 
         <div class="rrule-row rrule-end-inputs">
-          <div class="form-group rrule-until-field" id="${prefix}-rrule-until-wrap" ${endType === 'until' ? '' : 'hidden'} style="margin-bottom:0">
+          <div class="form-group rrule-until-field" id="${prefix}-rrule-until-wrap" ${endType === 'until' ? '' : 'hidden'}>
             <label class="label form-label" for="${prefix}-rrule-until">${t('rrule.labelUntil')}</label>
             <yuvomi-datepicker type="date" id="${prefix}-rrule-until"
                    value="${formatDateInput(parsed.until)}"></yuvomi-datepicker>
           </div>
-          ${allowCount ? `<div class="form-group rrule-count-field" id="${prefix}-rrule-count-wrap" ${endType === 'count' ? '' : 'hidden'} style="margin-bottom:0">
+          ${allowCount ? `<div class="form-group rrule-count-field" id="${prefix}-rrule-count-wrap" ${endType === 'count' ? '' : 'hidden'}>
             <label class="label form-label" for="${prefix}-rrule-count">${t('rrule.labelCount')}</label>
             <div class="rrule-interval-wrap">
               <input class="input form-input" type="number" id="${prefix}-rrule-count"

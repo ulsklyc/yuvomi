@@ -2760,6 +2760,16 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   Regel als `.pantry-form-row` in pantry.css und kopiert als `.inventory-form-row`; der
   Artikel-Dialog des Einkaufs benutzte die Vorratsklasse, deren Blatt dort nicht laedt (Dialog
   mobil 748 -> 563px). Kein Modulblatt kopiert die Zeile (`test:frontend-audit`).
+- **Ein Feldtakt im Dialog (R22-F, F4.1):** zwischen zwei Feldern steht `--space-4`, gesetzt
+  vom Behaelter. Die Marge von `.form-group` ist der Takt im Block-Fluss; in einem Gap-Behaelter
+  (Dialog-Rumpf, `.form-advanced__body`, `.form-stack`, `.form-pair`, `.modal-grid`, Erinnerungs-
+  und Wiederholungszeilen, Abo-Raster) faellt sie weg (layout.css "EIN FELDTAKT IM DIALOG"), und
+  ein Block als Kind einer Gap-Spalte endet ohne sie. Ein Formular, das Felder, Paare und Raster
+  mischt, ist `.form-stack` (Aufgaben). Nie eine Inline-Marge am Feld. Vorher mobil 32px
+  (Mahlzeit, Budget, Kontakt, Vorrat, Abfall), 28 (Inventar, Abo), 16 (Aufgaben), 48 hinter
+  einem Block. Paare und Raster behalten ihre engere Spalten-/Zeilenluecke (`--space-3`), die
+  Seitenformulare der Einstellungen (`.settings-form`) ihren eigenen Takt. Guard:
+  `test:frontend-audit` ("F4.1 Dialog-Feldtakt", findet auch den naechsten Gap-Behaelter).
 - **Feldsatz in Dialogen (R17, E6):** `<label class="form-field">` mit `.form-label` (Footnote
   13 medium, sekundaer; bis R21 S9b 14px) + `.form-input`; Pflichtfeld = `${REQUIRED_MARK}` am Label; ein Geldbetrag traegt
   `.budget-amount-input` (48px/20/600), sein Nachbar in der Zeile dieselbe Hoehe. Die Dialoge der

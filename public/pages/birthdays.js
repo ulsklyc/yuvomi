@@ -202,7 +202,7 @@ function renderBirthdayReminderSection(birthday = null) {
   const customUnit = birthday?.reminder_custom_unit || 'days';
   return `
     <div class="reminder-section">
-      <div class="form-group" style="margin:0">
+      <div class="form-group">
         <label class="form-label" for="bd-reminder-offset">${t('reminders.offsetLabel')}</label>
         <select class="form-input birthday-modal__select" id="bd-reminder-offset">
           ${birthdayReminderOptions(birthday).map((o) =>
@@ -211,11 +211,11 @@ function renderBirthdayReminderSection(birthday = null) {
         </select>
       </div>
       <div class="modal-grid modal-grid--2 reminder-custom" id="bd-reminder-custom" ${currentOffset === 'custom' ? '' : 'hidden'}>
-        <div class="form-group" style="margin:0">
+        <div class="form-group">
           <label class="form-label" for="bd-reminder-custom-amount">${t('reminders.customAmountLabel')}</label>
           <input class="form-input" type="number" id="bd-reminder-custom-amount" min="1" max="${REMINDER_AMOUNT_MAX}" step="1" value="${customAmount}">
         </div>
-        <div class="form-group" style="margin:0">
+        <div class="form-group">
           <label class="form-label" for="bd-reminder-custom-unit">${t('reminders.customUnitLabel')}</label>
           <select class="form-input" id="bd-reminder-custom-unit">
             <option value="minutes" ${customUnit === 'minutes' ? 'selected' : ''}>${t('reminders.customMinutes')}</option>

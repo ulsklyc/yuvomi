@@ -7156,10 +7156,6 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   min-width: 0;
 }
 
-.modal-grid > .form-group {
-  margin-bottom: 0;
-}
-
 /* ZWEI FELDER NEBENEINANDER, GETEILT (R17, E6). Menge/Einheit, Ort/Kategorie:
  * `auto-fit` misst das Modal, nicht das Fenster, und faellt einspaltig, sobald
  * die Untergrenze je Spalte nicht mehr passt. Die Regel stand als
@@ -8585,6 +8581,45 @@ textarea::placeholder {
   flex-direction: column;
   gap: var(--space-1);
   margin-bottom: var(--space-4);
+}
+
+/* EIN FELDTAKT IM DIALOG (Sammel-Ticket R22-F, F4.1). Die Marge der
+ * Feldgruppe ist der Takt im BLOCK-Fluss (Einstellungsseiten, Anmeldung, ein
+ * schlichter Block im Dialog). Steht das Feld in einem Behaelter, der seinen
+ * Takt selbst per `gap` setzt - Dialog-Rumpf, "Weitere Angaben", Feldpaar,
+ * Modal-Raster -, addierten sich beide: gemessen mobil 32px zwischen zwei
+ * Feldern im Mahlzeiten-, Budget-, Kontakt-, Vorrat- und Abfall-Dialog, 16px
+ * im Aufgaben-Dialog, 28px im Inventar und im Abo-Dialog. Eine Regel, ein
+ * Abstand (--space-4): im Gap-Behaelter traegt das Feld keine Marge.
+ *
+ * Dazu das Ende eines Blocks, der selbst Kind einer Gap-Spalte ist: als
+ * Flex-Item haelt er die Marge seines letzten Feldes fest, sie stand VOR der
+ * Luecke zum naechsten Geschwister (48px im Aufgaben-Dialog). NUR dort - im
+ * Block-Fluss tiefer drinnen ist dieselbe Marge der Abstand zum naechsten
+ * Geschwister des Blocks ("Erinnerungstage" klebte sonst an "Ende" im
+ * Abo-Dialog).
+ *
+ * Ersetzt sieben `style="margin-top"` und neun `style="margin:0"` an
+ * einzelnen Feldern. Ein neuer Gap-Behaelter fuer Felder gehoert in diese
+ * Liste, nie eine Inline-Marge ans Feld. Raster mit `align-items: end`
+ * (Abo-Abrechnung, Name + Farbe) brauchen es doppelt: eine Marge an einem
+ * Feld der Zeile verschiebt dessen Unterkante gegen die Nachbarn.
+ * Guard: test-frontend-audit.js "Dialog-Feldtakt". */
+
+/* Ein <form> im Rumpf, das Felder, Paare und Raster mischt, setzt den Takt
+ * mit `.form-stack` statt mit Inline-Margen vor jedem Raster (Aufgaben). */
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+:is(.modal-panel__body, .form-advanced__body, .form-stack, .form-pair, .modal-grid,
+    .rrule-row, .reminder-fields, .reminder-section,
+    .subscription-form__identity-fields, .subscription-form__billing-grid,
+    .shopping-import-meals-form, .settings-name-color-row) > .form-group,
+:is(.modal-panel__body, .form-advanced__body, .form-stack, .birthday-modal__identity) > * > .form-group:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Inline-Validierung ── */

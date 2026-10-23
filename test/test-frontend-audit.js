@@ -23478,3 +23478,101 @@ test('R21 S8: Agenda, Vorrat, Inventar, Budget und Einkauf rechnen nur, was in S
   assert.ok(shop.at.some((at) => /@container shopping-surface \(width < 60rem\)/.test(at)),
     'Einkauf: in Spalten/Masonry wechselten Gruppen mit Platzhalterhoehe beim Scrollen die Spalte');
 });
+
+/*
+ * Sammel-Ticket R22-F, F4.1: "Dialog-Feldtakt". Die Feldgruppe trug ihre
+ * Marge (--space-4) auch dort, wo der Behaelter den Takt schon per `gap`
+ * setzt - Dialog-Rumpf, "Weitere Angaben", Feldpaare. Gemessen mobil: 32px
+ * zwischen zwei Feldern im Mahlzeiten-/Budget-/Kontakt-Dialog, 16px im
+ * Aufgaben-Dialog, 28px im Inventar und im Abo-Dialog. Neun Felder flickten
+ * das mit `style="margin:0"`, sieben im Aufgaben-Dialog mit
+ * `style="margin-top"`. Jetzt EINE Regel in layout.css.
+ *
+ * Der zweite Test faengt den naechsten Gap-Behaelter: jede Klasse, die eine
+ * Basisregel zur Flex-/Grid-Flaeche mit `gap` macht und die im Markup direkt
+ * ein `.form-group` umschliesst, steht in der Liste der Regel (oder hat eine
+ * eigene `> .form-group`-Regel ohne Marge). Ausgenommen: `.form-group` selbst
+ * (ein Feld mit Unterfeldern) und `.settings-form` (Seitenformular der
+ * Einstellungen, kein Dialog - eigener Takt, eigenes Ticket).
+ */
+const FIELD_RHYTHM_EXEMPT = new Map([
+  ['form-group', 'ein Feld mit Unterfeldern, kein Behaelter'],
+  ['settings-form', 'Seitenformular der Einstellungen, kein Dialog'],
+]);
+
+function fieldRhythmRules() {
+  const css = read('../public/styles/layout.css');
+  return [...eachRule(css)].filter((r) => r.at.length === 0
+    && /(?:^|;)\s*margin-bottom:\s*0\s*;/.test(r.body)
+    && /\.form-group\b/.test(r.selector));
+}
+
+function isListMembers(selector, tail) {
+  const out = new Set();
+  for (const part of splitSelectorList(selector)) {
+    const s = part.replace(/\s+/g, ' ').trim();
+    if (!s.endsWith(tail)) continue;
+    const head = s.slice(0, -tail.length).trim();
+    const m = /^:is\((.*)\)$/.exec(head);
+    for (const cls of (m ? m[1].split(',') : [head])) out.add(cls.trim());
+  }
+  return out;
+}
+
+test('F4.1 Dialog-Feldtakt: eine Regel nimmt dem Feld im Gap-Behaelter die Marge, kein Feld traegt eine Inline-Marge', () => {
+  const rules = fieldRhythmRules();
+  const direct = new Set(rules.flatMap((r) => [...isListMembers(r.selector, '> .form-group')]));
+  for (const cls of ['.modal-panel__body', '.form-advanced__body', '.form-stack', '.form-pair', '.modal-grid']) {
+    assert.ok(direct.has(cls), `${cls} > .form-group: Luecke UND Marge - 32px statt 16px zwischen zwei Feldern`);
+  }
+  const trailing = new Set(rules.flatMap((r) => [...isListMembers(r.selector, '> * > .form-group:last-child')]));
+  for (const cls of ['.modal-panel__body', '.form-advanced__body', '.form-stack']) {
+    assert.ok(trailing.has(cls), `${cls} > * > .form-group:last-child: der Block haelt die Marge seines letzten Feldes vor der Luecke fest`);
+  }
+  assert.ok(!rules.some((r) => /\.modal-panel__body \.form-group:last-child/.test(r.selector)),
+    'das letzte Feld JEDES Blocks im Dialog verlor seine Marge - im Block-Fluss ist sie der Abstand zum naechsten Geschwister');
+  const stack = [...eachRule(read('../public/styles/layout.css'))].find((r) => r.at.length === 0 && r.selector.trim() === '.form-stack');
+  assert.match(stack?.body ?? '', /gap:\s*var\(--space-4\)/);
+  assert.match(read('../public/pages/tasks.js'), /<form id="task-form" class="form-stack" novalidate>/,
+    'der Aufgaben-Dialog setzt den Takt per gap statt mit Inline-Margen');
+
+  const offenders = [];
+  for (const file of walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX))) {
+    const src = read(file);
+    for (const m of src.matchAll(/<(?:div|label|fieldset)\b[^<>]*\bclass="form-group\b[^"]*"[^<>]*\bstyle="[^"]*\bmargin\b/g)) {
+      offenders.push(`${file}:${src.slice(0, m.index).split('\n').length}`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'Inline-Marge an einer Feldgruppe - der Behaelter setzt den Takt (layout.css "EIN FELDTAKT IM DIALOG")');
+});
+
+test('F4.1 Dialog-Feldtakt: jeder Gap-Behaelter, der Felder umschliesst, steht in der Regel', () => {
+  const sheets = readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css'));
+  const allRules = sheets.flatMap((f) => [...eachRule(read(`../public/styles/${f}`))]);
+  const covered = new Set(fieldRhythmRules().flatMap((r) => [...isListMembers(r.selector, '> .form-group')]));
+  for (const r of allRules) {
+    if (!/(?:^|;)\s*margin(?:-bottom)?:\s*0\s*;/.test(r.body)) continue;
+    for (const part of splitSelectorList(r.selector)) {
+      const m = /^(\.[\w-]+) > \.form-group$/.exec(part.replace(/\s+/g, ' ').trim());
+      if (m) covered.add(m[1]);
+    }
+  }
+  const wrappers = new Map();
+  const wrap = /<(?:div|form|fieldset|section)\b[^<>]*?\bclass="([^"$]*)"[^<>]*>\s*(?:\$\{[^}]*\}\s*)?<(?:div|label|fieldset)\b[^<>]*\bclass="form-group\b/g;
+  for (const file of walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX))) {
+    for (const m of read(file).matchAll(wrap)) {
+      for (const cls of m[1].split(/\s+/).filter(Boolean)) if (!wrappers.has(cls)) wrappers.set(cls, file);
+    }
+  }
+  assert.ok(wrappers.size > 10, `der Markup-Scan fand nur ${wrappers.size} Behaelter - Muster pruefen`);
+  const missing = [];
+  for (const [cls, file] of wrappers) {
+    if (FIELD_RHYTHM_EXEMPT.has(cls)) continue;
+    const gapRule = allRules.find((r) => r.at.length === 0
+      && splitSelectorList(r.selector).some((s) => s.trim() === `.${cls}`)
+      && /(?:^|;)\s*display:\s*(?:inline-)?(?:flex|grid)\s*;/.test(r.body)
+      && /(?:^|;)\s*(?:row-)?gap:/.test(r.body));
+    if (gapRule && !covered.has(`.${cls}`)) missing.push(`.${cls} (${file})`);
+  }
+  assert.deepEqual(missing, [], 'Gap-Behaelter mit Feldern ohne Eintrag in layout.css "EIN FELDTAKT IM DIALOG": Luecke + Marge doppeln den Abstand');
+});

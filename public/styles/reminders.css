@@ -97,6 +97,12 @@ button.toast__reminder-text:focus-visible {
   margin-top: var(--space-4, 16px);
 }
 
+/* Im Gap-Behaelter ("Weitere Angaben") setzt die Luecke den Abstand ueber der
+ * Linie; die Marge stand darauf (32px ueber, 16px unter der Linie). */
+.form-advanced__body > .reminder-section {
+  margin-top: 0;
+}
+
 .reminder-section__header {
   display: flex;
   align-items: center;
