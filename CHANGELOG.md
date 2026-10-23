@@ -245,6 +245,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
+  booking types shared the width equally, so the longest word ran over its segment - in German
+  "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.
+  Each segment is now at least as wide as its word.
 - **Browsers without `:has()` keep nine layout rules.** In Firefox ESR 115 and other browsers
   that do not know the `:has()` selector, a rule that named it next to other selectors was dropped
   as a whole: the search in a computer's page header lost its width, the collapsed budget header

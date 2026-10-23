@@ -2556,7 +2556,27 @@ button.budget-entry__title {
 .budget-type-toggle {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  /* NIE SCHMALER ALS SEIN WORT (Sammel-Ticket R22-F, F4.4). Gleich breite
+   * Spalten (`minmax(0, 1fr)`) gaben "Umbuchung" am Telefon 78,5px fuer 80,5px
+   * Text: das Wort lief ueber sein Segment und stand 2px an der Leistenkante,
+   * auf Italienisch, Spanisch, Portugiesisch und Vietnamesisch 3-5px darueber
+   * hinaus. Jetzt mindestens die eigene Breite, der Rest gleich verteilt - wo
+   * Platz ist, bleiben die Segmente gleich breit. */
+  grid-auto-columns: minmax(max-content, 1fr);
+}
+
+/* Im schmalen Dialog reicht die Innenpolsterung des Kanons (--space-3) fuer
+ * vier Woerter nicht: 4 x 24px Polster + Text > 316px Leiste. Der Text haelt
+ * seine 14px (D8), Polster und Fuge geben nach; die Zeile bleibt 48px hoch.
+ * Gemessen 390px: Portugiesisch 5,8px ueber der Kante -> 2,7px davor. */
+@container modal-body (max-width: 480px) {
+  .budget-type-toggle {
+    gap: var(--space-0h);
+  }
+
+  .budget-type-toggle .segmented__item {
+    padding-inline: var(--space-1h);
+  }
 }
 
 /* Rate eines Darlehens (#859): Der Umschalter zeigt die Zuordnung, nimmt sie aber

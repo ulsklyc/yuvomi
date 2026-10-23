@@ -7675,3 +7675,19 @@ test('R22 D9: der Abo-Dialog ist flach gruppiert wie Buchung und Inventar', () =
   assert.doesNotMatch(src, /<h3><i data-lucide=/, 'kein Zeichen am Abschnittstitel');
   assert.equal((src.match(/<h3 class="subscription-form__title">/g) ?? []).length, 4);
 });
+
+// Sammel-Ticket R22-F, F4.4: "Umbuchung" stiess am Telefon an die Segmentkante.
+// Gleich breite Spalten (`minmax(0, 1fr)`) gaben dem Wort 78,5px fuer 80,5px
+// Text (390x844; it/es/pt/vi 3-5px ueber die Leiste hinaus). Gemessen nachher:
+// de 9px, pt 5,7px Abstand zur Kante, am Laptop weiter vier gleiche Segmente.
+test('F4.4: der Buchungstyp ist nie schmaler als sein Wort, im schmalen Dialog gibt das Polster nach', () => {
+  const rules = [...eachRule(read('../public/styles/budget.css'))];
+  const toggle = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-type-toggle');
+  assert.match(toggle?.body ?? '', /grid-auto-columns:\s*minmax\(max-content,\s*1fr\)/, 'gleich breite Spalten schneiden das laengste Wort');
+  const narrow = rules.filter((r) => r.at.some((a) => /@container modal-body \(max-width: 480px\)/.test(a)));
+  const item = narrow.find((r) => r.selector.trim() === '.budget-type-toggle .segmented__item');
+  assert.match(item?.body ?? '', /padding-inline:\s*var\(--space-1h\)/);
+  assert.doesNotMatch(item?.body ?? '', /font-size/, 'die Schrift bleibt 14px (D8)');
+  const gap = narrow.find((r) => r.selector.trim() === '.budget-type-toggle');
+  assert.match(gap?.body ?? '', /gap:\s*var\(--space-0h\)/);
+});
