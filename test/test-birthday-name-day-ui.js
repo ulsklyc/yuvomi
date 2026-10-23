@@ -309,8 +309,9 @@ test('Mitglied ohne Geburtsjahr: Liste ohne 2000, Editoren mit "Jahr unbekannt"'
   try {
     const row = family.memberHtml({ id: 5, username: 'gast', display_name: 'Gast', role: 'member', family_role: 'other',
       birth_date: '2000-03-15', birth_year_unknown: true }, 1);
-    assert.match(row, /15\. März/);
-    assert.doesNotMatch(row, /2000/);
+    // Seit R22 (D13) steht der Geburtstag gar nicht mehr in der Mitgliederzeile -
+    // erst recht kein Platzhalterjahr; Tag und Monat zeigt der Editor.
+    assert.doesNotMatch(row, /2000|15\. März/);
   } finally {
     delete globalThis.__locale;
   }
