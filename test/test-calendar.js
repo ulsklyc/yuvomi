@@ -1768,11 +1768,34 @@ test('R22 D5: Woche/Tag nennen "F · LJ" vor der Uhrzeit, der Monat zeigt Strich
     assert(!/month-day__holiday schedule-entry/.test(cell), 'keine Schicht als Zeile in der Monatszelle');
     assert((cell.match(/class="month-day__shift"/g) || []).length === 3, 'hoechstens drei Striche');
     assert(/class="month-day__shifts-more">\+1</.test(cell), 'der Rest als +N');
+    // Der Bezugsrahmen der Striche haengt an einer Klasse, nicht an `:has()`
+    // (S10): die Mindestversion Chrome 87 verwirft jede `:has()`-Regel, und
+    // die absoluten Striche aller Zellen stuenden an derselben Ecke.
+    assert(/class="month-day[^"]*\bmonth-day--shifts\b/.test(cell), 'die Zelle mit Schichten traegt month-day--shifts');
+    const shiftsBox = [...eachRule(calendarCss)].find((r) => /\.month-day__shifts\b/.test(r.selector) && /position:\s*absolute/.test(r.body));
+    assert(shiftsBox, 'die Striche stehen absolut in der Zelle');
+    const frame = [...eachRule(calendarCss)].find((r) => /position:\s*relative/.test(r.body) && /\.month-day--shifts\b/.test(r.selector));
+    assert(frame && !/:has\(/.test(frame.selector) && !frame.at.length, `den Rahmen gibt eine Regel ohne :has() und ohne Bedingung: ${frame?.selector}`);
+    state.scheduleEntries = [];
+    assert(!/month-day--shifts/.test(renderMonthDay('2026-10-21', true, { focusable: true })), 'ohne Schicht keine Klasse');
     assert(/data-total="0"/.test(cell), '"+N weitere" zaehlt nur Termine, Aufgaben und Feiertage');
     assert(/4 /.test(cell.match(/month-day__label">([^<]*)/)?.[1] ?? '') || /monthDayEntries/.test(cell), 'der Name der Zelle zaehlt die Schichten weiter');
   } finally {
     Object.assign(state, saved);
   }
+});
+
+// R22 S10 (a3 Klein): bei 1280 endeten 28 von 40 Monatstiteln in der Ellipse,
+// die Serienmarke nahm jedem 18px. Unter 9rem Balkenbreite weicht nur sie; das
+// gewaehlte Terminicon bleibt (gemessen 28 -> 9, ab 1440 unveraendert).
+test('R22 S10: im schmalen Monatsbalken weicht die Serienmarke dem Titel, nicht das Terminicon', () => {
+  const rules = [...eachRule(calendarCss)];
+  const desk = (r) => r.at.some((a) => /min-width:\s*1024px/.test(a));
+  const box = rules.find((r) => desk(r) && /\.month-day__event\s*$/.test(r.selector.trim()) && /container:\s*month-chip\s*\/\s*inline-size/.test(r.body));
+  assert(box, 'der Monatsbalken ist ab 1024px ein Container namens month-chip');
+  const hide = rules.find((r) => desk(r) && r.at.some((a) => /@container\s+month-chip\s*\(max-width:\s*9rem\)/.test(a)) && /display:\s*none/.test(r.body));
+  assert(hide, 'unter 9rem gibt es eine Regel, die etwas ausblendet');
+  assert(/\.calendar-repeat-icon/.test(hide.selector) && !/event-icon/.test(hide.selector), `nur die Serienmarke weicht: ${hide.selector}`);
 });
 
 // R22 (Critique a1 Klein, D20): eingeklappt nannte der Telefonkopf nur den

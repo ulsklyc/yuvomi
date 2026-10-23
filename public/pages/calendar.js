@@ -4090,7 +4090,12 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   const daySchedule = scheduleEntriesOnDay(date);
   const dayWaste = wasteOccurrencesOnDay(date);
   const isToday  = date === state.today;
-  const classes  = monthDayClasses(date, inMonth, state.today, { selected, selWeek });
+  // `month-day--shifts` gibt den Strichen am Kopf ihren Bezugsrahmen. Eine
+  // Klasse aus dem Renderer statt `:has()`: ohne `:has()` (Chrome < 105, die
+  // Mindestversion ist 87) fiele die Regel weg, und die Striche jeder Zelle
+  // stuenden an derselben Ecke des Rasters (R22, S10).
+  const classes  = monthDayClasses(date, inMonth, state.today, { selected, selWeek })
+    + (daySchedule.length ? ' month-day--shifts' : '');
 
   // Alle Chips (Feiertagsband, Termine, Aufgaben) bis zu einem großzügigen Puffer
   // ins DOM rendern; welche sichtbar bleiben, entscheidet fitMonthDayCells aus der

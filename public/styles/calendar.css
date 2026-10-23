@@ -1169,6 +1169,27 @@
   margin-inline-end: var(--space-0h);
 }
 
+/* DIE SERIENMARKE WEICHT DEM TITEL IM SCHMALEN MONAT (R22 S10, a3 Klein).
+ * Ab 1024px steht der Monatstitel einzeilig; bei 1280 ist die Zelle 141px,
+ * der Balken 132px, und Serienmarke samt Abstand kosteten 18px: 28 von 40
+ * Titeln endeten in der Ellipse ("Klavierstunde - Le..."), ohne die Marke 7.
+ * Unter 9rem Balkenbreite weicht deshalb nur die Serienmarke - das
+ * gewaehlte Terminicon bleibt, es ist Inhalt, die Marke ist Zustand und steht
+ * einen Tipp weiter im Detail. Ab 1440 (155px) ist sie wieder da. Der
+ * Container ist der Balken selbst (blockbreit, die Eindaemmung aendert seine
+ * Breite nicht); ohne Container-Queries bleibt die Marke - Verfeinerung. */
+@media (min-width: 1024px) {
+  .month-grid .month-day__event {
+    container: month-chip / inline-size;
+  }
+
+  @container month-chip (max-width: 9rem) {
+    .month-day__event > .calendar-repeat-icon {
+      display: none;
+    }
+  }
+}
+
 .month-day__more {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
@@ -3844,8 +3865,11 @@
  * Terminen. Der Strich ist Strich und kein Punkt: Punkte sind am Telefon die
  * Termine. Der Ring haelt die 3:1 gegen die Zellflaeche in jeder Farbe - die
  * Begruendung der Punktfassung unten gilt hier genauso. Wer welche Schicht
- * hat, nennen der Name der Zelle, die Tagesliste und der Tag. */
-.month-day:has(> .month-day__visual > .month-day__shifts) {
+ * hat, nennen der Name der Zelle, die Tagesliste und der Tag.
+ * Den Bezugsrahmen gibt eine Klasse des Renderers (calendar.js renderMonthDay),
+ * kein `:has()`: ohne `:has()` verloere die Zelle ihn, und alle Striche
+ * stuenden an derselben Ecke (Mindestversion Chrome 87, R22 S10). */
+.month-day--shifts {
   position: relative;
 }
 
