@@ -734,6 +734,14 @@ test('R14 P6: die Kopf-Pille nennt je Bereich ihr Objekt', () => {
   }
   const de = JSON.parse(read('public/locales/de.json')).newLabel;
   for (const k of keys) assert.ok(!['Eintrag', 'Einheit'].includes(de[k]), `de ${k}: „${de[k]}" ist kein Objekt`);
+  // R22 S10 (D12, „Bereichsname nicht dreifach"): am Desktop stand „Vorsorge"
+  // in der Bereichsliste, im Detailkopf UND in der Kopf-Pille („+ Vorsorge").
+  // Die Pille nennt das Objekt, nicht den Bereich - wie en „Checkup", sv
+  // „Undersökning". Geprueft an der Referenz-Locale; Sprachen ohne Numerus
+  // (ja „薬" fuer Bereich und Objekt) teilen das Wort von Natur aus.
+  const tabs = JSON.parse(read('public/locales/de.json')).health.tabs;
+  const areaOf = { healthVitals: 'vitals', healthCycle: 'cycle', healthMeds: 'meds', healthPrevention: 'prevention', healthLabs: 'labs', healthActivity: 'activity', healthNutrition: 'nutrition' };
+  for (const k of keys) assert.notEqual(de[k], tabs[areaOf[k]], `de ${k}: die Pille wiederholt den Bereichsnamen „${tabs[areaOf[k]]}"`);
 });
 
 /* R18 (Ursache zu #1770): DIE "HEUTE"-REGION SPRINGT NICHT INS BILD.
