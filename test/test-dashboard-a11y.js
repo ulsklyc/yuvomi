@@ -860,3 +860,44 @@ test('R20: Esc beendet das Anpassen wie "Abbrechen", nicht an einem offenen Dial
   assert.match(block, /dialog\[open\]/, 'ein offener Dialog behaelt sein Esc');
   assert.match(block, /requestCancelDashboardConfig\(\)/, 'derselbe Weg wie der Knopf, mit Rueckfrage');
 });
+
+/* DIE ZIELE DES HEUTE-BLATTS (Critique R22, D3, a6 P2). Termin, Mahlzeit,
+ * Medikament und Haushaltshilfe fuehrten ungleich weit: der Termin verliess die
+ * Uebersicht (/calendar?open=7), die Aufgabe oeffnete ihr Blatt ueber ihr, und
+ * Mahlzeit und Dosis landeten an der Wurzel ihres Moduls ohne Fokus. Jetzt
+ * oeffnet der Termin sein Leseblatt ueber der Uebersicht (calendar.js
+ * openEventById, wie openTaskById), und wo es kein Blatt gibt, nennt die Zeile
+ * ihr Objekt: Mahlzeit `?open=`, Dosis der Bereich, Geburtstag `?open=`.
+ * Gemessen im Browser (s1/probes/dash.mjs): Termin -> "/" mit Blatt. */
+test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die anderen Zeilen nennen ihr Objekt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eventLinkOf } = await import('../public/pages/dashboard.js');
+  assert.deepEqual(eventLinkOf('/calendar?open=7&date=2026-10-23'), { id: '7', date: '2026-10-23' });
+  assert.deepEqual(eventLinkOf('/calendar?open=7'), { id: '7', date: null });
+  assert.equal(eventLinkOf('/calendar?date=2026-10-23'), null, 'ein Tag ist kein Termin');
+  assert.equal(eventLinkOf('/calendar?open=7.2026-10-23'), null, 'die Auswahl-Form der Agenda bleibt dem Kalender');
+  assert.equal(eventLinkOf('/tasks?open=7'), null);
+
+  const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const wire = dash.slice(dash.indexOf('function wireLinks('), dash.indexOf('function reorderWidgetConfig('));
+  assert.match(wire, /const eventLink = editing \? null : eventLinkOf\(el\.dataset\.route\);/);
+  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
+  assert.match(dash, /const \{ openEventById \} = await import\('\/pages\/calendar\.js'\);/, 'nachgeladen wie die Aufgabe');
+  const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null \} = \{\}\)/);
+
+  const { buildTodayProgram } = __test;
+  // Jede Tageszeit belegt: selectTodayMeal waehlt nach der Uhr, gefunden wird immer id 16.
+  const meals = Object.fromEntries(['breakfast', 'lunch', 'dinner'].map((type) => [type, { id: 16, title: 'Porridge' }]));
+  const program = buildTodayProgram({ todayMeals: meals, upcomingEvents: [], urgentTasks: [] }, { includeTasks: false, includeCalendar: false });
+  const meal = (Array.isArray(program) ? program : program.rows).find((row) => row.kind === 'meal');
+  assert.equal(meal?.route, '/meals?open=16', 'die Mahlzeit nennt sich selbst');
+  assert.match(dash, /route: highlights\.meal\.id != null \? `\/meals\?open=\$\{encodeURIComponent\(String\(highlights\.meal\.id\)\)\}` : '\/meals',/);
+
+  const { TODAY_SHEET_SOURCES } = await import('../public/utils/today-sheet.js');
+  const ctx = { todayKey: '2026-10-23', tomorrowKey: '2026-10-24', nowTime: '09:00', existing: [] };
+  const doses = TODAY_SHEET_SOURCES.find((s) => s.id === 'doses').collect({ health: { dosesTotal: 1, dosesTaken: 0, nextDose: { name: 'Eisen', time: '08:00' } } }, ctx);
+  assert.equal(doses[0].route, '/health/meds', 'die Dosis fuehrt in den Bereich, in dem eingenommen wird');
+  const birthdays = TODAY_SHEET_SOURCES.find((s) => s.id === 'birthdays').collect({ birthdays: [{ id: 4, name: 'Oma', days_until: 0 }] }, ctx);
+  assert.equal(birthdays[0].route, '/birthdays?open=4', 'der Geburtstag nennt sich selbst');
+});

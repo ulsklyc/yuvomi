@@ -7499,6 +7499,60 @@ function renderEventDetail(ev, reminders = []) {
  * Der einzige Einstieg in einen bestehenden Termin. Ohne Anker (Deep-Link,
  * Suchtreffer) wird daraus ein Sheet, mit Anker am Desktop ein Popover.
  */
+/**
+ * DER TERMIN UEBER DER UEBERSICHT (Critique R22, D3). Die Zeilen des
+ * Heute-Blatts und der Termin-Kachel fuehrten auf `/calendar?open=..` - der
+ * Tipp verliess die Uebersicht, waehrend eine Aufgabe in derselben Liste ihr
+ * Blatt ueber ihr oeffnete (`openTaskById`). Jetzt geht auch der Termin als
+ * Leseblatt ueber der Seite auf, aus der getippt wurde: dieselben Renderer wie
+ * im Kalender (Kopf, Zeilen, Ort mit Kartenaktion, Erinnerungen), aber ohne
+ * Formular und Loeschen - die haengen am Zustand der Kalenderseite (Kalender,
+ * Mitglieder, Neuladen der Ansicht). "Im Kalender oeffnen" fuehrt zum selben
+ * Termin im Kalender, wo Bearbeiten steht.
+ *
+ * Ein Vorkommen einer Serie kommt aus dem Tag (`date`), wie beim Deep-Link
+ * des Kalenders (findDeepLinkedOccurrence): ohne es zeigte das Blatt den
+ * Serienstart.
+ * @param {string|number} id
+ * @param {{ date?: string|null, anchor?: HTMLElement|null }} [options]
+ */
+export async function openEventById(id, { date = null, anchor = null } = {}) {
+  const res = await api.get(`/calendar/${encodeURIComponent(String(id))}`);
+  if (!res?.data) throw new Error(t('calendar.loadError'));
+  const base = localizeBirthdayEvent(res.data);
+  const day = validDateParam(date) || localDate(base.start_datetime);
+  let ev = base;
+  if (base.recurrence_rule && day) {
+    try {
+      const range = await api.get(`/calendar?from=${day}&to=${day}`);
+      ev = findDeepLinkedOccurrence((range?.data ?? []).map(localizeBirthdayEvent), base, day);
+    } catch { /* der Serienstart bleibt die Antwort - besser als kein Blatt */ }
+  }
+  // Haushaltshilfe-Besuche haben ihr eigenes Modul (wie openEventDetail).
+  if (ev.housekeeping_visit_id) {
+    window.yuvomi.navigate(`/housekeeping?editVisit=${ev.housekeeping_visit_id}`);
+    return;
+  }
+  const reminders = await loadReminderForEvent(reminderOwnerId(ev));
+  const target = `/calendar?${new URLSearchParams({ open: String(ev.id), date: day || '' }).toString()}`;
+  openDetailView({
+    title: ev.title,
+    head: eventDetailHead(ev),
+    anchor,
+    sections: renderEventDetail(ev, reminders),
+    actions: [{
+      id: 'detail-open-calendar',
+      label: t('calendar.openInCalendar'),
+      icon: 'calendar',
+      variant: 'primary',
+      // Ohne eigenes Schliessen: navigate() raeumt das Blatt ab und setzt die
+      // Seite an die Stelle seines History-Eintrags (consumeOverlayMarker) -
+      // ein close() davor liefe mit seinem back() gegen das pushState.
+      onClick: () => window.yuvomi?.navigate(target),
+    }],
+  });
+}
+
 async function openEventDetail(ev, anchor = null, { pane = null } = {}) {
   // Haushaltshilfe-Besuche werden in ihrem eigenen Modul bearbeitet; der Umweg
   // über eine Detailansicht führte sonst ins Leere. (In der Detailspalte der

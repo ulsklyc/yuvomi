@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pairing a wall tablet points at the code field.** A wrong pairing code showed an English
   server sentence in a banner below the form. The message now stands under the code field, the
   field is marked as wrong and focused, and a link leads back to login.
+- **Appointments open over the overview.** Tapping an appointment in "Today" or the calendar tile
+  left the overview for the calendar, while a task in the same list opened its sheet on top. An
+  appointment now opens its sheet over the overview too, with "Open in calendar" to edit it there.
+  Today's meal opens its sheet in the meal plan, an open dose leads to Medications and a birthday
+  today to its entry, instead of the start of each module.
 - **Child accounts created before v2.79.0 now also start without the cycle tab in Health** (#2148).
   Since v2.79.0 a new child account hides it; existing ones still showed it. The update hides it
   once for every child account that never set the switch itself and has not used the cycle yet.

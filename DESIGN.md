@@ -2704,6 +2704,13 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
 - **Die Uebersicht eines Kindes** folgt der Vorgabe mit zwei Abweichungen
   (`childDefaultWidgetConfig`): Belohnungen zuerst und sichtbar, Budget aus. Im Heute-Blatt
   ruecken Aufgaben, die nur anderen gehoeren, ans Ende und fallen zuerst unter „+N weitere".
+- **Ein Objekt der Uebersicht oeffnet sich UEBER ihr (R22, D3).** Aufgabe (`openTaskById`) und
+  Termin (`openEventById`, calendar.js: Leseblatt, mit Anker am Desktop als Popover, Fuss „Im
+  Kalender oeffnen") gehen als Blatt ueber der Uebersicht auf; jede Zeile mit
+  `/calendar?open=<id>` (Heute-Blatt, Termin-Kachel, Countdown) nimmt diesen Weg (`eventLinkOf`).
+  Wo es kein wiederverwendbares Blatt gibt, nennt die Zeile ihr Objekt im Modul: Mahlzeit
+  `/meals?open=<id>` (Karte ins Bild, ihr Blatt geht auf), Dosis `/health/meds`, Geburtstag
+  `/birthdays?open=<id>`; die Haushaltshilfe bleibt `/housekeeping`. Pruefebene: test:dashboard-a11y.
 - **Die eigene Karte auf /rewards** (`.rw-own`): Stand im Large-Title-Grad, das naechste Ziel
   mit Zeichen, Name und Preis ueber dem Balken, „Verlauf" leise und „Anfragen" primaer erst,
   wenn der Stand reicht. Opak und randlos wie die Praemienkarte, der Modulton nur im Zeichen

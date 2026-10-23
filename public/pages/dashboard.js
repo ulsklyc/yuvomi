@@ -1434,7 +1434,9 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       sub: MEAL_LABELS()[highlights.mealType] ?? t('dashboard.todayDinner'),
       icon: MEAL_ICONS[highlights.mealType] ?? 'utensils',
       tone: 'dinner',
-      route: '/meals',
+      // Die Mahlzeit selbst, nicht die Wurzel des Plans (R22, D3): der
+      // Essensplan holt ihre Karte ins Bild und oeffnet ihr Blatt.
+      route: highlights.meal.id != null ? `/meals?open=${encodeURIComponent(String(highlights.meal.id))}` : '/meals',
       // Wer kocht (#1679): dasselbe Ueberlappungszeichen wie bei Termin und
       // Aufgabe - "wen geht es an" ist bei einer Mahlzeit der Koch. Ohne Koch
       // bleibt die Zeile, wie sie war.
@@ -6909,6 +6911,36 @@ async function openTaskFromOverview(taskId, container, rerender, user) {
   }
 }
 
+/**
+ * Der Termin hinter einer Kalender-Adresse (`/calendar?open=<id>&date=..`) -
+ * oder null. Heute-Blatt, Termin-Kachel und Countdown nennen ihren Termin so.
+ */
+export function eventLinkOf(route) {
+  if (typeof route !== 'string' || !route.startsWith('/calendar?')) return null;
+  const params = new URLSearchParams(route.slice('/calendar?'.length));
+  const id = params.get('open');
+  if (!id || !/^\d+$/.test(id)) return null;
+  return { id, date: params.get('date') };
+}
+
+/**
+ * DER TERMIN OEFFNET UEBER DER UEBERSICHT (Critique R22, D3), wie die
+ * Aufgabe daneben (openTaskFromOverview): das Leseblatt des Kalenders, die
+ * Uebersicht bleibt stehen. Scheitert das Laden, fuehrt die Zeile wie bisher
+ * in den Kalender - ein Fehler soll den Weg nicht verschliessen.
+ */
+async function openEventFromOverview(link, anchor) {
+  try {
+    const { openEventById } = await import('/pages/calendar.js');
+    await openEventById(link.id, { date: link.date, anchor });
+  } catch (err) {
+    console.error('[Dashboard] Termin konnte nicht geöffnet werden:', err);
+    const params = new URLSearchParams({ open: link.id });
+    if (link.date) params.set('date', link.date);
+    window.yuvomi.navigate(`/calendar?${params.toString()}`);
+  }
+}
+
 // --------------------------------------------------------
 // Navigations-Links verdrahten
 // --------------------------------------------------------
@@ -6933,7 +6965,12 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
       });
       return;
     }
-    const go = () => window.yuvomi.navigate(el.dataset.route);
+    // Ein Termin oeffnet sein Blatt ueber der Uebersicht (R22, D3); Cmd- und
+    // Mittelklick auf einen Link behalten unten ihren neuen Tab.
+    const eventLink = editing ? null : eventLinkOf(el.dataset.route);
+    const go = eventLink
+      ? () => openEventFromOverview(eventLink, el)
+      : () => window.yuvomi.navigate(el.dataset.route);
     if (el.tagName === 'A') {
       el.addEventListener('click', (e) => {
         // DER BROWSER BEHÄLT SEINEN KLICK. Ein bedingungsloses

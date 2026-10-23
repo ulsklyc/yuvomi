@@ -7,6 +7,7 @@
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
+import { releaseAddressOnClose } from '/utils/master-detail.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -771,6 +772,7 @@ export async function render(container, { user }) {
   wireNav();
   wireRecipeSidebar();
   wireRailToggle();
+  openMealFromQuery();
 
   // `?.`: bei `read` steht kein FAB im Markup. Der Riegel selbst sitzt in
   // openMealModal() - dort muenden alle Anlegewege.
@@ -778,6 +780,26 @@ export async function render(container, { user }) {
     const firstType = state.visibleMealTypes[0] ?? 'lunch';
     openMealModal({ mode: 'create', date: today, mealType: firstType });
   });
+}
+
+/**
+ * `/meals?open=<id>` - DIE MAHLZEIT AUS DER UEBERSICHT (Critique R22, D3).
+ * Die Zeile im Heute-Blatt fuehrte auf die Wurzel des Essensplans, und die
+ * Mahlzeit, von der sie sprach, musste man darin erst finden. Jetzt steht ihre
+ * Karte im Bild und ihr Blatt geht auf - derselbe Weg wie ein Tipp auf die
+ * Karte (Bearbeiten, bei `read` die Leseansicht). Ein eigenes Blatt UEBER der
+ * Uebersicht gibt es fuer Mahlzeiten nicht (kein Einzelabruf, das Formular
+ * haengt an Listen und Mitgliedern dieser Seite) - deshalb das Modul mit
+ * Fokus. Der Parameter geht mit dem Blatt (R22, D2).
+ */
+function openMealFromQuery() {
+  const raw = new URLSearchParams(window.location.search).get('open');
+  if (!raw || !/^\d+$/.test(raw)) return;
+  const btn = _container?.querySelector(`.meal-card__open[data-meal-id="${raw}"]`);
+  if (!btn) return;
+  btn.closest('.meal-card')?.scrollIntoView({ block: 'nearest' });
+  btn.click();
+  releaseAddressOnClose('open', raw);
 }
 
 // --------------------------------------------------------

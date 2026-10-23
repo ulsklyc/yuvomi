@@ -115,7 +115,8 @@ export const TODAY_SHEET_SOURCES = [
         sub: open === 1 || !next?.name ? t('dashboard.todayDose') : t('dashboard.todayNextUp', { event: next.name }),
         icon: MODULE_ICON.health,
         tone: 'health',
-        route: '/health',
+        // Der Bereich, in dem eingenommen wird - nicht die Wurzel (R22, D3).
+        route: '/health/meds',
         who: null,
         priority: 10,
         open: true,
@@ -223,7 +224,8 @@ export const TODAY_SHEET_SOURCES = [
           sub: b.kind === 'name_day' ? t('birthdays.nameDay') : t('contacts.birthdayLabel'),
           icon: MODULE_ICON.birthdays,
           tone: 'birthdays',
-          route: '/birthdays',
+          // Der Geburtstag selbst (`?open=`, R22 D3), wie aus der Suche.
+          route: b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays',
           who: null,
           priority: 60,
           open: false,
