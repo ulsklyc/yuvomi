@@ -22538,6 +22538,22 @@ test('R22 D14: das Mehr-Blatt bleibt unter der Statusleiste, blendet die Kante u
   }
 });
 
+// R22 D17 (Critique 2026-10-22, a2 P2): ab 640px reservierte der
+// Personenstapel eine Spalte ueber beide Zeilen - bei 1280 mass die Metazeile
+// 194 von 420px, "Heute faellig" und das Etikett endeten in Ellipse. Sie
+// laeuft jetzt unter den Avatar, ohne die Zeile zu strecken (Platzhalter D4).
+test('R22 D17: die Metazeile der Aufgabe laeuft am Desktop unter den Avatar', () => {
+  const rules = [...eachRule(read('../public/styles/tasks.css'))]
+    .filter((r) => r.at.some((a) => /min-width:\s*640px/.test(a)));
+  const body = (sel) => rules.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(body('.task-card__main:has(> .avatar-stack)'), /display:\s*grid/, 'mit Avatar ein Raster');
+  assert.match(body('.task-card__main:has(> .avatar-stack) > .task-card__body'), /display:\s*contents/);
+  assert.match(body('.task-card__main:has(> .avatar-stack) .task-card__meta'), /grid-column:\s*2 \/ 4/, 'die Metazeile spannt bis unter den Stapel');
+  const avatar = body('.task-card__main > .avatar-stack');
+  assert.match(avatar, /grid-row:\s*1 \/ span 2/, 'der Stapel liegt ueber beiden Zeilen - in Zeile 1 allein streckte er sie um 1px');
+  assert.match(avatar, /align-self:\s*start/);
+});
+
 // R22 D15 (Critique 2026-10-22, a2 Klein): am Finger begann die erste
 // Einkaufsgruppe 0px unter der Haarlinie des Kuechenkopfs, Vorrat, Rezepte und
 // Aufgaben lassen 12-16px. Die Schnellzeile (Zeiger) bringt ihre Luft mit.

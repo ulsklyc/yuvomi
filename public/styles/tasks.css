@@ -357,7 +357,10 @@
  * Falz, und `auto` merkt sich danach die echte Hoehe). Die Zeile ist selbst
  * `overflow: hidden` (Wischbuehne, layout.css) - die Paint-Containment
  * schneidet nichts ab, was nicht ohnehin geschnitten wird. Wer die Zeile
- * umbaut, misst neu (test:frontend-audit). */
+ * umbaut, misst neu (test:frontend-audit). Neu gemessen R22 S9 nach dem
+ * 12px-Einzug mobil (S4) und der Metazeile unter dem Avatar (D17), 211
+ * Aufgaben: 84,6 mobil, 80 Tablet und 1920, 100,6 mit Detailspalte -
+ * unveraendert. */
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .task-group .row-carrier > .swipe-row:nth-child(n+20) {
     content-visibility: auto;
@@ -1119,6 +1122,58 @@
   .task-card__main {
     -webkit-touch-callout: none;
     user-select: none;
+  }
+}
+
+/* DIE METAZEILE LAEUFT UNTER DEN AVATAR (R22 D17). Ab 640px stand der
+ * Personenstapel als eigene Flex-Spalte ueber beide Zeilen: bei 1280 mass die
+ * Metazeile 194 von 420px, und „Heute faellig" samt Etikett endeten in drei
+ * von vier Zeilen mit Ellipse - neben 36px leerer Flaeche unter dem Avatar.
+ * Jetzt ein Raster wie mobil: der Stapel steht in der Titelzeile, die
+ * Metazeile spannt darunter bis an seine Endkante. Mehr-Knopf und Griff
+ * reihen sich als implizite Spalten ueber beide Zeilen an (ohne leere Spur,
+ * also ohne doppelten Spaltenabstand, wenn einer fehlt). Ohne Avatar bleibt
+ * die Flexzeile: dort spannt die Metazeile ohnehin schon den ganzen Koerper. */
+@media (min-width: 640px) {
+  .task-card__main:has(> .avatar-stack) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-auto-columns: auto;
+    row-gap: 0;
+  }
+
+  .task-card__main:has(> .avatar-stack) > .task-card__body {
+    display: contents;
+  }
+
+  .task-card__main:has(> .avatar-stack) > :is(.task-status-btn, .select-circle) {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .task-card__main:has(> .avatar-stack) .task-card__title {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .task-card__main:has(> .avatar-stack) .task-card__meta {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  /* Ueber beide Zeilen gelegt, oben ausgerichtet: in Zeile 1 allein haette
+   * der 24px-Stapel die 22,8px der Titelzeile gestreckt - jede Zeile 1px
+   * hoeher, und der Platzhalter der langen Listen (85/80px, D4) stimmte
+   * nicht mehr. Die Metazeile ist mittig in ihren 25px; die 1,2px, die der
+   * Stapel in sie hineinreicht, beruehren keinen Chip. */
+  .task-card__main > .avatar-stack {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+
+  .task-card__main:has(> .avatar-stack) > :is(.row-action--more, .list-row__drag) {
+    grid-row: 1 / span 2;
   }
 }
 
