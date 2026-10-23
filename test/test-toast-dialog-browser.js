@@ -28,10 +28,16 @@
  * (neben ihm); sonst ist er zurueckgenommen (`toast--tucked` + inert) und kommt
  * mit dem Schliessen wieder (toast-placement.js, persistentToastMustYield).
  * Die Erinnerungs-Faelle pruefen deshalb diese Regel (`assertReminderYields`).
- * Wo die Sonde einen SICHTBAREN Stapel ueber einem Dialog braucht - mehrere
- * Toasts, Felder unter dem Stapel, Tab-Fokus -, misst sie gewoehnliche Toasts
- * mit Aktion und langer Standzeit (`showProbeToasts`): sie laufen durch
- * dieselbe Lage-Regel und weichen nicht.
+ * Wo die Sonde einen SICHTBAREN Toast ueber einem Dialog braucht - Felder
+ * unter dem Stapel, Tab-Fokus -, misst sie gewoehnliche Toasts mit Aktion und
+ * langer Standzeit (`showProbeToasts`): sie laufen durch dieselbe Lage-Regel
+ * und weichen nicht.
+ *
+ * SEIT R22 (D18) STEHT HOECHSTENS EINE RUECKMELDUNG DA. Ein neuer Toast beendet
+ * den stehenden; mehrere gewoehnliche Toasts stapeln sich nicht mehr, und die
+ * Erinnerungen weichen dem Dialog (R9). Die Sonden, die frueher zwei oder drei
+ * Toasts stapelten, zeigen sie jetzt nacheinander und pruefen, dass genau der
+ * juengste bleibt - und dass er keinen Knopf deckt.
  */
 
 import { test, before, beforeEach, after } from 'node:test';
@@ -108,21 +114,26 @@ async function waitForToasts(page, count) {
 const PROBE_TOAST = '.toast:not(.toast--reminder):not(.toast--danger):not(.toast--warning)';
 
 /**
- * Legt `count` gewoehnliche Toasts mit einem Knopf und langer Standzeit an -
- * die Messkoerper fuer einen sichtbaren Stapel ueber einem Dialog (R9 M14:
- * eine Erinnerung ist das nicht mehr, sie weicht).
+ * Zeigt `count` gewoehnliche Toasts mit einem Knopf und langer Standzeit
+ * nacheinander - die Messkoerper fuer einen sichtbaren Toast ueber einem
+ * Dialog (R9 M14: eine Erinnerung ist das nicht mehr, sie weicht). Seit R22
+ * (D18) ersetzt jeder den vorigen: am Ende steht genau einer, der juengste.
  */
-async function showProbeToasts(page, count) {
-  const before = await page.$$eval(PROBE_TOAST, (list) => list.length);
-  await page.evaluate(({ n, from }) => {
-    for (let i = 0; i < n; i += 1) {
-      window.yuvomi.showToast(`Toast probe ${from + i + 1}`, 'default', 120000, { label: 'Probe', onClick: () => {} });
+let probeSerial = 0;
+async function showProbeToasts(page, count, { text = '' } = {}) {
+  const labels = Array.from({ length: count }, () => `Toast probe ${++probeSerial}${text}`);
+  await page.evaluate((list) => {
+    for (const label of list) {
+      window.yuvomi.showToast(label, 'default', 120000, { label: 'Probe', onClick: () => {} });
     }
-  }, { n: count, from: before });
+  }, labels);
   await page.waitForFunction(
-    ({ n, sel }) => document.querySelectorAll(sel).length >= n,
+    ({ newest, sel }) => {
+      const shown = document.querySelectorAll(sel);
+      return shown.length === 1 && shown[0].textContent.includes(newest);
+    },
     { timeout: 10000 },
-    { n: before + count, sel: PROBE_TOAST },
+    { newest: labels.at(-1).slice(0, 40), sel: PROBE_TOAST },
   );
 }
 
@@ -149,13 +160,22 @@ async function settleAnimations(page) {
   await page.evaluate(() => document.activeViewTransition?.finished.catch(() => {}));
   // Endlose Animationen (der Hintergrund der Shell driftet dauernd) enden nie,
   // abgebrochene auch nicht: sie zaehlen mit ihrem `cancel` als erledigt.
+  // Keine wartet laenger als ihre Restlaufzeit: mobil hingen nach einem
+  // vorigen Fall zwei Laeufe 180 s an einer Animation, die im Moment der
+  // Abfrage noch nicht gestartet war und danach weder endete noch abbrach
+  // (gemessen R22, 3 von 3 rot; jede zusaetzliche Abfrage davor liess es gruen).
   await page.evaluate(() => Promise.all(
     document.getAnimations()
       .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-      .map((a) => Promise.race([
-        a.finished.catch(() => {}),
-        new Promise((resolve) => a.addEventListener('cancel', resolve, { once: true })),
-      ])),
+      .map((a) => {
+        const { endTime } = a.effect.getComputedTiming();
+        const rest = Math.max(0, endTime - (a.currentTime ?? 0)) / Math.abs(a.playbackRate || 1);
+        return Promise.race([
+          a.finished.catch(() => {}),
+          new Promise((resolve) => a.addEventListener('cancel', resolve, { once: true })),
+          new Promise((resolve) => setTimeout(resolve, rest + 250)),
+        ]);
+      }),
   ));
   // Zwei Frames fuer die Reaktion auf `animationend`.
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -479,7 +499,7 @@ const FAMILY_SIZES = [
 ];
 
 for (const size of FAMILY_SIZES) {
-  test(`#1160 ${size.label} - Mitglied bearbeiten, ans Ende gescrollt: Speichern und Abbrechen bleiben frei (2 Toasts)`, async () => {
+  test(`#1160 ${size.label} - Mitglied bearbeiten, ans Ende gescrollt: Speichern und Abbrechen bleiben frei (der juengste von 2 Toasts)`, async () => {
     const page = await openPage(harness, { device: size.device, locale: 'de' });
     try {
       await page.setViewport(size.viewport);
@@ -536,7 +556,7 @@ const SMALL_SIZES = [
 ];
 
 for (const size of SMALL_SIZES) {
-  test(`#1160 ${size.label} - drei Toasts im Kalender-Editor decken keinen seiner Knoepfe`, async () => {
+  test(`#1160 ${size.label} - von drei Toasts im Kalender-Editor bleibt einer und deckt keinen seiner Knoepfe`, async () => {
     const page = await openPage(harness, { device: size.device, locale: 'de' });
     try {
       const eventId = await seedEvent(page);
@@ -550,8 +570,8 @@ for (const size of SMALL_SIZES) {
       assert.equal(measured.toast, true, 'die Toasts sind verschwunden - so misst die Sonde nichts');
       assert.equal(measured.toastVisible, true, 'mindestens ein Toast muss sichtbar bleiben');
       assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
-      assert.equal(await page.$$eval(PROBE_TOAST, (list) => list.length), 3,
-        'die verborgenen Toasts muessen im Dokument bleiben (Live-Region)');
+      assert.equal(await page.$$eval(PROBE_TOAST, (list) => list.length), 1,
+        'eine Rueckmeldung zur Zeit (R22, D18): die neue ersetzt die alten');
     } finally {
       await page.close();
     }
@@ -559,21 +579,18 @@ for (const size of SMALL_SIZES) {
 }
 
 /*
- * WELCHER TOAST BLEIBT, UND WAS DIE ANDEREN NOCH KOENNEN (Review an #1421).
+ * WELCHER TOAST BLEIBT, UND WAS ER NOCH KANN (Review an #1421, seit R22 D18).
  *
- * Die bestimmte Live-Region (Fehler) steht im Stapel immer HINTER der
- * hoeflichen (Erinnerungen). Wer den letzten nach DOM-Reihenfolge behielt,
- * behielt jede Fehlermeldung und nahm die Erinnerung zurueck, die gerade kam.
- * Und ein zurueckgenommener Toast ist unsichtbar - seine Knoepfe (Verwerfen,
- * Oeffnen) duerfen dann auch per Tab nicht erreichbar sein.
+ * Frueher stand die bestimmte Live-Region (Fehler) im Stapel hinter der
+ * hoeflichen, und wer den letzten nach DOM-Reihenfolge behielt, behielt jede
+ * Fehlermeldung. Seit D18 steht hoechstens eine Rueckmeldung da: der neue
+ * Toast beendet auch einen stehenden Fehler. Die Sonde prueft, dass genau der
+ * juengste bleibt, sichtbar, nicht inert und ohne einen Knopf des Editors zu
+ * decken - und dass er nach dem Schliessen des Dialogs bedienbar bleibt.
  */
-test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler; die zurueckgenommenen sind inert', async () => {
+test('#1160 568x320 - nach einem Fehler steht nur der juengste Toast, sichtbar und bedienbar', async () => {
   const page = await openPage(harness, { device: 'mobile', locale: 'de' });
   try {
-    // Gewoehnliche Toasts statt Erinnerungen: eine Erinnerung weicht dem
-    // Editor seit R9 ganz (M14, siehe die Sonden oben) und stuende hier nicht
-    // mehr zur Wahl. Die Frage bleibt dieselbe: wer bleibt, wenn der Stapel
-    // zuruecknehmen muss - der juengste, nicht der letzte in DOM-Reihenfolge.
     const eventId = await seedEvent(page);
     await page.setViewport({ width: 568, height: 320, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     await gotoRoute(page, '/calendar');
@@ -589,26 +606,22 @@ test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler
       const all = [...document.querySelectorAll('.shell-bottom-stack .toast')];
       return {
         count: all.length,
-        tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
+        danger: document.querySelectorAll('.toast--danger').length,
         newestTucked: newest.classList.contains('toast--tucked'),
         newestInert: newest.inert,
-        dangerTucked: document.querySelector('.toast--danger')?.classList.contains('toast--tucked'),
-        tuckedNotInert: all.filter((t) => t.classList.contains('toast--tucked') && !t.inert).length,
       };
     }, PROBE_TOAST);
-    assert.equal(state.count, 3, `drei Toasts erwartet (${JSON.stringify(state)})`);
-    assert.ok(state.tucked >= 1, `bei 568x320 muss der Stapel zuruecknehmen, sonst misst die Sonde nichts (${JSON.stringify(state)})`);
+    assert.equal(state.count, 1, `eine Rueckmeldung zur Zeit (D18) (${JSON.stringify(state)})`);
+    assert.equal(state.danger, 0, `der aeltere Fehler endet mit dem neuen Toast (${JSON.stringify(state)})`);
     assert.equal(state.newestTucked, false, `der zuletzt eingetroffene Toast wurde zurueckgenommen (${JSON.stringify(state)})`);
     assert.equal(state.newestInert, false, 'der sichtbare Toast darf nicht inert sein');
-    assert.equal(state.dangerTucked, true, `der aeltere Fehler muss zuruecktreten (${JSON.stringify(state)})`);
-    assert.equal(state.tuckedNotInert, 0, 'ein zurueckgenommener Toast ist per Tab erreichbar (nicht inert)');
     const measured = await measureDialog(page, { toastSelector: PROBE_TOAST });
-    assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Stapel');
+    assert.deepEqual(measured.covered, [], 'ein Knopf des Editors liegt unter dem Toast');
     assert.equal(measured.toastVisible, true, 'der juengste Toast muss sichtbar sein');
 
-    // Nach dem Schliessen kommen die zurueckgenommenen Toasts zurueck - und
-    // wieder bedienbar. Ohne `inert = false` in untuck() blieben sie sichtbar,
-    // aber Verwerfen und Oeffnen reagierten nicht mehr (Review an #1421).
+    // Nach dem Schliessen bleibt er stehen und bedienbar: ohne `inert = false`
+    // in untuck() bliebe ein einmal zurueckgenommener Toast sichtbar, aber sein
+    // Knopf reagierte nicht mehr (Review an #1421).
     await page.evaluate(async () => (await import('/components/modal.js')).closeModal({ force: true }));
     await page.waitForFunction(() => !document.querySelector('.modal-overlay'), { timeout: 5000 });
     await settleAnimations(page);
@@ -620,9 +633,9 @@ test('#1160 568x320 - der juengste Toast bleibt sichtbar, auch nach einem Fehler
         tucked: all.filter((t) => t.classList.contains('toast--tucked')).length,
       };
     });
-    assert.ok(after.count >= 2, `die Toasts sind mit dem Dialog verschwunden (${JSON.stringify(after)})`);
-    assert.equal(after.tucked, 0, `nach dem Schliessen ist noch ein Toast zurueckgenommen (${JSON.stringify(after)})`);
-    assert.equal(after.inert, 0, `nach dem Schliessen ist noch ein Toast inert (${JSON.stringify(after)})`);
+    assert.equal(after.count, 1, `der Toast ist mit dem Dialog verschwunden (${JSON.stringify(after)})`);
+    assert.equal(after.tucked, 0, `nach dem Schliessen ist der Toast zurueckgenommen (${JSON.stringify(after)})`);
+    assert.equal(after.inert, 0, `nach dem Schliessen ist der Toast inert (${JSON.stringify(after)})`);
   } finally {
     await page.close();
   }
@@ -671,7 +684,9 @@ test('#1160 375x812 - Mitglied bearbeiten: jedes Feld, auf dem der Tab-Fokus lan
   const page = await openPage(harness, { device: 'mobile', locale: 'de' });
   try {
     await gotoRoute(page, '/settings/admin/family');
-    await showProbeToasts(page, 2);
+    // Ein Toast zur Zeit (D18) ist niedriger als der fruehere Stapel aus zwei:
+    // eine mehrzeilige Meldung gibt ihm die Hoehe, unter der ein Feld liegt.
+    await showProbeToasts(page, 1, { text: ' - eine laengere Rueckmeldung, die auf dem Telefon ueber mehrere Zeilen umbricht und so die Hoehe des frueheren Stapels einnimmt' });
     await page.waitForSelector('[data-edit-user]');
     await page.$eval('[data-edit-user]', (el) => el.click());
     await page.waitForSelector('#edit-member-cancel');
