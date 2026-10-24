@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "\"{{name}}\" voltou a ficar pendente - não foi possível marcar. Tente novamente.",
         "errorUncheckRolledBack": "\"{{name}}\" voltou a ficar marcado - não foi possível desmarcar. Tente novamente.",
         "errorNotOwner": "Outra pessoa criou isto - você pode ver, mas não alterar.",
-        "foreignReadOnlyHint": "Criado por {{name}} - você pode ver, mas não alterar."
+        "foreignReadOnlyHint": "Criado por {{name}} - você pode ver, mas não alterar.",
+        "deletedNamed": "\"{{name}}\" excluído."
     },
     "kitchen": {
         "noShoppingLists": "Ainda não existe lista de compras.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Feito por …",
         "checkedDoneNamed": "\"{{title}}\" concluído.",
         "checkedOpenNamed": "\"{{title}}\" aberto novamente.",
-        "errorReorderNotAllowed": "Você pode ver a ordem da família, mas não alterar."
+        "errorReorderNotAllowed": "Você pode ver a ordem da família, mas não alterar.",
+        "doneSubtasksOpen": "\"{{title}}\" concluído - ainda {{count}} subtarefas em aberto.",
+        "doneSubtasksOpen_one": "\"{{title}}\" concluído - ainda {{count}} subtarefa em aberto.",
+        "checkAllSubtasks": "Marcar todas",
+        "subtasksAllDone": "\"{{title}}\" e todas as subtarefas concluídos."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Esses lançamentos perdem, no entanto, a associação e deixam de pertencer a qualquer conta. O saldo e o tipo de conta perdem-se e não podem ser recuperados.",
         "editAccount": "Editar conta",
         "newAccount": "Nova conta",
-        "accountDeletedToast": "Conta eliminada",
         "accountSavedToast": "Conta salva",
         "accountAddedToast": "Conta adicionada",
         "accountLabel": "Conta",
@@ -4023,7 +4027,6 @@
         "supplyName": "Nome do produto",
         "supplyPlaceholder": "O que faltou?",
         "checkedInToast": "Entrada registrada.",
-        "checkedOutToast": "Saída registrada.",
         "supplyAddedToast": "Adicionado à lista de compras.",
         "overdue": "Atrasada",
         "dueToday": "Hoje",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Esta tarefa não existe mais.",
         "errorAlreadyCheckedOut": "Esta faxineira já registrou a saída.",
         "errorAlreadyCheckedIn": "Esta faxineira já registrou a entrada.",
-        "allVisitsInReport": "Todas as visitas no relatório"
+        "allVisitsInReport": "Todas as visitas no relatório",
+        "checkedOutNamed": "Saída de {{name}} registrada.",
+        "visitToday": "Aqui hoje: {{from}} - {{to}}",
+        "checkInAgain": "Registrar entrada de novo"
     },
     "userMultiSelect": {
         "moreUsers": "mais",
@@ -4202,8 +4208,6 @@
         "subtitle": "Divida contas da casa, viagens, compras e custos da família.",
         "addExpense": "Adicionar despesa",
         "editExpense": "Editar despesa",
-        "deleteExpenseConfirm": "Excluir esta despesa?",
-        "deleteExpenseConfirmDetail": "Todos os saldos do grupo são recalculados sem esta despesa, e quem passa de devedor a credor vê-o de imediato. Os Comprovantes anexados mantêm-se.",
         "addGroup": "Novo grupo",
         "groups": "Grupos",
         "searchGroups": "Buscar grupos",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Insira uma data de pagamento válida.",
         "savedToast": "Assinatura salva.",
         "addedToast": "Assinatura adicionada.",
-        "renewedToast": "Data de renovação atualizada.",
-        "deleteConfirm": "Excluir a assinatura \"{{name}}\"?",
-        "deleteConfirmDetail": "Com a assinatura são apagados os lembretes e o lançamento de orçamento do próximo pagamento. Os pagamentos já concluídos mantêm-se no resumo mensal.",
-        "renewConfirm": "Registrar o pagamento de \"{{name}}\"?",
-        "renewConfirmDetail": "A data de vencimento avança e o pagamento de {{date}} é registrado como despesa no orçamento.",
-        "deletedToast": "Assinatura excluída.",
         "monthlyBudgetLabel": "Orçamento mensal de assinaturas",
         "baseCurrencyLabel": "Moeda base",
         "fixerHint": "A conversão ao vivo usa Fixer quando FIXER_API_KEY está configurada no servidor.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Falta {{count}} pagamento",
         "completed": "Concluído",
         "completedOn": "Concluído em {{date}}",
-        "completedToast": "Assinatura concluída.",
         "endsAfter": "Faltam {{count}} pagamentos",
         "logoTypeError": "Use uma imagem PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Registrado com",
         "accountUsernameHint": "Endereço de e-mail ou nome de usuário. Não é um campo de senha - o Yuvomi não guarda senhas.",
         "detailAmountLabel": "Valor",
-        "detailNextPaymentLabel": "Próximo pagamento"
+        "detailNextPaymentLabel": "Próximo pagamento",
+        "renewedNamed": "\"{{name}}\" pago - próximo pagamento em {{date}}.",
+        "completedNamed": "\"{{name}}\" pago e concluído."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Este registro não vem de um plano e pode ser eliminado.",
                 "saved": "Registro salvo",
                 "saveError": "Não foi possível salvar o registro.",
-                "deleteConfirm": "Eliminar este registro?",
-                "deleted": "Registro eliminado",
-                "deleteConfirmDetail": "O registro também desaparece da exportação. Isto não pode ser anulado."
+                "deleted": "Registro eliminado"
             },
             "prn": {
                 "title": "Conforme necessário",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Registrar a dose antes de terminar o intervalo mínimo?",
                 "earlyDetail": "A próxima dose só está prevista a partir das {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Registrar mesmo assim"
-            }
+            },
+            "doseTakenNamed": "\"{{name}}\" tomado.",
+            "doseSkippedNamed": "\"{{name}}\" pulado."
         },
         "prevention": {
             "title": "Prevenção e vacinas",
@@ -5198,8 +5197,6 @@
             "saveError": "Não foi possível salvar a sessão.",
             "deleted": "Sessão eliminada.",
             "deleteError": "Não foi possível eliminar a sessão.",
-            "deleteConfirm": "Eliminar esta sessão?",
-            "deleteConfirmDetail": "A sessão desaparece do histórico e de todos os totais semanais e mensais em que contava até agora. Não é possível restaurá-la.",
             "invalid": "Informe valores válidos.",
             "totals": {
                 "count": "Sessões",
@@ -5281,11 +5278,7 @@
             "retry": "Tentar novamente",
             "saved": "Salvo.",
             "saveError": "Não foi possível salvar.",
-            "deleted": "Eliminado.",
             "deleteError": "Não foi possível eliminar.",
-            "deleteConfirm": "Eliminar mesmo esta entrada?",
-            "periodDeleteConfirmDetail": "O período registrado desaparece. Se era recente, as próximas datas calculadas também podem mudar; a duração média só muda se não houver um valor fixo configurado.",
-            "logDeleteConfirmDetail": "O fluxo, os sintomas, o humor e a nota desse dia são apagados com o registro e deixam de constar em qualquer análise. Não é possível restaurar.",
             "invalid": "Insira valores válidos.",
             "fertilityDisclaimer": "A janela fértil e a ovulação são estimadas pelo método do calendário. Não são um contraceptivo nem substituem o aconselhamento médico.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Assinar o ciclo previsto no calendário",
             "widgetHint": "Adicione o bloco do ciclo à {{overview}} em “{{customize}}”.",
-            "endBeforeStart": "O fim não pode ser antes do início."
+            "endBeforeStart": "O fim não pode ser antes do início.",
+            "periodDeleted": "Período excluído.",
+            "logDeleted": "Registro do dia excluído."
         },
         "duration": {
             "hm": "{{hours}} h e {{minutes}} min",
@@ -5764,11 +5759,8 @@
         "statusLost": "Perdido",
         "notesLabel": "Observações",
         "notesPlaceholder": "Ex.: a nota fiscal está na pasta",
-        "deleteConfirm": "Excluir \"{{name}}\"?",
-        "deleteConfirmDetail": "O item será excluído permanentemente do inventário e não poderá ser recuperado.",
         "created": "Item adicionado.",
         "updated": "Item atualizado.",
-        "deleted": "Item excluído.",
         "emptyTitle": "Seu inventário está vazio",
         "emptyDescription": "Cadastre seus pertences - com localização, categoria e valor de compra.",
         "loadErrorTitle": "Não foi possível carregar o inventário",
@@ -6060,8 +6052,6 @@
         "yourPoints": "Seus pontos",
         "approve": "Aprovar",
         "reject": "Recusar",
-        "confirmReject": "Deseja recusar esta solicitação de resgate? Os pontos serão devolvidos.",
-        "confirmCancel": "Deseja cancelar esta solicitação? Os pontos serão devolvidos.",
         "manageParticipants": "Gerenciar participantes",
         "participantsIntro": "Escolha quem pode acumular pontos. Apenas membros ativos aparecem na visão geral.",
         "emptyOverviewTitle": "Ninguém acumulando pontos ainda",
@@ -6165,8 +6155,6 @@
             "ledgerWithdrawal": "Saque",
             "ledgerCredit": "Crédito",
             "ledgerDebit": "Desconto",
-            "confirmReject": "Recusar este pedido? Nada é lançado.",
-            "confirmCancel": "Cancelar este pedido?",
             "openAccount": "Abrir conta",
             "closeAccount": "Fechar conta",
             "confirmCloseAccount": "Fechar a conta de {{name}}?",
@@ -6185,7 +6173,10 @@
         "errorNotParticipating": "Esta pessoa não acumula pontos.",
         "errorMoneyAccountGone": "Esta conta não existe mais.",
         "errorMoneyPlanGone": "Este plano não existe mais.",
-        "ownLedger": "Seus lançamentos"
+        "ownLedger": "Seus lançamentos",
+        "toastApprovedNamed": "\"{{reward}}\" aprovado para {{name}}.",
+        "toastRejectedNamed": "\"{{reward}}\" recusado para {{name}}.",
+        "toastCancelledNamed": "\"{{reward}}\" retirado."
     },
     "schedule": {
         "title": "Turnos",

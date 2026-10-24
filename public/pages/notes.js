@@ -1628,8 +1628,12 @@ async function deleteNote(id) {
   renderNotesAndFilters({ motion: true });
   vibrate([30, 50, 30]);
 
+  // Der Toast nennt die Notiz (Critique R23, D6): "Notiz geloescht" sagte nach
+  // zwei schnellen Loeschungen nicht, welche zurueckkaeme. Ohne Titel bleibt
+  // der allgemeine Satz.
+  const name = String(note?.title ?? '').trim();
   scheduleUndoableDelete({
-    message: t('notes.deletedToast'),
+    message: name ? t('common.deletedNamed', { name }) : t('notes.deletedToast'),
     commit: async ({ keepalive }) => {
       try {
         await api.delete(`/notes/${id}`, { keepalive });

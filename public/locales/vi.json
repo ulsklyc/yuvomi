@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "\"{{name}}\" đã mở lại - chưa đánh dấu được. Hãy thử lại.",
         "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại.",
         "errorNotOwner": "Người khác đã tạo mục này - bạn có thể xem nhưng không thể sửa.",
-        "foreignReadOnlyHint": "Do {{name}} tạo - bạn có thể xem nhưng không thể sửa."
+        "foreignReadOnlyHint": "Do {{name}} tạo - bạn có thể xem nhưng không thể sửa.",
+        "deletedNamed": "Đã xóa \"{{name}}\"."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Do … làm",
         "checkedDoneNamed": "Đã hoàn thành \"{{title}}\".",
         "checkedOpenNamed": "\"{{title}}\" đang mở lại.",
-        "errorReorderNotAllowed": "Bạn có thể xem thứ tự của gia đình nhưng không thể đổi."
+        "errorReorderNotAllowed": "Bạn có thể xem thứ tự của gia đình nhưng không thể đổi.",
+        "doneSubtasksOpen": "Đã hoàn thành \"{{title}}\" - còn {{count}} việc con chưa xong.",
+        "doneSubtasksOpen_one": "Đã hoàn thành \"{{title}}\" - còn một việc con chưa xong.",
+        "checkAllSubtasks": "Đánh dấu tất cả",
+        "subtasksAllDone": "Đã hoàn thành \"{{title}}\" và mọi việc con."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Tuy nhiên các bút toán sẽ mất liên kết và không còn thuộc tài khoản nào. Số dư và loại tài khoản mất hẳn, không khôi phục được.",
         "editAccount": "Sửa tài khoản",
         "newAccount": "Tài khoản mới",
-        "accountDeletedToast": "Đã xóa tài khoản",
         "accountSavedToast": "Đã lưu tài khoản",
         "accountAddedToast": "Đã thêm tài khoản",
         "accountLabel": "Tài khoản",
@@ -4023,7 +4027,6 @@
         "supplyName": "Tên sản phẩm",
         "supplyPlaceholder": "Cái gì bị thiếu?",
         "checkedInToast": "Đã ghi nhận điểm danh.",
-        "checkedOutToast": "Đã ghi nhận trang xuất.",
         "supplyAddedToast": "Đã thêm vào danh sách mua sắm.",
         "overdue": "Quá hạn",
         "dueToday": "Đến hạn hôm nay",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Nhiệm vụ này không còn nữa.",
         "errorAlreadyCheckedOut": "Người dọn dẹp này đã trả ca.",
         "errorAlreadyCheckedIn": "Người dọn dẹp này đã vào ca.",
-        "allVisitsInReport": "Tất cả lượt đến trong báo cáo"
+        "allVisitsInReport": "Tất cả lượt đến trong báo cáo",
+        "checkedOutNamed": "{{name}} đã trang xuất.",
+        "visitToday": "Có mặt hôm nay: {{from}} - {{to}}",
+        "checkInAgain": "Điểm danh lại"
     },
     "userMultiSelect": {
         "moreUsers": "thêm",
@@ -4202,8 +4208,6 @@
         "subtitle": "Chia sẻ hóa đơn gia đình, các chuyến đi, mua sắm và chi phí gia đình.",
         "addExpense": "Thêm chi phí",
         "editExpense": "Sửa chi phí",
-        "deleteExpenseConfirm": "Xóa chi phí này?",
-        "deleteExpenseConfirmDetail": "Mọi số dư của nhóm được tính lại mà không có khoản chi này, ai từ người nợ thành người cho nợ sẽ thấy ngay. Hoá đơn đính kèm vẫn được giữ.",
         "addGroup": "Nhóm mới",
         "groups": "Các nhóm",
         "searchGroups": "Tìm kiếm nhóm",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Nhập ngày thanh toán hợp lệ.",
         "savedToast": "Đã lưu đăng ký.",
         "addedToast": "Đã thêm đăng ký.",
-        "renewedToast": "Đã cập nhật ngày gia hạn.",
-        "deleteConfirm": "Xóa đăng ký \"{{name}}\"?",
-        "deleteConfirmDetail": "Cùng với gói đăng ký, các nhắc việc và bút toán ngân sách của lần thanh toán kế tiếp cũng bị xoá. Những khoản đã thanh toán vẫn nằm trong bảng tháng.",
-        "renewConfirm": "Ghi nhận khoản thanh toán cho \"{{name}}\"?",
-        "renewConfirmDetail": "Ngày đến hạn sẽ dời về sau và khoản thanh toán ngày {{date}} được ghi là chi phí trong ngân sách.",
-        "deletedToast": "Đã xóa đăng ký.",
         "monthlyBudgetLabel": "Ngân sách đăng ký hằng tháng",
         "baseCurrencyLabel": "Tiền tệ cơ sở",
         "fixerHint": "Chuyển đổi trực tiếp dùng Fixer khi FIXER_API_KEY được cấu hình trên máy chủ.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Còn {{count}} lần thanh toán",
         "completed": "Đã hoàn tất",
         "completedOn": "Hoàn tất vào {{date}}",
-        "completedToast": "Đã hoàn tất gói đăng ký.",
         "endsAfter": "Còn {{count}} lần thanh toán",
         "logoTypeError": "Sử dụng ảnh PNG, JPEG, WebP hoặc SVG.",
         "accountUsernameLabel": "Đăng ký dưới tên",
         "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu.",
         "detailAmountLabel": "Số tiền",
-        "detailNextPaymentLabel": "Khoản thanh toán tiếp theo"
+        "detailNextPaymentLabel": "Khoản thanh toán tiếp theo",
+        "renewedNamed": "Đã thanh toán \"{{name}}\" - lần thanh toán tiếp theo vào {{date}}.",
+        "completedNamed": "Đã thanh toán và kết thúc \"{{name}}\"."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Mục này không đến từ lịch và có thể xóa.",
                 "saved": "Đã lưu mục",
                 "saveError": "Không thể lưu mục.",
-                "deleteConfirm": "Xóa mục này?",
-                "deleted": "Đã xóa mục",
-                "deleteConfirmDetail": "Mục này cũng biến mất khỏi bản xuất. Không thể hoàn tác."
+                "deleted": "Đã xóa mục"
             },
             "prn": {
                 "title": "Khi cần",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Ghi nhận liều trước khi hết khoảng cách tối thiểu?",
                 "earlyDetail": "Liều tiếp theo chỉ được tính từ {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Vẫn ghi nhận"
-            }
+            },
+            "doseTakenNamed": "Đã uống \"{{name}}\".",
+            "doseSkippedNamed": "Đã bỏ qua \"{{name}}\"."
         },
         "prevention": {
             "title": "Phòng ngừa & tiêm chủng",
@@ -5198,8 +5197,6 @@
             "saveError": "Không thể lưu buổi tập.",
             "deleted": "Đã xóa buổi tập.",
             "deleteError": "Không thể xóa buổi tập.",
-            "deleteConfirm": "Thực sự xóa buổi tập này?",
-            "deleteConfirmDetail": "Buổi tập biến mất khỏi lịch sử và khỏi mọi tổng tuần, tổng tháng mà nó từng được tính vào. Không thể khôi phục.",
             "invalid": "Vui lòng nhập giá trị hợp lệ.",
             "totals": {
                 "count": "Buổi tập",
@@ -5281,11 +5278,7 @@
             "retry": "Thử lại",
             "saved": "Đã lưu.",
             "saveError": "Không thể lưu.",
-            "deleted": "Đã xoá.",
             "deleteError": "Không thể xoá.",
-            "deleteConfirm": "Thực sự xoá mục này?",
-            "periodDeleteConfirmDetail": "Khoảng đã ghi sẽ mất. Nếu đó là kỳ gần nhất, các mốc tiếp theo được tính cũng dịch chuyển; độ dài chu kỳ trung bình chỉ đổi khi chưa đặt giá trị cố định.",
-            "logDeleteConfirmDetail": "Lượng máu, triệu chứng, tâm trạng và ghi chú của ngày đó bị xoá cùng bản ghi và sẽ không còn trong bất kỳ phân tích nào. Không thể khôi phục.",
             "invalid": "Vui lòng nhập giá trị hợp lệ.",
             "fertilityDisclaimer": "Cửa sổ dễ thụ thai và rụng trứng được ước tính bằng phương pháp lịch. Đây không phải biện pháp tránh thai và không thay thế tư vấn y tế.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Đăng ký chu kỳ dự đoán trong lịch",
             "widgetHint": "Thêm ô chu kỳ vào {{overview}} trong “{{customize}}”.",
-            "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu."
+            "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu.",
+            "periodDeleted": "Đã xóa kỳ kinh.",
+            "logDeleted": "Đã xóa ghi chép trong ngày."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Điểm của bạn",
         "approve": "Duyệt",
         "reject": "Từ chối",
-        "confirmReject": "Từ chối yêu cầu đổi này? Điểm sẽ được hoàn lại.",
-        "confirmCancel": "Rút yêu cầu này? Điểm sẽ được hoàn lại.",
         "manageParticipants": "Quản lý người tham gia",
         "participantsIntro": "Chọn ai có thể tích điểm. Chỉ thành viên được bật mới xuất hiện trong tổng quan.",
         "emptyOverviewTitle": "Chưa có ai tích điểm",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Rút tiền",
             "ledgerCredit": "Khoản cộng",
             "ledgerDebit": "Khoản trừ",
-            "confirmReject": "Từ chối yêu cầu này? Không có gì được ghi sổ.",
-            "confirmCancel": "Thu hồi yêu cầu này?",
             "openAccount": "Mở tài khoản",
             "closeAccount": "Đóng tài khoản",
             "confirmCloseAccount": "Đóng tài khoản của {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Người này không tích điểm.",
         "errorMoneyAccountGone": "Tài khoản này không còn nữa.",
         "errorMoneyPlanGone": "Kế hoạch này không còn nữa.",
-        "ownLedger": "Giao dịch của bạn"
+        "ownLedger": "Giao dịch của bạn",
+        "toastApprovedNamed": "Đã duyệt \"{{reward}}\" cho {{name}}.",
+        "toastRejectedNamed": "Đã từ chối \"{{reward}}\" cho {{name}}.",
+        "toastCancelledNamed": "Đã rút lại \"{{reward}}\"."
     },
     "datepicker": {
         "openCalendar": "Mở lịch",
@@ -6206,11 +6200,8 @@
         "statusLost": "Đã mất",
         "notesLabel": "Ghi chú",
         "notesPlaceholder": "vd. hóa đơn nằm trong hồ sơ",
-        "deleteConfirm": "Xóa \"{{name}}\"?",
-        "deleteConfirmDetail": "Món đồ sẽ bị xóa vĩnh viễn khỏi tài sản ngay lập tức, không có thùng rác để khôi phục.",
         "created": "Đã thêm món đồ.",
         "updated": "Đã cập nhật món đồ.",
-        "deleted": "Đã xóa món đồ.",
         "emptyTitle": "Tài sản của bạn vẫn trống",
         "emptyDescription": "Ghi lại những gì bạn sở hữu - kèm vị trí, danh mục và giá mua.",
         "loadErrorTitle": "Không thể tải tài sản",

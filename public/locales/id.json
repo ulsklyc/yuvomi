@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "\"{{name}}\" terbuka lagi - centang tidak tersimpan. Coba lagi.",
         "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi.",
         "errorNotOwner": "Ini dibuat orang lain - kamu bisa melihatnya, tetapi tidak bisa mengubahnya.",
-        "foreignReadOnlyHint": "Dibuat oleh {{name}} - kamu bisa melihatnya, tetapi tidak bisa mengubahnya."
+        "foreignReadOnlyHint": "Dibuat oleh {{name}} - kamu bisa melihatnya, tetapi tidak bisa mengubahnya.",
+        "deletedNamed": "\"{{name}}\" dihapus."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -670,7 +671,11 @@
         "doneByMenuItem": "Dikerjakan oleh …",
         "checkedDoneNamed": "\"{{title}}\" selesai.",
         "checkedOpenNamed": "\"{{title}}\" terbuka lagi.",
-        "errorReorderNotAllowed": "Kamu bisa melihat urutan keluarga, tetapi tidak bisa mengubahnya."
+        "errorReorderNotAllowed": "Kamu bisa melihat urutan keluarga, tetapi tidak bisa mengubahnya.",
+        "doneSubtasksOpen": "\"{{title}}\" selesai - masih ada {{count}} subtugas terbuka.",
+        "doneSubtasksOpen_one": "\"{{title}}\" selesai - masih ada satu subtugas terbuka.",
+        "checkAllSubtasks": "Centang semua",
+        "subtasksAllDone": "\"{{title}}\" dan semua subtugas selesai."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",
@@ -1777,7 +1782,6 @@
         "deleteAccountConfirmDetail": "Namun catatan itu kehilangan kaitan akunnya dan tidak lagi menjadi milik akun mana pun. Saldo dan jenis akun hilang dan tidak bisa dipulihkan.",
         "editAccount": "Edit akun",
         "newAccount": "Akun baru",
-        "accountDeletedToast": "Akun dihapus",
         "accountSavedToast": "Akun disimpan",
         "accountAddedToast": "Akun ditambahkan",
         "accountLabel": "Akun",
@@ -4027,7 +4031,6 @@
         "supplyName": "Nama produk",
         "supplyPlaceholder": "Apa yang kurang?",
         "checkedInToast": "Check-in disimpan.",
-        "checkedOutToast": "Check-out disimpan.",
         "supplyAddedToast": "Ditambahkan ke daftar belanja.",
         "overdue": "Terlambat",
         "dueToday": "Jatuh tempo hari ini",
@@ -4195,15 +4198,16 @@
         "errorTaskGone": "Tugas ini sudah tidak ada.",
         "errorAlreadyCheckedOut": "Asisten rumah tangga ini sudah check-out.",
         "errorAlreadyCheckedIn": "Asisten rumah tangga ini sudah check-in.",
-        "allVisitsInReport": "Semua kunjungan di laporan"
+        "allVisitsInReport": "Semua kunjungan di laporan",
+        "checkedOutNamed": "{{name}} sudah check-out.",
+        "visitToday": "Hadir hari ini: {{from}} - {{to}}",
+        "checkInAgain": "Check-in lagi"
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",
         "subtitle": "Bagi tagihan rumah tangga, perjalanan, belanja, dan biaya keluarga.",
         "addExpense": "Tambah pengeluaran",
         "editExpense": "Edit pengeluaran",
-        "deleteExpenseConfirm": "Hapus pengeluaran ini?",
-        "deleteExpenseConfirmDetail": "Semua saldo grup dihitung ulang tanpa pengeluaran ini, dan siapa pun yang berubah dari penghutang menjadi pemberi pinjaman langsung melihatnya. Bukti terlampir tetap tersimpan.",
         "addGroup": "Grup baru",
         "groups": "Grup",
         "searchGroups": "Cari grup",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Masukkan tanggal pembayaran yang valid.",
         "savedToast": "Langganan disimpan.",
         "addedToast": "Langganan ditambahkan.",
-        "renewedToast": "Tanggal perpanjangan diperbarui.",
-        "deleteConfirm": "Hapus langganan \"{{name}}\"?",
-        "deleteConfirmDetail": "Bersama langganan, pengingatnya dan catatan anggaran untuk pembayaran berikutnya ikut dihapus. Pembayaran yang sudah selesai tetap ada di ikhtisar bulanan.",
-        "renewConfirm": "Catat pembayaran untuk \"{{name}}\"?",
-        "renewConfirmDetail": "Tanggal jatuh tempo bergeser maju dan pembayaran tanggal {{date}} dicatat sebagai pengeluaran di anggaran.",
-        "deletedToast": "Langganan dihapus.",
         "monthlyBudgetLabel": "Anggaran langganan bulanan",
         "baseCurrencyLabel": "Mata uang dasar",
         "fixerHint": "Konversi langsung menggunakan Fixer jika FIXER_API_KEY dikonfigurasi di server.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Tersisa {{count}} pembayaran",
         "completed": "Selesai",
         "completedOn": "Selesai pada {{date}}",
-        "completedToast": "Langganan selesai.",
         "endsAfter": "Tersisa {{count}} pembayaran",
         "logoTypeError": "Gunakan gambar PNG, JPEG, WebP, atau SVG.",
         "accountUsernameLabel": "Terdaftar atas nama",
         "accountUsernameHint": "Alamat email atau nama pengguna. Bukan kolom kata sandi - Yuvomi tidak menyimpan kata sandi.",
         "detailAmountLabel": "Jumlah",
-        "detailNextPaymentLabel": "Pembayaran berikutnya"
+        "detailNextPaymentLabel": "Pembayaran berikutnya",
+        "renewedNamed": "\"{{name}}\" dibayar - pembayaran berikutnya {{date}}.",
+        "completedNamed": "\"{{name}}\" dibayar dan selesai."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Entri ini bukan berasal dari jadwal dan dapat dihapus.",
                 "saved": "Entri disimpan",
                 "saveError": "Entri tidak dapat disimpan.",
-                "deleteConfirm": "Hapus entri ini?",
-                "deleted": "Entri dihapus",
-                "deleteConfirmDetail": "Entri juga hilang dari ekspor. Tindakan ini tidak dapat dibatalkan."
+                "deleted": "Entri dihapus"
             },
             "prn": {
                 "title": "Sesuai kebutuhan",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Catat dosis sebelum jeda minimum terlewati?",
                 "earlyDetail": "Dosis berikutnya baru dijadwalkan mulai {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Tetap catat"
-            }
+            },
+            "doseTakenNamed": "\"{{name}}\" diminum.",
+            "doseSkippedNamed": "\"{{name}}\" dilewati."
         },
         "prevention": {
             "title": "Pencegahan & vaksinasi",
@@ -5198,8 +5197,6 @@
             "saveError": "Sesi tidak dapat disimpan.",
             "deleted": "Sesi dihapus.",
             "deleteError": "Sesi tidak dapat dihapus.",
-            "deleteConfirm": "Benar-benar hapus sesi ini?",
-            "deleteConfirmDetail": "Sesi ini hilang dari riwayat dan dari semua total mingguan serta bulanan yang selama ini menghitungnya. Tidak bisa dipulihkan.",
             "invalid": "Harap masukkan nilai yang valid.",
             "totals": {
                 "count": "Sesi",
@@ -5281,11 +5278,7 @@
             "retry": "Coba lagi",
             "saved": "Tersimpan.",
             "saveError": "Gagal menyimpan.",
-            "deleted": "Terhapus.",
             "deleteError": "Gagal menghapus.",
-            "deleteConfirm": "Yakin ingin menghapus entri ini?",
-            "periodDeleteConfirmDetail": "Rentang yang tercatat hilang. Kalau itu periode terbaru, tanggal berikutnya yang dihitung ikut bergeser; panjang siklus rata-rata hanya berubah bila tidak ada nilai tetap yang diatur.",
-            "logDeleteConfirmDetail": "Deras aliran, gejala, suasana hati, dan catatan hari itu ikut terhapus dan tidak akan muncul lagi di analisis mana pun. Tidak bisa dipulihkan.",
             "invalid": "Harap masukkan nilai yang valid.",
             "fertilityDisclaimer": "Masa subur dan ovulasi diperkirakan dengan metode kalender. Ini bukan alat kontrasepsi dan bukan pengganti nasihat medis.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Berlangganan siklus yang diperkirakan di kalender",
             "widgetHint": "Tambahkan petak siklus ke {{overview}} lewat “{{customize}}”.",
-            "endBeforeStart": "Akhir tidak boleh sebelum awal."
+            "endBeforeStart": "Akhir tidak boleh sebelum awal.",
+            "periodDeleted": "Haid dihapus.",
+            "logDeleted": "Catatan harian dihapus."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Poinmu",
         "approve": "Setujui",
         "reject": "Tolak",
-        "confirmReject": "Tolak permintaan penukaran ini? Poin akan dikembalikan.",
-        "confirmCancel": "Tarik permintaan ini? Poin akan dikembalikan.",
         "manageParticipants": "Kelola peserta",
         "participantsIntro": "Pilih siapa yang bisa mengumpulkan poin. Hanya anggota yang diaktifkan yang muncul di ringkasan.",
         "emptyOverviewTitle": "Belum ada yang mengumpulkan poin",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Penarikan",
             "ledgerCredit": "Kredit",
             "ledgerDebit": "Pengurangan",
-            "confirmReject": "Tolak permintaan ini? Tidak ada yang dicatat.",
-            "confirmCancel": "Batalkan permintaan ini?",
             "openAccount": "Buka rekening",
             "closeAccount": "Tutup rekening",
             "confirmCloseAccount": "Tutup rekening {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Orang ini tidak mengumpulkan poin.",
         "errorMoneyAccountGone": "Rekening ini sudah tidak ada.",
         "errorMoneyPlanGone": "Rencana ini sudah tidak ada.",
-        "ownLedger": "Catatanmu"
+        "ownLedger": "Catatanmu",
+        "toastApprovedNamed": "\"{{reward}}\" disetujui untuk {{name}}.",
+        "toastRejectedNamed": "\"{{reward}}\" ditolak untuk {{name}}.",
+        "toastCancelledNamed": "\"{{reward}}\" ditarik."
     },
     "datepicker": {
         "openCalendar": "Buka kalender",
@@ -6206,11 +6200,8 @@
         "statusLost": "Hilang",
         "notesLabel": "Catatan",
         "notesPlaceholder": "mis. struk ada di map",
-        "deleteConfirm": "Hapus \"{{name}}\"?",
-        "deleteConfirmDetail": "Barang langsung dihapus permanen dari inventaris, tidak ada tempat sampah untuk memulihkannya.",
         "created": "Barang ditambahkan.",
         "updated": "Barang diperbarui.",
-        "deleted": "Barang dihapus.",
         "emptyTitle": "Inventaris Anda masih kosong",
         "emptyDescription": "Catat apa yang Anda miliki - dengan lokasi, kategori, dan harga pembelian.",
         "loadErrorTitle": "Inventaris tidak dapat dimuat",

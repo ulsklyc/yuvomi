@@ -17,7 +17,7 @@ import { openModal, closeModal, captureModalContext, confirmModal, confirmOverMo
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { wireScrollFade, vibrate, acknowledgeCheck, scheduleUndoableDelete } from '/utils/ux.js';
+import { wireScrollFade, vibrate, acknowledgeCheck, scheduleUndoableDelete, offerUndo } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
@@ -552,8 +552,21 @@ async function toggleSession(container, workerId) {
   if (!worker) return;
   try {
     if (current) {
-      await api.post('/housekeeping/work-sessions/check-out', { worker_id: worker.id });
-      window.yuvomi?.showToast(t('housekeeping.checkedOutToast'), 'success');
+      const out = await api.post('/housekeeping/work-sessions/check-out', { worker_id: worker.id });
+      // "<Person> ausgecheckt." mit Rueckweg (Critique R23, D6): ein Fehlgriff
+      // auf "Auschecken" war endgueltig, und der Primaerknopf danach hiess
+      // "Einchecken" - der naechste Tipp legte einen zweiten Einsatz an.
+      // Rueckgaengig oeffnet dieselbe Sitzung am Server wieder.
+      const sessionId = out?.data?.id ?? current.id;
+      offerUndo({
+        message: t('housekeeping.checkedOutNamed', { name: worker.display_name }),
+        undo: async () => {
+          await api.post(`/housekeeping/work-sessions/${sessionId}/reopen`, {});
+          await reloadAfterSave(() => loadData());
+          renderCurrentTab(container);
+        },
+        onError: (err) => { reportWriteError(err); },
+      });
     } else {
       await api.post('/housekeeping/work-sessions/check-in', {
         worker_id: worker.id,
@@ -633,6 +646,16 @@ function renderWorkerSummary() {
     // Zeile am Knopf, verliert sie nach dem Auschecken den Besuch von heute
     // und faellt auf den Tarif zurueck.
     const session = worker.current_session ?? worker.today_session;
+    // DER FOLGEZUSTAND (R23, D6): nach dem Auschecken sagte die Zeile dasselbe
+    // wie davor ("Einsatz erfasst um 08:00"), und "Einchecken" stand als
+    // Primaerknopf da. Jetzt steht der Einsatz als Spanne da, und ein zweites
+    // Einchecken am selben Tag ist moeglich (#1138), aber nicht mehr die
+    // naheliegende Handlung.
+    const doneToday = !checkedIn && Boolean(worker.today_session?.check_out);
+    const sessionLine = !session ? null
+      : checkedIn ? `${t('housekeeping.checkedInAt')} ${formatTime(session.check_in)}`
+        : doneToday ? t('housekeeping.visitToday', { from: formatTime(session.check_in), to: formatTime(session.check_out) })
+          : `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}`;
     return `
     <section class="housekeeping-worker-strip">
       <div class="housekeeping-avatar" style="background:${esc(worker.avatar_color) || 'var(--module-housekeeping)'}">
@@ -640,13 +663,13 @@ function renderWorkerSummary() {
       </div>
       <div class="housekeeping-worker-strip__identity">
         <strong>${esc(worker.display_name)}</strong>
-        <span>${esc(session ? `${t('housekeeping.visitRecordedAt')} ${formatTime(session.check_in)}` : amountsHidden(worker.daily_rate) ? t('housekeeping.notHereToday') : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`))}</span>
+        <span>${esc(sessionLine ?? (amountsHidden(worker.daily_rate) ? t('housekeeping.notHereToday') : (worker.rate_type === 'hourly' ? `${money(worker.hourly_rate)}/${t('housekeeping.rateHourly')}` : `${money(worker.daily_rate)} · ${scheduleLabel(worker.payment_schedule)}`)))}</span>
       </div>
       ${readOnly() ? presenceSignHtml(checkedIn) : `
-      <button class="btn ${checkedIn ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
+      <button class="btn ${checkedIn || doneToday ? 'btn--secondary' : 'btn--primary'} housekeeping-check-small" type="button"
               data-worker-check="${worker.id}">
         <i data-lucide="${checkedIn ? 'log-out' : 'log-in'}" aria-hidden="true"></i>
-        <span>${esc(checkedIn ? t('housekeeping.checkOut') : t('housekeeping.checkIn'))}</span>
+        <span>${esc(checkedIn ? t('housekeeping.checkOut') : t(doneToday ? 'housekeeping.checkInAgain' : 'housekeeping.checkIn'))}</span>
       </button>`}
     </section>
   `;

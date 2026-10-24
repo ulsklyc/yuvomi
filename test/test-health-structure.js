@@ -84,6 +84,8 @@ const EXPECTED = [
   // und die falsche Uhrzeit stand auch im Export.
   'PATCH /logs/:id',
   'DELETE /logs/:id',
+  // Der Rueckweg des Toasts (R23, D6): Eintrag UND Bestand zurueck.
+  'POST /logs/:id/undo',
   'POST /logs/:id/take',
   'POST /logs/:id/skip',
   // labs + results

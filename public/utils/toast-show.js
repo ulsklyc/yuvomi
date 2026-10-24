@@ -114,7 +114,14 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   // `role="alert"` machte jeden Toast bestimmt, auch in der hoeflichen Region,
   // und liess ihn je nach Screenreader doppelt ansagen.
 
-  const iconEl = TOAST_ICONS[type]?.();
+  // EIN DIALEKT FUER DIE RUECKMELDUNG MIT RUECKWEG (Critique R23, D6/N1): ein
+  // Toast mit Aktion traegt kein Haekchen. Bis R23 sagte dieselbe Quittung mal
+  // mit, mal ohne Haken "erledigt" - je nachdem, ob die Seite 'success' oder
+  // 'default' schrieb. Der Satz ("<Objekt> <Verb>") und sein "Rueckgaengig"
+  // tragen die Rueckmeldung; das Haekchen bleibt der Bestaetigung OHNE Rueckweg
+  // ("Gespeichert"). Fehler und Warnung behalten ihr Zeichen: sie sollen
+  // unterbrechen, auch wenn sie eine Aktion anbieten.
+  const iconEl = (action && type === 'success') ? null : TOAST_ICONS[type]?.();
   if (iconEl) toast.appendChild(iconEl);
   const span = document.createElement('span');
   span.textContent = message;

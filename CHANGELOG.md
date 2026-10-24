@@ -47,6 +47,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Status actions say what they did and can be undone, instead of asking first.** Approving or
+  rejecting a reward, checking a housekeeper out, taking or skipping a dose and marking a
+  subscription paid no longer ask for confirmation. The toast names the object ("“Ibuprofen”
+  taken.", "Maria checked out.", "“Netflix” paid - next payment on 20 Nov 2026.") and offers
+  Undo, which takes the action back on the server: the request is open again with the balance as
+  before, the visit is open again, the dose and the stock it took are restored, due date, count and
+  bookings of the subscription are as before. Undo works for a few minutes and for whoever did it.
+  Deleting a subscription, an inventory item, an empty account, a shared expense, a dose entry,
+  an activity, a period or a day entry no longer asks either: the item goes at once and is only
+  removed for good when the toast ends. A confirmation remains where more goes with it - a
+  medication with its log, a lab report with its values, an account with bookings. Completing a
+  task now names it even when it leaves the list, and a task with open subtasks says how many are
+  left and offers "Check off all". After checking out, the housekeeping row shows the visit as a
+  time span and offers "Check in again" as a secondary button, so a second tap no longer starts a
+  second visit by accident. In the API, the answers of dose bookings carry `stock_deducted`, and
+  the undo routes are documented in the OpenAPI description.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

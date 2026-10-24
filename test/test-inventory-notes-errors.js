@@ -435,15 +435,30 @@ test('Inventar: der verschwundene Gegenstand faellt aus dem Stand, ohne die List
   });
 });
 
-test('Inventar: loeschen - "schon geloescht" ist ein Erfolg; alles andere sagt den Satz der App', async () => {
+test('Inventar: loeschen - Rueckgaengig statt Rueckfrage; "schon geloescht" ist ein Erfolg, alles andere sagt den Satz der App (R23 D6)', async () => {
   for (const [err, expected] of [
-    [fehler(404, 'inventory_item_not_found'), [['inventory.deleted', 'success']]],
+    [fehler(404, 'inventory_item_not_found'), []],
     [fehler(404), [['common.errorGeneric', 'danger']]],
     [fehler(500), [['common.errorGeneric', 'danger']]],
   ]) {
-    await mitInventar(() => mit({ delete: async () => { throw err; } }, () => inventory.removeItem(gegenstand())));
-    assert.deepEqual(toasts, expected, `${err.status} ${err.data.reason ?? ''}`);
-    assertNoServerText();
+    let undo = null;
+    globalThis.__undoStub = (opts) => { undo = opts; };
+    try {
+      const { calls } = await mitInventar(async () => {
+        const first = await mit({ delete: async () => { throw err; } }, () => inventory.removeItem(gegenstand()));
+        assert.equal(undo?.message, 'common.deletedNamed{"name":"Espressomaschine"}', 'der Satz nennt den Gegenstand');
+        assert.deepEqual(first.calls.filter(([verb]) => verb === 'DELETE'), [], 'geloescht wird erst mit dem Ende der Frist');
+        assert.ok(!inventory.state.items.some((i) => i.id === gegenstand().id), 'die Liste ohne den Gegenstand');
+        return mit({ delete: async () => { throw err; } }, async () => {
+          try { await undo.commit({ keepalive: false }); } catch (e) { await undo.restore(e); }
+        });
+      });
+      assert.equal(calls.filter(([verb]) => verb === 'DELETE').length, 1);
+      assert.deepEqual(toasts, expected, `${err.status} ${err.data.reason ?? ''}`);
+      assertNoServerText();
+    } finally {
+      delete globalThis.__undoStub;
+    }
   }
 });
 

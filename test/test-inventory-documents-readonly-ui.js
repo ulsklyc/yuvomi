@@ -319,7 +319,16 @@ async function inventarSchreibwege() {
     await inventory.openCategoryManager();
     // Nicht abgewartet: mit Schreibrecht wartet die Karte auf ihr Schliessen.
     inventory.openCompletionSheet(item, item.tracked_dates[0]);
-    await inventory.removeItem(item);
+    // Loeschen geht seit R23 (D6) mit Rueckgaengig: es sendet erst mit dem Ende
+    // der Toast-Frist - hier sofort, damit der Gegenfall den Weg misst.
+    let fenster = null;
+    globalThis.__undoStub = (opts) => { fenster = opts; };
+    try {
+      await inventory.removeItem(item);
+      await fenster?.commit({ keepalive: false });
+    } finally {
+      delete globalThis.__undoStub;
+    }
   });
   return modale;
 }
@@ -328,7 +337,7 @@ test('Inventar bei `read`: kein Schreibweg oeffnet ein Formular oder sendet etwa
   let modale;
   const gesendet = await withAccess(LESEN, () => aufrufe(async () => { modale = await inventarSchreibwege(); }));
   assert.deepEqual(modale, [], 'Anlegen, Bearbeiten, beide Verwaltungen und die Abschluss-Karte bleiben zu');
-  assert.deepEqual(schreibend(gesendet), [], 'und Loeschen sendet nichts (die Rueckfrage ist im Test bejaht)');
+  assert.deepEqual(schreibend(gesendet), [], 'und Loeschen sendet nichts, auch nicht mit dem Ende der Frist');
 
   let volleModale;
   const voll = await withAccess(SCHREIBEN, () => aufrufe(async () => { volleModale = await inventarSchreibwege(); }));

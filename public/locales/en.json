@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "“{{name}}” is open again - ticking it off didn't go through. Try again.",
         "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again.",
         "errorNotOwner": "Someone else created this - you can view it but not change it.",
-        "foreignReadOnlyHint": "Created by {{name}} - you can view it but not change it."
+        "foreignReadOnlyHint": "Created by {{name}} - you can view it but not change it.",
+        "deletedNamed": "“{{name}}” deleted."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Done by …",
         "checkedDoneNamed": "“{{title}}” done.",
         "checkedOpenNamed": "“{{title}}” open again.",
-        "errorReorderNotAllowed": "You can view the family order but not change it."
+        "errorReorderNotAllowed": "You can view the family order but not change it.",
+        "doneSubtasksOpen": "“{{title}}” done - {{count}} subtasks still open.",
+        "doneSubtasksOpen_one": "“{{title}}” done - one subtask still open.",
+        "checkAllSubtasks": "Check off all",
+        "subtasksAllDone": "“{{title}}” and all subtasks done."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Those entries do lose their account assignment, though, and will no longer belong to any account. The balance and account type are gone for good.",
         "editAccount": "Edit account",
         "newAccount": "New account",
-        "accountDeletedToast": "Account deleted",
         "accountSavedToast": "Account saved",
         "accountAddedToast": "Account added",
         "accountLabel": "Account",
@@ -4023,7 +4027,6 @@
         "supplyName": "Product name",
         "supplyPlaceholder": "What is missing?",
         "checkedInToast": "Check-in recorded.",
-        "checkedOutToast": "Check-out recorded.",
         "supplyAddedToast": "Added to the shopping list.",
         "overdue": "Overdue",
         "dueToday": "Due today",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "This task no longer exists.",
         "errorAlreadyCheckedOut": "This housekeeper is already checked out.",
         "errorAlreadyCheckedIn": "This housekeeper is already checked in.",
-        "allVisitsInReport": "All visits in the report"
+        "allVisitsInReport": "All visits in the report",
+        "checkedOutNamed": "{{name}} checked out.",
+        "visitToday": "Here today: {{from}} - {{to}}",
+        "checkInAgain": "Check in again"
     },
     "userMultiSelect": {
         "moreUsers": "more",
@@ -4202,8 +4208,6 @@
         "subtitle": "Split household bills, trips, shopping, and family costs.",
         "addExpense": "Add expense",
         "editExpense": "Edit expense",
-        "deleteExpenseConfirm": "Delete this expense?",
-        "deleteExpenseConfirmDetail": "Every balance in the group is recalculated without this expense, and anyone who flips from debtor to creditor sees it right away. Attached receipts are kept.",
         "addGroup": "New group",
         "groups": "Groups",
         "searchGroups": "Search groups",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Enter a valid payment date.",
         "savedToast": "Subscription saved.",
         "addedToast": "Subscription added.",
-        "renewedToast": "Renewal date updated.",
-        "deleteConfirm": "Delete subscription \"{{name}}\"?",
-        "deleteConfirmDetail": "Its reminders and the budget entry for the next payment are deleted along with the subscription. Payments already completed stay in the monthly overview.",
-        "renewConfirm": "Book the payment for \"{{name}}\"?",
-        "renewConfirmDetail": "The due date moves forward, and the payment from {{date}} is recorded as an expense in the budget.",
-        "deletedToast": "Subscription deleted.",
         "monthlyBudgetLabel": "Monthly subscription budget",
         "baseCurrencyLabel": "Base currency",
         "fixerHint": "Live conversion uses Fixer when FIXER_API_KEY is configured on the server.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} payment left",
         "completed": "Completed",
         "completedOn": "Completed on {{date}}",
-        "completedToast": "Subscription completed.",
         "endsAfter": "{{count}} payments left",
         "logoTypeError": "Use a PNG, JPEG, WebP or SVG image.",
         "accountUsernameLabel": "Registered under",
         "accountUsernameHint": "E-mail address or username. Not a password field - Yuvomi does not store passwords.",
         "detailAmountLabel": "Amount",
-        "detailNextPaymentLabel": "Next payment"
+        "detailNextPaymentLabel": "Next payment",
+        "renewedNamed": "“{{name}}” paid - next payment on {{date}}.",
+        "completedNamed": "“{{name}}” paid and completed."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "This entry does not come from a schedule and can be deleted.",
                 "saved": "Entry saved",
                 "saveError": "Could not save the entry.",
-                "deleteConfirm": "Delete this entry?",
-                "deleted": "Entry deleted",
-                "deleteConfirmDetail": "The entry also disappears from the export. This cannot be undone."
+                "deleted": "Entry deleted"
             },
             "prn": {
                 "title": "As needed",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Log this dose before the minimum interval has passed?",
                 "earlyDetail": "The next dose is not due until {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Log anyway"
-            }
+            },
+            "doseTakenNamed": "“{{name}}” taken.",
+            "doseSkippedNamed": "“{{name}}” skipped."
         },
         "prevention": {
             "title": "Preventive care & vaccinations",
@@ -5198,8 +5197,6 @@
             "saveError": "Activity could not be saved.",
             "deleted": "Activity deleted.",
             "deleteError": "Activity could not be deleted.",
-            "deleteConfirm": "Really delete this activity?",
-            "deleteConfirmDetail": "The session disappears from your history and from every weekly and monthly total it has counted towards so far. It cannot be restored.",
             "invalid": "Please enter valid values.",
             "totals": {
                 "count": "Activities",
@@ -5281,11 +5278,7 @@
             "retry": "Try again",
             "saved": "Saved.",
             "saveError": "Could not be saved.",
-            "deleted": "Deleted.",
             "deleteError": "Could not be deleted.",
-            "deleteConfirm": "Really delete this entry?",
-            "periodDeleteConfirmDetail": "The recorded span is gone afterwards. If it was the most recent period, the calculated upcoming dates shift as well; the average cycle length only changes when no fixed value is configured.",
-            "logDeleteConfirmDetail": "Flow, symptoms, mood and the note for this day are deleted with it and will no longer appear in any analysis. This cannot be restored.",
             "invalid": "Please enter valid values.",
             "fertilityDisclaimer": "Fertile window and ovulation are estimated with the calendar method. They are not a form of contraception and no substitute for medical advice.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Subscribe to the predicted cycle in your calendar",
             "widgetHint": "Add the cycle tile to the {{overview}} under “{{customize}}”.",
-            "endBeforeStart": "The end can't be before the start."
+            "endBeforeStart": "The end can't be before the start.",
+            "periodDeleted": "Period deleted.",
+            "logDeleted": "Day entry deleted."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Your points",
         "approve": "Approve",
         "reject": "Reject",
-        "confirmReject": "Reject this redemption request? The points will be refunded.",
-        "confirmCancel": "Withdraw this request? The points will be refunded.",
         "manageParticipants": "Manage participants",
         "participantsIntro": "Choose who can collect points. Only enabled members appear in the overview.",
         "emptyOverviewTitle": "No one is collecting points yet",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Withdrawal",
             "ledgerCredit": "Credit",
             "ledgerDebit": "Deduction",
-            "confirmReject": "Reject this request? Nothing is booked.",
-            "confirmCancel": "Cancel this request?",
             "openAccount": "Open account",
             "closeAccount": "Close account",
             "confirmCloseAccount": "Close the account of {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "This person does not collect points.",
         "errorMoneyAccountGone": "This account no longer exists.",
         "errorMoneyPlanGone": "This plan no longer exists.",
-        "ownLedger": "Your entries"
+        "ownLedger": "Your entries",
+        "toastApprovedNamed": "“{{reward}}” approved for {{name}}.",
+        "toastRejectedNamed": "“{{reward}}” rejected for {{name}}.",
+        "toastCancelledNamed": "“{{reward}}” withdrawn."
     },
     "datepicker": {
         "openCalendar": "Open calendar",
@@ -6206,11 +6200,8 @@
         "statusLost": "Lost",
         "notesLabel": "Note",
         "notesPlaceholder": "e.g. receipt is in the folder",
-        "deleteConfirm": "Delete \"{{name}}\"?",
-        "deleteConfirmDetail": "The item is permanently removed from the inventory right away, there is no trash to recover it from.",
         "created": "Item added.",
         "updated": "Item updated.",
-        "deleted": "Item deleted.",
         "emptyTitle": "Your inventory is still empty",
         "emptyDescription": "Record what you own - with location, category and purchase price.",
         "loadErrorTitle": "Could not load the inventory",

@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "\"{{name}}\" yeniden açık - işaretleme gerçekleşmedi. Tekrar deneyin.",
         "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin.",
         "errorNotOwner": "Bunu başka biri oluşturdu - görebilirsin ama değiştiremezsin.",
-        "foreignReadOnlyHint": "{{name}} oluşturdu - görebilirsin ama değiştiremezsin."
+        "foreignReadOnlyHint": "{{name}} oluşturdu - görebilirsin ama değiştiremezsin.",
+        "deletedNamed": "\"{{name}}\" silindi."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Yapan …",
         "checkedDoneNamed": "\"{{title}}\" tamamlandı.",
         "checkedOpenNamed": "\"{{title}}\" yeniden açık.",
-        "errorReorderNotAllowed": "Ailenin sıralamasını görebilirsin ama değiştiremezsin."
+        "errorReorderNotAllowed": "Ailenin sıralamasını görebilirsin ama değiştiremezsin.",
+        "doneSubtasksOpen": "\"{{title}}\" tamamlandı - {{count}} alt görev hâlâ açık.",
+        "doneSubtasksOpen_one": "\"{{title}}\" tamamlandı - bir alt görev hâlâ açık.",
+        "checkAllSubtasks": "Tümünü işaretle",
+        "subtasksAllDone": "\"{{title}}\" ve tüm alt görevler tamamlandı."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Ancak kayıtlar hesap bağlantısını yitirir ve bundan sonra hiçbir hesaba ait olmaz. Bakiye ve hesap türü kalıcı olarak kaybolur.",
         "editAccount": "Hesabı düzenle",
         "newAccount": "Yeni hesap",
-        "accountDeletedToast": "Hesap silindi",
         "accountSavedToast": "Hesap kaydedildi",
         "accountAddedToast": "Hesap eklendi",
         "accountLabel": "Hesap",
@@ -4023,7 +4027,6 @@
         "supplyName": "Ürün adı",
         "supplyPlaceholder": "Ne eksik?",
         "checkedInToast": "Giriş kaydedildi.",
-        "checkedOutToast": "Çıkış kaydedildi.",
         "supplyAddedToast": "Alışveriş listesine eklendi.",
         "overdue": "Gecikmiş",
         "dueToday": "Bugün son gün",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Bu görev artık yok.",
         "errorAlreadyCheckedOut": "Bu yardımcının çıkışı zaten yapıldı.",
         "errorAlreadyCheckedIn": "Bu yardımcının girişi zaten yapıldı.",
-        "allVisitsInReport": "Tüm ziyaretler raporda"
+        "allVisitsInReport": "Tüm ziyaretler raporda",
+        "checkedOutNamed": "{{name}} çıkış yaptı.",
+        "visitToday": "Bugün burada: {{from}} - {{to}}",
+        "checkInAgain": "Yeniden giriş yap"
     },
     "userMultiSelect": {
         "moreUsers": "daha",
@@ -4202,8 +4208,6 @@
         "subtitle": "Ev faturalarını, seyahatleri, alışverişleri ve aile giderlerini bölüşün.",
         "addExpense": "Gider ekle",
         "editExpense": "Gideri düzenle",
-        "deleteExpenseConfirm": "Bu gider silinsin mi?",
-        "deleteExpenseConfirmDetail": "Grubun tüm bakiyeleri bu gider olmadan yeniden hesaplanır ve borçluyken alacaklı olan bunu hemen görür. Ekli fişler korunur.",
         "addGroup": "Yeni grup",
         "groups": "Gruplar",
         "searchGroups": "Grup ara",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Geçerli bir ödeme tarihi girin.",
         "savedToast": "Abonelik kaydedildi.",
         "addedToast": "Abonelik eklendi.",
-        "renewedToast": "Yenileme tarihi güncellendi.",
-        "deleteConfirm": "\"{{name}}\" aboneliği silinsin mi?",
-        "deleteConfirmDetail": "Abonelikle birlikte hatırlatıcıları ve bir sonraki ödemenin bütçe kaydı silinir. Tamamlanmış ödemeler aylık özette kalır.",
-        "renewConfirm": "\"{{name}}\" ödemesi kaydedilsin mi?",
-        "renewConfirmDetail": "Ödeme tarihi ileri kayar ve {{date}} tarihli ödeme bütçeye gider olarak kaydedilir.",
-        "deletedToast": "Abonelik silindi.",
         "monthlyBudgetLabel": "Aylık abonelik bütçesi",
         "baseCurrencyLabel": "Temel para birimi",
         "fixerHint": "FIXER_API_KEY sunucuda yapılandırıldığında canlı dönüştürme Fixer kullanır.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} ödeme kaldı",
         "completed": "Tamamlandı",
         "completedOn": "{{date}} tarihinde tamamlandı",
-        "completedToast": "Abonelik tamamlandı.",
         "endsAfter": "{{count}} ödeme kaldı",
         "logoTypeError": "PNG, JPEG, WebP veya SVG resmi kullanın.",
         "accountUsernameLabel": "Şu adla kayıtlı",
         "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz.",
         "detailAmountLabel": "Tutar",
-        "detailNextPaymentLabel": "Sonraki ödeme"
+        "detailNextPaymentLabel": "Sonraki ödeme",
+        "renewedNamed": "\"{{name}}\" ödendi - sonraki ödeme {{date}}.",
+        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Bu kayıt bir plandan gelmiyor ve silinebilir.",
                 "saved": "Kayıt kaydedildi",
                 "saveError": "Kayıt kaydedilemedi.",
-                "deleteConfirm": "Bu kayıt silinsin mi?",
-                "deleted": "Kayıt silindi",
-                "deleteConfirmDetail": "Kayıt dışa aktarmadan da kaybolur. Bu işlem geri alınamaz."
+                "deleted": "Kayıt silindi"
             },
             "prn": {
                 "title": "Gerektiğinde",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Doz, en kısa aralık dolmadan kaydedilsin mi?",
                 "earlyDetail": "Sonraki doz ancak {{time}} itibarıyla öngörülüyor ({{remaining}}).",
                 "earlyConfirmAction": "Yine de kaydet"
-            }
+            },
+            "doseTakenNamed": "\"{{name}}\" alındı.",
+            "doseSkippedNamed": "\"{{name}}\" atlandı."
         },
         "prevention": {
             "title": "Önleyici bakım ve aşılar",
@@ -5198,8 +5197,6 @@
             "saveError": "Antrenman kaydedilemedi.",
             "deleted": "Antrenman silindi.",
             "deleteError": "Antrenman silinemedi.",
-            "deleteConfirm": "Bu antrenman gerçekten silinsin mi?",
-            "deleteConfirmDetail": "Bu birim geçmişten ve şimdiye kadar sayıldığı tüm haftalık ve aylık toplamlardan çıkar. Geri getirilemez.",
             "invalid": "Lütfen geçerli değerler girin.",
             "totals": {
                 "count": "Antrenmanlar",
@@ -5281,11 +5278,7 @@
             "retry": "Tekrar dene",
             "saved": "Kaydedildi.",
             "saveError": "Kaydedilemedi.",
-            "deleted": "Silindi.",
             "deleteError": "Silinemedi.",
-            "deleteConfirm": "Bu kayıt gerçekten silinsin mi?",
-            "periodDeleteConfirmDetail": "Kaydedilen dönem silinir. En son dönemse, hesaplanan sonraki tarihler de kayar; ortalama döngü uzunluğu yalnızca sabit bir değer ayarlı değilse değişir.",
-            "logDeleteConfirmDetail": "O güne ait kanama yoğunluğu, belirtiler, ruh hali ve not kayıtla birlikte silinir ve hiçbir değerlendirmede yer almaz. Geri getirilemez.",
             "invalid": "Lütfen geçerli değerler girin.",
             "fertilityDisclaimer": "Doğurgan pencere ve yumurtlama takvim yöntemiyle tahmin edilir. Bunlar bir doğum kontrol yöntemi değildir ve tıbbi tavsiyenin yerini tutmaz.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Tahmini döngüye takviminden abone ol",
             "widgetHint": "Döngü kutucuğunu {{overview}} içinde “{{customize}}” ile ekle.",
-            "endBeforeStart": "Bitiş başlangıçtan önce olamaz."
+            "endBeforeStart": "Bitiş başlangıçtan önce olamaz.",
+            "periodDeleted": "Regl silindi.",
+            "logDeleted": "Günlük kayıt silindi."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Puanların",
         "approve": "Onayla",
         "reject": "Reddet",
-        "confirmReject": "Bu kullanım isteği reddedilsin mi? Puanlar iade edilecek.",
-        "confirmCancel": "Bu istek geri çekilsin mi? Puanlar iade edilecek.",
         "manageParticipants": "Katılımcıları yönet",
         "participantsIntro": "Kimlerin puan toplayabileceğini seç. Genel bakışta yalnızca etkin üyeler görünür.",
         "emptyOverviewTitle": "Henüz kimse puan toplamıyor",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Para çekme",
             "ledgerCredit": "Alacak",
             "ledgerDebit": "Kesinti",
-            "confirmReject": "Bu istek reddedilsin mi? Hiçbir şey kaydedilmez.",
-            "confirmCancel": "Bu istek geri çekilsin mi?",
             "openAccount": "Hesap aç",
             "closeAccount": "Hesabı kapat",
             "confirmCloseAccount": "{{name}} için hesap kapatılsın mı?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Bu kişi puan toplamıyor.",
         "errorMoneyAccountGone": "Bu hesap artık yok.",
         "errorMoneyPlanGone": "Bu plan artık yok.",
-        "ownLedger": "Hareketlerin"
+        "ownLedger": "Hareketlerin",
+        "toastApprovedNamed": "\"{{reward}}\", {{name}} için onaylandı.",
+        "toastRejectedNamed": "\"{{reward}}\", {{name}} için reddedildi.",
+        "toastCancelledNamed": "\"{{reward}}\" geri çekildi."
     },
     "datepicker": {
         "openCalendar": "Takvimi aç",
@@ -6206,11 +6200,8 @@
         "statusLost": "Kayıp",
         "notesLabel": "Not",
         "notesPlaceholder": "örn. fiş klasörde",
-        "deleteConfirm": "\"{{name}}\" silinsin mi?",
-        "deleteConfirmDetail": "Eşya envanterden hemen ve kalıcı olarak kaldırılır; geri alınabileceği bir çöp kutusu yoktur.",
         "created": "Eşya eklendi.",
         "updated": "Eşya güncellendi.",
-        "deleted": "Eşya silindi.",
         "emptyTitle": "Envanteriniz henüz boş",
         "emptyDescription": "Sahip olduklarınızı kaydedin - konum, kategori ve satın alma fiyatıyla.",
         "loadErrorTitle": "Envanter yüklenemedi",

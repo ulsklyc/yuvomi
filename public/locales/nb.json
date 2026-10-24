@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "«{{name}}» er åpen igjen - avkryssingen gikk ikke gjennom. Prøv igjen.",
         "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen.",
         "errorNotOwner": "Dette har noen andre laget - du kan se det, men ikke endre det.",
-        "foreignReadOnlyHint": "Laget av {{name}} - du kan se det, men ikke endre det."
+        "foreignReadOnlyHint": "Laget av {{name}} - du kan se det, men ikke endre det.",
+        "deletedNamed": "«{{name}}» slettet."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Fullført av …",
         "checkedDoneNamed": "«{{title}}» utført.",
         "checkedOpenNamed": "«{{title}}» er åpen igjen.",
-        "errorReorderNotAllowed": "Du kan se familiens rekkefølge, men ikke endre den."
+        "errorReorderNotAllowed": "Du kan se familiens rekkefølge, men ikke endre den.",
+        "doneSubtasksOpen": "«{{title}}» utført - {{count}} deloppgaver er fortsatt åpne.",
+        "doneSubtasksOpen_one": "«{{title}}» utført - én deloppgave er fortsatt åpen.",
+        "checkAllSubtasks": "Huk av alle",
+        "subtasksAllDone": "«{{title}}» og alle deloppgaver utført."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Disse postene vil imidlertid miste kontotilknytningen og vil ikke lenger tilhøre noen konto. Saldo og kontotype vil bli slettet permanent.",
         "editAccount": "Rediger konto",
         "newAccount": "Ny konto",
-        "accountDeletedToast": "Konto slettet",
         "accountSavedToast": "Konto lagret",
         "accountAddedToast": "Konto lagt til",
         "accountLabel": "Konto",
@@ -4023,7 +4027,6 @@
         "supplyName": "Produktnavn",
         "supplyPlaceholder": "Hva mangler?",
         "checkedInToast": "Sjekk inn registrert.",
-        "checkedOutToast": "Sjekk ut registrert.",
         "supplyAddedToast": "Lagt til i handlelisten.",
         "overdue": "Forfalt",
         "dueToday": "Forfaller i dag",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Denne oppgaven finnes ikke lenger.",
         "errorAlreadyCheckedOut": "Denne vaskehjelpen er allerede sjekket ut.",
         "errorAlreadyCheckedIn": "Denne vaskehjelpen er allerede sjekket inn.",
-        "allVisitsInReport": "Alle besøk i rapporten"
+        "allVisitsInReport": "Alle besøk i rapporten",
+        "checkedOutNamed": "{{name}} sjekket ut.",
+        "visitToday": "Her i dag: {{from}} - {{to}}",
+        "checkInAgain": "Sjekk inn igjen"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -4202,8 +4208,6 @@
         "subtitle": "Del husholdningsregninger, turer, shopping og familieutgifter.",
         "addExpense": "Legg til utgift",
         "editExpense": "Rediger utgift",
-        "deleteExpenseConfirm": "Slett denne utgiften?",
-        "deleteExpenseConfirmDetail": "Hver saldo i gruppen beregnes på nytt uten denne utgiften, og alle som går fra debitor til kreditor ser det med en gang. Vedlagte kvitteringer beholdes.",
         "addGroup": "Ny gruppe",
         "groups": "Grupper",
         "searchGroups": "Søk etter grupper",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Oppgi en gyldig betalingsdato.",
         "savedToast": "Abonnement lagret.",
         "addedToast": "Abonnement lagt til.",
-        "renewedToast": "Fornyelsesdato oppdatert.",
-        "deleteConfirm": "Slett abonnement \"{{name}}\"?",
-        "deleteConfirmDetail": "Påminnelser og budsjettposten for neste betaling slettes sammen med abonnementet. Betalinger som allerede er fullført, blir værende i månedsoversikten.",
-        "renewConfirm": "Registrer betaling for \"{{name}}\"?",
-        "renewConfirmDetail": "Forfallsdatoen flyttes frem, og betalingen fra {{date}} registreres som en utgift i budsjettet.",
-        "deletedToast": "Abonnement slettet.",
         "monthlyBudgetLabel": "Månedlig abonnementsbudsjett",
         "baseCurrencyLabel": "Basisvaluta",
         "fixerHint": "Live konvertering bruker Fixer når FIXER_API_KEY er konfigurert på serveren.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} betalinger igjen",
         "completed": "Fullført",
         "completedOn": "Fullført {{date}}",
-        "completedToast": "Abonnement fullført.",
         "endsAfter": "{{count}} betalinger igjen",
         "logoTypeError": "Bruk et bilde i PNG, JPEG, WebP eller SVG.",
         "accountUsernameLabel": "Registrert under",
         "accountUsernameHint": "E-postadresse eller brukernavn. Ikke et passordfelt - Yuvomi lagrer ikke passord.",
         "detailAmountLabel": "Beløp",
-        "detailNextPaymentLabel": "Neste betaling"
+        "detailNextPaymentLabel": "Neste betaling",
+        "renewedNamed": "«{{name}}» betalt - neste betaling {{date}}.",
+        "completedNamed": "«{{name}}» betalt og avsluttet."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Dette innlegget kommer ikke fra en plan og kan slettes.",
                 "saved": "Oppføring lagret",
                 "saveError": "Kunne ikke lagre innlegget.",
-                "deleteConfirm": "Slett dette innlegget?",
-                "deleted": "Oppføring slettet",
-                "deleteConfirmDetail": "Innlegget vil også forsvinne fra eksporten. Dette kan ikke angres."
+                "deleted": "Oppføring slettet"
             },
             "prn": {
                 "title": "Ved behov",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Loggfør denne dosen før minimumsintervallet er passert?",
                 "earlyDetail": "Neste dose er ikke klar før {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Loggfør likevel"
-            }
+            },
+            "doseTakenNamed": "«{{name}}» tatt.",
+            "doseSkippedNamed": "«{{name}}» hoppet over."
         },
         "prevention": {
             "title": "Forebyggende behandling og vaksiner",
@@ -5198,8 +5197,6 @@
             "saveError": "Aktiviteten kunne ikke lagres.",
             "deleted": "Aktivitet slettet.",
             "deleteError": "Aktiviteten kunne ikke slettes.",
-            "deleteConfirm": "Vil du virkelig slette denne aktiviteten?",
-            "deleteConfirmDetail": "Økten forsvinner fra historikken din og fra alle ukentlige og månedlige summer den har blitt regnet med i så langt. Den kan ikke gjenopprettes.",
             "invalid": "Vennligst skriv inn gyldige verdier.",
             "totals": {
                 "count": "Aktiviteter",
@@ -5281,11 +5278,7 @@
             "retry": "Prøv igjen",
             "saved": "Lagret.",
             "saveError": "Kunne ikke lagres.",
-            "deleted": "Slettet.",
             "deleteError": "Kunne ikke slettes.",
-            "deleteConfirm": "Vil du virkelig slette denne oppføringen?",
-            "periodDeleteConfirmDetail": "Det registrerte tidsrommet forsvinner etterpå. Hvis det var den nyeste perioden, vil de beregnede kommende datoene også flytte seg; gjennomsnittlig sykluslengde endres kun når ingen fast verdi er konfigurert.",
-            "logDeleteConfirmDetail": "Flyt, symptomer, humør og noten for denne dagen slettes med det og vil ikke lenger vises i noen analyser. Dette kan ikke gjenopprettes.",
             "invalid": "Vennligst skriv inn gyldige verdier.",
             "fertilityDisclaimer": "Fertilt vindu og eggløsning beregnes med kalendermetoden. De er ikke en form for prevensjon og er ingen erstatning for medisinsk rådgivning.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Abonner på den forventede syklusen i kalenderen",
             "widgetHint": "Legg syklusflisen til i {{overview}} under «{{customize}}».",
-            "endBeforeStart": "Slutten kan ikke være før starten."
+            "endBeforeStart": "Slutten kan ikke være før starten.",
+            "periodDeleted": "Mens slettet.",
+            "logDeleted": "Dagsoppføring slettet."
         },
         "duration": {
             "hm": "{{hours}} t {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Poengene dine",
         "approve": "Godkjenn",
         "reject": "Avvis",
-        "confirmReject": "Avvis denne innløsningsforespørselen? Poengene vil bli refundert.",
-        "confirmCancel": "Trekk denne forespørselen? Poengene vil bli refundert.",
         "manageParticipants": "Administrer deltakere",
         "participantsIntro": "Velg hvem som kan samle poeng. Kun aktiverte medlemmer vises i oversikten.",
         "emptyOverviewTitle": "Ingen samler poeng ennå",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Uttak",
             "ledgerCredit": "Godskriving",
             "ledgerDebit": "Trekk",
-            "confirmReject": "Avslå denne forespørselen? Ingenting bokføres.",
-            "confirmCancel": "Trekke tilbake denne forespørselen?",
             "openAccount": "Åpne konto",
             "closeAccount": "Lukk konto",
             "confirmCloseAccount": "Lukke kontoen til {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Denne personen samler ikke poeng.",
         "errorMoneyAccountGone": "Denne kontoen finnes ikke lenger.",
         "errorMoneyPlanGone": "Denne planen finnes ikke lenger.",
-        "ownLedger": "Dine posteringer"
+        "ownLedger": "Dine posteringer",
+        "toastApprovedNamed": "«{{reward}}» godkjent for {{name}}.",
+        "toastRejectedNamed": "«{{reward}}» avvist for {{name}}.",
+        "toastCancelledNamed": "«{{reward}}» trukket tilbake."
     },
     "datepicker": {
         "openCalendar": "Åpne kalender",
@@ -6206,11 +6200,8 @@
         "statusLost": "Tapt",
         "notesLabel": "Notat",
         "notesPlaceholder": "f.eks. kvitteringen ligger i mappen",
-        "deleteConfirm": "Slett \"{{name}}\"?",
-        "deleteConfirmDetail": "Elementet fjernes permanent fra beholdningen umiddelbart, det finnes ingen søppelkurv for å gjenopprette det fra.",
         "created": "Vare lagt til.",
         "updated": "Vare oppdatert.",
-        "deleted": "Vare slettet.",
         "emptyTitle": "Beholdningen din er fortsatt tom",
         "emptyDescription": "Registrer det du eier - med plassering, kategori og kjøpspris.",
         "loadErrorTitle": "Kunne ikke laste beholdningen",

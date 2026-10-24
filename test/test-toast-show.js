@@ -455,3 +455,25 @@ test('D18: die Rueckmeldung endet beim Modulwechsel, zwischen den Kuechen-Reiter
   assert.match(router, /function moduleSectionOf\(path\) \{\s*if \(!path\) return null;\s*return isKitchenRoute\(path\) \? '\/kitchen' : topLevelSection\(path\);/,
     'die Kueche zaehlt als ein Modul, Einstellungen/Gesundheit/Schichtplan ueber topLevelSection');
 });
+
+/* EIN DIALEKT FUER DIE RUECKMELDUNG MIT RUECKWEG (Critique R23, D6/N1): dieselbe
+ * Quittung trug mal ein Haekchen ('success'), mal keins ('default'). Ein Toast
+ * mit Aktion traegt jetzt nie das Haekchen; die Bestaetigung ohne Rueckweg
+ * behaelt es, Fehler und Warnung behalten ihr Zeichen auch mit Aktion. */
+test('R23 D6: ein Toast mit Rueckgaengig traegt kein Haekchen, ohne Aktion bleibt es', async () => {
+  const { polite, assertive } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { showToast } = await import('../public/utils/toast-show.js');
+    const hasIcon = (toast) => toast.children.some((c) => c.getAttribute?.('class') === 'toast__icon');
+    showToast('„Ibuprofen“ eingenommen.', 'success', 5000, () => {});
+    assert.equal(hasIcon(toastsIn(polite)[0]), false, 'mit Rueckgaengig: kein Haekchen');
+    showToast('Gespeichert', 'success', 3000);
+    assert.equal(hasIcon(toastsIn(polite).at(-1)), true, 'ohne Aktion: Haekchen');
+    showToast('Konnte nicht speichern', 'danger', 3000, { label: 'Erneut', onClick() {} });
+    assert.equal(hasIcon(toastsIn(assertive).at(-1)), true, 'ein Fehler behaelt sein Zeichen');
+  } finally {
+    mock.timers.reset();
+    removeDom();
+  }
+});

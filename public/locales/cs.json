@@ -109,7 +109,8 @@
         "errorCheckRolledBack": "„{{name}}“ je znovu otevřené - odškrtnutí se nepodařilo. Zkuste to znovu.",
         "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu.",
         "errorNotOwner": "Tohle vytvořil někdo jiný - můžete to zobrazit, ale ne změnit.",
-        "foreignReadOnlyHint": "Vytvořil(a) {{name}} - můžete to zobrazit, ale ne změnit."
+        "foreignReadOnlyHint": "Vytvořil(a) {{name}} - můžete to zobrazit, ale ne změnit.",
+        "deletedNamed": "„{{name}}“ smazáno."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -704,7 +705,13 @@
         "doneByMenuItem": "Splnil(a) …",
         "checkedDoneNamed": "„{{title}}“ hotovo.",
         "checkedOpenNamed": "„{{title}}“ je znovu otevřené.",
-        "errorReorderNotAllowed": "Pořadí rodiny můžete zobrazit, ale ne změnit."
+        "errorReorderNotAllowed": "Pořadí rodiny můžete zobrazit, ale ne změnit.",
+        "doneSubtasksOpen": "„{{title}}“ hotovo - stále otevřených dílčích úkolů: {{count}}.",
+        "doneSubtasksOpen_one": "„{{title}}“ hotovo - stále je otevřený jeden dílčí úkol.",
+        "checkAllSubtasks": "Odškrtnout vše",
+        "subtasksAllDone": "„{{title}}“ a všechny dílčí úkoly hotovo.",
+        "doneSubtasksOpen_few": "„{{title}}“ hotovo - stále jsou otevřené {{count}} dílčí úkoly.",
+        "doneSubtasksOpen_many": "„{{title}}“ hotovo - stále otevřených dílčích úkolů: {{count}}."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
@@ -1839,7 +1846,6 @@
         "deleteAccountConfirmDetail": "Záznamy ovšem ztratí vazbu na účet a nebudou už patřit k žádnému. Zůstatek a typ účtu jsou pryč a nelze je obnovit.",
         "editAccount": "Upravit účet",
         "newAccount": "Nový účet",
-        "accountDeletedToast": "Účet smazán",
         "accountSavedToast": "Účet uložen",
         "accountAddedToast": "Účet přidán",
         "accountLabel": "Účet",
@@ -3643,7 +3649,6 @@
         "supplyName": "Název produktu",
         "supplyPlaceholder": "Co chybí?",
         "checkedInToast": "Přihlášení uloženo.",
-        "checkedOutToast": "Odhlášení uloženo.",
         "supplyAddedToast": "Přidáno do nákupního seznamu.",
         "overdue": "Po termínu",
         "dueToday": "Splatné dnes",
@@ -3811,15 +3816,16 @@
         "errorTaskGone": "Tento úkol už neexistuje.",
         "errorAlreadyCheckedOut": "Tento pracovník je už odhlášen.",
         "errorAlreadyCheckedIn": "Tento pracovník je už přihlášen.",
-        "allVisitsInReport": "Všechny návštěvy v hlášení"
+        "allVisitsInReport": "Všechny návštěvy v hlášení",
+        "checkedOutNamed": "{{name}} - odhlášeno.",
+        "visitToday": "Dnes přítomnost: {{from}} - {{to}}",
+        "checkInAgain": "Znovu přihlásit"
     },
     "splitExpenses": {
         "title": "Společné výdaje",
         "subtitle": "Sdílejte domácí účty, cestovní náklady, nákupy a rodinné výdaje.",
         "addExpense": "Přidat výdaj",
         "editExpense": "Upravit výdaj",
-        "deleteExpenseConfirm": "Smazat tento výdaj?",
-        "deleteExpenseConfirmDetail": "Všechny zůstatky ve skupině se přepočítají bez tohoto výdaje a kdo se tím z dlužníka stane věřitelem, uvidí to hned. Přiložené doklady zůstávají.",
         "addGroup": "Nová skupina",
         "groups": "Skupiny",
         "searchGroups": "Hledat skupiny",
@@ -4739,12 +4745,6 @@
         "invalidDate": "Zadejte platné datum platby.",
         "savedToast": "Předplatné uloženo.",
         "addedToast": "Předplatné přidáno.",
-        "renewedToast": "Datum obnovení aktualizováno.",
-        "deleteConfirm": "Smazat předplatné \"{{name}}\"?",
-        "deleteConfirmDetail": "S předplatným se smažou jeho připomínky a rozpočtový záznam příští platby. Již dokončené platby v měsíčním přehledu zůstanou.",
-        "renewConfirm": "Zaúčtovat platbu za \"{{name}}\"?",
-        "renewConfirmDetail": "Datum splatnosti se posune a platba z {{date}} se zapíše jako výdaj v rozpočtu.",
-        "deletedToast": "Předplatné smazáno.",
         "monthlyBudgetLabel": "Měsíční rozpočet předplatných",
         "baseCurrencyLabel": "Základní měna",
         "fixerHint": "Živý převod používá Fixer, pokud je na serveru nastaven FIXER_API_KEY.",
@@ -4841,14 +4841,15 @@
         "endsAfter_one": "Zbývá {{count}} platba",
         "completed": "Dokončeno",
         "completedOn": "Dokončeno {{date}}",
-        "completedToast": "Předplatné dokončeno.",
         "endsAfter": "Zbývá {{count}} plateb",
         "endsAfter_few": "Zbývají {{count}} platby",
         "logoTypeError": "Použijte prosím obrázek ve formátu PNG, JPEG, WebP nebo SVG.",
         "accountUsernameLabel": "Registrováno na",
         "accountUsernameHint": "E-mailová adresa nebo uživatelské jméno. Není to pole pro heslo - Yuvomi hesla neukládá.",
         "detailAmountLabel": "Částka",
-        "detailNextPaymentLabel": "Další platba"
+        "detailNextPaymentLabel": "Další platba",
+        "renewedNamed": "„{{name}}“ zaplaceno - další platba {{date}}.",
+        "completedNamed": "„{{name}}“ zaplaceno a ukončeno."
     },
     "health": {
         "fasting": {
@@ -5178,9 +5179,7 @@
                 "adhocHint": "Tento záznam nepochází z plánu a lze jej smazat.",
                 "saved": "Záznam uložen",
                 "saveError": "Záznam se nepodařilo uložit.",
-                "deleteConfirm": "Smazat tento záznam?",
-                "deleted": "Záznam smazán",
-                "deleteConfirmDetail": "Záznam zmizí i z exportu. Tuto akci nelze vrátit zpět."
+                "deleted": "Záznam smazán"
             },
             "prn": {
                 "title": "Podle potřeby",
@@ -5193,7 +5192,9 @@
                 "earlyConfirm": "Zapsat dávku před uplynutím minimálního odstupu?",
                 "earlyDetail": "Další dávka je na řadě až od {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Přesto zapsat"
-            }
+            },
+            "doseTakenNamed": "„{{name}}“ užito.",
+            "doseSkippedNamed": "„{{name}}“ vynecháno."
         },
         "prevention": {
             "title": "Prevence a očkování",
@@ -5327,8 +5328,6 @@
             "saveError": "Trénink se nepodařilo uložit.",
             "deleted": "Trénink smazán.",
             "deleteError": "Trénink se nepodařilo smazat.",
-            "deleteConfirm": "Opravdu smazat tento trénink?",
-            "deleteConfirmDetail": "Jednotka zmizí z historie i ze všech týdenních a měsíčních součtů, do kterých se dosud počítala. Obnovit ji nelze.",
             "invalid": "Zadejte platné hodnoty.",
             "totals": {
                 "count": "Tréninky",
@@ -5410,11 +5409,7 @@
             "retry": "Zkusit znovu",
             "saved": "Uloženo.",
             "saveError": "Nepodařilo se uložit.",
-            "deleted": "Smazáno.",
             "deleteError": "Nepodařilo se smazat.",
-            "deleteConfirm": "Opravdu smazat tento záznam?",
-            "periodDeleteConfirmDetail": "Zaznamenané období bude pryč. Pokud šlo o nejnovější, posunou se i vypočítané příští termíny; průměrná délka cyklu se změní jen bez pevně nastavené hodnoty.",
-            "logDeleteConfirmDetail": "Intenzita krvácení, příznaky, nálada i poznámka z tohoto dne se smažou spolu se záznamem a v žádném vyhodnocení už nebudou. Obnovit to nelze.",
             "invalid": "Zadejte platné hodnoty.",
             "fertilityDisclaimer": "Údaje o plodném období a ovulaci vycházejí z kalendářní metody. Nenahrazují antikoncepci ani lékařskou konzultaci.",
             "pregnancy": {
@@ -5747,7 +5742,9 @@
             },
             "feedLink": "Odebírat předpokládaný cyklus v kalendáři",
             "widgetHint": "Dlaždici cyklu přidáte do přehledu „{{overview}}“ přes „{{customize}}“.",
-            "endBeforeStart": "Konec nesmí být před začátkem."
+            "endBeforeStart": "Konec nesmí být před začátkem.",
+            "periodDeleted": "Menstruace smazána.",
+            "logDeleted": "Denní záznam smazán."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -6093,8 +6090,6 @@
         "yourPoints": "Tvoje body",
         "approve": "Schválit",
         "reject": "Zamítnout",
-        "confirmReject": "Zamítnout tuto žádost o vyzvednutí? Body budou vráceny.",
-        "confirmCancel": "Stáhnout tuto žádost? Body budou vráceny.",
         "manageParticipants": "Spravovat účastníky",
         "participantsIntro": "Vyberte, kdo může sbírat body. V přehledu se zobrazují jen aktivovaní členové.",
         "emptyOverviewTitle": "Zatím nikdo nesbírá body",
@@ -6198,8 +6193,6 @@
             "ledgerWithdrawal": "Výběr",
             "ledgerCredit": "Připsání",
             "ledgerDebit": "Odečtení",
-            "confirmReject": "Zamítnout tuto žádost? Nic se nezaúčtuje.",
-            "confirmCancel": "Vzít tuto žádost zpět?",
             "openAccount": "Otevřít účet",
             "closeAccount": "Zavřít účet",
             "confirmCloseAccount": "Zavřít účet uživatele {{name}}?",
@@ -6218,7 +6211,10 @@
         "errorNotParticipating": "Tato osoba nesbírá body.",
         "errorMoneyAccountGone": "Tento účet už neexistuje.",
         "errorMoneyPlanGone": "Tento plán už neexistuje.",
-        "ownLedger": "Tvoje záznamy"
+        "ownLedger": "Tvoje záznamy",
+        "toastApprovedNamed": "„{{reward}}“ schváleno pro: {{name}}.",
+        "toastRejectedNamed": "„{{reward}}“ zamítnuto pro: {{name}}.",
+        "toastCancelledNamed": "„{{reward}}“ staženo."
     },
     "datepicker": {
         "openCalendar": "Otevřít kalendář",
@@ -6360,11 +6356,8 @@
         "statusLost": "Ztraceno",
         "notesLabel": "Poznámka",
         "notesPlaceholder": "např. účtenka je v šanonu",
-        "deleteConfirm": "Smazat „{{name}}“?",
-        "deleteConfirmDetail": "Věc se z inventáře odstraní okamžitě a natrvalo, žádný koš k obnovení neexistuje.",
         "created": "Věc přidána.",
         "updated": "Věc aktualizována.",
-        "deleted": "Věc smazána.",
         "emptyTitle": "Váš inventář je zatím prázdný",
         "emptyDescription": "Zaznamenejte, co vlastníte - s místem, kategorií a kupní cenou.",
         "loadErrorTitle": "Inventář se nepodařilo načíst",

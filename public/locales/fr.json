@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "« {{name}} » est de nouveau à faire - la coche n'a pas été enregistrée. Réessayez.",
         "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez.",
         "errorNotOwner": "Quelqu’un d’autre l’a créé : vous pouvez le voir, mais pas le modifier.",
-        "foreignReadOnlyHint": "Créé par {{name}} : vous pouvez le voir, mais pas le modifier."
+        "foreignReadOnlyHint": "Créé par {{name}} : vous pouvez le voir, mais pas le modifier.",
+        "deletedNamed": "« {{name}} » supprimé."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Fait par …",
         "checkedDoneNamed": "« {{title}} » terminé.",
         "checkedOpenNamed": "« {{title}} » de nouveau ouvert.",
-        "errorReorderNotAllowed": "Vous pouvez voir l’ordre de la famille, mais pas le modifier."
+        "errorReorderNotAllowed": "Vous pouvez voir l’ordre de la famille, mais pas le modifier.",
+        "doneSubtasksOpen": "« {{title}} » terminé - encore {{count}} sous-tâches ouvertes.",
+        "doneSubtasksOpen_one": "« {{title}} » terminé - encore {{count}} sous-tâche ouverte.",
+        "checkAllSubtasks": "Tout cocher",
+        "subtasksAllDone": "« {{title}} » et toutes ses sous-tâches terminés."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Ces écritures perdent toutefois leur rattachement et n'appartiendront plus à aucun compte. Le solde et le type de compte sont définitivement perdus.",
         "editAccount": "Modifier le compte",
         "newAccount": "Nouveau compte",
-        "accountDeletedToast": "Compte supprimé",
         "accountSavedToast": "Compte enregistré",
         "accountAddedToast": "Compte ajouté",
         "accountLabel": "Compte",
@@ -4023,7 +4027,6 @@
         "supplyName": "Produit",
         "supplyPlaceholder": "Que manque-t-il ?",
         "checkedInToast": "Arrivée enregistrée.",
-        "checkedOutToast": "Départ enregistré.",
         "supplyAddedToast": "Ajouté à la liste de courses.",
         "overdue": "En retard",
         "dueToday": "Aujourd’hui",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Cette tâche n’existe plus.",
         "errorAlreadyCheckedOut": "Le départ de cette aide ménagère est déjà enregistré.",
         "errorAlreadyCheckedIn": "L’arrivée de cette aide ménagère est déjà enregistrée.",
-        "allVisitsInReport": "Toutes les visites dans le rapport"
+        "allVisitsInReport": "Toutes les visites dans le rapport",
+        "checkedOutNamed": "Départ de {{name}} enregistré.",
+        "visitToday": "Présent aujourd’hui : {{from}} - {{to}}",
+        "checkInAgain": "Pointer à nouveau"
     },
     "userMultiSelect": {
         "moreUsers": "autres",
@@ -4202,8 +4208,6 @@
         "subtitle": "Partagez factures, voyages, courses et coûts familiaux.",
         "addExpense": "Ajouter une dépense",
         "editExpense": "Modifier la dépense",
-        "deleteExpenseConfirm": "Supprimer cette dépense ?",
-        "deleteExpenseConfirmDetail": "Tous les soldes du groupe sont recalculés sans cette dépense, et qui passe de débiteur à créancier le voit aussitôt. Les justificatifs joints sont conservés.",
         "addGroup": "Nouveau groupe",
         "groups": "Groupes",
         "searchGroups": "Rechercher des groupes",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Saisissez une date de paiement valide.",
         "savedToast": "Abonnement enregistré.",
         "addedToast": "Abonnement ajouté.",
-        "renewedToast": "Date de renouvellement mise à jour.",
-        "deleteConfirm": "Supprimer l’abonnement \"{{name}}\" ?",
-        "deleteConfirmDetail": "Ses rappels et l'écriture budgétaire du prochain paiement sont supprimés avec l'abonnement. Les paiements déjà effectués restent dans le récapitulatif mensuel.",
-        "renewConfirm": "Enregistrer le paiement de « {{name}} » ?",
-        "renewConfirmDetail": "La date d'échéance avance et le paiement du {{date}} est enregistré comme dépense dans le budget.",
-        "deletedToast": "Abonnement supprimé.",
         "monthlyBudgetLabel": "Budget mensuel des abonnements",
         "baseCurrencyLabel": "Devise de base",
         "fixerHint": "La conversion en direct utilise Fixer lorsque FIXER_API_KEY est configuré sur le serveur.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Encore {{count}} paiement",
         "completed": "Terminé",
         "completedOn": "Terminé le {{date}}",
-        "completedToast": "Abonnement terminé.",
         "endsAfter": "Encore {{count}} paiements",
         "logoTypeError": "Utilisez une image PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Enregistré sous",
         "accountUsernameHint": "Adresse e-mail ou nom d'utilisateur. Ce n'est pas un champ de mot de passe - Yuvomi n'enregistre aucun mot de passe.",
         "detailAmountLabel": "Montant",
-        "detailNextPaymentLabel": "Prochain paiement"
+        "detailNextPaymentLabel": "Prochain paiement",
+        "renewedNamed": "« {{name}} » payé - prochain paiement le {{date}}.",
+        "completedNamed": "« {{name}} » payé et terminé."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Cette entrée ne provient pas d'un plan et peut être supprimée.",
                 "saved": "Entrée enregistrée",
                 "saveError": "Impossible d'enregistrer l'entrée.",
-                "deleteConfirm": "Supprimer cette entrée ?",
-                "deleted": "Entrée supprimée",
-                "deleteConfirmDetail": "L'entrée disparaît aussi de l'export. Cette action est irréversible."
+                "deleted": "Entrée supprimée"
             },
             "prn": {
                 "title": "Au besoin",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Enregistrer la dose avant la fin de l'intervalle minimal ?",
                 "earlyDetail": "La prochaine dose n'est prévue qu'à partir de {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Enregistrer quand même"
-            }
+            },
+            "doseTakenNamed": "« {{name}} » pris.",
+            "doseSkippedNamed": "« {{name}} » sauté."
         },
         "prevention": {
             "title": "Prévention et vaccinations",
@@ -5198,8 +5197,6 @@
             "saveError": "Impossible d'enregistrer la séance.",
             "deleted": "Séance supprimée.",
             "deleteError": "Impossible de supprimer la séance.",
-            "deleteConfirm": "Supprimer cette séance ?",
-            "deleteConfirmDetail": "La séance disparaît de l'historique ainsi que de tous les totaux hebdomadaires et mensuels auxquels elle contribuait. Elle ne peut pas être restaurée.",
             "invalid": "Veuillez saisir des valeurs valides.",
             "totals": {
                 "count": "Séances",
@@ -5281,11 +5278,7 @@
             "retry": "Réessayer",
             "saved": "Enregistré.",
             "saveError": "Impossible d’enregistrer.",
-            "deleted": "Supprimé.",
             "deleteError": "Impossible de supprimer.",
-            "deleteConfirm": "Voulez-vous vraiment supprimer cette entrée ?",
-            "periodDeleteConfirmDetail": "La période enregistrée disparaît. S'il s'agissait de la plus récente, les prochaines dates calculées se décalent aussi ; la durée moyenne ne change que sans valeur fixe configurée.",
-            "logDeleteConfirmDetail": "Le flux, les symptômes, l'humeur et la note de ce jour sont supprimés avec l'entrée et n'apparaîtront plus dans aucune analyse. Aucune restauration n'est possible.",
             "invalid": "Veuillez saisir des valeurs valides.",
             "fertilityDisclaimer": "La fenêtre de fécondité et l’ovulation sont estimées par la méthode du calendrier. Elles ne constituent ni une contraception ni un avis médical.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "S’abonner au cycle prévu dans votre calendrier",
             "widgetHint": "Ajoutez la tuile du cycle à {{overview}} via « {{customize}} ».",
-            "endBeforeStart": "La fin ne peut pas précéder le début."
+            "endBeforeStart": "La fin ne peut pas précéder le début.",
+            "periodDeleted": "Règles supprimées.",
+            "logDeleted": "Entrée du jour supprimée."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Tes points",
         "approve": "Approuver",
         "reject": "Refuser",
-        "confirmReject": "Refuser cette demande d’échange ? Les points seront remboursés.",
-        "confirmCancel": "Retirer cette demande ? Les points seront remboursés.",
         "manageParticipants": "Gérer les participants",
         "participantsIntro": "Choisissez qui peut accumuler des points. Seuls les membres activés apparaissent dans l’aperçu.",
         "emptyOverviewTitle": "Personne n’accumule encore de points",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Retrait",
             "ledgerCredit": "Versement",
             "ledgerDebit": "Déduction",
-            "confirmReject": "Refuser cette demande ? Rien n'est enregistré.",
-            "confirmCancel": "Annuler cette demande ?",
             "openAccount": "Ouvrir le compte",
             "closeAccount": "Fermer le compte",
             "confirmCloseAccount": "Fermer le compte de {{name}} ?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Cette personne ne cumule pas de points.",
         "errorMoneyAccountGone": "Ce compte n’existe plus.",
         "errorMoneyPlanGone": "Ce plan n’existe plus.",
-        "ownLedger": "Tes opérations"
+        "ownLedger": "Tes opérations",
+        "toastApprovedNamed": "« {{reward}} » approuvé pour {{name}}.",
+        "toastRejectedNamed": "« {{reward}} » refusé pour {{name}}.",
+        "toastCancelledNamed": "« {{reward}} » retiré."
     },
     "datepicker": {
         "openCalendar": "Ouvrir le calendrier",
@@ -6206,11 +6200,8 @@
         "statusLost": "Perdu",
         "notesLabel": "Note",
         "notesPlaceholder": "p. ex. le ticket de caisse est dans le classeur",
-        "deleteConfirm": "Supprimer « {{name}} » ?",
-        "deleteConfirmDetail": "L'objet est retiré immédiatement et définitivement de l'inventaire, il n'y a pas de corbeille pour le récupérer.",
         "created": "Objet ajouté.",
         "updated": "Objet mis à jour.",
-        "deleted": "Objet supprimé.",
         "emptyTitle": "Votre inventaire est encore vide",
         "emptyDescription": "Notez ce que vous possédez - avec emplacement, catégorie et prix d'achat.",
         "loadErrorTitle": "Impossible de charger l'inventaire",

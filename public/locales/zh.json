@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "“{{name}}”已恢复为未完成 - 勾选未成功。请重试。",
         "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。",
         "errorNotOwner": "这是其他人创建的，你可以查看，但不能修改。",
-        "foreignReadOnlyHint": "由 {{name}} 创建，你可以查看，但不能修改。"
+        "foreignReadOnlyHint": "由 {{name}} 创建，你可以查看，但不能修改。",
+        "deletedNamed": "“{{name}}”已删除。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "完成者 …",
         "checkedDoneNamed": "“{{title}}”已完成。",
         "checkedOpenNamed": "“{{title}}”已重新打开。",
-        "errorReorderNotAllowed": "你可以查看家庭排序，但不能更改。"
+        "errorReorderNotAllowed": "你可以查看家庭排序，但不能更改。",
+        "doneSubtasksOpen": "“{{title}}”已完成 - 还有 {{count}} 个子任务未完成。",
+        "doneSubtasksOpen_one": "“{{title}}”已完成 - 还有 1 个子任务未完成。",
+        "checkAllSubtasks": "全部勾选",
+        "subtasksAllDone": "“{{title}}”及所有子任务已完成。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "不过这些记录会失去账户归属，之后不再属于任何账户。余额和账户类型将永久消失，无法恢复。",
         "editAccount": "编辑账户",
         "newAccount": "新账户",
-        "accountDeletedToast": "账户已删除",
         "accountSavedToast": "账户已保存",
         "accountAddedToast": "账户已添加",
         "accountLabel": "账户",
@@ -4023,7 +4027,6 @@
         "supplyName": "物品名称",
         "supplyPlaceholder": "缺什么？",
         "checkedInToast": "签到已记录。",
-        "checkedOutToast": "签退已记录。",
         "supplyAddedToast": "已加入购物清单。",
         "overdue": "已逾期",
         "dueToday": "今天到期",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "该任务已不存在。",
         "errorAlreadyCheckedOut": "该家政人员已签退。",
         "errorAlreadyCheckedIn": "该家政人员已签到。",
-        "allVisitsInReport": "在报告中查看所有访问"
+        "allVisitsInReport": "在报告中查看所有访问",
+        "checkedOutNamed": "{{name}}已签退。",
+        "visitToday": "今日在岗：{{from}} - {{to}}",
+        "checkInAgain": "再次签到"
     },
     "userMultiSelect": {
         "moreUsers": "更多",
@@ -4202,8 +4208,6 @@
         "subtitle": "分摊家庭账单、旅行、购物和家庭费用。",
         "addExpense": "添加支出",
         "editExpense": "编辑支出",
-        "deleteExpenseConfirm": "删除此支出？",
-        "deleteExpenseConfirmDetail": "群组内所有余额都会在不含这笔支出的情况下重新计算，由欠款方变为收款方的人会立即看到变化。已附的凭证会保留。",
         "addGroup": "新建群组",
         "groups": "群组",
         "searchGroups": "搜索群组",
@@ -4615,12 +4619,6 @@
         "invalidDate": "请输入有效的付款日期。",
         "savedToast": "订阅已保存。",
         "addedToast": "订阅已添加。",
-        "renewedToast": "续订日期已更新。",
-        "deleteConfirm": "删除订阅“{{name}}”？",
-        "deleteConfirmDetail": "订阅连同它的提醒和下次付款的预算记录一并删除。已完成的付款仍留在月度概览中。",
-        "renewConfirm": "记录「{{name}}」的付款吗？",
-        "renewConfirmDetail": "到期日将向后推移，{{date}} 的付款会作为支出记入预算。",
-        "deletedToast": "订阅已删除。",
         "monthlyBudgetLabel": "每月订阅预算",
         "baseCurrencyLabel": "基础货币",
         "fixerHint": "当服务器配置了 FIXER_API_KEY 时，实时换算会使用 Fixer。",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "还剩 {{count}} 次付款",
         "completed": "已完成",
         "completedOn": "于 {{date}} 完成",
-        "completedToast": "订阅已完成。",
         "endsAfter": "还剩 {{count}} 次付款",
         "logoTypeError": "请使用 PNG、JPEG、WebP 或 SVG 图片。",
         "accountUsernameLabel": "注册账号",
         "accountUsernameHint": "电子邮箱地址或用户名。这不是密码字段，Yuvomi 不保存密码。",
         "detailAmountLabel": "金额",
-        "detailNextPaymentLabel": "下次付款"
+        "detailNextPaymentLabel": "下次付款",
+        "renewedNamed": "“{{name}}”已付款 - 下次付款日 {{date}}。",
+        "completedNamed": "“{{name}}”已付款并结束。"
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "此记录并非来自计划，可以删除。",
                 "saved": "记录已保存",
                 "saveError": "无法保存记录。",
-                "deleteConfirm": "要删除此记录吗？",
-                "deleted": "记录已删除",
-                "deleteConfirmDetail": "该记录也会从导出中消失，且无法撤销。"
+                "deleted": "记录已删除"
             },
             "prn": {
                 "title": "按需",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "在最短间隔结束前记录这次服用吗？",
                 "earlyDetail": "下一次服用要到 {{time}} 之后（{{remaining}}）。",
                 "earlyConfirmAction": "仍然记录"
-            }
+            },
+            "doseTakenNamed": "“{{name}}”已服用。",
+            "doseSkippedNamed": "“{{name}}”已跳过。"
         },
         "prevention": {
             "title": "预防保健与疫苗接种",
@@ -5198,8 +5197,6 @@
             "saveError": "无法保存训练。",
             "deleted": "训练已删除。",
             "deleteError": "无法删除训练。",
-            "deleteConfirm": "确定删除此训练吗？",
-            "deleteConfirmDetail": "该记录会从历史中消失，也会从此前计入它的所有周统计和月统计中消失，且无法恢复。",
             "invalid": "请输入有效的数值。",
             "totals": {
                 "count": "训练",
@@ -5281,11 +5278,7 @@
             "retry": "重试",
             "saved": "已保存。",
             "saveError": "无法保存。",
-            "deleted": "已删除。",
             "deleteError": "无法删除。",
-            "deleteConfirm": "确定要删除此记录吗？",
-            "periodDeleteConfirmDetail": "这段记录会消失。如果删的是最近一次周期，推算出的后续日期也会随之移动；平均周期长度只有在未设置固定值时才会改变。",
-            "logDeleteConfirmDetail": "当天的出血量、症状、情绪和备注会随记录一并删除，之后不会出现在任何分析中，且无法恢复。",
             "invalid": "请输入有效的数值。",
             "fertilityDisclaimer": "易孕期和排卵日基于日历法推算，不能作为避孕手段，也不能替代医疗建议。",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "在日历中订阅预测周期",
             "widgetHint": "可在{{overview}}的“{{customize}}”中添加周期卡片。",
-            "endBeforeStart": "结束不能早于开始。"
+            "endBeforeStart": "结束不能早于开始。",
+            "periodDeleted": "经期已删除。",
+            "logDeleted": "当日记录已删除。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",
@@ -5954,8 +5949,6 @@
         "yourPoints": "你的积分",
         "approve": "批准",
         "reject": "拒绝",
-        "confirmReject": "拒绝此兑换请求？积分将退回。",
-        "confirmCancel": "撤回此请求？积分将退回。",
         "manageParticipants": "管理参与者",
         "participantsIntro": "选择谁可以积累积分。概览中仅显示已启用的成员。",
         "emptyOverviewTitle": "还没有人积累积分",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "取款",
             "ledgerCredit": "入账",
             "ledgerDebit": "扣款",
-            "confirmReject": "拒绝这个请求？不会记任何账。",
-            "confirmCancel": "撤回这个请求？",
             "openAccount": "开设账户",
             "closeAccount": "关闭账户",
             "confirmCloseAccount": "关闭 {{name}} 的账户？",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "此人不积累积分。",
         "errorMoneyAccountGone": "该账户已不存在。",
         "errorMoneyPlanGone": "该计划已不存在。",
-        "ownLedger": "你的记录"
+        "ownLedger": "你的记录",
+        "toastApprovedNamed": "已为{{name}}批准“{{reward}}”。",
+        "toastRejectedNamed": "已为{{name}}拒绝“{{reward}}”。",
+        "toastCancelledNamed": "“{{reward}}”已撤回。"
     },
     "datepicker": {
         "openCalendar": "打开日历",
@@ -6206,11 +6200,8 @@
         "statusLost": "已丢失",
         "notesLabel": "备注",
         "notesPlaceholder": "例如 收据在文件夹里",
-        "deleteConfirm": "删除“{{name}}”？",
-        "deleteConfirmDetail": "该物品会立即从物品清单中永久删除，没有可恢复的回收站。",
         "created": "物品已添加。",
         "updated": "物品已更新。",
-        "deleted": "物品已删除。",
         "emptyTitle": "你的物品清单还是空的",
         "emptyDescription": "记录你拥有的东西 - 包括位置、类别和购买价格。",
         "loadErrorTitle": "无法加载物品",

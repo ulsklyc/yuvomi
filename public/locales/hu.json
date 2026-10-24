@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "„{{name}}” ismét nyitott - a kipipálás nem sikerült. Próbálja újra.",
         "errorUncheckRolledBack": "„{{name}}” ismét ki van pipálva - a visszavétel nem sikerült. Próbálja újra.",
         "errorNotOwner": "Ezt valaki más hozta létre - megnézheted, de nem módosíthatod.",
-        "foreignReadOnlyHint": "Létrehozta: {{name}} - megnézheted, de nem módosíthatod."
+        "foreignReadOnlyHint": "Létrehozta: {{name}} - megnézheted, de nem módosíthatod.",
+        "deletedNamed": "„{{name}}” törölve."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Elvégezte: …",
         "checkedDoneNamed": "„{{title}}” kész.",
         "checkedOpenNamed": "„{{title}}” újra nyitott.",
-        "errorReorderNotAllowed": "A család sorrendjét megnézheted, de nem módosíthatod."
+        "errorReorderNotAllowed": "A család sorrendjét megnézheted, de nem módosíthatod.",
+        "doneSubtasksOpen": "„{{title}}” kész - még {{count}} részfeladat nyitott.",
+        "doneSubtasksOpen_one": "„{{title}}” kész - még egy részfeladat nyitott.",
+        "checkAllSubtasks": "Összes kipipálása",
+        "subtasksAllDone": "„{{title}}” és minden részfeladat kész."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "A tételek viszont elveszítik a számlához rendelést, és többé egyetlen számlához sem tartoznak. Az egyenleg és a számlatípus véglegesen elvész.",
         "editAccount": "Számla szerkesztése",
         "newAccount": "Új számla",
-        "accountDeletedToast": "Számla törölve",
         "accountSavedToast": "Számla mentve",
         "accountAddedToast": "Számla hozzáadva",
         "accountLabel": "Számla",
@@ -4023,7 +4027,6 @@
         "supplyName": "Termék neve",
         "supplyPlaceholder": "Mi hiányzik?",
         "checkedInToast": "Bejelentkezés rögzítve.",
-        "checkedOutToast": "Kijelentkezés rögzítve.",
         "supplyAddedToast": "Hozzáadva a bevásárlólistához.",
         "overdue": "Lejárt",
         "dueToday": "Ma esedékes",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Ez a feladat már nem létezik.",
         "errorAlreadyCheckedOut": "Ez a háztartási alkalmazott már kijelentkezett.",
         "errorAlreadyCheckedIn": "Ez a háztartási alkalmazott már bejelentkezett.",
-        "allVisitsInReport": "Minden látogatás a jelentésben"
+        "allVisitsInReport": "Minden látogatás a jelentésben",
+        "checkedOutNamed": "{{name}} kijelentkezett.",
+        "visitToday": "Ma itt: {{from}} - {{to}}",
+        "checkInAgain": "Újra bejelentkezés"
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",
@@ -4202,8 +4208,6 @@
         "subtitle": "Ossza meg a háztartási számlákat, utazásokat, bevásárlásokat és családi költségeket.",
         "addExpense": "Költség hozzáadása",
         "editExpense": "Kiadás szerkesztése",
-        "deleteExpenseConfirm": "Törli ezt a kiadást?",
-        "deleteExpenseConfirmDetail": "A csoport minden egyenlege újraszámolódik e kiadás nélkül, és aki így adósból hitelezővé válik, azonnal látja. A csatolt bizonylatok megmaradnak.",
         "addGroup": "Új csoport",
         "groups": "Csoportok",
         "searchGroups": "Csoportok keresése",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Érvényes fizetési dátumot adjon meg.",
         "savedToast": "Előfizetés mentve.",
         "addedToast": "Előfizetés hozzáadva.",
-        "renewedToast": "Megújítás dátuma frissítve.",
-        "deleteConfirm": "Törli az \"{{name}}\" előfizetést?",
-        "deleteConfirmDetail": "Az előfizetéssel együtt törlődnek az emlékeztetői és a következő fizetés költségvetési tétele. A már teljesített fizetések a havi áttekintésben maradnak.",
-        "renewConfirm": "Könyveljük a(z) \"{{name}}\" fizetését?",
-        "renewConfirmDetail": "Az esedékesség dátuma előrelép, és a(z) {{date}} napi fizetés kiadásként kerül a költségvetésbe.",
-        "deletedToast": "Előfizetés törölve.",
         "monthlyBudgetLabel": "Havi előfizetési költségvetés",
         "baseCurrencyLabel": "Alappénznem",
         "fixerHint": "Az élő átváltás a Fixer-t használja, ha a FIXER_API_KEY be van állítva a szerveren.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Még {{count}} fizetés",
         "completed": "Befejezve",
         "completedOn": "Befejezve: {{date}}",
-        "completedToast": "Előfizetés befejezve.",
         "endsAfter": "Még {{count}} fizetés",
         "logoTypeError": "Használjon PNG, JPEG, WebP vagy SVG képet.",
         "accountUsernameLabel": "Regisztrálva erre",
         "accountUsernameHint": "E-mail-cím vagy felhasználónév. Ez nem jelszómező - a Yuvomi nem tárol jelszavakat.",
         "detailAmountLabel": "Összeg",
-        "detailNextPaymentLabel": "Következő fizetés"
+        "detailNextPaymentLabel": "Következő fizetés",
+        "renewedNamed": "„{{name}}” kifizetve - következő fizetés: {{date}}.",
+        "completedNamed": "„{{name}}” kifizetve és lezárva."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Ez a bejegyzés nem tervből származik, ezért törölhető.",
                 "saved": "Bejegyzés mentve",
                 "saveError": "A bejegyzést nem sikerült menteni.",
-                "deleteConfirm": "Törlöd ezt a bejegyzést?",
-                "deleted": "Bejegyzés törölve",
-                "deleteConfirmDetail": "A bejegyzés az exportból is eltűnik. Ez nem vonható vissza."
+                "deleted": "Bejegyzés törölve"
             },
             "prn": {
                 "title": "Szükség szerint",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Rögzíted az adagot a minimális időköz letelte előtt?",
                 "earlyDetail": "A következő adag csak {{time}} után esedékes ({{remaining}}).",
                 "earlyConfirmAction": "Rögzítés mégis"
-            }
+            },
+            "doseTakenNamed": "„{{name}}” bevéve.",
+            "doseSkippedNamed": "„{{name}}” kihagyva."
         },
         "prevention": {
             "title": "Megelőzés és védőoltások",
@@ -5198,8 +5197,6 @@
             "saveError": "Az edzés nem menthető.",
             "deleted": "Edzés törölve.",
             "deleteError": "Az edzés nem törölhető.",
-            "deleteConfirm": "Biztosan törlöd ezt az edzést?",
-            "deleteConfirmDetail": "Az egység eltűnik az előzményekből és minden heti és havi összegzésből, amelybe eddig beleszámított. Nem állítható vissza.",
             "invalid": "Adj meg érvényes értékeket.",
             "totals": {
                 "count": "Edzések",
@@ -5281,11 +5278,7 @@
             "retry": "Újra",
             "saved": "Mentve.",
             "saveError": "Nem sikerült menteni.",
-            "deleted": "Törölve.",
             "deleteError": "Nem sikerült törölni.",
-            "deleteConfirm": "Biztosan törlöd ezt a bejegyzést?",
-            "periodDeleteConfirmDetail": "A rögzített időszak eltűnik. Ha a legutóbbi volt, a kiszámított következő időpontok is eltolódnak; az átlagos ciklushossz csak beállított fix érték nélkül változik.",
-            "logDeleteConfirmDetail": "Az aznapi vérzéserősség, tünetek, hangulat és a jegyzet a bejegyzéssel együtt törlődnek, és többé egyetlen kiértékelésben sem szerepelnek. Nem állítható vissza.",
             "invalid": "Adj meg érvényes értékeket.",
             "fertilityDisclaimer": "A termékeny időszakot és az ovulációt a naptármódszer becsli. Ezek nem fogamzásgátlók és nem helyettesítik az orvosi tanácsadást.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Az előre jelzett ciklus feliratkozása a naptárban",
             "widgetHint": "A ciklus csempét a(z) {{overview}} oldalon a „{{customize}}” alatt adhatja hozzá.",
-            "endBeforeStart": "A vége nem lehet a kezdete előtt."
+            "endBeforeStart": "A vége nem lehet a kezdete előtt.",
+            "periodDeleted": "Menstruáció törölve.",
+            "logDeleted": "Napi bejegyzés törölve."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",
@@ -5954,8 +5949,6 @@
         "yourPoints": "A pontjaid",
         "approve": "Jóváhagyás",
         "reject": "Elutasítás",
-        "confirmReject": "Elutasítja ezt a beváltási kérést? A pontok visszakerülnek.",
-        "confirmCancel": "Visszavonja ezt a kérést? A pontok visszakerülnek.",
         "manageParticipants": "Résztvevők kezelése",
         "participantsIntro": "Válaszd ki, ki gyűjthet pontokat. Az áttekintésben csak az engedélyezett tagok jelennek meg.",
         "emptyOverviewTitle": "Még senki sem gyűjt pontot",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Kivétel",
             "ledgerCredit": "Jóváírás",
             "ledgerDebit": "Levonás",
-            "confirmReject": "Elutasítod ezt a kérést? Semmi sem könyvelődik.",
-            "confirmCancel": "Visszavonod ezt a kérést?",
             "openAccount": "Számla megnyitása",
             "closeAccount": "Számla lezárása",
             "confirmCloseAccount": "Lezárod {{name}} számláját?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Ez a személy nem gyűjt pontokat.",
         "errorMoneyAccountGone": "Ez a számla már nem létezik.",
         "errorMoneyPlanGone": "Ez a terv már nem létezik.",
-        "ownLedger": "Saját tételeid"
+        "ownLedger": "Saját tételeid",
+        "toastApprovedNamed": "„{{reward}}” jóváhagyva neki: {{name}}.",
+        "toastRejectedNamed": "„{{reward}}” elutasítva neki: {{name}}.",
+        "toastCancelledNamed": "„{{reward}}” visszavonva."
     },
     "datepicker": {
         "openCalendar": "Naptár megnyitása",
@@ -6206,11 +6200,8 @@
         "statusLost": "Elveszett",
         "notesLabel": "Megjegyzés",
         "notesPlaceholder": "pl. a blokk a mappában van",
-        "deleteConfirm": "Törli: „{{name}}”?",
-        "deleteConfirmDetail": "A tárgy azonnal és véglegesen törlődik a leltárból; nincs lomtár, ahonnan visszaállítható lenne.",
         "created": "Tárgy hozzáadva.",
         "updated": "Tárgy frissítve.",
-        "deleted": "Tárgy törölve.",
         "emptyTitle": "A leltára még üres",
         "emptyDescription": "Jegyezze fel, mije van - hellyel, kategóriával és vételárral.",
         "loadErrorTitle": "A leltárt nem sikerült betölteni",

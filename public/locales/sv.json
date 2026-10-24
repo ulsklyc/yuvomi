@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "”{{name}}” är öppen igen - avbockningen gick inte igenom. Försök igen.",
         "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen.",
         "errorNotOwner": "Någon annan har skapat det här - du kan se det men inte ändra det.",
-        "foreignReadOnlyHint": "Skapad av {{name}} - du kan se det men inte ändra det."
+        "foreignReadOnlyHint": "Skapad av {{name}} - du kan se det men inte ändra det.",
+        "deletedNamed": "”{{name}}” raderad."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Gjord av …",
         "checkedDoneNamed": "”{{title}}” klar.",
         "checkedOpenNamed": "”{{title}}” öppen igen.",
-        "errorReorderNotAllowed": "Du kan se familjens ordning men inte ändra den."
+        "errorReorderNotAllowed": "Du kan se familjens ordning men inte ändra den.",
+        "doneSubtasksOpen": "”{{title}}” klar - {{count}} deluppgifter är fortfarande öppna.",
+        "doneSubtasksOpen_one": "”{{title}}” klar - en deluppgift är fortfarande öppen.",
+        "checkAllSubtasks": "Bocka av alla",
+        "subtasksAllDone": "”{{title}}” och alla deluppgifter klara."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Posterna förlorar dock sin kontokoppling och tillhör därefter inget konto alls. Saldot och kontotypen är borta och går inte att återställa.",
         "editAccount": "Redigera konto",
         "newAccount": "Nytt konto",
-        "accountDeletedToast": "Konto borttaget",
         "accountSavedToast": "Konto sparat",
         "accountAddedToast": "Konto tillagt",
         "accountLabel": "Konto",
@@ -4023,7 +4027,6 @@
         "supplyName": "Produkt",
         "supplyPlaceholder": "Vad saknas?",
         "checkedInToast": "Incheckning sparad.",
-        "checkedOutToast": "Utcheckning sparad.",
         "supplyAddedToast": "Tillagd i inköpslistan.",
         "overdue": "Försenad",
         "dueToday": "Idag",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Den här uppgiften finns inte längre.",
         "errorAlreadyCheckedOut": "Den här städaren är redan utcheckad.",
         "errorAlreadyCheckedIn": "Den här städaren är redan incheckad.",
-        "allVisitsInReport": "Alla besök i rapporten"
+        "allVisitsInReport": "Alla besök i rapporten",
+        "checkedOutNamed": "{{name}} utcheckad.",
+        "visitToday": "Här i dag: {{from}} - {{to}}",
+        "checkInAgain": "Checka in igen"
     },
     "userMultiSelect": {
         "moreUsers": "mer",
@@ -4202,8 +4208,6 @@
         "subtitle": "Dela hushållsräkningar, resor, inköp och familjekostnader.",
         "addExpense": "Lägg till utgift",
         "editExpense": "Redigera utgift",
-        "deleteExpenseConfirm": "Ta bort denna utgift?",
-        "deleteExpenseConfirmDetail": "Alla saldon i gruppen räknas om utan denna utgift, och den som därmed går från gäldenär till fordringsägare ser det direkt. Bifogade kvitton behålls.",
         "addGroup": "Ny grupp",
         "groups": "Grupper",
         "searchGroups": "Sök grupper",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Ange ett giltigt betalningsdatum.",
         "savedToast": "Prenumeration sparad.",
         "addedToast": "Prenumeration tillagd.",
-        "renewedToast": "Förnyelsedatum uppdaterat.",
-        "deleteConfirm": "Ta bort prenumerationen \"{{name}}\"?",
-        "deleteConfirmDetail": "Med abonnemanget raderas påminnelserna och budgetposten för nästa betalning. Redan genomförda betalningar ligger kvar i månadsöversikten.",
-        "renewConfirm": "Bokföra betalningen för \"{{name}}\"?",
-        "renewConfirmDetail": "Förfallodatumet flyttas fram och betalningen från {{date}} bokförs som en utgift i budgeten.",
-        "deletedToast": "Prenumeration borttagen.",
         "monthlyBudgetLabel": "Månadsbudget för prenumerationer",
         "baseCurrencyLabel": "Basvaluta",
         "fixerHint": "Livekonvertering använder Fixer när FIXER_API_KEY är konfigurerad på servern.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} betalning kvar",
         "completed": "Avslutad",
         "completedOn": "Avslutad {{date}}",
-        "completedToast": "Prenumeration avslutad.",
         "endsAfter": "{{count}} betalningar kvar",
         "logoTypeError": "Använd en PNG-, JPEG-, WebP- eller SVG-bild.",
         "accountUsernameLabel": "Registrerad på",
         "accountUsernameHint": "E-postadress eller användarnamn. Inget lösenordsfält - Yuvomi lagrar inga lösenord.",
         "detailAmountLabel": "Belopp",
-        "detailNextPaymentLabel": "Nästa betalning"
+        "detailNextPaymentLabel": "Nästa betalning",
+        "renewedNamed": "”{{name}}” betald - nästa betalning {{date}}.",
+        "completedNamed": "”{{name}}” betald och avslutad."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Den här posten kommer inte från ett schema och kan tas bort.",
                 "saved": "Posten sparad",
                 "saveError": "Posten kunde inte sparas.",
-                "deleteConfirm": "Ta bort den här posten?",
-                "deleted": "Posten borttagen",
-                "deleteConfirmDetail": "Posten försvinner även ur exporten. Detta går inte att ångra."
+                "deleted": "Posten borttagen"
             },
             "prn": {
                 "title": "Vid behov",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Registrera dosen innan minsta intervall har gått?",
                 "earlyDetail": "Nästa dos är inte planerad förrän {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Registrera ändå"
-            }
+            },
+            "doseTakenNamed": "”{{name}}” tagen.",
+            "doseSkippedNamed": "”{{name}}” överhoppad."
         },
         "prevention": {
             "title": "Förebyggande vård & vaccinationer",
@@ -5198,8 +5197,6 @@
             "saveError": "Passet kunde inte sparas.",
             "deleted": "Pass borttaget.",
             "deleteError": "Passet kunde inte tas bort.",
-            "deleteConfirm": "Vill du verkligen ta bort detta pass?",
-            "deleteConfirmDetail": "Passet försvinner ur historiken och ur alla vecko- och månadssummor som det hittills räknats in i. Det går inte att återställa.",
             "invalid": "Ange giltiga värden.",
             "totals": {
                 "count": "Pass",
@@ -5281,11 +5278,7 @@
             "retry": "Försök igen",
             "saved": "Sparat.",
             "saveError": "Kunde inte sparas.",
-            "deleted": "Borttaget.",
             "deleteError": "Kunde inte tas bort.",
-            "deleteConfirm": "Vill du verkligen ta bort den här posten?",
-            "periodDeleteConfirmDetail": "Den registrerade perioden är borta efteråt. Var det den senaste förskjuts även de beräknade kommande datumen; genomsnittlig cykellängd ändras bara utan fast inställt värde.",
-            "logDeleteConfirmDetail": "Blödningsmängd, symtom, humör och anteckningen för den dagen raderas med posten och finns inte längre med i någon analys. Det går inte att återställa.",
             "invalid": "Ange giltiga värden.",
             "fertilityDisclaimer": "Fertilt fönster och ägglossning uppskattas med kalendermetoden. De är inte ett preventivmedel och ersätter inte medicinsk rådgivning.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Prenumerera på den förväntade cykeln i kalendern",
             "widgetHint": "Lägg till cykelrutan i {{overview}} under ”{{customize}}”.",
-            "endBeforeStart": "Slutet får inte vara före början."
+            "endBeforeStart": "Slutet får inte vara före början.",
+            "periodDeleted": "Mens raderad.",
+            "logDeleted": "Dagsanteckning raderad."
         },
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Dina poäng",
         "approve": "Godkänn",
         "reject": "Avslå",
-        "confirmReject": "Avslå denna inlösenförfrågan? Poängen återförs.",
-        "confirmCancel": "Dra tillbaka denna förfrågan? Poängen återförs.",
         "manageParticipants": "Hantera deltagare",
         "participantsIntro": "Välj vem som kan samla poäng. Endast aktiverade medlemmar visas i översikten.",
         "emptyOverviewTitle": "Ingen samlar poäng ännu",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Uttag",
             "ledgerCredit": "Gottskrivning",
             "ledgerDebit": "Avdrag",
-            "confirmReject": "Avslå den här förfrågan? Inget bokförs.",
-            "confirmCancel": "Dra tillbaka den här förfrågan?",
             "openAccount": "Öppna konto",
             "closeAccount": "Stäng konto",
             "confirmCloseAccount": "Stänga kontot för {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Den här personen samlar inte poäng.",
         "errorMoneyAccountGone": "Det här kontot finns inte längre.",
         "errorMoneyPlanGone": "Den här planen finns inte längre.",
-        "ownLedger": "Dina poster"
+        "ownLedger": "Dina poster",
+        "toastApprovedNamed": "”{{reward}}” godkänd för {{name}}.",
+        "toastRejectedNamed": "”{{reward}}” avslagen för {{name}}.",
+        "toastCancelledNamed": "”{{reward}}” återkallad."
     },
     "datepicker": {
         "openCalendar": "Öppna kalender",
@@ -6206,11 +6200,8 @@
         "statusLost": "Förlorat",
         "notesLabel": "Anteckning",
         "notesPlaceholder": "t.ex. kvittot ligger i pärmen",
-        "deleteConfirm": "Ta bort \"{{name}}\"?",
-        "deleteConfirmDetail": "Föremålet tas bort från inventarierna direkt och permanent, det finns ingen papperskorg att återställa från.",
         "created": "Föremål tillagt.",
         "updated": "Föremål uppdaterat.",
-        "deleted": "Föremål borttaget.",
         "emptyTitle": "Dina inventarier är fortfarande tomma",
         "emptyDescription": "Anteckna vad du äger - med plats, kategori och inköpspris.",
         "loadErrorTitle": "Inventarierna kunde inte läsas in",

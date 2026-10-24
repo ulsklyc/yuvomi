@@ -17,7 +17,6 @@ import {
   advancedSection,
   wireBlurValidation,
   reportFieldError,
-  confirmModal,
   refocusAfterRender,
   captureModalContext,
   captureOpenContext,
@@ -38,7 +37,7 @@ import { canChangeRecord, canSeeInventoryPrices } from '/permissions.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines, deadlineChipSpec } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
-import { wireScrollFade } from '/utils/ux.js';
+import { wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { attachOverlay, whenHistorySettled } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
@@ -822,7 +821,7 @@ function renderListBody() {
 
 async function loadItems() {
   const res = await api.get('/inventory/items');
-  state.items = res.data;
+  state.items = (res.data ?? []).filter((entry) => !pendingItemDeletes.has(entry.id));
 }
 
 /**
@@ -1370,6 +1369,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
       onClick: async ({ close }) => {
         await close({ force: true });
         await removeItem(item);
+        refocusAfterRender();
       },
     }],
     edit: ro ? null : {
@@ -2348,41 +2348,46 @@ async function offerCurrentLocations(panel) {
   select.focus();
 }
 
+/** Gegenstaende in der Ruecknahmefrist: lokal weg, am Server noch da (R23, D6). */
+const pendingItemDeletes = new Set();
+
+// LOESCHEN MIT RUECKGAENGIG STATT RUECKFRAGE (Critique R23, D6). Ein Gegenstand
+// ist kein Behaelter: was an ihm haengt (Fristen, Wartungsbuch, Verknuepfungen),
+// geht mit ihm, und bis die Frist des Toasts endet, ist am Server nichts davon
+// geschehen (`scheduleUndoableDelete`).
 async function removeItem(item) {
   if (!mayChangeItem(item)) return;
-  const ok = await confirmModal(t('inventory.deleteConfirm', { name: item.name }), {
-    danger: true,
-    detail: t('inventory.deleteConfirmDetail'),
+  const id = item.id;
+  pendingItemDeletes.add(id);
+  state.items = state.items.filter((entry) => entry.id !== id);
+  // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
+  // Liste ohne sie neu (ohne Bewegung loest collapseRow sofort auf).
+  await collapseRow(_container?.querySelector(`#inventory-list .list-row[data-id="${id}"]`) ?? null);
+  await whenHistorySettled();
+  renderList({ repaint: true, motion: true });
+  updateAttentionBadge();
+  scheduleUndoableDelete({
+    commit: async ({ keepalive } = {}) => {
+      try {
+        await api.delete(`/inventory/items/${id}`, { keepalive });
+      } catch (err) {
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
+        // war schneller. Gegenstaende haben keine Sichtbarkeit - die 404 heisst
+        // nur "gibt es nicht mehr". Alles andere bleibt ein Fehler.
+        if (!isAlreadyDeleted(err, 'inventory_item_not_found')) throw err;
+      }
+      pendingItemDeletes.delete(id);
+    },
+    restore: async (err) => {
+      pendingItemDeletes.delete(id);
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
+      try { await loadItems(); } catch { /* der Stand von eben bleibt */ }
+      if (!_container?.isConnected) return;
+      renderList({ repaint: true, motion: true });
+      updateAttentionBadge();
+    },
+    message: t('common.deletedNamed', { name: item.name }),
   });
-  if (!ok) return;
-  try {
-    try {
-      await api.delete(`/inventory/items/${item.id}`);
-    } catch (err) {
-      // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
-      // war schneller. Gegenstaende haben keine Sichtbarkeit - die 404 heisst
-      // nur "gibt es nicht mehr". Alles andere bleibt ein Fehler.
-      if (!isAlreadyDeleted(err, 'inventory_item_not_found')) throw err;
-    }
-    await loadItems();
-    // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
-    // Liste ohne sie neu (ohne Bewegung loest collapseRow sofort auf).
-    await collapseRow(_container?.querySelector(`#inventory-list .list-row[data-id="${item.id}"]`) ?? null);
-    // ERST WENN DIE HISTORY WIEDER DER SEITE GEHOERT (R17). Die Rueckfrage
-    // gibt ihren Marker per `history.back()` zurueck, und das kommt erst nach
-    // ihrem Ausblenden an (~220ms). Antwortet der Server schneller, raeumte der
-    // Listenaufbau `?open=<id>` vom MARKER-Eintrag ab - das `back()` trug den
-    // Browser danach auf den Eintrag darunter, und in der Adresse stand wieder
-    // der geloeschte Gegenstand (gemessen bei aktiver Suche: Spalte leer,
-    // Adresse `?open=9`; ein Neuladen zeigte „nicht gefunden").
-    await whenHistorySettled();
-    renderList({ repaint: true, motion: true });
-    refocusAfterRender();
-    updateAttentionBadge();
-    window.yuvomi?.showToast(t('inventory.deleted'), 'success');
-  } catch (err) {
-    window.yuvomi?.showToast(errorSentence(err), 'danger');
-  }
 }
 
 /**

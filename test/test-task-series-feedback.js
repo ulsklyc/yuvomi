@@ -212,7 +212,7 @@ test('Liste: Haken und Wisch reichen die ANTWORT ihres Schreibvorgangs an die Qu
   const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
   // Je Aufrufstelle: im Abschnitt davor steht der Schreibvorgang, dessen
   // Antwort in `response` landet - und genau die geht in die Quittung.
-  const sites = [...src.matchAll(/(?<!function )acknowledgeStatusToggle\(container, \w+, nextStatus, response\)/g)];
+  const sites = [...src.matchAll(/(?<!function )acknowledgeStatusToggle\(container, \w+, nextStatus, response(?:, before)?\)/g)];
   assert.equal(sites.length, 2, 'Haken und Wisch rufen beide die geteilte Quittung');
   for (const site of sites) {
     const before = src.slice(Math.max(0, site.index - 600), site.index);

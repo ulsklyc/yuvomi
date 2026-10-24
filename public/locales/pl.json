@@ -110,7 +110,8 @@
         "errorCheckRolledBack": "„{{name}}” znowu jest otwarte - odhaczenie się nie powiodło. Spróbuj ponownie.",
         "errorUncheckRolledBack": "„{{name}}” znowu jest odhaczone - przywrócenie się nie powiodło. Spróbuj ponownie.",
         "errorNotOwner": "Utworzył to ktoś inny - możesz to oglądać, ale nie zmieniać.",
-        "foreignReadOnlyHint": "Utworzone przez {{name}} - możesz to oglądać, ale nie zmieniać."
+        "foreignReadOnlyHint": "Utworzone przez {{name}} - możesz to oglądać, ale nie zmieniać.",
+        "deletedNamed": "„{{name}}” usunięte."
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -774,7 +775,13 @@
         "doneByMenuItem": "Wykonał(a) …",
         "checkedDoneNamed": "„{{title}}” zrobione.",
         "checkedOpenNamed": "„{{title}}” znowu otwarte.",
-        "errorReorderNotAllowed": "Kolejność rodziny możesz oglądać, ale nie zmieniać."
+        "errorReorderNotAllowed": "Kolejność rodziny możesz oglądać, ale nie zmieniać.",
+        "doneSubtasksOpen": "„{{title}}” zrobione - wciąż otwartych podzadań: {{count}}.",
+        "doneSubtasksOpen_one": "„{{title}}” zrobione - wciąż otwarte jedno podzadanie.",
+        "checkAllSubtasks": "Odhacz wszystkie",
+        "subtasksAllDone": "„{{title}}” i wszystkie podzadania zrobione.",
+        "doneSubtasksOpen_few": "„{{title}}” zrobione - wciąż otwarte {{count}} podzadania.",
+        "doneSubtasksOpen_many": "„{{title}}” zrobione - wciąż otwartych {{count}} podzadań."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -1937,7 +1944,6 @@
         "deleteAccountConfirmDetail": "Te zapisy tracą jednak powiązanie i nie będą już należeć do żadnego konta. Saldo i typ konta przepadają bezpowrotnie.",
         "editAccount": "Edytuj konto",
         "newAccount": "Nowe konto",
-        "accountDeletedToast": "Konto usunięte",
         "accountSavedToast": "Konto zapisane",
         "accountAddedToast": "Konto dodane",
         "accountLabel": "Konto",
@@ -4261,7 +4267,6 @@
         "supplyName": "Nazwa produktu",
         "supplyPlaceholder": "Czego brakuje?",
         "checkedInToast": "Zameldowanie zapisane.",
-        "checkedOutToast": "Wymeldowanie zapisane.",
         "supplyAddedToast": "Dodano do listy zakupów.",
         "overdue": "Przeterminowane",
         "dueToday": "Na dziś",
@@ -4429,15 +4434,16 @@
         "errorTaskGone": "To zadanie już nie istnieje.",
         "errorAlreadyCheckedOut": "Ta pomoc domowa jest już wymeldowana.",
         "errorAlreadyCheckedIn": "Ta pomoc domowa jest już zameldowana.",
-        "allVisitsInReport": "Wszystkie wizyty w raporcie"
+        "allVisitsInReport": "Wszystkie wizyty w raporcie",
+        "checkedOutNamed": "{{name}} - wymeldowano.",
+        "visitToday": "Dziś obecność: {{from}} - {{to}}",
+        "checkInAgain": "Zamelduj ponownie"
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",
         "subtitle": "Dziel rachunki domowe, wyjazdy, zakupy i koszty rodzinne.",
         "addExpense": "Dodaj wydatek",
         "editExpense": "Edytuj wydatek",
-        "deleteExpenseConfirm": "Usunąć ten wydatek?",
-        "deleteExpenseConfirmDetail": "Wszystkie salda grupy zostaną przeliczone bez tego wydatku, a kto zmieni się z dłużnika w wierzyciela, zobaczy to od razu. Załączone rachunki zostają.",
         "addGroup": "Nowa grupa",
         "groups": "Grupy",
         "searchGroups": "Szukaj grup",
@@ -4861,12 +4867,6 @@
         "invalidDate": "Podaj prawidłową datę płatności.",
         "savedToast": "Subskrypcja zapisana.",
         "addedToast": "Subskrypcja dodana.",
-        "renewedToast": "Data odnowienia zaktualizowana.",
-        "deleteConfirm": "Usunąć subskrypcję \"{{name}}\"?",
-        "deleteConfirmDetail": "Razem z subskrypcją usuwane są jej przypomnienia i zapis budżetowy najbliższej płatności. Płatności już zrealizowane pozostają w podsumowaniu miesięcznym.",
-        "renewConfirm": "Zaksięgować płatność za \"{{name}}\"?",
-        "renewConfirmDetail": "Termin płatności przesunie się, a płatność z {{date}} zostanie zapisana jako wydatek w budżecie.",
-        "deletedToast": "Subskrypcja usunięta.",
         "monthlyBudgetLabel": "Miesięczny budżet subskrypcji",
         "baseCurrencyLabel": "Waluta bazowa",
         "fixerHint": "Konwersja na żywo używa Fixer, gdy FIXER_API_KEY jest skonfigurowany na serwerze.",
@@ -4964,7 +4964,6 @@
         "endsAfter_one": "Pozostała {{count}} płatność",
         "completed": "Zakończono",
         "completedOn": "Zakończono {{date}}",
-        "completedToast": "Subskrypcja zakończona.",
         "endsAfter": "Pozostało {{count}} płatności",
         "endsAfter_few": "Pozostały {{count}} płatności",
         "endsAfter_many": "Pozostało {{count}} płatności",
@@ -4972,7 +4971,9 @@
         "accountUsernameLabel": "Zarejestrowano na",
         "accountUsernameHint": "Adres e-mail lub nazwa użytkownika. To nie jest pole hasła - Yuvomi nie przechowuje haseł.",
         "detailAmountLabel": "Kwota",
-        "detailNextPaymentLabel": "Następna płatność"
+        "detailNextPaymentLabel": "Następna płatność",
+        "renewedNamed": "„{{name}}” opłacone - następna płatność {{date}}.",
+        "completedNamed": "„{{name}}” opłacone i zakończone."
     },
     "health": {
         "fasting": {
@@ -5303,9 +5304,7 @@
                 "adhocHint": "Ten wpis nie pochodzi z planu i można go usunąć.",
                 "saved": "Zapisano wpis",
                 "saveError": "Nie udało się zapisać wpisu.",
-                "deleteConfirm": "Usunąć ten wpis?",
-                "deleted": "Wpis usunięty",
-                "deleteConfirmDetail": "Wpis zniknie także z eksportu. Tej operacji nie można cofnąć."
+                "deleted": "Wpis usunięty"
             },
             "prn": {
                 "title": "W razie potrzeby",
@@ -5318,7 +5317,9 @@
                 "earlyConfirm": "Zapisać dawkę przed upływem minimalnego odstępu?",
                 "earlyDetail": "Następna dawka przewidziana jest dopiero od {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Zapisz mimo to"
-            }
+            },
+            "doseTakenNamed": "„{{name}}” przyjęte.",
+            "doseSkippedNamed": "„{{name}}” pominięte."
         },
         "prevention": {
             "title": "Profilaktyka i szczepienia",
@@ -5454,8 +5455,6 @@
             "saveError": "Nie udało się zapisać treningu.",
             "deleted": "Trening usunięty.",
             "deleteError": "Nie udało się usunąć treningu.",
-            "deleteConfirm": "Na pewno usunąć ten trening?",
-            "deleteConfirmDetail": "Sesja zniknie z historii oraz ze wszystkich sum tygodniowych i miesięcznych, do których dotąd się liczyła. Nie da się jej przywrócić.",
             "invalid": "Wprowadź prawidłowe wartości.",
             "totals": {
                 "count": "Treningi",
@@ -5537,11 +5536,7 @@
             "retry": "Spróbuj ponownie",
             "saved": "Zapisano.",
             "saveError": "Nie udało się zapisać.",
-            "deleted": "Usunięto.",
             "deleteError": "Nie udało się usunąć.",
-            "deleteConfirm": "Na pewno usunąć ten wpis?",
-            "periodDeleteConfirmDetail": "Zapisany okres zostanie usunięty. Jeśli był najnowszy, przesuną się też wyliczone kolejne terminy; średnia długość cyklu zmienia się tylko bez ustawionej stałej wartości.",
-            "logDeleteConfirmDetail": "Obfitość, objawy, nastrój i notatka z tego dnia zostaną usunięte razem z wpisem i nie pojawią się już w żadnej analizie. Nie da się tego przywrócić.",
             "invalid": "Wprowadź prawidłowe wartości.",
             "fertilityDisclaimer": "Okno płodności i owulacja są szacowane metodą kalendarzową. Nie są antykoncepcją ani nie zastępują porady lekarskiej.",
             "pregnancy": {
@@ -5878,7 +5873,9 @@
             },
             "feedLink": "Subskrybuj przewidywany cykl w kalendarzu",
             "widgetHint": "Kafelek cyklu dodasz do widoku {{overview}} w „{{customize}}”.",
-            "endBeforeStart": "Koniec nie może być przed początkiem."
+            "endBeforeStart": "Koniec nie może być przed początkiem.",
+            "periodDeleted": "Miesiączka usunięta.",
+            "logDeleted": "Wpis dnia usunięty."
         },
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",
@@ -6230,8 +6227,6 @@
         "yourPoints": "Twoje punkty",
         "approve": "Zatwierdź",
         "reject": "Odrzuć",
-        "confirmReject": "Odrzucić tę prośbę o wymianę? Punkty zostaną zwrócone.",
-        "confirmCancel": "Wycofać tę prośbę? Punkty zostaną zwrócone.",
         "manageParticipants": "Zarządzaj uczestnikami",
         "participantsIntro": "Wybierz, kto może zbierać punkty. W przeglądzie widoczni są tylko włączeni członkowie.",
         "emptyOverviewTitle": "Nikt jeszcze nie zbiera punktów",
@@ -6335,8 +6330,6 @@
             "ledgerWithdrawal": "Wypłata",
             "ledgerCredit": "Uznanie",
             "ledgerDebit": "Potrącenie",
-            "confirmReject": "Odrzucić tę prośbę? Nic nie zostanie zaksięgowane.",
-            "confirmCancel": "Wycofać tę prośbę?",
             "openAccount": "Otwórz konto",
             "closeAccount": "Zamknij konto",
             "confirmCloseAccount": "Zamknąć konto {{name}}?",
@@ -6355,7 +6348,10 @@
         "errorNotParticipating": "Ta osoba nie zbiera punktów.",
         "errorMoneyAccountGone": "To konto już nie istnieje.",
         "errorMoneyPlanGone": "Ten plan już nie istnieje.",
-        "ownLedger": "Twoje wpisy"
+        "ownLedger": "Twoje wpisy",
+        "toastApprovedNamed": "„{{reward}}” zatwierdzone dla: {{name}}.",
+        "toastRejectedNamed": "„{{reward}}” odrzucone dla: {{name}}.",
+        "toastCancelledNamed": "„{{reward}}” wycofane."
     },
     "datepicker": {
         "openCalendar": "Otwórz kalendarz",
@@ -6504,11 +6500,8 @@
         "statusLost": "Zgubiony",
         "notesLabel": "Notatka",
         "notesPlaceholder": "np. paragon jest w segregatorze",
-        "deleteConfirm": "Usunąć „{{name}}”?",
-        "deleteConfirmDetail": "Przedmiot zostanie natychmiast i trwale usunięty z inwentarza; nie ma kosza, z którego można go przywrócić.",
         "created": "Przedmiot dodany.",
         "updated": "Przedmiot zaktualizowany.",
-        "deleted": "Przedmiot usunięty.",
         "emptyTitle": "Twój inwentarz jest jeszcze pusty",
         "emptyDescription": "Zapisz, co posiadasz - z miejscem, kategorią i ceną zakupu.",
         "loadErrorTitle": "Nie udało się wczytać inwentarza",

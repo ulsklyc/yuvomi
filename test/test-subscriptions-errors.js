@@ -46,7 +46,14 @@ globalThis.localStorage = globalThis.localStorage ?? { getItem: () => null, setI
 const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
 const toasts = [];
-globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind) => { toasts.push([text, kind]); } };
+// Der juengste Toast mit Aktion: Rueckgaengig und das Ende seiner Frist
+// (`onExpire`, dort laeuft das Loeschen hinter scheduleUndoableDelete).
+let lastAction = null;
+globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind, _ms, action, opts) => {
+  toasts.push([text, kind]);
+  if (action) lastAction = { action, onExpire: opts?.onExpire ?? null };
+  return true;
+} };
 globalThis.window.matchMedia = globalThis.window.matchMedia
   ?? (() => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
 
@@ -635,31 +642,95 @@ test('Seite: verlaengern auf einem abgeschlossenen Abo (#2011) - weder Knopf noc
   }
 });
 
-test('Seite: loeschen - "schon geloescht" ist ein Erfolg und laedt wie ein Erfolg; alles andere bleibt ein Fehler und laesst die Liste stehen', async () => {
+/* R23, D6: Loeschen mit Rueckgaengig statt Rueckfrage. Die Liste verliert das
+ * Abo sofort, der Server erst mit dem Ende der Toast-Frist. */
+/** Faengt das Undo-Fenster ab (Stub von scheduleUndoableDelete in test-browser-loader). */
+function fangeUndo() {
+  const box = { opts: null };
+  globalThis.__undoStub = (opts) => { box.opts = opts; };
+  test.after(() => { delete globalThis.__undoStub; });
+  return box;
+}
+
+test('Seite: loeschen - keine Rueckfrage, das Abo geht sofort, der Server erst mit dem Ende der Frist (R23 D6)', async () => {
+  let gefragt = 0;
+  const zuvor = globalThis.__confirmModal;
+  globalThis.__confirmModal = async () => { gefragt += 1; return true; };
+  try {
+    await mitSeite(async () => {
+      const undo = fangeUndo();
+      const { calls } = await mit({ delete: async () => ({}) }, () => page.deleteSubscription(abo()));
+      assert.equal(gefragt, 0, 'keine Rueckfrage');
+      assert.equal(undo.opts?.message, 'common.deletedNamed{"name":"Netflix"}', 'der Satz nennt das Abo');
+      assert.deepEqual(calls.filter(([v]) => v === 'DELETE'), [], 'noch nichts geloescht');
+      assert.deepEqual(page.state.subscriptions.map((x) => x.id), [], 'die Liste ohne das Abo');
+      const ende = await mit({ delete: async () => ({}) }, () => undo.opts.commit({ keepalive: false }));
+      assert.deepEqual(ende.calls.filter(([v]) => v === 'DELETE').map(([, p]) => p), ['/budget/subscriptions/3']);
+    });
+  } finally {
+    globalThis.__confirmModal = zuvor;
+  }
+});
+
+test('Seite: loeschen - Rueckgaengig loescht nichts und holt das Abo zurueck', async () => {
+  await mitSeite(async () => {
+    const undo = fangeUndo();
+    await mit({ get: () => undefined }, () => page.deleteSubscription(abo()));
+    const back = await mit({
+      get: (path) => (LIST_PATH.test(path) ? { data: { subscriptions: [abo()], summary: null, rates: null } } : undefined),
+    }, () => undo.opts.restore());
+    assert.deepEqual(back.calls.filter(([v]) => v === 'DELETE'), [], 'kein Loeschen');
+    assert.ok(reloaded(back.gets));
+    assert.deepEqual(page.state.subscriptions.map((x) => x.id), [3], 'das Abo steht wieder da');
+  });
+});
+
+test('Seite: loeschen - "schon geloescht" ist ein Erfolg, alles andere nennt den Fehler und holt das Abo zurueck', async () => {
   for (const [err, expectedToasts, gone] of [
-    [fehler(404, 'subscriptions_subscription_not_found'), [['subscriptions.deletedToast', 'success']], true],
+    [fehler(404, 'subscriptions_subscription_not_found'), [], true],
     [fehler(403), [['common.errorNoPermission', 'danger']], false],
     [fehler(404), [['common.unknownError', 'danger']], false],
     [fehler(500), [['common.unknownError', 'danger']], false],
   ]) {
     await mitSeite(async () => {
-      const { gets } = await mit({ get: serverDanach(), delete: async () => { throw err; } }, () => page.deleteSubscription(abo()));
+      const undo = fangeUndo();
+      await mit({ get: () => undefined }, () => page.deleteSubscription(abo()));
       const label = `${err.status} ${err.data.reason ?? ''}`;
+      // Wie scheduleUndoableDelete: scheitert das Loeschen, laeuft restore(err).
+      const ende = await mit({
+        get: (path) => (LIST_PATH.test(path) ? { data: { subscriptions: gone ? [] : [abo()], summary: null, rates: null } } : undefined),
+        delete: async () => { throw err; },
+      }, async () => { try { await undo.opts.commit({ keepalive: false }); } catch (e) { await undo.opts.restore(e); } });
       assert.deepEqual(toasts, expectedToasts, label);
-      if (gone) assert.ok(einmalGeladen(gets), `${label}: ${gets.join(', ')}`);
-      else assert.deepEqual(gets, [], `${label}: kein Laden`);
-      assert.deepEqual(page.state.subscriptions.map((s) => s.id), gone ? [4] : [3], label);
+      if (gone) assert.deepEqual(ende.gets, [], `${label}: kein Laden noetig`);
+      else assert.ok(reloaded(ende.gets), `${label}: ${ende.gets.join(', ')}`);
+      assert.deepEqual(page.state.subscriptions.map((x) => x.id), gone ? [] : [3], label);
       assertNoServerText();
     });
   }
 });
 
-test('Seite: loeschen gelingt - die Liste kommt wie bisher vom Server', async () => {
-  await mitSeite(async () => {
-    const { gets } = await mit({ delete: async () => ({}) }, () => page.deleteSubscription(abo()));
-    assert.deepEqual(toasts, [['subscriptions.deletedToast', 'success']]);
-    assert.ok(reloaded(gets), gets.join(', '));
-  });
+/* R23, D6: "Bezahlt" ohne Rueckfrage, mit Rueckweg ueber die Marke des Servers. */
+test('Seite: verlaengern - keine Rueckfrage, Toast mit Name und Datum, Rueckgaengig schickt die Marke (R23 D6)', async () => {
+  let gefragt = 0;
+  const zuvor = globalThis.__confirmModal;
+  globalThis.__confirmModal = async () => { gefragt += 1; return true; };
+  try {
+    await mitSeite(async () => {
+      lastAction = null;
+      const renewed = { ...abo(), next_payment_date: '2026-12-05' };
+      const { calls } = await mit({ post: async () => ({ data: renewed, undo: { token: 'abc' } }) }, () => page.renewSubscription(abo()));
+      assert.equal(gefragt, 0, 'keine Rueckfrage');
+      assert.deepEqual(calls.filter(([v]) => v === 'POST').map(([, p]) => p), ['/budget/subscriptions/3/renew']);
+      assert.deepEqual(toasts, [['subscriptions.renewedNamed{"name":"Netflix","date":"2026-12-05"}', 'default']]);
+      let body = null;
+      const undo = await mit({ post: async (_p, b) => { body = b; return { data: abo() }; } }, () => lastAction.action());
+      assert.deepEqual(undo.calls.filter(([v]) => v === 'POST').map(([, p]) => p), ['/budget/subscriptions/3/renew/undo']);
+      assert.deepEqual(body, { token: 'abc' }, 'nur die Marke, keine Buchungs-Id');
+    });
+  } finally {
+    globalThis.__confirmModal = zuvor;
+  }
 });
 
 test('Seite: Monatsbudget speichern - der allgemeine Satz, nie der Text des Servers', async () => {
@@ -1016,7 +1087,10 @@ test('Seite: eine spaete "gibt es nicht mehr"-Antwort nach "weg und zurueck" lae
     ['Abo speichern', 'put', 'subscriptions_subscription_not_found', () => page.saveSubscription(formular(ABO_FORM), abo())],
     ['gewaehlte Kategorie', 'put', 'subscriptions_selected_category_not_found', () => page.saveSubscription(formular(ABO_FORM), abo())],
     ['verlaengern', 'post', 'subscriptions_subscription_not_found', () => page.renewSubscription(abo())],
-    ['loeschen', 'delete', 'subscriptions_subscription_not_found', () => page.deleteSubscription(abo())],
+    // Loeschen faellt seit R23 (D6) heraus: es fragt den Server erst mit dem
+    // Ende der Toast-Frist, und sein restore laedt nur die eigene Instanz
+    // (isCurrentOwner) - der Fall "Antwort kommt auf einer neuen Seite an"
+    // entsteht dort nicht mehr waehrend des Tipps.
   ];
   for (const kind of ['categories', 'methods']) {
     faelle.push([`umbenennen ${kind}`, 'put', kind === 'categories' ? 'subscriptions_category_not_found' : 'subscriptions_payment_method_not_found', async () => {

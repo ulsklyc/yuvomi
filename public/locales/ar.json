@@ -111,7 +111,8 @@
         "errorCheckRolledBack": "«{{name}}» مفتوح مجددًا - لم يتم وضع العلامة. حاول مرة أخرى.",
         "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى.",
         "errorNotOwner": "أنشأ هذا شخص آخر - يمكنك عرضه لكن لا يمكنك تغييره.",
-        "foreignReadOnlyHint": "أنشأه {{name}} - يمكنك عرضه لكن لا يمكنك تغييره."
+        "foreignReadOnlyHint": "أنشأه {{name}} - يمكنك عرضه لكن لا يمكنك تغييره.",
+        "deletedNamed": "تم حذف «{{name}}»."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -808,7 +809,14 @@
         "doneByMenuItem": "أنجزها …",
         "checkedDoneNamed": "تم إنجاز «{{title}}».",
         "checkedOpenNamed": "«{{title}}» مفتوحة مجددًا.",
-        "errorReorderNotAllowed": "يمكنك عرض ترتيب العائلة لكن لا يمكنك تغييره."
+        "errorReorderNotAllowed": "يمكنك عرض ترتيب العائلة لكن لا يمكنك تغييره.",
+        "doneSubtasksOpen": "تم إنجاز «{{title}}» - لا تزال {{count}} مهام فرعية مفتوحة.",
+        "doneSubtasksOpen_one": "تم إنجاز «{{title}}» - لا تزال مهمة فرعية واحدة مفتوحة.",
+        "checkAllSubtasks": "تحديد الكل كمنجز",
+        "subtasksAllDone": "تم إنجاز «{{title}}» وجميع المهام الفرعية.",
+        "doneSubtasksOpen_two": "تم إنجاز «{{title}}» - لا تزال مهمتان فرعيتان مفتوحتين.",
+        "doneSubtasksOpen_few": "تم إنجاز «{{title}}» - لا تزال {{count}} مهام فرعية مفتوحة.",
+        "doneSubtasksOpen_many": "تم إنجاز «{{title}}» - لا تزال {{count}} مهمة فرعية مفتوحة."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -2000,7 +2008,6 @@
         "deleteAccountConfirmDetail": "لكن القيود تفقد ارتباطها ولن تعود تابعة لأي حساب. الرصيد ونوع الحساب يضيعان نهائيًا ولا يمكن استعادتهما.",
         "editAccount": "تعديل الحساب",
         "newAccount": "حساب جديد",
-        "accountDeletedToast": "تم حذف الحساب",
         "accountSavedToast": "تم حفظ الحساب",
         "accountAddedToast": "تمت إضافة الحساب",
         "accountLabel": "الحساب",
@@ -4375,7 +4382,6 @@
         "supplyName": "اسم المنتج",
         "supplyPlaceholder": "ما الناقص؟",
         "checkedInToast": "تم تسجيل الدخول.",
-        "checkedOutToast": "تم تسجيل الخروج.",
         "supplyAddedToast": "تمت الإضافة إلى قائمة التسوق.",
         "overdue": "متأخرة",
         "dueToday": "مستحقة اليوم",
@@ -4543,7 +4549,10 @@
         "errorTaskGone": "هذه المهمة لم تعد موجودة.",
         "errorAlreadyCheckedOut": "تم تسجيل خروج عامل التدبير المنزلي هذا بالفعل.",
         "errorAlreadyCheckedIn": "تم تسجيل دخول عامل التدبير المنزلي هذا بالفعل.",
-        "allVisitsInReport": "كل الزيارات في التقرير"
+        "allVisitsInReport": "كل الزيارات في التقرير",
+        "checkedOutNamed": "تم تسجيل خروج {{name}}.",
+        "visitToday": "الحضور اليوم: {{from}} - {{to}}",
+        "checkInAgain": "تسجيل الدخول مجددًا"
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",
@@ -4554,8 +4563,6 @@
         "subtitle": "قسّم فواتير المنزل والرحلات والتسوق وتكاليف العائلة.",
         "addExpense": "إضافة مصروف",
         "editExpense": "تعديل المصروف",
-        "deleteExpenseConfirm": "حذف هذا المصروف؟",
-        "deleteExpenseConfirmDetail": "تُعاد حسبة كل أرصدة المجموعة بدون هذه النفقة، ومن يتحول بذلك من مدين إلى دائن يرى ذلك فورًا. أما الإيصالات المرفقة فتبقى.",
         "addGroup": "مجموعة جديدة",
         "groups": "المجموعات",
         "searchGroups": "بحث في المجموعات",
@@ -4985,12 +4992,6 @@
         "invalidDate": "أدخل تاريخ دفع صالحًا.",
         "savedToast": "تم حفظ الاشتراك.",
         "addedToast": "تمت إضافة الاشتراك.",
-        "renewedToast": "تم تحديث تاريخ التجديد.",
-        "deleteConfirm": "حذف الاشتراك \"{{name}}\"؟",
-        "deleteConfirmDetail": "تُحذف مع الاشتراك تذكيراته وقيد الميزانية الخاص بالدفعة التالية. أما الدفعات المكتملة فتبقى في نظرة الشهر العامة.",
-        "renewConfirm": "هل تريد تسجيل دفعة \"{{name}}\"؟",
-        "renewConfirmDetail": "سيتقدم تاريخ الاستحقاق، وستُسجَّل دفعة {{date}} كمصروف في الميزانية.",
-        "deletedToast": "تم حذف الاشتراك.",
         "monthlyBudgetLabel": "ميزانية الاشتراكات الشهرية",
         "baseCurrencyLabel": "العملة الأساسية",
         "fixerHint": "يستخدم التحويل المباشر Fixer عند ضبط FIXER_API_KEY على الخادم.",
@@ -5089,7 +5090,6 @@
         "endsAfter_one": "المتبقّي: {{count}} دفعة",
         "completed": "مكتمل",
         "completedOn": "اكتمل في {{date}}",
-        "completedToast": "اكتمل الاشتراك.",
         "endsAfter": "المتبقّي: {{count}} دفعة",
         "endsAfter_few": "المتبقّي: {{count}} دفعات",
         "endsAfter_two": "المتبقّي: دفعتان",
@@ -5098,7 +5098,9 @@
         "accountUsernameLabel": "مسجَّل باسم",
         "accountUsernameHint": "عنوان بريد إلكتروني أو اسم مستخدم. ليس حقل كلمة مرور - لا يحفظ Yuvomi كلمات المرور.",
         "detailAmountLabel": "المبلغ",
-        "detailNextPaymentLabel": "الدفعة التالية"
+        "detailNextPaymentLabel": "الدفعة التالية",
+        "renewedNamed": "تم دفع «{{name}}» - الدفعة التالية في {{date}}.",
+        "completedNamed": "تم دفع «{{name}}» وإنهاؤه."
     },
     "health": {
         "fasting": {
@@ -5430,9 +5432,7 @@
                 "adhocHint": "هذا السجل ليس من خطة ويمكن حذفه.",
                 "saved": "تم حفظ السجل",
                 "saveError": "تعذر حفظ السجل.",
-                "deleteConfirm": "هل تريد حذف هذا السجل؟",
-                "deleted": "تم حذف السجل",
-                "deleteConfirmDetail": "سيختفي السجل أيضًا من التصدير. لا يمكن التراجع عن ذلك."
+                "deleted": "تم حذف السجل"
             },
             "prn": {
                 "title": "عند الحاجة",
@@ -5445,7 +5445,9 @@
                 "earlyConfirm": "هل تُسجَّل الجرعة قبل انقضاء الفاصل الأدنى؟",
                 "earlyDetail": "الجرعة التالية مقررة ابتداءً من {{time}} فقط ({{remaining}}).",
                 "earlyConfirmAction": "سجّل على أي حال"
-            }
+            },
+            "doseTakenNamed": "تم تناول «{{name}}».",
+            "doseSkippedNamed": "تم تخطي «{{name}}»."
         },
         "prevention": {
             "title": "الوقاية واللقاحات",
@@ -5583,8 +5585,6 @@
             "saveError": "تعذّر حفظ الجلسة.",
             "deleted": "تم حذف الجلسة.",
             "deleteError": "تعذّر حذف الجلسة.",
-            "deleteConfirm": "هل تريد حقًا حذف هذه الجلسة؟",
-            "deleteConfirmDetail": "تختفي الحصة من السجل ومن كل المجاميع الأسبوعية والشهرية التي كانت تُحتسب فيها حتى الآن. ولا يمكن استعادتها.",
             "invalid": "يرجى إدخال قيم صحيحة.",
             "totals": {
                 "count": "الجلسات",
@@ -5666,11 +5666,7 @@
             "retry": "أعد المحاولة",
             "saved": "تم الحفظ.",
             "saveError": "تعذّر الحفظ.",
-            "deleted": "تم الحذف.",
             "deleteError": "تعذّر الحذف.",
-            "deleteConfirm": "هل تريد حقًا حذف هذا الإدخال؟",
-            "periodDeleteConfirmDetail": "تختفي الفترة المسجلة. وإن كانت الأحدث، تنزاح أيضًا المواعيد المحسوبة القادمة؛ أما متوسط طول الدورة فلا يتغير إلا إذا لم تكن هناك قيمة ثابتة مضبوطة.",
-            "logDeleteConfirmDetail": "تُحذف معه شدة النزيف والأعراض والمزاج والملاحظة المسجلة لذلك اليوم، ولن تظهر في أي تحليل بعد الآن. ولا يمكن استعادتها.",
             "invalid": "يرجى إدخال قيم صحيحة.",
             "fertilityDisclaimer": "تُقدَّر أيام الخصوبة والإباضة بطريقة التقويم. وهي ليست وسيلة لمنع الحمل ولا بديلاً عن الاستشارة الطبية.",
             "pregnancy": {
@@ -6011,7 +6007,9 @@
             },
             "feedLink": "الاشتراك في الدورة المتوقعة في التقويم",
             "widgetHint": "تضيفين بطاقة الدورة إلى {{overview}} عبر „{{customize}}“.",
-            "endBeforeStart": "لا يمكن أن تكون النهاية قبل البداية."
+            "endBeforeStart": "لا يمكن أن تكون النهاية قبل البداية.",
+            "periodDeleted": "تم حذف الدورة.",
+            "logDeleted": "تم حذف سجل اليوم."
         },
         "duration": {
             "hm": "{{hours}} س {{minutes}} د",
@@ -6369,8 +6367,6 @@
         "yourPoints": "نقاطك",
         "approve": "موافقة",
         "reject": "رفض",
-        "confirmReject": "رفض طلب الاستبدال هذا؟ ستُعاد النقاط.",
-        "confirmCancel": "سحب هذا الطلب؟ ستُعاد النقاط.",
         "manageParticipants": "إدارة المشاركين",
         "participantsIntro": "اختر من يمكنه جمع النقاط. تظهر في النظرة العامة الأعضاء المفعّلون فقط.",
         "emptyOverviewTitle": "لا أحد يجمع النقاط بعد",
@@ -6474,8 +6470,6 @@
             "ledgerWithdrawal": "سحب",
             "ledgerCredit": "إضافة",
             "ledgerDebit": "خصم",
-            "confirmReject": "رفض هذا الطلب؟ لن يُسجَّل شيء.",
-            "confirmCancel": "سحب هذا الطلب؟",
             "openAccount": "فتح حساب",
             "closeAccount": "إغلاق الحساب",
             "confirmCloseAccount": "إغلاق حساب {{name}}؟",
@@ -6494,7 +6488,10 @@
         "errorNotParticipating": "هذا الشخص لا يجمع النقاط.",
         "errorMoneyAccountGone": "هذا الحساب لم يعد موجودًا.",
         "errorMoneyPlanGone": "هذه الخطة لم تعد موجودة.",
-        "ownLedger": "معاملاتك"
+        "ownLedger": "معاملاتك",
+        "toastApprovedNamed": "تمت الموافقة على «{{reward}}» لـ {{name}}.",
+        "toastRejectedNamed": "تم رفض «{{reward}}» لـ {{name}}.",
+        "toastCancelledNamed": "تم سحب «{{reward}}»."
     },
     "datepicker": {
         "openCalendar": "فتح التقويم",
@@ -6654,11 +6651,8 @@
         "statusLost": "مفقود",
         "notesLabel": "ملاحظة",
         "notesPlaceholder": "مثل: الإيصال في المجلد",
-        "deleteConfirm": "حذف \"{{name}}\"؟",
-        "deleteConfirmDetail": "يُحذف الغرض من المقتنيات فورًا ونهائيًا، ولا توجد سلة محذوفات لاستعادته.",
         "created": "تمت إضافة الغرض.",
         "updated": "تم تحديث الغرض.",
-        "deleted": "تم حذف الغرض.",
         "emptyTitle": "مقتنياتك لا تزال فارغة",
         "emptyDescription": "سجّل ما تملكه - مع الموقع والفئة وسعر الشراء.",
         "loadErrorTitle": "تعذّر تحميل المقتنيات",

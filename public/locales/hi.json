@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "\"{{name}}\" फिर से खुला है - टिक नहीं हो पाया। फिर से कोशिश करें।",
         "errorUncheckRolledBack": "\"{{name}}\" फिर से टिक है - वापस नहीं हो पाया। फिर से कोशिश करें।",
         "errorNotOwner": "इसे किसी और ने बनाया है - आप इसे देख सकते हैं, पर बदल नहीं सकते।",
-        "foreignReadOnlyHint": "{{name}} ने बनाया - आप इसे देख सकते हैं, पर बदल नहीं सकते।"
+        "foreignReadOnlyHint": "{{name}} ने बनाया - आप इसे देख सकते हैं, पर बदल नहीं सकते।",
+        "deletedNamed": "\"{{name}}\" हटाया गया।"
     },
     "kitchen": {
         "noShoppingLists": "अभी कोई खरीद सूची नहीं है.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "किसने किया …",
         "checkedDoneNamed": "\"{{title}}\" पूर्ण।",
         "checkedOpenNamed": "\"{{title}}\" फिर से खुला।",
-        "errorReorderNotAllowed": "आप परिवार का क्रम देख सकते हैं, पर बदल नहीं सकते।"
+        "errorReorderNotAllowed": "आप परिवार का क्रम देख सकते हैं, पर बदल नहीं सकते।",
+        "doneSubtasksOpen": "\"{{title}}\" पूर्ण - {{count}} उपकार्य अभी खुले हैं।",
+        "doneSubtasksOpen_one": "\"{{title}}\" पूर्ण - {{count}} उपकार्य अभी खुला है।",
+        "checkAllSubtasks": "सभी पर निशान लगाएं",
+        "subtasksAllDone": "\"{{title}}\" और सभी उपकार्य पूर्ण।"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "हालाँकि वे प्रविष्टियाँ अपना खाता-संबंध खो देंगी और उसके बाद किसी भी खाते की नहीं रहेंगी। शेष राशि और खाता प्रकार हमेशा के लिए चले जाते हैं।",
         "editAccount": "खाता संपादित करें",
         "newAccount": "नया खाता",
-        "accountDeletedToast": "खाता हटाया गया",
         "accountSavedToast": "खाता सहेजा गया",
         "accountAddedToast": "खाता जोड़ा गया",
         "accountLabel": "खाता",
@@ -4023,7 +4027,6 @@
         "supplyName": "उत्पाद का नाम",
         "supplyPlaceholder": "क्या नहीं है?",
         "checkedInToast": "चेक-इन दर्ज हुआ।",
-        "checkedOutToast": "चेक-आउट दर्ज हुआ।",
         "supplyAddedToast": "खरीदारी सूची में जोड़ा गया।",
         "overdue": "विलंबित",
         "dueToday": "आज देय",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "यह कार्य अब मौजूद नहीं है।",
         "errorAlreadyCheckedOut": "यह सहायक पहले ही चेक-आउट कर चुका है।",
         "errorAlreadyCheckedIn": "यह सहायक पहले ही चेक-इन कर चुका है।",
-        "allVisitsInReport": "रिपोर्ट में सभी यात्राएं"
+        "allVisitsInReport": "रिपोर्ट में सभी यात्राएं",
+        "checkedOutNamed": "{{name}} का चेक-आउट हुआ।",
+        "visitToday": "आज यहाँ: {{from}} - {{to}}",
+        "checkInAgain": "फिर से चेक-इन करें"
     },
     "userMultiSelect": {
         "moreUsers": "और",
@@ -4202,8 +4208,6 @@
         "subtitle": "घर के बिल, यात्राएं, खरीदारी और पारिवारिक खर्च बांटें।",
         "addExpense": "खर्च जोड़ें",
         "editExpense": "व्यय संपादित करें",
-        "deleteExpenseConfirm": "इस व्यय को हटाएं?",
-        "deleteExpenseConfirmDetail": "समूह के सभी शेष इस खर्च के बिना दोबारा गिने जाते हैं, और जो इससे देनदार से लेनदार बनता है वह तुरंत देख लेता है। संलग्न रसीदें बनी रहती हैं।",
         "addGroup": "नया समूह",
         "groups": "समूह",
         "searchGroups": "समूह खोजें",
@@ -4615,12 +4619,6 @@
         "invalidDate": "एक मान्य भुगतान तिथि दर्ज करें।",
         "savedToast": "सदस्यता सहेजी गई।",
         "addedToast": "सदस्यता जोड़ी गई।",
-        "renewedToast": "नवीनीकरण तिथि अपडेट की गई।",
-        "deleteConfirm": "सदस्यता \"{{name}}\" हटाएँ?",
-        "deleteConfirmDetail": "सदस्यता के साथ उसके रिमाइंडर और अगली भुगतान की बजट प्रविष्टि मिट जाती है। पहले पूरे हो चुके भुगतान मासिक अवलोकन में बने रहते हैं।",
-        "renewConfirm": "\"{{name}}\" का भुगतान दर्ज करें?",
-        "renewConfirmDetail": "देय तिथि आगे बढ़ जाएगी और {{date}} का भुगतान बजट में व्यय के रूप में दर्ज होगा।",
-        "deletedToast": "सदस्यता हटाई गई।",
         "monthlyBudgetLabel": "मासिक सदस्यता बजट",
         "baseCurrencyLabel": "आधार मुद्रा",
         "fixerHint": "जब सर्वर पर FIXER_API_KEY कॉन्फ़िगर हो, तो लाइव रूपांतरण Fixer का उपयोग करता है।",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} भुगतान शेष",
         "completed": "पूर्ण",
         "completedOn": "{{date}} को पूर्ण",
-        "completedToast": "सदस्यता पूर्ण हुई।",
         "endsAfter": "{{count}} भुगतान शेष",
         "logoTypeError": "PNG, JPEG, WebP या SVG चित्र इस्तेमाल करें।",
         "accountUsernameLabel": "इसके नाम पंजीकृत",
         "accountUsernameHint": "ईमेल पता या उपयोगकर्ता नाम। यह पासवर्ड फ़ील्ड नहीं है - Yuvomi पासवर्ड सहेजता नहीं है।",
         "detailAmountLabel": "राशि",
-        "detailNextPaymentLabel": "अगला भुगतान"
+        "detailNextPaymentLabel": "अगला भुगतान",
+        "renewedNamed": "\"{{name}}\" का भुगतान हुआ - अगला भुगतान {{date}} को।",
+        "completedNamed": "\"{{name}}\" का भुगतान हुआ और समाप्त।"
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "यह प्रविष्टि किसी योजना से नहीं है और मिटाई जा सकती है।",
                 "saved": "प्रविष्टि सहेजी गई",
                 "saveError": "प्रविष्टि सहेजी नहीं जा सकी।",
-                "deleteConfirm": "इस प्रविष्टि को मिटाएँ?",
-                "deleted": "प्रविष्टि मिटाई गई",
-                "deleteConfirmDetail": "यह प्रविष्टि निर्यात से भी हट जाएगी। इसे पूर्ववत नहीं किया जा सकता।"
+                "deleted": "प्रविष्टि मिटाई गई"
             },
             "prn": {
                 "title": "आवश्यकतानुसार",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "न्यूनतम अंतराल पूरा होने से पहले खुराक दर्ज करें?",
                 "earlyDetail": "अगली खुराक {{time}} से ही तय है ({{remaining}}).",
                 "earlyConfirmAction": "फिर भी दर्ज करें"
-            }
+            },
+            "doseTakenNamed": "\"{{name}}\" ली गई।",
+            "doseSkippedNamed": "\"{{name}}\" छोड़ी गई।"
         },
         "prevention": {
             "title": "निवारण और टीकाकरण",
@@ -5198,8 +5197,6 @@
             "saveError": "सत्र सहेजा नहीं जा सका।",
             "deleted": "सत्र हटाया गया।",
             "deleteError": "सत्र हटाया नहीं जा सका।",
-            "deleteConfirm": "क्या वाकई यह सत्र हटाना है?",
-            "deleteConfirmDetail": "यह सत्र इतिहास से और उन सभी साप्ताहिक व मासिक योगों से हट जाएगा जिनमें अब तक गिना जाता था। इसे वापस नहीं लाया जा सकता।",
             "invalid": "कृपया मान्य मान दर्ज करें।",
             "totals": {
                 "count": "सत्र",
@@ -5281,11 +5278,7 @@
             "retry": "पुनः प्रयास करें",
             "saved": "सहेजा गया।",
             "saveError": "सहेजा नहीं जा सका।",
-            "deleted": "हटाया गया।",
             "deleteError": "हटाया नहीं जा सका।",
-            "deleteConfirm": "क्या वाकई यह प्रविष्टि हटानी है?",
-            "periodDeleteConfirmDetail": "दर्ज अवधि मिट जाती है। यदि वह सबसे हालिया थी, तो गणना की गई आगामी तिथियाँ भी खिसक जाती हैं; औसत चक्र-अवधि केवल तभी बदलती है जब कोई निश्चित मान सेट न हो।",
-            "logDeleteConfirmDetail": "उस दिन का रक्तस्राव, लक्षण, मनोदशा और टिप्पणी प्रविष्टि के साथ मिट जाते हैं और किसी विश्लेषण में नहीं दिखेंगे। इन्हें वापस नहीं लाया जा सकता।",
             "invalid": "कृपया मान्य मान दर्ज करें।",
             "fertilityDisclaimer": "उपजाऊ अवधि और ओव्यूलेशन कैलेंडर विधि से अनुमानित हैं। ये गर्भनिरोधक नहीं हैं और चिकित्सीय सलाह का विकल्प नहीं हैं।",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "अनुमानित चक्र को कैलेंडर में सब्सक्राइब करें",
             "widgetHint": "चक्र टाइल को {{overview}} में “{{customize}}” से जोड़ें।",
-            "endBeforeStart": "अंत आरंभ से पहले नहीं हो सकता।"
+            "endBeforeStart": "अंत आरंभ से पहले नहीं हो सकता।",
+            "periodDeleted": "मासिक धर्म हटाया गया।",
+            "logDeleted": "दिन की प्रविष्टि हटाई गई।"
         },
         "duration": {
             "hm": "{{hours}} घं {{minutes}} मि",
@@ -5954,8 +5949,6 @@
         "yourPoints": "तुम्हारे अंक",
         "approve": "स्वीकृत करें",
         "reject": "अस्वीकार करें",
-        "confirmReject": "इस भुनाने के अनुरोध को अस्वीकार करें? अंक वापस कर दिए जाएँगे।",
-        "confirmCancel": "यह अनुरोध वापस लें? अंक वापस कर दिए जाएँगे।",
         "manageParticipants": "प्रतिभागी प्रबंधित करें",
         "participantsIntro": "चुनें कि कौन अंक जमा कर सकता है। अवलोकन में केवल सक्रिय सदस्य दिखते हैं।",
         "emptyOverviewTitle": "अभी कोई अंक जमा नहीं कर रहा",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "निकासी",
             "ledgerCredit": "जोड़",
             "ledgerDebit": "कटौती",
-            "confirmReject": "यह अनुरोध अस्वीकार करें? कुछ भी दर्ज नहीं होगा।",
-            "confirmCancel": "यह अनुरोध वापस लें?",
             "openAccount": "खाता खोलें",
             "closeAccount": "खाता बंद करें",
             "confirmCloseAccount": "{{name}} का खाता बंद करें?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "यह व्यक्ति अंक जमा नहीं करता।",
         "errorMoneyAccountGone": "यह खाता अब मौजूद नहीं है।",
         "errorMoneyPlanGone": "यह योजना अब मौजूद नहीं है।",
-        "ownLedger": "तुम्हारी प्रविष्टियाँ"
+        "ownLedger": "तुम्हारी प्रविष्टियाँ",
+        "toastApprovedNamed": "{{name}} के लिए \"{{reward}}\" स्वीकृत।",
+        "toastRejectedNamed": "{{name}} के लिए \"{{reward}}\" अस्वीकृत।",
+        "toastCancelledNamed": "\"{{reward}}\" वापस लिया गया।"
     },
     "datepicker": {
         "openCalendar": "कैलेंडर खोलें",
@@ -6206,11 +6200,8 @@
         "statusLost": "खो गया",
         "notesLabel": "नोट",
         "notesPlaceholder": "जैसे रसीद फ़ोल्डर में है",
-        "deleteConfirm": "\"{{name}}\" हटाएँ?",
-        "deleteConfirmDetail": "चीज़ तुरंत और स्थायी रूप से इन्वेंटरी से हटा दी जाती है; इसे वापस पाने के लिए कोई रीसायकल बिन नहीं है।",
         "created": "चीज़ जोड़ी गई।",
         "updated": "चीज़ अपडेट की गई।",
-        "deleted": "चीज़ हटाई गई।",
         "emptyTitle": "आपकी इन्वेंटरी अभी खाली है",
         "emptyDescription": "जो आपके पास है उसे दर्ज करें - स्थान, श्रेणी और खरीद मूल्य के साथ।",
         "loadErrorTitle": "इन्वेंटरी लोड नहीं हो सकी",

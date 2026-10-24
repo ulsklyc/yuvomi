@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "„{{name}}“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.",
         "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal.",
         "errorNotOwner": "Das hat jemand anderes angelegt - du kannst es ansehen, aber nicht ändern.",
-        "foreignReadOnlyHint": "Von {{name}} angelegt - du kannst es ansehen, aber nicht ändern."
+        "foreignReadOnlyHint": "Von {{name}} angelegt - du kannst es ansehen, aber nicht ändern.",
+        "deletedNamed": "„{{name}}“ gelöscht."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -670,7 +671,11 @@
         "doneByMenuItem": "Erledigt von …",
         "checkedDoneNamed": "„{{title}}“ erledigt.",
         "checkedOpenNamed": "„{{title}}“ wieder offen.",
-        "errorReorderNotAllowed": "Die Reihenfolge der Familie kannst du ansehen, aber nicht ändern."
+        "errorReorderNotAllowed": "Die Reihenfolge der Familie kannst du ansehen, aber nicht ändern.",
+        "doneSubtasksOpen": "„{{title}}“ erledigt - {{count}} Teilaufgaben noch offen.",
+        "doneSubtasksOpen_one": "„{{title}}“ erledigt - eine Teilaufgabe noch offen.",
+        "checkAllSubtasks": "Alle abhaken",
+        "subtasksAllDone": "„{{title}}“ und alle Teilaufgaben erledigt."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -1777,7 +1782,6 @@
         "deleteAccountConfirmDetail": "Die Buchungen verlieren allerdings ihre Kontozuordnung und zählen danach zu keinem Konto mehr. Kontostand und Kontotyp sind weg und lassen sich nicht wiederherstellen.",
         "editAccount": "Konto bearbeiten",
         "newAccount": "Neues Konto",
-        "accountDeletedToast": "Konto gelöscht",
         "accountSavedToast": "Konto gespeichert",
         "accountAddedToast": "Konto hinzugefügt",
         "accountLabel": "Konto",
@@ -4027,7 +4031,6 @@
         "supplyName": "Produktname",
         "supplyPlaceholder": "Was fehlt?",
         "checkedInToast": "Check-in gespeichert.",
-        "checkedOutToast": "Check-out gespeichert.",
         "supplyAddedToast": "Zur Einkaufsliste hinzugefügt.",
         "overdue": "Überfällig",
         "dueToday": "Heute fällig",
@@ -4195,15 +4198,16 @@
         "errorTaskGone": "Diese Aufgabe gibt es nicht mehr.",
         "errorAlreadyCheckedOut": "Diese Haushaltshilfe ist schon ausgecheckt.",
         "errorAlreadyCheckedIn": "Diese Haushaltshilfe ist schon eingecheckt.",
-        "allVisitsInReport": "Alle Besuche im Bericht"
+        "allVisitsInReport": "Alle Besuche im Bericht",
+        "checkedOutNamed": "{{name}} ausgecheckt.",
+        "visitToday": "Heute da: {{from}} - {{to}}",
+        "checkInAgain": "Erneut einchecken"
     },
     "splitExpenses": {
         "title": "Gemeinsame Ausgaben",
         "subtitle": "Teile Haushaltsrechnungen, Reisen, Einkäufe und Familienkosten.",
         "addExpense": "Ausgabe hinzufügen",
         "editExpense": "Ausgabe bearbeiten",
-        "deleteExpenseConfirm": "Diese Ausgabe löschen?",
-        "deleteExpenseConfirmDetail": "Alle Salden der Gruppe werden ohne diese Ausgabe neu berechnet, wer dadurch vom Schuldner zum Gläubiger wird, sieht das sofort. Angehängte Belege bleiben erhalten.",
         "addGroup": "Neue Gruppe",
         "groups": "Gruppen",
         "searchGroups": "Gruppen suchen",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Gib ein gültiges Zahlungsdatum ein.",
         "savedToast": "Abonnement gespeichert.",
         "addedToast": "Abonnement hinzugefügt.",
-        "renewedToast": "Verlängerungsdatum aktualisiert.",
-        "deleteConfirm": "Abonnement \"{{name}}\" löschen?",
-        "deleteConfirmDetail": "Mit dem Abo werden seine Erinnerungen und die Budget-Buchung der nächsten Zahlung gelöscht. Bereits abgeschlossene Zahlungen bleiben in der Monatsübersicht stehen.",
-        "renewConfirm": "Zahlung für \"{{name}}\" buchen?",
-        "renewConfirmDetail": "Das Fälligkeitsdatum rückt weiter, und die Zahlung vom {{date}} wird als Ausgabe im Budget gebucht.",
-        "deletedToast": "Abonnement gelöscht.",
         "monthlyBudgetLabel": "Monatliches Abonnement-Budget",
         "baseCurrencyLabel": "Basiswährung",
         "fixerHint": "Live-Umrechnung nutzt Fixer, wenn FIXER_API_KEY auf dem Server konfiguriert ist.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Noch {{count}} Zahlung",
         "completed": "Abgeschlossen",
         "completedOn": "Abgeschlossen am {{date}}",
-        "completedToast": "Abo abgeschlossen.",
         "endsAfter": "Noch {{count}} Zahlungen",
         "logoTypeError": "Bitte ein PNG-, JPEG-, WebP- oder SVG-Bild verwenden.",
         "accountUsernameLabel": "Registriert unter",
         "accountUsernameHint": "E-Mail-Adresse oder Benutzername. Kein Passwortfeld - Yuvomi speichert keine Passwörter.",
         "detailAmountLabel": "Betrag",
-        "detailNextPaymentLabel": "Nächste Zahlung"
+        "detailNextPaymentLabel": "Nächste Zahlung",
+        "renewedNamed": "„{{name}}“ bezahlt - nächste Zahlung am {{date}}.",
+        "completedNamed": "„{{name}}“ bezahlt und abgeschlossen."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Dieser Eintrag stammt aus keinem Plan und lässt sich löschen.",
                 "saved": "Eintrag gespeichert",
                 "saveError": "Eintrag konnte nicht gespeichert werden.",
-                "deleteConfirm": "Diesen Eintrag löschen?",
-                "deleted": "Eintrag gelöscht",
-                "deleteConfirmDetail": "Der Eintrag verschwindet damit auch aus dem Export. Rückgängig machen lässt sich das nicht."
+                "deleted": "Eintrag gelöscht"
             },
             "prn": {
                 "title": "Bei Bedarf",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Dosis vor Ablauf des Mindestabstands eintragen?",
                 "earlyDetail": "Die nächste Dosis ist erst ab {{time}} vorgesehen ({{remaining}}).",
                 "earlyConfirmAction": "Trotzdem eintragen"
-            }
+            },
+            "doseTakenNamed": "„{{name}}“ eingenommen.",
+            "doseSkippedNamed": "„{{name}}“ ausgelassen."
         },
         "prevention": {
             "title": "Vorsorge & Impfungen",
@@ -5198,8 +5197,6 @@
             "saveError": "Einheit konnte nicht gespeichert werden.",
             "deleted": "Einheit gelöscht.",
             "deleteError": "Einheit konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diese Einheit wirklich löschen?",
-            "deleteConfirmDetail": "Die Einheit verschwindet aus dem Verlauf und aus allen Wochen- und Monatssummen, die sie bisher mitgezählt haben. Wiederherstellen lässt sie sich nicht.",
             "invalid": "Bitte gültige Werte eingeben.",
             "totals": {
                 "count": "Einheiten",
@@ -5281,11 +5278,7 @@
             "retry": "Erneut versuchen",
             "saved": "Gespeichert.",
             "saveError": "Konnte nicht gespeichert werden.",
-            "deleted": "Gelöscht.",
             "deleteError": "Konnte nicht gelöscht werden.",
-            "deleteConfirm": "Diesen Eintrag wirklich löschen?",
-            "periodDeleteConfirmDetail": "Der erfasste Zeitraum ist danach weg. War es die jüngste Periode, verschieben sich auch die berechneten nächsten Termine; die durchschnittliche Zykluslänge ändert sich nur ohne fest eingestellten Wert.",
-            "logDeleteConfirmDetail": "Blutungsstärke, Symptome, Stimmung und die Notiz dieses Tages werden mitgelöscht und stehen in keiner Auswertung mehr zur Verfügung. Wiederherstellen lässt sich das nicht.",
             "invalid": "Bitte gültige Werte eingeben.",
             "fertilityDisclaimer": "Die Angaben zu fruchtbarem Fenster und Eisprung beruhen auf der Kalendermethode. Sie ersetzen keine Verhütung und keine ärztliche Beratung.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Vorhergesagten Zyklus im Kalender abonnieren",
             "widgetHint": "Die Zyklus-Kachel blendest du in der {{overview}} unter „{{customize}}“ ein.",
-            "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen."
+            "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen.",
+            "periodDeleted": "Periode gelöscht.",
+            "logDeleted": "Tageseintrag gelöscht."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Deine Punkte",
         "approve": "Freigeben",
         "reject": "Ablehnen",
-        "confirmReject": "Diese Einlöse-Anfrage ablehnen? Die Punkte werden zurückgebucht.",
-        "confirmCancel": "Diese Anfrage zurückziehen? Die Punkte werden zurückgebucht.",
         "manageParticipants": "Teilnehmer verwalten",
         "participantsIntro": "Wähle, wer Punkte sammeln kann. Nur aktivierte Mitglieder erscheinen in der Übersicht.",
         "emptyOverviewTitle": "Noch niemand sammelt Punkte",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Abhebung",
             "ledgerCredit": "Gutschrift",
             "ledgerDebit": "Abzug",
-            "confirmReject": "Diese Anfrage ablehnen? Es wird nichts gebucht.",
-            "confirmCancel": "Diese Anfrage zurückziehen?",
             "openAccount": "Konto eröffnen",
             "closeAccount": "Konto schließen",
             "confirmCloseAccount": "Konto von {{name}} schließen?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Diese Person sammelt keine Punkte.",
         "errorMoneyAccountGone": "Dieses Konto gibt es nicht mehr.",
         "errorMoneyPlanGone": "Diesen Plan gibt es nicht mehr.",
-        "ownLedger": "Deine Buchungen"
+        "ownLedger": "Deine Buchungen",
+        "toastApprovedNamed": "„{{reward}}“ für {{name}} freigegeben.",
+        "toastRejectedNamed": "„{{reward}}“ für {{name}} abgelehnt.",
+        "toastCancelledNamed": "„{{reward}}“ zurückgezogen."
     },
     "datepicker": {
         "openCalendar": "Kalender öffnen",
@@ -6206,11 +6200,8 @@
         "statusLost": "Verloren",
         "notesLabel": "Notiz",
         "notesPlaceholder": "z. B. Kaufbeleg liegt im Ordner",
-        "deleteConfirm": "\"{{name}}\" wirklich löschen?",
-        "deleteConfirmDetail": "Der Gegenstand wird sofort endgültig aus dem Inventar gelöscht, einen Papierkorb gibt es nicht.",
         "created": "Gegenstand hinzugefügt.",
         "updated": "Gegenstand aktualisiert.",
-        "deleted": "Gegenstand gelöscht.",
         "emptyTitle": "Das Inventar ist noch leer",
         "emptyDescription": "Trage ein, was du besitzt - mit Ort, Kategorie und Kaufpreis.",
         "loadErrorTitle": "Inventar konnte nicht geladen werden",

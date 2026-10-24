@@ -110,7 +110,8 @@
         "errorCheckRolledBack": "«{{name}}» снова не отмечено - отметить не удалось. Попробуйте ещё раз.",
         "errorUncheckRolledBack": "«{{name}}» снова отмечено - снять отметку не удалось. Попробуйте ещё раз.",
         "errorNotOwner": "Это создал кто-то другой - вы можете смотреть, но не изменять.",
-        "foreignReadOnlyHint": "Создал(а) {{name}} - вы можете смотреть, но не изменять."
+        "foreignReadOnlyHint": "Создал(а) {{name}} - вы можете смотреть, но не изменять.",
+        "deletedNamed": "«{{name}}» удалено."
     },
     "kitchen": {
         "noShoppingLists": "Списка покупок ещё нет.",
@@ -756,7 +757,13 @@
         "doneByMenuItem": "Выполнил(а) …",
         "checkedDoneNamed": "«{{title}}» выполнено.",
         "checkedOpenNamed": "«{{title}}» снова открыто.",
-        "errorReorderNotAllowed": "Порядок семьи можно смотреть, но не изменять."
+        "errorReorderNotAllowed": "Порядок семьи можно смотреть, но не изменять.",
+        "doneSubtasksOpen": "«{{title}}» выполнено - ещё открыто подзадач: {{count}}.",
+        "doneSubtasksOpen_one": "«{{title}}» выполнено - ещё открыта {{count}} подзадача.",
+        "checkAllSubtasks": "Отметить все",
+        "subtasksAllDone": "«{{title}}» и все подзадачи выполнены.",
+        "doneSubtasksOpen_few": "«{{title}}» выполнено - ещё открыты {{count}} подзадачи.",
+        "doneSubtasksOpen_many": "«{{title}}» выполнено - ещё открыто {{count}} подзадач."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",
@@ -1919,7 +1926,6 @@
         "deleteAccountConfirmDetail": "Но записи потеряют привязку и больше не будут относиться ни к одному счёту. Остаток и тип счёта пропадут безвозвратно.",
         "editAccount": "Изменить счёт",
         "newAccount": "Новый счёт",
-        "accountDeletedToast": "Счёт удалён",
         "accountSavedToast": "Счёт сохранён",
         "accountAddedToast": "Счёт добавлен",
         "accountLabel": "Счёт",
@@ -4257,7 +4263,6 @@
         "supplyName": "Название товара",
         "supplyPlaceholder": "Чего не хватает?",
         "checkedInToast": "Приход отмечен.",
-        "checkedOutToast": "Уход отмечен.",
         "supplyAddedToast": "Добавлено в список покупок.",
         "overdue": "Просрочено",
         "dueToday": "Срок сегодня",
@@ -4425,7 +4430,10 @@
         "errorTaskGone": "Этой задачи больше нет.",
         "errorAlreadyCheckedOut": "Уход этого помощника уже отмечен.",
         "errorAlreadyCheckedIn": "Приход этого помощника уже отмечен.",
-        "allVisitsInReport": "Все посещения в отчёте"
+        "allVisitsInReport": "Все посещения в отчёте",
+        "checkedOutNamed": "{{name}}: уход отмечен.",
+        "visitToday": "Сегодня: {{from}} - {{to}}",
+        "checkInAgain": "Отметить приход снова"
     },
     "userMultiSelect": {
         "moreUsers": "ещё",
@@ -4436,8 +4444,6 @@
         "subtitle": "Делите счета дома, поездки, покупки и семейные расходы.",
         "addExpense": "Добавить расход",
         "editExpense": "Изменить расход",
-        "deleteExpenseConfirm": "Удалить этот расход?",
-        "deleteExpenseConfirmDetail": "Все балансы группы пересчитаются без этого расхода, и тот, кто из должника станет кредитором, увидит это сразу. Прикреплённые чеки останутся.",
         "addGroup": "Новая группа",
         "groups": "Группы",
         "searchGroups": "Поиск групп",
@@ -4861,12 +4867,6 @@
         "invalidDate": "Введите действительную дату платежа.",
         "savedToast": "Подписка сохранена.",
         "addedToast": "Подписка добавлена.",
-        "renewedToast": "Дата продления обновлена.",
-        "deleteConfirm": "Удалить подписку \"{{name}}\"?",
-        "deleteConfirmDetail": "Вместе с подпиской удаляются её напоминания и бюджетная запись следующего платежа. Уже завершённые платежи остаются в месячном обзоре.",
-        "renewConfirm": "Записать платёж по «{{name}}»?",
-        "renewConfirmDetail": "Дата следующего платежа сдвинется, а платёж от {{date}} будет записан как расход в бюджете.",
-        "deletedToast": "Подписка удалена.",
         "monthlyBudgetLabel": "Месячный бюджет подписок",
         "baseCurrencyLabel": "Базовая валюта",
         "fixerHint": "Живая конвертация использует Fixer, если на сервере настроен FIXER_API_KEY.",
@@ -4964,7 +4964,6 @@
         "endsAfter_one": "Остался {{count}} платёж",
         "completed": "Завершено",
         "completedOn": "Завершено {{date}}",
-        "completedToast": "Подписка завершена.",
         "endsAfter": "Осталось {{count}} платежей",
         "endsAfter_few": "Осталось {{count}} платежа",
         "endsAfter_many": "Осталось {{count}} платежей",
@@ -4972,7 +4971,9 @@
         "accountUsernameLabel": "Зарегистрировано на",
         "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли.",
         "detailAmountLabel": "Сумма",
-        "detailNextPaymentLabel": "Следующий платеж"
+        "detailNextPaymentLabel": "Следующий платеж",
+        "renewedNamed": "«{{name}}» оплачено - следующий платёж {{date}}.",
+        "completedNamed": "«{{name}}» оплачено и завершено."
     },
     "health": {
         "fasting": {
@@ -5303,9 +5304,7 @@
                 "adhocHint": "Эта запись не из плана, её можно удалить.",
                 "saved": "Запись сохранена",
                 "saveError": "Не удалось сохранить запись.",
-                "deleteConfirm": "Удалить эту запись?",
-                "deleted": "Запись удалена",
-                "deleteConfirmDetail": "Запись исчезнет и из экспорта. Отменить это нельзя."
+                "deleted": "Запись удалена"
             },
             "prn": {
                 "title": "По потребности",
@@ -5318,7 +5317,9 @@
                 "earlyConfirm": "Записать дозу до истечения минимального интервала?",
                 "earlyDetail": "Следующая доза предусмотрена только с {{time}} ({{remaining}}).",
                 "earlyConfirmAction": "Всё равно записать"
-            }
+            },
+            "doseTakenNamed": "«{{name}}» принято.",
+            "doseSkippedNamed": "«{{name}}» пропущено."
         },
         "prevention": {
             "title": "Профилактика и прививки",
@@ -5454,8 +5455,6 @@
             "saveError": "Не удалось сохранить тренировку.",
             "deleted": "Тренировка удалена.",
             "deleteError": "Не удалось удалить тренировку.",
-            "deleteConfirm": "Действительно удалить эту тренировку?",
-            "deleteConfirmDetail": "Занятие исчезнет из истории и из всех недельных и месячных итогов, в которых оно до сих пор учитывалось. Восстановить его нельзя.",
             "invalid": "Введите корректные значения.",
             "totals": {
                 "count": "Тренировки",
@@ -5537,11 +5536,7 @@
             "retry": "Повторить",
             "saved": "Сохранено.",
             "saveError": "Не удалось сохранить.",
-            "deleted": "Удалено.",
             "deleteError": "Не удалось удалить.",
-            "deleteConfirm": "Действительно удалить эту запись?",
-            "periodDeleteConfirmDetail": "Записанный период пропадёт. Если это была последняя менструация, сместятся и расчётные ближайшие даты; средняя длина цикла меняется только без заданного фиксированного значения.",
-            "logDeleteConfirmDetail": "Интенсивность, симптомы, настроение и заметка за этот день удалятся вместе с записью и больше не попадут ни в одну сводку. Восстановить нельзя.",
             "invalid": "Введите корректные значения.",
             "fertilityDisclaimer": "Фертильное окно и овуляция рассчитываются календарным методом. Это не средство контрацепции и не замена медицинской консультации.",
             "pregnancy": {
@@ -5878,7 +5873,9 @@
             },
             "feedLink": "Подписаться на прогноз цикла в календаре",
             "widgetHint": "Плитку цикла можно добавить в «{{overview}}» через «{{customize}}».",
-            "endBeforeStart": "Конец не может быть раньше начала."
+            "endBeforeStart": "Конец не может быть раньше начала.",
+            "periodDeleted": "Менструация удалена.",
+            "logDeleted": "Запись дня удалена."
         },
         "duration": {
             "hm": "{{hours}} ч {{minutes}} мин",
@@ -6230,8 +6227,6 @@
         "yourPoints": "Твои баллы",
         "approve": "Одобрить",
         "reject": "Отклонить",
-        "confirmReject": "Отклонить этот запрос на обмен? Баллы будут возвращены.",
-        "confirmCancel": "Отозвать этот запрос? Баллы будут возвращены.",
         "manageParticipants": "Управление участниками",
         "participantsIntro": "Выберите, кто может копить баллы. В обзоре отображаются только включённые участники.",
         "emptyOverviewTitle": "Пока никто не копит баллы",
@@ -6335,8 +6330,6 @@
             "ledgerWithdrawal": "Снятие",
             "ledgerCredit": "Зачисление",
             "ledgerDebit": "Списание",
-            "confirmReject": "Отклонить этот запрос? Ничего не будет проведено.",
-            "confirmCancel": "Отозвать этот запрос?",
             "openAccount": "Открыть счёт",
             "closeAccount": "Закрыть счёт",
             "confirmCloseAccount": "Закрыть счёт для {{name}}?",
@@ -6355,7 +6348,10 @@
         "errorNotParticipating": "Этот человек не копит баллы.",
         "errorMoneyAccountGone": "Этого счёта больше нет.",
         "errorMoneyPlanGone": "Этого плана больше нет.",
-        "ownLedger": "Твои записи"
+        "ownLedger": "Твои записи",
+        "toastApprovedNamed": "«{{reward}}» одобрено для: {{name}}.",
+        "toastRejectedNamed": "«{{reward}}» отклонено для: {{name}}.",
+        "toastCancelledNamed": "«{{reward}}» отозвано."
     },
     "datepicker": {
         "openCalendar": "Открыть календарь",
@@ -6504,11 +6500,8 @@
         "statusLost": "Утеряно",
         "notesLabel": "Заметка",
         "notesPlaceholder": "напр. чек лежит в папке",
-        "deleteConfirm": "Удалить «{{name}}»?",
-        "deleteConfirmDetail": "Предмет сразу и безвозвратно удаляется из инвентаря, корзины для восстановления нет.",
         "created": "Предмет добавлен.",
         "updated": "Предмет обновлён.",
-        "deleted": "Предмет удалён.",
         "emptyTitle": "Ваш инвентарь пока пуст",
         "emptyDescription": "Запишите, чем вы владеете - с местом, категорией и ценой покупки.",
         "loadErrorTitle": "Не удалось загрузить инвентарь",

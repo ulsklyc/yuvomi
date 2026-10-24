@@ -15,7 +15,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
-import { scheduleUndoableDelete, expandIn, drawChartOnce } from '/utils/ux.js';
+import { scheduleUndoableDelete, offerUndo, expandIn, drawChartOnce } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -1942,6 +1942,46 @@ function markPendingDelete(area, id) {
   pendingDeletes[area].set(id, Infinity);
 }
 
+/**
+ * EIN LOESCHDIALEKT IM MODUL (Critique R23, G5-3/D6). Messung, Vorsorge und
+ * Naehrwerte gingen mit Rueckgaengig, Einnahme-Eintrag, Aktivitaet, Periode und
+ * Tageseintrag mit Rueckfrage - ohne dass einer davon mehr mitnahm als sich
+ * selbst. Jetzt fragen nur noch die Behaelter (Medikament mit Protokoll,
+ * Laborbefund mit Werten); die Zeilen gehen sofort aus dem Bild und am Server
+ * erst mit dem Ende der Toast-Frist.
+ *
+ * Die Bereiche hier laden nach dem Loeschen frisch vom Server; was in der Frist
+ * steht, filtern ihre Lader heraus (`visibleRows`).
+ */
+const hiddenRows = { activity: new Set(), cyclePeriods: new Set(), cycleLogs: new Set(), medLogs: new Set() };
+
+function visibleRows(area, rows) {
+  const hidden = hiddenRows[area];
+  return hidden.size ? (rows ?? []).filter((row) => !hidden.has(row.id)) : (rows ?? []);
+}
+
+function deleteRowWithUndo({ area, id, path, message, reload, errorKey }) {
+  hiddenRows[area].add(id);
+  reload();
+  scheduleUndoableDelete({
+    // Eine 404 ist hier NIE ein Erfolg (Codex an #1971): sie heisst "geloescht"
+    // ODER "Betreuung entzogen, die Zeile steht noch". Dann der Satz und der
+    // frische Stand vom Server - restore laedt ohnehin.
+    commit: async ({ keepalive } = {}) => {
+      await api.delete(path, { keepalive });
+      await reload();
+      hiddenRows[area].delete(id);
+    },
+    restore: async (err) => {
+      hiddenRows[area].delete(id);
+      if (err) window.yuvomi?.showToast(errorSentence(err, errorKey), 'danger');
+      if (err && isGone(err)) await loadCareGrants();
+      await reload();
+    },
+    message,
+  });
+}
+
 /** Loeschen einer Messung mit Undo-Toast statt Confirm (Hausmuster). */
 function deleteVitalWithUndo(id) {
   const idx = vitals.rows.findIndex((r) => r.id === id);
@@ -2996,7 +3036,7 @@ async function loadMeds() {
       api.get(`/health/medications/${m.id}/logs?from=${from}T00:00&to=${today}T23:59`),
     ]);
     meds.schedulesByMed[m.id] = sRes.data || [];
-    meds.logsByMed[m.id] = lRes.data || [];
+    meds.logsByMed[m.id] = visibleRows('medLogs', lRes.data);
   }));
   // Der Stand ist da: offene Dosis-Versuche fuer diese Medikamente sind geklaert (#2069).
   doseAttempts.confirmedBy(startedAt, meds.list.map((m) => m.id));
@@ -3418,6 +3458,7 @@ async function handlePrnDose(btn) {
 
   setDoseBusy(medId, true);
   const dose = med.prn_dose_qty != null ? Number(med.prn_dose_qty) : null;
+  let booked = null;
   try {
     // Eine Bedarfsdosis hat kein Vorkommen, an dem der Server eine Wiederholung
     // erkennen koennte - nur ihr Schluessel (postDose) haelt einen zweiten Tipp
@@ -3425,7 +3466,7 @@ async function handlePrnDose(btn) {
     // gilt nur fuer den unmittelbaren Wiederholversuch: nach dem Wiederhol-
     // fenster oder dem naechsten Laden der Dosis-Daten ist ein Tipp eine neue
     // Dosis mit neuem Schluessel (createDoseAttempts, utils/health-meds.js).
-    await postDose(`prn:${medId}`, `/health/medications/${medId}/logs`, () => ({
+    booked = await postDose(`prn:${medId}`, `/health/medications/${medId}/logs`, () => ({
       status: 'taken',
       // Wanduhrzeit, keine ISO-Zone: die Route kuerzt den Wert auf Minuten und
       // wuerfe die Zone weg - die Einnahme stuende dann mit der UTC-Zahl im
@@ -3443,10 +3484,10 @@ async function handlePrnDose(btn) {
     return;
   }
 
-  // Der Abzug wird beim Zuruecknehmen NICHT gutgeschrieben - so haelt es die
-  // geplante Dosis seit jeher (#701 korrigiert den Eintrag, nicht den Bestand).
-  // Das ist eine bekannte Grenze und keine Eigenheit der Bedarfsdosis.
-  window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
+  // "<Medikament> eingenommen." mit Rueckweg (R23, D6), der den Abzug wieder
+  // gutschreibt - bis R23 blieb die Tablette abgezogen (#701 korrigierte nur
+  // den Eintrag), und ein Toast "Eintrag aktualisiert." stapelte sich.
+  acknowledgeDose(booked, med.name, 'take');
   // Erst nach dem Neuzeichnen freigeben: bis dahin darf kein Zwilling scharf
   // sein. Freigegeben wird ueber `setDoseBusy` und nicht ueber das Set allein -
   // die Knoepfe von eben sind beim Neuzeichnen verschwunden, und die neuen sind
@@ -3718,20 +3759,13 @@ function openMedLogModal(logId) {
   });
 }
 
-async function deleteMedLog(entry) {
-  const modalContext = captureModalContext();
-  if (!(await confirmOverModal(t('health.meds.log.deleteConfirm'),
-    { danger: true, confirmLabel: t('common.delete'), detail: t('health.meds.log.deleteConfirmDetail') }))) return;
-  try {
-    await api.delete(`/health/logs/${entry.id}`);
-    closeModal({ force: true, context: modalContext });
-    window.yuvomi?.showToast(t('health.meds.log.deleted'), 'success');
-    await reloadMedViews();
-    refocusAfterRender();
-  } catch (err) {
-    console.error('[Health] med log delete error:', err);
-    reportError(err, 'health.meds.log.saveError', reloadMedViews);
-  }
+function deleteMedLog(entry) {
+  if (!entry?.id) return;
+  closeModal({ force: true, context: captureModalContext() });
+  deleteRowWithUndo({
+    area: 'medLogs', id: entry.id, path: `/health/logs/${entry.id}`,
+    message: t('health.meds.log.deleted'), reload: reloadMedViews, errorKey: 'health.meds.log.saveError',
+  });
 }
 
 function medListMarkup() {
@@ -3886,6 +3920,39 @@ function sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action
   }, medId);
 }
 
+/** Der Name eines Medikaments aus Medikamente-Tab oder Uebersicht. */
+function medNameOf(medId) {
+  return (meds.list ?? []).find((m) => m.id === medId)?.name
+    ?? (overview.meds ?? []).find((m) => m.id === medId)?.name
+    ?? '';
+}
+
+/**
+ * DIE QUITTUNG EINER DOSIS (Critique R23, D6): "„Ibuprofen“ eingenommen."
+ * statt "Eintrag aktualisiert.", mit Rueckgaengig. Das nimmt am Server Eintrag
+ * UND Bestand zurueck (POST /logs/:id/undo): gutgeschrieben wird, was die
+ * Buchung laut Antwort wirklich abzog (`stock_deducted`), nicht die Dosis.
+ */
+function acknowledgeDose(booked, name, action) {
+  const log = booked?.data;
+  const sentence = name
+    ? t(action === 'skip' ? 'health.meds.doseSkippedNamed' : 'health.meds.doseTakenNamed', { name })
+    : t('health.meds.doseSaved');
+  if (!log?.id || readOnly()) {
+    window.yuvomi?.showToast(sentence, 'success');
+    return;
+  }
+  const credit = Number(booked.stock_deducted) || 0;
+  offerUndo({
+    message: sentence,
+    undo: async () => {
+      await api.post(`/health/logs/${log.id}/undo`, credit > 0 ? { stock_credit: credit } : {});
+      await reloadAfterSave(() => reloadMedViews());
+    },
+    onError: (err) => reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false }),
+  });
+}
+
 async function handleDose(btn, action) {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const medId = Number(btn.dataset.medId);
@@ -3900,9 +3967,9 @@ async function handleDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
-    await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
+    const booked = await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
-    window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
+    acknowledgeDose(booked, medNameOf(medId), action);
     // Beide Tabs, nicht nur dieser: ein Medikament kann Plan UND Bedarf haben,
     // und dann verschiebt auch die geplante Dosis den Countdown drueben.
     await reloadAfterSave(() => reloadMedViews());
@@ -5094,7 +5161,7 @@ async function mountActivity() {
 async function loadActivity() {
   const query = activity.personId ? `?user_id=${encodeURIComponent(activity.personId)}` : '';
   const res = await api.get(`/health/activities${query}`);
-  activity.rows = res.data || [];
+  activity.rows = visibleRows('activity', res.data);
 }
 
 async function switchActivityPerson() {
@@ -5600,19 +5667,13 @@ function collectActivityBody(panel) {
   return body;
 }
 
-async function deleteActivity(row) {
+function deleteActivity(row) {
   if (!row?.id) return;
-  if (!(await confirmOverModal(t('health.activity.deleteConfirm'),
-    { danger: true, confirmLabel: t('common.delete'), detail: t('health.activity.deleteConfirmDetail') }))) return;
-  try {
-    await api.delete(`/health/activities/${row.id}`);
-    window.yuvomi?.showToast(t('health.activity.deleted'), 'success');
-    await reloadActivity();
-    refocusAfterRender();
-  } catch (err) {
-    console.error('[Health] activity delete error:', err);
-    reportError(err, 'health.activity.deleteError', reloadActivity);
-  }
+  closeModal({ force: true, context: captureModalContext() });
+  deleteRowWithUndo({
+    area: 'activity', id: row.id, path: `/health/activities/${row.id}`,
+    message: t('health.activity.deleted'), reload: reloadActivity, errorKey: 'health.activity.deleteError',
+  });
 }
 
 // ========================================================
@@ -7049,9 +7110,9 @@ async function handleOverviewDose(btn, action) {
 
   setDoseBusy(medId, true);
   try {
-    await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
+    const booked = await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
-    window.yuvomi?.showToast(t('health.meds.doseSaved'), 'success');
+    acknowledgeDose(booked, medNameOf(medId), action);
     await reloadAfterSave(() => reloadMedViews());
     setDoseBusy(medId, false);
   } catch (err) {
@@ -7544,8 +7605,8 @@ async function loadCycle() {
     api.get(`/health/cycle/periods${query}`),
     api.get(`/health/cycle/logs${query}`),
   ]);
-  cycle.periods = periodsRes.data || [];
-  cycle.logs = logsRes.data || [];
+  cycle.periods = visibleRows('cyclePeriods', periodsRes.data);
+  cycle.logs = visibleRows('cycleLogs', logsRes.data);
   // Einstellungen (und damit persönliche Vorhersage-Parameter) nur in der eigenen
   // Ansicht; für fremde Personen greifen die aus deren Historie abgeleiteten Werte.
   if (isOwnCycleView()) {
@@ -9448,21 +9509,13 @@ function openPeriodModal(period) {
   });
 }
 
-async function deletePeriod(period) {
+function deletePeriod(period) {
   if (!period?.id) return;
-  // Eigener Folgentext je Ziel: der Confirm-Titel ist für Periode und Tages-Log
-  // derselbe, die Folgen sind es nicht (Vorhersage vs. Tageswerte).
-  if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
-    { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.periodDeleteConfirmDetail') }))) return;
-  try {
-    await api.delete(`/health/cycle/periods/${period.id}`);
-    window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
-    await reloadCycle();
-    refocusAfterRender();
-  } catch (err) {
-    console.error('[Health] cycle period delete error:', err);
-    reportError(err, 'health.cycle.deleteError', reloadCycle);
-  }
+  closeModal({ force: true, context: captureModalContext() });
+  deleteRowWithUndo({
+    area: 'cyclePeriods', id: period.id, path: `/health/cycle/periods/${period.id}`,
+    message: t('health.cycle.periodDeleted'), reload: reloadCycle, errorKey: 'health.cycle.deleteError',
+  });
 }
 
 // --------------------------------------------------------
@@ -9857,19 +9910,13 @@ function openDayLogModal(dateKey) {
   });
 }
 
-async function deleteDayLog(log) {
+function deleteDayLog(log) {
   if (!log?.id) return;
-  if (!(await confirmOverModal(t('health.cycle.deleteConfirm'),
-    { danger: true, confirmLabel: t('common.delete'), detail: t('health.cycle.logDeleteConfirmDetail') }))) return;
-  try {
-    await api.delete(`/health/cycle/logs/${log.id}`);
-    window.yuvomi?.showToast(t('health.cycle.deleted'), 'success');
-    await reloadCycle();
-    refocusAfterRender();
-  } catch (err) {
-    console.error('[Health] cycle log delete error:', err);
-    reportError(err, 'health.cycle.deleteError', reloadCycle);
-  }
+  closeModal({ force: true, context: captureModalContext() });
+  deleteRowWithUndo({
+    area: 'cycleLogs', id: log.id, path: `/health/cycle/logs/${log.id}`,
+    message: t('health.cycle.logDeleted'), reload: reloadCycle, errorKey: 'health.cycle.deleteError',
+  });
 }
 
 // --------------------------------------------------------

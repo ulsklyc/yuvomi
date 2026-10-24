@@ -12,7 +12,8 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { stagger } from '/utils/ux.js';
+import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -465,7 +466,7 @@ async function loadGroupData() {
   ]);
   // Ein spaeteres Laden hat inzwischen begonnen: dessen Stand gilt, nicht dieser.
   if (generation !== _activityGeneration) return;
-  state.expenses = expenses.items;
+  state.expenses = expenses.items.filter((entry) => !pendingExpenseDeletes.has(entry.id));
   state.expensesCursor = expenses.cursor;
   state.expensesKey = expensesKey;
   state.balances = balances.data || { balances: [], simplified_debts: [] };
@@ -475,6 +476,9 @@ async function loadGroupData() {
   state.groupMembers = groupMembers.data || [];
   state.recurring = recurring?.data || [];
 }
+
+/** Ausgaben in der Ruecknahmefrist: lokal weg, am Server noch da (R23, D6). */
+const pendingExpenseDeletes = new Set();
 
 /**
  * "Mehr laden" im Verlauf (#1309): die naechste Seite hinter dem Cursor,
@@ -2249,21 +2253,34 @@ function openExpenseModal(expense = null, prefill = null) {
       wireSplitFields(panel, '#split-expense-form');
       panel.querySelector('#split-delete-expense')?.addEventListener('click', async () => {
         if (readOnly()) return;
-        // confirmOverModal statt confirmModal: das Ausgaben-Formular trägt
-        // Betrag, Teilnehmer, Aufteilung und wartende Belege - „Abbrechen" gibt
-        // es unverändert zurück, statt alles davon zu verdrängen.
-        const confirmed = await confirmOverModal(t('splitExpenses.deleteExpenseConfirm'), {
-          danger: true,
-          confirmLabel: t('common.delete'),
-          detail: t('splitExpenses.deleteExpenseConfirmDetail'),
-        });
-        if (!confirmed) return;
-        await api.delete(`/split-expenses/expenses/${expense.id}`);
-        await refreshDashboard();
-        await loadGroupData();
-        await collapseSplitRow(`expense-${expense.id}`);
+        // RUECKGAENGIG STATT RUECKFRAGE (Critique R23, D6): eine Ausgabe ist
+        // kein Behaelter. Sie geht sofort aus der Liste, geloescht wird erst mit
+        // dem Ende der Toast-Frist - bis dahin rechnen die Salden mit ihr.
+        closeModal({ force: true, context: captureModalContext() });
+        const id = expense.id;
+        pendingExpenseDeletes.add(id);
+        state.expenses = state.expenses.filter((entry) => entry.id !== id);
+        await collapseSplitRow(`expense-${id}`);
         renderAll({ motion: true });
         refocusAfterRender();
+        scheduleUndoableDelete({
+          commit: async ({ keepalive } = {}) => {
+            await api.delete(`/split-expenses/expenses/${id}`, { keepalive });
+            pendingExpenseDeletes.delete(id);
+            await refreshDashboard();
+            await loadGroupData();
+            renderAll({ motion: true });
+            refocusAfterRender();
+          },
+          restore: async (err) => {
+            pendingExpenseDeletes.delete(id);
+            if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
+            await loadGroupData();
+            renderAll({ motion: true });
+            refocusAfterRender();
+          },
+          message: expense.title ? t('common.deletedNamed', { name: expense.title }) : t('splitExpenses.expenseDeleted'),
+        });
       });
       panel.querySelector('#split-expense-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();

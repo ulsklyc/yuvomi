@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "「{{name}}」は未完了に戻りました - チェックできませんでした。もう一度お試しください。",
         "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。",
         "errorNotOwner": "これは他の人が作成しました。表示はできますが、変更はできません。",
-        "foreignReadOnlyHint": "{{name}} が作成 - 表示はできますが、変更はできません。"
+        "foreignReadOnlyHint": "{{name}} が作成 - 表示はできますが、変更はできません。",
+        "deletedNamed": "「{{name}}」を削除しました。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "実行した人 …",
         "checkedDoneNamed": "「{{title}}」を完了しました。",
         "checkedOpenNamed": "「{{title}}」を未完了に戻しました。",
-        "errorReorderNotAllowed": "家族の並び順は表示できますが、変更はできません。"
+        "errorReorderNotAllowed": "家族の並び順は表示できますが、変更はできません。",
+        "doneSubtasksOpen": "「{{title}}」を完了しました - サブタスクが{{count}}件残っています。",
+        "doneSubtasksOpen_one": "「{{title}}」を完了しました - サブタスクが1件残っています。",
+        "checkAllSubtasks": "すべて完了にする",
+        "subtasksAllDone": "「{{title}}」とすべてのサブタスクを完了しました。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "ただし記録は口座との結び付きを失い、どの口座にも属さなくなります。残高と口座種別は失われ、復元できません。",
         "editAccount": "口座を編集",
         "newAccount": "新しい口座",
-        "accountDeletedToast": "口座を削除しました",
         "accountSavedToast": "口座を保存しました",
         "accountAddedToast": "口座を追加しました",
         "accountLabel": "口座",
@@ -4023,7 +4027,6 @@
         "supplyName": "商品名",
         "supplyPlaceholder": "何が不足していますか?",
         "checkedInToast": "チェックインを記録しました。",
-        "checkedOutToast": "チェックアウトを記録しました。",
         "supplyAddedToast": "買い物リストに追加しました。",
         "overdue": "期限切れ",
         "dueToday": "今日が期限",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "このタスクはもう存在しません。",
         "errorAlreadyCheckedOut": "このハウスキーパーはすでにチェックアウトしています。",
         "errorAlreadyCheckedIn": "このハウスキーパーはすでにチェックインしています。",
-        "allVisitsInReport": "すべての訪問をレポートで見る"
+        "allVisitsInReport": "すべての訪問をレポートで見る",
+        "checkedOutNamed": "{{name}}さんがチェックアウトしました。",
+        "visitToday": "本日の在室: {{from}} - {{to}}",
+        "checkInAgain": "もう一度チェックイン"
     },
     "userMultiSelect": {
         "moreUsers": "他",
@@ -4202,8 +4208,6 @@
         "subtitle": "家計、旅行、買い物、家族の費用を分割します。",
         "addExpense": "費用を追加",
         "editExpense": "支出を編集",
-        "deleteExpenseConfirm": "この支出を削除しますか？",
-        "deleteExpenseConfirmDetail": "グループの残高はすべてこの支出を除いて再計算され、債務者から債権者に変わる人にはすぐ反映されます。添付したレシートは残ります。",
         "addGroup": "新しいグループ",
         "groups": "グループ",
         "searchGroups": "グループを検索",
@@ -4615,12 +4619,6 @@
         "invalidDate": "有効な支払日を入力してください。",
         "savedToast": "サブスクリプションを保存しました。",
         "addedToast": "サブスクリプションを追加しました。",
-        "renewedToast": "更新日を更新しました。",
-        "deleteConfirm": "サブスクリプション「{{name}}」を削除しますか？",
-        "deleteConfirmDetail": "サブスクリプションと一緒に、そのリマインダーと次回支払い分の予算記録も削除されます。すでに完了した支払いは月次の概要に残ります。",
-        "renewConfirm": "「{{name}}」の支払いを記録しますか？",
-        "renewConfirmDetail": "次回の支払日が繰り上がり、{{date}} の支払いが予算に支出として記録されます。",
-        "deletedToast": "サブスクリプションを削除しました。",
         "monthlyBudgetLabel": "月間サブスクリプション予算",
         "baseCurrencyLabel": "基準通貨",
         "fixerHint": "サーバーで FIXER_API_KEY が設定されている場合、リアルタイム換算に Fixer を使用します。",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "残り{{count}}回の支払い",
         "completed": "完了",
         "completedOn": "{{date}}に完了",
-        "completedToast": "サブスクリプションが完了しました。",
         "endsAfter": "残り{{count}}回の支払い",
         "logoTypeError": "PNG、JPEG、WebP、SVG画像を使用してください。",
         "accountUsernameLabel": "登録先アカウント",
         "accountUsernameHint": "メールアドレスまたはユーザー名。パスワード欄ではありません。Yuvomi はパスワードを保存しません。",
         "detailAmountLabel": "金額",
-        "detailNextPaymentLabel": "次回支払い"
+        "detailNextPaymentLabel": "次回支払い",
+        "renewedNamed": "「{{name}}」を支払いました - 次回の支払いは{{date}}です。",
+        "completedNamed": "「{{name}}」を支払い、終了しました。"
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "この記録は予定によるものではないため、削除できます。",
                 "saved": "記録を保存しました",
                 "saveError": "記録を保存できませんでした。",
-                "deleteConfirm": "この記録を削除しますか？",
-                "deleted": "記録を削除しました",
-                "deleteConfirmDetail": "この記録はエクスポートからも消えます。元に戻すことはできません。"
+                "deleted": "記録を削除しました"
             },
             "prn": {
                 "title": "必要時",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "最短間隔が過ぎる前に記録しますか？",
                 "earlyDetail": "次の服用は {{time}} 以降の予定です（{{remaining}}）。",
                 "earlyConfirmAction": "それでも記録"
-            }
+            },
+            "doseTakenNamed": "「{{name}}」を服用しました。",
+            "doseSkippedNamed": "「{{name}}」をスキップしました。"
         },
         "prevention": {
             "title": "予防接種・健診管理",
@@ -5198,8 +5197,6 @@
             "saveError": "トレーニングを保存できませんでした。",
             "deleted": "トレーニングを削除しました。",
             "deleteError": "トレーニングを削除できませんでした。",
-            "deleteConfirm": "このトレーニングを削除しますか？",
-            "deleteConfirmDetail": "この記録は履歴からも、これまで集計されていた週次・月次の合計からも消えます。復元はできません。",
             "invalid": "有効な値を入力してください。",
             "totals": {
                 "count": "トレーニング",
@@ -5281,11 +5278,7 @@
             "retry": "再試行",
             "saved": "保存しました。",
             "saveError": "保存できませんでした。",
-            "deleted": "削除しました。",
             "deleteError": "削除できませんでした。",
-            "deleteConfirm": "このエントリを削除しますか？",
-            "periodDeleteConfirmDetail": "記録された期間はなくなります。それが最新の周期だった場合は、算出済みの次回予定日もずれます。平均周期の長さは、固定値を設定していないときだけ変わります。",
-            "logDeleteConfirmDetail": "その日の経血量・症状・気分・メモも一緒に削除され、どの分析にも表示されなくなります。復元はできません。",
             "invalid": "有効な値を入力してください。",
             "fertilityDisclaimer": "妊娠可能期間と排卵はカレンダー法による推定です。避妊法ではなく、医学的アドバイスの代わりにもなりません。",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "予測周期をカレンダーで購読",
             "widgetHint": "周期のタイルは{{overview}}の「{{customize}}」から追加できます。",
-            "endBeforeStart": "終了を開始より前にはできません。"
+            "endBeforeStart": "終了を開始より前にはできません。",
+            "periodDeleted": "生理を削除しました。",
+            "logDeleted": "日の記録を削除しました。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",
@@ -5954,8 +5949,6 @@
         "yourPoints": "あなたのポイント",
         "approve": "承認",
         "reject": "却下",
-        "confirmReject": "この交換リクエストを却下しますか？ポイントは返却されます。",
-        "confirmCancel": "このリクエストを取り消しますか？ポイントは返却されます。",
         "manageParticipants": "参加者を管理",
         "participantsIntro": "ポイントを貯められる人を選びます。概要には有効なメンバーのみ表示されます。",
         "emptyOverviewTitle": "まだ誰もポイントを貯めていません",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "引き出し",
             "ledgerCredit": "入金",
             "ledgerDebit": "差し引き",
-            "confirmReject": "このリクエストを却下しますか？何も記帳されません。",
-            "confirmCancel": "このリクエストを取り下げますか？",
             "openAccount": "口座を開く",
             "closeAccount": "口座を閉じる",
             "confirmCloseAccount": "{{name}}の口座を閉じますか？",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "この人はポイントを貯めていません。",
         "errorMoneyAccountGone": "この口座はもう存在しません。",
         "errorMoneyPlanGone": "このプランはもう存在しません。",
-        "ownLedger": "自分の記録"
+        "ownLedger": "自分の記録",
+        "toastApprovedNamed": "{{name}}さんの「{{reward}}」を承認しました。",
+        "toastRejectedNamed": "{{name}}さんの「{{reward}}」を却下しました。",
+        "toastCancelledNamed": "「{{reward}}」を取り下げました。"
     },
     "datepicker": {
         "openCalendar": "カレンダーを開く",
@@ -6206,11 +6200,8 @@
         "statusLost": "紛失",
         "notesLabel": "メモ",
         "notesPlaceholder": "例: レシートはファイルの中",
-        "deleteConfirm": "「{{name}}」を削除しますか？",
-        "deleteConfirmDetail": "この持ち物は直ちに完全に削除されます。復元できるゴミ箱はありません。",
         "created": "持ち物を追加しました。",
         "updated": "持ち物を更新しました。",
-        "deleted": "持ち物を削除しました。",
         "emptyTitle": "持ち物はまだ登録されていません",
         "emptyDescription": "持っているものを、場所・カテゴリ・購入価格と一緒に記録しましょう。",
         "loadErrorTitle": "持ち物を読み込めませんでした",

@@ -9,7 +9,7 @@ import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js
 import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
 import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
-import { stagger, vibrate, scheduleUndoableDelete, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, offerUndo, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -1905,31 +1905,70 @@ async function toggleTaskStatus(id, currentStatus, doneByUserId = null) {
  * @param {string} nextStatus der Status NACH dem Wechsel
  * @param {object} response die Antwort von `toggleTaskStatus`
  */
-function acknowledgeStatusToggle(container, taskId, nextStatus, response) {
-  window.yuvomi.showToast(
-    seriesDoneText(response) ?? statusToggleSentence(taskId, nextStatus),
-    'default',
-    5000,
-    async () => {
-      try {
-        await toggleTaskStatus(taskId, nextStatus);
+function acknowledgeStatusToggle(container, taskId, nextStatus, response, before = null) {
+  // DIE QUITTUNG NENNT DIE AUFGABE AUCH NACH DEM AUSTRITT (Critique R23, N1).
+  // `before` ist der Stand von VOR dem Haken: nach `reloadWithRowMotion` steht
+  // eine erledigte Aufgabe, die der Filter ausblendet, nicht mehr in
+  // `state.tasks`, und der Satz fiel auf das titellose "Als erledigt markiert."
+  // zurueck - R22-D17 griff genau dort nicht, wo die Zeile geht.
+  const snap = before ?? taskSnapshot(taskId);
+  // ELTERNAUFGABE MIT OFFENEN TEILAUFGABEN (R23, D6): sie schloss still, die
+  // offenen Teilaufgaben blieben unsichtbar zurueck. Der Toast sagt es und
+  // bietet "Alle abhaken" an; zurueck geht es ueber den Haken der Zeile.
+  if (nextStatus === 'done' && snap?.openSubtaskIds.length && !seriesDoneText(response)) {
+    const ids = snap.openSubtaskIds;
+    offerUndo({
+      message: t('tasks.doneSubtasksOpen', { title: snap.title, count: ids.length }),
+      label: t('tasks.checkAllSubtasks'),
+      undo: async () => {
+        for (const id of ids) await api.patch(`/tasks/${id}/status`, { status: 'done' });
         await reloadWithRowMotion(container, taskId);
-      } catch (err) {
+        window.yuvomi.showToast(t('tasks.subtasksAllDone', { title: snap.title }), 'success');
+      },
+      onError: async (err) => {
         window.yuvomi.showToast(errorSentence(err), 'danger');
         await reloadIfTaskGone(err, container);
-      }
+      },
+    });
+    return;
+  }
+  offerUndo({
+    message: seriesDoneText(response) ?? statusToggleSentence(taskId, nextStatus, snap?.title),
+    undo: async () => {
+      await toggleTaskStatus(taskId, nextStatus);
+      await reloadWithRowMotion(container, taskId);
     },
-  );
+    onError: async (err) => {
+      window.yuvomi.showToast(errorSentence(err), 'danger');
+      await reloadIfTaskGone(err, container);
+    },
+  });
+}
+
+/**
+ * Was die Quittung von einer Aufgabe braucht, gelesen VOR dem Statuswechsel:
+ * Titel und die offenen Teilaufgaben, die man sehen darf.
+ * @returns {{ title: string, openSubtaskIds: number[] } | null}
+ */
+function taskSnapshot(taskId) {
+  const task = state.tasks.find((x) => String(x.id) === String(taskId));
+  if (!task) return null;
+  const subs = Array.isArray(task.subtasks) ? task.subtasks : [];
+  return {
+    title: task.title,
+    openSubtaskIds: subs.filter((sub) => sub && sub.status !== 'done' && sub.id != null).map((sub) => sub.id),
+  };
 }
 
 /**
  * DIE QUITTUNG NENNT DIE AUFGABE (R22 D17). „Als erledigt markiert." sagte
  * nicht, WAS - nach einem Wisch ist die Zeile weg, und wer zwei schnell
  * nacheinander abhakt, sieht zwei gleiche Saetze (der zweite ersetzt den
- * ersten, D18). Ohne Titel (Zeile schon aus dem Zustand) bleibt der alte Satz.
+ * ersten, D18). Ohne Titel (weder vorher gemerkt noch im Zustand) bleibt der
+ * alte Satz.
  */
-function statusToggleSentence(taskId, nextStatus) {
-  const title = state.tasks.find((x) => String(x.id) === String(taskId))?.title;
+function statusToggleSentence(taskId, nextStatus, knownTitle = null) {
+  const title = knownTitle ?? state.tasks.find((x) => String(x.id) === String(taskId))?.title;
   if (title) return t(nextStatus === 'done' ? 'tasks.checkedDoneNamed' : 'tasks.checkedOpenNamed', { title });
   return t(nextStatus === 'done' ? 'tasks.swipedDoneToast' : 'tasks.swipedOpenToast');
 }
@@ -4673,10 +4712,11 @@ function wireSwipeGestures(container) {
         // Neuzeichnen (auch im Fehlerfall) bringt eine frische Karte.
         const card = row.querySelector('.task-card');
         if (card) card.style.visibility = 'hidden';
+        const before = taskSnapshot(taskId);
         try {
           const response = await toggleTaskStatus(taskId, capturedStatus);
           await reloadWithRowMotion(container, taskId);
-          acknowledgeStatusToggle(container, taskId, nextStatus, response);
+          acknowledgeStatusToggle(container, taskId, nextStatus, response, before);
         } catch (err) {
           window.yuvomi.showToast(toggleFailedSentence(err, taskId, nextStatus), 'danger');
           await loadTasks(container);
@@ -5639,12 +5679,13 @@ function wireTaskList(container) {
       // Die Haltezeit laeuft ab dem Tipp, neben dem Roundtrip - ein langsames
       // Netz verlaengert sie nicht noch einmal (EXIT_HOLD_MS).
       const holdUntil = performance.now() + EXIT_HOLD_MS;
+      const before = taskSnapshot(id);
       try {
         const response = await toggleTaskStatus(id, status);
         await settled;
         await reloadWithRowMotion(container, id, { holdUntil });
         // Derselbe Rückweg wie beim Wischen - und dieselbe Quittung.
-        acknowledgeStatusToggle(container, id, nextStatus, response);
+        acknowledgeStatusToggle(container, id, nextStatus, response, before);
       } catch (err) {
         window.yuvomi.showToast(toggleFailedSentence(err, id, nextStatus), 'danger');
         await loadTasks(container);

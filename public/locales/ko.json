@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "'{{name}}' 항목이 다시 열렸습니다 - 체크하지 못했습니다. 다시 시도하세요.",
         "errorUncheckRolledBack": "'{{name}}' 항목이 다시 체크되었습니다 - 되돌리지 못했습니다. 다시 시도하세요.",
         "errorNotOwner": "다른 사람이 만든 항목입니다. 볼 수는 있지만 바꿀 수는 없습니다.",
-        "foreignReadOnlyHint": "{{name}}님이 만듦 - 볼 수는 있지만 바꿀 수는 없습니다."
+        "foreignReadOnlyHint": "{{name}}님이 만듦 - 볼 수는 있지만 바꿀 수는 없습니다.",
+        "deletedNamed": "'{{name}}' 삭제했습니다."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -670,7 +671,11 @@
         "doneByMenuItem": "한 사람 …",
         "checkedDoneNamed": "'{{title}}' 완료했습니다.",
         "checkedOpenNamed": "'{{title}}' 다시 미완료로 표시했습니다.",
-        "errorReorderNotAllowed": "가족 순서를 볼 수는 있지만 바꿀 수는 없습니다."
+        "errorReorderNotAllowed": "가족 순서를 볼 수는 있지만 바꿀 수는 없습니다.",
+        "doneSubtasksOpen": "'{{title}}' 완료했습니다 - 하위 작업 {{count}}개가 아직 남아 있습니다.",
+        "doneSubtasksOpen_one": "'{{title}}' 완료했습니다 - 하위 작업 1개가 아직 남아 있습니다.",
+        "checkAllSubtasks": "모두 완료로 표시",
+        "subtasksAllDone": "'{{title}}'와 모든 하위 작업을 완료했습니다."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}}개 항목이 삭제되었습니다.",
@@ -1777,7 +1782,6 @@
         "deleteAccountConfirmDetail": "다만 해당 기록은 계좌 연결을 잃고 이후 어떤 계좌에도 속하지 않습니다. 잔액과 계좌 유형은 사라지며 복구할 수 없습니다.",
         "editAccount": "계좌 편집",
         "newAccount": "새 계좌",
-        "accountDeletedToast": "계좌를 삭제했습니다",
         "accountSavedToast": "계좌를 저장했습니다",
         "accountAddedToast": "계좌를 추가했습니다",
         "accountLabel": "계좌",
@@ -4027,7 +4031,6 @@
         "supplyName": "물품 이름",
         "supplyPlaceholder": "무엇이 부족한가요?",
         "checkedInToast": "체크인이 저장되었습니다.",
-        "checkedOutToast": "체크아웃이 저장되었습니다.",
         "supplyAddedToast": "장보기 목록에 추가되었습니다.",
         "overdue": "기한 초과",
         "dueToday": "오늘 마감",
@@ -4195,15 +4198,16 @@
         "errorTaskGone": "이 작업은 더 이상 없습니다.",
         "errorAlreadyCheckedOut": "이 가사 도우미는 이미 체크아웃했습니다.",
         "errorAlreadyCheckedIn": "이 가사 도우미는 이미 체크인했습니다.",
-        "allVisitsInReport": "보고서에서 모든 방문 보기"
+        "allVisitsInReport": "보고서에서 모든 방문 보기",
+        "checkedOutNamed": "{{name}} 님이 체크아웃했습니다.",
+        "visitToday": "오늘 근무: {{from}} - {{to}}",
+        "checkInAgain": "다시 체크인"
     },
     "splitExpenses": {
         "title": "공동 지출",
         "subtitle": "집안 청구서, 여행, 장보기, 가족 비용을 나누세요.",
         "addExpense": "지출 추가",
         "editExpense": "지출 편집",
-        "deleteExpenseConfirm": "이 지출을 삭제하시겠습니까?",
-        "deleteExpenseConfirmDetail": "그룹의 모든 잔액이 이 지출을 빼고 다시 계산되며, 채무자에서 채권자로 바뀌는 사람은 즉시 확인할 수 있습니다. 첨부한 영수증은 남습니다.",
         "addGroup": "새 그룹",
         "groups": "그룹",
         "searchGroups": "그룹 검색",
@@ -4615,12 +4619,6 @@
         "invalidDate": "유효한 결제 날짜를 입력하세요.",
         "savedToast": "구독이 저장되었습니다.",
         "addedToast": "구독이 추가되었습니다.",
-        "renewedToast": "갱신 날짜가 업데이트되었습니다.",
-        "deleteConfirm": "\"{{name}}\" 구독을 삭제할까요?",
-        "deleteConfirmDetail": "구독과 함께 알림과 다음 결제분의 예산 기록도 삭제됩니다. 이미 완료된 결제는 월간 개요에 남습니다.",
-        "renewConfirm": "\"{{name}}\" 결제를 기록할까요?",
-        "renewConfirmDetail": "다음 결제일이 앞당겨지고 {{date}} 결제가 예산에 지출로 기록됩니다.",
-        "deletedToast": "구독이 삭제되었습니다.",
         "monthlyBudgetLabel": "월 구독 예산",
         "baseCurrencyLabel": "기준 통화",
         "fixerHint": "서버에 FIXER_API_KEY가 구성되어 있으면 실시간 환산에 Fixer를 사용합니다.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}}회 결제 남음",
         "completed": "완료됨",
         "completedOn": "{{date}}에 완료됨",
-        "completedToast": "구독이 완료되었습니다.",
         "endsAfter": "{{count}}회 결제 남음",
         "logoTypeError": "PNG, JPEG, WebP 또는 SVG 이미지를 사용하세요.",
         "accountUsernameLabel": "등록 계정",
         "accountUsernameHint": "이메일 주소 또는 사용자 이름. 비밀번호 입력란이 아닙니다. Yuvomi는 비밀번호를 저장하지 않습니다.",
         "detailAmountLabel": "금액",
-        "detailNextPaymentLabel": "다음 결제"
+        "detailNextPaymentLabel": "다음 결제",
+        "renewedNamed": "'{{name}}' 결제했습니다 - 다음 결제일은 {{date}}입니다.",
+        "completedNamed": "'{{name}}' 결제 후 종료했습니다."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "이 기록은 일정에서 온 것이 아니므로 삭제할 수 있습니다.",
                 "saved": "기록이 저장되었습니다",
                 "saveError": "기록을 저장할 수 없습니다.",
-                "deleteConfirm": "이 기록을 삭제할까요?",
-                "deleted": "기록이 삭제되었습니다",
-                "deleteConfirmDetail": "이 기록은 내보내기에서도 사라집니다. 되돌릴 수 없습니다."
+                "deleted": "기록이 삭제되었습니다"
             },
             "prn": {
                 "title": "필요 시",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "최소 간격이 지나기 전에 기록할까요?",
                 "earlyDetail": "다음 복용은 {{time}}부터 예정되어 있습니다({{remaining}}).",
                 "earlyConfirmAction": "그래도 기록"
-            }
+            },
+            "doseTakenNamed": "'{{name}}' 복용했습니다.",
+            "doseSkippedNamed": "'{{name}}' 건너뛰었습니다."
         },
         "prevention": {
             "title": "예방접종 및 건강검진",
@@ -5198,8 +5197,6 @@
             "saveError": "기록을 저장하지 못했습니다.",
             "deleted": "기록이 삭제되었습니다.",
             "deleteError": "기록을 삭제하지 못했습니다.",
-            "deleteConfirm": "이 기록을 정말 삭제할까요?",
-            "deleteConfirmDetail": "이 세션은 기록에서, 그리고 지금까지 합산되던 모든 주간 및 월간 합계에서 사라집니다. 복구할 수 없습니다.",
             "invalid": "유효한 값을 입력하세요.",
             "totals": {
                 "count": "횟수",
@@ -5281,11 +5278,7 @@
             "retry": "다시 시도",
             "saved": "저장되었습니다.",
             "saveError": "저장하지 못했습니다.",
-            "deleted": "삭제되었습니다.",
             "deleteError": "삭제하지 못했습니다.",
-            "deleteConfirm": "이 항목을 정말 삭제할까요?",
-            "periodDeleteConfirmDetail": "기록된 기간이 사라집니다. 가장 최근 주기였다면 계산된 다음 예정일도 함께 밀립니다. 평균 주기 길이는 고정값을 설정하지 않은 경우에만 바뀝니다.",
-            "logDeleteConfirmDetail": "그날의 출혈량, 증상, 기분, 메모가 기록과 함께 삭제되어 어떤 분석에도 나타나지 않습니다. 복구할 수 없습니다.",
             "invalid": "유효한 값을 입력하세요.",
             "fertilityDisclaimer": "가임기와 배란은 달력법으로 추정한 값입니다. 피임 수단이 아니며 의학적 상담을 대신하지 않습니다.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "예상 주기를 캘린더에서 구독",
             "widgetHint": "주기 타일은 {{overview}}의 “{{customize}}”에서 추가할 수 있습니다.",
-            "endBeforeStart": "종료는 시작보다 앞설 수 없습니다."
+            "endBeforeStart": "종료는 시작보다 앞설 수 없습니다.",
+            "periodDeleted": "생리 기록을 삭제했습니다.",
+            "logDeleted": "하루 기록을 삭제했습니다."
         },
         "duration": {
             "hm": "{{hours}}시간 {{minutes}}분",
@@ -5954,8 +5949,6 @@
         "yourPoints": "내 포인트",
         "approve": "승인",
         "reject": "거절",
-        "confirmReject": "이 교환 요청을 거절할까요? 포인트가 환급됩니다.",
-        "confirmCancel": "이 요청을 취소할까요? 포인트가 환급됩니다.",
         "manageParticipants": "참여자 관리",
         "participantsIntro": "포인트를 모을 수 있는 사람을 선택하세요. 개요에는 활성화된 구성원만 표시됩니다.",
         "emptyOverviewTitle": "아직 아무도 포인트를 모으지 않습니다",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "출금 요청",
             "ledgerCredit": "입금 기록",
             "ledgerDebit": "차감",
-            "confirmReject": "이 요청을 거절할까요? 아무것도 기록되지 않습니다.",
-            "confirmCancel": "이 요청을 철회할까요?",
             "openAccount": "계좌 열기",
             "closeAccount": "계좌 닫기",
             "confirmCloseAccount": "{{name}}의 계좌를 닫을까요?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "이 사람은 포인트를 모으지 않습니다.",
         "errorMoneyAccountGone": "이 계좌는 더 이상 없습니다.",
         "errorMoneyPlanGone": "이 계획은 더 이상 없습니다.",
-        "ownLedger": "내 내역"
+        "ownLedger": "내 내역",
+        "toastApprovedNamed": "{{name}} 님의 '{{reward}}'을 승인했습니다.",
+        "toastRejectedNamed": "{{name}} 님의 '{{reward}}'을 거절했습니다.",
+        "toastCancelledNamed": "'{{reward}}' 요청을 취소했습니다."
     },
     "datepicker": {
         "openCalendar": "캘린더 열기",
@@ -6206,11 +6200,8 @@
         "statusLost": "분실",
         "notesLabel": "메모",
         "notesPlaceholder": "예: 영수증은 서류철에 있음",
-        "deleteConfirm": "\"{{name}}\"을(를) 삭제할까요?",
-        "deleteConfirmDetail": "물건은 즉시 소지품에서 영구 삭제되며, 복원할 수 있는 휴지통이 없습니다.",
         "created": "물건을 추가했습니다.",
         "updated": "물건을 업데이트했습니다.",
-        "deleted": "물건을 삭제했습니다.",
         "emptyTitle": "아직 등록된 소지품이 없습니다",
         "emptyDescription": "가지고 있는 물건을 위치, 카테고리, 구매 가격과 함께 기록하세요.",
         "loadErrorTitle": "소지품을 불러오지 못했습니다",

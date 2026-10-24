@@ -4947,7 +4947,8 @@ test('#1668: keine Stelle der Budget-Seite schreibt den Satz des Servers in eine
   assert.doesNotMatch(code, /err(?:or)?\??\.data\??\.error/, 'die Seite liest den Satz des Servers');
   // Die 13 Stellen von damals und der Verbuchen-Dialog laufen ueber eine Funktion.
   const calls = [...code.matchAll(/(?<!function )\bshowBudgetError\(err\b/g)].length;
-  assert.equal(calls, 16, `showBudgetError(err, ...) steht ${calls}x`);
+  // 17 seit R23 (D6): das leere Konto geht mit Rueckgaengig, sein restore meldet ueber showBudgetError.
+  assert.equal(calls, 17, `showBudgetError(err, ...) steht ${calls}x`);
   // Die vier Dialogwege, einschliesslich Transfers, geben die Absage ans Feld.
   assert.equal([...code.matchAll(/showBudgetError\(err, \{ panel, fallback: BUDGET_SAVE_FAILED \}\)/g)].length, 4);
 });

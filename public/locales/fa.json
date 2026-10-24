@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "«{{name}}» دوباره باز است - علامت‌گذاری انجام نشد. دوباره تلاش کنید.",
         "errorUncheckRolledBack": "«{{name}}» دوباره علامت خورده است - بازگرداندن انجام نشد. دوباره تلاش کنید.",
         "errorNotOwner": "این را شخص دیگری ساخته است - می‌توانید آن را ببینید اما نه تغییر دهید.",
-        "foreignReadOnlyHint": "ساخته‌شده توسط {{name}} - می‌توانید آن را ببینید اما نه تغییر دهید."
+        "foreignReadOnlyHint": "ساخته‌شده توسط {{name}} - می‌توانید آن را ببینید اما نه تغییر دهید.",
+        "deletedNamed": "«{{name}}» حذف شد."
     },
     "kitchen": {
         "noShoppingLists": "هنوز فهرست خریدی وجود ندارد.",
@@ -670,7 +671,11 @@
         "doneByMenuItem": "انجام‌شده توسط …",
         "checkedDoneNamed": "«{{title}}» انجام شد.",
         "checkedOpenNamed": "«{{title}}» دوباره باز است.",
-        "errorReorderNotAllowed": "می‌توانید ترتیب خانواده را ببینید اما نه تغییر دهید."
+        "errorReorderNotAllowed": "می‌توانید ترتیب خانواده را ببینید اما نه تغییر دهید.",
+        "doneSubtasksOpen": "«{{title}}» انجام شد - هنوز {{count}} زیرکار باز است.",
+        "doneSubtasksOpen_one": "«{{title}}» انجام شد - هنوز {{count}} زیرکار باز است.",
+        "checkAllSubtasks": "علامت زدن همه",
+        "subtasksAllDone": "«{{title}}» و همه زیرکارها انجام شد."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",
@@ -1777,7 +1782,6 @@
         "deleteAccountConfirmDetail": "اما ثبت‌ها ارتباطشان با حساب را از دست می‌دهند و دیگر به هیچ حسابی تعلق ندارند. مانده و نوع حساب برای همیشه از بین می‌روند.",
         "editAccount": "ویرایش حساب",
         "newAccount": "حساب جدید",
-        "accountDeletedToast": "حساب حذف شد",
         "accountSavedToast": "حساب ذخیره شد",
         "accountAddedToast": "حساب افزوده شد",
         "accountLabel": "حساب",
@@ -4027,7 +4031,6 @@
         "supplyName": "نام محصول",
         "supplyPlaceholder": "چه چیزی کم است؟",
         "checkedInToast": "ورود ذخیره شد.",
-        "checkedOutToast": "خروج ذخیره شد.",
         "supplyAddedToast": "به فهرست خرید افزوده شد.",
         "overdue": "معوق",
         "dueToday": "موعد امروز",
@@ -4195,15 +4198,16 @@
         "errorTaskGone": "این کار دیگر وجود ندارد.",
         "errorAlreadyCheckedOut": "خروج این خدمتکار خانه قبلاً ثبت شده است.",
         "errorAlreadyCheckedIn": "ورود این خدمتکار خانه قبلاً ثبت شده است.",
-        "allVisitsInReport": "همهٔ بازدیدها در گزارش"
+        "allVisitsInReport": "همهٔ بازدیدها در گزارش",
+        "checkedOutNamed": "خروج {{name}} ثبت شد.",
+        "visitToday": "حضور امروز: {{from}} - {{to}}",
+        "checkInAgain": "ورود دوباره"
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",
         "subtitle": "قبض‌های خانه، سفر، خرید و هزینه‌های خانواده را تقسیم کنید.",
         "addExpense": "افزودن هزینه",
         "editExpense": "ویرایش هزینه",
-        "deleteExpenseConfirm": "این هزینه حذف شود؟",
-        "deleteExpenseConfirmDetail": "همه مانده‌های گروه بدون این هزینه دوباره محاسبه می‌شوند و هرکس از بدهکار به بستانکار تبدیل شود، فوراً می‌بیند. رسیدهای پیوست باقی می‌مانند.",
         "addGroup": "گروه جدید",
         "groups": "گروه‌ها",
         "searchGroups": "جستجوی گروه‌ها",
@@ -4615,12 +4619,6 @@
         "invalidDate": "یک تاریخ پرداخت معتبر وارد کنید.",
         "savedToast": "اشتراک ذخیره شد.",
         "addedToast": "اشتراک افزوده شد.",
-        "renewedToast": "تاریخ تمدید به‌روزرسانی شد.",
-        "deleteConfirm": "اشتراک «{{name}}» حذف شود؟",
-        "deleteConfirmDetail": "همراه با اشتراک، یادآورهای آن و ثبت بودجه پرداخت بعدی حذف می‌شوند. پرداخت‌های انجام‌شده در نمای ماهانه باقی می‌مانند.",
-        "renewConfirm": "پرداخت «{{name}}» ثبت شود؟",
-        "renewConfirmDetail": "تاریخ سررسید جلو می‌رود و پرداخت {{date}} به عنوان هزینه در بودجه ثبت می‌شود.",
-        "deletedToast": "اشتراک حذف شد.",
         "monthlyBudgetLabel": "بودجه ماهانه اشتراک",
         "baseCurrencyLabel": "واحد پول پایه",
         "fixerHint": "تبدیل زنده از Fixer استفاده می‌کند اگر FIXER_API_KEY روی سرور پیکربندی شده باشد.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} پرداخت باقی‌مانده",
         "completed": "تکمیل‌شده",
         "completedOn": "تکمیل در {{date}}",
-        "completedToast": "اشتراک تکمیل شد.",
         "endsAfter": "{{count}} پرداخت باقی‌مانده",
         "logoTypeError": "لطفاً از تصویر PNG، JPEG، WebP یا SVG استفاده کنید.",
         "accountUsernameLabel": "ثبت‌شده با",
         "accountUsernameHint": "نشانی رایانامه یا نام کاربری. این قسمت گذرواژه نیست - Yuvomi گذرواژه ذخیره نمی‌کند.",
         "detailAmountLabel": "مبلغ",
-        "detailNextPaymentLabel": "پرداخت بعدی"
+        "detailNextPaymentLabel": "پرداخت بعدی",
+        "renewedNamed": "«{{name}}» پرداخت شد - پرداخت بعدی در {{date}}.",
+        "completedNamed": "«{{name}}» پرداخت و پایان یافت."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "این رکورد از یک برنامه نیامده و می‌توان آن را حذف کرد.",
                 "saved": "رکورد ذخیره شد",
                 "saveError": "ذخیره رکورد ممکن نبود.",
-                "deleteConfirm": "این رکورد حذف شود؟",
-                "deleted": "رکورد حذف شد",
-                "deleteConfirmDetail": "این رکورد از خروجی هم حذف می‌شود. این کار برگشت‌پذیر نیست."
+                "deleted": "رکورد حذف شد"
             },
             "prn": {
                 "title": "در صورت نیاز",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "دوز پیش از پایان کمترین فاصله ثبت شود؟",
                 "earlyDetail": "دوز بعدی تنها از {{time}} پیش‌بینی شده است ({{remaining}}).",
                 "earlyConfirmAction": "با این حال ثبت کن"
-            }
+            },
+            "doseTakenNamed": "«{{name}}» مصرف شد.",
+            "doseSkippedNamed": "«{{name}}» رد شد."
         },
         "prevention": {
             "title": "پیشگیری و واکسیناسیون",
@@ -5198,8 +5197,6 @@
             "saveError": "جلسه ذخیره نشد.",
             "deleted": "جلسه حذف شد.",
             "deleteError": "جلسه حذف نشد.",
-            "deleteConfirm": "آیا واقعاً این جلسه حذف شود؟",
-            "deleteConfirmDetail": "این جلسه از سابقه و از همه جمع‌های هفتگی و ماهانه‌ای که تاکنون در آن‌ها شمرده می‌شد حذف می‌گردد و قابل بازیابی نیست.",
             "invalid": "لطفاً مقادیر معتبری وارد کنید.",
             "totals": {
                 "count": "جلسات",
@@ -5281,11 +5278,7 @@
             "retry": "تلاش مجدد",
             "saved": "ذخیره شد.",
             "saveError": "ذخیره نشد.",
-            "deleted": "حذف شد.",
             "deleteError": "حذف نشد.",
-            "deleteConfirm": "واقعاً این مورد حذف شود؟",
-            "periodDeleteConfirmDetail": "بازه ثبت‌شده از بین می‌رود. اگر تازه‌ترین دوره بوده باشد، تاریخ‌های محاسبه‌شده بعدی هم جابه‌جا می‌شوند؛ میانگین طول چرخه تنها بدون مقدار ثابتِ تنظیم‌شده تغییر می‌کند.",
-            "logDeleteConfirmDetail": "شدت خونریزی، علائم، خلق‌وخو و یادداشت آن روز همراه با ثبت حذف می‌شوند و دیگر در هیچ تحلیلی نخواهند بود. بازیابی ممکن نیست.",
             "invalid": "لطفاً مقادیر معتبری وارد کنید.",
             "fertilityDisclaimer": "پنجره باروری و تخمک‌گذاری با روش تقویمی برآورد می‌شوند. این‌ها روش پیشگیری از بارداری نیستند و جایگزین مشاوره پزشکی نمی‌شوند.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "اشتراک چرخهٔ پیش‌بینی‌شده در تقویم",
             "widgetHint": "کاشی چرخه را در {{overview}} از «{{customize}}» اضافه کنید.",
-            "endBeforeStart": "پایان نمی‌تواند پیش از آغاز باشد."
+            "endBeforeStart": "پایان نمی‌تواند پیش از آغاز باشد.",
+            "periodDeleted": "دوره قاعدگی حذف شد.",
+            "logDeleted": "یادداشت روز حذف شد."
         },
         "duration": {
             "hm": "{{hours}} ساعت {{minutes}} دقیقه",
@@ -5954,8 +5949,6 @@
         "yourPoints": "امتیازهای تو",
         "approve": "تأیید",
         "reject": "رد",
-        "confirmReject": "این درخواست دریافت رد شود؟ امتیازها بازگردانده می‌شوند.",
-        "confirmCancel": "این درخواست پس گرفته شود؟ امتیازها بازگردانده می‌شوند.",
         "manageParticipants": "مدیریت شرکت‌کنندگان",
         "participantsIntro": "انتخاب کنید چه کسی می‌تواند امتیاز جمع کند. فقط اعضای فعال‌شده در نمای کلی دیده می‌شوند.",
         "emptyOverviewTitle": "هنوز کسی امتیاز جمع نمی‌کند",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "برداشت",
             "ledgerCredit": "افزایش",
             "ledgerDebit": "کسر",
-            "confirmReject": "این درخواست رد شود؟ چیزی ثبت نمی‌شود.",
-            "confirmCancel": "این درخواست پس گرفته شود؟",
             "openAccount": "باز کردن حساب",
             "closeAccount": "بستن حساب",
             "confirmCloseAccount": "حساب {{name}} بسته شود؟",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "این شخص امتیاز جمع نمی‌کند.",
         "errorMoneyAccountGone": "این حساب دیگر وجود ندارد.",
         "errorMoneyPlanGone": "این برنامه دیگر وجود ندارد.",
-        "ownLedger": "تراکنش‌های تو"
+        "ownLedger": "تراکنش‌های تو",
+        "toastApprovedNamed": "«{{reward}}» برای {{name}} تأیید شد.",
+        "toastRejectedNamed": "«{{reward}}» برای {{name}} رد شد.",
+        "toastCancelledNamed": "«{{reward}}» پس گرفته شد."
     },
     "datepicker": {
         "openCalendar": "باز کردن تقویم",
@@ -6206,11 +6200,8 @@
         "statusLost": "گم‌شده",
         "notesLabel": "یادداشت",
         "notesPlaceholder": "مثلاً رسید داخل پوشه است",
-        "deleteConfirm": "«{{name}}» حذف شود؟",
-        "deleteConfirmDetail": "این وسیله بلافاصله و برای همیشه از اموال حذف می‌شود؛ سطل بازیافتی برای بازیابی وجود ندارد.",
         "created": "وسیله افزوده شد.",
         "updated": "وسیله به‌روزرسانی شد.",
-        "deleted": "وسیله حذف شد.",
         "emptyTitle": "فهرست اموال شما هنوز خالی است",
         "emptyDescription": "آنچه دارید را ثبت کنید - با محل، دسته و قیمت خرید.",
         "loadErrorTitle": "بارگذاری اموال ممکن نشد",

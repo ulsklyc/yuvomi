@@ -14,7 +14,7 @@ import {
   t,
 } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { isImeComposing } from '/utils/ux.js';
+import { isImeComposing, offerUndo, scheduleUndoableDelete } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, searchEmptyHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
@@ -341,7 +341,7 @@ async function loadOnce({ refreshRates = false } = {}) {
   }
   if (outdated()) return newest();
   const [list, meta, settings] = answers;
-  state.subscriptions = list.data?.subscriptions || [];
+  state.subscriptions = (list.data?.subscriptions || []).filter((entry) => !pendingDeletes.has(entry.id));
   state.summary = list.data?.summary || null;
   state.rates = list.data?.rates || null;
   state.meta = meta.data || state.meta;
@@ -1999,26 +1999,39 @@ function openLogoPickerModal(panel, initialQuery, onSelect) {
 }
 
 // Eine Zahlung zu buchen schiebt das Faelligkeitsdatum und legt einen
-// Budget-Eintrag an. Beides ist mit einem zweiten Wisch NICHT umkehrbar - anders
-// als das Abhaken einer Aufgabe, das dieselbe Kante traegt. Deshalb fragt die
-// Aktion nach, und deshalb fragt sie an BEIDEN Wegen nach, Geste wie Knopf: eine
-// Bestaetigung, die nur an einem der beiden haengt, ist keine Regel, sondern
-// eine Eigenschaft des Wegs.
+// Budget-Eintrag an. Bis R23 fragte die Aktion deshalb an BEIDEN Wegen nach
+// (Geste wie Knopf), weil sich nichts zurueckholen liess - die Rueckfrage stand
+// an der Stelle eines Rueckwegs (N4). Seit R23 (D6) nimmt "Rueckgaengig" im
+// Toast die Zahlung am Server ECHT zurueck (POST /renew/undo: Datum, Zaehler,
+// Abschluss, beide Buchungen), und keiner der beiden Wege fragt mehr.
 async function renewSubscription(subscription) {
   if (readOnly()) return;
   // Ein abgeschlossenes Abo hat keine naechste Zahlung (#2011): weder Knopf
-  // noch Geste fragen nach, der Server lehnt es ohnehin ab.
+  // noch Geste tun etwas, der Server lehnt es ohnehin ab.
   if (isCompleted(subscription)) return;
-  const confirmed = await confirmModal(
-    t('subscriptions.renewConfirm', { name: subscription.name }),
-    { detail: t('subscriptions.renewConfirmDetail', { date: formatDate(subscription.next_payment_date) }) });
-  if (!confirmed) return;
   const owner = pageOwner();
   try {
     const response = await api.post(`/budget/subscriptions/${subscription.id}/renew`, {});
     if (await reloadAfterSave(() => reload(undefined, { motion: true, owner }))) refocusAfterRender();
     const completed = response.data?.status === 'completed';
-    window.yuvomi?.showToast(t(completed ? 'subscriptions.completedToast' : 'subscriptions.renewedToast'), 'success');
+    const message = completed
+      ? t('subscriptions.completedNamed', { name: subscription.name })
+      : t('subscriptions.renewedNamed', { name: subscription.name, date: formatDate(response.data?.next_payment_date) });
+    if (!response.undo?.token) {
+      window.yuvomi?.showToast(message, 'success');
+      return;
+    }
+    offerUndo({
+      message,
+      undo: async () => {
+        await api.post(`/budget/subscriptions/${subscription.id}/renew/undo`, response.undo);
+        if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
+      },
+      onError: async (err) => {
+        await reportError(err, { owner });
+        if (isCurrentOwner(owner)) await reload(undefined, { owner, quiet: true });
+      },
+    });
   } catch (err) {
     await reportError(err, { owner });
     // Schon abgeschlossen (#2011): die Karte war veraltet - ein anderes
@@ -2030,31 +2043,43 @@ async function renewSubscription(subscription) {
   }
 }
 
+/**
+ * Abos in der Ruecknahmefrist: lokal schon weg, am Server noch da, bis ihr
+ * Loeschen nach der Frist des Toasts laeuft. Ein Neuladen in dieser Zeit
+ * (Speichern eines anderen Abos) holte sie sonst zurueck.
+ */
+const pendingDeletes = new Set();
+
+// LOESCHEN MIT RUECKGAENGIG STATT RUECKFRAGE (Critique R23, D6). Das Loeschen
+// laeuft erst, wenn die Frist des Toasts endet (`scheduleUndoableDelete`):
+// bis dahin ist am Server nichts geschehen - auch nicht an Erinnerungen und
+// der Buchung der naechsten Zahlung, die mit dem Abo gehen.
 async function deleteSubscription(subscription) {
   if (readOnly()) return;
-  const confirmed = await confirmModal(t('subscriptions.deleteConfirm', { name: subscription.name }),
-    { danger: true, detail: t('subscriptions.deleteConfirmDetail') });
-  if (!confirmed) return;
   const owner = pageOwner();
-  try {
-    await api.delete(`/budget/subscriptions/${subscription.id}`);
-  } catch (err) {
-    // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied war
-    // schneller. Die 404 eines Abos heisst nur das - die Route liest es ohne
-    // Sichtbarkeitsfilter, ein fremdes privates Abo endet dort mit 403.
-    if (!isAlreadyDeleted(err, 'subscriptions_subscription_not_found')) {
-      reportError(err, { owner });
-      return;
-    }
-  }
-  // Die Zeile klappt aus, die Nachbarn ruecken nach - erst dann steht die
-  // Liste ohne sie neu (der Server hat schon geloescht; ohne Bewegung loest
-  // collapseRow sofort auf). Ist die Seite inzwischen eine andere Instanz,
-  // bleibt sie unberuehrt; der Toast sagt trotzdem, dass geloescht ist.
-  if (isCurrentOwner(owner)) await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${subscription.id}"]`));
-  // Ob gerade geloescht oder schon geloescht: die Liste kommt vom Server.
+  const id = subscription.id;
+  pendingDeletes.add(id);
+  if (isCurrentOwner(owner)) await collapseRow(container.querySelector(`#subscriptions-list .swipe-row[data-swipe-id="${id}"]`));
+  state.subscriptions = state.subscriptions.filter((entry) => entry.id !== id);
   if (await reload(undefined, { motion: true, owner })) refocusAfterRender();
-  window.yuvomi?.showToast(t('subscriptions.deletedToast'), 'success');
+  scheduleUndoableDelete({
+    commit: async ({ keepalive } = {}) => {
+      try {
+        await api.delete(`/budget/subscriptions/${id}`, { keepalive });
+      } catch (err) {
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): ein anderes Haushaltsmitglied
+        // war schneller.
+        if (!isAlreadyDeleted(err, 'subscriptions_subscription_not_found')) throw err;
+      }
+      pendingDeletes.delete(id);
+    },
+    restore: async (err) => {
+      pendingDeletes.delete(id);
+      if (err) await reportError(err, { owner });
+      if (isCurrentOwner(owner) && await reload(undefined, { motion: true, owner })) refocusAfterRender();
+    },
+    message: t('common.deletedNamed', { name: subscription.name }),
+  });
 }
 
 async function openSettingsModal() {

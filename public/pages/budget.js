@@ -709,6 +709,32 @@ function findEntry(id) {
   return state.entries.find((e) => e.id === id) ?? state.ledgerResults?.find((e) => e.id === id);
 }
 
+/** Konten in der Ruecknahmefrist: lokal weg, am Server noch da (R23, D6). */
+const pendingAccountDeletes = new Set();
+
+/** Ein Konto ohne Buchungen loeschen - mit Rueckgaengig statt Rueckfrage (R23, D6). */
+function deleteEmptyAccountWithUndo(account) {
+  const id = account.id;
+  pendingAccountDeletes.add(id);
+  state.accounts = state.accounts.filter((entry) => entry.id !== id);
+  renderBody();
+  scheduleUndoableDelete({
+    commit: async ({ keepalive } = {}) => {
+      await api.delete(`/budget/accounts/${id}`, { keepalive });
+      pendingAccountDeletes.delete(id);
+      await loadAccounts();
+      renderBody();
+    },
+    restore: async (err) => {
+      pendingAccountDeletes.delete(id);
+      if (err) showBudgetError(err);
+      await loadAccounts();
+      renderBody();
+    },
+    message: t('common.deletedNamed', { name: account.name }),
+  });
+}
+
 async function loadAccounts() {
   try {
     // Immer inkl. archivierter Konten laden: für die Namensauflösung in der
@@ -716,7 +742,7 @@ async function loadAccounts() {
     // den optionalen „Archivierte anzeigen"-Modus. net_worth ignoriert archivierte
     // serverseitig; die Kachel-Liste filtert clientseitig.
     const res = await api.get('/budget/accounts?include_archived=1');
-    state.accounts = res.data?.accounts ?? [];
+    state.accounts = (res.data?.accounts ?? []).filter((entry) => !pendingAccountDeletes.has(entry.id));
     state.netWorth = res.data?.net_worth ?? 0;
   } catch (err) {
     console.error('[Budget] loadAccounts Fehler:', err);
@@ -3094,6 +3120,16 @@ function openAccountModal(account = null) {
 
       panel.querySelector('#am-delete')?.addEventListener('click', async () => {
         if (readOnly()) return;
+        // RUECKFRAGE NUR BEI KASKADE (Critique R23, D6): ein Konto MIT Buchungen
+        // nimmt ihnen die Kontozuordnung - das benennt der Dialog vorher. Ein
+        // leeres Konto geht mit Rueckgaengig: geloescht wird erst, wenn die
+        // Frist des Toasts endet.
+        if (!(Number(account.entry_count) > 0)) {
+          closeModal({ force: true, context: captureModalContext() });
+          deleteEmptyAccountWithUndo(account);
+          refocusAfterRender();
+          return;
+        }
         // confirmOverModal statt confirmModal: „Abbrechen" gibt das Konto-Modal
         // unverändert zurück, statt es samt Eingaben zu verdrängen. Bestätigt
         // der Nutzer, ist es beim Weiterlaufen hier bereits geschlossen.
@@ -3107,7 +3143,7 @@ function openAccountModal(account = null) {
           await reloadMonth();
           renderBody();
           refocusAfterRender();
-          window.yuvomi?.showToast(t('budget.accountDeletedToast'), 'success');
+          window.yuvomi?.showToast(t('common.deletedNamed', { name: account.name }), 'success');
         } catch (err) {
           showBudgetError(err);
         }

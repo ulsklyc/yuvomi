@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "Bukas muli ang \"{{name}}\" - hindi natuloy ang pag-check. Subukan ulit.",
         "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit.",
         "errorNotOwner": "Iba ang gumawa nito - makikita mo ito pero hindi mo mababago.",
-        "foreignReadOnlyHint": "Ginawa ni {{name}} - makikita mo ito pero hindi mo mababago."
+        "foreignReadOnlyHint": "Ginawa ni {{name}} - makikita mo ito pero hindi mo mababago.",
+        "deletedNamed": "Nabura ang \"{{name}}\"."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -670,7 +671,11 @@
         "doneByMenuItem": "Ginawa ni …",
         "checkedDoneNamed": "Tapos na ang \"{{title}}\".",
         "checkedOpenNamed": "Bukas muli ang \"{{title}}\".",
-        "errorReorderNotAllowed": "Makikita mo ang pagkakasunod-sunod ng pamilya pero hindi mo ito mababago."
+        "errorReorderNotAllowed": "Makikita mo ang pagkakasunod-sunod ng pamilya pero hindi mo ito mababago.",
+        "doneSubtasksOpen": "Tapos na ang \"{{title}}\" - {{count}} subtask pa ang bukas.",
+        "doneSubtasksOpen_one": "Tapos na ang \"{{title}}\" - {{count}} subtask pa ang bukas.",
+        "checkAllSubtasks": "Markahan lahat",
+        "subtasksAllDone": "Tapos na ang \"{{title}}\" at lahat ng subtask."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -1777,7 +1782,6 @@
         "deleteAccountConfirmDetail": "Mawawala naman sa mga entry na iyon ang talaga sa account, at hindi na sila mabibilang sa alinmang account. Tuluyan nang mawawala ang balanse at ang uri ng account.",
         "editAccount": "I-edit ang account",
         "newAccount": "Bagong account",
-        "accountDeletedToast": "Natanggal ang account",
         "accountSavedToast": "Na-save ang account",
         "accountAddedToast": "Naidagdag ang account",
         "accountLabel": "Account",
@@ -4027,7 +4031,6 @@
         "supplyName": "Pangalan ng produkto",
         "supplyPlaceholder": "Ano ang kulang?",
         "checkedInToast": "Naitala ang check-in.",
-        "checkedOutToast": "Naitala ang check-out.",
         "supplyAddedToast": "Naidagdag sa listahan ng pamimili.",
         "overdue": "Lampas na sa taning",
         "dueToday": "Taning ngayon",
@@ -4195,15 +4198,16 @@
         "errorTaskGone": "Wala na ang gawaing ito.",
         "errorAlreadyCheckedOut": "Naka-check out na ang katulong na ito.",
         "errorAlreadyCheckedIn": "Naka-check in na ang katulong na ito.",
-        "allVisitsInReport": "Lahat ng pagbisita sa ulat"
+        "allVisitsInReport": "Lahat ng pagbisita sa ulat",
+        "checkedOutNamed": "Naka-check out na si {{name}}.",
+        "visitToday": "Narito ngayon: {{from}} - {{to}}",
+        "checkInAgain": "Mag-check in ulit"
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",
         "subtitle": "Hatiin ang mga bayarin sa bahay, biyahe, pamimili at gastusin ng pamilya.",
         "addExpense": "Magdagdag ng gastos",
         "editExpense": "I-edit ang gastos",
-        "deleteExpenseConfirm": "Tanggalin ang gastos na ito?",
-        "deleteExpenseConfirmDetail": "Muling kinakalkula ang bawat balanse sa grupo nang wala ang gastos na ito, at agad itong makikita ng sinumang magiging pinagkakautangan mula sa may utang. Nananatili ang mga nakalakip na resibo.",
         "addGroup": "Bagong grupo",
         "groups": "Mga Grupo",
         "searchGroups": "Maghanap ng grupo",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Maglagay ng wastong petsa ng bayad.",
         "savedToast": "Na-save ang subscription.",
         "addedToast": "Naidagdag ang subscription.",
-        "renewedToast": "Na-update ang petsa ng pag-renew.",
-        "deleteConfirm": "Tanggalin ang subscription na \"{{name}}\"?",
-        "deleteConfirmDetail": "Tinatanggal kasama ng subscription ang mga paalala nito at ang entry sa badyet para sa susunod na bayad. Nananatili sa buwanang pangkalahatang-tanaw ang mga natapos nang bayad.",
-        "renewConfirm": "Itala ang bayad para sa \"{{name}}\"?",
-        "renewConfirmDetail": "Uusog nang pasulong ang takdang petsa, at itatala ang bayad noong {{date}} bilang gastos sa badyet.",
-        "deletedToast": "Natanggal ang subscription.",
         "monthlyBudgetLabel": "Buwanang badyet para sa subscription",
         "baseCurrencyLabel": "Batayang pera",
         "fixerHint": "Gumagamit ang live na conversion ng Fixer kapag naka-configure ang FIXER_API_KEY sa server.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "{{count}} bayad na lang ang natitira",
         "completed": "Natapos",
         "completedOn": "Natapos noong {{date}}",
-        "completedToast": "Natapos ang subscription.",
         "endsAfter": "{{count}} bayad na lang ang natitira",
         "logoTypeError": "Gumamit ng larawang PNG, JPEG, WebP o SVG.",
         "accountUsernameLabel": "Nakarehistro sa",
         "accountUsernameHint": "Email address o username. Hindi ito password field - hindi nag-iimbak ng password ang Yuvomi.",
         "detailAmountLabel": "Halaga",
-        "detailNextPaymentLabel": "Susunod na bayad"
+        "detailNextPaymentLabel": "Susunod na bayad",
+        "renewedNamed": "Nabayaran ang \"{{name}}\" - susunod na bayad sa {{date}}.",
+        "completedNamed": "Nabayaran at natapos ang \"{{name}}\"."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Ang talang ito ay hindi mula sa iskedyul at maaaring burahin.",
                 "saved": "Na-save ang tala",
                 "saveError": "Hindi ma-save ang tala.",
-                "deleteConfirm": "Burahin ang talang ito?",
-                "deleted": "Nabura ang tala",
-                "deleteConfirmDetail": "Mawawala rin ang tala sa export. Hindi ito maibabalik."
+                "deleted": "Nabura ang tala"
             },
             "prn": {
                 "title": "Kapag kailangan",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Itala ang dosis bago matapos ang pinakamaikling agwat?",
                 "earlyDetail": "Ang susunod na dosis ay sa {{time}} pa ({{remaining}}).",
                 "earlyConfirmAction": "Itala pa rin"
-            }
+            },
+            "doseTakenNamed": "Nainom na ang \"{{name}}\".",
+            "doseSkippedNamed": "Nilaktawan ang \"{{name}}\"."
         },
         "prevention": {
             "title": "Pag-iwas at bakuna",
@@ -5198,8 +5197,6 @@
             "saveError": "Hindi ma-save ang aktibidad.",
             "deleted": "Natanggal ang aktibidad.",
             "deleteError": "Hindi matanggal ang aktibidad.",
-            "deleteConfirm": "Talagang tanggalin ang aktibidad na ito?",
-            "deleteConfirmDetail": "Mawawala ang sesyon sa iyong kasaysayan at sa bawat lingguhan at buwanang kabuuan kung saan ito nabilang. Hindi na ito maibabalik.",
             "invalid": "Pakilagay ang wastong halaga.",
             "totals": {
                 "count": "Mga Aktibidad",
@@ -5281,11 +5278,7 @@
             "retry": "Subukang muli",
             "saved": "Na-save.",
             "saveError": "Hindi ma-save.",
-            "deleted": "Natanggal.",
             "deleteError": "Hindi matanggal.",
-            "deleteConfirm": "Talagang tanggalin ang entry na ito?",
-            "periodDeleteConfirmDetail": "Mawawala ang naitalang haba pagkatapos. Kung ito ang pinakahuling regla, lilipat din ang mga kinalkulang paparating na petsa; nagbabago lamang ang karaniwang haba ng siklo kapag walang nakatakdang halaga.",
-            "logDeleteConfirmDetail": "Kasama nitong matatanggal ang daloy, mga sintomas, kalooban at ang tala para sa araw na ito, at hindi na ito lalabas sa anumang pagsusuri. Hindi na ito maibabalik.",
             "invalid": "Pakilagay ang wastong halaga.",
             "fertilityDisclaimer": "Tinatantiya ang matabang panahon at obulasyon sa pamamaraang kalendaryo. Hindi ito paraan ng kontrasepsyon at hindi kapalit ng payong medikal.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Mag-subscribe sa inaasahang siklo sa kalendaryo",
             "widgetHint": "Idagdag ang tile ng siklo sa {{overview}} sa “{{customize}}”.",
-            "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula."
+            "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula.",
+            "periodDeleted": "Nabura ang regla.",
+            "logDeleted": "Nabura ang tala ng araw."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Ang iyong puntos",
         "approve": "Aprubahan",
         "reject": "Tanggihan",
-        "confirmReject": "Tanggihan ang hiling na ito sa pag-redeem? Ibabalik ang mga puntos.",
-        "confirmCancel": "Bawiin ang hiling na ito? Ibabalik ang mga puntos.",
         "manageParticipants": "Pamahalaan ang mga kalahok",
         "participantsIntro": "Piliin kung sino ang maaaring mangolekta ng puntos. Ang mga naka-enable na miyembro lamang ang lalabas sa pangkalahatang-tanaw.",
         "emptyOverviewTitle": "Wala pang nangongolekta ng puntos",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Pag-withdraw",
             "ledgerCredit": "Dagdag",
             "ledgerDebit": "Bawas",
-            "confirmReject": "Tanggihan ang kahilingang ito? Walang itatala.",
-            "confirmCancel": "Bawiin ang kahilingang ito?",
             "openAccount": "Magbukas ng account",
             "closeAccount": "Isara ang account",
             "confirmCloseAccount": "Isara ang account ni {{name}}?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Hindi nangongolekta ng puntos ang taong ito.",
         "errorMoneyAccountGone": "Wala na ang account na ito.",
         "errorMoneyPlanGone": "Wala na ang planong ito.",
-        "ownLedger": "Iyong mga entry"
+        "ownLedger": "Iyong mga entry",
+        "toastApprovedNamed": "Inaprubahan ang \"{{reward}}\" para kay {{name}}.",
+        "toastRejectedNamed": "Tinanggihan ang \"{{reward}}\" para kay {{name}}.",
+        "toastCancelledNamed": "Binawi ang \"{{reward}}\"."
     },
     "datepicker": {
         "openCalendar": "Buksan ang kalendaryo",
@@ -6206,11 +6200,8 @@
         "statusLost": "Nawala",
         "notesLabel": "Tala",
         "notesPlaceholder": "hal. nasa folder ang resibo",
-        "deleteConfirm": "Burahin ang \"{{name}}\"?",
-        "deleteConfirmDetail": "Agad at permanenteng aalisin ang gamit sa imbentaryo, walang basurahan na mapagbabawian nito.",
         "created": "Naidagdag ang gamit.",
         "updated": "Na-update ang gamit.",
-        "deleted": "Nabura ang gamit.",
         "emptyTitle": "Wala pang laman ang imbentaryo mo",
         "emptyDescription": "Itala ang mga pag-aari mo - kasama ang lokasyon, kategorya, at halaga ng pagbili.",
         "loadErrorTitle": "Hindi ma-load ang imbentaryo",

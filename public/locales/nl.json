@@ -108,7 +108,8 @@
         "errorCheckRolledBack": "‘{{name}}’ staat weer open - afvinken is niet gelukt. Probeer het opnieuw.",
         "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw.",
         "errorNotOwner": "Iemand anders heeft dit gemaakt - je kunt het bekijken, maar niet wijzigen.",
-        "foreignReadOnlyHint": "Gemaakt door {{name}} - je kunt het bekijken, maar niet wijzigen."
+        "foreignReadOnlyHint": "Gemaakt door {{name}} - je kunt het bekijken, maar niet wijzigen.",
+        "deletedNamed": "‘{{name}}’ verwijderd."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -652,7 +653,11 @@
         "doneByMenuItem": "Gedaan door …",
         "checkedDoneNamed": "‘{{title}}’ klaar.",
         "checkedOpenNamed": "‘{{title}}’ weer open.",
-        "errorReorderNotAllowed": "Je kunt de volgorde van het gezin bekijken, maar niet wijzigen."
+        "errorReorderNotAllowed": "Je kunt de volgorde van het gezin bekijken, maar niet wijzigen.",
+        "doneSubtasksOpen": "‘{{title}}’ klaar - nog {{count}} subtaken open.",
+        "doneSubtasksOpen_one": "‘{{title}}’ klaar - nog één subtaak open.",
+        "checkAllSubtasks": "Alles afvinken",
+        "subtasksAllDone": "‘{{title}}’ en alle subtaken klaar."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",
@@ -1759,7 +1764,6 @@
         "deleteAccountConfirmDetail": "Die boekingen verliezen wel hun rekeningkoppeling en horen daarna bij geen enkele rekening meer. Saldo en rekeningtype zijn weg en niet te herstellen.",
         "editAccount": "Rekening bewerken",
         "newAccount": "Nieuwe rekening",
-        "accountDeletedToast": "Rekening verwijderd",
         "accountSavedToast": "Rekening opgeslagen",
         "accountAddedToast": "Rekening toegevoegd",
         "accountLabel": "Rekening",
@@ -4023,7 +4027,6 @@
         "supplyName": "Productnaam",
         "supplyPlaceholder": "Wat ontbreekt er?",
         "checkedInToast": "Inchecking vastgelegd.",
-        "checkedOutToast": "Uitchecking vastgelegd.",
         "supplyAddedToast": "Toegevoegd aan de boodschappenlijst.",
         "overdue": "Verlopen",
         "dueToday": "Vervalt vandaag",
@@ -4191,7 +4194,10 @@
         "errorTaskGone": "Deze taak bestaat niet meer.",
         "errorAlreadyCheckedOut": "Deze schoonmaker is al uitgecheckt.",
         "errorAlreadyCheckedIn": "Deze schoonmaker is al ingecheckt.",
-        "allVisitsInReport": "Alle bezoeken in het rapport"
+        "allVisitsInReport": "Alle bezoeken in het rapport",
+        "checkedOutNamed": "{{name}} uitgecheckt.",
+        "visitToday": "Vandaag hier: {{from}} - {{to}}",
+        "checkInAgain": "Opnieuw inchecken"
     },
     "userMultiSelect": {
         "moreUsers": "meer",
@@ -4202,8 +4208,6 @@
         "subtitle": "Huishoudrekeningen, reizen, boodschappen en gezinskosten splitsen.",
         "addExpense": "Uitgave toevoegen",
         "editExpense": "Uitgave bewerken",
-        "deleteExpenseConfirm": "Deze uitgave verwijderen?",
-        "deleteExpenseConfirmDetail": "Alle saldi van de groep worden zonder deze uitgave herberekend, en wie daardoor van schuldenaar schuldeiser wordt ziet dat meteen. Bonnen blijven bewaard.",
         "addGroup": "Nieuwe groep",
         "groups": "Groepen",
         "searchGroups": "Groepen zoeken",
@@ -4615,12 +4619,6 @@
         "invalidDate": "Voer een geldige betaaldatum in.",
         "savedToast": "Abonnement opgeslagen.",
         "addedToast": "Abonnement toegevoegd.",
-        "renewedToast": "Verlengingsdatum bijgewerkt.",
-        "deleteConfirm": "Abonnement \"{{name}}\" verwijderen?",
-        "deleteConfirmDetail": "Met het abonnement verdwijnen de herinneringen en de budgetboeking van de volgende betaling. Al afgeronde betalingen blijven in het maandoverzicht staan.",
-        "renewConfirm": "Betaling voor \"{{name}}\" boeken?",
-        "renewConfirmDetail": "De vervaldatum schuift op en de betaling van {{date}} wordt als uitgave in het budget geboekt.",
-        "deletedToast": "Abonnement verwijderd.",
         "monthlyBudgetLabel": "Maandbudget voor abonnementen",
         "baseCurrencyLabel": "Basisvaluta",
         "fixerHint": "Live conversie gebruikt Fixer wanneer FIXER_API_KEY op de server is geconfigureerd.",
@@ -4716,13 +4714,14 @@
         "endsAfter_one": "Nog {{count}} betaling",
         "completed": "Voltooid",
         "completedOn": "Voltooid op {{date}}",
-        "completedToast": "Abonnement voltooid.",
         "endsAfter": "Nog {{count}} betalingen",
         "logoTypeError": "Gebruik een PNG-, JPEG-, WebP- of SVG-afbeelding.",
         "accountUsernameLabel": "Geregistreerd op",
         "accountUsernameHint": "E-mailadres of gebruikersnaam. Geen wachtwoordveld - Yuvomi bewaart geen wachtwoorden.",
         "detailAmountLabel": "Bedrag",
-        "detailNextPaymentLabel": "Volgende betaling"
+        "detailNextPaymentLabel": "Volgende betaling",
+        "renewedNamed": "‘{{name}}’ betaald - volgende betaling op {{date}}.",
+        "completedNamed": "‘{{name}}’ betaald en afgerond."
     },
     "health": {
         "fasting": {
@@ -5051,9 +5050,7 @@
                 "adhocHint": "Deze vermelding komt niet uit een schema en kan worden verwijderd.",
                 "saved": "Vermelding opgeslagen",
                 "saveError": "Vermelding kon niet worden opgeslagen.",
-                "deleteConfirm": "Deze vermelding verwijderen?",
-                "deleted": "Vermelding verwijderd",
-                "deleteConfirmDetail": "De vermelding verdwijnt ook uit de export. Dit kan niet ongedaan worden gemaakt."
+                "deleted": "Vermelding verwijderd"
             },
             "prn": {
                 "title": "Zo nodig",
@@ -5066,7 +5063,9 @@
                 "earlyConfirm": "Dosis vastleggen voordat de minimale tussentijd voorbij is?",
                 "earlyDetail": "De volgende dosis is pas vanaf {{time}} voorzien ({{remaining}}).",
                 "earlyConfirmAction": "Toch vastleggen"
-            }
+            },
+            "doseTakenNamed": "‘{{name}}’ ingenomen.",
+            "doseSkippedNamed": "‘{{name}}’ overgeslagen."
         },
         "prevention": {
             "title": "Preventie & vaccinaties",
@@ -5198,8 +5197,6 @@
             "saveError": "Sessie kon niet worden opgeslagen.",
             "deleted": "Sessie verwijderd.",
             "deleteError": "Sessie kon niet worden verwijderd.",
-            "deleteConfirm": "Deze sessie echt verwijderen?",
-            "deleteConfirmDetail": "De sessie verdwijnt uit het overzicht en uit alle week- en maandtotalen waarin ze tot nu toe meetelde. Herstellen is niet mogelijk.",
             "invalid": "Voer geldige waarden in.",
             "totals": {
                 "count": "Sessies",
@@ -5281,11 +5278,7 @@
             "retry": "Opnieuw proberen",
             "saved": "Opgeslagen.",
             "saveError": "Kon niet worden opgeslagen.",
-            "deleted": "Verwijderd.",
             "deleteError": "Kon niet worden verwijderd.",
-            "deleteConfirm": "Dit item echt verwijderen?",
-            "periodDeleteConfirmDetail": "De vastgelegde periode is daarna weg. Was het de meest recente, dan verschuiven ook de berekende volgende data; de gemiddelde cycluslengte verandert alleen zonder vaste ingestelde waarde.",
-            "logDeleteConfirmDetail": "Bloedverlies, symptomen, stemming en de notitie van die dag worden mee verwijderd en komen in geen enkele analyse meer voor. Herstellen is niet mogelijk.",
             "invalid": "Voer geldige waarden in.",
             "fertilityDisclaimer": "De vruchtbare periode en eisprong zijn geschat met de kalendermethode. Ze zijn geen voorbehoedsmiddel en geen vervanging voor medisch advies.",
             "pregnancy": {
@@ -5614,7 +5607,9 @@
             },
             "feedLink": "Abonneren op de voorspelde cyclus in je agenda",
             "widgetHint": "Voeg de cyclustegel toe aan {{overview}} via ‘{{customize}}’.",
-            "endBeforeStart": "Het einde mag niet vóór het begin liggen."
+            "endBeforeStart": "Het einde mag niet vóór het begin liggen.",
+            "periodDeleted": "Menstruatie verwijderd.",
+            "logDeleted": "Dagnotitie verwijderd."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",
@@ -5954,8 +5949,6 @@
         "yourPoints": "Jouw punten",
         "approve": "Goedkeuren",
         "reject": "Afwijzen",
-        "confirmReject": "Dit inwisselverzoek afwijzen? De punten worden teruggeboekt.",
-        "confirmCancel": "Dit verzoek intrekken? De punten worden teruggeboekt.",
         "manageParticipants": "Deelnemers beheren",
         "participantsIntro": "Kies wie punten kan sparen. Alleen ingeschakelde leden verschijnen in het overzicht.",
         "emptyOverviewTitle": "Nog niemand spaart punten",
@@ -6059,8 +6052,6 @@
             "ledgerWithdrawal": "Opname",
             "ledgerCredit": "Bijschrijving",
             "ledgerDebit": "Afschrijving",
-            "confirmReject": "Dit verzoek afwijzen? Er wordt niets geboekt.",
-            "confirmCancel": "Dit verzoek intrekken?",
             "openAccount": "Rekening openen",
             "closeAccount": "Rekening sluiten",
             "confirmCloseAccount": "Rekening van {{name}} sluiten?",
@@ -6079,7 +6070,10 @@
         "errorNotParticipating": "Deze persoon spaart geen punten.",
         "errorMoneyAccountGone": "Deze rekening bestaat niet meer.",
         "errorMoneyPlanGone": "Dit plan bestaat niet meer.",
-        "ownLedger": "Jouw boekingen"
+        "ownLedger": "Jouw boekingen",
+        "toastApprovedNamed": "‘{{reward}}’ goedgekeurd voor {{name}}.",
+        "toastRejectedNamed": "‘{{reward}}’ afgewezen voor {{name}}.",
+        "toastCancelledNamed": "‘{{reward}}’ ingetrokken."
     },
     "datepicker": {
         "openCalendar": "Kalender openen",
@@ -6206,11 +6200,8 @@
         "statusLost": "Verloren",
         "notesLabel": "Notitie",
         "notesPlaceholder": "bijv. de kassabon zit in de map",
-        "deleteConfirm": "\"{{name}}\" verwijderen?",
-        "deleteConfirmDetail": "Het voorwerp wordt meteen definitief uit de inventaris verwijderd, er is geen prullenbak om het terug te halen.",
         "created": "Voorwerp toegevoegd.",
         "updated": "Voorwerp bijgewerkt.",
-        "deleted": "Voorwerp verwijderd.",
         "emptyTitle": "Je inventaris is nog leeg",
         "emptyDescription": "Leg vast wat je bezit - met locatie, categorie en aankoopprijs.",
         "loadErrorTitle": "Inventaris kon niet worden geladen",

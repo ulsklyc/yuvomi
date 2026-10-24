@@ -2684,15 +2684,30 @@ und sekundaer, wo eine steht. Fest liegen die Enden: `--delete` steht nie am Zei
 `api.delete`. Der Anlass der Regel war kein Konsistenzwunsch, sondern die eine Stelle der
 App, an der eine Geste sofort und endgueltig loeschte.
 
-**Es gibt zwei Rueckwege, und die REICHWEITE der Tat entscheidet.** Laesst sie sich in einem
-Satz zuruecknehmen, gehoert ihr der Undo-Toast (`scheduleUndoableDelete`): er unterbricht
-nicht und haelt den Weg fuenf Sekunden offen - Geburtstag, Einkaufszeile, Buchung. Wirkt sie
-UEBER IHR MODUL HINAUS, gehoert ihr die Bestaetigung (`confirmModal` mit `danger: true`),
-denn dann muss der Rueckweg die Nebenwirkung BENENNEN, und das kann nur ein Dialog vor der
-Tat: ein Abo zu loeschen nimmt seine Erinnerungen und die Budget-Buchung der naechsten
-Zahlung mit. Keiner der beiden ist die Ausnahme des anderen - es ist dieselbe Trennung, die
-der Kanon zwischen Undo und Action Sheet zieht. Eine Bestaetigung ohne `danger` zaehlt
-nicht: die rote Taste ist das, was den Rueckweg erkennbar macht.
+**Es gibt zwei Rueckwege, und ob die Tat ein BEHAELTER ist, entscheidet (R23, D6).** Der
+Normalfall ist der Undo-Toast: er unterbricht nicht und haelt den Weg fuenf Sekunden offen.
+Beim Loeschen geschieht am Server bis zum Ende der Frist nichts (`scheduleUndoableDelete`) -
+Geburtstag, Einkaufszeile, Buchung, Abo, Gegenstand, leeres Konto, geteilte Ausgabe, jede
+Zeile der Gesundheit. Die Bestaetigung (`confirmModal` mit `danger: true`) bleibt nur dem
+BEHAELTER mit Inhalt, dessen Inhalt die Tat mitnimmt und den der Dialog benennen muss:
+Medikament mit Protokoll, Laborbefund mit Werten, Konto mit Buchungen, Ordner, Gruppe. Bis
+R23 fragte auch das Abo (Erinnerungen, naechste Buchung) - das tut die aufgeschobene
+Loeschung jetzt nicht mehr vorher, sondern gar nicht: bis zum Ende der Frist ist nichts
+davon weg. Eine Bestaetigung ohne `danger` zaehlt nicht: die rote Taste ist das, was den
+Rueckweg erkennbar macht.
+
+**Statusaktionen fragen nie vorher, sie quittieren mit Rueckweg (R23, D6).** Abhaken,
+Freigeben/Ablehnen, Auschecken, Einnehmen/Auslassen, Abo bezahlen: der Toast sagt
+"<Objekt> <Verb>" ("„Ibuprofen“ eingenommen.", "Maria ausgecheckt.") und bietet
+Rueckgaengig, das die Tat am Server ECHT zuruecknimmt - Bestand, Buchungen, Punkte
+(`reopen` der Belohnungen, `work-sessions/:id/reopen`, `logs/:id/undo` mit der Gutschrift aus
+`stock_deducted`, `renew/undo` per Marke des Servers). Ein Baustein: `offerUndo()`
+(utils/ux.js). Ein Toast mit Aktion traegt kein Haekchen (toast-show.js), das Haekchen
+bleibt der Bestaetigung ohne Rueckweg. Bis R23 fragte ausgerechnet das harmlosere Ablehnen
+nach, und das Freigeben lief ohne Rueckweg durch (N4). Die Elternaufgabe mit offenen
+Teilaufgaben sagt es im Toast und bietet "Alle abhaken" statt Rueckgaengig (zurueck geht
+es ueber den Haken). Guards: `test:feedback-undo-ui`, `test:toast-show`; die Gegenwege
+halten die Route-Suiten.
 
 Zuordnung als Tabelle bei der Signature Component; Guards auf Ebene 3
 (`Eine Wischgeste, die loescht, hat einen Rueckgaengig-Weg`) und Ebene 4 (Sonde 5), weil

@@ -17,7 +17,7 @@ import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { wireScrollFade, stagger } from '/utils/ux.js';
+import { wireScrollFade, stagger, offerUndo } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
 import { collapseRow } from '/utils/list-motion.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1110,46 +1110,33 @@ async function openRedeemModal(memberId, presetItemId = null) {
 
 async function decideRedemption(id, action, btn) {
   if (readOnly()) return;
-  const gefragt = action === 'reject' || action === 'cancel';
-  // Eine Geld-Anfrage hat nichts reserviert (#1734): der Satz "die Punkte
-  // werden zurueckgebucht" waere bei ihr falsch.
-  const geld = isMoneyRequest(state.redemptions.find((r) => r.id === id));
-  if (gefragt && geld) {
-    const ok = await confirmModal(
-      action === 'reject' ? t('rewards.money.confirmReject') : t('rewards.money.confirmCancel'),
-      { confirmLabel: action === 'reject' ? t('rewards.reject') : t('common.cancel') },
-    );
-    if (!ok) return;
-  } else if (gefragt) {
-    // Kein `danger`: der Server bucht die reservierten Punkte per `reversal`
-    // zurück (routes/rewards.js), es geht also kein Guthaben verloren. Die
-    // Anfrage bleibt als entschieden stehen und lässt sich neu stellen, solange
-    // die Belohnung aktiv im Katalog steht - `POST /redemptions` verlangt
-    // `is_active = 1`. Ist sie inzwischen gelöscht, war das Löschen der
-    // Belohnung die endgültige Handlung, und die trägt ihr eigenes `danger`.
-    // Rot faerben wuerde hier eine Endgueltigkeit behaupten, die die
-    // Entscheidung selbst nicht hat.
-    const ok = await confirmModal(
-      action === 'reject' ? t('rewards.confirmReject') : t('rewards.confirmCancel'),
-      { confirmLabel: action === 'reject' ? t('rewards.reject') : t('common.cancel') },
-    );
-    if (!ok) return;
-  }
+  // KEINE RUECKFRAGE MEHR, AN KEINER DER DREI ENTSCHEIDUNGEN (Critique R23, D6).
+  // Bis dahin fragte das harmlosere Ablehnen nach (die Punkte gehen ja zurueck),
+  // und das Freigeben - der eine Schritt, nach dem das Kind etwas bekommt - lief
+  // ohne Rueckweg durch (N4). Jetzt nimmt "Rueckgaengig" im Toast jede
+  // Entscheidung am Server zurueck (`reopen`, routes/rewards.js): die Anfrage
+  // steht wieder offen, das Guthaben wie vorher.
+  const row = state.redemptions.find((r) => r.id === id) ?? null;
   if (btn) btn.disabled = true;
   const context = captureModalContext();
   try {
     await api.patch(`/rewards/redemptions/${id}`, { action });
-    const msg = action === 'fulfill' ? t('rewards.toastApproved')
-      : action === 'reject' ? t('rewards.toastRejected') : t('rewards.toastCancelled');
-    toast(msg, action === 'fulfill' ? 'success' : 'default');
+    offerUndo({
+      message: decisionSentence(row, action),
+      undo: async () => {
+        await api.patch(`/rewards/redemptions/${id}`, { action: 'reopen' });
+        await reloadAfterSave(() => refreshActiveTab());
+      },
+      onError: async (err) => {
+        toast(rewardsErrorSentence(err), 'danger');
+        await refreshActiveTab();
+      },
+    });
     // Die entschiedene Anfrage klappt aus, bevor die Liste ohne sie neu steht;
     // mit der letzten geht der ganze Abschnitt (Titel + Traeger).
-    const row = btn?.closest?.('.rw-pending');
-    await collapseRow(row, { group: row?.closest?.('.rw-section'), selector: '.rw-pending' });
+    const rowEl = btn?.closest?.('.rw-pending');
+    await collapseRow(rowEl, { group: rowEl?.closest?.('.rw-section'), selector: '.rw-pending' });
     await reloadAfterSave(() => refreshActiveTab());
-    // Nur nach der Rueckfrage: "Einloesen" fragt nicht, schliesst also keinen
-    // Dialog, und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
-    if (gefragt) refocusAfterRender();
   } catch (err) {
     if (btn) btn.disabled = false;
     // VERGRIFFEN IST KEIN FEHLSCHLAG, SONDERN EINE ENTSCHIEDENE ANFRAGE (#1310).
@@ -1181,6 +1168,24 @@ async function decideRedemption(id, action, btn) {
       refocusAfterRender();
     }
   }
+}
+
+/**
+ * "<Objekt> <Verb>" fuer eine Entscheidung (R23, D6): welche Praemie, fuer
+ * wen. Das Kind, das seine eigene Anfrage zurueckzieht, braucht keinen Namen.
+ */
+function decisionSentence(row, action) {
+  const reward = !row ? '' : isMoneyRequest(row)
+    ? t(row.kind === 'deposit' ? 'rewards.money.ledgerDeposit' : 'rewards.money.ledgerWithdrawal')
+    : row.reward_name;
+  if (!reward) {
+    return action === 'fulfill' ? t('rewards.toastApproved')
+      : action === 'reject' ? t('rewards.toastRejected') : t('rewards.toastCancelled');
+  }
+  if (action === 'cancel') return t('rewards.toastCancelledNamed', { reward });
+  const name = row.user_name || '';
+  if (!name) return t(action === 'fulfill' ? 'rewards.toastApproved' : 'rewards.toastRejected');
+  return t(action === 'fulfill' ? 'rewards.toastApprovedNamed' : 'rewards.toastRejectedNamed', { reward, name });
 }
 
 function openBonusModal() {

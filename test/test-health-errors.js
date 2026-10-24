@@ -267,7 +267,46 @@ const LOESCHEN = [
   ['Tageseintrag', () => page.deleteDayLog({ id: 8 }), '/health/cycle/logs/8', 'health_cycle_log_not_found', 'health.errorCycleDayGone', 'health.cycle.deleteError', '/health/cycle/logs'],
 ];
 
+// Seit R23 (D6) gehen Dosis-Eintrag, Aktivitaet, Periode und Tageseintrag mit
+// Rueckgaengig: geloescht wird mit dem Ende der Toast-Frist, und ein Fehler dort
+// laeuft durch restore(err). Die Behaelter (Medikament, Befund) fragen weiter.
+const MIT_UNDO = new Set(['Dosis-Eintrag', 'Aktivitaet', 'Periode', 'Tageseintrag']);
+
+/** Loeschen bis zum Ende der Frist: der erste Lauf faengt das Undo-Fenster, der zweite schliesst es. */
+async function loeschenBisZumEnde(loesche, antworten) {
+  let opts = null;
+  globalThis.__undoStub = (o) => { opts = o; };
+  try {
+    const erst = await mit({}, loesche);
+    assert.ok(opts, 'Loeschen mit Rueckgaengig');
+    assert.ok(!erst.calls.some(([verb]) => verb === 'DELETE'), 'geloescht wird erst mit dem Ende der Frist');
+    const ende = await mit(antworten, async () => {
+      try { await opts.commit({ keepalive: false }); } catch (err) { await opts.restore(err); }
+    });
+    return { ...ende, closed: erst.closed };
+  } finally {
+    delete globalThis.__undoStub;
+  }
+}
+
 for (const [name, loesche, path, reason, goneKey, fallbackKey, reloadPrefix] of LOESCHEN) {
+  if (MIT_UNDO.has(name)) {
+    test(`Seite: ${name} loeschen mit Rueckgaengig - "nicht gefunden" am Ende der Frist ist kein Erfolg, sein Satz, der Bereich kommt frisch`, async () => {
+      const { calls, closed, gets } = await loeschenBisZumEnde(loesche, { delete: async () => { throw fehler(404, reason); } });
+      assert.deepEqual(calls.find(([verb]) => verb === 'DELETE'), ['DELETE', path]);
+      assert.deepEqual(toasts, [[goneKey, 'danger']]);
+      assert.equal(closed.length, 1, 'der Dialog geht zu');
+      if (reloadPrefix) assert.ok(gets.some((p) => p.startsWith(reloadPrefix)), `nachgeladen: ${gets.join(', ')}`);
+    });
+    test(`Seite: ${name} loeschen scheitert am Ende der Frist an etwas anderem - der allgemeine Satz der Stelle, nie der des Servers`, async () => {
+      for (const err of [fehler(400), fehler(404), fehler(500), fehler(404, 'health_future_not_found')]) {
+        await loeschenBisZumEnde(loesche, { delete: async () => { throw err; } });
+        assert.deepEqual(toasts, [[fallbackKey, 'danger']], `${err.status} ${err.data.reason ?? ''}`);
+        assertNoServerText();
+      }
+    });
+    continue;
+  }
   test(`Seite: ${name} loeschen, das "nicht gefunden" wird - kein Erfolg, sein Satz, der Dialog geht zu, der Bereich kommt frisch`, async () => {
     const { calls, closed, gets } = await mit({ delete: async () => { throw fehler(404, reason); } }, loesche);
     assert.deepEqual(calls[0], ['DELETE', path]);

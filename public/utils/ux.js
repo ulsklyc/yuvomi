@@ -887,6 +887,41 @@ export function scheduleUndoableDelete({
 }
 
 /**
+ * DIE QUITTUNG EINER STATUSAKTION MIT RUECKWEG (Critique R23, D6). Abhaken,
+ * Freigeben, Auschecken, Einnehmen, Abo bezahlen: die Tat ist am Server schon
+ * geschehen, und "Rueckgaengig" nimmt sie dort ECHT zurueck (Bestand, Buchung,
+ * Punkte - jede Route hat dafuer ihren Gegenweg). Anders als beim Loeschen
+ * (`scheduleUndoableDelete`) wartet hier nichts auf die Frist: wer die Seite
+ * schliesst, hat getan, was er getan hat.
+ *
+ * Der Satz ist "<Objekt> <Verb>" ("„Ibuprofen“ eingenommen.") - der Aufrufer
+ * baut ihn ueber t(), dieser Helfer nur die eine Form: kein Haekchen (der Toast
+ * traegt eine Aktion, toast-show.js), fuenf Sekunden, ein Knopf.
+ *
+ * @param {Object} opts
+ * @param {string} opts.message
+ * @param {() => Promise<void>} opts.undo  der Gegenweg am Server; wirft er, kommt `onError`
+ * @param {(err: Error) => void} [opts.onError]  Fehlersatz zeigen, Ansicht neu laden
+ * @param {string} [opts.label]  ein anderer Knopf als "Rueckgaengig" ("Alle abhaken")
+ * @param {number} [opts.duration=5000]
+ * @returns {boolean} ob ein Toast steht
+ */
+export function offerUndo({ message, undo, onError, label, duration = 5000 }) {
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await undo();
+    } catch (err) {
+      onError?.(err);
+    }
+  };
+  const action = label ? { label, onClick: run } : run;
+  return window.yuvomi?.showToast(message, 'default', duration, action) === true;
+}
+
+/**
  * Scroll-Affordanz für überlaufende Leisten und Listen (Audit F-01/F-06):
  * setzt `has-fade-start`/`has-fade-end` auf dem Element, solange in der
  * jeweiligen Richtung verborgener Inhalt liegt. Die zugehörigen Masken liegen
