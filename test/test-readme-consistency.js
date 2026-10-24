@@ -228,8 +228,13 @@ for (const lang of Object.keys(READMES)) {
     const md = readme(lang);
     const locales = readdirSync(resolve(ROOT, 'public/locales')).filter((f) => f.endsWith('.json')).length;
 
+    // Seit der Re-Critique R3 (2026-10-24) nennt jede README die Zahl genau
+    // einmal, in der Kennzahlenzeile; vorher stand sie dreimal da und las sich
+    // als Fuellung. Die Mindestzahl war nur die Wache gegen ein veraltetes
+    // Muster und verlangte zwei Nennungen - sie haette die Wiederholung
+    // erzwungen. Die Wache bleibt: keine Nennung heisst Muster veraltet.
     const claims = [...md.matchAll(/(\d+)\s*(?:<\/b>(?:\s|&nbsp;)*)?(?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
-    assert.ok(claims.length >= 2, `nur ${claims.length} Sprachangaben gefunden - Muster veraltet?`);
+    assert.ok(claims.length >= 1, `keine Sprachangabe gefunden - Muster veraltet?`);
 
     for (const claimed of claims) {
       assert.equal(claimed, locales,
@@ -295,11 +300,40 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
  * A und B weiter in ihren zwei Menuegruppen zeigen, und fuer den Vergleich wird
  * B dort aus seiner Gruppe genommen.
  */
+/*
+ * Seit der Re-Critique R3 (2026-10-24) traegt die Haushaltszeile die
+ * Kuechen-Gruppe der App: `Kitchen (Meals · Recipes · Shopping · Pantry)`.
+ * Am Telefon und in der Seitenleiste stehen diese vier als EIN Eintrag
+ * "Kueche" (public/router.js `kitchenGroup`). Die Klammer ist eine
+ * Beschriftung, kein Modul: die Namen darin zaehlen wie jeder andere, die
+ * Unterlabel stehen in `subgroups` und werden unten gegen Router und Locale
+ * geprueft.
+ */
 function readmeGroups(md) {
   const sec = md.split(/^## /m).find((s) => claimedModuleWord(`## ${s.split('\n')[0]}`)) || '';
   const summary = (sec.match(/<details>\s*<summary>([\s\S]*?)<\/summary>/) || [, ''])[1];
-  return [...summary.matchAll(/^<b>(.+?)<\/b> - (.+?)(?:<br>)?$/gm)]
-    .map((m) => ({ label: m[1].trim(), names: m[2].split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()) }));
+  return [...summary.matchAll(/^<b>(.+?)<\/b> - (.+?)(?:<br>)?$/gm)].map((m) => {
+    const subgroups = [];
+    const flat = m[2].replace(/([^·()]+?) \(([^()]+)\)/g, (_, label, inner) => {
+      subgroups.push({ label: label.trim(), names: inner.split(' · ').map((n) => n.trim()) });
+      return inner;
+    });
+    return { label: m[1].trim(), names: flat.split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()), subgroups };
+  });
+}
+
+/** Die Kuechen-Klammer der README gegen `kitchenGroup` im Router und `nav.kitchen` der Locale. */
+function kitchenFindings(md, lang, routerSrc, nav) {
+  const subs = readmeGroups(md).flatMap((g) => g.subgroups.map((sg) => ({ ...sg, group: g.label })));
+  const kitchen = [...routerSrc.matchAll(/module: '(\w+)',[^\n]*kitchenGroup: true/g)].map((x) => nav[x[1]]);
+  if (kitchen.length < 2) return ['public/router.js: keine kitchenGroup-Eintraege gefunden - Muster veraltet?'];
+  const found = [];
+  if (subs.length !== 1) found.push(`${subs.length} Unterklammern in den Gruppenzeilen, erwartet genau die Kueche`);
+  for (const sg of subs) {
+    if (sg.label !== nav.kitchen) found.push(`Unterklammer "${sg.label}" heisst in der App "${nav.kitchen}" (nav.kitchen, ${lang})`);
+    if (sg.names.join(' · ') !== kitchen.join(' · ')) found.push(`Kueche: README ${sg.names.join(' · ')} / App ${kitchen.join(' · ')}`);
+  }
+  return found;
 }
 
 function pageGroups(html, lang) {
@@ -354,11 +388,31 @@ function groupFindings(md, html, lang) {
   return found;
 }
 
+const ROUTER_SRC = () => read('public/router.js');
+const NAV = (lang) => JSON.parse(read(`public/locales/${lang}.json`)).nav;
+
 for (const lang of Object.keys(READMES)) {
   test(`${READMES[lang]}: die Gruppenzeilen sind die Menuegruppen der Homepage und nennen jedes Modul der Tabelle`, () => {
     assert.deepEqual(groupFindings(readme(lang), read('docs/index.html'), lang), []);
   });
+  test(`${READMES[lang]}: die Kuechen-Klammer ist die Kuechen-Gruppe der App`, () => {
+    assert.deepEqual(kitchenFindings(readme(lang), lang, ROUTER_SRC(), NAV(lang)), []);
+  });
 }
+
+test('der Kuechen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const md = readme('en');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  assert.ok(md.includes('Kitchen (Meals · Recipes · Shopping · Pantry)'), 'Vorbedingung: die Kuechen-Klammer steht in README.md');
+  const noBracket = kitchenFindings(md.replace('Kitchen (Meals · Recipes · Shopping · Pantry)', 'Meals · Recipes · Shopping · Pantry'), 'en', ROUTER_SRC(), NAV('en'));
+  assert.ok(hit(noBracket, /0 Unterklammern/), noBracket.join(' | '));
+  const renamed = kitchenFindings(md.replace('Kitchen (', 'Food ('), 'en', ROUTER_SRC(), NAV('en'));
+  assert.ok(hit(renamed, /Unterklammer "Food" heisst in der App "Kitchen"/), renamed.join(' | '));
+  // Ein Modul wandert in der App aus der Kuechen-Gruppe, die README bleibt stehen.
+  const router = ROUTER_SRC().replace(/(module: 'pantry',[^\n]*?), kitchenGroup: true/, '$1');
+  assert.notEqual(router, ROUTER_SRC(), 'Vorbedingung: pantry traegt kitchenGroup im Router');
+  assert.ok(hit(kitchenFindings(md, 'en', router, NAV('en')), /Kueche: README Meals · Recipes · Shopping · Pantry \/ App Meals · Recipes · Shopping$/));
+});
 
 test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const md = readme('en');
@@ -591,7 +645,13 @@ const README_FACTS = [
     what: 'SSO als einziger Weg (server/auth.js isPasswordLoginEnabled, .env.example AUTH_ALLOW_PASSWORD_LOGIN)' },
   { says: { en: /signed out from any of your other devices/, de: /von jedem eurer anderen Ger[aä]te aus ab/ },
     holds: (s) => /router\.post\('\/logout-others'/.test(s.auth),
-    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },
+    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },  // Der Weg der Eingeladenen (Re-Critique R3), wie die Karte fam_inv_* der Homepage.
+  { says: { en: /it works for seven days/, de: /er gilt sieben Tage/ },
+    holds: (s) => /INVITE_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(s.invites),
+    what: 'Einladungslink sieben Tage gueltig (server/services/invites.js INVITE_TTL_MS)' },
+  { says: { en: /none if your household signs in with single sign-on/, de: /keins, wenn sich\s+euer Haushalt per Single Sign-on anmeldet/ },
+    holds: (s) => /password_required: isPasswordLoginEnabled\(getDb\(\)\)/.test(s.auth),
+    what: '/join fragt ohne Passwort-Anmeldung kein Passwort (server/auth.js GET /invites/preview)' },
 ];
 
 /** Saetze, die nicht zurueckkommen duerfen - in beiden READMEs. */
@@ -652,6 +712,7 @@ function factSources() {
     sw: src('public/sw.js'),
     permissions: src('server/permissions.js'),
     twoFactor: src('server/services/two-factor.js'),
+    invites: src('server/services/invites.js'),
     pages: { 'docs/index.html': src('docs/index.html'), 'docs/install.html': src('docs/install.html') },
   };
 }

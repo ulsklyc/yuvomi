@@ -171,6 +171,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The "Open Yuvomi" card at the end of the install guide sits on the page like the other cards.**
   It carried the wide shadow of a floating panel, a grey haze in light mode and a second ring
   beside its border in dark mode, and now has the same shallow shadow as the rest.
+- **The README's install section fits on one screen of a laptop.** It was the longest part of the
+  page. It now shows the app stores as one line with links and the Docker way as the commands to
+  run, with the key warning between them; Podman, Proxmox, the guided setup and the encryption key
+  details fold away below, next to requirements and network, and the full guides are linked. The
+  module groups show the app's Kitchen (Meals, Recipes, Shopping, Pantry) under Household, a short
+  paragraph tells an invited family member how to join, and the language count and the RAM figure
+  each appear once.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

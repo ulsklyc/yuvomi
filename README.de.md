@@ -83,6 +83,12 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 - **Die App auf jedem Handy** kommt direkt aus dem Browser auf den Startbildschirm, ohne App Store. Erinnerungen kommen als Mitteilung, auch wenn die App zu ist (dafür braucht euer Server HTTPS), und die zuletzt geöffnete Einkaufsliste bleibt lesbar, wenn kein Netz da ist.
 - **Jedes Mitglied kommt per Einladungslink** und wählt sein Passwort selbst; ein Kind ohne Handy bekommt sein Konto direkt angelegt. Je Familienrolle ist jedes Modul voll, nur lesen oder gar nicht freigegeben.
 
+**Von eurer Familie eingeladen?** Öffnet den Einladungslink, den euer Admin geschickt hat; er gilt
+sieben Tage. Wählt einen Benutzernamen, falls die Einladung keinen vorgibt, und euer eigenes
+Passwort (keins, wenn sich euer Haushalt per Single Sign-on anmeldet). Dann meldet euch an und holt
+Yuvomi auf den Startbildschirm: Installieren antippen, wenn die App es anbietet, oder auf iPhone
+und iPad Teilen und dann Zum Home-Bildschirm wählen.
+
 [Mehr auf yuvomi.cloud](https://yuvomi.cloud/#family)
 
 ## Die zwanzig Module
@@ -94,7 +100,7 @@ Entsorgung und Schichtplan sind anfangs aus.
 <summary>
 Alle 20 Module, je in einer Zeile<br>
 <b>Planen</b> - Aufgaben · Kalender · Belohnungen · Notizen &amp; Kontakte · Schichtplan<br>
-<b>Haushalt</b> - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar<br>
+<b>Haushalt</b> - Küche (Mahlzeiten · Rezepte · Einkauf · Vorrat) · Haushaltshilfe · Entsorgung · Dokumente · Inventar<br>
 <b>Menschen</b> - Gesundheit · Geburtstage<br>
 <b>Finanzen</b> - Budget<br>
 <b>Einstellungen</b> - Familie · Erinnerungen · API-Tokens · Backup
@@ -159,17 +165,64 @@ unter *Voraussetzungen, Netzwerk und eure Daten*.
 
 ## Installieren
 
-Sucht euch euren Weg aus:
+**Aus dem App-Store eures NAS** - [TrueNAS SCALE](https://yuvomi.cloud/install.html#truenas),
+[Umbrel](https://yuvomi.cloud/install.html#umbrel) oder [Unraid](https://yuvomi.cloud/install.html#unraid):
+im Katalog nach Yuvomi suchen und installieren, ganz ohne Terminal.
 
-- **[Aus dem App-Store eures NAS](#aus-dem-app-store-eures-nas)** - TrueNAS SCALE, Umbrel oder Unraid, ganz ohne Terminal.
-- **[Docker oder Podman](#docker-oder-podman)** - Compose auf eurem eigenen Server, für volle Kontrolle.
-- **[Geführte Einrichtung](#geführte-einrichtung)** - ein Assistent im Browser, der alles einrichtet und den Container startet.
+**Mit Docker** auf jedem Server. Das Image `ghcr.io/ulsklyc/yuvomi:latest` ist rund 500 MB groß und
+läuft auf amd64 und arm64 (Raspberry Pi 4/5); Yuvomi braucht einen Port, standardmäßig 3000.
 
-Egal welcher Weg:
+```bash
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
+cp .env.example .env
+openssl rand -hex 32   # SESSION_SECRET
+openssl rand -hex 32   # DB_ENCRYPTION_KEY
+```
 
-- **Image** - `ghcr.io/ulsklyc/yuvomi:latest`, rund 500 MB, für amd64 und arm64 (Raspberry Pi 4/5).
-- **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
-- **Schlüssel** - optional, aber ohne Weg zurück: ein verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für euch noch für uns. Die geführte Einrichtung und Umbrel erzeugen ihn für euch; mit Compose, TrueNAS oder Unraid setzt ihr ihn selbst, also schreibt ihn auf.
+> **Öffnet jetzt `.env` und ersetzt beide `REPLACE_WITH_…`-Platzhalter** durch die zwei Werte, in
+> dieser Reihenfolge, und schreibt den zweiten auf: er ist der Datenbankschlüssel, und ein
+> verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für euch noch für
+> uns. Bleibt ein Platzhalter stehen, startet Yuvomi nicht. Ohne Verschlüsselung: die Zeile
+> `DB_ENCRYPTION_KEY` leeren statt sie zu füllen.
+
+```bash
+docker compose up -d
+```
+
+Öffnet `http://localhost:3000` und legt euer Admin-Konto an. Podman, Proxmox, HTTPS, Backups und
+Fehlersuche Schritt für Schritt: die [Installationsanleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html)
+und die [Installationsanleitung im Repository](docs/installation.md).
+
+<details>
+<summary><b>Podman, Proxmox, die geführte Einrichtung und der Schlüssel</b></summary>
+
+- **Podman** - ladet `podman-compose.yml` statt `docker-compose.yml` und startet mit
+  `podman compose -f podman-compose.yml up -d`; darin stecken die SELinux-`:Z`-Labels, die RHEL,
+  Fedora und CentOS Stream brauchen.
+- **Seite lädt nicht** - `docker compose logs` (unter Podman
+  `podman compose -f podman-compose.yml logs`) nennt meist den Grund, und die
+  [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
+- **Proxmox** - dieselben Schritte laufen in einem kleinen Debian-LXC: siehe die
+  [Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
+- **Schlüssel** - optional, aber ohne Weg zurück. Die geführte Einrichtung und Umbrel erzeugen ihn
+  für euch; mit Compose, TrueNAS oder Unraid setzt ihr ihn selbst, also schreibt ihn auf.
+- **Geführte Einrichtung** - ein lokalisierter Einrichtungsassistent im Browser. Er erkennt Docker
+  oder Podman, richtet Single Sign-on und geplante Backups ein, bereitet Yuvomi auf einen
+  HTTPS-Reverse-Proxy vor (das Zertifikat bleibt Sache des Proxys), startet dann den Container und
+  legt euer Admin-Konto an.
+
+  ```bash
+  git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
+  node tools/installer/install-server.js
+  ```
+
+  Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht.
+  Von einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
+  und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container
+  bringt sein eigenes Node 24 mit.
+
+</details>
 
 <details>
 <summary><b>Voraussetzungen, Netzwerk und eure Daten</b></summary>
@@ -184,60 +237,6 @@ Egal welcher Weg:
 - **Eure Daten** - eine SQLite-Datei unter `/data/yuvomi.db`, dazu Ordner, WebDAV oder Drive, falls die Dokumente dort liegen.
 
 </details>
-
-### Aus dem App-Store eures NAS
-
-**TrueNAS SCALE**, **Umbrel** und **Unraid** führen Yuvomi alle: im Katalog suchen und installieren,
-ganz ohne Terminal. Neu bei Containern? Die
-**[Installationsanleitung](docs/installation.md)** führt Schritt für Schritt durch Engine, HTTPS,
-Backups und Fehlersuche.
-
-### Docker oder Podman
-
-```bash
-curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env
-openssl rand -hex 32   # SESSION_SECRET
-openssl rand -hex 32   # DB_ENCRYPTION_KEY
-```
-
-> **Öffnet jetzt `.env` und ersetzt beide `REPLACE_WITH_…`-Platzhalter** durch die zwei eben
-> erzeugten Werte, in dieser Reihenfolge, und schreibt den zweiten auf: er ist der
-> Datenbankschlüssel, und nichts kann ihn wiederherstellen. Bleibt ein Platzhalter stehen, startet
-> Yuvomi nicht. Ohne Verschlüsselung: die Zeile `DB_ENCRYPTION_KEY` leeren statt sie zu füllen.
-
-```bash
-docker compose up -d
-```
-
-Unter Podman ladet ihr `podman-compose.yml` statt `docker-compose.yml` und startet mit
-`podman compose -f podman-compose.yml up -d`; darin stecken die SELinux-`:Z`-Labels, die RHEL,
-Fedora und CentOS Stream brauchen.
-
-Öffnet `http://localhost:3000`. Der erste Besuch führt euch durch das Anlegen des Admin-Kontos. Lädt
-die Seite nicht, nennt `docker compose logs` (unter Podman `podman compose -f podman-compose.yml logs`)
-meist den Grund, und die
-[Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
-
-Auf **Proxmox** laufen dieselben Schritte in einem kleinen Debian-LXC: siehe die
-[Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
-
-### Geführte Einrichtung
-
-Ein Einrichtungsassistent im Browser, in 27 Sprachen. Er erkennt Docker oder Podman, richtet Single
-Sign-on und geplante Backups ein, bereitet Yuvomi auf einen HTTPS-Reverse-Proxy vor (das Zertifikat
-bleibt Sache des Proxys), startet dann den Container und legt euer Admin-Konto an.
-
-```bash
-git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
-node tools/installer/install-server.js
-```
-
-Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht. Von
-einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
-und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container bringt sein eigenes
-Node 24 mit.
 
 <details>
 <summary><b>Bevor ihr live geht: Gesundheitsdaten, Google-Drive-Freigabe und DSGVO</b></summary>
@@ -274,7 +273,7 @@ Yuvomi wurde von **Oikos** umbenannt, um einen Markenkonflikt mit einem unabhän
 - **Fühlt sich an wie eine native App** - gebaut nach Apples Gestaltungsrichtlinien: Systemschrift, Kapsel-Knöpfe, gruppierte Listen und federnde Bewegung, mit in Hell und Dunkel geprüftem WCAG-AA-Kontrast.
 - **Privatsphäre zuerst** - vollständig selbstgehostet, optionale SQLCipher-AES-256-Datenbankverschlüsselung, keine Telemetrie.
 - **Anmeldung für einen ganzen Haushalt** - Zwei-Faktor-Anmeldung, Einladungslinks, optionaler Passwort-Reset per E-Mail und Single Sign-on mit jedem OIDC-Anbieter; siehe [wie sicher der Zugang von außen ist](#bevor-ihr-euch-festlegt).
-- **27 Sprachen** mit automatischer Erkennung. Eine eigene Haushaltseinstellung bestimmt die Sprache der Einträge, die Yuvomi selbst anlegt - so spricht ein exportierter Kalender die Sprache eures Haushalts statt Englisch.
+- **Eure Sprache, automatisch erkannt.** Eine eigene Haushaltseinstellung bestimmt die Sprache der Einträge, die Yuvomi selbst anlegt - so spricht ein exportierter Kalender die Sprache eures Haushalts statt Englisch.
 - **Technik** - Node.js und Express mit SQLite (SQLCipher), ein Container für Docker oder Podman, eine PWA auf jedem Handy.
 
 ---
@@ -301,7 +300,7 @@ zurückliegen; wo sie und die Quellen oben sich widersprechen, gelten die oben.
     und nichts von uns zwischen eurem Haushalt und seinen Daten.
   </p>
   <p>
-    <a href="#installieren"><strong>→ In Minuten installieren</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="#installieren"><strong>→ Installieren</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="https://yuvomi.cloud/"><strong>Rundgang ansehen</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="https://github.com/ulsklyc/yuvomi/discussions"><strong>Fragt nach</strong></a>
   </p>
