@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Calendar sync has its own settings page.** CalDAV, Google, Apple and Outlook accounts and
+  "Fill in assignments" now live on "Calendar sync", right after "Calendar" in Settings, instead of
+  at the end of a very long calendar page. Old links and the return from Google or Outlook
+  sign-in land there. Roles & permissions, Active modules and "Fill in assignments" now start
+  with one sentence or two and keep the rest behind "Learn more".
 - **Sign-in and first setup point at the field that needs fixing.** A missing username, a too
   short password or passwords that do not match now show their message right under that field,
   and the cursor moves there. Wrong credentials put the message and the cursor on the password,

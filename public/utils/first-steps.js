@@ -104,7 +104,7 @@ export function firstStepsHtml(model, t) {
       <div class="first-steps__head">
         <h2 class="first-steps__title" id="first-steps-title">${esc(t('firstSteps.title'))}</h2>
         <span class="first-steps__count">${esc(`${model.doneCount}/${model.steps.length}`)}</span>
-        <button type="button" class="row-action first-steps__close" data-first-steps-dismiss aria-label="${esc(t('firstSteps.dismiss'))}">
+        <button type="button" class="btn btn--icon btn--ghost first-steps__close" data-first-steps-dismiss aria-label="${esc(t('firstSteps.dismiss'))}">
           <i data-lucide="x" aria-hidden="true"></i>
         </button>
       </div>

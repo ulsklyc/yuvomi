@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "Bu klasörün adı geçerli bir modül kimliği değil. Klasörü sunucudan elle kaldırın.",
         "moduleDeleteErrorNotWebInstalled": "Bu modül sunucuya elle kopyalanmış. Klasörünü orada kaldırın.",
         "activeModulesTitle": "Evin modülleri",
-        "activeModulesHint": "Burada kapalı olan, evdeki hiç kimse için yoktur. Bir modülü yalnızca kendinde gizlemek için Modüller → Gezinme sayfasına git.",
+        "activeModulesHint": "Burada kapalı olan, evdeki hiç kimse için yoktur.",
         "modulesEnableForHousehold": "{{module}} modülünü ev için aç",
         "modulesHideKitchenForMe": "Tüm mutfak modüllerini bende gizle",
         "modulesHiddenScopeHint": "Gizlenen modüller yalnızca senin gezinmenden kaybolur. Bağlantılar ve arama onlara hâlâ ulaşır.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Roller ve izinler",
         "pagePermissionsDescription": "Modül ve widget erişimini role ve üyeye göre ayarlayın.",
         "permModeLabel": "İzinleri şuna göre ayarla",
-        "permIntro": "Her aile rolünün hangi modülleri ve pano widget'larını görebileceğine ve düzenleyebileceğine karar verin. Bireysel üyeler rol varsayılanından farklı olabilir. Ayar yapılmazsa her rol tam erişime sahiptir; yöneticiler her zaman.",
+        "permIntro": "Her aile rolünün hangi modülleri ve pano widget'larını görebileceğine ve düzenleyebileceğine karar verin.",
         "permByRole": "Role göre",
         "permByMember": "Üyeye göre",
         "permRoleLegend": "Bu izinler, üyenin kendi istisnası olmadıkça bu aile rolüne sahip tüm üyeler için geçerlidir.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişiye atanır.",
             "defaultAssigneeRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişiye atanır ve yalnızca o kişiye atanan yeni bir etkinlik o takvimde oluşturulur. Google ve CalDAV takvimleri için geçerlidir, Apple veya Outlook için değil.",
             "backfillTitle": "Atamaları tamamla",
-            "backfillDescription": "Varsayılan atama yalnızca ayarlandıktan sonra içe aktarılan randevulara uygulanır. Burada bunu tüm hesaplardan zaten içe aktarılmış randevulara bir kez uygulayabilirsiniz. Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez.",
+            "backfillDescription": "Varsayılan atama yalnızca ayarlandıktan sonra içe aktarılan randevulara uygulanır. Burada bunu tüm hesaplardan zaten içe aktarılmış randevulara bir kez uygulayabilirsiniz.",
             "backfillAction": "Mevcut randevulara uygula",
             "backfillQuestion": "Atanmamış {{count}} randevu atansın mı?",
             "backfillQuestion_one": "Atanmamış {{count}} randevu atansın mı?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "{{total}} randevudan {{first}} ile {{last}} arası. “Ata” bu sayfadaki seçimi uygular, “Sonrakileri göster” uygulamadan ilerler. Seçilmeyen randevular değişmez.",
             "backfillMovedNext": "Sonrakileri göster",
             "backfillMovedAll": "Tümünü seç",
-            "backfillMovedChange": "{{from}} yerine {{to}}"
+            "backfillMovedChange": "{{from}} yerine {{to}}",
+            "backfillDescriptionMore": "Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez."
         },
         "calendarAssignMeLabel": "Yeni etkinlikleri bana ata",
         "calendarDefaultRemindersLabel": "Varsayılan hatırlatıcılar",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Duvar tabletleri",
         "pageDisplaysDescription": "Duvar tableti oluştur, cihaz eşleştir ve erişimini iptal et.",
         "sheetDashboardDescription": "Genel bakıştaki süresi dolmuş geri sayımlar için ek süreyi ayarla.",
-        "sheetCalendarDescription": "Kendi etkinlik varsayılanların, abonelikler ve dışa aktarmalar; ayrıca tatiller, hafta başlangıcı ve takvim senkronizasyonu.",
+        "sheetCalendarDescription": "Kendi etkinlik varsayılanların, abonelikler ve dışa aktarmalar; ayrıca tatiller ve hafta başlangıcı.",
         "sheetScheduleDescription": "Vardiya planının hangi hızlı başlangıç şablonlarını sunacağını seç.",
         "sheetTasksDescription": "Yeni görevler için hatırlatıcı listen, alt görevler ve hatırlatıcı senkronizasyonu.",
         "sheetBudgetDescription": "Paylaşılan kayıtlarla kişisel bütçeleri aç.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Başkalarının eşyalarını değiştir",
         "permCapabilityInventoryPrices": "Satın alma fiyatlarını gör",
         "permCapabilityTasksReorder": "Ailenin sıralamasını değiştir",
-        "permChildRoleHint": "Yeni çocuk hesapları oluşturulurken ayrıca kendi başlangıç izinlerini alır: {{list}}. Sonra bunlar ilgili üyede görünür."
+        "permChildRoleHint": "Yeni çocuk hesapları oluşturulurken ayrıca kendi başlangıç izinlerini alır: {{list}}. Sonra bunlar ilgili üyede görünür.",
+        "activeModulesHintMore": "Bir modülü yalnızca kendinde gizlemek için Modüller → Gezinme sayfasına git.",
+        "permIntroMore": "Bireysel üyeler rol varsayılanından farklı olabilir. Ayar yapılmazsa her rol tam erişime sahiptir; yöneticiler her zaman."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

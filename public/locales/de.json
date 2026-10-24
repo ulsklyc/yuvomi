@@ -2057,7 +2057,7 @@
         "moduleDeleteErrorBadId": "Dieser Ordnername ist keine gültige Modulkennung. Entferne den Ordner auf dem Server von Hand.",
         "moduleDeleteErrorNotWebInstalled": "Dieses Modul wurde von Hand auf den Server kopiert. Entferne den Ordner dort.",
         "activeModulesTitle": "Module des Haushalts",
-        "activeModulesHint": "Was hier aus ist, gibt es für niemanden im Haushalt. Wer ein Modul nur für sich aus der Navigation nehmen will, tut das unter Module → Navigation.",
+        "activeModulesHint": "Was hier aus ist, gibt es für niemanden im Haushalt.",
         "modulesEnableForHousehold": "{{module}} für den Haushalt aktivieren",
         "modulesHideKitchenForMe": "Alle Küchen-Module für mich ausblenden",
         "modulesHiddenScopeHint": "Ausgeblendete Module verschwinden nur aus deiner Navigation. Über Links und die Suche bleiben sie erreichbar.",
@@ -2854,7 +2854,7 @@
         "pagePermissions": "Rollen und Rechte",
         "pagePermissionsDescription": "Modul- und Widget-Zugriff pro Rolle und Mitglied festlegen.",
         "permModeLabel": "Rechte festlegen nach",
-        "permIntro": "Lege fest, welche Module und Widgets der Übersicht jede Familienrolle sehen und bearbeiten darf. Einzelne Mitglieder können vom Rollen-Standard abweichen. Ohne Einstellung hat jede Rolle vollen Zugriff; Administratoren immer.",
+        "permIntro": "Lege fest, welche Module und Widgets der Übersicht jede Familienrolle sehen und bearbeiten darf.",
         "permByRole": "Nach Rolle",
         "permByMember": "Nach Mitglied",
         "permRoleLegend": "Diese Rechte gelten für alle Mitglieder mit dieser Familienrolle, sofern für das Mitglied keine eigene Ausnahme gesetzt ist.",
@@ -3057,7 +3057,7 @@
             "defaultAssigneeHint": "Neu synchronisierte Termine werden automatisch dieser Person zugewiesen.",
             "defaultAssigneeRoutingHint": "Standard-Zuweisung: Termine aus einem Kalender bekommen die dort gewählte Person, und ein neuer Termin, der nur dieser Person zugewiesen ist, wird in diesem Kalender angelegt. Das gilt für Google- und CalDAV-Kalender, nicht für Apple oder Outlook.",
             "backfillTitle": "Zuweisung nachtragen",
-            "backfillDescription": "Eine Standard-Zuweisung gilt nur für Termine, die nach dem Setzen übernommen werden. Hier lässt sie sich einmalig auf die schon übernommenen Termine aller Konten anwenden. Termine ohne Zuweisung bekommen sie direkt. Termine, die noch die Standard-Zuweisung eines anderen Kalenders tragen, stehen einzeln zur Auswahl. Jede andere Zuweisung bleibt unverändert.",
+            "backfillDescription": "Eine Standard-Zuweisung gilt nur für Termine, die nach dem Setzen übernommen werden. Hier lässt sie sich einmalig auf die schon übernommenen Termine aller Konten anwenden.",
             "backfillAction": "Auf bestehende Termine anwenden",
             "backfillQuestion": "{{count}} Termine ohne Zuweisung zuweisen?",
             "backfillQuestion_one": "{{count}} Termin ohne Zuweisung zuweisen?",
@@ -3074,7 +3074,8 @@
             "backfillMovedPartial": "Termine {{first}} bis {{last}} von {{total}}. „Zuweisen“ übernimmt die Auswahl auf dieser Seite, „Nächste anzeigen“ blättert ohne Übernehmen weiter. Nicht ausgewählte Termine bleiben unverändert.",
             "backfillMovedNext": "Nächste anzeigen",
             "backfillMovedAll": "Alle auswählen",
-            "backfillMovedChange": "Von {{from}} zu {{to}}"
+            "backfillMovedChange": "Von {{from}} zu {{to}}",
+            "backfillDescriptionMore": "Termine ohne Zuweisung bekommen sie direkt. Termine, die noch die Standard-Zuweisung eines anderen Kalenders tragen, stehen einzeln zur Auswahl. Jede andere Zuweisung bleibt unverändert."
         },
         "calendarAssignMeLabel": "Neue Termine mir zuweisen",
         "calendarDefaultRemindersLabel": "Standard-Erinnerungen",
@@ -3223,7 +3224,7 @@
         "pageDisplays": "Wandtabletts",
         "pageDisplaysDescription": "Ein Wandtablett anlegen, ein Gerät koppeln und seinen Zugang widerrufen.",
         "sheetDashboardDescription": "Nachfrist für abgelaufene Countdowns auf der Übersicht festlegen.",
-        "sheetCalendarDescription": "Eigene Termin-Vorgaben, Abos und Exporte, dazu Feiertage, Wochenstart und die Kalender-Synchronisation.",
+        "sheetCalendarDescription": "Eigene Termin-Vorgaben, Abos und Exporte, dazu Feiertage und Wochenstart.",
         "sheetScheduleDescription": "Festlegen, welche Schnellstart-Vorlagen der Schichtplan anbietet.",
         "sheetTasksDescription": "Eigene Erinnerungsliste für neue Aufgaben, Unteraufgaben und die Erinnerungs-Synchronisation.",
         "sheetBudgetDescription": "Persönliche Budgets mit geteilten Einträgen einschalten.",
@@ -3357,7 +3358,9 @@
         "permCapabilityInventoryEditOthers": "Gegenstände anderer ändern",
         "permCapabilityInventoryPrices": "Kaufpreise sehen",
         "permCapabilityTasksReorder": "Reihenfolge der Familie ändern",
-        "permChildRoleHint": "Neue Kinderkonten bekommen beim Anlegen zusätzlich eigene Startrechte: {{list}}. Danach stehen sie beim jeweiligen Mitglied."
+        "permChildRoleHint": "Neue Kinderkonten bekommen beim Anlegen zusätzlich eigene Startrechte: {{list}}. Danach stehen sie beim jeweiligen Mitglied.",
+        "activeModulesHintMore": "Wer ein Modul nur für sich aus der Navigation nehmen will, tut das unter Module → Navigation.",
+        "permIntroMore": "Einzelne Mitglieder können vom Rollen-Standard abweichen. Ohne Einstellung hat jede Rolle vollen Zugriff; Administratoren immer."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

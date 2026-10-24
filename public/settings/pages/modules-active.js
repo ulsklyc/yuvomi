@@ -10,6 +10,7 @@ import {
   bindDisclosure,
   createDisclosure,
   createInfoList,
+  hintFoldHtml,
   thirdPartyStatusLabel,
   toggleRowHtml,
 } from '/settings/components.js';
@@ -606,7 +607,8 @@ async function renderActiveModules(container, user) {
     <section class="settings-section">
       <section class="settings-navigation-panel">
         <h2 class="settings-navigation-panel__title">${t('settings.activeModulesTitle')}</h2>
-        <p class="form-hint">${t('settings.activeModulesHint')}</p>
+        ${/* Hoechstens ein Satz vor dem ersten Feld (R23 D14), der Rest hinter "Mehr dazu". */ ''}
+        ${hintFoldHtml({ lead: t('settings.activeModulesHint'), moreHtml: `<p>${esc(t('settings.activeModulesHintMore'))}</p>` })}
         <div class="settings-navigation-groups" id="module-toggles">
           ${NAV_SECTIONS.map((section) => sectionHtml(section, rows)).join('')}
         </div>

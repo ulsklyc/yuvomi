@@ -2057,7 +2057,7 @@
         "moduleDeleteErrorBadId": "Nama folder ini bukan ID modul yang valid. Hapus folder itu secara manual di server.",
         "moduleDeleteErrorNotWebInstalled": "Modul ini disalin ke server secara manual. Hapus foldernya di sana.",
         "activeModulesTitle": "Modul rumah tangga",
-        "activeModulesHint": "Yang mati di sini tidak ada untuk siapa pun di rumah. Untuk menyembunyikan hanya bagi dirimu, buka Modul → Navigasi.",
+        "activeModulesHint": "Yang mati di sini tidak ada untuk siapa pun di rumah.",
         "modulesEnableForHousehold": "Aktifkan {{module}} untuk rumah tangga",
         "modulesHideKitchenForMe": "Sembunyikan semua modul dapur untuk saya",
         "modulesHiddenScopeHint": "Modul yang disembunyikan hanya hilang dari navigasimu. Tautan dan pencarian tetap menjangkaunya.",
@@ -2817,7 +2817,7 @@
         "pagePermissions": "Peran dan izin",
         "pagePermissionsDescription": "Atur akses modul dan widget per peran dan anggota.",
         "permModeLabel": "Atur izin berdasarkan",
-        "permIntro": "Tentukan modul dan widget dasbor mana yang dapat dilihat dan diedit oleh setiap peran keluarga. Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu.",
+        "permIntro": "Tentukan modul dan widget dasbor mana yang dapat dilihat dan diedit oleh setiap peran keluarga.",
         "permByRole": "Menurut peran",
         "permByMember": "Menurut anggota",
         "permRoleLegend": "Izin ini berlaku untuk semua anggota dengan peran keluarga ini, kecuali anggota memiliki pengecualian sendiri.",
@@ -3020,7 +3020,7 @@
             "defaultAssigneeHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang ini.",
             "defaultAssigneeRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang hanya ditugaskan ke orang itu dibuat di kalender tersebut. Berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook.",
             "backfillTitle": "Lengkapi penugasan",
-            "backfillDescription": "Penerima tugas default hanya berlaku untuk janji temu yang diimpor setelah diatur. Di sini Anda dapat menerapkannya sekali ke janji temu yang sudah diimpor dari semua akun. Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah.",
+            "backfillDescription": "Penerima tugas default hanya berlaku untuk janji temu yang diimpor setelah diatur. Di sini Anda dapat menerapkannya sekali ke janji temu yang sudah diimpor dari semua akun.",
             "backfillAction": "Terapkan ke janji temu yang ada",
             "backfillQuestion": "Tugaskan {{count}} janji temu tanpa penerima tugas?",
             "backfillQuestion_one": "Tugaskan {{count}} janji temu tanpa penerima tugas?",
@@ -3037,7 +3037,8 @@
             "backfillMovedPartial": "Janji temu {{first}} sampai {{last}} dari {{total}}. “Tugaskan” menerapkan pilihan di halaman ini, “Tampilkan berikutnya” lanjut tanpa menerapkannya. Janji temu yang tidak dipilih tetap seperti semula.",
             "backfillMovedNext": "Tampilkan berikutnya",
             "backfillMovedAll": "Pilih semua",
-            "backfillMovedChange": "Dari {{from}} ke {{to}}"
+            "backfillMovedChange": "Dari {{from}} ke {{to}}",
+            "backfillDescriptionMore": "Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah."
         },
         "calendarAssignMeLabel": "Tugaskan acara baru ke saya",
         "calendarDefaultRemindersLabel": "Pengingat bawaan",
@@ -3223,7 +3224,7 @@
         "pageDisplays": "Tablet dinding",
         "pageDisplaysDescription": "Buat tablet dinding, pasangkan perangkat, dan cabut aksesnya.",
         "sheetDashboardDescription": "Atur masa tenggang hitung mundur yang kedaluwarsa di ringkasan.",
-        "sheetCalendarDescription": "Bawaan acara, langganan, dan ekspor milikmu, ditambah hari libur, awal minggu, dan sinkronisasi kalender.",
+        "sheetCalendarDescription": "Bawaan acara, langganan, dan ekspor milikmu, ditambah hari libur dan awal minggu.",
         "sheetScheduleDescription": "Pilih templat mulai cepat yang ditawarkan jadwal sif.",
         "sheetTasksDescription": "Daftar pengingatmu untuk tugas baru, subtugas, dan sinkronisasi pengingat.",
         "sheetBudgetDescription": "Aktifkan anggaran pribadi dengan entri bersama.",
@@ -3357,7 +3358,9 @@
         "permCapabilityInventoryEditOthers": "Ubah barang orang lain",
         "permCapabilityInventoryPrices": "Lihat harga beli",
         "permCapabilityTasksReorder": "Ubah urutan keluarga",
-        "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu."
+        "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu.",
+        "activeModulesHintMore": "Untuk menyembunyikan hanya bagi dirimu, buka Modul → Navigasi.",
+        "permIntroMore": "Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

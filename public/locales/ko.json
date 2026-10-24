@@ -2057,7 +2057,7 @@
         "moduleDeleteErrorBadId": "이 폴더 이름은 올바른 모듈 ID가 아닙니다. 서버에서 폴더를 직접 삭제하세요.",
         "moduleDeleteErrorNotWebInstalled": "이 모듈은 서버에 직접 복사된 것입니다. 서버에서 폴더를 삭제하세요.",
         "activeModulesTitle": "가정의 모듈",
-        "activeModulesHint": "여기서 끈 모듈은 가정의 누구에게도 표시되지 않습니다. 내 화면에서만 숨기려면 모듈 → 내비게이션으로 가세요.",
+        "activeModulesHint": "여기서 끈 모듈은 가정의 누구에게도 표시되지 않습니다.",
         "modulesEnableForHousehold": "가정에서 {{module}} 사용",
         "modulesHideKitchenForMe": "주방 모듈 전체를 내 화면에서 숨기기",
         "modulesHiddenScopeHint": "숨긴 모듈은 내 내비게이션에서만 사라집니다. 링크와 검색으로는 계속 열 수 있습니다.",
@@ -2817,7 +2817,7 @@
         "pagePermissions": "역할 및 권한",
         "pagePermissionsDescription": "역할과 구성원별로 모듈 및 위젯 접근 권한을 설정합니다.",
         "permModeLabel": "권한 설정 기준",
-        "permIntro": "각 가족 역할이 어떤 모듈과 대시보드 위젯을 보고 편집할 수 있는지 결정합니다. 개별 구성원은 역할 기본값과 다르게 설정할 수 있습니다. 설정하지 않으면 모든 역할이 전체 접근 권한을 가지며 관리자는 항상 전체 접근 권한을 가집니다.",
+        "permIntro": "각 가족 역할이 어떤 모듈과 대시보드 위젯을 보고 편집할 수 있는지 결정합니다.",
         "permByRole": "역할별",
         "permByMember": "구성원별",
         "permRoleLegend": "이 권한은 구성원에게 자체 예외가 없는 한 이 가족 역할을 가진 모든 구성원에게 적용됩니다.",
@@ -3020,7 +3020,7 @@
             "defaultAssigneeHint": "새로 동기화된 일정은 자동으로 이 사람에게 할당됩니다.",
             "defaultAssigneeRoutingHint": "기본 담당자: 캘린더의 일정은 그곳에서 선택한 사람에게 할당되고, 그 사람에게만 할당된 새 일정은 해당 캘린더에 만들어집니다. Google 및 CalDAV 캘린더에 적용되며 Apple이나 Outlook에는 적용되지 않습니다.",
             "backfillTitle": "담당자 채우기",
-            "backfillDescription": "기본 담당자는 설정한 뒤에 가져온 일정에만 적용됩니다. 여기서 모든 계정에서 이미 가져온 일정에 한 번 적용할 수 있습니다. 담당자가 없는 일정에는 바로 지정됩니다. 아직 다른 캘린더의 기본 담당자가 지정된 일정은 하나씩 표시되어 직접 고를 수 있습니다. 그 밖의 할당은 그대로 유지됩니다.",
+            "backfillDescription": "기본 담당자는 설정한 뒤에 가져온 일정에만 적용됩니다. 여기서 모든 계정에서 이미 가져온 일정에 한 번 적용할 수 있습니다.",
             "backfillAction": "기존 일정에 적용",
             "backfillQuestion": "담당자가 없는 일정 {{count}}개를 할당할까요?",
             "backfillQuestion_one": "담당자가 없는 일정 {{count}}개를 할당할까요?",
@@ -3037,7 +3037,8 @@
             "backfillMovedPartial": "{{total}}개 중 {{first}}번째부터 {{last}}번째 일정입니다. “할당”은 이 페이지의 선택을 적용하고, “다음 보기”는 적용하지 않고 넘어갑니다. 선택하지 않은 일정은 그대로 유지됩니다.",
             "backfillMovedNext": "다음 보기",
             "backfillMovedAll": "모두 선택",
-            "backfillMovedChange": "{{from}}에서 {{to}}(으)로"
+            "backfillMovedChange": "{{from}}에서 {{to}}(으)로",
+            "backfillDescriptionMore": "담당자가 없는 일정에는 바로 지정됩니다. 아직 다른 캘린더의 기본 담당자가 지정된 일정은 하나씩 표시되어 직접 고를 수 있습니다. 그 밖의 할당은 그대로 유지됩니다."
         },
         "calendarAssignMeLabel": "새 일정을 나에게 배정",
         "calendarDefaultRemindersLabel": "기본 알림",
@@ -3223,7 +3224,7 @@
         "pageDisplays": "벽면 태블릿",
         "pageDisplaysDescription": "벽면 태블릿을 만들고, 기기를 페어링하고, 그 접근을 해지합니다.",
         "sheetDashboardDescription": "개요에서 만료된 카운트다운의 유예 기간을 설정합니다.",
-        "sheetCalendarDescription": "내 일정 기본값, 구독과 내보내기, 그리고 공휴일, 주 시작일, 캘린더 동기화.",
+        "sheetCalendarDescription": "내 일정 기본값, 구독과 내보내기, 그리고 공휴일과 주 시작일.",
         "sheetScheduleDescription": "교대 근무표가 제공할 빠른 시작 템플릿을 선택합니다.",
         "sheetTasksDescription": "새 할 일의 미리 알림 목록, 하위 할 일, 미리 알림 동기화.",
         "sheetBudgetDescription": "공유 항목이 있는 개인 예산을 켭니다.",
@@ -3357,7 +3358,9 @@
         "permCapabilityInventoryEditOthers": "다른 사람의 물품 변경",
         "permCapabilityInventoryPrices": "구매 가격 보기",
         "permCapabilityTasksReorder": "가족 순서 변경",
-        "permChildRoleHint": "새 자녀 계정은 만들 때 자체 시작 권한도 받습니다: {{list}}. 이후에는 해당 구성원에게 표시됩니다."
+        "permChildRoleHint": "새 자녀 계정은 만들 때 자체 시작 권한도 받습니다: {{list}}. 이후에는 해당 구성원에게 표시됩니다.",
+        "activeModulesHintMore": "내 화면에서만 숨기려면 모듈 → 내비게이션으로 가세요.",
+        "permIntroMore": "개별 구성원은 역할 기본값과 다르게 설정할 수 있습니다. 설정하지 않으면 모든 역할이 전체 접근 권한을 가지며 관리자는 항상 전체 접근 권한을 가집니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "此資料夾名稱不是有效的模組 ID。請在伺服器上手動刪除該資料夾。",
         "moduleDeleteErrorNotWebInstalled": "此模組是手動複製到伺服器上的。請在伺服器上刪除其資料夾。",
         "activeModulesTitle": "家庭的模組",
-        "activeModulesHint": "在這裡關閉的模組，家裡任何人都看不到。只想在自己這裡隱藏，請前往「模組 → 導航」。",
+        "activeModulesHint": "在這裡關閉的模組，家裡任何人都看不到。",
         "modulesEnableForHousehold": "為家庭啟用 {{module}}",
         "modulesHideKitchenForMe": "在我這裡隱藏全部廚房模組",
         "modulesHiddenScopeHint": "隱藏的模組只會從你的導航中消失，連結和搜尋仍能開啟。",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "角色與權限",
         "pagePermissionsDescription": "按角色和成員設定模組和小元件的存取權限。",
         "permModeLabel": "按以下方式設定權限",
-        "permIntro": "決定每個家庭角色可以檢視和編輯哪些模組和儀表板小元件。各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。",
+        "permIntro": "決定每個家庭角色可以檢視和編輯哪些模組和儀表板小元件。",
         "permByRole": "按角色",
         "permByMember": "按成員",
         "permRoleLegend": "除非成員有自己的例外設定，否則這些權限適用於具有此家庭角色的所有成員。",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "新同步的日程會自動分配給此人。",
             "defaultAssigneeRoutingHint": "預設分配: 日曆中的事件會分配給在此選擇的人，僅分配給此人的新事件會建立在該日曆中。適用於 Google 和 CalDAV 日曆，不適用於 Apple 或 Outlook。",
             "backfillTitle": "補充分配",
-            "backfillDescription": "預設分配只適用於設定之後匯入的日程。你可以在這裡將其一次性套用到所有帳戶中已匯入的日程。未分配的日程會直接套用預設分配。仍帶有其他日曆預設分配的日程會逐筆列出，供你選擇。其他任何分配保持不變。",
+            "backfillDescription": "預設分配只適用於設定之後匯入的日程。你可以在這裡將其一次性套用到所有帳戶中已匯入的日程。",
             "backfillAction": "應用到現有日程",
             "backfillQuestion": "分配 {{count}} 個未分配的日程？",
             "backfillQuestion_one": "分配 {{count}} 個未分配的日程？",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "第 {{first}} 至 {{last}} 個日程，共 {{total}} 個。「分配」會套用本頁的選擇，「顯示下一批」則不套用、直接翻頁。未選取的日程保持不變。",
             "backfillMovedNext": "顯示下一批",
             "backfillMovedAll": "全選",
-            "backfillMovedChange": "從 {{from}} 改為 {{to}}"
+            "backfillMovedChange": "從 {{from}} 改為 {{to}}",
+            "backfillDescriptionMore": "未分配的日程會直接套用預設分配。仍帶有其他日曆預設分配的日程會逐筆列出，供你選擇。其他任何分配保持不變。"
         },
         "calendarAssignMeLabel": "將新事件分配給我",
         "calendarDefaultRemindersLabel": "預設提醒",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "壁掛平板",
         "pageDisplaysDescription": "建立壁掛平板、配對裝置並撤銷其存取權限。",
         "sheetDashboardDescription": "設定概覽中已過期倒數計時的寬限期。",
-        "sheetCalendarDescription": "你的日程預設值、訂閱和匯出，以及節假日、每週起始日和日曆同步。",
+        "sheetCalendarDescription": "你的日程預設值、訂閱和匯出，以及節假日和每週起始日。",
         "sheetScheduleDescription": "選擇排班表提供哪些快速開始模板。",
         "sheetTasksDescription": "新任務的提醒列表、子任務和提醒同步。",
         "sheetBudgetDescription": "開啟帶共享條目的個人預算。",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "修改他人的物品",
         "permCapabilityInventoryPrices": "查看購買價格",
         "permCapabilityTasksReorder": "變更家庭排序",
-        "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。"
+        "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。",
+        "activeModulesHintMore": "只想在自己這裡隱藏，請前往「模組 → 導航」。",
+        "permIntroMore": "各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

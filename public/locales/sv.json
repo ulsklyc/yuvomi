@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "Namnet på den här mappen är inget giltigt modul-ID. Ta bort mappen på servern för hand.",
         "moduleDeleteErrorNotWebInstalled": "Den här modulen kopierades till servern för hand. Ta bort mappen där.",
         "activeModulesTitle": "Hushållets moduler",
-        "activeModulesHint": "Det som är av här finns inte för någon i hushållet. Vill du dölja en modul bara för dig, gå till Moduler → Navigering.",
+        "activeModulesHint": "Det som är av här finns inte för någon i hushållet.",
         "modulesEnableForHousehold": "Aktivera {{module}} för hushållet",
         "modulesHideKitchenForMe": "Dölj alla köksmoduler för mig",
         "modulesHiddenScopeHint": "Dolda moduler försvinner bara från din navigering. Länkar och sökning når dem fortfarande.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Roller och behörigheter",
         "pagePermissionsDescription": "Ställ in modul- och widgetåtkomst per roll och medlem.",
         "permModeLabel": "Ange behörigheter efter",
-        "permIntro": "Bestäm vilka moduler och panelwidgetar varje familjeroll kan se och redigera. Enskilda medlemmar kan avvika från rollens standard. Utan inställning har varje roll full åtkomst; administratörer alltid.",
+        "permIntro": "Bestäm vilka moduler och panelwidgetar varje familjeroll kan se och redigera.",
         "permByRole": "Per roll",
         "permByMember": "Per medlem",
         "permRoleLegend": "Dessa behörigheter gäller alla medlemmar med denna familjeroll, om inte medlemmen har ett eget undantag.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Nyligen synkroniserade händelser tilldelas automatiskt den här personen.",
             "defaultAssigneeRoutingHint": "Standardtilldelning: händelser från en kalender får personen som valts där, och en ny händelse som bara är tilldelad den personen skapas i den kalendern. Gäller Google- och CalDAV-kalendrar, inte Apple eller Outlook.",
             "backfillTitle": "Fyll i tilldelningar",
-            "backfillDescription": "En standardtilldelning gäller bara möten som hämtats efter att den ställts in. Här kan du tillämpa den en gång på möten som redan hämtats från alla konton. Möten utan tilldelning får den direkt. Möten som fortfarande har en annan kalenders standardtilldelning visas ett och ett så att du kan välja. All annan tilldelning lämnas orörd.",
+            "backfillDescription": "En standardtilldelning gäller bara möten som hämtats efter att den ställts in. Här kan du tillämpa den en gång på möten som redan hämtats från alla konton.",
             "backfillAction": "Tillämpa på befintliga möten",
             "backfillQuestion": "Tilldela {{count}} möten utan tilldelning?",
             "backfillQuestion_one": "Tilldela {{count}} möte utan tilldelning?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "Möten {{first}} till {{last}} av {{total}}. ”Tilldela” tillämpar valet på den här sidan, ”Visa nästa” går vidare utan att tillämpa det. Möten som inte är valda lämnas orörda.",
             "backfillMovedNext": "Visa nästa",
             "backfillMovedAll": "Markera alla",
-            "backfillMovedChange": "Från {{from}} till {{to}}"
+            "backfillMovedChange": "Från {{from}} till {{to}}",
+            "backfillDescriptionMore": "Möten utan tilldelning får den direkt. Möten som fortfarande har en annan kalenders standardtilldelning visas ett och ett så att du kan välja. All annan tilldelning lämnas orörd."
         },
         "calendarAssignMeLabel": "Tilldela nya händelser till mig",
         "calendarDefaultRemindersLabel": "Standardpåminnelser",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Väggplattor",
         "pageDisplaysDescription": "Skapa en väggplatta, parkoppla en enhet och återkalla dess åtkomst.",
         "sheetDashboardDescription": "Ställ in respittiden för utgångna nedräkningar på översikten.",
-        "sheetCalendarDescription": "Dina egna händelseinställningar, prenumerationer och exporter, plus helgdagar, veckostart och kalendersynkronisering.",
+        "sheetCalendarDescription": "Dina egna händelseinställningar, prenumerationer och exporter, plus helgdagar och veckostart.",
         "sheetScheduleDescription": "Välj vilka snabbstartsmallar schemat erbjuder.",
         "sheetTasksDescription": "Din påminnelselista för nya uppgifter, deluppgifter och påminnelsesynkronisering.",
         "sheetBudgetDescription": "Slå på personliga budgetar med delade poster.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Ändra andras föremål",
         "permCapabilityInventoryPrices": "Se inköpspriser",
         "permCapabilityTasksReorder": "Ändra familjens ordning",
-        "permChildRoleHint": "Nya barnkonton får dessutom egna startbehörigheter när de skapas: {{list}}. Därefter står de hos respektive medlem."
+        "permChildRoleHint": "Nya barnkonton får dessutom egna startbehörigheter när de skapas: {{list}}. Därefter står de hos respektive medlem.",
+        "activeModulesHintMore": "Vill du dölja en modul bara för dig, gå till Moduler → Navigering.",
+        "permIntroMore": "Enskilda medlemmar kan avvika från rollens standard. Utan inställning har varje roll full åtkomst; administratörer alltid."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

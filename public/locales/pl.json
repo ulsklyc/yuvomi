@@ -2227,7 +2227,7 @@
         "moduleDeleteErrorBadId": "Nazwa tego folderu nie jest prawidłowym identyfikatorem modułu. Usuń folder ręcznie na serwerze.",
         "moduleDeleteErrorNotWebInstalled": "Ten moduł skopiowano na serwer ręcznie. Usuń jego folder tam.",
         "activeModulesTitle": "Moduły gospodarstwa",
-        "activeModulesHint": "To, co jest tu wyłączone, nie istnieje dla nikogo w gospodarstwie. Aby ukryć moduł tylko u siebie, wejdź w Moduły → Nawigacja.",
+        "activeModulesHint": "To, co jest tu wyłączone, nie istnieje dla nikogo w gospodarstwie.",
         "modulesEnableForHousehold": "Włącz {{module}} dla gospodarstwa",
         "modulesHideKitchenForMe": "Ukryj u mnie wszystkie moduły kuchenne",
         "modulesHiddenScopeHint": "Ukryte moduły znikają tylko z twojej nawigacji. Linki i wyszukiwanie nadal do nich prowadzą.",
@@ -3007,7 +3007,7 @@
         "pagePermissions": "Role i uprawnienia",
         "pagePermissionsDescription": "Ustaw dostęp do modułów i widżetów według roli i członka.",
         "permModeLabel": "Ustaw uprawnienia według",
-        "permIntro": "Zdecyduj, które moduły i widżety pulpitu może widzieć i edytować każda rola rodzinna. Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze.",
+        "permIntro": "Zdecyduj, które moduły i widżety pulpitu może widzieć i edytować każda rola rodzinna.",
         "permByRole": "Według roli",
         "permByMember": "Według członka",
         "permRoleLegend": "Te uprawnienia dotyczą wszystkich członków z tą rolą rodzinną, chyba że członek ma własny wyjątek.",
@@ -3214,7 +3214,7 @@
             "defaultAssigneeHint": "Nowo zsynchronizowane wydarzenia są automatycznie przypisywane do tej osoby.",
             "defaultAssigneeRoutingHint": "Domyślne przypisanie: wydarzenia z kalendarza otrzymują wybraną tam osobę, a nowe wydarzenie przypisane tylko tej osobie jest tworzone w tym kalendarzu. Dotyczy kalendarzy Google i CalDAV, nie Apple ani Outlook.",
             "backfillTitle": "Uzupełnij przypisania",
-            "backfillDescription": "Domyślne przypisanie dotyczy tylko terminów pobranych po jego ustawieniu. Tutaj możesz jednorazowo zastosować je do terminów już pobranych ze wszystkich kont. Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian.",
+            "backfillDescription": "Domyślne przypisanie dotyczy tylko terminów pobranych po jego ustawieniu. Tutaj możesz jednorazowo zastosować je do terminów już pobranych ze wszystkich kont.",
             "backfillAction": "Zastosuj do istniejących terminów",
             "backfillQuestion": "Przypisać {{count}} terminów bez przypisania?",
             "backfillQuestion_one": "Przypisać {{count}} termin bez przypisania?",
@@ -3237,7 +3237,8 @@
             "backfillMovedPartial": "Terminy od {{first}} do {{last}} z {{total}}. „Przypisz” stosuje wybór z tej strony, „Pokaż następne” przechodzi dalej bez stosowania. Niezaznaczone terminy pozostają bez zmian.",
             "backfillMovedNext": "Pokaż następne",
             "backfillMovedAll": "Zaznacz wszystkie",
-            "backfillMovedChange": "Z {{from}} na {{to}}"
+            "backfillMovedChange": "Z {{from}} na {{to}}",
+            "backfillDescriptionMore": "Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian."
         },
         "calendarAssignMeLabel": "Przypisuj nowe wydarzenia do mnie",
         "calendarDefaultRemindersLabel": "Domyślne przypomnienia",
@@ -3427,7 +3428,7 @@
         "pageDisplays": "Tablety ścienne",
         "pageDisplaysDescription": "Dodać tablet ścienny, sparować urządzenie i unieważnić jego dostęp.",
         "sheetDashboardDescription": "Ustaw okres karencji dla wygasłych odliczań w przeglądzie.",
-        "sheetCalendarDescription": "Twoje ustawienia wydarzeń, subskrypcje i eksporty, a także święta, początek tygodnia i synchronizacja kalendarza.",
+        "sheetCalendarDescription": "Twoje ustawienia wydarzeń, subskrypcje i eksporty, a także święta i początek tygodnia.",
         "sheetScheduleDescription": "Wybierz, jakie szablony szybkiego startu oferuje grafik zmian.",
         "sheetTasksDescription": "Twoja lista przypomnień dla nowych zadań, podzadania i synchronizacja przypomnień.",
         "sheetBudgetDescription": "Włącz budżety osobiste ze wspólnymi wpisami.",
@@ -3567,7 +3568,9 @@
         "permCapabilityInventoryEditOthers": "Zmieniać przedmioty innych",
         "permCapabilityInventoryPrices": "Widzieć ceny zakupu",
         "permCapabilityTasksReorder": "Zmieniać kolejność rodziny",
-        "permChildRoleHint": "Nowe konta dzieci dostają przy tworzeniu także własne uprawnienia początkowe: {{list}}. Potem widnieją przy danym członku."
+        "permChildRoleHint": "Nowe konta dzieci dostają przy tworzeniu także własne uprawnienia początkowe: {{list}}. Potem widnieją przy danym członku.",
+        "activeModulesHintMore": "Aby ukryć moduł tylko u siebie, wejdź w Moduły → Nawigacja.",
+        "permIntroMore": "Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

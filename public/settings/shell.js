@@ -791,6 +791,9 @@ function moduleEnabled(moduleId) {
  */
 function createModuleStatus(leaf, user) {
   if (!leaf.module || leaf.module === 'dashboard' || leaf.extensionModule) return null;
+  // Ein zweites Blatt desselben Moduls (R23 D14, Kalender-Synchronisation)
+  // nennt den Zustand nicht noch einmal - und nicht mit seinem eigenen Namen.
+  if (leaf.moduleStatus === false) return null;
   const enabled = moduleEnabled(leaf.module);
   const row = document.createElement('div');
   row.className = `settings-sheet-status settings-sheet-status--${enabled ? 'on' : 'off'}`;

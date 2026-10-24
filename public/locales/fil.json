@@ -2057,7 +2057,7 @@
         "moduleDeleteErrorBadId": "Hindi wastong ID ng module ang pangalan ng folder na ito. Alisin nang manu-mano ang folder sa server.",
         "moduleDeleteErrorNotWebInstalled": "Kinopya nang mano-mano sa server ang module na ito. Alisin ang folder nito doon.",
         "activeModulesTitle": "Mga module ng sambahayan",
-        "activeModulesHint": "Ang naka-off dito ay wala para sa kahit sino sa sambahayan. Para itago lang para sa iyo, pumunta sa Mga Modyul → Nabigasyon.",
+        "activeModulesHint": "Ang naka-off dito ay wala para sa kahit sino sa sambahayan.",
         "modulesEnableForHousehold": "Buksan ang {{module}} para sa sambahayan",
         "modulesHideKitchenForMe": "Itago ang lahat ng module ng kusina para sa akin",
         "modulesHiddenScopeHint": "Ang mga nakatagong module ay nawawala lang sa iyong nabigasyon. Maabot pa rin sila sa link at paghahanap.",
@@ -2854,7 +2854,7 @@
         "pagePermissions": "Mga papel at pahintulot",
         "pagePermissionsDescription": "Itakda ang access sa modyul at widget bawat papel at miyembro.",
         "permModeLabel": "Itakda ang mga pahintulot ayon sa",
-        "permIntro": "Magpasya kung aling mga modyul at widget sa dashboard ang makikita at mae-edit ng bawat papel sa pamilya. Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator.",
+        "permIntro": "Magpasya kung aling mga modyul at widget sa dashboard ang makikita at mae-edit ng bawat papel sa pamilya.",
         "permByRole": "Ayon sa papel",
         "permByMember": "Ayon sa miyembro",
         "permRoleLegend": "Naaangkop ang mga pahintulot na ito sa bawat miyembrong may papel na ito sa pamilya, maliban kung may sariling itinakdang pagbubukod ang miyembrong iyon.",
@@ -3057,7 +3057,7 @@
             "defaultAssigneeHint": "Awtomatikong inaatasan sa taong ito ang mga bagong naka-sync na kaganapan.",
             "defaultAssigneeRoutingHint": "Default na naaatasan: ang mga event mula sa kalendaryo ay itinatalaga sa taong pinili rito, at ang bagong event na itinalaga lamang sa taong iyon ay nilikha sa kalendaryong iyon. Para sa mga kalendaryong Google at CalDAV, hindi para sa Apple o Outlook.",
             "backfillTitle": "Punan ang mga pag-aatas",
-            "backfillDescription": "Ang default na naaatasan ay nalalapat lamang sa mga appointment na na-import matapos itong itakda. Dito ay maaari mong ilapat ito nang minsan sa mga appointment na na-import na mula sa lahat ng account. Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas.",
+            "backfillDescription": "Ang default na naaatasan ay nalalapat lamang sa mga appointment na na-import matapos itong itakda. Dito ay maaari mong ilapat ito nang minsan sa mga appointment na na-import na mula sa lahat ng account.",
             "backfillAction": "Ilapat sa mga kasalukuyang appointment",
             "backfillQuestion": "Iatas ang {{count}} na appointment na walang naaatasan?",
             "backfillQuestion_one": "Iatas ang {{count}} na appointment na walang naaatasan?",
@@ -3074,7 +3074,8 @@
             "backfillMovedPartial": "Mga appointment {{first}} hanggang {{last}} sa {{total}}. Inilalapat ng “Iatas” ang napili sa pahinang ito, at lumilipat ang “Ipakita ang susunod” nang hindi ito inilalapat. Hindi binabago ang mga appointment na hindi napili.",
             "backfillMovedNext": "Ipakita ang susunod",
             "backfillMovedAll": "Piliin lahat",
-            "backfillMovedChange": "Mula kay {{from}} papunta kay {{to}}"
+            "backfillMovedChange": "Mula kay {{from}} papunta kay {{to}}",
+            "backfillDescriptionMore": "Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas."
         },
         "calendarAssignMeLabel": "Iatas sa akin ang mga bagong kaganapan",
         "calendarDefaultRemindersLabel": "Mga default na paalala",
@@ -3223,7 +3224,7 @@
         "pageDisplays": "Mga wall tablet",
         "pageDisplaysDescription": "Gumawa ng wall tablet, ipares ang device at bawiin ang access nito.",
         "sheetDashboardDescription": "Itakda ang palugit para sa mga nag-expire na countdown sa overview.",
-        "sheetCalendarDescription": "Sarili mong default ng event, mga subscription at export, pati mga holiday, simula ng linggo at sync ng kalendaryo.",
+        "sheetCalendarDescription": "Sarili mong default ng event, mga subscription at export, pati mga holiday at simula ng linggo.",
         "sheetScheduleDescription": "Piliin kung aling quick-start template ang iniaalok ng iskedyul ng shift.",
         "sheetTasksDescription": "Ang listahan mo ng paalala para sa mga bagong gawain, mga subtask at sync ng paalala.",
         "sheetBudgetDescription": "I-on ang mga personal na budget na may pinagsasaluhang entry.",
@@ -3357,7 +3358,9 @@
         "permCapabilityInventoryEditOthers": "Baguhin ang mga gamit ng iba",
         "permCapabilityInventoryPrices": "Makita ang mga presyo ng pagbili",
         "permCapabilityTasksReorder": "Baguhin ang pagkakasunod-sunod ng pamilya",
-        "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon."
+        "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon.",
+        "activeModulesHintMore": "Para itago lang para sa iyo, pumunta sa Mga Modyul → Nabigasyon.",
+        "permIntroMore": "Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

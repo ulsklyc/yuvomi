@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "このフォルダー名は有効なモジュール ID ではありません。サーバー上のフォルダーを手動で削除してください。",
         "moduleDeleteErrorNotWebInstalled": "このモジュールは手動でサーバーにコピーされたものです。サーバー上でフォルダーを削除してください。",
         "activeModulesTitle": "世帯のモジュール",
-        "activeModulesHint": "ここでオフにしたものは世帯の誰にも表示されません。自分の画面だけで隠す場合は「モジュール → ナビゲーション」へ。",
+        "activeModulesHint": "ここでオフにしたものは世帯の誰にも表示されません。",
         "modulesEnableForHousehold": "{{module}} を世帯で有効にする",
         "modulesHideKitchenForMe": "キッチンのモジュールをすべて自分の画面で非表示",
         "modulesHiddenScopeHint": "非表示にしたモジュールは自分のナビゲーションから消えるだけです。リンクや検索からは開けます。",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "役割と権限",
         "pagePermissionsDescription": "役割とメンバーごとにモジュールとウィジェットのアクセスを設定します。",
         "permModeLabel": "権限の設定単位",
-        "permIntro": "各家族の役割が閲覧・編集できるモジュールとダッシュボードウィジェットを決めます。個々のメンバーは役割の既定値と異なる設定にできます。未設定の場合、すべての役割がフルアクセスを持ち、管理者は常にフルアクセスです。",
+        "permIntro": "各家族の役割が閲覧・編集できるモジュールとダッシュボードウィジェットを決めます。",
         "permByRole": "役割ごと",
         "permByMember": "メンバーごと",
         "permRoleLegend": "これらの権限は、メンバー独自の例外がない限り、この家族の役割を持つすべてのメンバーに適用されます。",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。",
             "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。",
             "backfillTitle": "割り当てを補完",
-            "backfillDescription": "既定の割り当て先は、設定後に取り込まれた予定にだけ適用されます。ここでは、すべてのアカウントからすでに取り込まれた予定に一度だけ適用できます。割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。",
+            "backfillDescription": "既定の割り当て先は、設定後に取り込まれた予定にだけ適用されます。ここでは、すべてのアカウントからすでに取り込まれた予定に一度だけ適用できます。",
             "backfillAction": "既存の予定に適用",
             "backfillQuestion": "割り当てのない予定 {{count}} 件を割り当てますか？",
             "backfillQuestion_one": "割り当てのない予定 {{count}} 件を割り当てますか？",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "{{total}} 件中 {{first}} 件目から {{last}} 件目。「割り当てる」はこのページの選択を適用し、「次を表示」は適用せずに先へ進みます。選択していない予定は変更されません。",
             "backfillMovedNext": "次を表示",
             "backfillMovedAll": "すべて選択",
-            "backfillMovedChange": "{{from}} から {{to}} へ"
+            "backfillMovedChange": "{{from}} から {{to}} へ",
+            "backfillDescriptionMore": "割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。"
         },
         "calendarAssignMeLabel": "新しい予定を自分に割り当てる",
         "calendarDefaultRemindersLabel": "既定のリマインダー",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "壁掛けタブレット",
         "pageDisplaysDescription": "壁掛けタブレットを作成し、端末をペアリングし、そのアクセスを失効させます。",
         "sheetDashboardDescription": "概要に表示される期限切れカウントダウンの猶予期間を設定します。",
-        "sheetCalendarDescription": "自分の予定の既定値、購読とエクスポート、さらに祝日、週の始まり、カレンダー同期。",
+        "sheetCalendarDescription": "自分の予定の既定値、購読とエクスポート、さらに祝日と週の始まり。",
         "sheetScheduleDescription": "シフト表で使えるクイックスタートテンプレートを選びます。",
         "sheetTasksDescription": "新しいタスク用のリマインダーリスト、サブタスク、リマインダー同期。",
         "sheetBudgetDescription": "共有項目付きの個人予算を有効にします。",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "他の人の持ち物を変更",
         "permCapabilityInventoryPrices": "購入価格を表示",
         "permCapabilityTasksReorder": "家族の並び順を変更",
-        "permChildRoleHint": "新しい子どものアカウントには、作成時に独自の初期権限も付きます: {{list}}。その後は各メンバーに表示されます。"
+        "permChildRoleHint": "新しい子どものアカウントには、作成時に独自の初期権限も付きます: {{list}}。その後は各メンバーに表示されます。",
+        "activeModulesHintMore": "自分の画面だけで隠す場合は「モジュール → ナビゲーション」へ。",
+        "permIntroMore": "個々のメンバーは役割の既定値と異なる設定にできます。未設定の場合、すべての役割がフルアクセスを持ち、管理者は常にフルアクセスです。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

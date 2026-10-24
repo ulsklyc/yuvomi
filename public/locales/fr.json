@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "Le nom de ce dossier n’est pas un identifiant de module valide. Supprimez le dossier à la main sur le serveur.",
         "moduleDeleteErrorNotWebInstalled": "Ce module a été copié à la main sur le serveur. Supprimez son dossier à cet endroit.",
         "activeModulesTitle": "Les modules du foyer",
-        "activeModulesHint": "Ce qui est désactivé ici n’existe pour personne dans le foyer. Pour masquer un module seulement pour toi, va dans Modules → Navigation.",
+        "activeModulesHint": "Ce qui est désactivé ici n’existe pour personne dans le foyer.",
         "modulesEnableForHousehold": "Activer {{module}} pour le foyer",
         "modulesHideKitchenForMe": "Masquer tous les modules cuisine pour moi",
         "modulesHiddenScopeHint": "Les modules masqués disparaissent seulement de ta navigation. Les liens et la recherche y accèdent toujours.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Rôles et autorisations",
         "pagePermissionsDescription": "Définissez l'accès aux modules et widgets par rôle et par membre.",
         "permModeLabel": "Définir les droits par",
-        "permIntro": "Choisissez quels modules et widgets du tableau de bord chaque rôle familial peut voir et modifier. Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours.",
+        "permIntro": "Choisissez quels modules et widgets du tableau de bord chaque rôle familial peut voir et modifier.",
         "permByRole": "Par rôle",
         "permByMember": "Par membre",
         "permRoleLegend": "Ces autorisations s'appliquent à tous les membres ayant ce rôle familial, sauf si le membre a sa propre exception.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Les événements nouvellement synchronisés sont automatiquement attribués à cette personne.",
             "defaultAssigneeRoutingHint": "Attribution par défaut: les événements d'un calendrier reçoivent la personne choisie pour lui, et un nouvel événement attribué uniquement à cette personne est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook.",
             "backfillTitle": "Compléter les attributions",
-            "backfillDescription": "L’attribution par défaut ne s’applique qu’aux rendez-vous importés après sa définition. Ici, vous pouvez l’appliquer une fois aux rendez-vous déjà importés de tous les comptes. Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée.",
+            "backfillDescription": "L’attribution par défaut ne s’applique qu’aux rendez-vous importés après sa définition. Ici, vous pouvez l’appliquer une fois aux rendez-vous déjà importés de tous les comptes.",
             "backfillAction": "Appliquer aux rendez-vous existants",
             "backfillQuestion": "Attribuer {{count}} rendez-vous sans attribution ?",
             "backfillQuestion_one": "Attribuer {{count}} rendez-vous sans attribution ?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "Rendez-vous {{first}} à {{last}} sur {{total}}. « Attribuer » applique la sélection de cette page, « Afficher les suivants » passe à la suite sans l’appliquer. Les rendez-vous non sélectionnés restent inchangés.",
             "backfillMovedNext": "Afficher les suivants",
             "backfillMovedAll": "Tout sélectionner",
-            "backfillMovedChange": "De {{from}} à {{to}}"
+            "backfillMovedChange": "De {{from}} à {{to}}",
+            "backfillDescriptionMore": "Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée."
         },
         "calendarAssignMeLabel": "M'attribuer les nouveaux événements",
         "calendarDefaultRemindersLabel": "Rappels par défaut",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Tablettes murales",
         "pageDisplaysDescription": "Créer une tablette murale, appairer un appareil et révoquer son accès.",
         "sheetDashboardDescription": "Définir le délai de grâce des comptes à rebours expirés sur l’aperçu.",
-        "sheetCalendarDescription": "Vos réglages d’événements, abonnements et exports, plus jours fériés, début de semaine et synchronisation du calendrier.",
+        "sheetCalendarDescription": "Vos réglages d’événements, abonnements et exports, plus jours fériés et début de semaine.",
         "sheetScheduleDescription": "Choisir les modèles de démarrage rapide proposés par le planning d’équipes.",
         "sheetTasksDescription": "Votre liste de rappels pour les nouvelles tâches, les sous-tâches et la synchronisation des rappels.",
         "sheetBudgetDescription": "Activer les budgets personnels avec des entrées partagées.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Modifier les objets des autres",
         "permCapabilityInventoryPrices": "Voir les prix d’achat",
         "permCapabilityTasksReorder": "Modifier l’ordre de la famille",
-        "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné."
+        "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné.",
+        "activeModulesHintMore": "Pour masquer un module seulement pour toi, va dans Modules → Navigation.",
+        "permIntroMore": "Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

@@ -2174,6 +2174,11 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   Laeuft die Zeile mobil ueber, traegt sie den geteilten Anriss (`wireScrollFade`, R22).
 - **Einstellungen sagen weniger und fuehren weiter (R22, D13).** Vor dem ersten Feld stehen
   hoechstens zwei Saetze, der Rest hinter "Mehr dazu" (`hintFoldHtml`, natives `<details>`).
+  Seit R23 (D14) auch Rollen und Rechte, Aktive Module und "Zuweisung nachtragen" (gemessen:
+  alle 29 Blaetter, je Blatt und Karte hoechstens zwei Saetze vor dem ersten Feld). Die
+  **Kalender-Synchronisation ist ein eigenes Blatt** (`/settings/modules/calendar-sync`, direkt
+  hinter dem Kalender, ohne zweite Statuszeile; die einzige benannte Ausnahme von "je Modul
+  ein Blatt"): das Kalender-Blatt trug vorher 12 Karten auf 3473px.
   Eine Mitgliederzeile oeffnet per Tipp (der Name ist der Knopf, seine Flaeche deckt die
   Zeile) und endet in [Mehr][Griff]; der Geburtstag steht nicht in der Zeile. Was an zwei Orten
   wohnt (Wetter: Mein Wetter / Fotos und Wetter; Wand: Dieses Geraet / Wandtabletts), verweist

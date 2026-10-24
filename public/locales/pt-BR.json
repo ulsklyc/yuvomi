@@ -2598,7 +2598,7 @@
         "moduleDeleteErrorBadId": "O nome desta pasta não é um ID de módulo válido. Remova a pasta do servidor manualmente.",
         "moduleDeleteErrorNotWebInstalled": "Este módulo foi copiado manualmente para o servidor. Remova a pasta dele lá.",
         "activeModulesTitle": "Os módulos da casa",
-        "activeModulesHint": "O que está desativado aqui não existe para ninguém da casa. Para ocultar um módulo só para você, vá em Módulos → Navegação.",
+        "activeModulesHint": "O que está desativado aqui não existe para ninguém da casa.",
         "modulesEnableForHousehold": "Ativar {{module}} para a casa",
         "modulesHideKitchenForMe": "Ocultar todos os módulos de cozinha para mim",
         "modulesHiddenScopeHint": "Módulos ocultos somem apenas da sua navegação. Links e busca continuam chegando neles.",
@@ -2798,7 +2798,7 @@
         "pagePermissions": "Funções e permissões",
         "pagePermissionsDescription": "Defina o acesso a módulos e widgets por função e membro.",
         "permModeLabel": "Definir permissões por",
-        "permIntro": "Decida quais módulos e widgets do painel cada função familiar pode ver e editar. Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre.",
+        "permIntro": "Decida quais módulos e widgets do painel cada função familiar pode ver e editar.",
         "permByRole": "Por função",
         "permByMember": "Por membro",
         "permRoleLegend": "Estas permissões aplicam-se a todos os membros com esta função familiar, a menos que o membro tenha a sua própria exceção.",
@@ -3001,7 +3001,7 @@
             "defaultAssigneeHint": "Os eventos recém-sincronizados são atribuídos automaticamente a esta pessoa.",
             "defaultAssigneeRoutingHint": "Atribuição padrão: os eventos de um calendário recebem a pessoa escolhida nele, e um novo evento atribuído apenas a essa pessoa é criado nesse calendário. Vale para calendários Google e CalDAV, não para Apple nem Outlook.",
             "backfillTitle": "Completar atribuições",
-            "backfillDescription": "A atribuição padrão só vale para eventos importados depois de configurada. Aqui você pode aplicá-la uma vez aos eventos já importados de todas as contas. Eventos que já estão atribuídos a alguém não mudam.",
+            "backfillDescription": "A atribuição padrão só vale para eventos importados depois de configurada. Aqui você pode aplicá-la uma vez aos eventos já importados de todas as contas.",
             "backfillAction": "Aplicar aos eventos existentes",
             "backfillQuestion": "Atribuir {{count}} eventos sem atribuição?",
             "backfillQuestion_one": "Atribuir {{count}} evento sem atribuição?",
@@ -3018,7 +3018,8 @@
             "backfillMovedHint": "Alguns eventos já foram movidos. Revise os eventos restantes antes de continuar.",
             "backfillMovedNext": "Próximo evento",
             "backfillMovedPartial": "Os eventos {{first}} a {{last}} de {{total}} foram movidos.",
-            "backfillMovedTitle": "Revisar eventos movidos"
+            "backfillMovedTitle": "Revisar eventos movidos",
+            "backfillDescriptionMore": "Eventos que já estão atribuídos a alguém não mudam."
         },
         "calendarAssignMeLabel": "Atribuir novos eventos a mim",
         "calendarDefaultRemindersLabel": "Lembretes padrão",
@@ -3204,7 +3205,7 @@
         "pageDisplays": "Tablets de parede",
         "pageDisplaysDescription": "Criar um tablet de parede, conectar um dispositivo e revogar o seu acesso.",
         "sheetDashboardDescription": "Defina o prazo de carência para contagens regressivas expiradas na visão geral.",
-        "sheetCalendarDescription": "Seus padrões de eventos, assinaturas e exportações, além de feriados, início da semana e sincronização do calendário.",
+        "sheetCalendarDescription": "Seus padrões de eventos, assinaturas e exportações, além de feriados e início da semana.",
         "sheetScheduleDescription": "Escolha quais modelos de início rápido o plano de turnos oferece.",
         "sheetTasksDescription": "Sua lista de lembretes para novas tarefas, subtarefas e a sincronização de lembretes.",
         "sheetBudgetDescription": "Ative orçamentos pessoais com lançamentos compartilhados.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Alterar itens de outras pessoas",
         "permCapabilityInventoryPrices": "Ver preços de compra",
         "permCapabilityTasksReorder": "Alterar a ordem da família",
-        "permChildRoleHint": "Contas infantis novas também recebem permissões iniciais próprias ao serem criadas: {{list}}. Depois elas aparecem no respectivo membro."
+        "permChildRoleHint": "Contas infantis novas também recebem permissões iniciais próprias ao serem criadas: {{list}}. Depois elas aparecem no respectivo membro.",
+        "activeModulesHintMore": "Para ocultar um módulo só para você, vá em Módulos → Navegação.",
+        "permIntroMore": "Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

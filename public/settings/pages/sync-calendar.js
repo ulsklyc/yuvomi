@@ -17,6 +17,7 @@ import {
   createRetryState,
   createSettingRow,
   createStatusSummary,
+  hintFoldHtml,
   settingRowHtml,
   settingSwitchRowHtml,
 } from '/settings/components.js';
@@ -26,10 +27,10 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
-// Seit R10 ein Abschnitt im Blatt Kalender (registry.js). Neu laden heisst,
-// das Blatt an dieser Stelle neu zu zeichnen - nicht ueber die Alt-Adresse,
-// die erst umleitet und dabei an den Blattanfang springt.
-const SYNC_CALENDAR_HREF = '/settings/modules/calendar?section=sync-calendar';
+// Seit R23 ein eigenes Blatt (registry.js, D14; R10-R22 ein Abschnitt im
+// Blatt Kalender). Neu laden heisst, das Blatt neu zu zeichnen - nicht ueber
+// die Alt-Adresse, die erst umleitet.
+const SYNC_CALENDAR_HREF = '/settings/modules/calendar-sync?section=sync-calendar';
 
 const MORE_PROVIDERS_ID = 'sync-more-providers';
 const GOOGLE_PROVIDER_ID = 'sync-provider-google';
@@ -109,7 +110,7 @@ function renderPage(container, user) {
       <section class="settings-section">
         <h2 class="settings-section__title">${t('settings.sync.backfillTitle')}</h2>
         <div class="settings-card">
-          <p class="settings-card-description">${t('settings.sync.backfillDescription')}</p>
+          ${hintFoldHtml({ lead: t('settings.sync.backfillDescription'), moreHtml: `<p>${esc(t('settings.sync.backfillDescriptionMore'))}</p>` })}
           <div class="settings-form-actions">
             <button type="button" class="btn btn--secondary" id="sync-default-assignee-backfill-btn">
               ${t('settings.sync.backfillAction')}

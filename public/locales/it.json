@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "Il nome di questa cartella non è un ID modulo valido. Rimuovi la cartella dal server a mano.",
         "moduleDeleteErrorNotWebInstalled": "Questo modulo è stato copiato a mano sul server. Rimuovi la sua cartella lì.",
         "activeModulesTitle": "I moduli della famiglia",
-        "activeModulesHint": "Ciò che è spento qui non esiste per nessuno in famiglia. Per nascondere un modulo solo per te, vai su Moduli → Navigazione.",
+        "activeModulesHint": "Ciò che è spento qui non esiste per nessuno in famiglia.",
         "modulesEnableForHousehold": "Attiva {{module}} per la famiglia",
         "modulesHideKitchenForMe": "Nascondi per me tutti i moduli cucina",
         "modulesHiddenScopeHint": "I moduli nascosti spariscono solo dalla tua navigazione. Link e ricerca continuano a raggiungerli.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Ruoli e autorizzazioni",
         "pagePermissionsDescription": "Imposta l'accesso a moduli e widget per ruolo e membro.",
         "permModeLabel": "Imposta i permessi per",
-        "permIntro": "Decidi quali moduli e widget della dashboard ogni ruolo familiare può vedere e modificare. Ogni membro può differire dal valore predefinito del ruolo. Senza impostazioni, ogni ruolo ha accesso completo; gli amministratori sempre.",
+        "permIntro": "Decidi quali moduli e widget della dashboard ogni ruolo familiare può vedere e modificare.",
         "permByRole": "Per ruolo",
         "permByMember": "Per membro",
         "permRoleLegend": "Queste autorizzazioni si applicano a tutti i membri con questo ruolo familiare, a meno che il membro non abbia una propria eccezione.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Gli eventi appena sincronizzati vengono assegnati automaticamente a questa persona.",
             "defaultAssigneeRoutingHint": "Assegnazione predefinita: gli eventi di un calendario ricevono la persona scelta lì, e un nuovo evento assegnato solo a quella persona viene creato in quel calendario. Vale per i calendari Google e CalDAV, non per Apple o Outlook.",
             "backfillTitle": "Completa le assegnazioni",
-            "backfillDescription": "L’assegnazione predefinita vale solo per gli appuntamenti importati dopo averla impostata. Qui puoi applicarla una volta agli appuntamenti già importati da tutti gli account. Gli appuntamenti senza assegnazione la ricevono direttamente. Quelli che portano ancora l’assegnazione predefinita di un altro calendario compaiono uno per uno da scegliere. Ogni altra assegnazione resta invariata.",
+            "backfillDescription": "L’assegnazione predefinita vale solo per gli appuntamenti importati dopo averla impostata. Qui puoi applicarla una volta agli appuntamenti già importati da tutti gli account.",
             "backfillAction": "Applica agli appuntamenti esistenti",
             "backfillQuestion": "Assegnare {{count}} appuntamenti senza assegnazione?",
             "backfillQuestion_one": "Assegnare {{count}} appuntamento senza assegnazione?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "Appuntamenti da {{first}} a {{last}} di {{total}}. «Assegna» applica la selezione di questa pagina, «Mostra i successivi» va avanti senza applicarla. Gli appuntamenti non selezionati restano invariati.",
             "backfillMovedNext": "Mostra i successivi",
             "backfillMovedAll": "Seleziona tutti",
-            "backfillMovedChange": "Da {{from}} a {{to}}"
+            "backfillMovedChange": "Da {{from}} a {{to}}",
+            "backfillDescriptionMore": "Gli appuntamenti senza assegnazione la ricevono direttamente. Quelli che portano ancora l’assegnazione predefinita di un altro calendario compaiono uno per uno da scegliere. Ogni altra assegnazione resta invariata."
         },
         "calendarAssignMeLabel": "Assegna a me i nuovi eventi",
         "calendarDefaultRemindersLabel": "Promemoria predefiniti",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Tablet da parete",
         "pageDisplaysDescription": "Creare un tablet da parete, associare un dispositivo e revocarne l'accesso.",
         "sheetDashboardDescription": "Imposta il periodo di tolleranza dei conti alla rovescia scaduti nella panoramica.",
-        "sheetCalendarDescription": "Le tue impostazioni per eventi, abbonamenti ed esportazioni, più festività, inizio settimana e sincronizzazione del calendario.",
+        "sheetCalendarDescription": "Le tue impostazioni per eventi, abbonamenti ed esportazioni, più festività e inizio settimana.",
         "sheetScheduleDescription": "Scegli quali modelli di avvio rapido offre il piano turni.",
         "sheetTasksDescription": "La tua lista promemoria per nuove attività, sottoattività e la sincronizzazione dei promemoria.",
         "sheetBudgetDescription": "Attiva budget personali con voci condivise.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Modificare gli oggetti degli altri",
         "permCapabilityInventoryPrices": "Vedere i prezzi d’acquisto",
         "permCapabilityTasksReorder": "Modificare l’ordine della famiglia",
-        "permChildRoleHint": "I nuovi account bambino ricevono inoltre, alla creazione, permessi iniziali propri: {{list}}. Poi compaiono presso il rispettivo membro."
+        "permChildRoleHint": "I nuovi account bambino ricevono inoltre, alla creazione, permessi iniziali propri: {{list}}. Poi compaiono presso il rispettivo membro.",
+        "activeModulesHintMore": "Per nascondere un modulo solo per te, vai su Moduli → Navigazione.",
+        "permIntroMore": "Ogni membro può differire dal valore predefinito del ruolo. Senza impostazioni, ogni ruolo ha accesso completo; gli amministratori sempre."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

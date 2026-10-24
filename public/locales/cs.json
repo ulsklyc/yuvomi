@@ -2125,7 +2125,7 @@
         "moduleDeleteErrorBadId": "Název této složky není platné ID modulu. Odstraňte složku na serveru ručně.",
         "moduleDeleteErrorNotWebInstalled": "Tento modul byl na server zkopírován ručně. Odstraňte jeho složku tam.",
         "activeModulesTitle": "Moduly domácnosti",
-        "activeModulesHint": "Co je vypnuté zde, neexistuje pro nikoho v domácnosti. Skrýt modul jen u sebe můžeš v Moduly → Navigace.",
+        "activeModulesHint": "Co je vypnuté zde, neexistuje pro nikoho v domácnosti.",
         "modulesEnableForHousehold": "Zapnout {{module}} pro domácnost",
         "modulesHideKitchenForMe": "Skrýt u mě všechny kuchyňské moduly",
         "modulesHiddenScopeHint": "Skryté moduly zmizí jen z tvé navigace. Odkazy a hledání se k nim stále dostanou.",
@@ -2895,7 +2895,7 @@
         "pagePermissions": "Role a oprávnění",
         "pagePermissionsDescription": "Nastavte přístup k modulům a widgetům podle role a člena.",
         "permModeLabel": "Nastavit oprávnění podle",
-        "permIntro": "Určete, které moduly a widgety nástěnky může každá rodinná role vidět a upravovat. Jednotliví členové se mohou od výchozího nastavení role lišit. Bez nastavení má každá role plný přístup; správci vždy.",
+        "permIntro": "Určete, které moduly a widgety nástěnky může každá rodinná role vidět a upravovat.",
         "permByRole": "Podle role",
         "permByMember": "Podle člena",
         "permRoleLegend": "Tato oprávnění platí pro všechny členy s touto rodinnou rolí, pokud člen nemá vlastní výjimku.",
@@ -3100,7 +3100,7 @@
             "defaultAssigneeHint": "Nově synchronizované události se automaticky přiřadí této osobě.",
             "defaultAssigneeRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osobu zvolenou u něj a nová událost přiřazená jen této osobě se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook.",
             "backfillTitle": "Doplnit přiřazení",
-            "backfillDescription": "Výchozí přiřazení platí jen pro události přenesené po jeho nastavení. Zde ho můžete jednorázově použít na události už přenesené ze všech účtů. Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny.",
+            "backfillDescription": "Výchozí přiřazení platí jen pro události přenesené po jeho nastavení. Zde ho můžete jednorázově použít na události už přenesené ze všech účtů.",
             "backfillAction": "Použít na stávající události",
             "backfillQuestion": "Přiřadit {{count}} nepřiřazených událostí?",
             "backfillQuestion_one": "Přiřadit {{count}} nepřiřazenou událost?",
@@ -3120,7 +3120,8 @@
             "backfillMovedPartial": "Události {{first}} až {{last}} z {{total}}. „Přiřadit“ použije výběr na této stránce, „Zobrazit další“ přejde dál bez použití. Nevybrané události zůstanou beze změny.",
             "backfillMovedNext": "Zobrazit další",
             "backfillMovedAll": "Vybrat vše",
-            "backfillMovedChange": "Z {{from}} na {{to}}"
+            "backfillMovedChange": "Z {{from}} na {{to}}",
+            "backfillDescriptionMore": "Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny."
         },
         "calendarAssignMeLabel": "Přiřazovat nové události mně",
         "calendarDefaultRemindersLabel": "Výchozí připomenutí",
@@ -3308,7 +3309,7 @@
         "pageDisplays": "Nástěnné tablety",
         "pageDisplaysDescription": "Vytvořit nástěnný tablet, spárovat zařízení a odvolat jeho přístup.",
         "sheetDashboardDescription": "Nastavte lhůtu pro prošlá odpočítávání v přehledu.",
-        "sheetCalendarDescription": "Vaše výchozí hodnoty událostí, odběry a exporty, navíc svátky, začátek týdne a synchronizace kalendáře.",
+        "sheetCalendarDescription": "Vaše výchozí hodnoty událostí, odběry a exporty, navíc svátky a začátek týdne.",
         "sheetScheduleDescription": "Zvolte, jaké šablony rychlého startu nabízí plán směn.",
         "sheetTasksDescription": "Váš seznam připomínek pro nové úkoly, podúkoly a synchronizace připomínek.",
         "sheetBudgetDescription": "Zapněte osobní rozpočty se sdílenými položkami.",
@@ -3445,7 +3446,9 @@
         "permCapabilityInventoryEditOthers": "Měnit předměty ostatních",
         "permCapabilityInventoryPrices": "Vidět kupní ceny",
         "permCapabilityTasksReorder": "Měnit pořadí rodiny",
-        "permChildRoleHint": "Nové dětské účty dostanou při vytvoření navíc vlastní počáteční oprávnění: {{list}}. Potom jsou uvedena u daného člena."
+        "permChildRoleHint": "Nové dětské účty dostanou při vytvoření navíc vlastní počáteční oprávnění: {{list}}. Potom jsou uvedena u daného člena.",
+        "activeModulesHintMore": "Skrýt modul jen u sebe můžeš v Moduly → Navigace.",
+        "permIntroMore": "Jednotliví členové se mohou od výchozího nastavení role lišit. Bez nastavení má každá role plný přístup; správci vždy."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

@@ -227,7 +227,8 @@ test('die Blaetter verteilen sich wie beschlossen auf drei Bereiche, je Modul ei
   // Dazu "Eigenes Modul hinzufuegen" (modules-install): Drittmodule zu
   // installieren ist eine Handlung im Modul-Bereich, kein Modul - deshalb ein
   // Blatt ohne `module`, aber in derselben Domaene.
-  assert.deepEqual(perDomain, { personal: 5, admin: 8, modules: 16 });
+  // R23 D14: die Kalender-Synchronisation ist ein eigenes Blatt (vorher 16).
+  assert.deepEqual(perDomain, { personal: 5, admin: 8, modules: 17 });
   assert.deepEqual(SETTINGS_DOMAINS.map((domain) => domain.id), ['personal', 'admin', 'modules']);
   // Jedes Blatt haengt an einem existierenden Bereich, jeder Abschnitt an
   // einem existierenden Blatt, und kein Blatt ist leer.
@@ -242,8 +243,10 @@ test('die Blaetter verteilen sich wie beschlossen auf drei Bereiche, je Modul ei
     assert.ok(SETTINGS_SCOPES.includes(section.scope), `${section.id}: unbekannte Reichweite "${section.scope}"`);
   }
   assert.equal(new Set(SETTINGS_SECTIONS.map((section) => section.id)).size, SETTINGS_SECTIONS.length);
-  // Je Modul hoechstens EIN Blatt.
-  const modules = SETTINGS_LEAVES.filter((leaf) => leaf.module).map((leaf) => leaf.module);
+  // Je Modul hoechstens EIN Blatt - mit EINER benannten Ausnahme (R23 D14,
+  // Ulas 2026-10-24): die Kalender-Synchronisation (Konten, Anbieter,
+  // Nachtrag) steht neben dem Kalender, das Blatt hatte 12 Karten und 3473px.
+  const modules = SETTINGS_LEAVES.filter((leaf) => leaf.module && leaf.id !== 'module-calendar-sync').map((leaf) => leaf.module);
   assert.equal(new Set(modules).size, modules.length, 'ein Modul hat zwei Blaetter');
   // Die Sammelschublade ist aufgeloest: kein Blatt heisst mehr Modul-Optionen.
   assert.equal(SETTINGS_LEAVES.some((leaf) => leaf.labelKey === 'settings.pageModuleOptions'), false);
@@ -667,8 +670,9 @@ test('Mitglieder erreichen ihre eigenen Termin-Vorgaben', () => {
   assert.deepEqual(settingsSheetSections(sheet, member).map((entry) => entry.id),
     ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds', 'feed-birthdays']);
   // Der haushaltweite Teil bleibt adminOnly.
+  // Seit R23 D14 steht die Synchronisation in einem eigenen Blatt.
   assert.deepEqual(settingsSheetSections(sheet, admin).filter((entry) => entry.adminOnly).map((entry) => entry.id),
-    ['modules-calendar', 'sync-calendar']);
+    ['modules-calendar']);
 });
 
 test('Mitglieder erreichen ihr eigenes Zyklus-Opt-out (#760)', () => {
@@ -730,7 +734,7 @@ test('/settings/modules/health ist das Blatt Gesundheit samt Vorsorge-Typregiste
 test('legacy settings tabs migrate to their new destinations', () => {
   assert.equal(migrateLegacySettingsTab('general'), '/settings/personal/appearance');
   assert.equal(migrateLegacySettingsTab('shopping'), '/shopping?manage=categories');
-  assert.equal(migrateLegacySettingsTab('sync'), '/settings/modules/calendar');
+  assert.equal(migrateLegacySettingsTab('sync'), '/settings/modules/calendar-sync');
   assert.equal(migrateLegacySettingsTab('backup'), '/settings/admin/backup');
   // Ein Alt-Tab muss am heutigen Blatt ankommen, nicht an einem Zwischenstand.
   assert.equal(migrateLegacySettingsTab('budget'), '/settings/modules/budget');
@@ -748,7 +752,7 @@ test('legacy settings migration covers every previous tab', () => {
       budget: '/settings/modules/budget',
       shopping: '/shopping?manage=categories',
       calendar: '/settings/modules/calendar',
-      sync: '/settings/modules/calendar',
+      sync: '/settings/modules/calendar-sync',
       account: '/settings/personal/account',
       family: '/settings/admin/family',
       'api-tokens': '/settings/admin/api',
@@ -2925,13 +2929,13 @@ test('S2: der Controller leitet Alt-Adressen samt Abschnitt und Parametern um', 
   // Am Programm statt an der Schreibweise: der Controller fuehrt die Adresse
   // samt Parametern ueber movedSettingsUrl weiter.
   assert.deepEqual((await runSettingsController('/settings/sync/calendar', '?sync_ok=google')).replaced,
-    ['/settings/modules/calendar?section=sync-calendar&sync_ok=google']);
+    ['/settings/modules/calendar-sync?section=sync-calendar&sync_ok=google']);
   // Das OAuth-Ergebnis (?sync_ok) gehoert an den Abschnitt Kalender-Synchronisation.
-  assert.match(source, /const SYNC_CALENDAR_LEAF = '\/settings\/modules\/calendar';/);
+  assert.match(source, /const SYNC_CALENDAR_LEAF = '\/settings\/modules\/calendar-sync';/);
   assert.match(source, /`\$\{SYNC_CALENDAR_LEAF\}\?section=\$\{SYNC_CALENDAR_SECTION\}&\$\{query\.toString\(\)\}`/);
   // Parameter reisen mit, ein alter `?section=` nicht doppelt.
   const { sheet, section, params } = landing('/settings/sync/calendar', 'sync_ok=google&section=alt');
-  assert.equal(sheet.id, 'module-calendar');
+  assert.equal(sheet.id, 'module-calendar-sync');
   assert.equal(section, 'sync-calendar');
   assert.equal(params.get('sync_ok'), 'google');
   assert.equal(params.getAll('section').length, 1);
@@ -3320,7 +3324,8 @@ test('R14: Modulblaetter stehen in der Reihenfolge der Seitenleiste', async () =
   const mods = plain.slice(2, -1);
   // R19 (Ulas 2026-10-16): Planen = Kalender, Aufgaben, Belohnungen, Notizen,
   // Schichtplan. Notizen haben kein eigenes Modulblatt.
-  assert.deepEqual(mods, ['dashboard', 'calendar', 'tasks', 'rewards', 'schedule', 'kitchen', 'housekeeping', 'waste', 'documents',
+  // R23 D14: die Kalender-Synchronisation steht als zweites Blatt des Kalenders direkt dahinter.
+  assert.deepEqual(mods, ['dashboard', 'calendar', 'calendar', 'tasks', 'rewards', 'schedule', 'kitchen', 'housekeeping', 'waste', 'documents',
     'inventory', 'contacts', 'health', 'budget'], 'ohne eigene Anordnung genau wie die Seitenleiste (gemessen 1440)');
   const pos = (id) => mods.indexOf(id);
   assert.equal(mods[0], 'dashboard', 'die Uebersicht fuehrt wie in der Seitenleiste');
@@ -3564,9 +3569,9 @@ test('R16: ein Blatt mit mehr als drei Abschnitten fuehrt Sprungmarken auf seine
 
   const calendar = settingsSheetJumpTargets(sheet('module-calendar'), admin);
   assert.deepEqual(calendar.map((target) => target.id),
-    ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds', 'feed-birthdays', 'modules-calendar', 'sync-calendar'],
+    ['personal-calendar', 'personal-calendar-subscriptions', 'personal-feeds', 'feed-birthdays', 'modules-calendar'],
     'in der Reihenfolge des Blatts: erst "Fuer mich", dann der Haushalt');
-  assert.equal(calendar[5].url, '/settings/modules/calendar?section=sync-calendar', 'dasselbe Ziel wie die Umleitungen');
+  assert.equal(calendar[4].url, '/settings/modules/calendar?section=modules-calendar', 'dasselbe Ziel wie die Umleitungen');
   assert.equal(calendar[0].labelKey, 'settings.pageCalendarDefaults', 'die Marke heisst wie der Abschnitt in der Registry');
 
   // Drei Abschnitte sind ein Blick, keine Navigation.
@@ -5516,4 +5521,20 @@ test('R22 D13: der aktive Eintrag bleibt ueber der Bereichszeile sichtbar', asyn
   };
   __test.revealActiveNavigationLink(navigation);
   assert.equal(navigation.scrollTop, 44, 'der Eintrag rueckt ueber die klebende Zeile (694 - 650)');
+});
+
+// R23 D14 (Critique G6 P2: Kalender-Blatt 3473px mit 12 Karten): die
+// Kalender-Synchronisation ist ein eigenes Blatt direkt hinter dem Kalender,
+// ohne zweite Statuszeile; lange Erklaerungen stehen hinter "Mehr dazu".
+test('R23: Kalender-Synchronisation als eigenes Blatt, Prosa hoechstens ein bis zwei Saetze vor dem Feld', async () => {
+  const sync = SETTINGS_LEAVES.find((leaf) => leaf.id === 'module-calendar-sync');
+  assert.equal(sync?.path, '/settings/modules/calendar-sync');
+  assert.equal(sync.moduleStatus, false, 'keine zweite Zeile "Kalender ist eingeschaltet"');
+  assert.deepEqual(settingsSheetSections(sync, admin).map((s) => s.id), ['sync-calendar']);
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  assert.match(shell, /if \(leaf\.moduleStatus === false\) return null;/);
+  for (const [file, key] of [['modules-active.js', 'activeModulesHint'], ['admin-permissions.js', 'permIntro'], ['sync-calendar.js', 'sync.backfillDescription']]) {
+    const src = await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8');
+    assert.match(src, new RegExp(`hintFoldHtml\\(\\{ lead: t\\('settings\\.${key.replace('.', '\\.')}'\\), moreHtml: \`<p>\\$\\{esc\\(t\\('settings\\.${key.replace('.', '\\.')}More'\\)\\)\\}</p>\``), `${file}: der Rest steht hinter "Mehr dazu"`);
+  }
 });

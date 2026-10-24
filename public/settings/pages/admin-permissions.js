@@ -17,7 +17,7 @@ import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { confirmModal } from '/components/modal.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { createRetryState } from '/settings/components.js';
+import { createRetryState, hintFoldHtml } from '/settings/components.js';
 import { syncLeafEdits, trackLeafEdits } from '/settings/dirty-guard.js';
 import { resolveExtensionLabel } from '/utils/extension-i18n.js';
 import {
@@ -780,7 +780,8 @@ function renderShell(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="settings-section perm-page">
-      <p class="settings-section__intro">${esc(t('settings.permIntro'))}</p>
+      ${/* Ein Satz vor dem ersten Feld, der Rest hinter "Mehr dazu" (R23 D14). */ ''}
+      ${hintFoldHtml({ lead: t('settings.permIntro'), moreHtml: `<p>${esc(t('settings.permIntroMore'))}</p>`, className: 'settings-section__intro' })}
 
       <!-- Trug bis zum Copy-Durchgang den Seitentitel als Label: der beschreibt
            die Seite, nicht die Umschaltung (Critique 2026-07-27). -->

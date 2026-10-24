@@ -2012,7 +2012,7 @@
         "moduleDeleteErrorBadId": "Ennek a mappának a neve nem érvényes modulazonosító. Távolítsd el a mappát kézzel a szerveren.",
         "moduleDeleteErrorNotWebInstalled": "Ezt a modult kézzel másolták a szerverre. Ott távolítsd el a mappáját.",
         "activeModulesTitle": "A háztartás moduljai",
-        "activeModulesHint": "Ami itt ki van kapcsolva, az senkinek sem létezik a háztartásban. Ha csak magadnál rejtenéd el, nézd meg a Modulok → Navigáció oldalt.",
+        "activeModulesHint": "Ami itt ki van kapcsolva, az senkinek sem létezik a háztartásban.",
         "modulesEnableForHousehold": "{{module}} bekapcsolása a háztartásnak",
         "modulesHideKitchenForMe": "Minden konyhamodul elrejtése nálam",
         "modulesHiddenScopeHint": "Az elrejtett modulok csak a te navigációdból tűnnek el. Hivatkozásból és keresésből továbbra is elérhetők.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Szerepek és jogosultságok",
         "pagePermissionsDescription": "Állítsd be a modulok és widgetek hozzáférését szerep és tag szerint.",
         "permModeLabel": "Jogosultságok beállítása eszerint",
-        "permIntro": "Döntsd el, mely modulokat és irányítópult-widgeteket láthat és szerkeszthet az egyes családi szerepek. Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig.",
+        "permIntro": "Döntsd el, mely modulokat és irányítópult-widgeteket láthat és szerkeszthet az egyes családi szerepek.",
         "permByRole": "Szerep szerint",
         "permByMember": "Tag szerint",
         "permRoleLegend": "Ezek a jogosultságok minden tagra vonatkoznak, aki ezt a családi szerepet viseli, kivéve ha a tagnak saját kivétele van.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Az újonnan szinkronizált események automatikusan ehhez a személyhez lesznek rendelve.",
             "defaultAssigneeRoutingHint": "Alapértelmezett hozzárendelés: egy naptár eseményei az ott kiválasztott személyhez kerülnek, és a csak neki kiosztott új esemény abban a naptárban jön létre. Google- és CalDAV-naptárakra vonatkozik, Apple-re és Outlookra nem.",
             "backfillTitle": "Hozzárendelések pótlása",
-            "backfillDescription": "Az alapértelmezett hozzárendelés csak a beállítása után behozott időpontokra vonatkozik. Itt egyszer alkalmazhatja az összes fiókból már behozott időpontokra. A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad.",
+            "backfillDescription": "Az alapértelmezett hozzárendelés csak a beállítása után behozott időpontokra vonatkozik. Itt egyszer alkalmazhatja az összes fiókból már behozott időpontokra.",
             "backfillAction": "Alkalmazás a meglévő időpontokra",
             "backfillQuestion": "Hozzárendel {{count}} hozzárendelés nélküli időpontot?",
             "backfillQuestion_one": "Hozzárendel {{count}} hozzárendelés nélküli időpontot?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "A(z) {{first}}. és {{last}}. közötti időpontok, összesen {{total}}. A „Hozzárendelés” ennek az oldalnak a kijelölését alkalmazza, a „Következők” alkalmazás nélkül lapoz tovább. A ki nem jelölt időpontok változatlanok maradnak.",
             "backfillMovedNext": "Következők",
             "backfillMovedAll": "Összes kijelölése",
-            "backfillMovedChange": "{{from}} helyett {{to}}"
+            "backfillMovedChange": "{{from}} helyett {{to}}",
+            "backfillDescriptionMore": "A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad."
         },
         "calendarAssignMeLabel": "Új események hozzám rendelése",
         "calendarDefaultRemindersLabel": "Alapértelmezett emlékeztetők",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Fali táblagépek",
         "pageDisplaysDescription": "Fali táblagép létrehozása, eszköz párosítása és hozzáférésének visszavonása.",
         "sheetDashboardDescription": "A lejárt visszaszámlálások türelmi idejének beállítása az áttekintésen.",
-        "sheetCalendarDescription": "Saját eseménybeállítások, előfizetések és exportok, valamint ünnepnapok, hétkezdet és naptárszinkronizálás.",
+        "sheetCalendarDescription": "Saját eseménybeállítások, előfizetések és exportok, valamint ünnepnapok és hétkezdet.",
         "sheetScheduleDescription": "Annak kiválasztása, milyen gyors indítási sablonokat kínál a beosztás.",
         "sheetTasksDescription": "Saját emlékeztetőlista új feladatokhoz, részfeladatok és emlékeztető-szinkronizálás.",
         "sheetBudgetDescription": "Személyes költségvetések bekapcsolása megosztott tételekkel.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Mások tárgyainak módosítása",
         "permCapabilityInventoryPrices": "Vételárak megtekintése",
         "permCapabilityTasksReorder": "A család sorrendjének módosítása",
-        "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók."
+        "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók.",
+        "activeModulesHintMore": "Ha csak magadnál rejtenéd el, nézd meg a Modulok → Navigáció oldalt.",
+        "permIntroMore": "Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

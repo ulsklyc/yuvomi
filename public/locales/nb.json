@@ -2012,7 +2012,7 @@
         "moduleDeleteErrorBadId": "Navnet på denne mappen er ikke en gyldig modul-ID. Fjern mappen på serveren for hånd.",
         "moduleDeleteErrorNotWebInstalled": "Denne modulen ble kopiert til serveren for hånd. Fjern mappen der.",
         "activeModulesTitle": "Husholdningens moduler",
-        "activeModulesHint": "Det som er slått av her, eksisterer ikke for noen i husholdningen. For å fjerne en modul kun fra din egen navigasjon, gå til Moduler → Navigasjon.",
+        "activeModulesHint": "Det som er slått av her, eksisterer ikke for noen i husholdningen.",
         "modulesEnableForHousehold": "Aktiver {{module}} for husholdningen",
         "modulesHideKitchenForMe": "Skjul alle kjøkkenmoduler for meg",
         "modulesHiddenScopeHint": "Skjulte moduler forsvinner kun fra din navigasjon. Lenker og søk vil fortsatt finne dem.",
@@ -2836,7 +2836,7 @@
         "pagePermissions": "Roller og tillatelser",
         "pagePermissionsDescription": "Angi tilgang til moduler og widgets per rolle og medlem.",
         "permModeLabel": "Angi tillatelser etter",
-        "permIntro": "Bestem hvilke moduler og dashbord-widgets hver familierolle kan se og redigere. Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang.",
+        "permIntro": "Bestem hvilke moduler og dashbord-widgets hver familierolle kan se og redigere.",
         "permByRole": "Etter rolle",
         "permByMember": "Etter medlem",
         "permRoleLegend": "Disse tillatelsene gjelder for alle medlemmer med denne familierollen, med mindre det medlemmet har egne unntak.",
@@ -3039,7 +3039,7 @@
             "defaultAssigneeHint": "Nytt synkroniserte hendelser blir automatisk tildelt denne personen.",
             "defaultAssigneeRoutingHint": "Standardansvarlig: hendelser fra en kalender får personen som er valgt der, og en ny hendelse tildelt kun til den personen blir opprettet i den kalenderen. Dette gjelder for Google- og CalDAV-kalendere, ikke for Apple eller Outlook.",
             "backfillTitle": "Fyll ut tildelinger",
-            "backfillDescription": "En standardansvarlig gjelder kun for avtaler som er importert etter at den ble satt. Her kan du bruke den én gang på avtaler som allerede er importert fra alle kontoer. Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er.",
+            "backfillDescription": "En standardansvarlig gjelder kun for avtaler som er importert etter at den ble satt. Her kan du bruke den én gang på avtaler som allerede er importert fra alle kontoer.",
             "backfillAction": "Bruk på eksisterende avtaler",
             "backfillQuestion": "Tildel {{count}} utildelte avtaler?",
             "backfillQuestion_one": "Tildel {{count}} utildelt avtale?",
@@ -3056,7 +3056,8 @@
             "backfillMovedPartial": "Avtaler {{first}} til {{last}} av {{total}}. «Tildel» utfører handlingen på dette utvalget, «Vis neste» går videre uten å utføre handlingen. Avtaler som ikke er valgt, forblir som de er.",
             "backfillMovedNext": "Vis neste",
             "backfillMovedAll": "Velg alle",
-            "backfillMovedChange": "Fra {{from}} til {{to}}"
+            "backfillMovedChange": "Fra {{from}} til {{to}}",
+            "backfillDescriptionMore": "Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er."
         },
         "calendarAssignMeLabel": "Tildel nye hendelser til meg",
         "calendarDefaultRemindersLabel": "Standardpåminnelser",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Nettbrett",
         "pageDisplaysDescription": "Opprett et nettbrett, par en enhet og trekk tilbake tilgangen dens.",
         "sheetDashboardDescription": "Angi utløpsfristen for utløpte nedtellinger i oversikten.",
-        "sheetCalendarDescription": "Dine egne standardinnstillinger for hendelser, abonnementer og eksporter, samt helligdager, ukesstart og kalendersynkronisering.",
+        "sheetCalendarDescription": "Dine egne standardinnstillinger for hendelser, abonnementer og eksporter, samt helligdager og ukesstart.",
         "sheetScheduleDescription": "Velg hvilke hurtigstartmaler vaktplanleggeren tilbyr.",
         "sheetTasksDescription": "Din påminnelsesliste for nye oppgaver, underoppgaver og synkronisering av påminnelser.",
         "sheetBudgetDescription": "Slå på personlige budsjetter med delte oppføringer.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Endre andres gjenstander",
         "permCapabilityInventoryPrices": "Se innkjøpspriser",
         "permCapabilityTasksReorder": "Endre familiens rekkefølge",
-        "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet."
+        "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet.",
+        "activeModulesHintMore": "For å fjerne en modul kun fra din egen navigasjon, gå til Moduler → Navigasjon.",
+        "permIntroMore": "Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

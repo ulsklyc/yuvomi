@@ -2012,7 +2012,7 @@
         "moduleDeleteErrorBadId": "Tên thư mục này không phải là ID mô-đun hợp lệ. Hãy xóa thư mục trên máy chủ theo cách thủ công.",
         "moduleDeleteErrorNotWebInstalled": "Mô-đun này được sao chép thủ công lên máy chủ. Hãy xóa thư mục của nó ở đó.",
         "activeModulesTitle": "Mô-đun của gia đình",
-        "activeModulesHint": "Những gì tắt ở đây sẽ không có với bất kỳ ai trong nhà. Để chỉ ẩn với riêng bạn, vào Mô-đun → Điều hướng.",
+        "activeModulesHint": "Những gì tắt ở đây sẽ không có với bất kỳ ai trong nhà.",
         "modulesEnableForHousehold": "Bật {{module}} cho gia đình",
         "modulesHideKitchenForMe": "Ẩn tất cả mô-đun bếp với tôi",
         "modulesHiddenScopeHint": "Mô-đun đã ẩn chỉ biến mất khỏi điều hướng của bạn. Liên kết và tìm kiếm vẫn mở được.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Vai trò và quyền",
         "pagePermissionsDescription": "Đặt quyền truy cập mô-đun và widget theo vai trò và thành viên.",
         "permModeLabel": "Đặt quyền theo",
-        "permIntro": "Quyết định mỗi vai trò gia đình có thể xem và chỉnh sửa những mô-đun và widget bảng điều khiển nào. Từng thành viên có thể khác với mặc định của vai trò. Nếu không đặt gì, mỗi vai trò có toàn quyền truy cập; quản trị viên luôn luôn.",
+        "permIntro": "Quyết định mỗi vai trò gia đình có thể xem và chỉnh sửa những mô-đun và widget bảng điều khiển nào.",
         "permByRole": "Theo vai trò",
         "permByMember": "Theo thành viên",
         "permRoleLegend": "Các quyền này áp dụng cho mọi thành viên có vai trò gia đình này, trừ khi thành viên có ngoại lệ riêng.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Các sự kiện mới đồng bộ sẽ tự động được giao cho người này.",
             "defaultAssigneeRoutingHint": "Người được giao mặc định: sự kiện từ một lịch được giao cho người đã chọn ở đó, và sự kiện mới chỉ giao cho người đó sẽ được tạo trong lịch ấy. Áp dụng cho lịch Google và CalDAV, không áp dụng cho Apple hay Outlook.",
             "backfillTitle": "Bổ sung người được giao",
-            "backfillDescription": "Người được giao mặc định chỉ áp dụng cho các lịch hẹn được nhập sau khi thiết lập. Tại đây bạn có thể áp dụng một lần cho các lịch hẹn đã được nhập từ tất cả tài khoản. Các lịch hẹn chưa có người được giao sẽ nhận trực tiếp. Các lịch hẹn vẫn mang người được giao mặc định của lịch khác được liệt kê từng mục để bạn chọn. Mọi việc giao khác sẽ giữ nguyên.",
+            "backfillDescription": "Người được giao mặc định chỉ áp dụng cho các lịch hẹn được nhập sau khi thiết lập. Tại đây bạn có thể áp dụng một lần cho các lịch hẹn đã được nhập từ tất cả tài khoản.",
             "backfillAction": "Áp dụng cho lịch hẹn hiện có",
             "backfillQuestion": "Giao {{count}} lịch hẹn chưa có người được giao?",
             "backfillQuestion_one": "Giao {{count}} lịch hẹn chưa có người được giao?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "Lịch hẹn {{first}} đến {{last}} trên {{total}}. “Giao” áp dụng lựa chọn trên trang này, “Hiện tiếp” chuyển tiếp mà không áp dụng. Các lịch hẹn không được chọn sẽ giữ nguyên.",
             "backfillMovedNext": "Hiện tiếp",
             "backfillMovedAll": "Chọn tất cả",
-            "backfillMovedChange": "Từ {{from}} sang {{to}}"
+            "backfillMovedChange": "Từ {{from}} sang {{to}}",
+            "backfillDescriptionMore": "Các lịch hẹn chưa có người được giao sẽ nhận trực tiếp. Các lịch hẹn vẫn mang người được giao mặc định của lịch khác được liệt kê từng mục để bạn chọn. Mọi việc giao khác sẽ giữ nguyên."
         },
         "calendarAssignMeLabel": "Giao sự kiện mới cho tôi",
         "calendarDefaultRemindersLabel": "Nhắc nhở mặc định",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Máy tính bảng gắn tường",
         "pageDisplaysDescription": "Tạo máy tính bảng gắn tường, ghép nối thiết bị và thu hồi quyền truy cập của nó.",
         "sheetDashboardDescription": "Đặt thời gian gia hạn cho các bộ đếm ngược đã hết hạn trên tổng quan.",
-        "sheetCalendarDescription": "Mặc định sự kiện, đăng ký và xuất của bạn, cùng ngày lễ, ngày bắt đầu tuần và đồng bộ lịch.",
+        "sheetCalendarDescription": "Mặc định sự kiện, đăng ký và xuất của bạn, cùng ngày lễ và ngày bắt đầu tuần.",
         "sheetScheduleDescription": "Chọn các mẫu khởi động nhanh mà lịch ca cung cấp.",
         "sheetTasksDescription": "Danh sách nhắc nhở của bạn cho việc mới, việc con và đồng bộ nhắc nhở.",
         "sheetBudgetDescription": "Bật ngân sách cá nhân với các mục dùng chung.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Sửa đồ vật của người khác",
         "permCapabilityInventoryPrices": "Xem giá mua",
         "permCapabilityTasksReorder": "Đổi thứ tự của gia đình",
-        "permChildRoleHint": "Tài khoản trẻ em mới khi được tạo còn nhận quyền khởi đầu riêng: {{list}}. Sau đó các quyền này hiển thị ở thành viên đó."
+        "permChildRoleHint": "Tài khoản trẻ em mới khi được tạo còn nhận quyền khởi đầu riêng: {{list}}. Sau đó các quyền này hiển thị ở thành viên đó.",
+        "activeModulesHintMore": "Để chỉ ẩn với riêng bạn, vào Mô-đun → Điều hướng.",
+        "permIntroMore": "Từng thành viên có thể khác với mặc định của vai trò. Nếu không đặt gì, mỗi vai trò có toàn quyền truy cập; quản trị viên luôn luôn."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

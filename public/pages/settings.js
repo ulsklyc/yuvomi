@@ -20,8 +20,8 @@ import { renderSettingsShell } from '/settings/shell.js';
 
 const SETTINGS_ROOT = '/settings';
 const ACCOUNT_LEAF = '/settings/personal/account';
-const SYNC_CALENDAR_LEAF = '/settings/modules/calendar';
-const SYNC_CALENDAR_SECTION = 'sync-calendar'; // seit R10 ein Abschnitt im Blatt Kalender
+const SYNC_CALENDAR_LEAF = '/settings/modules/calendar-sync';
+const SYNC_CALENDAR_SECTION = 'sync-calendar'; // seit R23 ein eigenes Blatt (D14)
 const OVERVIEW_VIEWS = new Set(['domains', 'domain']);
 
 // Container der zuletzt gemounteten Shell — Basis für das Soft-Update (update()).

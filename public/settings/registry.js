@@ -477,7 +477,10 @@ export const SETTINGS_SECTIONS = freezeEntries([
     // CalDAV und Google/Apple haengen an Zugangsdaten des Haushalts, ihre
     // Routen tragen `requireAdmin`.
     id: 'sync-calendar',
-    sheetId: 'module-calendar',
+    // EIN EIGENES BLATT (R23 D14, Critique G6 P2: Kalender-Blatt 3473px, 12
+    // Karten). Konten, Anbieter und die nachtraegliche Zuweisung sind eine
+    // eigene Aufgabe des Haushalts, keine Vorgabe des Kalenders.
+    sheetId: 'module-calendar-sync',
     scope: 'household',
     labelKey: 'settings.pageSyncCalendar',
     descriptionKey: 'settings.pageSyncCalendarDescription',
@@ -784,6 +787,9 @@ export const SETTINGS_LEAVES = freezeEntries([
   { id: 'modules-navigation', domainId: 'modules', path: '/settings/modules/navigation', labelKey: 'settings.pageNavigation', descriptionKey: 'settings.pageNavigationDescription', icon: 'panel-left' },
   { id: 'module-dashboard', domainId: 'modules', path: '/settings/modules/overview', labelKey: 'nav.dashboard', descriptionKey: 'settings.sheetDashboardDescription', icon: 'layout-dashboard', module: 'dashboard' },
   { id: 'module-calendar', domainId: 'modules', path: '/settings/modules/calendar', labelKey: 'nav.calendar', descriptionKey: 'settings.sheetCalendarDescription', icon: 'calendar', module: 'calendar' },
+  // Direkt hinter dem Kalender (gleiches Modul, stabile Sortierung), eigene
+  // Adresse: die OAuth-Rueckkehr und die Alt-Pfade landen hier.
+  { id: 'module-calendar-sync', domainId: 'modules', path: '/settings/modules/calendar-sync', labelKey: 'settings.pageSyncCalendar', descriptionKey: 'settings.pageSyncCalendarDescription', icon: 'refresh-cw', module: 'calendar', moduleStatus: false },
   { id: 'module-tasks', domainId: 'modules', path: '/settings/modules/tasks', labelKey: 'nav.tasks', descriptionKey: 'settings.sheetTasksDescription', icon: 'check-square', module: 'tasks' },
   { id: 'module-rewards', domainId: 'modules', path: '/settings/modules/rewards', labelKey: 'nav.rewards', descriptionKey: 'settings.sheetRewardsDescription', icon: 'award', module: 'rewards' },
   { id: 'module-schedule', domainId: 'modules', path: '/settings/modules/schedule', labelKey: 'nav.schedule', descriptionKey: 'settings.sheetScheduleDescription', icon: 'briefcase-business', module: 'schedule' },
@@ -823,7 +829,7 @@ const MOVED_SETTINGS_PATHS = Object.freeze({
   '/settings/personal/navigation': { path: '/settings/modules/navigation', section: 'modules-navigation' },
   '/settings/modules/options': { path: '/settings/modules/budget', section: 'options-budget', dissolved: true },
   '/settings/modules/countdowns': { path: '/settings/modules/overview', section: 'modules-countdowns' },
-  '/settings/sync/calendar': { path: '/settings/modules/calendar', section: 'sync-calendar' },
+  '/settings/sync/calendar': { path: '/settings/modules/calendar-sync', section: 'sync-calendar' },
   '/settings/sync/contacts': { path: '/settings/modules/contacts', section: 'sync-contacts' },
   '/settings/sync/reminders': { path: '/settings/modules/tasks', section: 'sync-reminders' },
   '/settings/sync/storage': { path: '/settings/modules/documents', section: 'documents-storage' },

@@ -2599,7 +2599,7 @@
         "moduleDeleteErrorBadId": "El nombre de esta carpeta no es un ID de módulo válido. Elimina la carpeta del servidor a mano.",
         "moduleDeleteErrorNotWebInstalled": "Este módulo se copió a mano en el servidor. Elimina su carpeta allí.",
         "activeModulesTitle": "Los módulos del hogar",
-        "activeModulesHint": "Lo que está apagado aquí no existe para nadie del hogar. Para ocultar un módulo solo para ti, ve a Módulos → Navegación.",
+        "activeModulesHint": "Lo que está apagado aquí no existe para nadie del hogar.",
         "modulesEnableForHousehold": "Activar {{module}} para el hogar",
         "modulesHideKitchenForMe": "Ocultar todos los módulos de cocina para mí",
         "modulesHiddenScopeHint": "Los módulos ocultos solo desaparecen de tu navegación. Los enlaces y la búsqueda siguen llegando a ellos.",
@@ -2799,7 +2799,7 @@
         "pagePermissions": "Roles y permisos",
         "pagePermissionsDescription": "Configura el acceso a módulos y widgets por rol y miembro.",
         "permModeLabel": "Definir permisos por",
-        "permIntro": "Decide qué módulos y widgets del panel puede ver y editar cada rol familiar. Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre.",
+        "permIntro": "Decide qué módulos y widgets del panel puede ver y editar cada rol familiar.",
         "permByRole": "Por rol",
         "permByMember": "Por miembro",
         "permRoleLegend": "Estos permisos se aplican a todos los miembros con este rol familiar, salvo que el miembro tenga su propia excepción.",
@@ -3002,7 +3002,7 @@
             "defaultAssigneeHint": "Los eventos recién sincronizados se asignan automáticamente a esta persona.",
             "defaultAssigneeRoutingHint": "Asignación predeterminada: los eventos de un calendario reciben a la persona elegida allí, y un evento nuevo asignado solo a esa persona se crea en ese calendario. Se aplica a calendarios de Google y CalDAV, no a Apple ni Outlook.",
             "backfillTitle": "Completar asignaciones",
-            "backfillDescription": "La asignación predeterminada solo se aplica a las citas importadas después de configurarla. Aquí puedes aplicarla una vez a las citas ya importadas de todas las cuentas. Las citas sin asignar la reciben directamente. Las citas que aún llevan la asignación predeterminada de otro calendario aparecen una a una para que elijas. Cualquier otra asignación no cambia.",
+            "backfillDescription": "La asignación predeterminada solo se aplica a las citas importadas después de configurarla. Aquí puedes aplicarla una vez a las citas ya importadas de todas las cuentas.",
             "backfillAction": "Aplicar a las citas existentes",
             "backfillQuestion": "¿Asignar {{count}} citas sin asignar?",
             "backfillQuestion_one": "¿Asignar {{count}} cita sin asignar?",
@@ -3019,7 +3019,8 @@
             "backfillMovedPartial": "Citas {{first}} a {{last}} de {{total}}. «Asignar» aplica la selección de esta página, «Mostrar siguientes» avanza sin aplicarla. Las citas no seleccionadas no cambian.",
             "backfillMovedNext": "Mostrar siguientes",
             "backfillMovedAll": "Seleccionar todas",
-            "backfillMovedChange": "De {{from}} a {{to}}"
+            "backfillMovedChange": "De {{from}} a {{to}}",
+            "backfillDescriptionMore": "Las citas sin asignar la reciben directamente. Las citas que aún llevan la asignación predeterminada de otro calendario aparecen una a una para que elijas. Cualquier otra asignación no cambia."
         },
         "calendarAssignMeLabel": "Asignarme los nuevos eventos",
         "calendarDefaultRemindersLabel": "Recordatorios predeterminados",
@@ -3205,7 +3206,7 @@
         "pageDisplays": "Tabletas de pared",
         "pageDisplaysDescription": "Crear una tableta de pared, vincular un dispositivo y revocar su acceso.",
         "sheetDashboardDescription": "Fija el plazo de gracia de las cuentas atrás vencidas en el resumen.",
-        "sheetCalendarDescription": "Tus valores de eventos, suscripciones y exportaciones, además de festivos, inicio de semana y sincronización del calendario.",
+        "sheetCalendarDescription": "Tus valores de eventos, suscripciones y exportaciones, además de festivos e inicio de semana.",
         "sheetScheduleDescription": "Elige qué plantillas de inicio rápido ofrece el plan de turnos.",
         "sheetTasksDescription": "Tu lista de recordatorios para tareas nuevas, subtareas y la sincronización de recordatorios.",
         "sheetBudgetDescription": "Activa presupuestos personales con entradas compartidas.",
@@ -3339,7 +3340,9 @@
         "permCapabilityInventoryEditOthers": "Cambiar objetos de otros",
         "permCapabilityInventoryPrices": "Ver precios de compra",
         "permCapabilityTasksReorder": "Cambiar el orden de la familia",
-        "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente."
+        "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente.",
+        "activeModulesHintMore": "Para ocultar un módulo solo para ti, ve a Módulos → Navegación.",
+        "permIntroMore": "Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
