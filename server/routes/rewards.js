@@ -734,7 +734,9 @@ function reopenRedemption(req, res, d, row, me) {
   if (row.status === 'pending') {
     return res.status(409).json({ error: 'This request is still open.', code: 409, reason: 'rewards_redemption_open' });
   }
-  if (row.decided_by !== me) return res.status(403).json({ error: 'Only who decided can take the decision back.', code: 403 });
+  if (row.decided_by !== me) {
+    return res.status(403).json({ error: 'Only who decided can take the decision back.', code: 403, reason: 'rewards_reopen_not_allowed' });
+  }
   // FREIGEBEN UND ABLEHNEN NIMMT NUR EIN FREIGEBER ZURUECK, und nie eine
   // Auto-Erfuellung (Sicherheitspruefung zu R23). Ohne Freigabepflicht traegt
   // die Anfrage `decided_by = requested_by`: der Antragsteller haette die
@@ -742,7 +744,11 @@ function reopenRedemption(req, res, d, row, me) {
   // zurueckbekommen - die Praemie hatte er da schon. Das Zurueckziehen selbst
   // bleibt fuer den, der es tat, umkehrbar: es reserviert nur wieder, was es
   // zurueckgegeben hat (Richtung: weniger Guthaben, nie mehr).
-  if (row.status !== 'cancelled' && (!isAdminRequest(req) || row.decided_by === row.requested_by)) {
+  // Auto-Erfuellung = beim Stellen erfuellt: derselbe Schritt schreibt Antrag
+  // und Entscheidung (decided_at == created_at, decided_by == requested_by). Ein
+  // Admin, der fuer ein Kind beantragt und SPAETER freigibt, bleibt Freigeber.
+  const autoFulfilled = row.decided_by === row.requested_by && row.decided_at === row.created_at;
+  if (row.status !== 'cancelled' && (!isAdminRequest(req) || autoFulfilled)) {
     return res.status(403).json({ error: 'This decision cannot be taken back here.', code: 403, reason: 'rewards_reopen_not_allowed' });
   }
   const decidedMs = Date.parse(row.decided_at ?? '');
@@ -769,8 +775,11 @@ function reopenRedemption(req, res, d, row, me) {
     `).run(row.id);
     return null;
   })();
+  if (refused === 'insufficient_funds') {
+    return res.status(409).json({ error: 'The balance no longer allows taking this back.', code: 409, reason: 'insufficient_funds' });
+  }
   if (refused) {
-    return res.status(409).json({ error: 'The balance no longer allows taking this back.', code: 409, reason: refused });
+    return res.status(409).json({ error: 'The balance no longer allows taking this back.', code: 409, reason: 'insufficient_points' });
   }
   return res.json({ data: d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id) });
 }

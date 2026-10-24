@@ -755,3 +755,14 @@ test('R23 Sicherheit: eine Auto-Erfuellung laesst sich nicht oeffnen und zurueck
   assert.equal(getBalance(db, kid.id), 0, 'wieder reserviert');
   assert.equal((await call('PATCH', `/redemptions/${pend}`, { actor: kid, body: { action: 'fulfill' } })).status, 403);
 });
+
+test('R23: ein Admin, der fuer ein Kind beantragt und spaeter freigibt, nimmt die Freigabe zurueck', async () => {
+  const kid = freshKid(40);
+  const item = (await call('POST', '/catalog', { body: { name: 'Undo-Stellvertretend', cost: 15 } })).body.data.id;
+  const id = (await call('POST', '/redemptions', { body: { catalog_id: item, user_id: kid.id } })).body.data.id;
+  db.prepare("UPDATE reward_redemptions SET created_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 minutes') WHERE id = ?").run(id);
+  assert.equal((await call('PATCH', `/redemptions/${id}`, { body: { action: 'fulfill' } })).status, 200);
+  const back = await call('PATCH', `/redemptions/${id}`, { body: { action: 'reopen' } });
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  assert.equal(getBalance(db, kid.id), 25, 'weiter reserviert');
+});

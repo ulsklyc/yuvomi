@@ -846,6 +846,10 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   'display_account', 'display_only', 'display_action', 'acting_person_no_access', 'split_guest_scope',
   // Taschengeld am Wandtablett (#1734): die Seite fragt dort gar nicht erst nach Geld.
   'money_not_on_display',
+  // Rueckgaengig einer Entscheidung (R23, D6): der Toast bietet es nur dem an,
+  // der eben entschieden hat; der Fall (fremde oder Auto-Erfuellung) ist aus der
+  // Oberflaeche nicht erreichbar, der Fehlerweg sagt "keine Berechtigung".
+  'rewards_reopen_not_allowed',
   // Die Oberflaeche bietet das Loeschen dort nicht an; der Servertext ist deutsch.
   'family_member_contact',
   'FASTING_CAPABILITY_REQUIRED', 'FASTING_SUBJECT_FORBIDDEN', 'FASTING_ACK_FORBIDDEN', 'FASTING_SETTINGS_FORBIDDEN',
