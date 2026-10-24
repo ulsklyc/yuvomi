@@ -33,6 +33,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the web installer 简体中文 and 繁體中文. New regions set the currency, date format and 12-hour clock in one step: Taiwan with
   New Taiwan dollars and YYYY/MM/DD, Hong Kong and Macau with Hong Kong dollars and patacas and
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
+- **Stock: the page lists products, with their batches underneath** (part 2 of #1448). Without a
+  filter, stock is sorted into sections by category, in the order of your shopping categories.
+  A product with one batch looks as before and now names its storage location. A product with
+  several batches shows its total and where it is, such as "4 l in all · 2 places", and warns
+  when one of them has expired or expires soon; tap it to open the batches, each with its own
+  location, best-before date, stepper and cart. A product whose last batch is used up stays
+  listed as out of stock, with a cart that puts it on the shopping list; swipe it away or use
+  its menu to delete it, with undo like a batch. The expired, expiring soon and running low
+  filters still list single batches, now with the product's total where it has several, and a
+  chip for each storage location that holds stock lists what is there. For API clients,
+  `GET /api/v1/pantry` additionally returns `products`, `import-pantry` accepts
+  `pantry_product_id`, and `DELETE /api/v1/pantry/products/{id}` deletes a product without
+  batches.
 
 ### Changed
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one

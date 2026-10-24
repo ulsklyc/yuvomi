@@ -37,6 +37,22 @@ function loadLocations() {
   return db.get().prepare('SELECT * FROM pantry_locations ORDER BY sort_order ASC, id ASC').all();
 }
 
+/**
+ * The household products with the number of batches each one has (#1448). A
+ * product outlives its last batch, so this is the only place a product without
+ * batches can be seen: the stock page shows it as out of stock. The batches
+ * themselves stay in `data`; this list only names the products.
+ */
+function loadProducts() {
+  return db.get().prepare(`
+    SELECT p.id, p.name, p.unit, p.category, COUNT(pi.id) AS batch_count
+    FROM pantry_products p
+    LEFT JOIN pantry_items pi ON pi.product_id = p.id
+    GROUP BY p.id
+    ORDER BY p.name COLLATE NOCASE ASC, p.id ASC
+  `).all();
+}
+
 function loadCategories() {
   return db.get().prepare('SELECT * FROM shopping_categories ORDER BY sort_order ASC').all();
 }
@@ -425,13 +441,59 @@ router.post('/import-shopping', (req, res) => {
 // Alle Vorratsartikel plus Lagerorte und Kategorien in einem Roundtrip.
 // Der Ablauf-/Bestands-Status wird bewusst NICHT hier berechnet: "abgelaufen"
 // hängt am lokalen Datum des Nutzers, der Server rechnet in UTC.
-// Response: { data: PantryItem[], locations: [], categories: [] }
+// `products` names the household products with their number of batches,
+// including products without batches (#1448).
+// Response: { data: PantryItem[], products: [], locations: [], categories: [] }
 // --------------------------------------------------------
 router.get('/', (_req, res) => {
   try {
-    res.json({ data: loadItems(), locations: loadLocations(), categories: loadCategories() });
+    res.json({ data: loadItems(), products: loadProducts(), locations: loadLocations(), categories: loadCategories() });
   } catch (err) {
     log.error('GET / error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// DELETE /api/v1/pantry/products/:productId
+// Deletes a household product that has no batches left (#1448; brought
+// forward from step 5 so a product that outlived its last batch can go). A
+// product with batches is refused with 409 and `reason`
+// `pantry_product_has_batches`, so the ON DELETE CASCADE on
+// `pantry_items.product_id` never takes stock with it. Count and delete run in
+// one transaction: a batch written in between cannot slip under the check.
+// Nothing else points at a product: recipe matches and reminders point at
+// batches. Behind the pantry write permission like every DELETE under /pantry
+// (module gate in server/index.js).
+// Response: 204
+// --------------------------------------------------------
+router.delete('/products/:productId', (req, res) => {
+  try {
+    const vId = idParam(req.params.productId, 'Produkt-ID');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+
+    const outcome = db.get().transaction(() => {
+      const product = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(vId.value);
+      if (!product) return { status: 404 };
+      const { batches } = db.get()
+        .prepare('SELECT COUNT(*) AS batches FROM pantry_items WHERE product_id = ?').get(vId.value);
+      if (batches > 0) return { status: 409, batches };
+      db.get().prepare('DELETE FROM pantry_products WHERE id = ?').run(vId.value);
+      return { status: 204 };
+    })();
+
+    if (outcome.status === 404) return res.status(404).json({ error: 'Product not found.', code: 404 });
+    if (outcome.status === 409) {
+      return res.status(409).json({
+        error: 'The product still has batches; delete them first.',
+        code: 409,
+        reason: 'pantry_product_has_batches',
+        count: outcome.batches,
+      });
+    }
+    res.status(204).end();
+  } catch (err) {
+    log.error('DELETE /products/:productId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

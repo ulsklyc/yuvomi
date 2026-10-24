@@ -8,7 +8,8 @@ export function pantryPaths() {
         description: 'Each pantry item is one batch (a quantity with its own location and best-before date). `product_id` names the household product the batch belongs to: '
           + 'batches with the same name, compared trimmed, case-insensitive and with collapsed whitespace, and the same unit share one product. '
           + 'The server sets it on every write that changes the name, unit or category, and moves the batch to another product when the name or unit no longer matches; '
-          + 'a `product_id` in a request body is ignored. Every pantry item response carries it.',
+          + 'a `product_id` in a request body is ignored. Every pantry item response carries it. '
+          + '`products` lists the household products (`id`, `name`, `unit`, `category`, `batch_count`), including products whose last batch is gone (`batch_count` 0).',
         tag: 'Pantry',
       }),
       post: op({ summary: 'Create pantry item', tag: 'Pantry', stateChanging: true, requestBody: jsonBody(null) }),
@@ -38,6 +39,23 @@ export function pantryPaths() {
         tag: 'Pantry',
         stateChanging: true,
         requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/pantry/products/{productId}': {
+      delete: op({
+        summary: 'Delete pantry product without batches',
+        description: 'Deletes a household product whose last batch is gone (`batch_count` 0 in `GET /api/v1/pantry`). '
+          + 'A product that still has batches is refused with 409 and `reason` `pantry_product_has_batches`; its batches are never deleted along with it.',
+        tag: 'Pantry',
+        params: [idParam('productId', 'Product ID')],
+        stateChanging: true,
+        responses: {
+          204: { description: 'Product deleted' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'Product not found' },
+          409: { description: 'The product still has batches. The response body reason is `pantry_product_has_batches`, `count` the number of batches.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/pantry/{itemId}': {

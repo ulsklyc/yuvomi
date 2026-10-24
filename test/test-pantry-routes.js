@@ -404,3 +404,150 @@ test('undo-transfer: unbekannte IDs werden uebergangen, leerer Body ist kein Feh
   assert.equal(r.body.data.removed, 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM shopping_items WHERE list_id = ?').get(list.body.data.id).n, 0);
 });
+
+// --------------------------------------------------------------------------
+// Products in GET /pantry and the handover of a product without batches (#1448, step 2)
+// --------------------------------------------------------------------------
+test('GET /pantry: products names every household product with its batch count, also the one without batches', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const cellar = db.prepare("SELECT id FROM pantry_locations WHERE name = 'Keller'").get().id;
+  const fridge = db.prepare("SELECT id FROM pantry_locations WHERE name = 'Kühlschrank'").get().id;
+  await call('POST', '/pantry', { name: 'Milch', quantity: 2, unit: 'l', location_id: cellar, category: 'Milchprodukte' });
+  await call('POST', '/pantry', { name: 'milch ', quantity: 1, unit: 'l', location_id: fridge, category: 'Milchprodukte' });
+  const tooth = await call('POST', '/pantry', { name: 'Zahnpasta', quantity: 1, category: 'Drogerie' });
+  await call('DELETE', `/pantry/${tooth.body.data.id}`);
+
+  const r = await call('GET', '/pantry');
+  assert.equal(r.status, 200);
+  // Additive: the batches, places and categories are still there.
+  assert.equal(r.body.data.length, 2);
+  assert.ok(Array.isArray(r.body.locations) && Array.isArray(r.body.categories));
+  assert.deepEqual(
+    r.body.products.map(({ name, unit, category, batch_count }) => ({ name, unit, category, batch_count })),
+    [
+      { name: 'Milch', unit: 'l', category: 'Milchprodukte', batch_count: 2 },
+      { name: 'Zahnpasta', unit: 'pcs', category: 'Drogerie', batch_count: 0 },
+    ],
+  );
+  const milk = r.body.products.find((p) => p.name === 'Milch');
+  assert.ok(r.body.data.every((i) => i.product_id === milk.id), 'both batches point at the product listed');
+});
+
+test('import-pantry: a product without batches goes over by pantry_product_id, with its name and category and no quantity', async () => {
+  const list = await call('POST', '/shopping', { name: 'Drogerie' });
+  const listId = list.body.data.id;
+  const tooth = db.prepare("SELECT id FROM pantry_products WHERE name = 'Zahnpasta'").get();
+  const r = await call('POST', `/shopping/${listId}/import-pantry`, {
+    // A quantity sent along is not taken: there is no stock to measure it against.
+    items: [{ pantry_product_id: tooth.id, quantity: '3' }, { pantry_product_id: 999999 }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.added, 1);
+  assert.equal(r.body.data.skipped, 1, 'an unknown product is skipped like an unknown batch');
+  const row = db.prepare('SELECT id, name, quantity, category FROM shopping_items WHERE list_id = ?').get(listId);
+  assert.deepEqual({ name: row.name, quantity: row.quantity, category: row.category },
+    { name: 'Zahnpasta', quantity: null, category: 'Drogerie' });
+  assert.deepEqual(r.body.data.added_ids, [row.id]);
+
+  // Same name unchecked on the list: skipped, as for a batch.
+  const again = await call('POST', `/shopping/${listId}/import-pantry`, { items: [{ pantry_product_id: tooth.id }] });
+  assert.deepEqual(again.body.data, { added: 0, skipped: 1, added_ids: [] });
+
+  // pantry_item_id wins when both are sent: a batch entry keeps meaning the batch.
+  const milkBatch = db.prepare("SELECT id FROM pantry_items WHERE location_id IS NOT NULL ORDER BY id LIMIT 1").get();
+  const both = await call('POST', `/shopping/${listId}/import-pantry`, {
+    items: [{ pantry_item_id: milkBatch.id, pantry_product_id: tooth.id, quantity: '1 l' }],
+  });
+  assert.equal(both.body.data.added, 1);
+  assert.equal(db.prepare('SELECT quantity FROM shopping_items WHERE id = ?').get(both.body.data.added_ids[0]).quantity, '1 l');
+  assert.equal(db.prepare('SELECT name FROM shopping_items WHERE id = ?').get(both.body.data.added_ids[0]).name, 'Milch');
+});
+
+// --------------------------------------------------------------------------
+// Deleting a product without batches (#1448, brought forward from step 5;
+// review of #2085, point 1)
+// --------------------------------------------------------------------------
+const productRow = (id) => db.prepare('SELECT id FROM pantry_products WHERE id = ?').get(id);
+const batchesOf = (id) => db.prepare('SELECT COUNT(*) AS n FROM pantry_items WHERE product_id = ?').get(id).n;
+
+test('DELETE /pantry/products/:id: a product without batches goes, 204', async () => {
+  const made = await call('POST', '/pantry', { name: 'Seife', quantity: 1 });
+  const productId = made.body.data.product_id;
+  await call('DELETE', `/pantry/${made.body.data.id}`);
+  assert.ok(productRow(productId), 'the product outlives its last batch');
+
+  const r = await call('DELETE', `/pantry/products/${productId}`);
+  assert.equal(r.status, 204);
+  assert.equal(productRow(productId), undefined, 'the product is gone');
+  const list = await call('GET', '/pantry');
+  assert.equal(list.body.products.some((p) => p.id === productId), false, 'and no longer listed');
+
+  // Gone already: 404; not an id: 400.
+  assert.equal((await call('DELETE', `/pantry/products/${productId}`)).status, 404);
+  assert.equal((await call('DELETE', '/pantry/products/0')).status, 400);
+  assert.equal((await call('DELETE', '/pantry/products/abc')).status, 400);
+});
+
+test('DELETE /pantry/products/:id: a product with batches is refused with 409 and a reason, nothing is deleted', async () => {
+  const first = await call('POST', '/pantry', { name: 'Linsen', quantity: 2, unit: 'kg' });
+  await call('POST', '/pantry', { name: 'linsen', quantity: 1, unit: 'kg', expires_on: '2027-01-01' });
+  const productId = first.body.data.product_id;
+  assert.equal(batchesOf(productId), 2);
+
+  const r = await call('DELETE', `/pantry/products/${productId}`);
+  assert.equal(r.status, 409);
+  assert.equal(r.body.reason, 'pantry_product_has_batches', 'a stable reason for the client');
+  assert.equal(r.body.count, 2);
+  assert.ok(productRow(productId), 'the product stays');
+  assert.equal(batchesOf(productId), 2, 'the ON DELETE CASCADE never takes the stock with it');
+});
+
+test('DELETE /pantry/products/:id: behind the pantry write permission, like the delete of a batch', async () => {
+  const { sessionModuleAccessRequirement, tokenAccessRequirement } = await import('../server/scopes.js');
+  const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED } = await import('../server/permissions.js');
+  // Both gates in server/index.js ask these two functions, at the path below /api/v1.
+  for (const ask of [sessionModuleAccessRequirement, tokenAccessRequirement]) {
+    assert.deepEqual(ask('/pantry/products/5', 'DELETE'), ask('/pantry/5', 'DELETE'), 'the same requirement as a batch');
+    assert.deepEqual(ask('/pantry/products/5', 'DELETE'), { moduleKey: 'pantry', access: 'write' });
+  }
+
+  // The session gate of server/index.js in front of the real router.
+  let level = 'read';
+  const gated = express();
+  gated.use((req, res, next) => {
+    req.authUserId = USER;
+    req.session = { userId: USER, role: 'member' };
+    const { moduleKey, access } = sessionModuleAccessRequirement(req.path, req.method);
+    const verdict = moduleAccessVerdict({ pantry: level }, moduleKey, access);
+    if (verdict === MODULE_ACCESS_DENIED) return res.status(403).json({ code: 403, reason: 'module_access_denied' });
+    if (verdict === MODULE_ACCESS_READ_ONLY) return res.status(403).json({ code: 403, reason: 'module_read_only' });
+    return next();
+  });
+  gated.use('/pantry', pantryRouter);
+  const gatedServer = gated.listen(0, '127.0.0.1');
+  await new Promise((r) => gatedServer.on('listening', r));
+  try {
+    const made = await call('POST', '/pantry', { name: 'Kerzen', quantity: 1 });
+    const productId = made.body.data.product_id;
+    await call('DELETE', `/pantry/${made.body.data.id}`);
+    const url = `http://127.0.0.1:${gatedServer.address().port}/pantry/products/${productId}`;
+
+    let r = await fetch(url, { method: 'DELETE' });
+    assert.equal(r.status, 403);
+    assert.equal((await r.json()).reason, 'module_read_only');
+    assert.ok(productRow(productId), 'pantry: read deletes nothing');
+
+    level = 'none';
+    r = await fetch(url, { method: 'DELETE' });
+    assert.equal(r.status, 403);
+    assert.ok(productRow(productId));
+
+    level = 'write';
+    r = await fetch(url, { method: 'DELETE' });
+    assert.equal(r.status, 204, 'with write access it goes');
+    assert.equal(productRow(productId), undefined);
+  } finally {
+    gatedServer.close();
+  }
+});

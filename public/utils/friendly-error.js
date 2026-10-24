@@ -272,6 +272,9 @@ export const CASE_MESSAGES = new Map([
   ['inventory_location_exists', 'inventory.errorLocationExists'],
   ['inventory_location_not_found', 'inventory.errorLocationGone'],
   ['inventory_category_not_found', 'inventory.errorCategoryGone'],
+  // Vorrat (#1448): ein Produkt ohne Charge wird geloescht, und im
+  // Rueckgaengig-Fenster hat jemand wieder eine Charge eingebucht.
+  ['pantry_product_has_batches', 'pantry.errorProductHasStock'],
   // Aufgaben (#1909). Die 404 heisst "geloescht oder nicht mehr sichtbar"
   // (privat gestellt) - fuer diese Person ist die Aufgabe in beiden Faellen
   // weg, ein Loeschen mit diesem Grund ist deshalb ein Erfolg.
