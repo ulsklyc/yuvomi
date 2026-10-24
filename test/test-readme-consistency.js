@@ -385,7 +385,8 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Die alte Form kommt zurueck: Gruppen als eigene Liste vor einer Klappe mit
   // anderem <summary>. Dann fehlen die Gruppenzeilen, statt doppelt zu zaehlen.
   const summary = md.match(/<details>\s*<summary>[\s\S]*?<\/summary>/)[0];
-  const asList = summary.replace(/<details>\s*<summary>\n?/, '').replace(/<br>|<\/summary>|<sub>.*<\/sub>\n?/g, '')
+  // Die erste Zeile des <summary> ist der Aufklapp-Hinweis, keine Gruppe.
+  const asList = summary.replace(/<details>\s*<summary>\n?/, '').replace(/^(?!<b>).*<br>\n/m, '').replace(/<br>|<\/summary>/g, '')
     .replace(/^<b>(.+?)<\/b> - /gm, '- **$1** - ');
   const oldForm = groupFindings(md.replace(summary, `${asList}\n<details>\n<summary><b>Every module in one line</b></summary>`), html, 'en');
   assert.ok(hit(oldForm, /0 Gruppenzeilen, die Homepage zeigt 5 Gruppen/), oldForm.join(' | '));

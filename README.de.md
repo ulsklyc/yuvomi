@@ -7,8 +7,7 @@
 
   <p>
     Aufgaben, Kalender, Budget, Mahlzeiten, Gesundheit und mehr für eine Familie, ein Paar oder
-    euch allein, auf einem Server, der euch gehört. Von sich aus fragt er nur bei GitHub, ob es eine
-    neuere Version gibt; alles andere wartet, bis ihr eine Funktion nutzt, die es braucht.
+    euch allein, auf einem Server, der euch gehört.
   </p>
 
   <p>
@@ -21,7 +20,7 @@
 
   <p>
     <a href="https://yuvomi.cloud/"><strong>→ Rundgang auf yuvomi.cloud</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="#installieren"><strong>In&nbsp;Minuten&nbsp;installieren</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="#installieren"><strong>Installieren</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#dokumentation">Doku</a>&nbsp;&nbsp;·&nbsp;
     <a href="CHANGELOG.md">Changelog</a>&nbsp;&nbsp;·&nbsp;
     <a href="README.md" hreflang="en">English&nbsp;(maßgeblich)</a>
@@ -67,15 +66,16 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp" width="196">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-wall-light-web.webp" width="196">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp" width="324">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-wall-light-web.webp" width="324">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp">
     <img src="docs/screenshots/de/dashboard-wall-light-web.webp" alt="Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp" width="600">
-  </picture>&emsp;<picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/shopping-dark-mobile.webp" width="68">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/de/shopping-light-mobile.webp" width="68">
+  </picture>
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/shopping-dark-mobile.webp" width="170">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/shopping-light-mobile.webp" width="170">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/shopping-dark-mobile.webp">
-    <img src="docs/screenshots/de/shopping-light-mobile.webp" alt="Die geteilte Einkaufsliste auf dem Handy, nach Gang sortiert: Obst und Gemüse, Backwaren, Milchprodukte, Fleisch und Fisch" width="207">
+    <img src="docs/screenshots/de/shopping-light-mobile.webp" alt="Die geteilte Einkaufsliste auf dem Handy, nach Gang sortiert: Obst und Gemüse, Backwaren, Milchprodukte, Fleisch und Fisch" width="207" hspace="12">
   </picture>
 </p>
 
@@ -92,12 +92,12 @@ Entsorgung und Schichtplan sind anfangs aus.
 
 <details>
 <summary>
+Alle 20 Module, je in einer Zeile<br>
 <b>Planen</b> - Aufgaben · Kalender · Belohnungen · Notizen &amp; Kontakte · Schichtplan<br>
 <b>Haushalt</b> - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar<br>
 <b>Menschen</b> - Gesundheit · Geburtstage<br>
 <b>Finanzen</b> - Budget<br>
-<b>Einstellungen</b> - Familie · Erinnerungen · API-Tokens · Backup<br>
-<sub>Aufklappen für jedes Modul in einer Zeile</sub>
+<b>Einstellungen</b> - Familie · Erinnerungen · API-Tokens · Backup
 </summary>
 
 | Modul | In einer Zeile |
@@ -149,6 +149,11 @@ von jedem eurer anderen Geräte aus ab.
 
 **Was kostet es?** Nichts. Yuvomi ist kostenlos und MIT-lizenziert. Ihr stellt den Server; es gibt
 kein Abo, keinen Upsell und keine Bezahlstufe.
+
+**Telefoniert es nach Hause?** Von sich aus fragt Yuvomi nur bei GitHub, ob es eine neuere Version
+gibt, und wer das blockiert, macht nichts kaputt. Alles andere wartet, bis ihr eine Funktion nutzt
+oder einschaltet, die es braucht; jede Verbindung steht im Abschnitt [Installieren](#installieren)
+unter *Voraussetzungen, Netzwerk und eure Daten*.
 
 ---
 
@@ -231,7 +236,7 @@ node tools/installer/install-server.js
 
 Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht. Von
 einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
-und dann dort dieselbe Adresse. Braucht Node.js 22+ auf dem Host; der Container bringt sein eigenes
+und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container bringt sein eigenes
 Node 24 mit.
 
 <details>

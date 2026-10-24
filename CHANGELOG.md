@@ -147,6 +147,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   out of scrolling back up on slower phones. Buttons spring back with the app's own curve when
   released, and the floating buttons settle into place the same way; with reduced motion turned
   on they simply appear.
+- **The README puts the kitchen wall back to full width on a phone and opens with what Yuvomi
+  does.** On a phone the wall-mode picture and the phone beside it had shrunk to about 200 and 70
+  pixels wide, too small to read; the wall picture now fills the column and the phone stands
+  centred below it, while on a laptop the two stay side by side. The opening paragraph says only
+  what Yuvomi does; the note on the one update check it makes on its own moved to "Before you
+  commit" as "Does it phone home?", with a pointer to the full list. The module list's hint is
+  now its first line in normal size instead of small grey text at the end, the guided setup names
+  the Node.js versions the installer accepts (22.14+ or 23.6+, it said 22+), and the install link
+  in the top row is plain "Install", since only the NAS route takes minutes.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

@@ -7,8 +7,7 @@
 
   <p>
     Tasks, calendar, budget, meals, health and more for a family, a couple or just you, on a
-    server you own. On its own, it only asks GitHub whether a newer version exists; anything else
-    waits until you use a feature that needs it.
+    server you own.
   </p>
 
   <p>
@@ -21,7 +20,7 @@
 
   <p>
     <a href="https://yuvomi.cloud/"><strong>→ Take the tour on yuvomi.cloud</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="#install"><strong>Install&nbsp;in&nbsp;minutes</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="#install"><strong>Install</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#documentation">Docs</a>&nbsp;&nbsp;·&nbsp;
     <a href="CHANGELOG.md">Changelog</a>&nbsp;&nbsp;·&nbsp;
     <a href="README.de.md" hreflang="de">Auf&nbsp;Deutsch</a>
@@ -67,15 +66,16 @@ This is the part a folder full of separate apps cannot do:
 
 <p align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp" width="196">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/dashboard-wall-light-web.webp" width="196">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp" width="324">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/dashboard-wall-light-web.webp" width="324">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp">
     <img src="docs/screenshots/dashboard-wall-light-web.webp" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" width="600">
-  </picture>&emsp;<picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-mobile.webp" width="68">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/shopping-light-mobile.webp" width="68">
+  </picture>
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-mobile.webp" width="170">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/shopping-light-mobile.webp" width="170">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-mobile.webp">
-    <img src="docs/screenshots/shopping-light-mobile.webp" alt="The shared shopping list on a phone, sorted by aisle: fruit and veg, bakery, dairy, meat and fish" width="207">
+    <img src="docs/screenshots/shopping-light-mobile.webp" alt="The shared shopping list on a phone, sorted by aisle: fruit and veg, bakery, dairy, meat and fish" width="207" hspace="12">
   </picture>
 </p>
 
@@ -92,12 +92,12 @@ Waste collection and Schedule start switched off.
 
 <details>
 <summary>
+All 20 modules, one line each<br>
 <b>Plan</b> - Tasks · Calendar · Rewards · Notes &amp; Contacts · Schedule<br>
 <b>Household</b> - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory<br>
 <b>People</b> - Health · Birthdays<br>
 <b>Finance</b> - Budget<br>
-<b>Settings</b> - Family · Reminders · API Tokens · Backup<br>
-<sub>Open for every module in one line</sub>
+<b>Settings</b> - Family · Reminders · API Tokens · Backup
 </summary>
 
 | Module | In one line |
@@ -148,6 +148,11 @@ be switched off for the household, and a lost phone is signed out from any of yo
 
 **What does it cost?** Nothing. Yuvomi is free and MIT-licensed. You provide the server; there is
 no subscription, no upsell and no paid tier.
+
+**Does it phone home?** On its own, it only asks GitHub whether a newer version exists, and
+blocking that breaks nothing. Anything else waits until you use or switch on a feature that needs
+it; every connection is listed in the [Install](#install) section, under *Requirements, network
+and your data*.
 
 ---
 
@@ -229,7 +234,7 @@ node tools/installer/install-server.js
 
 Open **http://localhost:8090** on the server itself; the wizard answers nowhere else. From another
 device, open a tunnel first, `ssh -L 8090:localhost:8090 user@server`, then open the same address
-there. Needs Node.js 22+ on the host; the container ships its own Node 24.
+there. Needs Node.js 22.14+ or 23.6+ on the host; the container ships its own Node 24.
 
 <details>
 <summary><b>Before you go live: health data, Google Drive sharing and GDPR</b></summary>
