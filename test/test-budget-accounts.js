@@ -373,14 +373,14 @@ test('POST/PUT /accounts weisen einen negativen Kreditrahmen ab (#541)', async (
   } finally { await h.close(); }
 });
 
-// Critique R23 (Rest aus S4): ein Konto zu loeschen nimmt ALLEN Buchungen die
-// Zuordnung. Im personal-Modus kann daran eine private Buchung eines anderen
-// Mitglieds haengen, die der Loeschende weder sieht noch zaehlt - sein Dialog
-// ging deshalb als "leeres Konto" ohne Rueckfrage durch, und der Server nahm
-// der fremden Buchung still Konto und Saldo. Ueber fremde Daten entscheidet
-// niemand mit: der Server lehnt ab (Archivieren bleibt), und die Kontoliste
-// sagt es vorher, damit der Dialog nicht erst "geloescht" meldet.
-test('DELETE /accounts/:id lehnt ab, solange fremde private Buchungen daran haengen (personal)', async () => {
+// Critique R23 (Rest aus S4, Sicherheitspruefung): ein Konto zu loeschen nimmt
+// ALLEN Buchungen die Zuordnung. Im personal-Modus kann daran eine private
+// Buchung eines anderen Mitglieds haengen, die der Loeschende weder sieht noch
+// zaehlt - sein Dialog ging als "leeres Konto" mit Rueckgaengig durch, und der
+// Server nahm der fremden Buchung still Konto und Saldo. Jetzt lehnt der Server
+// ab, NEUTRAL (nennt keine privaten Buchungen), und keine Lese-Antwort traegt
+// einen Hinweis darauf - sonst waere die Kontoliste ein Privatsphaere-Orakel.
+test('DELETE /accounts/:id nimmt fremden privaten Buchungen nie das Konto, und die Liste verraet sie nicht (personal)', async () => {
   cleanup();
   const setMode = (mode) => suiteDatabase.prepare(`INSERT INTO sync_config (key, value) VALUES ('budget_mode', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
@@ -393,20 +393,20 @@ test('DELETE /accounts/:id lehnt ab, solange fremde private Buchungen daran haen
   const b = createHarness({ userId: otherId, role: 'member' });
   try {
     const acc = (await a.call('POST', '/accounts', { name: 'Gemeinsam', starting_balance: 0 })).body.data;
+    const empty = (await a.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
     const foreign = await b.call('POST', '', {
       title: 'Privat B', amount: -40, category: EXPENSE_CAT, date: PAST, account_id: acc.id, visibility: 'private',
     });
     assert.equal(foreign.status, 201, JSON.stringify(foreign.body));
 
     const seenByA = (await a.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
-    assert.equal(seenByA.entry_count, 0, 'A zaehlt die fremde private Buchung nicht (kein Leck)');
-    assert.equal(seenByA.has_hidden_entries, true, 'A erfaehrt vorher, dass das Konto nicht leer ist');
-    const seenByB = (await b.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
-    assert.equal(seenByB.has_hidden_entries, false, 'B sieht die eigene Buchung - nichts verborgen');
+    assert.deepEqual(seenByA, empty, 'die Kontoliste von A ist mit und ohne fremde private Buchung dieselbe');
+    for (const key of Object.keys(seenByA)) assert.doesNotMatch(key, /hidden|all_entry/, `kein Feld ${key}`);
 
     const del = await a.call('DELETE', `/accounts/${acc.id}`);
     assert.equal(del.status, 409);
-    assert.equal(del.body.reason, 'account_has_hidden_entries', JSON.stringify(del.body));
+    assert.equal(del.body.reason, 'account_delete_refused', JSON.stringify(del.body));
+    assert.doesNotMatch(del.body.error, /private|member|entr/i, 'die Ablehnung nennt keine privaten Buchungen');
     const row = suiteDatabase.prepare('SELECT account_id FROM budget_entries WHERE id = ?').get(foreign.body.data.id);
     assert.equal(row.account_id, acc.id, 'die fremde Buchung behaelt ihr Konto');
     assert.ok(suiteDatabase.prepare('SELECT 1 FROM budget_accounts WHERE id = ?').get(acc.id), 'Konto steht noch');

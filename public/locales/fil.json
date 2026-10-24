@@ -1884,7 +1884,7 @@
         "ledgerSortActive": "Pagkakasunod: {{sort}}",
         "ledgerAccountsAll": "Lahat ng account",
         "showAccountTransactions": "Ipakita ang mga transaksyon",
-        "accountHasHiddenEntries": "May mga pribadong entry ng ibang miyembro ang account na ito. I-archive ito sa halip na tanggalin."
+        "accountDeleteRefused": "Hindi matatanggal ang account na ito. I-archive ito sa halip."
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",

@@ -2030,7 +2030,7 @@
         "ledgerSortActive": "Сортировка: {{sort}}",
         "ledgerAccountsAll": "Все счета",
         "showAccountTransactions": "Показать операции по счёту",
-        "accountHasHiddenEntries": "На этом счёте есть личные записи других участников. Архивируйте его вместо удаления."
+        "accountDeleteRefused": "Этот счёт нельзя удалить. Архивируйте его вместо этого."
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

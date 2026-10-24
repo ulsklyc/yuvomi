@@ -1949,7 +1949,7 @@
         "ledgerSortActive": "Řazení: {{sort}}",
         "ledgerAccountsAll": "Všechny účty",
         "showAccountTransactions": "Zobrazit pohyby účtu",
-        "accountHasHiddenEntries": "K tomuto účtu patří soukromé položky jiných členů. Místo smazání jej archivujte."
+        "accountDeleteRefused": "Tento účet nelze smazat. Místo toho jej archivujte."
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

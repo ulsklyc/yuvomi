@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Orden: {{sort}}",
         "ledgerAccountsAll": "Todas las cuentas",
         "showAccountTransactions": "Ver movimientos",
-        "accountHasHiddenEntries": "Esta cuenta tiene movimientos privados de otros miembros. Archívala en lugar de eliminarla."
+        "accountDeleteRefused": "Esta cuenta no se puede eliminar. Archívala en su lugar."
     },
     "settings": {
         "healthCycleEnableLabel": "Ofrecer el ciclo en el hogar",

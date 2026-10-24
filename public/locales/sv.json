@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alla konton",
         "showAccountTransactions": "Visa transaktioner",
-        "accountHasHiddenEntries": "Det här kontot har privata poster från andra medlemmar. Arkivera det i stället för att radera det."
+        "accountDeleteRefused": "Det här kontot kan inte raderas. Arkivera det i stället."
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

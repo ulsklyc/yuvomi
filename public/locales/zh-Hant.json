@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "排序：{{sort}}",
         "ledgerAccountsAll": "所有帳戶",
         "showAccountTransactions": "檢視交易",
-        "accountHasHiddenEntries": "此帳戶包含其他成員的私人記錄。請封存而非刪除。"
+        "accountDeleteRefused": "此帳戶無法刪除。請改為封存。"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供週期",

@@ -2030,7 +2030,7 @@
         "ledgerSortActive": "Сортування: {{sort}}",
         "ledgerAccountsAll": "Усі рахунки",
         "showAccountTransactions": "Показати операції рахунку",
-        "accountHasHiddenEntries": "Цей рахунок містить приватні записи інших учасників. Архівуйте його замість видалення."
+        "accountDeleteRefused": "Цей рахунок не можна видалити. Натомість архівуйте його."
     },
     "settings": {
         "healthCycleEnableLabel": "Пропонувати цикл у родині",

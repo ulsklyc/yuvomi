@@ -2448,9 +2448,9 @@ An account with linked transfers cannot be deleted (`409 account_has_transfers`)
 instead to retain both legs and their account references. Ordinary entries still survive deletion
 of an account without linked transfers, with `account_id` cleared.
 In personal budget mode an account that also carries another member's private entries cannot be
-deleted either (`409 account_has_hidden_entries`): deleting would clear their `account_id` without
-their say. The account list reports this as `has_hidden_entries` (one bit, no count), so the client
-says so before offering an undo.
+deleted either: deleting would clear their `account_id` without their say. The refusal is
+deliberately unspecific (`409 account_delete_refused`, "archive it instead"), and no read response
+carries a hint, so neither the list nor the error tells anyone that private entries exist.
 New transfers and account changes require active accounts (`400 transfer_account_archived`);
 existing transfers on archived accounts remain editable.
 Separate accounts (checking, savings, cash, credit card, investment, other) shown in Budget → Accounts. Each account carries a starting balance; its **current balance** is `starting_balance + Σ assigned entries dated up to today`, and the **projected balance** additionally includes future-dated entries. The Accounts tab shows every account with its current balance plus the household **net worth** (sum of the active accounts' current balances). Entries optionally reference an account (`budget_entries.account_id`); the assignment is set from the entry modal. Deleting an account without linked transfers keeps its entries — their `account_id` is cleared. Account assignment is optional; existing entries stay unassigned. Accounts themselves have no owner or visibility, but in personal budget mode the computed balances and entry counts only include entries the viewer may see, so a private entry never leaks its amount through a shared account's balance. An entry set to `shared_amount` (migration v156, #659) is the deliberate exception: its amount *does* enter everyone's balance and the household net worth, while its title, category and receipts stay with the owner - which is what makes a shared account's balance match the bank again.

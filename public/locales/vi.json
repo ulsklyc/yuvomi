@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sắp xếp: {{sort}}",
         "ledgerAccountsAll": "Tất cả tài khoản",
         "showAccountTransactions": "Xem giao dịch",
-        "accountHasHiddenEntries": "Tài khoản này có giao dịch riêng tư của thành viên khác. Hãy lưu trữ thay vì xóa."
+        "accountDeleteRefused": "Không thể xóa tài khoản này. Hãy lưu trữ thay thế."
     },
     "settings": {
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",

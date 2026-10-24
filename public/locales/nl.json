@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle rekeningen",
         "showAccountTransactions": "Boekingen tonen",
-        "accountHasHiddenEntries": "Op deze rekening staan privéboekingen van andere leden. Archiveer de rekening in plaats van haar te verwijderen."
+        "accountDeleteRefused": "Deze rekening kan niet worden verwijderd. Archiveer haar in plaats daarvan."
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",

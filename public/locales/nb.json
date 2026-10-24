@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle kontoer",
         "showAccountTransactions": "Vis transaksjoner",
-        "accountHasHiddenEntries": "Denne kontoen har private posteringer fra andre medlemmer. Arkiver den i stedet for å slette den."
+        "accountDeleteRefused": "Denne kontoen kan ikke slettes. Arkiver den i stedet."
     },
     "settings": {
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",

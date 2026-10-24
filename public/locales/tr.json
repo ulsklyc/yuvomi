@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sıralama: {{sort}}",
         "ledgerAccountsAll": "Tüm hesaplar",
         "showAccountTransactions": "Hareketleri göster",
-        "accountHasHiddenEntries": "Bu hesapta diğer üyelerin özel kayıtları var. Silmek yerine arşivleyin."
+        "accountDeleteRefused": "Bu hesap silinemez. Bunun yerine arşivleyin."
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

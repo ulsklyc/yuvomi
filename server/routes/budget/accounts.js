@@ -154,7 +154,7 @@ router.put('/accounts/:id', (req, res) => {
 /**
  * DELETE /api/v1/budget/accounts/:id
  * Konto löschen. Zugeordnete Einträge bleiben erhalten (account_id wird geleert).
- * 409 account_has_transfers / account_has_hidden_entries (fremde private Buchungen).
+ * 409 account_has_transfers, 409 account_delete_refused (neutral: fremde private Buchungen haengen daran).
  * Response: 204 No Content
  */
 router.delete('/accounts/:id', (req, res) => {
@@ -168,9 +168,11 @@ router.delete('/accounts/:id', (req, res) => {
     }
     // Loeschen nimmt JEDER Buchung am Konto die Zuordnung - auch fremden
     // privaten, die der Loeschende nicht sieht und ueber die er nicht
-    // entscheidet (Critique R23). Dann bleibt nur Archivieren.
+    // entscheidet (Critique R23). Dann bleibt nur Archivieren. Die Ablehnung
+    // ist NEUTRAL: sie nennt keine privaten Buchungen, damit sie kein Orakel
+    // fuer fremde Privatsphaere wird.
     if (accountHasHiddenEntries(id, budgetFilter(req, 'e', { scoped: false }))) {
-      return refuse(res, [refusal('account_has_hidden_entries', 'Other members have private entries on this account. Archive it instead.')], 409);
+      return refuse(res, [refusal('account_delete_refused', 'This account cannot be deleted. Archive it instead.')], 409);
     }
 
     const tx = db.get().transaction(() => {

@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Ordenação: {{sort}}",
         "ledgerAccountsAll": "Todas as contas",
         "showAccountTransactions": "Ver lançamentos",
-        "accountHasHiddenEntries": "Esta conta tem movimentos privados de outros membros. Arquive-a em vez de a eliminar."
+        "accountDeleteRefused": "Esta conta não pode ser eliminada. Arquive-a em vez disso."
     },
     "settings": {
         "healthCycleEnableLabel": "Disponibilizar o ciclo no agregado",

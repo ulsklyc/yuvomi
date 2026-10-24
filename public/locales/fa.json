@@ -1884,7 +1884,7 @@
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
         "ledgerAccountsAll": "همه حساب‌ها",
         "showAccountTransactions": "نمایش تراکنش‌ها",
-        "accountHasHiddenEntries": "این حساب تراکنش‌های خصوصی اعضای دیگر را دارد. به‌جای حذف، آن را بایگانی کنید."
+        "accountDeleteRefused": "این حساب قابل حذف نیست. به‌جای آن، بایگانی‌اش کنید."
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

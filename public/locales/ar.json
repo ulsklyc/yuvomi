@@ -2113,7 +2113,7 @@
         "ledgerSortActive": "الترتيب: {{sort}}",
         "ledgerAccountsAll": "كل الحسابات",
         "showAccountTransactions": "عرض الحركات",
-        "accountHasHiddenEntries": "يحتوي هذا الحساب على قيود خاصة لأعضاء آخرين. أرشفه بدلاً من حذفه."
+        "accountDeleteRefused": "لا يمكن حذف هذا الحساب. أرشفه بدلاً من ذلك."
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

@@ -2048,7 +2048,7 @@
         "ledgerSortActive": "Sortowanie: {{sort}}",
         "ledgerAccountsAll": "Wszystkie konta",
         "showAccountTransactions": "Pokaż operacje konta",
-        "accountHasHiddenEntries": "To konto zawiera prywatne wpisy innych członków. Zarchiwizuj je zamiast usuwać."
+        "accountDeleteRefused": "Tego konta nie można usunąć. Zamiast tego je zarchiwizuj."
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",

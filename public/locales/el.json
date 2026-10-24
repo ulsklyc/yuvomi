@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Ταξινόμηση: {{sort}}",
         "ledgerAccountsAll": "Όλοι οι λογαριασμοί",
         "showAccountTransactions": "Εμφάνιση κινήσεων",
-        "accountHasHiddenEntries": "Σε αυτόν τον λογαριασμό υπάρχουν ιδιωτικές εγγραφές άλλων μελών. Αρχειοθετήστε τον αντί να τον διαγράψετε."
+        "accountDeleteRefused": "Αυτός ο λογαριασμός δεν μπορεί να διαγραφεί. Αρχειοθετήστε τον αντί γι' αυτό."
     },
     "settings": {
         "healthCycleEnableLabel": "Διάθεση του κύκλου στο νοικοκυριό",

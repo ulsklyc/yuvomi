@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "क्रम: {{sort}}",
         "ledgerAccountsAll": "सभी खाते",
         "showAccountTransactions": "लेन-देन दिखाएं",
-        "accountHasHiddenEntries": "इस खाते में अन्य सदस्यों की निजी प्रविष्टियाँ हैं। इसे हटाने के बजाय संग्रहित करें।"
+        "accountDeleteRefused": "यह खाता हटाया नहीं जा सकता। इसके बजाय इसे संग्रहित करें।"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",

@@ -1884,7 +1884,7 @@
         "ledgerSortActive": "정렬: {{sort}}",
         "ledgerAccountsAll": "모든 계좌",
         "showAccountTransactions": "거래 내역 보기",
-        "accountHasHiddenEntries": "이 계좌에는 다른 구성원의 비공개 내역이 있습니다. 삭제하는 대신 보관하세요."
+        "accountDeleteRefused": "이 계좌는 삭제할 수 없습니다. 대신 보관하세요."
     },
     "settings": {
         "healthCycleEnableLabel": "가구에 주기 제공",

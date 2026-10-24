@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Sorted: {{sort}}",
         "ledgerAccountsAll": "All accounts",
         "showAccountTransactions": "Show transactions",
-        "accountHasHiddenEntries": "Other members have private entries on this account. Archive it instead of deleting it."
+        "accountDeleteRefused": "This account cannot be deleted. Archive it instead."
     },
     "settings": {
         "healthCycleEnableLabel": "Offer the cycle in the household",

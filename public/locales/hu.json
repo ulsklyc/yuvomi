@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Rendezés: {{sort}}",
         "ledgerAccountsAll": "Minden számla",
         "showAccountTransactions": "Tételek megjelenítése",
-        "accountHasHiddenEntries": "Ehhez a számlához más tagok privát tételei tartoznak. Törlés helyett archiváld."
+        "accountDeleteRefused": "Ez a számla nem törölhető. Archiváld helyette."
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",

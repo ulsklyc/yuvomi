@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "並べ替え: {{sort}}",
         "ledgerAccountsAll": "すべての口座",
         "showAccountTransactions": "記録を表示",
-        "accountHasHiddenEntries": "この口座には他のメンバーの非公開の記録があります。削除せずにアーカイブしてください。"
+        "accountDeleteRefused": "この口座は削除できません。代わりにアーカイブしてください。"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

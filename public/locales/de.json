@@ -1884,7 +1884,7 @@
         "ledgerSortActive": "Sortierung: {{sort}}",
         "ledgerAccountsAll": "Alle Konten",
         "showAccountTransactions": "Buchungen anzeigen",
-        "accountHasHiddenEntries": "An diesem Konto hängen private Buchungen anderer Mitglieder. Archiviere es, statt es zu löschen."
+        "accountDeleteRefused": "Dieses Konto lässt sich nicht löschen. Archiviere es stattdessen."
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

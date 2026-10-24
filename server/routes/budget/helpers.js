@@ -1334,13 +1334,12 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
              SELECT SUM(e.amount) FROM budget_entries e
              WHERE e.account_id = a.id${f.clause}${bookedOnly('e')}
            ), 0) AS projected_balance,
-           (SELECT COUNT(*) FROM budget_entries e WHERE e.account_id = a.id${f.clause}) AS entry_count,
-           (SELECT COUNT(*) FROM budget_entries e WHERE e.account_id = a.id) AS all_entry_count
+           (SELECT COUNT(*) FROM budget_entries e WHERE e.account_id = a.id${f.clause}) AS entry_count
     FROM budget_accounts a
     WHERE ? = 1 OR a.archived = 0
     ORDER BY a.sort_order ASC, a.name COLLATE NOCASE ASC
   `).all(today, ...f.params, ...f.params, ...f.params, includeArchived ? 1 : 0);
-  return rows.map(({ all_entry_count: allEntryCount, ...a }) => {
+  return rows.map((a) => {
     // Preserve three-decimal account currencies, including linked transfers.
     // Keep existing fractional values on zero-decimal accounts as before.
     const digits = Math.max(2, accountFractionDigits(a.currency || budgetCurrency()));
@@ -1358,18 +1357,15 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
       current_balance:   currentBalance,
       projected_balance: round(a.projected_balance),
       available_limit:   availableLimit,
-      // Haengen Buchungen daran, die der Betrachter nicht sieht (fremde private
-      // im personal-Modus)? Nur dieses eine Bit, keine Zahl: das Konto loeschen
-      // darf er dann nicht (DELETE /accounts/:id), und der Dialog soll das
-      // vorher wissen, statt erst "geloescht" zu melden (Critique R23).
-      has_hidden_entries: allEntryCount > a.entry_count,
     };
   });
 }
 
 /**
  * Haengen an Konto `id` Buchungen, die `filter` (budgetFilter, scoped:false)
- * dem Betrachter verbirgt? Dieselbe Regel wie `has_hidden_entries` oben.
+ * dem Betrachter verbirgt? NUR fuer den Kaskadenschutz beim Loeschen - nie in
+ * eine Lese-Antwort: ein Bit in der Kontoliste waere ein Orakel, wann andere
+ * private Buchungen auf einem gemeinsamen Konto anlegen (Sicherheitspruefung R23).
  */
 export function accountHasHiddenEntries(id, filter = { clause: '', params: [] }) {
   if (!filter || !filter.clause) return false;

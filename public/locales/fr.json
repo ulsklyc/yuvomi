@@ -1866,7 +1866,7 @@
         "ledgerSortActive": "Tri : {{sort}}",
         "ledgerAccountsAll": "Tous les comptes",
         "showAccountTransactions": "Voir les écritures",
-        "accountHasHiddenEntries": "Ce compte contient des écritures privées d'autres membres. Archivez-le au lieu de le supprimer."
+        "accountDeleteRefused": "Ce compte ne peut pas être supprimé. Archivez-le plutôt."
     },
     "settings": {
         "healthCycleEnableLabel": "Proposer le cycle au foyer",
