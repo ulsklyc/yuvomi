@@ -4422,7 +4422,8 @@
         "mobileSearch": "Öppna sök med förstoringsglaset på översikten eller via ”Mer”.",
         "mobileSettings": "Inställningar hittar du under ”Mer”.",
         "guideLink": "Användarhandbok",
-        "guideHint": "Underhålls av communityn. Öppnas i en ny flik."
+        "guideHint": "Underhålls av communityn. Öppnas i en ny flik.",
+        "replayTour": "Se rundturen"
     },
     "changelog": {
         "title": "Ändringar",

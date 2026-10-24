@@ -4422,7 +4422,8 @@
         "mobileSearch": "Apri la ricerca con la lente nella panoramica o da „Altro“.",
         "mobileSettings": "Trovi le impostazioni sotto la voce „Altro“.",
         "guideLink": "Manuale utente",
-        "guideHint": "Curato dalla community. Si apre in una nuova scheda."
+        "guideHint": "Curato dalla community. Si apre in una nuova scheda.",
+        "replayTour": "Guarda il tour"
     },
     "changelog": {
         "title": "Novità",

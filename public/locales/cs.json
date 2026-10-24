@@ -4544,7 +4544,8 @@
         "mobileSearch": "Vyhledávání otevřeš lupou na přehledu nebo přes „Více“.",
         "mobileSettings": "Nastavení najdeš pod „Více“.",
         "guideLink": "Uživatelská příručka",
-        "guideHint": "Spravuje ho komunita. Otevře se na nové kartě."
+        "guideHint": "Spravuje ho komunita. Otevře se na nové kartě.",
+        "replayTour": "Projít prohlídku"
     },
     "changelog": {
         "title": "Změny",

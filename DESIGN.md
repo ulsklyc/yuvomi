@@ -4631,7 +4631,9 @@ Schatten nach aussen (100vmax Spreizung, `--color-bg` 78 %), das Overlay wird da
 (`.onboarding-overlay--spot`); ohne sichtbares Ziel bleibt die Unschaerfe. Klicks faengt das
 Overlay, der Ring ist aria-hidden, die Tafel liegt positioniert darueber.
 Ab Schritt 2 steht **„Zurueck"** dort, wo auf Schritt 1 „Ueberspringen" steht (R23 S10);
-Esc und die Zurueck-Geste beenden den Rundgang weiter.
+Esc und die Zurueck-Geste beenden den Rundgang weiter. Die Hilfe fuehrt mit „Rundgang
+ansehen" zurueck auf die Uebersicht und zeigt ihn dort erneut (einmal je Wunsch, ohne die
+Erste-Schritte-Karte zu starten).
 
 **Erste Schritte (R23 D14).** Nach dem Rundgang keine Sackgasse: ein Admin sieht auf der
 Uebersicht eine Karte mit drei Wegen - Familie einladen, Module auswaehlen, Region und

@@ -73,7 +73,7 @@ import {
   restoreScrollPorts,
   noteRestoringScroll,
 } from '/utils/scroll-restore.js';
-import { openModal, confirmModal } from '/components/modal.js';
+import { openModal, confirmModal, closeModal } from '/components/modal.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { prefersInkText } from '/utils/contrast.js';
@@ -3066,7 +3066,23 @@ function showHelpModal() {
           ${esc(t('help.guideLink'))}
         </a>
         <span class="help-guide__hint">${esc(t('help.guideHint'))}</span>
+      </p>
+      <!-- DER RUNDGANG LAESST SICH WIEDERHOLEN (R23 S10, Critique G6 P3 "Hilfe
+           nur Kuerzel"). Die Hilfe trug am Zeiger nur die Tastenkuerzel; wer den
+           Rundgang uebersprungen hatte, kam nie wieder an ihn. Der Knopf fuehrt
+           auf die Uebersicht und zeigt ihn dort (dashboard.js, REPLAY_TOUR_KEY). -->
+      <p class="help-tour">
+        <button type="button" class="btn btn--secondary btn--sm" data-help-tour>
+          <i data-lucide="play-circle" aria-hidden="true"></i>${esc(t('help.replayTour'))}
+        </button>
       </p>`,
+    onSave(panel) {
+      panel.querySelector('[data-help-tour]')?.addEventListener('click', () => {
+        try { sessionStorage.setItem('yuvomi-replay-tour', '1'); } catch { /* ohne Speicher kein Rundgang */ }
+        closeModal({ force: true });
+        navigate('/');
+      });
+    },
   });
 }
 

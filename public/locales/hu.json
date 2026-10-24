@@ -4422,7 +4422,8 @@
         "mobileSearch": "A keresést az áttekintés nagyítójával vagy a „Több” menüből nyithatod meg.",
         "mobileSettings": "A beállítások a „Több” menü alatt találhatók.",
         "guideLink": "Felhasználói kézikönyv",
-        "guideHint": "A közösség gondozza. Új lapon nyílik meg."
+        "guideHint": "A közösség gondozza. Új lapon nyílik meg.",
+        "replayTour": "Bemutató megtekintése"
     },
     "changelog": {
         "title": "Változások",

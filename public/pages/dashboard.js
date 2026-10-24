@@ -8602,10 +8602,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Schluessel bleibt eine ZUSAETZLICHE Bedingung statt zu entfallen: er ist
   // der Weg, mit dem Test-Faelle (document-guards-harness.js) den Dialog
   // gezielt unterdruecken, ohne einen Testnutzer am Server zu markieren.
-  if (user?.onboarding_pending && !localStorage.getItem(ONBOARDING_KEY)) {
+  // Aus der Hilfe gewuenscht (router.js, "Rundgang ansehen", R23 S10): einmal,
+  // unabhaengig vom Merker am Konto.
+  let replayTour = false;
+  try { replayTour = sessionStorage.getItem('yuvomi-replay-tour') === '1'; sessionStorage.removeItem('yuvomi-replay-tour'); } catch { /* ohne Speicher kein Rundgang */ }
+  if (replayTour || (user?.onboarding_pending && !localStorage.getItem(ONBOARDING_KEY))) {
     setTimeout(() => showOnboarding(container, () => {
-      // Nach dem Rundgang keine Sackgasse (R23 D14): die Karte beginnt jetzt.
-      startFirstSteps();
+      // Nach dem Rundgang keine Sackgasse (R23 D14): die Karte beginnt jetzt -
+      // nicht nach einer Wiederholung aus der Hilfe (der Haushalt laeuft schon).
+      if (!replayTour) startFirstSteps();
       firstSteps = mountSteps();
       firstSteps.update(Array.isArray(data?.users) ? data.users.length : null);
       maybeHintCustomize(container);

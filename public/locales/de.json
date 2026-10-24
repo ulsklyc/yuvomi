@@ -4422,7 +4422,8 @@
         "mobileSearch": "Die Suche öffnest du über die Lupe auf der Übersicht oder unter „Mehr“.",
         "mobileSettings": "Einstellungen findest du unter „Mehr“.",
         "guideLink": "Nutzerhandbuch",
-        "guideHint": "Von der Community gepflegt. Öffnet sich in einem neuen Tab."
+        "guideHint": "Von der Community gepflegt. Öffnet sich in einem neuen Tab.",
+        "replayTour": "Rundgang ansehen"
     },
     "changelog": {
         "title": "Änderungsverlauf",

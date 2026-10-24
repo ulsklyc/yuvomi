@@ -4422,7 +4422,8 @@
         "mobileSearch": "Open zoeken met het vergrootglas op het overzicht of via ‘Meer’.",
         "mobileSettings": "Je vindt instellingen onder ‘Meer’.",
         "guideLink": "Gebruikershandleiding",
-        "guideHint": "Onderhouden door de community. Opent in een nieuw tabblad."
+        "guideHint": "Onderhouden door de community. Opent in een nieuw tabblad.",
+        "replayTour": "Rondleiding bekijken"
     },
     "changelog": {
         "title": "Wijzigingen",

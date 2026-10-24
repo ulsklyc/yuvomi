@@ -77,7 +77,22 @@ test('dashboard.js: die Karte steht vom ersten Bild an neben dem Zonen-Hinweis u
   assert.match(src, /import \{ mountFirstSteps, startFirstSteps \} from '\/utils\/first-steps\.js';/);
   assert.match(src, /let firstSteps = mountSteps\(\);/);
   assert.match(src, /firstSteps\.update\(Array\.isArray\(data\?\.users\) \? data\.users\.length : null\);/);
-  assert.match(src, /showOnboarding\(container, \(\) => \{\s*\/\/[^\n]*\n\s*startFirstSteps\(\);/);
+  assert.match(src, /if \(!replayTour\) startFirstSteps\(\);/, 'nach dem ersten Rundgang, nicht nach einer Wiederholung aus der Hilfe');
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   assert.match(css, /\.first-steps \{[^}]*background-color: var\(--color-surface\);/);
+});
+
+// R23 S10 (Critique G6 P3 "Tour ohne Zurueck", "Hilfe nur Kuerzel"): der
+// Rundgang hat ab Schritt 2 einen Weg zurueck und laesst sich aus der Hilfe
+// wiederholen.
+test('Rundgang: Zurueck ab Schritt 2, Wiederholen aus der Hilfe', () => {
+  const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(dash, /if \(current > 0\) actions\.appendChild\(backBtn\);\s*else if \(!isLast\) actions\.appendChild\(skipBtn\);/);
+  assert.match(dash, /swapContent\(stepEl, \(\) => \{ next = fillStep\(\); \}, \{ direction: -1 \}\);/);
+  assert.match(dash, /replayTour = sessionStorage\.getItem\('yuvomi-replay-tour'\) === '1'; sessionStorage\.removeItem\('yuvomi-replay-tour'\);/);
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const help = router.slice(router.indexOf('function showHelpModal()'), router.indexOf('function showHelpModal()') + 6000);
+  assert.match(help, /data-help-tour/);
+  assert.match(help, /sessionStorage\.setItem\('yuvomi-replay-tour', '1'\)/);
+  assert.match(help, /navigate\('\/'\);/);
 });

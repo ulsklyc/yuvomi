@@ -4422,7 +4422,8 @@
         "mobileSearch": "Pencarian dibuka lewat kaca pembesar di ringkasan atau melalui „Lainnya\".",
         "mobileSettings": "Pengaturan dapat ditemukan di „Lainnya\".",
         "guideLink": "Panduan pengguna",
-        "guideHint": "Dikelola oleh komunitas. Terbuka di tab baru."
+        "guideHint": "Dikelola oleh komunitas. Terbuka di tab baru.",
+        "replayTour": "Lihat tur"
     },
     "changelog": {
         "title": "Catatan perubahan",

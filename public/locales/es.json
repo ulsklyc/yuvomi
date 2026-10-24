@@ -4422,7 +4422,8 @@
         "mobileSearch": "Abre la búsqueda con la lupa de la vista general o desde «Más».",
         "mobileSettings": "Encuentras los ajustes en «Más».",
         "guideLink": "Manual de usuario",
-        "guideHint": "Mantenido por la comunidad. Se abre en una pestaña nueva."
+        "guideHint": "Mantenido por la comunidad. Se abre en una pestaña nueva.",
+        "replayTour": "Ver el recorrido"
     },
     "changelog": {
         "title": "Novedades",

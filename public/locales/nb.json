@@ -4422,7 +4422,8 @@
         "mobileSearch": "Åpne søk via «Mer» → Søk.",
         "mobileSettings": "Finn innstillinger under «Mer».",
         "guideLink": "Brukerveiledning",
-        "guideHint": "Vedlikeholdes av fellesskapet. Åpnes i en ny fane."
+        "guideHint": "Vedlikeholdes av fellesskapet. Åpnes i en ny fane.",
+        "replayTour": "Se omvisningen"
     },
     "changelog": {
         "title": "Endringslogg",

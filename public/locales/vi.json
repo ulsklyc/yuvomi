@@ -4422,7 +4422,8 @@
         "mobileSearch": "Mở tìm kiếm bằng kính lúp trên trang tổng quan hoặc qua “Thêm”.",
         "mobileSettings": "Bạn tìm thấy cài đặt trong “Thêm”.",
         "guideLink": "Hướng dẫn sử dụng",
-        "guideHint": "Do cộng đồng duy trì. Mở trong thẻ mới."
+        "guideHint": "Do cộng đồng duy trì. Mở trong thẻ mới.",
+        "replayTour": "Xem hướng dẫn"
     },
     "changelog": {
         "title": "Nhật ký thay đổi",

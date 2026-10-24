@@ -4662,7 +4662,8 @@
         "mobileSearch": "Wyszukiwanie otworzysz lupą na przeglądzie albo przez „Więcej”.",
         "mobileSettings": "Ustawienia znajdziesz w „Więcej”.",
         "guideLink": "Podręcznik użytkownika",
-        "guideHint": "Prowadzony przez społeczność. Otwiera się w nowej karcie."
+        "guideHint": "Prowadzony przez społeczność. Otwiera się w nowej karcie.",
+        "replayTour": "Obejrzyj przewodnik"
     },
     "changelog": {
         "title": "Zmiany",

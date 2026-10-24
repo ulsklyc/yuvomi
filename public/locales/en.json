@@ -4422,7 +4422,8 @@
         "mobileSearch": "Open search with the magnifier on the overview or via “More”.",
         "mobileSettings": "Find settings under “More”.",
         "guideLink": "User guide",
-        "guideHint": "Maintained by the community. Opens in a new tab."
+        "guideHint": "Maintained by the community. Opens in a new tab.",
+        "replayTour": "Take the tour"
     },
     "changelog": {
         "title": "Changelog",

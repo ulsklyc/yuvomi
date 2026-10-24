@@ -7402,6 +7402,11 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-text-tertiary);
 }
 
+/* Der Rundgang aus der Hilfe (R23 S10): ein leiser Knopf unter dem Handbuch. */
+.help-tour {
+  margin: var(--space-3) 0 0;
+}
+
 /* „Neu in deiner App" (#496): der Block, mit dem die Ansicht oeffnet. Traegt
  * als einziger die Akzentfarbe - er ist die Antwort auf die Frage, mit der
  * jemand herkommt, die Versionsliste darunter ist das Archiv. */

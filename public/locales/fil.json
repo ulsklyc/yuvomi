@@ -4422,7 +4422,8 @@
         "mobileSearch": "Buksan ang paghahanap gamit ang magnifier sa overview o sa \"Higit pa\".",
         "mobileSettings": "Matatagpuan ang mga setting sa ilalim ng \"Higit pa\".",
         "guideLink": "Gabay ng gumagamit",
-        "guideHint": "Pinapanatili ng komunidad. Bubukas sa bagong tab."
+        "guideHint": "Pinapanatili ng komunidad. Bubukas sa bagong tab.",
+        "replayTour": "Tingnan ang tour"
     },
     "changelog": {
         "title": "Changelog",

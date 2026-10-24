@@ -4422,7 +4422,8 @@
         "mobileSearch": "検索は概要の虫めがね、または「その他」から開きます。",
         "mobileSettings": "設定は「その他」にあります。",
         "guideLink": "ユーザーガイド",
-        "guideHint": "コミュニティが管理しています。新しいタブで開きます。"
+        "guideHint": "コミュニティが管理しています。新しいタブで開きます。",
+        "replayTour": "ツアーを見る"
     },
     "changelog": {
         "title": "変更履歴",

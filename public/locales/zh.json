@@ -4422,7 +4422,8 @@
         "mobileSearch": "在概览页点放大镜，或通过“更多”打开搜索。",
         "mobileSettings": "设置在“更多”中。",
         "guideLink": "用户手册",
-        "guideHint": "由社区维护。在新标签页中打开。"
+        "guideHint": "由社区维护。在新标签页中打开。",
+        "replayTour": "观看导览"
     },
     "changelog": {
         "title": "更新日志",

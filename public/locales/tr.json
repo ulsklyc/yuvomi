@@ -4422,7 +4422,8 @@
         "mobileSearch": "Aramayı genel bakıştaki büyüteçle ya da „Daha fazla” ile açın.",
         "mobileSettings": "Ayarları „Daha fazla” altında bulursunuz.",
         "guideLink": "Kullanıcı kılavuzu",
-        "guideHint": "Topluluk tarafından sürdürülür. Yeni sekmede açılır."
+        "guideHint": "Topluluk tarafından sürdürülür. Yeni sekmede açılır.",
+        "replayTour": "Turu izle"
     },
     "changelog": {
         "title": "Değişiklikler",

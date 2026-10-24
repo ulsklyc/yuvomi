@@ -4422,7 +4422,8 @@
         "mobileSearch": "Ouvrez la recherche avec la loupe de l’aperçu ou via « Plus ».",
         "mobileSettings": "Vous trouvez les paramètres sous « Plus ».",
         "guideLink": "Guide utilisateur",
-        "guideHint": "Tenu à jour par la communauté. S'ouvre dans un nouvel onglet."
+        "guideHint": "Tenu à jour par la communauté. S'ouvre dans un nouvel onglet.",
+        "replayTour": "Voir la visite guidée"
     },
     "changelog": {
         "title": "Journal des changements",

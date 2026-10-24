@@ -4422,7 +4422,8 @@
         "mobileSearch": "Abra a busca pela lupa no painel ou em “Mais”.",
         "mobileSettings": "As configurações ficam em “Mais”.",
         "guideLink": "Manual do usuário",
-        "guideHint": "Mantido pela comunidade. Abre em uma nova aba."
+        "guideHint": "Mantido pela comunidade. Abre em uma nova aba.",
+        "replayTour": "Ver o tour"
     },
     "changelog": {
         "title": "Alterações",
