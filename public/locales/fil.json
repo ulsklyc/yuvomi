@@ -6619,6 +6619,6 @@
         "password": "passcode, login, pag-sign in, kredensyal",
         "install": "app, home screen, dock",
         "push": "alerto, abiso, paalala, kampana",
-        "wallMode": "kiosk, tablet, wall display, full screen"
+        "wallMode": "kiosk, tablet, display sa dingding, buong screen"
     }
 }
