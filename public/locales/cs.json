@@ -6764,5 +6764,13 @@
         "failed": "Tento párovací kód neplatí.",
         "codeRequired": "Zadej párovací kód zobrazený v nastavení.",
         "codeLength": "Párovací kód má deset znaků. Zkontrolujte, zda některý nechybí nebo nepřebývá."
+    },
+    "firstSteps": {
+        "title": "První kroky",
+        "family": "Pozvat domácnost",
+        "modules": "Vybrat moduly",
+        "region": "Zkontrolovat region a časové pásmo",
+        "dismiss": "Skrýt první kroky",
+        "stepDone": "hotovo"
     }
 }

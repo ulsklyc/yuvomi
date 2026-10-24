@@ -6599,5 +6599,13 @@
         "failed": "Bu eşleştirme kodu geçerli değil.",
         "codeRequired": "Ayarlarda gösterilen eşleştirme kodunu girin.",
         "codeLength": "Eşleştirme kodu on karakterlidir. Eksik ya da fazla karakter olup olmadığını kontrol et."
+    },
+    "firstSteps": {
+        "title": "İlk adımlar",
+        "family": "Haneni davet et",
+        "modules": "Modülleri seç",
+        "region": "Bölgeyi ve saat dilimini kontrol et",
+        "dismiss": "İlk adımları gizle",
+        "stepDone": "tamamlandı"
     }
 }

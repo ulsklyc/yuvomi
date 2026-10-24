@@ -6599,5 +6599,13 @@
         "failed": "Mã ghép nối này không hợp lệ.",
         "codeRequired": "Nhập mã ghép nối hiển thị trong Cài đặt.",
         "codeLength": "Mã ghép nối có mười ký tự. Kiểm tra xem có thiếu hay thừa ký tự nào không."
+    },
+    "firstSteps": {
+        "title": "Những bước đầu tiên",
+        "family": "Mời người trong nhà",
+        "modules": "Chọn mô-đun",
+        "region": "Kiểm tra khu vực và múi giờ",
+        "dismiss": "Ẩn những bước đầu tiên",
+        "stepDone": "đã xong"
     }
 }

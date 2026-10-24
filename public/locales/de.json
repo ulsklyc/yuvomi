@@ -6599,5 +6599,13 @@
         "failed": "Dieser Kopplungscode gilt nicht.",
         "codeRequired": "Gib den Kopplungscode aus den Einstellungen ein.",
         "codeLength": "Der Kopplungscode hat zehn Zeichen. Prüfe, ob eins fehlt oder zu viel ist."
+    },
+    "firstSteps": {
+        "title": "Erste Schritte",
+        "family": "Familie einladen",
+        "modules": "Module auswählen",
+        "region": "Region und Zeitzone prüfen",
+        "dismiss": "Erste Schritte ausblenden",
+        "stepDone": "erledigt"
     }
 }

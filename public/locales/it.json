@@ -6599,5 +6599,13 @@
         "failed": "Questo codice di associazione non è valido.",
         "codeRequired": "Inserisci il codice di abbinamento mostrato nelle impostazioni.",
         "codeLength": "Il codice di abbinamento ha dieci caratteri. Controlla se ne manca uno o ce n’è uno in più."
+    },
+    "firstSteps": {
+        "title": "Primi passi",
+        "family": "Invita la tua famiglia",
+        "modules": "Scegli i moduli",
+        "region": "Controlla regione e fuso orario",
+        "dismiss": "Nascondi i primi passi",
+        "stepDone": "fatto"
     }
 }

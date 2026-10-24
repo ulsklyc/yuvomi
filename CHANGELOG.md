@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A "First steps" card after the welcome tour.** When an admin finishes the tour, the
+  Overview shows three ways to set up the household: invite your household, choose your
+  modules, and check region and time zone. Each is ticked off when done (the household counts
+  as invited once it has two members), and the card disappears when all three are done or when
+  you close it. Existing households do not see it. The tour itself now has a "Back" button from
+  its second step on.
 - **Children can read what others put into Calendar, Notes and Inventory, but only change their
   own.** Five new permissions in Roles & permissions decide this per member or family role:
   change other people's events, notes and items, see purchase prices in Inventory, and change

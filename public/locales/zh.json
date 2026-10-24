@@ -6599,5 +6599,13 @@
         "failed": "此配对码无效。",
         "codeRequired": "请输入设置中显示的配对码。",
         "codeLength": "配对码共有十个字符。请检查是否少了或多了字符。"
+    },
+    "firstSteps": {
+        "title": "入门步骤",
+        "family": "邀请家人",
+        "modules": "选择模块",
+        "region": "确认地区和时区",
+        "dismiss": "隐藏入门步骤",
+        "stepDone": "已完成"
     }
 }

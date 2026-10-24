@@ -6599,5 +6599,13 @@
         "failed": "Este código de emparelhamento não é válido.",
         "codeRequired": "Introduz o código de emparelhamento mostrado nas definições.",
         "codeLength": "O código de emparelhamento tem dez caracteres. Verifique se falta ou sobra algum."
+    },
+    "firstSteps": {
+        "title": "Primeiros passos",
+        "family": "Convidar a família",
+        "modules": "Escolher os módulos",
+        "region": "Verificar região e fuso horário",
+        "dismiss": "Ocultar primeiros passos",
+        "stepDone": "concluído"
     }
 }

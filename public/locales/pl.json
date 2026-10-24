@@ -6917,5 +6917,13 @@
         "failed": "Ten kod parowania jest nieprawidłowy.",
         "codeRequired": "Wpisz kod parowania widoczny w ustawieniach.",
         "codeLength": "Kod parowania ma dziesięć znaków. Sprawdź, czy żadnego nie brakuje i żadnego nie jest za dużo."
+    },
+    "firstSteps": {
+        "title": "Pierwsze kroki",
+        "family": "Zaproś domowników",
+        "modules": "Wybierz moduły",
+        "region": "Sprawdź region i strefę czasową",
+        "dismiss": "Ukryj pierwsze kroki",
+        "stepDone": "gotowe"
     }
 }

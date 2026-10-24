@@ -6599,5 +6599,13 @@
         "icsPickupSummary": "Coleta: {{name}}",
         "intervalDecrease": "Diminuir intervalo",
         "intervalIncrease": "Aumentar intervalo"
+    },
+    "firstSteps": {
+        "title": "Primeiros passos",
+        "family": "Convidar a família",
+        "modules": "Escolher os módulos",
+        "region": "Conferir região e fuso horário",
+        "dismiss": "Ocultar primeiros passos",
+        "stepDone": "concluído"
     }
 }

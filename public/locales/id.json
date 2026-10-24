@@ -6599,5 +6599,13 @@
         "failed": "Kode pemasangan ini tidak berlaku.",
         "codeRequired": "Masukkan kode pemasangan yang ditampilkan di Pengaturan.",
         "codeLength": "Kode pemasangan terdiri dari sepuluh karakter. Periksa apakah ada yang kurang atau lebih."
+    },
+    "firstSteps": {
+        "title": "Langkah pertama",
+        "family": "Undang anggota rumah tangga",
+        "modules": "Pilih modul",
+        "region": "Periksa wilayah dan zona waktu",
+        "dismiss": "Sembunyikan langkah pertama",
+        "stepDone": "selesai"
     }
 }

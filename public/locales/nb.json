@@ -6599,5 +6599,13 @@
         "failed": "Denne paringskoden er ikke gyldig.",
         "codeRequired": "Skriv inn paringskoden som vises i innstillingene.",
         "codeLength": "Paringskoden har ti tegn. Sjekk om ett mangler eller er for mye."
+    },
+    "firstSteps": {
+        "title": "Første steg",
+        "family": "Inviter husstanden",
+        "modules": "Velg moduler",
+        "region": "Sjekk region og tidssone",
+        "dismiss": "Skjul første steg",
+        "stepDone": "ferdig"
     }
 }

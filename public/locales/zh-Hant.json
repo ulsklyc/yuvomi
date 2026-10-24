@@ -6599,5 +6599,13 @@
         "failed": "此配對碼無效。",
         "codeRequired": "請輸入設定中顯示的配對碼。",
         "codeLength": "配對碼共有十個字元。請檢查是否少了或多了字元。"
+    },
+    "firstSteps": {
+        "title": "入門步驟",
+        "family": "邀請家人",
+        "modules": "選擇模組",
+        "region": "確認地區和時區",
+        "dismiss": "隱藏入門步驟",
+        "stepDone": "已完成"
     }
 }

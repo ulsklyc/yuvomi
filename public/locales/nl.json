@@ -6599,5 +6599,13 @@
         "failed": "Deze koppelcode is niet geldig.",
         "codeRequired": "Voer de koppelcode in die in de instellingen staat.",
         "codeLength": "De koppelcode heeft tien tekens. Controleer of er een ontbreekt of te veel is."
+    },
+    "firstSteps": {
+        "title": "Eerste stappen",
+        "family": "Huishouden uitnodigen",
+        "modules": "Modules kiezen",
+        "region": "Regio en tijdzone controleren",
+        "dismiss": "Eerste stappen verbergen",
+        "stepDone": "klaar"
     }
 }

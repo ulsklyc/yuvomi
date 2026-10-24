@@ -59,6 +59,7 @@ import { whoMark } from '/utils/seal-pair.js';
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { enterWallMode, exitWallMode, isWallActive, syncWallMode } from '/utils/wall-mode.js';
 import { mountZonePrompt } from '/utils/household-zone-hint.js';
+import { mountFirstSteps, startFirstSteps } from '/utils/first-steps.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
 import { rememberLayoutHint, layoutHintTiles, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
 import { emptyHintHTML } from '/utils/empty-state.js';
@@ -600,7 +601,23 @@ function showOnboarding(appContainer, onDone) {
       next?.focus();
     });
 
-    if (!isLast) actions.appendChild(skipBtn);
+    // EIN SCHRITT ZURUECK (R23 S10, Critique G6 P3 "Tour ohne Zurueck"): wer
+    // den Text zur Leiste zu schnell weggetippt hat, kam nur durch einen
+    // Neustart des Rundgangs zurueck. Ab Schritt 2 steht "Zurueck" vorn, wo
+    // auf Schritt 1 "Ueberspringen" steht (Zurueck-Geste und Esc beenden ihn
+    // weiterhin, attachOverlay unten).
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn--ghost';
+    backBtn.textContent = t('common.back');
+    backBtn.addEventListener('click', () => {
+      current--;
+      let next = null;
+      swapContent(stepEl, () => { next = fillStep(); }, { direction: -1 });
+      next?.focus();
+    });
+
+    if (current > 0) actions.appendChild(backBtn);
+    else if (!isLast) actions.appendChild(skipBtn);
     actions.appendChild(nextBtn);
     stepEl.appendChild(icon);
     stepEl.appendChild(title);
@@ -7402,6 +7419,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     before: container.querySelector('#dashboard-shell'),
     toast: (message, type) => window.yuvomi?.showToast(message, type),
   });
+  // ERSTE SCHRITTE (R23 D14): nach dem Rundgang drei Wege - Familie, Module,
+  // Region - an derselben Stelle wie der Zonen-Hinweis, vom ersten Bild an
+  // (utils/first-steps.js). Den Haken der Mitglieder setzt das Laden.
+  const mountSteps = () => mountFirstSteps(container.querySelector('.dashboard'), {
+    user, t, wall: wallMode,
+    before: container.querySelector('#dashboard-shell'),
+    navigate: (path) => window.yuvomi?.navigate(path),
+  });
+  let firstSteps = mountSteps();
 
   // Ein Neuaufbau AUS DER SEITE HERAUS laeuft nicht durch renderPage() im
   // Router, und damit an dessen FAB-Wechsel vorbei (#634): den alten Knopf aus
@@ -7506,6 +7532,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (signal.aborted) return;
     primeMealTypeNames(prefsRes?.data);
     data         = dashRes;
+    firstSteps.update(Array.isArray(data?.users) ? data.users.length : null);
     /* Die Zahlen an den Nav-Zielen und Modulkacheln kommen aus derselben
      * Antwort (#868). Sie hier hereinzureichen spart die zweite Aggregation,
      * die der Shell-Aufbau sonst beim Anmelden anstiess - `layoutHintQuery`
@@ -8576,7 +8603,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // der Weg, mit dem Test-Faelle (document-guards-harness.js) den Dialog
   // gezielt unterdruecken, ohne einen Testnutzer am Server zu markieren.
   if (user?.onboarding_pending && !localStorage.getItem(ONBOARDING_KEY)) {
-    setTimeout(() => showOnboarding(container, () => maybeHintCustomize(container)), 400);
+    setTimeout(() => showOnboarding(container, () => {
+      // Nach dem Rundgang keine Sackgasse (R23 D14): die Karte beginnt jetzt.
+      startFirstSteps();
+      firstSteps = mountSteps();
+      firstSteps.update(Array.isArray(data?.users) ? data.users.length : null);
+      maybeHintCustomize(container);
+    }), 400);
   } else {
     maybeHintCustomize(container);
   }

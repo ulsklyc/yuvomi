@@ -6599,5 +6599,13 @@
         "failed": "This pairing code is not valid.",
         "codeRequired": "Enter the pairing code shown in Settings.",
         "codeLength": "The pairing code has ten characters. Check whether one is missing or extra."
+    },
+    "firstSteps": {
+        "title": "First steps",
+        "family": "Invite your household",
+        "modules": "Choose your modules",
+        "region": "Check region and time zone",
+        "dismiss": "Hide first steps",
+        "stepDone": "done"
     }
 }

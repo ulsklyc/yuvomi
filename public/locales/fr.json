@@ -6599,5 +6599,13 @@
         "failed": "Ce code d'appairage n'est pas valide.",
         "codeRequired": "Saisis le code d’appairage affiché dans les réglages.",
         "codeLength": "Le code d’appairage compte dix caractères. Vérifiez s’il en manque un ou s’il y en a un de trop."
+    },
+    "firstSteps": {
+        "title": "Premiers pas",
+        "family": "Inviter votre foyer",
+        "modules": "Choisir les modules",
+        "region": "Vérifier la région et le fuseau horaire",
+        "dismiss": "Masquer les premiers pas",
+        "stepDone": "fait"
     }
 }

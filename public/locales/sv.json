@@ -6599,5 +6599,13 @@
         "failed": "Den här parkopplingskoden gäller inte.",
         "codeRequired": "Ange parkopplingskoden som visas i inställningarna.",
         "codeLength": "Parkopplingskoden har tio tecken. Kontrollera om något saknas eller är för mycket."
+    },
+    "firstSteps": {
+        "title": "Första stegen",
+        "family": "Bjud in hushållet",
+        "modules": "Välj moduler",
+        "region": "Kontrollera region och tidszon",
+        "dismiss": "Dölj första stegen",
+        "stepDone": "klart"
     }
 }

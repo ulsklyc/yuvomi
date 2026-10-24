@@ -4619,6 +4619,18 @@ Radius des Ziels plus Luft, Ring 2px `--color-accent`. Den Abdunkler traegt der 
 Schatten nach aussen (100vmax Spreizung, `--color-bg` 78 %), das Overlay wird dafuer klar
 (`.onboarding-overlay--spot`); ohne sichtbares Ziel bleibt die Unschaerfe. Klicks faengt das
 Overlay, der Ring ist aria-hidden, die Tafel liegt positioniert darueber.
+Ab Schritt 2 steht **„Zurueck"** dort, wo auf Schritt 1 „Ueberspringen" steht (R23 S10);
+Esc und die Zurueck-Geste beenden den Rundgang weiter.
+
+**Erste Schritte (R23 D14).** Nach dem Rundgang keine Sackgasse: ein Admin sieht auf der
+Uebersicht eine Karte mit drei Wegen - Familie einladen, Module auswaehlen, Region und
+Zeitzone pruefen (`utils/first-steps.js`, an der Stelle des Zonen-Hinweises, vom ersten Bild
+an). Derselbe Traeger wie jede Liste, Zeilen in Zielgroesse, der Abhakkreis als Zeichen
+(`.check-ring--static`, erledigt in Erfolgsfarbe), ein Zaehler „1/3" und ein X. Die Familie
+gilt ab zwei Mitgliedern als erledigt, Module und Region, sobald der Weg einmal genommen
+wurde; alles erledigt oder weggeklickt beendet die Karte fuer immer. Sie beginnt nur nach dem
+Rundgang - Bestandshaushalte sehen sie nach einem Update nie - und ihr Stand liegt im Browser
+(eine Anleitung fuer den ersten Abend, kein Datensatz).
 
 Der **Fehlerbildschirm einer Seite** (router.js `renderError`) nennt die Seite mit ihrem Namen
 aus der Navigation ("Die Seite „Kontakte" lässt sich gerade nicht öffnen"), haengt an die

@@ -6599,5 +6599,13 @@
         "failed": "Ez a párosítókód nem érvényes.",
         "codeRequired": "Add meg a beállításokban látható párosítási kódot.",
         "codeLength": "A párosítókód tíz karakterből áll. Ellenőrizd, nem hiányzik-e vagy nincs-e több."
+    },
+    "firstSteps": {
+        "title": "Első lépések",
+        "family": "Háztartás meghívása",
+        "modules": "Modulok kiválasztása",
+        "region": "Régió és időzóna ellenőrzése",
+        "dismiss": "Első lépések elrejtése",
+        "stepDone": "kész"
     }
 }

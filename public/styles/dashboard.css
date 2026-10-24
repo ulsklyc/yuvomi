@@ -2584,6 +2584,94 @@ svg.weather-forecast__icon {
   gap: var(--space-5);
 }
 
+/* ERSTE SCHRITTE (R23 D14, utils/first-steps.js). Nach dem Rundgang eine
+ * Karte mit drei Wegen: derselbe Traeger wie jede Liste (Flaeche, Radius,
+ * leiser Schatten), Zeilen in Zielgroesse, der Abhakkreis als Zeichen
+ * (`.check-ring--static`, erledigt in Erfolgsfarbe). Kein Akzent, keine
+ * Illustration - sie ist eine Anleitung fuer einen Abend und tritt danach ab. */
+.first-steps {
+  margin: 0 0 var(--space-4);
+  max-width: var(--page-measure, var(--content-max-width-narrow));
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.first-steps__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0 var(--space-4);
+}
+
+.first-steps__title {
+  margin: 0;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.first-steps__count {
+  margin-inline-end: auto;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.first-steps__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-1);
+}
+
+.first-steps__step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--target-base);
+  padding: var(--space-1) var(--space-4);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.first-steps__step:hover {
+  background-color: var(--color-surface-raised);
+}
+
+.first-steps__step:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.first-steps__ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.first-steps__ring::after,
+.first-steps__ring > .check-ring__check {
+  grid-area: 1 / 1;
+}
+
+.first-steps__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.first-steps__step--done .first-steps__label {
+  color: var(--color-text-secondary);
+}
+
+.first-steps__chevron {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  color: var(--color-text-tertiary);
+}
+
 /* Dashboard-Ladefehler: ruhiger, zentrierter Zustand mit Retry — bewusst als
    eigene Fläche statt eines still gefüllt wirkenden Leer-Layouts. */
 .dashboard-error {

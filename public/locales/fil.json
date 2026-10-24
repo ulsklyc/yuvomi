@@ -6599,5 +6599,13 @@
         "failed": "Hindi balido ang pairing code na ito.",
         "codeRequired": "Ilagay ang pairing code na nasa Settings.",
         "codeLength": "Sampung character ang pairing code. Tingnan kung may kulang o sobra."
+    },
+    "firstSteps": {
+        "title": "Mga unang hakbang",
+        "family": "Imbitahan ang iyong sambahayan",
+        "modules": "Pumili ng mga module",
+        "region": "Suriin ang rehiyon at time zone",
+        "dismiss": "Itago ang mga unang hakbang",
+        "stepDone": "tapos na"
     }
 }

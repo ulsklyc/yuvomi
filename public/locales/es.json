@@ -6599,5 +6599,13 @@
         "failed": "Este código de vinculación no es válido.",
         "codeRequired": "Introduce el código de emparejamiento que aparece en Ajustes.",
         "codeLength": "El código de vinculación tiene diez caracteres. Comprueba si falta o sobra alguno."
+    },
+    "firstSteps": {
+        "title": "Primeros pasos",
+        "family": "Invitar a tu hogar",
+        "modules": "Elegir los módulos",
+        "region": "Revisar región y zona horaria",
+        "dismiss": "Ocultar primeros pasos",
+        "stepDone": "hecho"
     }
 }
