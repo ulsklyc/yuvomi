@@ -424,6 +424,18 @@ test('DELETE /accounts/:id: fremde private Buchungen behalten ihr Konto, und der
     assert.deepEqual(seenByB.map((x) => [x.id, x.archived, x.entry_count, x.current_balance]), [[shared.id, 1, 1, -40]]);
     assert.equal((await b.call('GET', '/accounts')).body.data.accounts.length, 0, 'in der aktiven Liste steht es nicht');
 
+    // Die Huelle verraet sich auch nicht ueber die Position des naechsten Kontos:
+    // nach zwei echten Loeschungen begaenne die Reihe wieder bei 0.
+    const next = (await a.call('POST', '/accounts', { name: 'Neu', starting_balance: 0 })).body.data;
+    assert.equal(next.sort_order, 0, 'die Huelle zaehlt bei der Position nicht mit');
+    assert.equal((await a.call('DELETE', `/accounts/${next.id}`)).status, 204);
+
+    // Auch ihr Rest-Besitzer holt sie nicht ins Aktive zurueck - A saehe sonst
+    // das geloeschte Konto wieder.
+    assert.equal((await b.call('PUT', `/accounts/${shared.id}`, { archived: false, name: 'Wieder da' })).status, 200);
+    assert.deepEqual((await listA()).accounts, [], 'fuer A bleibt es weg');
+    assert.equal(suiteDatabase.prepare('SELECT archived FROM budget_accounts WHERE id = ?').get(shared.id).archived, 2);
+
     // Loescht B es, ist nichts Fremdes mehr daran: echt geloescht.
     assert.equal((await b.call('DELETE', `/accounts/${shared.id}`)).status, 204);
     assert.equal(suiteDatabase.prepare('SELECT 1 FROM budget_accounts WHERE id = ?').get(shared.id), undefined);

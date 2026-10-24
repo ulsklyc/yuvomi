@@ -1391,6 +1391,9 @@ export function accountGoneFor(row, filter = { clause: '', params: [] }) {
 }
 
 export function nextAccountSortOrder() {
-  const row = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM budget_accounts').get();
+  // Huellen zaehlen nicht: sonst verriete die naechste Position eines neuen
+  // Kontos, dass hinter einem geloeschten noch eine Huelle steht.
+  const row = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM budget_accounts WHERE archived <> ?')
+    .get(ACCOUNT_SHELL);
   return row.next;
 }

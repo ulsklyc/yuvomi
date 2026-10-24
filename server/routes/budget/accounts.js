@@ -114,7 +114,12 @@ router.put('/accounts/:id', (req, res) => {
     const color = req.body.color !== undefined
       ? validateColor(req.body.color, 'Color', { allowTokens: true }).value
       : existing.color;
-    const archived = req.body.archived !== undefined ? (req.body.archived ? 1 : 0) : existing.archived;
+    // Eine Huelle bleibt Huelle (ACCOUNT_SHELL, helpers.js): auch ihr Rest-Besitzer
+    // holt sie nicht ins Aktive oder normal Archivierte zurueck - sonst stuende das
+    // geloeschte Konto fuer den Loeschenden wieder da und verriete die Huelle.
+    const archived = existing.archived === ACCOUNT_SHELL
+      ? ACCOUNT_SHELL
+      : (req.body.archived !== undefined ? (req.body.archived ? 1 : 0) : existing.archived);
     // Leerer String und null löschen das Feld, `undefined` lässt es unangetastet -
     // sonst könnte ein Teil-Update Bank oder Limit unbeabsichtigt verwerfen.
     const creditBank = req.body.credit_bank !== undefined
