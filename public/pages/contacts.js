@@ -269,7 +269,7 @@ export async function render(container, { user, signal } = {}) {
       <div id="contacts-status" class="sr-only" role="status" aria-live="polite"></div>
       <div class="split-view contacts-split">
         <div id="contacts-list" class="contacts-list page-scrollport split-view__list" data-scroll-port="contacts" aria-busy="true">
-          <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.categoryLabel')}"></div>
+          <div class="contacts-filters page-chip-row" id="contacts-filters" role="group" aria-label="${t('contacts.categoryLabel')}" data-pending></div>
           <div id="contacts-rows" class="contacts-rows">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
         </div>
         ${splitViewDetailHtml({
@@ -513,6 +513,9 @@ function filterCategoryKeys() {
 function renderCategoryFilters() {
   const bar = _container?.querySelector('#contacts-filters');
   if (!bar) return;
+  // Die Reihe haelt ihren Platz, bis die Daten da sind (contacts.css, R23):
+  // gerufen wird hier erst mit ihnen.
+  bar.removeAttribute('data-pending');
   const active = state.activeCategory;
   const keys = filterCategoryKeys();
   // Nur neu bauen, wenn sich die Menge der Chips geaendert hat: renderList()

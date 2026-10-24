@@ -709,3 +709,17 @@ test('R23: im Auswahlmodus tritt das Menue ab, der Name meldet sich am Feld', ()
   assert.match(js, /if \(!name && reportFieldErrors\(\[\[panel\.querySelector\('#cm-first-name'\), t\('contacts\.nameRequiredHint'\)\]\]\)\) return;/);
   assert.doesNotMatch(js, /showToast\(t\('contacts\.nameRequiredHint'\)/, 'kein Toast mehr fuer ein Feld');
 });
+
+// R23: die Chipreihe erschien erst mit den Daten, und die Liste rutschte um
+// ihre Hoehe nach unten (390x844 Layout-Shift 0,068 bei 4x CPU).
+test('R23: die Chipreihe haelt ihren Platz, bis die Kontakte geladen sind', () => {
+  const css = read('../public/styles/contacts.css');
+  const rules = [...eachRule(css)];
+  assert.ok(!rules.some((r) => r.selector.trim() === '.contacts-filters:empty' && /display:\s*none/.test(r.body)), 'leer heisst nicht weg, solange geladen wird');
+  const hide = rules.find((r) => r.selector.trim() === '.contacts-filters:empty:not([data-pending])');
+  assert.ok(hide && /display:\s*none/.test(hide.body), 'erst nach dem Laden faellt eine leere Reihe weg');
+  const js = read('../public/pages/contacts.js');
+  assert.match(js, /id="contacts-filters" role="group" aria-label="\$\{t\('contacts\.categoryLabel'\)\}" data-pending><\/div>/, 'die Marke steht im ersten Bild');
+  const fn = js.slice(js.indexOf('function renderCategoryFilters()'), js.indexOf('function openContactCategoryManager()'));
+  assert.match(fn, /bar\.removeAttribute\('data-pending'\);/, 'und faellt beim ersten Zeichnen mit Daten');
+});

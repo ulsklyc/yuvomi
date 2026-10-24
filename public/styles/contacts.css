@@ -54,7 +54,15 @@
  * es schon traegt) und die Desktop-Kappung, die genau dieses Polster
  * gegenrechnete.
  * -------------------------------------------------------- */
-.contacts-filters:empty {
+/* DIE REIHE HAELT IHREN PLATZ, BIS DIE DATEN DA SIND (R23). Leer ist sie,
+ * solange die Kontakte laden, und erschien dann mit ihren Chips: die Liste
+ * darunter rutschte um die Hoehe der Reihe nach unten (390x844: y 65 -> 129,
+ * Layout-Shift 0,068 bei 4x CPU; 1440: 0,013). `data-pending` steht im Markup
+ * und faellt beim ersten Zeichnen mit Daten (renderCategoryFilters); erst dann
+ * entscheidet, ob es Chips gibt. Ein Adressbuch mit weniger als zwei
+ * Kategorien rueckt dann einmal nach oben - der seltene Fall statt des
+ * haeufigen. */
+.contacts-filters:empty:not([data-pending]) {
   display: none;
 }
 

@@ -6474,13 +6474,20 @@ function fitWallWho(root, data, { now = new Date(), reset = false, isDisplay = f
   if (free !== step) place(free);
   // Und laeuft sie dann noch ueber, ist das Programm der Grund (R23). Hat es
   // Zeilen abgegeben, duerfen unter den Gesichtern wieder Titel stehen, die
-  // jetzt nichts mehr kosten - von oben gesucht, die reichste Stufe zuerst.
+  // jetzt nichts mehr kosten - von der stehenden Stufe aufwaerts, eine nach
+  // der anderen, bis die naechste nicht mehr passt (jede Probe ist ein
+  // Layout; meist reicht der Platz fuer keine oder eine Stufe).
   if (overflows() && shedWallProgram(wall, data, overflows, { now, isDisplay }) > 0) {
-    for (let richer = 0; richer < free; richer += 1) {
+    let kept = free;
+    let current = free;
+    for (let richer = free - 1; richer >= 0; richer -= 1) {
       place(richer);
-      if (!overflows()) return richer;
+      current = richer;
+      if (overflows()) break;
+      kept = richer;
     }
-    place(free);
+    if (current !== kept) place(kept);
+    return kept;
   }
   return free;
 }

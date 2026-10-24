@@ -71,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selection mode the header drops its menu, so "Contacts" is no longer cut to "Cont..." on a
   phone. Saving a contact without a name now marks the first-name field instead of showing a
   message at the bottom. Initials skip a leading title such as "Dr." or "Prof.", so "Dr. Anna
-  Weber" shows AW everywhere in the app.
+  Weber" shows AW everywhere in the app. The contact list no longer slides down when the
+  category chips appear after loading.
 - **The calendar month stays even on a tablet, and wide screens show each filter once.** Between
   640 and 1023 px an entry in the month grid is one line again, cut with an ellipsis, so every
   week keeps the same height. With the side panel visible on a wide screen, the filter sheet
