@@ -970,10 +970,19 @@
   white-space: nowrap;
 }
 
-/* Waagerecht rollt nur das Raster; senkrecht rollt die Seite. */
+/* Waagerecht rollt nur das Raster; senkrecht rollt die Seite.
+ *
+ * DER TAG RASTET AN DER STUNDENACHSE EIN (R23, Critique G1 P2). Am Telefon
+ * passten 2,8 Tage ins Bild, und das Rollen hielt, wo der Finger losliess:
+ * der erste sichtbare Tag stand halb unter der klebenden Achse ("Frühschicht"
+ * ohne ihren Anfang), auch beim Oeffnen auf heute (der Weg war am Ende). Jetzt
+ * rastet jeder Tag mit seiner Startkante an der Achse ein, und am Telefon ist
+ * ein Tag genau so breit, dass ganze Tage ins Bild passen (unten). */
 .schedule-overview__scroll {
   overflow-x: auto;
   overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline-start: var(--cal-gutter-width);
 }
 
 .schedule-overview__day {
@@ -981,6 +990,21 @@
   min-width: 0;
   block-size: calc(24 * var(--cal-hour-height));
   border-inline-start: 1px solid var(--color-border-subtle);
+  scroll-snap-align: start;
+}
+
+/* GANZE TAGE AM TELEFON. Drei Tage bei einer Person, sonst einer je Bild -
+ * die Spuren mehrerer Personen brauchen die Breite (`--schedule-lanes`). Ein
+ * Tag ist der Rest der Inhaltsbreite neben der Achse, geteilt durch diese
+ * Zahl; die Tagesansicht zeigt ihren einen Tag in voller Breite. Ohne
+ * `round()` (aeltere Browser) bleibt das Mindestmass von oben stehen. */
+@supports (width: round(down, 3px, 1px)) {
+  @media (max-width: 767px) {
+    .schedule-overview {
+      --schedule-day-fit: max(1, min(var(--schedule-days, 7), round(down, 3 / var(--schedule-lanes, 1), 1)));
+      --schedule-columns: var(--cal-gutter-width) repeat(var(--schedule-days, 7), calc((100vw - 2 * var(--page-gutter) - var(--cal-gutter-width)) / var(--schedule-day-fit)));
+    }
+  }
 }
 
 .schedule-overview__lanes {
@@ -999,7 +1023,7 @@
  * Monat. Mit dem Vollton im Punkt ist die Schrift NEUTRAL (DESIGN.md,
  * Skalen-Regel "Rangmarke -> Vollton-Punkt, Schrift neutral"). */
 .schedule-overview__holiday > span::before,
-.schedule-overview__block-title::before {
+.schedule-overview__block--allday .schedule-overview__block-title::before {
   content: '';
   display: inline-block;
   inline-size: var(--space-1h);
@@ -1039,6 +1063,30 @@
   overflow: clip;
   line-height: 1.3;
   z-index: 1;
+}
+
+/* AUF DER ACHSE SPRICHT DER BLOCK WIE IM KALENDER (R23, Critique G1 P2 "zwei
+ * Blocksprachen im Zeitraster"). Seit R22 steht die Uebersicht auf dem Raster
+ * des Kalenders, ihre Bloecke sprachen aber weiter den Punkt: dieselbe Woche
+ * zeigte im Kalender Termine mit Vollton-Kante und Mischtinte, hier
+ * Schichten mit Punkt und neutraler Schrift. Jetzt traegt der Block mit
+ * Uhrzeit das Rezept von `.week-event` (calendar.css): Kante
+ * `--cal-event-edge` im Vollton der Schicht, Tinte 35 % Schichtfarbe, Titel
+ * halbfett. Der Punkt bleibt, wo auch der Kalender ihn fuehrt: an Eintraegen
+ * OHNE Stunde (Ganztagszone, Feiertag) - dort steht er an den Schicht-Chips
+ * des Kalenders genauso. */
+.schedule-overview__block:not(.schedule-overview__block--allday) {
+  border-inline-start: var(--cal-event-edge) solid var(--schedule-color);
+  color: color-mix(in srgb, var(--schedule-color) 35%, var(--color-text-primary));
+  font-weight: var(--font-weight-medium);
+}
+
+.schedule-overview__block:not(.schedule-overview__block--allday) .schedule-overview__block-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.schedule-overview__block:not(.schedule-overview__block--allday) .schedule-overview__block-time {
+  font-weight: var(--font-weight-regular);
 }
 
 /* Ohne Uhrzeit (frei, Urlaub) steht der Eintrag in der Ganztagszone unter dem

@@ -3655,7 +3655,17 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   wie im Kalender, aber gerechnet statt `sticky` (der waagerechte Scroller ist in beiden Achsen
   Scroll-Container): `pinOverviewTitles()` setzt `--title-shift` bis an die Klebekante, nie
   tiefer, als der Block Platz hat (R22-F; Titel y -24 -> 200 bei Kante 198, mobil;
-  `test:schedule` "R22-F").
+  `test:schedule` "R22-F"). **Eine Blocksprache mit dem Kalender** (R23): der Block auf der
+  Achse traegt das Rezept von `.week-event` - Vollton-Kante `--cal-event-edge` in der
+  Schichtfarbe, Tinte 35 %, Titel halbfett; den Punkt tragen nur Eintraege ohne Stunde
+  (Ganztagszone, Feiertag), wie die Schicht-Chips des Kalenders. **Tage rasten an der Achse
+  ein** (`scroll-snap`, Polster = Achsenbreite), und am Telefon ist ein Tag so breit, dass
+  ganze Tage ins Bild passen (drei bei einer Person, sonst einer; vorher 2,8 und der erste
+  halb unter der Achse). **Ein Reiterwechsel haelt den Kopf**: der neue Reiter beginnt unter
+  der angedockten Leiste, die Uebersicht wieder auf der laufenden Stunde; `update()` meldet
+  `'own-scroll'`, und der Router setzt den Stand bei der Soft-Navigation nicht noch einmal auf 0
+  (vorher zwei Spruenge 0,035/0,038 beim Wechsel, und die Rueckkehr stand auf 00:00). Traegt
+  ein Reiter die Hoehe nicht (Planung), klappt der Kopf weiter auf.
 - **Schichtplan: der Plan zuerst (R17, E1).** "Vergleich" ist erster Reiter und Startreiter,
   die eigene Person vorgewaehlt; ohne Schichtart oder Plan traegt er den Leerzustand, der das
   Fehlende anlegt, statt Personenwahl und Stepper ueber einem leeren Raster. "Heute" ist EINE

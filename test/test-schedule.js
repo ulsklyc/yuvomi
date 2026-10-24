@@ -1779,7 +1779,8 @@ test('renderPage() preserves the #main-content scroll position across its own DO
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const body = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function updateScheduleFab()'));
   assert.match(body, /const scrollPort = document\.getElementById\('main-content'\);/);
-  assert.match(body, /const scrollTop = scrollPort\?\.scrollTop \?\? 0;/, 'must capture the scroll position before body.replaceChildren() runs');
+  // R23: the SAME tab keeps its position; a new tab starts at the top (below a docked bar).
+  assert.match(body, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'must capture the scroll position before body.replaceChildren() runs');
   assert.match(body, /if \(scrollPort\) scrollPort\.scrollTop = scrollTop;/, 'must restore the scroll position after the DOM rebuild completes');
   const saveIndex = body.indexOf('const scrollTop = scrollPort');
   const rebuildIndex = body.indexOf('body.replaceChildren()');
@@ -2806,21 +2807,55 @@ test('ein Anlege-Verb im Schichtplan: jedes Anlegen heisst "hinzufuegen"', () =>
   }
 });
 
-test('Feiertag und Planblock tragen einen Farbpunkt statt eines Randstreifens', async () => {
+// R23 (Critique G1 P2, "zwei Blocksprachen im Zeitraster"): auf der Achse
+// spricht der Schichtblock wie der Termin im Kalender (Vollton-Kante,
+// Mischtinte, Titel halbfett); den Punkt tragen nur Eintraege OHNE Stunde -
+// Feiertag und Ganztagszone -, wie die Schicht-Chips des Kalenders.
+test('Planblock auf der Achse wie der Kalender-Termin, Punkt nur ohne Stunde', async () => {
   const { eachRule } = await import('./css-rules.js');
   const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
-  const rules = [...eachRule(scheduleCss)];
-  const stripe = /border-(?:inline-start|left)\s*:\s*(?:[2-9]|\d{2,})px/;
-  for (const selector of ['.schedule-overview__holiday', '.schedule-overview__block']) {
-    const own = rules.filter((r) => r.selector.split(',').some((part) => part.trim().startsWith(selector)));
-    assert.ok(own.length > 0, `Vorbedingung: ${selector} hat Regeln`);
-    assert.ok(!own.some((r) => stripe.test(r.body) || /border-inline-start\s*:[^;]*var\(--(?:holi|schedule)-color\)/.test(r.body)),
-      `${selector}: kein farbiger Streifen an der Startkante (Detektor side-tab)`);
-  }
-  assert.ok(rules.some((r) => /\.schedule-overview__block-title::before/.test(r.selector) && /background\s*:\s*var\(--dot-color\)/.test(r.body)),
-    'der Planblock zeigt seine Farbe als Punkt vor dem Titel');
-  assert.ok(rules.some((r) => /\.schedule-overview__holiday > span::before/.test(r.selector)),
-    'der Feiertag ebenso');
+  const calendarCss = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(scheduleCss)].filter((r) => !r.at.length);
+  const timed = rules.find((r) => r.selector.trim() === '.schedule-overview__block:not(.schedule-overview__block--allday)');
+  assert.ok(timed, 'eine Regel fuer den Block mit Uhrzeit');
+  const week = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.week-event' && !r.at.length);
+  assert.match(week.body, /border-inline-start:\s*var\(--cal-event-edge\) solid var\(--ev-color\)/, 'Vorbedingung: das Rezept des Kalenders');
+  assert.match(timed.body, /border-inline-start:\s*var\(--cal-event-edge\) solid var\(--schedule-color\)/, 'dieselbe Vollton-Kante');
+  assert.match(timed.body, /color:\s*color-mix\(in srgb, var\(--schedule-color\) 35%, var\(--color-text-primary\)\)/, 'dieselbe Mischtinte');
+  const title = rules.find((r) => r.selector.trim() === '.schedule-overview__block:not(.schedule-overview__block--allday) .schedule-overview__block-title');
+  assert.match(title?.body ?? '', /font-weight:\s*var\(--font-weight-semibold\)/, 'Titel halbfett wie .week-event__title');
+  // Der Punkt: Feiertag und Ganztag, nie der Block auf der Achse.
+  const dot = rules.filter((r) => /::before/.test(r.selector) && /background\s*:\s*var\(--dot-color\)/.test(r.body));
+  const dotSelectors = dot.flatMap((r) => r.selector.split(',').map((x) => x.trim()));
+  assert.ok(dotSelectors.includes('.schedule-overview__holiday > span::before'), 'der Feiertag traegt den Punkt');
+  assert.ok(dotSelectors.includes('.schedule-overview__block--allday .schedule-overview__block-title::before'), 'der Ganztagseintrag traegt den Punkt');
+  assert.ok(!dotSelectors.includes('.schedule-overview__block-title::before'), 'der Block auf der Achse traegt keinen Punkt mehr');
+  const stripe = /border-(?:inline-start|left)\s*:/;
+  const holiday = rules.filter((r) => r.selector.split(',').some((part) => part.trim().startsWith('.schedule-overview__holiday')));
+  assert.ok(!holiday.some((r) => stripe.test(r.body)), 'der Feiertag bleibt ohne Kante');
+});
+
+// R23 (Critique G1 P2): am Telefon stand der erste sichtbare Tag halb unter
+// der Stundenachse, und ein Reiterwechsel klappte den Kopf auf und zu.
+test('Uebersicht: Tage rasten an der Achse ein, am Telefon ganze Tage; ein Reiterwechsel haelt seinen Stand', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const js = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const router = readFileSync(new URL('../public/utils/router-navigate.js', import.meta.url), 'utf8');
+  const all = [...eachRule(css)];
+  const scroller = all.find((r) => r.selector.trim() === '.schedule-overview__scroll' && !r.at.length);
+  assert.match(scroller.body, /scroll-snap-type:\s*x mandatory/);
+  assert.match(scroller.body, /scroll-padding-inline-start:\s*var\(--cal-gutter-width\)/, 'eingerastet wird an der Kante der Achse');
+  const day = all.find((r) => r.selector.trim() === '.schedule-overview__day' && !r.at.length);
+  assert.match(day.body, /scroll-snap-align:\s*start/);
+  const phone = all.find((r) => r.selector.trim() === '.schedule-overview' && r.at.some((a) => /max-width:\s*767px/.test(a)));
+  assert.ok(phone && phone.at.some((a) => /@supports/.test(a) || /round\(/.test(a)), 'nur wo round() gilt');
+  assert.match(phone.body, /--schedule-day-fit:\s*max\(1, min\(var\(--schedule-days, 7\), round\(down, 3 \/ var\(--schedule-lanes, 1\), 1\)\)\)/, 'drei Tage bei einer Person, sonst einer, nie mehr als die Ansicht hat');
+  assert.match(phone.body, /--schedule-columns:[^;]*\/ var\(--schedule-day-fit\)/, 'ein Tag ist der Rest neben der Achse, geteilt durch diese Zahl');
+  // Der Reiterwechsel setzt seinen Stand selbst, der Router nicht noch einmal.
+  assert.match(js, /return 'own-scroll';/, 'update() meldet den eigenen Stand');
+  assert.match(router, /if \(main && !\(handled === 'own-scroll' && pushState\)\) main\.scrollTop = scrollTarget;/, 'der Router laesst ihn stehen, Zurueck stellt weiter her');
+  assert.match(js, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'ein neuer Reiter beginnt oben, unter einer angedockten Leiste');
 });
 
 test('das Gueltigkeitsfenster eines Musters steht hinter "Weitere Einstellungen", offen sobald gesetzt (W2/A2)', async () => {

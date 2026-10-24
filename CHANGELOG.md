@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moves its last entries into "+N more today" until the screen fits, instead of running off the
   bottom. On the Overview, "N to approve" in Rewards now follows the standings instead of
   sitting at the bottom of a tall tile.
+- **The shift plan overview reads like the calendar and keeps its place.** Shifts on the hour
+  grid now look like calendar events, with a colored edge and tinted text instead of a dot.
+  Days snap to the hour column when scrolling sideways, and on a phone whole days fit the
+  screen, so the first day is no longer half hidden under the hours. Switching tabs no longer
+  folds the header open and shut, and coming back to the overview shows the current hour again
+  instead of midnight.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days

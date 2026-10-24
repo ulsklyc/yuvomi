@@ -730,6 +730,8 @@ let pendingTabDirection = null;
 // Die naechste fertige Uebersicht stellt die Seite auf die laufende Stunde
 // (alignOverviewToNow()) - beim Oeffnen des Reiters und bei "Heute".
 let overviewAlignPending = false;
+// Welcher Reiter zuletzt gezeichnet wurde (renderPage: neuer Reiter beginnt oben).
+let renderedView = null;
 
 /**
  * `step` setzt nur das Blaettern in der Uebersicht: dann bleibt der gezeigte
@@ -2383,7 +2385,25 @@ function renderPage() {
   // visible; restoring the scroll position afterward papers over it for
   // every tab uniformly rather than special-casing statistics.
   const scrollPort = document.getElementById('main-content');
-  const scrollTop = scrollPort?.scrollTop ?? 0;
+  // EIN NEUER REITER BEGINNT OBEN (R23, Critique G1 P2). Hier wurde auch beim
+  // Reiterwechsel der Stand der Uebersicht zurueckgeschrieben (mobil 732px):
+  // der kuerzere Reiter kappte ihn, der Kopf klappte auf und gleich wieder zu
+  // (zwei Spruenge, 0,035 und 0,038). Neu gezeichnet wird derselbe Reiter mit
+  // seinem Stand (Statistik-Fokus, unten); ein anderer beginnt bei 0 - die
+  // Uebersicht stellt sich danach selbst auf die laufende Stunde.
+  //
+  // UND DER ANGEDOCKTE KOPF BLEIBT ANGEDOCKT. Oben heisst dann: unter der
+  // Leiste, nicht unter dem Large Title - der Stand ist genau die Lead-Zone
+  // des Kopfs (sein negatives `top`, utils/ux.js). Sonst klappte jeder Wechsel
+  // aus der Uebersicht den Kopf auf und zog die Reiter unter dem Finger um
+  // 35px weg. Traegt der neue Reiter die Hoehe nicht, kappt der Browser den
+  // Stand, und der Kopf klappt auf - die Reserve-Regel der Shell.
+  const sameView = renderedView === activeView;
+  renderedView = activeView;
+  const headBar = root?.querySelector('.schedule-toolbar');
+  const docked = Boolean(headBar?.classList.contains('is-docked'));
+  const lead = docked ? Math.max(0, -parseFloat(getComputedStyle(headBar).top) || 0) : 0;
+  const scrollTop = sameView ? (scrollPort?.scrollTop ?? 0) : lead;
   // Repaint statt Neubau: wireTablist() haelt Klasse/aria-selected/tabindex der
   // schon bestehenden Knoepfe selbst nach (sync() loest dabei bewusst KEIN
   // erneutes onChange aus - activeView aendert sich hier ueber Wege, die die
@@ -3783,6 +3803,10 @@ export async function update({ path } = {}) {
   }
   if (nextView !== activeView) {
     await activateView(nextView);
+    // Den Stand des neuen Reiters hat renderPage() gesetzt (oben bzw. unter
+    // der angedockten Leiste, die Uebersicht auf der laufenden Stunde) - der
+    // Router setzt ihn nicht noch einmal auf 0 (utils/router-navigate.js).
+    return 'own-scroll';
   }
   return true;
 }

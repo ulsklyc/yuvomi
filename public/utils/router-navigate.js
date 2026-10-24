@@ -605,8 +605,15 @@ export function createNavigate(state, deps) {
           // Auch die Soft-Navigation wechselt den Inhalt (Settings-Blatt, Health-Tab)
           // und muss den Scrollport nachziehen - hier zwangsläufig NACH dem Render,
           // weil kein Teardown existiert, an den man sich hängen könnte.
+          //
+          // AUSSER, DAS MODUL HAT SEINEN STAND SELBST GESETZT (R23): update()
+          // antwortet dann `'own-scroll'`. Der Schichtplan stellt die Uebersicht
+          // beim Reiterwechsel auf die laufende Stunde und haelt einen
+          // angedockten Kopf angedockt - diese Zeile setzte beides danach auf 0
+          // zurueck (Kopf klappte auf, die Stunde war weg). Zurueck/Vor stellt
+          // weiter den gemerkten Stand her.
           const main = document.getElementById('main-content');
-          if (main) main.scrollTop = scrollTarget;
+          if (main && !(handled === 'own-scroll' && pushState)) main.scrollTop = scrollTarget;
           // Ein Tabwechsel kann einen neuen FAB anlegen (Health-Tabs) - der muss
           // denselben Weg aus dem Scrollport nehmen wie beim vollen Rendern.
           adoptPageFab();
