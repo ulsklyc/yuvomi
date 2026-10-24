@@ -320,6 +320,20 @@ test('POST /:id/to-shopping-list: abgehakte Artikel blockieren die Übernahme ni
   assert.equal(shoppingItems(listId).length, 2);
 });
 
+// R23 (D2): die Regel der ganzen Kueche normalisiert wie ingredientMatchKey -
+// Raender, Leerraum und Gross-/Kleinschreibung auch jenseits von ASCII.
+test('POST /:id/to-shopping-list: "ÖL" auf der Liste deckt " öl " im Rezept (D2)', async () => {
+  const listId = newList('Transfer Unicode');
+  db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, 'ÖL');
+  const created = await call('POST', '/', {
+    title: 'Unicode', ingredients: [{ name: ' öl ' }, { name: 'Brot  dunkel' }, { name: 'brot dunkel', quantity: '1' }],
+  });
+  const r = await call('POST', `/${created.body.data.id}/to-shopping-list`, { listId });
+  assert.equal(r.body.data.transferred, 1, 'zweimal Brot im Rezept ist EINE Zeile');
+  assert.equal(r.body.data.skipped, 1, 'nur das Öl stand schon da');
+  assert.deepEqual(shoppingItems(listId).map((i) => i.name), ['ÖL', 'Brot  dunkel']);
+});
+
 test('POST /:id/to-shopping-list: Rezept ohne Zutaten → 0/0 statt Fehler', async () => {
   const listId = newList('Transfer D');
   const created = await call('POST', '/', { title: 'Leer', ingredients: [] });

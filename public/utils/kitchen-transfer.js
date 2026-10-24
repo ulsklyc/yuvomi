@@ -262,6 +262,22 @@ export function mountMissingShoppingList(target, opts) {
 }
 
 /**
+ * Der Satz eines Transfers: was neu auf der Liste steht, und - wenn etwas
+ * schon darauf stand - wie viel (R23, D2: "5 Zutaten auf REWE übernommen.
+ * 2 standen schon darauf."). Zwei vollständige Sätze, mit Leerzeichen
+ * verbunden: ein Key mit beiden Zahlen muesste zwei Plurale in einem String
+ * beugen, was Intl.PluralRules nicht kann (vorher so im Vorrat, jetzt fuer
+ * alle Wege der Kueche).
+ *
+ * @param {string} successKey  Erfolgssatz des Moduls mit `count` und `list`
+ * @param {{ added: number, skipped?: number, list: string }} counts
+ */
+export function transferMessage(successKey, { added, skipped = 0, list }) {
+  const done = t(successKey, { count: added, list });
+  return skipped > 0 ? `${done} ${t('kitchen.transferSkipped', { count: skipped })}` : done;
+}
+
+/**
  * Meldet einen gelungenen Transfer und bietet ihn zur Rücknahme an.
  *
  * Echtes Rücknehmen, kein verzögerter Commit: der Server überspringt Duplikate,
@@ -283,20 +299,26 @@ export function mountMissingShoppingList(target, opts) {
  * @param {object}   opts
  * @param {string}   opts.message     Aufgelöster Erfolgstext des Moduls.
  * @param {number[]} [opts.addedIds]  `added_ids` aus der Transfer-Antwort.
+ * @param {number[]} [opts.ingredientIds]  `ingredient_ids` (nur Essensplan-Wege).
  * @param {Function} [opts.onUndone]  Läuft nach erfolgreicher Rücknahme; die
  *                                    Aufrufstelle zeichnet damit ihre eigene
  *                                    Ansicht neu (der Essensplan etwa zeigt die
  *                                    Zutaten wieder als offen).
  */
-export function announceTransfer({ message, addedIds = [], onUndone } = {}) {
+export function announceTransfer({ message, addedIds = [], ingredientIds = [], onUndone } = {}) {
   refreshKitchenBadges();
 
   const ids = Array.isArray(addedIds) ? addedIds.filter((id) => Number.isFinite(Number(id))) : [];
+  // Die Zutaten, die der Transfer markiert hat - auch die uebersprungenen
+  // (R23, D2; server/services/kitchen-handover.js). Ohne sie bliebe nach dem
+  // Rueckgaengig eine Zutat als "schon auf der Liste" stehen, deren Artikel
+  // von vornherein ein anderer war.
+  const ingredient_ids = Array.isArray(ingredientIds) ? ingredientIds.filter((id) => Number.isFinite(Number(id))) : [];
   const canUndo = mayWritePath('/shopping/items/undo-transfer');
   const undo = canUndo && ids.length
     ? async () => {
         try {
-          await api.post('/shopping/items/undo-transfer', { ids });
+          await api.post('/shopping/items/undo-transfer', ingredient_ids.length ? { ids, ingredient_ids } : { ids });
           refreshKitchenBadges();
           await onUndone?.();
           // Zählfrei: die Anzahl stand eine Sekunde vorher im Toast, den der

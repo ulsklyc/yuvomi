@@ -17,7 +17,7 @@ import { promptModal, openModal, closeModal, captureModalContext, captureOpenCon
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
-import { mayImportMealPlan, mayTransferShoppingToPantry } from '/utils/kitchen-transfer.js';
+import { mayImportMealPlan, mayTransferShoppingToPantry, announceTransfer, transferMessage } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -3528,17 +3528,26 @@ function openMealPlanImport(container) {
         try {
           const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to, preview: true });
           const transferred = Number(data.data?.transferred) || 0;
+          const added = Number(data.data?.added) || 0;
+          const skipped = Number(data.data?.skipped) || 0;
           const meals = Number(data.data?.meals) || 0;
           // Zwei Zahlachsen, eine Pluralmechanik: t() dekliniert nur über
           // `count`. Die Mahlzeiten-Angabe kommt deshalb als eigener, selbst
           // pluralisierter Teilstring herein (Audit A2-21: "aus 1 Mahlzeiten").
-          previewEl.textContent = transferred
-            ? t('shopping.importMealsPreview', {
-              count: transferred,
+          //
+          // Gezaehlt wird, was NEU auf die Liste kommt (R23, D2) - vorher die
+          // Zahl der Quellzutaten, die zusammengefasste und schon vorhandene
+          // mitzaehlte. Was schon darauf steht, sagt ein zweiter Satz.
+          const parts = [];
+          if (added) {
+            parts.push(t('shopping.importMealsPreview', {
+              count: added,
               mealsText: t('shopping.importMealsPreviewMeals', { count: meals }),
-            })
-            : t('shopping.importMealsEmpty');
-          submitBtn.disabled = !transferred;
+            }));
+          }
+          if (skipped) parts.push(t(added ? 'shopping.importMealsPreviewSkipped' : 'kitchen.transferAllPresent', { count: skipped }));
+          previewEl.textContent = transferred ? parts.join(' ') : t('shopping.importMealsEmpty');
+          submitBtn.disabled = !added;
         } catch {
           previewEl.textContent = '';
           // Vorschau fehlgeschlagen: nicht sperren. Der Nutzer soll es versuchen
@@ -3558,9 +3567,15 @@ function openMealPlanImport(container) {
         if (!mayImportMealPlan(state.activeListId)) return;
         const modalContext = captureModalContext();
         try {
-          const data = await api.post(`/shopping/${state.activeListId}/import-meal-plan`, { from, to });
+          const listId = state.activeListId;
+          const data = await api.post(`/shopping/${listId}/import-meal-plan`, { from, to });
           if (!data.data?.transferred) {
             window.yuvomi.showToast(t('shopping.importMealsEmpty'), 'default');
+            return;
+          }
+          if (!data.data.added) {
+            closeModal({ force: true, context: modalContext });
+            window.yuvomi.showToast(t('kitchen.transferAllPresent'), 'info');
             return;
           }
           await reloadAfterSave(() => Promise.all([loadLists(), loadItems(state.activeListId)]));
@@ -3570,8 +3585,25 @@ function openMealPlanImport(container) {
           // force: siehe openItemDetails - ein geänderter Zeitraum ist nach dem
           // Import nichts, was noch zu verwerfen wäre.
           closeModal({ force: true, context: modalContext });
-          const count = Number(data.data.transferred) || 0;
-          window.yuvomi.showToast(t('meals.transferSuccess', { count }), 'success');
+          // Derselbe Satz und dasselbe Rueckgaengig wie an Karte und Rezept
+          // (R23, D2). Bis dahin stand hier ein Toast ohne Ruecknahme, der die
+          // Quellzutaten zaehlte und den Listennamen als leeren Platzhalter
+          // trug ("3 Zutaten auf  übernommen.").
+          const listName = state.lists.find((l) => l.id === listId)?.name ?? '';
+          announceTransfer({
+            message: transferMessage('meals.transferSuccess', {
+              added: Number(data.data.added) || 0, skipped: Number(data.data.skipped) || 0, list: listName,
+            }),
+            addedIds: data.data.added_ids ?? [],
+            ingredientIds: data.data.ingredient_ids ?? [],
+            onUndone: async () => {
+              if (state.activeListId !== listId) return;
+              await Promise.all([loadLists(), loadItems(listId)]);
+              renderTabs(container);
+              renderListContent(container);
+              wireListContentEvents(container);
+            },
+          });
         } catch (err) {
           reportError(err, container);
         }

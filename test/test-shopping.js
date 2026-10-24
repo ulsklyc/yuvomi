@@ -698,9 +698,15 @@ test('shopping-Route validiert und persistiert notes/url', () => {
 test('shopping-Route bietet einen Datumsbereich-Import aus dem Essensplan an', () => {
   const source = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
   assert(/router\.post\('\/:listId\/import-meal-plan'/.test(source), 'Shopping-Route muss eine Import-Route für den Essensplan bereitstellen');
-  assert(/aggregateMealIngredients/.test(source), 'Import-Route muss aggregierte Zutaten verwenden');
-  assert(/m\.date BETWEEN \? AND \?/.test(source), 'Import-Route muss Mahlzeiten nach Datumsbereich filtern');
-  assert(/mi\.on_shopping_list = 0/.test(source), 'Bereits übertragene Zutaten dürfen nicht erneut importiert werden');
+  // Seit R23 (D2) liest die Route den Essensplan ueber die geteilte Quelle der
+  // Kueche und schreibt ueber die eine Dublettenregel; das Verhalten belegt
+  // test:shopping-routes, hier steht nur die Verdrahtung.
+  const service = readFileSync(new URL('../server/services/kitchen-handover.js', import.meta.url), 'utf8');
+  assert(/mealPlanSource\(db\.get\(\), range\)/.test(source), 'Import-Route muss den Essensplan ueber mealPlanSource lesen');
+  assert(/handOverToShoppingList\(/.test(source), 'Import-Route muss ueber die geteilte Dublettenregel schreiben');
+  assert(/aggregateMealIngredients/.test(service), 'die Quelle muss aggregierte Zutaten liefern');
+  assert(/date BETWEEN \? AND \?/.test(service), 'die Quelle muss Mahlzeiten nach Datumsbereich filtern');
+  assert(/on_shopping_list = 0/.test(service), 'Bereits übertragene Zutaten dürfen nicht erneut importiert werden');
 });
 
 // --------------------------------------------------------

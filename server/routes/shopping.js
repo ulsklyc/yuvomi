@@ -11,7 +11,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
-import { aggregateMealIngredients } from '../services/shopping-import.js';
+import { handOverToShoppingList, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletions, moveShoppingMirror,
@@ -680,7 +680,8 @@ router.patch('/items/:itemId', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/shopping/items/undo-transfer
 // Nimmt einen Übertrag aus einem Nachbar-Tab der Küche zurück.
-// Body: { ids: number[] } - die `added_ids` aus der Transfer-Antwort.
+// Body: { ids: number[], ingredient_ids?: number[] } - `added_ids` und
+// `ingredient_ids` aus der Transfer-Antwort.
 // Response: { data: { removed: number } }
 //
 // Die drei erzeugenden Pfade der Küche (Vorrat, Rezept, Mahlzeit → Einkauf)
@@ -708,7 +709,14 @@ router.post('/items/undo-transfer', (req, res) => {
     const ids = Array.isArray(req.body?.ids)
       ? req.body.ids.map(Number).filter(Number.isInteger)
       : [];
-    if (!ids.length) return res.json({ data: { removed: 0 } });
+    // Seit R23 (D2) nennt der Transfer die Zutaten, die er markiert hat
+    // (`ingredient_ids`), auch die uebersprungenen - sie stehen ja auf der
+    // Liste. Die Ruecknahme setzt genau diese zurueck. Ohne das Feld (aeltere
+    // Clients) bleibt es beim Rueckschluss ueber Mahlzeit und Name unten.
+    const ingredientIds = Array.isArray(req.body?.ingredient_ids)
+      ? req.body.ingredient_ids.map(Number).filter(Number.isInteger)
+      : null;
+    if (!ids.length && !ingredientIds?.length) return res.json({ data: { removed: 0 } });
 
     // DIESELBE GEGENRICHTUNG (#1290), aber nur fuer den Mahlzeit-Pfad. Die
     // Ruecknahme loescht Einkaufsartikel UND setzt aus Grund 2. oben
@@ -721,7 +729,7 @@ router.post('/items/undo-transfer', (req, res) => {
     // Je ID eine Abfrage statt eines `IN (...)`: die Liste kommt vom Client
     // und ist unbegrenzt, die Platzhalter-Grenze von SQLite dagegen nicht.
     const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
-    const touchesMealPlan = ids.some((id) => findSource.get(id)?.added_from_meal);
+    const touchesMealPlan = Boolean(ingredientIds?.length) || ids.some((id) => findSource.get(id)?.added_from_meal);
     if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
       return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
     }
@@ -735,14 +743,19 @@ router.post('/items/undo-transfer', (req, res) => {
         WHERE meal_id = ? AND name = ? AND on_shopping_list = 1
       `);
 
+      const unmarkById = db.get().prepare(
+        'UPDATE meal_ingredients SET on_shopping_list = 0 WHERE id = ? AND on_shopping_list = 1',
+      );
+
       let count = 0;
       for (const id of ids) {
         const item = findItem.get(id);
         if (!item) continue;
         deleteItem.run(id);
-        if (item.added_from_meal) unmarkIngredient.run(item.added_from_meal, item.name);
+        if (!ingredientIds && item.added_from_meal) unmarkIngredient.run(item.added_from_meal, item.name);
         count += 1;
       }
+      for (const id of ingredientIds ?? []) unmarkById.run(id);
       return count;
     })();
 
@@ -1236,7 +1249,13 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
 // Body: { from: YYYY-MM-DD, to: YYYY-MM-DD, preview?: boolean }
 // preview:true rechnet nur (keine Schreib-Transaktion) - für die Vorschau
 // "X Zutaten aus Y Mahlzeiten" im Import-Dialog (Audit A1-22).
-// Response: { data: { transferred: number, added: number, meals: number, preview?: true } }
+// Response: { data: { transferred, added, skipped, meals, added_ids, ingredient_ids, preview?: true } }
+//
+// Seit R23 (D2) mit den Mahlzeiten, die aus einem Rezept geplant sind (vorher
+// las die Route nur meal_ingredients und uebersah sie), unter der EINEN
+// Dublettenregel der Kueche (services/kitchen-handover.js) und mit `added_ids`
+// fuer das Rueckgaengig - der Import schrieb bis dahin als einziger Kuechenweg
+// ohne Ruecknahme in die Liste.
 // --------------------------------------------------------
 router.post('/:listId/import-meal-plan', (req, res) => {
   try {
@@ -1269,46 +1288,28 @@ router.post('/:listId/import-meal-plan', (req, res) => {
       return res.status(400).json({ error: 'From date must be before or equal to end date.', code: 400 });
     }
 
-    const ingredients = db.get().prepare(`
-      SELECT mi.id, mi.meal_id, mi.name, mi.quantity, mi.category
-      FROM meal_ingredients mi
-      JOIN meals m ON m.id = mi.meal_id
-      WHERE m.date BETWEEN ? AND ?
-        AND mi.on_shopping_list = 0
-      ORDER BY m.date ASC, mi.id ASC
-    `).all(vFrom.value, vTo.value);
+    const range = { from: vFrom.value, to: vTo.value };
+    const empty = { transferred: 0, added: 0, skipped: 0, meals: 0, added_ids: [], ingredient_ids: [] };
 
-    if (!ingredients.length) {
-      return res.json({ data: { transferred: 0, added: 0, meals: 0 } });
-    }
-
-    const mealCount = new Set(ingredients.map((i) => i.meal_id)).size;
-    const aggregated = aggregateMealIngredients(ingredients);
-
-    // Vorschau (Audit A1-22): identische Auswahl und Aggregation, aber ohne
-    // Schreib-Transaktion. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
-    // bevor der Nutzer den Import bestätigt.
+    // Vorschau (Audit A1-22): dieselbe Auswahl und Aggregation, aber ohne
+    // Schreib-Transaktion - Rezept-Mahlzeiten werden dafuer aus dem Rezept
+    // gelesen statt kopiert. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
+    // und seit R23 auch, wie viele davon schon auf der Liste stehen.
     if (req.body.preview === true) {
-      return res.json({ data: { transferred: ingredients.length, added: aggregated.length, meals: mealCount, preview: true } });
+      const { ingredients, rows, meals } = mealPlanSource(db.get(), range, { materialize: false });
+      if (!ingredients.length) return res.json({ data: { ...empty, preview: true } });
+      const { added, skipped } = previewHandover(db.get(), req.params.listId, rows);
+      return res.json({ data: { transferred: ingredients.length, added, skipped, meals, preview: true } });
     }
 
-    const added = db.get().transaction(() => {
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category, added_from_meal)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      const markDone = db.get().prepare('UPDATE meal_ingredients SET on_shopping_list = 1 WHERE id = ?');
+    const result = db.transaction(() => {
+      const { ingredients, rows, meals } = mealPlanSource(db.get(), range);
+      if (!ingredients.length) return null;
+      return { transferred: ingredients.length, meals, ...handOverToShoppingList(db.get(), req.params.listId, rows) };
+    });
+    if (!result) return res.json({ data: empty });
 
-      for (const item of aggregated) {
-        insertItem.run(req.params.listId, item.name, item.quantity, item.category, item.added_from_meal);
-      }
-      for (const ingredient of ingredients) {
-        markDone.run(ingredient.id);
-      }
-      return aggregated.length;
-    })();
-
-    res.json({ data: { transferred: ingredients.length, added, meals: mealCount } });
+    res.json({ data: { ...result, added: result.added_ids.length } });
   } catch (err) {
     log.error('POST /:listId/import-meal-plan error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1361,33 +1362,23 @@ router.post('/:listId/import-pantry', (req, res) => {
     // beiden Routen sollen nicht auseinanderlaufen.
     const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
 
-    const result = db.get().transaction(() => {
+    // Die Dublettenregel ist die der ganzen Kueche (services/kitchen-handover.js,
+    // R23 D2) - bis dahin stand hier eine eigene mit SQLites NOCASE, die nur
+    // ASCII kennt: "Öl" und "öl" waren zwei Artikel.
+    const result = db.transaction(() => {
       const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
-      const findDuplicate = db.get().prepare(`
-        SELECT id FROM shopping_items
-        WHERE list_id = ? AND is_checked = 0 AND name = ? COLLATE NOCASE
-        LIMIT 1
-      `);
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category) VALUES (?, ?, ?, ?)
-      `);
-
-      let skipped = 0;
-      const addedIds = [];
-
+      let missing = 0;
+      const rows = [];
       for (const entry of entries) {
         const pantryItem = findPantryItem.get(Number(entry?.pantry_item_id));
-        if (!pantryItem) { skipped += 1; continue; }
-        if (findDuplicate.get(req.params.listId, pantryItem.name)) { skipped += 1; continue; }
-
+        if (!pantryItem) { missing += 1; continue; }
         const vQty = str(entry.quantity, 'Menge', { max: MAX_SHORT, required: false });
         const category = validNames.includes(pantryItem.category) ? pantryItem.category : defaultCat;
-        const info = insertItem.run(req.params.listId, pantryItem.name, vQty.value, category);
-        addedIds.push(Number(info.lastInsertRowid));
+        rows.push({ name: pantryItem.name, quantity: vQty.value, category });
       }
-
-      return { added: addedIds.length, skipped, added_ids: addedIds };
-    })();
+      const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), req.params.listId, rows);
+      return { added: addedIds.length, skipped: skipped + missing, added_ids: addedIds };
+    });
 
     res.json({ data: result });
   } catch (err) {

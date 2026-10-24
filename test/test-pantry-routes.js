@@ -358,6 +358,17 @@ test('POST /shopping/:listId/import-pantry: gleicher Name unabgehakt → übersp
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM shopping_items WHERE list_id = ?').get(listId).n, 1);
 });
 
+// R23 (D2): die Regel der ganzen Kueche statt SQLites NOCASE, das nur ASCII
+// kennt - "Öl" auf der Liste und "öl" im Vorrat waren zwei Artikel.
+test('POST /shopping/:listId/import-pantry: "Öl" deckt "öl" (D2)', async () => {
+  const list = await call('POST', '/shopping', { name: 'Unicode-Dublette' });
+  const listId = list.body.data.id;
+  await call('POST', `/shopping/${listId}/items`, { name: 'Öl' });
+  const oil = await call('POST', '/pantry', { name: 'öl', quantity: 0 });
+  const r = await call('POST', `/shopping/${listId}/import-pantry`, { items: [{ pantry_item_id: oil.body.data.id }] });
+  assert.deepEqual(r.body.data, { added: 0, skipped: 1, added_ids: [] });
+});
+
 test('POST /shopping/:listId/import-pantry: unbekannter Vorratsartikel → skipped, unbekannte Liste → 404', async () => {
   const list = await call('POST', '/shopping', { name: 'Unbekannt' });
   const r = await call('POST', `/shopping/${list.body.data.id}/import-pantry`, {

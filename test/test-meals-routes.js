@@ -918,3 +918,116 @@ test('POST /:id/to-shopping-list: Mahlzeit ohne Rezept und ohne Zutaten → 0 ü
   assert.equal(r.status, 200);
   assert.equal(r.body.data.transferred, 0);
 });
+
+// --------------------------------------------------------------------------
+// R23 (D2): EINE Dublettenregel an allen Uebergaben in den Einkauf
+//
+// Gemessen vor R23 (Critique G3, P1): zwei Mahlzeiten aus demselben Rezept
+// brachten "Zwiebeln" zweimal auf die Liste, der Wochenimport danach ein drittes
+// Mal, und "Aus dem Essensplan" uebersah jede Mahlzeit, die aus einem Rezept
+// geplant war (5 von 8, 27 Zutaten). Die Regel steht jetzt einmal in
+// server/services/kitchen-handover.js; diese Faelle fahren sie ueber die Routen.
+// --------------------------------------------------------------------------
+
+const D2_RECIPE = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Gulasch', ?)`).run(U).lastInsertRowid;
+db.prepare(`INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, 'Zwiebeln', '2', 'Obst & Gemüse')`).run(D2_RECIPE);
+db.prepare(`INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, 'Öl', '2 EL', 'Sonstiges')`).run(D2_RECIPE);
+
+const d2List = (name) => db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(
+  db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)`).run(name, U).lastInsertRowid, '__seed__',
+) && db.prepare('SELECT MAX(id) id FROM shopping_lists').get().id;
+const openNames = (list) => db.prepare(
+  "SELECT name FROM shopping_items WHERE list_id = ? AND is_checked = 0 AND name <> '__seed__' ORDER BY id",
+).all(list).map((r) => r.name);
+
+test('D2 Mahlzeit-Karte: dieselbe Zutat aus zwei Mahlzeiten steht EINMAL da, Name normalisiert', async () => {
+  const list = d2List('D2-Karte');
+  // " öl " ist dieselbe Zutat wie "Öl": SQLites NOCASE kannte das "Ö" nicht.
+  db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(list, ' öl ');
+  const a = (await createMeal({ date: '2027-01-04', title: 'G1', recipe_id: D2_RECIPE })).body.data;
+  const b = (await createMeal({ date: '2027-01-05', title: 'G2', recipe_id: D2_RECIPE })).body.data;
+
+  const first = await call('POST', `/${a.id}/to-shopping-list`, { listId: list });
+  assert.equal(first.body.data.transferred, 1, 'nur die Zwiebeln, das Öl stand schon da');
+  assert.equal(first.body.data.skipped, 1);
+
+  const second = await call('POST', `/${b.id}/to-shopping-list`, { listId: list });
+  assert.equal(second.body.data.transferred, 0, 'die zweite Mahlzeit bringt nichts Neues');
+  assert.equal(second.body.data.skipped, 2);
+  assert.deepEqual(second.body.data.added_ids, []);
+  assert.deepEqual(openNames(list), [' öl ', 'Zwiebeln'], 'keine Dublette auf der Liste');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ? AND on_shopping_list = 1').get(b.id).c, 2,
+    'die uebersprungenen Zutaten gelten als auf der Liste - die Karte bietet keinen leeren Transfer mehr an',
+  );
+  assert.equal(second.body.data.ingredient_ids.length, 2, 'die Antwort nennt die markierten Zutaten');
+
+  // Das Undo nimmt auch die nur markierten Zutaten zurueck.
+  const undo = await call('POST', '/shopping/items/undo-transfer', {
+    ids: second.body.data.added_ids, ingredient_ids: second.body.data.ingredient_ids,
+  });
+  assert.equal(undo.status, 200);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ? AND on_shopping_list = 0').get(b.id).c, 2,
+    'nach dem Undo sind die Zutaten der zweiten Mahlzeit wieder offen',
+  );
+  assert.deepEqual(openNames(list), [' öl ', 'Zwiebeln'], 'das Undo der zweiten Karte laesst die erste stehen');
+});
+
+test('D2 abgehakt zaehlt nicht: was gekauft ist, braucht das naechste Gericht wieder', async () => {
+  const list = d2List('D2-Abgehakt');
+  db.prepare('INSERT INTO shopping_items (list_id, name, is_checked) VALUES (?, ?, 1)').run(list, 'Zwiebeln');
+  const m = (await createMeal({ date: '2027-01-06', title: 'G3', recipe_id: D2_RECIPE })).body.data;
+  const r = await call('POST', `/${m.id}/to-shopping-list`, { listId: list });
+  assert.equal(r.body.data.transferred, 2);
+  assert.equal(r.body.data.skipped, 0);
+});
+
+test('D2 Wochenimport: materialisiert Rezept-Mahlzeiten, eine Zeile je Name', async () => {
+  const list = d2List('D2-Woche');
+  await createMeal({ date: '2027-02-01', title: 'W-Rezept', recipe_id: D2_RECIPE });
+  await createMeal({ date: '2027-02-02', title: 'W-Eigen', ingredients: [{ name: 'zwiebeln', quantity: '1 Stück' }, { name: 'Brot' }] });
+
+  const r = await call('POST', '/week-to-shopping-list', { listId: list, week: '2027-02-01' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(openNames(list), ['Zwiebeln', 'Öl', 'Brot'], 'Rezeptzutaten dabei, Zwiebeln einmal');
+  const zwiebeln = db.prepare("SELECT quantity FROM shopping_items WHERE list_id = ? AND name = 'Zwiebeln'").get(list);
+  assert.equal(zwiebeln.quantity, '2 + 1 Stück', 'zwei Mengen eines Namens, die sich nicht addieren lassen, stehen zusammen');
+  assert.equal(r.body.data.transferred, 3);
+
+  const again = await call('POST', '/week-to-shopping-list', { listId: list, week: '2027-02-01' });
+  assert.equal(again.body.data.transferred, 0, 'zweiter Import: alles markiert');
+});
+
+test('D2 "Aus dem Essensplan": Vorschau zaehlt Rezept-Mahlzeiten ohne zu schreiben, Import mit Undo', async () => {
+  const list = d2List('D2-Liste');
+  db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(list, 'ÖL');
+  const m = (await createMeal({ date: '2027-03-01', title: 'L-Rezept', recipe_id: D2_RECIPE })).body.data;
+  await createMeal({ date: '2027-03-02', title: 'L-Eigen', ingredients: [{ name: 'Milch', quantity: '1 l' }] });
+
+  const preview = await call('POST', `/shopping/${list}/import-meal-plan`, { from: '2027-03-01', to: '2027-03-07', preview: true });
+  assert.equal(preview.status, 200);
+  assert.deepEqual(preview.body.data, { transferred: 3, added: 2, skipped: 1, meals: 2, preview: true });
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ?').get(m.id).c, 0,
+    'die Vorschau kopiert keine Rezeptzutaten');
+
+  const before = openNames(list);
+  const r = await call('POST', `/shopping/${list}/import-meal-plan`, { from: '2027-03-01', to: '2027-03-07' });
+  assert.equal(r.body.data.added, 2);
+  assert.equal(r.body.data.skipped, 1);
+  assert.equal(r.body.data.added_ids.length, 2, 'der Import liefert IDs fuer das Rueckgaengig');
+  assert.deepEqual(openNames(list), ['ÖL', 'Zwiebeln', 'Milch']);
+
+  const undo = await call('POST', '/shopping/items/undo-transfer', {
+    ids: r.body.data.added_ids, ingredient_ids: r.body.data.ingredient_ids,
+  });
+  assert.equal(undo.body.data.removed, 2);
+  assert.deepEqual(openNames(list), before, 'das Undo stellt die Liste wieder her');
+  assert.equal(
+    db.prepare(`SELECT COUNT(*) c FROM meal_ingredients mi JOIN meals ml ON ml.id = mi.meal_id
+      WHERE ml.date BETWEEN '2027-03-01' AND '2027-03-07' AND mi.on_shopping_list = 1`).get().c, 0,
+    'und alle Zutaten des Zeitraums sind wieder offen - auch die uebersprungene',
+  );
+  const again = await call('POST', `/shopping/${list}/import-meal-plan`, { from: '2027-03-01', to: '2027-03-07' });
+  assert.equal(again.body.data.added, 2, 'derselbe Import geht nach dem Undo erneut');
+});

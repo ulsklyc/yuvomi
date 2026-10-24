@@ -23,7 +23,7 @@ import {
   refocusAfterRender,
 } from '/components/modal.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
@@ -1374,9 +1374,7 @@ async function sendToShopping(items, btn) {
     // Typ, nicht die Liste - bei mehreren Listen bleibt damit offen, auf welche
     // (Critique 2026-07-30, P1). Der Name steht hier ohnehin fest: entweder gibt es
     // nur eine Liste, oder der Nutzer hat sie gerade ausgewählt.
-    const message = skipped
-      ? `${t('pantry.toShoppingDone', { count: added, list: target.name })} ${t('pantry.toShoppingSkipped', { count: skipped })}`
-      : t('pantry.toShoppingDone', { count: added, list: target.name });
+    const message = transferMessage('pantry.toShoppingDone', { added, skipped, list: target.name });
 
     // Meldung, Standzeit, Tab-Zahl und Rücknahme kommen aus dem geteilten
     // Baustein. Der Warenkorb ist der Pfad, den man am leichtesten versehentlich

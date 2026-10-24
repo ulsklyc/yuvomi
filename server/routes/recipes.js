@@ -14,6 +14,7 @@ import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
+import { handOverToShoppingList } from '../services/kitchen-handover.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -535,26 +536,10 @@ router.post('/:id/to-shopping-list', (req, res) => {
     ).all(id);
     if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
 
+    // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
+    // dieser Weg hatte sie als einziger schon, die drei anderen nicht.
     const result = db.transaction(() => {
-      const existing = db.get().prepare(
-        'SELECT name FROM shopping_items WHERE list_id = ? AND is_checked = 0',
-      ).all(vList.value);
-      const present = new Set(existing.map((i) => i.name.trim().toLowerCase()));
-
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category)
-        VALUES (?, ?, ?, ?)
-      `);
-
-      const addedIds = [];
-      let skipped = 0;
-      for (const ing of ingredients) {
-        const key = ing.name.trim().toLowerCase();
-        if (present.has(key)) { skipped += 1; continue; }
-        const info = insertItem.run(vList.value, ing.name, ing.quantity, ing.category || 'Sonstiges');
-        present.add(key);
-        addedIds.push(Number(info.lastInsertRowid));
-      }
+      const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), vList.value, ingredients);
       return { transferred: addedIds.length, skipped, added_ids: addedIds };
     });
 

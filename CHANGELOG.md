@@ -260,6 +260,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows the usual "No results" with the search term and "Reset search", and the figure above it
   is the total across all groups. The transaction search in Budget and the subscription search
   use the same "No results" state with a way back.
+- **The kitchen no longer puts the same ingredient on the shopping list twice.** Planning two
+  meals from one recipe put "Onions" on the list twice, and importing the week afterwards a third
+  time; only a recipe checked what was already there. Recipes, the meal card, "From the meal plan"
+  and the pantry basket now follow one rule: an item of the same name that is still open on the
+  list is skipped - regardless of case and spaces, also for names with umlauts - while a checked
+  item does not count, because the next dish needs it again. Two rows of one name in one transfer
+  become one item. The message says what happened: "5 ingredients added to Weekly shop. 2 were
+  already on it." "From the meal plan" now also takes the meals planned from a recipe, which it
+  skipped before (in the demo household 5 of 8 meals), counts only what is new in its preview,
+  and can be undone like every other transfer.
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.

@@ -27,7 +27,7 @@ export function recipesPaths() {
       post: op({
         summary: 'Transfer recipe ingredients to shopping list',
         tag: 'Recipes',
-        description: 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403.',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),

@@ -86,7 +86,7 @@ export function mealsPaths() {
       post: op({
         summary: 'Transfer meal ingredients to shopping list',
         tag: 'Meals',
-        description: 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). A meal planned from a recipe gets the recipe ingredients as its own on the first transfer. The response carries `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403.',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
@@ -102,7 +102,7 @@ export function mealsPaths() {
       post: op({
         summary: 'Transfer weekly meal ingredients to shopping list',
         tag: 'Meals',
-        description: 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included (their recipe ingredients become their own). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403.',
         stateChanging: true,
         requestBody: jsonBody(null),
         responses: {

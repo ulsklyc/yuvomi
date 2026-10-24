@@ -11,6 +11,7 @@ import { str, oneOf, date, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, D
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../permissions.js';
+import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
 
 const log = createLogger('Meals');
@@ -915,7 +916,11 @@ router.delete('/ingredients/:ingId', (req, res) => {
  * POST /api/v1/meals/:id/to-shopping-list
  * Alle noch nicht übertragenen Zutaten einer Mahlzeit auf eine Einkaufsliste übernehmen.
  * Body: { listId: number, category?: string }
- * Response: { data: { transferred: number, added_ids: number[] } }
+ * Response: { data: { transferred: number, skipped: number, added_ids: number[], ingredient_ids: number[] } }
+ *
+ * Seit R23 (D2) unter der EINEN Regel der Kueche (services/kitchen-handover.js):
+ * was unabgehakt unter demselben Namen auf der Liste steht, wird uebersprungen
+ * und als `skipped` gezaehlt, statt ein zweites Mal zu entstehen.
  *
  * `added_ids` trägt das Undo im Client (Audit 2026-07-30, P1-B). Zurückgenommen
  * wird über `POST /shopping/items/undo-transfer` und nicht durch einfaches
@@ -955,58 +960,18 @@ router.post('/:id/to-shopping-list', (req, res) => {
     const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
     if (!list) return res.status(404).json({ error: 'Einkaufsliste nicht gefunden', code: 404 });
 
-    // Eine aus einem Rezept geplante Mahlzeit hat keine eigenen Zutaten - sie
-    // kennt nur die recipe_id. Beim ersten Transfer werden die Rezeptzutaten
-    // hier zu echten meal_ingredients materialisiert. Erst danach greift das
-    // on_shopping_list-Flag, das die Mahlzeit (anders als das wiederverwendbare
-    // Rezept) vor doppeltem Übertragen schützt. Bedingung ist bewusst „gar
-    // keine Zutaten" und nicht „keine offenen": nach einem vollständigen
-    // Transfer darf nicht erneut materialisiert werden.
-    const existingCount = db.get()
-      .prepare('SELECT COUNT(*) AS c FROM meal_ingredients WHERE meal_id = ?').get(mealId).c;
-    if (existingCount === 0 && meal.recipe_id) {
-      const recipeIngredients = db.get().prepare(
-        'SELECT name, quantity, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC',
-      ).all(meal.recipe_id);
-      if (recipeIngredients.length > 0) {
-        const copyIng = db.get().prepare(
-          'INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, ?, ?)',
-        );
-        db.transaction(() => {
-          for (const ing of recipeIngredients) {
-            copyIng.run(mealId, ing.name, ing.quantity, ing.category || 'Sonstiges');
-          }
-        });
-      }
-    }
-
-    const ingredients = db.get().prepare(`
-      SELECT * FROM meal_ingredients
-      WHERE meal_id = ? AND on_shopping_list = 0
-    `).all(mealId);
-
-    if (ingredients.length === 0)
-      return res.json({ data: { transferred: 0, added_ids: [] } });
-
-    const addedIds = db.transaction(() => {
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category, added_from_meal)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      const markDone = db.get().prepare(`
-        UPDATE meal_ingredients SET on_shopping_list = 1 WHERE id = ?
-      `);
-
-      const ids = [];
-      for (const ing of ingredients) {
-        const info = insertItem.run(listId, ing.name, ing.quantity, ing.category || 'Sonstiges', mealId);
-        markDone.run(ing.id);
-        ids.push(Number(info.lastInsertRowid));
-      }
-      return ids;
+    // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
+    // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
+    // seit R23 derselbe Weg wie im Wochen- und im Listenimport.
+    const result = db.transaction(() => {
+      const { rows } = mealPlanSource(db.get(), { mealId });
+      if (!rows.length) return null;
+      return handOverToShoppingList(db.get(), listId, rows);
     });
 
-    res.json({ data: { transferred: addedIds.length, added_ids: addedIds } });
+    if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
+
+    res.json({ data: { transferred: result.added_ids.length, ...result } });
   } catch (err) {
     log.error('POST /:id/to-shopping-list', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -1017,7 +982,10 @@ router.post('/:id/to-shopping-list', (req, res) => {
  * POST /api/v1/meals/week-to-shopping-list
  * Alle noch nicht übertragenen Zutaten einer ganzen Woche auf eine Einkaufsliste übernehmen.
  * Body: { listId, week: YYYY-MM-DD, category? }
- * Response: { data: { transferred: number, added_ids: number[] } }
+ * Response: { data: { transferred: number, skipped: number, added_ids: number[], ingredient_ids: number[] } }
+ *
+ * Seit R23 (D2) mit den Rezept-Mahlzeiten der Woche (ihre Zutaten werden wie
+ * beim Einzel-Transfer materialisiert) und unter der Dublettenregel der Kueche.
  *
  * `added_ids` wie beim Einzel-Transfer. Diese Route hat derzeit keinen Aufrufer in
  * der Oberfläche; die IDs stehen trotzdem in der Antwort, damit ein künftiger
@@ -1044,35 +1012,15 @@ router.post('/week-to-shopping-list', (req, res) => {
     const from = weekStart(week);
     const to   = weekEnd(week);
 
-    const ingredients = db.get().prepare(`
-      SELECT mi.* FROM meal_ingredients mi
-      JOIN meals m ON m.id = mi.meal_id
-      WHERE m.date BETWEEN ? AND ?
-        AND mi.on_shopping_list = 0
-    `).all(from, to);
-
-    if (ingredients.length === 0)
-      return res.json({ data: { transferred: 0, added_ids: [] } });
-
-    const addedIds = db.transaction(() => {
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category, added_from_meal)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      const markDone = db.get().prepare(`
-        UPDATE meal_ingredients SET on_shopping_list = 1 WHERE id = ?
-      `);
-
-      const ids = [];
-      for (const ing of ingredients) {
-        const info = insertItem.run(listId, ing.name, ing.quantity, ing.category || 'Sonstiges', ing.meal_id);
-        markDone.run(ing.id);
-        ids.push(Number(info.lastInsertRowid));
-      }
-      return ids;
+    const result = db.transaction(() => {
+      const { rows } = mealPlanSource(db.get(), { from, to });
+      if (!rows.length) return null;
+      return handOverToShoppingList(db.get(), listId, rows);
     });
 
-    res.json({ data: { transferred: addedIds.length, added_ids: addedIds } });
+    if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
+
+    res.json({ data: { transferred: result.added_ids.length, ...result } });
   } catch (err) {
     log.error('POST /week-to-shopping-list', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

@@ -5143,13 +5143,15 @@ function transferRoutes(source) {
       path: head[2],
       body: source.slice(head.index, heads[index + 1]?.index ?? source.length),
     }))
-    .filter(({ method, path }) => method === 'post' && /\/to-shopping-list$|\/import-[a-z-]+$/.test(path));
+    .filter(({ method, path }) => method === 'post' && /[/-]to-shopping-list$|\/import-[a-z-]+$/.test(path));
 }
 
 /**
- * Wege mit eigenem Bestätigungsdialog. Dort ist die Rückfrage der Schutz, und
- * der Nutzer steht beim Auslösen auf dem ZIEL - beides fehlt den drei Ein-Tipp-
- * Pfaden, um die es hier geht.
+ * Wege mit eigenem Dialog AUF DEM ZIEL: dort gibt es die Liste schon, die
+ * Vorpruefung "keine Einkaufsliste" faellt weg. Seit R23 (D2, D3) haben beide
+ * trotzdem ein Rueckgaengig - der Dialog schuetzt vor dem Fehlgriff, nicht vor
+ * dem Irrtum, den man erst am Ergebnis sieht (der Import las bis dahin die
+ * Rezept-Mahlzeiten nicht, die Uebernahme leerte die Liste).
  */
 const CONFIRMED_TRANSFERS = new Map([
   ['import-meal-plan', 'Einkauf holt sich den Essensplan: eigener Dialog mit Zeitraum-Wahl und '
@@ -5159,6 +5161,43 @@ const CONFIRMED_TRANSFERS = new Map([
 ]);
 
 const isConfirmedTransfer = (url) => [...CONFIRMED_TRANSFERS.keys()].some((name) => url.endsWith(name));
+
+/**
+ * EINE Dublettenregel an allen Uebergaben in den Einkauf (R23, D2).
+ *
+ * Gemessen (Critique R23, G3 P1): drei Regeln an vier Wegen. Das Rezept
+ * uebersprang Offenes gleichen Namens, der Vorrat auch (per NOCASE, nur ASCII),
+ * Mahlzeit-Karte und beide Essensplan-Importe schrieben alles neu - zweimal
+ * "Zwiebeln" nach zwei Mahlzeiten aus einem Rezept. Die Regel steht jetzt in
+ * server/services/kitchen-handover.js; dieser Guard sucht den Routenbestand ab,
+ * damit kein Weg sie wieder selbst schreibt.
+ */
+test('jede Übergabe in den Einkauf geht über die eine Dublettenregel', () => {
+  const routesDir = new URL('../server/routes/', import.meta.url);
+  let checked = 0;
+  for (const entry of readdirSync(routesDir)) {
+    if (!entry.endsWith('.js')) continue;
+    for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
+      if (route.path.endsWith('import-shopping')) continue;
+      checked += 1;
+      assert.match(route.body, /handOverToShoppingList\(/,
+        `POST ${route.path} (${entry}) muss über handOverToShoppingList() schreiben`);
+      assert.doesNotMatch(route.body, /INSERT INTO shopping_items/,
+        `POST ${route.path} (${entry}) schreibt selbst in den Einkauf - dann gilt dort eine eigene Regel`);
+      assert.doesNotMatch(route.body, /is_checked = 0|COLLATE NOCASE/,
+        `POST ${route.path} (${entry}) prüft Dubletten selbst`);
+    }
+  }
+  assert.ok(checked >= 5, `fünf Übergaben erwartet (Rezept, Karte, Woche, Essensplan, Vorrat), gefunden: ${checked}`);
+
+  const service = read('../server/services/kitchen-handover.js');
+  assert.match(service, /is_checked = 0/, 'nur OFFENE Artikel zählen - was gekauft ist, braucht das nächste Gericht wieder');
+  assert.match(service, /ingredientMatchKey/, 'der Name wird wie jede Küchen-Identität normalisiert, nicht per SQLite-NOCASE');
+  for (const route of ['meals.js', 'shopping.js']) {
+    assert.match(read(`../server/routes/${route}`), /mealPlanSource\(db\.get\(\), \{ (?:mealId|from, to) \}\)|mealPlanSource\(db\.get\(\), range/,
+      `${route}: der Essensplan wird über die eine Quelle gelesen, die Rezept-Mahlzeiten mitnimmt`);
+  }
+});
 
 /**
  * Der Zustand „es gibt noch keine Einkaufsliste" hatte VIER Antworten.
@@ -5257,8 +5296,8 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
     'der Erfolgs-Toast muss die Rücknahme tragen');
   assert.match(helper, /ids\.length\s*\?/,
     'ohne IDs darf kein Undo-Knopf erscheinen, der nichts zurücknehmen kann');
-  assert.match(helper, /api\.post\('\/shopping\/items\/undo-transfer', \{ ids \}\)/,
-    'die Rücknahme läuft über EINEN Aufruf - N einzelne DELETEs können zur Hälfte scheitern');
+  assert.match(helper, /api\.post\('\/shopping\/items\/undo-transfer', ingredient_ids\.length \? \{ ids, ingredient_ids \} : \{ ids \}\)/,
+    'die Rücknahme läuft über EINEN Aufruf - N einzelne DELETEs können zur Hälfte scheitern - und nimmt die markierten Zutaten mit (R23, D2)');
   assert.match(helper, /refreshKitchenBadges\(\)/,
     'die Zahl des Einkaufs-Tabs ändert sich in beide Richtungen, beide Male hier');
 
@@ -5270,17 +5309,23 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   for (const entry of readdirSync(routesDir)) {
     if (!entry.endsWith('.js')) continue;
     for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
-      if (isConfirmedTransfer(route.path)) continue;
+      // Der Weg in den VORRAT nimmt ueber seine eigene Route zurueck (R23, D3);
+      // dafuer steht unten eine eigene Zusicherung.
+      if (route.path.endsWith('import-shopping')) continue;
       routesChecked += 1;
       assert.match(route.body, /added_ids/,
         `POST ${route.path} (${entry}) muss die erzeugten IDs zurückgeben`);
-      assert.match(route.body, /lastInsertRowid/,
-        `POST ${route.path} (${entry}) muss die IDs beim Einfügen einsammeln`);
-      assert.match(route.body, /added_ids: \[\] \} \}\)/,
+      // Seit R23 (D2) sammelt die EINE Uebergabe-Funktion die IDs beim Einfuegen.
+      assert.match(route.body, /handOverToShoppingList\(/,
+        `POST ${route.path} (${entry}) muss über die geteilte Übergabe schreiben, die die IDs einsammelt`);
+      assert.match(route.body, /added_ids: \[\]/,
         `POST ${route.path} (${entry}) muss auch im Leerfall added_ids liefern, damit der Client nicht raten muss`);
     }
   }
-  assert.ok(routesChecked >= 3, `mindestens drei Transfer-Routen erwartet, gefunden: ${routesChecked}`);
+  assert.ok(routesChecked >= 4, `mindestens vier Transfer-Routen erwartet, gefunden: ${routesChecked}`);
+  assert.match(read('../server/services/kitchen-handover.js'), /addedIds\.push\(Number\(info\.lastInsertRowid\)\)/,
+    'die Übergabe muss die IDs beim Einfügen einsammeln');
+
 
   // Die Rücknahme nimmt den GANZEN Übertrag zurück, nicht nur seine Artikel: der
   // Mahlzeit-Pfad setzt beim Übertragen `on_shopping_list`. Wer nur die
@@ -5300,7 +5345,7 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
     if (!entry.endsWith('.js')) continue;
     const source = read(`../public/pages/${entry}`);
     for (const url of transferCalls(source)) {
-      if (isConfirmedTransfer(url)) continue;
+      if (url.endsWith('import-shopping')) continue;
       assert.match(source, /announceTransfer\(\{/,
         `${entry} überträgt nach ${url} und muss den Erfolg über announceTransfer() melden`);
       assert.match(source, /added_ids/,
@@ -6300,7 +6345,7 @@ test('die Küche benutzt ein Vokabular für eine Sache', () => {
   // ein Guard auf diese Schreibweisen scheiterte am nächsten Refactor, obwohl die
   // Regel weiter galt.
   for (const [page, key] of [['meals', 'meals.transferSuccess'], ['recipes', 'recipes.toShoppingSuccess'], ['pantry', 'pantry.toShoppingDone']]) {
-    assert.match(pages[page], new RegExp(`t\\('${key}',\\s*\\{[^}]*list:`),
+    assert.match(pages[page], new RegExp(`(?:\\bt|transferMessage)\\('${key}',\\s*\\{[^}]*list:`),
       `${page}.js muss den Listennamen an ${key} übergeben`);
   }
 
@@ -6403,8 +6448,8 @@ test('die beiden Küchen-Editoren sind derselbe Dialog', () => {
   // („Plan zufällig füllen") macht das seit dem Audit korrekt.
   assert.match(shopping, /id="shopping-import-submit" disabled/,
     'der Import-Knopf muss deaktiviert starten');
-  assert.match(shopping, /submitBtn\.disabled = !transferred/,
-    'die Vorschau muss ihn freischalten, sobald der Zeitraum Zutaten enthält');
+  assert.match(shopping, /submitBtn\.disabled = !added/,
+    'die Vorschau muss ihn freischalten, sobald der Zeitraum Zutaten enthält, die noch nicht auf der Liste stehen (R23, D2)');
 });
 
 /**

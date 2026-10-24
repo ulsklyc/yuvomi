@@ -154,7 +154,10 @@ function aggregateMealIngredients(ingredients = []) {
     group.count += 1;
     if (parsed) {
       group.amount = (group.amount ?? 0) + parsed.amount;
-      group.quantity = formatQuantity(group.amount, group.unit);
+      // Eine EINZELNE Menge bleibt, wie sie geschrieben wurde ("1 Stück");
+      // umgeschrieben wird erst eine Summe - die Einheit des Schluessels ist
+      // kleingeschrieben und machte aus "Stück" sonst "stück" (R23).
+      group.quantity = group.count === 1 ? quantity : formatQuantity(group.amount, group.unit);
     } else if (!quantity) {
       group.quantity = null;
     } else if (group.count > 1) {

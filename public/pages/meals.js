@@ -14,7 +14,7 @@ import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePe
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
-import { resolveShoppingTarget, announceTransfer, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
+import { resolveShoppingTarget, announceTransfer, transferMessage, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { addLocalDays, startOfLocalWeekKey, weekStartIndex, todayKey } from '/utils/date.js';
 import { normalizeRecipeMealTypes, recipeSupportsMealType, recipeAllowsMealType } from '/utils/recipe-meal-types.js';
@@ -2238,11 +2238,13 @@ function openMealModal(opts) {
             // Dieselbe Meldung, Standzeit und Rücknahme wie am Slot-Knopf: es ist
             // derselbe Transfer, nur ein anderer Auslöser.
             announceTransfer({
-              message: t('meals.transferSuccess', {
-                count: res.data.transferred,
+              message: transferMessage('meals.transferSuccess', {
+                added: res.data.transferred,
+                skipped: res.data.skipped ?? 0,
                 list: state.lists.find((l) => l.id === listId)?.name ?? '',
               }),
               addedIds: res.data.added_ids ?? [],
+              ingredientIds: res.data.ingredient_ids ?? [],
               onUndone: async () => {
                 await loadWeek(state.currentWeek);
                 renderWeekGrid();
@@ -2250,8 +2252,17 @@ function openMealModal(opts) {
               },
             });
           } else {
-            window.yuvomi?.showToast(t('meals.transferAlreadyDone'), 'info');
-            btn.disabled = false;
+            // Alles stand schon auf der Liste (R23, D2): die Zutaten gelten
+            // trotzdem als uebernommen, also zeichnet die Woche neu, und der
+            // Dialog schliesst - es gibt nichts mehr zu tun.
+            if (res.data.skipped > 0) {
+              await reloadAfterSave(() => loadWeek(state.currentWeek));
+              closeModal({ force: true, context: dialog });
+              renderWeekGrid();
+            } else {
+              btn.disabled = false;
+            }
+            window.yuvomi?.showToast(t('kitchen.transferAllPresent'), 'info');
           }
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
@@ -2909,15 +2920,24 @@ async function transferMeal(mealId, btn) {
       // `on_shopping_list` zurück, die Zutaten sind danach wieder offen - und die
       // Kachel zeigt den Übernahme-Knopf wieder an.
       announceTransfer({
-        message: t('meals.transferSuccess', { count: res.data.transferred, list: target.name }),
+        message: transferMessage('meals.transferSuccess', {
+          added: res.data.transferred, skipped: res.data.skipped ?? 0, list: target.name,
+        }),
         addedIds: res.data.added_ids ?? [],
+        ingredientIds: res.data.ingredient_ids ?? [],
         onUndone: async () => {
           await loadWeek(state.currentWeek);
           renderWeekGrid();
         },
       });
     } else {
-      window.yuvomi?.showToast(t('meals.transferAlreadyDone'), 'info');
+      // Alles stand schon darauf (R23, D2) - die Kachel zeigt danach keinen
+      // Uebernahme-Knopf mehr, die Zutaten gelten als uebernommen.
+      if (res.data.skipped > 0) {
+        await reloadAfterSave(() => loadWeek(state.currentWeek));
+        renderWeekGrid();
+      }
+      window.yuvomi?.showToast(t('kitchen.transferAllPresent'), 'info');
     }
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
