@@ -7,31 +7,34 @@
 
   <p>
     Aufgaben, Kalender, Budget, Mahlzeiten, Gesundheit und mehr für eine Familie, ein Paar oder
-    euch allein, auf einem Server, der euch gehört. Ab Werk verlässt ihn nur eine Versionsprüfung.
+    euch allein, auf einem Server, der euch gehört. Ab Werk ruft er nach außen nur eins auf: eine
+    Versionsprüfung bei GitHub.
   </p>
 
   <p>
     <a href="https://github.com/ulsklyc/yuvomi/releases"><img src="https://img.shields.io/github/v/release/ulsklyc/yuvomi?style=flat-square&color=6C3AED&label=release" alt="Neuestes Release"></a>
     <a href="https://github.com/ulsklyc/yuvomi/stargazers"><img src="https://img.shields.io/github/stars/ulsklyc/yuvomi?style=flat-square&color=6C3AED&label=stars" alt="GitHub-Sterne"></a>
-    <a href="https://github.com/ulsklyc/yuvomi/pkgs/container/yuvomi"><img src="https://img.shields.io/badge/ghcr.io-yuvomi-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker-Image"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT-Lizenz"></a>
+    <a href="https://github.com/ulsklyc/yuvomi/pkgs/container/yuvomi"><img src="https://img.shields.io/badge/image-ghcr.io%2Fulsklyc%2Fyuvomi-6C3AED?style=flat-square" alt="Container-Image ghcr.io/ulsklyc/yuvomi"></a>
+    <a href="#installieren"><img src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-6C3AED?style=flat-square" alt="Läuft auf amd64 und arm64"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6C3AED?style=flat-square" alt="MIT-Lizenz"></a>
   </p>
 
   <p>
     <a href="https://yuvomi.cloud/"><strong>→ Rundgang auf yuvomi.cloud</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#installieren"><strong>In&nbsp;Minuten&nbsp;installieren</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#dokumentation"><strong>Doku</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="CHANGELOG.md"><strong>Changelog</strong></a>
+    <a href="CHANGELOG.md"><strong>Changelog</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="README.md" hreflang="en">English&nbsp;(maßgeblich)</a>
   </p>
 
-  <sub>Die englische Fassung (<a href="README.md">README.md</a>) ist die maßgebliche; diese Übersetzung folgt ihr.</sub>
+  <p><b>20</b>&nbsp;Module&nbsp;&nbsp;·&nbsp; <b>27</b>&nbsp;Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b>&nbsp;Tracker&nbsp;&nbsp;·&nbsp; <b>1</b>&nbsp;SQLite&#8209;Datei&nbsp;&nbsp;·&nbsp; <b>256&nbsp;MB</b>&nbsp;RAM</p>
 
   <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-mobile.webp">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-light-mobile.webp">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-web.webp">
     <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Geburtstage und Belohnungen" width="820">
   </picture>
-
-  <sub><b>20</b> Module&nbsp;&nbsp;·&nbsp; <b>27</b> Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b> Tracker&nbsp;&nbsp;·&nbsp; optionale&nbsp;<b>AES&#8209;256</b>&#8209;Datenbankverschlüsselung</sub>
 </div>
 
 Die meisten Haushalte kleben ihren Alltag aus einem Dutzend Bezahl-Apps zusammen, jede mit eigenem
@@ -80,33 +83,34 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 Schaltet ab, was euer Haushalt nicht braucht, und es verschwindet für alle aus dem Menü. Inventar,
 Entsorgung und Schichtplan sind anfangs aus.
 
-- **Planen** - Aufgaben · Kalender · Belohnungen · Notizen · Schichtplan
-- **Haushalt** - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar
-- **Menschen** - Gesundheit · Kontakte · Geburtstage
-- **Finanzen** - Budget
-- **Einstellungen** - Familie · Erinnerungen · API-Tokens · Backup
-
 <details>
-<summary><b>Jedes Modul in einer Zeile</b></summary>
+<summary>
+<b>Planen</b> - Aufgaben · Kalender · Belohnungen · Notizen · Schichtplan<br>
+<b>Haushalt</b> - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar<br>
+<b>Menschen</b> - Gesundheit · Kontakte · Geburtstage<br>
+<b>Finanzen</b> - Budget<br>
+<b>Einstellungen</b> - Familie · Erinnerungen · API-Tokens · Backup<br>
+<sub>Aufklappen für jedes Modul in einer Zeile</sub>
+</summary>
 
 | Modul | In einer Zeile |
 |---|---|
 | **Aufgaben** | Kanban-Board mit Fristen, Unteraufgaben, Wiederholungen, Kommentaren und einem Verlauf, wer was abgehakt hat. |
-| **Einkauf** | Geteilte Listen nach Gang sortiert, mit Wischgesten und einem Import aus dem Essensplan. |
+| **Kalender** | Zwei-Wege-Sync mit Google und CalDAV, Outlook-Push, Kalender-Abos, Feiertage und Sichtbarkeit je Termin. |
+| **Belohnungen** | Punkte aus Aufgaben, ein elterlich freigegebener Katalog, ein nachvollziehbares Konto und Taschengeld je Kind. |
+| **Notizen &amp; Kontakte** | Markdown-Haftnotizen mit antippbaren Checklisten, dazu Kontakte mit CardDAV-Sync und vCard-Import/-Export. |
+| **Schichtplan** | Rotierende Schichten und feste Wochenpläne, als Ebene im Kalender eingeblendet. Standardmäßig aus. |
 | **Mahlzeiten** | Wochenplaner per Drag-and-drop mit Rezept-Seitenleiste und direktem Export in die Einkaufsliste. |
 | **Rezepte** | Rezepte anlegen und skalieren, Mahlzeiten vorbelegen oder eine Mealie- oder Tandoor-Instanz lesend spiegeln. |
+| **Einkauf** | Geteilte Listen nach Gang sortiert, mit Wischgesten und einem Import aus dem Essensplan. |
 | **Vorrat** | Menge, Lagerort und Mindesthaltbarkeit, mit einer Erinnerung, bevor etwas abläuft. |
-| **Kalender** | Zwei-Wege-Sync mit Google und CalDAV, Outlook-Push, Kalender-Abos, Feiertage und Sichtbarkeit je Termin. |
-| **Dokumente** | Durchsuchbare Familiendateien in Ordnern, lokal, auf WebDAV oder in Google Drive. |
-| **Inventar** | Was ihr besitzt, mit Kaufpreis, Garantie, verknüpften Belegen, einem Wartungsprotokoll und wiederkehrenden Erinnerungen vor Fristablauf. Standardmäßig aus. |
-| **Budget** | Einnahmen, Ausgaben, Konten, Darlehen, Abos und gemeinsame Ausgaben mit vereinfachten Schulden. |
 | **Haushaltshilfe** | Für Hilfen im Haushalt: Dienstpläne, Ein- und Ausstempeln, Abrechnung, Aufgaben und Materialwünsche. |
 | **Entsorgung** | Abholtermine je Abfallart, auch „der letzte Freitag", oder ein abonnierter kommunaler ICS-Kalender. Standardmäßig aus. |
-| **Belohnungen** | Punkte aus Aufgaben, ein elterlich freigegebener Katalog, ein nachvollziehbares Konto und Taschengeld je Kind. |
+| **Dokumente** | Durchsuchbare Familiendateien in Ordnern, lokal, auf WebDAV oder in Google Drive. |
+| **Inventar** | Was ihr besitzt, mit Kaufpreis, Garantie, verknüpften Belegen, einem Wartungsprotokoll und wiederkehrenden Erinnerungen vor Fristablauf. Standardmäßig aus. |
 | **Gesundheit** | Vitalwerte, Medikamente, Vorsorge, Laborwerte, Aktivität, Zyklus, ein Fastentagebuch und ein Ernährungstagebuch je Mitglied, mit Verlaufsdiagrammen. |
-| **Schichtplan** | Rotierende Schichten und feste Wochenpläne, als Ebene im Kalender eingeblendet. Standardmäßig aus. |
-| **Notizen &amp; Kontakte** | Markdown-Haftnotizen mit antippbaren Checklisten, dazu Kontakte mit CardDAV-Sync und vCard-Import/-Export. |
 | **Geburtstage** | Geburtstage und optionale Namenstage, mit Kalendereinträgen, Alter und Erinnerungen. |
+| **Budget** | Einnahmen, Ausgaben, Konten, Darlehen, Abos und gemeinsame Ausgaben mit vereinfachten Schulden. |
 | **Familie** | Mitgliedsprofile mit Rollen und Einladungslinks, über die neue Mitglieder ihr Passwort selbst wählen. |
 | **Erinnerungen** | An Aufgaben, Termine, Medikamente, Garantien, Mindesthaltbarkeit, ablaufende Dokumente und Abfuhr - in der App, per Push, Gotify, ntfy, Webhook oder E-Mail. |
 | **API-Tokens** | Bearer-Tokens mit OpenAPI-3.1-Spezifikation und eingebautem MCP-Endpunkt für KI-Agenten. |
@@ -143,9 +147,13 @@ kein Abo, keinen Upsell und keine Bezahlstufe.
 
 ## Installieren
 
-Sucht euch euren Weg aus: [Docker oder Podman](#docker-oder-podman) für volle Kontrolle, die
-[geführte Einrichtung](#geführte-einrichtung) im Browser oder den
-[App-Store eures NAS](#aus-dem-app-store-eures-nas) ganz ohne Terminal.
+Sucht euch euren Weg aus:
+
+- **[Aus dem App-Store eures NAS](#aus-dem-app-store-eures-nas)** - TrueNAS SCALE, Umbrel oder Unraid, ganz ohne Terminal.
+- **[Docker oder Podman](#docker-oder-podman)** - Compose auf eurem eigenen Server, für volle Kontrolle.
+- **[Geführte Einrichtung](#geführte-einrichtung)** - ein Assistent im Browser, der alles einrichtet und den Container startet.
+
+Egal welcher Weg:
 
 - **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB, für amd64 und arm64 (Raspberry Pi 4/5).
 - **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
@@ -162,11 +170,14 @@ Sucht euch euren Weg aus: [Docker oder Podman](#docker-oder-podman) für volle K
 
 </details>
 
-### Docker oder Podman
+### Aus dem App-Store eures NAS
 
-Unter Podman ladet ihr `podman-compose.yml` statt `docker-compose.yml` und startet mit
-`podman compose -f podman-compose.yml up -d`; darin stecken die SELinux-`:Z`-Labels, die RHEL,
-Fedora und CentOS Stream brauchen.
+**TrueNAS SCALE**, **Umbrel** und **Unraid** führen Yuvomi alle: im Katalog suchen und installieren,
+ganz ohne Terminal. Neu bei Containern? Die
+**[Installationsanleitung](docs/installation.md)** führt Schritt für Schritt durch Engine, HTTPS,
+Backups und Fehlersuche.
+
+### Docker oder Podman
 
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
@@ -184,6 +195,10 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 ```bash
 docker compose up -d
 ```
+
+Unter Podman ladet ihr `podman-compose.yml` statt `docker-compose.yml` und startet mit
+`podman compose -f podman-compose.yml up -d`; darin stecken die SELinux-`:Z`-Labels, die RHEL,
+Fedora und CentOS Stream brauchen.
 
 Öffnet `http://localhost:3000`. Der erste Besuch führt euch durch das Anlegen des Admin-Kontos. Lädt
 die Seite nicht, nennt `docker compose logs` (unter Podman `podman compose -f podman-compose.yml logs`)
@@ -208,13 +223,6 @@ node tools/installer/install-server.js
 einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
 und dann dort dieselbe Adresse. Braucht Node.js 22+ auf dem Host; der Container bringt sein eigenes
 Node 24 mit.
-
-### Aus dem App-Store eures NAS
-
-**TrueNAS SCALE**, **Umbrel** und **Unraid** führen Yuvomi alle: im Katalog suchen und installieren,
-ganz ohne Terminal. Neu bei Containern? Die
-**[Installationsanleitung](docs/installation.md)** führt Schritt für Schritt durch Engine, HTTPS,
-Backups und Fehlersuche.
 
 <details>
 <summary><b>Bevor ihr live geht: Gesundheitsdaten, Google-Drive-Freigabe und DSGVO</b></summary>
@@ -248,21 +256,11 @@ Yuvomi wurde von **Oikos** umbenannt, um einen Markenkonflikt mit einem unabhän
 ## Unter der Haube
 
 - **Kein Build-Schritt** - reine ES-Module und einfaches CSS. Kein Bundler, kein Transpiler, kein Framework, kein CDN zur Laufzeit.
-- **Apple HIG in der Liquid-Glass-Sprache** - Systemschrift und Apples Typoskala, Kapsel-Bedienelemente, eingerückte Listengruppen und federnde Bewegung, in Hell und Dunkel gegen WCAG AA geprüft.
+- **Fühlt sich an wie eine native App** - gebaut nach Apples Gestaltungsrichtlinien: Systemschrift, Kapsel-Knöpfe, gruppierte Listen und federnde Bewegung, mit in Hell und Dunkel geprüftem WCAG-AA-Kontrast.
 - **Privatsphäre zuerst** - vollständig selbstgehostet, optionale SQLCipher-AES-256-Datenbankverschlüsselung, keine Telemetrie.
 - **Anmeldung für einen ganzen Haushalt** - Zwei-Faktor-Anmeldung, Einladungslinks, optionaler Passwort-Reset per E-Mail und Single Sign-on mit jedem OIDC-Anbieter; siehe [wie sicher der Zugang von außen ist](#bevor-ihr-euch-festlegt).
 - **27 Sprachen** mit automatischer Erkennung. Eine eigene Haushaltseinstellung bestimmt die Sprache der Einträge, die Yuvomi selbst anlegt - so spricht ein exportierter Kalender die Sprache eures Haushalts statt Englisch.
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white" alt="Express">
-  <img src="https://img.shields.io/badge/SQLite%20%2F%20SQLCipher-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite / SQLCipher">
-  <img src="https://img.shields.io/badge/Vanilla_JS_(ES_Modules)-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="Vanilla JS">
-  <img src="https://img.shields.io/badge/Plain_CSS-1572B6?style=flat-square&logo=css3&logoColor=white" alt="Plain CSS">
-  <img src="https://img.shields.io/badge/Node.js-%E2%89%A522.14-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 22.14 oder neuer">
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/Podman-892CA0?style=flat-square&logo=podman&logoColor=white" alt="Podman">
-  <img src="https://img.shields.io/badge/PWA-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
-</p>
+- **Technik** - Node.js und Express mit SQLite (SQLCipher), ein Container für Docker oder Podman, eine PWA auf jedem Handy.
 
 ---
 

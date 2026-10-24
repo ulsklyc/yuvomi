@@ -78,6 +78,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (image, memory, volumes, data, outbound connections) stay, with one button into the guide, and
   the page closes on the family call to action under the same three-circle mark as the opening
   line. On a phone the page is about 570px shorter.
+- **The README reads on a phone and leads with the easiest install.** On a phone the opening
+  screenshot was the desktop view shrunk to 324px, too small to read; a phone now gets the phone
+  screenshot, in light or dark. The figures line (modules, languages, trackers, now also the one
+  SQLite file and 256 MB RAM) sits above the screenshot in normal size, and the badges show the
+  image, amd64 and arm64 and the licence in one violet. The module groups are the line you open
+  for one sentence per module instead of a second list above it. Install starts with the NAS app
+  stores, Docker comes before the Podman note, the outbound sentence at the top names the one
+  version check against GitHub, the design line speaks of a native-feeling app instead of design
+  jargon, and the coloured technology badges became one line under "Under the hood". The German
+  README follows, with its English link in the link row.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

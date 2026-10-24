@@ -202,7 +202,9 @@ function claimedModuleWord(md) {
 
 /** Die Ziffer aus der Kennzahlenzeile (`<b>18</b> modules` / `… Module`). */
 function claimedModuleDigit(md) {
-  const m = md.match(/<b>(\d+)<\/b>\s*(?:modules|Module)\b/);
+  // `&nbsp;` zaehlt als Leerraum: die Kennzahlenzeile haelt Zahl und Wort
+  // zusammen, sonst brach sie am Telefon zwischen "1" und "SQLite file" (S5, 2026-10-24).
+  const m = md.match(/<b>(\d+)<\/b>(?:\s|&nbsp;)*(?:modules|Module)\b/);
   return m ? Number(m[1]) : null;
 }
 
@@ -226,7 +228,7 @@ for (const lang of Object.keys(READMES)) {
     const md = readme(lang);
     const locales = readdirSync(resolve(ROOT, 'public/locales')).filter((f) => f.endsWith('.json')).length;
 
-    const claims = [...md.matchAll(/(\d+)\s*(?:<\/b>\s*)?(?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
+    const claims = [...md.matchAll(/(\d+)\s*(?:<\/b>(?:\s|&nbsp;)*)?(?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
     assert.ok(claims.length >= 2, `nur ${claims.length} Sprachangaben gefunden - Muster veraltet?`);
 
     for (const claimed of claims) {
@@ -274,8 +276,13 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
 
 /**
  * Seit der Critique vom 2026-09-30 steht die Modultabelle in einem <details>,
- * und sichtbar bleiben fuenf Gruppenzeilen in der Reihenfolge des App-Menues
- * (`- **Plan** - Tasks · Calendar · …`). Die Homepage (#modules) zeigt dieselben
+ * und sichtbar bleiben fuenf Gruppenzeilen in der Reihenfolge des App-Menues.
+ * Seit der README-Critique vom 2026-10-24 sind sie das <summary> genau dieses
+ * <details> (`<b>Plan</b> - Tasks · Calendar · …<br>`): vorher standen sie als
+ * eigene Liste ueber einer Klappe "Every module in one line", und die Module
+ * standen mit der Tauschtabelle dreimal auf der Seite. Eine Gruppenliste
+ * AUSSERHALB des <summary> zaehlt deshalb nicht mehr als Gruppenzeile - sie
+ * waere genau die Doppelung, die der Umbau entfernt hat. Die Homepage (#modules) zeigt dieselben
  * Gruppen, und `test-docs-landing.js` haelt sie gegen `public/router.js`. Hier:
  * README-Gruppen == Homepage-Gruppen (Name, Reihenfolge, Mitglieder), je
  * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle - eine
@@ -284,7 +291,8 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
  */
 function readmeGroups(md) {
   const sec = md.split(/^## /m).find((s) => claimedModuleWord(`## ${s.split('\n')[0]}`)) || '';
-  return [...sec.matchAll(/^- \*\*(.+?)\*\* - (.+)$/gm)]
+  const summary = (sec.match(/<details>\s*<summary>([\s\S]*?)<\/summary>/) || [, ''])[1];
+  return [...summary.matchAll(/^<b>(.+?)<\/b> - (.+?)(?:<br>)?$/gm)]
     .map((m) => ({ label: m[1].trim(), names: m[2].split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()) }));
 }
 
@@ -341,12 +349,19 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     return groupFindings(md.replace(from, to), html, 'en');
   };
   // Kontakte zurueck zu den Notizen (der Anlass von Runde 2 auf der Homepage).
-  const f1 = swap('Notes · Schedule\n', 'Notes · Schedule · Contacts\n');
+  const f1 = swap('Notes · Schedule<br>', 'Notes · Schedule · Contacts<br>');
   assert.ok(hit(f1, /Gruppe "Plan"/) && hit(f1, /zwei Gruppenzeilen/), f1.join(' | '));
   // Ein Modul fehlt in den Gruppenzeilen, steht aber in der Tabelle.
   assert.ok(hit(swap(' · Waste collection', ''), /Tabellenzeile "Waste collection" steht in keiner Gruppenzeile/));
   // Eine Gruppe umbenannt.
-  assert.ok(hit(swap('- **People** - ', '- **Persons** - '), /Gruppe 3: README "Persons", Homepage "People"/));
+  assert.ok(hit(swap('<b>People</b> - ', '<b>Persons</b> - '), /Gruppe 3: README "Persons", Homepage "People"/));
+  // Die alte Form kommt zurueck: Gruppen als eigene Liste vor einer Klappe mit
+  // anderem <summary>. Dann fehlen die Gruppenzeilen, statt doppelt zu zaehlen.
+  const summary = md.match(/<details>\s*<summary>[\s\S]*?<\/summary>/)[0];
+  const asList = summary.replace(/<details>\s*<summary>\n?/, '').replace(/<br>|<\/summary>|<sub>.*<\/sub>\n?/g, '')
+    .replace(/^<b>(.+?)<\/b> - /gm, '- **$1** - ');
+  const oldForm = groupFindings(md.replace(summary, `${asList}\n<details>\n<summary><b>Every module in one line</b></summary>`), html, 'en');
+  assert.ok(hit(oldForm, /0 Gruppenzeilen, die Homepage zeigt 5 Gruppen/), oldForm.join(' | '));
   // Die Homepage bekommt ein Modul, das die Gruppenzeilen nicht kennen.
   const more = html.replace('<h4 data-t="m_backup_t">', '<h4 data-t="m_backup_t">x</h4></div><div class="mod-card"><h4 data-t="m_bday_t">');
   assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als <h4> im Markup');
