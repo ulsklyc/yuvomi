@@ -507,3 +507,20 @@ test('Erfolg nach Dialogwechsel - jeder Weg schliesst nur mit dem Kontext von VO
     deinstalliere();
   }
 });
+
+// R23 S10 (Critique G2 P2/P3): der Besuchsbericht ist ein Leseblatt - kein
+// "Abbrechen" ohne Eingabe, dafuer Bearbeiten; das Einchecken meldet sich in
+// derselben Form wie das Auschecken; ein Wort fuer den Besuch.
+test('R23: Besuchsbericht mit Bearbeiten statt Abbrechen, Einchecken mit Namen, ein Wort "Besuch"', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  const src = read(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function openVisitReportModal('), src.indexOf('function renderStaff('));
+  assert.doesNotMatch(fn, /data-action="close-modal">\$\{esc\(t\('common\.cancel'\)\)\}/, 'kein Abbrechen im Leseblatt');
+  assert.match(fn, /id="visit-report-edit"/, 'Bearbeiten im Fuss');
+  assert.match(fn, /const editable = writable && visit\.can_edit;/, 'nur wo der Server es zugesteht');
+  assert.match(fn, /t\('housekeeping\.visitDate'\)/, 'das Datum heisst Besuchsdatum, nicht "Letzter Besuch"');
+  assert.match(src, /t\('housekeeping\.checkedInNamed', \{ name: worker\.display_name \}\)/);
+  const de = JSON.parse(read(new URL('../public/locales/de.json', import.meta.url), 'utf8')).housekeeping;
+  const einsatz = Object.entries(de).filter(([, v]) => /Einsatz|Einsätze/.test(v)).map(([k]) => k);
+  assert.deepEqual(einsatz, [], 'die Haushaltshilfe sagt "Besuch" (Reiter "Besuche"), nicht "Einsatz"');
+});

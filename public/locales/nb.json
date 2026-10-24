@@ -4028,7 +4028,6 @@
         "quickSupply": "Manglende produkt",
         "supplyName": "Produktnavn",
         "supplyPlaceholder": "Hva mangler?",
-        "checkedInToast": "Sjekk inn registrert.",
         "supplyAddedToast": "Lagt til i handlelisten.",
         "overdue": "Forfalt",
         "dueToday": "Forfaller i dag",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Alle besøk i rapporten",
         "checkedOutNamed": "{{name}} sjekket ut.",
         "visitToday": "Her i dag: {{from}} - {{to}}",
-        "checkInAgain": "Sjekk inn igjen"
+        "checkInAgain": "Sjekk inn igjen",
+        "checkedInNamed": "{{name}} sjekket inn."
     },
     "userMultiSelect": {
         "moreUsers": "mer",

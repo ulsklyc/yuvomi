@@ -4028,7 +4028,6 @@
         "quickSupply": "Eksik ürün",
         "supplyName": "Ürün adı",
         "supplyPlaceholder": "Ne eksik?",
-        "checkedInToast": "Giriş kaydedildi.",
         "supplyAddedToast": "Alışveriş listesine eklendi.",
         "overdue": "Gecikmiş",
         "dueToday": "Bugün son gün",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Tüm ziyaretler raporda",
         "checkedOutNamed": "{{name}} çıkış yaptı.",
         "visitToday": "Bugün burada: {{from}} - {{to}}",
-        "checkInAgain": "Yeniden giriş yap"
+        "checkInAgain": "Yeniden giriş yap",
+        "checkedInNamed": "{{name}} giriş yaptı."
     },
     "userMultiSelect": {
         "moreUsers": "daha",

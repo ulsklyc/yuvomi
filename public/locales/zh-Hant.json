@@ -4028,7 +4028,6 @@
         "quickSupply": "缺少物品",
         "supplyName": "物品名稱",
         "supplyPlaceholder": "缺什麼？",
-        "checkedInToast": "簽到已記錄。",
         "supplyAddedToast": "已加入購物清單。",
         "overdue": "已逾期",
         "dueToday": "今天到期",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "在報告中檢視所有上門記錄",
         "checkedOutNamed": "{{name}}已簽退。",
         "visitToday": "今日在場：{{from}} - {{to}}",
-        "checkInAgain": "再次簽到"
+        "checkInAgain": "再次簽到",
+        "checkedInNamed": "{{name}}已簽到。"
     },
     "userMultiSelect": {
         "moreUsers": "更多",

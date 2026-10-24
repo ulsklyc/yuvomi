@@ -4028,7 +4028,6 @@
         "quickSupply": "Missing product",
         "supplyName": "Product name",
         "supplyPlaceholder": "What is missing?",
-        "checkedInToast": "Check-in recorded.",
         "supplyAddedToast": "Added to the shopping list.",
         "overdue": "Overdue",
         "dueToday": "Due today",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "All visits in the report",
         "checkedOutNamed": "{{name}} checked out.",
         "visitToday": "Here today: {{from}} - {{to}}",
-        "checkInAgain": "Check in again"
+        "checkInAgain": "Check in again",
+        "checkedInNamed": "{{name}} checked in."
     },
     "userMultiSelect": {
         "moreUsers": "more",

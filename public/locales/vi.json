@@ -4028,7 +4028,6 @@
         "quickSupply": "Thiếu sản phẩm",
         "supplyName": "Tên sản phẩm",
         "supplyPlaceholder": "Cái gì bị thiếu?",
-        "checkedInToast": "Đã ghi nhận điểm danh.",
         "supplyAddedToast": "Đã thêm vào danh sách mua sắm.",
         "overdue": "Quá hạn",
         "dueToday": "Đến hạn hôm nay",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Tất cả lượt đến trong báo cáo",
         "checkedOutNamed": "{{name}} đã trang xuất.",
         "visitToday": "Có mặt hôm nay: {{from}} - {{to}}",
-        "checkInAgain": "Điểm danh lại"
+        "checkInAgain": "Điểm danh lại",
+        "checkedInNamed": "{{name}} đã điểm danh."
     },
     "userMultiSelect": {
         "moreUsers": "thêm",

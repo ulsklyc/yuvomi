@@ -4380,7 +4380,6 @@
         "quickSupply": "منتج ناقص",
         "supplyName": "اسم المنتج",
         "supplyPlaceholder": "ما الناقص؟",
-        "checkedInToast": "تم تسجيل الدخول.",
         "supplyAddedToast": "تمت الإضافة إلى قائمة التسوق.",
         "overdue": "متأخرة",
         "dueToday": "مستحقة اليوم",
@@ -4551,7 +4550,8 @@
         "allVisitsInReport": "كل الزيارات في التقرير",
         "checkedOutNamed": "تم تسجيل خروج {{name}}.",
         "visitToday": "الحضور اليوم: {{from}} - {{to}}",
-        "checkInAgain": "تسجيل الدخول مجددًا"
+        "checkInAgain": "تسجيل الدخول مجددًا",
+        "checkedInNamed": "تم تسجيل دخول {{name}}."
     },
     "userMultiSelect": {
         "moreUsers": "آخرون",

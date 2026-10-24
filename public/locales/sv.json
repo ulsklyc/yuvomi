@@ -4028,7 +4028,6 @@
         "quickSupply": "Produkt saknas",
         "supplyName": "Produkt",
         "supplyPlaceholder": "Vad saknas?",
-        "checkedInToast": "Incheckning sparad.",
         "supplyAddedToast": "Tillagd i inköpslistan.",
         "overdue": "Försenad",
         "dueToday": "Idag",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Alla besök i rapporten",
         "checkedOutNamed": "{{name}} utcheckad.",
         "visitToday": "Här i dag: {{from}} - {{to}}",
-        "checkInAgain": "Checka in igen"
+        "checkInAgain": "Checka in igen",
+        "checkedInNamed": "{{name}} incheckad."
     },
     "userMultiSelect": {
         "moreUsers": "mer",

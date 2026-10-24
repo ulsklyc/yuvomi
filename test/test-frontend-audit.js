@@ -10216,8 +10216,9 @@ test('German housekeeping visit copy contains no English fallback strings', () =
   const locale = JSON.parse(read('../public/locales/de.json'));
   const expected = {
     reports: 'Berichte',
-    visitRecordedAt: 'Einsatz erfasst um',
-    editVisit: 'Einsatz bearbeiten',
+    // R23 S10: ein Wort fuer den Besuch (Reiter "Besuche"), nicht "Einsatz".
+    visitRecordedAt: 'Besuch erfasst um',
+    editVisit: 'Besuch bearbeiten',
     paymentPaid: 'Bezahlt',
     paymentPending: 'Ausstehend',
     filterMonth: 'Monat',

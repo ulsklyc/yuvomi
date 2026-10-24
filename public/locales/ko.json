@@ -4032,7 +4032,6 @@
         "quickSupply": "물품 부족",
         "supplyName": "물품 이름",
         "supplyPlaceholder": "무엇이 부족한가요?",
-        "checkedInToast": "체크인이 저장되었습니다.",
         "supplyAddedToast": "장보기 목록에 추가되었습니다.",
         "overdue": "기한 초과",
         "dueToday": "오늘 마감",
@@ -4203,7 +4202,8 @@
         "allVisitsInReport": "보고서에서 모든 방문 보기",
         "checkedOutNamed": "{{name}} 님이 체크아웃했습니다.",
         "visitToday": "오늘 근무: {{from}} - {{to}}",
-        "checkInAgain": "다시 체크인"
+        "checkInAgain": "다시 체크인",
+        "checkedInNamed": "{{name}} 님이 체크인했습니다."
     },
     "splitExpenses": {
         "title": "공동 지출",

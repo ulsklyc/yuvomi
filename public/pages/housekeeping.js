@@ -576,7 +576,9 @@ async function toggleSession(container, workerId) {
         timezone: dayTimeZone(),
         ...visitTextPayload(worker, todayKey(), worker.rate_type === 'hourly' ? 0 : (worker.daily_rate || 0), 0),
       });
-      window.yuvomi?.showToast(t('housekeeping.checkedInToast'), 'success');
+      // Dieselbe Form wie das Auschecken (D6, "<Objekt> <Verb>"), vorher
+      // "Check-in gespeichert." - ein drittes Wort fuer dieselbe Handlung.
+      window.yuvomi?.showToast(t('housekeeping.checkedInNamed', { name: worker.display_name }), 'success');
     }
     await reloadAfterSave(() => loadData());
     // Nur den Tab neu zeichnen, nicht die Schale: ein neuer Kopf verloere den
@@ -1839,6 +1841,12 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
   // Bei `housekeeping: read` liest der Bericht nur: weder Bezahlen noch
   // Zuruecknehmen, auch wenn die Felder aus einer aelteren Antwort stammen.
   const writable = !readOnly();
+  // DER BERICHT IST EIN LESEBLATT (R23 S10, Critique G2 P2). Er trug
+  // "Abbrechen" neben "Als bezahlt markieren" - Abbrechen von nichts, das
+  // Blatt schliesst das X - und keinen Weg zum Bearbeiten, den es nur im
+  // Mehr-Menue der Zeile gab. Jetzt: Bearbeiten (wo der Server es zugesteht)
+  // und die Zahlung; ist keine Zahlung offen, ist Bearbeiten die Hauptaktion.
+  const editable = writable && visit.can_edit;
   let footerAction = '';
   if (writable && visit.can_mark_paid) {
     footerAction = `
@@ -1866,7 +1874,7 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
           </div>
         </div>
         <dl class="housekeeping-report-details">
-          <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(dateText(visit.check_in, { weekday: true }))} · ${esc(amountsHidden(visit.total_amount) ? visitTimeText(visit) : formatTime(visit.check_in))}</dd></div>
+          <div><dt>${esc(t('housekeeping.visitDate'))}</dt><dd>${esc(dateText(visit.check_in, { weekday: true }))} · ${esc(amountsHidden(visit.total_amount) ? visitTimeText(visit) : formatTime(visit.check_in))}</dd></div>
           ${visitWorkDetailsHtml(visit)}
           ${amountsHidden(visit.total_amount) ? '' : `
           <div><dt>${esc(t('housekeeping.extras'))}</dt><dd>${esc(money(visit.extras))}</dd></div>
@@ -1876,14 +1884,26 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
           ${visit.calendar_event_id ? `<div><dt>${esc(t('housekeeping.calendarEvent'))}</dt><dd>#${esc(visit.calendar_event_id)}</dd></div>` : ''}
           ${visitReceiptDetailHtml(visit)}
         </dl>
-        ${footerAction ? `
+        ${footerAction || editable ? `
         <div class="modal-panel__footer modal-panel__footer--plain">
-          <button class="btn btn--secondary" type="button" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          ${editable ? `<button class="btn ${visit.can_mark_paid ? 'btn--secondary' : 'btn--primary'}" type="button" id="visit-report-edit">
+            <i data-lucide="pencil" class="icon-sm" aria-hidden="true"></i>${esc(t('common.edit'))}
+          </button>` : ''}
           ${footerAction}
         </div>` : ''}
       </div>
     `,
     onSave(panel) {
+      panel.querySelector('#visit-report-edit')?.addEventListener('click', () => {
+        closeModal({ force: true });
+        openVisitEditModal(visit, content, {
+          onDone: async () => {
+            if (onRefresh) await onRefresh();
+            else if (content?.isConnected) renderReports(content);
+            refocusAfterRender();
+          },
+        });
+      });
       panel.querySelector('#visit-report-pay')?.addEventListener('click', () => payVisit(visit, async () => {
         closeModal({ force: true });
         await loadData();

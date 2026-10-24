@@ -4032,7 +4032,6 @@
         "quickSupply": "کمبود محصول",
         "supplyName": "نام محصول",
         "supplyPlaceholder": "چه چیزی کم است؟",
-        "checkedInToast": "ورود ذخیره شد.",
         "supplyAddedToast": "به فهرست خرید افزوده شد.",
         "overdue": "معوق",
         "dueToday": "موعد امروز",
@@ -4203,7 +4202,8 @@
         "allVisitsInReport": "همهٔ بازدیدها در گزارش",
         "checkedOutNamed": "خروج {{name}} ثبت شد.",
         "visitToday": "حضور امروز: {{from}} - {{to}}",
-        "checkInAgain": "ورود دوباره"
+        "checkInAgain": "ورود دوباره",
+        "checkedInNamed": "ورود {{name}} ثبت شد."
     },
     "splitExpenses": {
         "title": "هزینه‌های مشترک",

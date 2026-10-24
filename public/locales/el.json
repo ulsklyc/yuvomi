@@ -4028,7 +4028,6 @@
         "quickSupply": "Λείπει προϊόν",
         "supplyName": "Όνομα προϊόντος",
         "supplyPlaceholder": "Τι λείπει;",
-        "checkedInToast": "Η άφιξη καταγράφηκε.",
         "supplyAddedToast": "Προστέθηκε στη λίστα αγορών.",
         "overdue": "Εκπρόθεσμη",
         "dueToday": "Λήγει σήμερα",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Όλες οι επισκέψεις στην αναφορά",
         "checkedOutNamed": "Αναχώρηση: {{name}}.",
         "visitToday": "Σήμερα εδώ: {{from}} - {{to}}",
-        "checkInAgain": "Νέα άφιξη"
+        "checkInAgain": "Νέα άφιξη",
+        "checkedInNamed": "Άφιξη: {{name}}."
     },
     "userMultiSelect": {
         "moreUsers": "ακόμη",

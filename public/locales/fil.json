@@ -4032,7 +4032,6 @@
         "quickSupply": "Kulang na produkto",
         "supplyName": "Pangalan ng produkto",
         "supplyPlaceholder": "Ano ang kulang?",
-        "checkedInToast": "Naitala ang check-in.",
         "supplyAddedToast": "Naidagdag sa listahan ng pamimili.",
         "overdue": "Lampas na sa taning",
         "dueToday": "Taning ngayon",
@@ -4203,7 +4202,8 @@
         "allVisitsInReport": "Lahat ng pagbisita sa ulat",
         "checkedOutNamed": "Naka-check out na si {{name}}.",
         "visitToday": "Narito ngayon: {{from}} - {{to}}",
-        "checkInAgain": "Mag-check in ulit"
+        "checkInAgain": "Mag-check in ulit",
+        "checkedInNamed": "Naka-check in na si {{name}}."
     },
     "splitExpenses": {
         "title": "Mga hinating gastos",

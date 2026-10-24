@@ -4028,7 +4028,6 @@
         "quickSupply": "不足している商品",
         "supplyName": "商品名",
         "supplyPlaceholder": "何が不足していますか?",
-        "checkedInToast": "チェックインを記録しました。",
         "supplyAddedToast": "買い物リストに追加しました。",
         "overdue": "期限切れ",
         "dueToday": "今日が期限",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "すべての訪問をレポートで見る",
         "checkedOutNamed": "{{name}}さんがチェックアウトしました。",
         "visitToday": "本日の在室: {{from}} - {{to}}",
-        "checkInAgain": "もう一度チェックイン"
+        "checkInAgain": "もう一度チェックイン",
+        "checkedInNamed": "{{name}}さんがチェックインしました。"
     },
     "userMultiSelect": {
         "moreUsers": "他",

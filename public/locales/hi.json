@@ -4028,7 +4028,6 @@
         "quickSupply": "उत्पाद नहीं है",
         "supplyName": "उत्पाद का नाम",
         "supplyPlaceholder": "क्या नहीं है?",
-        "checkedInToast": "चेक-इन दर्ज हुआ।",
         "supplyAddedToast": "खरीदारी सूची में जोड़ा गया।",
         "overdue": "विलंबित",
         "dueToday": "आज देय",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "रिपोर्ट में सभी यात्राएं",
         "checkedOutNamed": "{{name}} का चेक-आउट हुआ।",
         "visitToday": "आज यहाँ: {{from}} - {{to}}",
-        "checkInAgain": "फिर से चेक-इन करें"
+        "checkInAgain": "फिर से चेक-इन करें",
+        "checkedInNamed": "{{name}} का चेक-इन हुआ।"
     },
     "userMultiSelect": {
         "moreUsers": "और",

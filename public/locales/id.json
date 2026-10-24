@@ -4032,7 +4032,6 @@
         "quickSupply": "Produk habis",
         "supplyName": "Nama produk",
         "supplyPlaceholder": "Apa yang kurang?",
-        "checkedInToast": "Check-in disimpan.",
         "supplyAddedToast": "Ditambahkan ke daftar belanja.",
         "overdue": "Terlambat",
         "dueToday": "Jatuh tempo hari ini",
@@ -4203,7 +4202,8 @@
         "allVisitsInReport": "Semua kunjungan di laporan",
         "checkedOutNamed": "{{name}} sudah check-out.",
         "visitToday": "Hadir hari ini: {{from}} - {{to}}",
-        "checkInAgain": "Check-in lagi"
+        "checkInAgain": "Check-in lagi",
+        "checkedInNamed": "{{name}} sudah check-in."
     },
     "splitExpenses": {
         "title": "Pengeluaran Bersama",

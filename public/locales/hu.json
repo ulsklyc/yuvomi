@@ -4028,7 +4028,6 @@
         "quickSupply": "Hiányzó termék",
         "supplyName": "Termék neve",
         "supplyPlaceholder": "Mi hiányzik?",
-        "checkedInToast": "Bejelentkezés rögzítve.",
         "supplyAddedToast": "Hozzáadva a bevásárlólistához.",
         "overdue": "Lejárt",
         "dueToday": "Ma esedékes",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Minden látogatás a jelentésben",
         "checkedOutNamed": "{{name}} kijelentkezett.",
         "visitToday": "Ma itt: {{from}} - {{to}}",
-        "checkInAgain": "Újra bejelentkezés"
+        "checkInAgain": "Újra bejelentkezés",
+        "checkedInNamed": "{{name}} bejelentkezett."
     },
     "userMultiSelect": {
         "moreUsers": "továbbiak",

@@ -4028,7 +4028,6 @@
         "quickSupply": "Prodotto mancante",
         "supplyName": "Prodotto",
         "supplyPlaceholder": "Cosa manca?",
-        "checkedInToast": "Entrata registrata.",
         "supplyAddedToast": "Aggiunto alla lista della spesa.",
         "overdue": "In ritardo",
         "dueToday": "Oggi",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Tutte le visite nel resoconto",
         "checkedOutNamed": "Uscita di {{name}} registrata.",
         "visitToday": "Oggi qui: {{from}} - {{to}}",
-        "checkInAgain": "Registra di nuovo l’entrata"
+        "checkInAgain": "Registra di nuovo l’entrata",
+        "checkedInNamed": "Entrata di {{name}} registrata."
     },
     "userMultiSelect": {
         "moreUsers": "altri",

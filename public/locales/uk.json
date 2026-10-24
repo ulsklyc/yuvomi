@@ -4262,7 +4262,6 @@
         "quickSupply": "Відсутній товар",
         "supplyName": "Назва продукту",
         "supplyPlaceholder": "Чого не вистачає",
-        "checkedInToast": "Реєстрація записана.",
         "supplyAddedToast": "Додано до списку покупок.",
         "overdue": "Прострочена",
         "dueToday": "Термін виконання сьогодні",
@@ -4433,7 +4432,8 @@
         "allVisitsInReport": "Усі відвідування у звіті",
         "checkedOutNamed": "{{name}}: виїзд зареєстровано.",
         "visitToday": "Сьогодні: {{from}} - {{to}}",
-        "checkInAgain": "Зареєструвати заїзд знову"
+        "checkInAgain": "Зареєструвати заїзд знову",
+        "checkedInNamed": "{{name}}: прибуття зареєстровано."
     },
     "userMultiSelect": {
         "moreUsers": "інші",

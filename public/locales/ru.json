@@ -4262,7 +4262,6 @@
         "quickSupply": "Не хватает товара",
         "supplyName": "Название товара",
         "supplyPlaceholder": "Чего не хватает?",
-        "checkedInToast": "Приход отмечен.",
         "supplyAddedToast": "Добавлено в список покупок.",
         "overdue": "Просрочено",
         "dueToday": "Срок сегодня",
@@ -4433,7 +4432,8 @@
         "allVisitsInReport": "Все посещения в отчёте",
         "checkedOutNamed": "{{name}}: уход отмечен.",
         "visitToday": "Сегодня: {{from}} - {{to}}",
-        "checkInAgain": "Отметить приход снова"
+        "checkInAgain": "Отметить приход снова",
+        "checkedInNamed": "{{name}}: приход отмечен."
     },
     "userMultiSelect": {
         "moreUsers": "ещё",

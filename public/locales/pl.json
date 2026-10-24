@@ -4266,7 +4266,6 @@
         "quickSupply": "Brakuje produktu",
         "supplyName": "Nazwa produktu",
         "supplyPlaceholder": "Czego brakuje?",
-        "checkedInToast": "Zameldowanie zapisane.",
         "supplyAddedToast": "Dodano do listy zakupów.",
         "overdue": "Przeterminowane",
         "dueToday": "Na dziś",
@@ -4437,7 +4436,8 @@
         "allVisitsInReport": "Wszystkie wizyty w raporcie",
         "checkedOutNamed": "{{name}} - wymeldowano.",
         "visitToday": "Dziś obecność: {{from}} - {{to}}",
-        "checkInAgain": "Zamelduj ponownie"
+        "checkInAgain": "Zamelduj ponownie",
+        "checkedInNamed": "{{name}} - zameldowano."
     },
     "splitExpenses": {
         "title": "Wspólne wydatki",

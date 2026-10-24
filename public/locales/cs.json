@@ -3652,7 +3652,6 @@
         "quickSupply": "Chybí produkt",
         "supplyName": "Název produktu",
         "supplyPlaceholder": "Co chybí?",
-        "checkedInToast": "Přihlášení uloženo.",
         "supplyAddedToast": "Přidáno do nákupního seznamu.",
         "overdue": "Po termínu",
         "dueToday": "Splatné dnes",
@@ -3823,7 +3822,8 @@
         "allVisitsInReport": "Všechny návštěvy v hlášení",
         "checkedOutNamed": "{{name}} - odhlášeno.",
         "visitToday": "Dnes přítomnost: {{from}} - {{to}}",
-        "checkInAgain": "Znovu přihlásit"
+        "checkInAgain": "Znovu přihlásit",
+        "checkedInNamed": "{{name}} - přihlášeno."
     },
     "splitExpenses": {
         "title": "Společné výdaje",

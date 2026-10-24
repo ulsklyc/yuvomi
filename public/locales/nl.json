@@ -4028,7 +4028,6 @@
         "quickSupply": "Ontbrekend product",
         "supplyName": "Productnaam",
         "supplyPlaceholder": "Wat ontbreekt er?",
-        "checkedInToast": "Inchecking vastgelegd.",
         "supplyAddedToast": "Toegevoegd aan de boodschappenlijst.",
         "overdue": "Verlopen",
         "dueToday": "Vervalt vandaag",
@@ -4199,7 +4198,8 @@
         "allVisitsInReport": "Alle bezoeken in het rapport",
         "checkedOutNamed": "{{name}} uitgecheckt.",
         "visitToday": "Vandaag hier: {{from}} - {{to}}",
-        "checkInAgain": "Opnieuw inchecken"
+        "checkInAgain": "Opnieuw inchecken",
+        "checkedInNamed": "{{name}} ingecheckt."
     },
     "userMultiSelect": {
         "moreUsers": "meer",

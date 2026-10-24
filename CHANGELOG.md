@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The housekeeping visit report can be edited from where you read it.** The visit report now
+  offers "Edit" next to "Mark as paid" instead of a "Cancel" that had nothing to cancel, and
+  its date row says "Visit date" rather than "Last visit". Checking in now confirms with the
+  helper's name, like checking out. German and French call a visit a visit throughout, where
+  some dialogs and messages used a second word.
 - **Fasting starts from the add button, and the cycle view explains only what it shows.** In
   Health, "Start fast" is now the add button of the Fasting area, like every other area,
   and disappears while a fast runs, when the ring offers "Finish fast". Logging a past fast and
