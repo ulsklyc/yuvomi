@@ -106,7 +106,9 @@
         "fieldStep": "Voer een waarde in stappen van {{step}} in.",
         "fieldInvalid": "Controleer deze invoer.",
         "errorCheckRolledBack": "‘{{name}}’ staat weer open - afvinken is niet gelukt. Probeer het opnieuw.",
-        "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw."
+        "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw.",
+        "errorNotOwner": "Iemand anders heeft dit gemaakt - je kunt het bekijken, maar niet wijzigen.",
+        "foreignReadOnlyHint": "Gemaakt door {{name}} - je kunt het bekijken, maar niet wijzigen."
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Toon {{count}} meer",
         "doneByMenuItem": "Gedaan door …",
         "checkedDoneNamed": "‘{{title}}’ klaar.",
-        "checkedOpenNamed": "‘{{title}}’ weer open."
+        "checkedOpenNamed": "‘{{title}}’ weer open.",
+        "errorReorderNotAllowed": "Je kunt de volgorde van het gezin bekijken, maar niet wijzigen."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",
@@ -2171,7 +2174,7 @@
         "familyRoleGrandparent": "Grootouder",
         "familyRoleRelative": "Familie",
         "familyRoleOther": "Gezinslid",
-        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget en vasten en zien Huishoudhulp alleen-lezen, zonder lonen en betalingen. Je kunt dit daarna wijzigen onder “Rollen en rechten”. Ook de cyclus is verborgen; die kan worden getoond in de persoonlijke instellingen van het kind.",
+        "childStartHint": "Nieuwe kinderaccounts starten zonder Budget, vasten en aankoopprijzen, zien Huishoudhulp (zonder lonen) en Afval alleen-lezen en kunnen wat anderen in Agenda, Notities en Inventaris hebben gemaakt alleen lezen - net als de volgorde van de taken. Je kunt dit daarna wijzigen onder “Rollen en rechten”. Ook de cyclus is verborgen; die kan worden getoond in de persoonlijke instellingen van het kind.",
         "systemAdminLabel": "Systeembeheerder",
         "systemAdminHint": "Systeembeheerders kunnen applicatie-instellingen, integraties, API-tokens en gezinsaccounts beheren.",
         "systemAdminBadge": "Systeembeheerder",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} blijven vergrendeld. Je kunt ze altijd vrijgeven bij Rollen en rechten.",
             "presetHintRoleOpen": "De rol {{role}} beperkt niets - het lid ziet alle modules.",
             "presetHintRoleLimited": "De rol {{role}} vergrendelt: {{modules}}.",
-            "presetHintUnavailable": "De exacte werking is nu niet te tonen. Het sjabloon geldt toch."
+            "presetHintUnavailable": "De exacte werking is nu niet te tonen. Het sjabloon geldt toch.",
+            "presetHintRoleChild": "De rol {{role}} blokkeert geen enkele module. De startrechten voor kinderen hierboven komen erbij.",
+            "presetHintChildExtra": "De startrechten voor kinderen hierboven komen erbij."
         },
         "healthCaregiversLabel": "Mag gezondheidsgegevens invoeren",
         "healthCaregiversHint": "Deze personen mogen vitale waarden, medicijnen, labuitslagen en activiteiten voor dit lid invoeren en zien daarbij ook diens privé-invoer. Het cyclusdagboek blijft uitgesloten.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Het zoeken naar plaatsen is nu niet bereikbaar. Probeer het zo opnieuw of vul de coördinaten met de hand in.",
         "weatherManualTitle": "Coördinaten met de hand",
         "backupDropzoneTitleTouch": "Tik om een back-upbestand te kiezen",
-        "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen"
+        "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen",
+        "permCapabilityCalendarEditOthers": "Afspraken van anderen wijzigen",
+        "permCapabilityNotesEditOthers": "Notities van anderen wijzigen",
+        "permCapabilityInventoryEditOthers": "Spullen van anderen wijzigen",
+        "permCapabilityInventoryPrices": "Aankoopprijzen zien",
+        "permCapabilityTasksReorder": "Volgorde van het gezin wijzigen",
+        "permChildRoleHint": "Nieuwe kinderaccounts krijgen bij het aanmaken ook eigen startrechten: {{list}}. Daarna staan ze bij het betreffende lid."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

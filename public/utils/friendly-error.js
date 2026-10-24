@@ -32,6 +32,10 @@ export const REFUSAL_MESSAGES = new Map([
   ['contact_email_protected', 'contacts.emailLockedHint'],
   // Bezahlen ohne das Recht, Betraege der Haushaltshilfe zu sehen (R20).
   ['amounts_hidden', 'housekeeping.errorAmountsHidden'],
+  // Fremdes aendern ohne `*_edit_others` (R23, D5) - Kalender, Notizen, Inventar.
+  ['not_owner', 'common.errorNotOwner'],
+  // Die Handordnung der Aufgaben ohne `tasks_reorder_family` (R23, D15).
+  ['reorder_not_allowed', 'tasks.errorReorderNotAllowed'],
 ]);
 
 /**

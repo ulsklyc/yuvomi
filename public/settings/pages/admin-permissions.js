@@ -384,6 +384,33 @@ function subjectTitle() {
   return member ? member.display_name : '';
 }
 
+/**
+ * Was ein NEUES Kinderkonto zusaetzlich zum Rollenprofil bekommt (R23, D5) -
+ * als eine Zeile aus dem Katalog (`childStart`), nicht als zweite Liste. Ohne
+ * sie zeigte das Profil "Kind" "Voller Zugriff", waehrend jedes neu angelegte
+ * Kind mit gesperrtem Budget startete. Leer, wenn der Katalog nichts nennt.
+ */
+export function childStartSummary(catalog = state.catalog) {
+  const start = catalog?.childStart;
+  if (!start) return '';
+  // Nach Stufe gebuendelt ("Nur lesen: Haushaltshilfe, Entsorgung"), nicht je
+  // Eintrag mit eigener Stufe: zehn mal "Nicht erlaubt" las sich mobil als
+  // Wand.
+  const groups = new Map();
+  const add = (level, name) => { if (!groups.has(level)) groups.set(level, []); groups.get(level).push(name); };
+  for (const [key, access] of Object.entries(start.modules || {})) {
+    if (!(catalog.modules || []).some((m) => m.key === key)) continue;
+    add(accessShort(access), moduleLabel(key));
+  }
+  for (const [key, access] of Object.entries(start.capabilities || {})) {
+    const item = (catalog.capabilities || []).find((entry) => entry.key === key);
+    if (!item) continue;
+    add(t(access === 'allow' ? 'settings.permCapabilityAllowed' : 'settings.permCapabilityBlocked'), capabilityLabel(item));
+  }
+  const list = [...groups].map(([level, names]) => `${level}: ${names.join(', ')}`).join('; ');
+  return list ? t('settings.permChildRoleHint', { list }) : '';
+}
+
 function renderMatrix(container) {
   const panel = container.querySelector('#perm-matrix');
   if (!panel) return;
@@ -444,6 +471,9 @@ function renderMatrix(container) {
       <p class="perm-matrix__hint">${esc(
         state.mode === 'role' ? t('settings.permRoleLegend') : t('settings.permMemberLegend'),
       )}</p>
+      ${state.mode === 'role' && state.subjectId === 'child' && childStartSummary()
+        ? `<p class="perm-matrix__hint perm-matrix__hint--child" id="perm-child-start">${esc(childStartSummary())}</p>`
+        : ''}
     </div>
     <div id="perm-summary"></div>
     <div class="perm-list">${groupsHtml}${generalHtml}</div>

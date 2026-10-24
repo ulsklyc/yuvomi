@@ -106,7 +106,9 @@
         "fieldStep": "Maglagay ng halaga sa hakbang na {{step}}.",
         "fieldInvalid": "Suriin ang entry na ito.",
         "errorCheckRolledBack": "Bukas muli ang \"{{name}}\" - hindi natuloy ang pag-check. Subukan ulit.",
-        "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit."
+        "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit.",
+        "errorNotOwner": "Iba ang gumawa nito - makikita mo ito pero hindi mo mababago.",
+        "foreignReadOnlyHint": "Ginawa ni {{name}} - makikita mo ito pero hindi mo mababago."
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -667,7 +669,8 @@
         "kanbanShowMore_one": "Ipakita ang {{count}} pa",
         "doneByMenuItem": "Ginawa ni …",
         "checkedDoneNamed": "Tapos na ang \"{{title}}\".",
-        "checkedOpenNamed": "Bukas muli ang \"{{title}}\"."
+        "checkedOpenNamed": "Bukas muli ang \"{{title}}\".",
+        "errorReorderNotAllowed": "Makikita mo ang pagkakasunod-sunod ng pamilya pero hindi mo ito mababago."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -2216,7 +2219,7 @@
         "familyRoleGrandparent": "Lolo/Lola",
         "familyRoleRelative": "Kamag-anak",
         "familyRoleOther": "Miyembro ng pamilya",
-        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget at pag-aayuno at nakikita ang Kasambahay na pangbasa lang, walang sahod at bayad. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”. Nakatago rin ang siklo; maipapakita ito sa mga personal na setting ng bata.",
+        "childStartHint": "Ang mga bagong account ng bata ay nagsisimula nang walang Budget, pag-aayuno at presyo ng pagbili, nakikita ang Kasambahay (walang sahod) at Basura na pangbasa lang, at nababasa lang ang ginawa ng iba sa Kalendaryo, Mga Tala at Imbentaryo - pati ang pagkakasunod-sunod ng mga gawain. Mababago mo ito pagkatapos sa “Mga papel at pahintulot”. Nakatago rin ang siklo; maipapakita ito sa mga personal na setting ng bata.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "Napapamahalaan ng mga system admin ang mga setting ng aplikasyon, integrasyon, API token at account ng pamilya.",
         "systemAdminBadge": "System admin",
@@ -3126,7 +3129,9 @@
             "presetHintRestricted": "Mananatiling naka-lock ang {{modules}}. Puwede mo itong buksan anumang oras sa Mga papel at pahintulot.",
             "presetHintRoleOpen": "Walang nililimitahan ang papel na {{role}} - nakikita ng miyembro ang lahat ng modyul.",
             "presetHintRoleLimited": "Nila-lock ng papel na {{role}} ang: {{modules}}.",
-            "presetHintUnavailable": "Hindi maipakita ngayon ang eksaktong epekto. Gumagana pa rin ang template."
+            "presetHintUnavailable": "Hindi maipakita ngayon ang eksaktong epekto. Gumagana pa rin ang template.",
+            "presetHintRoleChild": "Walang hinaharang na module ang papel na {{role}}. Dagdag na nalalapat ang panimulang pahintulot para sa mga bata sa itaas.",
+            "presetHintChildExtra": "Dagdag na nalalapat ang panimulang pahintulot para sa mga bata sa itaas."
         },
         "healthCaregiversLabel": "Puwedeng magtala ng datos ng kalusugan",
         "healthCaregiversHint": "Puwedeng magtala ang mga taong ito ng vitals, gamot, resulta ng lab at aktibidad para sa miyembrong ito, at makikita rin nila ang mga pribadong tala nito. Hindi kasama ang talaarawan ng siklo.",
@@ -3338,7 +3343,13 @@
         "weatherPlaceUnavailable": "Hindi maabot ang paghahanap ng lugar ngayon. Subukan ulit mamaya o ilagay nang mano-mano ang mga coordinate.",
         "weatherManualTitle": "Mano-manong coordinate",
         "backupDropzoneTitleTouch": "I-tap para pumili ng backup file",
-        "installModuleDropzoneTitleTouch": "I-tap para pumili ng ZIP file"
+        "installModuleDropzoneTitleTouch": "I-tap para pumili ng ZIP file",
+        "permCapabilityCalendarEditOthers": "Baguhin ang mga kaganapan ng iba",
+        "permCapabilityNotesEditOthers": "Baguhin ang mga tala ng iba",
+        "permCapabilityInventoryEditOthers": "Baguhin ang mga gamit ng iba",
+        "permCapabilityInventoryPrices": "Makita ang mga presyo ng pagbili",
+        "permCapabilityTasksReorder": "Baguhin ang pagkakasunod-sunod ng pamilya",
+        "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

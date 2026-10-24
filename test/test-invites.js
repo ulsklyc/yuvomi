@@ -602,12 +602,16 @@ test('accept einer Kinder-Einladung bringt die Kinder-Startrechte mit (R20), bei
   // aus. Mit der Vorlage "wie das Rollenprofil" kommen nur diese dazu.
   const cases = [
     ['xenia', 'restricted', [
-      'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
-      'module:budget=none', 'module:documents=none', 'module:health=none', 'module:housekeeping=read',
+      'capability:calendar_edit_others=none', 'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
+      'capability:inventory_edit_others=none', 'capability:inventory_view_prices=none', 'capability:notes_edit_others=none',
+      'capability:tasks_reorder_family=none',
+      'module:budget=none', 'module:documents=none', 'module:health=none', 'module:housekeeping=read', 'module:waste=read',
     ]],
     ['yara', 'role', [
-      'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
-      'module:budget=none', 'module:housekeeping=read',
+      'capability:calendar_edit_others=none', 'capability:health_use_fasting=none', 'capability:housekeeping_view_amounts=none',
+      'capability:inventory_edit_others=none', 'capability:inventory_view_prices=none', 'capability:notes_edit_others=none',
+      'capability:tasks_reorder_family=none',
+      'module:budget=none', 'module:housekeeping=read', 'module:waste=read',
     ]],
   ];
   for (const [username, preset, expected] of cases) {

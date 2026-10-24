@@ -106,7 +106,9 @@
         "fieldStep": "Masukkan nilai dengan kelipatan {{step}}.",
         "fieldInvalid": "Periksa isian ini.",
         "errorCheckRolledBack": "\"{{name}}\" terbuka lagi - centang tidak tersimpan. Coba lagi.",
-        "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi."
+        "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi.",
+        "errorNotOwner": "Ini dibuat orang lain - kamu bisa melihatnya, tetapi tidak bisa mengubahnya.",
+        "foreignReadOnlyHint": "Dibuat oleh {{name}} - kamu bisa melihatnya, tetapi tidak bisa mengubahnya."
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -667,7 +669,8 @@
         "kanbanShowMore_one": "Tampilkan {{count}} lagi",
         "doneByMenuItem": "Dikerjakan oleh …",
         "checkedDoneNamed": "\"{{title}}\" selesai.",
-        "checkedOpenNamed": "\"{{title}}\" terbuka lagi."
+        "checkedOpenNamed": "\"{{title}}\" terbuka lagi.",
+        "errorReorderNotAllowed": "Kamu bisa melihat urutan keluarga, tetapi tidak bisa mengubahnya."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",
@@ -2216,7 +2219,7 @@
         "familyRoleGrandparent": "Kakek/Nenek",
         "familyRoleRelative": "Kerabat",
         "familyRoleOther": "Anggota keluarga",
-        "childStartHint": "Akun anak baru dimulai tanpa Anggaran dan puasa serta melihat Asisten rumah tangga hanya untuk dibaca, tanpa upah dan pembayaran. Ini bisa diubah nanti di “Peran dan izin”. Siklus juga disembunyikan; dapat ditampilkan di pengaturan pribadi anak.",
+        "childStartHint": "Akun anak baru dimulai tanpa Anggaran, puasa, dan harga beli, melihat Asisten rumah tangga (tanpa upah) dan Sampah hanya untuk dibaca, dan hanya bisa membaca apa yang dibuat orang lain di Kalender, Catatan, dan Inventaris - begitu juga urutan tugas. Ini bisa diubah nanti di “Peran dan izin”. Siklus juga disembunyikan; dapat ditampilkan di pengaturan pribadi anak.",
         "systemAdminLabel": "Administrator sistem",
         "systemAdminHint": "Administrator sistem dapat mengelola pengaturan aplikasi, integrasi, token API, dan akun keluarga.",
         "systemAdminBadge": "Administrator sistem",
@@ -3126,7 +3129,9 @@
             "presetHintRestricted": "{{modules}} tetap terkunci. Kamu bisa membukanya kapan saja di Peran dan izin.",
             "presetHintRoleOpen": "Peran {{role}} tidak membatasi apa pun - anggota melihat semua modul.",
             "presetHintRoleLimited": "Peran {{role}} mengunci: {{modules}}.",
-            "presetHintUnavailable": "Efek persisnya tidak dapat ditampilkan sekarang. Templat tetap berlaku."
+            "presetHintUnavailable": "Efek persisnya tidak dapat ditampilkan sekarang. Templat tetap berlaku.",
+            "presetHintRoleChild": "Peran {{role}} tidak memblokir modul apa pun. Izin awal untuk anak di atas tetap berlaku.",
+            "presetHintChildExtra": "Izin awal untuk anak di atas tetap berlaku."
         },
         "healthCaregiversLabel": "Boleh mencatat data kesehatan",
         "healthCaregiversHint": "Orang-orang ini boleh mencatat tanda vital, obat, hasil lab, dan aktivitas untuk anggota ini, dan sekaligus melihat catatan pribadinya. Buku harian siklus tetap dikecualikan.",
@@ -3338,7 +3343,13 @@
         "weatherPlaceUnavailable": "Pencarian tempat sedang tidak dapat dijangkau. Coba lagi sebentar lagi atau masukkan koordinat secara manual.",
         "weatherManualTitle": "Koordinat manual",
         "backupDropzoneTitleTouch": "Ketuk untuk memilih file cadangan",
-        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP"
+        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP",
+        "permCapabilityCalendarEditOthers": "Ubah acara orang lain",
+        "permCapabilityNotesEditOthers": "Ubah catatan orang lain",
+        "permCapabilityInventoryEditOthers": "Ubah barang orang lain",
+        "permCapabilityInventoryPrices": "Lihat harga beli",
+        "permCapabilityTasksReorder": "Ubah urutan keluarga",
+        "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

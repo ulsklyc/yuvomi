@@ -106,7 +106,9 @@
         "fieldStep": "{{step}} adımlarla bir değer girin.",
         "fieldInvalid": "Bu girişi kontrol edin.",
         "errorCheckRolledBack": "\"{{name}}\" yeniden açık - işaretleme gerçekleşmedi. Tekrar deneyin.",
-        "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin."
+        "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin.",
+        "errorNotOwner": "Bunu başka biri oluşturdu - görebilirsin ama değiştiremezsin.",
+        "foreignReadOnlyHint": "{{name}} oluşturdu - görebilirsin ama değiştiremezsin."
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "{{count}} tane daha göster",
         "doneByMenuItem": "Yapan …",
         "checkedDoneNamed": "\"{{title}}\" tamamlandı.",
-        "checkedOpenNamed": "\"{{title}}\" yeniden açık."
+        "checkedOpenNamed": "\"{{title}}\" yeniden açık.",
+        "errorReorderNotAllowed": "Ailenin sıralamasını görebilirsin ama değiştiremezsin."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "Büyükanne/Büyükbaba",
         "familyRoleRelative": "Akraba",
         "familyRoleOther": "Aile üyesi",
-        "childStartHint": "Yeni çocuk hesapları Bütçe ve oruç olmadan başlar; ev yardımcısını yalnızca okuma amaçlı, ücretler ve ödemeler olmadan görür. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz. Döngü de gizlidir; çocuğun kişisel ayarlarından gösterilebilir.",
+        "childStartHint": "Yeni çocuk hesapları Bütçe, oruç ve satın alma fiyatları olmadan başlar; ev yardımcısını (ücretler olmadan) ve atıkları yalnızca okuma amaçlı görür, başkalarının Takvim, Notlar ve Envanter'de oluşturduklarını - görev sıralaması gibi - yalnızca okuyabilir. Bunu sonradan “Roller ve izinler” bölümünden değiştirebilirsiniz. Döngü de gizlidir; çocuğun kişisel ayarlarından gösterilebilir.",
         "systemAdminLabel": "Sistem yöneticisi",
         "systemAdminHint": "Sistem yöneticileri ayarları, entegrasyonları, API tokenlarını ve aile hesaplarını yönetebilir.",
         "systemAdminBadge": "Sistem yöneticisi",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} kilitli kalır. İstediğin zaman Roller ve izinler bölümünden açabilirsin.",
             "presetHintRoleOpen": "{{role}} rolü hiçbir şeyi kısıtlamıyor - üye tüm modülleri görür.",
             "presetHintRoleLimited": "{{role}} rolü şunları kilitler: {{modules}}.",
-            "presetHintUnavailable": "Tam etkisi şu anda gösterilemiyor. Şablon yine de geçerli."
+            "presetHintUnavailable": "Tam etkisi şu anda gösterilemiyor. Şablon yine de geçerli.",
+            "presetHintRoleChild": "{{role}} rolü hiçbir modülü engellemez. Yukarıdaki çocuk başlangıç izinleri de eklenir.",
+            "presetHintChildExtra": "Yukarıdaki çocuk başlangıç izinleri de eklenir."
         },
         "healthCaregiversLabel": "Sağlık verisi girebilir",
         "healthCaregiversHint": "Bu kişiler bu üye için yaşamsal değerler, ilaçlar, laboratuvar sonuçları ve aktiviteler girebilir ve bunu yaparken özel kayıtlarını da görür. Döngü günlüğü hariç kalır.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
         "weatherManualTitle": "Koordinatları elle gir",
         "backupDropzoneTitleTouch": "Yedek dosyası seçmek için dokunun",
-        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun"
+        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun",
+        "permCapabilityCalendarEditOthers": "Başkalarının etkinliklerini değiştir",
+        "permCapabilityNotesEditOthers": "Başkalarının notlarını değiştir",
+        "permCapabilityInventoryEditOthers": "Başkalarının eşyalarını değiştir",
+        "permCapabilityInventoryPrices": "Satın alma fiyatlarını gör",
+        "permCapabilityTasksReorder": "Ailenin sıralamasını değiştir",
+        "permChildRoleHint": "Yeni çocuk hesapları oluşturulurken ayrıca kendi başlangıç izinlerini alır: {{list}}. Sonra bunlar ilgili üyede görünür."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

@@ -106,7 +106,9 @@
         "fieldStep": "{{step}}刻みで入力してください。",
         "fieldInvalid": "この入力を確認してください。",
         "errorCheckRolledBack": "「{{name}}」は未完了に戻りました - チェックできませんでした。もう一度お試しください。",
-        "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。"
+        "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。",
+        "errorNotOwner": "これは他の人が作成しました。表示はできますが、変更はできません。",
+        "foreignReadOnlyHint": "{{name}} が作成 - 表示はできますが、変更はできません。"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "さらに{{count}}件表示",
         "doneByMenuItem": "実行した人 …",
         "checkedDoneNamed": "「{{title}}」を完了しました。",
-        "checkedOpenNamed": "「{{title}}」を未完了に戻しました。"
+        "checkedOpenNamed": "「{{title}}」を未完了に戻しました。",
+        "errorReorderNotAllowed": "家族の並び順は表示できますが、変更はできません。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "親族",
         "familyRoleOther": "家族メンバー",
-        "childStartHint": "新しい子どものアカウントは予算と断食なしで始まり、家事サポートは閲覧のみで給与と支払いは表示されません。あとで「役割と権限」から変更できます。周期も非表示になります。子どもの個人設定で表示できます。",
+        "childStartHint": "新しい子どものアカウントは予算、断食、購入価格なしで始まり、家事サポート（給与なし）とごみは閲覧のみで、カレンダー、メモ、持ち物で他の人が作成したものとタスクの並び順は閲覧のみになります。あとで「役割と権限」から変更できます。周期も非表示になります。子どもの個人設定で表示できます。",
         "systemAdminLabel": "システム管理者",
         "systemAdminHint": "システム管理者は設定、連携、APIトークン、家族アカウントを管理できます。",
         "systemAdminBadge": "システム管理者",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} はロックされたままです。「役割と権限」でいつでも解除できます。",
             "presetHintRoleOpen": "役割「{{role}}」は何も制限しません。メンバーはすべてのモジュールを見られます。",
             "presetHintRoleLimited": "役割「{{role}}」がロックするもの: {{modules}}。",
-            "presetHintUnavailable": "正確な効果は現在表示できません。テンプレートは適用されます。"
+            "presetHintUnavailable": "正確な効果は現在表示できません。テンプレートは適用されます。",
+            "presetHintRoleChild": "役割「{{role}}」はどのモジュールもブロックしません。上の子ども用初期権限が加わります。",
+            "presetHintChildExtra": "上の子ども用初期権限が加わります。"
         },
         "healthCaregiversLabel": "健康データを記録できる",
         "healthCaregiversHint": "これらの人はこのメンバーのバイタル、薬、検査結果、アクティビティを記録でき、その際に非公開の記録も見えます。周期の記録は対象外です。",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
         "weatherManualTitle": "座標を手動で入力",
         "backupDropzoneTitleTouch": "タップしてバックアップファイルを選択",
-        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択"
+        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択",
+        "permCapabilityCalendarEditOthers": "他の人の予定を変更",
+        "permCapabilityNotesEditOthers": "他の人のメモを変更",
+        "permCapabilityInventoryEditOthers": "他の人の持ち物を変更",
+        "permCapabilityInventoryPrices": "購入価格を表示",
+        "permCapabilityTasksReorder": "家族の並び順を変更",
+        "permChildRoleHint": "新しい子どものアカウントには、作成時に独自の初期権限も付きます: {{list}}。その後は各メンバーに表示されます。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

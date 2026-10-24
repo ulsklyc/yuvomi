@@ -1174,8 +1174,12 @@ test('openEventModal() riegelt ALLE Anlegewege an einer Stelle ab', () => {
 });
 
 test('requestDeleteEvent() riegelt alle drei Serien-Löschwege ab', () => {
+  // Seit R23 (D5) fragt der Riegel je Termin: mayChangeEvent() schliesst
+  // readOnly() ein und sperrt dazu fremde Termine ohne `calendar_edit_others`.
   const fn = CAL_CODE.slice(CAL_CODE.indexOf('async function requestDeleteEvent(event) {'));
-  assert.ok(fn.indexOf('if (readOnly()) return;') > -1 && fn.indexOf('if (readOnly()) return;') < 200);
+  const riegel = fn.indexOf('if (!mayChangeEvent(event)) return;');
+  assert.ok(riegel > -1 && riegel < 400);
+  assert.match(CAL_CODE, /function mayChangeEvent\(ev\) \{\s*if \(readOnly\(\) \|\| !ev\) return false;/);
 });
 
 test('Kalender: FAB und beide Leerzustands-CTAs hängen an readOnly()', () => {
@@ -1192,11 +1196,12 @@ test('Kalender: FAB und beide Leerzustands-CTAs hängen an readOnly()', () => {
 });
 
 test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg, die Karte bleibt', () => {
-  assert.match(CAL_CODE, /const actions = readOnly\(\) \? \[\] : \[\{\s*id: 'detail-delete'/,
+  // `locked` = !mayChangeEvent(ev): Nur-lesen ODER fremder Termin ohne Recht (R23).
+  assert.match(CAL_CODE, /const locked = !mayChangeEvent\(ev\);\s*const actions = locked \? \[\] : \[\{\s*id: 'detail-delete'/,
     'die Fußzeile fängt bei Nur-lesen leer an');
-  assert.match(CAL_CODE, /ev\.external_source === 'ics' && ev\.user_modified === 1 && !readOnly\(\)/,
+  assert.match(CAL_CODE, /ev\.external_source === 'ics' && ev\.user_modified === 1 && !locked/,
     'auch das Zurücksetzen eines ICS-Termins ist ein Schreibvorgang');
-  assert.match(CAL_CODE, /edit: readOnly\(\) \? undefined : \{/,
+  assert.match(CAL_CODE, /edit: locked \? undefined : \{/,
     'ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf');
   // Und die einzige nicht schreibende Aktion bleibt bedingungslos drin - seit
   // R10 als Folgeaktion der Ort-Zeile (mapRowAction), nicht im Fuss.

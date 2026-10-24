@@ -107,7 +107,9 @@
         "fieldStep": "Zadejte hodnotu v krocích po {{step}}.",
         "fieldInvalid": "Zkontrolujte tento údaj.",
         "errorCheckRolledBack": "„{{name}}“ je znovu otevřené - odškrtnutí se nepodařilo. Zkuste to znovu.",
-        "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu."
+        "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu.",
+        "errorNotOwner": "Tohle vytvořil někdo jiný - můžete to zobrazit, ale ne změnit.",
+        "foreignReadOnlyHint": "Vytvořil(a) {{name}} - můžete to zobrazit, ale ne změnit."
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -701,7 +703,8 @@
         "kanbanShowMore_few": "Zobrazit {{count}} další",
         "doneByMenuItem": "Splnil(a) …",
         "checkedDoneNamed": "„{{title}}“ hotovo.",
-        "checkedOpenNamed": "„{{title}}“ je znovu otevřené."
+        "checkedOpenNamed": "„{{title}}“ je znovu otevřené.",
+        "errorReorderNotAllowed": "Pořadí rodiny můžete zobrazit, ale ne změnit."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
@@ -2282,7 +2285,7 @@
         "familyRoleGrandparent": "Prarodič",
         "familyRoleRelative": "Příbuzný/á",
         "familyRoleOther": "Člen rodiny",
-        "childStartHint": "Nové dětské účty začínají bez rozpočtu a půstu a pomoc v domácnosti vidí jen ke čtení, bez mezd a plateb. Později to změníte v sekci „Role a oprávnění“. Cyklus je také skrytý; zobrazit ho lze v osobním nastavení dítěte.",
+        "childStartHint": "Nové dětské účty začínají bez rozpočtu, půstu a kupních cen, pomoc v domácnosti (bez mezd) a odpad vidí jen ke čtení a to, co ostatní vytvořili v kalendáři, poznámkách a inventáři, mohou jen číst - stejně jako pořadí úkolů. Později to změníte v sekci „Role a oprávnění“. Cyklus je také skrytý; zobrazit ho lze v osobním nastavení dítěte.",
         "systemAdminLabel": "Správce systému",
         "systemAdminHint": "Správci systému mohou spravovat nastavení aplikace, integrace, API tokeny a rodinné účty.",
         "systemAdminBadge": "Správce systému",
@@ -3207,7 +3210,9 @@
             "presetHintRestricted": "{{modules}} zůstanou zamčené. Kdykoli je můžeš otevřít v Role a oprávnění.",
             "presetHintRoleOpen": "Role {{role}} nic neomezuje - člen vidí všechny moduly.",
             "presetHintRoleLimited": "Role {{role}} zamyká: {{modules}}.",
-            "presetHintUnavailable": "Přesný účinek teď nelze zobrazit. Šablona přesto platí."
+            "presetHintUnavailable": "Přesný účinek teď nelze zobrazit. Šablona přesto platí.",
+            "presetHintRoleChild": "Role {{role}} neblokuje žádný modul. Navíc platí počáteční oprávnění pro děti výše.",
+            "presetHintChildExtra": "Navíc platí počáteční oprávnění pro děti výše."
         },
         "healthCaregiversLabel": "Může zadávat zdravotní údaje",
         "healthCaregiversHint": "Tyto osoby mohou za tohoto člena zadávat vitální hodnoty, léky, laboratorní výsledky a aktivity a přitom vidí i jeho soukromé záznamy. Deník cyklu zůstává vyňat.",
@@ -3424,7 +3429,13 @@
         "weatherPlaceUnavailable": "Vyhledávání míst teď není dostupné. Zkus to za chvíli znovu nebo zadej souřadnice ručně.",
         "weatherManualTitle": "Souřadnice ručně",
         "backupDropzoneTitleTouch": "Klepnutím vyberte soubor zálohy",
-        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP"
+        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP",
+        "permCapabilityCalendarEditOthers": "Měnit události ostatních",
+        "permCapabilityNotesEditOthers": "Měnit poznámky ostatních",
+        "permCapabilityInventoryEditOthers": "Měnit předměty ostatních",
+        "permCapabilityInventoryPrices": "Vidět kupní ceny",
+        "permCapabilityTasksReorder": "Měnit pořadí rodiny",
+        "permChildRoleHint": "Nové dětské účty dostanou při vytvoření navíc vlastní počáteční oprávnění: {{list}}. Potom jsou uvedena u daného člena."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

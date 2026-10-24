@@ -148,6 +148,50 @@ export const PERMISSION_CAPABILITIES = Object.freeze([
     labelKey: 'housekeeping.amountsPermissionLabel',
     default: 'allow',
   },
+  // FREMDES AENDERN (R23, D5). Das Modulrecht `write` sagt, OB jemand dort
+  // anlegt und bearbeitet; diese Schalter sagen, ob das auch fuer das gilt, was
+  // ANDERE angelegt haben. Ohne sie: lesen ja, anlegen ja, bearbeiten und
+  // loeschen nur Eigenes (`mayChangeRecord()` unten, durchgesetzt in den
+  // Routen). Wie `housekeeping_view_amounts` ohne Migration: `allow` als
+  // Standard laesst jedes bestehende Konto, wie es ist; neue Kinderkonten
+  // starten ohne (CHILD_START_PERMISSIONS). Kontakte fehlen bewusst: ein
+  // Kontakt traegt keinen Ersteller, "Eigenes" waere dort geraten.
+  {
+    key: 'calendar_edit_others',
+    module: 'calendar',
+    labelKey: 'settings.permCapabilityCalendarEditOthers',
+    default: 'allow',
+  },
+  {
+    key: 'notes_edit_others',
+    module: 'notes',
+    labelKey: 'settings.permCapabilityNotesEditOthers',
+    default: 'allow',
+  },
+  {
+    key: 'inventory_edit_others',
+    module: 'inventory',
+    labelKey: 'settings.permCapabilityInventoryEditOthers',
+    default: 'allow',
+  },
+  // Kaufpreise im Inventar (R23, D5): wie die Betraege der Haushaltshilfe -
+  // ohne das Recht fehlen `purchase_price` und `currency` in jeder Antwort,
+  // und ein Schreiben laesst den gespeicherten Preis stehen.
+  {
+    key: 'inventory_view_prices',
+    module: 'inventory',
+    labelKey: 'settings.permCapabilityInventoryPrices',
+    default: 'allow',
+  },
+  // Die Handordnung der Aufgaben gehoert dem Haushalt (tasks.js PATCH
+  // /reorder): ein Zug aendert die Reihenfolge fuer alle. Kinder lesen sie
+  // (R23, D15), sortieren sie aber nicht um.
+  {
+    key: 'tasks_reorder_family',
+    module: 'tasks',
+    labelKey: 'settings.permCapabilityTasksReorder',
+    default: 'allow',
+  },
 ]);
 
 export const MODULE_ACCESS_LEVELS = Object.freeze(['none', 'read', 'write']);
@@ -199,9 +243,21 @@ export const INVITE_RESTRICTED_MODULES = Object.freeze(['health', 'budget', 'doc
 // strenger ist (`housekeeping: none`), bleibt strenger: eine Mitglied-Zeile
 // gewinnt in `resolvePermissions()`, und ein `read` ueber einem `none` waere
 // eine Oeffnung, die niemand gewaehlt hat.
+//
+// R23 (D5, D15): die Entsorgung nur zum Lesen, und Fremdes in Kalender,
+// Notizen und Inventar nur lesen, keine Kaufpreise, keine Handordnung der
+// Aufgaben. Dieselbe Regel: nur neue Konten, die heutigen Kinder bleiben.
 export const CHILD_START_PERMISSIONS = Object.freeze({
-  modules: Object.freeze({ budget: 'none', housekeeping: 'read' }),
-  capabilities: Object.freeze({ health_use_fasting: 'none', housekeeping_view_amounts: 'none' }),
+  modules: Object.freeze({ budget: 'none', housekeeping: 'read', waste: 'read' }),
+  capabilities: Object.freeze({
+    health_use_fasting: 'none',
+    housekeeping_view_amounts: 'none',
+    calendar_edit_others: 'none',
+    notes_edit_others: 'none',
+    inventory_edit_others: 'none',
+    inventory_view_prices: 'none',
+    tasks_reorder_family: 'none',
+  }),
 });
 
 // Persoenliche Vorgaben eines NEUEN Kinderkontos (R21, Critique 2026-10-21,
@@ -775,6 +831,33 @@ export function userHasCapability(database, userId, key, { isDisplay = false } =
   if (!user) return false;
   if (user.role === 'admin') return true;
   return resolvePermissions(database, user, { isDisplay }).capabilities[key] === 'allow';
+}
+
+/**
+ * Darf diese Anfrage einen Datensatz AENDERN oder LOESCHEN (R23, D5)?
+ *
+ * `own` sagt der Aufrufer, weil "eigen" je Modul etwas anderes heisst: die
+ * Notiz und der Gegenstand, die ich angelegt habe; im Kalender zusaetzlich der
+ * Termin, dem ich zugewiesen bin. Eigenes immer; Fremdes nur mit der
+ * Capability des Moduls. Das Modulrecht selbst (`read` = gar nicht schreiben)
+ * prueft weiter die Pfad-Middleware, diese Frage kommt danach.
+ *
+ * EINE Stelle fuer REST, API-Tokens und die MCP-Bruecke: `call_api_operation`
+ * laeuft per Loopback durch dieselben Routen, und `requestHasCapability()`
+ * liest das Subjekt aus `req.authUserId` wie aus der Sitzung.
+ */
+export function mayChangeRecord(database, req, capabilityKey, own) {
+  if (own) return true;
+  return requestHasCapability(database, req, capabilityKey);
+}
+
+/** Die Absage zu `mayChangeRecord()`: 403 mit festem Grund, den die Oberflaeche benennt. */
+export function sendNotOwner(res) {
+  return res.status(403).json({
+    error: 'You can only change entries you created.',
+    code: 403,
+    reason: 'not_owner',
+  });
 }
 
 export function isValidInvitePreset(preset) {

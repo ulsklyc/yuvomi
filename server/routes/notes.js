@@ -10,7 +10,7 @@ import * as db from '../db.js';
 import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { resolvePermissions } from '../permissions.js';
+import { mayChangeRecord, resolvePermissions, sendNotOwner } from '../permissions.js';
 import {
   categoryNameKey,
   hydrateNotesWithCategories,
@@ -34,6 +34,21 @@ function canManageHousehold(req) {
   if (isAdminRequest(req)) return true;
   const user = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actorId(req));
   return resolvePermissions(db.get(), user).capabilities.notes_manage_household_categories === 'allow';
+}
+
+// FREMDE NOTIZEN NUR LESEN (R23, D5). Ohne `notes_edit_others` bearbeitet,
+// pinnt und loescht ein Konto nur Notizen, die es angelegt hat. Zwei Gesten
+// bleiben bewusst offen: das Abhaken einer Checklisten-Zeile (PATCH /:id/check)
+// ist Benutzen einer geteilten Liste wie im Einkauf, kein Umschreiben; und das
+// Zuordnen der EIGENEN Kategorien (`category_ids` allein im PUT) aendert nur,
+// wie ich die Notiz einsortiere - `replaceEditableAssignments()` laesst ohnehin
+// nur zu, was diese Person verwalten darf.
+function refuseForeignNote(req, res, note, { categoriesOnly = false } = {}) {
+  if (categoriesOnly) return false;
+  const own = Number(note?.created_by) === Number(actorId(req));
+  if (mayChangeRecord(db.get(), req, 'notes_edit_others', own)) return false;
+  sendNotOwner(res);
+  return true;
 }
 
 function categoryPayload(category) {
@@ -276,6 +291,9 @@ router.put('/:id', (req, res) => {
     const id   = parseInt(req.params.id, 10);
     const note = db.get().prepare('SELECT * FROM notes WHERE id = ?').get(id);
     if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
+    const bodyKeys = Object.keys(req.body || {});
+    const categoriesOnly = bodyKeys.length === 1 && bodyKeys[0] === 'category_ids';
+    if (refuseForeignNote(req, res, note, { categoriesOnly })) return;
 
     const { pinned } = req.body;
     const checks = [];
@@ -335,8 +353,9 @@ router.put('/:id', (req, res) => {
 router.patch('/:id/pin', (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
-    const note = db.get().prepare('SELECT pinned FROM notes WHERE id = ?').get(id);
+    const note = db.get().prepare('SELECT pinned, created_by FROM notes WHERE id = ?').get(id);
     if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
+    if (refuseForeignNote(req, res, note)) return;
 
     const newPinned = note.pinned ? 0 : 1;
     db.get().prepare('UPDATE notes SET pinned = ? WHERE id = ?').run(newPinned, id);
@@ -418,6 +437,9 @@ router.patch('/:id/check', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
+    const note   = db.get().prepare('SELECT created_by FROM notes WHERE id = ?').get(id);
+    if (!note) return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
+    if (refuseForeignNote(req, res, note)) return;
     const result = db.get().prepare('DELETE FROM notes WHERE id = ?').run(id);
     if (result.changes === 0)
       return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });

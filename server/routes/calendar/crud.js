@@ -29,7 +29,7 @@ import { documentViewer } from '../../services/document-links.js';
 import {
   ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
 } from '../../services/document-access.js';
-import { mayWriteModule } from '../../permissions.js';
+import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../permissions.js';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {
@@ -706,6 +706,25 @@ function loadVisibleEvent(id, req) {
   `).get(id, me, me, me);
 }
 
+// FREMDE TERMINE NUR LESEN (R23, D5). Ohne `calendar_edit_others` aendert und
+// loescht ein Konto nur Termine, die es angelegt hat oder denen es zugewiesen
+// ist (Einzelzuweisung `assigned_to` oder `event_assignments`). Gilt fuer jeden
+// Schreibweg auf einen bestehenden Termin - auch Einzelausnahmen und Kuerzen
+// einer Serie, gemessen an der Serie. Nach `loadVisibleEvent()`: wer den
+// Termin nicht sieht, bekommt weiter 404, nie diese 403.
+function ownsEvent(event, req) {
+  const me = getUserId(req);
+  if (me == null || !event) return false;
+  if (Number(event.created_by) === Number(me) || Number(event.assigned_to) === Number(me)) return true;
+  return !!db.get().prepare('SELECT 1 FROM event_assignments WHERE event_id = ? AND user_id = ?').get(event.id, me);
+}
+
+function refuseForeignEvent(req, res, event) {
+  if (mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(event, req))) return false;
+  sendNotOwner(res);
+  return true;
+}
+
 const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_series_not_found: 'Terminserie nicht gefunden. Lade den Kalender erneut.',
   not_authorized: 'Du darfst diese Terminserie nicht bearbeiten.',
@@ -779,6 +798,7 @@ router.put('/:id', async (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (refuseForeignEvent(req, res, event)) return;
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
     const rights = attachmentRights(req);
 
@@ -1368,6 +1388,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         { status: 404, code: 'calendar_series_not_found' },
       ));
     }
+    if (refuseForeignEvent(req, res, master)) return;
     const eligibility = isEligibleLocalSeries(db.get(), master, actorId);
     if (!eligibility.eligible) {
       const unauthorized = eligibility.reason === 'not_authorized';
@@ -1529,6 +1550,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
         { status: 404, code: 'calendar_series_not_found' },
       ));
     }
+    if (refuseForeignEvent(req, res, master)) return;
     const eligibility = isEligibleLocalSeries(db.get(), master, actorId);
     if (!eligibility.eligible) {
       const unauthorized = eligibility.reason === 'not_authorized';
@@ -1729,12 +1751,14 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
 router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
-    if (!Number.isInteger(seriesId) || !loadVisibleEvent(seriesId, req)) {
+    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
         { status: 404, code: 'calendar_series_not_found' },
       ));
     }
+    if (refuseForeignEvent(req, res, master)) return;
     deleteOccurrence(db.get(), {
       seriesId,
       recurrenceId: req.params.recurrenceId,
@@ -1752,12 +1776,14 @@ router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
 router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
-    if (!Number.isInteger(seriesId) || !loadVisibleEvent(seriesId, req)) {
+    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
         { status: 404, code: 'calendar_series_not_found' },
       ));
     }
+    if (refuseForeignEvent(req, res, master)) return;
     truncateSeries(db.get(), {
       seriesId,
       recurrenceId: req.params.recurrenceId,
@@ -1842,6 +1868,7 @@ router.post('/:id/exceptions', (req, res) => {
 
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (refuseForeignEvent(req, res, event)) return;
     const eligibility = isEligibleLocalSeries(db.get(), event, getUserId(req));
     if (!isLocallyOwnedSeries(db.get(), event)) {
       const notSeries = !event.recurrence_rule;
@@ -1884,6 +1911,7 @@ router.delete('/:id', (req, res) => {
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
     if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (refuseForeignEvent(req, res, event)) return;
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
     const queued = queueEventDeletion(event);
 

@@ -106,7 +106,9 @@
         "fieldStep": "Skriv inn en verdi i trinn på {{step}}.",
         "fieldInvalid": "Sjekk denne verdien.",
         "errorCheckRolledBack": "«{{name}}» er åpen igjen - avkryssingen gikk ikke gjennom. Prøv igjen.",
-        "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen."
+        "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen.",
+        "errorNotOwner": "Dette har noen andre laget - du kan se det, men ikke endre det.",
+        "foreignReadOnlyHint": "Laget av {{name}} - du kan se det, men ikke endre det."
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Vis {{count}} til",
         "doneByMenuItem": "Fullført av …",
         "checkedDoneNamed": "«{{title}}» utført.",
-        "checkedOpenNamed": "«{{title}}» er åpen igjen."
+        "checkedOpenNamed": "«{{title}}» er åpen igjen.",
+        "errorReorderNotAllowed": "Du kan se familiens rekkefølge, men ikke endre den."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",
@@ -2171,7 +2174,7 @@
         "familyRoleGrandparent": "Besteforelder",
         "familyRoleRelative": "Slektning",
         "familyRoleOther": "Familiemedlem",
-        "childStartHint": "Nye barnekontoer starter uten Budsjett og faste og ser Husholdningshjelp bare for lesing, uten lønn og betalinger. Du kan endre dette senere under «Roller og tillatelser». Syklusen er også skjult; den kan vises i barnets personlige innstillinger.",
+        "childStartHint": "Nye barnekontoer starter uten Budsjett, faste og innkjøpspriser, ser Husholdningshjelp (uten lønn) og Avfall bare for lesing, og kan bare lese det andre har laget i Kalender, Notater og Inventar - det samme gjelder rekkefølgen på oppgavene. Du kan endre dette senere under «Roller og tillatelser». Syklusen er også skjult; den kan vises i barnets personlige innstillinger.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratorer kan administrere applikasjonsinnstillinger, integrasjoner, API-tokener og familiekontoer.",
         "systemAdminBadge": "Systemadministrator",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} forblir låst. Du kan åpne dem når som helst under Roller og tillatelser.",
             "presetHintRoleOpen": "Rollen som {{role}} begrenser ingenting - medlemmet ser alle moduler.",
             "presetHintRoleLimited": "Rollen {{role}} låser: {{modules}}.",
-            "presetHintUnavailable": "Den nøyaktige effekten kan ikke vises akkurat nå. Malen gjelder fortsatt."
+            "presetHintUnavailable": "Den nøyaktige effekten kan ikke vises akkurat nå. Malen gjelder fortsatt.",
+            "presetHintRoleChild": "Rollen {{role}} sperrer ingen moduler. Startrettighetene for barn ovenfor kommer i tillegg.",
+            "presetHintChildExtra": "Startrettighetene for barn ovenfor kommer i tillegg."
         },
         "healthCaregiversLabel": "Kan registrere helsedata",
         "healthCaregiversHint": "Disse personene kan registrere vitale tegn, medisiner, laboratorieresultater og aktiviteter for dette medlemmet, og se deres private oppføringer mens de gjør det. Syklusdagboken forblir ekskludert.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Stedssøket er ikke tilgjengelig akkurat nå. Prøv igjen om litt, eller skriv inn koordinatene for hånd.",
         "weatherManualTitle": "Koordinater for hånd",
         "backupDropzoneTitleTouch": "Trykk for å velge en sikkerhetskopifil",
-        "installModuleDropzoneTitleTouch": "Trykk for å velge en ZIP-fil"
+        "installModuleDropzoneTitleTouch": "Trykk for å velge en ZIP-fil",
+        "permCapabilityCalendarEditOthers": "Endre andres hendelser",
+        "permCapabilityNotesEditOthers": "Endre andres notater",
+        "permCapabilityInventoryEditOthers": "Endre andres gjenstander",
+        "permCapabilityInventoryPrices": "Se innkjøpspriser",
+        "permCapabilityTasksReorder": "Endre familiens rekkefølge",
+        "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

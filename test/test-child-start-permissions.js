@@ -118,10 +118,17 @@ async function createMember(body) {
 test('Admin legt ein Kind an: Budget aus, Haushaltshilfe nur lesen ohne Betraege, Fasten aus', async () => {
   const id = await createMember({ username: 'kim', family_role: 'child' });
   assert.deepEqual(userRows(id), [
+    // R23 (D5, D15): Fremdes nur lesen, keine Kaufpreise, keine Handordnung.
+    { resource_type: 'capability', resource_key: 'calendar_edit_others', access: 'none' },
     { resource_type: 'capability', resource_key: 'health_use_fasting', access: 'none' },
     { resource_type: 'capability', resource_key: 'housekeeping_view_amounts', access: 'none' },
+    { resource_type: 'capability', resource_key: 'inventory_edit_others', access: 'none' },
+    { resource_type: 'capability', resource_key: 'inventory_view_prices', access: 'none' },
+    { resource_type: 'capability', resource_key: 'notes_edit_others', access: 'none' },
+    { resource_type: 'capability', resource_key: 'tasks_reorder_family', access: 'none' },
     { resource_type: 'module', resource_key: 'budget', access: 'none' },
     { resource_type: 'module', resource_key: 'housekeeping', access: 'read' },
+    { resource_type: 'module', resource_key: 'waste', access: 'read' },
   ]);
   const resolved = resolvePermissions(db, { id, role: 'member', family_role: 'child' });
   assert.equal(resolved.modules.budget, 'none');
@@ -198,8 +205,16 @@ test('ein spaeterer Rollenwechsel aendert die Rechte nicht', async () => {
 
 test('der Katalog nennt die Kinder-Startrechte fuer das Formular', () => {
   const { childStart } = permissionCatalog();
-  assert.deepEqual(childStart.modules, { budget: 'none', housekeeping: 'read' });
-  assert.deepEqual(childStart.capabilities, { health_use_fasting: 'none', housekeeping_view_amounts: 'none' });
+  assert.deepEqual(childStart.modules, { budget: 'none', housekeeping: 'read', waste: 'read' });
+  assert.deepEqual(childStart.capabilities, {
+    health_use_fasting: 'none',
+    housekeeping_view_amounts: 'none',
+    calendar_edit_others: 'none',
+    notes_edit_others: 'none',
+    inventory_edit_others: 'none',
+    inventory_view_prices: 'none',
+    tasks_reorder_family: 'none',
+  });
 });
 
 // --------------------------------------------------------------------------

@@ -106,7 +106,9 @@
         "fieldStep": "请按 {{step}} 的步长输入。",
         "fieldInvalid": "请检查此项输入。",
         "errorCheckRolledBack": "“{{name}}”已恢复为未完成 - 勾选未成功。请重试。",
-        "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。"
+        "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。",
+        "errorNotOwner": "这是其他人创建的，你可以查看，但不能修改。",
+        "foreignReadOnlyHint": "由 {{name}} 创建，你可以查看，但不能修改。"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "显示另外 {{count}} 项",
         "doneByMenuItem": "完成者 …",
         "checkedDoneNamed": "“{{title}}”已完成。",
-        "checkedOpenNamed": "“{{title}}”已重新打开。"
+        "checkedOpenNamed": "“{{title}}”已重新打开。",
+        "errorReorderNotAllowed": "你可以查看家庭排序，但不能更改。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "亲属",
         "familyRoleOther": "家庭成员",
-        "childStartHint": "新的儿童账户开始时没有预算和断食功能，家政只能查看，不显示工资和付款。之后可在“角色与权限”中更改。周期也会隐藏，可在孩子的个人设置中重新显示。",
+        "childStartHint": "新的儿童账户开始时没有预算、断食和购买价格，家政（不含工资）和垃圾只能查看，其他人在日历、笔记和物品中创建的内容以及任务排序也只能查看。之后可在“角色与权限”中更改。周期也会隐藏，可在孩子的个人设置中重新显示。",
         "systemAdminLabel": "系统管理员",
         "systemAdminHint": "系统管理员可以管理应用设置、集成、API 令牌和家庭账户。",
         "systemAdminBadge": "系统管理员",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} 保持锁定。你可以随时在“角色与权限”中开放。",
             "presetHintRoleOpen": "角色“{{role}}”不作任何限制，成员可以看到所有模块。",
             "presetHintRoleLimited": "角色“{{role}}”锁定：{{modules}}。",
-            "presetHintUnavailable": "目前无法显示确切效果。模板仍然生效。"
+            "presetHintUnavailable": "目前无法显示确切效果。模板仍然生效。",
+            "presetHintRoleChild": "角色“{{role}}”不屏蔽任何模块。另外适用上方的儿童初始权限。",
+            "presetHintChildExtra": "另外适用上方的儿童初始权限。"
         },
         "healthCaregiversLabel": "可以记录健康数据",
         "healthCaregiversHint": "这些人可以为该成员记录体征、用药、化验结果和活动，并在此过程中看到其私密记录。经期日记不在此列。",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "地点搜索暂时无法访问。请稍后重试，或手动输入坐标。",
         "weatherManualTitle": "手动输入坐标",
         "backupDropzoneTitleTouch": "点按以选择备份文件",
-        "installModuleDropzoneTitleTouch": "点按以选择 ZIP 文件"
+        "installModuleDropzoneTitleTouch": "点按以选择 ZIP 文件",
+        "permCapabilityCalendarEditOthers": "修改他人的日程",
+        "permCapabilityNotesEditOthers": "修改他人的笔记",
+        "permCapabilityInventoryEditOthers": "修改他人的物品",
+        "permCapabilityInventoryPrices": "查看购买价格",
+        "permCapabilityTasksReorder": "更改家庭排序",
+        "permChildRoleHint": "新的儿童账户在创建时还会获得自己的初始权限：{{list}}。之后会显示在该成员处。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

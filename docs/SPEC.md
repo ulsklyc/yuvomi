@@ -5256,10 +5256,23 @@ schema-level allowance (migration v175, #996) and got its first consumer in the 
 `housekeeping_view_amounts` (module `housekeeping`, default `allow`): without it every Housekeeping
 answer and the Overview tile carry wages, totals, payment state and the unpaid amount as `null`,
 paying is refused (`reason: amounts_hidden`) and a write keeps the stored amounts.
+**Changing other people's entries (R23, D5):** five more capabilities, all default `allow`, so no
+existing account changes: `calendar_edit_others`, `notes_edit_others`, `inventory_edit_others`
+(without them a caller reads and creates, but changes and deletes only its own entries - created by
+it, in the calendar also events it is assigned to through `assigned_to` or `event_assignments`;
+every write path on an existing record answers 403 `reason: not_owner` through `mayChangeRecord()`,
+including occurrence overrides, truncation and exceptions of a series, measured at the series, and
+item bookings, tracked dates and service log; ticking a checklist line and a note `PUT` carrying only
+`category_ids` stay open), `inventory_view_prices` (without it `purchase_price` and `currency` are
+missing from every item in an Inventory response, a create stores no price and a replace keeps the
+stored one; linked bookings follow the Budget rights as before) and `tasks_reorder_family` (without
+it `PATCH /tasks/reorder` and `POST /tasks/reorder/reset` answer 403 `reason: reorder_not_allowed`).
+The rule sits in the routes, so app, API tokens and the MCP bridge (`call_api_operation` loops back
+through REST) share it. Contacts have no such capability: a contact row records no creator.
 **Child start permissions (R20):** a new account with family role `child` that is not an admin gets
 member rows from `CHILD_START_PERMISSIONS` when it is created (`POST /auth/users`) or its invitation is
 accepted - `budget` none, `housekeeping` read, `health_use_fasting` and `housekeeping_view_amounts`
-none - written only where the role profile and invite preset are not already stricter. Existing
+none; since R23 also `waste` read and the five capabilities above none - written only where the role profile and invite preset are not already stricter. Existing
 accounts and later role changes are not touched; OIDC accounts start without a family role.
 **Child start preferences (R21, v2.79.0):** the same step (`applyChildStartPermissions()`) writes
 `CHILD_START_PREFERENCES` from `server/permissions.js` - `health_cycle_enabled` = `'0'` as the

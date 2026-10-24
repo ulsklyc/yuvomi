@@ -372,7 +372,11 @@ test('permissionCatalog liefert Module, Widgets, Rollen, Levels', () => {
   assert.equal(cat.capabilities.find((item) => item.key === 'housekeeping_view_amounts').module, 'housekeeping');
   // R20: die Betraege der Haushaltshilfe sind eine eigene Capability, Standard
   // `allow` - jedes bestehende Konto sieht sie weiter.
-  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories', 'health_use_fasting', 'housekeeping_view_amounts']);
+  // R23 (D5, D15): Fremdes aendern, Kaufpreise, Handordnung - Standard `allow`.
+  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), [
+    'notes_manage_household_categories', 'health_use_fasting', 'housekeeping_view_amounts',
+    'calendar_edit_others', 'notes_edit_others', 'inventory_edit_others', 'inventory_view_prices', 'tasks_reorder_family',
+  ]);
 });
 
 test('capability summary compares against each capability default', () => {

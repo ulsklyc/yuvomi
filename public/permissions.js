@@ -131,3 +131,44 @@ export function canSeeHousekeepingAmounts() {
   if (_perms.admin) return true;
   return (_perms.capabilities?.housekeeping_view_amounts ?? 'allow') !== 'none';
 }
+
+// FREMDES NUR LESEN (R23, D5). Modul -> Capability, die das Aendern fremder
+// Eintraege erlaubt. Muss zu server/permissions.js passen (PERMISSION_CAPABILITIES);
+// der Server setzt es durch (403 `not_owner`), das hier blendet nur aus, was
+// er ohnehin abweisen wuerde - keine toten Knoepfe.
+const EDIT_OTHERS_CAPABILITY = Object.freeze({
+  calendar: 'calendar_edit_others',
+  notes: 'notes_edit_others',
+  inventory: 'inventory_edit_others',
+});
+
+/** Darf dieses Konto Eintraege ANDERER in diesem Modul aendern? Standard ja. */
+export function canEditOthers(moduleKey) {
+  if (_perms.admin) return true;
+  const key = EDIT_OTHERS_CAPABILITY[moduleKey];
+  if (!key) return true;
+  return (_perms.capabilities?.[key] ?? 'allow') !== 'none';
+}
+
+/**
+ * Darf dieses Konto DIESEN Eintrag aendern? Modulrecht `write` UND (eigen ODER
+ * Fremdes erlaubt). `own` sagt die Seite - im Kalender zaehlt auch "mir
+ * zugewiesen", wie am Server.
+ */
+export function canChangeRecord(moduleKey, own) {
+  if (moduleAccess(moduleKey) !== 'write') return false;
+  return own === true || canEditOthers(moduleKey);
+}
+
+/** Kaufpreise im Inventar (R23). Ohne Recht fehlen sie schon in der Antwort. */
+export function canSeeInventoryPrices() {
+  if (_perms.admin) return true;
+  return (_perms.capabilities?.inventory_view_prices ?? 'allow') !== 'none';
+}
+
+/** Handordnung der Aufgaben (R23, D15): gehoert dem Haushalt. */
+export function canReorderTasks() {
+  if (_perms.admin) return true;
+  if (moduleAccess('tasks') !== 'write') return false;
+  return (_perms.capabilities?.tasks_reorder_family ?? 'allow') !== 'none';
+}

@@ -106,7 +106,9 @@
         "fieldStep": "Introduce un valor en pasos de {{step}}.",
         "fieldInvalid": "Revisa este dato.",
         "errorCheckRolledBack": "«{{name}}» vuelve a estar pendiente - no se pudo marcar. Inténtalo de nuevo.",
-        "errorUncheckRolledBack": "«{{name}}» vuelve a estar marcado - no se pudo desmarcar. Inténtalo de nuevo."
+        "errorUncheckRolledBack": "«{{name}}» vuelve a estar marcado - no se pudo desmarcar. Inténtalo de nuevo.",
+        "errorNotOwner": "Lo creó otra persona: puedes verlo, pero no cambiarlo.",
+        "foreignReadOnlyHint": "Creado por {{name}}: puedes verlo, pero no cambiarlo."
     },
     "kitchen": {
         "noShoppingLists": "Todavía no hay lista de la compra.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Mostrar {{count}} más",
         "doneByMenuItem": "Hecho por …",
         "checkedDoneNamed": "«{{title}}» hecho.",
-        "checkedOpenNamed": "«{{title}}» abierto de nuevo."
+        "checkedOpenNamed": "«{{title}}» abierto de nuevo.",
+        "errorReorderNotAllowed": "Puedes ver el orden de la familia, pero no cambiarlo."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artículo eliminado.",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "Abuelo/a",
         "familyRoleRelative": "Familiar",
         "familyRoleOther": "Miembro de la familia",
-        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto ni ayuno y ven la Ayuda doméstica solo en lectura, sin sueldos ni pagos. Puedes cambiarlo después en «Roles y permisos». El ciclo también está oculto; se puede mostrar en los ajustes personales del niño.",
+        "childStartHint": "Las cuentas infantiles nuevas empiezan sin Presupuesto, ayuno ni precios de compra, ven la Ayuda doméstica (sin sueldos) y Residuos solo en lectura y solo leen lo que otros crearon en Calendario, Notas e Inventario, igual que el orden de las tareas. Puedes cambiarlo después en «Roles y permisos». El ciclo también está oculto; se puede mostrar en los ajustes personales del niño.",
         "systemAdminLabel": "Administrador del sistema",
         "systemAdminHint": "Los administradores del sistema pueden gestionar ajustes, integraciones, tokens de API y cuentas familiares.",
         "systemAdminBadge": "Admin del sistema",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} quedan bloqueados. Puedes abrirlos cuando quieras en Roles y permisos.",
             "presetHintRoleOpen": "El rol {{role}} no restringe nada: el miembro ve todos los módulos.",
             "presetHintRoleLimited": "El rol {{role}} bloquea: {{modules}}.",
-            "presetHintUnavailable": "Ahora mismo no se puede mostrar el efecto exacto. La plantilla se aplica igualmente."
+            "presetHintUnavailable": "Ahora mismo no se puede mostrar el efecto exacto. La plantilla se aplica igualmente.",
+            "presetHintRoleChild": "El rol {{role}} no bloquea ningún módulo. Se suman los permisos iniciales para niños de arriba.",
+            "presetHintChildExtra": "Se suman los permisos iniciales para niños de arriba."
         },
         "healthCaregiversLabel": "Puede registrar datos de salud",
         "healthCaregiversHint": "Estas personas pueden registrar constantes, medicamentos, resultados de laboratorio y actividades para este miembro, y ver sus entradas privadas al hacerlo. El diario del ciclo queda excluido.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "La búsqueda de lugares no está disponible ahora. Inténtalo de nuevo en un momento o introduce las coordenadas a mano.",
         "weatherManualTitle": "Coordenadas a mano",
         "backupDropzoneTitleTouch": "Toca para elegir un archivo de copia de seguridad",
-        "installModuleDropzoneTitleTouch": "Toca para elegir un archivo ZIP"
+        "installModuleDropzoneTitleTouch": "Toca para elegir un archivo ZIP",
+        "permCapabilityCalendarEditOthers": "Cambiar eventos de otros",
+        "permCapabilityNotesEditOthers": "Cambiar notas de otros",
+        "permCapabilityInventoryEditOthers": "Cambiar objetos de otros",
+        "permCapabilityInventoryPrices": "Ver precios de compra",
+        "permCapabilityTasksReorder": "Cambiar el orden de la familia",
+        "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

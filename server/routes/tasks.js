@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from '../logger.js';
-import { mayWriteModule } from '../permissions.js';
+import { mayWriteModule, requestHasCapability } from '../permissions.js';
 import express from 'express';
 import * as db from '../db.js';
 import { documentVisibleSql } from '../services/document-access.js';
@@ -774,6 +774,13 @@ router.patch('/categories/reorder', (req, res) => {
  * Aufgabe umnummeriert, die in keiner Liste dieser Person steht.
  */
 function parseReorderIds(req, res, list) {
+  // Die Handordnung gehoert dem Haushalt (R23, D15): wer sie nicht aendern
+  // darf, liest sie nur. Vor jeder Pruefung des Bodys - eine 400 waere hier
+  // die falsche Auskunft.
+  if (!requestHasCapability(db.get(), req, 'tasks_reorder_family')) {
+    res.status(403).json({ error: 'You may not change the household order.', code: 403, reason: 'reorder_not_allowed' });
+    return null;
+  }
   if (!Array.isArray(list) || list.length === 0) {
     res.status(400).json({ error: 'A non-empty array of task IDs is required.', code: 400 });
     return null;

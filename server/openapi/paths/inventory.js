@@ -1,5 +1,10 @@
 import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE } from '../helpers.js';
 
+// R23 (D5): Kaufpreise folgen einem eigenen Recht.
+const PRICES_NOTE = 'Without the `inventory_view_prices` capability (new child accounts start without it) `purchase_price` and `currency` '
+  + 'are missing from every item in the response, and a write keeps the stored price: a create stores none, a replace leaves it as it is. '
+  + 'Linked bookings follow the Budget rights as before.';
+
 export function inventoryPaths() {
   return withCaseReasons({
     '/api/v1/inventory/locations': {
@@ -47,12 +52,12 @@ export function inventoryPaths() {
       }),
     },
     '/api/v1/inventory/items': {
-      get: op({ summary: 'List inventory items', description: `Filters: category, location_id, status, q. Each item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, tag: 'Inventory' }),
+      get: op({ summary: 'List inventory items', description: `Filters: category, location_id, status, q. Each item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE} ${PRICES_NOTE}`, tag: 'Inventory' }),
       post: op({ summary: 'Create an inventory item (optional `attachment_document_ids`: documents from the documents module; optional `entry_id`: prefills purchase_price from that booking if it has no existing links; optional `tracked_dates`: array of custom {label, date, reminder_offset_days, interval_months, interval_distance} entries, where `interval_months` recurs the date on completion and `interval_distance` is a distance hint only, never a reminder; optional `odometer`/`odometer_unit`/`odometer_on` for a manual reading, silently cleared unless `category` has `tracks_odometer` set)', tag: 'Inventory', description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE} This includes \`entry_id\`.`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/inventory/items/{id}': {
-      get: op({ summary: 'Get an inventory item', description: `The item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, tag: 'Inventory', params: [idParam('id', 'Item ID')] }),
-      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'Get an inventory item', description: `The item carries \`attachments\` and \`linked_entries\`. ${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE} ${PRICES_NOTE}`, tag: 'Inventory', params: [idParam('id', 'Item ID')] }),
+      put: op({ summary: 'Replace an inventory item (`attachment_document_ids` replaces the document links, omit to leave untouched; `tracked_dates` replaces the whole set of custom tracked dates, omit to leave untouched; `odometer`/`odometer_unit`/`odometer_on` are a full replace like every other field - omitting them clears the reading, as does switching to a `category` without `tracks_odometer` set)', tag: 'Inventory', params: [idParam('id', 'Item ID')], description: `${DOCUMENT_LINKS_READ_NOTE} ${BUDGET_LINKS_READ_NOTE} ${PRICES_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete an inventory item', tag: 'Inventory', params: [idParam('id', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/inventory/items/{id}/entries': {
@@ -134,6 +139,7 @@ const LOC_EXISTS = '`inventory_location_exists` (409, a location with this name 
 const LOC_GONE = '`inventory_location_not_found` (404, the location does not exist - deleted)';
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
 const CAT_GONE = '`inventory_category_not_found` (404, the category does not exist - deleted)';
+const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only items you created can be changed or deleted - R23)';
 const CASE_REASONS = {
   '/api/v1/inventory/locations': { post: LOC_EXISTS },
   '/api/v1/inventory/locations/{id}': { put: `${LOC_GONE}, ${LOC_EXISTS}`, delete: LOC_GONE },
@@ -142,14 +148,16 @@ const CASE_REASONS = {
   '/api/v1/inventory/categories': { post: CAT_EXISTS },
   '/api/v1/inventory/categories/{key}': { put: `${CAT_GONE}, ${CAT_EXISTS}`, delete: CAT_GONE },
   '/api/v1/inventory/items': { post: `${LOCATION_GONE}, ${BOOKING_GONE}` },
-  '/api/v1/inventory/items/{id}': { get: ITEM_GONE, put: `${ITEM_GONE}, ${LOCATION_GONE}`, delete: ITEM_GONE },
+  '/api/v1/inventory/items/{id}': { get: ITEM_GONE, put: `${ITEM_GONE}, ${LOCATION_GONE}, ${NOT_OWNER}`, delete: `${ITEM_GONE}, ${NOT_OWNER}` },
   '/api/v1/inventory/items/{id}/entries': {
-    post: `${ITEM_GONE}, ${BOOKING_GONE}, \`inventory_booking_already_linked\` (409, the booking is already linked with this role)`,
+    post: `${ITEM_GONE}, ${BOOKING_GONE}, \`inventory_booking_already_linked\` (409, the booking is already linked with this role), ${NOT_OWNER}`,
   },
-  '/api/v1/inventory/items/{id}/entries/{entryId}': { delete: `${ITEM_GONE}, ${BOOKING_GONE}` },
+  '/api/v1/inventory/items/{id}/entries/{entryId}': { delete: `${ITEM_GONE}, ${BOOKING_GONE}, ${NOT_OWNER}` },
   '/api/v1/inventory/items/{id}/dates/{dateId}/complete': {
-    post: `${ITEM_GONE}, \`inventory_tracked_date_not_found\` (404, the item no longer has this tracked date)`,
+    post: `${ITEM_GONE}, \`inventory_tracked_date_not_found\` (404, the item no longer has this tracked date), ${NOT_OWNER}`,
   },
+  '/api/v1/inventory/items/{id}/service-log': { post: NOT_OWNER },
+  '/api/v1/inventory/items/{id}/service-log/{logId}': { put: NOT_OWNER, delete: NOT_OWNER },
 };
 
 function withCaseReasons(paths) {

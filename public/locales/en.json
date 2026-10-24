@@ -106,7 +106,9 @@
         "fieldStep": "Enter a value in steps of {{step}}.",
         "fieldInvalid": "Check this entry.",
         "errorCheckRolledBack": "“{{name}}” is open again - ticking it off didn't go through. Try again.",
-        "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again."
+        "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again.",
+        "errorNotOwner": "Someone else created this - you can view it but not change it.",
+        "foreignReadOnlyHint": "Created by {{name}} - you can view it but not change it."
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Show {{count}} more",
         "doneByMenuItem": "Done by …",
         "checkedDoneNamed": "“{{title}}” done.",
-        "checkedOpenNamed": "“{{title}}” open again."
+        "checkedOpenNamed": "“{{title}}” open again.",
+        "errorReorderNotAllowed": "You can view the family order but not change it."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",
@@ -2171,7 +2174,7 @@
         "familyRoleGrandparent": "Grandparent",
         "familyRoleRelative": "Relative",
         "familyRoleOther": "Family member",
-        "childStartHint": "New child accounts start without Budget and fasting and see Housekeeping read-only, without wages and payments. You can change this afterwards under \"Roles & permissions\". The cycle is hidden too; it can be shown again in the child's personal settings.",
+        "childStartHint": "New child accounts start without Budget, fasting and purchase prices, see Housekeeping (without wages) and Waste read-only, and can only read what others created in Calendar, Notes and Inventory - as well as the task order. You can change this afterwards under \"Roles & permissions\". The cycle is hidden too; it can be shown again in the child's personal settings.",
         "systemAdminLabel": "System admin",
         "systemAdminHint": "System admins can manage application settings, integrations, API tokens and family accounts.",
         "systemAdminBadge": "System admin",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} stay locked. You can open them any time under Roles & permissions.",
             "presetHintRoleOpen": "The {{role}} role restricts nothing - the member sees every module.",
             "presetHintRoleLimited": "The {{role}} role locks: {{modules}}.",
-            "presetHintUnavailable": "The exact effect cannot be shown right now. The template still applies."
+            "presetHintUnavailable": "The exact effect cannot be shown right now. The template still applies.",
+            "presetHintRoleChild": "The role {{role}} blocks no module. The starting permissions for children above apply on top.",
+            "presetHintChildExtra": "The starting permissions for children above apply on top."
         },
         "healthCaregiversLabel": "May record health data",
         "healthCaregiversHint": "These people may record vitals, medications, lab results and activities for this member, and see their private entries while doing so. The cycle diary stays excluded.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Place search is not reachable right now. Try again in a moment or enter the coordinates by hand.",
         "weatherManualTitle": "Coordinates by hand",
         "backupDropzoneTitleTouch": "Tap to choose a backup file",
-        "installModuleDropzoneTitleTouch": "Tap to choose a ZIP file"
+        "installModuleDropzoneTitleTouch": "Tap to choose a ZIP file",
+        "permCapabilityCalendarEditOthers": "Change other people's events",
+        "permCapabilityNotesEditOthers": "Change other people's notes",
+        "permCapabilityInventoryEditOthers": "Change other people's items",
+        "permCapabilityInventoryPrices": "See purchase prices",
+        "permCapabilityTasksReorder": "Change the family order",
+        "permChildRoleHint": "New child accounts also get their own starting permissions when they are created: {{list}}. Afterwards they are listed with that member."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

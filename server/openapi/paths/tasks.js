@@ -146,10 +146,11 @@ export function tasksPaths() {
 const TASK_GONE = '`tasks_task_not_found` (404, the task does not exist or is not visible to you - deleted, or made private)';
 const PARENT_GONE = '`tasks_parent_not_found` (404, `parent_task_id` names a task that does not exist or is not visible to you)';
 const COMMENT_GONE = `${TASK_GONE}, \`tasks_comment_not_found\` (404, the task is there, the comment is not - deleted in the meantime)`;
+const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reorder_family` - the hand order belongs to the household, R23)';
 const CASE_REASONS = {
   '/api/v1/tasks': { post: PARENT_GONE },
-  '/api/v1/tasks/reorder': { patch: TASK_GONE },
-  '/api/v1/tasks/reorder/reset': { post: TASK_GONE },
+  '/api/v1/tasks/reorder': { patch: `${TASK_GONE}, ${REORDER_DENIED}` },
+  '/api/v1/tasks/reorder/reset': { post: `${TASK_GONE}, ${REORDER_DENIED}` },
   '/api/v1/tasks/{id}': { get: TASK_GONE, put: TASK_GONE, delete: TASK_GONE },
   '/api/v1/tasks/{id}/status': { patch: TASK_GONE },
   '/api/v1/tasks/{id}/archive': { patch: TASK_GONE },

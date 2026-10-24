@@ -2932,10 +2932,26 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
   wenn der Stand reicht. Opak und randlos wie die Praemienkarte, der Modulton nur im Zeichen
   des Ziels - kein Spiel-Look.
 - **Anlegen und Einladen** nennen die Startrechte unter der Familienrolle, nur bei Kind
-  (`settings.childStartHint`), und nur dann zeigt `aria-describedby` darauf.
+  (`settings.childStartHint`), und nur dann zeigt `aria-describedby` darauf. Der Hinweis der
+  Einladungsvorlage verweist bei Kind auf diese Startrechte, statt "sieht alle Module" zu sagen
+  (R23); das Rollenprofil Kind traegt eine Zeile mit denselben Startrechten, nach Stufe
+  gebuendelt aus dem Katalog (`childStartSummary`, admin-permissions.js).
+- **Fremdes nur lesen (R23, D5).** Fuenf Capabilities nach dem Muster von
+  `housekeeping_view_amounts` (Standard `allow`, keine Migration): `calendar_edit_others`,
+  `notes_edit_others`, `inventory_edit_others`, `inventory_view_prices`, `tasks_reorder_family`.
+  Neue Kinderkonten starten ohne alle fuenf und mit der Entsorgung nur zum Lesen (D15). Ohne
+  Recht: lesen und anlegen ja, aendern und loeschen nur Eigenes ("eigen" = angelegt; im Kalender
+  auch zugewiesen) - am Server (403 `not_owner`, `mayChangeRecord`), in der Oberflaeche ohne tote
+  Knoepfe: ein fremder Termin, Gegenstand oder Zettel oeffnet als Leseansicht ohne Bearbeiten
+  und Loeschen, mit dem Satz "Von <Name> angelegt - du kannst es ansehen, aber nicht aendern"
+  (`common.foreignReadOnlyHint`); Nadel und Mehr-Menue fehlen an der fremden Notiz-Karte. Das
+  Abhaken einer Checklisten-Zeile bleibt offen (Benutzen, nicht Umschreiben). Ohne Preisrecht
+  fehlen Kaufpreis und Waehrung in der Antwort, also auch Wert-Kennzahl, Preisspalte und
+  Preisfeld. Ohne Handordnungsrecht keine Griffe und kein "Zuruecksetzen" in den Aufgaben.
+  Kontakte bleiben aussen vor: ein Kontakt traegt keinen Ersteller.
 
-Gemessen: `test:child-start-permissions`, `test:housekeeping-ui`, `test:dashboard-today`,
-`test:dashboard-rewards`, `test:member-order`.
+Gemessen: `test:child-start-permissions`, `test:edit-others-permissions`, `test:edit-others-ui`,
+`test:housekeeping-ui`, `test:dashboard-today`, `test:dashboard-rewards`, `test:member-order`.
 
 ### Navigation
 - **Mobil:** schwebende Glas-Kapsel (radius-full) mit gleitendem Aktiv-Indikator, duenner

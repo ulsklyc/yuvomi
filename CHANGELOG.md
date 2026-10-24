@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Children can read what others put into Calendar, Notes and Inventory, but only change their
+  own.** Five new permissions in Roles & permissions decide this per member or family role:
+  change other people's events, notes and items, see purchase prices in Inventory, and change
+  the family order of tasks. Every existing account keeps them, so nothing changes in a household
+  that is already running. New child accounts start without them and with Waste read-only: a
+  child adds its own appointments and notes and edits them, sees family events and notes, and
+  opens them as a read view that says who created them, without edit or delete buttons. An
+  event a child is assigned to counts as its own. The server enforces the same rule for the app,
+  API tokens and the MCP bridge, and without the price permission the purchase price and its
+  currency are missing from every Inventory response. Contacts are not covered yet: a contact
+  does not record who created it. The family role "Child" now lists what new child accounts get
+  on top, and inviting a child no longer says the member sees every module.
 - **A contact with a birthday can be added to Birthdays from its detail view** (#2149). Until now
   only contacts whose birthday had been imported showed a way to Birthdays. A contact with a birth
   date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same
@@ -245,6 +257,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **The permissions sheet fits on a phone again.** Each name in the rights matrix took 12rem of
+  height on narrow screens, which made the sheet about 12,000 pixels long.
 - **An amount typed with a thousands separator is no longer saved as a thousandth of it.** In
   Budget (entries, accounts, transfers, confirmations, plans, loans), Subscriptions, Inventory
   and Housekeeping the amount fields were number fields, and the browser read "1.200" under a

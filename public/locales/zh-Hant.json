@@ -106,7 +106,9 @@
         "fieldStep": "請以 {{step}} 為間距輸入。",
         "fieldInvalid": "請檢查此項輸入。",
         "errorCheckRolledBack": "「{{name}}」已恢復為未完成 - 勾選未成功。請重試。",
-        "errorUncheckRolledBack": "「{{name}}」已恢復為已勾選 - 取消勾選未成功。請重試。"
+        "errorUncheckRolledBack": "「{{name}}」已恢復為已勾選 - 取消勾選未成功。請重試。",
+        "errorNotOwner": "這是其他人建立的，你可以檢視，但不能修改。",
+        "foreignReadOnlyHint": "由 {{name}} 建立，你可以檢視，但不能修改。"
     },
     "kitchen": {
         "noShoppingLists": "還沒有購物清單。",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "顯示另外 {{count}} 項",
         "doneByMenuItem": "完成者 …",
         "checkedDoneNamed": "「{{title}}」已完成。",
-        "checkedOpenNamed": "「{{title}}」已重新開啟。"
+        "checkedOpenNamed": "「{{title}}」已重新開啟。",
+        "errorReorderNotAllowed": "你可以檢視家庭排序，但不能變更。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已刪除 {{count}} 件商品。",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "祖父母",
         "familyRoleRelative": "親屬",
         "familyRoleOther": "家庭成員",
-        "childStartHint": "新的兒童帳戶開始時沒有預算和斷食功能，家政只能檢視，不顯示工資和付款。之後可在「角色與權限」中變更。週期也會隱藏，可在孩子的個人設定中重新顯示。",
+        "childStartHint": "新的兒童帳戶開始時沒有預算、斷食和購買價格，家政（不含工資）和垃圾只能檢視，其他人在行事曆、筆記和物品中建立的內容以及任務排序也只能檢視。之後可在「角色與權限」中變更。週期也會隱藏，可在孩子的個人設定中重新顯示。",
         "systemAdminLabel": "系統管理員",
         "systemAdminHint": "系統管理員可以管理應用設定、整合、API 令牌和家庭帳戶。",
         "systemAdminBadge": "系統管理員",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} 保持鎖定。你可以隨時在「角色與權限」中開放。",
             "presetHintRoleOpen": "角色「{{role}}」不作任何限制，成員可以看到所有模組。",
             "presetHintRoleLimited": "角色「{{role}}」鎖定：{{modules}}。",
-            "presetHintUnavailable": "目前無法顯示確切效果。模板仍然生效。"
+            "presetHintUnavailable": "目前無法顯示確切效果。模板仍然生效。",
+            "presetHintRoleChild": "角色「{{role}}」不封鎖任何模組。另外適用上方的兒童初始權限。",
+            "presetHintChildExtra": "另外適用上方的兒童初始權限。"
         },
         "healthCaregiversLabel": "可以記錄健康資料",
         "healthCaregiversHint": "這些人可以為該成員記錄體徵、用藥、化驗結果和活動，並在此過程中看到其私密記錄。經期日記不在此列。",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "地點搜尋暫時無法使用。請稍後重試，或手動輸入座標。",
         "weatherManualTitle": "手動輸入座標",
         "backupDropzoneTitleTouch": "點選以選擇備份檔案",
-        "installModuleDropzoneTitleTouch": "點選以選擇 ZIP 檔案"
+        "installModuleDropzoneTitleTouch": "點選以選擇 ZIP 檔案",
+        "permCapabilityCalendarEditOthers": "修改他人的行程",
+        "permCapabilityNotesEditOthers": "修改他人的筆記",
+        "permCapabilityInventoryEditOthers": "修改他人的物品",
+        "permCapabilityInventoryPrices": "查看購買價格",
+        "permCapabilityTasksReorder": "變更家庭排序",
+        "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

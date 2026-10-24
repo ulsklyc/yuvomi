@@ -106,7 +106,9 @@
         "fieldStep": "Adjon meg egy értéket {{step}} lépésközzel.",
         "fieldInvalid": "Ellenőrizze ezt a bejegyzést.",
         "errorCheckRolledBack": "„{{name}}” ismét nyitott - a kipipálás nem sikerült. Próbálja újra.",
-        "errorUncheckRolledBack": "„{{name}}” ismét ki van pipálva - a visszavétel nem sikerült. Próbálja újra."
+        "errorUncheckRolledBack": "„{{name}}” ismét ki van pipálva - a visszavétel nem sikerült. Próbálja újra.",
+        "errorNotOwner": "Ezt valaki más hozta létre - megnézheted, de nem módosíthatod.",
+        "foreignReadOnlyHint": "Létrehozta: {{name}} - megnézheted, de nem módosíthatod."
     },
     "kitchen": {
         "noShoppingLists": "Még nincs bevásárlólista.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "{{count}} további megjelenítése",
         "doneByMenuItem": "Elvégezte: …",
         "checkedDoneNamed": "„{{title}}” kész.",
-        "checkedOpenNamed": "„{{title}}” újra nyitott."
+        "checkedOpenNamed": "„{{title}}” újra nyitott.",
+        "errorReorderNotAllowed": "A család sorrendjét megnézheted, de nem módosíthatod."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -2171,7 +2174,7 @@
         "familyRoleGrandparent": "Nagyszülő",
         "familyRoleRelative": "Rokon",
         "familyRoleOther": "Családtag",
-        "childStartHint": "Az új gyerekfiókok költségvetés és böjt nélkül indulnak, a háztartási segítőt csak olvasásra látják, bérek és kifizetések nélkül. Ezt később itt: „Szerepek és jogosultságok” módosíthatod. A ciklus is rejtve van; a gyerek saját beállításaiban jeleníthető meg.",
+        "childStartHint": "Az új gyerekfiókok költségvetés, böjt és vételárak nélkül indulnak, a háztartási segítőt (bérek nélkül) és a hulladékot csak olvasásra látják, és amit mások a naptárban, a jegyzetekben és a leltárban létrehoztak, azt csak olvashatják - a feladatok sorrendjét is. Ezt később itt: „Szerepek és jogosultságok” módosíthatod. A ciklus is rejtve van; a gyerek saját beállításaiban jeleníthető meg.",
         "systemAdminLabel": "Rendszergazda",
         "systemAdminHint": "A rendszergazdák kezelhetik az alkalmazás beállításait, integrációit, API tokenjeit és családi fiókjait.",
         "systemAdminBadge": "Rendszergazda",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} zárolva marad. Bármikor feloldhatod a Szerepek és jogosultságok alatt.",
             "presetHintRoleOpen": "A(z) {{role}} szerep semmit sem korlátoz - a tag minden modult lát.",
             "presetHintRoleLimited": "A(z) {{role}} szerep zárolja: {{modules}}.",
-            "presetHintUnavailable": "A pontos hatás most nem jeleníthető meg. A sablon ettől még érvényes."
+            "presetHintUnavailable": "A pontos hatás most nem jeleníthető meg. A sablon ettől még érvényes.",
+            "presetHintRoleChild": "A(z) {{role}} szerep egyetlen modult sem tilt. Ehhez jönnek még a fenti gyerek kezdő jogosultságok.",
+            "presetHintChildExtra": "Ehhez jönnek még a fenti gyerek kezdő jogosultságok."
         },
         "healthCaregiversLabel": "Rögzíthet egészségügyi adatokat",
         "healthCaregiversHint": "Ezek a személyek rögzíthetnek életjeleket, gyógyszereket, laboreredményeket és tevékenységeket ehhez a taghoz, és eközben a privát bejegyzéseit is látják. A ciklusnapló kivétel marad.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "A helykeresés most nem érhető el. Próbáld újra kicsit később, vagy add meg kézzel a koordinátákat.",
         "weatherManualTitle": "Koordináták kézzel",
         "backupDropzoneTitleTouch": "Koppintson egy biztonsági mentés kiválasztásához",
-        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához"
+        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához",
+        "permCapabilityCalendarEditOthers": "Mások eseményeinek módosítása",
+        "permCapabilityNotesEditOthers": "Mások jegyzeteinek módosítása",
+        "permCapabilityInventoryEditOthers": "Mások tárgyainak módosítása",
+        "permCapabilityInventoryPrices": "Vételárak megtekintése",
+        "permCapabilityTasksReorder": "A család sorrendjének módosítása",
+        "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

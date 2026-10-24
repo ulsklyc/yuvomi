@@ -3973,6 +3973,14 @@
     gap: var(--space-2);
   }
 
+  /* DIE BASIS DES NAMENS IST IN DER SPALTE EINE HOEHE (R23, D5). `flex: 1 1
+   * 12rem` oben gilt der Zeile; in der Spalte wurde daraus 12rem HOEHE je
+   * Name, und das Blatt maß mobil 12143px. In der Spalte nimmt der Name nur,
+   * was er braucht. */
+  .perm-row > .perm-row__label {
+    flex: none;
+  }
+
   /* Der Name darf jetzt umbrechen: er teilt die Zeile mit nichts mehr. */
   .perm-row__name {
     white-space: normal;

@@ -106,7 +106,9 @@
         "fieldStep": "Inserisci un valore a passi di {{step}}.",
         "fieldInvalid": "Controlla questo dato.",
         "errorCheckRolledBack": "«{{name}}» è di nuovo da fare - la spunta non è andata a buon fine. Riprova.",
-        "errorUncheckRolledBack": "«{{name}}» è di nuovo spuntato - il ripristino non è andato a buon fine. Riprova."
+        "errorUncheckRolledBack": "«{{name}}» è di nuovo spuntato - il ripristino non è andato a buon fine. Riprova.",
+        "errorNotOwner": "L’ha creato qualcun altro: puoi vederlo, ma non modificarlo.",
+        "foreignReadOnlyHint": "Creato da {{name}}: puoi vederlo, ma non modificarlo."
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Mostra {{count}} in più",
         "doneByMenuItem": "Svolto da …",
         "checkedDoneNamed": "«{{title}}» fatto.",
-        "checkedOpenNamed": "«{{title}}» di nuovo aperto."
+        "checkedOpenNamed": "«{{title}}» di nuovo aperto.",
+        "errorReorderNotAllowed": "Puoi vedere l’ordine della famiglia, ma non modificarlo."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} articolo eliminato.",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "Nonno/a",
         "familyRoleRelative": "Parente",
         "familyRoleOther": "Membro della famiglia",
-        "childStartHint": "I nuovi account bambino partono senza Budget e digiuno e vedono l’Aiuto domestico in sola lettura, senza compensi e pagamenti. Puoi cambiarlo dopo in «Ruoli e autorizzazioni». Anche il ciclo è nascosto; si può mostrare nelle impostazioni personali del bambino.",
+        "childStartHint": "I nuovi account bambino partono senza Budget, digiuno e prezzi d’acquisto, vedono l’Aiuto domestico (senza compensi) e i Rifiuti in sola lettura e possono solo leggere ciò che altri hanno creato in Calendario, Note e Inventario, così come l’ordine delle attività. Puoi cambiarlo dopo in «Ruoli e autorizzazioni». Anche il ciclo è nascosto; si può mostrare nelle impostazioni personali del bambino.",
         "systemAdminLabel": "Amministratore di sistema",
         "systemAdminHint": "Gli amministratori di sistema possono gestire impostazioni, integrazioni, token API e account familiari.",
         "systemAdminBadge": "Admin sistema",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} restano bloccati. Puoi sbloccarli quando vuoi in Ruoli e autorizzazioni.",
             "presetHintRoleOpen": "Il ruolo {{role}} non limita nulla: il membro vede tutti i moduli.",
             "presetHintRoleLimited": "Il ruolo {{role}} blocca: {{modules}}.",
-            "presetHintUnavailable": "L'effetto esatto non è visualizzabile al momento. Il modello vale comunque."
+            "presetHintUnavailable": "L'effetto esatto non è visualizzabile al momento. Il modello vale comunque.",
+            "presetHintRoleChild": "Il ruolo {{role}} non blocca nessun modulo. Si aggiungono i permessi iniziali per i bambini qui sopra.",
+            "presetHintChildExtra": "Si aggiungono i permessi iniziali per i bambini qui sopra."
         },
         "healthCaregiversLabel": "Può registrare dati sanitari",
         "healthCaregiversHint": "Queste persone possono registrare parametri vitali, farmaci, esami di laboratorio e attività per questo membro, vedendone anche le voci private. Il diario del ciclo resta escluso.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "La ricerca dei luoghi non è raggiungibile ora. Riprova tra poco o inserisci le coordinate a mano.",
         "weatherManualTitle": "Coordinate a mano",
         "backupDropzoneTitleTouch": "Tocca per scegliere un file di backup",
-        "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP"
+        "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP",
+        "permCapabilityCalendarEditOthers": "Modificare gli eventi degli altri",
+        "permCapabilityNotesEditOthers": "Modificare le note degli altri",
+        "permCapabilityInventoryEditOthers": "Modificare gli oggetti degli altri",
+        "permCapabilityInventoryPrices": "Vedere i prezzi d’acquisto",
+        "permCapabilityTasksReorder": "Modificare l’ordine della famiglia",
+        "permChildRoleHint": "I nuovi account bambino ricevono inoltre, alla creazione, permessi iniziali propri: {{list}}. Poi compaiono presso il rispettivo membro."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

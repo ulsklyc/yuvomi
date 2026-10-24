@@ -34,6 +34,7 @@ import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
+import { canChangeRecord, canSeeInventoryPrices } from '/permissions.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines, deadlineChipSpec } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml } from '/utils/master-detail.js';
@@ -82,6 +83,20 @@ const state = {
  */
 function readOnly() {
   return !mayWritePath('/inventory');
+}
+
+// Wer bin ich - fuer "eigen" (R23, D5). Kommt aus render({ user }).
+let _userId = null;
+
+/**
+ * Darf ich DIESEN Gegenstand aendern? Ohne `inventory_edit_others` nur, was ich
+ * angelegt habe: ein fremder steht als vollstaendige Leseansicht da, ohne
+ * Bearbeiten, Loeschen und "Erledigt" (der Server antwortet sonst 403
+ * `not_owner`).
+ */
+function mayChangeItem(item) {
+  if (readOnly() || !item) return false;
+  return canChangeRecord('inventory', item.created_by != null && Number(item.created_by) === Number(_userId));
 }
 
 async function loadLocations() {
@@ -455,7 +470,8 @@ function renderMetrics() {
     label: t('inventory.metricItemsLabel'),
     value: String(count),
     flows: [
-      { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) },
+      // Ohne Preisrecht (R23) gibt es keinen Wert - die Antwort traegt keine Preise.
+      canSeeInventoryPrices() ? { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) } : null,
       // Eine leere Kennzahl entfaellt in der Kurzzeile.
       needsAttention > 0 ? { label: t('inventory.metricAttentionLabel'), amount: String(needsAttention) } : null,
     ],
@@ -465,10 +481,10 @@ function renderMetrics() {
         <div class="metric-card__label">${esc(t('inventory.metricItemsLabel'))}</div>
         <div class="metric-card__value">${count}</div>
       </div>
-      <div class="metric-card">
+      ${canSeeInventoryPrices() ? `<div class="metric-card">
         <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
         <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
-      </div>
+      </div>` : ''}
       ${/* NULL IST KEIN WEG (R22, a4 Klein): "Braucht Aufmerksamkeit 0" stand
            in Akzenttinte als Knopf da und versprach einen Filter, der eine
            leere Liste zeigt. Ohne Frist und ohne aktiven Filter ist die Zeile
@@ -622,7 +638,7 @@ function renderItemRow(item) {
         </span>
         ${item.location_path ? `<span class="list-row__meta">${esc(item.location_path)}</span>` : ''}
       </button>
-      <span class="inventory-row__value">${item.purchase_price != null ? esc(formatMoney(item.purchase_price, item.currency)) : ''}</span>
+      ${canSeeInventoryPrices() ? `<span class="inventory-row__value">${item.purchase_price != null ? esc(formatMoney(item.purchase_price, item.currency)) : ''}</span>` : ''}
     </div>`;
 }
 
@@ -1205,7 +1221,7 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
         { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
         { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
         { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
-        { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
+        { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: canSeeInventoryPrices() && item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
         { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
         // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
         // Benutzername, nie ein Passwort. Steht bei den uebrigen Herkunftsangaben,
@@ -1290,7 +1306,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
   // gewaehlt sein - dann gehoert die Spalte ihr, nicht diesem Gegenstand.
   if (signal?.aborted) return;
 
-  const ro = readOnly();
+  const ro = !mayChangeItem(item);
   const onDoneTrackedDate = ro ? null : async (trackedDate) => {
     if (pane) {
       // In der Spalte liegt kein Overlay offen: die Abschluss-Karte geht direkt
@@ -1382,7 +1398,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
  * @returns {Promise<boolean>} true, wenn die Frist erledigt wurde
  */
 function openCompletionSheet(item, trackedDate) {
-  if (readOnly()) return Promise.resolve(false);
+  if (!mayChangeItem(item)) return Promise.resolve(false);
   return new Promise((resolve) => {
     let settled = false;
     const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
@@ -1917,10 +1933,10 @@ function buildItemForm({ mode, item = null }) {
             <yuvomi-datepicker id="inv-purchase-date" type="date"
                                value="${esc(isEdit && item.purchase_date ? item.purchase_date : '')}"></yuvomi-datepicker>
           </div>
-          <div class="form-group">
+          ${canSeeInventoryPrices() ? `<div class="form-group">
             <label class="form-label" for="inv-purchase-price">${esc(t('inventory.purchasePriceLabel'))}</label>
             <input id="inv-purchase-price" class="form-input"${amountInputAttrs(itemCurrency(item))}>
-          </div>
+          </div>` : ''}
         </div>
         ${!isEdit && showsBookings ? `
         <div class="form-group">
@@ -2046,7 +2062,8 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-name').value = isEdit ? item.name : '';
     panel.querySelector('#inv-category').value = isEdit ? item.category : 'other';
     panel.querySelector('#inv-location').value = isEdit && item.location_id ? String(item.location_id) : '';
-    panel.querySelector('#inv-purchase-price').value = isEdit && item.purchase_price != null ? amountToInput(item.purchase_price, itemCurrency(item)) : '';
+    const priceField = panel.querySelector('#inv-purchase-price');
+    if (priceField) priceField.value = isEdit && item.purchase_price != null ? amountToInput(item.purchase_price, itemCurrency(item)) : '';
     panel.querySelector('#inv-status').value = isEdit ? item.status : 'active';
     panel.querySelector('#inv-brand').value = isEdit && item.brand ? item.brand : '';
     panel.querySelector('#inv-model').value = isEdit && item.model ? item.model : '';
@@ -2189,7 +2206,7 @@ function buildItemForm({ mode, item = null }) {
         });
         if (window.lucide) window.lucide.createIcons({ el: chip });
         const priceInput = panel.querySelector('#inv-purchase-price');
-        if (!priceInput.value.trim()) priceInput.value = amountToInput(Math.abs(picked.entry.amount), itemCurrency(item));
+        if (priceInput && !priceInput.value.trim()) priceInput.value = amountToInput(Math.abs(picked.entry.amount), itemCurrency(item));
       });
     }
 
@@ -2219,6 +2236,7 @@ function openItemModal(mode, item = null) {
   // Leerzustand, Tastenkuerzel „n" (klickt den FAB), Enter auf der Zeile und
   // „Bearbeiten" aus der Detailspalte.
   if (readOnly()) return;
+  if (mode === 'edit' && !mayChangeItem(item)) return;
   const form = buildItemForm({ mode, item });
   // Anlegen: Buehne zuerst, Felder nach dem ersten Bild (modal.js `staged`, R21 a6).
   openSharedModal({ title: form.title, size: 'md', content: form.content, onSave: form.wire, staged: mode === 'create' });
@@ -2233,10 +2251,12 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
 
   // Der Kaufpreis als TEXT (D1): "1.200" unter de ist abgewiesen und benannt,
   // nie still 1,2. 0 ist erlaubt (Geschenk), leer heisst "kein Preis".
+  // Ohne Preisrecht (R23) steht das Feld nicht da; der Server laesst den
+  // gespeicherten Preis dann stehen.
   const priceInput = panel.querySelector('#inv-purchase-price');
-  const priceProblem = amountFieldError(priceInput, itemCurrency(item), {
+  const priceProblem = priceInput ? amountFieldError(priceInput, itemCurrency(item), {
     sign: 'nonNegative', original: item?.purchase_price ?? null, originalCurrency: item?.currency ?? null,
-  });
+  }) : null;
   if (priceProblem) { reportFieldError(...priceProblem); return; }
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
   const category = panel.querySelector('#inv-category').value;
@@ -2251,7 +2271,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     category,
     location_id: panel.querySelector('#inv-location').value || null,
     purchase_date: panel.querySelector('#inv-purchase-date').value || null,
-    purchase_price: parseAmountInput(priceInput.value),
+    ...(priceInput ? { purchase_price: parseAmountInput(priceInput.value) } : {}),
     status: panel.querySelector('#inv-status').value,
     brand: panel.querySelector('#inv-brand').value.trim() || null,
     model: panel.querySelector('#inv-model').value.trim() || null,
@@ -2329,7 +2349,7 @@ async function offerCurrentLocations(panel) {
 }
 
 async function removeItem(item) {
-  if (readOnly()) return;
+  if (!mayChangeItem(item)) return;
   const ok = await confirmModal(t('inventory.deleteConfirm', { name: item.name }), {
     danger: true,
     detail: t('inventory.deleteConfirmDetail'),
@@ -2385,8 +2405,9 @@ function inventoryToolsHtml() {
     </div>`;
 }
 
-export async function render(container, { signal } = {}) {
+export async function render(container, { signal, user } = {}) {
   _container = container;
+  _userId = user?.id ?? null;
   _md = null;
 
   const page = document.createElement('div');
@@ -2572,7 +2593,7 @@ export async function render(container, { signal } = {}) {
       openNarrow: openItemNarrow,
       onEnter: (id) => {
         const item = state.items.find((i) => String(i.id) === id);
-        if (item && !readOnly()) openItemModal('edit', item);
+        if (item && mayChangeItem(item)) openItemModal('edit', item);
       },
       onModeChange: onInventoryModeChange,
     });

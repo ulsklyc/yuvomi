@@ -53,7 +53,7 @@ import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { filterButtonHtml, openFilterSheet, filterChipsHtml, filtersAsPopover } from '/utils/filter-sheet.js';
 import { attachSegmentIndicator, afterGlideStart } from '/utils/segment-indicator.js';
 import { wirePeriodSwipe, parkPeriodGhost } from '/utils/period-swipe.js';
-import { isNavModuleReadOnly } from '/permissions.js';
+import { canChangeRecord, isNavModuleReadOnly } from '/permissions.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
 // 2026-07-27) - die Funktion selbst ist geteiltes UI-Vokabular und kein
@@ -307,6 +307,27 @@ const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 function readOnly() {
   return isNavModuleReadOnly('calendar');
+}
+
+/**
+ * Gehoert mir dieser Termin (R23, D5)? Angelegt oder zugewiesen - dieselbe
+ * Regel wie `ownsEvent()` in server/routes/calendar/crud.js.
+ */
+function ownsEvent(ev) {
+  const me = state.currentUserId;
+  if (me == null || !ev) return false;
+  if (Number(ev.created_by) === Number(me) || Number(ev.assigned_to) === Number(me)) return true;
+  return (ev.assigned_users ?? []).some((u) => Number(u.id) === Number(me));
+}
+
+/**
+ * Darf ich DIESEN Termin aendern? Ohne `calendar_edit_others` nur eigene und
+ * zugewiesene - ein fremder oeffnet als Leseansicht, ohne Bearbeiten und
+ * Loeschen, mit dem Satz, wer ihn angelegt hat.
+ */
+function mayChangeEvent(ev) {
+  if (readOnly() || !ev) return false;
+  return canChangeRecord('calendar', ownsEvent(ev));
 }
 
 /** Gemessene Stundenhoehe einer 24-Stunden-Spalte (Klick- und Scroll-Mathematik). */
@@ -7661,7 +7682,8 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
   // "In Karte oeffnen" ist der einzige Eintrag dieser Fusszeile, der nichts
   // schreibt - er gehoert deshalb auch einem Nur-lesen-Nutzer. Die Liste faengt
   // bei `calendar: read` leer an und nimmt unten nur noch ihn auf.
-  const actions = readOnly() ? [] : [{
+  const locked = !mayChangeEvent(ev);
+  const actions = locked ? [] : [{
     id: 'detail-delete',
     label: t('common.delete'),
     variant: 'danger-ghost',
@@ -7684,7 +7706,7 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
 
   // ICS-Abos: Ein lokal geänderter Termin lässt sich auf das Original
   // zurücksetzen. Die Aktion gehört zum Objekt, also in die Fußzeile.
-  if (ev.external_source === 'ics' && ev.user_modified === 1 && !readOnly()) {
+  if (ev.external_source === 'ics' && ev.user_modified === 1 && !locked) {
     actions.push({
       id: 'detail-ics-reset',
       label: t('calendar.ics.reset'),
@@ -7718,11 +7740,17 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
     // neben der Liste statt als Popover. Bearbeiten steht dort im Kopf und
     // fuehrt ins Formular-Modal (`edit.standalone`).
     pane: pane ?? undefined,
-    sections: renderEventDetail(ev, reminders),
+    sections: [
+      ...renderEventDetail(ev, reminders),
+      // Fremd ohne Recht (R23): der Grund, warum Bearbeiten fehlt.
+      ...(locked && !readOnly() && ev.creator_name
+        ? [{ icon: 'eye', label: '', value: t('common.foreignReadOnlyHint', { name: ev.creator_name }), multiline: true }]
+        : []),
+    ],
     actions,
     // Ohne `edit` baut die geteilte Ansicht keinen Bearbeiten-Knopf
     // (components/detail-view.js) - dasselbe Muster wie in der Aufgabenansicht.
-    edit: readOnly() ? undefined : {
+    edit: locked ? undefined : {
       label: t('common.edit'),
       title: t('calendar.editEvent'),
       // Bearbeiten ist die Hauptaktion unten (detail-view.js,
@@ -8536,6 +8564,7 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
   // einzeln zu sperren waere sechs Chancen, eine zu vergessen; der siebte Weg,
   // der morgen dazukommt, findet den Riegel hier ohnehin.
   if (readOnly()) return;
+  if (mode === 'edit' && event && !mayChangeEvent(event)) return;
   if (mode === 'edit' && event?.housekeeping_visit_id) {
     window.yuvomi.navigate(`/housekeeping?editVisit=${event.housekeeping_visit_id}`);
     return;
@@ -9409,6 +9438,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   // `calendar: read` nicht offen, aber ein Dialog kann es gewesen sein, als die
   // Rechte wechselten.
   if (readOnly()) return;
+  if (mode === 'edit' && event && !mayChangeEvent(event)) return;
   // Geschlossen wird nur DIESER Dialog: kommt die Antwort erst, nachdem der
   // Nutzer ihn zugemacht und einen anderen geoeffnet hat, bleibt der andere
   // samt seinen Eingaben offen (#1997). Festgehalten vor jedem await - eine
@@ -9997,7 +10027,7 @@ async function requestDeleteEvent(event) {
   // Der Riegel vor jedem Loeschweg: die Fusszeile der Detailansicht ist der
   // sichtbare, die drei Serien-Varianten darunter (ganze Reihe, dieser und
   // folgende, einzelner Termin) haengen alle an dieser einen Weiche.
-  if (readOnly()) return;
+  if (!mayChangeEvent(event)) return;
   if (isExternalRecurringSeries(event)) {
     if (await confirmExternalSeriesDelete(event)) await deleteEvent(event);
     return;

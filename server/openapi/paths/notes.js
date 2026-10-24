@@ -66,10 +66,11 @@ export function notesPaths() {
 // englischen `error` - je Operation der Satz, der sie nennt.
 const NOTE_GONE = '`notes_note_not_found` (404, the note does not exist - deleted)';
 const CATEGORY_GONE = '`notes_selected_category_not_found` (400 or 409, a category in `category_ids` does not exist or is not available to you)';
+const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only notes you created; ticking a checklist line stays open can be changed or deleted - R23)';
 const CASE_REASONS = {
   '/api/v1/notes': { post: CATEGORY_GONE },
-  '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}`, delete: NOTE_GONE },
-  '/api/v1/notes/{id}/pin': { patch: NOTE_GONE },
+  '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}, ${NOT_OWNER} (a body with only \`category_ids\` stays open)`, delete: `${NOTE_GONE}, ${NOT_OWNER}` },
+  '/api/v1/notes/{id}/pin': { patch: `${NOTE_GONE}, ${NOT_OWNER}` },
   '/api/v1/notes/{id}/check': { patch: NOTE_GONE },
   '/api/v1/notes/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/notes/categories/{id}': { put: '`category_exists` (409, a category with this name already exists)' },

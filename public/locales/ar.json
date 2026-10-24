@@ -109,7 +109,9 @@
         "fieldStep": "أدخل قيمة بخطوات قدرها {{step}}.",
         "fieldInvalid": "تحقق من هذا الإدخال.",
         "errorCheckRolledBack": "«{{name}}» مفتوح مجددًا - لم يتم وضع العلامة. حاول مرة أخرى.",
-        "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى."
+        "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى.",
+        "errorNotOwner": "أنشأ هذا شخص آخر - يمكنك عرضه لكن لا يمكنك تغييره.",
+        "foreignReadOnlyHint": "أنشأه {{name}} - يمكنك عرضه لكن لا يمكنك تغييره."
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -805,7 +807,8 @@
         "kanbanShowMore_many": "عرض {{count}} أخرى",
         "doneByMenuItem": "أنجزها …",
         "checkedDoneNamed": "تم إنجاز «{{title}}».",
-        "checkedOpenNamed": "«{{title}}» مفتوحة مجددًا."
+        "checkedOpenNamed": "«{{title}}» مفتوحة مجددًا.",
+        "errorReorderNotAllowed": "يمكنك عرض ترتيب العائلة لكن لا يمكنك تغييره."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -2310,7 +2313,7 @@
         "familyRoleGrandparent": "جد/جدة",
         "familyRoleRelative": "قريب",
         "familyRoleOther": "فرد من العائلة",
-        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام، وترى المساعدة المنزلية للقراءة فقط دون الأجور والمدفوعات. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات». الدورة مخفية أيضًا؛ يمكن إظهارها من الإعدادات الشخصية للطفل.",
+        "childStartHint": "تبدأ حسابات الأطفال الجديدة بدون الميزانية والصيام وأسعار الشراء، وترى المساعدة المنزلية (دون الأجور) والنفايات للقراءة فقط، ولا تقرأ إلا ما أنشأه الآخرون في التقويم والملاحظات والمخزون - وكذلك ترتيب المهام. يمكنك تغيير ذلك لاحقًا ضمن «الأدوار والأذونات». الدورة مخفية أيضًا؛ يمكن إظهارها من الإعدادات الشخصية للطفل.",
         "systemAdminLabel": "مسؤول النظام",
         "systemAdminHint": "يمكن لمسؤولي النظام إدارة الإعدادات والتكاملات ورموز API وحسابات العائلة.",
         "systemAdminBadge": "مسؤول النظام",
@@ -3406,7 +3409,9 @@
             "presetHintRestricted": "يبقى {{modules}} مقفلاً. يمكنك فتحه في أي وقت من الأدوار والأذونات.",
             "presetHintRoleOpen": "الدور {{role}} لا يقيّد شيئاً - يرى العضو جميع الوحدات.",
             "presetHintRoleLimited": "الدور {{role}} يقفل: {{modules}}.",
-            "presetHintUnavailable": "لا يمكن عرض التأثير الدقيق الآن. القالب سارٍ رغم ذلك."
+            "presetHintUnavailable": "لا يمكن عرض التأثير الدقيق الآن. القالب سارٍ رغم ذلك.",
+            "presetHintRoleChild": "الدور {{role}} لا يحظر أي وحدة. تُضاف إليه أذونات البدء الخاصة بالأطفال أعلاه.",
+            "presetHintChildExtra": "تُضاف أذونات البدء الخاصة بالأطفال أعلاه."
         },
         "healthCaregiversLabel": "يمكنه تسجيل البيانات الصحية",
         "healthCaregiversHint": "يمكن لهؤلاء الأشخاص تسجيل العلامات الحيوية والأدوية ونتائج المختبر والأنشطة لهذا العضو، ورؤية إدخالاته الخاصة أثناء ذلك. تبقى يوميات الدورة مستثناة.",
@@ -3633,7 +3638,13 @@
         "weatherPlaceUnavailable": "البحث عن الأماكن غير متاح حاليًا. حاول مجددًا بعد قليل أو أدخل الإحداثيات يدويًا.",
         "weatherManualTitle": "الإحداثيات يدويًا",
         "backupDropzoneTitleTouch": "اضغط لاختيار ملف نسخة احتياطية",
-        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP"
+        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP",
+        "permCapabilityCalendarEditOthers": "تعديل مواعيد الآخرين",
+        "permCapabilityNotesEditOthers": "تعديل ملاحظات الآخرين",
+        "permCapabilityInventoryEditOthers": "تعديل أغراض الآخرين",
+        "permCapabilityInventoryPrices": "رؤية أسعار الشراء",
+        "permCapabilityTasksReorder": "تغيير ترتيب العائلة",
+        "permChildRoleHint": "تحصل حسابات الأطفال الجديدة عند إنشائها أيضًا على أذونات بدء خاصة: {{list}}. بعد ذلك تظهر لدى العضو نفسه."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

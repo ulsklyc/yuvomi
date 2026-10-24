@@ -434,9 +434,14 @@ export function calendarPaths() {
 
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // `error` - je Operation der Satz, der sie nennt.
+const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only events you created or are assigned to can be changed or deleted - R23)';
 const CASE_REASONS = {
+  '/api/v1/calendar/{id}': { put: NOT_OWNER, delete: NOT_OWNER },
+  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}': { put: NOT_OWNER, delete: NOT_OWNER },
+  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following': { put: NOT_OWNER, delete: NOT_OWNER },
   '/api/v1/calendar/{id}/exceptions': {
-    post: '`malformed_recurrence_id` (400, `recurrence_id` or `date` is not an occurrence key), '
+    post: `${NOT_OWNER}, `
+      + '`malformed_recurrence_id` (400, `recurrence_id` or `date` is not an occurrence key), '
       + '`invalid_recurrence_id` (400, the key names no occurrence of this series), '
       + '`ambiguous_recurrence_id` (409, a date-only key matches two occurrences)',
   },

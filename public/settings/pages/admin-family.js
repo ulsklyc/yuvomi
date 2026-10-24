@@ -785,12 +785,19 @@ function bindInviteEvents(container, initialInvites) {
         async function updatePresetHint() {
           if (!presetSelect || !presetHint) return;
           const role = roleSelect?.value || 'other';
+          // EIN KIND BEKOMMT DIE STARTRECHTE AUS DEM HINWEIS OBEN (R23): dieser
+          // Satz sagte bei "wie das Rollenprofil" "sieht alle Module", zwei
+          // Zeilen unter "startet ohne Budget". Fuer ein Kind nennt er deshalb
+          // nur, was die Vorlage sperrt, und verweist auf die Startrechte.
+          const child = role === 'child';
           if (presetSelect.value === 'restricted') {
             const names = (permissionCatalog?.invitePresets?.restrictedModules || []).map(moduleLabel);
             const base = names.length
               ? t('settings.invites.presetHintRestricted', { modules: names.join(', ') })
               : t('settings.invites.presetHintUnavailable');
-            presetHint.textContent = appendCapabilityState(base, capabilityStateText('health_use_fasting', null, true));
+            presetHint.textContent = child
+              ? `${base} ${t('settings.invites.presetHintChildExtra')}`
+              : appendCapabilityState(base, capabilityStateText('health_use_fasting', null, true));
             return;
           }
           if (!roleProfiles.has(role)) {
@@ -811,6 +818,12 @@ function bindInviteEvents(container, initialInvites) {
             return;
           }
           const denied = deniedModuleNames(profile.modules);
+          if (child) {
+            presetHint.textContent = denied.length
+              ? `${t('settings.invites.presetHintRoleLimited', { role: roleName, modules: denied.join(', ') })} ${t('settings.invites.presetHintChildExtra')}`
+              : t('settings.invites.presetHintRoleChild', { role: roleName });
+            return;
+          }
           const base = denied.length
             ? t('settings.invites.presetHintRoleLimited', { role: roleName, modules: denied.join(', ') })
             : t('settings.invites.presetHintRoleOpen', { role: roleName });

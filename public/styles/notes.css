@@ -416,6 +416,12 @@
   margin-bottom: var(--space-2);
 }
 
+/* Wer die fremde Notiz angelegt hat (R23, D5): ueber dem Inhalt, im Ton der
+ * Hinweise - die Antwort auf "warum kann ich das nicht bearbeiten". */
+.note-read__owner {
+  margin: 0 0 var(--space-3);
+}
+
 .note-read__categories {
   display: flex;
   flex-wrap: wrap;

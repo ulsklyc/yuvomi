@@ -106,7 +106,9 @@
         "fieldStep": "Bitte in Schritten von {{step}} eingeben.",
         "fieldInvalid": "Bitte prüfe diese Eingabe.",
         "errorCheckRolledBack": "„{{name}}“ ist wieder offen - das Abhaken hat nicht geklappt. Versuch es noch einmal.",
-        "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal."
+        "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal.",
+        "errorNotOwner": "Das hat jemand anderes angelegt - du kannst es ansehen, aber nicht ändern.",
+        "foreignReadOnlyHint": "Von {{name}} angelegt - du kannst es ansehen, aber nicht ändern."
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -667,7 +669,8 @@
         "kanbanShowMore_one": "{{count}} weitere anzeigen",
         "doneByMenuItem": "Erledigt von …",
         "checkedDoneNamed": "„{{title}}“ erledigt.",
-        "checkedOpenNamed": "„{{title}}“ wieder offen."
+        "checkedOpenNamed": "„{{title}}“ wieder offen.",
+        "errorReorderNotAllowed": "Die Reihenfolge der Familie kannst du ansehen, aber nicht ändern."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -2216,7 +2219,7 @@
         "familyRoleGrandparent": "Großelternteil",
         "familyRoleRelative": "Verwandte/r",
         "familyRoleOther": "Familienmitglied",
-        "childStartHint": "Neue Kinderkonten starten ohne Budget und Fasten und sehen die Haushaltshilfe nur zum Lesen, ohne Löhne und Zahlungen. Ändern lässt sich das danach unter „Rollen und Rechte“. Auch der Zyklus ist ausgeblendet; einblenden lässt er sich in den persönlichen Einstellungen des Kindes.",
+        "childStartHint": "Neue Kinderkonten starten ohne Budget, Fasten und Kaufpreise, sehen Haushaltshilfe (ohne Löhne) und Entsorgung nur zum Lesen und lesen nur, was andere in Kalender, Notizen und Inventar angelegt haben - ebenso die Reihenfolge der Aufgaben. Ändern lässt sich das danach unter „Rollen und Rechte“. Auch der Zyklus ist ausgeblendet; einblenden lässt er sich in den persönlichen Einstellungen des Kindes.",
         "systemAdminLabel": "Systemadministrator",
         "systemAdminHint": "Systemadministratoren können App-Einstellungen, Integrationen, API-Tokens und Familienkonten verwalten.",
         "systemAdminBadge": "Systemadministrator",
@@ -3126,7 +3129,9 @@
             "presetHintRestricted": "{{modules}} bleiben gesperrt. Freigeben kannst du sie jederzeit unter Rollen und Rechte.",
             "presetHintRoleOpen": "Die Rolle {{role}} schränkt nichts ein - das Mitglied sieht alle Module.",
             "presetHintRoleLimited": "Die Rolle {{role}} sperrt: {{modules}}.",
-            "presetHintUnavailable": "Die genaue Wirkung lässt sich gerade nicht anzeigen. Die Vorlage gilt trotzdem."
+            "presetHintUnavailable": "Die genaue Wirkung lässt sich gerade nicht anzeigen. Die Vorlage gilt trotzdem.",
+            "presetHintRoleChild": "Die Rolle {{role}} sperrt kein Modul. Dazu kommen die Startrechte für Kinder oben.",
+            "presetHintChildExtra": "Dazu kommen die Startrechte für Kinder oben."
         },
         "healthCaregiversLabel": "Darf Gesundheitsdaten eintragen",
         "healthCaregiversHint": "Diese Personen dürfen für dieses Mitglied Vitalwerte, Medikamente, Laborwerte und Aktivitäten eintragen und dabei auch dessen private Einträge sehen. Das Zyklus-Tagebuch bleibt ausgenommen.",
@@ -3338,7 +3343,13 @@
         "weatherPlaceUnavailable": "Die Ortssuche ist gerade nicht erreichbar. Versuch es gleich noch einmal oder trag die Koordinaten von Hand ein.",
         "weatherManualTitle": "Koordinaten von Hand",
         "backupDropzoneTitleTouch": "Tippen, um eine Backup-Datei auszuwählen",
-        "installModuleDropzoneTitleTouch": "Tippen, um eine ZIP-Datei auszuwählen"
+        "installModuleDropzoneTitleTouch": "Tippen, um eine ZIP-Datei auszuwählen",
+        "permCapabilityCalendarEditOthers": "Termine anderer ändern",
+        "permCapabilityNotesEditOthers": "Notizen anderer ändern",
+        "permCapabilityInventoryEditOthers": "Gegenstände anderer ändern",
+        "permCapabilityInventoryPrices": "Kaufpreise sehen",
+        "permCapabilityTasksReorder": "Reihenfolge der Familie ändern",
+        "permChildRoleHint": "Neue Kinderkonten bekommen beim Anlegen zusätzlich eigene Startrechte: {{list}}. Danach stehen sie beim jeweiligen Mitglied."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

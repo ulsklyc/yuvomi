@@ -106,7 +106,9 @@
         "fieldStep": "Hãy nhập giá trị theo bước {{step}}.",
         "fieldInvalid": "Hãy kiểm tra mục này.",
         "errorCheckRolledBack": "\"{{name}}\" đã mở lại - chưa đánh dấu được. Hãy thử lại.",
-        "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại."
+        "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại.",
+        "errorNotOwner": "Người khác đã tạo mục này - bạn có thể xem nhưng không thể sửa.",
+        "foreignReadOnlyHint": "Do {{name}} tạo - bạn có thể xem nhưng không thể sửa."
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Hiện thêm {{count}} mục",
         "doneByMenuItem": "Do … làm",
         "checkedDoneNamed": "Đã hoàn thành \"{{title}}\".",
-        "checkedOpenNamed": "\"{{title}}\" đang mở lại."
+        "checkedOpenNamed": "\"{{title}}\" đang mở lại.",
+        "errorReorderNotAllowed": "Bạn có thể xem thứ tự của gia đình nhưng không thể đổi."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",
@@ -2171,7 +2174,7 @@
         "familyRoleGrandparent": "Ông bà",
         "familyRoleRelative": "Họ hàng",
         "familyRoleOther": "Thành viên gia đình",
-        "childStartHint": "Tài khoản trẻ em mới bắt đầu không có Ngân sách và nhịn ăn, chỉ xem Người giúp việc ở chế độ đọc, không có tiền công và thanh toán. Bạn có thể đổi sau trong “Vai trò và quyền”. Chu kỳ cũng bị ẩn; có thể hiện lại trong cài đặt cá nhân của trẻ.",
+        "childStartHint": "Tài khoản trẻ em mới bắt đầu không có Ngân sách, nhịn ăn và giá mua, chỉ xem Người giúp việc (không có tiền công) và Rác ở chế độ đọc, và chỉ đọc được những gì người khác tạo trong Lịch, Ghi chú và Kho đồ - cả thứ tự công việc. Bạn có thể đổi sau trong “Vai trò và quyền”. Chu kỳ cũng bị ẩn; có thể hiện lại trong cài đặt cá nhân của trẻ.",
         "systemAdminLabel": "Quản trị hệ thống",
         "systemAdminHint": "Quản trị hệ thống có thể quản lý cài đặt ứng dụng, tích hợp, mã API và tài khoản gia đình.",
         "systemAdminBadge": "Quản trị hệ thống",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} vẫn bị khóa. Bạn có thể mở bất cứ lúc nào trong Vai trò và quyền.",
             "presetHintRoleOpen": "Vai trò {{role}} không hạn chế gì - thành viên thấy mọi mô-đun.",
             "presetHintRoleLimited": "Vai trò {{role}} khóa: {{modules}}.",
-            "presetHintUnavailable": "Hiện không thể hiển thị tác dụng chính xác. Mẫu vẫn được áp dụng."
+            "presetHintUnavailable": "Hiện không thể hiển thị tác dụng chính xác. Mẫu vẫn được áp dụng.",
+            "presetHintRoleChild": "Vai trò {{role}} không chặn mô-đun nào. Quyền khởi đầu cho trẻ em ở trên được áp dụng thêm.",
+            "presetHintChildExtra": "Quyền khởi đầu cho trẻ em ở trên được áp dụng thêm."
         },
         "healthCaregiversLabel": "Có thể ghi dữ liệu sức khỏe",
         "healthCaregiversHint": "Những người này có thể ghi chỉ số sinh tồn, thuốc, kết quả xét nghiệm và hoạt động cho thành viên này, đồng thời thấy các mục riêng tư của họ. Nhật ký chu kỳ vẫn được loại trừ.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
         "weatherManualTitle": "Nhập tọa độ thủ công",
         "backupDropzoneTitleTouch": "Chạm để chọn tệp sao lưu",
-        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP"
+        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP",
+        "permCapabilityCalendarEditOthers": "Sửa sự kiện của người khác",
+        "permCapabilityNotesEditOthers": "Sửa ghi chú của người khác",
+        "permCapabilityInventoryEditOthers": "Sửa đồ vật của người khác",
+        "permCapabilityInventoryPrices": "Xem giá mua",
+        "permCapabilityTasksReorder": "Đổi thứ tự của gia đình",
+        "permChildRoleHint": "Tài khoản trẻ em mới khi được tạo còn nhận quyền khởi đầu riêng: {{list}}. Sau đó các quyền này hiển thị ở thành viên đó."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

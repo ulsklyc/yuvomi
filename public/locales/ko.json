@@ -106,7 +106,9 @@
         "fieldStep": "{{step}} 단위로 입력하세요.",
         "fieldInvalid": "이 입력을 확인하세요.",
         "errorCheckRolledBack": "'{{name}}' 항목이 다시 열렸습니다 - 체크하지 못했습니다. 다시 시도하세요.",
-        "errorUncheckRolledBack": "'{{name}}' 항목이 다시 체크되었습니다 - 되돌리지 못했습니다. 다시 시도하세요."
+        "errorUncheckRolledBack": "'{{name}}' 항목이 다시 체크되었습니다 - 되돌리지 못했습니다. 다시 시도하세요.",
+        "errorNotOwner": "다른 사람이 만든 항목입니다. 볼 수는 있지만 바꿀 수는 없습니다.",
+        "foreignReadOnlyHint": "{{name}}님이 만듦 - 볼 수는 있지만 바꿀 수는 없습니다."
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -667,7 +669,8 @@
         "kanbanShowMore_one": "{{count}}개 더 보기",
         "doneByMenuItem": "한 사람 …",
         "checkedDoneNamed": "'{{title}}' 완료했습니다.",
-        "checkedOpenNamed": "'{{title}}' 다시 미완료로 표시했습니다."
+        "checkedOpenNamed": "'{{title}}' 다시 미완료로 표시했습니다.",
+        "errorReorderNotAllowed": "가족 순서를 볼 수는 있지만 바꿀 수는 없습니다."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}}개 항목이 삭제되었습니다.",
@@ -2216,7 +2219,7 @@
         "familyRoleGrandparent": "조부모",
         "familyRoleRelative": "친척",
         "familyRoleOther": "가족 구성원",
-        "childStartHint": "새 자녀 계정은 예산과 단식 없이 시작하며 가사 도우미는 읽기 전용으로, 급여와 지급 내역 없이 봅니다. 나중에 “역할 및 권한”에서 바꿀 수 있습니다. 주기도 숨겨지며, 자녀의 개인 설정에서 다시 표시할 수 있습니다.",
+        "childStartHint": "새 자녀 계정은 예산, 단식, 구매 가격 없이 시작하며 가사 도우미(급여 제외)와 쓰레기는 읽기 전용으로 보고, 캘린더, 메모, 물품에서 다른 사람이 만든 항목과 할 일 순서는 읽기만 할 수 있습니다. 나중에 “역할 및 권한”에서 바꿀 수 있습니다. 주기도 숨겨지며, 자녀의 개인 설정에서 다시 표시할 수 있습니다.",
         "systemAdminLabel": "시스템 관리자",
         "systemAdminHint": "시스템 관리자는 앱 설정, 통합, API 토큰 및 가족 계정을 관리할 수 있습니다.",
         "systemAdminBadge": "시스템 관리자",
@@ -3126,7 +3129,9 @@
             "presetHintRestricted": "{{modules}}은(는) 잠긴 상태로 유지됩니다. 역할 및 권한에서 언제든 열 수 있습니다.",
             "presetHintRoleOpen": "{{role}} 역할은 아무것도 제한하지 않습니다 - 구성원은 모든 모듈을 봅니다.",
             "presetHintRoleLimited": "{{role}} 역할이 잠그는 항목: {{modules}}.",
-            "presetHintUnavailable": "지금은 정확한 효과를 표시할 수 없습니다. 템플릿은 그대로 적용됩니다."
+            "presetHintUnavailable": "지금은 정확한 효과를 표시할 수 없습니다. 템플릿은 그대로 적용됩니다.",
+            "presetHintRoleChild": "{{role}} 역할은 어떤 모듈도 막지 않습니다. 위의 자녀 시작 권한이 추가로 적용됩니다.",
+            "presetHintChildExtra": "위의 자녀 시작 권한이 추가로 적용됩니다."
         },
         "healthCaregiversLabel": "건강 데이터를 기록할 수 있음",
         "healthCaregiversHint": "이 사람들은 이 구성원의 활력징후, 약, 검사 결과, 활동을 기록할 수 있으며 그 과정에서 비공개 기록도 볼 수 있습니다. 주기 일기는 제외됩니다.",
@@ -3338,7 +3343,13 @@
         "weatherPlaceUnavailable": "지금은 장소 검색에 연결할 수 없습니다. 잠시 후 다시 시도하거나 좌표를 직접 입력하세요.",
         "weatherManualTitle": "좌표 직접 입력",
         "backupDropzoneTitleTouch": "탭하여 백업 파일 선택",
-        "installModuleDropzoneTitleTouch": "탭하여 ZIP 파일 선택"
+        "installModuleDropzoneTitleTouch": "탭하여 ZIP 파일 선택",
+        "permCapabilityCalendarEditOthers": "다른 사람의 일정 변경",
+        "permCapabilityNotesEditOthers": "다른 사람의 메모 변경",
+        "permCapabilityInventoryEditOthers": "다른 사람의 물품 변경",
+        "permCapabilityInventoryPrices": "구매 가격 보기",
+        "permCapabilityTasksReorder": "가족 순서 변경",
+        "permChildRoleHint": "새 자녀 계정은 만들 때 자체 시작 권한도 받습니다: {{list}}. 이후에는 해당 구성원에게 표시됩니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

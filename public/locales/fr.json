@@ -106,7 +106,9 @@
         "fieldStep": "Saisissez une valeur par pas de {{step}}.",
         "fieldInvalid": "Vérifiez cette saisie.",
         "errorCheckRolledBack": "« {{name}} » est de nouveau à faire - la coche n'a pas été enregistrée. Réessayez.",
-        "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez."
+        "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez.",
+        "errorNotOwner": "Quelqu’un d’autre l’a créé : vous pouvez le voir, mais pas le modifier.",
+        "foreignReadOnlyHint": "Créé par {{name}} : vous pouvez le voir, mais pas le modifier."
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Afficher {{count}} de plus",
         "doneByMenuItem": "Fait par …",
         "checkedDoneNamed": "« {{title}} » terminé.",
-        "checkedOpenNamed": "« {{title}} » de nouveau ouvert."
+        "checkedOpenNamed": "« {{title}} » de nouveau ouvert.",
+        "errorReorderNotAllowed": "Vous pouvez voir l’ordre de la famille, mais pas le modifier."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "Grand-parent",
         "familyRoleRelative": "Proche",
         "familyRoleOther": "Membre de la famille",
-        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget ni jeûne et voient l’Aide ménagère en lecture seule, sans salaires ni paiements. Vous pouvez le modifier ensuite dans «Rôles et autorisations». Le cycle est également masqué ; il peut être réaffiché dans les réglages personnels de l’enfant.",
+        "childStartHint": "Les nouveaux comptes enfant démarrent sans Budget, jeûne ni prix d’achat, voient l’Aide ménagère (sans salaires) et les Déchets en lecture seule et ne font que lire ce que d’autres ont créé dans le Calendrier, les Notes et l’Inventaire, de même que l’ordre des tâches. Vous pouvez le modifier ensuite dans «Rôles et autorisations». Le cycle est également masqué ; il peut être réaffiché dans les réglages personnels de l’enfant.",
         "systemAdminLabel": "Administrateur système",
         "systemAdminHint": "Les administrateurs système peuvent gérer les paramètres, intégrations, jetons API et comptes familiaux.",
         "systemAdminBadge": "Admin système",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} restent verrouillés. Tu peux les ouvrir à tout moment dans Rôles et autorisations.",
             "presetHintRoleOpen": "Le rôle {{role}} ne restreint rien : le membre voit tous les modules.",
             "presetHintRoleLimited": "Le rôle {{role}} verrouille : {{modules}}.",
-            "presetHintUnavailable": "L'effet exact ne peut pas être affiché pour le moment. Le modèle s'applique quand même."
+            "presetHintUnavailable": "L'effet exact ne peut pas être affiché pour le moment. Le modèle s'applique quand même.",
+            "presetHintRoleChild": "Le rôle {{role}} ne bloque aucun module. Les droits de départ des enfants ci-dessus s’y ajoutent.",
+            "presetHintChildExtra": "Les droits de départ des enfants ci-dessus s’y ajoutent."
         },
         "healthCaregiversLabel": "Peut saisir des données de santé",
         "healthCaregiversHint": "Ces personnes peuvent saisir les constantes, médicaments, résultats de laboratoire et activités de ce membre, et voir ses entrées privées à cette occasion. Le journal du cycle reste exclu.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "La recherche de lieu est injoignable pour le moment. Réessaie dans un instant ou saisis les coordonnées à la main.",
         "weatherManualTitle": "Coordonnées à la main",
         "backupDropzoneTitleTouch": "Touchez pour choisir un fichier de sauvegarde",
-        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP"
+        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP",
+        "permCapabilityCalendarEditOthers": "Modifier les événements des autres",
+        "permCapabilityNotesEditOthers": "Modifier les notes des autres",
+        "permCapabilityInventoryEditOthers": "Modifier les objets des autres",
+        "permCapabilityInventoryPrices": "Voir les prix d’achat",
+        "permCapabilityTasksReorder": "Modifier l’ordre de la famille",
+        "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

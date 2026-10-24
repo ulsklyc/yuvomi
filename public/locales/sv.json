@@ -106,7 +106,9 @@
         "fieldStep": "Ange ett värde i steg om {{step}}.",
         "fieldInvalid": "Kontrollera den här uppgiften.",
         "errorCheckRolledBack": "”{{name}}” är öppen igen - avbockningen gick inte igenom. Försök igen.",
-        "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen."
+        "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen.",
+        "errorNotOwner": "Någon annan har skapat det här - du kan se det men inte ändra det.",
+        "foreignReadOnlyHint": "Skapad av {{name}} - du kan se det men inte ändra det."
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -649,7 +651,8 @@
         "kanbanShowMore_one": "Visa {{count}} till",
         "doneByMenuItem": "Gjord av …",
         "checkedDoneNamed": "”{{title}}” klar.",
-        "checkedOpenNamed": "”{{title}}” öppen igen."
+        "checkedOpenNamed": "”{{title}}” öppen igen.",
+        "errorReorderNotAllowed": "Du kan se familjens ordning men inte ändra den."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",
@@ -2060,7 +2063,7 @@
         "familyRoleGrandparent": "Far-/morförälder",
         "familyRoleRelative": "Släkting",
         "familyRoleOther": "Familjemedlem",
-        "childStartHint": "Nya barnkonton startar utan Budget och fasta och ser Hushållshjälp bara för läsning, utan löner och betalningar. Du kan ändra det efteråt under “Roller och behörigheter”. Även cykeln är dold; den kan visas i barnets personliga inställningar.",
+        "childStartHint": "Nya barnkonton startar utan Budget, fasta och inköpspriser, ser Hushållshjälp (utan löner) och Avfall bara för läsning och kan bara läsa det andra har skapat i Kalender, Anteckningar och Inventarier - liksom ordningen på uppgifterna. Du kan ändra det efteråt under “Roller och behörigheter”. Även cykeln är dold; den kan visas i barnets personliga inställningar.",
         "systemAdminLabel": "Systemadministratör",
         "systemAdminHint": "Systemadministratörer kan hantera inställningar, integrationer, API-token och familjekonton.",
         "systemAdminBadge": "Systemadmin",
@@ -3108,7 +3111,9 @@
             "presetHintRestricted": "{{modules}} förblir låsta. Du kan öppna dem när som helst under Roller och behörigheter.",
             "presetHintRoleOpen": "Rollen {{role}} begränsar ingenting - medlemmen ser alla moduler.",
             "presetHintRoleLimited": "Rollen {{role}} låser: {{modules}}.",
-            "presetHintUnavailable": "Den exakta effekten kan inte visas just nu. Mallen gäller ändå."
+            "presetHintUnavailable": "Den exakta effekten kan inte visas just nu. Mallen gäller ändå.",
+            "presetHintRoleChild": "Rollen {{role}} spärrar ingen modul. Startbehörigheterna för barn ovan tillkommer.",
+            "presetHintChildExtra": "Startbehörigheterna för barn ovan tillkommer."
         },
         "healthCaregiversLabel": "Får registrera hälsodata",
         "healthCaregiversHint": "Dessa personer får registrera vitalvärden, mediciner, provsvar och aktiviteter åt den här medlemmen och ser då även dennes privata poster. Cykeldagboken förblir undantagen.",
@@ -3320,7 +3325,13 @@
         "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
         "weatherManualTitle": "Koordinater för hand",
         "backupDropzoneTitleTouch": "Tryck för att välja en säkerhetskopia",
-        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil"
+        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil",
+        "permCapabilityCalendarEditOthers": "Ändra andras händelser",
+        "permCapabilityNotesEditOthers": "Ändra andras anteckningar",
+        "permCapabilityInventoryEditOthers": "Ändra andras föremål",
+        "permCapabilityInventoryPrices": "Se inköpspriser",
+        "permCapabilityTasksReorder": "Ändra familjens ordning",
+        "permChildRoleHint": "Nya barnkonton får dessutom egna startbehörigheter när de skapas: {{list}}. Därefter står de hos respektive medlem."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

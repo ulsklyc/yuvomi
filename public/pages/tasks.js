@@ -26,7 +26,7 @@ import { emptyStateHTML, mountLoadError, searchEmptyHTML } from '/utils/empty-st
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
-import { isNavModuleReadOnly } from '/permissions.js';
+import { canReorderTasks as mayReorderHousehold, isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
@@ -770,8 +770,10 @@ function sortTasksManual(a, b, now) {
  * Auswahlflaeche), nicht bei `tasks: read` und nicht am Wandtablett.
  */
 function canReorderTasks(groupMode) {
+  // Die Handordnung gehoert dem Haushalt (R23, D15): ohne
+  // `tasks_reorder_family` liest man sie, Griffe und "Zuruecksetzen" fehlen.
   return groupMode === 'category' && state.viewMode === 'list'
-    && !state.bulkSelectMode && !readOnly() && !actingAsDisplay();
+    && !state.bulkSelectMode && !readOnly() && !actingAsDisplay() && mayReorderHousehold();
 }
 
 /** Der Knopf am Gruppenkopf, der die Gruppe zur automatischen Reihenfolge zurueckbringt. */

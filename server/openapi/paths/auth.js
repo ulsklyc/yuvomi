@@ -403,7 +403,7 @@ export function authPaths() {
         summary: 'Accept an invitation and create the account',
         tag: 'Auth',
         auth: false,
-        description: 'Public endpoint, rate-limited, no CSRF: the token is the secret. Role and family role come from the invitation and cannot be raised through the request body. A new account with `family_role: child` that is not an administrator starts with the child defaults as member overrides: `budget` none, `housekeeping` read, the capabilities `health_use_fasting` and `housekeeping_view_amounts` none - only where the role profile is not already stricter. Existing accounts and a later change of the family role keep their rights. No session is established; the client redirects to the login page.',
+        description: 'Public endpoint, rate-limited, no CSRF: the token is the secret. Role and family role come from the invitation and cannot be raised through the request body. A new account with `family_role: child` that is not an administrator starts with the child defaults as member overrides: `budget` none, `housekeeping` and `waste` read, the capabilities `health_use_fasting`, `housekeeping_view_amounts`, `calendar_edit_others`, `notes_edit_others`, `inventory_edit_others`, `inventory_view_prices` and `tasks_reorder_family` none - only where the role profile is not already stricter. Existing accounts and a later change of the family role keep their rights. No session is established; the client redirects to the login page.',
         requestBody: jsonBody('#/components/schemas/InviteAcceptRequest'),
         responses: {
           201: { description: 'Account created.' },
@@ -549,7 +549,7 @@ export function authPaths() {
       post: op({
         summary: 'Create user',
         tag: 'Auth',
-        description: 'A new account with `family_role: child` that is not an administrator starts with the child defaults as member overrides: `budget` none, `housekeeping` read, the capabilities `health_use_fasting` and `housekeeping_view_amounts` none - only where the role profile is not already stricter. Existing accounts and a later change of the family role keep their rights.',
+        description: 'A new account with `family_role: child` that is not an administrator starts with the child defaults as member overrides: `budget` none, `housekeeping` and `waste` read, the capabilities `health_use_fasting`, `housekeeping_view_amounts`, `calendar_edit_others`, `notes_edit_others`, `inventory_edit_others`, `inventory_view_prices` and `tasks_reorder_family` none - only where the role profile is not already stricter. Existing accounts and a later change of the family role keep their rights.',
         admin: true,
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/UserCreateRequest'),
