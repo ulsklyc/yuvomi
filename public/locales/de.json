@@ -6610,5 +6610,14 @@
         "region": "Region und Zeitzone prüfen",
         "dismiss": "Erste Schritte ausblenden",
         "stepDone": "erledigt"
+    },
+    "settingsSynonyms": {
+        "theme": "Dunkelmodus, Dark Mode, Nachtmodus, Hell, Farbschema",
+        "timezone": "Uhrzeit, Zeitverschiebung, UTC, Sommerzeit",
+        "timeFormat": "12 Stunden, 24 Stunden, AM, PM, Uhrzeit",
+        "password": "Kennwort, Login, Anmeldung, Zugangsdaten",
+        "install": "App, Startbildschirm, Homescreen, Dock",
+        "push": "Mitteilungen, Benachrichtigung, Hinweise, Glocke",
+        "wallMode": "Kiosk, Tablet, Wandtablett, Vollbild"
     }
 }

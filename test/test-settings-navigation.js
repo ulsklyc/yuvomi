@@ -4112,8 +4112,10 @@ test('R19: Wand-Modus und Bildschirmschoner stehen im Blatt "Dieses Geraet"', as
   assert.equal(section.sheetId, 'personal-device');
   assert.equal(section.props?.part, 'device');
   for (const key of ['settings.wallModeLabel', 'settings.screensaverIdleLabel', 'settings.screensaverClockLabel', 'settings.screensaverCoverLabel']) {
-    assert.ok(section.options.includes(key), `${key} im Geraete-Abschnitt`);
-    assert.ok(!SETTINGS_SECTIONS.find((s) => s.id === 'personal-appearance').options.includes(key), `${key} nicht mehr unter Darstellung`);
+    // Eine Option ist ein Schluessel oder ein Objekt mit `key` (R23: `synonyms`).
+    const keyOf = (o) => (typeof o === 'string' ? o : o.key);
+    assert.ok(section.options.map(keyOf).includes(key), `${key} im Geraete-Abschnitt`);
+    assert.ok(!SETTINGS_SECTIONS.find((s) => s.id === 'personal-appearance').options.map(keyOf).includes(key), `${key} nicht mehr unter Darstellung`);
   }
   const src = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
   assert.match(src, /if \(container\.dataset\?\.part === 'device'\) \{[\s\S]{0,400}?renderDeviceDisplay\(container, \{ screensaverOn, isAdmin[^}]*\}\);\s*return;/);
@@ -5568,4 +5570,16 @@ test('R23: Textfelder stapeln am Telefon unter ihrem Label; die Wochenstart-Vors
   assert.doesNotMatch(cell.body, /border:/, 'keine Kaestchen');
   const start = rules.find((r) => r.selector.trim() === '.week-start-preview__cell--start' && !r.at.length);
   assert.doesNotMatch(start.body, /background:/, 'keine Fuellung wie ein gewaehlter Knopf');
+});
+
+// R23 S10 (Critique G6 P3 "Suche ohne Synonyme"): die Einstellungssuche kennt
+// die Woerter, die Menschen in ihrer Sprache tippen.
+test('R23: die Einstellungssuche findet Synonyme ("Dark Mode", "Kennwort", "Kiosk")', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((o, k) => o?.[k], de) ?? key;
+  const found = (q) => searchSettings(q, { user: admin, translate }).options.map((o) => o.key);
+  assert.ok(found('dark mode').includes('settings.sectionDesign'));
+  assert.ok(found('kennwort').includes('settings.changePassword'));
+  assert.ok(found('kiosk').includes('settings.wallModeLabel'));
+  assert.ok(found('24 stunden').includes('settings.timeFormatLabel'));
 });

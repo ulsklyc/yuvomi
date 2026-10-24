@@ -6928,5 +6928,14 @@
         "region": "Sprawdź region i strefę czasową",
         "dismiss": "Ukryj pierwsze kroki",
         "stepDone": "gotowe"
+    },
+    "settingsSynonyms": {
+        "theme": "tryb ciemny, tryb nocny, jasny, schemat kolorów",
+        "timezone": "godzina, różnica czasu, UTC, czas letni",
+        "timeFormat": "12 godzin, 24 godziny, AM, PM, zegar",
+        "password": "hasło, logowanie, dane logowania",
+        "install": "aplikacja, ekran główny, Dock",
+        "push": "alerty, powiadomienia, przypomnienia, dzwonek",
+        "wallMode": "kiosk, tablet, wyświetlacz ścienny, pełny ekran"
     }
 }

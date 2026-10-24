@@ -6610,5 +6610,14 @@
         "region": "Periksa wilayah dan zona waktu",
         "dismiss": "Sembunyikan langkah pertama",
         "stepDone": "selesai"
+    },
+    "settingsSynonyms": {
+        "theme": "mode gelap, mode malam, terang, skema warna",
+        "timezone": "waktu, selisih waktu, UTC, waktu musim panas",
+        "timeFormat": "12 jam, 24 jam, AM, PM, jam",
+        "password": "sandi, login, masuk, kredensial",
+        "install": "aplikasi, layar utama, Dock",
+        "push": "peringatan, notifikasi, pengingat, lonceng",
+        "wallMode": "kios, tablet, layar dinding, layar penuh"
     }
 }

@@ -6610,5 +6610,14 @@
         "region": "Check region and time zone",
         "dismiss": "Hide first steps",
         "stepDone": "done"
+    },
+    "settingsSynonyms": {
+        "theme": "dark mode, night mode, light, color scheme, appearance",
+        "timezone": "time, time difference, UTC, daylight saving",
+        "timeFormat": "12-hour, 24-hour, AM, PM, clock",
+        "password": "passcode, login, sign-in, credentials",
+        "install": "app, home screen, dock, desktop app",
+        "push": "alerts, notifications, reminders, bell",
+        "wallMode": "kiosk, tablet, wall display, full screen"
     }
 }

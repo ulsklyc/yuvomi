@@ -6610,5 +6610,14 @@
         "region": "确认地区和时区",
         "dismiss": "隐藏入门步骤",
         "stepDone": "已完成"
+    },
+    "settingsSynonyms": {
+        "theme": "深色模式, 夜间模式, 浅色, 配色",
+        "timezone": "时间, 时差, UTC, 夏令时",
+        "timeFormat": "12小时, 24小时, 上午, 下午, 时钟",
+        "password": "密码, 登录, 凭据",
+        "install": "应用, 主屏幕, 程序坞",
+        "push": "提醒, 通知, 铃声",
+        "wallMode": "信息亭, 平板, 墙面显示, 全屏"
     }
 }

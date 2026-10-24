@@ -6610,5 +6610,14 @@
         "region": "Revisar región y zona horaria",
         "dismiss": "Ocultar primeros pasos",
         "stepDone": "hecho"
+    },
+    "settingsSynonyms": {
+        "theme": "modo oscuro, modo noche, claro, esquema de colores",
+        "timezone": "hora, diferencia horaria, UTC, horario de verano",
+        "timeFormat": "12 horas, 24 horas, AM, PM, reloj",
+        "password": "clave, inicio de sesión, acceso, credenciales",
+        "install": "app, pantalla de inicio, Dock",
+        "push": "avisos, notificaciones, recordatorios, campana",
+        "wallMode": "quiosco, tableta, pantalla de pared, pantalla completa"
     }
 }

@@ -6610,5 +6610,14 @@
         "region": "Regio en tijdzone controleren",
         "dismiss": "Eerste stappen verbergen",
         "stepDone": "klaar"
+    },
+    "settingsSynonyms": {
+        "theme": "donkere modus, nachtmodus, licht, kleurenschema",
+        "timezone": "tijd, tijdsverschil, UTC, zomertijd",
+        "timeFormat": "12 uur, 24 uur, AM, PM, klok",
+        "password": "wachtwoord, inloggen, aanmelden, inloggegevens",
+        "install": "app, beginscherm, Dock",
+        "push": "meldingen, notificaties, herinneringen, bel",
+        "wallMode": "kiosk, tablet, wandscherm, volledig scherm"
     }
 }

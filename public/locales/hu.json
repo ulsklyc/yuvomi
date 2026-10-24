@@ -6610,5 +6610,14 @@
         "region": "Régió és időzóna ellenőrzése",
         "dismiss": "Első lépések elrejtése",
         "stepDone": "kész"
+    },
+    "settingsSynonyms": {
+        "theme": "sötét mód, éjszakai mód, világos, színséma",
+        "timezone": "idő, időeltolódás, UTC, nyári időszámítás",
+        "timeFormat": "12 órás, 24 órás, de., du., óra",
+        "password": "jelszó, bejelentkezés, belépési adatok",
+        "install": "alkalmazás, kezdőképernyő, Dock",
+        "push": "értesítések, figyelmeztetések, emlékeztetők, csengő",
+        "wallMode": "kioszk, tablet, fali kijelző, teljes képernyő"
     }
 }

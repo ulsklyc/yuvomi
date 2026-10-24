@@ -6775,5 +6775,14 @@
         "region": "Zkontrolovat region a časové pásmo",
         "dismiss": "Skrýt první kroky",
         "stepDone": "hotovo"
+    },
+    "settingsSynonyms": {
+        "theme": "tmavý režim, noční režim, světlý, barevné schéma",
+        "timezone": "čas, časový posun, UTC, letní čas",
+        "timeFormat": "12 hodin, 24 hodin, AM, PM, hodiny",
+        "password": "heslo, přihlášení, přihlašovací údaje",
+        "install": "aplikace, plocha, domovská obrazovka, Dock",
+        "push": "upozornění, oznámení, připomínky, zvonek",
+        "wallMode": "kiosek, tablet, nástěnný displej, celá obrazovka"
     }
 }

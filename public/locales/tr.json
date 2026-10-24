@@ -6610,5 +6610,14 @@
         "region": "Bölgeyi ve saat dilimini kontrol et",
         "dismiss": "İlk adımları gizle",
         "stepDone": "tamamlandı"
+    },
+    "settingsSynonyms": {
+        "theme": "karanlık mod, gece modu, açık, renk şeması",
+        "timezone": "saat, saat farkı, UTC, yaz saati",
+        "timeFormat": "12 saat, 24 saat, ÖÖ, ÖS, saat",
+        "password": "parola, giriş, oturum açma, kimlik bilgileri",
+        "install": "uygulama, ana ekran, Dock",
+        "push": "uyarılar, bildirimler, hatırlatıcılar, zil",
+        "wallMode": "kiosk, tablet, duvar ekranı, tam ekran"
     }
 }

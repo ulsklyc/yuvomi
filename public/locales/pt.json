@@ -6610,5 +6610,14 @@
         "region": "Verificar região e fuso horário",
         "dismiss": "Ocultar primeiros passos",
         "stepDone": "concluído"
+    },
+    "settingsSynonyms": {
+        "theme": "modo escuro, modo noturno, claro, esquema de cores",
+        "timezone": "hora, diferença horária, UTC, hora de verão",
+        "timeFormat": "12 horas, 24 horas, AM, PM, relógio",
+        "password": "palavra-passe, iniciar sessão, credenciais",
+        "install": "app, ecrã principal, Dock",
+        "push": "alertas, notificações, lembretes, sino",
+        "wallMode": "quiosque, tablet, ecrã de parede, ecrã inteiro"
     }
 }

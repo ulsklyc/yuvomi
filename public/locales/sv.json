@@ -6610,5 +6610,14 @@
         "region": "Kontrollera region och tidszon",
         "dismiss": "Dölj första stegen",
         "stepDone": "klart"
+    },
+    "settingsSynonyms": {
+        "theme": "mörkt läge, nattläge, ljust, färgschema",
+        "timezone": "tid, tidsskillnad, UTC, sommartid",
+        "timeFormat": "12 timmar, 24 timmar, AM, PM, klocka",
+        "password": "lösenord, inloggning, inloggningsuppgifter",
+        "install": "app, hemskärm, Dock",
+        "push": "aviseringar, notiser, påminnelser, klocka",
+        "wallMode": "kiosk, surfplatta, väggskärm, helskärm"
     }
 }

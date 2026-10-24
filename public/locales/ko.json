@@ -6610,5 +6610,14 @@
         "region": "지역과 시간대 확인하기",
         "dismiss": "첫 단계 숨기기",
         "stepDone": "완료"
+    },
+    "settingsSynonyms": {
+        "theme": "다크 모드, 야간 모드, 라이트, 색상 테마",
+        "timezone": "시간, 시차, UTC, 서머타임",
+        "timeFormat": "12시간, 24시간, 오전, 오후, 시계",
+        "password": "암호, 로그인, 계정 정보",
+        "install": "앱, 홈 화면, Dock",
+        "push": "알림, 경고, 미리 알림, 벨",
+        "wallMode": "키오스크, 태블릿, 벽걸이 화면, 전체 화면"
     }
 }

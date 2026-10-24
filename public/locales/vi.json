@@ -6610,5 +6610,14 @@
         "region": "Kiểm tra khu vực và múi giờ",
         "dismiss": "Ẩn những bước đầu tiên",
         "stepDone": "đã xong"
+    },
+    "settingsSynonyms": {
+        "theme": "chế độ tối, chế độ ban đêm, sáng, bảng màu",
+        "timezone": "giờ, chênh lệch giờ, UTC, giờ mùa hè",
+        "timeFormat": "12 giờ, 24 giờ, SA, CH, đồng hồ",
+        "password": "mật mã, đăng nhập, thông tin đăng nhập",
+        "install": "ứng dụng, màn hình chính, Dock",
+        "push": "cảnh báo, thông báo, lời nhắc, chuông",
+        "wallMode": "kiosk, máy tính bảng, màn hình treo tường, toàn màn hình"
     }
 }

@@ -57,7 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sit under their label on a phone instead of sharing the row half and half. The week start
   preview reads like the calendar's weekday header instead of a row of buttons, and the
   "Account / Household / Modules" bar under the settings list marks the group you are looking
-  at, including the group of the open page.
+  at, including the group of the open page. The settings search also finds everyday words
+  such as "dark mode", "passcode", "kiosk" or "24-hour" in every language.
 - **Calendar sync has its own settings page.** CalDAV, Google, Apple and Outlook accounts and
   "Fill in assignments" now live on "Calendar sync", right after "Calendar" in Settings, instead of
   at the end of a very long calendar page. Old links and the return from Google or Outlook

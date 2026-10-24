@@ -104,7 +104,8 @@ export const SETTINGS_SCOPES = Object.freeze(['mine', 'household']);
  * zeigen (shell.js, revealSettingsOption). Als Objekt: `also` sind weitere
  * Schluessel, die nur mitgesucht werden (die drei Werte des Theme-Segments),
  * `terms` Produktnamen, die in keiner Sprache uebersetzt werden (Mealie,
- * CalDAV) und deshalb kein Schluessel sind. `test:settings-copy` haelt, dass
+ * CalDAV) und deshalb kein Schluessel sind. `synonyms` ist ein Schluessel mit
+ * den Woertern, die man in der eigenen Sprache dafuer tippt (R23). `test:settings-copy` haelt, dass
  * jeder Schluessel in SEINEM Abschnitt gerendert wird.
  *
  * `labelKey`/`descriptionKey` sind die Namen der frueheren Blaetter: die Suche
@@ -126,7 +127,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
       'settings.displayNameLabel',
       'settings.colorLabel',
       { key: 'settings.contactDetailsLegend', also: ['settings.memberPhoneLabel', 'settings.memberEmailLabel', 'settings.memberBirthDateLabel'] },
-      'settings.changePassword',
+      { key: 'settings.changePassword', synonyms: 'settingsSynonyms.password' },
       { key: 'settings.twoFactorTitle', terms: ['2FA', 'TOTP'] },
       'settings.otherSessionsTitle',
       { key: 'settings.oidcLinkTitle', terms: ['SSO', 'OIDC'] },
@@ -141,14 +142,14 @@ export const SETTINGS_SECTIONS = freezeEntries([
     labelKey: 'settings.pageAppearance',
     descriptionKey: 'settings.pageAppearanceDescription',
     options: [
-      { key: 'settings.sectionDesign', also: ['settings.themeSystem', 'settings.themeLight', 'settings.themeDark'] },
+      { key: 'settings.sectionDesign', also: ['settings.themeSystem', 'settings.themeLight', 'settings.themeDark'], synonyms: 'settingsSynonyms.theme' },
       'settings.localeLabel',
       'settings.dataLanguageLabel',
       'settings.regionLabel',
       'settings.currencyLabel',
-      'settings.timezoneLabel',
+      { key: 'settings.timezoneLabel', synonyms: 'settingsSynonyms.timezone' },
       'settings.dateFormatLabel',
-      'settings.timeFormatLabel',
+      { key: 'settings.timeFormatLabel', synonyms: 'settingsSynonyms.timeFormat' },
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-appearance.js'),
@@ -160,7 +161,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     labelKey: 'settings.pageDevice',
     descriptionKey: 'settings.pageDeviceDescription',
     options: [
-      { key: 'settings.pwaInstallTitle', terms: ['PWA'] },
+      { key: 'settings.pwaInstallTitle', terms: ['PWA'], synonyms: 'settingsSynonyms.install' },
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/personal-device.js'),
@@ -174,7 +175,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     labelKey: 'settings.sectionDeviceDisplay',
     descriptionKey: 'settings.wallModeHint',
     options: [
-      'settings.wallModeLabel',
+      { key: 'settings.wallModeLabel', synonyms: 'settingsSynonyms.wallMode' },
       'settings.screensaverIdleLabel',
       'settings.screensaverClockLabel',
       'settings.screensaverCoverLabel',
@@ -190,7 +191,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     labelKey: 'settings.pageNotifications',
     descriptionKey: 'settings.pageNotificationsDescription',
     options: [
-      'settings.pushToggleTitle',
+      { key: 'settings.pushToggleTitle', synonyms: 'settingsSynonyms.push' },
       { key: 'settings.notificationChannelsTitle', terms: ['ntfy', 'Gotify', 'Webhook'] },
     ],
     adminOnly: false,
@@ -1134,7 +1135,7 @@ export function normalizeSettingsSearch(value) {
 function optionEntry(option) {
   return typeof option === 'string'
     ? { key: option, also: [], terms: [] }
-    : { key: option.key, also: option.also ?? [], terms: option.terms ?? [] };
+    : { key: option.key, also: option.also ?? [], terms: option.terms ?? [], synonyms: option.synonyms ?? null };
 }
 
 /**
@@ -1178,7 +1179,11 @@ export function searchSettings(query, { user, translate }) {
       }
       for (const option of (section.options ?? []).map(optionEntry)) {
         const optionLabel = translate(option.key);
-        const haystack = [optionLabel, ...option.also.map(translate), ...option.terms].join(' ');
+        // SYNONYME (R23 S10, Critique G6 P3 "Suche ohne Synonyme"): "Dark
+        // Mode" fand kein "Design", "Kennwort" kein "Passwort aendern". Ein
+        // Schluessel je Option mit den Woertern, die Menschen in DIESER
+        // Sprache dafuer tippen - uebersetzt, anders als `terms`.
+        const haystack = [optionLabel, ...option.also.map(translate), ...option.terms, option.synonyms ? translate(option.synonyms) : ''].join(' ');
         if (hit(haystack)) options.push({ leaf, section, key: option.key, label: optionLabel });
       }
     }

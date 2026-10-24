@@ -6610,5 +6610,14 @@
         "region": "Sjekk region og tidssone",
         "dismiss": "Skjul første steg",
         "stepDone": "ferdig"
+    },
+    "settingsSynonyms": {
+        "theme": "mørk modus, nattmodus, lys, fargetema",
+        "timezone": "klokkeslett, tidsforskjell, UTC, sommertid",
+        "timeFormat": "12 timer, 24 timer, AM, PM, klokke",
+        "password": "passord, innlogging, påloggingsinformasjon",
+        "install": "app, hjemskjerm, Dock",
+        "push": "varsler, påminnelser, bjelle",
+        "wallMode": "kiosk, nettbrett, veggskjerm, fullskjerm"
     }
 }

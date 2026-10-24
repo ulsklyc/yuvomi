@@ -6610,5 +6610,14 @@
         "region": "Suriin ang rehiyon at time zone",
         "dismiss": "Itago ang mga unang hakbang",
         "stepDone": "tapos na"
+    },
+    "settingsSynonyms": {
+        "theme": "dark mode, night mode, maliwanag, color scheme",
+        "timezone": "oras, pagkakaiba ng oras, UTC, daylight saving",
+        "timeFormat": "12 oras, 24 oras, AM, PM, orasan",
+        "password": "passcode, login, pag-sign in, kredensyal",
+        "install": "app, home screen, dock",
+        "push": "alerto, abiso, paalala, kampana",
+        "wallMode": "kiosk, tablet, wall display, full screen"
     }
 }
