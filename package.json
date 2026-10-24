@@ -588,7 +588,7 @@
     "helmet": "^8.3.0",
     "libphonenumber-js": "^1.13.15",
     "node-cron": "^4.6.0",
-    "nodemailer": "^10.1.2",
+    "nodemailer": "^10.1.4",
     "openid-client": "^6.8.8",
     "tsdav": "^2.5.0",
     "web-push": "^3.6.7"
