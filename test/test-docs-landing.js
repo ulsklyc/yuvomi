@@ -3185,11 +3185,15 @@ function platLiftFindings(html) {
   return found;
 }
 
-/** Der GitHub-Knopf verliert unter 600px seine Beschriftung nur sichtbar - mit display:none hiess er "★ 1.6k". */
-function ghNameFindings(html) {
-  return inlineStyles(html).flatMap((css) => [...eachRule(css)])
-    .filter((r) => /\.nav-gh span|#gh-stars-nav/.test(r.selector) && /display:\s*none/.test(r.body))
-    .map((r) => `${r.selector} nimmt dem GitHub-Link den Namen (display: none)`);
+/**
+ * Die Leistenknoepfe verlieren auf dem Telefon ihre Beschriftung nur sichtbar -
+ * mit display:none hiess der GitHub-Link "★ 1.6k". Seit der Rahmen-Runde
+ * stehen die Regeln in site.css (GitHub und Installieren).
+ */
+function ghNameFindings(cssList) {
+  return cssList.flatMap((css) => [...eachRule(css)])
+    .filter((r) => /\.nav-gh span|\.nav-gh-label|\.nav-install-label|\.nav-lang-label|#gh-stars-nav/.test(r.selector) && /display:\s*none/.test(r.body))
+    .map((r) => `${r.selector} nimmt dem Leistenknopf den Namen (display: none)`);
 }
 
 function siteSheets() {
@@ -3221,7 +3225,7 @@ test('site.css: das Glas hat die Fallbacks der App, und jeder Blur haengt am Sch
 
 test('index.html: die Plattformkarte hebt sich wie die App, der GitHub-Knopf behaelt seinen Namen', () => {
   const html = read('index.html');
-  assert.deepEqual([...platLiftFindings(html), ...ghNameFindings(html)], []);
+  assert.deepEqual([...platLiftFindings(html), ...ghNameFindings([read('assets/site.css'), ...inlineStyles(html)])], []);
 });
 
 test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () => {
@@ -3261,9 +3265,10 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.ok(hit(rowTrackFindings(badTracks), /nennt 2 Spuren/));
   // Leiste: die alte Kopfzeile der Rechtsseiten und ihre Regeln in legal.css.
   const pages = PAGES.map((p) => [p, read(p)]);
-  const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">').replace('class="nav-btn nav-back"', 'class="back-link"') : h]);
+  const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">') : h]);
   assert.ok(hit(sharedBarFindings(oldHead, read('assets/site.css'), read('assets/legal.css')), /privacy\.html: 0x <header class="site-bar">/));
-  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn" hreflang="en"', 'class="lang-link" hreflang="en"') : h]);
+  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn nav-lang" id="langBtn" hreflang="en"', 'class="lang-link" id="langBtn" hreflang="en"') : h]);
+  assert.notDeepEqual(oldBtn, pages, 'Vorbedingung: datenschutz.html traegt den Sprachlink als .nav-btn');
   assert.ok(hit(sharedBarFindings(oldBtn, read('assets/site.css'), read('assets/legal.css')), /datenschutz\.html: <a class="lang-link"> in der Leiste ist keine \.nav-btn/));
   const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
   const lf = sharedBarFindings(pages, read('assets/site.css'), legalOld);
@@ -3274,7 +3279,8 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   // Der erste Entwurf dieser Runde: das Glas am <header> - die Pille sprang nach oben.
   const onHeader = read('assets/site.css') + '\n.site-bar { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }\n';
   assert.ok(hit(sharedBarFindings(pages, onHeader, read('assets/legal.css')), /Bezugsrahmen der fixierten Install-Pille/));
-  const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<div class="topbar">', '<div>') : h]);
+  const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<nav class="topbar" ', '<nav ') : h]);
+  assert.notDeepEqual(noTop, pages, 'Vorbedingung: impressum.html traegt <nav class="topbar">');
   assert.ok(hit(sharedBarFindings(noTop, read('assets/site.css'), read('assets/legal.css')), /impressum\.html: Leiste ohne \.topbar/));
   // Zeilenkante: die Regel fehlt (Rechtsseiten zurueck auf 820px), oder die
   // Startseite wird breiter und --bar-maxw bleibt stehen.
@@ -3297,7 +3303,125 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
   assert.notEqual(lift, html);
   assert.ok(hit(platLiftFindings(lift), /hebt die Karte 4px/));
-  const nameless = html.replace('.nav-gh span:not(#gh-stars-nav) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '.nav-gh span:not(#gh-stars-nav) { display: none; }');
-  assert.notEqual(nameless, html);
-  assert.ok(hit(ghNameFindings(nameless), /nimmt dem GitHub-Link den Namen/));
+  const nameless = site.replace('  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '  .nav-gh-label { display: none; }');
+  assert.notEqual(nameless, site);
+  assert.ok(hit(ghNameFindings([nameless]), /nimmt dem Leistenknopf den Namen/));
+});
+
+// ── (18) Ein Seitenrahmen: dieselbe Kopf- und Fussleiste auf allen fuenf Seiten ──
+/**
+ * Anlass (Critique 2026-10-24): vier Kopfleisten-, drei Fusszeilen- und drei
+ * Sprachknopf-Varianten. "Install" fuehrte in der Leiste der Startseite zu zwei
+ * Zielen, der Theme-Knopf kam nach dem ersten Klick nie mehr auf "System"
+ * zurueck, und der zugaengliche Name des Sprachknopfs ("Auf Deutsch
+ * umschalten") begann nicht mit dem sichtbaren "DE" (SC 2.5.3).
+ *
+ * Verglichen wird das Geruest: Elemente, Klassen, IDs und Ziele - ohne Text,
+ * Namen und Sprachattribute (die Rechtsseiten sprechen je eine Sprache, index
+ * und install uebersetzen). Was eine Seite weglassen darf, steht hier:
+ * Sprungmenue, Fortschrittslinie und Install-Pille (nur die Startseite), der
+ * Sprachknopf (nur impressum.html - es gibt keine zweite Fassung). Die
+ * Metazeile der Fusszeile ist inhaltlich seitenweise (Version oder Copyright).
+ */
+const LANG_OPTIONAL = ['impressum.html'];
+
+function shellSkeleton(block) {
+  return block
+    .replace(/<div class="nav-progress"[\s\S]*?<\/div>\s*/, '')
+    .replace(/<details class="nav-jump"[\s\S]*?<\/details>\s*/, '')
+    .replace(/<a href="install\.html" class="mobile-cta"[\s\S]*?<\/a>\s*/, '')
+    .replace(/<(a|button)\b[^>]*\bid="langBtn"[\s\S]*?<\/\1>\s*/, '')
+    .replace(/<span class="foot-meta">[\s\S]*?<\/span>(?=\s*<span data-t="foot_madewith")/, '<span class="foot-meta"></span>')
+    .replace(/>[^<]*</g, '><')
+    .replace(/\s(?:aria-label|title|lang|hreflang|data-href-en|data-href-de|aria-current)="[^"]*"/g, '')
+    .replace(/href="#top"/g, 'href="index.html"')
+    .replace(/href="#/g, 'href="index.html#')
+    .replace(/datenschutz\.html/g, 'privacy.html')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function siteShellFindings(pages, siteCss, siteJs) {
+  const found = [];
+  const sk = {};
+  for (const [page, html] of pages) {
+    const masked = stripComments(html);
+    const head = masked.match(/<header class="site-bar">[\s\S]*?<\/header>/);
+    const foot = masked.match(/<footer class="site-foot">[\s\S]*?<\/footer>/g) || [];
+    if (!head) { found.push(`${page}: keine <header class="site-bar">`); continue; }
+    if (foot.length !== 1) { found.push(`${page}: ${foot.length}x <footer class="site-foot"> statt einmal`); continue; }
+    if (/<footer(?![^>]*class="site-foot")/.test(masked)) found.push(`${page}: eine zweite Fusszeile neben .site-foot`);
+    sk[page] = { head: shellSkeleton(head[0]), foot: shellSkeleton(foot[0]) };
+    // Sprachknopf: eine ID, eine Klasse, der Name beginnt mit dem Sichtbaren.
+    const lb = head[0].match(/<(a|button)\b([^>]*\bid="langBtn"[^>]*)>([\s\S]*?)<\/\1>/);
+    if (!lb) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne #langBtn`); }
+    else {
+      if (!/class="nav-btn nav-lang"/.test(lb[2])) found.push(`${page}: #langBtn ohne class="nav-btn nav-lang"`);
+      const vis = (lb[3].match(/<span class="nav-lang-label">([^<]*)<\/span>/) || [])[1];
+      const name = (lb[2].match(/aria-label="([^"]*)"/) || [])[1];
+      if (!vis) found.push(`${page}: #langBtn ohne .nav-lang-label`);
+      else if (name !== undefined && !name.startsWith(vis.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${vis.trim()}" (SC 2.5.3)`);
+      if (!/\blang="(?:de|en)"/.test(lb[2])) found.push(`${page}: #langBtn nennt seine Sprache nicht (lang)`);
+    }
+    // Ein Label, ein Ziel: "Install" der Leiste fuehrt nach install.html, und
+    // das Sprungmenue traegt keinen zweiten Install-Eintrag.
+    const inst = head[0].match(/<a href="([^"]*)" class="nav-btn nav-install"/);
+    if (!inst || inst[1] !== 'install.html') found.push(`${page}: der Install-Knopf der Leiste fuehrt nicht nach install.html`);
+    const jump = head[0].match(/<details class="nav-jump"[\s\S]*?<\/details>/);
+    if (jump && />\s*Install[^<]*</i.test(jump[0])) found.push(`${page}: das Sprungmenue nennt ein zweites "Install"-Ziel`);
+    // Das Theme gehoert site.js: keine Seite schreibt es selbst (dort fehlte "System").
+    if (!/<script src="assets\/site\.js"><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js nicht`);
+    if (/lsSet\('theme'|setItem\('yuvomi-theme'/.test(masked)) found.push(`${page}: schreibt das Theme selbst statt ueber assets/site.js`);
+    if (!/id="themeBtn"[^>]*data-mode="system"/.test(head[0])) found.push(`${page}: Theme-Knopf ohne data-mode="system"`);
+  }
+  const ref = sk['index.html'];
+  for (const [page] of pages) {
+    if (!sk[page] || !ref || page === 'index.html') continue;
+    if (sk[page].head !== ref.head) found.push(`${page}: Kopfleiste weicht vom Geruest der Startseite ab`);
+    if (sk[page].foot !== ref.foot) found.push(`${page}: Fusszeile weicht vom Geruest der Startseite ab`);
+  }
+  if (!/ORDER = \['system', 'light', 'dark'\]/.test(siteJs)) found.push('site.js: kein Zyklus System -> Hell -> Dunkel');
+  if (!/removeItem\(KEY\)/.test(siteJs)) found.push('site.js: "System" loescht den gespeicherten Wert nicht');
+  const vt = [...eachRule(siteCss)];
+  if (!/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*@view-transition\s*\{\s*navigation:\s*auto;/.test(siteCss)) found.push('site.css: @view-transition fehlt oder laeuft auch unter reduced motion');
+  if (!vt.some((r) => r.selector === '.topbar' && /view-transition-name:\s*site-bar/.test(r.body))) found.push('site.css: die Leiste hat keinen view-transition-name');
+  return found;
+}
+
+test('docs: ein Seitenrahmen - Kopf- und Fussleiste, Sprach- und Theme-Knopf gleich auf allen fuenf Seiten', () => {
+  assert.deepEqual(siteShellFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css'), js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
+  // install.html verliert den GitHub-Knopf: Geruest weicht ab.
+  const noGh = swap('install.html', /\s*<a href="https:\/\/github\.com\/ulsklyc\/yuvomi" class="nav-btn nav-gh"[\s\S]*?<\/a>/, '');
+  assert.notDeepEqual(noGh, pages);
+  assert.ok(hit(siteShellFindings(noGh, css, js), /install\.html: Kopfleiste weicht ab|install\.html: Kopfleiste weicht vom Geruest/));
+  // Die alte Fusszeile der Rechtsseiten.
+  const oldFoot = swap('privacy.html', '<footer class="site-foot">', '<footer class="bot">');
+  assert.ok(hit(siteShellFindings(oldFoot, css, js), /privacy\.html: 0x <footer class="site-foot">/));
+  // Der alte Sprachknopfname (2.5.3) und der fehlende Sprachknopf.
+  const oldName = swap('index.html', 'aria-label="DE - Auf Deutsch lesen"', 'aria-label="Auf Deutsch umschalten"');
+  assert.notDeepEqual(oldName, pages);
+  assert.ok(hit(siteShellFindings(oldName, css, js), /index\.html: Name "Auf Deutsch umschalten" beginnt nicht mit dem sichtbaren "DE"/));
+  const noLang = swap('privacy.html', /<a href="datenschutz\.html" class="nav-btn nav-lang"[\s\S]*?<\/a>\s*/, '');
+  assert.notDeepEqual(noLang, pages);
+  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne #langBtn/));
+  // Install mit zwei Zielen: der alte Sprungmenue-Eintrag.
+  const twoInstall = swap('index.html', 'data-t="jump_install">Where it runs<', 'data-t="jump_install">Install it<');
+  assert.notDeepEqual(twoInstall, pages);
+  assert.ok(hit(siteShellFindings(twoInstall, css, js), /zweites "Install"-Ziel/));
+  // Der alte Umschalter: eine Seite schreibt hell/dunkel selbst.
+  const oldToggle = swap('install.html', "lsSet('lang', lang); applyLang(); });", "lsSet('lang', lang); applyLang(); });\n    lsSet('theme', 'dark');");
+  assert.notDeepEqual(oldToggle, pages);
+  assert.ok(hit(siteShellFindings(oldToggle, css, js), /install\.html: schreibt das Theme selbst/));
+  // site.js ohne "System", site.css ohne Bremse unter reduced motion.
+  assert.ok(hit(siteShellFindings(pages, css, js.replace("ORDER = ['system', 'light', 'dark']", "ORDER = ['light', 'dark']")), /kein Zyklus/));
+  const always = css.replace('@media (prefers-reduced-motion: no-preference) {\n  @view-transition', '@media all {\n  @view-transition');
+  assert.notEqual(always, css);
+  assert.ok(hit(siteShellFindings(pages, always, js), /laeuft auch unter reduced motion/));
 });

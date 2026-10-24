@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The five pages of yuvomi.cloud share one header and one footer.** The landing page, the
+  install guide and the three legal pages had four different top bars, three footers and three
+  kinds of language switch between them. Every page now carries the same bar - logo, language,
+  theme, GitHub and Install, in that order - and the same footer with its three link columns;
+  only the landing page adds its jump menu. The GitHub link in the bar is a quiet capsule like its
+  neighbours instead of the loudest element (it turned near-white in dark mode), and Install
+  stays the one filled button. Moving between the pages fades the content while the bar holds
+  still, in browsers that support it and only when reduced motion is off.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
@@ -245,6 +253,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **The website's theme button returns to the system setting.** It used to switch between light
+  and dark only, so after one click the page never followed the system again. It now cycles
+  System, Light, Dark, names the current and the next mode, and keeps the choice on all five
+  pages. The install guide also applies a stored theme before it first paints instead of flashing
+  the system one.
+- **One name, one target in the website's bar.** "Install" in the landing page's bar led to the
+  install guide, while the jump menu's "Install it" scrolled to the platform section; that entry is
+  now "Where it runs". The language switch's accessible name now starts with the letters it shows
+  ("DE - Auf Deutsch lesen"), so voice control finds it by what is on screen.
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.

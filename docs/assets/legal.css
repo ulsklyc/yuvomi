@@ -32,28 +32,12 @@ body {
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; width: 100%; }
 
-/* Header: the site's one bar (.topbar, .bar-row, .nav-logo, .nav-controls,
-   .nav-btn from site.css) - fixed, glass, --bar-h high, the same capsules as
-   index.html and install.html. The order follows install.html: logo, the way
-   back ("Overview"/"Übersicht"), the language switch (privacy/datenschutz
-   only, a link to the other document), the theme toggle. Until round 2 these
-   pages drew a header of their own: opaque, 81px, not fixed, 14px controls,
-   under a comment that already called it "one header". The text column
-   stays the page's own 820px; the bar's row sits on the landing page's
-   column (--bar-maxw in site.css), so the logo keeps its place between pages.
-
-   On a phone the row did not fit: the wordmark yields to the icon (as on the
-   other pages), and below 400px the way back keeps its chevron and drops its
-   label from view - the logo beside it leads to the same page, and the label
-   stays in the link's name. */
-@media (max-width: 480px) {
-  .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
-}
-@media (max-width: 400px) {
-  .nav-back { padding: 0; }
-  .nav-back-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
-.nav-back { position: relative; }
+/* Header and footer: the site's one bar and one footer, both from site.css
+   with the same markup as on index.html and install.html (test:docs-landing
+   compares it). Until round 2 these pages drew a header of their own, and
+   until the shell round a one-line footer strip of their own. The text
+   column stays the page's own 820px; bar and footer sit on the landing
+   page's column (--bar-maxw), so the logo keeps its place between pages. */
 
 main { flex: 1; padding: calc(var(--bar-h) + 48px) 0 64px; }
 
@@ -166,26 +150,6 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
   display: inline-flex; align-items: center; min-height: 44px; padding: 2px 0; }
 .toc-list a:hover { color: var(--accent); text-decoration: underline; }
 @media (max-width: 560px) { .toc-list { grid-template-columns: 1fr; } }
-
-footer.bot {
-  border-top: 1px solid var(--border);
-  background: var(--bg-alt);
-  padding: 24px 0;
-  margin-top: auto;
-}
-footer.bot .wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  color: var(--text-3);
-}
-footer.bot a { color: var(--text-2); text-decoration: none; }
-footer.bot a:hover { color: var(--accent); }
-footer.bot nav { display: flex; gap: 14px; flex-wrap: wrap; }
-footer.bot nav a { padding: 6px 2px; min-height: 44px; display: inline-flex; align-items: center; }
 
 /* Long legal sections with the table of contents at the very top and no way
    back to it on a phone. Appears only once you are past the first screen. */

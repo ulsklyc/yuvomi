@@ -42,6 +42,15 @@
        up first. -->
   <script>
     document.documentElement.classList.add('js');
+    /* The theme picked on any page, before the first paint (assets/site.js
+       writes the key). This page used to set it only at the end of the body,
+       so a stored choice flashed the system theme first. */
+    (function(){
+      try {
+        var t = localStorage.getItem('yuvomi-theme') || localStorage.getItem('oikos-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
     if (/^#podman$/i.test(location.hash)) document.documentElement.setAttribute('data-engine', 'podman');
   </script>
   <style>
@@ -61,7 +70,7 @@
        Regel wie index.html. */
     a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { text-decoration-thickness: 2px; }
-    .prereq-link, .path-now a, .footer-links a, .to-top { text-decoration: none; }
+    .prereq-link, .path-now a, .to-top { text-decoration: none; }
     /* Trefferflaeche der Textlinks: 16-17px Zeile, SC 2.5.8 will 24. Das
        senkrechte Polster eines Inline-Elements nimmt Klicks an, ohne die
        Zeilenhoehe anzufassen. */
@@ -367,18 +376,7 @@
     .details-body code { font-size: 0.84em; background: var(--bg-alt); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
     .details-body .code-block { margin: 10px 0; }
 
-    /* Footer */
-    footer { border-top: 1px solid var(--border); padding: 44px 0; text-align: center; }
-    .footer-heart { font-size: 0.9rem; color: var(--text-2); margin-bottom: 14px; }
-    .footer-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 0.85rem; }
-    .footer-links a { color: var(--text-2); padding: 6px 4px; min-height: 44px; display: inline-flex; align-items: center; }
-    .footer-links a:hover { color: var(--accent); }
-    /* This is the page every CTA points at and the one a technical reader goes
-       through end to end, and it carried no version, no date and no star count -
-       nothing to tell them whether anyone is still minding the project. */
-    .footer-meta { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
-      font-size: 0.82rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
-    .footer-meta b { color: var(--text-2); font-weight: 600; }
+    /* Footer: assets/site.css, gleich auf allen fuenf Seiten. */
 
     /* Back to top. The legal pages have had this since they got a table of
        contents; this page is longer than either of them and had no way back to
@@ -423,8 +421,6 @@
       .tab-btn .tb-one { display: none; }
       .tab-group { margin-top: 8px; font-size: 0.7rem; }
       .tab-group:not(:first-of-type) { margin-top: 8px; }
-      /* Class-scoped: the footer link block is a <nav> now too. */
-      .nav .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
       .success-box { padding: 44px 20px; }
       .success-url { display: flex; width: 100%; font-size: 0.95rem; padding: 10px 12px; }
     }
@@ -477,32 +473,18 @@
        the only <header> was the hero, and that is inside <main>. role on <nav>
        was redundant with the element itself. -->
   <header class="site-bar">
-  <nav class="nav topbar" data-t-aria="nav_main" aria-label="Main">
-    <div class="container-wide bar-row">
-      <a href="index.html" class="nav-logo" data-t-aria="nav_home" aria-label="Yuvomi home">
-        <svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="navbg" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#navbg)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>
-        Yuvomi
-      </a>
-      <div class="nav-controls">
-        <!-- No aria-label: the hardcoded English one overrode #backLabel, which
-             applyLang() does translate, so a German reader heard "Back to
-             overview" over the visible "Übersicht" (SC 2.5.3). -->
-        <a href="index.html" class="nav-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          <span id="backLabel">Overview</span>
-        </a>
-        <button class="nav-btn" id="langToggle" type="button" aria-label="Switch language">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <span id="langLabel">DE</span>
-        </button>
-        <button class="nav-btn" id="themeToggle" type="button" aria-label="Toggle theme" aria-pressed="false">
-          <svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-      </div>
+<nav class="topbar" data-t-aria="nav_main" aria-label="Main">
+  <div class="bar-row">
+    <a href="index.html" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="logo-g-bar" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#logo-g-bar)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
+    <div class="nav-controls">
+      <button class="nav-btn nav-lang" id="langBtn" type="button" lang="de" aria-label="DE - Auf Deutsch lesen" title="DE - Auf Deutsch lesen"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg><span class="nav-lang-label">DE</span></button>
+      <button class="nav-btn nav-theme" id="themeBtn" type="button" data-mode="system" aria-label="Theme: system - switch to light" title="Theme: system - switch to light"><svg class="ico-system" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="ico-light" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="ico-dark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span class="nav-gh-label" data-t="nav_gh">GitHub</span></a>
+      <a href="install.html" class="nav-btn nav-install" aria-current="page"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="nav-install-label" data-t="nav_install">Install</span></a>
     </div>
-  </nav>
-  </header>
+  </div>
+</nav>
+</header>
 
   <!-- Hero -->
   <main id="main-content" tabindex="-1">
@@ -1055,23 +1037,45 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
   </section>
 
   </main>
-  <footer>
-    <div class="container">
-      <p class="footer-heart" data-t="footer_heart">Built with care for families who value privacy and simplicity.</p>
-      <nav class="footer-links" data-t-aria="foot_nav" aria-label="Footer">
-        <a href="index.html" data-t="footer_home">Home</a>
-        <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
-        <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="footer_contrib">Contributing</a>
-        <a href="impressum.html" data-t="footer_impressum">Imprint (DE)</a>
-        <a href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="footer_privacy">Privacy</a>
+  <footer class="site-foot">
+  <div class="foot-in">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="index.html" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="logo-g-foot" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#logo-g-foot)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
+        <p data-t="footer_heart">Built with care for households who value privacy and simplicity.</p>
+      </div>
+      <nav class="foot-cols" data-t-aria="foot_nav" aria-label="Footer">
+        <div class="foot-col">
+          <h2 data-t="foot_product">Product</h2>
+          <a href="index.html#screens" data-t="foot_screens">Screenshots</a>
+          <a href="install.html" data-t="foot_install">Install</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/SPEC.md" target="_blank" rel="noopener" data-t="foot_docs">Docs &amp; spec</a>
+          <a href="https://kyrodan.github.io/yuvomi-docs/" target="_blank" rel="noopener" data-t="foot_guide">User guide (community)</a>
+        </div>
+        <div class="foot-col">
+          <h2 data-t="foot_project">Project</h2>
+          <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="foot_contrib">Contributing</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="foot_changelog">Changelog</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+        </div>
+        <div class="foot-col">
+          <h2 data-t="foot_legal">Legal</h2>
+          <a href="impressum.html" data-t="foot_impressum">Imprint (DE)</a>
+          <a href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="foot_privacy">Privacy</a>
+        </div>
       </nav>
-      <p class="footer-meta"><span id="gh-stars-install" data-gh-stars>★ 1.7k · </span><b>v2.79.0</b> · <span id="install-released" data-released="2026-10-22">22 October 2026</span></p>
     </div>
-  </footer>
+    <div class="foot-bottom">
+      <span class="foot-meta"><span id="gh-stars-install" data-gh-stars>★ 1.7k · </span><b>v2.79.0</b> · <span id="install-released" data-released="2026-10-22">22 October 2026</span></span>
+      <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
+    </div>
+  </div>
+</footer>
 
   <a class="to-top" href="#main-content" id="toTop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg><span data-t="to_top">Back to top</span></a>
 
+  <script src="assets/site.js"></script>
   <script>
   (function(){
     'use strict';
@@ -1080,7 +1084,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         hero_eyebrow:'Installation', hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
         hero_desc:'Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a Docker setup with a handful of commands, or the guided web installer.',
         hero_time:'~10 minutes',
-        nav_main:'Main', nav_home:'Yuvomi home', foot_nav:'Footer', tablist_label:'Installation options', code_label:'Command block',
+        nav_main:'Main', foot_nav:'Footer', nav_gh:'GitHub', nav_install:'Install', tablist_label:'Installation options', code_label:'Command block',
         prereq_title:'What you need',
         prereq_desc:'Yuvomi runs as a Docker or Podman container, so there is no Node.js or other runtime to install. App-store installs bring even the container engine along; only the guided web installer also needs Git and Node.js.',
         prereq_docker_title:'Docker or Podman', prereq_docker_desc:"Packages the app so you don't need to install anything else. Free for personal use. Podman (RHEL/Fedora/CentOS Stream) works too - rootless and SELinux-ready.",
@@ -1179,16 +1183,21 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         trouble_db_warning:'<code>rm -rf ./data</code> deletes the database for good - only on a fresh install. With existing data you need the original key; nothing else opens it. <code>down -v</code> is no shortcut: the data sits in a host folder, not in a Docker volume, so it survives that command.',
         trouble_nginx_title:'Nginx shows 502 Bad Gateway', trouble_nginx_desc:"Nginx can't reach the container. Check it's running and the port matches:",
         trouble_nginx_port:'Ensure the <code>proxy_pass</code> port in your Nginx config matches <code>OIKOS_HTTP_PORT</code> in your <code>.env</code> (default: 3000).',
-        footer_home:'Home', footer_heart:'Built with care for families who value privacy and simplicity.', footer_contrib:'Contributing', footer_impressum:'Imprint (DE)', footer_privacy:'Privacy',
+        footer_heart:'Built with care for households who value privacy and simplicity.',
+        foot_product:'Product', foot_screens:'Screenshots', foot_install:'Install', foot_docs:'Docs & spec',
+        foot_guide:'User guide (community)',
+        foot_project:'Project', foot_contrib:'Contributing', foot_changelog:'Changelog',
+        foot_legal:'Legal', foot_impressum:'Imprint (DE)', foot_privacy:'Privacy',
+        foot_madewith:'Self-hosted · Privacy-first · Open source',
         to_top:'Back to top',
         meta_desc:'Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or the guided web installer. Your self-hosted family planner runs in about 10 minutes.',
-        skip_link:'Skip to content', backLabel:'Overview', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
+        skip_link:'Skip to content', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
       },
       de: {
         hero_eyebrow:'Installation', hero_title_pre:'Yuvomi installieren', hero_title_em:'- euer Weg.',
         hero_desc:'Euren selbst gehosteten Familienplaner in wenigen Minuten zum Laufen bringen. Wählt eine App-Store-Installation mit einem Klick, ein Docker-Setup mit einer Handvoll Befehle oder den geführten Web-Installer.',
         hero_time:'~10 Minuten',
-        nav_main:'Hauptnavigation', nav_home:'Yuvomi Startseite', foot_nav:'Fußzeile', tablist_label:'Installationswege', code_label:'Befehlsblock',
+        nav_main:'Hauptnavigation', foot_nav:'Fußzeile', nav_gh:'GitHub', nav_install:'Installieren', tablist_label:'Installationswege', code_label:'Befehlsblock',
         prereq_title:'Was ihr braucht',
         prereq_desc:'Yuvomi läuft als Docker- oder Podman-Container, Node.js oder eine andere Laufzeit müsst ihr also nicht installieren. App-Store-Installationen bringen sogar die Container-Engine mit; nur der geführte Web-Installer braucht zusätzlich Git und Node.js.',
         prereq_docker_title:'Docker oder Podman', prereq_docker_desc:'Verpackt die App, sodass ihr nichts weiter installieren müsst. Für den privaten Gebrauch kostenlos. Podman (RHEL/Fedora/CentOS Stream) funktioniert ebenfalls - rootless und SELinux-fähig.',
@@ -1286,10 +1295,15 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         trouble_db_warning:'<code>rm -rf ./data</code> löscht die Datenbank endgültig - nur bei einer Neuinstallation. Mit vorhandenen Daten braucht ihr den ursprünglichen Schlüssel; nichts anderes öffnet sie. <code>down -v</code> ist keine Abkürzung: Die Daten liegen in einem Host-Ordner, nicht in einem Docker-Volume, und überstehen den Befehl.',
         trouble_nginx_title:'Nginx zeigt 502 Bad Gateway', trouble_nginx_desc:'Nginx kann den Container nicht erreichen. Prüfen, ob er läuft und der Port stimmt:',
         trouble_nginx_port:'Sicherstellen, dass der <code>proxy_pass</code>-Port in der Nginx-Konfiguration mit <code>OIKOS_HTTP_PORT</code> in eurer <code>.env</code> übereinstimmt (Standard: 3000).',
-        footer_home:'Startseite', footer_heart:'Mit Sorgfalt gebaut für Familien, die Privatsphäre und Einfachheit schätzen.', footer_contrib:'Mitmachen', footer_impressum:'Impressum', footer_privacy:'Datenschutz',
+        footer_heart:'Mit Sorgfalt gebaut für Haushalte, die Privatsphäre und Einfachheit schätzen.',
+        foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
+        foot_guide:'Nutzerhandbuch (Community)',
+        foot_project:'Projekt', foot_contrib:'Mitmachen', foot_changelog:'Changelog',
+        foot_legal:'Rechtliches', foot_impressum:'Impressum', foot_privacy:'Datenschutz',
+        foot_madewith:'Selbst gehostet · Privacy-First · Open Source',
         to_top:'Nach oben',
         meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid oder der geführte Web-Installer. Euer selbst gehosteter Familienplaner läuft in etwa 10 Minuten.',
-        skip_link:'Zum Inhalt springen', backLabel:'Übersicht', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
+        skip_link:'Zum Inhalt springen', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
       }
     };
 
@@ -1298,33 +1312,11 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
     function detectLang(){ var n = (navigator.language || navigator.userLanguage || 'en').toLowerCase(); return n.indexOf('de') === 0 ? 'de' : 'en'; }
 
     var lang = lsGet('lang') || detectLang();
-    var theme = lsGet('theme');
     /* Assigned by the tabs block below; applyLang() calls it so the platform
        name in .path-now follows the language switch like everything else. */
     var refreshPathScope = null;
 
-    function isDark(){ if (theme==='dark') return true; if (theme==='light') return false; return matchMedia('(prefers-color-scheme:dark)').matches; }
-    function applyTheme(){
-      var d = isDark();
-      if (theme) document.documentElement.setAttribute('data-theme', theme); else document.documentElement.removeAttribute('data-theme');
-      document.getElementById('themeIconSun').style.display = d ? 'none' : 'block';
-      document.getElementById('themeIconMoon').style.display = d ? 'block' : 'none';
-      applyThemeLabel();
-    }
-    /* The label names the target state, matching the language button next to it,
-       and aria-pressed reports the current one - the icon alone says neither.
-       Called from both apply functions: the theme decides the value, the
-       language its wording, and either can change without the other. */
-    function applyThemeLabel(){
-      var d = isDark();
-      var tb = document.getElementById('themeToggle');
-      var tl = d
-        ? (lang === 'de' ? 'Zum hellen Design wechseln' : 'Switch to light theme')
-        : (lang === 'de' ? 'Zum dunklen Design wechseln' : 'Switch to dark theme');
-      tb.setAttribute('aria-label', tl);
-      tb.setAttribute('title', tl);
-      tb.setAttribute('aria-pressed', d ? 'true' : 'false');
-    }
+    /* Das Theme (System -> Hell -> Dunkel) verwaltet assets/site.js. */
     /* Many translated strings carry inline <code> around commands, paths and env
        vars. Assigning textContent would strip it and leave "docker compose down
        -v" indistinguishable from prose, so those strings are built as real nodes
@@ -1398,11 +1390,6 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         el.setAttribute('aria-label', s[k]);
         if (el.matches('button, a[href]')) el.setAttribute('title', s[k]);
       });
-      document.getElementById('langLabel').textContent = lang === 'en' ? 'DE' : 'EN';
-      var lt = document.getElementById('langToggle');
-      lt.setAttribute('aria-label', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
-      lt.setAttribute('title', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
-      document.getElementById('backLabel').textContent = s.backLabel;
       /* Die Beschreibung folgt der Sprache wie der Titel (seit 2026-09-29). */
       document.querySelector('meta[name="description"]').setAttribute('content', s.meta_desc);
       document.title = lang === 'en' ? 'Install Yuvomi - Self-Hosted Family Planner' : 'Yuvomi installieren - Selbst gehosteter Familienplaner';
@@ -1417,13 +1404,12 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
             .toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
         }
       }
-      applyThemeLabel();
+      /* Sprach- und Theme-Knopf benennt assets/site.js nach <html lang>. */
+      document.dispatchEvent(new Event('yuvomi:lang'));
       syncCodeScroll();
       if (refreshPathScope) refreshPathScope();
     }
-    document.getElementById('themeToggle').addEventListener('click', function(){ theme = isDark() ? 'light' : 'dark'; lsSet('theme', theme); applyTheme(); });
-    document.getElementById('langToggle').addEventListener('click', function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); });
-    matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
+    document.getElementById('langBtn').addEventListener('click', function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); });
 
     /* Engine switch (Docker / Podman) inside the Docker panel. State lives on
        <html data-engine>, where the head script already put it for #podman, so
@@ -1625,7 +1611,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
       addEventListener('scroll', sync, { passive: true }); sync();
     })();
 
-    applyTheme(); applyLang();
+    applyLang();
   })();
   </script>
 </body>

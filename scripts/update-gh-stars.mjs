@@ -31,11 +31,8 @@ function fmtStars(n) {
 // Not every marker exists on every page, so each one records which file it
 // belongs to; a marker that is missing from its own file is still an error.
 const patterns = (stars) => [
-  {
-    file: 'index.html',
-    re: /(<span id="gh-stars-nav" data-gh-stars>)[^<]*(<\/span>)/,
-    replacement: `$1&nbsp;${stars}$2`,
-  },
+  // No marker in the top bar any more: the GitHub capsule there is a quiet
+  // icon-and-name link since the site-shell round (docs/assets/site.css).
   {
     file: 'index.html',
     re: /(<span id="gh-stars-proof" data-gh-stars>)[^<]*(<\/span>)/,

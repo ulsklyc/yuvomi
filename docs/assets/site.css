@@ -381,8 +381,12 @@
    install guide to the privacy notice changed websites for one click.
    Markup: <header class="site-bar"> (the banner landmark, unstyled) holds
    .topbar (this rule), inside it .bar-row on the landing page's column
-   (--bar-maxw, whatever column class it carries); the controls on its right are .nav-btn capsules in a
-   .nav-controls group (index.html groups its larger set as .nav-right).
+   (--bar-maxw); the controls on its right are .nav-btn capsules in one
+   .nav-controls group, in the same order on every page: language, theme,
+   GitHub, Install. The markup is the same on all five pages
+   (test:docs-landing compares it); a page may only leave out the jump menu
+   and the progress line (index.html) and the language control (impressum.html,
+   which has no second language).
    The glass sits on .topbar, NOT on the header: backdrop-filter makes an
    element the containing block of its fixed descendants, and index.html's
    install pill is fixed to the thumb zone from inside that header - on the
@@ -405,7 +409,9 @@
   font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1); text-decoration: none; }
 .nav-logo:hover { color: var(--text-1); text-decoration: none; }
 .nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
-.nav-controls { display: flex; align-items: center; gap: 8px; }
+.nav-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
+/* The bar stays put while the page under it changes (view transitions below). */
+.topbar { view-transition-name: site-bar; }
 /* More contrast: the bar's lower edge in the text colour, as the app does
    with its glass edge. After the base rule, which sets the whole border. */
 @media (prefers-contrast: more) {
@@ -458,6 +464,80 @@
 .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
 .nav-btn:active { transform: scale(0.95); }
 .nav-btn svg { width: 16px; height: 16px; }
+
+/* ===== The bar's controls ===============================================
+   Language: a button on the two translated pages, a link to the other
+   document on privacy/datenschutz - same id, class and look. The visible text
+   is the target language ("DE"/"EN"); the accessible name STARTS with that
+   text (SC 2.5.3: a voice user says what they see) and then spells it out in
+   the target language, which the control's lang attribute names.
+   Theme: one button cycling System -> Light -> Dark -> System; data-mode
+   picks the icon, the name says the current mode and the next one
+   (assets/site.js). Without JS both buttons do nothing, so they leave; the
+   language link keeps working. */
+html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
+.nav-theme svg { display: none; }
+.nav-theme[data-mode="system"] .ico-system,
+.nav-theme[data-mode="light"] .ico-light,
+.nav-theme[data-mode="dark"] .ico-dark { display: block; }
+/* GitHub is a way out, not the goal: the same quiet capsule as language and
+   theme. It used to be a solid text-colour pill, the loudest thing in the
+   bar - inverted to near-white in dark mode. */
+.nav-gh { position: relative; }
+/* Install is the bar's one primary: the flat accent surface of .btn-primary
+   at bar size, no glow. */
+.nav-install { background: var(--accent-fill); color: var(--accent-ink); border-color: transparent; }
+.nav-install:hover { background: var(--accent-fill-hover); color: var(--accent-ink); border-color: transparent; }
+/* Phones. Each step takes away only what is seen, never a name: the hidden
+   labels stay in the accessibility tree (clip, not display: none). */
+@media (max-width: 700px) {
+  .nav-gh { padding: 0; }
+  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
+  .nav-lang svg { display: none; }
+}
+@media (max-width: 380px) {
+  .nav-controls { gap: 6px; }
+  .nav-install { padding: 0; }
+  .nav-install-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* ===== Footer ==============================================================
+   ONE footer for all five pages: brand and line, three link columns, and a
+   bottom row with the meta line (version and date on index and install, the
+   copyright on the legal pages) and the three words. Until this round there
+   were three: a column grid (index), a centred link row (install) and a
+   one-line strip (legal pages). */
+.site-foot { border-top: 1px solid var(--border); padding: 56px 0 48px; background: var(--bg); }
+.site-foot .foot-in { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
+.foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.foot-brand { max-width: 320px; }
+.foot-brand .nav-logo { margin-bottom: 14px; }
+.foot-brand p { font-size: 0.88rem; color: var(--text-2); line-height: 1.6; margin: 0; }
+.foot-cols { display: flex; gap: 56px; flex-wrap: wrap; }
+.foot-col h2 { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 14px; }
+.foot-col a { display: flex; align-items: center; min-height: 44px; font-size: 0.9rem; color: var(--text-2); text-decoration: none; transition: color .15s; }
+.foot-col a:hover { color: var(--accent); }
+.foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-size: 0.82rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.foot-bottom b { color: var(--text-2); font-weight: 600; }
+@media (max-width: 560px) {
+  .site-foot { padding: 44px 0 36px; }
+  .foot-cols { gap: 28px 40px; }
+}
+
+/* ===== Page changes =======================================================
+   Crossing between the five pages is a cross-document view transition: the
+   bar (view-transition-name above) holds still, the page under it fades.
+   Only when motion is welcome - under reduced motion the browser swaps
+   pages the old way. Browsers without it ignore the rule. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; animation-timing-function: var(--ease-out); }
+  ::view-transition-group(site-bar) { animation-duration: .22s; }
+}
 
 /* The code plate and its copy button, identical on both pages that draw one.
    The span classes are the page's own syntax colours: .cmd for the command a

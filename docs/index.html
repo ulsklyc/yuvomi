@@ -142,7 +142,7 @@
        Textlink musste sich den Strich selbst holen - zwei taten es nicht. */
     a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { text-decoration-thickness: 2px; }
-    .mobile-cta, .plat-card, .to-top, .foot-col a { text-decoration: none; }
+    .mobile-cta, .plat-card, .to-top { text-decoration: none; }
     /* Trefferflaeche der Textlinks: die Zeile gibt ihnen 17px, SC 2.5.8 will
        24. Senkrechtes Polster an einem Inline-Element vergroessert die Flaeche,
        die den Klick annimmt, ohne die Zeilenhoehe anzufassen - der Absatz
@@ -177,10 +177,12 @@
        das Menue offen. Beides steht unten im Skript. */
     .nav-jump { position: relative; margin-left: auto; margin-right: 14px; }
     .nav-jump summary { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px;
-      border-radius: var(--r-full); border: 1px solid var(--border); background: var(--surface);
-      color: var(--text-2); font-size: 0.84rem; font-weight: 600; cursor: pointer; list-style: none; }
+      border-radius: var(--r-full); border: 1px solid var(--border); background: none;
+      color: var(--text-2); font-size: 0.82rem; font-weight: 600; cursor: pointer; list-style: none; }
+    .nav-jump + .nav-controls { margin-left: 0; }
     .nav-jump summary::-webkit-details-marker { display: none; }
-    .nav-jump summary:hover { border-color: var(--border-strong); color: var(--text-1); }
+    .nav-jump summary:hover { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
+    /* Wie jede .nav-btn der Leiste: durchsichtig, Haarlinie, Flaeche erst beim Hover. */
     .nav-jump summary svg { width: 15px; height: 15px; }
     /* So breit wie der laengste Eintrag: mit fester Mindestbreite von 232px
        brach "Everything your household needs" / "Alles, was euer Haushalt
@@ -222,34 +224,9 @@
       .nav-jump { position: static; }
       .nav-jump ul { left: 24px; right: auto; }
     }
-    .nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    /* The star count made the GitHub pill wrap to two lines and it then set the
-       height of the whole bar; below 400px the wordmark yields to the icon so the
-       logo stops touching the language button. */
-    .nav-gh { white-space: nowrap; position: relative; }
-    @media (max-width: 400px) {
-      .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
-    }
-    /* Bei 320px endete die Leiste bei 351px, der GitHub-Knopf ragte 31px aus
-       dem Bild (Runde 2). Darunter bleibt er ein Symbolknopf; die Sternzahl
-       geht nur sichtbar weg und bleibt Teil des Namens. */
-    @media (max-width: 360px) {
-      .nav-gh { padding: 0; }
-      #gh-stars-nav { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-    }
-    /* .nav-btn steht in site.css. Der Installieren-Knopf der Leiste ist ein
-       Primaerknopf in Leistengroesse: dieselbe flache Akzentflaeche, kein Glow. */
-    .nav-install { background: var(--accent-fill); color: var(--accent-ink); border-color: transparent; }
-    .nav-install:hover { background: var(--accent-fill-hover); color: var(--accent-ink); border-color: transparent; }
-    .nav-gh { background: var(--text-1); color: var(--bg); border-color: var(--text-1); }
-    .nav-gh:hover { background: var(--text-1); color: var(--bg); opacity: 0.86; }
-    #gh-stars-nav:not(:empty) { font-variant-numeric: tabular-nums; }
-    /* Ohne JS sind Sprach- und Theme-Knopf tote Bedienelemente mit englischen
-       aria-Labels (die uebersetzten setzt applyLang() zur Laufzeit). Ein Knopf,
-       der nichts tut, verschwindet - Theme folgt dann prefers-color-scheme,
-       Sprache bleibt die englische Dokumentfassung. Gleiches Muster wie der
-       .reveal-No-JS-Fallback. */
-    html:not(.js) #langBtn, html:not(.js) #themeBtn { display: none; }
+    /* Sprache, Theme, GitHub und Installieren - Markup, Reihenfolge und Stil
+       stehen in assets/site.css und sind auf allen fuenf Seiten gleich. */
+    /* Ohne JS verschwinden Sprach- und Theme-Knopf (Regel in site.css). */
     /* Das Hero-Bild hat absichtlich kein src (siehe Kommentar am Bild); ohne
        JS bekommt es auch keins und stand als leerer Kasten mit Alt-Text ueber
        der <noscript>-Aufnahme. Ohne JS zeigt nur die noscript-Kopie. */
@@ -266,7 +243,7 @@
        nichts verschoben - so malt die Seite trotzdem sofort etwas. Die
        Animation ist der Notausgang: faellt das Skript aus, wird der Bildschirm
        nach drei Sekunden trotzdem sichtbar (englisch, aber lesbar). */
-    html.i18n-wait .topbar .nav-jump, html.i18n-wait .topbar .nav-right,
+    html.i18n-wait .topbar .nav-jump, html.i18n-wait .topbar .nav-controls,
     html.i18n-wait .hero .wrap, html.i18n-wait .proof .wrap {
       visibility: hidden; animation: i18n-failsafe 0s 3s forwards; }
     @keyframes i18n-failsafe { to { visibility: visible; } }
@@ -926,19 +903,7 @@
     .cta-box p { color: var(--text-2); font-size: 1.08rem; max-width: 44ch; margin: 0 auto 32px; }
     .cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
-    /* ===== Footer ===== */
-    footer { border-top: 1px solid var(--border); padding: 56px 0 48px; }
-    .foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
-    .foot-brand { max-width: 320px; }
-    .foot-brand .nav-logo { margin-bottom: 14px; }
-    .foot-brand p { font-size: 0.88rem; color: var(--text-2); line-height: 1.6; }
-    .foot-cols { display: flex; gap: 56px; flex-wrap: wrap; }
-    .foot-col h3 { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 14px; }
-    .foot-col a { display: flex; align-items: center; min-height: 44px; font-size: 0.9rem; color: var(--text-2); transition: color .15s; }
-    .foot-col a:hover { color: var(--accent); }
-    .foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-      font-size: 0.82rem; color: var(--text-3); }
-    .foot-bottom b { color: var(--text-2); font-variant-numeric: tabular-nums; }
+    /* ===== Footer: assets/site.css, gleich auf allen fuenf Seiten. ===== */
 
     /* ===== Back to top =====
        The legal pages have had this since they grew a table of contents. This
@@ -1014,9 +979,6 @@
       .gallery { padding: 64px 0 16px; }
       .gal-cap p { font-size: 0.95rem; }
       .cta-box { padding: 52px 24px; }
-      /* Nur sichtbar weg, nicht aus dem Namen: mit display:none hiess der Link
-         fuer Screenreader nur noch "★ 1.6k". */
-      .nav-gh span:not(#gh-stars-nav) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       /* Zwei Knoepfe, zwei Breiten, je nach Sprache in anderer Reihenfolge
          umgebrochen (DE 224/180px, EN 186/192px). Gestapelt und gleich breit
          stehen sie ruhig - in beiden Sprachen an derselben Stelle, und kein
@@ -1124,11 +1086,8 @@
 <header class="site-bar">
 <nav class="topbar" data-t-aria="nav_main" aria-label="Main">
   <div class="nav-progress" aria-hidden="true"><span id="navBar"></span></div>
-  <div class="wrap bar-row">
-    <a href="#top" class="nav-logo" aria-label="Yuvomi">
-      <svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#g)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>
-      Yuvomi
-    </a>
+  <div class="bar-row">
+    <a href="#top" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="logo-g-bar" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#logo-g-bar)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
     <!-- Vier Laeufe lang gemeldet: 15,2 Bildschirme Desktop und 25,2 mobil ohne
          jede Positionsanzeige und ohne Weg, das Dokument zu ueberfliegen. Die
          Linie darueber beantwortet "wo bin ich", dieses Menue "was kommt noch".
@@ -1143,14 +1102,14 @@
         <li><a href="#family" data-t="jump_family">For the family</a></li>
         <li><a href="#modules" data-t="jump_modules">Everything your household needs</a></li>
         <li><a href="#longevity" data-t="jump_longevity">Before you commit</a></li>
-        <li><a href="#install" data-t="jump_install">Install it</a></li>
+        <li><a href="#install" data-t="jump_install">Where it runs</a></li>
       </ul>
     </details>
-    <div class="nav-right">
-      <button class="nav-btn" id="langBtn" type="button" aria-label="Switch language"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg><span id="langLbl">DE</span></button>
-      <button class="nav-btn" id="themeBtn" type="button" aria-label="Toggle theme" aria-pressed="false"><svg aria-hidden="true" id="sunIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg aria-hidden="true" id="moonIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
-      <a href="install.html" class="nav-btn nav-install"><span data-t="nav_install">Install</span></a>
-      <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span data-t="nav_gh">GitHub</span><span id="gh-stars-nav" data-gh-stars>&nbsp;★ 1.7k</span></a>
+    <div class="nav-controls">
+      <button class="nav-btn nav-lang" id="langBtn" type="button" lang="de" aria-label="DE - Auf Deutsch lesen" title="DE - Auf Deutsch lesen"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg><span class="nav-lang-label">DE</span></button>
+      <button class="nav-btn nav-theme" id="themeBtn" type="button" data-mode="system" aria-label="Theme: system - switch to light" title="Theme: system - switch to light"><svg class="ico-system" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="ico-light" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="ico-dark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span class="nav-gh-label" data-t="nav_gh">GitHub</span></a>
+      <a href="install.html" class="nav-btn nav-install"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="nav-install-label" data-t="nav_install">Install</span></a>
     </div>
   </div>
 </nav>
@@ -1272,7 +1231,7 @@
       alt_c_cal:'Yuvomi calendar showing appointments, tasks and birthdays for the whole household',
       jump_label:'Jump to', jump_aria:'Jump to a section',
       jump_screens:'See it first', jump_swap:'What it replaces', jump_handoff:'Why one app', jump_family:'For the family',
-      jump_modules:'Everything your household needs', jump_longevity:'Before you commit', jump_install:'Install it',
+      jump_modules:'Everything your household needs', jump_longevity:'Before you commit', jump_install:'Where it runs',
       fam_eyebrow:'For the family',
       fam_title:'On the kitchen wall, in every pocket, <em>for every age.</em>',
       fam_desc:'Everyone in the house gets their own login from a link and the app on their phone. A terminal, if needed at all, is only for whoever sets it up.',
@@ -1395,7 +1354,7 @@
       alt_c_cal:'Yuvomi-Kalender mit Terminen, Aufgaben und Geburtstagen des ganzen Haushalts',
       jump_label:'Springen zu', jump_aria:'Springen zu einem Abschnitt',
       jump_screens:'Erst sehen', jump_swap:'Was es ersetzt', jump_handoff:'Warum eine App', jump_family:'Für die Familie',
-      jump_modules:'Alles, was euer Haushalt braucht', jump_longevity:'Bevor ihr euch festlegt', jump_install:'Installieren',
+      jump_modules:'Alles, was euer Haushalt braucht', jump_longevity:'Bevor ihr euch festlegt', jump_install:'Wo es läuft',
       fam_eyebrow:'Für die Familie',
       fam_title:'An der Küchenwand, in jeder Hosentasche, <em>für jedes Alter.</em>',
       fam_desc:'Alle im Haus bekommen per Link ein eigenes Konto und die App aufs Handy. Ein Terminal braucht, wenn überhaupt, nur wer es einrichtet.',
@@ -1553,10 +1512,9 @@
     });
     var s = T[lang];
     document.querySelectorAll('[data-t]').forEach(function(el){ var k = el.getAttribute('data-t'); if (s[k] !== undefined) setRich(el, s[k]); });
-    document.getElementById('langLbl').textContent = lang === 'en' ? 'DE' : 'EN';
-    var lb = document.getElementById('langBtn');
-    lb.setAttribute('aria-label', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
-    lb.setAttribute('title', lang === 'en' ? 'Auf Deutsch umschalten' : 'Switch to English');
+    /* Sprach- und Theme-Knopf benennt assets/site.js nach <html lang> -
+       auf allen fuenf Seiten dieselben Namen. */
+    document.dispatchEvent(new Event('yuvomi:lang'));
     /* Die Beschreibung folgt der Sprache wie der Titel; bis 2026-09-29 blieb
        sie englisch, waehrend der Rest der Seite deutsch sprach. Der Wert im
        Markup ist der englische Eintrag (test:docs-landing), weil Vorschauen
@@ -2205,16 +2163,16 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
      Region nicht zuverlaessig beobachtet wird. -->
 <p id="copyStatus" class="sr-only" role="status" aria-live="polite"></p>
 
-<footer>
-  <div class="wrap">
+<footer class="site-foot">
+  <div class="foot-in">
     <div class="foot-grid">
       <div class="foot-brand">
-        <a href="#top" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="gf" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#gf)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
+        <a href="#top" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="logo-g-foot" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#logo-g-foot)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
         <p data-t="footer_heart">Built with care for households who value privacy and simplicity.</p>
       </div>
       <nav class="foot-cols" data-t-aria="foot_nav" aria-label="Footer">
         <div class="foot-col">
-          <h3 data-t="foot_product">Product</h3>
+          <h2 data-t="foot_product">Product</h2>
           <a href="#screens" data-t="foot_screens">Screenshots</a>
           <a href="install.html" data-t="foot_install">Install</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/SPEC.md" target="_blank" rel="noopener" data-t="foot_docs">Docs &amp; spec</a>
@@ -2225,21 +2183,21 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
           <a href="https://kyrodan.github.io/yuvomi-docs/" target="_blank" rel="noopener" data-t="foot_guide">User guide (community)</a>
         </div>
         <div class="foot-col">
-          <h3 data-t="foot_project">Project</h3>
+          <h2 data-t="foot_project">Project</h2>
           <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="foot_contrib">Contributing</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="foot_changelog">Changelog</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
         </div>
         <div class="foot-col">
-          <h3 data-t="foot_legal">Legal</h3>
+          <h2 data-t="foot_legal">Legal</h2>
           <a href="impressum.html" data-t="foot_impressum">Imprint (DE)</a>
           <a href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="foot_privacy">Privacy</a>
         </div>
       </nav>
     </div>
     <div class="foot-bottom">
-      <span><span id="gh-stars-footer" data-gh-stars>★ 1.7k · </span><b>v2.79.0</b> · <span id="foot-released" data-released="2026-10-22">22 October 2026</span></span>
+      <span class="foot-meta"><span id="gh-stars-footer" data-gh-stars>★ 1.7k · </span><b>v2.79.0</b> · <span id="foot-released" data-released="2026-10-22">22 October 2026</span></span>
       <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
     </div>
   </div>
@@ -2247,6 +2205,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
 
 <a class="to-top" href="#top" id="toTop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg><span data-t="to_top">Back to top</span></a>
 
+<script src="assets/site.js"></script>
 <script>
 (function(){
   'use strict';
@@ -2255,8 +2214,9 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   function lsSet(k,v){ try { localStorage.setItem('yuvomi-'+k, v); } catch(e){} }
   function detectLang(){ var n = (navigator.language || navigator.userLanguage || 'en').toLowerCase(); return n.indexOf('de') === 0 ? 'de' : 'en'; }
   var lang = lsGet('lang') || detectLang();
-  var theme = lsGet('theme');
-  function isDark(){ if (theme==='dark') return true; if (theme==='light') return false; return matchMedia('(prefers-color-scheme:dark)').matches; }
+  /* Das Theme (System -> Hell -> Dunkel) verwaltet assets/site.js fuer alle
+     fuenf Seiten; hier haengen nur die Aufnahmen daran. */
+  function isDark(){ return window.YuvomiSite ? window.YuvomiSite.isDark() : matchMedia('(prefers-color-scheme:dark)').matches; }
   /* Screenshots vary on two axes: theme (data-light/data-dark hold the English
      base paths) and locale (localized sets live under screenshots/<lang>/ with
      identical basenames). A non-English shot falls back to the English one if it
@@ -2307,28 +2267,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     });
   }
   narrowShots.addEventListener('change', applyShots);
-  function applyTheme(){
-    var d = isDark();
-    if (theme) document.documentElement.setAttribute('data-theme', theme); else document.documentElement.removeAttribute('data-theme');
-    document.getElementById('sunIco').style.display = d ? 'none' : 'block';
-    document.getElementById('moonIco').style.display = d ? 'block' : 'none';
-    applyThemeLabel();
-    applyShots();
-  }
-  /* The label names the target state, matching the language button next to it,
-     and aria-pressed reports the current one - the icon alone says neither.
-     Called from both apply functions: the theme decides the value, the language
-     decides its wording, and either can change without the other. */
-  function applyThemeLabel(){
-    var d = isDark();
-    var tb = document.getElementById('themeBtn');
-    var tl = d
-      ? (lang === 'de' ? 'Zum hellen Design wechseln' : 'Switch to light theme')
-      : (lang === 'de' ? 'Zum dunklen Design wechseln' : 'Switch to dark theme');
-    tb.setAttribute('aria-label', tl);
-    tb.setAttribute('title', tl);
-    tb.setAttribute('aria-pressed', d ? 'true' : 'false');
-  }
+  document.addEventListener('yuvomi:theme', applyShots);
   /* Same rule as the §5 table on the privacy page: a box that scrolls has to be
      reachable from the keyboard (SC 2.1.1) - and named, because aria-label on a
      roleless <div> is ignored. The quick-start plate scrolls on a phone.
@@ -2352,16 +2291,13 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     document.title = lang === 'en' ? 'Yuvomi - The Self-Hosted Family Planner' : 'Yuvomi - Der selbst gehostete Familienplaner';
     var rel = document.getElementById('foot-released');
     if (rel) { var rp = (rel.getAttribute('data-released') || '').split('-'); if (rp[0]) { rel.textContent = new Date(+rp[0], (+rp[1] || 1) - 1, +rp[2] || 1).toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }); } }
-    applyThemeLabel();
     applyShots();
     syncCodeScroll();
     /* Die deutsche Fassung ist laenger: alles, was Positionen cacht (Scroll-Spy),
        misst auf dieses Signal neu. */
     document.dispatchEvent(new Event('yuvomi:layout'));
   }
-  document.getElementById('themeBtn').onclick = function(){ theme = isDark() ? 'light' : 'dark'; lsSet('theme', theme); applyTheme(); };
   document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
-  matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function(){ if (!theme) applyTheme(); });
   /* Die Klasse `js` setzt das Kopfskript, vor dem ersten Bild. */
   /* Bahn fuer die Handoff-Bewegung: vom Anfang des Pfeils zur Mitte des
      empfangenden Symbols - nie ueber einen Labeltext (Runde 2: von Symbol zu
@@ -2606,7 +2542,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   // GitHub star count is injected at build time into [data-gh-stars] elements
   // (see scripts/update-gh-stars.mjs). No request to api.github.com is made in
   // the visitor's browser - no visitor data is transmitted to any third party.
-  applyTheme(); applyLang();
+  applyLang();
 })();
 </script>
 </body>
