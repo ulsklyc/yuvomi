@@ -5187,7 +5187,6 @@
             "sparse": "Замало вимірювань, щоб показати тренд.",
             "recentMeasurements": "Останні вимірювання",
             "deleteMeasurement": "Видалити вимірювання {{value}} від {{date}}",
-            "editMeasurement": "Редагувати вимірювання {{value}} від {{date}}",
             "measurementDeleted": "Вимірювання видалено",
             "mood": {
                 "veryBad": "Дуже погане",

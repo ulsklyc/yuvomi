@@ -4935,7 +4935,6 @@
             "sparse": "For få målinger til å vise en trend.",
             "recentMeasurements": "Nylige målinger",
             "deleteMeasurement": "Slett måling {{value}} fra {{date}}",
-            "editMeasurement": "Rediger måling {{value}} fra {{date}}",
             "measurementDeleted": "Måling slettet",
             "mood": {
                 "veryBad": "Veldig dårlig",

@@ -5063,7 +5063,6 @@
             "sparse": "Příliš málo měření pro zobrazení trendu.",
             "recentMeasurements": "Poslední měření",
             "deleteMeasurement": "Smazat měření {{value}} z {{date}}",
-            "editMeasurement": "Upravit měření {{value}} z {{date}}",
             "measurementDeleted": "Měření smazáno",
             "mood": {
                 "veryBad": "Velmi špatná",

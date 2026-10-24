@@ -4935,7 +4935,6 @@
             "sparse": "Zu wenige Messwerte für einen Trend.",
             "recentMeasurements": "Letzte Messungen",
             "deleteMeasurement": "Messung {{value}} vom {{date}} löschen",
-            "editMeasurement": "Messung {{value}} vom {{date}} bearbeiten",
             "measurementDeleted": "Messung gelöscht",
             "mood": {
                 "veryBad": "Sehr schlecht",

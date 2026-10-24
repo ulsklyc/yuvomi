@@ -4935,7 +4935,6 @@
             "sparse": "रुझान दिखाने के लिए बहुत कम माप।",
             "recentMeasurements": "हाल की मापें",
             "deleteMeasurement": "{{date}} का माप {{value}} हटाएँ",
-            "editMeasurement": "{{date}} का माप {{value}} संपादित करें",
             "measurementDeleted": "माप हटाई गई",
             "mood": {
                 "veryBad": "बहुत खराब",

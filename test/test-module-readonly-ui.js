@@ -3280,7 +3280,10 @@ test('Vitalwerte-Historie mit `health: read`: die Messung bleibt, ihr Bearbeiten
       const html = health.recentMeasurementsMarkup(gewicht());
       // R8 H9: die Zeile oeffnet Bearbeiten (Stift) statt nur zu loeschen.
       assert.match(html, /data-vital-edit="41"/);
-      assert.match(html, /health\.vitals\.editMeasurement/);
+      // R23: die ganze Zeile ist der Knopf, kein Stift am Ende; ihr Name ist
+      // ihr Inhalt (Tag und Wert), kein aria-label, das ihn ersetzt.
+      assert.match(html, /<li class="list-row health-recent__row">\s*<button type="button" class="list-row__main list-row__main--interactive health-recent__open" data-vital-edit="41"/);
+      assert.doesNotMatch(html, /data-lucide="pencil"/);
       assert.doesNotMatch(html, /data-delete-vital/, 'Loeschen steht im Dialogfuss, nicht mehr in der Zeile');
     });
     withAccess({ health: 'read' }, () => {
@@ -3690,7 +3693,13 @@ test('Befund-Detail mit `health: read`: kein Bearbeiten, die Tabelle steht volls
 
 test('Aktivitaetszeile: Bearbeiten weg, Strecke und Dauer bleiben', () => {
   const zeile = { id: 21, type: 'run', performed_at: '2026-06-14', duration_min: 45, distance_km: 8.2, calories: 510, note: 'Waldweg' };
-  assert.match(health.activityRowMarkup(zeile, true), /data-activity-edit="21"/);
+  const eigen = health.activityRowMarkup(zeile, true);
+  assert.match(eigen, /data-activity-edit="21"/);
+  // R23 (Critique G5 P2): DIE ZEILE OEFFNET - der Koerper ist der Knopf
+  // (`.list-row__main--interactive` streckt sich ueber die Zeile), kein Stift.
+  assert.match(eigen, /<li class="list-row health-activity-row">/);
+  assert.match(eigen, /<button type="button" class="list-row__main list-row__main--interactive health-activity-row__body" data-activity-edit="21">/);
+  assert.doesNotMatch(eigen, /row-action|data-lucide="pencil"/, 'kein Stift als einziges Ziel');
   const html = health.activityRowMarkup(zeile, false);
   assert.doesNotMatch(html, /data-activity-edit/);
   assert.doesNotMatch(html, /<button/);

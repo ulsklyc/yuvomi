@@ -4935,7 +4935,6 @@
             "sparse": "Quá ít số đo để hiển thị xu hướng.",
             "recentMeasurements": "Các lần đo gần đây",
             "deleteMeasurement": "Xóa lần đo {{value}} ngày {{date}}",
-            "editMeasurement": "Sửa lần đo {{value}} ngày {{date}}",
             "measurementDeleted": "Đã xóa lần đo",
             "mood": {
                 "veryBad": "Rất tệ",

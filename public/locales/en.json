@@ -4935,7 +4935,6 @@
             "sparse": "Too few readings to show a trend.",
             "recentMeasurements": "Recent measurements",
             "deleteMeasurement": "Delete measurement {{value}} from {{date}}",
-            "editMeasurement": "Edit measurement {{value}} from {{date}}",
             "measurementDeleted": "Measurement deleted",
             "mood": {
                 "veryBad": "Very bad",

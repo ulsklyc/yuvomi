@@ -4935,7 +4935,6 @@
             "sparse": "Túl kevés mérés a trend megjelenítéséhez.",
             "recentMeasurements": "Legutóbbi mérések",
             "deleteMeasurement": "Mérés törlése: {{value}} ({{date}})",
-            "editMeasurement": "Mérés szerkesztése: {{value}} ({{date}})",
             "measurementDeleted": "Mérés törölve",
             "mood": {
                 "veryBad": "Nagyon rossz",

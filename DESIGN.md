@@ -1849,13 +1849,23 @@ und prueft sie gegen seine Mitgliederliste, jede Wahl schreibt sie - auch im Fas
 Person ohne lesbares Fasten auf die eigene zurueckfaellt. Steht eine fremde Person, nennt jeder
 Bereich sie im Hinweis ("Du traegst fuer X ein" bzw. nur lesen, auch das Fasten), und die Zeilen
 der Bereichsliste bleiben leer, statt den eigenen Status ueber die falsche Person zu sagen.
+**Und EIN Ort fuer sie (R23, Critique G5 P2):** rechts in der Titelzeile des Seitenkopfs, auf der
+Uebersicht wie in jedem Bereich, in jeder Breite (`hoistPlan`: immer `toolbar`). Vorher stand sie
+im Detailkopf, in der Zeile „‹ Gesundheit" und im Streifen vor der Liste. Am Telefon ist sie ein
+Gesicht (32px-Scheibe mit Initialen in der Personenfarbe, Name und Chevron weichen, der Knopf
+nennt die Person im Namen), ab 768px die Pille mit Namen. **Der Bereichskopf ist einzeilig wie
+die Uebersicht:** Rueckweg als Zeichen, Bereichsname als Titel, die Person rechts, kein Siegel -
+der Tipp in einen Bereich hob den Kopf sonst von 65 auf 113px (Shift 0,97 bei 390, 0,51 bei
+768); jetzt 65/69px in jeder Ansicht. **Verlaufszeilen oeffnen als Ganzes** (Trainings-Log,
+Letzte Messungen): `.list-row` mit `.list-row__main--interactive` statt Eigenbau mit Stift als
+einzigem Ziel; der Typ in der Zeilentitel-Stufe 16/500.
 
 **Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
 EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
 veraendert hat, die drei zuletzt gemessenen Messarten ("Seit der letzten Messung: Gewicht -0,2 kg,
 Schlaf +30 Min. und ..."), ohne Vorwert der letzte Wert, ohne Messung kein Satz. Er nennt Richtung
 und Betrag, nie eine Bewertung - die Zahl gehoert der Person, das Urteil ihrer Aerztin. Mobil zieht er
-mit Personenwahl und "Heute faellig" vor die Bereichsliste. **Was nicht gemessen ist, bekommt keine
+mit "Heute faellig" vor die Bereichsliste. **Was nicht gemessen ist, bekommt keine
 Kachel:** keine grauen Felder mit "-" (ein Kind ohne Messung hatte neun, 145.200px² am Laptop), sondern
 EINE ruhige Zeile "Noch keine Messwerte" mit der Erfassen-Aktion (`.health-overview__empty-row`); die
 Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte". **Die Kurven sind

@@ -4935,7 +4935,6 @@
             "sparse": "Te weinig metingen om een trend te tonen.",
             "recentMeasurements": "Recente metingen",
             "deleteMeasurement": "Meting {{value}} van {{date}} verwijderen",
-            "editMeasurement": "Meting {{value}} van {{date}} bewerken",
             "measurementDeleted": "Meting verwijderd",
             "mood": {
                 "veryBad": "Heel slecht",

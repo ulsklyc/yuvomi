@@ -722,8 +722,9 @@ function placePanels() {
 /* DER DETAILKOPF NENNT DEN BEREICH (R14 P6, A8 P2-2). Am Desktop stand
  * rechts nur das Panel, sein Titel sr-only - nur die Markierung links sagte,
  * wo man ist. Jetzt traegt die Spalte den Kopf der anderen Split-Views
- * (Aufgaben, Kontakte, Rezepte): Siegel des Bereichs, Name, rechts die
- * Personenwahl. Der sichtbare Name ist fuer Screenreader stumm - das Panel
+ * (Aufgaben, Kontakte, Rezepte): Siegel des Bereichs und Name; die
+ * Personenwahl steht seit R23 im Seitenkopf (health-hoist.js). Der sichtbare
+ * Name ist fuer Screenreader stumm - das Panel
  * darunter traegt dieselbe Ueberschrift als sr-only-h2, die Gliederung
  * bleibt eine. */
 let _detailHead = null;
@@ -733,7 +734,6 @@ function detailHeadEl() {
     <header class="split-view__detail-head health-detail-head">
       <span class="health-area-row__icon health-detail-head__seal" aria-hidden="true" data-health-detail-seal></span>
       <p class="split-view__detail-title health-detail-head__title" aria-hidden="true" data-health-detail-title></p>
-      <div class="split-view__detail-actions" data-health-person-detail></div>
     </header>`);
   return wrap.firstElementChild;
 }
@@ -802,7 +802,6 @@ const PRIORITY_WAIT_MS = 4000;
 
 function prioritySkeletonMarkup() {
   return `<div class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true">
-              <div class="skeleton health-priority-skeleton__pill"></div>
               <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--due">
                 <div class="skeleton skeleton-line skeleton-line--title"></div>
                 <div class="skeleton skeleton-line skeleton-line--medium"></div>
@@ -845,7 +844,6 @@ function syncHoists() {
   applyHoistPlan(hoistPlan({ split, overview: overviewActive, phone: isPhone() }), {
     panel,
     slots: {
-      detail: _detailHead?.querySelector('[data-health-person-detail]') ?? null,
       toolbar: _container.querySelector('[data-health-person-slot]'),
       priority: _container.querySelector('[data-health-priority]'),
     },
@@ -1166,12 +1164,12 @@ export async function render(container, ctx = {}) {
         <a class="health-toolbar__back" href="/health" hidden>
           <i data-lucide="chevron-left" class="health-toolbar__back-icon" aria-hidden="true"></i><span>${esc(t('nav.health'))}</span>
         </a>
-        <!-- Die Personenwahl eines Bereichs (schmal): in der Zeile des
-             Rueckwegs, rechts - keine eigene Zeile vor der ersten Karte
-             (health-hoist.js, R14 P3). -->
-        <div class="health-toolbar__person" data-health-person-slot></div>
-        <span class="health-toolbar__break" aria-hidden="true"></span>
         <h1 class="page-toolbar__title">${esc(t('nav.health'))}</h1>
+        <!-- DIE PERSONENWAHL HAT EINEN ORT (R23, G5 P2): rechts in der
+             Titelzeile, auf der Uebersicht und in jedem Bereich, in jeder
+             Breite (health-hoist.js). Der Bereichskopf bleibt dadurch
+             einzeilig wie die Uebersicht. -->
+        <div class="health-toolbar__person" data-health-person-slot></div>
         <!-- Eigener Traeger im Slot: am Desktop dockt der Router den
              Primaerknopf in denselben Slot (dieselbe Lehre wie shopping-tools). -->
         <div class="page-toolbar__actions"><span class="health-toolbar__tools" id="health-tools">${healthToolsHtml()}</span></div>
@@ -1211,7 +1209,6 @@ export async function render(container, ctx = {}) {
   for (const slot of [
     container.querySelector('[data-health-person-slot]'),
     container.querySelector('[data-health-priority]'),
-    _detailHead.querySelector('[data-health-person-detail]'),
   ]) installPopoverMenus(slot);
   container.querySelector('#health-tools')?.addEventListener('click', (event) => {
     if (event.target.closest('[data-action="health-export"]')) openHealthExport();
@@ -2012,19 +2009,20 @@ function recentMeasurementsMarkup(metric) {
     <div class="health-recent">
       <div class="health-recent__title">${esc(t('health.vitals.recentMeasurements'))}</div>
       <ul class="health-recent__list">
-        ${rows.map((r) => `
-          <li class="health-recent__row">
+        ${rows.map((r) => {
+          // DIE ZEILE OEFFNET (R23, Critique G5 P2; Zeilen-Endzone R21 D10).
+          // Hier stand eine Eigenbau-Zeile mit einem Stift als einzigem Ziel;
+          // jetzt ist die ganze Zeile der Knopf (`.list-row__main--interactive`
+          // streckt sich ueber sie), sein Name ist ihr Inhalt: Tag und Wert.
+          const cells = `
             <span class="health-recent__date">${esc(dateText(r.measured_at))}</span>
-            <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>
-            ${own ? rowActionHtml({
-              icon: 'pencil',
-              label: t('health.vitals.editMeasurement', {
-                value: [valueText(r), vitalUnitText(metric, r)].filter(Boolean).join(' '),
-                date: dateText(r.measured_at),
-              }),
-              attrs: { 'data-vital-edit': r.id },
-            }) : ''}
-          </li>`).join('')}
+            <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>`;
+          return `
+          <li class="list-row health-recent__row">
+            ${own ? `<button type="button" class="list-row__main list-row__main--interactive health-recent__open" data-vital-edit="${esc(r.id)}">${cells}</button>`
+              : `<span class="list-row__main health-recent__open">${cells}</span>`}
+          </li>`;
+        }).join('')}
       </ul>
     </div>`;
 }
@@ -5419,9 +5417,10 @@ function activityRowMarkup(row, own) {
   const typeLabel = preset ? t(preset.labelKey) : row.type;
   const raw = String(row.performed_at);
   const dateKey = raw.slice(0, 10);
+  // Jahr nur ausserhalb des laufenden (D11, utils/date-format.js).
   const whenLabel = raw.includes('T')
-    ? `${formatDate(dateKey)} · ${formatTime(raw)}`
-    : formatDate(dateKey);
+    ? `${dateText(dateKey)} · ${formatTime(raw)}`
+    : dateText(dateKey);
 
   const meta = [];
   if (row.duration_min != null) meta.push(t('health.activity.unit.min', { value: fmtNum(row.duration_min) }));
@@ -5432,22 +5431,26 @@ function activityRowMarkup(row, own) {
     ? `<span class="health-activity-row__meta">${meta.map((m) => `<span class="health-activity-row__chip">${esc(m)}</span>`).join('')}</span>`
     : '';
   const noteHtml = row.note ? `<span class="health-activity-row__note">${esc(row.note)}</span>` : '';
-  const editBtn = own
-    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${typeLabel}, ${whenLabel}` }), attrs: { 'data-activity-edit': row.id } })
-    : '';
-
-  return `
-    <li class="health-activity-row">
-      <span class="health-activity-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
-      <span class="health-activity-row__body">
+  // DIE ZEILE OEFFNET (R23, Critique G5 P2): der Koerper ist der Knopf und
+  // streckt sich ueber die Zeile (`.list-row__main--interactive`, list-row.css)
+  // - vorher war ein Stift am Ende das einzige Ziel. Sein Name ist der Inhalt
+  // der Zeile (Typ, Zeitpunkt, Dauer), wie bei jedem Zeilen-Oeffner. Der Typ
+  // steht in der Zeilentitel-Stufe (16/500) statt 16/600.
+  const body = `
         <span class="health-activity-row__head">
-          <span class="health-activity-row__type">${esc(typeLabel)}</span>
+          <span class="list-row__name health-activity-row__type">${esc(typeLabel)}</span>
           <span class="health-activity-row__when">${esc(whenLabel)}</span>
         </span>
         ${metaHtml}
-        ${noteHtml}
-      </span>
-      ${editBtn}
+        ${noteHtml}`;
+  const main = own
+    ? `<button type="button" class="list-row__main list-row__main--interactive health-activity-row__body" data-activity-edit="${esc(row.id)}">${body}</button>`
+    : `<span class="list-row__main health-activity-row__body">${body}</span>`;
+
+  return `
+    <li class="list-row health-activity-row">
+      <span class="health-activity-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
+      ${main}
     </li>`;
 }
 

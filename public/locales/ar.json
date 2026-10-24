@@ -5314,7 +5314,6 @@
             "sparse": "قياسات قليلة جدًا لعرض اتجاه.",
             "recentMeasurements": "آخر القياسات",
             "deleteMeasurement": "حذف القياس {{value}} ({{date}})",
-            "editMeasurement": "تعديل القياس {{value}} ({{date}})",
             "measurementDeleted": "تم حذف القياس",
             "mood": {
                 "veryBad": "سيئ جدًا",

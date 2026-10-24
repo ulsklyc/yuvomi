@@ -4935,7 +4935,6 @@
             "sparse": "Troppe poche misurazioni per mostrare un andamento.",
             "recentMeasurements": "Ultime misurazioni",
             "deleteMeasurement": "Elimina misurazione {{value}} del {{date}}",
-            "editMeasurement": "Modifica misurazione {{value}} del {{date}}",
             "measurementDeleted": "Misurazione eliminata",
             "mood": {
                 "veryBad": "Molto male",

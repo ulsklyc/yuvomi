@@ -4935,7 +4935,6 @@
             "sparse": "傾向を表示するには測定値が少なすぎます。",
             "recentMeasurements": "最近の測定",
             "deleteMeasurement": "測定 {{value}}（{{date}}）を削除",
-            "editMeasurement": "測定 {{value}}（{{date}}）を編集",
             "measurementDeleted": "測定を削除しました",
             "mood": {
                 "veryBad": "とても悪い",

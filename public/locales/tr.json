@@ -4935,7 +4935,6 @@
             "sparse": "Bir eğilim göstermek için ölçüm sayısı çok az.",
             "recentMeasurements": "Son ölçümler",
             "deleteMeasurement": "Ölçümü sil: {{value}} ({{date}})",
-            "editMeasurement": "Ölçümü düzenle: {{value}} ({{date}})",
             "measurementDeleted": "Ölçüm silindi",
             "mood": {
                 "veryBad": "Çok kötü",

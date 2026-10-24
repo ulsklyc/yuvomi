@@ -4935,7 +4935,6 @@
             "sparse": "测量数据太少，无法显示趋势。",
             "recentMeasurements": "最近的测量",
             "deleteMeasurement": "删除测量 {{value}}（{{date}}）",
-            "editMeasurement": "编辑测量 {{value}}（{{date}}）",
             "measurementDeleted": "测量已删除",
             "mood": {
                 "veryBad": "很差",

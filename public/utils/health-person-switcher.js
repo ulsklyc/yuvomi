@@ -8,6 +8,8 @@
  */
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { initials } from '/utils/initials.js';
+import { getReadableTextColor } from '/utils/color.js';
 
 // Geteilter Personen-Umschalter: EIN Knopf mit der aktiven Person statt einer
 // Dauer-Pillenzeile (Critique 2026-08-31: 6 Ansichts-Tabs + 4 Personen-Pillen
@@ -25,13 +27,18 @@ export function personSwitcherMarkup(members, activeId, meId, { menuId, label })
     : m.display_name);
   const dotOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
           style="background:${esc(m.avatar_color) || 'var(--module-health)'}"></span>`;
+  // Am Knopf traegt der Punkt die Initialen: im Seitenkopf des Telefons waechst
+  // er zum Gesicht (health.css, R23). Ohne Farbe bleibt die Schrift die des
+  // Moduls auf seiner Toenung.
+  const faceOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
+          style="background:${esc(m.avatar_color) || 'var(--module-health)'}${m.avatar_color ? `;color:${getReadableTextColor(m.avatar_color)}` : ''}"><span class="health-person-chip__initials">${esc(initials(m.display_name, '?'))}</span></span>`;
   const active = list.find((m) => m.id === activeId) ?? list[0];
   return `
     <div class="health-person-switcher">
       <button type="button" class="health-person-switcher__trigger popover-menu__trigger"
               popovertarget="${esc(menuId)}" aria-haspopup="menu" aria-expanded="false"
               aria-label="${esc(label)}: ${esc(nameOf(active))}">
-        ${dotOf(active)}
+        ${faceOf(active)}
         <span class="health-person-switcher__name">${esc(nameOf(active))}</span>
         <i data-lucide="chevron-down" class="icon-sm health-person-switcher__chevron" aria-hidden="true"></i>
       </button>

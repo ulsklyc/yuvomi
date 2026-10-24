@@ -4935,7 +4935,6 @@
             "sparse": "Πολύ λίγες μετρήσεις για να εμφανιστεί τάση.",
             "recentMeasurements": "Πρόσφατες μετρήσεις",
             "deleteMeasurement": "Διαγραφή μέτρησης {{value}} ({{date}})",
-            "editMeasurement": "Επεξεργασία μέτρησης {{value}} ({{date}})",
             "measurementDeleted": "Η μέτρηση διαγράφηκε",
             "mood": {
                 "veryBad": "Πολύ κακή",

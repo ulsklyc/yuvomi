@@ -62,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen, so the first day is no longer half hidden under the hours. Switching tabs no longer
   folds the header open and shut, and coming back to the overview shows the current hour again
   instead of midnight.
+- **Health has one place for the person you are viewing.** The person picker now sits at the
+  right of the page header on the overview and in every area, at every width; on a phone it
+  shows as the person's initials. Opening an area no longer makes the header twice as tall, so
+  the page no longer jumps. Entries in the training log and in "Recent measurements" open when
+  tapped anywhere on the row instead of only on a small pencil.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days

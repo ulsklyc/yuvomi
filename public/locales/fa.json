@@ -4935,7 +4935,6 @@
             "sparse": "اندازه‌گیری‌ها برای نمایش روند بسیار کم است.",
             "recentMeasurements": "آخرین اندازه‌گیری‌ها",
             "deleteMeasurement": "حذف اندازه‌گیری {{value}} ({{date}})",
-            "editMeasurement": "ویرایش اندازه‌گیری {{value}} ({{date}})",
             "measurementDeleted": "اندازه‌گیری حذف شد",
             "mood": {
                 "veryBad": "خیلی بد",

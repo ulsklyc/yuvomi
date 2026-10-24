@@ -4935,7 +4935,6 @@
             "sparse": "Kulang ang sukat para magpakita ng takbo.",
             "recentMeasurements": "Mga kamakailang sukat",
             "deleteMeasurement": "Tanggalin ang sukat na {{value}} ({{date}})",
-            "editMeasurement": "I-edit ang sukat na {{value}} ({{date}})",
             "measurementDeleted": "Natanggal ang sukat",
             "mood": {
                 "veryBad": "Napakasama",

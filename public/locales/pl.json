@@ -5187,7 +5187,6 @@
             "sparse": "Za mało pomiarów, aby pokazać trend.",
             "recentMeasurements": "Ostatnie pomiary",
             "deleteMeasurement": "Usuń pomiar {{value}} z {{date}}",
-            "editMeasurement": "Edytuj pomiar {{value}} z {{date}}",
             "measurementDeleted": "Pomiar usunięty",
             "mood": {
                 "veryBad": "Bardzo źle",

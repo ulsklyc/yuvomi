@@ -58,20 +58,25 @@
 }
 
 /* ---- Rückweg im Bereich (schmal) ----
- * Apples Navigationsleiste: „‹ Gesundheit" als eigene Zeile über dem
- * Bereichsnamen. Nur, wenn ein Bereich die Übersicht weggeschoben hat
- * (syncHealthHeader); am Desktop steht die Liste links und ist der Rückweg. */
-.health-toolbar:has(> .health-toolbar__back:not([hidden])) {
-  flex-wrap: wrap;
-  row-gap: 0;
-}
-
+ * EINE ZEILE WIE DIE UEBERSICHT (R23, Critique G5 P2). Hier stand Apples
+ * zweizeilige Navigationsleiste: „‹ Gesundheit" mit der Personenwahl als eigene
+ * Zeile ueber dem Bereichsnamen, eingeklappt erst beim Scrollen eine Zeile
+ * (R20). Der Tipp in einen Bereich hob den Kopf dadurch von 65 auf 113px, und
+ * alles darunter sprang (Layout-Shift 0,97 bei 390x844, 0,51 bei 768). Jetzt
+ * steht der Bereichskopf von Anfang an in der Form, in die er eingeklappt ist:
+ * der Rueckweg als Zeichen (sein Name bleibt fuer Screenreader), der
+ * Bereichsname als Titel, rechts die Personenwahl - am selben Ort wie auf der
+ * Uebersicht. Das Siegel geht: der Rueckweg nennt den Raum. Nur, wenn ein
+ * Bereich die Uebersicht weggeschoben hat (syncHealthHeader); am Desktop steht
+ * die Liste links und ist der Rueckweg. */
 .health-toolbar__back {
   display: inline-flex;
-  flex-basis: 100%;
+  flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
   min-height: var(--target-base);
+  min-inline-size: var(--target-base);
   /* Die Treffflaeche reicht bis an die Kante, das Zeichen steht auf der
    * Fluchtlinie des Inhalts (wie settings-toolbar__back). */
   margin-inline-start: calc(-1 * var(--space-2));
@@ -82,15 +87,32 @@
   text-decoration: none;
 }
 
-/* DIE PERSONENWAHL TEILT DIE ZEILE DES RUECKWEGS (R14 P3, A8 P3-3). Auf
- * jeder Bereichsseite kostete sie eine eigene Zeile vor der ersten Karte
- * (y122-170 bei 390x844). Jetzt steht sie rechts neben „‹ Gesundheit" wie
- * die Aktion in Apples Navigationsleiste; der Bereichsname bleibt der Large
- * Title darunter. Leer (ein Haushalt mit einer Person) kostet der Slot nichts.
- * health-hoist.js haengt die Pille ein. */
+.health-toolbar__back > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .module-seal--head {
+  display: none;
+}
+
+/* Wird es eng, kappt zuerst der Titel - die Person steht als Gesicht oder
+ * Pille da, der Bereich als Wort, und ein Wort laesst sich kuerzen. */
+.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .page-toolbar__title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* DIE PERSONENWAHL STEHT RECHTS IN DER TITELZELLE (R14 P3, R23). Leer (ein
+ * Haushalt mit einer Person) kostet der Slot nichts. health-hoist.js haengt
+ * die Pille ein. */
 .health-toolbar__person {
   display: flex;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   margin-inline-start: auto;
 }
@@ -99,74 +121,60 @@
   display: none;
 }
 
-.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__back {
-  flex: 1 0 auto;
-  flex-basis: auto;
+/* Den freien Raum der Zeile nimmt die Person allein: zwei `auto`-Raender
+ * (ihrer und der des Aktions-Slots, layout.css) teilten ihn, und am Desktop
+ * stand die Pille mitten im Kopf. */
+.health-toolbar__person:not(:empty) + .page-toolbar__actions {
+  margin-left: 0;
 }
 
-/* Der Zeilenumbruch nach Rueckweg und Pille: Siegel und Bereichsname stehen
- * gemeinsam darunter, wie ohne Pille. */
-.health-toolbar__break {
-  display: none;
-}
-
-.health-toolbar:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__break {
-  display: block;
-  flex-basis: 100%;
-  height: 0;
-}
-
-/* EINGEKLAPPT EINE ZEILE (R20, Re-Critique 2026-10-17: der Bereichskopf blieb
- * beim Lesen 113px hoch, 77 % Inhalt). Wie Apples Navigationsleiste: der
- * Rueckweg wird zum Zeichen (sein Name bleibt fuer Screenreader), der
- * Bereichsname rueckt als Inline-Titel zwischen Rueckweg und Personenwahl,
- * das Siegel geht. 113 -> 65px bei 390px. Das Umklappen gleitet per FLIP
- * (wireCollapsingHeader, utils/ux.js). */
+/* AM TELEFON IST DIE PERSON EIN GESICHT (R23). Die volle Pille („Linda
+ * Johnson · Ich", 193px) liesse neben Siegel und Werkzeug keinen Large Title
+ * stehen; Apples Systemapps zeigen die Person dort als ihr Bild. Der Farbpunkt
+ * waechst zur Scheibe mit Initialen, Name und Chevron weichen aus dem Bild -
+ * der Knopf nennt die Person in seinem Namen (aria-label), das Menue zeigt
+ * alle mit Namen. */
+/* Im Bereich traegt der Aktions-Slot unter 1024px nichts (das Werkzeug weicht,
+ * der FAB steht in der Kapsel) - leer haette er neben der Person noch seinen
+ * Abstand gehalten, und das Gesicht stand 54px vor der Kante. */
 @media (max-width: 1023px) {
-  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) {
-    flex-wrap: nowrap;
+  .health-page[data-health-pushed] .health-toolbar > .page-toolbar__actions {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .health-toolbar .health-toolbar__person .health-person-switcher__trigger {
+    justify-content: center;
+    min-width: var(--target-base);
+    padding: 0;
+    gap: 0;
+    background: transparent;
   }
 
-  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > :is(.health-toolbar__break, .module-seal--head) {
+  .health-toolbar__person .health-person-switcher__name,
+  .health-toolbar__person .health-person-switcher__chevron {
     display: none;
   }
 
-  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__back:not([hidden]) {
-    flex: 0 0 auto;
+  .health-toolbar__person .health-person-switcher__trigger > .health-person-chip__dot {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    min-inline-size: var(--target-base);
+    width: var(--target-sm);
+    height: var(--target-sm);
   }
 
-  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__back > span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .health-toolbar__person .health-person-switcher__trigger > .health-person-chip__dot > .health-person-chip__initials {
+    display: inline;
   }
+}
 
-  /* Wird es eng, kappt zuerst der Name in der Personenwahl, dann der Titel:
-   * der Bereich sagt, wo man ist; die Person steht auch als Farbpunkt da. */
-  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .page-toolbar__title {
-    order: 1;
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-
-  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .health-toolbar__person {
-    order: 2;
-    flex: 0 100 auto;
-    min-width: var(--target-base);
-  }
-
-  .health-toolbar.page-toolbar--capped.is-collapsed > .health-toolbar__person :is(.health-person-switcher, .health-person-switcher__trigger) {
-    min-width: 0;
-  }
-
-  .health-toolbar.page-toolbar--capped.is-collapsed:has(> .health-toolbar__back:not([hidden])) > .page-toolbar__actions {
-    order: 3;
-  }
+.health-person-chip__initials {
+  display: none;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
 }
 
 /* Im Kopf ist die Pille eine Kapsel ohne Kante: gefuellt aus der Well-Flaeche
@@ -263,8 +271,8 @@
 }
 
 /* ---- Detailkopf (Desktop, R14 P6, A8 P2-2) ----
- * Siegel des Bereichs und sein Name wie in den anderen Split-Views; rechts
- * die Personenwahl. */
+ * Siegel des Bereichs und sein Name wie in den anderen Split-Views; die
+ * Personenwahl steht seit R23 im Seitenkopf. */
 .health-detail-head__seal {
   flex: 0 0 auto;
 }
@@ -1846,9 +1854,7 @@ button.health-med-card:hover {
 }
 
 .health-activity-row {
-  display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
   padding: var(--space-3) 0;
   border: none;
   background: transparent;
@@ -1887,7 +1893,8 @@ button.health-med-card:hover {
 }
 
 .health-activity-row__type {
-  font-weight: var(--font-weight-semibold, 600);
+  /* Zeilentitel-Stufe (R23, N2): 16/500 wie jede Listenzeile, nicht 600. */
+  font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
 }
 
@@ -3851,11 +3858,19 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 
 .health-recent__row {
+  min-height: var(--target-md);
+  /* Die Zeile ist seit R23 eine `.list-row` (ihr Knopf streckt sich ueber sie);
+   * das Polster traegt der Kasten, nicht die Zeile. */
+  padding: 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.health-recent__open {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: var(--target-md);
-  border-top: 1px solid var(--color-border-subtle);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .health-recent__row:first-child { border-top: none; }

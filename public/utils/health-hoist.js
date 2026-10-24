@@ -9,13 +9,17 @@
  * erfassen" erst nach ~1900px Scroll. Am Desktop fehlte der Detailspalte ein
  * Kopf, der den Bereich nennt.
  *
- * Jetzt zieht die Pille in einen Kopf, ohne eigene Zeile:
- *   - Liste + Detail (Desktop): in den Detailkopf neben den Bereichstitel,
- *   - schmal in einem Bereich: in die Zeile „‹ Gesundheit" des Seitenkopfs
- *     (Apples Navigationsleiste: Zurueck links, Aktion rechts),
- *   - Telefon-Uebersicht: in den Streifen VOR der Bereichsliste, zusammen mit
- *     dem Hinweis auf die fremde Ansicht, „Heute faellig" und „Schnell
- *     erfassen" - das, was man heute tut, vor dem, wohin man geht.
+ * Jetzt zieht die Pille in den Seitenkopf, ohne eigene Zeile - und seit R23
+ * IMMER DORTHIN (Critique G5 P2 "Personenwahl an drei Orten"). Sie stand im
+ * Detailkopf (Desktop), in der Zeile „‹ Gesundheit" (schmal im Bereich) und im
+ * Streifen vor der Bereichsliste (Telefon-Uebersicht); der Bereichskopf war
+ * dafuer zweizeilig, und der Tipp in einen Bereich hob ihn von 65 auf 113px
+ * (Layout-Shift 0,97). Eine Personenwahl je Sitzung (D4) hat jetzt EINEN Ort:
+ * rechts in der Titelzeile, auf der Uebersicht wie in jedem Bereich, am
+ * Telefon als Gesicht (health.css). Auf der Telefon-Uebersicht stehen
+ * weiterhin der Hinweis auf die fremde Ansicht, der Satz, „Heute faellig" und
+ * „Schnell erfassen" VOR der Bereichsliste - das, was man heute tut, vor dem,
+ * wohin man geht.
  *
  * UMZIEHEN STATT NEU BAUEN: die Panels bauen ihren Inhalt selbst (Person,
  * Zeitraum, Verdrahtung). Diese Datei haengt fertige, verdrahtete Knoten nur
@@ -36,13 +40,12 @@ export const HOIST_PARTS = {
 /**
  * Wohin was gehoert - reine Entscheidung, ohne DOM.
  * @param {{ split: boolean, overview: boolean, phone: boolean }} s
- * @returns {Array<{ part: keyof HOIST_PARTS, slot: 'detail'|'toolbar'|'priority' }>}
+ * @returns {Array<{ part: keyof HOIST_PARTS, slot: 'toolbar'|'priority' }>}
  */
 export function hoistPlan({ split, overview, phone }) {
-  if (split) return [{ part: 'person', slot: 'detail' }];
-  if (!overview) return [{ part: 'person', slot: 'toolbar' }];
-  if (!phone) return [];
-  return ['person', 'banner', 'brief', 'due', 'quick'].map((part) => ({ part, slot: 'priority' }));
+  const person = [{ part: 'person', slot: 'toolbar' }];
+  if (split || !overview || !phone) return person;
+  return [...person, ...['banner', 'brief', 'due', 'quick'].map((part) => ({ part, slot: 'priority' }))];
 }
 
 const homes = new WeakMap();
@@ -56,7 +59,7 @@ function ownedPart(panel, selector, placed) {
 }
 
 /**
- * Den Plan anwenden. `slots` nennt die Ziele ({ detail, toolbar, priority }),
+ * Den Plan anwenden. `slots` nennt die Ziele ({ toolbar, priority }),
  * `panel` ist das aktive Panel. Alles, was vorher umgezogen war und jetzt
  * nicht mehr gewollt ist, geht nach Hause - oder weg, wenn sein Panel schon
  * einen frischen Knoten derselben Art traegt (neu gerendert).

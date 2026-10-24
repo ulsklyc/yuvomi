@@ -4935,7 +4935,6 @@
             "sparse": "Terlalu sedikit pengukuran untuk menampilkan tren.",
             "recentMeasurements": "Pengukuran terakhir",
             "deleteMeasurement": "Hapus pengukuran {{value}} dari {{date}}",
-            "editMeasurement": "Ubah pengukuran {{value}} dari {{date}}",
             "measurementDeleted": "Pengukuran dihapus",
             "mood": {
                 "veryBad": "Sangat buruk",

@@ -525,16 +525,23 @@ test('Beifang: Karten der Uebersicht auf der Radius-Skala, Disclaimer im Lesemas
 // Bereichsliste, „Heute faellig" bei y=658, „Schnell erfassen" bei y=1916. Am
 // Desktop fehlte der Detailspalte ein Kopf mit dem Bereichsnamen (nur sr-only).
 
-test('R14 P3/P6: der Umzugsplan - Desktop Detailkopf, Bereich schmal Kopfzeile, Telefon-Uebersicht vor die Liste', async () => {
+// R23 (Critique G5 P2 "Personenwahl an drei Orten"): die Pille stand im
+// Detailkopf, in der Zeile „‹ Gesundheit" und im Streifen vor der Liste; der
+// Tipp in einen Bereich hob den Kopf von 65 auf 113px. Jetzt EIN Ort: der
+// Seitenkopf, in jeder Breite und jeder Ansicht.
+test('R14 P3/P6 + R23: der Umzugsplan - die Person immer in den Kopf, Telefon-Uebersicht Heute vor die Liste', async () => {
   const { hoistPlan } = await import('../public/utils/health-hoist.js');
-  assert.deepEqual(hoistPlan({ split: true, overview: false, phone: false }), [{ part: 'person', slot: 'detail' }]);
-  assert.deepEqual(hoistPlan({ split: true, overview: true, phone: false }), [{ part: 'person', slot: 'detail' }]);
-  assert.deepEqual(hoistPlan({ split: false, overview: false, phone: true }), [{ part: 'person', slot: 'toolbar' }],
-    'Bereichsseite: die Pille teilt die Zeile mit „‹ Gesundheit" statt eine eigene zu kosten');
+  const person = [{ part: 'person', slot: 'toolbar' }];
+  assert.deepEqual(hoistPlan({ split: true, overview: false, phone: false }), person, 'Desktop: Kopf, nicht Detailkopf');
+  assert.deepEqual(hoistPlan({ split: true, overview: true, phone: false }), person);
+  assert.deepEqual(hoistPlan({ split: false, overview: false, phone: true }), person, 'Bereich: derselbe Ort');
+  assert.deepEqual(hoistPlan({ split: false, overview: true, phone: false }), person, 'Tablet-Uebersicht: derselbe Ort');
   assert.deepEqual(hoistPlan({ split: false, overview: true, phone: true }).map((p) => `${p.part}>${p.slot}`),
-    ['person>priority', 'banner>priority', 'brief>priority', 'due>priority', 'quick>priority'],
-    'Telefon-Uebersicht: Person, Hinweis, der Satz (R21 D6), Heute faellig, Schnell erfassen stehen VOR der Bereichsliste');
-  assert.deepEqual(hoistPlan({ split: false, overview: true, phone: false }), [], 'Tablet: das Raster bleibt, wie es ist');
+    ['person>toolbar', 'banner>priority', 'brief>priority', 'due>priority', 'quick>priority'],
+    'Telefon-Uebersicht: Hinweis, der Satz (R21 D6), Heute faellig, Schnell erfassen stehen VOR der Bereichsliste; die Person im Kopf');
+  for (const plan of [hoistPlan({ split: true, overview: true, phone: false }), hoistPlan({ split: false, overview: true, phone: true })]) {
+    assert.ok(!plan.some((p) => p.slot === 'detail'), 'kein Detailkopf-Ziel mehr');
+  }
 });
 
 test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck oder verwirft sie', async () => {
@@ -567,9 +574,11 @@ test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck o
   const slots = { toolbar, detail, priority };
 
   applyHoistPlan(hoistPlan({ split: false, overview: true, phone: true }), { panel, slots });
-  assert.deepEqual(priority.children, [person, due, quick], 'in Planreihenfolge vor der Liste');
+  assert.deepEqual(priority.children, [due, quick], 'in Planreihenfolge vor der Liste');
+  assert.deepEqual(toolbar.children, [person], 'die Person im Kopf (R23)');
   applyHoistPlan(hoistPlan({ split: true, overview: true, phone: false }), { panel, slots });
-  assert.deepEqual(detail.children, [person], 'Desktop: die Pille steht im Detailkopf');
+  assert.deepEqual(toolbar.children, [person], 'Desktop: dieselbe Pille am selben Ort');
+  assert.equal(detail.children.length, 0, 'kein Detailkopf-Ziel');
   assert.equal(priority.children.length, 0);
   assert.deepEqual(grid.children.map((c) => c.cls), ['health-overview__card--due', 'health-overview__card--other', 'health-overview__card--quick'],
     'die Karten stehen wieder an ihrem Platz im Raster');
@@ -579,7 +588,7 @@ test('R14 P3/P6: der Umzug haengt verdrahtete Knoten um und bringt sie zurueck o
   const frisch = root.children[0];
   applyHoistPlan(hoistPlan({ split: false, overview: false, phone: true }), { panel, slots });
   assert.deepEqual(toolbar.children, [frisch], 'die FRISCHE Pille zieht um');
-  assert.equal(detail.children.length, 0, 'die alte ist weg, nicht doppelt zurueck im Panel');
+  assert.ok(!toolbar.children.includes(person), 'die alte ist weg, nicht doppelt zurueck im Panel');
   assert.equal(root.children.filter((c) => c.cls === 'health-person-switcher').length, 0);
 });
 
@@ -783,8 +792,9 @@ test('R18: die Heute-Region steht auf dem Telefon vom ersten Bild an - mit Skele
   //    beim ersten Abgleich fort, vor den Daten.
   const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function prioritySkeletonMarkup()'), HEALTH_JS.indexOf('function syncPriorityRegion()'));
   assert.match(fn, /class="health-priority-skeleton" data-health-priority-skeleton aria-hidden="true"/);
-  assert.match(fn, /health-priority-skeleton__pill[\s\S]*health-priority-skeleton__card--due[\s\S]*health-priority-skeleton__card--quick/,
-    'die Form dessen, was kommt: Pille, Heute faellig, Schnell erfassen');
+  assert.match(fn, /health-priority-skeleton__card--due[\s\S]*health-priority-skeleton__card--quick/,
+    'die Form dessen, was kommt: Heute faellig, Schnell erfassen');
+  assert.doesNotMatch(fn, /health-priority-skeleton__pill/, 'die Pille steht seit R23 im Kopf, nicht im Streifen');
   assert.match(body('.health-priority-skeleton'), /display:\s*none/, 'ohne die Marke steht kein Skelett');
   const show = rules.find((r) => /\[data-health-priority-pending\]\s*>\s*\.health-priority:empty\s*~\s*\.health-priority-skeleton/.test(r.selector));
   assert.ok(show && /display:\s*flex/.test(show.body), 'es steht nur, solange die Region wartet UND ihr Ziel leer ist');
