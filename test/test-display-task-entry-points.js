@@ -170,10 +170,12 @@ test('die Hover-Reaktion nimmt das Zeichen aus, statt gegen es anzuschreiben', (
   // ist, und laesst den Zustandsring in Ruhe.
   assert.equal(regelnFuer(/^\.subtask-item__checkbox--static:hover$/).length, 0,
     'keine eigene Hover-Farbe fuer das Zeichen');
-  const hover = regelnFuer(/^\.subtask-item__checkbox[^,]*:hover$/);
-  assert.equal(hover.length, 1);
-  assert.match(hover[0].selector, /:not\(\.subtask-item__checkbox--static\)/,
-    'die Hover-Regel muss das Zeichen ausdruecklich ausnehmen');
+  // Seit R23 (D7) ist das Zeichen der geteilte Ring (`.check-ring--sm`): die
+  // Hover-Regel steht EINMAL in list-row.css und nimmt `--static` aus.
+  assert.equal(regelnFuer(/^\.subtask-item__checkbox[^,]*:hover$/).length, 0, 'keine eigene Hover-Regel mehr');
+  const ring = readFileSync(new URL('../public/styles/list-row.css', import.meta.url), 'utf8');
+  assert.match(ring, /\.check-ring:not\(\.check-ring--static\):hover::after\s*\{/,
+    'die Hover-Regel des Rings muss das Zeichen ausdruecklich ausnehmen');
 });
 
 test('kein Abhak-Zeichen animiert aus dem Stylesheet heraus', () => {

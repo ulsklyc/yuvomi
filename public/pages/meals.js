@@ -10,6 +10,7 @@ import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from 
 import { releaseAddressOnClose } from '/utils/master-detail.js';
 import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -1561,11 +1562,7 @@ function openRandomizeModal() {
     size: 'sm',
     content: `
       <div class="meal-randomize-modal">
-        <label class="toggle meal-randomize-modal__toggle">
-          <input type="checkbox" id="meal-randomize-replace">
-          <span class="toggle__track"></span>
-          <span>${t('meals.randomizeReplaceExisting')}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('meals.randomizeReplaceExisting'), attrs: { id: 'meal-randomize-replace' } })}
         <!-- Vorschau statt Blindflug: der Lauf füllt bis zu 28 Slots und kann
              eine ganze geplante Woche überschreiben. Vorher nannte der Dialog
              weder das eine noch das andere (Critique 2026-07-29). -->
@@ -2594,12 +2591,7 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
 
     ${isEdit ? '' : `
     <div class="meal-recurrence-option">
-      <label class="toggle">
-        <input type="checkbox" id="modal-repeat-weekly">
-        <span class="toggle__track"></span>
-        <span>${t('meals.recurrenceLabel')}</span>
-      </label>
-      <p class="form-hint">${t('meals.recurrenceHint')}</p>
+      ${formSwitchRowHtml({ label: t('meals.recurrenceLabel'), hint: t('meals.recurrenceHint'), hintId: 'modal-repeat-weekly-hint', attrs: { id: 'modal-repeat-weekly' } })}
       <div class="form-group" id="modal-repeat-until-group" hidden>
         <label class="form-label" for="modal-repeat-until">${t('meals.recurrenceUntilLabel')}</label>
         <yuvomi-datepicker type="date" id="modal-repeat-until" value=""></yuvomi-datepicker>

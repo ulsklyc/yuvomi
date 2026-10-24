@@ -2385,6 +2385,8 @@ function valueFieldsMarkup(type, row = null) {
     return formRowHtml({
       label: t(metric.labelKey),
       labelId: 'vital-pair-label',
+      // Pflicht wie der Einzelwert (R23, D8, Q1): beide Teilfelder sind required.
+      labelExtra: REQUIRED_MARK,
       field: true,
       control: formCompositeHtml({
         labelledBy: 'vital-pair-label',

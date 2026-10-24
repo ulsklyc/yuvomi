@@ -47,6 +47,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **One check mark for everything you tick off.** Subtasks (in the list, in the detail view and
+  on the phone sheet) and checklists in notes and task descriptions now use the same round check
+  as tasks, filled green with a tick when done; before, the same gesture had a square, a small
+  circle icon and a box. Renaming and deleting a subtask moved into its row menu, so the row no
+  longer shows a pencil and a red bin next to every step. In multi-select, a chosen row is marked
+  with an outlined accent circle and tick instead of a filled one, so it no longer looks done.
+- **Dialogs use one switch, mark every required field and start in the right field.** On/off
+  options in the dialogs of Calendar, Tasks, Budget, Subscriptions, Notes, Shopping, Pantry,
+  Waste, Meals, Shift schedule and Rewards are switches with the label on the left, as in
+  Settings, and screen readers announce them as switches; before there were three different
+  controls, some without a name. Required fields carry the star in Birthdays, Shift schedule,
+  Housekeeping, Waste and Health readings, optional fields no longer say "(optional)" next to
+  starred ones, and Birthdays and transfers show every missing field at the field at once instead
+  of one toast or one error per click. A dialog now opens in its first required field you type
+  into, not on a logo upload, a type picker or a switch. Settings use one file picker (the drop
+  zone of the backup page, now also for calendar import) and one colour picker.
+- **Dragging a row to reorder it looks like moving one row.** The gap where the row will land is
+  an empty, outlined slot, and the row under your finger is fully opaque; before, both were
+  half-transparent copies, and the neighbouring rows overshot and bounced as they made room.
 - **Status actions say what they did and can be undone, instead of asking first.** Approving or
   rejecting a reward, checking a housekeeper out, taking or skipping a dose and marking a
   subscription paid no longer ask for confirmation. The toast names the object ("“Ibuprofen”

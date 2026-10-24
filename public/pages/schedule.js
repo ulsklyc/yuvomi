@@ -1,6 +1,6 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -17,7 +17,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
 import { hourOffset, alignedHourScroll, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
@@ -649,9 +649,8 @@ function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
 // Formular statt einer Karte lebt.
 function reminderOffsetField(selectedMinutes) {
   const active = selectedMinutes != null;
-  const nameId = toggleNameId();
-  return '<div class="form-field schedule-active-field"><span class="form-label" id="' + nameId + '">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox" aria-labelledby="' + nameId + '"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
-    + '<select class="form-input" name="reminder_offset_minutes" aria-labelledby="' + nameId + '"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
+  return formSwitchRowHtml({ label: t('schedule.extraReminderOffset'), checked: active, attrs: { name: 'reminder_enabled' } })
+    + '<select class="form-input" name="reminder_offset_minutes" aria-label="' + esc(t('schedule.extraReminderOffset')) + '"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
 }
 
 function statisticsSummary() {
@@ -949,7 +948,12 @@ function setOwnerContext({ users = [], people = [], patterns = [], overrides = [
 // der Symbol-Knopf ueber seinen Text.
 let formFieldSeq = 0;
 const LABELABLE_CONTROL = /<(input|select|textarea)\b(?![^>]*\stype="hidden")([^>]*)>/;
-function formField(label, control, className = '') {
+// DER STERN FOLGT DER PFLICHT (R23, D8, Q1): traegt das Feld `required`, steht
+// hinter seinem Label `REQUIRED_MARK` - die Dialoge mischen Pflicht- und
+// Kannfelder. Filterzeilen (Statistik-Zeitraum) fragen nichts ab, was man
+// vergessen koennte, und schalten ihn mit `{ star: false }` ab.
+const REQUIRED_CONTROL = /^\s*<(?:input|select|textarea|yuvomi-datepicker)\b(?![^>]*type="color")[^>]*\srequired\b/;
+function formField(label, control, className = '', { star = true } = {}) {
   let html = control;
   let forAttr = '';
   const match = LABELABLE_CONTROL.exec(control);
@@ -959,13 +963,8 @@ function formField(label, control, className = '') {
     if (!own) html = control.slice(0, match.index) + '<' + match[1] + ' id="' + id + '"' + control.slice(match.index + 1 + match[1].length);
     forAttr = ' for="' + id + '"';
   }
-  return '<div class="form-field ' + className + '"><label class="form-label"' + forAttr + '>' + esc(label) + '</label>' + html + '</div>';
-}
-
-// Ein Schalter, dessen sichtbarer Name NEBEN seinem <label class="toggle">
-// steht (das Label umschliesst nur die Spur), hat ohne Verweis keinen Namen.
-function toggleNameId() {
-  return 'schedule-field-' + (++formFieldSeq);
+  const mark = star && REQUIRED_CONTROL.test(control) ? REQUIRED_MARK : '';
+  return '<div class="form-field ' + className + '"><label class="form-label"' + forAttr + '>' + esc(label) + mark + '</label>' + html + '</div>';
 }
 
 function shiftFields(type = {}) {
@@ -1011,12 +1010,11 @@ async function pickShiftIcon(button) {
 function patternFields(pattern = {}) {
   const active = pattern.is_active === false || pattern.is_active === 0 ? '' : ' checked';
   const hasWindow = Boolean(pattern.valid_from || pattern.valid_until);
-  const activeNameId = toggleNameId();
   return [
     formField(t('schedule.name'), '<input class="form-input" required name="name" maxlength="200" value="' + esc(pattern.name ?? '') + '">'),
     formField(t('schedule.anchorDate'), '<yuvomi-datepicker required name="anchor_date" type="date" label="' + esc(t('schedule.anchorDate')) + '" value="' + esc(pattern.anchor_date ?? todayKey()) + '"></yuvomi-datepicker>'),
     formField(t('schedule.cycleLength'), '<input class="form-input" required name="cycle_length" type="number" min="1" max="366" value="' + esc(String(pattern.cycle_length ?? 7)) + '">'),
-    '<div class="form-field schedule-active-field"><span class="form-label" id="' + activeNameId + '">' + esc(t('schedule.active')) + '</span><label class="toggle"><input name="is_active" type="checkbox" aria-labelledby="' + activeNameId + '"' + active + '><span class="toggle__track"></span></label></div>',
+    formSwitchRowHtml({ label: t('schedule.active'), checked: Boolean(active), attrs: { name: 'is_active' } }),
     advancedSection([
       formField(t('schedule.validFrom'), '<yuvomi-datepicker name="valid_from" type="date" label="' + esc(t('schedule.validFrom')) + '" value="' + esc(pattern.valid_from ?? '') + '"></yuvomi-datepicker>'),
       formField(t('schedule.validUntil'), '<yuvomi-datepicker name="valid_until" type="date" label="' + esc(t('schedule.validUntil')) + '" value="' + esc(pattern.valid_until ?? '') + '"></yuvomi-datepicker>'),
@@ -1095,7 +1093,7 @@ function shiftTypeFieldRow(field) {
   return '<div class="schedule-type-field-row" data-type-field-row data-custom-field-id="' + field.id + '">'
     + '<button type="button" class="schedule-type-field-row__handle" aria-hidden="true" tabindex="-1"><i data-lucide="grip-vertical" aria-hidden="true"></i></button>'
     + '<span class="schedule-type-field-row__name">' + esc(field.name) + '</span>'
-    + '<label class="toggle schedule-type-field-row__overlay"><input type="checkbox" data-show-in-overlay' + (field.show_in_overlay ? ' checked' : '') + '><span class="toggle__track"></span>' + esc(t('schedule.showInOverlay')) + '</label>'
+    + '<label class="toggle schedule-type-field-row__overlay"><input type="checkbox" role="switch" data-show-in-overlay' + (field.show_in_overlay ? ' checked' : '') + '><span class="toggle__track" aria-hidden="true"></span>' + esc(t('schedule.showInOverlay')) + '</label>'
     + '<button type="button" class="btn btn--secondary btn--icon" data-action="move-type-field" data-direction="up" aria-label="' + esc(t('schedule.moveUp')) + '"><i data-lucide="chevron-up" aria-hidden="true"></i></button>'
     + '<button type="button" class="btn btn--secondary btn--icon" data-action="move-type-field" data-direction="down" aria-label="' + esc(t('schedule.moveDown')) + '"><i data-lucide="chevron-down" aria-hidden="true"></i></button>'
     + rowActionHtml({ icon: 'x', action: 'remove-type-field', label: t('common.removeNamed', { name: field.name }) })
@@ -1521,14 +1519,14 @@ function renderStatistics() {
   if (summary.freeDays) countItems.push({ type: { name: t('schedule.freeDays'), short_code: '', color: 'var(--color-text-secondary)' }, count: summary.freeDays, minutes: 0, hasHours: false });
   const hourItems = summary.values.filter((item) => item.hasHours);
   const controls = range === 'months'
-    ? formField(t('schedule.monthFrom'), '<input class="form-input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">')
-      + formField(t('schedule.monthTo'), '<input class="form-input" required type="month" name="month_to" value="' + esc(statistics.monthTo || monthKey()) + '">')
+    ? formField(t('schedule.monthFrom'), '<input class="form-input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">', '', { star: false })
+      + formField(t('schedule.monthTo'), '<input class="form-input" required type="month" name="month_to" value="' + esc(statistics.monthTo || monthKey()) + '">', '', { star: false })
     : range === 'custom'
       // S-06: "Valid from/until" ist Muster-Vokabular (patternFields() oben) -
       // ein Berichtszeitraum ist kein Gueltigkeitsfenster. rangeFrom/rangeTo
       // sind dieselben Schluessel, die Override-/Extra-Bereiche schon tragen.
-      ? formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(statistics.from || bounds?.from || todayKey()) + '"></yuvomi-datepicker>')
-        + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(statistics.to || bounds?.to || todayKey()) + '"></yuvomi-datepicker>')
+      ? formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(statistics.from || bounds?.from || todayKey()) + '"></yuvomi-datepicker>', '', { star: false })
+        + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(statistics.to || bounds?.to || todayKey()) + '"></yuvomi-datepicker>', '', { star: false })
       : '';
   // Ohne `bounds` gibt es keine Auswertung, sondern einen ungueltigen Zeitraum:
   // `statisticBounds()` antwortet mit null, `refreshStatistics()` wirft, und der

@@ -724,10 +724,6 @@
   color: var(--color-text-tertiary);
 }
 
-.swipe-row.sortable-ghost {
-  opacity: 0.4;
-}
-
 .swipe-row.sortable-chosen .list-row {
   background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
 }
@@ -880,8 +876,9 @@
  * Guard: test-frontend-audit.js, "der Abhakkreis steht einmal". */
 .check-ring::after {
   content: '';
-  width: var(--space-5);
-  height: var(--space-5);
+  width: var(--check-ring-size, var(--space-5));
+  height: var(--check-ring-size, var(--space-5));
+  box-sizing: border-box;
   border-radius: var(--radius-full);
   border: 2px solid var(--color-text-tertiary);
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
@@ -889,6 +886,38 @@
 
 .check-ring:not(.check-ring--static):hover::after {
   border-color: var(--module-accent, var(--color-accent));
+}
+
+/* EIN ZEICHEN IN ZWEI GROESSEN (R23, D7). Die Teilaufgabe trug bis R23 ein
+ * 18px-Kaestchen in der Zeile und einen 12px-Lucide-Kreis im Detail, die
+ * Notiz-Checkliste ein Quadrat - drei Zeichen fuer dieselbe Geste neben dem
+ * Ring der Aufgabe. Jetzt derselbe Ring, an der Teilaufgabe eine Stufe
+ * kleiner (`--sm`, 16px), erledigt in Erfolgsfarbe mit dem Haken als Kind
+ * (`.check-ring__check`). Das Kaestchen des Einkaufs bleibt (Supermarkt-Geste). */
+.check-ring--sm {
+  --check-ring-size: var(--space-4);
+}
+
+.check-ring--sm::after {
+  border-width: 1.5px;
+}
+
+.check-ring--done::after {
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+}
+
+.check-ring__check {
+  position: absolute;
+  z-index: 1;
+  width: calc(var(--check-ring-size, var(--space-5)) * 0.6);
+  height: calc(var(--check-ring-size, var(--space-5)) * 0.6);
+  color: var(--color-ink-on-vivid);
+  display: none;
+}
+
+.check-ring--done > .check-ring__check {
+  display: block;
 }
 
 /* --------------------------------------------------------

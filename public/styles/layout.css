@@ -8848,14 +8848,17 @@ textarea::placeholder {
  * ihr eigenes Polster und ihre Rundung gehoeren der freistehenden Form. Mit
  * Hinweis steht sie in `.form-switch` (formSwitchRowHtml, settings/
  * components.js, R19) - Schalter oben, Hinweis darunter, eine Zeile. */
+/* Seit R23 (D8) traegt jeder Moduldialog seine Schalter als `.form-switch`,
+ * auch ausserhalb von `.form-rows` (in `.form-group`): dort gilt dasselbe -
+ * das Label fluchtet mit den Feldlabels, kein Polster, keine Hover-Flaeche. */
 .form-rows > .toggle-row,
-.form-rows > .form-switch > .toggle-row {
+.form-switch > .toggle-row {
   padding-inline: 0;
   border-radius: 0;
 }
 
 .form-rows > .toggle-row:hover,
-.form-rows > .form-switch > .toggle-row:hover {
+.form-switch > .toggle-row:hover {
   background-color: transparent;
 }
 
@@ -8863,6 +8866,10 @@ textarea::placeholder {
   margin: calc(-1 * var(--space-1)) 0 var(--space-2);
 }
 
+/* Im Zeilentraeger (`.form-rows`) steht das Label in Zeilengroesse; in einem
+ * Dialog mit Labels UEBER den Feldern (`.form-group`) bleibt es bei der
+ * Groesse der Schalterzeile (text-sm) - eine Stufe ueber den Feldlabels, nicht
+ * zwei (R23, D8, im Browser verglichen). */
 .form-rows > .toggle-row--switch .toggle-row__label,
 .form-rows > .form-switch > .toggle-row--switch .toggle-row__label {
   font-size: var(--text-base);
@@ -11593,13 +11600,38 @@ p.field-hint--warn svg {
    Kontakte und Dokumente seit R8 H14). Ein Knopf mit `aria-pressed` und
    einem Namen mit Objekt ("<Titel> auswaehlen"); er ERSETZT Statuskreis und
    Zeilen-Picker, die Leiste dazu ist die Bulk-Pille (utils/bulk-pill.js).
-   20px-Ring in der Tertiaerfarbe, gewaehlt gefuellt im App-Akzent mit Haken
-   (NICHT im Modulton: bei den Aufgaben ist der Gruen und vom erledigten Haken
-   nicht zu unterscheiden), Trefflaeche --target-base. Er steht in der Shell,
+   20px-Ring in der Tertiaerfarbe, gewaehlt UMRANDET im App-Akzent mit Haken
+   (seit R23 D7 ungefuellt - gefuellt ist "erledigt"; und NICHT im Modulton:
+   bei den Aufgaben ist der Gruen), Trefflaeche --target-base. Er steht in der Shell,
    weil Modul-CSS nur auf seiner Route laedt - vorher trugen documents.css und
    contacts.css je eine gleichlautende Kopie. Wie er in einer Zeile sitzt
    (Ausgleich, disabled), bleibt Sache des Moduls.
    ================================================================ */
+/* ================================================================
+   DAS ZIEHBILD UND SEIN PLATZ (Critique R23, N3) - fuer jede sortierbare
+   Liste (utils/sortable.js). Bis R23 stand die Zeile zweimal da: der Platz an
+   der Zielstelle als 40-%-Abbild (je Modul eine Kopie dieser Regel) und das
+   mitgefuehrte Abbild in SortableJS' 80 % - zwei halbe Zeilen, keine ganze.
+   Jetzt: der Platz ist ein LEERER Schlitz in der Hoehe der Zeile (getoent,
+   gestrichelt im Modulton, Inhalt unsichtbar), das Abbild ist die Zeile
+   selbst, deckend und gehoben (die Module geben ihm Schatten und Flaeche).
+   Die 0.8, die SortableJS als Inline-Stil an den Klon schreibt, nimmt
+   utils/sortable.js zurueck (`liftDragImage`) - ein `!important` hier haette
+   die Sperrklinke gerissen, und eine Option dafuer hat SortableJS nicht.
+   ================================================================ */
+.sortable-ghost {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+  outline: var(--space-px) dashed var(--module-accent, var(--color-accent));
+  outline-offset: calc(var(--space-px) * -1);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.sortable-ghost > * {
+  visibility: hidden;
+}
+
 .select-circle {
   width: var(--target-base);
   height: var(--target-base);
@@ -11636,8 +11668,15 @@ p.field-hint--warn svg {
 }
 
 .select-circle--on::after {
+  /* UMRANDET, NICHT GEFUELLT (R23, D7): ein gefuellter Kreis mit Haken ist
+   * das Zeichen fuer "erledigt" (`.check-ring--done`). Gewaehlt heisst: Ring
+   * und Haken im App-Akzent, die Flaeche bleibt leer. */
   border-color: var(--color-accent);
-  background-color: var(--color-accent);
+  background-color: transparent;
+}
+
+.select-circle--on {
+  color: var(--color-accent);
 }
 
 .select-circle__check {

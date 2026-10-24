@@ -2869,13 +2869,19 @@ test('jedes Feld der Schichtplan-Dialoge hat einen zugaenglichen Namen (A2 P1-1)
     const labelled = new Set([...html.matchAll(/<label\b[^>]*\sfor="([^"]+)"/g)].map((m) => m[1]));
     const controls = [...html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)].filter((m) => !/\stype="hidden"/.test(m[2]));
     assert.ok(controls.length >= 10, 'die Stichprobe deckt die Dialogfelder ab');
-    for (const [tag, , attrs] of controls) {
+    for (const match of controls) {
+      const [tag, , attrs] = match;
       const id = /\sid="([^"]+)"/.exec(attrs)?.[1];
+      // Die Schalterzeile (formSwitchRowHtml, R23 D8): das Label umschliesst Text UND Schalter.
+      const before = html.slice(0, match.index);
+      const open = before.lastIndexOf('<label');
+      const wrapping = open >= 0 && before.indexOf('</label>', open) < 0
+        && /<span class="toggle-row__label">[^<]+<\/span>/.test(before.slice(open));
       const byFor = id && labelled.has(id);
       const byAria = /\saria-label="[^"]+"/.test(attrs);
       const refs = /\saria-labelledby="([^"]+)"/.exec(attrs)?.[1]?.split(/\s+/) ?? [];
       const byRef = refs.length > 0 && refs.every((ref) => ids.has(ref));
-      assert.ok(byFor || byAria || byRef, `ohne Namen: ${tag.slice(0, 80)}`);
+      assert.ok(byFor || byAria || byRef || wrapping, `ohne Namen: ${tag.slice(0, 80)}`);
     }
     for (const [picker] of html.matchAll(/<yuvomi-datepicker\b[^>]*>/g)) {
       assert.match(picker, /\slabel="[^"]+"/, 'die Datumsauswahl benennt ihr inneres Feld selbst');

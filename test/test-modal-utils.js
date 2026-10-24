@@ -2492,3 +2492,43 @@ test('R21 S7: ein Feld, das schon oben im Blatt steht, rollt den Koerper nicht',
   assert.match(fn, /if \(top >= box\.top && top < box\.top \+ box\.height \/ 2\) return;/, 'oben im Bild bleibt alles stehen');
   assert.ok(fn.indexOf('return;') < fn.indexOf('scrollIntoView'), 'erst pruefen, dann rollen');
 });
+
+// Critique R23 (D8): der Erstfokus geht ins erste PFLICHTFELD zum Tippen, dann ins
+// erste Feld zum Tippen, erst dann irgendwohin - nicht auf die Logo-Dateiwahl des
+// Abos, die Typ-Auswahl des Vitalwerts oder einen Schalter.
+test('firstEntryField: Pflichtfeld zum Tippen vor Tippfeld vor Auswahl/Schalter/Datei', async () => {
+  const { firstEntryField } = await import('../public/components/modal.js');
+  assert.equal(typeof firstEntryField, 'function');
+  const asked = [];
+  const root = (answers) => ({
+    querySelectorAll(sel) { asked.push(sel); const hit = answers.find(([re]) => re(sel))?.[1]; return hit ? [].concat(hit) : []; },
+  });
+  const required = { id: 'name' };
+  const typed = { id: 'qty' };
+  const anyField = { id: 'select' };
+  // 1. Gibt es ein Pflichtfeld zum Tippen, gewinnt es - die erste Frage gilt ihm.
+  assert.equal(firstEntryField(root([[(s) => /\[required\]/.test(s), required], [() => true, anyField]])), required);
+  const first = asked[0];
+  assert.match(first, /\[required\]/);
+  for (const type of ['checkbox', 'radio', 'file', 'color', 'hidden']) {
+    assert.match(first, new RegExp(`:not\\(\\[type="${type}"\\]\\)`), `${type} ist kein Feld zum Tippen`);
+  }
+  assert.doesNotMatch(first, /\bselect\b/, 'eine Auswahl ist kein Feld zum Tippen');
+  // 2. Ohne Pflichtfeld das erste Tippfeld, 3. sonst irgendein Feld.
+  asked.length = 0;
+  assert.equal(firstEntryField(root([[(s) => !/\[required\]/.test(s) && /textarea/.test(s) && !/select/.test(s), typed], [(s) => /select/.test(s), anyField]])), typed);
+  asked.length = 0;
+  assert.equal(firstEntryField(root([[(s) => /select/.test(s), anyField]])), anyField);
+  assert.equal(asked.length, 3, 'die Auswahl kommt erst als dritte Frage');
+  // 4. Ein Feld in einer verborgenen Gruppe zaehlt nicht (Entsorgung: Monatsfelder
+  // einer woechentlichen Regel) - sonst liefe der Fokus ins Leere.
+  const hidden = { id: 'month-day', closest: (sel) => (/\[hidden\]/.test(sel) ? {} : null) };
+  const visible = { id: 'interval', closest: () => null };
+  assert.equal(firstEntryField(root([[(s) => !/\[required\]/.test(s) && /textarea/.test(s) && !/select/.test(s), [hidden, visible]]])), visible);
+});
+
+test('firstEntryField traegt jeden Erstfokus des Dialogs (Oeffnen, Einfahrt, Bearbeiten)', () => {
+  const src = readFileSync(fileURLToPath(new URL('../public/components/modal.js', import.meta.url)), 'utf8');
+  assert.equal((src.match(/firstEntryField\((?:container|panel)\)/g) ?? []).length, 3);
+  assert.doesNotMatch(src, /querySelector\(FIRST_FIELD\) \?\? \w+\.querySelector\(FOCUSABLE\)/);
+});

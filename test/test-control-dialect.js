@@ -1627,7 +1627,6 @@ const PENDING = {
     'public/pages/health-fasting.js': 1,
     'public/pages/health.js': 1,
     'public/pages/housekeeping.js': 1,
-    'public/pages/tasks.js': 1,
     'public/settings/pages/personal-calendar-subscriptions.js': 1,
   },
   // Leer seit R21: gegen den Stand davor rot gesehen (Rezeptzeile).
@@ -1650,7 +1649,6 @@ const PENDING = {
     'public/pages/contacts.js': 1,
     'public/pages/health-fasting.js': 1,
     'public/pages/health.js': 2,
-    'public/pages/tasks.js': 1,
     'public/settings/pages/admin-api.js': 1,
     'public/settings/pages/personal-calendar-subscriptions.js': 1,
     'public/utils/ingredient-row.js': 1,
@@ -2057,4 +2055,52 @@ test('Pillen-Rueckfrage: die Detailzeile nimmt eine ganze Zeile und bricht innen
   assert.match(rule.body, /flex:\s*1\s+0\s+100%|flex-basis:\s*100%/, 'eine eigene Zeile');
   assert.match(rule.body, /white-space:\s*normal/, 'bricht innen um');
   assert.match(rule.body, /font-size:\s*var\(--text-/, 'Schriftgroesse aus den Tokens');
+});
+
+// R23 D8 (Critique 2026-10-24 Q2): EIN Schalter in den Moduldialogen. Bis R23
+// standen drei Bauformen nebeneinander - die nackte `.toggle`-Bahn mit Text
+// rechts (ohne role=switch), `.rw-switch`/`.form-check` als System-Checkbox und
+// der Settings-Schalter. Jetzt: Moduldialoge bauen ihn mit formSwitchRowHtml
+// (settings/components.js, Label links, role=switch). Eine freistehende
+// `.toggle`-Bahn bleibt nur, wo eine Zeile ihren Namen schon traegt (Teilnehmer,
+// Overlay-Feld, Jahr unbekannt) - dann aber mit role=switch.
+test('D8: kein Moduldialog baut einen Schalter von Hand (role=switch, keine System-Checkbox als Schalter)', () => {
+  const files = ALL_FILES.map((path) => ({ path, rel: relative(REPO, path).split(sep).join('/') }))
+    .filter((f) => /^public\/(?:(?:pages|components|utils)\/.*|[^/]+)\.js$/.test(f.rel) && !f.rel.endsWith('.min.js'));
+  assert.ok(files.length > 50, 'die Suche sieht die Module');
+  const offenders = [];
+  for (const { path, rel } of files) {
+    const src = readFileSync(path, 'utf8');
+    for (const m of src.matchAll(/<label class="toggle\b[^"]*"[^>]*>\s*(?:'\s*\+\s*')?<input\b([^>]*)>/g)) {
+      if (!/role="switch"/.test(m[1])) offenders.push(`${rel}: .toggle ohne role=switch`);
+    }
+    for (const m of src.matchAll(/class="(form-check|rw-switch)\b/g)) offenders.push(`${rel}: ${m[1]}`);
+  }
+  assert.deepEqual(offenders, []);
+});
+
+// Critique R23 (N3): EIN Ziehbild. Der Platz an der Zielstelle war je Modul ein
+// 40-%-Abbild der Zeile und das mitgefuehrte Abbild SortableJS' 80 % - die Zeile
+// stand zweimal halb da, und die Nachbarn federten mit `--ease-glass`.
+test('N3: der Ziehplatz ist ein leerer Schlitz, das Ziehbild deckend, die Kurve ohne Feder', () => {
+  const cssFiles = ALL_FILES.filter((f) => f.endsWith('.css'));
+  const ghostRules = [];
+  for (const path of cssFiles) {
+    for (const rule of eachRule(readFileSync(path, 'utf8'))) {
+      if (/\.sortable-(?:ghost|drag)\b/.test(rule.selector) && /(?:^|;)\s*opacity\s*:/.test(rule.body)) {
+        ghostRules.push(`${relative(REPO, path).split(sep).join('/')}: ${rule.selector.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(ghostRules.sort(), ['public/styles/layout.css: .sortable-ghost'],
+    'die Deckung des Platzes steht EINMAL in layout.css, das Ziehbild traegt keine eigene');
+  const layout = [...eachRule(readFileSync(join(PUBLIC, 'styles/layout.css'), 'utf8'))];
+  const ghost = layout.find((r) => r.selector.trim() === '.sortable-ghost' && !r.at.length);
+  assert.match(ghost.body, /opacity:\s*1\b/);
+  assert.ok(layout.some((r) => r.selector.trim() === '.sortable-ghost > *' && /visibility:\s*hidden/.test(r.body)), 'der Inhalt des Platzes ist unsichtbar');
+  const sortable = readFileSync(join(PUBLIC, 'utils/sortable.js'), 'utf8');
+  assert.match(sortable, /onStart\(\) \{ liftDragImage\(\); \}/, 'die Inline-0.8 von SortableJS wird zurueckgenommen');
+  assert.match(sortable, /clone\.style\.opacity = ''/);
+  assert.match(sortable, /easing: easingToken\('--ease-out'/);
+  assert.doesNotMatch(sortable, /--ease-glass'/);
 });

@@ -283,13 +283,22 @@ function subtaskListNode(task, ctx) {
       row.setAttribute('aria-pressed', String(status === 'done'));
       row.setAttribute('aria-label', t('tasks.subtaskMarkDone', { title }));
     }
+    // DERSELBE RING WIE IN DER ZEILE (R23, D7): `.check-ring--sm`, erledigt in
+    // Erfolgsfarbe mit Haken - bis R23 ein Lucide-Kreis von 12px, das dritte
+    // Zeichen fuer dieselbe Geste. Die Zeile ist der Knopf, der Ring nur Bild.
+    const ring = document.createElement('span');
+    ring.className = ['detail-subtask__ring', 'check-ring', 'check-ring--sm', 'check-ring--static',
+      status === 'done' ? 'check-ring--done' : ''].filter(Boolean).join(' ');
+    ring.setAttribute('aria-hidden', 'true');
     const icon = document.createElement('i');
-    icon.dataset.lucide = status === 'done' ? 'check-circle-2' : 'circle';
-    icon.className = 'icon-sm';
+    icon.dataset.lucide = 'check';
+    icon.className = 'check-ring__check';
     icon.setAttribute('aria-hidden', 'true');
+    ring.appendChild(icon);
     const label = document.createElement('span');
+    label.className = 'detail-subtask__title';
     label.textContent = title;
-    row.replaceChildren(icon, label);
+    row.replaceChildren(ring, label);
     if (window.lucide) window.lucide.createIcons({ el: row });
   };
 

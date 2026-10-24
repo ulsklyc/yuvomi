@@ -31,7 +31,7 @@ import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
@@ -553,29 +553,30 @@ function renderTaskCard(task, opts = {}) {
                Der Fortschritts-Umschalter bleibt: er klappt nur auf und zu
                (READ_SAFE_ACTIONS) und zeigt, was man gerade auswaehlt. */''}
           ${darfAbhaken && !selecting ? `
-          <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+          <button class="subtask-item__checkbox check-ring check-ring--sm${s.status === 'done' ? ' check-ring--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
-            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+            <i data-lucide="check" class="check-ring__check" aria-hidden="true"></i>
           </button>` : `
-          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+          <span class="subtask-item__checkbox subtask-item__checkbox--static check-ring check-ring--sm check-ring--static${s.status === 'done' ? ' check-ring--done' : ''}"
                 role="img" aria-label="${esc(`${s.title}: ${statusLabel(s.status)}`)}">
-            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+            <i data-lucide="check" class="check-ring__check" aria-hidden="true"></i>
           </span>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
-          ${!selecting && canEditTaskDefinition(s, task) ? `
-          <div class="subtask-item__actions">
-            <button type="button" class="row-action subtask-item__action"
-                    data-action="rename-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
-                    aria-label="${t('tasks.subtaskRename', { title: esc(s.title) })}">
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
-            <button type="button" class="row-action row-action--danger subtask-item__action"
-                    data-action="delete-subtask" data-id="${s.id}" data-title="${esc(s.title)}"
-                    aria-label="${t('tasks.subtaskDelete', { title: esc(s.title) })}">
-              <i data-lucide="trash-2" aria-hidden="true"></i>
-            </button>
-          </div>` : ''}
+          ${/* UMBENENNEN UND LOESCHEN IM ZEILENMENUE (R23, D7): Stift und
+               Papierkorb standen dauerhaft an jeder Teilaufgabe - zwei
+               Handlungen neben dem Haken, der Papierkorb sichtbar rot. Dieselbe
+               Endzone wie die Aufgabe darueber: EIN Mehr-Knopf. */ ''}
+          ${!selecting && canEditTaskDefinition(s, task) ? rowMenuHtml({
+            id: `subtask-menu-${s.id}`,
+            label: t('common.moreActionsNamed', { name: s.title }),
+            className: 'subtask-item__action',
+            defer: true,
+            items: [
+              { action: 'rename-subtask', id: s.id, icon: 'pencil', label: t('common.edit'), attrs: { 'data-title': s.title } },
+              { action: 'delete-subtask', id: s.id, icon: 'trash-2', label: t('common.delete'), danger: true, attrs: { 'data-title': s.title } },
+            ],
+          }) : ''}
         </div>`).join('')
     : '';
 
@@ -1231,13 +1232,10 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
            Ausgeschaltet steht er seit R19 hinter dem Aufklapper, dessen Zeile
            ihn nennt (countdownTucked oben). -->
       <div class="form-group">
-        <label class="toggle" style="margin:0">
-          <input type="checkbox" id="task-countdown" name="countdown" aria-describedby="task-countdown-hint"
-                 ${task?.countdown ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('tasks.countdownToggle')}</span>
-        </label>
-        <p class="task-field-hint" id="task-countdown-hint">${t('tasks.countdownHint')}</p>
+        ${formSwitchRowHtml({
+          label: t('tasks.countdownToggle'), checked: Boolean(task?.countdown),
+          hint: t('tasks.countdownHint'), hintId: 'task-countdown-hint', attrs: { id: 'task-countdown', name: 'countdown' },
+        })}
         <!-- DER SCHALTER SPERRT SICH SELBST, statt sich auf die Zeile darueber
              zu verlassen. Ein Hinweis ist keine Fehlervermeidung: ohne
              Faelligkeit war der Schalter voll bedienbar, speicherte, meldete
@@ -1326,13 +1324,10 @@ ${syncTargetFieldHtml(task)}
            die Sperre das Aendern. In einem Ein-Personen-Haushalt sagen beide
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
       <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
-        <label class="toggle" style="margin:0">
-          <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
-                 ${task?.locked ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('tasks.lockedToggle')}</span>
-        </label>
-        <p class="task-field-hint" id="task-locked-hint">${t('tasks.lockedHint')}</p>
+        ${formSwitchRowHtml({
+          label: t('tasks.lockedToggle'), checked: Boolean(task?.locked),
+          hint: t('tasks.lockedHint'), hintId: 'task-locked-hint', attrs: { id: 'task-locked', name: 'locked' },
+        })}
       </div>
 
       ${renderDocumentAttachField({
@@ -2127,11 +2122,7 @@ function renderReminderSection(task = null, reminder = null) {
   return `
     <div class="reminder-section"${lockedDue}>
       <div class="reminder-section__header">
-        <label class="toggle" style="margin:0">
-          <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}${off}>
-          <span class="toggle__track"></span>
-          <span class="reminder-section__title">${t('reminders.enableLabel')}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('reminders.enableLabel'), checked: hasReminder, disabled: Boolean(off), attrs: { id: 'reminder-toggle' } })}
       </div>
       ${locked ? `<p class="task-field-hint">${t('reminders.readOnlyNotice')}</p>` : ''}
       <div id="reminder-fields" class="reminder-fields" ${hasReminder ? '' : 'style="display:none"'}>
@@ -5722,7 +5713,7 @@ function wireTaskList(container) {
       // Neuzeichnen wartet auf beides (R18 - vorher kam der Haken erst mit der
       // Antwort, und die Quittung spielte auf JEDER erledigten Teilaufgabe).
       const subtaskDone = target.dataset.status !== 'done';
-      target.classList.toggle('subtask-item__checkbox--done', subtaskDone);
+      target.classList.toggle('check-ring--done', subtaskDone);
       const settled = acknowledgeCheck(target, { checked: subtaskDone });
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
@@ -5730,7 +5721,7 @@ function wireTaskList(container) {
         await loadTasks(container);
       } catch (err) {
         // Der vorgezogene Haken geht zurueck - der Server kennt ihn nicht.
-        target.classList.toggle('subtask-item__checkbox--done', !subtaskDone);
+        target.classList.toggle('check-ring--done', !subtaskDone);
         window.yuvomi.showToast(errorSentence(err), 'danger');
         await reloadIfTaskGone(err, container);
       }

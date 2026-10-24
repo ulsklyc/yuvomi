@@ -277,13 +277,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Geometrie, Zielgröße und das eingekleidete Control kommen aus dem geteilten
- * .form-check (layout.css). Hier bleibt nur die Tinte: die Zeile ist eine
- * Nebenoption unter der Artikel-Liste, kein Formularfeld auf Augenhöhe. */
-.pantry-transfer__clear {
-  color: var(--color-text-secondary);
-}
-
 .shopping-import-meals-form {
   display: grid;
   /* Feldtakt des Dialogs (layout.css "EIN FELDTAKT IM DIALOG"). */

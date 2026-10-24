@@ -1087,10 +1087,6 @@
   gap: var(--space-4);
 }
 
-.meal-randomize-modal__toggle {
-  align-items: center;
-}
-
 /* Vorschauzeile: sagt vor dem Klick, wie viele Slots gefüllt und wie viele
  * bestehende Mahlzeiten überschrieben werden. Sekundär gesetzt - sie informiert,
  * sie warnt nicht; die Entscheidung trägt der Toggle darüber. */

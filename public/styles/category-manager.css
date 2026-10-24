@@ -310,12 +310,6 @@
   cursor: grabbing;
 }
 
-.cat-row.sortable-ghost,
-.cat-subrow.sortable-ghost {
-  opacity: 0.4;
-  background: var(--glass-bg-card-hover);
-}
-
 .cat-row.sortable-chosen,
 .cat-subrow.sortable-chosen {
   background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));

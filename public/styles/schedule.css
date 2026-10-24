@@ -159,7 +159,7 @@
 .schedule-form > h2,
 .schedule-form > button,
 .schedule-form > .schedule-actions,
-.schedule-form > .schedule-active-field {
+.schedule-form > .form-switch {
   grid-column: 1 / -1;
 }
 
@@ -179,10 +179,6 @@
 .schedule-color-field .form-input--color {
   width: 64px;
   flex: 0 0 auto;
-}
-
-.schedule-active-field .toggle {
-  align-self: start;
 }
 
 /* Bare <fieldset> carries a browser-default border/padding/min-width this

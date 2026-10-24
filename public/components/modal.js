@@ -277,6 +277,38 @@ const FIRST_FIELD = [
   'select:not([disabled]):not([tabindex="-1"])',
 ].join(', ');
 
+// DER ERSTFOKUS GEHT INS ERSTE PFLICHT- ODER WERTFELD (Critique R23, D8). Das
+// erste Feld in DOM-Reihenfolge war oft keins, in das man tippt: die Logo-Suche
+// des Abos, die Typ-Auswahl des Vitalwerts, ein Schalter, das Symbol einer
+// Praemie. Vorrang hat deshalb das erste PFLICHTFELD zum Tippen, dann das erste
+// Feld zum Tippen ueberhaupt, erst dann irgendein Feld (Auswahl, Schalter).
+const TYPED = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])'
+  + ':not([type="color"]):not([type="range"]):not([type="button"]):not([type="submit"])'
+  + ':not([disabled]):not([tabindex="-1"]):not([readonly])';
+const TYPED_FIELD = `${TYPED}, textarea:not([disabled]):not([tabindex="-1"]):not([readonly])`;
+// Die Datumsauswahl (`yuvomi-datepicker`) traegt `required` am Element, nicht
+// an ihrem Tippfeld - sie zaehlt trotzdem als Pflichtfeld.
+const REQUIRED_TYPED_FIELD = `${TYPED}[required], textarea[required]:not([disabled]):not([tabindex="-1"]):not([readonly]),`
+  + ` yuvomi-datepicker[required] ${TYPED}`;
+
+/**
+ * Das Ziel des Erstfokus in `root` (siehe oben), sonst das erste Fokussierbare.
+ * Ein Feld in einer verborgenen Gruppe (`[hidden]`, etwa die Monatsfelder einer
+ * woechentlichen Regel) zaehlt nicht: der Fokus darauf liefe still ins Leere,
+ * und der Dialog bliebe ohne Einstieg (im Browser gemessen, Entsorgung).
+ */
+export function firstEntryField(root) {
+  const usable = (el) => !el.closest?.('[hidden], [inert]');
+  const all = (selector) => (typeof root.querySelectorAll === 'function'
+    ? [...root.querySelectorAll(selector)]
+    : [root.querySelector?.(selector)].filter(Boolean));
+  for (const selector of [REQUIRED_TYPED_FIELD, TYPED_FIELD, FIRST_FIELD, FOCUSABLE]) {
+    const hit = all(selector).find(usable);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 // --------------------------------------------------------
 // Focus-Trap (Spec §5.2)
 // --------------------------------------------------------
@@ -419,7 +451,7 @@ function applyInitialFocus(container, initialFocus) {
 
   const target = initialFocus && typeof initialFocus.focus === 'function'
     ? initialFocus
-    : container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
+    : firstEntryField(container);
   if (target) {
     const beimPlanen = document.activeElement;
     setTimeout(() => _focusInitialUnlessClaimed(container, target, beimPlanen), 50);
@@ -465,7 +497,7 @@ export function focusFirstField(panel) {
     }
   }
 
-  const target = panel.querySelector(FIRST_FIELD) ?? panel.querySelector(FOCUSABLE);
+  const target = firstEntryField(panel);
   target?.focus();
   return target ?? null;
 }
@@ -2200,7 +2232,7 @@ export function openModal({
       const planned = document.activeElement;
       const target = initialFocus === 'none' ? null
         : initialFocus && typeof initialFocus.focus === 'function' ? initialFocus
-          : panel.querySelector(FIRST_FIELD) ?? panel.querySelector(FOCUSABLE);
+          : firstEntryField(panel);
       if (typeof onSave === 'function') onSave(panel);
       if (target) _focusInitialUnlessClaimed(panel, target, planned);
     });

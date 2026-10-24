@@ -7,7 +7,7 @@
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
@@ -994,16 +994,16 @@ function openTaskCreateModal(content) {
         <form id="housekeeping-task-form" class="housekeeping-task-form" novalidate aria-labelledby="housekeeping-custom-title">
           <h3 class="housekeeping-create__heading" id="housekeeping-custom-title">${esc(t('housekeeping.addCustomTask'))}</h3>
           <label class="housekeeping-field">
-            <span>${esc(t('housekeeping.taskName'))}</span>
+            <span>${esc(t('housekeeping.taskName'))}${REQUIRED_MARK}</span>
             <input name="name" required maxlength="200" autocomplete="off" placeholder="${esc(t('housekeeping.taskNamePlaceholder'))}">
           </label>
           <div class="housekeeping-form-grid housekeeping-form-grid--pair">
             <label class="housekeeping-field">
-              <span>${esc(t('housekeeping.taskArea'))}</span>
+              <span>${esc(t('housekeeping.taskArea'))}${REQUIRED_MARK}</span>
               <input name="area" required maxlength="100" autocomplete="off" placeholder="${esc(t('housekeeping.taskAreaPlaceholder'))}">
             </label>
             <label class="housekeeping-field">
-              <span>${esc(t('housekeeping.taskFrequency'))}</span>
+              <span>${esc(t('housekeeping.taskFrequency'))}${REQUIRED_MARK}</span>
               <input name="frequency_days" required inputmode="numeric" type="number" min="1" step="1" value="7">
             </label>
           </div>
@@ -2046,15 +2046,15 @@ function openTaskEditModal(task, content) {
     content: `
       <form id="housekeeping-task-edit-form" class="housekeeping-worker-form" novalidate>
         <label class="housekeeping-field">
-          <span>${esc(t('housekeeping.taskName'))}</span>
+          <span>${esc(t('housekeeping.taskName'))}${REQUIRED_MARK}</span>
           <input name="name" required maxlength="200" value="${esc(task.name)}">
         </label>
         <label class="housekeeping-field">
-          <span>${esc(t('housekeeping.taskArea'))}</span>
+          <span>${esc(t('housekeeping.taskArea'))}${REQUIRED_MARK}</span>
           <input name="area" required maxlength="100" value="${esc(task.area)}">
         </label>
         <label class="housekeeping-field">
-          <span>${esc(t('housekeeping.taskFrequency'))}</span>
+          <span>${esc(t('housekeeping.taskFrequency'))}${REQUIRED_MARK}</span>
           <input name="frequency_days" required inputmode="numeric" type="number" min="1" step="1" value="${esc(task.frequency_days)}">
         </label>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -2398,7 +2398,7 @@ function openStaffModal(worker, content, options = {}) {
                  aria-label="${esc(t('housekeeping.profilePicture'))}" tabindex="-1">
           <div class="housekeeping-profile-editor__fields">
             <label class="housekeeping-field">
-              <span>${esc(t('housekeeping.workerName'))}</span>
+              <span>${esc(t('housekeeping.workerName'))}${REQUIRED_MARK}</span>
               <input name="display_name" required maxlength="128" value="${esc(item.display_name || '')}">
             </label>
             <label class="housekeeping-field">

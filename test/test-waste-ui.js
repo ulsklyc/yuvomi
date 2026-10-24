@@ -1039,8 +1039,9 @@ test('R17 E6: Wochentage sind Chips mit Zustand, "Aktiv" ist ein Schalter', () =
   assert.deepEqual(__test.weekdayPickerValue(root), ['MO', 'TH']);
 
   const modal = WASTE_SRC.slice(WASTE_SRC.indexOf('function openScheduleModal(type, schedule = null) {'), WASTE_SRC.indexOf('function openPickupModal('));
-  assert.match(modal, /<label class="toggle">\s*<input type="checkbox" id="wsm-active"[^>]*>\s*<span class="toggle__track"><\/span>/,
-    '"Aktiv" traegt die Schalter-Bahn');
+  // Seit R23 (D8) die Schalterzeile der Moduldialoge (role=switch, Label links).
+  assert.match(modal, /formSwitchRowHtml\(\{ label: t\('waste\.activeLabel'\), checked: schedule\?\.active !== 0, attrs: \{ id: 'wsm-active' \} \}\)/,
+    '"Aktiv" ist der Schalter der Moduldialoge');
   assert.match(modal, /body\.weekdays = weekdayPickerValue\(panel\)/, 'der Speicherweg liest die Chips');
   assert.match(modal, /wireWeekdayPicker\(panel\)/, 'und die Chips sind verdrahtet');
 });

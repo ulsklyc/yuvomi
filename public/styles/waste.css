@@ -494,19 +494,11 @@
   border-bottom: none;
 }
 
-.waste-reminder-setting-row__enable {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-weight: var(--font-weight-medium);
-}
-
 .waste-reminder-setting-row__fields {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  padding-left: var(--space-6);
 }
 
 .waste-reminder-setting-row__fields .form-input {

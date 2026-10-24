@@ -697,9 +697,7 @@
 .rw-detail-hint { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
 
 /* Toggle-Switch */
-.rw-switch { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
-.rw-switch input { accent-color: var(--color-accent); width: 18px; height: 18px; }
-.rw-switch--compact { margin-left: auto; }
+.rw-participant__switch { margin-inline-start: auto; }
 
 /* `.btn--sm` STEHT IN layout.css (2026-09-24), samt seiner Touch-Hoehe.
  * Hier lebte die Variante als „global additiv", aber der Router laedt dieses

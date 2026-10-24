@@ -6451,19 +6451,16 @@ test('die beiden Küchen-Editoren sind derselbe Dialog', () => {
   // sein muss sie weiterhin: nackte System-Checkboxen waren der Anlass.
   assert.match(layout, /\.form-check input\[type="checkbox"\]\s*\{[\s\S]*?accent-color:\s*var\(--color-accent\)/,
     'die Checkbox muss eingekleidet sein und die Stimme tragen, auch im Modal');
-  assert.match(shopping, /class="form-check pantry-transfer__clear"/,
-    'die folgenreichste Checkbox des Moduls („Artikel von der Einkaufsliste löschen", standardmäßig aktiv) war die unauffälligste');
+  // Seit R23 (D8) ein Schalter der Moduldialoge statt einer Checkbox.
+  assert.match(shopping, /formSwitchRowHtml\(\{ label: t\('shopping\.toPantryClearList'\), checked: true, attrs: \{ id: 'pantry-transfer-clear' \} \}\)/,
+    'die folgenreichste Option des Moduls („Artikel von der Einkaufsliste löschen", standardmäßig aktiv) war die unauffälligste');
   // Die Mahlzeit-Typen im Rezept-Formular waren die zweite nackte System-
   // Checkbox; seit der Re-Critique 2026-09-28 (A4 P2-7) sind sie Umschalt-Chips
   // (filter-chip, aria-pressed) statt Checkbox plus Farbbadge.
   assert.match(read('../public/pages/recipes.js'), /class="filter-chip recipe-meal-types__chip"/,
     'die Mahlzeit-Typen im Rezept-Formular sind Umschalt-Chips');
   // Die Modul-CSS dürfen die Geometrie nicht zurückholen.
-  for (const [file, selector] of [['shopping.css', '.pantry-transfer__clear']]) {
-    const block = read(`../public/styles/${file}`).match(new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
-    assert.doesNotMatch(block, /display:|align-items:|cursor:/,
-      `${file}: ${selector} darf Geometrie und Zielgröße nicht doppelt pflegen - das leistet .form-check`);
-  }
+  assert.doesNotMatch(read('../public/styles/shopping.css'), /\.pantry-transfer__clear/, 'kein Modul-Eigenbau fuer den Schalter');
 
   // „Übernehmen" darf bei 0 Treffern nicht klickbar sein. Die Schwesteraktion
   // („Plan zufällig füllen") macht das seit dem Audit korrekt.
@@ -17391,10 +17388,14 @@ test('ein Teilschritt lässt sich korrigieren und entfernen, nicht nur abhaken (
 
   const row = /class="subtask-item [\s\S]*?<\/div>`\)\.join\(''\)/.exec(tasksPage);
   assert.ok(row, 'die Teilschritt-Zeile ist nicht mehr auffindbar');
-  for (const action of ['toggle-subtask', 'rename-subtask', 'delete-subtask']) {
-    assert.match(row[0], new RegExp(`data-action="${action}"`),
-      `die Teilschritt-Zeile bietet "${action}" nicht an`);
+  assert.match(row[0], /data-action="toggle-subtask"/, 'die Teilschritt-Zeile bietet "toggle-subtask" nicht an');
+  // Seit R23 (D7) stehen Umbenennen und Loeschen im Zeilenmenue (rowMenuHtml),
+  // nicht mehr als Stift und Papierkorb neben dem Haken.
+  for (const action of ['rename-subtask', 'delete-subtask']) {
+    assert.match(row[0], new RegExp(`rowMenuHtml\\(\\{[\\s\\S]*action: '${action}'`),
+      `die Teilschritt-Zeile bietet "${action}" nicht im Zeilenmenue an`);
   }
+  assert.match(row[0], /action: 'delete-subtask'[^}]*danger: true/, 'Loeschen ist der rote Menueeintrag');
 
   // Beide Aktionen sind auch verdrahtet - ein Knopf ohne Handler ist schlimmer
   // als keiner.
@@ -20949,8 +20950,11 @@ test('R16: der Abhakkreis steht einmal - eine Groesse, eine Tonregel', () => {
   const listRow = rulesOf(read('../public/styles/list-row.css'));
   const ring = listRow.find((rule) => rule.selector.trim() === '.check-ring::after');
   assert.ok(ring, 'list-row.css fuehrt den Ring als `.check-ring::after`');
-  assert.match(ring.body, /width:\s*var\(--space-5\)/);
-  assert.match(ring.body, /height:\s*var\(--space-5\)/);
+  // Eine Groesse je Stufe (R23, D7): Standard 20px, `--sm` 16px fuer Teilaufgaben.
+  assert.match(ring.body, /width:\s*var\(--check-ring-size, var\(--space-5\)\)/);
+  assert.match(ring.body, /height:\s*var\(--check-ring-size, var\(--space-5\)\)/);
+  assert.ok(listRow.some((rule) => rule.selector.trim() === '.check-ring--sm' && /--check-ring-size:\s*var\(--space-4\)/.test(rule.body)),
+    'die kleine Stufe ist ein Token, kein Pixelwert');
   assert.match(ring.body, /border:\s*2px solid var\(--color-text-tertiary\)/, 'in Ruhe neutral, nicht im Modulton');
   assert.ok(listRow.some((rule) => rule.selector.trim() === '.check-ring:not(.check-ring--static):hover::after'
     && /--module-accent/.test(rule.body)), 'der Modulton laedt ein, das Zeichen ist ausgenommen');
@@ -23128,6 +23132,7 @@ test('a starred label marks a required field, and a required field in a mixed fo
     'public/settings/pages/personal-account.js #two-factor-code', // nur der Code
     'public/settings/pages/personal-account.js #two-factor-confirm-code', // nur der Code
     'public/settings/pages/admin-displays.js #display-name', // das Koppelformular hat nur den Namen
+    'public/pages/waste.js #wmm-date', // Abholung verschieben: nur das neue Datum
   ]);
   const files = walkJsFiles('../public/').filter((f) => !f.includes('/vendor/') && !AUTH.test(f));
   // Das Objekt-Literal um eine Stelle: `{ label, labelFor, labelExtra, control }`
@@ -23171,7 +23176,9 @@ test('a starred label marks a required field, and a required field in a mixed fo
       if (extra && builder && !takesLabelExtra.has(builder)) starNoReq.push(`${rel} #${m[1]}: ${builder}() nimmt kein labelExtra`);
       labels.push([m[1], extra]);
     }
-    const controls = new Map([...src.matchAll(/<(?:input|select|textarea)\b([^>]*)>/g)]
+    // Seit R23 (D8, Q1) auch die Datumsauswahl: `<yuvomi-datepicker required>`
+    // ohne Stern war die haeufigste Luecke (Entsorgung, Geburtstag).
+    const controls = new Map([...src.matchAll(/<(?:input|select|textarea|yuvomi-datepicker)\b([^>]*)>/g)]
       .map((m) => [m[1].match(/\bid="([\w-]+)"/)?.[1], m[1]]).filter(([id]) => id));
     for (const [id, text] of labels) {
       const attrs = controls.get(id);

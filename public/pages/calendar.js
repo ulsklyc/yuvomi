@@ -60,7 +60,7 @@ import { canChangeRecord, isNavModuleReadOnly } from '/permissions.js';
 // Einstellungs-Bauteil. Eine Kopie im Kalender waeren zwei Wahrheiten ueber
 // dieselbe Form; der Umzug nach `/utils/` beruehrt zehn Blaetter und gehoert
 // in eine eigene Runde. Der Import benennt die Schuld, statt sie zu umgehen.
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { googleTargetValue, caldavTargetValue, outlookTargetValue, assigneeSyncTarget } from '/utils/sync-target.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -8209,15 +8209,11 @@ function renderCalendarReminderSection(reminders = [], event = null, defaultOffs
   // Der Schalter spricht wie „Ganztägig" ueber ihm, nicht wie eine
   // Abschnittsueberschrift: seit der Critique 2026-09-24 ist die Erinnerung
   // ein Feld in der Reihe des Termin-Dialogs, kein eigener Abschnitt mehr
-  // (die Aufgaben behalten `.reminder-section__title`).
+  // (seit R23 dieselbe Schalterzeile wie alle Dialoge, formSwitchRowHtml).
   return `
     <div class="reminder-section">
       <div class="reminder-section__header">
-        <label class="toggle" style="margin:0">
-          <input type="checkbox" id="modal-reminder-toggle" ${enabled ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('reminders.enableLabel')}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('reminders.enableLabel'), checked: enabled, attrs: { id: 'modal-reminder-toggle' } })}
       </div>
       <div id="modal-reminder-fields" class="reminder-fields" ${enabled ? '' : 'style="display:none"'}>
         <div class="reminder-rows" id="modal-reminder-rows">
@@ -9216,13 +9212,10 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
          trotzdem gefunden wird, ohne dass jeder Termin ihn vor Wiederholung
          und Erinnerung vorgelegt bekommt. -->
     <div class="form-group">
-      <label class="toggle">
-        <input type="checkbox" id="modal-countdown" aria-describedby="modal-countdown-hint"
-               ${isEdit && event.countdown ? 'checked' : ''}>
-        <span class="toggle__track"></span>
-        <span>${t('calendar.countdownToggle')}</span>
-      </label>
-      <p class="form-hint" id="modal-countdown-hint">${t('calendar.countdownHint')}</p>
+      ${formSwitchRowHtml({
+        label: t('calendar.countdownToggle'), checked: Boolean(isEdit && event.countdown),
+        hint: t('calendar.countdownHint'), hintId: 'modal-countdown-hint', attrs: { id: 'modal-countdown' },
+      })}
     </div>
 
     <div class="form-group">
@@ -9296,11 +9289,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     </div>` : ''}
 
     <div class="form-group">
-      <label class="toggle">
-        <input type="checkbox" id="modal-allday" ${isEdit && event.all_day ? 'checked' : ''}>
-        <span class="toggle__track"></span>
-        <span>${t('calendar.allDayToggle')}</span>
-      </label>
+      ${formSwitchRowHtml({ label: t('calendar.allDayToggle'), checked: Boolean(isEdit && event.all_day), attrs: { id: 'modal-allday' } })}
     </div>
 
     <div class="cal-when" id="time-fields">

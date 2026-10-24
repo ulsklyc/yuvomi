@@ -236,8 +236,9 @@ test('category-manager: nutzt weiterhin kein innerHTML', () => {
 
 const css = read('../public/styles/category-manager.css');
 
-test('category-manager.css: definiert ghost/chosen/drag-States', () => {
-  assert.match(css, /\.cat-row\.sortable-ghost/);
+test('category-manager.css: definiert chosen/drag-States, der Platz ist der geteilte (R23, N3)', () => {
+  assert.doesNotMatch(css, /\.cat-row\.sortable-ghost/, 'der leere Platz steht EINMAL in layout.css');
+  assert.match(read('../public/styles/layout.css'), /^\.sortable-ghost \{/m);
   assert.match(css, /\.cat-row\.sortable-chosen/);
   assert.match(css, /\.cat-row\.sortable-drag/);
 });

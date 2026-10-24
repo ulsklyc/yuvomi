@@ -9,6 +9,7 @@
 import { api } from '/api.js';
 import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { initials } from '/utils/initials.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, refocusAfterRender } from '/components/modal.js';
@@ -1279,10 +1280,7 @@ function openRewardModal(item) {
           <textarea class="input" id="rw-reward-desc" rows="2" maxlength="500" placeholder="${esc(t('rewards.descPlaceholder'))}">${esc(item?.description ?? '')}</textarea>
         </div>
         ${isEdit ? `
-          <label class="rw-switch">
-            <input type="checkbox" id="rw-reward-active" ${item.is_active !== 0 ? 'checked' : ''}>
-            <span>${esc(t('rewards.activeLabel'))}</span>
-          </label>` : ''}
+          ${formSwitchRowHtml({ label: t('rewards.activeLabel'), checked: item.is_active !== 0, attrs: { id: 'rw-reward-active' } })}` : ''}
         <div id="rw-reward-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="rw-reward-delete">${esc(t('common.delete'))}</button>` : ''}
@@ -1380,9 +1378,9 @@ async function openParticipantsModal() {
           <li class="rw-participant">
             ${avatar(m, 36)}
             <span class="rw-participant__name">${esc(m.display_name)}</span>
-            <label class="rw-switch rw-switch--compact">
-              <input type="checkbox" data-participant="${m.id}" ${m.enabled ? 'checked' : ''}>
-              <span class="rw-switch__track" aria-hidden="true"></span>
+            <label class="toggle rw-participant__switch">
+              <input type="checkbox" role="switch" data-participant="${m.id}" aria-label="${esc(m.display_name)}" ${m.enabled ? 'checked' : ''}>
+              <span class="toggle__track" aria-hidden="true"></span>
             </label>
           </li>`).join('')}
       </ul>
@@ -1901,10 +1899,7 @@ function openMoneyPlanModal(memberId) {
           <select class="input" id="rw-plan-monthday">${days}</select>
           <p class="rw-hint">${esc(t('rewards.money.dayOfMonthHint'))}</p>
         </div>
-        <label class="rw-switch">
-          <input type="checkbox" id="rw-plan-paused" ${plan?.paused ? 'checked' : ''}>
-          <span>${esc(t('rewards.money.pausePlan'))}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('rewards.money.pausePlan'), checked: Boolean(plan?.paused), attrs: { id: 'rw-plan-paused' } })}
         <div id="rw-money-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${plan ? `<button type="button" class="btn btn--danger-outline" id="rw-plan-remove">${esc(t('rewards.money.removePlan'))}</button>` : ''}

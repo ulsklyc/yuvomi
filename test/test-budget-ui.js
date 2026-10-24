@@ -7670,3 +7670,33 @@ test('F4.4: der Buchungstyp ist nie schmaler als sein Wort, im schmalen Dialog g
   const gap = narrow.find((r) => r.selector.trim() === '.budget-type-toggle');
   assert.match(gap?.body ?? '', /gap:\s*var\(--space-0h\)/);
 });
+
+// R23 (D8, Rest aus S1): die Umbuchung meldet ALLE Fehler auf einmal, wie der
+// Buchungsdialog - vorher einen je Klick, und wer drei Felder vergass, klickte dreimal.
+test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zugleich (reportFieldErrors)', async () => {
+  const { wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
+  const element = (value = '') => ({ value, checked: false, dataset: {}, addEventListener() {}, setAttribute() {}, removeAttribute() {} });
+  const select = element();
+  select.replaceChildren = () => {};
+  select.insertAdjacentHTML = () => {};
+  const elements = {
+    '#bt-category': element(''), '#bt-subcategory': select, '#bt-subcategory-group': {},
+    '#bt-title': element('  '), '#bt-amount': element(''), '#bt-date': element('2026-10-24'),
+    '#bt-from': element('0'), '#bt-to': element('0'),
+    '#bt-recurring': element(), '#bt-confirm': element(), '#bt-save': element(),
+    '#bt-interval': element('monthly'), '#bt-interval-count': element('1'), '#bt-interval-unit': {},
+  };
+  const name = (el) => Object.keys(elements).find((k) => elements[k] === el);
+  const reported = [];
+  const previous = globalThis.__reportFieldError;
+  globalThis.__reportFieldError = (el) => { reported.push(name(el)); };
+  try {
+    const save = wireTransferForm({ querySelector: (selector) => elements[selector] ?? null }, {
+      accounts: [], currency: 'EUR', subcategories: {}, readOnly: () => false, onSaved() {}, onError() {}, onDelete: async () => {},
+    });
+    await save(elements['#bt-save']);
+    assert.deepEqual(reported, ['#bt-category', '#bt-title', '#bt-amount', '#bt-to']);
+  } finally {
+    if (previous === undefined) delete globalThis.__reportFieldError; else globalThis.__reportFieldError = previous;
+  }
+});

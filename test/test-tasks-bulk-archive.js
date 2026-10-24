@@ -367,7 +367,7 @@ test('Auswahlmodus: Teilaufgaben zeigen ihren Zustand, bieten aber nichts an - d
     assert.deepEqual([...aktionen(html)].filter((a) => !ERLAUBT.has(a)), [],
       'in der Auswahl nur auswaehlen, oeffnen (waehlt dort aus) und auf-/zuklappen');
     assert.equal((html.match(/subtask-item__checkbox--static/g) ?? []).length, 2, 'der Zustand jeder Teilaufgabe bleibt als Zeichen');
-    assert.match(html, /subtask-item__checkbox--done subtask-item__checkbox--static|subtask-item__checkbox--static[^"]*subtask-item__checkbox--done/,
+    assert.match(html, /subtask-item__checkbox--static[^"]*check-ring--done/,
       'die erledigte Teilaufgabe bleibt als erledigt erkennbar');
   } finally {
     tasks.state.user = vorher;

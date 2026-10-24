@@ -110,8 +110,12 @@ button.toast__reminder-text:focus-visible {
   margin-bottom: var(--space-3, 12px);
 }
 
-.reminder-section__title {
-  color: var(--color-text-primary);
+/* Der Schalter "Erinnerung setzen" ist seit R23 (D8) die Schalterzeile der
+ * Dialoge (formSwitchRowHtml) - sie fuellt die Kopfzeile, damit der Schalter
+ * wie jeder andere am Ende steht und nicht hinter dem Wort. */
+.reminder-section__header > .form-switch {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Die Hinweiszeile im gesperrten Abschnitt gehoert zum SCHALTER UEBER IHR.

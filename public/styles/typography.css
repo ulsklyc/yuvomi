@@ -287,7 +287,6 @@
 .dms-result__title,
 .meal-card__title,
 .housekeeping-section-heading span,
-.reminder-section__title,
 .cat-row__name,
 .cat-subrow__name,
 /* Gruppentitel über den Modul-Listen ("Übersicht", "Planen"). Sie standen in
@@ -609,7 +608,12 @@
   width: 1em;
   height: 1em;
   border: 1.5px solid color-mix(in srgb, currentColor 50%, transparent);
-  border-radius: var(--radius-xs);
+  /* DER RING DER AUFGABEN (R23, D7), nicht das Kaestchen: eine Checkliste in
+   * Notiz oder Aufgabenbeschreibung ist dieselbe Geste wie das Abhaken einer
+   * Teilaufgabe. In em, weil sie mit dem Text der Karte skaliert, und im Ton
+   * der Karte (`currentColor`), weil Notizen eigene Flaechenfarben tragen;
+   * erledigt in Erfolgsfarbe wie jeder Ring. */
+  border-radius: var(--radius-full);
 }
 /* Antippbares Kaestchen (#704). Ein <button role="checkbox"> statt des
    dekorativen <span>: sichtbar ist es dasselbe Quadrat, es tilgt nur die
@@ -650,8 +654,8 @@ button.note-md-box:focus-visible {
   opacity: 0.65;
 }
 .note-md-check.is-checked .note-md-box {
-  background: color-mix(in srgb, currentColor 70%, transparent);
-  border-color: color-mix(in srgb, currentColor 70%, transparent);
+  background: var(--color-success);
+  border-color: var(--color-success);
   /* Die Quittung des Tipps (#704) startet der Handler (acknowledgeCheck in
    * utils/ux.js), nicht diese Zustandsregel: hier lief sie bei jedem Zeichnen
    * einer Notiz an jedem schon gesetzten Haken (R18, Guard test:motion). */
@@ -659,11 +663,11 @@ button.note-md-box:focus-visible {
 .note-md-check.is-checked .note-md-box::after {
   content: '';
   position: absolute;
-  inset-inline-start: 0.28em;
-  top: 0.02em;
-  width: 0.3em;
-  height: 0.6em;
-  border: solid var(--color-surface);
+  inset-inline-start: 0.3em;
+  top: 0.1em;
+  width: 0.25em;
+  height: 0.5em;
+  border: solid var(--color-ink-on-vivid);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

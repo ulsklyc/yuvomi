@@ -9,7 +9,7 @@
  * Abhaengigkeiten: /i18n.js, /utils/html.js
  */
 import { t, formatDate, formatDayMonth, getLocale } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 
 /** Spiegel von YEAR_UNKNOWN_PLACEHOLDER in server/services/birthdays.js. */
 export const YEAR_UNKNOWN_PLACEHOLDER = 2000;
@@ -95,11 +95,11 @@ function dayOptionsHtml(month, selected) {
  * den es geht.
  * @param {{ id: string, label: string, value?: string|null, yearUnknown?: boolean|number, max?: string, hint?: string }} opts
  */
-export function birthDateFieldHtml({ id, label, value = '', yearUnknown = false, max = '', hint = '' }) {
+export function birthDateFieldHtml({ id, label, value = '', yearUnknown = false, max = '', hint = '', required = false }) {
   return `
     <div class="form-group">
-      <label class="form-label" for="${esc(id)}" id="${esc(id)}-label">${esc(label)}</label>
-      ${birthDateControlHtml({ id, value, yearUnknown, max })}
+      <label class="form-label" for="${esc(id)}" id="${esc(id)}-label">${esc(label)}${required ? REQUIRED_MARK : ''}</label>
+      ${birthDateControlHtml({ id, value, yearUnknown, max, required })}
       ${hint ? `<p class="form-hint">${esc(hint)}</p>` : ''}
     </div>`;
 }
@@ -111,13 +111,13 @@ export function birthDateFieldHtml({ id, label, value = '', yearUnknown = false,
  * ohne Jahr nennt sie als ihren Namen.
  * @param {{ id: string, value?: string|null, yearUnknown?: boolean|number, max?: string, describedBy?: string }} opts
  */
-export function birthDateControlHtml({ id, value = '', yearUnknown = false, max = '', describedBy = '' }) {
+export function birthDateControlHtml({ id, value = '', yearUnknown = false, max = '', describedBy = '', required = false }) {
   const unknown = isYearUnknown(yearUnknown);
   const [, month = '', day = ''] = String(value || '').split('-');
   const described = describedBy ? ` aria-describedby="${esc(describedBy)}"` : '';
   return `
     <div class="birth-date-field" data-birth-date-field="${esc(id)}">
-      <yuvomi-datepicker id="${esc(id)}" type="date"${max ? ` max="${esc(max)}"` : ''} value="${unknown ? '' : esc(value || '')}"${described}${unknown ? ' hidden' : ''}></yuvomi-datepicker>
+      <yuvomi-datepicker id="${esc(id)}" type="date"${required ? ' required' : ''}${max ? ` max="${esc(max)}"` : ''} value="${unknown ? '' : esc(value || '')}"${described}${unknown ? ' hidden' : ''}></yuvomi-datepicker>
       <div class="birth-date-field__yearless" id="${esc(id)}-yearless" role="group" aria-labelledby="${esc(id)}-label"${unknown ? '' : ' hidden'}>
         <select class="form-input birth-date-field__select" id="${esc(id)}-month" aria-label="${esc(t('birthdays.yearlessMonthLabel'))}">
           <option value="">${esc(t('birthdays.yearlessMonthPlaceholder'))}</option>

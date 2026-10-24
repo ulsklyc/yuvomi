@@ -1,10 +1,10 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, reportFieldErrors, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatDate, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
-import { esc } from '/utils/html.js';
+import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
@@ -1065,8 +1065,8 @@ function openBirthdayModal({ mode, birthday = null }) {
           </div>
           <div class="birthday-modal__fields">
             <div class="form-group">
-              <label class="form-label" for="bd-name">${t('birthdays.nameLabel')}</label>
-              <input class="form-input" id="bd-name" type="text" value="${esc(birthday?.name || '')}" autocomplete="name">
+              <label class="form-label" for="bd-name">${t('birthdays.nameLabel')}${REQUIRED_MARK}</label>
+              <input class="form-input" id="bd-name" type="text" value="${esc(birthday?.name || '')}" autocomplete="name" required>
             </div>
             ${birthDateFieldHtml({
               id: 'bd-birth-date',
@@ -1074,6 +1074,7 @@ function openBirthdayModal({ mode, birthday = null }) {
               value: birthday?.birth_date || '',
               yearUnknown: birthday?.year_unknown,
               max: today,
+              required: true,
             })}
           </div>
         </div>
@@ -1219,12 +1220,19 @@ function openBirthdayModal({ mode, birthday = null }) {
         // Mit Jahr wie bisher aus dem Datumswaehler; ohne Jahr aus Monat und
         // Tag, mit dem Platzhalterjahr, das der Server ohnehin setzt (#2095).
         const birth = birthDateField.read();
-        if (birth.yearUnknown && !birth.complete) {
-          window.yuvomi?.showToast(t('birthdays.yearlessIncomplete'), 'warning');
-          return;
-        }
         const birthDateRaw = birth.raw;
         const birthDate = birth.yearUnknown ? birth.date : parseDateInput(birthDateRaw);
+        // DER FEHLER STEHT AM FELD (R23, D8): Name und Datum sind Pflicht und
+        // tragen den Stern; wer sie leer laesst, landet im Feld, statt einen
+        // Sammel-Toast zu lesen, der nicht sagt, welches gemeint ist.
+        const nameInput = panel.querySelector('#bd-name');
+        const dateMissing = !birthDate || !isDateInputValid(birthDateRaw);
+        if (reportFieldErrors([
+          !nameInput.value.trim() && [nameInput, t('common.nameRequired')],
+          birth.yearUnknown && (!birth.complete || dateMissing)
+            && [panel.querySelector('#bd-birth-date-month'), t('birthdays.yearlessIncomplete')],
+          !birth.yearUnknown && dateMissing && [panel.querySelector('#bd-birth-date'), t('common.required')],
+        ])) return;
         const nameDay = normalizeNameDaySelection(nameDayMonth?.value, nameDayDay?.value);
         if (!nameDay.complete) {
           window.yuvomi?.showToast(t('birthdays.nameDayIncomplete'), 'warning');
@@ -1255,10 +1263,6 @@ function openBirthdayModal({ mode, birthday = null }) {
         if (reminderChanged) Object.assign(body, reminder);
         const reminderInvalid = reminderChanged && invalid;
 
-        if (!body.name || !body.birth_date || !isDateInputValid(birthDateRaw)) {
-          window.yuvomi?.showToast(t('birthdays.requiredFields'), 'warning');
-          return;
-        }
         if (reminderInvalid) {
           window.yuvomi?.showToast(t('birthdays.reminderAmountInvalid', { max: REMINDER_AMOUNT_MAX }), 'warning');
           panel.querySelector('#bd-reminder-custom-amount')?.focus();

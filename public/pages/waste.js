@@ -14,6 +14,7 @@
 import { api } from '/api.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -1415,10 +1416,7 @@ function openScheduleModal(type, schedule = null) {
     <div class="form-group" id="wsm-monthly-fields" ${kind === 'monthly_fixed_day' ? '' : 'hidden'}>
       <label class="form-label" for="wsm-month-day">${t('waste.monthDayLabel')}</label>
       <input type="number" class="form-input" id="wsm-month-day" min="1" max="31" value="${esc(String((schedule?.month_day ?? -1) === -1 ? 1 : schedule.month_day))}">
-      <label class="form-check">
-        <input type="checkbox" id="wsm-last-day"${schedule?.month_day === -1 ? ' checked' : ''}>
-        <span>${t('waste.monthDayLastDay')}</span>
-      </label>
+      ${formSwitchRowHtml({ label: t('waste.monthDayLastDay'), checked: schedule?.month_day === -1, attrs: { id: 'wsm-last-day' } })}
     </div>
     <div class="form-group" id="wsm-ordinal-fields" ${isOrdinal ? '' : 'hidden'}>
       <label class="form-label" for="wsm-ordinal-position">${t('waste.ordinalPositionLabel')}</label>
@@ -1435,7 +1433,7 @@ function openScheduleModal(type, schedule = null) {
       ${intervalStepperHtml(schedule?.interval ?? 1)}
     </div>
     <div class="form-group">
-      <label class="form-label" for="wsm-anchor">${t('waste.anchorDateLabel')}</label>
+      <label class="form-label" for="wsm-anchor">${t('waste.anchorDateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker required id="wsm-anchor" name="anchor_date" type="date" value="${esc(schedule?.anchor_date ?? todayKey())}"></yuvomi-datepicker>
     </div>
     <div class="form-group">
@@ -1443,11 +1441,7 @@ function openScheduleModal(type, schedule = null) {
       <yuvomi-datepicker id="wsm-valid-until" name="valid_until" type="date" value="${esc(schedule?.valid_until ?? '')}"></yuvomi-datepicker>
     </div>
     <div class="form-group">
-      <label class="toggle">
-        <input type="checkbox" id="wsm-active"${schedule?.active === 0 ? '' : ' checked'}>
-        <span class="toggle__track"></span>
-        <span>${t('waste.activeLabel')}</span>
-      </label>
+      ${formSwitchRowHtml({ label: t('waste.activeLabel'), checked: schedule?.active !== 0, attrs: { id: 'wsm-active' } })}
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
@@ -1570,7 +1564,7 @@ function openPickupModal(pickup = null) {
       <select class="form-input" id="wpm-type">${typeOptions}</select>
     </div>
     <div class="form-group">
-      <label class="form-label" for="wpm-date">${t('waste.pickupDateLabel')}</label>
+      <label class="form-label" for="wpm-date">${t('waste.pickupDateLabel')}${REQUIRED_MARK}</label>
       <yuvomi-datepicker required id="wpm-date" name="date" type="date" value="${esc(pickup?.date ?? todayKey())}"></yuvomi-datepicker>
     </div>
     <div class="form-group">
@@ -2310,10 +2304,7 @@ function openUrlSourceWizard() {
 function reminderSettingRowHtml(setting) {
   return `
     <div class="waste-reminder-setting-row" data-type-id="${setting.type_id}">
-      <label class="waste-reminder-setting-row__enable">
-        <input type="checkbox" data-role="reminder-enabled" ${setting.enabled ? 'checked' : ''}>
-        <span>${esc(setting.type_name)}</span>
-      </label>
+      ${formSwitchRowHtml({ label: setting.type_name, checked: Boolean(setting.enabled), attrs: { 'data-role': 'reminder-enabled' } })}
       <div class="waste-reminder-setting-row__fields"${setting.enabled ? '' : ' hidden'}>
         <label class="form-label" for="rem-offset-${setting.type_id}">${t('waste.reminderOffsetDaysLabel')}</label>
         <input type="number" class="form-input" id="rem-offset-${setting.type_id}" data-role="reminder-offset"

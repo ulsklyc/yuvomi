@@ -32,7 +32,7 @@ import { installPopoverMenus } from '/utils/popover-menu.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
-import { toggleRowHtml } from '/settings/components.js';
+import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { leadCardClass } from '/utils/metric-card.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
@@ -1558,16 +1558,10 @@ export function openSubscriptionModal(subscription = null) {
           <label class="form-label" for="subscription-notes">${t('subscriptions.notesLabel')}</label>
           <textarea class="form-input" id="subscription-notes" rows="3">${esc(subscription?.notes || '')}</textarea>
         </div>
-        <div class="subscriptions-enabled-row">
-          <div>
-            <strong>${t('subscriptions.enabledLabel')}</strong>
-            <small>${t('subscriptions.enabledHint')}</small>
-          </div>
-          <label class="toggle">
-            <input id="subscription-enabled" type="checkbox" ${subscription?.enabled === false ? '' : 'checked'}>
-            <span class="toggle__track"></span>
-          </label>
-        </div>
+        ${formSwitchRowHtml({
+          label: t('subscriptions.enabledLabel'), checked: subscription?.enabled !== false,
+          hint: t('subscriptions.enabledHint'), hintId: 'subscription-enabled-hint', attrs: { id: 'subscription-enabled' },
+        })}
       </section>`;
 
   const content = `
@@ -1638,7 +1632,7 @@ export function openSubscriptionModal(subscription = null) {
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
-            <yuvomi-datepicker id="subscription-next-date" type="date"
+            <yuvomi-datepicker id="subscription-next-date" type="date" required
                    value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
             ${isCompleted(subscription) ? `<p class="form-hint" id="subscription-next-date-hint">${t('subscriptions.nextPaymentCompletedHint')}</p>` : ''}
           </div>

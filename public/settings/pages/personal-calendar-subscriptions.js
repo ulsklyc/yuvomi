@@ -25,7 +25,7 @@ import { api } from '/api.js';
 import { formatDate, formatTime, t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
-import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml, fileDropzoneHtml, wireFileDropzone } from '/settings/components.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
@@ -68,7 +68,7 @@ function renderPage(container) {
               })}
               ${settingRowHtml({
                 label: t('settings.ics.form.color'), labelFor: 'ics-color',
-                control: '<input class="form-input form-input--color" type="color" id="ics-color" value="#6366f1" />',
+                control: '<input class="settings-color-button" type="color" id="ics-color" value="#6366f1" />',
               })}
               ${settingRowHtml({
                 label: t('settings.sync.defaultAssignee'), labelFor: 'ics-assignee',
@@ -104,8 +104,12 @@ function renderPage(container) {
           ${/* Derselbe Dialekt wie das Abo darueber (R19). */ ''}
           <div class="row-carrier settings-group">
             ${settingRowHtml({
-              label: t('settings.calendarImport.fileLabel'), labelFor: 'cal-import-file',
-              control: '<input class="form-input" type="file" id="cal-import-file" accept=".ics,text/calendar" />',
+              label: t('settings.calendarImport.fileLabel'), labelFor: 'cal-import-file', stacked: true,
+              control: fileDropzoneHtml({
+                id: 'cal-import-dropzone', inputId: 'cal-import-file', accept: '.ics,text/calendar',
+                title: t('settings.calendarImport.dropzoneTitle'), titleTouch: t('settings.calendarImport.dropzoneTitleTouch'),
+                hint: t('settings.calendarImport.dropzoneHint'), icon: 'calendar-plus',
+              }),
             })}
             ${settingRowHtml({
               label: t('settings.calendarImport.urlLabel'), labelFor: 'cal-import-url',
@@ -114,7 +118,7 @@ function renderPage(container) {
             })}
             ${settingRowHtml({
               label: t('settings.calendarImport.colorLabel'), labelFor: 'cal-import-color',
-              control: '<input class="form-input form-input--color" type="color" id="cal-import-color" value="#007AFF" />',
+              control: '<input class="settings-color-button" type="color" id="cal-import-color" value="#007AFF" />',
             })}
             ${settingRowHtml({
               label: t('settings.calendarImport.targetCalendarLabel'), labelFor: 'cal-import-calendar',
@@ -454,6 +458,7 @@ function bindCalendarImport(container, calendars = []) {
   const errorEl = container.querySelector('#cal-import-error');
   const submitBtn = container.querySelector('#cal-import-submit');
   const importedCalendars = [...calendars];
+  const dropzone = wireFileDropzone(container, 'cal-import-file');
 
   const syncNewCalendarVisibility = () => {
     if (newCalendarGroup) newCalendarGroup.hidden = calendarSelect?.value !== '__new';
@@ -499,6 +504,7 @@ function bindCalendarImport(container, calendars = []) {
       }
       const { imported = 0, skipped = 0 } = res.data || {};
       form.reset();
+      dropzone.reset();
       populateCalendarImportTarget(container, importedCalendars);
       syncNewCalendarVisibility();
 

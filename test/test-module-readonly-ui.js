@@ -493,11 +493,14 @@ test('und an der Zeile der Leseansicht - dort war es nur noch nicht schaedlich',
 });
 
 test('dasselbe an der Teilaufgabe - dort seit #1209', () => {
-  const zeichen = ['subtask-item__checkbox', 'subtask-item__checkbox--done', 'subtask-item__checkbox--static'];
-  assert.equal(effektiverWert(TASKS_CSS, zeichen, 'border-color', ':hover'), null);
-  assert.equal(effektiverWert(TASKS_CSS, zeichen, 'border-color'), 'var(--color-success)');
+  // Seit R23 (D7) traegt die Teilaufgabe denselben Ring (`.check-ring--sm`):
+  // die Regeln stehen in list-row.css, also misst der Test die Kaskade.
+  const KASKADE = `${readFileSync(new URL('../public/styles/list-row.css', import.meta.url), 'utf8')}\n${TASKS_CSS}`;
+  const zeichen = ['subtask-item__checkbox', 'subtask-item__checkbox--static', 'check-ring', 'check-ring--sm', 'check-ring--done', 'check-ring--static'];
+  assert.equal(effektiverWert(KASKADE, zeichen, 'border-color', ':hover::after'), null);
+  assert.equal(effektiverWert(KASKADE, zeichen, 'border-color', '::after'), 'var(--color-success)');
   assert.match(
-    effektiverWert(TASKS_CSS, ['subtask-item__checkbox', 'subtask-item__checkbox--done'], 'border-color', ':hover') ?? '',
+    effektiverWert(KASKADE, ['subtask-item__checkbox', 'check-ring', 'check-ring--sm', 'check-ring--done'], 'border-color', ':hover::after') ?? '',
     /module-accent/,
   );
 });
@@ -2787,14 +2790,19 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
   globalThis.window.yuvomi = globalThis.window.yuvomi ?? {};
   const toasts = [];
   globalThis.window.yuvomi.showToast = (text, art) => { toasts.push({ text, art }); };
+  // Feldfehler (R23, D8): wo das Formular einen Fehler an ein Feld schreibt.
+  const felder = [];
+  const vorherFeld = globalThis.__reportFieldError;
+  globalThis.__reportFieldError = (feld, text) => { felder.push({ feld: Object.keys(el).find((k) => el[k] === feld) ?? '?', text }); };
   try {
     await el['#bd-save'].feuern('click');
   } finally {
     globalThis.__apiStub = vorher.api;
     globalThis.window.yuvomi.showToast = vorher.toast;
+    globalThis.__reportFieldError = vorherFeld;
     birthdays.state.birthdays = vorher.liste;
   }
-  if (roh) return { gesendet, toasts, el };
+  if (roh) return { gesendet, toasts, felder, el };
   assert.equal(gesendet.length, 1, 'genau ein Schreibaufruf - sonst misst der Test den Speichern-Weg nicht');
   return gesendet[0];
 }
@@ -2819,7 +2827,7 @@ test('Jahr unbekannt: der Editor schickt Monat, Tag und die Marke (#2095)', asyn
   assert.equal(mitJahr.body.year_unknown, false);
   assert.equal(mitJahr.body.birth_date, '1950-04-03');
 
-  const { gesendet, toasts } = await geburtstagSpeichern(geburtstag(), {
+  const { gesendet, toasts, felder } = await geburtstagSpeichern(geburtstag(), {
     roh: true,
     bedienen: async (el) => {
       el['#bd-birth-date-year-unknown'].checked = true;
@@ -2827,7 +2835,29 @@ test('Jahr unbekannt: der Editor schickt Monat, Tag und die Marke (#2095)', asyn
     },
   });
   assert.equal(gesendet.length, 0, 'ohne Tag geht nichts an den Server');
-  assert.ok(toasts.some((x) => x.text === 'birthdays.yearlessIncomplete'), JSON.stringify(toasts));
+  // R23 (D8): der Fehler steht am Feld, nicht als Toast.
+  assert.deepEqual(felder, [{ feld: '#bd-birth-date-month', text: 'birthdays.yearlessIncomplete' }], JSON.stringify({ felder, toasts }));
+  assert.deepEqual(toasts, []);
+});
+
+test('Geburtstag: Name und Datum sind Pflicht, der Fehler steht am Feld (R23, D8)', async () => {
+  const { gesendet, toasts, felder } = await geburtstagSpeichern(geburtstag(), {
+    roh: true,
+    bedienen: async (el) => {
+      el['#bd-name'].value = '  ';
+      el['#bd-birth-date'].value = '';
+    },
+  });
+  assert.equal(gesendet.length, 0);
+  assert.deepEqual(felder.map((f) => f.feld), ['#bd-name', '#bd-birth-date'], JSON.stringify({ felder, toasts }));
+  assert.deepEqual(toasts, [], 'kein Sammel-Toast');
+  const html = withAccess({ calendar: 'write' }, () => modalOptionen(
+    () => birthdays.openBirthdayModal({ mode: 'create', birthday: null }),
+  )).content;
+  assert.match(html, /for="bd-name">[^<]*<span class="required-marker"/, 'Stern am Namen');
+  assert.match(html, /id="bd-name"[^>]*\srequired/, 'und required');
+  assert.match(html, /for="bd-birth-date" id="bd-birth-date-label">[^<]*<span class="required-marker"/, 'Stern am Datum');
+  assert.match(html, /<yuvomi-datepicker id="bd-birth-date" type="date" required/, 'und required');
 });
 
 test('eigene Angabe mit ungueltiger Anzahl: der Editor speichert nicht und sagt es ueber t() (Nachzug zu #1384)', async () => {
@@ -3307,7 +3337,8 @@ test('R18: "Messwert erfassen" spricht in Formularzeilen - der Blutdruck ist EIN
   assert.match(neu, /<div class="form-field">\s*<label class="form-label" for="vital-note">/);
 
   const bp = health.valueFieldsMarkup('bp', { id: 1, type: 'bp', value_num: 128, value_num2: 84, value_num3: 66 });
-  assert.match(bp, /<span class="form-row__label" id="vital-pair-label">health\.vitals\.metric\.bp<\/span>/, 'die Zeile heisst "Blutdruck"');
+  assert.match(bp, /<span class="form-row__label" id="vital-pair-label">health\.vitals\.metric\.bp<span class="required-marker" aria-hidden="true"> \*<\/span><\/span>/,
+    'die Zeile heisst "Blutdruck" und traegt den Stern (R23, D8) - stumm fuer den Namen der Gruppe');
   assert.match(bp, /<span class="form-composite" role="group" aria-labelledby="vital-pair-label">/);
   assert.match(bp, /id="vital-sys" aria-label="health\.vitals\.field\.systolic" value="128">/);
   assert.match(bp, /<span class="form-composite__sep" aria-hidden="true">\/<\/span>/);

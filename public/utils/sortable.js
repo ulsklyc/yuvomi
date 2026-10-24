@@ -68,6 +68,23 @@ function prefersReducedMotion() {
  *        bekommt das rohe SortableJS-Event (item, from, to, oldIndex, newIndex, ...)
  * @returns {Promise<object|null>} die Sortable-Instanz (zum späteren `.destroy()`) oder null
  */
+/**
+ * DAS ZIEHBILD IST DECKEND (Critique R23, N3). SortableJS schreibt dem
+ * mitgefuehrten Klon im Fallback-Modus `opacity: 0.8` als Inline-Stil - neben
+ * dem Platz an der Zielstelle stand die Zeile damit zweimal halb da. Der Klon
+ * entsteht erst bei der ersten Bewegung; bis er da ist, sieht ein Bild je Frame
+ * nach (hoechstens ein paar), dann nie wieder.
+ */
+function liftDragImage(frames = 30) {
+  if (typeof requestAnimationFrame !== 'function' || typeof document === 'undefined') return;
+  const tick = (left) => {
+    const clone = document.querySelector('.sortable-drag');
+    if (clone) { clone.style.opacity = ''; return; }
+    if (left > 0) requestAnimationFrame(() => tick(left - 1));
+  };
+  requestAnimationFrame(() => tick(frames));
+}
+
 export async function makeSortable(listEl, { handle, draggable, filter, group, sort = true, onEnd } = {}) {
   if (!listEl || typeof onEnd !== 'function') return null;
   const Sortable = await loadSortable();
@@ -85,10 +102,12 @@ export async function makeSortable(listEl, { handle, draggable, filter, group, s
     preventOnFilter: false,
     group,
     sort,
-    // Dauer und Feder aus tokens.css (--duration-sm, --ease-glass): die Kurve
-    // stand hier als zweite Quelle neben dem Token.
+    // Dauer und Kurve aus tokens.css (--duration-sm, --ease-out). Bis R23 die
+    // Feder `--ease-glass`: die Nachbarzeilen schossen beim Ausweichen ueber
+    // ihr Ziel hinaus und federten zurueck - Bewegung, die nichts mitteilt,
+    // unter einer Zeile, die man gerade festhaelt (Critique R23, N3).
     animation: reduced ? 0 : durationToken('--duration-sm', 150),
-    easing: easingToken('--ease-glass', 'ease-out'),
+    easing: easingToken('--ease-out', 'ease-out'),
     delay: 120,
     delayOnTouchOnly: true,
     touchStartThreshold: 5,
@@ -100,6 +119,7 @@ export async function makeSortable(listEl, { handle, draggable, filter, group, s
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
+    onStart() { liftDragImage(); },
     onEnd(evt) {
       // ZWISCHEN LISTEN ZAEHLT DER INDEX NICHT. Die Bedingung war
       // `oldIndex === newIndex` und stimmte, solange jede Liste fuer sich blieb:

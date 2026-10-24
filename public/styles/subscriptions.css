@@ -674,7 +674,6 @@
  * .btn--icon auf --target-base); ein Modul, das sie neu beantwortet, gibt eine
  * zweite Antwort auf eine Shell-Frage. */
 
-.subscriptions-enabled-row,
 .subscriptions-metadata-add,
 .subscriptions-logo-search,
 .subscriptions-settings-section {
@@ -893,15 +892,6 @@
   outline-offset: var(--focus-ring-offset-inset);
 }
 
-.subscriptions-enabled-row > div {
-  display: grid;
-  gap: var(--space-0h);
-}
-
-.subscriptions-enabled-row small {
-  color: var(--color-text-secondary);
-}
-
 /* Abschnitt in der Einstellungskarte: Inset-Well statt Kasten (tokens.css). */
 .subscriptions-settings-section {
   justify-content: space-between;
@@ -916,11 +906,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-
-.subscriptions-enabled-row {
-  justify-content: space-between;
-  min-height: 44px;
 }
 
 .subscriptions-modal-footer {

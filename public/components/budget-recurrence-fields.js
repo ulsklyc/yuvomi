@@ -1,11 +1,12 @@
 /** The same interval and toggle controls for ordinary entries and transfers. */
 import { t } from '/i18n.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { intervalUnitLabel } from '/rrule-ui.js';
 import { MAX_INTERVAL_COUNT } from '/utils/budget-recurrence.js';
 
+/** Ein Schalter der Budget-Dialoge: die Schalterzeile der Moduldialoge (R23, D8). */
 export function budgetToggleHtml(id, label, { checked = false, disabled = false } = {}) {
-  return `<label class="toggle"><input type="checkbox" id="${id}"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}>
-    <span class="toggle__track"></span><span>${t(label)}</span></label>`;
+  return formSwitchRowHtml({ label: t(label), checked, disabled, attrs: { id } });
 }
 
 export function budgetIntervalFieldsHtml(prefix, interval = 'monthly', count = 1) {

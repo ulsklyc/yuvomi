@@ -152,7 +152,7 @@ function renderPage(container, preferences) {
             ${settingRowHtml({
               label: t('settings.holidayPublicColor'), labelFor: 'holiday-public-color',
               attrs: { id: 'holiday-public-color-group', hidden: !preferences.holiday_show_public },
-              control: `<input class="form-input" type="color" id="holiday-public-color" value="${esc(preferences.holiday_public_color)}">`,
+              control: `<input class="settings-color-button" type="color" id="holiday-public-color" value="${esc(preferences.holiday_public_color)}">`,
             })}
             ${settingSwitchRowHtml({
               label: t('settings.holidaySchoolLabel'),
@@ -163,7 +163,7 @@ function renderPage(container, preferences) {
             ${settingRowHtml({
               label: t('settings.holidaySchoolColor'), labelFor: 'holiday-school-color',
               attrs: { id: 'holiday-school-color-group', hidden: !preferences.holiday_show_school },
-              control: `<input class="form-input" type="color" id="holiday-school-color" value="${esc(preferences.holiday_school_color)}">`,
+              control: `<input class="settings-color-button" type="color" id="holiday-school-color" value="${esc(preferences.holiday_school_color)}">`,
             })}
           </div>
           <div id="holidays-form-error" class="form-error" role="alert" hidden></div>

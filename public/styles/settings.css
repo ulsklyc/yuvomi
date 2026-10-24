@@ -2211,10 +2211,6 @@
   cursor: grabbing;
 }
 
-.settings-member.sortable-ghost {
-  opacity: 0.4;
-}
-
 .settings-member.sortable-chosen {
   background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
 }
@@ -3197,10 +3193,6 @@
 
 .settings-module-row.sortable-chosen .settings-module-row__handle {
   cursor: grabbing;
-}
-
-.settings-module-row.sortable-ghost {
-  opacity: 0.4;
 }
 
 /* AUSBLENDEN IST EIN KNOPF, KEIN SCHALTER (#673).

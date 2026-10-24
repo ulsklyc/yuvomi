@@ -2,7 +2,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal, closeModal, reportFieldErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { todayKey, monthPeriodKeys, defaultDateInPeriod } from '/utils/date.js';
 import { parseAmountInput, amountToInput } from '/utils/money.js';
@@ -94,15 +94,19 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
     const value = id => panel.querySelector('#bt-' + id).value;
     const body = { title: value('title').trim(), amount: parseAmountInput(value('amount')), category: value('category'), subcategory: value('subcategory'),
       date: value('date'), from_account_id: Number(value('from')), to_account_id: Number(value('to')) };
-    if (!body.category) return reportFieldError(panel.querySelector('#bt-category'), t('budget.categoryRequired'));
-    if (panel.querySelector('#bt-subcategory').required && !body.subcategory) return reportFieldError(panel.querySelector('#bt-subcategory'), t('budget.subcategoryRequired'));
-    if (!body.title) return reportFieldError(panel.querySelector('#bt-title'), t('common.titleRequired'));
+    // ALLE FEHLER AUF EINMAL, Fokus aufs erste im Bild (R23, D8 - wie der
+    // Buchungsdialog seit R19): vorher meldete der Dialog einen Fehler je Klick.
     const sourceCurrency = accounts.find(a => a.id === body.from_account_id)?.currency || currency;
     const current = scope?.value === 'series' ? transfer?.series : transfer;
     const original = current?.from_account_id === body.from_account_id ? Math.abs(current.amount) : null;
-    const amountProblem = amountFieldError(panel.querySelector('#bt-amount'), sourceCurrency, { required: true, original });
-    if (amountProblem) return reportFieldError(...amountProblem);
-    if (!body.from_account_id || !body.to_account_id || body.from_account_id === body.to_account_id) return reportFieldError(panel.querySelector('#bt-to'), t('budget.transferChooseAccounts'));
+    if (reportFieldErrors([
+      !body.category && [panel.querySelector('#bt-category'), t('budget.categoryRequired')],
+      panel.querySelector('#bt-subcategory').required && !body.subcategory && [panel.querySelector('#bt-subcategory'), t('budget.subcategoryRequired')],
+      !body.title && [panel.querySelector('#bt-title'), t('common.titleRequired')],
+      amountFieldError(panel.querySelector('#bt-amount'), sourceCurrency, { required: true, original }),
+      (!body.from_account_id || !body.to_account_id || body.from_account_id === body.to_account_id)
+        && [panel.querySelector('#bt-to'), t('budget.transferChooseAccounts')],
+    ])) return;
     if (panel.querySelector('#bt-visibility')) body.visibility = value('visibility');
     const suffix = panel.querySelector('#bt-scope')?.value === 'series' ? '/series' : '';
     if (!transfer || suffix) Object.assign(body, { is_recurring: panel.querySelector('#bt-recurring').checked,

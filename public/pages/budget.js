@@ -18,6 +18,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
 import { wirePeriodSwipe } from '/utils/period-swipe.js';
@@ -4375,7 +4376,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
       <div class="form-group">
         <label class="form-label" for="bm-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
         <yuvomi-datepicker type="date" id="bm-date"
-               value="${isEdit ? entry.date : defaultDate}"></yuvomi-datepicker>
+               value="${isEdit ? entry.date : defaultDate}" required></yuvomi-datepicker>
       </div>
       ${accountField}
     </div>
@@ -4419,18 +4420,14 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
 
         <div class="form-group" id="bm-recurrence-options" ${isEdit && entry.is_recurring ? '' : 'hidden'}>
           ${budgetIntervalFieldsHtml('bm', curInterval, curCount)}
-          <label class="toggle" style="margin-top:var(--space-3)">
-            <input type="checkbox" id="bm-virtual" ${isEdit && entry.recurrence_virtual ? 'checked' : ''}>
-            <span class="toggle__track"></span>
-            <span>${t('budget.virtualBudgetLabel')}</span>
-          </label>
-          <p style="color:var(--color-text-secondary);font-size:var(--text-sm);margin-top:var(--space-1)">${t('budget.virtualBudgetHint')}</p>
-          <label class="toggle" style="margin-top:var(--space-3)">
-            <input type="checkbox" id="bm-confirm-first" ${isEdit && entry.recurrence_confirm ? 'checked' : ''}>
-            <span class="toggle__track"></span>
-            <span>${t('budget.confirmFirstLabel')}</span>
-          </label>
-          <p style="color:var(--color-text-secondary);font-size:var(--text-sm);margin-top:var(--space-1)">${t('budget.confirmFirstHint')}</p>
+          ${formSwitchRowHtml({
+            label: t('budget.virtualBudgetLabel'), checked: Boolean(isEdit && entry.recurrence_virtual),
+            hint: t('budget.virtualBudgetHint'), hintId: 'bm-virtual-hint', attrs: { id: 'bm-virtual' },
+          })}
+          ${formSwitchRowHtml({
+            label: t('budget.confirmFirstLabel'), checked: Boolean(isEdit && entry.recurrence_confirm),
+            hint: t('budget.confirmFirstHint'), hintId: 'bm-confirm-first-hint', attrs: { id: 'bm-confirm-first' },
+          })}
         </div>
 
         ${renderDocumentAttachField({
@@ -5919,7 +5916,7 @@ async function openConfirmBookingModal(id) {
     </div>
     <div class="form-group">
       <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
-      <yuvomi-datepicker type="date" id="cb-date" value="${esc(entry.date)}"></yuvomi-datepicker>
+      <yuvomi-datepicker type="date" id="cb-date" required value="${esc(entry.date)}"></yuvomi-datepicker>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       <button class="btn btn--secondary" id="cb-cancel">${t('common.cancel')}</button>

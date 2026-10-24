@@ -11,6 +11,7 @@ import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/sw
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
 import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
@@ -1174,25 +1175,13 @@ async function openDuplicateListDialog(container) {
                value="${esc(t('shopping.duplicateDefaultName', { name: source.name }))}" autocomplete="off">
       </div>
       <div class="form-group">
-        <label class="toggle">
-          <input type="checkbox" id="duplicate-reset-checked" checked>
-          <span class="toggle__track"></span>
-          <span>${esc(t('shopping.duplicateResetChecked'))}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('shopping.duplicateResetChecked'), checked: true, attrs: { id: 'duplicate-reset-checked' } })}
       </div>
       <div class="form-group">
-        <label class="toggle">
-          <input type="checkbox" id="duplicate-keep-quantities" checked>
-          <span class="toggle__track"></span>
-          <span>${esc(t('shopping.duplicateKeepQuantities'))}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('shopping.duplicateKeepQuantities'), checked: true, attrs: { id: 'duplicate-keep-quantities' } })}
       </div>
       <div class="form-group">
-        <label class="toggle">
-          <input type="checkbox" id="duplicate-keep-notes" checked>
-          <span class="toggle__track"></span>
-          <span>${esc(t('shopping.duplicateKeepNotes'))}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('shopping.duplicateKeepNotes'), checked: true, attrs: { id: 'duplicate-keep-notes' } })}
       </div>
       <div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
@@ -3252,19 +3241,16 @@ async function openPantryTransfer(container) {
         <select id="pantry-transfer-location" class="form-input">${locationOptions(fallbackLocationId)}</select>
       </div>
       <ul class="pantry-transfer__list">${rows}</ul>
-      <!-- Geteiltes .form-check (layout.css): 20px-Box in Modul-Akzent, Label mit
-           eigener Trefferflaeche. Das war die folgenreichste Checkbox des Moduls -
+      <!-- Der Schalter der Moduldialoge (formSwitchRowHtml, R23 D8). Das war die
+           folgenreichste Checkbox des Moduls -
            sie loescht die eingekauften Artikel von der Liste, ist standardmaessig
            aktiv, und war als nackte System-Checkbox in System-Groesse die
            unauffaelligste (Critique 2026-07-30, P2). Der Default bleibt aktiv: wer
            eingekauft und eingeraeumt hat, will nicht doppelt kaufen. Seit R23
            steht das Abraeumen unter demselben Rueckgaengig wie die Uebernahme.
            Das Abraeumen ist ein DELETE im EINKAUF: ohne dessen Schreibrecht
-           entfaellt die Checkbox, sonst endete der Uebertrag danach im 403 (#1265). -->
-      ${readOnly() ? '' : `<label class="form-check pantry-transfer__clear">
-        <input type="checkbox" id="pantry-transfer-clear" checked>
-        <span>${esc(t('shopping.toPantryClearList'))}</span>
-      </label>`}
+           entfaellt der Schalter, sonst endete der Uebertrag danach im 403 (#1265). -->
+      ${readOnly() ? '' : formSwitchRowHtml({ label: t('shopping.toPantryClearList'), checked: true, attrs: { id: 'pantry-transfer-clear' } })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-transfer-confirm">${esc(t('common.apply'))}</button>

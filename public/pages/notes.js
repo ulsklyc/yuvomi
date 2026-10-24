@@ -11,6 +11,7 @@ import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCh
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
 import { esc, renderMarkdownLight } from '/utils/html.js';
+import { formSwitchRowHtml } from '/settings/components.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
@@ -985,11 +986,7 @@ function openNoteModal({ mode, note = null }) {
         </div>
       </div>
       <div class="form-group">
-        <label class="toggle">
-          <input type="checkbox" id="note-pinned" ${isEdit && note.pinned ? 'checked' : ''}>
-          <span class="toggle__track"></span>
-          <span>${t('notes.pinnedLabel')}</span>
-        </label>
+        ${formSwitchRowHtml({ label: t('notes.pinnedLabel'), checked: Boolean(isEdit && note.pinned), attrs: { id: 'note-pinned' } })}
       </div>`,
       { open: isEdit && (!!note.pinned || (!!note.color && note.color !== NOTE_COLORS[0])) })}
       </div>

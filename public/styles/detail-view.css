@@ -391,16 +391,25 @@
   text-decoration: line-through;
 }
 
-/* Das Zeichen vor dem Teilschritt: ruhig, erledigt in Erfolgsfarbe. Bis
- * 2026-09-26 zielten diese Regeln auf `i` - Lucide ersetzt das `<i>` aber
- * durch `<svg>`, sie trafen also nie (Komponenten-Kanon, Regel dead-i). */
-.detail-subtask svg {
+/* Das Zeichen vor dem Teilschritt ist der Ring der Liste (`.check-ring--sm`,
+ * list-row.css, R23 D7). Er ist `--static`: die Einladung unter dem Zeiger
+ * traegt hier die ganze Zeile (Hover-Flaeche oben), nicht der Ring. */
+.detail-subtask__ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  color: var(--color-text-tertiary);
+  width: var(--space-5);
+  height: var(--space-5);
 }
 
-.detail-subtask--done svg {
-  color: var(--color-success);
+.detail-subtask:not(.detail-subtask--static):hover .detail-subtask__ring::after {
+  border-color: var(--module-accent, var(--color-accent));
+}
+
+.detail-subtask--done .detail-subtask__ring::after {
+  border-color: var(--color-success);
 }
 
 /* Der Einstieg steht IN der Liste, nicht daneben: die Karte blendet ihre

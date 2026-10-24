@@ -1198,7 +1198,7 @@ test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async (
     'budget.responsibleLabel': [[/value="3"[^>]*checked/], /^Emma$/],
     'budget.recurringLabel': [
       [/id="bm-recurring" checked/, /<option value="monthly" selected>/, /id="bm-interval-count"[^>]*value="1"/,
-        /id="bm-virtual" checked/, /id="bm-confirm-first" checked/],
+        /id="bm-virtual"[^>]*checked/, /id="bm-confirm-first"[^>]*checked/],
       /^budget\.intervalMonthly · budget\.virtualBudgetLabel · budget\.confirmFirstLabel$/],
     'budget.receiptsLabel': [[/Rechnung\.pdf/], belegLink(5, 'Rechnung.pdf')],
   };
@@ -1246,7 +1246,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
   const werte = {
     'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12,99"/, /id="subscription-currency" type="hidden" value="EUR"/],
       /^12,99\s€ · subscriptions\.monthlyEquivalent\{"amount":"12,99\s€"\}$/],
-    'subscriptions.filterLabelStatus': [[/id="subscription-enabled" type="checkbox" checked/], /^subscriptions\.active$/],
+    'subscriptions.filterLabelStatus': [[/role="switch" id="subscription-enabled"[^>]*checked/], /^subscriptions\.active$/],
     'subscriptions.descriptionLabel': [[/id="subscription-description"[^>]*value="Premium"/], /^Premium$/],
     'subscriptions.billingCycleLabel': [[/id="subscription-cycle" type="hidden" value="monthly"/, /id="subscription-interval"[^>]*value="1"/],
       /^subscriptions\.cycle\.monthly$/],

@@ -1377,10 +1377,13 @@
 .subtask-item:last-child { border-bottom: none; }
 
 .subtask-item__checkbox {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-xs);
-  border: 1.5px solid var(--color-border);
+  /* Das Zeichen ist der Ring (`.check-ring--sm`, list-row.css, R23 D7) -
+   * hier bleiben Masse, Trefflaeche und Zustandszeichen. */
+  width: var(--space-5);
+  height: var(--space-5);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
   background: none;
   cursor: pointer;
   flex-shrink: 0;
@@ -1391,27 +1394,13 @@
   position: relative;
 }
 
-/* Dieselbe Modulton-Einladung wie am grossen Statusknopf (oben) und an
- * .item-check (shopping.css) - die Unteraufgabe war der dritte Abhakmoment
- * und der einzige ohne sie (Signaturelement-Runde 2026-08-31). */
-/* Wie am Statusknopf daneben: das Zeichen ist AUSGENOMMEN, statt seine Farbe
- * zurueckzuschreiben. Die alte Gegenregel (`--static:hover` mit
- * `border-color: var(--color-border)`) trug (0,2,0) und schlug damit
- * `--done` (0,1,0) - am Wandtablett wurde der gruene Rahmen einer erledigten
- * Teilaufgabe beim Ueberfahren grau, seit #1209. */
-.subtask-item__checkbox:not(.subtask-item__checkbox--static):hover {
-  border-color: var(--module-accent, var(--color-accent));
-}
+/* Die Modulton-Einladung unter dem Zeiger und ihre Ausnahme fuer das Zeichen
+ * (`--static`) traegt der Ring selbst (`.check-ring`, list-row.css). */
 
 .subtask-item__checkbox::before {
   content: '';
   position: absolute;
   inset: -15px;
-}
-
-.subtask-item__checkbox--done {
-  background-color: var(--color-success);
-  border-color: var(--color-success);
 }
 
 /* Am Wandtablett ist die Teilaufgabe ein Zustandszeichen, kein Bedienelement
@@ -1434,12 +1423,6 @@
 
 .subtask-item__checkbox--static::before {
   content: none;
-}
-
-.subtask-item__checkbox-icon {
-  width: 10px;
-  height: 10px;
-  color: var(--color-ink-on-vivid);
 }
 
 .subtask-item__title {
@@ -1666,16 +1649,9 @@
 
 /* Der Platzhalter zeigt, WO die Karte landet - er ist die Zielmarke, die vorher
  * ein eigenes leeres div (`.kanban-drop-placeholder`) und eine eingefärbte
- * Spalte übernommen haben. Er steht an der genaueren Stelle als beide. */
-.kanban-card.sortable-ghost {
-  opacity: 0.4;
-  border: var(--space-px) dashed var(--module-accent, var(--color-accent));
-  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
-  box-shadow: none;
-}
-
+ * Spalte übernommen haben. Seit R23 (N3) ist er der geteilte leere Platz aus
+ * layout.css (`.sortable-ghost`), kein blasses Duplikat der Karte. */
 .kanban-card.sortable-drag {
-  opacity: 0.88;
   box-shadow: var(--shadow-xl);
   transform: rotate(2deg) scale(1.03);
   transition: none;
