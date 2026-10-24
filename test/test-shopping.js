@@ -69,7 +69,10 @@ test('Shopping-Löschaktionen importieren den gemeinsamen Undo-Helper', () => {
   // invertiert: der einzelne Artikel hatte Undo und keine Rückfrage, die Liste des
   // ganzen Haushalts eine Rückfrage und kein Undo.
   const calls = source.match(/\bscheduleUndoableDelete\s*\(/g) ?? [];
-  assert(calls.length === 3, `Einzel-, Sammel- und Listenlöschung müssen den Undo-Helper nutzen, gefunden: ${calls.length}`);
+  // Seit R23 (D3) traegt auch die Uebernahme in den Vorrat ohne Abraeumen der
+  // Liste ihr Rueckgaengig ueber denselben Helfer (mit Abraeumen laeuft sie
+  // durch „Abgehakt löschen").
+  assert(calls.length === 4, `Einzel-, Sammel-, Listenlöschung und Vorrats-Übernahme müssen den Undo-Helper nutzen, gefunden: ${calls.length}`);
   // Die Liste behält ZUSÄTZLICH ihre Rückfrage - eine Rückfrage schützt vor dem
   // Fehlgriff, ein Undo vor dem falschen Entschluss.
   const deleteList = source.slice(source.indexOf("action === 'delete-list'"));

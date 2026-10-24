@@ -485,7 +485,9 @@ test('the category reaches the product only when a write changed it', async () =
 });
 
 test('import from Shopping: a new batch joins the product of its wording', async () => {
-  const existing = await call('POST', '/pantry', { name: 'Butter', quantity: 1, unit: 'pcs', location_id: null });
+  // With its own best-before date: since R23 (D3) a batch without one takes in
+  // an import of the same product, and this case is about a NEW batch.
+  const existing = await call('POST', '/pantry', { name: 'Butter', quantity: 1, unit: 'pcs', location_id: null, expires_on: '2026-12-01' });
   const list = await call('POST', '/shopping', { name: 'Produkte' });
   const listId = list.body.data.id;
   const butter = await call('POST', `/shopping/${listId}/items`, { name: 'BUTTER' });
@@ -501,7 +503,8 @@ test('import from Shopping: a new batch joins the product of its wording', async
       { shopping_item_id: tea.body.data.id, quantity: 1, unit: 'pkg' },
     ],
   });
-  assert.deepEqual(imported.body.data, { added: 2, merged: 0, skipped: 0 });
+  const { changes: _changes, ...counts } = imported.body.data;
+  assert.deepEqual(counts, { added: 2, merged: 0, skipped: 0 });
 
   const butterRows = db.prepare(`SELECT product_id FROM pantry_items WHERE name IN ('Butter', 'BUTTER')`).all();
   assert.equal(butterRows.length, 2);

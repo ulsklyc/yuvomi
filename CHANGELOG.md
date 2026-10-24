@@ -270,6 +270,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already on it." "From the meal plan" now also takes the meals planned from a recipe, which it
   skipped before (in the demo household 5 of 8 meals), counts only what is new in its preview,
   and can be undone like every other transfer.
+- **Putting the shopping away no longer leaves duplicates in the pantry, and it can be undone.**
+  "Move into the pantry" put every item into one storage location and joined an item with
+  existing stock only if name, unit, location and best-before date matched exactly - in the demo
+  household 6 of 10 items ended up as a second row, "Milk 2 l" in the cupboard next to the litre
+  in the fridge. Each row now has its own location, preset from the stock of the same name, else
+  from where the household keeps most items of that category, else from "All to" at the top,
+  which sets every row at once. The unit is read from the amount in the language of the app
+  ("2 cans", "1 pack", "500g"), and an item joins the existing batch at the same place when the
+  units fit - grams and kilograms, millilitres and litres are converted - and the best-before
+  dates are the same or one is empty. The message now offers Undo, which takes back what was
+  added to the pantry and brings the items back onto the list. The bar for checked items no
+  longer stands over the dialog it opened, or over any other dialog.
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.

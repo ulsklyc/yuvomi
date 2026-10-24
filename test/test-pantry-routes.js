@@ -260,14 +260,18 @@ test('POST /pantry/import-shopping: nur abgehakte Artikel, gleiche Charge addier
     ],
   });
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body.data, { added: 2, merged: 0, skipped: 1 });
+  const { changes: firstChanges, ...firstCounts } = first.body.data;
+  assert.deepEqual(firstCounts, { added: 2, merged: 0, skipped: 1 });
+  assert.deepEqual(firstChanges.map((c) => c.kind), ['added', 'added']);
 
   // Zweiter Lauf mit identischer Charge (Name/Einheit/Ort/MHD) addiert auf.
   const second = await call('POST', '/pantry/import-shopping', {
     list_id: listId,
     items: [{ shopping_item_id: milk.body.data.id, quantity: 1, unit: 'l' }],
   });
-  assert.deepEqual(second.body.data, { added: 0, merged: 1, skipped: 0 });
+  const { changes: secondChanges, ...secondCounts } = second.body.data;
+  assert.deepEqual(secondCounts, { added: 0, merged: 1, skipped: 0 });
+  assert.deepEqual(secondChanges, [{ pantry_item_id: firstChanges[0].pantry_item_id, kind: 'merged', quantity_added: 1, expires_set: false }]);
 
   const rows = db.prepare(`SELECT quantity FROM pantry_items WHERE name = 'Milch'`).all();
   assert.equal(rows.length, 1);
@@ -295,6 +299,112 @@ test('POST /pantry/import-shopping: abweichendes MHD ist eine eigene Charge', as
   assert.deepEqual(rows.map((r) => r.expires_on), ['2026-08-10', '2026-08-24']);
 });
 
+// --------------------------------------------------------------------------
+// R23 (D3): Zusammenfuehren in bestehende Chargen + Rueckgaengig
+//
+// Gemessen vor R23 (Critique G3, P1): 6 Dubletten aus 10 uebernommenen
+// Artikeln - der Abgleich verlangte Name, Einheit, Ort und MHD exakt gleich.
+// --------------------------------------------------------------------------
+async function checkedOn(listId, name) {
+  const item = await call('POST', `/shopping/${listId}/items`, { name });
+  await call('PATCH', `/shopping/items/${item.body.data.id}`, { is_checked: 1 });
+  return item.body.data.id;
+}
+const fridgeId = () => db.prepare("SELECT id FROM pantry_locations WHERE name = 'Kühlschrank'").get().id;
+const shelfId = () => db.prepare("SELECT id FROM pantry_locations WHERE name = 'Vorratsschrank'").get().id;
+
+test('D3 import-shopping: g/kg und ml/l rechnen in die Einheit der Charge, Name normalisiert', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  const flour = await call('POST', '/pantry', { name: 'Mehl', quantity: 1, unit: 'kg', location_id: shelfId() });
+  const milk = await call('POST', '/pantry', { name: 'Hafermilch', quantity: 1, unit: 'l', location_id: fridgeId() });
+  const list = (await call('POST', '/shopping', { name: 'D3-Einheiten' })).body.data.id;
+  const a = await checkedOn(list, ' mehl ');
+  const b = await checkedOn(list, 'HAFERMILCH');
+
+  const r = await call('POST', '/pantry/import-shopping', {
+    list_id: list,
+    items: [
+      { shopping_item_id: a, quantity: 500, unit: 'g', location_id: shelfId() },
+      { shopping_item_id: b, quantity: 500, unit: 'ml', location_id: fridgeId() },
+    ],
+  });
+  assert.equal(r.body.data.merged, 2);
+  assert.equal(r.body.data.added, 0);
+  assert.equal(itemRow(flour.body.data.id).quantity, 1.5, '500 g zu 1 kg = 1,5 kg');
+  assert.equal(itemRow(milk.body.data.id).quantity, 1.5);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM pantry_items').get().n, 2, 'keine Dublette');
+});
+
+test('D3 import-shopping: anderer Ort oder unvertraegliche Einheit ist eine eigene Zeile', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  await call('POST', '/pantry', { name: 'Tomaten', quantity: 2, unit: 'can', location_id: shelfId() });
+  const list = (await call('POST', '/shopping', { name: 'D3-Getrennt' })).body.data.id;
+  const a = await checkedOn(list, 'Tomaten');
+  const b = await checkedOn(list, 'Tomaten');
+  const r = await call('POST', '/pantry/import-shopping', {
+    list_id: list,
+    items: [
+      { shopping_item_id: a, quantity: 500, unit: 'g', location_id: shelfId() }, // Dose vs. Gramm
+      { shopping_item_id: b, quantity: 1, unit: 'can', location_id: fridgeId() }, // anderer Ort
+    ],
+  });
+  assert.equal(r.body.data.added, 2);
+  assert.equal(r.body.data.merged, 0);
+});
+
+test('D3 import-shopping: MHD gleich oder eins leer fuehrt zusammen, zwei verschiedene nicht', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  const butter = await call('POST', '/pantry', { name: 'Butter', quantity: 1, unit: 'pcs', location_id: fridgeId() });
+  const list = (await call('POST', '/shopping', { name: 'D3-MHD' })).body.data.id;
+  const a = await checkedOn(list, 'Butter');
+  const r = await call('POST', '/pantry/import-shopping', {
+    list_id: list, items: [{ shopping_item_id: a, quantity: 1, unit: 'pcs', location_id: fridgeId(), expires_on: '2027-05-01' }],
+  });
+  assert.equal(r.body.data.merged, 1);
+  assert.equal(itemRow(butter.body.data.id).expires_on, '2027-05-01', 'das gesetzte MHD gilt');
+  assert.equal(r.body.data.changes[0].expires_set, true);
+
+  const b = await checkedOn(list, 'Butter');
+  const r2 = await call('POST', '/pantry/import-shopping', {
+    list_id: list, items: [{ shopping_item_id: b, quantity: 1, unit: 'pcs', location_id: fridgeId(), expires_on: '2027-06-01' }],
+  });
+  assert.equal(r2.body.data.added, 1, 'ein anderes MHD ist eine neue Charge');
+});
+
+test('D3 import-shopping/undo: stellt den Vorrat genau wieder her', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  const rice = await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', location_id: shelfId() });
+  const before = db.prepare('SELECT id, name, quantity, unit, location_id, expires_on FROM pantry_items ORDER BY id').all();
+  const list = (await call('POST', '/shopping', { name: 'D3-Undo' })).body.data.id;
+  const a = await checkedOn(list, 'Reis');
+  const b = await checkedOn(list, 'Linsen');
+  const r = await call('POST', '/pantry/import-shopping', {
+    list_id: list,
+    items: [
+      { shopping_item_id: a, quantity: 250, unit: 'g', location_id: shelfId(), expires_on: '2027-09-01' },
+      { shopping_item_id: b, quantity: 2, unit: 'pkg', location_id: shelfId() },
+    ],
+  });
+  assert.equal(r.body.data.merged, 1);
+  assert.equal(r.body.data.added, 1);
+  assert.equal(itemRow(rice.body.data.id).quantity, 1.25);
+
+  // Im Undo-Fenster nimmt jemand 0,25 kg heraus - das bleibt nach der Ruecknahme.
+  await call('PATCH', `/pantry/${rice.body.data.id}`, { quantity: 1 });
+  const undo = await call('POST', '/pantry/import-shopping/undo', { changes: r.body.data.changes });
+  assert.equal(undo.status, 200);
+  assert.deepEqual(undo.body.data, { removed: 1, reduced: 1 });
+  const after = db.prepare('SELECT id, name, quantity, unit, location_id, expires_on FROM pantry_items ORDER BY id').all();
+  assert.deepEqual(after, [{ ...before[0], quantity: 0.75 }],
+    'Linsen weg, Reis um genau seinen Zuwachs verringert, das erst gesetzte MHD wieder leer');
+
+  const added = r.body.data.changes.filter((c) => c.kind === 'added');
+  const again = await call('POST', '/pantry/import-shopping/undo', { changes: added });
+  assert.deepEqual(again.body.data, { removed: 0, reduced: 0 }, 'eine geloeschte Charge wird still uebergangen');
+  const junk = await call('POST', '/pantry/import-shopping/undo', { changes: [{ pantry_item_id: 'x', kind: 'added' }, { kind: 'nope' }] });
+  assert.deepEqual(junk.body.data, { removed: 0, reduced: 0 });
+});
+
 test('POST /pantry/import-shopping: räumt die Einkaufsliste bewusst NICHT ab', async () => {
   const list = await call('POST', '/shopping', { name: 'Bleibt stehen' });
   const listId = list.body.data.id;
@@ -315,7 +425,7 @@ test('POST /pantry/import-shopping: unbekannte Liste → 404, leere Auswahl → 
   assert.equal((await call('POST', '/pantry/import-shopping', { list_id: 999999, items: [] })).status, 404);
   const list = await call('POST', '/shopping', { name: 'Leer' });
   const r = await call('POST', '/pantry/import-shopping', { list_id: list.body.data.id, items: [] });
-  assert.deepEqual(r.body.data, { added: 0, merged: 0, skipped: 0 });
+  assert.deepEqual(r.body.data, { added: 0, merged: 0, skipped: 0, changes: [] });
 });
 
 // --------------------------------------------------------------------------

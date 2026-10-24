@@ -89,3 +89,30 @@ export function pantryQuantityLabel(quantity, unit, { t, formatNumber }) {
   // direkter DB-Zugriff) stuende sonst als nackter Schluessel in der Zeile.
   return `${formatNumber(amount)} ${label === key ? String(unit ?? '') : label}`;
 }
+
+/**
+ * Gewicht und Volumen in ihrer Grundeinheit (R23, D3). Nur diese beiden
+ * Paare rechnen ineinander: 500 g passen zu einem Kilo im Regal, eine Dose
+ * passt zu nichts als einer Dose - wie viel in ihr steckt, weiss der Vorrat nicht.
+ */
+const UNIT_BASE = Object.freeze({
+  g: ['g', 1], kg: ['g', 1000], ml: ['ml', 1], l: ['ml', 1000],
+});
+
+/**
+ * Eine Menge in eine andere Einheit umrechnen, oder null, wenn die beiden
+ * nicht zusammenpassen. Gleiche Einheit ist immer vertraeglich.
+ * @param {number} quantity
+ * @param {string} from
+ * @param {string} to
+ * @returns {number|null}
+ */
+export function convertPantryQuantity(quantity, from, to) {
+  const a = normalizePantryUnit(from);
+  const b = normalizePantryUnit(to);
+  if (a === b) return Number(quantity);
+  const [baseA, factorA] = UNIT_BASE[a] ?? [];
+  const [baseB, factorB] = UNIT_BASE[b] ?? [];
+  if (!baseA || baseA !== baseB) return null;
+  return (Number(quantity) * factorA) / factorB;
+}

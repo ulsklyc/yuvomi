@@ -595,7 +595,7 @@ test('„In den Vorrat": der Einstieg fragt den Vorrat, bevor er irgendetwas lae
   assert.deepEqual(await withAccess({ shopping: 'write', pantry: 'read' },
     () => aufrufe(() => shopping.openPantryTransfer(container()))), []);
   const gegen = await withAccess(SCHREIBEN, () => aufrufe(() => shopping.openPantryTransfer(container())));
-  assert.deepEqual(gegen, ['GET /pantry/locations'], 'Gegenfall: mit Schreibrecht laedt der Dialog die Lagerorte');
+  assert.deepEqual(gegen, ['GET /pantry'], 'Gegenfall: mit Schreibrecht laedt der Dialog Bestand und Lagerorte');
 });
 
 const knapp = () => ({
@@ -1028,8 +1028,13 @@ test('Leseansicht: die Notiz geht durch esc()', () => {
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
 });
 
-/** Den Dialog „In den Vorrat" oeffnen und bestaetigen - mit oder ohne Haken bei „entfernen". */
-async function inDenVorrat(offen, bestaetigt) {
+/**
+ * Den Dialog „In den Vorrat" oeffnen und bestaetigen - mit oder ohne Haken bei
+ * „entfernen". Seit R23 (D3) raeumt die Uebernahme erst ab, wenn ihr Toast
+ * ablaeuft: `ausgang` waehlt, ob er ablaeuft ('frist') oder zurueckgenommen
+ * wird ('undo').
+ */
+async function inDenVorrat(offen, bestaetigt, ausgang = 'frist') {
   zustand({ items: [artikel({ is_checked: 1 })] });
   let opts;
   const zuvor = globalThis.__openModal;
@@ -1051,11 +1056,25 @@ async function inDenVorrat(offen, bestaetigt) {
     querySelectorAll: () => [],
   };
   opts.onSave(panel);
-  const calls = await withAccess(bestaetigt, () => aufrufe(
-    () => felder['#pantry-transfer-confirm'].listeners.click({ currentTarget: {} }),
-    { 'POST /pantry/import-shopping': { data: { added: 1, merged: 0 } } },
-  ));
-  return { content: opts.content, calls };
+  // Der Loader ersetzt scheduleUndoableDelete durch `__undoStub` (test-browser-loader.mjs).
+  const stubZuvor = globalThis.__undoStub;
+  let toast = null;
+  globalThis.__undoStub = (o) => { toast = o; };
+  let calls;
+  try {
+    calls = await withAccess(bestaetigt, () => aufrufe(
+      async () => {
+        await felder['#pantry-transfer-confirm'].listeners.click({ currentTarget: {} });
+        if (ausgang === 'undo') await toast?.restore?.();
+        else await toast?.commit?.({ keepalive: false });
+        await new Promise((r) => setTimeout(r, 0));
+      },
+      { 'POST /pantry/import-shopping': { data: { added: 1, merged: 0, changes: [{ pantry_item_id: 5, kind: 'added' }] } } },
+    ));
+  } finally {
+    globalThis.__undoStub = stubZuvor;
+  }
+  return { content: opts.content, calls, toast };
 }
 
 test('„In den Vorrat": ohne Schreibrecht im Einkauf kein Abraeumen der Liste', async () => {
@@ -1069,4 +1088,14 @@ test('„In den Vorrat": ohne Schreibrecht im Einkauf kein Abraeumen der Liste',
   assert.match(gegen.content, /id="pantry-transfer-clear"/);
   assert.deepEqual(gegen.calls, ['POST /pantry/import-shopping', `DELETE /shopping/${LISTE.id}/items/checked`],
     'Gegenfall: mit Schreibrecht raeumt die Uebernahme die Liste ab');
+  assert.equal(typeof gegen.toast?.restore, 'function', 'die Uebernahme meldet sich mit Rueckgaengig (R23, D3)');
+});
+
+test('„In den Vorrat": Rueckgaengig raeumt den Vorrat zurueck und laesst die Liste stehen (R23, D3)', async () => {
+  const mit = await inDenVorrat(SCHREIBEN, SCHREIBEN, 'undo');
+  assert.deepEqual(mit.calls, ['POST /pantry/import-shopping', 'POST /pantry/import-shopping/undo'],
+    'kein DELETE auf der Liste, dafuer die Ruecknahme im Vorrat');
+  const ohne = await inDenVorrat(LESEN, LESEN, 'undo');
+  assert.deepEqual(ohne.calls, ['POST /pantry/import-shopping', 'POST /pantry/import-shopping/undo'],
+    'auch ohne Abraeumen steht das Rueckgaengig');
 });

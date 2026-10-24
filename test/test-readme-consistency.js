@@ -496,7 +496,7 @@ for (const lang of Object.keys(READMES)) {
  */
 const README_FACTS = [
   { says: { en: /One import turns the week's meal plan into a shopping list/, de: /Ein Import macht aus dem Wochenplan eine Einkaufsliste/ },
-    holds: (s) => /\/import-meal-plan`/.test(s.shoppingPage) && /addLocalDays\(today, 6\)/.test(s.shoppingPage) && /mi\.category/.test(s.shoppingRoutes),
+    holds: (s) => /\/import-meal-plan`/.test(s.shoppingPage) && /addLocalDays\(today, 6\)/.test(s.shoppingPage) && /mealPlanSource\(db\.get\(\), range\)/.test(s.shoppingRoutes) && /\bcategory FROM meal_ingredients/.test(s.kitchenHandover),
     what: 'Import-Dialog mit vorausgewaehlten sieben Tagen, Kategorie der Zutat (public/pages/shopping.js, server/routes/shopping.js import-meal-plan)' },
   { says: { en: /one button books what you ticked off back into the pantry, with amount and unit/, de: /bucht ein Knopf, was ihr abgehakt habt, mit Menge und Einheit zur[uü]ck in den Vorrat/ },
     holds: (s) => /async function openPantryTransfer/.test(s.shoppingPage) && /pantry-transfer__qty/.test(s.shoppingPage) && /pantry-transfer__unit/.test(s.shoppingPage),
@@ -594,6 +594,8 @@ function factSources() {
     readmes: { en: readme('en'), de: readme('de') },
     shoppingPage: src('public/pages/shopping.js'),
     shoppingRoutes: src('server/routes/shopping.js'),
+    // Seit R23 (D2) liest der Import den Essensplan ueber die geteilte Quelle.
+    kitchenHandover: src('server/services/kitchen-handover.js'),
     db: src('server/db.js'),
     toggleable: [...toggleable.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]),
     dockerPublish: src('.github/workflows/docker-publish.yml'),

@@ -518,6 +518,52 @@ test('parseShoppingQuantity: die Schreibweisen aus dem Seed bleiben, wie sie war
   assert.deepEqual(p(null), { quantity: 1, unit: 'pcs' });
 });
 
+// R23 (D3): „2 Dosen" und „1 Packung" landeten bei Stück und legten im Vorrat
+// eine zweite Zeile neben die Dosen im Regal. Gelesen werden die Einheitennamen
+// der Sprache (dieselben Keys, die der Vorrat zeigt) und englische Kurzformen.
+test('parseShoppingQuantity: Einheiten als Wort, mit und ohne Leerzeichen (R23, D3)', () => {
+  const p = __test.parseShoppingQuantity;
+  const de = new Map([['dose', 'can'], ['dosen', 'can'], ['packung', 'pkg'], ['packungen', 'pkg'], ['stück', 'pcs'], ['flaschen', 'bottle'], ['g', 'g'], ['l', 'l']]);
+  assert.deepEqual(p('2 Dosen', de), { quantity: 2, unit: 'can' });
+  assert.deepEqual(p('1 Packung', de), { quantity: 1, unit: 'pkg' });
+  assert.deepEqual(p('3 Flaschen', de), { quantity: 3, unit: 'bottle' });
+  assert.deepEqual(p('500g', de), { quantity: 500, unit: 'g' });
+  assert.deepEqual(p('2 x 500 g', de), { quantity: 2, unit: 'pcs' }, 'das x ist keine Einheit, die 2 ist die Menge');
+  assert.deepEqual(p('1 Laib', de), { quantity: 1, unit: 'pcs' }, 'ein unbekanntes Wort bleibt Stück');
+  assert.deepEqual(p('1 Liter', de), { quantity: 1, unit: 'pcs' }, 'kein Raten ueber die bekannten Woerter hinaus');
+
+  const words = __test.pantryUnitWords(['pkg', 'can', 'g']);
+  assert.equal(words.get('pack'), 'pkg', 'englische Kurzformen gelten in jeder Sprache');
+  assert.equal(words.get('pkg'), 'pkg', 'der Schluessel selbst gilt');
+  assert.equal(words.get('cans'), 'can');
+  assert.equal(words.get('g'), 'g');
+  assert.deepEqual(p('2 cans', words), { quantity: 2, unit: 'can' });
+});
+
+// R23 (D3): EIN Ort fuer den ganzen Einkauf legte die Milch in den
+// Vorratsschrank. Je Zeile vorbelegt: Bestand, sonst Kategorie, sonst Kopf.
+test('pantryTransferPreset: Bestand vor Kategorie vor Kopfauswahl (R23, D3)', () => {
+  const pre = __test.pantryTransferPreset;
+  const words = new Map([['g', 'g'], ['l', 'l']]);
+  const pantry = {
+    items: [
+      { name: 'Milch', unit: 'l', location_id: 2, category: 'Milchprodukte' },
+      { name: 'Joghurt', unit: 'pcs', location_id: 2, category: 'Milchprodukte' },
+      { name: 'Quark', unit: 'pcs', location_id: 2, category: 'Milchprodukte' },
+      { name: 'Sahne', unit: 'pcs', location_id: 3, category: 'Milchprodukte' },
+      { name: 'Reis', unit: 'kg', location_id: 1, category: 'Grundnahrung' },
+    ],
+  };
+  assert.deepEqual(pre({ name: ' MILCH ', quantity: '', category: 'Sonstiges' }, pantry, words, '1'),
+    { quantity: 1, unit: 'l', locationId: '2', source: 'stock' }, 'gleichnamiger Bestand: sein Ort und seine Einheit');
+  assert.deepEqual(pre({ name: 'Reis', quantity: '500 g', category: 'Grundnahrung' }, pantry, words, '1'),
+    { quantity: 500, unit: 'g', locationId: '1', source: 'stock' }, 'eine genannte Einheit bleibt - der Server rechnet g in kg');
+  assert.deepEqual(pre({ name: 'Butter', quantity: '', category: 'Milchprodukte' }, pantry, words, '1'),
+    { quantity: 1, unit: 'pcs', locationId: '2', source: 'category' }, 'der Ort, an dem die Kategorie meistens liegt');
+  assert.deepEqual(pre({ name: 'Batterien', quantity: '4', category: 'Haushalt' }, pantry, words, '1'),
+    { quantity: 4, unit: 'pcs', locationId: '1', source: 'default' }, 'sonst die Kopfauswahl');
+});
+
 test('parseShoppingQuantity: der Dezimaltrenner kommt aus der Region, nicht aus dem Quelltext', () => {
   // In de trennt das Komma. Das konnte die alte Fassung auch - sie hatte den
   // Trenner nur fest verdrahtet und lag damit ueberall sonst falsch.

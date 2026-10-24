@@ -5326,6 +5326,12 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   assert.match(read('../server/services/kitchen-handover.js'), /addedIds\.push\(Number\(info\.lastInsertRowid\)\)/,
     'die Übergabe muss die IDs beim Einfügen einsammeln');
 
+  // Einkauf -> Vorrat (R23, D3): die Uebernahme war der einzige Kuechenweg, der
+  // ohne Ruecknahme schrieb und dabei die Liste leerte.
+  const pantryRoute = read('../server/routes/pantry.js');
+  assert.match(pantryRoute, /router\.post\('\/import-shopping\/undo'/, 'die Übernahme in den Vorrat braucht ihre Rücknahme');
+  assert.match(pantryRoute, /changes\.push\(\{ pantry_item_id: match\.id, kind: 'merged'/,
+    'die Übernahme muss je Zeile melden, was sie wo dazugelegt hat');
 
   // Die Rücknahme nimmt den GANZEN Übertrag zurück, nicht nur seine Artikel: der
   // Mahlzeit-Pfad setzt beim Übertragen `on_shopping_list`. Wer nur die
@@ -5500,6 +5506,21 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
  *   3. Sie verdeckt am Scroll-Ende nichts - derselbe Defekt, den Sonde 18 für
  *      den FAB misst, und der FAB löst ihn seit #634 über einen Nachlauf.
  */
+/**
+ * Die Pille tritt vor jedem Dialog ab (Critique R23, G3/K2). Der Shell-Stapel
+ * liegt ueber Dialogen, damit Meldungen sichtbar bleiben - die Pille ist aber
+ * eine Bedienung fuer die Liste darunter: ueber „In den Vorrat" stand sie als
+ * zweite Fusszeile mit einem Löschen, das ins Leere griff. Generisch im CSS,
+ * damit kein Aufrufer sie einzeln abraeumen muss.
+ */
+test('die Sammel-Pille steht nie über einem Dialog oder Blatt', () => {
+  const css = read('../public/styles/layout.css');
+  for (const surface of ['\\.modal-overlay', '\\.more-sheet\\[aria-hidden="false"\\]', '\\.search-overlay--visible']) {
+    assert.match(css, new RegExp(`html:has\\(${surface}\\) \\.bulk-pill-layer[^{]*\\{[^}]*display:\\s*none`),
+      `die Pille muss unter ${surface.replace(/\\\\/g, '')} abtreten`);
+  }
+});
+
 test('die Sammelaktions-Pille wohnt in der Shell und kostet die Liste keine Zeile', () => {
   const layout    = read('../public/styles/layout.css');
   const listRow   = read('../public/styles/list-row.css');

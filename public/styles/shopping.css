@@ -230,20 +230,43 @@
   overflow-y: auto;
 }
 
-/* Name | Menge | Einheit auf einer Zeile, solange der Name seine 10rem hält.
- * Darunter rutschen Menge und Einheit gemeinsam in die zweite Zeile und teilen
- * sie sich - drei Spalten auf einem schmalen Telefon hätten den Namen auf
- * wenige Zeichen zusammengedrückt. Intrinsisch statt per Breakpoint, weil die
- * maßgebliche Breite die des Modals ist, nicht die des Viewports. */
+/* Name | Menge | Einheit | Lagerort auf einer Zeile, solange der Dialog sie
+ * traegt; darunter steht der Name allein oben und die drei Felder teilen sich
+ * die zweite Zeile (R23, D3: der Lagerort kam als viertes Feld dazu). Gefragt
+ * wird die Breite der LISTE, nicht die des Viewports - die massgebliche Breite
+ * ist die des Modals. Ein Raster statt Umbruch: mit vier Feldern brach die
+ * Flex-Zeile auf einem Telefon dreizeilig und jede Zeile anders. */
+.pantry-transfer__list {
+  container-type: inline-size;
+  container-name: pantry-transfer;
+}
+
 .pantry-transfer__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem minmax(0, 8rem) minmax(0, 10rem);
   align-items: center;
   gap: var(--space-2);
 }
 
+@container pantry-transfer (max-width: 34rem) {
+  .pantry-transfer__row {
+    grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1.3fr);
+    row-gap: var(--space-1);
+  }
+
+  .pantry-transfer__name {
+    grid-column: 1 / -1;
+  }
+
+  /* Zwischen zwei Artikeln mehr Luft als zwischen Name und Feldern derselben
+   * Zeile - sonst liest sich der Name als Ueberschrift der Felder darueber. */
+  .pantry-transfer__row + .pantry-transfer__row {
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+}
+
 .pantry-transfer__name {
-  flex: 1 1 10rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -251,12 +274,7 @@
 }
 
 .pantry-transfer__qty {
-  flex: 1 1 6rem;
   font-variant-numeric: tabular-nums;
-}
-
-.pantry-transfer__unit {
-  flex: 1 1 8rem;
 }
 
 /* Geometrie, Zielgröße und das eingekleidete Control kommen aus dem geteilten

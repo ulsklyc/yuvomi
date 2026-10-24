@@ -20,9 +20,9 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
-import { normalizePantryUnit, normalizePantryQuantity } from '../../public/utils/pantry-units.js';
+import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
-import { assignPantryProduct } from '../services/pantry-products.js';
+import { assignPantryProduct, productKey } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../permissions.js';
 
@@ -315,7 +315,22 @@ router.delete('/locations/:locId', (req, res) => {
 // `pantry`; Name und Kategorie der Einkaufsartikel stehen danach im Vorrat.
 // Deshalb fragt die Route selbst nach `shopping: read` (beide Achsen), und
 // zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt.
-// Response: { data: { added, merged, skipped } }
+// Response: { data: { added, merged, skipped, changes } }
+//
+// ZUSAMMENFUEHREN (R23, D3). Eine Zeile wandert in eine bestehende Charge, wenn
+// Name (normalisiert wie das Produkt: productKey), Lagerort und Einheit passen -
+// vertraeglich heisst gleich ODER umrechenbar (g/kg, ml/l; die Menge wird in
+// die Einheit der Charge umgerechnet) - und das MHD gleich ist oder eins von
+// beiden fehlt (dann gilt das gesetzte). Bis R23 musste alles exakt gleich
+// sein, Name per NOCASE (nur ASCII): der Critique-Lauf ergab 6 Dubletten aus
+// 10 Artikeln ("Milch 1 l" neben "Milch 1000 ml", "Butter" ohne MHD neben
+// "Butter" mit MHD).
+//
+// `changes` traegt das Rueckgaengig (POST /pantry/import-shopping/undo): je
+// Zeile, ob sie neu ist oder wie viel sie wo dazugelegt hat und ob dabei ein
+// MHD gesetzt wurde. Die Ruecknahme zieht genau das wieder ab, statt einen
+// alten Stand zurueckzuschreiben - was jemand in der Zwischenzeit an der
+// Charge geaendert hat, bleibt.
 // --------------------------------------------------------
 router.post('/import-shopping', (req, res) => {
   try {
@@ -330,7 +345,7 @@ router.post('/import-shopping', (req, res) => {
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
     const entries = Array.isArray(req.body.items) ? req.body.items : [];
-    if (!entries.length) return res.json({ data: { added: 0, merged: 0, skipped: 0 } });
+    if (!entries.length) return res.json({ data: { added: 0, merged: 0, skipped: 0, changes: [] } });
 
     const checked = db.get()
       .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 1')
@@ -352,19 +367,32 @@ router.post('/import-shopping', (req, res) => {
     const today = householdToday(db.get());
 
     const result = db.get().transaction(() => {
-      const findMatch = db.get().prepare(`
-        SELECT id, quantity FROM pantry_items
-        WHERE name = ? COLLATE NOCASE
-          AND unit = ?
-          AND location_id IS ?
-          AND expires_on IS ?
-        LIMIT 1
-      `);
-      const bump = db.get().prepare('UPDATE pantry_items SET quantity = ? WHERE id = ?');
+      const sameLocation = db.get().prepare(
+        'SELECT id, name, quantity, unit, expires_on FROM pantry_items WHERE location_id IS ? ORDER BY id ASC',
+      );
+      const bump = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
       const insert = db.get().prepare(`
         INSERT INTO pantry_items (name, quantity, unit, location_id, category, expires_on, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
+      // Die beste passende Charge: gleiche Einheit und gleiches MHD vor gleicher
+      // Einheit vor umrechenbarer Einheit - "Milch 1 l" landet lieber bei der
+      // Literpackung als bei den 500 ml daneben.
+      const findMatch = (name, unit, locationId, expiresOn) => {
+        const key = productKey(name);
+        if (!key) return null;
+        let best = null;
+        let bestRank = Infinity;
+        for (const row of sameLocation.all(locationId)) {
+          if (productKey(row.name) !== key) continue;
+          if (convertPantryQuantity(1, unit, row.unit) === null) continue;
+          if (row.expires_on && expiresOn && row.expires_on !== expiresOn) continue;
+          const rank = (row.unit === unit ? 0 : 2) + (row.expires_on === expiresOn ? 0 : 1);
+          if (rank < bestRank) { best = row; bestRank = rank; }
+        }
+        return best;
+      };
+      const changes = [];
 
       let added = 0, merged = 0, skipped = 0;
 
@@ -392,12 +420,19 @@ router.post('/import-shopping', (req, res) => {
         const expiresOn = date(entry.expires_on, 'Mindesthaltbarkeitsdatum').value;
         const category = categoryNames.includes(source.category) ? source.category : fallbackCategory;
 
-        // Gleicher Name, gleiche Einheit, gleicher Ort UND gleiches MHD →
-        // dieselbe Charge, also aufaddieren. Ein abweichendes MHD ist eine neue
-        // Charge und bekommt bewusst eine eigene Zeile.
-        const match = findMatch.get(source.name, unit, locationId, expiresOn);
+        // Gleicher Name, gleicher Ort, vertraegliche Einheit, MHD gleich oder
+        // eins leer → dieselbe Charge, also aufaddieren (Regel im Kopf). Zwei
+        // VERSCHIEDENE MHDs sind zwei Chargen und bekommen eigene Zeilen.
+        const match = findMatch(source.name, unit, locationId, expiresOn);
         if (match) {
-          bump.run(normalizePantryQuantity(Number(match.quantity) + quantity, { fallback: quantity }), match.id);
+          const added = normalizePantryQuantity(convertPantryQuantity(quantity, unit, match.unit), { fallback: quantity });
+          const expiresSet = !match.expires_on && Boolean(expiresOn);
+          bump.run(
+            normalizePantryQuantity(Number(match.quantity) + added, { fallback: added }),
+            match.expires_on ?? expiresOn,
+            match.id,
+          );
+          changes.push({ pantry_item_id: match.id, kind: 'merged', quantity_added: added, expires_set: expiresSet });
           // Eine aufgefüllte Charge kann von Menge 0 zurückkommen - dann ist die
           // Erinnerung wieder fällig, die das Ausbuchen abgeräumt hat.
           syncReminder(getItem(match.id), access, today);
@@ -406,16 +441,79 @@ router.post('/import-shopping', (req, res) => {
           const inserted = insert.run(source.name, quantity, unit, locationId, category, expiresOn, userId);
           assignPantryProduct(db.get(), inserted.lastInsertRowid, { userId });
           syncReminder(getItem(inserted.lastInsertRowid), access, today);
+          changes.push({ pantry_item_id: Number(inserted.lastInsertRowid), kind: 'added' });
           added += 1;
         }
       }
 
-      return { added, merged, skipped };
+      return { added, merged, skipped, changes };
     })();
 
     res.json({ data: result });
   } catch (err) {
     log.error('POST /import-shopping error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /api/v1/pantry/import-shopping/undo
+// Nimmt eine Uebernahme aus dem Einkauf zurueck (R23, D3).
+// Body: { changes } - die `changes` aus der Antwort von /import-shopping.
+// Response: { data: { removed, reduced } }
+//
+// Neu angelegte Chargen werden geloescht (samt Erinnerung, wie DELETE /:itemId),
+// aufgefuellte um genau ihren Zuwachs verringert, und ein MHD, das erst die
+// Uebernahme gesetzt hat, faellt wieder weg. Abgezogen statt zurueckgeschrieben:
+// wer im Fenster des Toasts selbst an der Charge drehte, behaelt seine Aenderung.
+// Was inzwischen weg ist, wird still uebergangen - `removed`/`reduced` sagen,
+// was tatsaechlich zurueckging (dieselbe Regel wie /shopping/items/undo-transfer).
+//
+// Kein Lesen des Einkaufs, also kein zweiter Riegel: die Route schreibt nur in
+// den Vorrat und gehoert damit allein dessen Schreibrecht (Pfad-Guard).
+// --------------------------------------------------------
+router.post('/import-shopping/undo', (req, res) => {
+  try {
+    const raw = Array.isArray(req.body?.changes) ? req.body.changes : [];
+    const changes = raw
+      .map((c) => ({
+        id: Number(c?.pantry_item_id),
+        kind: c?.kind,
+        quantity: Number(c?.quantity_added),
+        expiresSet: c?.expires_set === true,
+      }))
+      .filter((c) => Number.isInteger(c.id) && c.id > 0 && (c.kind === 'added' || (c.kind === 'merged' && Number.isFinite(c.quantity))));
+    if (!changes.length) return res.json({ data: { removed: 0, reduced: 0 } });
+
+    const access = resolvePantryAccess(db.get());
+    const today = householdToday(db.get());
+
+    const result = db.get().transaction(() => {
+      const remove = db.get().prepare('DELETE FROM pantry_items WHERE id = ?');
+      const removeReminder = db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?");
+      const reduce = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
+      let removed = 0;
+      let reduced = 0;
+      for (const change of changes) {
+        const item = getItem(change.id);
+        if (!item) continue;
+        if (change.kind === 'added') {
+          remove.run(change.id);
+          removeReminder.run(change.id);
+          removed += 1;
+          continue;
+        }
+        const quantity = normalizePantryQuantity(Number(item.quantity) - change.quantity, { fallback: 0 });
+        reduce.run(quantity, change.expiresSet ? null : item.expires_on, change.id);
+        syncReminder(getItem(change.id), access, today);
+        reduced += 1;
+      }
+      return { removed, reduced };
+    })();
+
+    res.json({ data: result });
+  } catch (err) {
+    log.error('POST /import-shopping/undo error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

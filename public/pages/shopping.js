@@ -28,6 +28,8 @@ import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
 import { amountFieldError } from '/utils/amount-field.js';
+import { PANTRY_UNITS } from '/utils/pantry-units.js';
+import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -3034,15 +3036,56 @@ function updateItemsList(container) {
 }
 
 /**
+ * Die Einheiten des Vorrats, wie man sie in eine Einkaufsmenge schreibt.
+ *
+ * Bis R23 las die Zerlegung nur g/kg/ml/l, „2 Dosen" und „1 Packung" landeten
+ * bei „Stück" - und die Uebernahme legte damit eine zweite Zeile neben die
+ * Dosen im Regal (Critique R23, G3: shopping.js ~3080). Gelesen werden jetzt die
+ * metrischen Symbole, die Namen der Einheiten in der eingestellten Sprache in
+ * allen Pluralformen (dieselben Keys, die der Vorrat anzeigt - so passt die
+ * Liste zu jeder der 27 Sprachen, ohne einen zweiten Wortschatz zu pflegen) und
+ * die englischen Kurzformen, die Etiketten und Rezepte sprachuebergreifend
+ * benutzen. Kein Raten darueber hinaus: ein unbekanntes Wort bleibt „Stück",
+ * und der Dialog zeigt die Einheit in einem Feld, das sich korrigieren laesst.
+ */
+const UNIT_SHORTHANDS = Object.freeze({
+  pcs: ['pc', 'pcs', 'piece', 'pieces'],
+  pkg: ['pkg', 'pack', 'packs', 'pck', 'pkt'],
+  can: ['can', 'cans', 'tin', 'tins'],
+  bottle: ['bottle', 'bottles', 'btl'],
+  jar: ['jar', 'jars'],
+  bag: ['bag', 'bags'],
+});
+
+function pantryUnitWords(units) {
+  const words = new Map();
+  const add = (word, unit) => {
+    const key = String(word ?? '').trim().toLocaleLowerCase().replace(/\.$/, '');
+    if (key && !words.has(key)) words.set(key, unit);
+  };
+  for (const unit of units) {
+    add(unit, unit);
+    const base = `pantry.units.${unit}`;
+    for (const count of [undefined, 0, 1, 2, 3, 5, 11, 21, 0.5]) {
+      const label = t(base, count === undefined ? undefined : { count });
+      if (label !== base) add(label, unit);
+    }
+    for (const word of UNIT_SHORTHANDS[unit] ?? []) add(word, unit);
+  }
+  return words;
+}
+
+/**
  * Zerlegt den Freitext einer Einkaufsmenge in Zahl + Vorrats-Einheit.
  *
- * Bewusst nur die international geschriebenen metrischen Symbole: das Feld ist
- * Freitext in der Sprache des Haushalts, und ein deutschsprachiger Wortschatz
- * („Packung", „Dose") würde in 22 der 23 Sprachen ins Leere greifen. Zahl und
- * g/kg/ml/l sind sprachunabhängig und tragen den Großteil des Nutzens; alles
- * andere landet bei „Stück" und lässt sich im Dialog in einem Griff ändern.
+ * Zahl und Einheit sind getrennt gelesen: die Zahl sprachunabhaengig ueber die
+ * Region (unten), die Einheit ueber `pantryUnitWords()` oben. Alles andere
+ * landet bei „Stück" und lässt sich im Dialog in einem Griff ändern.
+ *
+ * @param {string} raw
+ * @param {Map<string,string>} [unitWords]  Wort -> Einheit; Standard: die Einheiten in der aktuellen Sprache
  */
-function parseShoppingQuantity(raw) {
+function parseShoppingQuantity(raw, unitWords = pantryUnitWords(PANTRY_UNITS)) {
   const fallback = { quantity: 1, unit: 'pcs' };
   const text = String(raw ?? '').trim();
   if (!text) return fallback;
@@ -3066,11 +3109,9 @@ function parseShoppingQuantity(raw) {
   const decimal = toDecimalString(text, { freeText: true });
   if (!decimal) return fallback;
 
-  // Die Einheit braucht eine Wortgrenze davor, sonst schluckt `\b` sie bei
-  // Schreibweisen wie „3x" nicht und die Menge fiele auf 1 zurück.
   // Der Trenner ist hier immer der Punkt - die Umschrift oben hat den der Region
   // bereits übersetzt.
-  const match = decimal.match(/^(\d+(?:\.\d+)?)\s*(?:(kg|g|ml|l)\b)?/i);
+  const match = decimal.match(/^(\d+(?:\.\d+)?)/);
   if (!match) return fallback;
 
   // Bricht die Zahl mitten in einem Trennzeichen ab, ist sie nicht gelesen,
@@ -3082,22 +3123,73 @@ function parseShoppingQuantity(raw) {
   //
   // Über die geteilte Prüfung aus utils/money.js, die genau die Trennzeichen der
   // wählbaren Regionen kennt: „irgendein Zeichen zwischen zwei Ziffern" war zu
-  // breit und traf „2x500 g" mit, also die Multiplikator-Schreibweise, die zwei
-  // Zeilen weiter oben ausdrücklich lesbar bleiben soll.
-  if (breaksOffAtSeparator(decimal.slice(match[1].length))) return fallback;
+  // breit und traf „2x500 g" mit, also die Multiplikator-Schreibweise, die
+  // ausdrücklich lesbar bleiben soll.
+  const rest = decimal.slice(match[1].length);
+  if (breaksOffAtSeparator(rest)) return fallback;
 
   const quantity = Number(match[1]);
   if (!Number.isFinite(quantity) || quantity <= 0) return fallback;
 
-  return { quantity, unit: match[2] ? match[2].toLowerCase() : 'pcs' };
+  // Das Wort direkt hinter der Zahl, mit oder ohne Leerzeichen („500g",
+  // „2 Dosen"). Nur Buchstaben und ein Abkuerzungspunkt: „2 x 500 g" liest das
+  // „x", kennt es nicht und bleibt bei Stück - die 2 ist die Menge.
+  const word = rest.match(/^\s*([\p{L}]+\.?)/u)?.[1] ?? '';
+  const unit = word ? unitWords.get(word.toLocaleLowerCase().replace(/\.$/, '')) : null;
+  return { quantity, unit: unit ?? 'pcs' };
 }
 
 /**
- * Übernahme-Dialog „Einkauf → Vorrat". Ein gemeinsamer Lagerort für alle
- * Artikel plus Menge/Einheit je Zeile: nach dem Einkauf räumt man einen Beutel
- * an einen Ort ein, nicht zwölf Artikel an zwölf Orte. Haltbarkeitsdaten bleiben
- * hier bewusst außen vor - sie sind die Ausnahme, nicht die Regel, und im
- * Vorrat einen Tap entfernt.
+ * Wo und in welcher Einheit ein eingekaufter Artikel im Vorrat landet (R23, D3).
+ *
+ * Bis R23 galt EIN Lagerort fuer den ganzen Einkauf, und die Einheit kam allein
+ * aus dem Freitext: die Milch ging in den Vorratsschrank, und „Milch" ohne Menge
+ * stand als „1 Stück" neben dem Liter im Kuehlschrank (Critique R23, G3 P1: 6
+ * Dubletten aus 10 Artikeln). Jetzt je Zeile vorbelegt, in dieser Reihenfolge:
+ *
+ *  1. Es gibt den Artikel schon (gleicher Name, normalisiert wie das Produkt):
+ *     sein Lagerort, und seine Einheit, wenn die Menge selbst keine nennt.
+ *  2. Sonst die Kategorie: der Ort, an dem der Haushalt die meisten Artikel
+ *     dieser Einkaufskategorie lagert - gelernt aus dem eigenen Bestand, keine
+ *     Tabelle, die in 27 Sprachen und jedem Haushalt anders stimmen muesste.
+ *  3. Sonst die Kopfauswahl „Alle nach …" (der erste Ort).
+ *
+ * @returns {{ quantity: number, unit: string, locationId: string, source: 'stock'|'category'|'default' }}
+ */
+function pantryTransferPreset(item, pantry, unitWords, fallbackLocationId) {
+  const parsed = parseShoppingQuantity(item.quantity, unitWords);
+  const key = ingredientMatchKey(item.name);
+  const stock = pantry.items.filter((p) => key && ingredientMatchKey(p.name) === key);
+  if (stock.length) {
+    const same = stock.find((p) => p.unit === parsed.unit) ?? stock[0];
+    return {
+      quantity: parsed.quantity,
+      unit: parsed.unit === 'pcs' ? same.unit : parsed.unit,
+      locationId: same.location_id == null ? '' : String(same.location_id),
+      source: 'stock',
+    };
+  }
+  const counts = new Map();
+  for (const p of pantry.items) {
+    if (p.category !== item.category || p.location_id == null) continue;
+    counts.set(p.location_id, (counts.get(p.location_id) ?? 0) + 1);
+  }
+  const [best] = [...counts.entries()].sort((x, y) => y[1] - x[1]);
+  if (best) return { quantity: parsed.quantity, unit: parsed.unit, locationId: String(best[0]), source: 'category' };
+  return { quantity: parsed.quantity, unit: parsed.unit, locationId: fallbackLocationId, source: 'default' };
+}
+
+/**
+ * Übernahme-Dialog „Einkauf → Vorrat". Menge, Einheit und Lagerort je Zeile,
+ * vorbelegt aus dem eigenen Bestand (`pantryTransferPreset`), dazu „Alle nach …"
+ * im Kopf fuer den Einkauf, der in einen Beutel und an einen Ort geht.
+ * Haltbarkeitsdaten bleiben hier bewusst außen vor - sie sind die Ausnahme,
+ * nicht die Regel, und im Vorrat einen Tap entfernt.
+ *
+ * Zusammengefuehrt wird auf dem Server (routes/pantry.js, import-shopping): eine
+ * Zeile wandert in die passende Charge, statt daneben eine zweite anzulegen.
+ * Und der ganze Vorgang ist zuruecknehmbar - die Uebernahme war bis R23 der
+ * einzige Kuechenweg, der ohne Rueckgaengig schrieb und dabei die Liste leerte.
  */
 async function openPantryTransfer(container) {
   // Der Uebertrag schreibt in den VORRAT (Pfad-Guard `pantry`) - die Frage
@@ -3109,32 +3201,43 @@ async function openPantryTransfer(container) {
   // Kommt die Antwort erst, nachdem der Nutzer einen anderen Dialog geoeffnet
   // oder die Seite verlassen hat, geht dieser Dialog nicht mehr auf (#1997).
   const context = captureOpenContext();
-  let locations = [];
+  // Bestand UND Orte in einem Aufruf: die Vorbelegung braucht beides.
+  let pantry;
   try {
-    const res = await api.get('/pantry/locations');
-    locations = res.data ?? [];
+    const res = await api.get('/pantry');
+    pantry = { items: res.data ?? [], locations: res.locations ?? [] };
   } catch (err) {
     reportError(err, container);
     return;
   }
 
-  const { PANTRY_UNITS } = await import('/utils/pantry-units.js');
   const { locationLabel } = await import('/utils/pantry-locations.js');
   if (!isModalContextCurrent(context)) return;
+
+  const { locations } = pantry;
+  const fallbackLocationId = locations.length ? String(locations[0].id) : '';
+  const unitWords = pantryUnitWords(PANTRY_UNITS);
 
   const unitOptions = (selected) => PANTRY_UNITS
     .map((u) => `<option value="${esc(u)}" ${u === selected ? 'selected' : ''}>${esc(t(`pantry.units.${u}`))}</option>`)
     .join('');
+  const locationOptions = (selected) => [
+    `<option value="" ${selected === '' ? 'selected' : ''}>${esc(t('pantry.unlocated'))}</option>`,
+    ...locations.map((loc) => `<option value="${loc.id}" ${String(loc.id) === selected ? 'selected' : ''}>${esc(locationLabel(loc.name))}</option>`),
+  ].join('');
 
   const rows = checked.map((item) => {
-    const parsed = parseShoppingQuantity(item.quantity);
+    const preset = pantryTransferPreset(item, pantry, unitWords, fallbackLocationId);
     return `
-      <li class="pantry-transfer__row" data-id="${item.id}">
+      <li class="pantry-transfer__row" data-id="${item.id}" data-preset="${preset.source}">
         <span class="pantry-transfer__name">${esc(item.name)}</span>
         <input class="form-input pantry-transfer__qty" type="number" min="0" step="any" inputmode="decimal"
-               value="${parsed.quantity}" aria-label="${esc(`${t('pantry.quantityLabel')}: ${item.name}`)}">
+               value="${preset.quantity}" aria-label="${esc(`${t('pantry.quantityLabel')}: ${item.name}`)}">
         <select class="form-input pantry-transfer__unit" aria-label="${esc(`${t('pantry.unitLabel')}: ${item.name}`)}">
-          ${unitOptions(parsed.unit)}
+          ${unitOptions(preset.unit)}
+        </select>
+        <select class="form-input pantry-transfer__loc" aria-label="${esc(`${t('pantry.locationLabel')}: ${item.name}`)}">
+          ${locationOptions(preset.locationId)}
         </select>
       </li>`;
   }).join('');
@@ -3144,12 +3247,9 @@ async function openPantryTransfer(container) {
     size: 'lg',
     content: `
       <p class="pantry-transfer__intro">${esc(t('shopping.toPantryDescription', { count: checked.length }))}</p>
-      <div class="form-group">
-        <label class="form-label" for="pantry-transfer-location">${esc(t('pantry.locationLabel'))}</label>
-        <select id="pantry-transfer-location" class="form-input">
-          <option value="">${esc(t('pantry.unlocated'))}</option>
-          ${locations.map((loc) => `<option value="${loc.id}">${esc(locationLabel(loc.name))}</option>`).join('')}
-        </select>
+      <div class="form-group pantry-transfer__all">
+        <label class="form-label" for="pantry-transfer-location">${esc(t('shopping.toPantryAllTo'))}</label>
+        <select id="pantry-transfer-location" class="form-input">${locationOptions(fallbackLocationId)}</select>
       </div>
       <ul class="pantry-transfer__list">${rows}</ul>
       <!-- Geteiltes .form-check (layout.css): 20px-Box in Modul-Akzent, Label mit
@@ -3157,7 +3257,8 @@ async function openPantryTransfer(container) {
            sie loescht die eingekauften Artikel von der Liste, ist standardmaessig
            aktiv, und war als nackte System-Checkbox in System-Groesse die
            unauffaelligste (Critique 2026-07-30, P2). Der Default bleibt aktiv: wer
-           eingekauft und eingeraeumt hat, will nicht doppelt kaufen.
+           eingekauft und eingeraeumt hat, will nicht doppelt kaufen. Seit R23
+           steht das Abraeumen unter demselben Rueckgaengig wie die Uebernahme.
            Das Abraeumen ist ein DELETE im EINKAUF: ohne dessen Schreibrecht
            entfaellt die Checkbox, sonst endete der Uebertrag danach im 403 (#1265). -->
       ${readOnly() ? '' : `<label class="form-check pantry-transfer__clear">
@@ -3169,13 +3270,15 @@ async function openPantryTransfer(container) {
         <button type="button" class="btn btn--primary" id="pantry-transfer-confirm">${esc(t('common.apply'))}</button>
       </div>`,
     onSave(panel) {
-      // Der erste Ort ist der wahrscheinlichste Standardwert; er ist zugleich
-      // der, den der Haushalt in der Lagerort-Verwaltung nach oben sortiert hat.
-      if (locations.length) panel.querySelector('#pantry-transfer-location').value = String(locations[0].id);
+      // „Alle nach …" gilt fuer ALLE Zeilen, auch die vorbelegten: es ist die
+      // ausdrueckliche Sammelwahl, und eine Zeile laesst sich danach einzeln
+      // zuruecksetzen.
+      panel.querySelector('#pantry-transfer-location')?.addEventListener('change', (e) => {
+        for (const select of panel.querySelectorAll('.pantry-transfer__loc')) select.value = e.currentTarget.value;
+      });
 
       panel.querySelector('#pantry-transfer-confirm').addEventListener('click', async (e) => {
         const btn = e.currentTarget;
-        const locationId = panel.querySelector('#pantry-transfer-location').value || null;
         // Beim Absenden neu gefragt: die Rechte koennen sich geaendert haben,
         // waehrend der Dialog offen stand.
         const clearList = !readOnly() && Boolean(panel.querySelector('#pantry-transfer-clear')?.checked);
@@ -3185,7 +3288,7 @@ async function openPantryTransfer(container) {
           shopping_item_id: Number(row.dataset.id),
           quantity: Number(row.querySelector('.pantry-transfer__qty').value) || 1,
           unit: row.querySelector('.pantry-transfer__unit').value,
-          location_id: locationId,
+          location_id: row.querySelector('.pantry-transfer__loc')?.value || null,
         }));
 
         const modalContext = captureModalContext();
@@ -3193,36 +3296,42 @@ async function openPantryTransfer(container) {
         try {
           const res = await api.post('/pantry/import-shopping', { list_id: listId, items });
           const stored = (res.data?.added ?? 0) + (res.data?.merged ?? 0);
-
-          if (clearList && stored) {
-            // Zweiter, getrennter Aufruf: der Vorrats-Router räumt bewusst
-            // nichts im Einkauf ab, damit ein `pantry:write`-Token dort keine
-            // Daten löschen kann (siehe routes/pantry.js).
-            await api.delete(`/shopping/${listId}/items/checked`);
-            const removed = checked.length;
-            state.items = state.items.filter((i) => !checkedOf(i));
-            updateItemsList(container);
-            updateListCounter(listId, -removed, -removed);
-            renderTabs(container);
-          }
+          const changes = res.data?.changes ?? [];
 
           closeModal({ force: true, context: modalContext });
-          // Der Vorrat ist ein einziges Ziel, der Toast nennt ihn also schon. Was er
-          // NICHT nennt, ist der Lagerort - und der ist die Wahl, die der Nutzer im
-          // Dialog gerade getroffen hat.
-          const locationName = locationId
-            ? (locations.find((l) => String(l.id) === String(locationId))?.name ?? '')
-            : '';
-          window.yuvomi.showToast(
-            stored
-              ? (locationName
-                ? t('shopping.toPantryDoneAt', { count: stored, location: locationLabel(locationName) })
-                : t('shopping.toPantryDone', { count: stored }))
-              : t('shopping.toPantryNothing'),
-            stored ? 'success' : 'info'
-          );
           // Der Vorrats-Tab zeigt jetzt eine andere Zahl.
           refreshKitchenBadges();
+          if (!stored) {
+            window.yuvomi.showToast(t('shopping.toPantryNothing'), 'info');
+            return;
+          }
+          // Der Toast nennt den Ort, wenn ALLES an einen ging - sonst den Vorrat.
+          const places = new Set(items.map((i) => i.location_id ?? ''));
+          const [onlyPlace] = places;
+          const locationName = places.size === 1 && onlyPlace
+            ? (locations.find((l) => String(l.id) === String(onlyPlace))?.name ?? '')
+            : '';
+          const message = locationName
+            ? t('shopping.toPantryDoneAt', { count: stored, location: locationLabel(locationName) })
+            : t('shopping.toPantryDone', { count: stored });
+
+          // Die Ruecknahme zieht im Vorrat genau ab, was die Uebernahme
+          // dazugelegt hat (POST /pantry/import-shopping/undo). Ohne Schreibrecht
+          // im Einkauf oder ohne Haken raeumt sie nur den Vorrat zurueck.
+          const undoPantry = async () => {
+            if (!changes.length) return;
+            try {
+              await api.post('/pantry/import-shopping/undo', { changes });
+              refreshKitchenBadges();
+            } catch (err) {
+              reportError(err, container);
+            }
+          };
+          if (clearList) {
+            clearCheckedUndoable(container, { message, onUndo: undoPantry });
+          } else {
+            scheduleUndoableDelete({ message, commit: async () => {}, restore: (err) => { if (!err) undoPantry(); } });
+          }
         } catch (err) {
           btn.disabled = false;
           reportError(err, container);
@@ -3344,7 +3453,7 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
  * delegierten Klick-Handler von `container`; die Pille lebt seitdem in der
  * Shell und ist von dort aus nicht mehr erreichbar - sie ruft direkt.
  */
-function clearCheckedUndoable(container) {
+function clearCheckedUndoable(container, { message = null, onUndo = null } = {}) {
   if (readOnly()) return;
   const checked = state.items.filter((i) => checkedOf(i));
   const count   = checked.length;
@@ -3367,7 +3476,10 @@ function clearCheckedUndoable(container) {
   renderTabs(container);
 
   scheduleUndoableDelete({
-    message: t('shopping.itemsRemovedToast', { count }),
+    // Die Uebernahme in den Vorrat raeumt ueber denselben Weg ab und bringt
+    // ihren eigenen Satz und ihre eigene Ruecknahme mit (R23, D3): EIN Toast,
+    // EIN Rueckgaengig fuer Liste und Vorrat.
+    message: message ?? t('shopping.itemsRemovedToast', { count }),
     commit: async ({ keepalive }) => {
       let response;
       try {
@@ -3408,6 +3520,9 @@ function clearCheckedUndoable(container) {
       updateListCounter(listId, count, count);
       renderTabs(container);
       if (err) reportError(err, container);
+      // Nur das Rueckgaengig nimmt auch den Vorrat zurueck - ein gescheitertes
+      // Abraeumen laesst die gelungene Uebernahme stehen.
+      else onUndo?.();
     },
   });
 }
@@ -4865,6 +4980,8 @@ export const __test = {
   // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,
   // ist also nur verhaltensgetrieben pruefbar (siehe test-shopping-ux.js).
   parseShoppingQuantity,
+  pantryUnitWords,
+  pantryTransferPreset,
   // Kategorie-Einklappen (#1039): reine Schluessel-/Speicherfunktionen, ohne
   // DOM. `state` bleibt bewusst ERREICHBAR, nicht ERSETZBAR - Tests lesen und
   // schreiben ihre Felder direkt, wie beim Muster in test-health-meds.js.

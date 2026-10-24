@@ -1915,7 +1915,12 @@ unveraendert blieb. Guard `test:typography` "prefers-contrast: more hebt".
 **Die Ausweich-Regel des Toast-Stapels (#1421, 2026-09-22).** Der untere Shell-Stapel
 (Toasts, Sammelpille) liegt UEBER Dialogen (`--z-toast` 300 ueber `--z-modal` 200), damit
 eine Meldung waehrend eines Dialogs sichtbar bleibt - und er verdeckt dabei keine
-Bedienleiste des Dialogs. Anlass: der Toast einer faelligen Erinnerung lag bei 1280x900
+Bedienleiste des Dialogs. **Die Sammelpille tritt vor jedem Dialog und Blatt ab (R23):** sie
+ist eine Bedienung fuer die Liste darunter, keine Meldung; ueber „In den Vorrat" stand sie als
+zweite Fusszeile, deren Löschen ins Leere griff. `html:has(.modal-overlay | .more-sheet |
+.search-overlay--visible) .bulk-pill-layer { display: none }` (layout.css), generisch statt
+je Aufrufer; sie kehrt mit dem Schliessen zurueck, wenn ihre Teilmenge noch besteht (Guard
+`test:frontend-audit` "die Sammel-Pille steht nie über einem Dialog"). Anlass: der Toast einer faelligen Erinnerung lag bei 1280x900
 genau auf "Speichern" des Kalenderdialogs, der Klick verwarf die Erinnerung und speicherte
 nichts. `pointer-events: none` am Toast waere keine Antwort (der Knopf bliebe verdeckt, und
 der Erinnerungs-Toast ist selbst bedienbar); CSS-Ankerpositionierung auch nicht (iOS vor 26
@@ -2128,6 +2133,18 @@ hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester O
   Zeilenaktionen im Kanon oben).
 - **Rezepte:** die Zeile oeffnet das Rezept; Bearbeiten und Loeschen stehen im Mehr-Menue der
   Zeile und im Leseblatt.
+
+**Die Uebergaben der Kueche (R23, D2/D3).** Jeder Weg in den Einkauf (Rezept, Mahlzeit-Karte,
+"Aus dem Essensplan", Warenkorb im Vorrat) folgt EINER Regel (server/services/kitchen-handover.js):
+ein offener Artikel gleichen normalisierten Namens wird uebersprungen, ein abgehakter zaehlt
+nicht; die Meldung nennt beides ("5 Zutaten auf Wocheneinkauf übernommen. 2 standen schon
+darauf.", `transferMessage()`), jeder Weg traegt Rueckgaengig. Die Uebernahme in den Vorrat
+belegt Menge, Einheit und Lagerort JE ZEILE vor - gleichnamiger Bestand, sonst der Ort, an dem
+der Haushalt die Kategorie meistens lagert, sonst "Alle nach …" im Kopf (das alle Zeilen
+setzt) - und fuehrt in eine Charge gleichen Namens, Orts und vertraeglicher Einheit (g/kg,
+ml/l) zusammen. Ein Rueckgaengig nimmt Vorrat UND Abraeumen der Liste zurueck. Zeilenraster:
+Name | Menge | Einheit | Ort, unter 34rem Listenbreite der Name oben und die drei Felder in
+der zweiten Zeile, Haarlinie zwischen den Artikeln.
 
 **Der INHALT eines Dialogs spricht den Ton seines Moduls.** `.modal-panel__body` setzt
 `--module-accent: var(--active-module-accent, var(--color-accent))`: das Modal haengt an

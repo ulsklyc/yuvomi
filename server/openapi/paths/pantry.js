@@ -34,7 +34,19 @@ export function pantryPaths() {
       post: op({
         summary: 'Take checked shopping items into the pantry',
         description: 'Creates or increments pantry items from the checked items of a shopping list. Does not modify the shopping list itself - clear it separately via DELETE /api/v1/shopping/{listId}/items/checked. '
+          + 'An item joins an existing batch when the name (trimmed, whitespace collapsed, case-insensitive), the storage location and the unit fit - the same unit, or one that converts (g/kg, ml/l; the amount is converted into the unit of the batch) - and the best-before dates are equal or one of them is empty. '
+          + 'The response lists `changes` per item (`added`, or `merged` with `quantity_added` and `expires_set`), which `POST /api/v1/pantry/import-shopping/undo` takes back. '
           + 'Reads the shopping list, so it requires read access to the `shopping` module in addition to `pantry` - a credential without it is refused with 403.',
+        tag: 'Pantry',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/pantry/import-shopping/undo': {
+      post: op({
+        summary: 'Undo a take-over from a shopping list',
+        description: 'Body: `{ changes }`, the `changes` of one `POST /api/v1/pantry/import-shopping` response. A batch the take-over created is deleted; a batch it topped up is reduced by exactly the amount it added, and a best-before date the take-over set is cleared again. '
+          + 'The amount is subtracted, not written back, so a change someone made to the batch in the meantime stays. Batches that are gone are skipped; `removed` and `reduced` report what actually went back.',
         tag: 'Pantry',
         stateChanging: true,
         requestBody: jsonBody(null),

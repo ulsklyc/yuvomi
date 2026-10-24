@@ -9834,6 +9834,20 @@ html:has(.app-page.is-selecting) {
   gap: var(--space-2);
 }
 
+/* DIE PILLE TRITT VOR EINEM DIALOG AB (Critique R23, G3/K2). Der Stapel liegt
+ * ueber Dialogen, damit eine Meldung waehrend eines Dialogs sichtbar bleibt
+ * (#1421, die Ausweich-Regel in DESIGN.md) - fuer die Sammel-Pille gilt das
+ * nicht: sie ist eine Bedienung fuer die Liste DARUNTER, und ueber dem Dialog
+ * „In den Vorrat" stand „3 Artikel abgehakt · In den Vorrat · Löschen" als
+ * zweite, konkurrierende Fusszeile, deren Löschen ins Leere griff. Generisch,
+ * fuer jeden Dialog und jedes Blatt, statt in jedem Aufrufer: sie kehrt zurueck,
+ * wenn der Dialog geht, und steht nur noch, wenn ihre Teilmenge noch besteht. */
+html:has(.modal-overlay) .bulk-pill-layer,
+html:has(.more-sheet[aria-hidden="false"]) .bulk-pill-layer,
+html:has(.search-overlay--visible) .bulk-pill-layer {
+  display: none;
+}
+
 /* ZWISCHEN 768 UND 1023px STEHT DIE TAB-LEISTE NOCH.
  *
  * Hier ersetzte `bottom: var(--space-8)` den Abstand der Basisregel, der die
