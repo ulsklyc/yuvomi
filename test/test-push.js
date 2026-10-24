@@ -143,7 +143,8 @@ function makeDb() {
       endpoint TEXT NOT NULL UNIQUE,
       p256dh TEXT NOT NULL, auth TEXT NOT NULL, user_agent TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-      last_used_at TEXT
+      last_used_at TEXT,
+      wall_paused_at TEXT
     );
   `);
   db.exec(MIGRATIONS.find((m) => m.version === 60).up);

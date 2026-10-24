@@ -654,6 +654,11 @@ router.get('/', (req, res) => {
         // dieselbe Form wie calendar_default_target, damit beide Dialoge ihr
         // Ziel gleich benennen.
         tasks_default_target: cfgUserGet('tasks_default_target', req.authUserId) || '',
+        // Sichtbarkeit und Sperre als persoenliche Vorbelegung fuer neue
+        // Aufgaben (#2125). Standardwert "all" und false, damit der Dialog
+        // unveraendert wirkt, solange kein Nutzer etwas eingestellt hat.
+        tasks_default_visibility: cfgUserGet('tasks_default_visibility', req.authUserId) || 'all',
+        tasks_default_locked: cfgUserGet('tasks_default_locked', req.authUserId) === '1',
         schedule_hidden_templates: parseScheduleHiddenTemplates(cfgGet('schedule_hidden_templates')),
         weather_provider: cfgGet('weather_provider') ?? null,
         weather_lat:      cfgGet('weather_lat')      ?? null,
@@ -716,7 +721,7 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
@@ -1121,6 +1126,17 @@ router.put('/', (req, res) => {
       cfgUserSet('tasks_default_target', req.authUserId, target);
     }
 
+    // Sichtbarkeit und Sperre als persoenliche Vorbelegung (#2125).
+    if (tasks_default_visibility !== undefined) {
+      if (!['all', 'assignees', 'private'].includes(tasks_default_visibility)) {
+        return res.status(400).json({ error: 'tasks_default_visibility muss "all", "assignees" oder "private" sein', code: 400 });
+      }
+      cfgUserSet('tasks_default_visibility', req.authUserId, tasks_default_visibility);
+    }
+    if (tasks_default_locked !== undefined) {
+      cfgUserSet('tasks_default_locked', req.authUserId, tasks_default_locked ? '1' : '0');
+    }
+
     // Validiert (Admin-Rolle, Array-Form) bereits ganz oben, vor jedem anderen
     // Schreiben in diesem Request - hier nur noch der eigentliche Schreibvorgang.
     if (schedule_hidden_templates !== undefined) {
@@ -1468,6 +1484,11 @@ router.put('/', (req, res) => {
         // dieselbe Form wie calendar_default_target, damit beide Dialoge ihr
         // Ziel gleich benennen.
         tasks_default_target: cfgUserGet('tasks_default_target', req.authUserId) || '',
+        // Sichtbarkeit und Sperre als persoenliche Vorbelegung fuer neue
+        // Aufgaben (#2125). Standardwert "all" und false, damit der Dialog
+        // unveraendert wirkt, solange kein Nutzer etwas eingestellt hat.
+        tasks_default_visibility: cfgUserGet('tasks_default_visibility', req.authUserId) || 'all',
+        tasks_default_locked: cfgUserGet('tasks_default_locked', req.authUserId) === '1',
         schedule_hidden_templates: parseScheduleHiddenTemplates(cfgGet('schedule_hidden_templates')),
         weather_provider: cfgGet('weather_provider') ?? null,
         weather_lat:      cfgGet('weather_lat')      ?? null,

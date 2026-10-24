@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **New tasks remember your preferred visibility and lock setting (#2125).** In Settings > Tasks
+  you can now choose the visibility and lock state that the new-task dialog opens with. Each
+  individual task can still use different values; the defaults only prefill the dialog.
 - **A contact with a birthday can be added to Birthdays from its detail view** (#2149). Until now
   only contacts whose birthday had been imported showed a way to Birthdays. A contact with a birth
   date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same

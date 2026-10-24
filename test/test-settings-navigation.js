@@ -2704,7 +2704,9 @@ async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
   const prev = { window: globalThis.window, document: globalThis.document, error: console.error };
   const navigations = [];
-  globalThis.window = { yuvomi: { showToast() {}, navigate: (href) => navigations.push(href) } };
+  const puts = [];
+  const toasts = [];
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args), navigate: (href) => navigations.push(href) } };
   globalThis.document = fakeDocument();
   console.error = () => {};
   const state = { syncTargets };
@@ -2717,10 +2719,11 @@ async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
       }
       return { data: null };
     },
+    put: async (url, body) => { puts.push([url, body]); return { data: body }; },
   };
   resetPreferencesCache();
   try {
-    await run({ render, state, navigations });
+    await run({ render, state, navigations, puts, toasts });
   } finally {
     delete globalThis.__apiStub;
     globalThis.window = prev.window;
@@ -2792,6 +2795,57 @@ test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Au
     assert.match(host.html, /id="tasks-default-target"/, 'Erneut versuchen laedt die Listen und zeigt das Feld');
     assert.equal(walkNodes(host.appended).some((node) => node.getAttribute?.('role') === 'alert'), false, 'der Fehler ist weg');
   });
+});
+
+test('Aufgaben-Standardwerte: Sichtbarkeit und Sperre erscheinen immer, gespeicherter Wert wird vorbelegt (#2125)', async () => {
+  await withTasksDefaults({
+    preferences: { tasks_default_visibility: 'assignees', tasks_default_locked: true },
+    syncTargets: [],
+  }, async ({ render }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    assert.match(host.html, /id="tasks-default-visibility"/, 'Sichtbarkeitsfeld fehlt');
+    assert.match(host.html, /id="tasks-default-locked"/, 'Sperrfeld fehlt');
+    assert.match(host.html, /value="assignees" selected/, 'gespeicherter Wert "assignees" ist nicht vorbelegt');
+    assert.match(host.html, / checked/, 'gespeicherter Wert "locked" ist nicht angehakt');
+  });
+});
+
+test('Aufgaben-Standardwerte: Aenderung der Sichtbarkeit speichert per PUT /preferences (#2125)', async () => {
+  await withTasksDefaults({ preferences: { tasks_default_visibility: 'all' }, syncTargets: [] }, async ({ render, puts, toasts }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    const select = host.querySelector('#tasks-default-visibility');
+    assert.ok(select, 'Sichtbarkeitsfeld nicht gefunden');
+    select.value = 'private';
+    await select.fire('change');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_visibility: 'private' }]], 'Wert nicht gespeichert');
+    assert.equal(toasts.length, 1, 'kein Toast nach Speichern');
+  });
+});
+
+test('Aufgaben-Standardwerte: Aenderung der Sperre speichert per PUT /preferences (#2125)', async () => {
+  await withTasksDefaults({ preferences: { tasks_default_locked: false }, syncTargets: [] }, async ({ render, puts, toasts }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    const toggle = host.querySelector('#tasks-default-locked');
+    assert.ok(toggle, 'Sperrfeld nicht gefunden');
+    toggle.checked = true;
+    await toggle.fire('change');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_locked: true }]], 'Wert nicht gespeichert');
+    assert.equal(toasts.length, 1, 'kein Toast nach Speichern');
+  });
+});
+
+test('Aufgaben-Standardwerte: neue Aufgabe belegt Sichtbarkeit und Sperre aus den Einstellungen vor (#2125)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const tasksSource = await readFile(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  // Beim Anlegen (isEdit = false) soll state.defaultVisibility und state.defaultLocked gelten.
+  assert.match(tasksSource, /state\.defaultVisibility/, 'state.defaultVisibility nicht referenziert');
+  assert.match(tasksSource, /state\.defaultLocked/, 'state.defaultLocked nicht referenziert');
+  // Beim Bearbeiten (isEdit = true) soll immer der task-eigene Wert stehen.
+  assert.match(tasksSource, /isEdit.*task.*visibility|task.*visibility.*isEdit/, 'Fallunterscheidung fuer Sichtbarkeit fehlt');
+  assert.match(tasksSource, /isEdit.*defaultLocked|defaultLocked.*isEdit/, 'Fallunterscheidung fuer Sperre fehlt');
 });
 
 /* ==========================================================================

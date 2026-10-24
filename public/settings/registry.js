@@ -529,6 +529,8 @@ export const SETTINGS_SECTIONS = freezeEntries([
     labelKey: 'settings.pageTaskDefaults',
     descriptionKey: 'settings.pageTaskDefaultsDescription',
     options: [
+      'settings.tasksDefaultVisibilityLabel',
+      'settings.tasksDefaultLockedLabel',
       'settings.tasksDefaultTargetLabel',
     ],
     adminOnly: false,

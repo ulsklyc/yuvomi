@@ -3,7 +3,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { caldavTargetValue, SYNC_TARGET_LOCAL } from '/utils/sync-target.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
-import { createRetryState, settingRowHtml } from '/settings/components.js';
+import { createRetryState, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 
 /**
  * Standardwerte, die nur für die eigenen neuen Aufgaben gelten (#695).
@@ -92,6 +92,28 @@ function targetFieldHtml(options, current) {
   `;
 }
 
+function visibilityFieldHtml(current) {
+  const opt = (v) => `<option value="${v}"${current === v ? ' selected' : ''}>${esc(t(`common.visibility.${v}`))}</option>`;
+  return `
+        <div class="row-carrier settings-group">
+          ${settingRowHtml({
+            label: t('settings.tasksDefaultVisibilityLabel'), labelFor: 'tasks-default-visibility',
+            description: t('settings.tasksDefaultVisibilityHint'), descriptionId: 'tasks-default-visibility-hint',
+            control: `<select id="tasks-default-visibility" class="form-input" aria-describedby="tasks-default-visibility-hint">${opt('all')}${opt('assignees')}${opt('private')}</select>`,
+          })}
+        </div>`;
+}
+
+function lockedFieldHtml(checked) {
+  return settingSwitchRowHtml({
+    label: t('settings.tasksDefaultLockedLabel'),
+    description: t('settings.tasksDefaultLockedHint'),
+    descriptionId: 'tasks-default-locked-hint',
+    checked,
+    attrs: { id: 'tasks-default-locked' },
+  });
+}
+
 function emptyStateHtml(user) {
   const release = user?.role === 'admin'
     ? `
@@ -107,6 +129,9 @@ ${release}`;
 
 function renderPage(container, preferences, lists, user) {
   const current = preferences.tasks_default_target || '';
+  const defaultVisibility = preferences.tasks_default_visibility || 'all';
+  const defaultLocked = preferences.tasks_default_locked === true;
+
   // Das Feld erscheint nur, wenn es etwas zu wählen gibt - ohne freigegebene
   // Erinnerungsliste bliebe ein Dropdown mit der einzigen Option "nur lokal".
   // Ist die Abfrage selbst gescheitert (lists === null), bleibt es ebenfalls
@@ -116,9 +141,9 @@ function renderPage(container, preferences, lists, user) {
     local: t('tasks.syncTargetLocal'),
     unavailable: t('settings.tasksDefaultTargetUnavailable'),
   }, current) : [];
-  let body = '';
-  if (options.length > 1) body = targetFieldHtml(options, current);
-  else if (lists) body = emptyStateHtml(user);
+  let targetBody = '';
+  if (options.length > 1) targetBody = targetFieldHtml(options, current);
+  else if (lists) targetBody = emptyStateHtml(user);
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -129,7 +154,9 @@ function renderPage(container, preferences, lists, user) {
       <h2 class="settings-section__title">${t('settings.tasksDefaultsTitle')}</h2>
       <div class="settings-card">
         <p class="settings-card-description">${t('settings.tasksDefaultsDescription')}</p>
-${body}      </div>
+        ${visibilityFieldHtml(defaultVisibility)}
+        ${lockedFieldHtml(defaultLocked)}
+${targetBody}      </div>
     </section>
   `);
 }
@@ -143,22 +170,58 @@ function bindEvents(container) {
     window.yuvomi.navigate(SYNC_REMINDERS_PATH);
   });
 
-  const select = container.querySelector('#tasks-default-target');
-  if (!select) return;
+  const visibilitySelect = container.querySelector('#tasks-default-visibility');
+  if (visibilitySelect) {
+    let persistedVisibility = visibilitySelect.value;
+    visibilitySelect.addEventListener('change', async () => {
+      const value = visibilitySelect.value;
+      visibilitySelect.disabled = true;
+      try {
+        await savePreferences({ tasks_default_visibility: value });
+        persistedVisibility = value;
+        window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
+      } catch (error) {
+        visibilitySelect.value = persistedVisibility;
+        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      } finally {
+        if (visibilitySelect.isConnected) visibilitySelect.disabled = false;
+      }
+    });
+  }
 
-  let persisted = select.value;
-  select.addEventListener('change', async () => {
-    const value = select.value;
-    select.disabled = true;
+  const lockedToggle = container.querySelector('#tasks-default-locked');
+  if (lockedToggle) {
+    lockedToggle.addEventListener('change', async () => {
+      const value = lockedToggle.checked;
+      lockedToggle.disabled = true;
+      try {
+        await savePreferences({ tasks_default_locked: value });
+        window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
+      } catch (error) {
+        lockedToggle.checked = !value;
+        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      } finally {
+        if (lockedToggle.isConnected) lockedToggle.disabled = false;
+      }
+    });
+  }
+
+  const targetSelect = container.querySelector('#tasks-default-target');
+  if (!targetSelect) return;
+
+  let persisted = targetSelect.value;
+  targetSelect.addEventListener('change', async () => {
+    const value = targetSelect.value;
+    targetSelect.disabled = true;
     try {
       await savePreferences({ tasks_default_target: value });
       persisted = value;
       window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
     } catch (error) {
-      select.value = persisted;
+      targetSelect.value = persisted;
       window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
     } finally {
-      if (select.isConnected) select.disabled = false;
+      if (targetSelect.isConnected) targetSelect.disabled = false;
     }
   });
 }

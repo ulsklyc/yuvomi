@@ -1114,7 +1114,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Wen der Zustaendigen-Picker anbietet: die Mitglieder und wer schon an der
   // Aufgabe steht. Versteckt wird er nur, wenn darin wirklich eine Person steht.
   const assigneePeople = withChosenPeople(users, task?.assigned_users);
-  const visibility  = task?.visibility || 'all';
+  const visibility = isEdit ? (task?.visibility || 'all') : (state.defaultVisibility || 'all');
 
   const selectedCat = task?.category ?? FALLBACK_CATEGORY;
   const categoryOptions = state.categories.map((c) =>
@@ -1326,7 +1326,7 @@ ${syncTargetFieldHtml(task)}
       <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         <label class="toggle" style="margin:0">
           <input type="checkbox" id="task-locked" name="locked" aria-describedby="task-locked-hint"
-                 ${task?.locked ? 'checked' : ''}>
+                 ${(isEdit ? task?.locked : state.defaultLocked) ? 'checked' : ''}>
           <span class="toggle__track"></span>
           <span>${t('tasks.lockedToggle')}</span>
         </label>
@@ -6431,6 +6431,8 @@ export async function render(container, { user, signal } = {}) {
     state.defaultPoints = Number(meta.default_points) || 0;
     state.subtasksExpandedByDefault = preferencesData.data?.tasks_subtasks_expanded === true;
     state.defaultSyncTarget = preferencesData.data?.tasks_default_target || '';
+    state.defaultVisibility = preferencesData.data?.tasks_default_visibility || 'all';
+    state.defaultLocked = preferencesData.data?.tasks_default_locked === true;
   } catch (err) {
     console.error('[Tasks] Ladefehler:', err);
     // Der Toast allein war die falsche Antwort: er verging, und darunter blieb
