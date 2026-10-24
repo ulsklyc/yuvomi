@@ -88,6 +88,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version check against GitHub, the design line speaks of a native-feeling app instead of design
   jargon, and the coloured technology badges became one line under "Under the hood". The German
   README follows, with its English link in the link row.
+- **yuvomi.cloud shows the app sooner and reads more evenly.** On a laptop screen the first
+  screen of the landing page now shows well over a third of the overview screenshot instead of a
+  thin strip at its bottom edge, with the household line and the Install button still above it.
+  The phone beside the screenshot moved off the Rewards card. Running text, labels and buttons on
+  the site use five type sizes instead of twenty. The four feature blocks in the module catalogue
+  open with the module's icon and name like every entry next to them, instead of a row of capital
+  letters above the heading. The meals screenshot no longer shows an empty lower third. In the
+  install guide the "~10 minutes" note no longer looks like a button, the extras and the
+  troubleshooting answers are lists instead of cards that held code and warnings inside, and the
+  ten extras fill their grid without empty places. Sections that fade in as you scroll do it once:
+  scrolling back up no longer fades out the text at the bottom of the screen.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
@@ -298,6 +309,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **yuvomi.cloud names all 27 languages.** The landing page and the web installer section of the
+  install guide still said 26 after Traditional Chinese arrived. On the platform cards "Start here"
+  in German no longer covers the Docker and Podman logos, and the README's number row says
+  "256 MB RAM minimum" (German "ab 256 MB RAM"), which is the minimum the install guide names,
+  not what the app uses.
 - **The website's theme button returns to the system setting.** It used to switch between light
   and dark only, so after one click the page never followed the system again. It now cycles
   System, Light, Dark, names the current and the next mode, and keeps the choice on all five

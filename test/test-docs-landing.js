@@ -3568,6 +3568,13 @@ function motionFindings(pages, siteCss, siteJs) {
       if (!gated && moving.some(([n]) => n === 'animation-timeline')) {
         found.push(`${where}: ${r.selector} bindet eine Animation an den Scroll ausserhalb von prefers-reduced-motion: no-preference`);
       }
+      // S6: eine Ankunft spielt einmal. An einer view()-Zeitleiste lief sie
+      // beim Hochscrollen rueckwaerts - was unten am Rand stand, blendete aus
+      // und blieb in Ruhe halb durchsichtig (gemessen: eine .ho-row bei 841px
+      // mit opacity 0, nachdem sie schon gelesen war).
+      if (sels.some((s) => /\.rv\b/.test(s)) && moving.some(([n]) => n === 'animation-timeline')) {
+        found.push(`${where}: ${r.selector} bindet eine Ankunft (.rv) an den Scroll - sie spielt beim Hochscrollen rueckwaerts`);
+      }
     }
   }
   for (const [p, h] of pages) {
@@ -3602,6 +3609,9 @@ test('der Ankunfts-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Ein Scroll-Effekt, der auch unter reduzierter Bewegung laeuft.
   const sda = pages.map(([p, h]) => [p, p === 'index.html' ? h.replace('</style>', '.hero-frame { animation: x linear both; animation-timeline: view(); }\n</style>') : h]);
   assert.ok(hit(motionFindings(sda, css, js), /index\.html: \.hero-frame bindet eine Animation an den Scroll/));
+  // Der S3-Stand: Ankunft an der view()-Zeitleiste, auch gebremst ein Befund.
+  const scrubbed = css + '\n@media (prefers-reduced-motion: no-preference) { html.js .rv { animation: rv-rise both; animation-timeline: view(); } }\n';
+  assert.ok(hit(motionFindings(pages, scrubbed, js), /bindet eine Ankunft \(\.rv\) an den Scroll/));
   // Der alte Observer der Installationsseite.
   const own = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('</body>', "<script>document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });</script>\n</body>") : h]);
   assert.ok(hit(motionFindings(own, css, js), /install\.html: schaltet die Ankuenfte selbst/));
@@ -3664,4 +3674,39 @@ test('der Erster-Bildschirm-Guard erkennt den Schaden, gegen den er gebaut ist',
   const noHouse = html.replace(/<p class="hero-house">[\s\S]*?<\/p>/, '');
   assert.notEqual(noHouse, html);
   assert.deepEqual(firstScreenFindings(noHouse), ['kein Haushaltssatz (hero_house) im Hero']);
+});
+
+// ── (22) Sprachzahlen der Website = Locale-Dateien ──────────────────────────
+//
+// Die README prueft ihre Sprachzahl gegen public/locales/ (test:readme-
+// consistency), die Website nicht: mit zh-Hant (#2178) kam die 27. Sprache,
+// und die Proof-Leiste der Startseite sagte weiter 26, der Web-Installer auf
+// install.html ebenso (gemessen S6, 24.10.). Die App-Zahl ist die Zahl der
+// Dateien in public/locales/, die des Installers die in
+// tools/installer/locales/ (ohne den cli-Ordner).
+function languageCountFindings(index, install) {
+  const count = (dir) => readdirSync(resolve(ROOT, dir)).filter((f) => f.endsWith('.json')).length;
+  const app = count('public/locales');
+  const wizard = count('tools/installer/locales');
+  const found = [];
+  const proof = index.match(/<b>(\d+)<\/b> <span data-t="proof_langs">/);
+  if (!proof) found.push('index.html: Sprachzahl der Proof-Leiste nicht gefunden - Muster veraltet?');
+  else if (Number(proof[1]) !== app) found.push(`index.html: Proof-Leiste nennt ${proof[1]} Sprachen, public/locales/ hat ${app}`);
+  const claims = [...install.matchAll(/(\d+) (?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
+  if (claims.length < 3) found.push(`install.html: nur ${claims.length} Sprachangaben des Installers gefunden - Muster veraltet?`);
+  for (const c of claims) if (c !== wizard) found.push(`install.html: der Installer nennt ${c} Sprachen, tools/installer/locales/ hat ${wizard}`);
+  return found;
+}
+
+test('docs: die Sprachzahlen der Website sind die Zahl der Locale-Dateien', () => {
+  assert.deepEqual(languageCountFindings(read('index.html'), read(INSTALL)), []);
+});
+
+test('der Sprachzahl-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const index = read('index.html');
+  const stale = index.replace(/<b>\d+<\/b> <span data-t="proof_langs">/, '<b>26</b> <span data-t="proof_langs">');
+  assert.notEqual(stale, index);
+  assert.match(languageCountFindings(stale, read(INSTALL)).join(), /Proof-Leiste nennt 26 Sprachen/);
+  const install = read(INSTALL).replace(/\d+ Sprachen\b/, '3 Sprachen');
+  assert.match(languageCountFindings(index, install).join(), /der Installer nennt 3 Sprachen/);
 });

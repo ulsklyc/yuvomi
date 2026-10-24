@@ -27,7 +27,7 @@
     <a href="README.de.md" hreflang="de">Auf&nbsp;Deutsch</a>
   </p>
 
-  <p><b>20</b>&nbsp;modules&nbsp;&nbsp;·&nbsp; <b>27</b>&nbsp;languages&nbsp;&nbsp;·&nbsp; <b>0</b>&nbsp;trackers&nbsp;&nbsp;·&nbsp; <b>1</b>&nbsp;SQLite&nbsp;file&nbsp;&nbsp;·&nbsp; <b>256&nbsp;MB</b>&nbsp;RAM</p>
+  <p><b>20</b>&nbsp;modules&nbsp;&nbsp;·&nbsp; <b>27</b>&nbsp;languages&nbsp;&nbsp;·&nbsp; <b>0</b>&nbsp;trackers&nbsp;&nbsp;·&nbsp; <b>1</b>&nbsp;SQLite&nbsp;file&nbsp;&nbsp;·&nbsp; <b>256&nbsp;MB</b>&nbsp;RAM&nbsp;minimum</p>
 
   <picture>
     <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-mobile.webp">

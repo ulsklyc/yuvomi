@@ -132,18 +132,18 @@
      arrival is never held back (S3 - the install guide's LCP paragraph used
      to wait 600-750ms for this). Runs once, here at the end of the body,
      before the page scrolls anywhere; rects are read before the first class
-     is written. Under reduced motion nothing is armed. With scroll-driven
-     animations the CSS plays the arrival on the scroll position; otherwise
-     an observer adds .vis once. With neither, nothing is armed, since
-     nothing would show it again.
+     is written. Under reduced motion nothing is armed. An observer adds .vis
+     once, and the arrival never plays backwards (S6: a scroll-bound timeline
+     faded text out again at the bottom edge when the reader scrolled up).
+     Without IntersectionObserver nothing is armed, since nothing would show
+     it again.
      A candidate inside a section the page defers (content-visibility: auto,
      index.html) is NOT measured: its rect would force the very layout the
      deferral saves. The section's own box stands in for it, and the row
      columns (--i) are counted when the section starts to render. */
   (function () {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var sda = !!(window.CSS && CSS.supports && CSS.supports('(animation-timeline: view()) and (animation-range: entry)'));
-    if (!sda && !('IntersectionObserver' in window)) return;
+    if (!('IntersectionObserver' in window)) return;
     var fold = window.innerHeight, seen = new Map(), later = new Map(), armed = [];
     function deferredBy(n) {
       for (var p = n.parentElement; p && p !== document.body; p = p.parentElement) {
@@ -191,7 +191,7 @@
       n.classList.add('rv');
       if (n.matches('.gal-item, .fam-shot')) n.classList.add('rv-media');
     });
-    if (sda || !armed.length) return;
+    if (!armed.length) return;
     var obs = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
         if (e.isIntersecting) { e.target.classList.add('vis'); obs.unobserve(e.target); }

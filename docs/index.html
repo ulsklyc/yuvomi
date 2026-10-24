@@ -178,7 +178,7 @@
     .nav-jump { position: relative; margin-left: auto; margin-right: 14px; }
     .nav-jump summary { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px;
       border-radius: var(--r-full); border: 1px solid var(--border); background: none;
-      color: var(--text-2); font-size: 0.82rem; font-weight: 600; cursor: pointer; list-style: none;
+      color: var(--text-2); font-size: var(--fs-meta); font-weight: 600; cursor: pointer; list-style: none;
       transition: background-color var(--dur-hover), border-color var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
     .nav-jump summary:active { transform: scale(var(--press-sm)); }
     .nav-jump[open] summary { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
@@ -212,7 +212,7 @@
       list-style: none; margin: 0; padding: 7px; border-radius: var(--r-md);
       background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
     .nav-jump a { display: block; padding: 9px 12px; border-radius: var(--r-sm); min-height: 44px;
-      display: flex; align-items: center; color: var(--text-2); font-size: 0.88rem; font-weight: 500; text-decoration: none; }
+      display: flex; align-items: center; color: var(--text-2); font-size: var(--fs-small); font-weight: 500; text-decoration: none; }
     .nav-jump a:hover, .nav-jump a:focus-visible { background: var(--bg-alt); color: var(--text-1); }
     /* Die Fortschrittslinie sagt "wie weit", das Menue sagte nicht "wo". Der
        aktive Eintrag traegt aria-current="location" (per Scroll-Spy) und die
@@ -295,7 +295,7 @@
     }
 
     .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-label); font-weight: 700;
       letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
     }
     .eyebrow::before { content: ''; width: 22px; height: 1.5px; background: var(--accent); opacity: 0.6; }
@@ -307,7 +307,7 @@
       letter-spacing: -0.035em; margin: 16px 0 14px; text-wrap: balance;
     }
     .sec-title em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .sec-desc { font-size: 1.075rem; color: var(--text-2); line-height: 1.65; max-width: var(--m-prose); }
+    .sec-desc { font-size: var(--fs-lead); color: var(--text-2); line-height: 1.65; max-width: var(--m-prose); }
     .sec-head.center .sec-desc { margin-left: auto; margin-right: auto; }
     /* Four heads sit flush left under an eyebrow - see it (gallery), it fits
        together (handoffs), it is for everyone in the house (family), it
@@ -333,7 +333,12 @@
        Collage stand seit S3 bei Fortschritt 0 still (gemessen S4). `clip`
        schneidet den Lichthof genauso, ohne Scroll-Container zu sein;
        `hidden` davor bleibt der Fallback fuer Browser ohne `clip`. */
-    .hero { padding: calc(var(--bar-h) + var(--sec-m)) 0 72px; position: relative; overflow: hidden; overflow: clip; }
+    /* Oben nur ein halber Kapitelrand (S6): bei 1440x900 zeigte der erste
+       Bildschirm 136px der Aufnahme, 15 % - der Beweis begann erst nach dem
+       Falz. Mit dem knapperen Kopf, der schmaleren h1 und dem zweizeiligen
+       Untertitel stehen dort jetzt rund 40 %, Haushaltszeile und Knopf
+       bleiben darueber. */
+    .hero { padding: calc(var(--bar-h) + 28px) 0 72px; position: relative; overflow: hidden; overflow: clip; }
     .hero-glow {
       position: absolute; top: -240px; left: 50%; transform: translateX(-50%);
       width: 1100px; height: 900px; pointer-events: none; z-index: 0;
@@ -350,36 +355,36 @@
        zentriert darueber und die Aufnahme bekommt die volle Spalte - der
        Beweis ist lesbar, und unten am ersten Bildschirm beginnt er schon. */
     .hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr);
-      gap: clamp(40px, 5vw, 64px); justify-items: center; text-align: center; }
+      gap: clamp(24px, 2vw, 28px); justify-items: center; text-align: center; }
     .hero-content { max-width: 56rem; }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 12px; border-radius: var(--r-full);
-      font-size: 0.8rem; font-weight: 600; color: var(--text-2);
+      font-size: var(--fs-meta); font-weight: 600; color: var(--text-2);
       background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--border); box-shadow: var(--shadow-sm); margin-bottom: 26px;
+      border: 1px solid var(--border); box-shadow: var(--shadow-sm); margin-bottom: 16px;
     }
     /* Akzent statt --m-tasks: der Punkt markiert einen Status (frei, offen),
        kein Modul - dieselbe Vokabelregel wie an .plat-badge unten. */
     .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
     .hero h1 {
-      font-size: clamp(2.7rem, 6vw, 4.4rem); font-weight: 700; line-height: 1.03;
-      letter-spacing: -0.04em; margin-bottom: 22px; text-wrap: balance;
+      font-size: clamp(2.5rem, 3.6vw + 0.5rem, 3.6rem); font-weight: 700; line-height: 1.04;
+      letter-spacing: -0.04em; margin-bottom: 14px; text-wrap: balance;
     }
     .hero h1 em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .hero-sub { font-size: 1.18rem; color: var(--text-2); max-width: 46ch; margin: 0 auto 34px; line-height: 1.6; text-wrap: pretty; }
+    .hero-sub { font-size: var(--fs-lead); color: var(--text-2); max-width: 56ch; margin: 0 auto 24px; line-height: 1.55; text-wrap: balance; }
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
     /* Die Technik steht als Satz unter dem Knopf, zu dem sie gehoert, statt als
        Chips ("Docker · Podman", "PWA") ohne Erklaerung mitten im ersten
        Bildschirm: wer installiert, liest hier womit; wer es nicht tut,
        ueberliest eine leise Zeile statt drei Fremdwoerter. */
-    .hero-runs { margin-top: 14px; font-size: 0.86rem; color: var(--text-2); line-height: 1.5; text-wrap: balance; }
+    .hero-runs { margin-top: 12px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.5; text-wrap: balance; }
     /* Die Antwort auf "und der Rest der Familie?" stand erst bei ~5.200px
        (mobil ~6.000px). Hier steht sie im ersten Bildschirm, mit der Bildmarke
        als Zeichen: drei Kreise, ein Haushalt. Unter den Knoepfen, nicht
        darueber - installieren bleibt die eine Hauptaktion. */
-    .hero-house { display: inline-flex; align-items: center; gap: 12px; margin-top: 28px; padding-top: 22px;
-      border-top: 1px solid var(--border); max-width: 46ch; text-align: left;
-      font-size: 1rem; font-weight: 500; line-height: 1.5; color: var(--text-1); }
+    .hero-house { display: inline-flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--border); max-width: 54rem; text-align: left;
+      font-size: var(--fs-body); font-weight: 500; line-height: 1.5; color: var(--text-1); }
     .house-mark { flex-shrink: 0; width: 34px; height: 34px; color: var(--accent); }
     .house-mark circle:nth-child(2) { fill-opacity: 0.62; }
     .house-mark circle:nth-child(3) { fill-opacity: 0.44; }
@@ -401,9 +406,13 @@
     .hero-frame img { width: 100%; height: auto; display: block; }
     /* Mit der Aufnahme waechst das Telefon (bei 1.152px rund 220px statt 150px):
        ein Fuenftel der Breite, damit es neben dem Dashboard ein zweites
-       Geraet bleibt und keine Briefmarke wird. */
+       Geraet bleibt und keine Briefmarke wird.
+       Links unten statt rechts (S6): rechts lag es genau auf der
+       Belohnungen-Karte des Dashboards, links liegt es auf dem unteren Teil
+       der Seitenleiste - Navigation, die schon oben zu sehen ist - und laesst
+       Familie, Geburtstage und Belohnungen frei. */
     .hero-float {
-      position: absolute; bottom: -28px; right: -22px; width: clamp(150px, 19%, 230px);
+      position: absolute; bottom: -28px; left: -22px; width: clamp(150px, 19%, 230px);
       border-radius: var(--r-phone); border: 4px solid var(--surface); box-shadow: var(--shadow-xl);
       z-index: 2; overflow: hidden; background: var(--surface);
     }
@@ -414,10 +423,9 @@
        schneller nach oben (-32px) - dieselbe Familie, zwei Bildschirme,
        zwei Ebenen. Gebunden an die Scrollposition (view-timeline auf dem
        unbewegten .hero-visual, Bereich `exit`), also beim Laden in Ruhe: das
-       LCP-Bild malt unbewegt. Nur `translate`/`scale`, nur am Schirm mit
-       zweispaltigem Hero (darunter faellt das Telefon weg, und das
-       Hochformat-Dashboard steht knapp ueber dem Hero-Rand, den
-       overflow:hidden schneidet). Ohne scroll-getriebene Animationen steht
+       LCP-Bild malt unbewegt. Nur `translate`/`scale`, nur ab 1025px
+       (darunter faellt das Telefon weg, und das Hochformat-Dashboard steht
+       knapp ueber dem Hero-Rand, den overflow:clip schneidet). Ohne scroll-getriebene Animationen steht
        die Collage still - Schmuck bekommt keinen Ersatz per Skript. */
     @media (prefers-reduced-motion: no-preference) and (min-width: 1025px) {
       @supports ((animation-timeline: view()) and (animation-range: entry)) {
@@ -432,7 +440,7 @@
     /* ===== Proof bar ===== */
     .proof { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-alt); }
     .proof .wrap { --proof-gap: 36px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
-      gap: 10px var(--proof-gap); padding: 16px 24px; font-size: 0.84rem; font-weight: 600; color: var(--text-2); }
+      gap: 10px var(--proof-gap); padding: 16px 24px; font-size: var(--fs-small); font-weight: 600; color: var(--text-2); }
     .proof b { color: var(--text-1); font-variant-numeric: tabular-nums; }
     /* Der Trennpunkt sitzt absolut in der Spaltenluecke vor seinem Eintrag und
        nimmt keinen Platz ein. Deshalb kann das Skript ihn am Zeilenanfang
@@ -469,14 +477,14 @@
     .gal-cap { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
     .gal-kicker {
       display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
-      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
       color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); padding: 5px 11px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--m) 12%, transparent);
     }
     /* Neben dem Kicker lief die Unterschrift bis 2026-09-29 ueber die ganze
        Spalte: 131 Zeichen (EN) bzw. 150 (DE) in EINER Zeile bei 1440px.
        --m-prose ist die Fliesstextstufe der Seite (gemessen hoechstens 78 Zeichen). */
-    .gal-cap p { font-size: 1.02rem; color: var(--text-2); line-height: 1.5; margin: 0; max-width: var(--m-prose); }
+    .gal-cap p { font-size: var(--fs-body); color: var(--text-2); line-height: 1.5; margin: 0; max-width: var(--m-prose); }
     .gal-cap b { color: var(--text-1); font-weight: 600; }
     .gal-frame { position: relative; border-radius: var(--r-xl); }
     /* Same radial accent the feature rows use, so the module colour still reads
@@ -490,6 +498,11 @@
       width: 100%; aspect-ratio: 4 / 3; border-radius: var(--r-xl);
       border: 1px solid var(--border); box-shadow: var(--shadow-xl);
     }
+    /* Der Wochenplan endet nach vier Mahlzeitenreihen bei rund 62 % der
+       Aufnahmehoehe; im 4:3-Rahmen war der Rest leere Flaeche. 16:9 von oben
+       zeigt dieselbe Woche ohne das leere Drittel (S6). Unter 860px gilt der
+       Telefonrahmen unten, dort ist die Hochkant-Aufnahme voll. */
+    .gal-frame--crop img { aspect-ratio: 16 / 9; object-fit: cover; object-position: top left; }
 
     /* ===== What it replaces =====
        Ein Band, keine Tabelle: sechs Paare, links gedaempft, rechts das Modul,
@@ -504,9 +517,9 @@
     /* Rechtsbuendig, damit der Pfeil an dem steht, worauf er zeigt. Linksbuendig
        standen zwischen Label und Pfeil gemessen 223 bis 360px Leerraum, und der
        Pfeil las sich als Zubehoer der rechten Spalte statt als Verbindung. */
-    .swap-from { font-size: 0.98rem; color: var(--text-3); text-align: right; text-wrap: pretty; }
+    .swap-from { font-size: var(--fs-body); color: var(--text-3); text-align: right; text-wrap: pretty; }
     .swap-arrow { width: 17px; height: 17px; color: var(--text-3); opacity: 0.5; flex-shrink: 0; }
-    .swap-to { font-size: 1rem; color: var(--text-2); line-height: 1.4; }
+    .swap-to { font-size: var(--fs-body); color: var(--text-2); line-height: 1.4; }
     /* Der Pfeil ist aria-hidden, die Beziehung stand also nur im Bild. */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -516,7 +529,7 @@
        violett"), das die Seite schon sechsmal traegt, und direkt unter dem Titel
        ihrer eigenen Sektion. Jetzt spricht sie in Fliesstextgroesse, aufrecht,
        und die zweite Haelfte hebt sich nur durch die dunklere Tinte ab. */
-    .swap-close { text-align: center; margin-top: 32px; font-size: 1.1rem; font-weight: 600;
+    .swap-close { text-align: center; margin-top: 32px; font-size: var(--fs-lead); font-weight: 600;
       letter-spacing: -0.01em; color: var(--text-2); }
     .swap-close span { color: var(--text-1); }
     /* Eine Spalte ab Tablet. Die Zeile selbst bleibt dreiteilig: rechts steht
@@ -534,9 +547,9 @@
     @media (max-width: 600px) {
       .swap-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "from from" "arrow to";
         gap: 4px 8px; padding: 12px 2px; }
-      .swap-from { grid-area: from; text-align: left; font-size: 0.94rem; }
+      .swap-from { grid-area: from; text-align: left; }
       .swap-arrow { grid-area: arrow; width: 15px; height: 15px; }
-      .swap-to { grid-area: to; font-size: 0.98rem; }
+      .swap-to { grid-area: to; }
     }
 
     /* ===== Feature showcase (alternating) ===== */
@@ -557,11 +570,11 @@
       color: var(--m); background: color-mix(in srgb, var(--m) 12%, transparent);
       border: 1px solid color-mix(in srgb, var(--m) 26%, transparent); }
     .ho-ico svg { width: 21px; height: 21px; }
-    .ho-label { font-size: 1.05rem; font-weight: 650; letter-spacing: -0.015em;
+    .ho-label { font-size: var(--fs-lead); font-weight: 650; letter-spacing: -0.015em;
       color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); text-wrap: balance; }
     .ho-arrow { color: var(--text-3, var(--text-2)); flex-shrink: 0; opacity: 0.55; }
     .ho-arrow svg { width: 26px; height: 26px; display: block; }
-    .ho-note { margin-top: 14px; margin-left: 54px; font-size: 0.97rem; color: var(--text-2); line-height: 1.6; max-width: 62ch; }
+    .ho-note { margin-top: 14px; margin-left: 54px; font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; max-width: 62ch; }
     /* Die eine erzaehlende Bewegung der Seite (Critique 2026-09-29): wird eine
        Zeile zum ersten Mal sichtbar, wandert ein Punkt in der Farbe des
        liefernden Moduls vom ersten zum zweiten Symbol, und das empfangende
@@ -598,7 +611,7 @@
       .ho-row { padding: 22px 0; }
       .ho-flow { flex-direction: column; align-items: flex-start; gap: 10px; }
       .ho-arrow { transform: rotate(90deg); margin-left: 8px; }
-      .ho-label { font-size: 1rem; }
+      .ho-label { font-size: var(--fs-body); }
       .ho-note { margin-left: 0; }
     }
 
@@ -630,8 +643,8 @@
     .fam-ico { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
       color: var(--accent-on-soft); background: var(--accent-soft); }
     .fam-ico svg { width: 21px; height: 21px; }
-    .fam-text h3 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin: 9px 0 6px; text-wrap: balance; }
-    .fam-text p { font-size: 0.96rem; color: var(--text-2); line-height: 1.6; max-width: var(--m-prose); }
+    .fam-text h3 { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin: 9px 0 6px; text-wrap: balance; }
+    .fam-text p { font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; max-width: var(--m-prose); }
     @media (max-width: 1024px) {
       .fam-list { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-top: 30px; }
     }
@@ -645,8 +658,7 @@
       .fam-item { grid-template-columns: 38px minmax(0, 1fr); gap: 13px; }
       .fam-ico { width: 38px; height: 38px; }
       .fam-ico svg { width: 19px; height: 19px; }
-      .fam-text h3 { margin-top: 6px; font-size: 1.04rem; }
-      .fam-text p { font-size: 0.95rem; }
+      .fam-text h3 { margin-top: 6px; }
     }
 
     /* Eine Sektion fuer beide Stufen. Der `--bg-alt`-Streifen sass frueher an
@@ -665,7 +677,7 @@
        nur ein oder kein weiteres Modul und teilen sich deshalb eine Reihe. */
     .mod-groups { display: grid; gap: 44px; margin-top: 40px; }
     .mod-group-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
-      font-size: 0.95rem; font-weight: 700; letter-spacing: -0.005em; color: var(--text-1); }
+      font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.005em; color: var(--text-1); }
     .mod-group-head::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
     .mod-group-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
     .mod-group-body > .feat-row { grid-column: span 2; grid-row: span var(--rows, 1); margin-bottom: 8px; }
@@ -685,21 +697,26 @@
     .feat-row { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 24px; align-items: center;
       padding: 26px; border-radius: var(--r-lg); background: var(--surface);
       border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    /* Module labels (.feat-kicker, .gal-kicker, .ho-label) follow the app's
+    /* Module labels (.gal-kicker, .ho-label) follow the app's
        convention for accent text on an accent-tinted ground: the hue mixed
        toward the text colour at --tint-ink, because the raw family tone is
        tuned for 4.5:1 on white and misses it on its own tint (the light
        kitchen orange measured 4.2:1 on the gallery chip). Icons keep the pure
        accent - they need 3:1, not 4.5:1. */
-    .feat-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-      color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); margin-bottom: 14px; }
-    .feat-kicker .k-ico { width: 26px; height: 26px; border-radius: var(--r-sm); display: grid; place-items: center;
+    /* Kein Eyebrow mehr (S6): Versalien mit Sperrung ueber der h4 waren vier
+       Kapitelmarken zusaetzlich zu den vier echten. Jetzt traegt die Zeile
+       dieselbe Kopfzeile wie jeder Modul-Eintrag daneben (.mod-card: Kachel
+       32px, Name in Textgroesse) - ein Modul beginnt im ganzen Katalog mit
+       Symbol und Namen, und die Behauptung darunter ist die Ueberschrift. */
+    .feat-kicker { display: inline-flex; align-items: center; gap: 12px; font-size: var(--fs-body); font-weight: 700;
+      letter-spacing: -0.01em; line-height: 1.3; color: var(--text-1); margin-bottom: 14px; }
+    .feat-kicker .k-ico { width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
-    .feat-kicker .k-ico svg { width: 15px; height: 15px; }
+    .feat-kicker .k-ico svg { width: 17px; height: 17px; }
     .feat-info h4 { font-size: clamp(1.15rem, 1.7vw, 1.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; margin-bottom: 14px; text-wrap: balance; }
-    .feat-info p { color: var(--text-2); font-size: 0.95rem; line-height: 1.6; }
+    .feat-info p { color: var(--text-2); font-size: var(--fs-body); line-height: 1.6; }
     .feat-list { list-style: none; margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .feat-list li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.88rem; color: var(--text-2); }
+    .feat-list li { display: flex; align-items: flex-start; gap: 9px; font-size: var(--fs-small); color: var(--text-2); }
     .feat-list svg { width: 18px; height: 18px; color: var(--m); flex-shrink: 0; margin-top: 2px; }
     .feat-visual { position: relative; }
     /* Die Feature-Spalte ist bei 1440px 544px breit. Eine Desktopaufnahme aus einer
@@ -746,10 +763,10 @@
     .mod-ico { width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
     .mod-ico svg { width: 17px; height: 17px; }
-    .mod-card h4 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
-    .mod-card p { grid-column: 1 / -1; margin-top: 9px; font-size: 0.875rem; color: var(--text-2); line-height: 1.6; }
+    .mod-card h4 { font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+    .mod-card p { grid-column: 1 / -1; margin-top: 9px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
     .mod-scope { max-width: var(--m-prose); margin: 44px auto 0; padding-top: 28px; border-top: 1px solid var(--border);
-      font-size: 0.98rem; line-height: 1.7; color: var(--text-2); text-align: center; text-wrap: pretty; }
+      font-size: var(--fs-body); line-height: 1.7; color: var(--text-2); text-align: center; text-wrap: pretty; }
     @media (max-width: 860px) {
       .mod-group-body, .mod-pair { grid-template-columns: minmax(0, 1fr); }
       .mod-group-body { grid-template-rows: none; }
@@ -779,7 +796,7 @@
       margin: 32px auto 0; min-height: 44px; padding: 0 22px; width: max-content;
       background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
       border-radius: var(--r-full); box-shadow: var(--shadow-sm);
-      font-family: var(--ff); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; cursor: pointer;
       transition: border-color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
     html.js .mod-toggle:hover { border-color: var(--border-strong); }
     html.js .mod-toggle:active { transform: scale(var(--press-sm)); }
@@ -819,7 +836,13 @@
        bekommt die Breite, die er zum Lesen braucht. */
     .plat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 48px; }
     .plat-card {
-      position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+      /* Raster statt Spalte (S6): das Abzeichen stand absolut in der Ecke und
+         lag im Deutschen ("Hier starten") auf dem doppelten Docker/Podman-
+         Logo. Jetzt teilen sich Logo und Abzeichen die erste Zeile, und ein
+         laengeres Wort bricht im Abzeichen um, statt etwas zu verdecken. */
+      position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: "logo badge" "head head" "text text" "go go"; grid-template-rows: auto auto 1fr auto;
+      align-items: start; gap: 14px 12px;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px;
       box-shadow: var(--shadow-sm); transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; color: inherit;
     }
@@ -828,7 +851,7 @@
        klickbare Karten), nicht 4px Sprung unter einem lg-Schatten. */
     .plat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
     .plat-card:active { transform: scale(var(--press-lg)); transition-duration: var(--dur-press); }
-    .plat-logo { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-md);
+    .plat-logo { grid-area: logo; width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-md);
       background: color-mix(in srgb, var(--pc, var(--accent)) 12%, transparent); color: var(--pc, var(--accent)); }
     .plat-logo svg { width: 26px; height: 26px; fill: currentColor; }
     /* Zwei Marken in einem Feld: die Karte fuehrt beide Laufzeiten, also darf
@@ -836,42 +859,40 @@
        Glyphen bleiben - eine geschrumpfte Marke liest sich als Fehler. */
     .plat-logo--pair { width: auto; padding: 0 9px; gap: 7px; grid-auto-flow: column; }
     .plat-logo__alt { color: var(--pc-alt, currentColor); }
-    .plat-card h3 { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; }
-    .plat-card p { font-size: 0.85rem; color: var(--text-2); line-height: 1.55; }
-    .plat-more { margin-top: 20px; max-width: var(--m-prose); font-size: 0.92rem;
+    .plat-card h3 { grid-area: head; font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; }
+    .plat-card p { grid-area: text; font-size: var(--fs-small); color: var(--text-2); line-height: 1.55; }
+    .plat-more { margin-top: 20px; max-width: var(--m-prose); font-size: var(--fs-small);
       color: var(--text-2); line-height: 1.6; }
     .plat-more a { color: var(--accent-deep); font-weight: 600; }
     .plat-card code { font-family: var(--ff-mono); font-size: 0.8em; background: var(--accent-soft); color: var(--accent-deep); padding: 1px 5px; border-radius: var(--r-xs); }
     /* "1-click" is a status, not a module: it was wearing --m-tasks green, which
        teaches the wrong vocabulary and landed at 4.21:1. Semantic success token,
        darkened enough to clear AA at this size. */
-    .plat-badge { position: absolute; top: 16px; right: 16px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+    .plat-badge { grid-area: badge; justify-self: end; align-self: start; max-width: 100%; text-align: center; font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.04em;
       text-transform: uppercase; color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 13%, transparent);
-      padding: 4px 9px; border-radius: var(--r-full); }
+      padding: 4px 9px; border-radius: var(--r-sm); line-height: 1.3; }
     /* Six cards, three of them wearing a green "1-click" badge that reads as the
        recommendation - while the guide opens on one of the cards without a
        badge (Docker). One card now says which one that is. Same
-       hue-darkening as .feat-kicker: the raw accent misses AA on the tint. */
+       hue-darkening as .gal-kicker: the raw accent misses AA on the tint. */
     .plat-badge--start { color: color-mix(in srgb, var(--accent) var(--tint-ink), var(--text-1));
       background: color-mix(in srgb, var(--accent) 13%, transparent); }
     /* Label uses the theme accent (AA-contrast on --surface in both themes); the
        platform brand colour (--pc) stays on the logo tint only. */
-    .plat-go { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 700; color: var(--accent); }
+    .plat-go { grid-area: go; align-self: end; justify-self: start; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); font-weight: 700; color: var(--accent); }
     .plat-go svg { width: 15px; height: 15px; transition: transform .2s var(--ease-out); }
     .plat-card:hover .plat-go svg { transform: translateX(4px); }
     /* Telefon: das Logo steht neben dem Namen statt darueber, das Abzeichen
-       im Fluss darunter statt absolut in der Ecke (dort laege es auf dem
-       Namen). Fuenf Karten untereinander kosteten je 227-248px, das Logo
+       unter dem Namen statt in der Ecke (dort laege es auf dem Namen). Fuenf Karten untereinander kosteten je 227-248px, das Logo
        allein 58px davon. */
     @media (max-width: 600px) {
       .plat-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "logo head" "logo badge" "text text" "go go";
-        column-gap: 14px; row-gap: 0; align-items: center; padding: 20px; }
-      .plat-logo { grid-area: logo; }
-      .plat-card h3 { grid-area: head; grid-row: 1 / span 2; }
+        grid-template-rows: none; column-gap: 14px; row-gap: 0; align-items: center; padding: 20px; }
+      .plat-card h3 { grid-row: 1 / span 2; }
       .plat-card:has(.plat-badge) h3 { grid-row: 1; align-self: end; }
-      .plat-badge { grid-area: badge; position: static; justify-self: start; align-self: start; margin-top: 4px; }
-      .plat-card p { grid-area: text; margin-top: 12px; }
-      .plat-go { grid-area: go; margin-top: 12px; }
+      .plat-badge { justify-self: start; margin-top: 4px; }
+      .plat-card p { margin-top: 12px; }
+      .plat-go { margin-top: 12px; }
     }
 
     /* Die Fakten-Leiste und der Knopf in die Anleitung: was vom Schnellstart
@@ -898,7 +919,7 @@
       .trust-bar { grid-template-columns: repeat(3, 1fr); }
       .trust-bar .tb-wide { grid-column: 1 / -1; }
     }
-    .trust-bar li { font-size: 0.86rem; color: var(--text-2); line-height: 1.5; display: flex; gap: 8px; }
+    .trust-bar li { font-size: var(--fs-small); color: var(--text-2); line-height: 1.5; display: flex; gap: 8px; }
     .trust-bar b { color: var(--text-1); font-weight: 600; flex-shrink: 0; }
         /* `anywhere` brach den Image-Tag mitten im Namen ("ghcr.io/ulsklyc/yuvo" /
        "mi:latest") - drei Laeufe lang gemeldet. `break-word` bricht erst, wenn
@@ -951,8 +972,8 @@
        Seite. Buendig unter der Kapitelmarke liest die Spalte als EIN Lauf. */
     .long-item { max-width: var(--m-read); padding: 26px 28px; border-radius: var(--r-lg); background: var(--surface);
       border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    .long-item dt { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 9px; color: var(--text-1); }
-    .long-item dd { margin: 0; max-width: var(--m-prose); font-size: 1rem; color: var(--text-2); line-height: 1.65; }
+    .long-item dt { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 9px; color: var(--text-1); }
+    .long-item dd { margin: 0; max-width: var(--m-prose); font-size: var(--fs-body); color: var(--text-2); line-height: 1.65; }
     .long-item dd b { color: var(--text-1); font-weight: 650; }
     @media (max-width: 600px) {
       .long-list { gap: 12px; }
@@ -986,9 +1007,9 @@
       background: radial-gradient(70% 100% at 50% -20%, var(--accent-glow), transparent 65%); }
     .cta-box > * { position: relative; z-index: 1; }
     .cta-box .house-mark { display: block; width: 58px; height: 58px; margin: 0 auto 22px; }
-    .cta-box h2 { font-size: clamp(2.1rem, 4.6vw, 3.2rem); font-weight: 700; letter-spacing: -0.035em; color: var(--text-1); margin-bottom: 14px; text-wrap: balance; }
+    .cta-box h2 { font-size: clamp(2.1rem, 4.6vw, 3.2rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.035em; color: var(--text-1); margin-bottom: 14px; text-wrap: balance; }
     .cta-box h2 em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .cta-box p { color: var(--text-2); font-size: 1.08rem; max-width: 44ch; margin: 0 auto 32px; }
+    .cta-box p { color: var(--text-2); font-size: var(--fs-lead); max-width: 44ch; margin: 0 auto 32px; }
     .cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
     /* ===== Footer: assets/site.css, gleich auf allen fuenf Seiten. ===== */
@@ -1040,18 +1061,19 @@
       /* Hochformat: auf Telefonbreite gedeckelt, sonst liefe die Aufnahme am
          Tablet ueber zwei Bildschirme. */
       .hero-visual { max-width: 420px; }
+      /* Das Handy-Float verdeckte bei 390px rund 40% der Dashboard-Aufnahme,
+         und an der 420px-Hochformataufnahme (601-860px) lag es auf der
+         Familienkarte, egal auf welcher Seite. Neben einer Hochformat-
+         Aufnahme ist der eine Beweis mehr wert als die Collage. (Es zeigt
+         seit Runde 2 die Einkaufsliste; die Aufgaben-Ansicht traegt allein
+         die Planen-Karte.) */
+      .hero-float { display: none; }
     }
     @media (max-width: 600px) {
       .hero { padding-bottom: 56px; }
-      /* Das Handy-Float verdeckte bei 390px rund 40% der Dashboard-Aufnahme -
-         ausgerechnet deren rechte Spalte. Auf dem Telefon ist der eine Beweis
-         mehr wert als die Collage. (Es zeigt seit Runde 2 die Einkaufsliste;
-         die Aufgaben-Ansicht traegt allein die Planen-Karte.) */
-      .hero-float { display: none; }
       /* Unten knapp: das Telefonbild endet schon mit eigenem Rand, und das
          Band "Was es ersetzt" bringt seinen Kopfabstand mit. */
       .gallery { padding-bottom: 16px; }
-      .gal-cap p { font-size: 0.95rem; }
       .cta-box { padding: 52px 24px; }
       /* Zwei Knoepfe, zwei Breiten, je nach Sprache in anderer Reihenfolge
          umgebrochen (DE 224/180px, EN 186/192px). Gestapelt und gleich breit
@@ -1070,7 +1092,7 @@
         /* Dieselbe flache Akzentflaeche wie .btn-primary. Sie schwebt ueber dem
            Inhalt und braucht deshalb einen Schatten, aber einen neutralen:
            der violette Glow war ein Knopfstil, den die App nicht kennt. */
-        background: var(--accent-fill); color: var(--accent-ink); font-weight: 700; font-size: 0.95rem;
+        background: var(--accent-fill); color: var(--accent-ink); font-weight: 700; font-size: var(--fs-body);
         box-shadow: var(--shadow-lg);
         border: 0;
       }
@@ -1261,7 +1283,7 @@
   <div class="wrap">
     <span class="pi"><span id="gh-stars-proof" data-gh-stars>★ 1.7k</span></span>
     <span class="pi"><b>20</b> <span data-t="proof_modules">modules</span></span>
-    <span class="pi"><b>26</b> <span data-t="proof_langs">languages</span></span>
+    <span class="pi"><b>27</b> <span data-t="proof_langs">languages</span></span>
     <!-- "0 trackers" is the strongest claim on the page for a privacy product and
          stays on phones, where it used to be the one that got dropped. It links
          the app's full list of outbound connections (README, "Outbound"), not
@@ -1586,10 +1608,9 @@
     /* Alt text is content, not chrome: it stayed English on a de-labelled page,
        so German screen-reader users got English image descriptions. */
     document.querySelectorAll('[data-alt-t]').forEach(function(img){ var k = img.getAttribute('data-alt-t'); if (s[k] !== undefined) img.alt = s[k]; });
-    /* Same for accessible names on icon-only controls, landmarks and the
-       scroll region. title is a tooltip and only makes sense on the controls
-       this started out as: on <nav> it would hover the whole bar, and on the
-       carousel the whole strip of screenshots. */
+    /* Same for accessible names on landmarks and controls (the two navs, the
+       jump menu). title is a tooltip and only goes on buttons and links: on
+       a <nav> it would hover the whole bar. */
     document.querySelectorAll('[data-t-aria]').forEach(function(el){
       var k = el.getAttribute('data-t-aria');
       if (s[k] === undefined) return;
@@ -1659,7 +1680,7 @@
           <span class="gal-kicker" data-t="gal_meals_k">Meals</span>
           <p data-t="gal_meals_c"><b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.</p>
         </figcaption>
-        <div class="gal-frame">
+        <div class="gal-frame gal-frame--crop">
           <img class="sc" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
           <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" decoding="async" width="900" height="675"></noscript>
         </div>
@@ -1678,7 +1699,7 @@
            feature rows below already carry. Four full-bleed screens ran 3.653px
            on a phone with no argument between them, and the two that repeated
            were the ones a reader met again 6.000px later. Two screens carry the
-           proof; the carousel carries the rest. -->
+           proof; the phone captures in the module catalogue carry the rest. -->
     </div>
   </div>
 </section>

@@ -92,10 +92,9 @@
     /* Der Sektionsabstand der Seite: --sec-s aus site.css, fliessend von 44px
        (Telefon) bis 80px (Schirm) - dieselbe Skala wie auf der Startseite. */
     section { padding: var(--sec-s) 0; }
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
     .section-title { font-size: clamp(1.7rem, 3.4vw, 2.4rem); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; margin: 14px 0 12px; text-wrap: balance; }
     .section-title em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .section-desc { font-size: 1.04rem; color: var(--text-2); line-height: 1.65; max-width: 60ch; }
+    .section-desc { font-size: var(--fs-lead); color: var(--text-2); line-height: 1.65; max-width: 60ch; }
 
     /* Hero */
     .hero { padding: calc(var(--bar-h) + var(--sec-s)) 0 56px; text-align: center; position: relative; overflow: hidden; }
@@ -104,12 +103,14 @@
     .hero > * { position: relative; }
     .hero h1 { font-size: clamp(2.4rem, 5.5vw, 3.6rem); font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; margin-bottom: 18px; text-wrap: balance; }
     .hero h1 em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .hero-desc { font-size: 1.15rem; color: var(--text-2); max-width: 52ch; margin: 0 auto 26px; }
-    .time-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--r-full);
-      font-size: 0.85rem; font-weight: 600; color: var(--accent);
-      background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-    .time-badge svg { width: 16px; height: 16px; }
+    .hero-desc { font-size: var(--fs-lead); color: var(--text-2); max-width: 52ch; margin: 0 auto 26px; }
+    /* Eine Angabe, kein Knopf (S6): Glas, Rahmen, Schatten und Akzentschrift
+       sahen aus wie die Kapselknoepfe der Kopfleiste, und ein Klick tat
+       nichts. Jetzt steht die Dauer als leise Zeile mit Uhr - Akzent nur am
+       Symbol, der Text in der Farbe der Nebenangaben. */
+    .time-badge { display: inline-flex; align-items: center; gap: 8px;
+      font-size: var(--fs-small); font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .time-badge svg { width: 16px; height: 16px; color: var(--accent); }
 
     /* Prerequisites */
     .prereq-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
@@ -117,13 +118,13 @@
     .prereq-ico { width: 46px; height: 46px; border-radius: var(--r-md); display: grid; place-items: center; margin-bottom: 16px;
       color: var(--accent); background: var(--accent-soft); }
     .prereq-ico svg { width: 23px; height: 23px; }
-    .prereq-card h3 { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
-    .prereq-card p { font-size: 0.88rem; color: var(--text-2); line-height: 1.6; }
+    .prereq-card h3 { font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+    .prereq-card p { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
     .prereq-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
     /* These are the Docker install links - the single biggest drop-off point on
        the page. They were 12px grey text with no underline and a 30px target, so
        they did not read as links at all. Now: accent-coloured, 44px tall. */
-    .prereq-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.8rem; font-weight: 600;
+    .prereq-link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--fs-meta); font-weight: 600;
       padding: 4px 14px; border-radius: var(--r-full); background: var(--bg-alt); border: 1px solid var(--border); color: var(--accent); }
     /* Auf der Akzenttoenung traegt der Text --accent-on-soft: --accent darauf
        stand im Dark bei 4.38:1. */
@@ -132,7 +133,7 @@
        a lone class) and the hint renders at the body's 0.88rem / --text-2 - the
        rule has been inert since it was written, so the quiet aside read exactly
        as loud as the paragraph above it. */
-    .prereq-card .prereq-hint { font-size: 0.78rem; color: var(--text-3); margin-top: 14px; }
+    .prereq-card .prereq-hint { font-size: var(--fs-label); color: var(--text-3); margin-top: 14px; }
 
     .alt { background: var(--bg-alt); border-block: 1px solid var(--border); }
 
@@ -142,11 +143,11 @@
        into two graspable clusters (terminal vs one-click). aria-hidden: the JS
        tablist still owns only the .tab-btn elements. */
     .tab-group { flex-basis: 100%; display: flex; align-items: center; gap: 12px; margin: 2px 2px 0;
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
+      font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
     .tab-group:not(:first-of-type) { margin-top: 12px; }
     .tab-group::after { content: ''; flex: 1; height: 1px; background: var(--border); }
     .tab-btn { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--border);
-      color: var(--text-2); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      color: var(--text-2); font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; cursor: pointer;
       padding: 10px 15px; min-height: 44px; border-radius: var(--r-full); box-shadow: var(--shadow-sm);
       transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .18s var(--ease-out), transform var(--dur-press) var(--ease-out); }
     .tab-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
@@ -156,7 +157,7 @@
     /* Der gewaehlte Tab traegt die Flaeche des Primaerknopfs: flach, ohne Glow. */
     .tab-btn.active { background: var(--accent-fill); border-color: transparent; color: var(--accent-ink); box-shadow: var(--shadow-sm); }
     .tab-btn.active .tb-logo { color: var(--accent-ink); }
-    .tab-btn .tb-one { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--r-full);
+    .tab-btn .tb-one { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success-ink); }
     /* On the active (accent-filled) tab the green badge would sit on violet.
        It inverts instead: the tab's ink becomes its plate and the tab's fill its
@@ -183,7 +184,7 @@
     @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
     /* Callouts */
-    .callout { display: flex; gap: 12px; padding: 16px 18px; border-radius: var(--r-md); font-size: 0.9rem; line-height: 1.55; margin-bottom: 24px; border: 1px solid transparent; }
+    .callout { display: flex; gap: 12px; padding: 16px 18px; border-radius: var(--r-md); font-size: var(--fs-small); line-height: 1.55; margin-bottom: 24px; border: 1px solid transparent; }
     .callout svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
     .callout code { font-size: 0.82em; background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: var(--r-xs); }
     [data-theme="dark"] .callout code { background: rgba(255,255,255,0.08); }
@@ -201,15 +202,15 @@
     /* Steps */
     .step { display: flex; gap: 18px; margin-bottom: 24px; }
     .step-num { flex-shrink: 0; width: 38px; height: 38px; border-radius: var(--r-md); display: grid; place-items: center;
-      font-weight: 700; font-size: 1.02rem; color: var(--accent-on-soft); background: var(--accent-soft); font-variant-numeric: tabular-nums; }
+      font-weight: 700; font-size: var(--fs-body); color: var(--accent-on-soft); background: var(--accent-soft); font-variant-numeric: tabular-nums; }
     .step-content { flex: 1; min-width: 0; padding-top: 4px; }
-    .step-title { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+    .step-title { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
     /* Die Schrittspalte ist bei 860px Container rund 760px breit, der Text lief
        darin bis 110 Zeichen. 53ch ergeben gemessen hoechstens ~75. `ch` ist
        die Breite der Null und in dieser Schrift deutlich breiter als ein
        Durchschnittszeichen: 64ch ergaben noch 88. Nachmessen, nicht rechnen. */
     .step-desc, .step-note { max-width: 53ch; }
-    .step-desc { font-size: 0.94rem; color: var(--text-2); line-height: 1.6; margin-bottom: 12px; }
+    .step-desc { font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; margin-bottom: 12px; }
     /* Inert code chips are neutral. Violet on this page already means "token
        name" in .env-name and "activate me" on every link and tab button; a
        third meaning made <code>OIDC_*</code> look like something to click.
@@ -219,7 +220,7 @@
     /* Platform asides inside a step (Windows): quieter than the step text, and
        after the command, so the reader who needs none of it reaches the
        command first. */
-    .step-note { font-size: 0.86rem; color: var(--text-2); line-height: 1.6; margin: 4px 0 12px; }
+    .step-note { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; margin: 4px 0 12px; }
     .step-note code { font-size: 0.84em; background: var(--bg-alt); color: var(--text-1); padding: 1px 6px; border-radius: var(--r-xs); border: 1px solid var(--border); }
     .step-note b { color: var(--text-1); }
 
@@ -228,17 +229,21 @@
        the reader to rewrite four commands by hand, so the commands switch
        instead of the panel. Without JS both variants stand, each labelled. */
     .engine-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 22px; }
-    .engine-label { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
+    .engine-label { font-size: var(--fs-small); font-weight: 600; color: var(--text-2); }
     .engine { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
     .engine-btn { min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-full); background: transparent; color: var(--text-2);
-      font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; cursor: pointer;
       transition: background-color .18s var(--ease-out), color .18s var(--ease-out), transform var(--dur-press) var(--ease-out); }
     .engine-btn:hover { color: var(--text-1); }
     .engine-btn:active { transform: scale(var(--press-sm)); }
     .engine-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-on-soft); }
     html.js:not([data-engine="podman"]) .eng-podman,
     html.js[data-engine="podman"] .eng-docker { display: none; }
-    .eng-head, .scope-head { display: none; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px; }
+    /* Normale Schreibung (S6): in Versalien liefen "Podman (RHEL, Fedora,
+       CentOS Stream)" und "Docker, Podman or from source" als 29-36 Zeichen
+       lange Grossbuchstabenzeilen - Fliesstext, kein Etikett. Gewicht und
+       Farbe tragen die Rolle. Sichtbar nur ohne Skript. */
+    .eng-head, .scope-head { display: none; font-size: var(--fs-small); font-weight: 700; color: var(--text-1); margin: 0 0 6px; }
     html:not(.js) .engine-row { display: none; }
     html:not(.js) .eng-head, html:not(.js) .scope-head { display: block; }
 
@@ -259,10 +264,13 @@
        The chosen tab is already in the URL hash; it just was not being read. */
     .path-now { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 22px;
       min-height: 44px; padding: 4px 6px 4px 18px; border-radius: var(--r-full);
-      background: var(--bg-alt); border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-2); }
+      background: var(--bg-alt); border: 1px solid var(--border); font-size: var(--fs-small); color: var(--text-2); }
     .path-now b { color: var(--text-1); font-weight: 700; }
+    /* In der Erfolgskarte ohne eigene Kapsel (S6): Kapsel in Karte war
+       Karte in Karte, und am Telefon brach die Kapsel zu einem Klumpen um. */
+    .success-box .path-now { background: none; border: 0; padding: 0; justify-content: center; }
     .path-now a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: var(--r-full);
-      background: var(--surface); border: 1px solid var(--border); font-size: 0.82rem; font-weight: 600; }
+      background: var(--surface); border: 1px solid var(--border); font-size: var(--fs-meta); font-weight: 600; }
     .path-now a:hover { border-color: var(--accent); text-decoration: none; }
     .scope { display: none; }
     .scope.on { display: block; }
@@ -285,11 +293,12 @@
     .success-box p { color: var(--text-2); margin-bottom: 18px; max-width: 52ch; margin-inline: auto; }
     /* Not a link, and it must not look like one: it points at the reader's own
        machine, so an accent-coloured pill under "navigate to:" was pure false
-       affordance. It reads as a value now, with the action it actually needs. */
+       affordance. It reads as a value now, with the action it actually needs.
+       No plate of its own any more (S6): a bordered box inside the bordered
+       success card was a card in a card; the mono type marks the value. */
     .success-url { display: inline-flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; max-width: 100%;
-      font-family: var(--ff-mono); font-size: 1.05rem; font-weight: 600;
-      color: var(--text-1); background: var(--bg-alt); border: 1px solid var(--border);
-      padding: 8px 8px 8px 20px; border-radius: var(--r-md); margin-bottom: 22px; }
+      font-family: var(--ff-mono); font-size: var(--fs-body); font-weight: 600;
+      color: var(--text-1); margin-bottom: 22px; }
     .success-url > span { overflow-wrap: anywhere; }
     /* The one control on the page below the 44px everything else commits to
        (it measured 94.7x36), and at 320px the whole pill ran 34px past
@@ -301,7 +310,7 @@
        "You're all set - open localhost:3000" one step AFTER "create your admin
        account", which needs that address open. Each path gets its own ending,
        so the command-line alternative and the Proxmox IP lookup live here. */
-    .success-box .success-note { font-size: 0.88rem; max-width: 52ch; margin: -6px auto 14px; }
+    .success-box .success-note { font-size: var(--fs-small); max-width: 52ch; margin: -6px auto 14px; }
     .success-box .success-note code { font-size: 0.86em; background: var(--bg-alt); color: var(--text-1); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
     .success-box .code-wrap { text-align: left; max-width: 560px; margin: 0 auto 22px; }
     .success-url var { font-style: italic; color: var(--text-2); }
@@ -311,9 +320,9 @@
     /* Env */
     .env-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 36px; }
     .env-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--shadow-sm); }
-    .env-name { font-family: var(--ff-mono); font-size: 0.92rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; word-break: break-all; }
-    .env-label { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .env-req { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
+    .env-name { font-family: var(--ff-mono); font-size: var(--fs-small); font-weight: 600; color: var(--accent); margin-bottom: 10px; word-break: break-all; }
+    .env-label { font-size: var(--fs-body); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .env-req { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
       /* Beide Kanaele aus DEMSELBEN Token, und zwar aus der lesbaren Stufe
          (--danger-ink = --color-danger-ink der App) statt der Signalfarbe: die
          misst auf dieser hellen Flaeche nur 3.89:1 und faellt fuer
@@ -331,23 +340,35 @@
        than leaving it off. Second, "one claim now" was only true here: the
        app-store panels still said "recommended". Every surface says optional and
        irreversible, and the quick start on index.html now names the placeholder. */
-    .env-irrev { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
+    .env-irrev { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warn-ink); }
-    .env-desc { font-size: 0.86rem; color: var(--text-2); line-height: 1.6; }
+    .env-desc { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
     .env-desc code { font-size: 0.82em; background: var(--bg-alt); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
 
     /* Optional. No reveal stagger here: the delays were hand-placed in a
        repeating 1-2 pattern that only lines up with the rendered column order at
        one breakpoint, so at every other width the nine cards animated in
-       right-then-left. Nine cards do not need a wave. */
-    .opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 36px; }
+       right-then-left. Ten cards do not need a wave. */
+    /* Zwei feste Spalten statt auto-fill (S6): in der 860px-Spalte ergab
+       minmax(260px) drei Spalten, und zehn Karten liessen in der letzten Reihe
+       zwei leere Zellen stehen. Zwei Spalten fuellen jede Reihe; bleibt bei
+       einer ungeraden Zahl eine Karte uebrig, nimmt sie die ganze Breite. */
+    .opt-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px 32px; margin-top: 36px; }
+    @media (min-width: 640px) {
+      .opt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .opt-card:nth-child(odd):last-child { grid-column: 1 / -1; }
+    }
     /* No hover lift: the card itself is not a control, only its guide link
        is, and a whole card rising under the pointer promised a click that did
        nothing (critique 2026-09-29). */
-    .opt-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--shadow-sm);
+    /* Eintraege an einer Haarlinie statt Karten (S6): zehn gleich grosse
+       Karten waren das Seitengeruest von der Stange, und drei davon trugen
+       eine Codeplatte - eine Karte in der Karte. Jetzt stehen die Extras als
+       Liste in zwei Spalten, die Codeplatte ist die einzige Flaeche. */
+    .opt-card { border-top: 1px solid var(--border); padding: 20px 0 6px;
       display: flex; flex-direction: column; min-width: 0; }
-    .opt-card h3 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
-    .opt-card p { font-size: 0.87rem; color: var(--text-2); line-height: 1.6; flex: 1; }
+    .opt-card h3 { font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+    .opt-card p { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; flex: 1; }
     .opt-card .code-wrap { margin: 14px 0 0; }
     .opt-restart { max-width: 60ch; margin-top: 14px; }
     .opt-card code { font-size: 0.8em; background: var(--bg-alt); color: var(--text-1); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
@@ -355,25 +376,18 @@
        rewrites [data-t] nodes and would otherwise drop it. Bottom-aligned so the
        ragged card heights still line their actions up, and tall enough to tap. */
     .opt-guide { align-self: flex-start; margin-top: 14px; display: inline-flex; align-items: center; min-height: 44px;
-      font-size: 0.87rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+      font-size: var(--fs-small); font-weight: 600; color: var(--accent); text-decoration: none; }
     .opt-guide:hover { text-decoration: underline; text-decoration-thickness: 1px; }
 
     /* Troubleshooting */
-    .trouble-list { margin-top: 32px; display: flex; flex-direction: column; gap: 10px; }
-    details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-    /* `overflow: hidden` haelt den Inhalt in den 12px-Radien - und schnitt dabei
-       den Fokusring des <summary> weg. Die Summary sitzt 1px innerhalb des
-       details (der Rahmen), der Ring liegt bei `outline-offset: 3px` also 2px
-       AUSSERHALB der Klammer und wurde vollstaendig geklippt: tastaturbedient
-       war nicht zu sehen, welches der fuenf Akkordeons den Fokus hat. (Der
-       Offset ist heute 2px wie in der App; der Ring liegt damit 1px ausserhalb
-       und wuerde weiter geklippt.)
-       Gemessen 0 geaenderte Pixel gegen 3.561 ohne die Klammer.
-       Die Ausnahme gilt nur, solange der Fokus sichtbar ist; im Ruhezustand
-       klippt es weiter wie zuvor. WCAG 2.4.7 und 2.4.11. */
-    details:has(> summary:focus-visible) { overflow: visible; }
-    details[open] { box-shadow: var(--shadow-sm); }
-    summary { cursor: pointer; padding: 16px 20px; font-weight: 600; font-size: 0.95rem; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    /* Eine Liste mit Haarlinien statt fuenf Karten (S6): aufgeklappt lagen
+       Warnkasten und Codeplatten in der Karte, Karte in Karte. */
+    .trouble-list { margin-top: 32px; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+    /* Ohne Radius braucht es kein overflow:hidden mehr - und damit auch
+       keine Ausnahme fuer den Fokusring des <summary>, den die Klammer frueher
+       wegschnitt (WCAG 2.4.7/2.4.11). */
+    details { border-bottom: 1px solid var(--border); }
+    summary { cursor: pointer; padding: 16px 4px; font-weight: 600; font-size: var(--fs-body); list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     summary::-webkit-details-marker { display: none; }
     summary::after { content: '+'; font-size: 1.3rem; color: var(--text-3); transition: transform .25s var(--ease-out), color var(--dur-hover); line-height: 1; }
     summary:hover::after { color: var(--accent); }
@@ -390,7 +404,7 @@
         .trouble-list details[open]::details-content { block-size: auto; }
       }
     }
-    .details-body { padding: 0 20px 18px; font-size: 0.9rem; color: var(--text-2); line-height: 1.6; }
+    .details-body { padding: 0 4px 20px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
     /* Lesemass wie .step-desc: die Antwort lief in der 816px-Box bis 114
        Zeichen. Nur der Text; die Codeplatten behalten die Breite. */
     .details-body p { max-width: 54ch; }
@@ -408,7 +422,7 @@
          icon beside the text instead of above it, tighter section rhythm. */
       .hero { padding-bottom: 36px; }
       .hero h1 { margin-bottom: 14px; }
-      .hero-desc { font-size: 1.04rem; margin-bottom: 20px; }
+      .hero-desc { font-size: var(--fs-body); margin-bottom: 20px; }
       .prereq-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 24px; }
       .prereq-card { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 14px; padding: 16px 18px; }
       .prereq-card > * { grid-column: 2; }
@@ -428,7 +442,7 @@
       .step { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 12px; align-items: center; }
       .step-content { display: contents; }
       .step-content > * { grid-column: 1 / -1; }
-      .step-num { width: 30px; height: 30px; font-size: 0.92rem; border-radius: var(--r-sm); }
+      .step-num { width: 30px; height: 30px; font-size: var(--fs-small); border-radius: var(--r-sm); }
       .step-content > .step-title { grid-column: 2; margin-bottom: 0; }
       .step-content > .step-title + * { margin-top: 8px; }
       .tab-btn { flex: 1 1 auto; justify-content: center; }
@@ -439,12 +453,12 @@
          and the "1-click" badge is redundant under a heading that already says
          one-click. Touch height stays at 44px. */
       .tab-bar { gap: 6px; }
-      .tab-btn { font-size: 0.8rem; padding: 8px 10px; gap: 6px; }
+      .tab-btn { font-size: var(--fs-meta); padding: 8px 10px; gap: 6px; }
       .tab-btn .tb-one { display: none; }
-      .tab-group { margin-top: 8px; font-size: 0.7rem; }
+      .tab-group { margin-top: 8px; font-size: var(--fs-label); }
       .tab-group:not(:first-of-type) { margin-top: 8px; }
       .success-box { padding: 44px 20px; }
-      .success-url { display: flex; width: 100%; font-size: 0.95rem; padding: 10px 12px; }
+      .success-url { display: flex; width: 100%; font-size: var(--fs-body); padding: 10px 12px; }
     }
     @media (prefers-reduced-motion: reduce) {
       /* Animations were already fully covered; transitions were not, so the
@@ -512,7 +526,6 @@
   <main id="main-content" tabindex="-1">
   <header class="hero">
     <div class="container">
-      <p class="eyebrow reveal" style="justify-content:center"><span data-t="hero_eyebrow">Installation</span></p>
       <h1 class="reveal"><span data-t="hero_title_pre">Install Yuvomi</span> <em data-t="hero_title_em">your way.</em></h1>
       <p class="hero-desc reveal" data-t="hero_desc">Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a Docker setup with a handful of commands, or the guided web installer.</p>
       <div class="reveal">
@@ -764,7 +777,7 @@ docker compose logs -f</div><button class="copy-btn" data-copy="docker compose u
         <h3 class="panel-head" data-t="tab_installer">Web Installer</h3>
         <div class="callout callout-success">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span data-t="opt_installer_info">A localized browser wizard (26 languages) detects your container engine (Docker or Podman), configures your .env (optional reverse proxy/HTTPS, Single Sign-On, automatic backups), starts the container, and creates your admin account. Want zero terminal? Use a one-click app-store install (TrueNAS, Umbrel, Unraid).</span>
+          <span data-t="opt_installer_info">A localized browser wizard (27 languages) detects your container engine (Docker or Podman), configures your .env (optional reverse proxy/HTTPS, Single Sign-On, automatic backups), starts the container, and creates your admin account. Want zero terminal? Use a one-click app-store install (TrueNAS, Umbrel, Unraid).</span>
         </div>
         <!-- The Git/Node requirement used to sit in sentence four of the green
              success callout above, two screens below "you don't need to install
@@ -967,7 +980,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <p class="scope-head">TrueNAS, Umbrel, Unraid</p>
           <p data-t="success_desc_store">Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server's, not this machine's - <code>localhost</code> only works if you are sitting at the box itself. The first visit walks you through creating your admin account.</p>
         </div>
-        <p style="font-size:0.88rem" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
+        <p style="font-size:var(--fs-small)" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
         <!-- No primary button: the accent went to "GitHub", which is not the next
              step for anyone who just installed. The address above is. -->
         <div class="success-links">
@@ -1103,7 +1116,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
     'use strict';
     var i18n = {
       en: {
-        hero_eyebrow:'Installation', hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
+        hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
         hero_desc:'Get your self-hosted family planner running in a few minutes. Pick a one-click app-store install, a Docker setup with a handful of commands, or the guided web installer.',
         hero_time:'~10 minutes',
         nav_main:'Main', foot_nav:'Footer', nav_gh:'GitHub', nav_install:'Install', tablist_label:'Installation options', code_label:'Command block',
@@ -1117,7 +1130,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         steps_title:'Choose your <em>platform</em>', steps_desc:'Seven ways to install. Pick the one that matches your setup; the result is the same private Yuvomi instance.',
         tab_group_terminal:'In a terminal', tab_group_store:'One-click app store',
         tab_installer:'Web Installer', tab_docker:'Docker / Podman', tab_proxmox:'Proxmox', tab_source:'From source', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1-click',
-        opt_installer_info:'A localized browser wizard (26 languages) detects your container engine (Docker or Podman), configures your <code>.env</code> (optional reverse proxy/HTTPS, Single Sign-On, automatic backups), starts the container, and creates your admin account. Want zero terminal? Use a one-click app-store install (TrueNAS, Umbrel, Unraid).',
+        opt_installer_info:'A localized browser wizard (27 languages) detects your container engine (Docker or Podman), configures your <code>.env</code> (optional reverse proxy/HTTPS, Single Sign-On, automatic backups), starts the container, and creates your admin account. Want zero terminal? Use a one-click app-store install (TrueNAS, Umbrel, Unraid).',
         opt_installer_prereq:'This path additionally needs Git and Node.js 22+ on the host, because the wizard runs from the repository. Every other path needs only a container engine.',
         step_inst1_title:'Clone the repository', step_inst1_desc:'Open your terminal and clone Yuvomi to a folder of your choice.',
         step_inst2_title:'Start the installer', step_inst2_desc:'Run this command from the repository root. The installer server starts on port 8090.',
@@ -1216,7 +1229,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         skip_link:'Skip to content', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
       },
       de: {
-        hero_eyebrow:'Installation', hero_title_pre:'Yuvomi installieren', hero_title_em:'- euer Weg.',
+        hero_title_pre:'Yuvomi installieren', hero_title_em:'- euer Weg.',
         hero_desc:'Euren selbst gehosteten Familienplaner in wenigen Minuten zum Laufen bringen. Wählt eine App-Store-Installation mit einem Klick, ein Docker-Setup mit einer Handvoll Befehle oder den geführten Web-Installer.',
         hero_time:'~10 Minuten',
         nav_main:'Hauptnavigation', foot_nav:'Fußzeile', nav_gh:'GitHub', nav_install:'Installieren', tablist_label:'Installationswege', code_label:'Befehlsblock',
@@ -1230,7 +1243,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         steps_title:'Wählt <em>eure Plattform</em>', steps_desc:'Sieben Installationswege. Wählt den, der zu eurem Setup passt; das Ergebnis ist dieselbe private Yuvomi-Instanz.',
         tab_group_terminal:'Im Terminal', tab_group_store:'Per App-Store · 1 Klick',
         tab_installer:'Web-Installer', tab_docker:'Docker / Podman', tab_proxmox:'Proxmox', tab_source:'Aus Quellcode', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1 Klick',
-        opt_installer_info:'Ein lokalisierter Browser-Assistent (26 Sprachen) erkennt eure Container-Engine (Docker oder Podman), konfiguriert eure <code>.env</code> (optional Reverse-Proxy/HTTPS, Single Sign-On, automatische Backups), startet den Container und erstellt euer Admin-Konto. Ganz ohne Terminal? Nutzt eine App-Store-Installation mit einem Klick (TrueNAS, Umbrel, Unraid).',
+        opt_installer_info:'Ein lokalisierter Browser-Assistent (27 Sprachen) erkennt eure Container-Engine (Docker oder Podman), konfiguriert eure <code>.env</code> (optional Reverse-Proxy/HTTPS, Single Sign-On, automatische Backups), startet den Container und erstellt euer Admin-Konto. Ganz ohne Terminal? Nutzt eine App-Store-Installation mit einem Klick (TrueNAS, Umbrel, Unraid).',
         opt_installer_prereq:'Dieser Weg braucht zusätzlich Git und Node.js 22+ auf dem Host, weil der Assistent aus dem Repository läuft. Alle anderen Wege brauchen nur eine Container-Engine.',
         step_inst1_title:'Repository klonen', step_inst1_desc:'Öffnet euer Terminal und klont Yuvomi in einen Ordner eurer Wahl.',
         step_inst2_title:'Installer starten', step_inst2_desc:'Führt diesen Befehl vom Projektordner aus. Der Installer-Server startet auf Port 8090.',

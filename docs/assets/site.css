@@ -57,6 +57,23 @@
   --ff: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
   --ff-mono: ui-monospace, 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 
+  /* Type scale for running text, labels and controls (S6). The page's own,
+     not the app's ramp: an editorial page reads at a larger body than a dense
+     app screen. Five steps where the pages had grown 20 distinct sizes
+     between 11 and 19px (0.94, 0.95, 0.96, 0.97, 0.98rem side by side), each
+     one a local guess. Display sizes (h1, section titles, feature headings)
+     stay fluid clamps in their pages; everything else picks a step here.
+       --fs-label  12px  uppercase labels, badges, chips
+       --fs-meta   13px  control captions, footer meta, the hero pill
+       --fs-small  14px  secondary text: card copy, lists, notes, bar buttons
+       --fs-body   16px  reading text and card titles
+       --fs-lead   18px  section intros, lead paragraphs, small headings */
+  --fs-label: 0.75rem;
+  --fs-meta: 0.8125rem;
+  --fs-small: 0.875rem;
+  --fs-body: 1rem;
+  --fs-lead: 1.125rem;
+
   /* Warm neutral surfaces, from the app's neutral ramp.
      The ladder runs surface > bg > bg-alt so a card stays visible on both
      grounds - the alternating section band is the app's own page background,
@@ -475,7 +492,7 @@
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   min-height: 48px; padding: 14px 26px; border: 1.5px solid transparent; border-radius: var(--r-full);
-  font-family: var(--ff); font-size: 1rem; font-weight: 600; line-height: 1.4;
+  font-family: var(--ff); font-size: var(--fs-body); font-weight: 600; line-height: 1.4;
   white-space: nowrap; text-decoration: none; cursor: pointer;
   transition: background-color var(--dur-hover), border-color var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-out);
 }
@@ -494,7 +511,7 @@
   min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
   padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-full);
   background: none; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap;
-  font-family: var(--ff); font-size: 0.82rem; font-weight: 600;
+  font-family: var(--ff); font-size: var(--fs-meta); font-weight: 600;
   transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-press) var(--ease-out);
 }
 .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
@@ -554,13 +571,13 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
 .foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
 .foot-brand { max-width: 320px; }
 .foot-brand .nav-logo { margin-bottom: 14px; }
-.foot-brand p { font-size: 0.88rem; color: var(--text-2); line-height: 1.6; margin: 0; }
+.foot-brand p { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; margin: 0; }
 .foot-cols { display: flex; gap: 56px; flex-wrap: wrap; }
-.foot-col h2 { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 14px; }
-.foot-col a { display: flex; align-items: center; min-height: 44px; font-size: 0.9rem; color: var(--text-2); text-decoration: none; transition: color .15s; }
+.foot-col h2 { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 14px; }
+.foot-col a { display: flex; align-items: center; min-height: 44px; font-size: var(--fs-small); color: var(--text-2); text-decoration: none; transition: color .15s; }
 .foot-col a:hover { color: var(--accent); }
 .foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  font-size: 0.82rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  font-size: var(--fs-meta); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .foot-bottom b { color: var(--text-2); font-weight: 600; }
 @media (max-width: 560px) {
   .site-foot { padding-top: 44px; }
@@ -599,7 +616,7 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
    overflow-x stays as the net: a plate that still scrolls gets its tab stop
    from the page script. */
 .code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-lg); padding: 20px 24px;
-  font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.85; overflow-x: auto;
+  font-family: var(--ff-mono); font-size: var(--fs-small); line-height: 1.85; overflow-x: auto;
   white-space: pre-wrap; overflow-wrap: break-word; tab-size: 2;
   box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.06); }
 @supports (text-indent: 2ch each-line hanging) {
@@ -622,7 +639,7 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
 .copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 44px; padding: 7px 13px; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-full);
   background: rgba(255,255,255,0.08); color: var(--code-text); cursor: pointer;
-  font-family: var(--ff); font-size: 0.75rem; font-weight: 600;
+  font-family: var(--ff); font-size: var(--fs-label); font-weight: 600;
   transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
 .copy-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
 .copy-btn:active { transform: scale(var(--press-sm)); }
@@ -644,7 +661,7 @@ html { scroll-padding-bottom: var(--float-band); }
 .to-top { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 89;
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
   background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; text-decoration: none;
+  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; text-decoration: none;
   opacity: 0; visibility: hidden; transform: translateY(8px);
   transition: opacity .2s var(--ease-out), transform .2s var(--ease-out), visibility .2s, border-color var(--dur-hover); }
 .to-top.show { opacity: 1; visibility: visible; transform: none; }
@@ -679,31 +696,25 @@ html { scroll-padding-bottom: var(--float-band); }
      five steps of --stagger), so a row arrives left to right and a second
      row does not wait for the first.
 
-   Where the browser has scroll-driven animations, the arrival is bound to
-   the scroll position (view timeline, the first 160px of the entry) and
-   costs no observer and no timer; elsewhere site.js's IntersectionObserver
-   adds .vis and the transition plays once. Never both: each branch sits in
-   its own @supports. Only opacity, translate and scale move. */
+   The arrival plays ONCE: site.js's IntersectionObserver adds .vis and the
+   transition runs. Until S6 the browsers that have scroll-driven animations
+   bound it to the view timeline instead (the first 160px of the entry), and
+   a timeline runs both ways: scrolling back up, whatever sat in the bottom
+   160px of the screen faded out again and stayed half-transparent at rest -
+   text the reader had just read, dimming at the edge of the screen. Only
+   opacity, translate and scale move. */
 @media (prefers-reduced-motion: no-preference) {
-  @supports ((animation-timeline: view()) and (animation-range: entry)) {
-    @keyframes rv-rise { from { opacity: 0; translate: 0 12px; } }
-    @keyframes rv-settle { from { opacity: 0; scale: 0.965; } }
-    html.js .rv {
-      animation: rv-rise both var(--ease-out);
-      animation-timeline: view();
-      animation-range: entry calc(var(--i, 0) * 28px) entry calc(160px + var(--i, 0) * 28px);
-    }
-    html.js .rv.rv-media { animation-name: rv-settle; transform-origin: 50% 100%; }
+  /* The transition sits on .vis only: on .rv itself, arming a candidate
+     (visible by default) would fade it OUT over 420ms, below the fold where
+     nobody sees it, but still work for the compositor. Hiding is instant,
+     arriving is animated. */
+  html.js .rv.vis {
+    transition: opacity var(--dur-reveal) var(--ease-out), translate var(--dur-reveal) var(--ease-out), scale var(--dur-reveal) var(--ease-out);
+    transition-delay: calc(var(--i, 0) * var(--stagger));
   }
-  @supports not ((animation-timeline: view()) and (animation-range: entry)) {
-    html.js .rv {
-      transition: opacity var(--dur-reveal) var(--ease-out), translate var(--dur-reveal) var(--ease-out), scale var(--dur-reveal) var(--ease-out);
-      transition-delay: calc(var(--i, 0) * var(--stagger));
-    }
-    html.js .rv:not(.vis) { opacity: 0; translate: 0 12px; }
-    html.js .rv.rv-media { transform-origin: 50% 100%; }
-    html.js .rv.rv-media:not(.vis) { translate: none; scale: 0.965; }
-  }
+  html.js .rv:not(.vis) { opacity: 0; translate: 0 12px; }
+  html.js .rv.rv-media { transform-origin: 50% 100%; }
+  html.js .rv.rv-media:not(.vis) { translate: none; scale: 0.965; }
 }
 @media print {
   .skip-link, .copy-btn, .to-top { display: none !important; }
