@@ -14,10 +14,17 @@
  * DIE REGEL
  *
  * 1. Mehrere Woerter: das erste Zeichen des ERSTEN und des LETZTEN Worts,
- *    gross ("Anna Maria Schmidt" -> "AS", "Dr. Hans Müller" -> "DM"). Ein
- *    Bindestrich trennt nicht ("Anna-Lena Vogt" -> "AV"). Die ersten zwei
- *    Woerter - die Regel von dreizehn der vierzehn Kopien - machten aus einem
- *    Zweitnamen oder Titel den Familiennamen; das letzte Wort ist er.
+ *    gross ("Anna Maria Schmidt" -> "AS"). Ein Bindestrich trennt nicht
+ *    ("Anna-Lena Vogt" -> "AV"). Die ersten zwei Woerter - die Regel von
+ *    dreizehn der vierzehn Kopien - machten aus einem Zweitnamen oder Titel
+ *    den Familiennamen; das letzte Wort ist er.
+ *    EINE ANREDE VORN ZAEHLT NICHT (R23, Critique G5 P3): ein Wort aus
+ *    mindestens zwei Buchstaben mit Punkt am Ende ("Dr.", "Prof.", "med.")
+ *    ist ein Titel, kein Vorname - "Dr. Hans Müller" -> "HM", nicht "DM",
+ *    und die Aerztinnen einer Kontaktliste trugen nicht alle ein D. Er weicht
+ *    nur, solange danach noch zwei Woerter stehen ("Dr. Müller" bleibt "DM");
+ *    ein einzelner Buchstabe mit Punkt ist eine Initiale ("J. R. Smith" ->
+ *    "JS").
  * 2. Name OHNE Leerraum, ganz in Hangul, Han oder Kana: die LETZTEN ZWEI
  *    Zeichen, also der Rufname (김민수 -> 민수, 田中太郎 -> 太郎); bei einem
  *    oder zwei Zeichen der ganze Name. Das erste Zeichen ist dort der
@@ -223,6 +230,10 @@ function parse(name) {
   // Ein Name NUR aus Satzzeichen: dann sein erstes Zeichen, wie bisher - eine
   // leere Scheibe sagte noch weniger.
   const words = said.length ? said : raw;
+  // Regel 1, Anrede: Titel vorn weichen, solange zwei Woerter bleiben.
+  const isTitle = (chars) => chars.length >= 3 && chars[chars.length - 1] === '.'
+    && chars.slice(0, -1).every((char) => /^\p{L}/u.test(char));
+  while (words.length > 2 && isTitle(words[0])) words.shift();
   const cjk = words.length <= 2 && words.every((chars) => chars.every((char) => CJK.test(char)));
   return { cjk, words };
 }

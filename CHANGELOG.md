@@ -67,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows as the person's initials. Opening an area no longer makes the header twice as tall, so
   the page no longer jumps. Entries in the training log and in "Recent measurements" open when
   tapped anywhere on the row instead of only on a small pencil.
+- **Contacts keep their title while selecting, and a missing name is shown at the field.** In
+  selection mode the header drops its menu, so "Contacts" is no longer cut to "Cont..." on a
+  phone. Saving a contact without a name now marks the first-name field instead of showing a
+  message at the bottom. Initials skip a leading title such as "Dr." or "Prof.", so "Dr. Anna
+  Weber" shows AW everywhere in the app.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days

@@ -693,3 +693,19 @@ test('Liste und Detail zeigen eine Telefonnummer in derselben Form', async () =>
     __primePhoneLib(null);
   }
 });
+
+// R23 (Critique G5 P2/P3): im Auswahlmodus kuerzte der Titel auf "Kont..."
+// (390px: Suche, "Abbrechen" und "..." daneben), und "Name noetig" kam als
+// Toast statt am Feld.
+test('R23: im Auswahlmodus tritt das Menue ab, der Name meldet sich am Feld', () => {
+  const css = read('../public/styles/contacts.css');
+  const hide = [...eachRule(css)].find((r) => r.selector.trim() === '.contacts-page.is-selecting .contacts-toolbar .page-tools-btn');
+  assert.ok(hide && /display:\s*none/.test(hide.body), 'das Menue weicht im Auswahlmodus');
+  const js = read('../public/pages/contacts.js');
+  const exit = js.slice(js.indexOf('function exitSelectMode()'), js.indexOf('function syncSelectChrome()'));
+  assert.ok(exit.indexOf("classList.remove('is-selecting')") > -1
+    && exit.indexOf("classList.remove('is-selecting')") < exit.indexOf(".page-tools-btn')?.focus()"),
+    'erst die Klasse, dann der Fokus - ein ausgeblendeter Knopf nimmt keinen');
+  assert.match(js, /if \(!name && reportFieldErrors\(\[\[panel\.querySelector\('#cm-first-name'\), t\('contacts\.nameRequiredHint'\)\]\]\)\) return;/);
+  assert.doesNotMatch(js, /showToast\(t\('contacts\.nameRequiredHint'\)/, 'kein Toast mehr fuer ein Feld');
+});

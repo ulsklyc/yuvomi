@@ -864,3 +864,14 @@
    @container-Kappung auf die Bahnbreite (424px bei 1440), die gegen die
    Shell-Regel (0,2,1) ohnehin nicht mehr ankam. test-contacts-list-detail.js
    haelt die Ungleichung. */
+
+/* IM AUSWAHLMODUS TRITT DAS MENUE AB (R23, Critique G5 P2). Neben Suche,
+ * „Abbrechen" und „..." blieben dem Titel bei 390px 108px - „Kont...". Sein
+ * einziger Eintrag fuer diesen Moment („Auswaehlen") ist gesperrt, die
+ * anderen (Kategorien, Import, Export) gehoeren nicht in eine Auswahl;
+ * „Abbrechen" steht an seiner Stelle am Ende der Zeile, wie in Apples Listen
+ * im Bearbeiten-Modus. Beim Verlassen kommt es zurueck und nimmt den Fokus
+ * (contacts.js exitSelectMode). */
+.contacts-page.is-selecting .contacts-toolbar .page-tools-btn {
+  display: none;
+}

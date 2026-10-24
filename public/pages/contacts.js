@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldErrors } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { openDetailView, leaveDetailTo } from '/components/detail-view.js';
 import { stagger, vibrate, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -1675,11 +1675,10 @@ function buildContactForm({ mode, contact = null }) {
           return;
         }
 
-        if (!name) {
-          window.yuvomi?.showToast(t('contacts.nameRequiredHint'), 'danger');
-          panel.querySelector('#cm-first-name').focus();
-          return;
-        }
+        // DER FEHLER STEHT AM FELD (R23, Critique G5 P3; D8 wie Geburtstage):
+        // vorher ein Toast, der das Feld nicht nannte - jetzt die Meldung am
+        // Vornamen (aria-invalid, aria-describedby), der Fokus darin.
+        if (!name && reportFieldErrors([[panel.querySelector('#cm-first-name'), t('contacts.nameRequiredHint')]])) return;
 
         saveBtn.disabled    = true;
         saveBtn.textContent = '…';
@@ -1791,8 +1790,10 @@ function exitSelectMode() {
   // Menue-Knopf, ueber den man hineingekommen ist - sonst faellt er auf <body>.
   const refocus = _container.querySelector('#contacts-select-cancel')?.contains(document.activeElement);
   syncSelectChrome();
-  if (refocus) _container.querySelector('.contacts-toolbar .page-tools-btn')?.focus();
+  // ERST die Klasse, DANN der Fokus: im Auswahlmodus ist das Menue
+  // ausgeblendet (contacts.css, R23) und nimmt keinen Fokus an.
   _container.querySelector('.contacts-page')?.classList.remove('is-selecting');
+  if (refocus) _container.querySelector('.contacts-toolbar .page-tools-btn')?.focus();
   setSelectionBulk(md, null);
   renderList();
 }

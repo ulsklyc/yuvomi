@@ -61,7 +61,13 @@ const TABLE = [
   ['Anna', 'A', 'ein Wort'],
   ['Anna Schmidt', 'AS', 'zwei Woerter'],
   ['Anna Maria Schmidt', 'AS', 'drei Woerter: das erste und das letzte, nicht die ersten zwei'],
-  ['Dr. Hans Müller', 'DM', 'ein Titel vorn: das letzte Wort ist der Familienname'],
+  // R23 (Critique G5 P3): eine Anrede vorn zaehlt nicht - sonst trugen alle
+  // Aerztinnen der Kontaktliste ein D.
+  ['Dr. Hans Müller', 'HM', 'eine Anrede vorn weicht: Vorname und Familienname'],
+  ['Prof. Dr. Anna Weber', 'AW', 'auch zwei Anreden'],
+  ['Dr. med. Anna Weber', 'AW', 'auch eine kleingeschriebene'],
+  ['Dr. Müller', 'DM', 'die Anrede bleibt, wenn sonst nur ein Wort bliebe'],
+  ['J. R. Smith', 'JS', 'ein Buchstabe mit Punkt ist eine Initiale, keine Anrede'],
   ['Jean-Luc Picard', 'JP', 'zwei Woerter, das erste mit Bindestrich'],
   ['Maria del Carmen Ruiz Soto', 'MS', 'fuenf Woerter: weiterhin das erste und das letzte'],
   ['Anna-Lena Vogt', 'AV', 'ein Bindestrich trennt nicht'],
