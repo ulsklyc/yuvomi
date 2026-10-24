@@ -2,9 +2,15 @@
    Yuvomi - shared script of the GitHub Pages site (yuvomi.cloud)
    ============================================================================
 
-   Loaded by all five pages, right after the footer and before the page's own
-   script, so window.YuvomiSite exists when that script runs. It owns the two
-   controls the bar shares (assets/site.css, "The bar's controls"):
+   Loaded by all five pages with `defer` (S7; before, it blocked the parser
+   at the end of the body). It therefore runs AFTER the page's own inline
+   script, once the document is parsed: a page script must not need
+   window.YuvomiSite at its first run (index.html reads <html data-theme>,
+   which the head script sets, until it exists), and a "yuvomi:lang" fired
+   before this file ran is not missed - syncLabels() reads <html lang> when
+   this script starts. The theme itself never waits for this file: the head
+   script of every page sets data-theme before the first paint. It owns the
+   two controls the bar shares (assets/site.css, "The bar's controls"):
 
    THEME. One button cycling System -> Light -> Dark -> System. Until this
    round every page toggled light/dark only, so one click lost "follow my
@@ -21,8 +27,9 @@
    text and is left alone. The theme button's name follows the same event.
 
    Since S2 it also switches the one back-to-top link and sizes the room the
-   code plates keep for their copy button (both at the end), and since S3 it
-   arms the arrivals below the first screen (ARRIVALS, the last block).
+   code plates keep for their copy button (both at the end), since S3 it
+   arms the arrivals below the first screen (ARRIVALS, the last block), and
+   since S7 it hands focus to the target of an in-page link (IN-PAGE TARGETS).
 
    No innerHTML anywhere: only attributes and textContent change. */
 (function () {
@@ -112,6 +119,28 @@
     syncTop();
   }
 
+  /* IN-PAGE TARGETS (S7). A link to an anchor on the same page (skip link,
+     jump menu, back to top, "See it in action") scrolled, but focus stayed
+     on BODY: the next Tab started from the top of the page again, and a
+     screen reader announced nothing. The target takes focus now - with
+     tabindex=-1 if it is not focusable itself, and preventScroll, because
+     the browser's own fragment scroll (scroll-padding included) is the one
+     that should run. The ring follows :focus-visible: a mouse click leaves
+     none, a keyboard user sees it inside the section (site.css,
+     [tabindex="-1"]). Links whose page handles the click itself
+     (preventDefault, e.g. install.html's tabs) are left alone. */
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var id = a.getAttribute('href').slice(1);
+    var target = null;
+    try { target = id && document.getElementById(decodeURIComponent(id)); } catch (err) {}
+    if (!target) return;
+    if (!target.matches('a[href], button, input, select, textarea, [tabindex]')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  });
+
   /* COPY BUTTON ROOM. The plate's text flows around an empty float the size
      of its copy button (assets/site.css, the code plate). The button's width
      changes with the language and with its Copied/failed state, so each
@@ -130,7 +159,7 @@
   /* ARRIVALS (assets/site.css, "Arrivals"). A .reveal candidate is armed
      (.rv) only if it starts below the first screen: what the visitor sees on
      arrival is never held back (S3 - the install guide's LCP paragraph used
-     to wait 600-750ms for this). Runs once, here at the end of the body,
+     to wait 600-750ms for this). Runs once, as a deferred script on the parsed document,
      before the page scrolls anywhere; rects are read before the first class
      is written. Under reduced motion nothing is armed. An observer adds .vis
      once, and the arrival never plays backwards (S6: a scroll-bound timeline

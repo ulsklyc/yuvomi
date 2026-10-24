@@ -1672,6 +1672,47 @@ test('index.html: die Modulgruppen sind die Menuegruppen des Routers, in seiner 
   assert.deepEqual(navGroupProblems(read('index.html'), ROUTER()), []);
 });
 
+/**
+ * Der Modulkatalog startet als Inhaltsangabe (S7, Entscheidung Ulas
+ * 2026-10-24): zugeklappt nur Gruppenkoepfe mit Symbol und Namen je Modul,
+ * die vier Feature-Karten (Behauptung, Satz, Stichpunkte, Telefon) und alle
+ * Beschreibungen erst mit dem Knopf. Vorher blieben die Karten stehen, und
+ * die Sektion lief bei 1440px 2.595px. Die Regeln gelten nur am Bildschirm,
+ * damit der Ausdruck alles zeigt; ohne JS (kein html.js) steht ohnehin alles.
+ */
+const COLLAPSED = 'html.js .mod-groups:not(.expanded)';
+function showcaseCollapsedFindings(html) {
+  const found = [];
+  const body = stripComments(html);
+  const grid = (body.match(/<div class="([^"]*)" id="modGrid">/) || [])[1];
+  if (grid === undefined) return ['#modGrid nicht gefunden'];
+  if (/\bexpanded\b/.test(grid)) found.push('#modGrid startet aufgeklappt');
+  const btn = (body.match(/<button\b[^>]*\bid="modToggle"[^>]*>/) || [])[0] || '';
+  if (!/aria-expanded="false"/.test(btn) || !/aria-controls="modGrid"/.test(btn)) found.push('#modToggle ohne aria-expanded="false" / aria-controls="modGrid"');
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)]);
+  const hides = (part) => rules.some((r) => /display:\s*none/.test(r.body)
+    && r.at.some((a) => a.replace(/\s+/g, '') === '@mediascreen')
+    && r.selector.split(',').map((x) => x.trim()).includes(`${COLLAPSED} ${part}`));
+  for (const part of ['.feat-visual', '.feat-info > h4', '.feat-info > p', '.feat-list', '.mod-card p']) {
+    if (!hides(part)) found.push(`zugeklappt sichtbar: ${part} (keine Regel ${COLLAPSED} ${part} { display: none } unter @media screen)`);
+  }
+  return found;
+}
+
+test('index.html: der Modulkatalog startet zugeklappt als Inhaltsangabe', () => {
+  assert.deepEqual(showcaseCollapsedFindings(read('index.html')), []);
+});
+
+test('der Inhaltsangabe-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const open = html.replace('<div class="mod-groups" id="modGrid">', '<div class="mod-groups expanded" id="modGrid">');
+  assert.notEqual(open, html);
+  assert.deepEqual(showcaseCollapsedFindings(open), ['#modGrid startet aufgeklappt']);
+  const cards = html.replace(`      ${COLLAPSED} .feat-visual,\n`, '');
+  assert.notEqual(cards, html);
+  assert.ok(showcaseCollapsedFindings(cards).some((f) => /zugeklappt sichtbar: \.feat-visual/.test(f)));
+});
+
 test('index.html: die Gruppenkoepfe heissen wie im Menue der App', () => {
   const html = read('index.html');
   const LOCALE_KEY = { plan: 'sectionPlan', household: 'sectionHousehold', people: 'sectionPeople',
@@ -2254,8 +2295,10 @@ function heroFindings(html) {
     const src = pngSize(resolve(DOCS, web));
     if (Math.abs(w / h - src.w / src.h) > 0.01) found.push(`heroShot ${w}x${h} passt nicht zur Desktopaufnahme ${src.w}x${src.h}`);
   }
-  const bp = (html.match(/id="heroShot">\s*<script>[\s\S]*?matchMedia\('\(max-width:(\d+)px\)'\)/) || [])[1];
-  if (!bp) found.push('Bildtausch-Schwelle im Inline-Skript nicht gefunden');
+  // Seit S7 waehlt das Kopfskript die Aufnahme (und startet sie als Preload);
+  // die Schwelle steht dort.
+  const bp = (heroHeadScript(html).match(/matchMedia\('\(max-width: ?(\d+)px\)'\)/) || [])[1];
+  if (!bp) found.push('Bildtausch-Schwelle im Kopfskript nicht gefunden');
   const rule = inlineStyles(html).flatMap((css) => [...eachRule(css)])
     .find((r) => r.selector === '.hero-frame img' && r.at.some((a) => a.replace(/\s+/g, '') === `@media(max-width:${bp}px)`));
   if (!rule || !/aspect-ratio:\s*var\(--ar-phone\)/.test(rule.body)) found.push(`kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:${bp}px`);
@@ -2273,6 +2316,67 @@ function heroFindings(html) {
   }
   return found;
 }
+
+/** Das Kopfskript, das die Hero-Aufnahme waehlt (S7), oder ''. */
+function heroHeadScript(html) {
+  const head = html.slice(0, html.indexOf('</head>'));
+  return [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((js) => /YuvomiHero/.test(js)) || '';
+}
+
+/**
+ * Die Hero-Aufnahme in der Schaerfe ihres Rahmens (S7). Bis dahin schrieb das
+ * Inline-Skript Dichte-Deskriptoren ("@1x.webp 1x, .webp 2x"): ein Schirm mit
+ * DPR 1 nahm die 700px-Datei fuer den 1150px-Rahmen (gemessen 0,61 der
+ * noetigen Pixel), waehrend die Galerie laengst nach Breite waehlte. Jetzt:
+ * Breiten-Deskriptoren mit sizes, gewaehlt im Kopfskript und dort als Preload
+ * gestartet (das <img> steht rund 30 KB komprimiert hinter dem Anfang), und
+ * dieselben Werte am Bild - sonst waehlte applyShots() spaeter anders und
+ * holte eine zweite Datei. Die Pfade im Kopfskript muessen die des Bildes sein.
+ */
+function heroDeliveryFindings(html) {
+  const found = [];
+  const img = (html.match(/<img\b[^>]*\bid="heroShot"[^>]*>/) || [])[0] || '';
+  const inline = (html.match(/id="heroShot">\s*<script>([\s\S]*?)<\/script>/) || [])[1] || '';
+  const noscript = (html.match(/id="heroShot">\s*<script>[\s\S]*?<\/script>\s*<noscript>([\s\S]*?)<\/noscript>/) || [])[1] || '';
+  const head = heroHeadScript(html);
+  if (!head) return ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)'];
+  for (const [where, code] of [['Kopfskript', head], ['Inline-Skript am Bild', inline], ['noscript-Kopie', noscript]]) {
+    if (/\b[12]x\b['"]|\s[12]x,|\s[12]x"/.test(code)) found.push(`Hero: Dichte-Deskriptoren (1x/2x) im ${where}`);
+  }
+  if (!/\+ ?' ' ?\+ ?w\[0\] ?\+ ?'w, '/.test(head) || !/w\[1\] ?\+ ?'w'/.test(head)) found.push('Hero: das Kopfskript schreibt keine Breiten-Deskriptoren (…w)');
+  if (!/rel = 'preload'/.test(head) || !/imagesrcset/.test(head) || !/imagesizes/.test(head)) found.push('Hero: kein Preload mit imagesrcset/imagesizes im Kopfskript');
+  if (!/i\.sizes ?= ?H\.sizes/.test(inline) || !/i\.srcset ?= ?H\.srcset/.test(inline)) found.push('Hero: das Inline-Skript uebernimmt srcset/sizes des Kopfskripts nicht');
+  const sizes = (head.match(/sizes: '([^']+)'/) || [])[1];
+  const dataSizes = (img.match(/\bdata-sizes="([^"]+)"/) || [])[1];
+  if (!sizes || sizes !== dataSizes) found.push(`Hero: sizes im Kopfskript (${sizes}) und data-sizes am Bild (${dataSizes}) weichen ab`);
+  const stem = (head.match(/base = '(screenshots\/[^']+-)' \+/) || [])[1];
+  for (const [attr, file] of [['data-light', 'light-web'], ['data-dark', 'dark-web'], ['data-light-m', 'light-mobile'], ['data-dark-m', 'dark-mobile']]) {
+    const v = (img.match(new RegExp(`\\b${attr}="([^"]+)"`)) || [])[1];
+    if (!stem || v !== `${stem}${file}.png`) found.push(`Hero: ${attr}="${v}" passt nicht zum Pfad im Kopfskript (${stem}${file}.png)`);
+  }
+  if (!/\bsrcset="[^"]*\b700w, [^"]*\b1400w"/.test(noscript) || !/\bsizes="/.test(noscript)) found.push('Hero: noscript-Kopie ohne Breiten-srcset und sizes');
+  return found;
+}
+
+test('index.html: die Hero-Aufnahme waehlt nach Breite, frueh und genau einmal', () => {
+  assert.deepEqual(heroDeliveryFindings(read('index.html')), []);
+});
+
+test('der Hero-Schaerfe-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Der Stand vor S7: Dichte-Deskriptoren im Inline-Skript, kein Kopfskript.
+  const old = html.replace(/<script>\(function\(i,H\)[\s\S]*?<\/script>/, "<script>document.getElementById('heroShot')&&(function(i){var p='x.png';i.srcset=p.replace(/\\.png$/,'@1x.webp')+' 1x, '+p.replace(/\\.png$/,'.webp')+' 2x';})(document.getElementById('heroShot'));</script>");
+  assert.notEqual(old, html);
+  assert.ok(heroDeliveryFindings(old).some((f) => /Dichte-Deskriptoren \(1x\/2x\) im Inline-Skript/.test(f)));
+  assert.ok(heroDeliveryFindings(old).some((f) => /uebernimmt srcset\/sizes/.test(f)));
+  const noHead = html.replace(/window\.YuvomiHero = hero;/, '').replace(/YuvomiHero/g, 'Other');
+  assert.deepEqual(heroDeliveryFindings(noHead), ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)']);
+  const drift = html.replace('data-sizes="(max-width: 467px)', 'data-sizes="(max-width: 468px)');
+  assert.notEqual(drift, html);
+  assert.ok(heroDeliveryFindings(drift).some((f) => /weichen ab/.test(f)));
+  const renamed = html.replace('data-dark-m="screenshots/dashboard-dark-mobile.png"', 'data-dark-m="screenshots/home-dark-mobile.png"');
+  assert.ok(heroDeliveryFindings(renamed).some((f) => /data-dark-m=.*passt nicht/.test(f)));
+});
 
 test('index.html: das LCP-Bild hat Vorrang und reservierten Platz in beiden Formaten', () => {
   assert.deepEqual(heroFindings(read('index.html')), []);
@@ -3386,7 +3490,10 @@ function siteShellFindings(pages, siteCss, siteJs) {
     const jump = head[0].match(/<details class="nav-jump"[\s\S]*?<\/details>/);
     if (jump && />\s*Install[^<]*</i.test(jump[0])) found.push(`${page}: das Sprungmenue nennt ein zweites "Install"-Ziel`);
     // Das Theme gehoert site.js: keine Seite schreibt es selbst (dort fehlte "System").
-    if (!/<script src="assets\/site\.js"><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js nicht`);
+    // Mit defer (S7): am Ende des Body blockierte es den Parser vor dem
+    // Seitenskript. Das Theme haengt nicht daran, es setzt das Kopfskript.
+    if (!/<script src="assets\/site\.js"( defer)?><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js nicht`);
+    else if (!/<script src="assets\/site\.js" defer><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js ohne defer (blockiert den Parser)`);
     if (/lsSet\('theme'|setItem\('yuvomi-theme'/.test(masked)) found.push(`${page}: schreibt das Theme selbst statt ueber assets/site.js`);
     if (!/id="themeBtn"[^>]*data-mode="system"/.test(head[0])) found.push(`${page}: Theme-Knopf ohne data-mode="system"`);
   }
@@ -3524,8 +3631,8 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.notEqual(flat, css);
   assert.ok(hit(rhythmFindings(pages, flat, js), /--sec-m fehlt oder fliesst nicht/));
   // Ein Seitenskript schaltet den Knopf wieder selbst.
-  const own = swap('privacy.html', '<script src="assets/site.js"></script>',
-    "<script>(function(){ var b = document.getElementById('toTop'); })();</script>\n<script src=\"assets/site.js\"></script>");
+  const own = swap('privacy.html', '<script src="assets/site.js" defer></script>',
+    "<script>(function(){ var b = document.getElementById('toTop'); })();</script>\n<script src=\"assets/site.js\" defer></script>");
   assert.notDeepEqual(own, pages);
   assert.ok(hit(rhythmFindings(own, css, js), /privacy\.html: schaltet den Nach-oben-Knopf selbst/));
   // Zwei Pillen am Telefon.

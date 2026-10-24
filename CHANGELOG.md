@@ -99,6 +99,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   troubleshooting answers are lists instead of cards that held code and warnings inside, and the
   ten extras fill their grid without empty places. Sections that fade in as you scroll do it once:
   scrolling back up no longer fades out the text at the bottom of the screen.
+- **yuvomi.cloud is sharper, shorter and easier to move through with the keyboard.** The overview
+  screenshot at the top of the landing page is picked by the width it is shown at, so a laptop
+  screen gets the large file instead of one stretched to almost twice its size, and on a computer
+  the screenshot starts loading with the page instead of after most of it. The meal and calendar
+  screenshots on a phone are sharp at three times the pixel density. The module catalogue starts
+  as a list of every module with its icon and name, grouped as in the app, and "Show what each
+  module does" opens the four feature cards and all descriptions; the landing page is about one and
+  a half screens shorter on a laptop. "Why one app" uses the full width on a wide screen. The
+  Install button that floats on a phone stays away while the closing card with the same button is
+  on screen. The five platform links name their platform ("Docker guide" instead of "Guide"). The
+  skip link, the jump menu, "Back to top" and the other links within a page now move the keyboard
+  focus to where they lead instead of leaving it at the top of the page. The shared script no
+  longer holds up the pages while it loads.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

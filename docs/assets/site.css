@@ -477,10 +477,19 @@
 
 /* Skip link: index and install put two dozen focusable nodes between the top
    of the page and the content, so keyboard users need a way past the nav. */
-.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none; }
-.skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
+/* The box (44px target) belongs to the link itself, not to :focus: it was
+   measured 26px high off screen (S7), and only the position should change. */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none;
+  display: inline-flex; align-items: center; min-height: 44px; padding: 12px 18px;
   background: var(--surface); color: var(--text-1);
   border: 1px solid var(--border); border-radius: var(--r-full); box-shadow: var(--shadow-md); font-weight: 600; }
+.skip-link:focus { left: 8px; top: 8px; }
+/* A target focused by script (tabindex=-1: #main-content, a section reached
+   by an in-page link - site.js, "IN-PAGE TARGETS") carries the ring inside
+   its box, so the keyboard user sees where they landed without the outline
+   being clipped by the page edge. A mouse click shows none (:focus-visible). */
+[tabindex="-1"]:focus { outline: none; }
+[tabindex="-1"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 
 /* Buttons. ONE shape, as in the app (DESIGN.md "Die Eine-Buttonform-Regel"):
    the capsule, for every element that triggers an action and carries its own
