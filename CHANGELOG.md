@@ -245,6 +245,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
+  A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
+  colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of
+  just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
+  quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
+
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.
