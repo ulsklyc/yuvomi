@@ -491,6 +491,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   just `Spritzen`. The parser now finds the first colon outside any double-quoted parameter, so
   quoted values like `data:text/html,...` are kept inside the parameter and the real value is read.
 
+- **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
+  (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
+  there, all remaining items waiting for that same list are now skipped for the rest of the sync
+  pass. Previously the stop check ran only between lists, not within a single list, so if two items
+  were both waiting to move to the same list, the second PUT went out even after the first was
+  rate-limited. An unreachable server (no HTTP status) also now pauses further carry attempts for
+  that list, matching the behavior for rate-limit and outage responses.
+
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.
