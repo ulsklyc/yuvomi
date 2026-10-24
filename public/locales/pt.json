@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Por valor",
         "ledgerSortActive": "Ordenação: {{sort}}",
         "ledgerAccountsAll": "Todas as contas",
-        "showAccountTransactions": "Ver lançamentos",
-        "accountDeleteRefused": "Esta conta não pode ser eliminada. Arquive-a em vez disso."
+        "showAccountTransactions": "Ver lançamentos"
     },
     "settings": {
         "healthCycleEnableLabel": "Disponibilizar o ciclo no agregado",

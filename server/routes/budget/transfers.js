@@ -6,7 +6,7 @@ import { normalizeBudgetVisibility } from '../../services/budget-visibility.js';
 import { todayKey } from '../../utils/timezone.js';
 import { createLogger } from '../../logger.js';
 import { createTransfer, transferPair, mirrorTransfer, transferIncomeCategory, TRANSFER_SAVING_CATEGORY, TRANSFER_SAVING_SUBCATEGORY } from '../../services/budget-transfers.js';
-import { mayEdit, getBudgetMode, defaultCategory, validExpenseCategoryKeys, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency, budgetAccountCurrency,
+import { budgetFilter, mayEdit, getBudgetMode, defaultCategory, validExpenseCategoryKeys, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency, budgetAccountCurrency,
   RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT, freezeSeriesPast, materializeSeriesStart } from './helpers.js';
 
 const router = express.Router();
@@ -39,8 +39,10 @@ function values(req, base = null, currentPartner = null) {
   const title = str(pick('title', base?.title), 'Title', { max: MAX_TITLE });
   const amount = num(pick('amount', base ? Math.abs(base.amount) : undefined), 'Amount', { required: true });
   const date = validateDate(pick('date', base?.date), 'Date', true);
-  const from = validateAccountRef(pick('from_account_id', base?.account_id));
-  const to = validateAccountRef(pick('to_account_id', partner?.account_id));
+  // Eine Kontohuelle ist fuer wen sie nichts traegt "nicht gefunden" (ACCOUNT_SHELL).
+  const seen = budgetFilter(req, 'e', { scoped: false });
+  const from = validateAccountRef(pick('from_account_id', base?.account_id), seen);
+  const to = validateAccountRef(pick('to_account_id', partner?.account_id), seen);
   const defaultOutgoing = validExpenseCategoryKeys().includes(TRANSFER_SAVING_CATEGORY) ? TRANSFER_SAVING_CATEGORY : defaultCategory('expense');
   const category = pick('category', base?.category ?? defaultOutgoing);
   const saving = db.get().prepare(`SELECT key FROM budget_subcategories WHERE category_key = ?

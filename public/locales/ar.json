@@ -2112,8 +2112,7 @@
         "ledgerSortAmount": "حسب المبلغ",
         "ledgerSortActive": "الترتيب: {{sort}}",
         "ledgerAccountsAll": "كل الحسابات",
-        "showAccountTransactions": "عرض الحركات",
-        "accountDeleteRefused": "لا يمكن حذف هذا الحساب. أرشفه بدلاً من ذلك."
+        "showAccountTransactions": "عرض الحركات"
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

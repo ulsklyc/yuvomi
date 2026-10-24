@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Tutara göre",
         "ledgerSortActive": "Sıralama: {{sort}}",
         "ledgerAccountsAll": "Tüm hesaplar",
-        "showAccountTransactions": "Hareketleri göster",
-        "accountDeleteRefused": "Bu hesap silinemez. Bunun yerine arşivleyin."
+        "showAccountTransactions": "Hareketleri göster"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

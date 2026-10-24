@@ -1883,8 +1883,7 @@
         "ledgerSortAmount": "Menurut jumlah",
         "ledgerSortActive": "Urutan: {{sort}}",
         "ledgerAccountsAll": "Semua akun",
-        "showAccountTransactions": "Tampilkan transaksi",
-        "accountDeleteRefused": "Rekening ini tidak dapat dihapus. Arsipkan saja."
+        "showAccountTransactions": "Tampilkan transaksi"
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",

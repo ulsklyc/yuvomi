@@ -1883,8 +1883,7 @@
         "ledgerSortAmount": "Ayon sa halaga",
         "ledgerSortActive": "Pagkakasunod: {{sort}}",
         "ledgerAccountsAll": "Lahat ng account",
-        "showAccountTransactions": "Ipakita ang mga transaksyon",
-        "accountDeleteRefused": "Hindi matatanggal ang account na ito. I-archive ito sa halip."
+        "showAccountTransactions": "Ipakita ang mga transaksyon"
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",

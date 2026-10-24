@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Op bedrag",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle rekeningen",
-        "showAccountTransactions": "Boekingen tonen",
-        "accountDeleteRefused": "Deze rekening kan niet worden verwijderd. Archiveer haar in plaats daarvan."
+        "showAccountTransactions": "Boekingen tonen"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",

@@ -3124,10 +3124,9 @@ function openAccountModal(account = null) {
         // nimmt ihnen die Kontozuordnung - das benennt der Dialog vorher. Ein
         // leeres Konto geht mit Rueckgaengig: geloescht wird erst, wenn die
         // Frist des Toasts endet.
-        // Haengen fremde private Buchungen daran, lehnt der Server am Ende
-        // der Frist neutral ab (account_delete_refused) - restore() bringt
-        // das Konto zurueck und nennt den Grund. Vorher weiss es hier niemand:
-        // ein Bit in der Kontoliste waere ein Privatsphaere-Orakel.
+        // Haengen fremde private Buchungen daran, die hier niemand sieht,
+        // laesst der Server das Konto fuer deren Besitzer als Huelle stehen
+        // (helpers.js ACCOUNT_SHELL) - fuer diese Seite ist es so oder so weg.
         if (!(Number(account.entry_count) > 0)) {
           closeModal({ force: true, context: captureModalContext() });
           deleteEmptyAccountWithUndo(account);
@@ -5510,7 +5509,6 @@ const BUDGET_REFUSALS = new Map([
   ['account_credit_bank_invalid', ['#am-credit-bank', BUDGET_SAVE_FAILED]],
   ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
   ['account_has_transfers', [null, 'budget.accountHasTransfers']],
-  ['account_delete_refused', [null, 'budget.accountDeleteRefused']],
   ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
   // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
   ['category_name_invalid', [null, 'common.nameRequired']],

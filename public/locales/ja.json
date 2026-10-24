@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "金額順",
         "ledgerSortActive": "並べ替え: {{sort}}",
         "ledgerAccountsAll": "すべての口座",
-        "showAccountTransactions": "記録を表示",
-        "accountDeleteRefused": "この口座は削除できません。代わりにアーカイブしてください。"
+        "showAccountTransactions": "記録を表示"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

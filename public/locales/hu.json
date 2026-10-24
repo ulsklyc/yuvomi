@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Összeg szerint",
         "ledgerSortActive": "Rendezés: {{sort}}",
         "ledgerAccountsAll": "Minden számla",
-        "showAccountTransactions": "Tételek megjelenítése",
-        "accountDeleteRefused": "Ez a számla nem törölhető. Archiváld helyette."
+        "showAccountTransactions": "Tételek megjelenítése"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",

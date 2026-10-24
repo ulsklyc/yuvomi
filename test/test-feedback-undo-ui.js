@@ -97,11 +97,9 @@ test('Inventar, Konto, geteilte Ausgabe, Notiz: Loeschen mit Rueckgaengig und Na
   const budget = read('public/pages/budget.js');
   assert.match(budget, /if \(!\(Number\(account\.entry_count\) > 0\)\) \{[\s\S]{0,200}deleteEmptyAccountWithUndo\(account\)/);
   assert.match(body(budget, 'function deleteEmptyAccountWithUndo('), /scheduleUndoableDelete\(/);
-  // Fremde private Buchungen am Konto: der Server lehnt am Ende der Frist neutral
-  // ab, restore() nennt den Grund. Die Seite weiss es vorher NICHT (kein Orakel).
-  assert.doesNotMatch(budget, /has_hidden_entries/);
-  assert.match(budget, /\['account_delete_refused', \[null, 'budget\.accountDeleteRefused'\]\]/);
-  assert.match(body(budget, 'function deleteEmptyAccountWithUndo('), /if \(err\) showBudgetError\(err\)/);
+  // Fremde private Buchungen am Konto weiss die Seite nicht (kein Orakel), und der
+  // Server antwortet darauf nicht anders (Huelle, test:budget-accounts).
+  assert.doesNotMatch(budget, /has_hidden_entries|account_delete_refused/);
   const split = read('public/pages/split-expenses.js');
   const del = split.slice(split.indexOf("#split-delete-expense')?.addEventListener"), split.indexOf("#split-expense-form')?.addEventListener('submit'"));
   assert.doesNotMatch(del, /confirmOverModal\(/);

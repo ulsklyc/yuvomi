@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Efter belopp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alla konton",
-        "showAccountTransactions": "Visa transaktioner",
-        "accountDeleteRefused": "Det här kontot kan inte raderas. Arkivera det i stället."
+        "showAccountTransactions": "Visa transaktioner"
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

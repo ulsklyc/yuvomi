@@ -1948,8 +1948,7 @@
         "ledgerSortAmount": "Podle částky",
         "ledgerSortActive": "Řazení: {{sort}}",
         "ledgerAccountsAll": "Všechny účty",
-        "showAccountTransactions": "Zobrazit pohyby účtu",
-        "accountDeleteRefused": "Tento účet nelze smazat. Místo toho jej archivujte."
+        "showAccountTransactions": "Zobrazit pohyby účtu"
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

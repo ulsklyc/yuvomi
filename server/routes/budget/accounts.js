@@ -8,7 +8,7 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
 import {
-  budgetFilter, listAccounts, accountHasHiddenEntries, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
+  budgetFilter, listAccounts, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -94,7 +94,9 @@ router.put('/accounts/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const existing = db.get().prepare('SELECT * FROM budget_accounts WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Account not found', code: 404 });
+    if (accountGoneFor(existing, budgetFilter(req, 'e', { scoped: false }))) {
+      return res.status(404).json({ error: 'Account not found', code: 404 });
+    }
 
     const checks = [];
     if (req.body.name !== undefined) checks.push(['account_name_invalid', str(req.body.name, 'Name', { max: MAX_SHORT })]);
@@ -154,34 +156,43 @@ router.put('/accounts/:id', (req, res) => {
 /**
  * DELETE /api/v1/budget/accounts/:id
  * Konto löschen. Zugeordnete Einträge bleiben erhalten (account_id wird geleert).
- * 409 account_has_transfers, 409 account_delete_refused (neutral: fremde private Buchungen haengen daran).
+ * Haengen danach noch Buchungen daran, die der Aufrufer nicht sieht (fremde
+ * private im personal-Modus), bleibt das Konto fuer sie als Huelle stehen
+ * (ACCOUNT_SHELL, helpers.js) - die Antwort ist dieselbe 204.
  * Response: 204 No Content
  */
 router.delete('/accounts/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const existing = db.get().prepare('SELECT id FROM budget_accounts WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Account not found', code: 404 });
+    const filter = budgetFilter(req, 'e', { scoped: false });
+    const existing = db.get().prepare('SELECT id, archived FROM budget_accounts WHERE id = ?').get(id);
+    if (accountGoneFor(existing, filter)) return res.status(404).json({ error: 'Account not found', code: 404 });
 
-    if (db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? AND transfer_entry_id IS NOT NULL LIMIT 1').get(id)) {
+    // Nur SICHTBARE Umbuchungen sperren: eine fremde private Umbuchung haelt
+    // die Huelle fest, statt mit 409 zu verraten, dass es sie gibt.
+    if (db.get().prepare(`SELECT 1 FROM budget_entries e WHERE e.account_id = ? AND e.transfer_entry_id IS NOT NULL${filter.clause} LIMIT 1`)
+      .get(id, ...filter.params)) {
       return refuse(res, [refusal('account_has_transfers', 'This account has linked transfers. Archive it instead.')], 409);
-    }
-    // Loeschen nimmt JEDER Buchung am Konto die Zuordnung - auch fremden
-    // privaten, die der Loeschende nicht sieht und ueber die er nicht
-    // entscheidet (Critique R23). Dann bleibt nur Archivieren. Die Ablehnung
-    // ist NEUTRAL: sie nennt keine privaten Buchungen, damit sie kein Orakel
-    // fuer fremde Privatsphaere wird.
-    if (accountHasHiddenEntries(id, budgetFilter(req, 'e', { scoped: false }))) {
-      return refuse(res, [refusal('account_delete_refused', 'This account cannot be deleted. Archive it instead.')], 409);
     }
 
     const tx = db.get().transaction(() => {
-      // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben bestehen.
-      db.get().prepare('UPDATE budget_entries SET account_id = NULL WHERE account_id = ?').run(id);
+      // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben
+      // bestehen - aber nur die, die der Aufrufer sieht: ueber fremde private
+      // entscheidet er nicht (Critique R23).
+      db.get().prepare(`UPDATE budget_entries SET account_id = NULL
+        WHERE id IN (SELECT e.id FROM budget_entries e WHERE e.account_id = ?${filter.clause})`).run(id, ...filter.params);
+      db.get().prepare(`UPDATE budget_series SET account_id = NULL
+        WHERE account_id = ? AND anchor_id IN (SELECT e.id FROM budget_entries e WHERE 1 = 1${filter.clause})`)
+        .run(id, ...filter.params);
       // Dasselbe für das Standardkonto eines Darlehens (#638) - künftige Raten
       // landen dann wieder ohne Kontobezug statt auf einer toten ID.
       db.get().prepare('UPDATE budget_loans SET account_id = NULL WHERE account_id = ?').run(id);
-      db.get().prepare('DELETE FROM budget_accounts WHERE id = ?').run(id);
+      const rest = db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? LIMIT 1').get(id);
+      if (rest) {
+        db.get().prepare('UPDATE budget_accounts SET archived = ? WHERE id = ?').run(ACCOUNT_SHELL, id);
+      } else {
+        db.get().prepare('DELETE FROM budget_accounts WHERE id = ?').run(id);
+      }
     });
     tx();
 

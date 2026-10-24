@@ -1883,8 +1883,7 @@
         "ledgerSortAmount": "금액순",
         "ledgerSortActive": "정렬: {{sort}}",
         "ledgerAccountsAll": "모든 계좌",
-        "showAccountTransactions": "거래 내역 보기",
-        "accountDeleteRefused": "이 계좌는 삭제할 수 없습니다. 대신 보관하세요."
+        "showAccountTransactions": "거래 내역 보기"
     },
     "settings": {
         "healthCycleEnableLabel": "가구에 주기 제공",

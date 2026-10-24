@@ -367,7 +367,7 @@ router.post('/loans', (req, res) => {
     if (money.error) errors.push(money);
     const dir = validateDirection(req.body);
     if (dir.error) errors.push(dir);
-    const account = validateAccountRef(req.body.account_id);
+    const account = validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
     if (account.error) errors.push(refusal('loan_account_invalid', account.error));
     const dueDay = validateDueDay(req.body);
     if (dueDay.error) errors.push(dueDay);
@@ -476,7 +476,7 @@ router.put('/loans/:id', (req, res) => {
       if (iDir.error) iErrors.push(iDir);
       const iAccount = req.body.account_id === undefined
         ? { value: loan.account_id }
-        : validateAccountRef(req.body.account_id);
+        : validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
       if (iAccount.error) iErrors.push(refusal('loan_account_invalid', iAccount.error));
       const iDueDay = validateDueDay(req.body, loan);
       if (iDueDay.error) iErrors.push(iDueDay);
@@ -536,7 +536,7 @@ router.put('/loans/:id', (req, res) => {
     if (dir.error) errors.push(dir);
     const account = req.body.account_id === undefined
       ? { value: loan.account_id }
-      : validateAccountRef(req.body.account_id);
+      : validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
     if (account.error) errors.push(refusal('loan_account_invalid', account.error));
     const dueDay = validateDueDay(req.body, loan);
     if (dueDay.error) errors.push(dueDay);

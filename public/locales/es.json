@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Por importe",
         "ledgerSortActive": "Orden: {{sort}}",
         "ledgerAccountsAll": "Todas las cuentas",
-        "showAccountTransactions": "Ver movimientos",
-        "accountDeleteRefused": "Esta cuenta no se puede eliminar. Archívala en su lugar."
+        "showAccountTransactions": "Ver movimientos"
     },
     "settings": {
         "healthCycleEnableLabel": "Ofrecer el ciclo en el hogar",

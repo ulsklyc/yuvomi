@@ -2696,6 +2696,14 @@ Loeschung jetzt nicht mehr vorher, sondern gar nicht: bis zum Ende der Frist ist
 davon weg. Eine Bestaetigung ohne `danger` zaehlt nicht: die rote Taste ist das, was den
 Rueckweg erkennbar macht.
 
+"Leer" und "mit Buchungen" misst jeder an dem, was ER sieht: im personal-Modus koennen an einem
+Konto private Buchungen anderer haengen. Ueber die entscheidet der Loeschende nicht mit, und er
+erfaehrt auch nichts von ihnen - keine eigene Ablehnung, kein Feld in der Liste, beides waere
+ein Orakel fuer fremde Privatsphaere. Der Server loest nur die sichtbaren Buchungen vom Konto;
+bleibt Fremdes daran, steht das Konto fuer dessen Besitzer archiviert weiter, fuer alle anderen
+ist es geloescht (`ACCOUNT_SHELL`, server/routes/budget/helpers.js). Dieselbe Regel gilt fuer
+jeden kuenftigen Behaelter, in dem Privates anderer liegen kann.
+
 **Statusaktionen fragen nie vorher, sie quittieren mit Rueckweg (R23, D6).** Abhaken,
 Freigeben/Ablehnen, Auschecken, Einnehmen/Auslassen, Abo bezahlen: der Toast sagt
 "<Objekt> <Verb>" ("„Ibuprofen“ eingenommen.", "Maria ausgecheckt.") und bietet

@@ -1883,8 +1883,7 @@
         "ledgerSortAmount": "Nach Betrag",
         "ledgerSortActive": "Sortierung: {{sort}}",
         "ledgerAccountsAll": "Alle Konten",
-        "showAccountTransactions": "Buchungen anzeigen",
-        "accountDeleteRefused": "Dieses Konto lässt sich nicht löschen. Archiviere es stattdessen."
+        "showAccountTransactions": "Buchungen anzeigen"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

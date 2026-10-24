@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "依金額",
         "ledgerSortActive": "排序：{{sort}}",
         "ledgerAccountsAll": "所有帳戶",
-        "showAccountTransactions": "檢視交易",
-        "accountDeleteRefused": "此帳戶無法刪除。請改為封存。"
+        "showAccountTransactions": "檢視交易"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供週期",

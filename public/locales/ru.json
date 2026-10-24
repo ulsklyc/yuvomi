@@ -2029,8 +2029,7 @@
         "ledgerSortAmount": "По сумме",
         "ledgerSortActive": "Сортировка: {{sort}}",
         "ledgerAccountsAll": "Все счета",
-        "showAccountTransactions": "Показать операции по счёту",
-        "accountDeleteRefused": "Этот счёт нельзя удалить. Архивируйте его вместо этого."
+        "showAccountTransactions": "Показать операции по счёту"
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

@@ -1883,8 +1883,7 @@
         "ledgerSortAmount": "بر اساس مبلغ",
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
         "ledgerAccountsAll": "همه حساب‌ها",
-        "showAccountTransactions": "نمایش تراکنش‌ها",
-        "accountDeleteRefused": "این حساب قابل حذف نیست. به‌جای آن، بایگانی‌اش کنید."
+        "showAccountTransactions": "نمایش تراکنش‌ها"
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

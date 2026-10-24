@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "按金额",
         "ledgerSortActive": "排序：{{sort}}",
         "ledgerAccountsAll": "所有账户",
-        "showAccountTransactions": "查看交易",
-        "accountDeleteRefused": "此账户无法删除。请改为归档。"
+        "showAccountTransactions": "查看交易"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供周期",

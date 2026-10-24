@@ -479,7 +479,7 @@ router.post('/', (req, res) => {
       return refuse(res, [refusal('entry_subcategory_invalid', 'Invalid subcategory.')]);
     }
 
-    const accountRef = validateAccountRef(req.body.account_id);
+    const accountRef = validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
     if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
     // Zustaendig nur Haushaltsmitglieder (#1207).
     const strangers = responsibleNonMembers(null, req.body.responsible_user_ids);
@@ -677,7 +677,7 @@ router.put('/:id/series', (req, res) => {
     const accountProvided = req.body.account_id !== undefined;
     let accountValue = null;
     if (accountProvided) {
-      const accountRef = validateAccountRef(req.body.account_id);
+      const accountRef = validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
       if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
       accountValue = accountRef.value;
     }
@@ -959,7 +959,7 @@ router.put('/:id', (req, res) => {
       if (req.body.amount !== undefined && !(Number(req.body.amount) * entry.amount > 0)) return refuse(res, [refusal('entry_amount_invalid', 'A transfer must retain its direction and a nonzero amount.')]);
       if (req.body.category !== undefined && !db.get().prepare('SELECT 1 FROM budget_categories WHERE key = ? AND type = ?').get(req.body.category, entry.amount > 0 ? 'income' : 'expense')) return refuse(res, [refusal('entry_category_invalid', 'Invalid transfer category.')]);
       if (req.body.account_id !== undefined && (!req.body.account_id || Number(req.body.account_id) === partner.account_id)) return refuse(res, [refusal('entry_account_invalid', 'Choose two different accounts.')]);
-      const accountRef = validateAccountRef(req.body.account_id ?? entry.account_id);
+      const accountRef = validateAccountRef(req.body.account_id ?? entry.account_id, budgetFilter(req, 'e', { scoped: false }));
       if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
       if (accountRef.value !== entry.account_id && isArchivedBudgetAccount(accountRef.value)) return refuse(res, [refusal('transfer_account_archived', 'Choose active accounts for a transfer.')]);
       if (accountRef.value !== entry.account_id && !transferCurrenciesMatch(accountRef.value, partner.account_id)) return refuse(res, [refusal('transfer_currency_mismatch', 'Transfer accounts must use the same currency.')]);
@@ -1026,7 +1026,7 @@ router.put('/:id', (req, res) => {
     const accountProvided = req.body.account_id !== undefined;
     let accountValue = null;
     if (accountProvided) {
-      const accountRef = validateAccountRef(req.body.account_id);
+      const accountRef = validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
       if (accountRef.error) return refuse(res, [refusal('entry_account_invalid', accountRef.error)]);
       accountValue = accountRef.value;
     }

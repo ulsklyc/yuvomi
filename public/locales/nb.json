@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Etter beløp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle kontoer",
-        "showAccountTransactions": "Vis transaksjoner",
-        "accountDeleteRefused": "Denne kontoen kan ikke slettes. Arkiver den i stedet."
+        "showAccountTransactions": "Vis transaksjoner"
     },
     "settings": {
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",

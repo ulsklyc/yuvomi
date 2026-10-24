@@ -374,13 +374,13 @@ test('POST/PUT /accounts weisen einen negativen Kreditrahmen ab (#541)', async (
 });
 
 // Critique R23 (Rest aus S4, Sicherheitspruefung): ein Konto zu loeschen nimmt
-// ALLEN Buchungen die Zuordnung. Im personal-Modus kann daran eine private
+// seinen Buchungen die Zuordnung. Im personal-Modus kann daran eine private
 // Buchung eines anderen Mitglieds haengen, die der Loeschende weder sieht noch
-// zaehlt - sein Dialog ging als "leeres Konto" mit Rueckgaengig durch, und der
-// Server nahm der fremden Buchung still Konto und Saldo. Jetzt lehnt der Server
-// ab, NEUTRAL (nennt keine privaten Buchungen), und keine Lese-Antwort traegt
-// einen Hinweis darauf - sonst waere die Kontoliste ein Privatsphaere-Orakel.
-test('DELETE /accounts/:id nimmt fremden privaten Buchungen nie das Konto, und die Liste verraet sie nicht (personal)', async () => {
+// zaehlt - der Server nahm ihr still Konto und Saldo. Jede eigene Antwort darauf
+// (409, ein Feld in der Liste) waere ein Orakel. Jetzt loest der Loeschende nur,
+// was er sieht; der Rest haelt das Konto als Huelle, die nur der Besitzer sieht
+// (archiviert), und fuer den Loeschenden ist alles wie bei einem echten Loeschen.
+test('DELETE /accounts/:id: fremde private Buchungen behalten ihr Konto, und der Loeschende merkt nichts (personal)', async () => {
   cleanup();
   const setMode = (mode) => suiteDatabase.prepare(`INSERT INTO sync_config (key, value) VALUES ('budget_mode', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
@@ -391,29 +391,42 @@ test('DELETE /accounts/:id nimmt fremden privaten Buchungen nie das Konto, und d
   setMode('personal');
   const a = createHarness();
   const b = createHarness({ userId: otherId, role: 'member' });
+  const listA = async () => (await a.call('GET', '/accounts?include_archived=1')).body.data;
   try {
-    const acc = (await a.call('POST', '/accounts', { name: 'Gemeinsam', starting_balance: 0 })).body.data;
-    const empty = (await a.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
+    const plain = (await a.call('POST', '/accounts', { name: 'Leer', starting_balance: 0 })).body.data;
+    const shared = (await a.call('POST', '/accounts', { name: 'Gemeinsam', starting_balance: 0 })).body.data;
     const foreign = await b.call('POST', '', {
-      title: 'Privat B', amount: -40, category: EXPENSE_CAT, date: PAST, account_id: acc.id, visibility: 'private',
+      title: 'Privat B', amount: -40, category: EXPENSE_CAT, date: PAST, account_id: shared.id, visibility: 'private',
     });
     assert.equal(foreign.status, 201, JSON.stringify(foreign.body));
+    const strip = ({ id, name, sort_order, ...rest }) => rest;
+    assert.deepEqual(strip((await listA()).accounts.find((x) => x.id === shared.id)),
+      strip((await listA()).accounts.find((x) => x.id === plain.id)), 'vorher: beide Konten sehen fuer A gleich aus');
 
-    const seenByA = (await a.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
-    assert.deepEqual(seenByA, empty, 'die Kontoliste von A ist mit und ohne fremde private Buchung dieselbe');
-    for (const key of Object.keys(seenByA)) assert.doesNotMatch(key, /hidden|all_entry/, `kein Feld ${key}`);
+    const delPlain = await a.call('DELETE', `/accounts/${plain.id}`);
+    const delShared = await a.call('DELETE', `/accounts/${shared.id}`);
+    assert.deepEqual(delShared, delPlain, 'gleicher Status, gleicher Body');
+    assert.equal(delShared.status, 204);
+    const after = await listA();
+    assert.deepEqual(after.accounts, [], 'fuer A sind beide weg');
+    assert.equal(after.net_worth, 0);
 
-    const del = await a.call('DELETE', `/accounts/${acc.id}`);
-    assert.equal(del.status, 409);
-    assert.equal(del.body.reason, 'account_delete_refused', JSON.stringify(del.body));
-    assert.doesNotMatch(del.body.error, /private|member|entr/i, 'die Ablehnung nennt keine privaten Buchungen');
+    // Auch danach antwortet die Huelle A wie ein geloeschtes Konto.
+    assert.deepEqual(await a.call('PUT', `/accounts/${shared.id}`, { name: 'x' }), await a.call('PUT', `/accounts/${plain.id}`, { name: 'x' }));
+    assert.deepEqual(await a.call('DELETE', `/accounts/${shared.id}`), await a.call('DELETE', `/accounts/${plain.id}`));
+    const viaEntry = (accountId) => a.call('POST', '', { title: 'y', amount: -1, category: EXPENSE_CAT, date: PAST, account_id: accountId });
+    assert.deepEqual(await viaEntry(shared.id), await viaEntry(plain.id), 'als Kontowahl einer Buchung: nicht gefunden');
+
+    // Die fremde Buchung behaelt ihr Konto, ihr Besitzer sieht es archiviert.
     const row = suiteDatabase.prepare('SELECT account_id FROM budget_entries WHERE id = ?').get(foreign.body.data.id);
-    assert.equal(row.account_id, acc.id, 'die fremde Buchung behaelt ihr Konto');
-    assert.ok(suiteDatabase.prepare('SELECT 1 FROM budget_accounts WHERE id = ?').get(acc.id), 'Konto steht noch');
+    assert.equal(row.account_id, shared.id, 'die fremde Buchung behaelt ihr Konto');
+    const seenByB = (await b.call('GET', '/accounts?include_archived=1')).body.data.accounts;
+    assert.deepEqual(seenByB.map((x) => [x.id, x.archived, x.entry_count, x.current_balance]), [[shared.id, 1, 1, -40]]);
+    assert.equal((await b.call('GET', '/accounts')).body.data.accounts.length, 0, 'in der aktiven Liste steht es nicht');
 
-    // Wer alle Buchungen sieht, darf (nach seiner Rueckfrage) loeschen.
-    const delByB = await b.call('DELETE', `/accounts/${acc.id}`);
-    assert.equal(delByB.status, 204);
+    // Loescht B es, ist nichts Fremdes mehr daran: echt geloescht.
+    assert.equal((await b.call('DELETE', `/accounts/${shared.id}`)).status, 204);
+    assert.equal(suiteDatabase.prepare('SELECT 1 FROM budget_accounts WHERE id = ?').get(shared.id), undefined);
   } finally {
     setMode('shared');
     await a.close();

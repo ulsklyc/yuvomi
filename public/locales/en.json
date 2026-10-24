@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "By amount",
         "ledgerSortActive": "Sorted: {{sort}}",
         "ledgerAccountsAll": "All accounts",
-        "showAccountTransactions": "Show transactions",
-        "accountDeleteRefused": "This account cannot be deleted. Archive it instead."
+        "showAccountTransactions": "Show transactions"
     },
     "settings": {
         "healthCycleEnableLabel": "Offer the cycle in the household",

@@ -2029,8 +2029,7 @@
         "ledgerSortAmount": "За сумою",
         "ledgerSortActive": "Сортування: {{sort}}",
         "ledgerAccountsAll": "Усі рахунки",
-        "showAccountTransactions": "Показати операції рахунку",
-        "accountDeleteRefused": "Цей рахунок не можна видалити. Натомість архівуйте його."
+        "showAccountTransactions": "Показати операції рахунку"
     },
     "settings": {
         "healthCycleEnableLabel": "Пропонувати цикл у родині",

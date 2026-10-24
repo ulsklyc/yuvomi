@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Κατά ποσό",
         "ledgerSortActive": "Ταξινόμηση: {{sort}}",
         "ledgerAccountsAll": "Όλοι οι λογαριασμοί",
-        "showAccountTransactions": "Εμφάνιση κινήσεων",
-        "accountDeleteRefused": "Αυτός ο λογαριασμός δεν μπορεί να διαγραφεί. Αρχειοθετήστε τον αντί γι' αυτό."
+        "showAccountTransactions": "Εμφάνιση κινήσεων"
     },
     "settings": {
         "healthCycleEnableLabel": "Διάθεση του κύκλου στο νοικοκυριό",

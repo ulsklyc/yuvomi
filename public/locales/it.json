@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Per importo",
         "ledgerSortActive": "Ordinamento: {{sort}}",
         "ledgerAccountsAll": "Tutti i conti",
-        "showAccountTransactions": "Mostra i movimenti",
-        "accountDeleteRefused": "Questo conto non può essere eliminato. Archivialo invece."
+        "showAccountTransactions": "Mostra i movimenti"
     },
     "settings": {
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",

@@ -1303,12 +1303,14 @@ export function refuse(res, errors, status = 400) {
  * Prüft eine optionale Konto-Zuordnung aus dem Request.
  * @returns {{ value: number|null }|{ error: string }} value=null ⇒ keinem Konto zugeordnet.
  */
-export function validateAccountRef(raw) {
+export function validateAccountRef(raw, filter) {
   if (raw === undefined || raw === null || raw === '') return { value: null };
   const id = Number(raw);
   if (!Number.isInteger(id) || id <= 0) return { error: 'account_id must be a valid account id.' };
-  const row = db.get().prepare('SELECT id FROM budget_accounts WHERE id = ?').get(id);
-  if (!row) return { error: 'Account not found.' };
+  const row = db.get().prepare('SELECT id, archived FROM budget_accounts WHERE id = ?').get(id);
+  // Eine Huelle (ACCOUNT_SHELL) ist fuer wen sie nichts traegt "nicht gefunden",
+  // wie ein geloeschtes Konto. Ohne Filter (alte Aufrufer) zaehlt nur das Dasein.
+  if (!row || (filter && accountGoneFor(row, filter))) return { error: 'Account not found.' };
   return { value: id };
 }
 
@@ -1339,7 +1341,10 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
     WHERE ? = 1 OR a.archived = 0
     ORDER BY a.sort_order ASC, a.name COLLATE NOCASE ASC
   `).all(today, ...f.params, ...f.params, ...f.params, includeArchived ? 1 : 0);
-  return rows.map((a) => {
+  // Eine Kontohuelle (archived = ACCOUNT_SHELL, siehe DELETE /accounts/:id)
+  // sieht nur, wer noch Buchungen daran sieht - fuer alle anderen ist das
+  // Konto geloescht, ununterscheidbar von einem echt geloeschten.
+  return rows.filter((a) => a.archived !== ACCOUNT_SHELL || a.entry_count > 0).map((a) => {
     // Preserve three-decimal account currencies, including linked transfers.
     // Keep existing fractional values on zero-decimal accounts as before.
     const digits = Math.max(2, accountFractionDigits(a.currency || budgetCurrency()));
@@ -1353,6 +1358,7 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
       : null;
     return {
       ...a,
+      archived:          a.archived ? 1 : 0, // die Huelle zeigt sich ihrem Rest-Besitzer als archiviert
       starting_balance:  round(a.starting_balance),
       current_balance:   currentBalance,
       projected_balance: round(a.projected_balance),
@@ -1362,19 +1368,26 @@ export function listAccounts(includeArchived = false, filter = { clause: '', par
 }
 
 /**
- * Haengen an Konto `id` Buchungen, die `filter` (budgetFilter, scoped:false)
- * dem Betrachter verbirgt? NUR fuer den Kaskadenschutz beim Loeschen - nie in
- * eine Lese-Antwort: ein Bit in der Kontoliste waere ein Orakel, wann andere
- * private Buchungen auf einem gemeinsamen Konto anlegen (Sicherheitspruefung R23).
+ * DIE KONTOHUELLE (Critique R23, Sicherheitspruefung). Ein Konto zu loeschen
+ * nimmt seinen Buchungen die Zuordnung. Im personal-Modus koennen daran
+ * private Buchungen anderer haengen, die der Loeschende nicht sieht - ueber die
+ * entscheidet er nicht mit. Jede eigene Antwort darauf (409, ein Bit in der
+ * Liste) waere ein Orakel: wer ein scheinbar leeres Konto loescht, wuesste,
+ * dass dort Fremdes liegt. Deshalb loest der Loeschende nur, was er sieht, und
+ * bleibt danach Fremdes am Konto, steht es als HUELLE weiter (archived = 2):
+ * fuer ihn und jeden ohne sichtbare Buchung daran ist es geloescht (Liste,
+ * PUT, DELETE, Kontowahl antworten wie bei einem echt geloeschten), der
+ * Besitzer der privaten Buchungen sieht es als archiviert.
  */
-export function accountHasHiddenEntries(id, filter = { clause: '', params: [] }) {
-  if (!filter || !filter.clause) return false;
-  const row = db.get().prepare(`
-    SELECT
-      (SELECT COUNT(*) FROM budget_entries e WHERE e.account_id = ?) AS total,
-      (SELECT COUNT(*) FROM budget_entries e WHERE e.account_id = ?${filter.clause}) AS seen
-  `).get(id, id, ...filter.params);
-  return row.total > row.seen;
+export const ACCOUNT_SHELL = 2;
+
+/** Ist Konto `row` fuer diesen Betrachter weg - nicht da, oder eine Huelle ohne sichtbare Buchung? */
+export function accountGoneFor(row, filter = { clause: '', params: [] }) {
+  if (!row) return true;
+  if (row.archived !== ACCOUNT_SHELL) return false;
+  const f = filter && filter.clause ? filter : { clause: '', params: [] };
+  return !db.get().prepare(`SELECT 1 FROM budget_entries e WHERE e.account_id = ?${f.clause} LIMIT 1`)
+    .get(row.id, ...f.params);
 }
 
 export function nextAccountSortOrder() {

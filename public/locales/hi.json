@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "राशि के अनुसार",
         "ledgerSortActive": "क्रम: {{sort}}",
         "ledgerAccountsAll": "सभी खाते",
-        "showAccountTransactions": "लेन-देन दिखाएं",
-        "accountDeleteRefused": "यह खाता हटाया नहीं जा सकता। इसके बजाय इसे संग्रहित करें।"
+        "showAccountTransactions": "लेन-देन दिखाएं"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",

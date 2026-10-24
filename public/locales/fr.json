@@ -1865,8 +1865,7 @@
         "ledgerSortAmount": "Par montant",
         "ledgerSortActive": "Tri : {{sort}}",
         "ledgerAccountsAll": "Tous les comptes",
-        "showAccountTransactions": "Voir les écritures",
-        "accountDeleteRefused": "Ce compte ne peut pas être supprimé. Archivez-le plutôt."
+        "showAccountTransactions": "Voir les écritures"
     },
     "settings": {
         "healthCycleEnableLabel": "Proposer le cycle au foyer",
