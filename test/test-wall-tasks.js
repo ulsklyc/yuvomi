@@ -445,27 +445,39 @@ test('Flaeche: die Zahl zaehlt offene Aufgaben und was das Programm sonst fuehrt
     wallTasks: [{ user_id: 2, ...entry(['a', 'b', 'c'], []) }],
   };
   const model = { allRows: [
-    { kind: 'event', who: { id: 1 } },                    // Annas Termin
-    { kind: 'meal', who: { id: 2 } },                     // Ben kocht
-    { kind: 'task', who: { id: 2 } },                     // dieselbe Aufgabe wie in wallTasks
-    { kind: 'task', who: { id: 3 } },                     // Cleos Aufgabe ist "nur Zugewiesene"
+    { kind: 'event', title: 'Elternabend', who: { id: 1 } },   // Annas Termin
+    { kind: 'meal', title: 'Lasagne', who: { id: 2 } },        // Ben kocht
+    { kind: 'task', title: 'a', who: { id: 2 } },              // dieselbe Aufgabe wie in wallTasks
+    { kind: 'task', title: 'Geheim', who: { id: 3 } },         // Cleos Aufgabe ist "nur Zugewiesene"
   ] };
   const html = dash.renderWallWho(data, model);
   const count = (block) => (/wall-who__count">\s*<span aria-hidden="true">(\d+)</.exec(block) ?? [])[1] ?? null;
   const by = Object.fromEntries(members(html).map((block) => [/wall-who__name">([^<]*)/.exec(block)[1], block]));
   assert.equal(count(by.Ben), '4', 'drei offene Aufgaben und das Kochen - die Programmzeile der Aufgabe zaehlt nicht doppelt');
   assert.equal(count(by.Anna), '1', 'ein Termin ist etwas, das heute vor ihr liegt');
-  assert.ok(!by.Anna.includes('wall-who__tasks'), 'aber kein Titel: der Termin steht links');
   assert.ok(by.Cleo, 'wer im Programm steht, ist dran');
   assert.equal(count(by.Cleo), null, 'eine Aufgabe, die der Haushalt nicht sehen darf, traegt auch keine Zahl an die Wand');
+  assert.ok(!by.Cleo.includes('Geheim'), 'und keinen Titel');
   assert.deepEqual(Object.keys(by), ['Ben', 'Anna', 'Cleo'], 'wer am meisten vor sich hat, zuerst');
+  // R23 (Critique G1 P2): DIE ZAHL IST DIE LISTE. Unter Annas „1" stand
+  // nichts, unter Bens „4" nur seine drei Aufgaben.
+  const titles = (block) => [...block.matchAll(/wall-who__task-title">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(titles(by.Anna), ['Elternabend'], 'der Termin steht unter ihrem Gesicht');
+  assert.deepEqual(titles(by.Ben), ['Lasagne', 'a', 'b', 'c'], 'das Kochen vor den Aufgaben, die Aufgabe nicht doppelt');
+  for (const [name, block] of Object.entries(by)) {
+    const shown = titles(block).length;
+    const more = Number((/count&quot;:(\d+)\}<\/li>/.exec(block) ?? [])[1] ?? 0);
+    assert.equal(String(shown + more || ''), count(block) ?? '', `${name}: was an Titeln steht plus "+N weitere" ist die Zahl`);
+  }
+  assert.match(by.Ben, /dashboard\.familyDayTally\{&quot;open&quot;:3,&quot;done&quot;:0\}/, 'die Bilanz fuer Screenreader bleibt eine Aufgabenbilanz');
 }));
 
 test('Flaeche: ohne Titel bleibt die Reihe der Gesichter', onWall(() => {
   const data = { users: [U(1, 'Anna'), U(2, 'Ben')], wallTasks: [] };
-  const html = dash.renderWallWho(data, { allRows: [{ kind: 'event', who: { id: 1 } }] });
+  const html = dash.renderWallWho(data, { allRows: [{ kind: 'event', title: 'Elternabend', who: { id: 1 } }] }, dash.WALL_WHO_LADDER.at(-1));
   assert.match(html, /Anna/);
-  assert.ok(!html.includes('wall-who__list--tasks'));
+  assert.ok(!html.includes('wall-who__list--tasks'), 'die unterste Stufe der Leiter zeigt nur Gesichter');
+  assert.ok(!html.includes('Elternabend'));
 }));
 
 test('Flaeche: was nicht passt, ist eine Zahl - offene als „weitere", Haken als „erledigt"', onWall(() => {
@@ -564,6 +576,46 @@ test('Flaeche: fitWallWho steigt hinab, bis die Wand passt - Haken zuerst', onWa
   const none = makeWall(790);
   assert.equal(dash.fitWallWho(none.root, data), dash.WALL_WHO_LADDER.length - 1);
   assert.ok(!none.html().includes('wall-who__task'), 'ohne Platz bleibt die Reihe der Gesichter');
+}));
+
+// R23 (Critique G1 P2): 768x1024 lief 25px, 1024x768 45px aus dem Bild,
+// waehrend „Wer" schon auf der letzten Stufe stand. Dann gibt das Programm
+// Zeilen ab - gemessen, eine nach der anderen, zwei bleiben.
+test('Flaeche: reicht das Tablett nicht, gibt das Programm Zeilen ab - zwei bleiben', onWall(() => {
+  const day = '2031-05-06';
+  const now = new Date(`${day}T06:00:00`);
+  const events = Array.from({ length: 8 }, (_, i) => ({
+    id: i + 1, title: `Termin ${i + 1}`, all_day: 0, assigned_users: [],
+    start_datetime: `${day}T${String(8 + i).padStart(2, '0')}:00`,
+    end_datetime: `${day}T${String(8 + i).padStart(2, '0')}:30`,
+  }));
+  const data = { upcomingEvents: events, urgentTasks: [], users: [] };
+  const full = dash.renderWallSurface(data, null, { now });
+  const program = (/<section class="wall__program"[\s\S]*?<\/section>/.exec(full) || [])[0];
+  assert.ok(program, 'Reichweite: die Flaeche traegt das Programm');
+  const rowsIn = (html) => (html.match(/class="wall-row wall-row--(?!shopping|state)/g) ?? []).length;
+  assert.equal(rowsIn(program), dash.WALL_ROW_CAP, 'Vorbedingung: der volle Deckel');
+
+  const run = (base) => {
+    const state = { html: program };
+    const section = () => ({
+      querySelectorAll: () => Array.from({ length: rowsIn(state.html) }),
+      insertAdjacentHTML(_pos, html) { state.html = html; },
+      remove() {},
+      get nextElementSibling() { return section(); },
+    });
+    const wall = { querySelector: (sel) => (sel === '.wall__program' ? section() : null) };
+    const overflows = () => base + 100 * rowsIn(state.html) > 800;
+    return { shed: dash.shedWallProgram(wall, data, overflows, { now }), state };
+  };
+  const tight = run(600);
+  assert.equal(tight.shed, 2, 'vier Zeilen -> zwei, dann passt es');
+  assert.equal(rowsIn(tight.state.html), 2);
+  assert.match(tight.state.html, /dashboard\.todayMore\{&quot;count&quot;:6\}/, '„+N weitere" zaehlt die abgegebenen mit');
+  const roomy = run(300);
+  assert.equal(roomy.shed, 0, 'passt es, gibt das Programm nichts ab');
+  const hopeless = run(900);
+  assert.equal(rowsIn(hopeless.state.html), 2, 'auch wenn es nie passt: zwei Zeilen bleiben');
 }));
 
 // --------------------------------------------------------------------------

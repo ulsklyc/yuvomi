@@ -2668,7 +2668,13 @@ svg.weather-forecast__icon {
 .today-cockpit-card {
   --today-card-accent: var(--module-accent);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* EINE TITELKANTE FUER ALLE ZEILEN (R23, Critique G1 P2). Jede Zeile ist ihr
+   * eigenes Raster; mit `auto` war die erste Spalte so breit wie das, was
+   * darin stand - ein Siegel mit Avatar (`.seal-pair`, 32 + 20 - 8px) schob
+   * den Titel 12px weiter als ein Siegel allein (Medikament, Einkauf), und
+   * die Titel standen bei 1440 auf x 312 und 324 durcheinander. Die Spalte
+   * ist jetzt so breit wie das Paar; ein einzelnes Siegel steht vorn darin. */
+  grid-template-columns: calc(var(--target-sm) + var(--space-5) - var(--space-2)) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--target-base);
@@ -3078,15 +3084,28 @@ button.today-cockpit__more--link {
  * die Zeilen des Grusses, statt der Datumszeile ihre 40px Hoehe aufzuzwingen.
  * Der Desktop-Kopf wird dadurch nicht hoeher, sondern um den Stand-Anker
  * niedriger (67 → 63px). */
+/* DIE WETTERZEILE STEHT MOBIL NEBEN DEN WERKZEUGEN (R23, Critique G1 P2).
+ * Die Knoepfe sind am Finger 48px hoch, das Datum daneben 16px: die erste
+ * Zeile war 32px leerer Streifen, und die Wetterzeile kostete unter dem Gruss
+ * eine eigene. Jetzt stehen Datum und Wetter gestapelt in der Hoehe der
+ * Knoepfe, der Gruss darunter ueber die volle Breite - die erste Zeile des
+ * Tagesprogramms rueckt bei 390x844 von y 226 nach oben. Ohne Wetter bleibt
+ * die Zeile leer und hoch wie zuvor. */
 .dashboard-overview__header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "date    tools"
-    "title   title"
-    "weather weather";
+    "weather tools"
+    "title   title";
   align-items: center;
   column-gap: var(--space-3);
+}
+
+@container dashboard-overview (max-width: 639px) {
+  .dashboard-overview__header:not(.dashboard-overview__header--editing) > .dashboard-overview__weather {
+    align-self: start;
+  }
 }
 
 @container dashboard-overview (min-width: 640px) {
@@ -3915,7 +3934,11 @@ button.today-cockpit__more--link {
  * Balken (1440), dazwischen stand leere Flaeche, und die Zeile las sich als
  * Fuss einer anderen Kachel. Die Anfrage gehoert zum Ziel, das sie betrifft:
  * sie folgt dem Inhalt, der Rest der Kachel bleibt unten frei. */
-.dashboard .rewards-widget--self > .rewards-widget__footer {
+/* DIESELBE REGEL FUER DIE ELTERN-SICHT (R23, Critique G1 P3). Neben Familie
+ * und Geburtstagen (je fuenf Zeilen) stand „2 zu bestaetigen" 230px unter den
+ * Punktestaenden (1440), dazwischen leere Kachel. Die Freigaben gehoeren zu
+ * den Staenden darueber; der Ueberschuss bleibt unten frei. */
+.dashboard .rewards-widget > .rewards-widget__footer {
   margin-block-start: 0;
 }
 
@@ -5714,6 +5737,24 @@ button.today-cockpit__more--link {
   .today-cockpit__header {
     align-items: start;
     gap: var(--space-2);
+  }
+
+  /* DAS BLATT STEHT MOBIL OHNE SICHTBARE UEBERSCHRIFT (R23, Critique G1 P2).
+   * Direkt unter dem Gruss ist es das erste und lauteste Element; „Heute
+   * wichtig" darueber kostete 34px vor der ersten Zeile und sagte, was der
+   * Gruss schon sagt. Die h2 bleibt im Dokument (Landmarke, aria-labelledby);
+   * im Anpassen-Modus steht sie wieder, dort traegt die Zeile den Ausblenden-
+   * Knopf. */
+  .today-cockpit:not(.today-cockpit--editing) > .today-cockpit__header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   /* Die Inset-Grouped-Liste bleibt auch mobil einspaltig (Apple-Muster:

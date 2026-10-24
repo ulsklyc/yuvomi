@@ -2758,7 +2758,9 @@ test('Wand-Modus: „Wer heute dran ist" zählt den ganzen Tag, nicht nur die si
       assigned_users: i === 7 ? [spaet] : [],
     }));
     const html = __test.renderWallSurface({ upcomingEvents: events, urgentTasks: [], users: [spaet] }, null, { now: new Date(`${day}T06:00:00`) });
-    nodeAssert.ok(!html.includes('Termin 8'), 'Vorbedingung: Mias Termin steht NICHT unter den gezeigten Zeilen');
+    // Nur das Programm zaehlt fuer die Vorbedingung: unter Mias Gesicht steht
+    // der Termin seit R23 beim Namen (die Zahl ist die Liste).
+    nodeAssert.ok(!html.split('wall__who')[0].includes('Termin 8'), 'Vorbedingung: Mias Termin steht NICHT unter den gezeigten Zeilen');
     nodeAssert.match(html, /wall-who__member/, 'Reichweite: der Abschnitt wurde gebaut');
     nodeAssert.match(html, /Mia/, 'wer hinter dem Deckel steht, steht trotzdem in der Antwort');
     nodeAssert.match(html, /wall-who__count/, 'die Zahl beantwortet „wie viel"');

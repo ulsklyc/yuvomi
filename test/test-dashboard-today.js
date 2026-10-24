@@ -1010,10 +1010,36 @@ test('R22 D16: die Spalte trennt, nicht die Zeile - eingerueckte Trenner je Spal
   assert.match(body('.today-cockpit__rows--split > .today-cockpit-card--span'), /grid-column:\s*1 \/ -1/);
 });
 
-test('R22 D16: die eigene Belohnungskachel (Kindkonto) steht oben, die Anfrage folgt dem Ziel', async () => {
+// R23 (Critique G1 P2): die Titel des Blatts standen je Zeile 12px versetzt -
+// die erste Spalte war `auto`, und ein Siegel mit Avatar ist breiter als eines
+// allein. Mobil stand die erste Zeile bei y 226: Werkzeuge ueber dem Datum,
+// die Wetterzeile in einer eigenen Zeile, „Heute wichtig" darueber.
+test('R23: eine Titelkante im Blatt, mobil Wetter neben den Werkzeugen und keine sichtbare Blatt-Ueberschrift', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const all = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))];
+  const rules = all.filter((r) => !r.at.length);
+  const card = rules.filter((r) => r.selector.trim() === '.today-cockpit-card' && /grid-template-columns/.test(r.body)).at(-1);
+  const columns = /grid-template-columns:\s*([^;]+)/.exec(card?.body ?? '')?.[1] ?? '';
+  assert.ok(columns && !/^auto\b/.test(columns.trim()), `die Siegelspalte ist fest, nicht auto (${columns})`);
+  assert.match(columns, /var\(--target-sm\)\s*\+\s*var\(--space-5\)\s*-\s*var\(--space-2\)/, 'so breit wie das Paar aus Siegel und Avatar (.seal-pair)');
+  const header = rules.filter((r) => r.selector.trim() === '.dashboard-overview__header' && /grid-template-areas/.test(r.body)).at(0);
+  assert.match(header?.body ?? '', /"date\s+tools"\s*"weather\s+tools"\s*"title\s+title"/, 'mobil: Datum und Wetter in der Hoehe der Knoepfe, der Gruss darunter');
+  const hidden = all.find((r) => r.selector.trim() === '.today-cockpit:not(.today-cockpit--editing) > .today-cockpit__header');
+  assert.ok(hidden && hidden.at.some((a) => /max-width:\s*639px/.test(a)), 'nur am Telefon');
+  assert.match(hidden.body, /position:\s*absolute/);
+  assert.match(hidden.body, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/, 'die Ueberschrift bleibt im Dokument, nur nicht im Bild');
+});
+
+// R23 (Critique G1 P3): dieselbe Regel fuer die Eltern-Sicht - neben hohen
+// Nachbarn stand „2 zu bestaetigen" 230px unter den Punktestaenden (1440).
+test('R22 D16 + R23: die Anfrage folgt den Punkten - im Kindkonto wie in der Eltern-Sicht', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))].filter((r) => !r.at.length);
-  const own = rules.find((r) => r.selector.trim() === '.dashboard .rewards-widget--self > .rewards-widget__footer');
-  assert.match(own?.body ?? '', /margin-block-start:\s*0/, 'kein margin-block-start: auto unter Punkten und Balken');
+  const footer = rules.filter((r) => r.selector.split(',').some((s) => /\.rewards-widget\b[^,]*\.rewards-widget__footer/.test(s)));
+  const last = footer.filter((r) => /margin-block-start/.test(r.body)).at(-1);
+  assert.ok(last, 'Vorbedingung: eine Regel setzt den Abstand des Fusses');
+  assert.match(last.selector, /^\s*\.dashboard \.rewards-widget > \.rewards-widget__footer\s*$/, 'die Regel gilt jeder Belohnungskachel, nicht nur der eigenen');
+  assert.match(last.body, /margin-block-start:\s*0/, 'kein margin-block-start: auto unter Punkten und Balken');
 });

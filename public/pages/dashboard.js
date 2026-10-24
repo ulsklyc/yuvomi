@@ -6309,18 +6309,35 @@ function renderWallWho(data, model, budget = WALL_WHO_LADDER[0]) {
     // Aufgaben kommt ungekappt aus `wallTasks` (#1817).
     for (const id of rowPeopleIds(row)) {
       inProgram.add(id);
-      if (row.kind !== 'task') otherRows.set(id, (otherRows.get(id) ?? 0) + 1);
+      if (row.kind !== 'task') otherRows.set(id, [...(otherRows.get(id) ?? []), { title: row.title }]);
     }
   }
+  // DIE ZAHL IST DIE LISTE (R23, Critique G1 P2). Die Zahl am Gesicht zaehlt,
+  // was heute vor der Person liegt - Aufgaben UND ihr Termin, ihr Kochen
+  // (#1679) -, die Titel darunter nannten aber nur Aufgaben: Leo trug „3"
+  // ueber „Klavier ueben", Emma „1" ueber nichts. Die Programmzeilen der Person
+  // stehen deshalb als offene Zeilen VOR ihren Aufgaben, mit derselben Leiter
+  // und derselben Zaehlzeile - was an Titeln steht plus „+N weitere" ist die
+  // Zahl. Die Aufgabenzeilen des Programms bleiben draussen (siehe oben).
   const tasksOf = new Map();
   for (const entry of Array.isArray(data?.wallTasks) ? data.wallTasks : []) {
     if (entry?.user_id != null) tasksOf.set(entry.user_id, entry);
   }
+  const entryOf = (id) => {
+    const entry = tasksOf.get(id);
+    const others = otherRows.get(id) ?? [];
+    if (!others.length) return entry;
+    const open = Array.isArray(entry?.open) ? entry.open : [];
+    const openTotal = Math.max(Number(entry?.open_count) || 0, open.length);
+    return { ...entry, open: [...others, ...open], open_count: openTotal + others.length };
+  };
   // Der Plan auf der OBERSTEN Stufe sagt, wer ueberhaupt etwas hat - die
   // Rangfolge darf sich nicht aendern, waehrend die Leiter hinabsteigt.
-  const totals = new Map(users.map((u) => [u.id, planWallWhoLines(tasksOf.get(u.id), WALL_WHO_LADDER[0])]));
+  const totals = new Map(users.map((u) => [u.id, planWallWhoLines(entryOf(u.id), WALL_WHO_LADDER[0])]));
+  // Die Aufgabenbilanz fuer Screenreader bleibt eine Aufgabenbilanz.
+  const taskTotals = new Map(users.map((u) => [u.id, planWallWhoLines(tasksOf.get(u.id), WALL_WHO_LADDER[0])]));
 
-  const ahead = (u) => totals.get(u.id).openTotal + (otherRows.get(u.id) ?? 0);
+  const ahead = (u) => totals.get(u.id).openTotal;
 
   const onDuty = users
     .filter((u) => inProgram.has(u.id) || totals.get(u.id).openTotal > 0 || totals.get(u.id).doneTotal > 0)
@@ -6328,7 +6345,7 @@ function renderWallWho(data, model, budget = WALL_WHO_LADDER[0]) {
     .sort((a, b) => (ahead(b) - ahead(a)) || compareMembers(a, b));
 
   const shown = onDuty.slice(0, WALL_WHO_CAP);
-  const plans = new Map(shown.map((u) => [u.id, planWallWhoLines(tasksOf.get(u.id), budget)]));
+  const plans = new Map(shown.map((u) => [u.id, planWallWhoLines(entryOf(u.id), budget)]));
   const withTitles = shown.some((u) => {
     const plan = plans.get(u.id);
     return plan.open.length || plan.done.length || plan.moreOpen || plan.moreDone;
@@ -6338,7 +6355,8 @@ function renderWallWho(data, model, budget = WALL_WHO_LADDER[0]) {
     ? `<ul class="wall-who__list${withTitles ? ' wall-who__list--tasks' : ''}">${shown.map((u) => {
         const color = u.avatar_color || AVATAR_FALLBACK_COLOR;
         const plan = plans.get(u.id);
-        const { openTotal, doneTotal } = plan;
+        const { doneTotal } = plan;
+        const { openTotal } = taskTotals.get(u.id);
         const count = ahead(u);
         const mark = count > 0
           ? `<span class="wall-who__count">
@@ -6404,10 +6422,13 @@ function renderWallWho(data, model, budget = WALL_WHO_LADDER[0]) {
  *
  * @returns {number} die Stufe, auf der die Flaeche steht (-1: nichts zu tun)
  */
-function fitWallWho(root, data, { now = new Date(), reset = false } = {}) {
+function fitWallWho(root, data, { now = new Date(), reset = false, isDisplay = false } = {}) {
   const wall = root?.querySelector?.('.wall');
-  if (!wall?.querySelector('.wall__who')) return -1;
   const overflows = () => wall.scrollHeight > (globalThis.window?.innerHeight ?? 0) + 1;
+  if (!wall?.querySelector('.wall__who')) {
+    if (wall && overflows() && !wallIsStacked(wall)) shedWallProgram(wall, data, overflows, { now, isDisplay });
+    return -1;
+  }
   if (!reset && !overflows()) return 0;
 
   // `allRows` haengt nicht am Deckel, der Timer spielt hier also keine Rolle.
@@ -6451,7 +6472,48 @@ function fitWallWho(root, data, { now = new Date(), reset = false } = {}) {
   const lowest = Math.min(...heights);
   const free = heights.findIndex((height) => height <= lowest + 1);
   if (free !== step) place(free);
+  // Und laeuft sie dann noch ueber, ist das Programm der Grund (R23). Hat es
+  // Zeilen abgegeben, duerfen unter den Gesichtern wieder Titel stehen, die
+  // jetzt nichts mehr kosten - von oben gesucht, die reichste Stufe zuerst.
+  if (overflows() && shedWallProgram(wall, data, overflows, { now, isDisplay }) > 0) {
+    for (let richer = 0; richer < free; richer += 1) {
+      place(richer);
+      if (!overflows()) return richer;
+    }
+    place(free);
+  }
   return free;
+}
+
+/**
+ * DAS PROGRAMM GIBT ZEILEN AB, WENN DAS TABLETT NICHT REICHT (R23, Critique
+ * G1 P2). `WALL_ROW_CAP` ist fuer 1280x800 gerechnet; auf 768x1024 (hochkant
+ * an der Wand) lief die Flaeche 25px, auf 1024x768 45px aus dem Bild - und
+ * genau dort, wo „Wer heute dran ist" schon auf der letzten Stufe stand, also
+ * nichts mehr hergab. Eine Wand scrollt nicht. Dieselbe Regel wie die Leiter:
+ * gemessen, nicht gerechnet - eine Zeile nach der anderen weicht in
+ * „+N weitere heute", das aus demselben Modell zaehlt, bis die Flaeche passt;
+ * zwei Zeilen bleiben immer. Jeder Neuaufbau beginnt wieder beim vollen
+ * Deckel. Das Telefon scrollt ohnehin und gibt nichts ab.
+ *
+ * @returns {number} wie viele Zeilen gewichen sind
+ */
+function shedWallProgram(wall, data, overflows, { now = new Date(), isDisplay = false } = {}) {
+  let section = wall.querySelector?.('.wall__program');
+  if (!section) return 0;
+  let rows = section.querySelectorAll('.wall-program__list > .wall-row:not(.wall-row--shopping):not(.wall-row--state)').length;
+  let shed = 0;
+  while (rows > 2 && overflows()) {
+    rows -= 1;
+    const model = buildTodayCockpitModel(data, [], { cap: rows, now, groupOverdue: false, isDisplay });
+    section.insertAdjacentHTML('afterend', renderWallProgram(model));
+    const next = section.nextElementSibling;
+    section.remove();
+    section = next;
+    if (globalThis.window?.lucide && section) globalThis.window.lucide.createIcons({ el: section });
+    shed += 1;
+  }
+  return shed;
 }
 
 /**
@@ -6486,7 +6548,7 @@ function createWallFit(win, signal) {
     if (!shown || frame) return;
     frame = win.requestAnimationFrame(() => {
       frame = 0;
-      if (shown) fitWallWho(shown.shell, shown.data, { reset: true });
+      if (shown) fitWallWho(shown.shell, shown.data, { reset: true, isDisplay: shown.isDisplay });
     });
   }, { signal, passive: true });
   signal.addEventListener('abort', () => {
@@ -6494,9 +6556,9 @@ function createWallFit(win, signal) {
     shown = null;
   }, { once: true });
   return {
-    show(shell, data) {
-      shown = { shell, data };
-      return fitWallWho(shell, data);
+    show(shell, data, { isDisplay = false } = {}) {
+      shown = { shell, data, isDisplay };
+      return fitWallWho(shell, data, { isDisplay });
     },
   };
 }
@@ -6518,7 +6580,7 @@ function rebuildWall(container, shell, { data, weather, failed, updatedAt, reren
   restoreFocusAfterRebuild(container, [keepFocus, takeWallFocusIntent('enter') ? '#wall-surface' : null]);
   // Die Titel unter den Gesichtern folgen dem Platz: nach jedem Aufbau von der
   // obersten Stufe hinab.
-  return fit.show(shell, data);
+  return fit.show(shell, data, { isDisplay });
 }
 
 /**
@@ -8580,7 +8642,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

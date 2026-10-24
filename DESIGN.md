@@ -4418,6 +4418,12 @@ darueber. **Ab 720px Blattbreite laufen die Zeilen in zwei Spalten** (spaltenwei
 Container-Abfrage) - ein Programm von sechs Zeilen soll auf einem breiten Schirm nicht
 halbleer eine Spalte hinunterlaufen.
 
+**Eine Titelkante fuer alle Zeilen** (R23): die Siegelspalte ist so breit wie das Paar aus Siegel
+und Avatar (`.seal-pair`), nicht `auto` - vorher standen Titel mit und ohne Avatar 12px versetzt.
+**Am Telefon steht das Blatt ohne sichtbare Ueberschrift** direkt unter dem Gruss (die h2 bleibt
+im Dokument, im Anpassen-Modus sichtbar), und die Wetterzeile steht unter dem Datum neben den
+Kopfknoepfen statt in einer eigenen Zeile: erste Zeile bei 390x844 y 226 -> 169.
+
 **Die Uebersicht ist ein Briefing, kein Kachel-Board** (R21, Critique 2026-10-21, D5). Das Blatt
 steht vor allen Kacheln und ist ihr Inhalt; die Kacheln sind Zusatz. **Auf dem Telefon traegt das
 Blatt so viele Zeilen, wie in den ersten Schirm passen** (bis zur Kapsel, mindestens zwei):
@@ -4993,7 +4999,13 @@ Spaltenbreite; ab fuenf Personen drei Spalten). Weil die Wand nicht scrollt, ste
 `fitWallWho` eine Leiter von Budgets hinab, bis das Bild passt: erst weichen die Haken, auf der
 ganzen Flaeche, dann die offenen Titel; was nicht passt, ist eine Zahl ("+2 weitere"), und die
 letzte Stufe ist die Reihe der Gesichter wie zuvor. Gemessen bei 1280x800: vier Personen tragen
-drei Zeilen, sechs tragen zwei. Nachts geht die Liste mit der Wand: offener Titel und Name eine
+drei Zeilen, sechs tragen zwei. **Die Zahl ist die Liste** (R23): die Zahl am Gesicht zaehlt, was
+heute vor der Person liegt - Aufgaben UND ihre Programmzeilen (Termin, Kochen) -, und genau das
+steht darunter: die Programmzeilen beim Namen vor den Aufgaben, durch dieselbe Leiter, Titel plus
+„+N weitere" ergeben die Zahl (vorher „3" ueber einem Titel, „1" ueber keinem). **Reicht das
+Tablett auch ohne Titel nicht, gibt das Programm Zeilen ab** (R23, `shedWallProgram`): gemessen,
+eine nach der anderen, in „+N weitere heute", zwei bleiben; danach duerfen wieder Titel stehen,
+die nichts kosten. Vorher lief 768x1024 25px und 1024x768 45px aus dem Bild. Nachts geht die Liste mit der Wand: offener Titel und Name eine
 Stufe zurueck, Erledigtes und Zaehlzeile eine weitere, und der Haken gibt sein Gruen ab.
 
 **Nachtabsenkung nach UHRZEIT, nicht nach Farbmodus.** Zwischen 22 und 6 Uhr traegt die Wurzel

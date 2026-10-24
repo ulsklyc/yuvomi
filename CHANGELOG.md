@@ -47,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The Overview starts higher on a phone, and the wall display fits a tablet.** On a phone the
+  weather now sits under the date beside the header buttons, and the "Today" sheet no longer
+  carries a visible heading, so the first entry moves up by about 60 px. The titles in the sheet
+  line up whether or not an entry shows a person. On the wall display the number at each face
+  now matches the list under it: a person's events and cooking are listed by name before their
+  tasks. When a tablet is too small for all entries, for example 768 x 1024 upright, the day plan
+  moves its last entries into "+N more today" until the screen fits, instead of running off the
+  bottom. On the Overview, "N to approve" in Rewards now follows the standings instead of
+  sitting at the bottom of a tall tile.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days
