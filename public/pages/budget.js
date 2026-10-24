@@ -2457,7 +2457,7 @@ function renderEntries() {
     return emptyStateHTML({
       icon: 'dollar-sign',
       title: t('budget.emptyTitle'),
-      action: ro ? null : { label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-budget' } },
+      action: ro ? null : { tone: 'secondary', label: t('budget.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-budget' } },
     });
   }
 
@@ -2916,7 +2916,7 @@ function renderAccountsPage() {
     icon: 'wallet',
     title: t('budget.accountsEmptyTitle'),
     description: ro ? '' : t('budget.accountsEmptyDescription'),
-    action: ro ? null : { label: t('budget.addAccount'), icon: 'plus', attrs: { id: 'budget-add-account-empty' } },
+    action: ro ? null : { tone: 'secondary', label: t('budget.addAccount'), icon: 'plus', attrs: { id: 'budget-add-account-empty' } },
   })}
         </div>
       </div>`;
@@ -3610,7 +3610,7 @@ function renderLoansPage() {
       ${emptyStateHTML({
     icon: 'hand-coins',
     title: t('budget.loansEmpty'),
-    action: ro ? null : { label: t('budget.newLoan'), icon: 'plus', attrs: { id: 'budget-empty-loan' } },
+    action: ro ? null : { tone: 'secondary', label: t('budget.newLoan'), icon: 'plus', attrs: { id: 'budget-empty-loan' } },
   })}
     </div>`;
   }

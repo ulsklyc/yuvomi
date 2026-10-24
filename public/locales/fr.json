@@ -713,7 +713,6 @@
         "catHousehold": "Ménage",
         "catDrugstore": "Pharmacie",
         "catMisc": "Divers",
-        "emptyAction": "Ajouter un article",
         "importMeals": "Depuis le plan de repas",
         "sendList": "Envoyer la liste",
         "sendListTitle": "Envoyer la liste de courses",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "Ce document est déjà stocké dans une GED.",
         "dropzoneTitleTouch": "Touchez pour choisir un fichier",
         "viewerPrevNamed": "Document précédent : {{name}}",
-        "viewerNextNamed": "Document suivant : {{name}}"
+        "viewerNextNamed": "Document suivant : {{name}}",
+        "emptyFolderTitle": "« {{name}} » est vide"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",

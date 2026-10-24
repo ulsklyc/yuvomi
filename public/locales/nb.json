@@ -713,7 +713,6 @@
         "catHousehold": "Husholdning",
         "catDrugstore": "Apotek",
         "catMisc": "Diverse",
-        "emptyAction": "Legg til element",
         "importMeals": "Fra måltidsplanen",
         "sendList": "Send liste",
         "sendListTitle": "Send handleliste",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Dette dokumentet er allerede lagret i et DMS.",
         "dropzoneTitleTouch": "Trykk for å velge en fil",
         "viewerPrevNamed": "Forrige dokument: {{name}}",
-        "viewerNextNamed": "Neste dokument: {{name}}"
+        "viewerNextNamed": "Neste dokument: {{name}}",
+        "emptyFolderTitle": "«{{name}}» er tom"
     },
     "housekeeping": {
         "title": "Husarbeid",

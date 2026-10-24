@@ -1184,6 +1184,23 @@ function emptyStateFor() {
       ],
     };
   }
+  // EIN LEERER ORDNER IST KEIN FILTER OHNE TREFFER (R23 S10, Critique G4 P2).
+  // Wer einen frisch angelegten Ordner oeffnet, sah „Keine Dokumente in dieser
+  // Auswahl" mit „Filter zuruecksetzen" als Primaerknopf - als haette er etwas
+  // falsch eingestellt. Ein Ordner allein (ohne Kategorie, ohne „Laeuft bald
+  // ab") ist ein Ort: er ist leer, und der Weg ist das Hochladen hierher
+  // (openDocumentModal waehlt den offenen Ordner vor). Sekundaer, denn der
+  // FAB daneben ist die Primaeraktion (Komponenten-Kanon D5).
+  const folderOnly = Number(state.folderId) > 0 && !state.category && !state.expiringSoon;
+  if (folderOnly) {
+    const folder = state.folders.find((f) => Number(f.id) === Number(state.folderId));
+    return {
+      variant: 'empty',
+      icon: 'folder-open',
+      title: folder ? t('documents.emptyFolderTitle', { name: folder.name }) : t('documents.emptyFilterTitle'),
+      actions: readOnly() ? [] : [{ id: 'documents-empty-upload', label: t('documents.emptyPrimary'), icon: 'upload', variant: 'secondary' }],
+    };
+  }
   if (hasActiveFilter()) {
     return {
       variant: 'no-results',
@@ -1191,7 +1208,7 @@ function emptyStateFor() {
       title: t('documents.emptyFilterTitle'),
       description: t('documents.emptyFilterDescription'),
       actions: [
-        { id: 'documents-empty-reset', label: t('documents.resetFiltersAction'), icon: 'filter-x', variant: 'primary' },
+        { id: 'documents-empty-reset', label: t('documents.resetFiltersAction'), icon: 'filter-x', variant: 'secondary' },
         ...(readOnly() ? [] : [{ id: 'documents-empty-upload', label: t('documents.emptyPrimary'), icon: 'upload', variant: 'secondary' }]),
       ],
     };
@@ -1203,7 +1220,7 @@ function emptyStateFor() {
       title: t('documents.emptyArchivedTitle'),
       description: t('documents.emptyArchivedDescription'),
       actions: [
-        { id: 'documents-empty-active', label: t('documents.showActiveAction'), icon: 'corner-up-left', variant: 'primary' },
+        { id: 'documents-empty-active', label: t('documents.showActiveAction'), icon: 'corner-up-left', variant: 'secondary' },
       ],
     };
   }
@@ -1218,8 +1235,9 @@ function emptyStateFor() {
     icon: 'folder-open',
     title: t('documents.emptyTitle'),
     description: t('documents.emptyDescription'),
+    // Beide sekundaer: der FAB ist der Primaerweg (Kanon D5, R23 D14-Guard).
     actions: [
-      { id: 'documents-empty-upload', label: t('documents.emptyPrimary'), icon: 'upload', variant: 'primary' },
+      { id: 'documents-empty-upload', label: t('documents.emptyPrimary'), icon: 'upload', variant: 'secondary' },
       { id: 'documents-empty-folder', label: t('documents.emptySecondary'), icon: 'folder-plus', variant: 'secondary' },
     ],
   };

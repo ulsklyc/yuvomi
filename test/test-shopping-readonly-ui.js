@@ -362,7 +362,8 @@ test('Leerzustaende bei `read`: nur der Zustand, keine Einladung und kein Knopf'
   const leereListe = { items: [] };
   for (const [name, patch, texte] of [
     ['keine Liste', ohneListe, ['shopping.noListsDescription', 'shopping.noListsHint', 'shopping.newListButton']],
-    ['leere Liste', leereListe, ['shopping.emptyListDescription', 'emptyHint.shopping', 'shopping.emptyAction']],
+    // R23 D14: die leere Liste hat keinen Knopf mehr (Schnelleingabe + FAB).
+    ['leere Liste', leereListe, ['shopping.emptyListDescription', 'emptyHint.shopping']],
   ]) {
     const lesend = await leer(LESEN, patch);
     const schreibend = await leer(SCHREIBEN, patch);
@@ -399,7 +400,7 @@ test('Leere Liste: der Vorrats-Hinweis steht nur, wo „In den Vorrat" auch steh
     ['pantry: none', await leer({ shopping: 'write', pantry: 'none' })],
   ]) {
     assert.ok(!html.includes('emptyHint.shopping'), `${name}: der Hinweis nennt einen Weg, den es hier nicht gibt`);
-    assert.ok(html.includes('shopping.emptyAction'), `${name}: das Anlegen bleibt`);
+    assert.ok(!html.includes('shopping.emptyAction'), `${name}: kein zweiter Anlegeknopf neben Schnelleingabe und FAB (R23 D14)`);
   }
 });
 

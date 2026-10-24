@@ -826,7 +826,7 @@ function renderTaskGroups(tasks, groupMode, rowsHtml = (items, render) => items.
         // Der CTA klickt den FAB, und den gibt es bei `tasks: read` nicht mehr.
         // Ohne diese Zeile blieb er als einziger Knopf einer leeren Seite
         // stehen und tat beim Antippen nichts.
-        action: readOnly() ? undefined : { label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
+        action: readOnly() ? undefined : { tone: 'secondary', label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
       });
   }
 

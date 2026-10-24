@@ -1281,6 +1281,7 @@ function renderListContent(container) {
       // Zustand war der einzige der vier ohne Hinweis (Critique 2026-07-29).
       hint: ro ? undefined : t('shopping.noListsHint'),
       action: ro ? null : {
+        tone: 'secondary',
         label: t('shopping.newListButton'),
         icon: 'plus',
         onClick: () => container.querySelector('[data-action="new-list"]')?.click(),
@@ -1393,11 +1394,8 @@ function mountItems(listEl, container) {
       title: t('shopping.emptyList'),
       description: ro ? undefined : t('shopping.emptyListDescription'),
       hint: ro || !pantryTransferOffered() ? undefined : t('emptyHint.shopping'),
-      action: ro ? null : {
-        label: t('shopping.emptyAction'),
-        icon: 'plus',
-        onClick: () => document.querySelector('.page-fab')?.click(),
-      },
+      // KEIN KNOPF (R23 D14, Critique G3 P2): er klickte nur den FAB, und
+      // ueber der leeren Liste steht die Schnelleingabe - zwei Wege genuegen.
     });
     return;
   }

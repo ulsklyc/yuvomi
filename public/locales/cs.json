@@ -774,7 +774,6 @@
         "catHousehold": "Domácnost",
         "catDrugstore": "Drogerie",
         "catMisc": "Různé",
-        "emptyAction": "Přidat položku",
         "importMeals": "Z jídelního plánu",
         "sendList": "Odeslat seznam",
         "sendListTitle": "Odeslat nákupní seznam",
@@ -4280,7 +4279,8 @@
         "errorDmsAlreadyStored": "Tento dokument je už uložený v DMS.",
         "dropzoneTitleTouch": "Klepnutím vyberte soubor",
         "viewerPrevNamed": "Předchozí dokument: {{name}}",
-        "viewerNextNamed": "Další dokument: {{name}}"
+        "viewerNextNamed": "Další dokument: {{name}}",
+        "emptyFolderTitle": "„{{name}}“ je prázdná"
     },
     "reminders": {
         "sectionTitle": "Připomínka",

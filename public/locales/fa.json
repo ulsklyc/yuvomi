@@ -689,7 +689,6 @@
         "noListsDescription": "یک فهرست برای هر خرید یا هر فروشگاه، برای همهٔ اعضای خانه.",
         "emptyList": "فهرست خالی است",
         "emptyListDescription": "نام کافی است - مقدار و دسته‌بندی اختیاری هستند.",
-        "emptyAction": "افزودن قلم",
         "newListPrompt": "نام فهرست جدید:",
         "newListButton": "ایجاد فهرست جدید",
         "renameListPrompt": "نام جدید فهرست:",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "این سند از قبل در یک DMS ذخیره شده است.",
         "dropzoneTitleTouch": "برای انتخاب فایل ضربه بزنید",
         "viewerPrevNamed": "سند قبلی: {{name}}",
-        "viewerNextNamed": "سند بعدی: {{name}}"
+        "viewerNextNamed": "سند بعدی: {{name}}",
+        "emptyFolderTitle": "«{{name}}» خالی است"
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",

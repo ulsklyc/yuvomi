@@ -799,7 +799,6 @@
         "noListsDescription": "Jedna lista na zakupy lub na sklep, widoczna dla całego domu.",
         "emptyList": "Lista jest pusta",
         "emptyListDescription": "Wystarczy nazwa - ilość i kategoria są opcjonalne.",
-        "emptyAction": "Dodaj artykuł",
         "newListPrompt": "Nazwa nowej listy:",
         "newListButton": "Utwórz nową listę",
         "renameListPrompt": "Nowa nazwa listy:",
@@ -4244,7 +4243,8 @@
         "errorDmsAlreadyStored": "Ten dokument jest już zapisany w systemie DMS.",
         "dropzoneTitleTouch": "Dotknij, aby wybrać plik",
         "viewerPrevNamed": "Poprzedni dokument: {{name}}",
-        "viewerNextNamed": "Następny dokument: {{name}}"
+        "viewerNextNamed": "Następny dokument: {{name}}",
+        "emptyFolderTitle": "Folder „{{name}}” jest pusty"
     },
     "userMultiSelect": {
         "nobody": "Nikt",

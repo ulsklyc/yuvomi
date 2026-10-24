@@ -689,7 +689,6 @@
         "noListsDescription": "Satu daftar per belanja atau per toko, terlihat oleh seluruh rumah.",
         "emptyList": "Daftar kosong",
         "emptyListDescription": "Nama saja cukup - jumlah dan kategori opsional.",
-        "emptyAction": "Tambah item",
         "newListPrompt": "Nama daftar baru:",
         "newListButton": "Buat daftar baru",
         "renameListPrompt": "Nama daftar baru:",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Dokumen ini sudah tersimpan di DMS.",
         "dropzoneTitleTouch": "Ketuk untuk memilih file",
         "viewerPrevNamed": "Dokumen sebelumnya: {{name}}",
-        "viewerNextNamed": "Dokumen berikutnya: {{name}}"
+        "viewerNextNamed": "Dokumen berikutnya: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" kosong"
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",

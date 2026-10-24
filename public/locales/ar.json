@@ -887,7 +887,6 @@
         "catHousehold": "مستلزمات المنزل",
         "catDrugstore": "صيدلية",
         "catMisc": "متنوع",
-        "emptyAction": "إضافة عنصر",
         "importMeals": "من خطة الوجبات",
         "sendList": "إرسال القائمة",
         "sendListTitle": "إرسال قائمة التسوق",
@@ -4298,7 +4297,8 @@
         "errorDmsAlreadyStored": "هذا المستند محفوظ بالفعل في نظام إدارة المستندات.",
         "dropzoneTitleTouch": "اضغط لاختيار ملف",
         "viewerPrevNamed": "المستند السابق: {{name}}",
-        "viewerNextNamed": "المستند التالي: {{name}}"
+        "viewerNextNamed": "المستند التالي: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" فارغ"
     },
     "shortcuts": {
         "goKitchen": "المطبخ",

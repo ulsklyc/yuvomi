@@ -830,7 +830,6 @@
         "catHousehold": "Хозтовары",
         "catDrugstore": "Аптека",
         "catMisc": "Разное",
-        "emptyAction": "Добавить товар",
         "importMeals": "Из плана питания",
         "sendList": "Отправить список",
         "sendListTitle": "Отправить список покупок",
@@ -4180,7 +4179,8 @@
         "errorDmsAlreadyStored": "Этот документ уже хранится в DMS.",
         "dropzoneTitleTouch": "Нажмите, чтобы выбрать файл",
         "viewerPrevNamed": "Предыдущий документ: {{name}}",
-        "viewerNextNamed": "Следующий документ: {{name}}"
+        "viewerNextNamed": "Следующий документ: {{name}}",
+        "emptyFolderTitle": "Папка «{{name}}» пуста"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

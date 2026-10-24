@@ -7715,7 +7715,7 @@ function renderCycleShell() {
     description: t('health.cycle.emptyDesc'),
     // DER LEERZUSTAND TRAEGT DIE AKTION (R22, D12): Glyphe, Titel, Satz,
     // Aktion - wie jeder leere Bereich. Seit der FAB hier fehlt, ist sie der
-    // einzige Anlege-Weg und kein zweiter.
+    // einzige Anlege-Weg und kein zweiter: hier steht kein FAB (Kanon D5).
     action: darf ? { label: t('health.cycle.add'), icon: 'plus', attrs: { 'data-action': 'cycle-add-period' } } : undefined,
   })}`);
     if (window.lucide) window.lucide.createIcons({ el: cycle.root });

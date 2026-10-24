@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Empty pages no longer show a second main button next to the add button.** Tasks, Notes,
+  Contacts, Budget, Recipes, the calendar agenda, Rewards and Documents now offer their "Add"
+  in an empty state as a quiet outlined button, so the add button stays the one main action.
+  An empty shopping list shows no button at all, since the quick entry field sits right above
+  it. An empty folder in Documents now says that the folder is empty and offers uploading into
+  it, instead of "No documents in this selection" with "Reset filters".
 - **Waste shows each pickup once.** The type cards under "Types & schedules" now only say how
   often a schedule runs, since the next pickup already stands in "Upcoming pickups" beside them. A
   card still says when a schedule is paused or has no pickup ahead. "Add type" moved from the

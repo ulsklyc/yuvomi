@@ -48,7 +48,7 @@ test('Such- und Filter-Leerzustand bieten die auflösende Aktion an, nicht "Hoch
   assert.match(page, /function resetFilters\(\)/);
   assert.match(page, /function clearSearch\(\)/);
   // Die Suchvariante darf nicht die Upload-Aktion als Primäraktion führen.
-  const searchBranch = page.slice(page.indexOf('if (state.query)'), page.indexOf('if (hasActiveFilter())'));
+  const searchBranch = page.slice(page.indexOf('if (state.query)'), page.indexOf('const folderOnly'));
   assert.doesNotMatch(searchBranch, /documents-empty-upload/);
 });
 

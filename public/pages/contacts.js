@@ -667,6 +667,7 @@ function contactsEmptyStateHtml(filtered) {
     description: ro ? '' : t('contacts.emptyDescription'),
     hint: ro ? '' : t('emptyHint.contacts'),
     action: ro ? null : {
+      tone: 'secondary',
       label: t('contacts.emptyAction'),
       icon: 'plus',
       attrs: { 'data-action': 'empty-cta' },

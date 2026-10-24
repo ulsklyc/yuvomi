@@ -6133,7 +6133,7 @@ function renderAgendaView(container) {
         ? emptyStateHTML({
           icon: 'calendar-plus',
           title: t('calendar.agendaEmpty'),
-          action: readOnly() ? undefined : { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
+          action: readOnly() ? undefined : { tone: 'secondary', label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
         })
         : groups.map((group) => `
           <div class="agenda-day">

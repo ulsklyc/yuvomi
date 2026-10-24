@@ -713,7 +713,6 @@
         "catHousehold": "Casa",
         "catDrugstore": "Drogheria",
         "catMisc": "Varie",
-        "emptyAction": "Aggiungi articolo",
         "importMeals": "Dal piano dei pasti",
         "sendList": "Invia la lista",
         "sendListTitle": "Invia la lista della spesa",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "Questo documento è già archiviato in un DMS.",
         "dropzoneTitleTouch": "Tocca per scegliere un file",
         "viewerPrevNamed": "Documento precedente: {{name}}",
-        "viewerNextNamed": "Documento successivo: {{name}}"
+        "viewerNextNamed": "Documento successivo: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" è vuota"
     },
     "shortcuts": {
         "goKitchen": "Cucina",

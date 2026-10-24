@@ -713,7 +713,6 @@
         "catHousehold": "日用品",
         "catDrugstore": "薬局",
         "catMisc": "その他",
-        "emptyAction": "アイテムを追加",
         "importMeals": "献立から",
         "sendList": "リストを送る",
         "sendListTitle": "買い物リストを送る",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "このドキュメントはすでに DMS に保存されています。",
         "dropzoneTitleTouch": "タップしてファイルを選択",
         "viewerPrevNamed": "前のドキュメント: {{name}}",
-        "viewerNextNamed": "次のドキュメント: {{name}}"
+        "viewerNextNamed": "次のドキュメント: {{name}}",
+        "emptyFolderTitle": "「{{name}}」は空です"
     },
     "shortcuts": {
         "goKitchen": "キッチン",

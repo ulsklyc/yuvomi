@@ -841,7 +841,8 @@ function renderCatalog(el) {
       <h2 class="sr-only">${esc(t('rewards.tabCatalog'))}</h2>` : '';
   if (!items.length) {
     const action = isAdmin() && !readOnly()
-      ? { label: t('rewards.addReward'), icon: 'plus', className: 'rw-add-reward' }
+      // Sekundaer: der FAB "Praemie" steht daneben (Kanon D5, R23 D14).
+      ? { label: t('rewards.addReward'), icon: 'plus', tone: 'secondary', className: 'rw-add-reward' }
       : null;
     el.insertAdjacentHTML('beforeend',
       `<div class="rewards-content__inner">${emptyState('gift', t('rewards.emptyCatalogTitle'), isAdmin() ? t('rewards.emptyCatalogAdmin') : t('rewards.emptyCatalogMember'), action)}</div>`);

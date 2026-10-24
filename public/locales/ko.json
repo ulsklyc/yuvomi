@@ -689,7 +689,6 @@
         "noListsDescription": "장보기나 상점마다 목록 하나, 가족 모두가 봅니다.",
         "emptyList": "목록이 비어 있습니다",
         "emptyListDescription": "이름만 있으면 됩니다. 수량과 분류는 선택 사항입니다.",
-        "emptyAction": "항목 추가",
         "newListPrompt": "새 목록 이름:",
         "newListButton": "새 목록 만들기",
         "renameListPrompt": "새 목록 이름:",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "이 문서는 이미 DMS에 저장되어 있습니다.",
         "dropzoneTitleTouch": "탭하여 파일 선택",
         "viewerPrevNamed": "이전 문서: {{name}}",
-        "viewerNextNamed": "다음 문서: {{name}}"
+        "viewerNextNamed": "다음 문서: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" 폴더가 비어 있습니다"
     },
     "userMultiSelect": {
         "nobody": "없음",

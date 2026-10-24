@@ -629,6 +629,8 @@ function renderWorkerSummary() {
       icon: 'user-plus',
       title: t('housekeeping.noWorkerTitle'),
       description: t(manage ? 'housekeeping.noWorkerHint' : 'housekeeping.noWorkerHintAdminOnly'),
+      // Primaer, weil die Uebersicht kein FAB hat (updateHousekeepingFab,
+      // Kanon D5): hier ist dies der einzige Weg zum Profil.
       action: !manage ? null : {
         label: t('housekeeping.setupProfileAction'),
         icon: 'plus',
@@ -1163,7 +1165,7 @@ function drawTasks(content) {
   const empty = emptyStateHTML({
     icon: 'list-checks',
     title: t('housekeeping.noTasks'),
-    ...(readOnly() ? {} : { action: { label: t('housekeeping.addTask'), icon: 'plus', attrs: { 'data-create-task': '' } } }),
+    ...(readOnly() ? {} : { action: { tone: 'secondary', label: t('housekeeping.addTask'), icon: 'plus', attrs: { 'data-create-task': '' } } }),
   });
 
   content.insertAdjacentHTML('beforeend', renderPageColumns({

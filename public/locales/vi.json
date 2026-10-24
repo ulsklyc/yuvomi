@@ -713,7 +713,6 @@
         "catHousehold": "Đồ gia dụng",
         "catDrugstore": "Nhà thuốc",
         "catMisc": "Khác",
-        "emptyAction": "Thêm mục",
         "importMeals": "Từ kế hoạch bữa ăn",
         "sendList": "Gửi danh sách",
         "sendListTitle": "Gửi danh sách mua sắm",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Tài liệu này đã được lưu trong một DMS.",
         "dropzoneTitleTouch": "Chạm để chọn tệp",
         "viewerPrevNamed": "Tài liệu trước: {{name}}",
-        "viewerNextNamed": "Tài liệu tiếp theo: {{name}}"
+        "viewerNextNamed": "Tài liệu tiếp theo: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" đang trống"
     },
     "housekeeping": {
         "title": "Dọn dẹp",

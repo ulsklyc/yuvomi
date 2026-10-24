@@ -656,7 +656,7 @@ function notesEmptyStateHtml(isFiltered) {
     title: t('notes.emptyTitle'),
     description: ro ? '' : t('notes.emptyDescription'),
     hint: ro ? '' : t('emptyHint.notes'),
-    action: ro ? null : { label: t('notes.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-notes' } },
+    action: ro ? null : { tone: 'secondary', label: t('notes.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-notes' } },
   });
 }
 

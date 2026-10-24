@@ -713,7 +713,6 @@
         "catHousehold": "家居",
         "catDrugstore": "日化",
         "catMisc": "其他",
-        "emptyAction": "新增商品",
         "importMeals": "來自用餐計劃",
         "sendList": "傳送清單",
         "sendListTitle": "傳送購物清單",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "此文件已儲存在 DMS 中。",
         "dropzoneTitleTouch": "點選以選擇檔案",
         "viewerPrevNamed": "上一個文件：{{name}}",
-        "viewerNextNamed": "下一個文件：{{name}}"
+        "viewerNextNamed": "下一個文件：{{name}}",
+        "emptyFolderTitle": "「{{name}}」是空的"
     },
     "shortcuts": {
         "goKitchen": "廚房",

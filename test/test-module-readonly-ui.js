@@ -1191,7 +1191,7 @@ test('Kalender: FAB und der Leerzustands-CTA der Agenda hängen an readOnly()', 
   assert.doesNotMatch(CAL_CODE, /toolbar-new-btn(?![\w-])/, 'kein zweiter Primaerknopf neben dem FAB');
   for (const [name, muster] of [
     ['der FAB', /\$\{readOnly\(\) \? '' : `\s*<button class="page-fab" id="fab-new-event"/],
-    ['der Agenda-CTA', /action: readOnly\(\) \? undefined : \{ label: t\('calendar\.newEvent'\), attrs: \{ id: 'agenda-empty-cta' \} \}/],
+    ['der Agenda-CTA', /action: readOnly\(\) \? undefined : \{ tone: 'secondary', label: t\('calendar\.newEvent'\), attrs: \{ id: 'agenda-empty-cta' \} \}/],
   ]) {
     assert.match(CAL_CODE, muster, `${name} muss bei 'calendar: read' verschwinden`);
   }

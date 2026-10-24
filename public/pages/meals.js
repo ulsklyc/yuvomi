@@ -1089,6 +1089,7 @@ function renderRecipeSidebar() {
       title: t('recipes.emptyTitle'),
       description: t('recipes.emptyDescription'),
       action: {
+        tone: 'secondary',
         label: t('recipes.emptyAction'),
         icon: 'plus',
         onClick: () => window.yuvomi?.navigate('/recipes'),

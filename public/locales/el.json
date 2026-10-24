@@ -713,7 +713,6 @@
         "catHousehold": "Οικιακά",
         "catDrugstore": "Φαρμακείο",
         "catMisc": "Διάφορα",
-        "emptyAction": "Προσθήκη στοιχείου",
         "importMeals": "Από το πρόγραμμα γευμάτων",
         "sendList": "Αποστολή λίστας",
         "sendListTitle": "Αποστολή λίστας αγορών",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "Αυτό το έγγραφο είναι ήδη αποθηκευμένο σε DMS.",
         "dropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο",
         "viewerPrevNamed": "Προηγούμενο έγγραφο: {{name}}",
-        "viewerNextNamed": "Επόμενο έγγραφο: {{name}}"
+        "viewerNextNamed": "Επόμενο έγγραφο: {{name}}",
+        "emptyFolderTitle": "Το «{{name}}» είναι κενό"
     },
     "shortcuts": {
         "goKitchen": "Κουζίνα",

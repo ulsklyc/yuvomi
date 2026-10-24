@@ -830,7 +830,6 @@
         "catHousehold": "Господарські товари",
         "catDrugstore": "Аптека",
         "catMisc": "Різне",
-        "emptyAction": "Додати товар",
         "importMeals": "З плану харчування",
         "sendList": "Надіслати список",
         "sendListTitle": "Надіслати список покупок",
@@ -4180,7 +4179,8 @@
         "errorDmsAlreadyStored": "Цей документ уже зберігається в DMS.",
         "dropzoneTitleTouch": "Торкніться, щоб вибрати файл",
         "viewerPrevNamed": "Попередній документ: {{name}}",
-        "viewerNextNamed": "Наступний документ: {{name}}"
+        "viewerNextNamed": "Наступний документ: {{name}}",
+        "emptyFolderTitle": "Тека «{{name}}» порожня"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

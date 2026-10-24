@@ -689,7 +689,6 @@
         "noListsDescription": "Eine Liste pro Einkauf oder Laden, für den ganzen Haushalt sichtbar.",
         "emptyList": "Die Liste ist leer",
         "emptyListDescription": "Der Name genügt - Menge und Kategorie sind optional.",
-        "emptyAction": "Artikel hinzufügen",
         "newListPrompt": "Name der neuen Liste:",
         "newListButton": "Neue Liste erstellen",
         "renameListPrompt": "Neuer Listen-Name:",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Dieses Dokument liegt schon in einem DMS.",
         "dropzoneTitleTouch": "Tippen, um eine Datei auszuwählen",
         "viewerPrevNamed": "Vorheriges Dokument: {{name}}",
-        "viewerNextNamed": "Nächstes Dokument: {{name}}"
+        "viewerNextNamed": "Nächstes Dokument: {{name}}",
+        "emptyFolderTitle": "„{{name}}“ ist leer"
     },
     "userMultiSelect": {
         "nobody": "Niemand",

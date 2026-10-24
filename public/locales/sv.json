@@ -713,7 +713,6 @@
         "catHousehold": "Hushåll",
         "catDrugstore": "Apotek",
         "catMisc": "Diverse",
-        "emptyAction": "Lägg till artikel",
         "importMeals": "Från måltidsplanen",
         "sendList": "Skicka listan",
         "sendListTitle": "Skicka inköpslistan",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "Det här dokumentet är redan lagrat i ett DMS.",
         "dropzoneTitleTouch": "Tryck för att välja en fil",
         "viewerPrevNamed": "Föregående dokument: {{name}}",
-        "viewerNextNamed": "Nästa dokument: {{name}}"
+        "viewerNextNamed": "Nästa dokument: {{name}}",
+        "emptyFolderTitle": "”{{name}}” är tom"
     },
     "shortcuts": {
         "goKitchen": "Kök",

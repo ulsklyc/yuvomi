@@ -689,7 +689,6 @@
         "noListsDescription": "Isang listahan bawat tindahan, nakikita ng buong sambahayan.",
         "emptyList": "Walang laman ang listahan",
         "emptyListDescription": "Sapat na ang pangalan - opsyonal ang dami at kategorya.",
-        "emptyAction": "Magdagdag ng item",
         "newListPrompt": "Pangalan para sa bagong listahan:",
         "newListButton": "Gumawa ng bagong listahan",
         "renameListPrompt": "Bagong pangalan ng listahan:",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Nakaimbak na sa isang DMS ang dokumentong ito.",
         "dropzoneTitleTouch": "I-tap para pumili ng file",
         "viewerPrevNamed": "Nakaraang dokumento: {{name}}",
-        "viewerNextNamed": "Susunod na dokumento: {{name}}"
+        "viewerNextNamed": "Susunod na dokumento: {{name}}",
+        "emptyFolderTitle": "Walang laman ang \"{{name}}\""
     },
     "userMultiSelect": {
         "nobody": "Wala",

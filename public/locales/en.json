@@ -713,7 +713,6 @@
         "catHousehold": "Household",
         "catDrugstore": "Drugstore",
         "catMisc": "Miscellaneous",
-        "emptyAction": "Add item",
         "importMeals": "From the meal plan",
         "sendList": "Send list",
         "sendListTitle": "Send shopping list",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "This document is already stored in a DMS.",
         "dropzoneTitleTouch": "Tap to choose a file",
         "viewerPrevNamed": "Previous document: {{name}}",
-        "viewerNextNamed": "Next document: {{name}}"
+        "viewerNextNamed": "Next document: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" is empty"
     },
     "housekeeping": {
         "title": "Housekeeping",

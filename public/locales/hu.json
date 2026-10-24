@@ -713,7 +713,6 @@
         "catHousehold": "Háztartás",
         "catDrugstore": "Gyógyszertár",
         "catMisc": "Vegyes",
-        "emptyAction": "Elem hozzáadása",
         "importMeals": "Az étkezési tervből",
         "sendList": "Lista küldése",
         "sendListTitle": "Bevásárlólista küldése",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Ez a dokumentum már egy DMS-ben van tárolva.",
         "dropzoneTitleTouch": "Koppintson egy fájl kiválasztásához",
         "viewerPrevNamed": "Előző dokumentum: {{name}}",
-        "viewerNextNamed": "Következő dokumentum: {{name}}"
+        "viewerNextNamed": "Következő dokumentum: {{name}}",
+        "emptyFolderTitle": "A(z) „{{name}}” mappa üres"
     },
     "housekeeping": {
         "title": "Háztartás",

@@ -713,7 +713,6 @@
         "catHousehold": "घरेलू",
         "catDrugstore": "दवाखाना",
         "catMisc": "विविध",
-        "emptyAction": "आइटम जोड़ें",
         "importMeals": "भोजन योजना से",
         "sendList": "सूची भेजें",
         "sendListTitle": "खरीदारी सूची भेजें",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "यह दस्तावेज़ पहले से किसी DMS में संग्रहीत है।",
         "dropzoneTitleTouch": "फ़ाइल चुनने के लिए टैप करें",
         "viewerPrevNamed": "पिछला दस्तावेज़: {{name}}",
-        "viewerNextNamed": "अगला दस्तावेज़: {{name}}"
+        "viewerNextNamed": "अगला दस्तावेज़: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" खाली है"
     },
     "shortcuts": {
         "goKitchen": "रसोई",

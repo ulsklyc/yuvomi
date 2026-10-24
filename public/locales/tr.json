@@ -713,7 +713,6 @@
         "catHousehold": "Ev Gereçleri",
         "catDrugstore": "Eczane",
         "catMisc": "Diğer",
-        "emptyAction": "Öğe ekle",
         "importMeals": "Öğün planından",
         "sendList": "Listeyi gönder",
         "sendListTitle": "Alışveriş listesini gönder",
@@ -3946,7 +3945,8 @@
         "errorDmsAlreadyStored": "Bu belge zaten bir DMS'de saklanıyor.",
         "dropzoneTitleTouch": "Dosya seçmek için dokunun",
         "viewerPrevNamed": "Önceki belge: {{name}}",
-        "viewerNextNamed": "Sonraki belge: {{name}}"
+        "viewerNextNamed": "Sonraki belge: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" boş"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",

@@ -713,7 +713,6 @@
         "catHousehold": "Huishouden",
         "catDrugstore": "Drogisterij",
         "catMisc": "Overig",
-        "emptyAction": "Item toevoegen",
         "importMeals": "Uit het maaltijdplan",
         "sendList": "Lijst versturen",
         "sendListTitle": "Boodschappenlijst versturen",
@@ -4010,7 +4009,8 @@
         "errorDmsAlreadyStored": "Dit document staat al in een DMS.",
         "dropzoneTitleTouch": "Tik om een bestand te kiezen",
         "viewerPrevNamed": "Vorig document: {{name}}",
-        "viewerNextNamed": "Volgend document: {{name}}"
+        "viewerNextNamed": "Volgend document: {{name}}",
+        "emptyFolderTitle": "\"{{name}}\" is leeg"
     },
     "housekeeping": {
         "title": "Huishouden",

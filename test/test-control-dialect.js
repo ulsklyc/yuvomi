@@ -2266,3 +2266,56 @@ test('R23 D13: Einkauf - Quick-Add meldet einen Artikel ausserhalb des Bilds, di
   assert.match(js, /announceAddedOutOfSight\(container, data\.data\)/);
   assert.match(fnBody(js, 'function renderTabs(', '\n}\n'), /wireScrollFade\(bar\)/);
 });
+
+/*
+ * R23 D14 (Kanon D5): "Ein Leerzustand neben dem FAB hat keine zweite
+ * Primaeraktion." Der Kanon stand seit 2026-10-16 in DESIGN.md, ein Guard fehlte -
+ * die Critique vom 24.10. fand den Primaerknopf trotzdem in Einkauf, Dokumente,
+ * Aufgaben, Notizen, Kontakten, Budget, Rezepten. Gescannt wird jeder Aufruf von
+ * emptyStateHTML/emptyStateEl/mountEmptyState in einer Seite mit FAB, dessen
+ * Aktion als Objekt-Literal mit `label:` im Aufruf steht: die Aktion traegt
+ * `tone: 'secondary'`. Ausgenommen sind Fehler/kein Treffer (eigener Ton) und
+ * Stellen, deren Kommentar im Aufruf sagt, dass dort KEIN FAB steht.
+ */
+function emptyStateCallsWithPrimary(src) {
+  const out = [];
+  const re = /(?:emptyState(?:HTML|El)|mountEmptyState)\((?:[^,()]*,\s*)?\{/g;
+  let m;
+  while ((m = re.exec(src))) {
+    let depth = 0;
+    let j = m.index + m[0].length - 1;
+    for (; j < src.length; j++) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}' && --depth === 0) break;
+    }
+    const call = src.slice(m.index, j + 1);
+    if (/variant:\s*'(?:error|no-results)'/.test(call)) continue;
+    const action = /\baction:\s*[^{}]*?\{\s*label:/.exec(call);
+    if (!action) continue;
+    if (/kein FAB/.test(call)) continue;
+    const body = call.slice(action.index, call.indexOf('}', action.index) + 1);
+    if (!/tone:\s*'secondary'/.test(body)) out.push(src.slice(0, m.index).split('\n').length);
+  }
+  return out;
+}
+
+test('R23 D14: ein Leerzustand neben dem FAB hat keine zweite Primaeraktion', () => {
+  // Proben: positiv und negativ, damit ein blinder Scanner nicht gruen ist.
+  assert.deepEqual(emptyStateCallsWithPrimary("emptyStateHTML({ title: 'x', action: { label: 'y', icon: 'plus' } })"), [1]);
+  assert.deepEqual(emptyStateCallsWithPrimary("emptyStateHTML({ title: 'x', action: { label: 'y', tone: 'secondary' } })"), []);
+  assert.deepEqual(emptyStateCallsWithPrimary("mountEmptyState(el, { title: 'x', action: ro ? null : {\n label: 'y' } })"), [1]);
+  assert.deepEqual(emptyStateCallsWithPrimary("emptyStateHTML({ variant: 'error', action: { label: 'y' } })"), []);
+  const pagesDir = fileURLToPath(new URL('../public/pages/', import.meta.url));
+  const offenders = [];
+  for (const file of readdirSync(pagesDir).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(join(pagesDir, file), 'utf8');
+    if (!/createPageFab|pageFabHtml|setPageFabAction|class="page-fab"/.test(src)) continue;
+    for (const line of emptyStateCallsWithPrimary(src)) offenders.push(`${file}:${line}`);
+  }
+  assert.deepEqual(offenders, [], 'Leerzustand mit Primaeraktion neben einem FAB - tone: \'secondary\', oder im Aufruf begruenden, dass dort kein FAB steht');
+  // Die Dokumente bauen ihre Aktionen als Liste mit `variant` (emptyStateFor).
+  const docs = readFileSync(join(pagesDir, 'documents.js'), 'utf8');
+  const empty = docs.slice(docs.indexOf('function emptyStateFor()'), docs.indexOf('function renderEmptyState('));
+  assert.doesNotMatch(empty, /variant: 'primary'/, 'Dokumente: kein Primaerknopf im Leerzustand');
+  assert.match(empty, /t\('documents\.emptyFolderTitle', \{ name: folder\.name \}\)/, 'ein leerer Ordner ist ein Ort, kein Filter ohne Treffer');
+});
