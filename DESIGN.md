@@ -3174,7 +3174,9 @@ Gemessen: `test:child-start-permissions`, `test:edit-others-permissions`, `test:
 - **Mehr-Blatt:** so breit wie die Kapsel (`max-inline-size: --nav-capsule-max`, zentriert;
   768px: 744 -> 560px, 390px unveraendert 366px). Die Module stehen als **gruppierte
   Zeilenliste wie in den iOS-Einstellungen** (R19, Ulas 2026-10-16), je Sektion der
-  Seitenleiste eine eingelassene Liste (`.more-sheet__list`): Zeile >= `--target-base`, Mulde
+  Seitenleiste eine eingelassene Liste (`.more-sheet__list`): Zeile 44px (seit R23; die Zeilen
+  stehen in einer Reihe, dort gilt WCAG 2.5.8 - mit 48px stand Budget bei 390x844 61px unter der
+  Falz, jetzt im Bild ohne Blende; Gruppen 6px auseinander), Mulde
   32px (seit R23 D9 die getoente Mulde der Seitenleiste, Zeichen 20px im Modulton), Name in `--type-body` einzeilig, Zaehlbadge und Pfeil am Ende, Trennlinie ab der
   Textkante. Vorher je Sektion ein Vierer-Raster mit 1-2 Kacheln je Gruppe (724px, Luecken).
   Die System-Reihe darunter bleibt eine volle Reihe aus vier monochromen Zielen und ist der

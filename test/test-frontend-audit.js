@@ -22642,7 +22642,10 @@ test('Mehr-Blatt: die Module stehen als Zeilenliste in den Sektionen der Seitenl
   const rule = (sel) => layout.find((r) => r.selector.trim() === sel)?.body ?? '';
   assert.doesNotMatch(read('../public/styles/layout.css'), /\.more-sheet__grid\b/, 'die Rasterregel ist weg');
   assert.match(rule('.more-item'), /display:\s*flex;[\s\S]*align-items:\s*center/, 'die Zeile: Siegel, Name, Badge, Pfeil nebeneinander');
-  assert.match(rule('.more-item'), /min-block-size:\s*var\(--target-base\)/, 'jede Zeile ist ein volles Ziel (am Finger 48px)');
+  // R23: 44px (Mulde 32 + 2 x 6px) - die Zeilen stehen in einer Reihe, dort
+  // gilt WCAG 2.5.8; mit 48px stand Budget bei 390x844 unter der Falz.
+  assert.match(rule('.more-item'), /min-block-size:\s*calc\(var\(--target-sm\) \+ 2 \* var\(--space-1h\)\)/, 'jede Zeile 44px hoch, wie Apples Listen');
+  assert.match(rule('.more-sheet__group + .more-sheet__group'), /margin-block-start:\s*var\(--space-1h\)/, '6px zwischen den Gruppen');
   assert.doesNotMatch(rule('.more-item'), /flex-direction:\s*column/, 'keine Kachel (Icon ueber Name) mehr');
   assert.match(rule('.more-item__label'), /white-space:\s*nowrap/, 'der Name steht auf einer Zeile, ohne Silbentrennung');
   assert.match(router, /chevron\.dataset\.lucide = 'chevron-right'/, 'der Pfeil am Zeilenende sagt: fuehrt weiter');

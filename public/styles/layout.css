@@ -1362,7 +1362,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 /* DIE KANTE SAGT „ES GEHT WEITER" (R22 D14): wireScrollFade (router.js,
  * buildMoreSheetBody) setzt has-fade-start/-end, solange ueber oder unter dem
  * Sichtfenster Module liegen. Dieselbe Blende wie die Seitenleiste, eine
- * Stufe kuerzer (--space-6): die Zeilen sind 48px hoch, und eine Blende ueber
+ * Stufe kuerzer (--space-6): die Zeilen sind 44px hoch, und eine Blende ueber
  * zwei Drittel der letzten sichtbaren Zeile nimmt ihr den Namen. */
 .more-sheet__body.has-fade-end {
   mask-image: linear-gradient(to bottom, var(--mask-opaque) calc(100% - var(--space-6)), transparent);
@@ -1379,8 +1379,12 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   -webkit-mask-image: linear-gradient(to bottom, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
 }
 
+/* 6px ZWISCHEN DEN GRUPPEN (R23): mit 12px und 48px-Zeilen stand Budget bei
+ * 390x844 61px unter der Falz des Blatts - siehe die Zeilenhoehe unten. Die
+ * Gruppen trennt ihr Kopf und ihre eigene Flaeche, nicht die Luft dazwischen;
+ * mit 8px fehlten der letzten Zeile noch 5px. */
 .more-sheet__group + .more-sheet__group {
-  margin-block-start: var(--space-3);
+  margin-block-start: var(--space-1h);
 }
 
 .more-sheet__section-label {
@@ -1698,14 +1702,20 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 /* ── More-Item: Modulzeile (Siegel · Name · Badge · Pfeil) ──
  * Die Zeile der iOS-Einstellungen: das Vollton-Siegel vorn nennt das Modul,
  * der Name steht in der Lesegroesse der App auf EINER Zeile, Zaehlbadge und
- * Pfeil sitzen am Ende. Die ganze Zeile ist das Ziel, mindestens
- * --target-base hoch (am Finger 48px). */
+ * Pfeil sitzen am Ende. Die ganze Zeile ist das Ziel.
+ *
+ * 44px, NICHT 48 (R23, Entscheidung S8/S9): die Zeilen stehen IN EINER REIHE
+ * (Zielgroessen-Regel, tokens.css §11b: dort gilt WCAG 2.5.8, die Reihe traegt
+ * ihre Dichte gemeinsam) - die 48px von `--target-base` am Finger sind das
+ * Mass fuer ein FREISTEHENDES Ziel. 44 ist das Mass der Listen in Apples
+ * Einstellungen: Mulde (32px) plus 6px Polster je Seite. Mit 48 stand Budget
+ * bei 390x844 61px unter der Falz, jetzt im Bild. */
 .more-item {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-block-size: var(--target-base);
+  min-block-size: calc(var(--target-sm) + 2 * var(--space-1h));
   padding: var(--space-1h) var(--space-2) var(--space-1h) var(--space-3);
   color: var(--color-text-primary);
   text-decoration: none;

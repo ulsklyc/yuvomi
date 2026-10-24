@@ -78,6 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only holds layers and display, since calendars and people are already in the panel; its
   counter and reset follow suit. "Open in Maps" now fits beside the place on a phone instead
   of taking a line of its own.
+- **Every module fits in the "More" sheet on a phone.** Its rows are now 44 px high, the size of
+  the lists in the system settings, so Budget is visible without scrolling on a 390 x 844 screen.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days
