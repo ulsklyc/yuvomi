@@ -2408,6 +2408,12 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* In einer Formularzeile (fileDropzoneHtml, R23 D8) gibt es keinen Formular-
+ * Abstand zwischen Zone und gewaehlter Datei - der Abstand gehoert dem Paar. */
+.form-row__control > .settings-backup-file {
+  margin-top: var(--space-2);
+}
+
 .settings-code-block {
   margin: var(--space-3) 0;
   padding: var(--space-3);
