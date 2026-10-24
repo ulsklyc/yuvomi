@@ -69,6 +69,9 @@ export function contactsPaths() {
       delete: op({ summary: 'Delete contact', tag: 'Contacts', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/contacts/{id}/vcard': { get: op({ summary: 'Download contact as vCard', tag: 'Contacts', description: 'vCard 3.0. A birthday without a year is written the way Apple and sabre/vobject write it in 3.0, `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`.', params: [idParam()] }) },
+    '/api/v1/contacts/{id}/photo': {
+      get: op({ summary: 'Get contact photo as data URL', tag: 'Contacts', description: 'Returns the contact\'s photo as a data URL, or null if no photo is set.', params: [idParam()], responses: { 200: { description: 'Photo data URL or null' }, 404: { $ref: '#/components/responses/NotFound' } } })
+    },
   });
 }
 
@@ -95,6 +98,7 @@ const MULTI_CASES = 'for `phones`, `emails` and `addresses`, checked after the f
 const CASE_REASONS = {
   '/api/v1/contacts': { post: `${CATEGORY_GONE}, ${FIELD_CASES}; ${MULTI_CASES}` },
   '/api/v1/contacts/{id}': { get: CONTACT_GONE, put: `${CONTACT_GONE}, ${CATEGORY_GONE}, ${FIELD_CASES}; ${MULTI_CASES}`, delete: CONTACT_GONE },
+  '/api/v1/contacts/{id}/photo': { get: CONTACT_GONE },
 };
 
 function withCaseReasons(paths) {
