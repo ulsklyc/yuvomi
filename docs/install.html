@@ -148,8 +148,9 @@
     .tab-btn { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--border);
       color: var(--text-2); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
       padding: 10px 15px; min-height: 44px; border-radius: var(--r-full); box-shadow: var(--shadow-sm);
-      transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .18s var(--ease-out); }
+      transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .18s var(--ease-out), transform var(--dur-press) var(--ease-out); }
     .tab-btn:hover { border-color: var(--border-strong); color: var(--text-1); }
+    .tab-btn:active { transform: scale(var(--press-sm)); }
     .tab-btn .tb-logo { width: 18px; height: 18px; display: grid; place-items: center; color: var(--pc, var(--accent)); }
     .tab-btn .tb-logo svg { width: 18px; height: 18px; fill: currentColor; }
     /* Der gewaehlte Tab traegt die Flaeche des Primaerknopfs: flach, ohne Glow. */
@@ -230,8 +231,10 @@
     .engine-label { font-size: 0.85rem; font-weight: 600; color: var(--text-2); }
     .engine { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
     .engine-btn { min-height: 44px; padding: 0 18px; border: 0; border-radius: var(--r-full); background: transparent; color: var(--text-2);
-      font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background .18s, color .18s; }
+      font-family: var(--ff); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      transition: background-color .18s var(--ease-out), color .18s var(--ease-out), transform var(--dur-press) var(--ease-out); }
     .engine-btn:hover { color: var(--text-1); }
+    .engine-btn:active { transform: scale(var(--press-sm)); }
     .engine-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-on-soft); }
     html.js:not([data-engine="podman"]) .eng-podman,
     html.js[data-engine="podman"] .eng-docker { display: none; }
@@ -372,8 +375,21 @@
     details[open] { box-shadow: var(--shadow-sm); }
     summary { cursor: pointer; padding: 16px 20px; font-weight: 600; font-size: 0.95rem; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: '+'; font-size: 1.3rem; color: var(--text-3); transition: transform .2s; line-height: 1; }
+    summary::after { content: '+'; font-size: 1.3rem; color: var(--text-3); transition: transform .25s var(--ease-out), color var(--dur-hover); line-height: 1; }
+    summary:hover::after { color: var(--accent); }
     details[open] summary::after { transform: rotate(45deg); }
+    /* Auf- und Zuklappen mit Hoehe (S3): ::details-content waechst von 0 auf
+       `auto` (interpolate-size), content-visibility wechselt erst am Ende
+       des Schliessens. Ohne beides klappt es wie bisher sofort. Kurz, weil
+       wer hier liest, ein Problem hat und nicht auf Bewegung warten will. */
+    @media (prefers-reduced-motion: no-preference) {
+      @supports (interpolate-size: allow-keywords) and selector(::details-content) {
+        .trouble-list { interpolate-size: allow-keywords; }
+        .trouble-list details::details-content { block-size: 0; overflow: clip;
+          transition: block-size .25s var(--ease-out), content-visibility .25s allow-discrete; }
+        .trouble-list details[open]::details-content { block-size: auto; }
+      }
+    }
     .details-body { padding: 0 20px 18px; font-size: 0.9rem; color: var(--text-2); line-height: 1.6; }
     /* Lesemass wie .step-desc: die Antwort lief in der 816px-Box bis 114
        Zeichen. Nur der Text; die Codeplatten behalten die Breite. */
@@ -440,7 +456,7 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
-      .prereq-card:hover { transform: none; }
+      .prereq-card:hover, .tab-btn:active, .engine-btn:active { transform: none; }
     }
 
     /* Print. This is the one page people actually put on paper next to the
@@ -465,7 +481,7 @@
       /* <details> is collapsed by default and CSS cannot set the open attribute;
          ::details-content is the only way to unfold it for the printer. */
       details > .details-body { display: block; }
-      details::details-content { content-visibility: visible; }
+      details::details-content { content-visibility: visible; block-size: auto !important; }
       summary::after { content: none; }
       .step, .opt-card, .env-card, .prereq-card, details, .success-box { break-inside: avoid; }
       a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
@@ -525,13 +541,13 @@
             <a href="https://podman.io/docs/installation" target="_blank" rel="noopener" class="prereq-link">Podman</a>
           </div>
         </div>
-        <div class="prereq-card reveal d1">
+        <div class="prereq-card reveal">
           <div class="prereq-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
           <h3 data-t="prereq_terminal_title">Terminal</h3>
           <p data-t="prereq_terminal_desc">A command-line interface to type a few commands. Built into every OS - no extra install needed.</p>
           <p class="prereq-hint" data-t="prereq_terminal_hint">macOS: Terminal · Windows: PowerShell · Linux: bash</p>
         </div>
-        <div class="prereq-card reveal d2">
+        <div class="prereq-card reveal">
           <div class="prereq-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
           <h3 data-t="prereq_sys_title">System</h3>
           <p data-t="prereq_sys_desc">256 MB RAM minimum. Runs on a Raspberry Pi, NAS, home server, or any desktop machine.</p>
@@ -906,7 +922,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <div class="env-label"><span data-t="env_session_label">Session Secret</span> <span class="env-req" data-t="env_required">Required</span></div>
           <div class="env-desc" data-t="env_session_desc">Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value.</div>
         </div>
-        <div class="env-card reveal d1">
+        <div class="env-card reveal">
           <div class="env-name">DB_ENCRYPTION_KEY</div>
           <div class="env-label"><span data-t="env_db_label">Database Key</span> <span class="env-irrev" data-t="env_irreversible">Irreversible</span></div>
           <div class="env-desc" data-t="env_db_desc">Optional, and strongly recommended if the household will keep health or financial records. Encrypts the whole database with AES-256; generate with <code>openssl rand -hex 32</code>. Leave it empty and the database stays unencrypted. Set it and there is no way back: lose the value and the data can never be opened again, not by you and not by us.</div>
@@ -1605,11 +1621,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
       });
     });
 
-    /* Reveal. The `js` class is set in <head> now, before first paint. */
-    if ('IntersectionObserver' in window) {
-      var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('vis'); obs.unobserve(e.target); } }); }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
-      document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
-    } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); }); }
+    /* Arrivals (.reveal) are switched by assets/site.js, as on every page. */
 
 
     applyLang();

@@ -21,7 +21,8 @@
    text and is left alone. The theme button's name follows the same event.
 
    Since S2 it also switches the one back-to-top link and sizes the room the
-   code plates keep for their copy button (both at the end).
+   code plates keep for their copy button (both at the end), and since S3 it
+   arms the arrivals below the first screen (ARRIVALS, the last block).
 
    No innerHTML anywhere: only attributes and textContent change. */
 (function () {
@@ -125,4 +126,77 @@
     });
     document.querySelectorAll('.code-wrap > .copy-btn').forEach(function (b) { ro.observe(b); });
   }
+
+  /* ARRIVALS (assets/site.css, "Arrivals"). A .reveal candidate is armed
+     (.rv) only if it starts below the first screen: what the visitor sees on
+     arrival is never held back (S3 - the install guide's LCP paragraph used
+     to wait 600-750ms for this). Runs once, here at the end of the body,
+     before the page scrolls anywhere; rects are read before the first class
+     is written. Under reduced motion nothing is armed. With scroll-driven
+     animations the CSS plays the arrival on the scroll position; otherwise
+     an observer adds .vis once. With neither, nothing is armed, since
+     nothing would show it again.
+     A candidate inside a section the page defers (content-visibility: auto,
+     index.html) is NOT measured: its rect would force the very layout the
+     deferral saves. The section's own box stands in for it, and the row
+     columns (--i) are counted when the section starts to render. */
+  (function () {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var sda = !!(window.CSS && CSS.supports && CSS.supports('(animation-timeline: view()) and (animation-range: entry)'));
+    if (!sda && !('IntersectionObserver' in window)) return;
+    var fold = window.innerHeight, seen = new Map(), later = new Map(), armed = [];
+    function deferredBy(n) {
+      for (var p = n.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (!seen.has(p)) seen.set(p, getComputedStyle(p).contentVisibility === 'auto');
+        if (seen.get(p)) return p;
+      }
+      return null;
+    }
+    /* Column in its row: earlier candidate siblings on the same line. A
+       single-column list stays at 0 - no wave down a list. */
+    function columns(list) {
+      var rects = list.map(function (n) { return n.getBoundingClientRect(); });
+      list.forEach(function (n, k) {
+        var col = 0;
+        for (var p = n.previousElementSibling; p; p = p.previousElementSibling) {
+          var j = list.indexOf(p);
+          if (j >= 0 && Math.abs(rects[j].top - rects[k].top) < 4) col++;
+        }
+        if (col) n.style.setProperty('--i', Math.min(col, 5));
+      });
+    }
+    var direct = [];
+    Array.prototype.forEach.call(document.querySelectorAll('.reveal'), function (n) {
+      var host = deferredBy(n);
+      if (!host) { direct.push(n); return; }
+      if (!later.has(host)) later.set(host, []);
+      later.get(host).push(n);
+    });
+    var rects = direct.map(function (n) { return n.getBoundingClientRect(); });
+    var hostTop = new Map();
+    later.forEach(function (list, host) { hostTop.set(host, host.getBoundingClientRect().top); });
+    var below = direct.filter(function (n, k) { return rects[k].height && rects[k].top >= fold; });
+    armed.push.apply(armed, below);
+    later.forEach(function (list, host) {
+      if (hostTop.get(host) < fold) return;
+      armed.push.apply(armed, list);
+      host.addEventListener('contentvisibilityautostatechange', function once(e) {
+        if (e.skipped) return;
+        host.removeEventListener('contentvisibilityautostatechange', once);
+        columns(list);
+      });
+    });
+    columns(below);
+    armed.forEach(function (n) {
+      n.classList.add('rv');
+      if (n.matches('.gal-item, .fam-shot')) n.classList.add('rv-media');
+    });
+    if (sda || !armed.length) return;
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('vis'); obs.unobserve(e.target); }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    armed.forEach(function (n) { obs.observe(n); });
+  })();
 })();

@@ -3530,3 +3530,80 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const copy = swap('install.html', '</style>', '.to-top { position: fixed; right: 16px; }\n</style>');
   assert.deepEqual(sharedRuleCopies(copy), ['install.html: .to-top']);
 });
+
+// ── (20) Ankuenfte: nie im ersten Bildschirm, nie unter reduzierter Bewegung ──
+//
+// Bis S3 (Website-Kette 24.10.) startete JEDER .reveal-Kandidat bei opacity 0
+// und wartete auf den Observer seiner Seite - auch der Kopf der
+// Installationsanleitung im ersten Bildschirm. Dessen Absatz war das
+// LCP-Element und malte 600-750ms nach dem ersten Bild (gemessen 728ms
+// Desktop, 2.032ms am Telefon bei 4x CPU + Fast 4G). Seitdem gilt: `.reveal`
+// ist nur ein Kandidat und sichtbar; versteckt wird allein `.rv`, und das
+// setzt assets/site.js nur unterhalb des ersten Bildschirms und nie unter
+// reduzierter Bewegung. Jede versteckende oder scroll-gebundene Regel steht
+// in `prefers-reduced-motion: no-preference`.
+const MOTION_PROPS = /^(opacity|translate|scale|transform|animation|animation-name|animation-timeline)$/;
+
+function motionFindings(pages, siteCss, siteJs) {
+  const found = [];
+  const sheets = [['assets/site.css', siteCss], ...pages.flatMap(([p, h]) => inlineStyles(h).map((css) => [p, css]))];
+  for (const [where, css] of sheets) {
+    for (const r of eachRule(css)) {
+      if (r.selector.startsWith('@') || r.at.some((a) => /\bprint\b/.test(a))) continue;
+      const moving = declarations(r.body).filter(([n, v]) => MOTION_PROPS.test(n) && !/^(none|1|auto)(\s*!important)?$/.test(v));
+      const gated = r.at.some((a) => /prefers-reduced-motion:\s*no-preference/.test(a));
+      const sels = r.selector.split(',').map((s) => s.trim());
+      if (sels.some((s) => /\.reveal\b/.test(s)) && moving.some(([n, v]) => n !== 'opacity' || /^0(\.0*)?$/.test(v))) {
+        found.push(`${where}: ${r.selector} bewegt oder versteckt jeden Kandidaten (.reveal), auch im ersten Bildschirm`);
+      }
+      if (!gated && sels.some((s) => /\.rv\b/.test(s)) && moving.length) {
+        found.push(`${where}: ${r.selector} bewegt eine Ankunft (.rv) ausserhalb von prefers-reduced-motion: no-preference`);
+      }
+      if (!gated && moving.some(([n]) => n === 'animation-timeline')) {
+        found.push(`${where}: ${r.selector} bindet eine Animation an den Scroll ausserhalb von prefers-reduced-motion: no-preference`);
+      }
+    }
+  }
+  for (const [p, h] of pages) {
+    const scripts = (stripComments(h).match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []).join('\n');
+    if (/querySelectorAll\(\s*['"]\.reveal['"]\s*\)/.test(scripts)) found.push(`${p}: schaltet die Ankuenfte selbst statt assets/site.js`);
+  }
+  const arm = siteJs.indexOf("classList.add('rv')");
+  if (arm < 0) found.push('site.js: setzt keine Ankunft (.rv)');
+  else {
+    const before = siteJs.slice(0, arm);
+    if (!/prefers-reduced-motion: reduce\)'\)\.matches\) return;/.test(before.slice(before.lastIndexOf('ARRIVALS')))) found.push('site.js: schaltet Ankuenfte auch unter reduzierter Bewegung scharf');
+    if (!/top\s*>=\s*fold/.test(before) || !/fold\s*=\s*window\.innerHeight/.test(before)) found.push('site.js: schaltet Ankuenfte ohne Pruefung gegen den ersten Bildschirm scharf');
+  }
+  return found;
+}
+
+test('docs: keine Ankunft im ersten Bildschirm, reduzierte Bewegung schaltet alles ab', () => {
+  assert.deepEqual(motionFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Ankunfts-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  // Der alte Stand: jeder Kandidat startet unsichtbar, ganz oben im Blatt.
+  const old = css + '\n.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s, transform .6s; }\n';
+  assert.ok(hit(motionFindings(pages, old, js), /\.reveal bewegt oder versteckt jeden Kandidaten/));
+  // Eine Ankunft ohne die Bewegungsbremse.
+  const ungated = css + '\nhtml.js .rv:not(.vis) { opacity: 0; translate: 0 12px; }\n';
+  assert.ok(hit(motionFindings(pages, ungated, js), /bewegt eine Ankunft \(\.rv\) ausserhalb/));
+  // Ein Scroll-Effekt, der auch unter reduzierter Bewegung laeuft.
+  const sda = pages.map(([p, h]) => [p, p === 'index.html' ? h.replace('</style>', '.hero-frame { animation: x linear both; animation-timeline: view(); }\n</style>') : h]);
+  assert.ok(hit(motionFindings(sda, css, js), /index\.html: \.hero-frame bindet eine Animation an den Scroll/));
+  // Der alte Observer der Installationsseite.
+  const own = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('</body>', "<script>document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });</script>\n</body>") : h]);
+  assert.ok(hit(motionFindings(own, css, js), /install\.html: schaltet die Ankuenfte selbst/));
+  // site.js ohne Bremse und ohne Falz.
+  const always = js.replace("if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;", '');
+  assert.notEqual(always, js);
+  assert.ok(hit(motionFindings(pages, css, always), /auch unter reduzierter Bewegung/));
+  const everywhere = js.replace(/top\s*>=\s*fold/g, 'top >= -Infinity');
+  assert.notEqual(everywhere, js);
+  assert.ok(hit(motionFindings(pages, css, everywhere), /ohne Pruefung gegen den ersten Bildschirm/));
+});

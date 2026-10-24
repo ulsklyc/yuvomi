@@ -54,6 +54,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of some scrolling sideways, and the copy button no longer pushes the command down. The
   legal pages read as one column: the note, the contents and the tables end where the text ends,
   and the contents list lines up with the text below it.
+- **yuvomi.cloud shows its first screen at once and moves with more care.** Every block used to
+  slide up from below the same way, including the top of the install guide, whose title and
+  introduction painted well after the rest of the page - on a slow phone about a second later.
+  What is on screen when a page opens now stands there immediately; only what lies further down
+  arrives as you scroll. Headings and text fade in with a short rise, screenshots settle into
+  place, and cards in a row follow each other left to right. Where the browser supports it the
+  arrival follows the scroll position itself. On a wide screen the two devices of the opening
+  picture drift apart a little as you scroll past them. Buttons, tabs, copy buttons and the jump
+  menu answer a press the way the app does, the jump menu and the troubleshooting answers fold
+  open and closed instead of snapping, and the lower half of the landing page is laid out only
+  when it comes near. With reduced motion turned on, nothing moves and everything is visible.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

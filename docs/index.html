@@ -178,8 +178,28 @@
     .nav-jump { position: relative; margin-left: auto; margin-right: 14px; }
     .nav-jump summary { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px;
       border-radius: var(--r-full); border: 1px solid var(--border); background: none;
-      color: var(--text-2); font-size: 0.82rem; font-weight: 600; cursor: pointer; list-style: none; }
+      color: var(--text-2); font-size: 0.82rem; font-weight: 600; cursor: pointer; list-style: none;
+      transition: background-color var(--dur-hover), border-color var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
+    .nav-jump summary:active { transform: scale(var(--press-sm)); }
+    .nav-jump[open] summary { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
     .nav-jump + .nav-controls { margin-left: 0; }
+    /* Auf- und Zuklappen weich (S3): die Liste blendet ueber ::details-content
+       ein und aus - nur Deckkraft, denn ein translate auf dem Pseudo-Element
+       machte es zum Bezugsrahmen der absolut gesetzten Liste (mobil haengt
+       sie an der Leiste). Den kleinen Weg nach unten macht die Liste selbst.
+       content-visibility wechselt `allow-discrete`, also bleibt die Liste
+       beim Schliessen sichtbar, bis sie ausgeblendet ist. Ohne
+       ::details-content klappt sie wie bisher sofort. Escape schliesst sie
+       (Skript unten). */
+    @media (prefers-reduced-motion: no-preference) {
+      @supports selector(::details-content) {
+        .nav-jump::details-content { opacity: 0; transition: opacity .12s var(--ease-out), content-visibility .12s allow-discrete; }
+        .nav-jump[open]::details-content { opacity: 1; transition-duration: .2s; }
+        .nav-jump ul { transform-origin: 24px 0; transition: translate .2s var(--ease-out), scale .2s var(--ease-out); }
+        .nav-jump:not([open]) ul { translate: 0 -4px; scale: 0.98; }
+        @starting-style { .nav-jump[open] ul { translate: 0 -4px; scale: 0.98; } }
+      }
+    }
     .nav-jump summary::-webkit-details-marker { display: none; }
     .nav-jump summary:hover { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
     /* Wie jede .nav-btn der Leiste: durchsichtig, Haarlinie, Flaeche erst beim Hover. */
@@ -250,6 +270,30 @@
 
     /* ===== Section primitives ===== */
     section { position: relative; }
+    /* Seitenaufbau (S3): die fuenf Sektionen ab "Warum eine App" liegen bei
+       jeder Breite und Sprache unter dem ersten Bildschirm (gemessen ab
+       3.931px am Schirm, 4.419px am Telefon) - der Browser rechnet ihr Layout
+       erst, wenn sie in die Naehe kommen. Die Platzhalterhoehen sind die
+       gemessenen (en/de gemittelt), `auto` merkt sich danach die echte. Nicht
+       an Galerie, "Was es ersetzt" und Familie: die stehen am Schirm nah am
+       Falz, und die Familie traegt einen Lichthof, den die Paint-Containment
+       von content-visibility abschnitte. Der Scroll-Spy misst neu, sobald
+       eine Sektion zu rendern beginnt (contentvisibilityautostatechange). */
+    .handoff, .showcase, .longevity, .platforms, .cta { content-visibility: auto; }
+    /* Die Platzhalterhoehe gilt dem Inhalt, die Polsterung kommt dazu - also
+       gemessene Hoehe minus beide Sektionsabstaende. */
+    .handoff { contain-intrinsic-block-size: auto calc(1250px - 2 * var(--sec-m)); }
+    .showcase { contain-intrinsic-block-size: auto calc(2600px - 2px - 2 * var(--sec-s)); }
+    .longevity { contain-intrinsic-block-size: auto calc(990px - 2 * var(--sec-m)); }
+    .platforms { contain-intrinsic-block-size: auto calc(1590px - 2 * var(--sec-m)); }
+    .cta { contain-intrinsic-block-size: auto calc(670px - 2 * var(--sec-l)); }
+    @media (max-width: 860px) {
+      .handoff { contain-intrinsic-block-size: auto calc(1600px - 2 * var(--sec-m)); }
+      .showcase { contain-intrinsic-block-size: auto calc(2500px - 2px - 2 * var(--sec-s)); }
+      .longevity { contain-intrinsic-block-size: auto calc(1750px - 2 * var(--sec-m)); }
+      .platforms { contain-intrinsic-block-size: auto calc(2750px - 2 * var(--sec-m)); }
+    }
+
     .eyebrow {
       display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700;
       letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
@@ -338,6 +382,26 @@
       z-index: 2; overflow: hidden; background: var(--surface);
     }
     .hero-float img { width: 100%; display: block; aspect-ratio: var(--ar-phone); }
+    /* Der eine Signaturmoment der Seite (S3): die zwei Geraete der Collage
+       trennen sich, sobald der Hero den Bildschirm verlaesst. Das Dashboard
+       bleibt zurueck (+40px, ein Hauch kleiner), das Telefon davor zieht
+       schneller nach oben (-32px) - dieselbe Familie, zwei Bildschirme,
+       zwei Ebenen. Gebunden an die Scrollposition (view-timeline auf dem
+       unbewegten .hero-visual, Bereich `exit`), also beim Laden in Ruhe: das
+       LCP-Bild malt unbewegt. Nur `translate`/`scale`, nur am Schirm mit
+       zweispaltigem Hero (darunter faellt das Telefon weg, und das
+       Hochformat-Dashboard steht knapp ueber dem Hero-Rand, den
+       overflow:hidden schneidet). Ohne scroll-getriebene Animationen steht
+       die Collage still - Schmuck bekommt keinen Ersatz per Skript. */
+    @media (prefers-reduced-motion: no-preference) and (min-width: 1025px) {
+      @supports ((animation-timeline: view()) and (animation-range: entry)) {
+        @keyframes hero-stay { to { translate: 0 40px; scale: 0.985; } }
+        @keyframes hero-lift { to { translate: 0 -32px; } }
+        .hero-visual { view-timeline: --hero-shot; }
+        .hero-frame, .hero-float { animation: hero-stay linear both; animation-timeline: --hero-shot; animation-range: exit 0% exit 100%; }
+        .hero-float { animation-name: hero-lift; }
+      }
+    }
 
     /* ===== Proof bar ===== */
     .proof { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-alt); }
@@ -689,8 +753,10 @@
       margin: 32px auto 0; min-height: 44px; padding: 0 22px; width: max-content;
       background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
       border-radius: var(--r-full); box-shadow: var(--shadow-sm);
-      font-family: var(--ff); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+      font-family: var(--ff); font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      transition: border-color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
     html.js .mod-toggle:hover { border-color: var(--border-strong); }
+    html.js .mod-toggle:active { transform: scale(var(--press-sm)); }
     html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform .2s var(--ease-out); }
     /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu. */
     html.js .mod-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
@@ -735,6 +801,7 @@
        aber das der App: 1px Hub und die naechste Schattenstufe (wie deren
        klickbare Karten), nicht 4px Sprung unter einem lg-Schatten. */
     .plat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+    .plat-card:active { transform: scale(var(--press-lg)); transition-duration: var(--dur-press); }
     .plat-logo { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-md);
       background: color-mix(in srgb, var(--pc, var(--accent)) 12%, transparent); color: var(--pc, var(--accent)); }
     .plat-logo svg { width: 26px; height: 26px; fill: currentColor; }
@@ -949,7 +1016,7 @@
        invisible "Install Yuvomi" while the hero was still on screen. .to-top
        (site.css) does it the same way. */
     html.js .mobile-cta { opacity: 0; visibility: hidden; pointer-events: none;
-      transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out); }
+      transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out), transform var(--dur-press) var(--ease-out); }
     html.js .mobile-cta.show { opacity: 1; visibility: visible; pointer-events: auto; }
 
     /* ===== Responsive ===== */
@@ -1025,7 +1092,7 @@
         border: 0;
       }
       .mobile-cta svg { width: 18px; height: 18px; }
-      .mobile-cta:active { transform: translateX(-50%) scale(0.97); }
+      .mobile-cta:active { transform: translateX(-50%) scale(var(--press-lg)); }
       .nav-install { display: none; } /* the sticky pill replaces it on phones */
       /* Das Seitenende haelt die Fusszeile frei (--float-band, site.css), und
          Fokus-Scrollen dasselbe Band (scroll-padding-bottom, site.css). Der
@@ -1060,7 +1127,8 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
       }
-      .plat-card:hover { transform: none; }
+      .plat-card:hover, .plat-card:active, .nav-jump summary:active, html.js .mod-toggle:active { transform: none; }
+      .mobile-cta:active { transform: translateX(-50%); }
       /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
          wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
       .ho-token { display: none !important; }
@@ -1074,6 +1142,7 @@
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; }
       .site-bar, .hero-glow, .ho-token, .mod-toggle { display: none !important; }
+      .handoff, .showcase, .longevity, .platforms, .cta { content-visibility: visible; }
       /* Papier hat keinen Aufklapp-Knopf: jede Modulbeschreibung steht da. */
       .mod-card p { display: block !important; }
       .mod-list { display: contents !important; }
@@ -1196,8 +1265,8 @@
            (414 KB), sobald das Woerterbuch-Skript das erste Layout ausloeste -
            vor applyShots(), und in jedem Theme und jeder Sprache. -->
       <div class="hero-float">
-        <img class="sc" data-light="screenshots/shopping-light-mobile.png" data-dark="screenshots/shopping-dark-mobile.png" alt="Yuvomi shopping list on mobile" data-alt-t="alt_hero_m" loading="lazy" width="440" height="956">
-        <noscript><img class="sc" src="screenshots/shopping-light-mobile.png" alt="Yuvomi shopping list on mobile" loading="lazy" width="440" height="956"></noscript>
+        <img class="sc" data-light="screenshots/shopping-light-mobile.png" data-dark="screenshots/shopping-dark-mobile.png" alt="Yuvomi shopping list on mobile" data-alt-t="alt_hero_m" loading="lazy" decoding="async" width="440" height="956">
+        <noscript><img class="sc" src="screenshots/shopping-light-mobile.png" alt="Yuvomi shopping list on mobile" loading="lazy" decoding="async" width="440" height="956"></noscript>
       </div>
     </div>
   </div>
@@ -1615,7 +1684,7 @@
         </figcaption>
         <div class="gal-frame">
           <img class="sc" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
-          <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" width="900" height="675"></noscript>
+          <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" decoding="async" width="900" height="675"></noscript>
         </div>
       </figure>
       <figure class="gal-item reveal" style="--m: var(--m-calendar)">
@@ -1625,7 +1694,7 @@
         </figcaption>
         <div class="gal-frame">
           <img class="sc" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
-          <noscript><img class="sc" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" loading="lazy" width="900" height="675"></noscript>
+          <noscript><img class="sc" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" loading="lazy" decoding="async" width="900" height="675"></noscript>
         </div>
       </figure>
       <!-- Tasks and Budget used to sit here too, with the same two images the
@@ -1773,7 +1842,7 @@
            Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
       <div class="fam-shot reveal">
         <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
-        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" width="1400" height="1050"></noscript>
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
       </div>
       <div class="sec-head lead fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
@@ -1788,14 +1857,14 @@
             <p data-t="fam_1_d">Wall mode shows today’s plan and who is up, readable across the room. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.</p>
           </div>
         </li>
-        <li class="fam-item reveal d1">
+        <li class="fam-item reveal">
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
           <div class="fam-text">
             <h3 data-t="fam_2_t">The app on every phone</h3>
             <p data-t="fam_2_d">It goes on the home screen straight from the browser, no app store. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.</p>
           </div>
         </li>
-        <li class="fam-item reveal d2">
+        <li class="fam-item reveal">
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>
           <div class="fam-text">
             <h3 data-t="fam_3_t">An invite, and just the right access</h3>
@@ -1846,8 +1915,8 @@
             </ul>
           </div>
           <div class="feat-visual">
-            <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" width="440" height="956">
-            <noscript><img class="sc feat-phone" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" loading="lazy" width="440" height="956"></noscript>
+            <img class="sc feat-phone" data-light="screenshots/tasks-light-mobile.png" data-dark="screenshots/tasks-dark-mobile.png" alt="Tasks on mobile" data-alt-t="alt_f_tasks_m" loading="lazy" decoding="async" width="440" height="956">
+            <noscript><img class="sc feat-phone" src="screenshots/tasks-light-mobile.png" alt="Tasks on mobile" loading="lazy" decoding="async" width="440" height="956"></noscript>
           </div>
         </div>
           <div class="mod-list">
@@ -1888,8 +1957,8 @@
             </ul>
           </div>
           <div class="feat-visual">
-            <img class="sc feat-phone" data-light="screenshots/recipes-light-mobile.png" data-dark="screenshots/recipes-dark-mobile.png" alt="Recipes on mobile" data-alt-t="alt_f_recipes_m" loading="lazy" width="440" height="956">
-            <noscript><img class="sc feat-phone" src="screenshots/recipes-light-mobile.png" alt="Recipes on mobile" loading="lazy" width="440" height="956"></noscript>
+            <img class="sc feat-phone" data-light="screenshots/recipes-light-mobile.png" data-dark="screenshots/recipes-dark-mobile.png" alt="Recipes on mobile" data-alt-t="alt_f_recipes_m" loading="lazy" decoding="async" width="440" height="956">
+            <noscript><img class="sc feat-phone" src="screenshots/recipes-light-mobile.png" alt="Recipes on mobile" loading="lazy" decoding="async" width="440" height="956"></noscript>
           </div>
         </div>
           <div class="mod-list">
@@ -1941,8 +2010,8 @@
               </ul>
             </div>
             <div class="feat-visual">
-              <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
-              <noscript><img class="sc feat-phone" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" style="left:-20px;right:auto" loading="lazy" width="440" height="956"></noscript>
+              <img class="sc feat-phone" data-light="screenshots/health-vitals-light-mobile.png" data-dark="screenshots/health-vitals-dark-mobile.png" alt="Health vitals on mobile" data-alt-t="alt_f_health_m" loading="lazy" decoding="async" style="left:-20px;right:auto" width="440" height="956">
+              <noscript><img class="sc feat-phone" src="screenshots/health-vitals-light-mobile.png" alt="Health vitals on mobile" style="left:-20px;right:auto" loading="lazy" decoding="async" width="440" height="956"></noscript>
             </div>
           </div>
             <div class="mod-list">
@@ -1976,8 +2045,8 @@
               </ul>
             </div>
             <div class="feat-visual">
-              <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" style="left:-20px;right:auto" width="440" height="956">
-              <noscript><img class="sc feat-phone" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" style="left:-20px;right:auto" loading="lazy" width="440" height="956"></noscript>
+              <img class="sc feat-phone" data-light="screenshots/budget-light-mobile.png" data-dark="screenshots/budget-dark-mobile.png" alt="Budget on mobile" data-alt-t="alt_f_budget_m" loading="lazy" decoding="async" style="left:-20px;right:auto" width="440" height="956">
+              <noscript><img class="sc feat-phone" src="screenshots/budget-light-mobile.png" alt="Budget on mobile" style="left:-20px;right:auto" loading="lazy" decoding="async" width="440" height="956"></noscript>
             </div>
           </div>
           </div>
@@ -2082,13 +2151,13 @@
         <p data-t="plat_docker">Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.</p>
         <span class="plat-go"><span data-t="plat_guide">Guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
       </a>
-      <a class="plat-card reveal d2" style="--pc:#E57000" href="install.html#proxmox">
+      <a class="plat-card reveal" style="--pc:#E57000" href="install.html#proxmox">
         <span class="plat-logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill-rule="evenodd" clip-rule="evenodd"><path d="M2.5 4.5A1.5 1.5 0 0 1 4 3h16a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 20 10H4a1.5 1.5 0 0 1-1.5-1.5v-4zM6 5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM2.5 15.5A1.5 1.5 0 0 1 4 14h16a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 20 21H4a1.5 1.5 0 0 1-1.5-1.5v-4zM6 16.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg></span>
         <h3>Proxmox</h3>
         <p data-t="plat_proxmox">A Debian LXC with <code>nesting=1</code>, or a plain VM, running the Docker path.</p>
         <span class="plat-go"><span data-t="plat_guide">Guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
       </a>
-      <a class="plat-card reveal d2" style="--pc:#0095D5" href="install.html#truenas">
+      <a class="plat-card reveal" style="--pc:#0095D5" href="install.html#truenas">
         <span class="plat-badge" data-t="plat_oneclick">1-click</span>
         <span class="plat-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M24 10.049v5.114l-10.949 6.324v-5.114L24 10.049zm-24 0v5.114l10.956 6.324v-5.114L0 10.049zm12.004-.605l-4.433 2.559 4.433 2.559 4.429-2.559-4.429-2.559zm10.952-1.207l-9.905-5.723v5.118l5.473 3.164 4.432-2.559zm-12-.605V2.513L1.044 8.236l4.432 2.555 5.48-3.159z"/></svg></span>
         <h3>TrueNAS</h3>
@@ -2102,7 +2171,7 @@
         <p data-t="plat_umbrel">Available in the Umbrel App Store; everything stays on your Umbrel.</p>
         <span class="plat-go"><span data-t="plat_guide">Guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
       </a>
-      <a class="plat-card reveal d1" style="--pc:#FF8C2F" href="install.html#unraid">
+      <a class="plat-card reveal" style="--pc:#FF8C2F" href="install.html#unraid">
         <span class="plat-badge" data-t="plat_oneclick">1-click</span>
         <span class="plat-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.406 8.528h1.17v6.926h-1.17zM1.17 15.454H0V8.528h1.17zm4.534.828h1.17v2.645h-1.17zm-2.86-2.969h1.169v4.282h-1.17zm5.703 0h1.17v4.282h-1.17zM22.83 8.528H24v6.926h-1.17zm-4.534-.81h-1.17V5.073h1.17zm2.86 2.95h-1.169V6.406h1.17zm-5.72 0h-1.17V6.406h1.17z"/></svg></span>
         <h3>Unraid</h3>
@@ -2337,9 +2406,8 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     row.style.setProperty('--ho-dx', Math.round(x1 - x0) + 'px');
     row.style.setProperty('--ho-dy', Math.round(y1 - y0) + 'px');
   }
+  /* Die Ankuenfte (.reveal) schaltet assets/site.js fuer alle Seiten. */
   if ('IntersectionObserver' in window) {
-    var obs = new IntersectionObserver(function(entries){ entries.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('vis'); obs.unobserve(e.target); } }); }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
     /* Eigener, spaeterer Ausloeser: der Reveal feuert, sobald 8 % der Zeile im
        Bild sind - die Bewegung liefe dann am unteren Rand ab, wo noch niemand
        hinsieht. Sie startet erst, wenn die Zeile zu drei Fuenfteln steht. */
@@ -2347,7 +2415,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
        nacheinander statt im Gleichschritt - eine Erzaehlung, kein Blinken. */
     var hoObs = new IntersectionObserver(function(entries){ var k = 0; entries.forEach(function(e){ if (e.intersectionRatio >= 0.6){ measureHandoff(e.target); e.target.style.setProperty('--ho-delay', (k++ * 0.45) + 's'); e.target.classList.add('go'); hoObs.unobserve(e.target); } }); }, { threshold: [0.6] });
     document.querySelectorAll('.ho-row').forEach(function(el){ hoObs.observe(el); });
-  } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); }); }
+  }
   /* Sticky mobile Install pill: reveal only after the hero's own buttons scroll
      out of view, so it never duplicates the in-hero Install button. Beobachtet
      werden die Knoepfe, nicht der ganze Hero: der ist mobil samt Aufnahme
@@ -2546,6 +2614,13 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     }
     addEventListener('resize', function(){ measure(); sync(); });
     document.addEventListener('yuvomi:layout', function(){ measure(); sync(); });
+    /* Sektionen mit content-visibility (CSS "Seitenaufbau") stehen mit
+       Platzhalterhoehe da, bis sie rendern; dann verschieben sich die Marken
+       darunter. Das Ereignis blubbert nicht, also in der Capture-Phase. */
+    var cvRaf = 0;
+    document.addEventListener('contentvisibilityautostatechange', function(){
+      cancelAnimationFrame(cvRaf); cvRaf = requestAnimationFrame(function(){ measure(); sync(); });
+    }, true);
     addEventListener('scroll', sync, { passive: true });
     /* Nach applyShots/Reveals verschieben sich Hoehen; einmal spaet nachmessen. */
     addEventListener('load', function(){ measure(); sync(); });
