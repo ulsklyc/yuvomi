@@ -197,11 +197,25 @@ router.post('/', (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const recipeId = db.transaction(() => {
+      // Nutze authUserId aus dem Token oder session.userId; falls keines
+      // vorhanden ist, suche den Standard-Admin/Creator. Eine leere userId
+      // würde die FOREIGN KEY constraint für created_by verletzen.
+      let createdBy = req.authUserId || req.session?.userId;
+      if (createdBy == null) {
+        // Fallback: suche nach dem ersten Admin-Nutzer in der Datenbank
+        const admin = db.get().prepare(
+          'SELECT id FROM users WHERE role = "admin" LIMIT 1'
+        ).get();
+        createdBy = admin?.id;
+      }
+      if (createdBy == null) {
+        return res.status(400).json({ error: 'No user context available for recipe creation.', code: 400 });
+      }
       const result = db.get().prepare(`
         INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, created_by)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','),
-        vImage.value ?? null, req.authUserId || req.session.userId);
+        vImage.value ?? null, createdBy);
 
       const rid = Number(result.lastInsertRowid);
       const insertIng = db.get().prepare(`
