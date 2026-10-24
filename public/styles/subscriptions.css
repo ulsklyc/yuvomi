@@ -296,25 +296,19 @@
   font-size: var(--text-sm);
 }
 
+/* EIN KATEGORIEBALKEN IM BUDGET (R23, Critique G4 "drei Bauformen"). Die
+ * Abo-Aufteilung trug eine eigene: Name 14px in Primaertinte und abgeschnitten,
+ * 8px-Literal auf --color-surface-3, ein <i> mit width-Prozent im Modulton.
+ * Jetzt spricht sie die Sprache der Kategoriezeile der Uebersicht und
+ * Statistik (`.budget-bar-row`, budget.css): Name als Fussnote in
+ * Sekundaertinte, umbrechend statt gekappt; Bahn und Fuellung SIND deren
+ * Bausteine (die Bahn teilt sich die Regel mit `.budget-bar-row__track`, die
+ * Fuellung ist `.budget-bar-row__fill--expenses`, waechst per scaleX). */
 .subscriptions-chart-row__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subscriptions-chart-row__track {
-  display: block;
-  height: 8px;
-  overflow: hidden;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-3);
-}
-
-.subscriptions-chart-row__track i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--module-accent);
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .subscriptions-chart-row > strong {

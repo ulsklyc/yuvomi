@@ -254,7 +254,7 @@ function builtInRowHtml(row, position) {
   const hiddenClass = row.hidden && row.enabled ? ' settings-module-row--hidden' : '';
   return `
     <div class="settings-module-row settings-module-row--sortable ${stateClass}${lockedClass}${hiddenClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}"` : ''}>
-      <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${moduleAccentVar(row.id)}">
+      <div class="settings-module-row__icon" style="--module-row-accent:${moduleAccentVar(row.id)}">
         ${moduleIconHTML(row.icon)}
       </div>
       <div class="settings-module-row__body">
@@ -289,7 +289,7 @@ function kitchenRowHtml(row, position) {
   const hiddenClass = row.hidden && row.enabled ? ' settings-module-row--hidden' : '';
   return `
     <div class="settings-module-row settings-module-row--sortable settings-module-row--kitchen ${stateClass}${hiddenClass}" data-module-row-id="${esc(row.orderId)}" data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}">
-      <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${moduleAccentVar('kitchen')}">
+      <div class="settings-module-row__icon" style="--module-row-accent:${moduleAccentVar('kitchen')}">
         ${moduleIconHTML(row.icon)}
       </div>
       <div class="settings-module-row__body">
@@ -326,7 +326,7 @@ function thirdPartyRowHtml(row, position) {
   const errorClass = row.hasError ? ' settings-module-row--error' : '';
   return `
     <div class="settings-module-row settings-module-row--sortable ${stateClass}${errorClass}${row.sortable ? '' : ' settings-module-row--fixed'}" data-module-row-id="${esc(row.orderId)}"${row.sortable ? ` data-module-order-id="${esc(row.orderId)}" data-module-name="${esc(row.label)}"` : ''}>
-      <div class="settings-module-row__icon vivid-mark" style="--module-row-accent:${esc(row.accent) || DEFAULT_MODULE_ACCENT}">
+      <div class="settings-module-row__icon" style="--module-row-accent:${esc(row.accent) || DEFAULT_MODULE_ACCENT}">
         ${moduleIconHTML(row.icon)}
       </div>
       <div class="settings-module-row__body">

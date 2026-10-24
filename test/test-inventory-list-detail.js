@@ -416,7 +416,9 @@ test('E3: ein Chip zeigt nur seine Kategorie (nach Ort gruppiert) und ersetzt di
     assert.equal(hist.state?.path, '/inventory?category=electronics', 'der Router liest `path` bei popstate');
     const groups = inventory.visibleGroups();
     assert.deepEqual(groups.flatMap((g) => g.items.map((i) => i.id)).sort(), [42, 8].sort());
-    assert.ok(groups.every((g) => g.icon === 'map-pin'), 'unter einem Chip gruppiert der Ort - der Kategoriename stuende sonst doppelt');
+    // Die Gruppen nach Ort tragen die Ort-ID als Schluessel (oder "ohne Ort"), die nach
+    // Kategorie den Kategorienamen; das Ort-Zeichen gibt es seit R23 (D10) nicht mehr.
+    assert.ok(groups.every((g) => /^(\d+|__unlocated__)$/.test(g.key)), 'unter einem Chip gruppiert der Ort - der Kategoriename stuende sonst doppelt');
     inventory.selectCategory(null);
     assert.deepEqual(entries(), ['/inventory'], '„Alle" nimmt die Kategorie aus der Adresse');
     inventory.selectCategory('sports');

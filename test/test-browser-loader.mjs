@@ -241,6 +241,7 @@ const STUBS = {
       typeof globalThis.__constraintErrors === 'function' ? globalThis.__constraintErrors(...args) : []
     );
     export const mountFooter = () => null;
+    export const decorateFooterDelete = () => [];
     // Wer sehen will, WOHIN ein Formular sich legt (R19, Bearbeiten in der
     // Detailspalte), setzt globalThis.__dockNextModal.
     export const dockNextModal = (...args) => globalThis.__dockNextModal?.(...args);

@@ -247,7 +247,7 @@ function rowHtml(row) {
 
   return `
     <div class="settings-module-row settings-module-row--fixed${menuClass} ${stateClass}${row.hasError ? ' settings-module-row--error' : ''}" data-module-row-id="${esc(row.id)}">
-      <div class="settings-module-row__icon vivid-mark"${accentStyle}>
+      <div class="settings-module-row__icon"${accentStyle}>
         ${moduleIconHTML(row.icon)}
       </div>
       <div class="settings-module-row__body">

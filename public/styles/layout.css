@@ -1755,7 +1755,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   text-align: center;
   font-variant-numeric: tabular-nums;
   /* NEUTRAL, obwohl das Mehr-Blatt eine Mischstelle ist: die Herkunft nennt in
-   * dieser Zeile bereits das Vollton-Siegel davor. Die ZAHL nennt keine -
+   * dieser Zeile bereits das Zeichen in der Mulde davor. Die ZAHL nennt keine -
    * sie zaehlt (Skalen-Regel, Gegenrichtung). */
   background-color: var(--color-fill-well);
   color: var(--color-text-secondary);
@@ -1772,22 +1772,27 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   color: var(--color-accent);
 }
 
-/* Das Markensiegel traegt das Modul (Block 2): Vollton-Scheibe im
- * Familienton. Form und Material kommen vom .module-seal-Baustein; hier
- * stehen nur die Zeilengroesse und die Akzent-Weiterleitung. 32px in einer
- * 48px-Zeile - das Verhaeltnis der iOS-Einstellungen (29 in 44). */
+/* DAS MODULZEICHEN IN EINER LISTE IST DIE MULDE DER SEITENLEISTE (R23, D9).
+ * Hier stand bis R23 die Vollton-Scheibe des Markensiegels: dasselbe Modul
+ * hatte in der Seitenleiste eine getoente Mulde, im Mehr-Blatt eine Vollton-
+ * Scheibe, in der Kapsel das nackte Zeichen und in den Einstellungen eine
+ * Verlaufskachel - vier Formen fuer eine Bedeutung (Critique S-P2-2, G6-4).
+ * Eine Liste antwortet auf "wohin", nicht auf "woher": der Vollton bleibt den
+ * Absendern (Seitenkopf-Siegel, Widget, Palette), die Listen tragen die Mulde.
+ * Dieselbe Geste wie `.nav-sidebar .nav-item__icon-well`: 8 % Tinte im Grund
+ * (hell vertieft, dunkel gehoben), die Vertiefung eines Felds, das Zeichen im
+ * Modulton. 32px in einer 48px-Zeile - das Verhaeltnis der iOS-Einstellungen
+ * (29 in 44); das Zeichen 20px, wie 18 in der 26px-Mulde der Seitenleiste. */
 .more-item__icon-well {
-  --seal-accent: var(--item-module-accent, var(--color-text-secondary));
-  --seal-icon: var(--icon-md);
+  display: grid;
+  place-items: center;
   width: var(--target-sm);
   height: var(--target-sm);
   flex-shrink: 0;
-  /* Der Inset-Specular kommt aus den Tokens (haengt am
-   * --glass-inset-strength-Schalter und faellt unter
-   * prefers-reduced-transparency / prefers-contrast mit). */
-  box-shadow:
-    var(--glass-inset-elevated),
-    var(--glass-inset-bottom-base);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), transparent);
+  box-shadow: var(--glass-inset-input);
+  color: var(--item-module-accent, var(--color-text-secondary));
 }
 
 /* Aktives Modul (Sheet auf dieser Route geöffnet): Akzent-Ring am Siegel
@@ -1798,8 +1803,8 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 }
 
 .more-item__icon {
-  width: var(--icon-md);
-  height: var(--icon-md);
+  width: var(--icon-lg);
+  height: var(--icon-lg);
   flex-shrink: 0;
 }
 
@@ -7040,6 +7045,13 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   text-wrap: balance;
 }
 
+/* Der Titel als ruhiger Einstieg (modal.js: per Zeiger geoeffnet, kein Feld;
+ * Fingergeraete beim Wechsel nach "Bearbeiten"). Er ist kein Steuerelement -
+ * ein Ring um eine Ueberschrift verspraeche eine Bedienung, die es nicht gibt. */
+.modal-panel__title[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* DIE TITELKANTE STEHT, WIE LANG DER TITEL AUCH IST (Critique R21). Der Kopf
  * zentrierte seine Kinder senkrecht: ein einzeiliger Titel stand mittig neben
  * den 48px-Knoepfen (Oberkante 25px), ein zweizeiliger fuellte ihre Hoehe und
@@ -7716,11 +7728,15 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * #872 bleibt), und `min-width: 0` plus `overflow-wrap: anywhere` halten auch
  * das längste Wort im Fuß statt ihn nach links hinauszuschieben.
  *
+ * `--delete-worded` (R23): steht neben Loeschen hoechstens EINE beschriftete
+ * Aktion (die Leseansicht: [Loeschen][Icon][Bearbeiten]), ist Platz fuer das
+ * Wort - dort bleibt der Knopf, wie er am Desktop steht.
+ *
  * Die Grenze ist die kanonische Mobil-Grenze (tokens.css §11c, `--bp-mobile`),
  * nicht die „~430px" der Critique: jedes Telefon im Hochformat liegt darunter,
  * und eine eigene Zahl wäre der sechste Breakpoint der App. */
 @media (max-width: 639px) {
-  .modal-panel__footer .btn.modal-panel__delete {
+  .modal-panel__footer:not(.modal-panel__footer--delete-worded) .btn.modal-panel__delete {
     flex: none;
     width: var(--target-base);
     min-width: var(--target-base);
@@ -7733,12 +7749,12 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
     color: var(--color-danger);
   }
 
-  .modal-panel__footer .btn.modal-panel__delete:hover {
+  .modal-panel__footer:not(.modal-panel__footer--delete-worded) .btn.modal-panel__delete:hover {
     background: var(--color-danger-light);
     color: var(--color-danger-ink);
   }
 
-  .modal-panel__footer .modal-panel__delete .modal-panel__delete-label {
+  .modal-panel__footer:not(.modal-panel__footer--delete-worded) .modal-panel__delete .modal-panel__delete-label {
     position: absolute;
     width: 1px;
     height: 1px;

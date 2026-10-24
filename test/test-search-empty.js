@@ -51,7 +51,7 @@ test('gerendert: Chip mit escaptem Begriff, kein Begriff im Satz, ein Knopf', ()
 
 // Die Module mit Suchfeld bauen ihren Leerzustand ueber den Baustein - keiner
 // fuehrt mehr einen eigenen Titel, Satz oder Knopf fuer die leere Suche.
-const MODULES = ['tasks', 'pantry', 'recipes', 'documents', 'inventory', 'contacts', 'notes', 'birthdays'];
+const MODULES = ['tasks', 'pantry', 'recipes', 'documents', 'inventory', 'contacts', 'notes', 'birthdays', 'calendar'];
 test('jede Seite mit Suche nimmt den Baustein, kein eigener Dialekt', () => {
   for (const name of MODULES) {
     const page = read(`../public/pages/${name}.js`);
@@ -64,6 +64,9 @@ test('jede Seite mit Suche nimmt den Baustein, kein eigener Dialekt', () => {
   const tasks = read('../public/pages/tasks.js');
   assert.equal((tasks.match(/searchEmptyHTML\(/g) || []).length, 2, 'Aufgaben: Liste UND Brett');
   assert.doesNotMatch(tasks, /kanban-reset-search/, 'das Brett hat keinen eigenen Knopf mehr');
+  // R23 (Critique G1): der Kalender baute einen eigenen Satz plus "Neuer Termin"
+  // neben dem FAB.
+  assert.doesNotMatch(read('../public/pages/calendar.js'), /cal-search-empty-cta/, 'Kalender: kein zweiter Anlegeknopf in der leeren Suche');
 });
 
 test('die Chips stehen im globalen Blatt, aus Tokens', () => {

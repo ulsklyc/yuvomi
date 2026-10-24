@@ -1178,10 +1178,21 @@
    * AA ueber alle neun Familien, knappster Wert Gesundheit 4,51:1, Kontakte
    * 5,05, Dokumente 5,08, Uebersicht 5,16. Heller geht nicht: --_neutral-300
    * druckte Gesundheit auf 3,68. Guard: test-frontend-audit.js, "der
-   * Segmentdaumen ist heller als seine Bahn". */
+   * Segmentdaumen ist heller als seine Bahn".
+   *
+   * DUNKEL TRAEGT DER DAUMEN EINE KANTE (R23, Critique G6-1). 1,19:1 ist ein
+   * Abstand, kein Zustand: die Grenze des gewaehlten Segments muss als Grafik
+   * 3:1 halten (WCAG 1.4.11), und der Schatten, der hell die Kante zeichnet,
+   * ist auf Kohle wirkungslos. Die Kante ist die Feldkante
+   * (--color-border-control, #857F76): 3,16:1 gegen die Bahn #37332E. Heller
+   * fuellen geht nicht (siehe oben, die Tinte darauf), also zeichnet ein 1px-
+   * Innenring die Form. Hell bleibt der Ring durchsichtig - dort traegt der
+   * Schatten. Guard: test-frontend-audit.js, "der Segmentdaumen hat dunkel
+   * eine 3:1-Kante". */
+  --_seg-active-ring:  transparent;
   --_seg-active-bg:    var(--_color-surface);
   --seg-active-bg:     var(--_seg-active-bg);
-  --seg-active-shadow: var(--shadow-xs);
+  --seg-active-shadow: inset 0 0 0 1px var(--_seg-active-ring), var(--shadow-xs);
 
   /* --------------------------------------------------------
    * 7. Overlay / Backdrop
@@ -2399,6 +2410,8 @@
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
     /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
     --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
+    /* Und seine Kante (R23, G6-1): 3,16:1 gegen die Bahn. Als Hex = --color-border-control. */
+    --_seg-active-ring:    #857F76;
 
     --_sidebar-bg:           #221F1D;
     --_sidebar-shadow-light: rgba(255, 255, 255, 0.04);
@@ -2681,6 +2694,8 @@
     --_color-switch-off:   #948E85;  /* = --_neutral-500 */
     /* Der Segmentdaumen: eine Stufe UEBER der Bahn (#37332E), Begruendung im :root-Block. */
     --_seg-active-bg:      #443E37;  /* = --_neutral-250 */
+    /* Und seine Kante (R23, G6-1): 3,16:1 gegen die Bahn. Als Hex = --color-border-control. */
+    --_seg-active-ring:    #857F76;
 
     /* Sidebar */
     --_sidebar-bg:           #221F1D;

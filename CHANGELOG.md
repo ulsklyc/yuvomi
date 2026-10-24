@@ -47,6 +47,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Module icons in lists look the same everywhere.** The More sheet and the module lists in
+  Settings (Active modules, Navigation) now show each module's icon in the same soft tinted well
+  as the sidebar. Before, the More sheet used solid colour discs and Settings used gradient tiles,
+  so one module had four looks. Page headers, widgets and search keep the solid seal.
+- **Group headings in Shopping, Pantry and Inventory are words only.** The category and location
+  icons in front of each group heading are gone; they stay in the category manager and in pickers.
+- **The selected segment is easier to see in dark mode.** The chosen option in segmented controls
+  and tab bars now has a visible edge in the dark theme instead of a barely lighter fill.
+- **A loan card keeps its actions together.** "Book instalment" and the "More" button now sit side
+  by side at the bottom right of the card, where every other row in Budget keeps its actions.
+- **Subscription charts use the same bars as the rest of Budget.** "By category" and "By payment
+  method" now grow and look like the category bars in Overview and Statistics, and long names wrap
+  instead of being cut off.
+- **Delete keeps its word on the phone where there is room.** In the read view of a recipe,
+  contact or note, Delete now shows its label next to Edit instead of a bare red bin.
+- **A search in Calendar with no results looks like every other search.** It shows "No results",
+  the search term, and one button to clear the search, without a second "New event" button next
+  to the add button.
 - **One check mark for everything you tick off.** Subtasks (in the list, in the detail view and
   on the phone sheet) and checklists in notes and task descriptions now use the same round check
   as tasks, filled green with a tick when done; before, the same gesture had a square, a small
@@ -292,6 +310,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **Open tasks no longer look done in Calendar.** Task chips in week, day and agenda views showed
+  a ticked box; they now show the open circle that tasks use.
+- **Opening a document with a tap no longer rings the close button.** Dialogs without fields, like
+  the document viewer, put the focus on their title after a tap or click. With the keyboard the
+  close button still gets the focus and its ring.
 - **Health keeps the person you picked across all areas.** Choosing a family member in Vitals
   and then opening Medications showed your own data again, and a value could end up with the
   wrong person. The choice now holds for the whole Health module until the tab is closed, every

@@ -1185,17 +1185,19 @@ test('requestDeleteEvent() riegelt alle drei Serien-Löschwege ab', () => {
   assert.match(CAL_CODE, /function mayChangeEvent\(ev\) \{\s*if \(readOnly\(\) \|\| !ev\) return false;/);
 });
 
-test('Kalender: FAB und beide Leerzustands-CTAs hängen an readOnly()', () => {
+test('Kalender: FAB und der Leerzustands-CTA der Agenda hängen an readOnly()', () => {
   // Einen eigenen Kopfknopf gibt es nicht mehr (Re-Critique 2026-09-27, D3):
   // am Zeigergeraet dockt die Shell den FAB in den Kopf.
   assert.doesNotMatch(CAL_CODE, /toolbar-new-btn(?![\w-])/, 'kein zweiter Primaerknopf neben dem FAB');
   for (const [name, muster] of [
     ['der FAB', /\$\{readOnly\(\) \? '' : `\s*<button class="page-fab" id="fab-new-event"/],
     ['der Agenda-CTA', /action: readOnly\(\) \? undefined : \{ label: t\('calendar\.newEvent'\), attrs: \{ id: 'agenda-empty-cta' \} \}/],
-    ['der Such-CTA', /\$\{readOnly\(\) \? '' : `<button class="btn btn--secondary" id="cal-search-empty-cta">/],
   ]) {
     assert.match(CAL_CODE, muster, `${name} muss bei 'calendar: read' verschwinden`);
   }
+  // Die leere Suche traegt seit R23 keinen Anlegeknopf mehr (geteilter Baustein,
+  // "Suche zuruecksetzen" liest nur).
+  assert.doesNotMatch(CAL_CODE, /cal-search-empty-cta/, 'kein Anlegen in der leeren Suche');
 });
 
 test('Kalender-Detailansicht: Löschen, Zurücksetzen und Bearbeiten fallen weg, die Karte bleibt', () => {

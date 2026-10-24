@@ -70,7 +70,7 @@ import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } 
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
-import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, emptyHintHTML, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
 import { loadErrorSentence } from '/utils/friendly-error.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { isPermAdmin, moduleAccess } from '/permissions.js';
@@ -1578,8 +1578,13 @@ function holidaysOnDay(dateStr) {
  *  (interactive:false) ist die Tageszelle selbst der Drill-in-Button; die Chips
  *  sind dort nur visuelles Signal und dürfen kein eigenes role/tabindex tragen -
  *  sonst entsteht ein fokussierbarer Button im Zellen-Button (Audit P1).
- *  icon:false lässt das check-square-Icon weg: die Monats-Bars sind nach Kanon
- *  icon-frei, Woche/Tag/Agenda behalten es als Termin/Aufgabe-Unterscheidung. */
+ *  icon:false lässt das Zeichen weg: die Monats-Bars sind nach Kanon
+ *  icon-frei, Woche/Tag/Agenda behalten es als Termin/Aufgabe-Unterscheidung.
+ *  DAS ZEICHEN IST DER OFFENE RING (R23, Critique G1): hier stand
+ *  `check-square`, ein abgehaktes Kaestchen - eine offene Aufgabe sah im
+ *  Kalender erledigt aus. Der Kalender zeigt nur offene Aufgaben, also traegt
+ *  der Chip das Zeichen, das die Aufgabenliste fuer "offen" fuehrt: den leeren
+ *  Ring (`.check-ring`, D7). */
 const TASK_PRIORITY_KEYS = {
   urgent: 'tasks.priorityUrgent', high: 'tasks.priorityHigh',
   medium: 'tasks.priorityMedium', low: 'tasks.priorityLow',
@@ -1627,7 +1632,7 @@ function renderTaskChip(task, { interactive = true, icon = true } = {}) {
   return `<div class="cal-task-chip cal-task-chip--${priority}"
                data-task-id="${task.id}"${button}
                title="${label}${esc(timeStr)}">
-    ${icon ? '<i data-lucide="check-square" class="icon-sm" aria-hidden="true"></i>' : ''}
+    ${icon ? '<i data-lucide="circle" class="icon-sm" aria-hidden="true"></i>' : ''}
     ${dot}
     <span>${label}${esc(timeStr)}</span>
   </div>`;
@@ -6973,15 +6978,18 @@ function renderCalendarSearchState(kind) {
     body.insertAdjacentHTML('beforeend', renderSkeletonList({ rows: 5, lines: 2 }));
     setSearchLive(t('common.loading'));
   } else if (kind === 'empty') {
-    body.insertAdjacentHTML('beforeend', `
-      <div class="cal-search-status">
-        <i data-lucide="calendar-search" class="cal-search-status__icon" aria-hidden="true"></i>
-        <p class="cal-search-status__text">${esc(t('calendar.searchEmpty', { query: searchQuery }))}</p>
-        ${readOnly() ? '' : `<button class="btn btn--secondary" id="cal-search-empty-cta">${esc(t('calendar.newEvent'))}</button>`}
-      </div>`);
-    // Bewusst ohne newEventDate(): die Trefferliste ersetzt die Ansicht, es steht
-    // gerade kein Zeitraum auf dem Schirm, auf den ein Vorschlag sich beziehen könnte.
-    body.querySelector('#cal-search-empty-cta')?.addEventListener('click', () => openEventModal({ mode: 'create' }));
+    // DER EINE LEERZUSTAND DER SUCHE (R23, Critique G1/Q4): hier stand ein
+    // Eigenbau mit eigenem Satz und einem zweiten "Neuer Termin" neben dem FAB.
+    // Jetzt der Baustein: "Keine Treffer", der Begriff als Chip, "Suche
+    // zuruecksetzen" - zurueck in die Ansicht, der Fokus zurueck ins Feld.
+    // Der Satz mit dem Begriff bleibt der Live-Region (setSearchLive).
+    body.appendChild(searchEmptyEl({
+      query: searchQuery,
+      onReset: () => {
+        closeCalendarSearch();
+        _container?.querySelector?.('#cal-search-input')?.focus();
+      },
+    }));
     setSearchLive(t('calendar.searchEmpty', { query: searchQuery }));
   } else if (kind === 'error') {
     body.insertAdjacentHTML('beforeend', `

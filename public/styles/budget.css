@@ -1513,7 +1513,9 @@ button.budget-bar-row:focus-visible {
   }
 }
 
-.budget-bar-row__track {
+.budget-bar-row__track,
+.subscriptions-chart-row__track {
+  display: block;
   height: var(--space-2);
   /* Fill-Well statt Surface-2: der Track lag bei 1.02:1 auf der weißen Karte
    * und war als Bezugsgröße unsichtbar (Critique 2026-08-10). Der Well ist die
@@ -1871,6 +1873,16 @@ button.budget-bar-row:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* [Rate buchen][Mehr] an der rechten Kante, wie die Endzone jeder Zeile
+ * (R23, D10). Bei `budget: read` steht der Mehr-Knopf allein darin. */
+.budget-loan-card__endzone {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
 /* Keine Haarlinie ueber dem Abschnitt: die Raten stehen seit der Re-Critique

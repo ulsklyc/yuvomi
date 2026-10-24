@@ -258,11 +258,11 @@ function groupedItems(items) {
   const groups = [];
   for (const loc of state.locations) {
     const rows = byLocation.get(loc.id);
-    if (rows?.length) groups.push({ key: loc.id, label: locationLabel(loc.name), icon: loc.icon, items: rows });
+    if (rows?.length) groups.push({ key: loc.id, label: locationLabel(loc.name), items: rows });
   }
   const orphans = byLocation.get('none');
   if (orphans?.length) {
-    groups.push({ key: 'none', label: t('pantry.unlocated'), icon: 'package', items: orphans });
+    groups.push({ key: 'none', label: t('pantry.unlocated'), items: orphans });
   }
   return groups;
 }
@@ -680,8 +680,6 @@ function drawList(list) {
     if (group.label) {
       const heading = document.createElement('h2');
       heading.className = 'list-group__title';
-      heading.insertAdjacentHTML('beforeend',
-        `<i data-lucide="${esc(group.icon || 'package')}" class="icon-sm" aria-hidden="true"></i>`);
       const name = document.createElement('span');
       name.textContent = group.label;
       const count = document.createElement('span');
@@ -712,8 +710,8 @@ function drawList(list) {
 // 10" uebertoente die Fristen. Das Panel beantwortet jetzt nur, was nicht
 // warten kann; "Fast leer" bleibt Chip plus Warenkorb an der Zeile.
 const WATCH_SECTIONS = [
-  { key: 'expired', label: 'pantry.filterExpired', icon: 'circle-alert', tone: 'danger' },
-  { key: 'soon', label: 'pantry.filterSoon', icon: 'clock', tone: 'warning' },
+  { key: 'expired', label: 'pantry.filterExpired', tone: 'danger' },
+  { key: 'soon', label: 'pantry.filterSoon', tone: 'warning' },
 ];
 
 /**
@@ -778,7 +776,6 @@ function renderWatch() {
     el.className = 'list-group pantry-watch__group';
     const heading = document.createElement('h2');
     heading.className = 'list-group__title';
-    heading.insertAdjacentHTML('beforeend', `<i data-lucide="${esc(section.icon)}" class="icon-sm" aria-hidden="true"></i>`);
     const label = document.createElement('span');
     label.textContent = t(section.label);
     const count = document.createElement('span');

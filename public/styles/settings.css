@@ -3376,23 +3376,28 @@
   margin-inline-end: calc(-1 * (var(--space-3) + var(--target-base)));
 }
 
+/* DIE MULDE DER SEITENLEISTE, NICHT DIE VERLAUFSKACHEL (R23, D9). Hier stand
+ * eine `.vivid-mark`-Kachel mit Sheen-Verlauf, und das Zeichen fuellte sie
+ * randlos (100 %) - die vierte Form desselben Modulzeichens neben Mulde,
+ * Scheibe und nacktem Zeichen (Critique G6-4). Die Modulliste der
+ * Einstellungen ist eine Liste wie die Seitenleiste und das Mehr-Blatt: 8 %
+ * Tinte im Grund, die Vertiefung eines Felds, das Zeichen im Modulton und mit
+ * Luft (24px in 44px, das Verhaeltnis der Seitenleiste). Regel und Messung:
+ * layout.css, `.nav-sidebar .nav-item__icon-well`. */
 .settings-module-row__icon {
   display: grid;
   place-items: center;
   width: var(--target-base);
   height: var(--target-base);
   border-radius: var(--radius-md);
-  --seal-accent: var(--module-row-accent, var(--color-accent));
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-wash), transparent);
+  box-shadow: var(--glass-inset-input);
+  color: var(--module-row-accent, var(--color-accent));
 }
 
-/* Das Zeichen fuellt die Scheibe - es TAT das schon, aber aus Versehen: das
- * SVG hatte kein eigenes Mass und nahm deshalb die Breite dieser Box. Seit
- * #949 bringt jedes Modulzeichen sein Grundmass mit (24, wie der
- * Lucide-Rueckfall), damit es in einer flexiblen Zeile nicht mehr ausufert.
- * Diese Zeile schreibt fest, was hier vorher zufaellig herauskam. */
 .settings-module-row__icon .module-glyph {
-  inline-size: 100%;
-  block-size: 100%;
+  inline-size: var(--icon-xl);
+  block-size: var(--icon-xl);
 }
 
 .settings-module-row__body {

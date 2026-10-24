@@ -3945,15 +3945,6 @@ function renderLoanCard(loan) {
           <button type="button" class="budget-loan-card__open" data-loan-id="${loan.id}" aria-haspopup="dialog">
             <span class="budget-loan-card__title">${esc(loan.title)}</span>
           </button>
-          ${rowMenuHtml({
-    id: `budget-loan-menu-${loan.id}`,
-    label: t('common.moreActionsNamed', { name: loan.title }),
-    className: 'budget-loan-card__more',
-    items: [
-      { action: 'loan-filter', id: loan.id, icon: 'filter', label: t('budget.filterLoanTransactions'),
-        checked: state.loanFilterId === loan.id },
-    ],
-  })}
         </div>
         <div class="budget-loan-card__meta">${t(isBorrowedLoan(loan)
           ? 'budget.loanDirectionBorrowedBadge'
@@ -3995,6 +3986,11 @@ function renderLoanCard(loan) {
         ${/* EINE ZEILENBEDIENUNG (R14 P8): Bearbeiten und Loeschen stehen im
             * Bericht, den die Karte oeffnet (openLoanReport) - an der Karte
             * bleibt nur „Rate buchen". */ ''}
+        ${/* DIE ENDZONE DER KARTE IST DIE DER ZEILE (R23, Critique G4 "fuenf
+            * Endzonen"): [eine Handlung][Mehr], unten rechts. Der Mehr-Knopf
+            * stand zwischen Titel und Betrag, mitten in der Karte - an keiner
+            * Kante, an der eine Zeile, ein Konto oder ein Abo ihn fuehrt. */ ''}
+        <div class="budget-loan-card__endzone">
         ${readOnly() ? '' : `<div class="budget-loan-card__actions">
           ${/* Sekundaer, nicht primaer (Critique 2026-09-25): drei Darlehen
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
@@ -4003,6 +3999,16 @@ function renderLoanCard(loan) {
             ${t(isBorrowedLoan(loan) ? 'budget.loanBookInstallment' : 'budget.loanReceiveRepayment')}
           </button>
         </div>`}
+          ${rowMenuHtml({
+    id: `budget-loan-menu-${loan.id}`,
+    label: t('common.moreActionsNamed', { name: loan.title }),
+    className: 'budget-loan-card__more',
+    items: [
+      { action: 'loan-filter', id: loan.id, icon: 'filter', label: t('budget.filterLoanTransactions'),
+        checked: state.loanFilterId === loan.id },
+    ],
+  })}
+        </div>
       </div>
     </article>
   `;

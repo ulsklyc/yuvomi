@@ -503,14 +503,15 @@ function renderMetrics() {
  * Gruppiert nach Kategorie, in der Reihenfolge von state.categories
  * (DB-Sortierung), unbekannte Kategorien ans Ende - gleiches Muster wie
  * public/pages/shopping.js#groupItemsByCategory. Anders als dort liefert
- * die API bereits category_name/category_icon je Item mit (JOIN gegen
- * inventory_categories), also keine separate catIcon()-Nachschau noetig.
+ * die API bereits category_name je Item mit (JOIN gegen inventory_categories).
+ * Der Gruppentitel traegt kein Zeichen (R23, D10); das Kategorie-Icon steht
+ * im Kategorie-Verwalter und in der Auswahl.
  */
 function groupItemsByCategory(items) {
   const grouped = new Map();
   for (const item of items) {
     if (!grouped.has(item.category)) {
-      grouped.set(item.category, { key: item.category, name: itemCategoryLabel(item), icon: item.category_icon || 'package', items: [] });
+      grouped.set(item.category, { key: item.category, name: itemCategoryLabel(item), items: [] });
     }
     grouped.get(item.category).items.push(item);
   }
@@ -550,7 +551,7 @@ function groupItemsByLocation(items) {
     const root = item.location_id != null ? lookup.get(item.location_id) : null;
     const key = root ? String(root.id) : UNLOCATED_KEY;
     if (!grouped.has(key)) {
-      grouped.set(key, { key, name: root ? root.name : t('inventory.unlocated'), icon: 'map-pin', items: [] });
+      grouped.set(key, { key, name: root ? root.name : t('inventory.unlocated'), items: [] });
     }
     grouped.get(key).items.push(item);
   }
@@ -572,7 +573,6 @@ function renderGroupedItems(groups) {
   return groups.map((g) => `
     <div class="list-group" data-group-key="${esc(g.key)}">
       <div class="list-group__title">
-        <i data-lucide="${esc(g.icon)}" class="icon-sm" aria-hidden="true"></i>
         ${esc(g.name)}
         <span class="list-group__count">${g.items.length}</span>
       </div>

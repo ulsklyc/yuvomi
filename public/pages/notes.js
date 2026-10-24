@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext, decorateFooterDelete } from '/components/modal.js';
 import { wireCategoryScopeHelp } from '/components/category-manager.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
@@ -1050,6 +1050,9 @@ function openNoteModal({ mode, note = null }) {
         readerOnly.forEach((el) => { el.style.display = view === 'read' ? '' : 'none'; });
         deleteBtn?.classList.toggle('btn--danger-ghost', view === 'read');
         deleteBtn?.classList.toggle('btn--danger-outline', view !== 'read');
+        // Lesend steht Loeschen mobil mit Wort, im Editor als Papierkorb neben
+        // Abbrechen/Speichern (R23, modal.js `--delete-worded`).
+        decorateFooterDelete(deleteBtn?.closest('.modal-panel__footer') ?? null);
       }
 
       function animatePane(pane) {

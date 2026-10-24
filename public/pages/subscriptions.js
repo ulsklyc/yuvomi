@@ -999,8 +999,8 @@ function renderBreakdown(title, rows) {
       <div class="subscriptions-chart__card">
       ${rows.length ? `<ul class="subscriptions-chart-rows">${rows.map((row) => `
         <li class="subscriptions-chart-row">
-          <span class="subscriptions-chart-row__label" title="${esc(row.label)}">${esc(row.label)}</span>
-          <span class="subscriptions-chart-row__track" aria-hidden="true"><i style="width:${Math.round((row.amount / max) * 100)}%"></i></span>
+          <span class="subscriptions-chart-row__label">${esc(row.label)}</span>
+          <span class="subscriptions-chart-row__track" aria-hidden="true"><span class="budget-bar-row__fill budget-bar-row__fill--expenses" style="--bar-scale:${(row.amount / max).toFixed(4)}"></span></span>
           <strong>${money(row.amount)}</strong>
           <span class="subscriptions-chart-row__share">${percent.format(row.amount / total)}</span>
         </li>

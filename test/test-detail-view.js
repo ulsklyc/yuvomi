@@ -350,7 +350,7 @@ test('das Formular wartet auf die Erinnerungen, die Leseansicht nicht', async ()
 
 test('ein neuer Termin startet weiterhin direkt im Formular', async () => {
   const src = await calendarJs();
-  assert.match(src, /openEventModal\(\{ mode: 'create' \}\)/, 'der Anlege-Pfad bleibt unangetastet');
+  assert.match(src, /openEventModal\(\{ mode: 'create'[,}]/, 'der Anlege-Pfad bleibt unangetastet');
 });
 
 test('die Termin-Verdrahtung ist zweigeteilt', async () => {

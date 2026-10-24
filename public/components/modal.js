@@ -468,7 +468,41 @@ function _focusInitialUnlessClaimed(container, target, beimPlanen) {
   const gewaehlt = jetzt && jetzt !== beimPlanen
     && (container.contains(jetzt) || Boolean(jetzt.closest?.('[popover]')));
   if (gewaehlt) return;
+  // KEIN FOKUSRING AM SCHLIESSEN-KNOPF NACH EINEM TIPP (R23, Critique G4). Hat
+  // der Dialog kein Feld (Dokument-Betrachter, Leseansichten), fiel der
+  // Erstfokus auf das erste Fokussierbare - das X im Kopf -, und Chromium
+  // zeichnet nach einem Zeigerklick auf eine nicht fokussierbare Zeile fuer
+  // jeden Skript-Fokus den Ring: ein umrandetes X, das niemand angesteuert hat.
+  // Per Zeiger geoeffnet nimmt deshalb der Titel den Fokus (tabindex -1, ohne
+  // Ring, ein Screenreader liest ihn vor); per Tastatur geoeffnet - der
+  // Ausloeser zeigte seinen Ring - bleibt es beim X.
+  // `showModal()` hat das X schon fokussiert, bevor hier geplant wurde - die
+  // Geste steht deshalb am Dialog (_enterTopLayer); ohne ihn (Node-Sonden,
+  // Div-Rueckfall) zaehlt der Fokus beim Planen.
+  const keyboard = container.closest?.('dialog')?._openedByKeyboard ?? _openedByKeyboard(beimPlanen);
+  if (target.matches?.('.modal-panel__close') && !keyboard) {
+    const heading = container.querySelector?.('.modal-panel__title');
+    if (heading && typeof heading.focus === 'function') {
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+      heading.focus();
+      return;
+    }
+  }
   target.focus();
+}
+
+/** Zeigte der Ausloeser seinen Fokusring? Rueckfall ohne `<dialog>` (Sonden). */
+function _openedByKeyboard(el) {
+  try { return el?.matches?.(':focus-visible') === true; } catch { return false; }
+}
+
+// Die letzte Eingabeart: Zeiger oder Taste. Ohne jede Eingabe (ein Dialog, den
+// die App selbst oeffnet) gilt "Tastatur" - dann bleibt es beim X mit Ring,
+// wie bisher.
+let _lastInput = 'keyboard';
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('pointerdown', () => { _lastInput = 'pointer'; }, true);
+  document.addEventListener('keydown', () => { _lastInput = 'keyboard'; }, true);
 }
 
 /**
@@ -802,6 +836,11 @@ function _removeOverlay(overlay) {
  */
 function _enterTopLayer(overlay) {
   if (typeof overlay?.showModal === 'function' && !overlay.open && overlay.isConnected) {
+    // Die Geste VOR `showModal()` merken (R23, siehe _focusInitialUnlessClaimed):
+    // danach steht der Fokus schon auf dem X. Der Ring des vorher fokussierten
+    // Elements taugt nicht als Zeuge - nach einem Seitenwechsel traegt ihn die
+    // per Skript fokussierte Seitenwurzel auch nach einem Mausklick (gemessen).
+    overlay._openedByKeyboard = _lastInput === 'keyboard';
     overlay.showModal();
   }
   _syncTopLayerGuests();
@@ -1739,9 +1778,27 @@ export function decorateFooterDelete(footer) {
   // quetschten sie sich auf je ~80px. Dort bleibt der Umbruch aus #872, der
   // Papierkorb spart trotzdem eine Knopfbreite. Icon-Knöpfe (Archivieren im
   // Kontodialog) zählen nicht mit: sie brauchen nur ihre 44px.
+  // Ausgeblendete Knoepfe zaehlen nicht: die Notiz traegt Lese- und
+  // Editor-Fuss in EINER Zeile und blendet je Ansicht aus (notes.js ruft
+  // decorateFooterDelete nach jedem Wechsel erneut).
+  // Ebenso wenig der leise Knopf des Leseblatts, den detail-view.css mobil auf
+  // sein Symbol faltet (Duplizieren, Als vCard exportieren): er braucht dort
+  // nur seine 44px, wie ein Icon-Knopf.
+  const leseFuss = footer.classList.contains('detail-view__footer') && Boolean(footer.querySelector(':scope > .btn--primary'));
+  const faltetZumSymbol = (b) => leseFuss && b.classList.contains('btn--ghost')
+    && Boolean(b.querySelector(':scope > svg, :scope > i')) && Boolean(b.querySelector(':scope > .btn__label'));
   const labelled = [...footer.querySelectorAll('button')]
-    .filter((b) => !found.includes(b) && !b.classList.contains('btn--icon'));
+    .filter((b) => !found.includes(b) && !b.classList.contains('btn--icon') && !b.hidden && b.style?.display !== 'none'
+      && !faltetZumSymbol(b));
   footer.classList.toggle('modal-panel__footer--one-row', found.length > 0 && labelled.length <= 2);
+  // DAS WORT BLEIBT, WO PLATZ IST (R23, Critique G3/G5). Der Papierkorb ist
+  // die Antwort auf die DREIHEIT, die bei 390px nicht in eine Zeile passt. Die
+  // Leseansicht (Rezept, Kontakt, Notiz) traegt neben Loeschen nur EINE
+  // beschriftete Aktion ("Bearbeiten") und ein Icon - dort stand mobil ein
+  // nackter roter Papierkorb neben einem nackten Duplizieren, und das einzige
+  // Wort im Fuss war "Bearbeiten". Mit hoechstens einer beschrifteten Nachbarin
+  // behaelt Loeschen sein Wort (layout.css, `--delete-worded`).
+  footer.classList.toggle('modal-panel__footer--delete-worded', found.length > 0 && labelled.length <= 1);
   for (const btn of found) {
     if (btn.classList.contains('modal-panel__delete')) continue;
     btn.classList.add('modal-panel__delete');

@@ -41,11 +41,6 @@ import { reloadAfterSave } from '/utils/reload-after-save.js';
 // Konstanten
 // --------------------------------------------------------
 
-/** Icon für eine Kategorie (aus state.categories, Fallback 'tag'). */
-function catIcon(name) {
-  return state.categories.find((c) => c.name === name)?.icon ?? 'tag';
-}
-
 /** Kategorienamen in DB-Reihenfolge. */
 function categoryNames() {
   return state.categories.map((c) => c.name);
@@ -1436,7 +1431,6 @@ function renderItems(rowsHtml = (items, render) => items.map(render).join('')) {
                 aria-expanded="${collapsed ? 'false' : 'true'}" aria-controls="${rowsId}">
           <i data-lucide="chevron-down" aria-hidden="true"
              class="list-group__chevron${collapsed ? ' list-group__chevron--collapsed' : ''}"></i>
-          <i data-lucide="${catIcon(cat)}" class="icon-sm" aria-hidden="true"></i>
           <span>${esc(categoryLabel(cat))}</span>
         </button>
         <span class="list-group__count">${items.length}</span>
@@ -1450,7 +1444,7 @@ function renderItems(rowsHtml = (items, render) => items.map(render).join('')) {
 
 /**
  * Der Abschnitt „Abgehakt" (#1816): EINE Gruppe am Listenende, von Haus aus
- * zu. Dieselbe Grammatik wie ein Kategoriekopf - Knopf im h2, Winkel, Zeichen,
+ * zu. Dieselbe Grammatik wie ein Kategoriekopf - Knopf im h2, Winkel, Wort,
  * Zaehlstand -, damit er sich bedient wie die Gruppen darueber.
  *
  * DER ZAEHLSTAND GEHOERT ZUM NAMEN DES KNOPFS (`aria-labelledby` auf Wort und
@@ -1471,7 +1465,6 @@ function renderTickedSection(ticked) {
                 aria-labelledby="shopping-ticked-label shopping-ticked-count">
           <i data-lucide="chevron-down" aria-hidden="true"
              class="list-group__chevron${open ? '' : ' list-group__chevron--collapsed'}"></i>
-          <i data-lucide="check" class="icon-sm" aria-hidden="true"></i>
           <span id="shopping-ticked-label">${t('shopping.tickedSection')}</span>
         </button>
         <span class="list-group__count" id="shopping-ticked-count">${ticked.length}</span>

@@ -8816,6 +8816,32 @@ test('R18: der Segmentdaumen ist in jedem Theme heller als seine Bahn, und die M
   assert.deepEqual(findings, []);
 });
 
+// R23 (Critique G6-1, WCAG 1.4.11): heller als die Bahn reicht nicht - der
+// Daumen lag dunkel bei 1,19:1, die Grenze des gewaehlten Segments war keine
+// Grafik. Dunkel zeichnet ein 1px-Innenring die Form; er muss gegen jede Bahn
+// 3:1 halten, und der Schatten des Daumens muss ihn tragen.
+test('R23: der Segmentdaumen hat dunkel eine 3:1-Kante gegen seine Bahn (WCAG 1.4.11)', () => {
+  const TRACKS = ['--color-fill-well', '--color-surface-3'];
+  const tokens = read('../public/styles/tokens.css');
+  const rootShadow = tokens.match(/^\s*--seg-active-shadow\s*:\s*([^;]+);/m)?.[1] ?? '';
+  assert.match(rootShadow, /inset 0 0 0 1px var\(--_seg-active-ring\)/, '--seg-active-shadow traegt den Ring');
+  const findings = [];
+  let darks = 0;
+  for (const [theme, map] of r18ThemeMaps()) {
+    if (theme === 'light') continue;
+    darks += 1;
+    const ring = resolveColor('--_seg-active-ring', map);
+    if (!/^#[0-9a-f]{6}$/i.test(ring ?? '')) { findings.push(`${theme}: --_seg-active-ring ist keine Hex-Farbe (${ring})`); continue; }
+    for (const token of TRACKS) {
+      const track = resolveColor(token, map);
+      const ratio = contrastRatio(ring, track);
+      if (ratio + 0.005 < 3) findings.push(`${theme}: Kante ${ring} auf ${token} (${track}) ${ratio.toFixed(2)}:1`);
+    }
+  }
+  assert.equal(darks, 2, 'beide Dark-Bloecke gemessen');
+  assert.deepEqual(findings, []);
+});
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Der Schalterknopf spiegelt in RTL (#1572)
  *

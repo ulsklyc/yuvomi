@@ -1143,7 +1143,7 @@ test('ohne Cursor bleibt es bei heute', () => {
   assert(newEventDate('day', '', TODAY) === TODAY, 'leerer Cursor fällt auf heute zurück');
 });
 
-test('jedes „+" ohne angeklickten Tag reicht ein Datum durch (nur die Suche nicht)', () => {
+test('jedes „+" ohne angeklickten Tag reicht ein Datum durch', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
@@ -1151,11 +1151,12 @@ test('jedes „+" ohne angeklickten Tag reicht ein Datum durch (nur die Suche ni
   // deckt der Guard N Fundstellen ab statt der Regel, und ein neuer Knopf fiele
   // still durch.
   const creates = src.match(/openEventModal\(\{\s*mode:\s*'create'[^)]*\)/g) || [];
-  assert(creates.length >= 5, `zu wenige create-Aufrufe gefunden (${creates.length}) - Regex greift nicht mehr`);
+  assert(creates.length >= 4, `zu wenige create-Aufrufe gefunden (${creates.length}) - Regex greift nicht mehr`);
+  // Der einzige Weg ohne Datum war der Knopf im Leerzustand der Suche; seit R23
+  // zeigt die leere Suche den geteilten Baustein ohne zweiten Anlegeknopf.
   const withoutDate = creates.filter((call) => !/\bdate:/.test(call));
-  assert(withoutDate.length === 1,
-    `genau ein „+" darf ohne Datum öffnen (der Leerzustand der Suche, dort steht kein Zeitraum `
-    + `auf dem Schirm), gefunden: ${withoutDate.length} - ${withoutDate.join(' | ')}`);
+  assert(withoutDate.length === 0,
+    `jedes „+" oeffnet mit Datum, gefunden ohne: ${withoutDate.length} - ${withoutDate.join(' | ')}`);
 });
 
 // --------------------------------------------------------

@@ -4878,9 +4878,9 @@ function moreItemEl({ path, navHref, label, icon, module: mod, accent, navId }) 
   if (accent) a.style.setProperty('--item-module-accent', accent);
   else if (mod) a.style.setProperty('--item-module-accent', moduleAccentVar(mod));
   const well = document.createElement('div');
-  // Markensiegel (Block 2): das Well nimmt Form und Material vom Baustein,
-  // die Zeilengroesse und die Akzent-Weiterleitung stehen in layout.css.
-  well.className = 'module-seal more-item__icon-well';
+  // Die Mulde der Seitenleiste (R23, D9), kein Siegel: eine Liste nennt das
+  // Ziel, der Vollton gehoert den Absendern. Form und Ton stehen in layout.css.
+  well.className = 'more-item__icon-well';
   well.appendChild(moduleIconEl(icon, 'more-item__icon'));
   const span = document.createElement('span');
   span.className = 'more-item__label';

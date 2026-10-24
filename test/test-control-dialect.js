@@ -748,8 +748,10 @@ export function scanSettingsCheckbox(src, file) {
  * Lebendig und deshalb ausgenommen: `<i>` OHNE data-lucide, das die App selbst
  * als Balken bzw. Farbscheibe rendert (subscriptions.js).
  */
+// Der Abo-Balken (`.subscriptions-chart-row__track i`) stand hier bis R23; seit
+// er die Fuellung der Kategoriezeile ist (`.budget-bar-row__fill`), gibt es
+// die Regel nicht mehr.
 const LIVE_I_RULES = new Map([
-  ['.subscriptions-chart-row__track i', 'Balken: <i style="width:..."> in subscriptions.js (Diagrammzeile)'],
   ['.subscriptions-metadata-row__view > i', 'Farbscheibe: <i style="background:..."> in subscriptions.js (Kategorie)'],
 ]);
 const TYPE_I = /(?:^|[\s>+~(])i(?=$|[.:[\s>+~,)])/;
@@ -1227,7 +1229,7 @@ test('Scanner: dead-i-rule faengt die reine i-Regel und laesst den svg-Zweig und
     .a i { color: red; }
     .b > i { width: 1px; }
     .c i, .c svg { width: 2px; }
-    .subscriptions-chart-row__track i { height: 100%; }
+    .subscriptions-metadata-row__view > i { background: red; }
     .d .icon { color: blue; }
     @media (min-width: 1px) { .e i[data-lucide] { margin: 0; } }`;
   assert.deepEqual(scanDeadIRules(css).map((f) => f.what), ['.a i', '.b > i', '.e i[data-lucide]']);
@@ -2103,4 +2105,49 @@ test('N3: der Ziehplatz ist ein leerer Schlitz, das Ziehbild deckend, die Kurve 
   assert.match(sortable, /clone\.style\.opacity = ''/);
   assert.match(sortable, /easing: easingToken\('--ease-out'/);
   assert.doesNotMatch(sortable, /--ease-glass'/);
+});
+
+// Critique R23 (D10, G3/G4): ein Gruppentitel IN einer Liste ist Wort plus
+// Zaehlstand, ohne Zeichen. Einkauf, Vorrat und Inventar stellten das
+// Kategorie- bzw. Ort-Icon davor - gegen den Kanon "Ueberschrift ueber Inhalt"
+// (DESIGN.md, Icon vor dem Titel). Das Icon bleibt im Kategorie-Verwalter und in
+// den Auswahlen. Gelesen wird je Fundstelle von `list-group__title` bis zum
+// Zaehlstand; nur der Auf/Zu-Winkel darf darin stehen.
+test('D10: kein Gruppentitel einer Liste traegt ein Zeichen (nur der Auf/Zu-Winkel)', () => {
+  const files = ALL_FILES.filter((f) => /\/pages\/[^/]+\.js$/.test(f.split(sep).join('/')));
+  const offenders = [];
+  let sites = 0;
+  for (const path of files) {
+    const src = readFileSync(path, 'utf8');
+    for (const m of src.matchAll(/list-group__title/g)) {
+      const rest = src.slice(m.index, m.index + 700);
+      const end = rest.indexOf('list-group__count');
+      if (end < 0) continue;
+      sites += 1;
+      for (const icon of rest.slice(0, end).matchAll(/data-lucide="([^"]+)"/g)) {
+        if (icon[1] !== 'chevron-down') offenders.push(`${relative(REPO, path).split(sep).join('/')}: ${icon[1]}`);
+      }
+    }
+  }
+  assert.ok(sites >= 5, `Vorbedingung: der Scanner sieht die Gruppentitel (${sites})`);
+  assert.deepEqual(offenders, []);
+});
+
+// Critique R23 (G4 "Kategoriebalken drei Bauformen"): die Abo-Aufteilung baute
+// ihren Balken selbst (8px-Literal, --color-surface-3, <i> mit width-Prozent im
+// Modulton, Name abgeschnitten). Jetzt teilt sie Bahn und Fuellung mit der
+// Kategoriezeile von Uebersicht und Statistik.
+test('Kategoriebalken: die Abo-Aufteilung nimmt Bahn und Fuellung der Kategoriezeile (R23)', () => {
+  const subsJs = readFileSync(join(PUBLIC, 'pages/subscriptions.js'), 'utf8');
+  assert.match(subsJs, /class="subscriptions-chart-row__track" aria-hidden="true"><span class="budget-bar-row__fill budget-bar-row__fill--expenses" style="--bar-scale:/);
+  assert.doesNotMatch(subsJs, /<i style="width:/, 'kein eigener Balken per width');
+  const budget = [...eachRule(readFileSync(join(PUBLIC, 'styles/budget.css'), 'utf8'))];
+  const track = budget.find((r) => !r.at.length && /\.budget-bar-row__track\b/.test(r.selector) && /\.subscriptions-chart-row__track\b/.test(r.selector));
+  assert.ok(track, 'eine Regel fuer beide Bahnen');
+  assert.match(track.body, /background-color:\s*var\(--color-fill-well\)/);
+  const subs = [...eachRule(readFileSync(join(PUBLIC, 'styles/subscriptions.css'), 'utf8'))];
+  const own = subs.filter((r) => /\.subscriptions-chart-row__track\b/.test(r.selector) && /(?:height|background)\s*:/.test(r.body));
+  assert.deepEqual(own.map((r) => r.selector.trim()), [], 'keine zweite Bahn in subscriptions.css');
+  const label = subs.find((r) => r.selector.trim() === '.subscriptions-chart-row__label');
+  assert.doesNotMatch(label?.body ?? 'nowrap', /nowrap|ellipsis/, 'der Name bricht um, wie in der Kategoriezeile');
 });

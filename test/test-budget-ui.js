@@ -5615,7 +5615,8 @@ test('Anteil hinter dem Betrag: Ausgaben-Unterkategorien rechnen gegen die Summe
 
 test('Anteil hinter dem Betrag: die Bahn behaelt ihre Hoehe, es gibt keine Regel fuer Text darin', () => {
   const rules = [...eachRule(budgetCss)];
-  const track = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.budget-bar-row__track' && /height:/.test(r.body));
+  // Seit R23 teilt die Abo-Aufteilung die Regel der Bahn (Selektorliste).
+  const track = rules.find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim()).includes('.budget-bar-row__track') && /height:/.test(r.body));
   assert.match(track.body, /height:\s*var\(--space-2\)/);
   assert.equal(rules.some((r) => /__pct\b/.test(r.selector)), false, 'kein Anteil mitten in der Bahn');
   const share = rules.find((r) => r.selector.trim() === '.budget-bar-row__share');
