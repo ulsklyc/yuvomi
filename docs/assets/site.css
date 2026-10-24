@@ -550,6 +550,13 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
    at bar size, no glow. */
 .nav-install { background: var(--accent-fill); color: var(--accent-ink); border-color: transparent; }
 .nav-install:hover { background: var(--accent-fill-hover); color: var(--accent-ink); border-color: transparent; }
+/* The page you are on (S8). install.html marked its own Install button with
+   aria-current="page", and it looked exactly like the call to action on
+   every other page - a primary that leads nowhere. The current page wears
+   the tint instead of the fill: still the voice, no longer the push. Any
+   bar control may carry the mark. */
+.nav-btn[aria-current="page"], .nav-btn[aria-current="page"]:hover {
+  background: var(--accent-soft); color: var(--accent-on-soft); border-color: transparent; box-shadow: none; }
 /* Phones. Each step takes away only what is seen, never a name: the hidden
    labels stay in the accessibility tree (clip, not display: none). */
 @media (max-width: 700px) {
@@ -674,6 +681,10 @@ html { scroll-padding-bottom: var(--float-band); }
   opacity: 0; visibility: hidden; transform: translateY(8px);
   transition: opacity .2s var(--ease-out), transform .2s var(--ease-out), visibility .2s, border-color var(--dur-hover); }
 .to-top.show { opacity: 1; visibility: visible; transform: none; }
+/* Something to press lies under the pill (S8): a copy button, a tab, a
+   summary row. It steps aside until that control has scrolled past, rather
+   than covering it (assets/site.js, "BACK TO TOP"). Focus keeps it. */
+.to-top.show.yield:not(:focus-visible) { opacity: 0; visibility: hidden; transform: translateY(8px); }
 .to-top.show:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); }
 .to-top:hover { color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
 .to-top svg { width: 15px; height: 15px; }

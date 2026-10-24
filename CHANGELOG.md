@@ -112,6 +112,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skip link, the jump menu, "Back to top" and the other links within a page now move the keyboard
   focus to where they lead instead of leaving it at the top of the page. The shared script no
   longer holds up the pages while it loads.
+- **The install guide opens with the choice of platform.** The tabs for Docker, Proxmox, the web
+  installer, TrueNAS, Umbrel and the rest now follow the heading directly, on a laptop and on a
+  phone within the first screen; until now three cards with the requirements came first, and the
+  choice started a screen and a half down on a phone. The requirements are one line under the
+  tabs - "Docker or Podman, a terminal, 256 MB RAM" - that opens to the full text and the Docker
+  install links. The key decision stays in the steps, right before the first start. "Back to top"
+  steps aside while a copy button, a tab or another control lies under it, on all five pages.
+  The bar shows the page you are on: on the install guide its Install button is tinted instead
+  of filled. The legal pages use the site's type scale, and in their table of contents every
+  number and first line in a row stand at the same height.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
@@ -332,6 +342,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   System, Light, Dark, names the current and the next mode, and keeps the choice on all five
   pages. The install guide also applies a stored theme before it first paints instead of flashing
   the system one.
+- **The German install guide no longer jumps while it loads.** It painted in English and switched
+  to German only after the last byte, so on a slow connection the bar and the first section
+  moved. German texts are now in place before the first paint, as on the landing page. The German
+  headline keeps its dash at the end of the first line on a phone instead of opening the second.
 - **One name, one target in the website's bar.** "Install" in the landing page's bar led to the
   install guide, while the jump menu's "Install it" scrolled to the platform section; that entry is
   now "Where it runs". The language switch's accessible name now starts with the letters it shows

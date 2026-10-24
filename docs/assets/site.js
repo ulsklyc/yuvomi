@@ -110,13 +110,52 @@
 
   /* BACK TO TOP (assets/site.css, "Back to top"). Every page carries the
      link (#toTop); it shows once the first screen has scrolled away. One
-     threshold for all five pages instead of 600px here and 800px there. */
+     threshold for all five pages instead of 600px here and 800px there.
+     Two observers, no scroll handler (S8):
+     - a sentinel as tall as max(600px, the first screen) at the top of the
+       page: once it has left the viewport, the pill shows;
+     - every control of the page, watched through a root shrunk to the
+       pill's corner (rootMargin): while one of them lies there, the pill
+       yields (.yield). On a phone it covered copy buttons, tabs, the Podman
+       switch and summary rows in 17 of 104 scroll positions of the install
+       guide. The corner is re-measured when the pill's size changes
+       (language) and on resize. */
   var top = document.getElementById('toTop');
-  if (top) {
-    var syncTop = function () { top.classList.toggle('show', window.scrollY > Math.max(600, window.innerHeight)); };
-    addEventListener('scroll', syncTop, { passive: true });
-    addEventListener('resize', syncTop);
-    syncTop();
+  if (top && 'IntersectionObserver' in window) {
+    var sentinel = document.createElement('div');
+    sentinel.setAttribute('aria-hidden', 'true');
+    sentinel.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:max(600px,100vh);pointer-events:none;visibility:hidden';
+    document.body.prepend(sentinel);
+    new IntersectionObserver(function (entries) {
+      top.classList.toggle('show', !entries[entries.length - 1].isIntersecting);
+    }).observe(sentinel);
+
+    var under = new Set(), cornerObs = null, cornerKey = '';
+    var CONTROLS = 'a[href], button, summary, input, select, textarea, [tabindex="0"]';
+    var watchCorner = function () {
+      var r = top.getBoundingClientRect();
+      if (!r.width) return;
+      /* The pill's box plus air, measured from the viewport edges: 16px
+         above (hidden, it sits 8px lower - translateY), 8px to the left. */
+      var key = Math.round(innerHeight - r.top) + '|' + Math.round(innerWidth - r.left);
+      if (key === cornerKey) return;
+      cornerKey = key;
+      if (cornerObs) cornerObs.disconnect();
+      under.clear();
+      top.classList.remove('yield');
+      cornerObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) under.add(e.target); else under.delete(e.target); });
+        top.classList.toggle('yield', under.size > 0);
+      }, { rootMargin: -Math.max(0, Math.round(r.top - 16)) + 'px 0px 0px ' + -Math.max(0, Math.round(r.left - 8)) + 'px' });
+      Array.prototype.forEach.call(document.querySelectorAll(CONTROLS), function (el) {
+        if (el !== top && !top.contains(el)) cornerObs.observe(el);
+      });
+    };
+    watchCorner();
+    addEventListener('resize', watchCorner);
+    if ('ResizeObserver' in window) new ResizeObserver(watchCorner).observe(top);
+  } else if (top) {
+    top.classList.add('show');
   }
 
   /* IN-PAGE TARGETS (S7). A link to an anchor on the same page (skip link,

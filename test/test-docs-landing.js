@@ -1568,6 +1568,43 @@ test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut 
   assert.deepEqual(brokenGuideAnchors('installation.md#option-g-portainer', anchors), ['option-g-portainer']);
 });
 
+/**
+ * Die Wahl zuerst (S8, Re-Critique 24.10.). Die Plattformwahl ist der Zweck
+ * der Seite, und sie begann bei 1440x900 erst bei y=1426 und am Telefon nach
+ * anderthalb Bildschirmen: zwischen Hero und `#install` stand eine eigene
+ * Sektion mit drei Voraussetzungs-Karten. Jetzt folgt `#install` direkt auf
+ * den Hero, die Tab-Leiste steht vor den Voraussetzungen, und die
+ * Voraussetzungen sind eine Zeile (<details>) unter den Tabs.
+ */
+function choiceFirstFindings(html) {
+  const body = stripComments(html.split('</head>')[1] || html).replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ');
+  const found = [];
+  const heroEnd = body.indexOf('</header>', body.indexOf('class="hero"'));
+  const install = body.indexOf('id="install"');
+  const tabs = body.indexOf('role="tablist"');
+  const needs = body.indexOf('data-t="prereq_title"');
+  if (heroEnd < 0 || install < 0 || tabs < 0 || needs < 0) return ['Hero, #install, Tab-Leiste oder Voraussetzungen nicht gefunden - Muster veraltet?'];
+  if (/<section\b/.test(body.slice(heroEnd, body.lastIndexOf('<', install)))) found.push('zwischen Hero und #install steht eine Sektion');
+  if (needs < tabs) found.push('die Voraussetzungen stehen vor der Tab-Leiste');
+  return found;
+}
+
+test('install.html: die Plattformwahl folgt direkt auf den Hero, vor den Voraussetzungen', () => {
+  assert.deepEqual(choiceFirstFindings(read(INSTALL)), []);
+});
+
+test('der Wahl-zuerst-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Der Stand vor S8, im Gerippe.
+  const alt = '<head></head><body><header class="hero"><h1>Install</h1></header>'
+    + '<section id="prerequisites"><h2 data-t="prereq_title">What you need</h2></section>'
+    + '<section class="alt" id="install"><div class="tab-bar" role="tablist"></div></section>';
+  assert.deepEqual(choiceFirstFindings(alt), ['zwischen Hero und #install steht eine Sektion', 'die Voraussetzungen stehen vor der Tab-Leiste']);
+  // Ein Kommentar oder Skript zaehlt nicht als Struktur.
+  const ok = '<head></head><body><header class="hero"></header><!-- <section> -->'
+    + '<section id="install"><div role="tablist"></div><details><summary data-t="prereq_title">x</summary></details></section>';
+  assert.deepEqual(choiceFirstFindings(ok), []);
+});
+
 // ── (9) Die Modulsektion ist gegliedert wie das Menue der App ────────────────
 
 /**
@@ -2099,9 +2136,10 @@ test('der legal.css-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Der Anlass: ein Zwilling bekommt seinen Block zurueck.
   const back = { ...files, 'privacy.html': files['privacy.html'].replace('</head>', '<style>.toc { padding: 0; }</style>\n</head>') };
   assert.match(legalSheetFindings(back, legal).join('\n'), /privacy\.html: traegt wieder einen eigenen Style-Block/);
-  // Das Impressum kopiert eine geteilte Regel zurueck.
-  const dup = { ...files, 'impressum.html': files['impressum.html'].replace('</style>', 'h2 { font-size: 20px; }\n</style>') };
-  assert.match(legalSheetFindings(dup, legal).join('\n'), /impressum\.html: h2 \{ font-size: 20px \}/);
+  // Das Impressum kopiert eine geteilte Regel zurueck (der Wert ist der aus
+  // legal.css - seit S8 in rem statt px).
+  const dup = { ...files, 'impressum.html': files['impressum.html'].replace('</style>', 'h2 { font-size: 1.25rem; }\n</style>') };
+  assert.match(legalSheetFindings(dup, legal).join('\n'), /impressum\.html: h2 \{ font-size: 1\.25rem \}/);
   // Ein Rechtstext laedt das geteilte Blatt nicht mehr.
   const unlinked = { ...files, 'datenschutz.html': files['datenschutz.html'].replace('<link rel="stylesheet" href="assets/legal.css">', '') };
   assert.match(legalSheetFindings(unlinked, legal).join('\n'), /datenschutz\.html: laedt assets\/legal\.css nicht/);
@@ -2919,7 +2957,9 @@ test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () =
     .replace('pveam update&#10;', '').replace('pveam update\n', '')
     .replace(/docker-compose curl openssl/g, 'docker-compose-v2 curl openssl')
     .replace('"local:vztmpl/$TEMPLATE"', 'local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst')
-    .replace('<a href="#open">', '<a href="#docker">');
+    // Im Panel, nicht im Woerterbuch: das steht seit S8 VOR den Panels (fruehe
+    // Uebersetzung), und ein schlichtes replace traefe dort den ersten Treffer.
+    .replace(/(id="panel-proxmox"[\s\S]*?)<a href="#open">/, '$1<a href="#docker">');
   const px = proxmoxFindings(pxOld);
   for (const re of [/pveam update/, /docker-compose-v2/, /feste[rn]? Versionsnummer/, /Docker-Tab/]) assert.ok(hit(px, re), `Proxmox-Guard blind fuer ${re}: ${px.join(' | ')}`);
   // Ein Docker-Schritt, der im Proxmox-Panel fehlt, faellt auf.
