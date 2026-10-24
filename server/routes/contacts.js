@@ -463,6 +463,7 @@ router.delete('/categories/:key', (req, res) => {
  */
 const CONTACT_SELECT = `
   SELECT contacts.*,
+         (contacts.photo IS NOT NULL) AS has_photo,
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
          u.avatar_data   AS family_avatar_data,
@@ -548,7 +549,10 @@ router.get('/', (req, res) => {
     // `category` sonst mehrdeutig.
     sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
 
-    const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
+    const contacts = db.get().prepare(sql).all(...params).map((c) => {
+      const { photo, ...rest } = c;
+      return withBirthdayLink(req, rest);
+    });
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
@@ -572,6 +576,26 @@ router.post('/', (req, res) => {
     const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
     const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
     const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
+    // Photo validation (optional, data URL format)
+    let vPhoto = { value: undefined, error: null };
+    if (req.body.photo !== undefined) {
+      const photo = req.body.photo;
+      if (photo && typeof photo === 'string' && photo.trim().length > 0) {
+        // Validate data URL format
+        if (!photo.startsWith('data:')) {
+          vPhoto = { value: null, error: 'Photo must be a valid data URL.' };
+        } else {
+          // Check size (rough heuristic: data URLs over ~5MB are likely too large)
+          const base64Part = photo.split(',')[1];
+          if (base64Part) {
+            const sizeEstimate = (base64Part.length / 4 * 3 / 1024 / 1024);
+            if (sizeEstimate > 2) {
+              vPhoto = { value: null, error: 'Photo is too large (over 2MB).' };
+            }
+          }
+        }
+      }
+    }
     // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
     // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
     // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
@@ -579,7 +603,7 @@ router.post('/', (req, res) => {
     const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
     const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'Geburtstag', false));
     const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
-                      ...namePartChecks(nameParts.parts)];
+                      ...namePartChecks(nameParts.parts), vPhoto];
     const errors   = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
 
@@ -617,6 +641,20 @@ router.post('/', (req, res) => {
              nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
 
       const contactId = result.lastInsertRowid;
+
+      // Handle photo if provided
+      if (req.body.photo !== undefined) {
+        const photo = req.body.photo;
+        // Normalize: ensure it's a valid data URL
+        if (photo && typeof photo === 'string' && photo.trim().length > 0) {
+          // Ensure data URL format
+          if (!photo.startsWith('data:')) {
+            // Assume it's base64 and prepend data URL
+            photo = `data:image/jpeg;base64,${photo.trim()}`;
+          }
+          db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(photo, contactId);
+        }
+      }
 
       // Insert phones. value_e164 ist additiv (Phase 2): der rohe value bleibt die
       // Wahrheit; value_e164 wird nur gesetzt, wo parsebar (sonst NULL).
@@ -710,6 +748,27 @@ router.put('/:id', (req, res) => {
     if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
     if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
     if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
+    // Photo validation (optional, data URL format)
+    let vPhoto = { value: undefined, error: null };
+    if (req.body.photo !== undefined) {
+      const photo = req.body.photo;
+      if (photo && typeof photo === 'string' && photo.trim().length > 0) {
+        // Validate data URL format
+        if (!photo.startsWith('data:')) {
+          vPhoto = { value: null, error: 'Photo must be a valid data URL.' };
+        } else {
+          // Check size (rough heuristic: data URLs over ~5MB are likely too large)
+          const base64Part = photo.split(',')[1];
+          if (base64Part) {
+            const sizeEstimate = (base64Part.length / 4 * 3 / 1024 / 1024);
+            if (sizeEstimate > 2) {
+              vPhoto = { value: null, error: 'Photo is too large (over 2MB).' };
+            }
+          }
+        }
+      }
+    }
+    checks.push(vPhoto);
     // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
     // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
     // echten Geburtsjahr.
@@ -854,6 +913,23 @@ router.put('/:id', (req, res) => {
         `);
         for (const email of req.body.emails) {
           insertEmail.run(id, email.label, email.value, email.isPrimary ? 1 : 0);
+        }
+      }
+
+      // Handle photo if provided
+      if (req.body.photo !== undefined) {
+        const photo = req.body.photo;
+        // Normalize: ensure it's a valid data URL
+        if (photo && typeof photo === 'string' && photo.trim().length > 0) {
+          // Ensure data URL format
+          if (!photo.startsWith('data:')) {
+            // Assume it's base64 and prepend data URL
+            photo = `data:image/jpeg;base64,${photo.trim()}`;
+          }
+          db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(photo, id);
+        } else if (photo === null || photo === '') {
+          // Explicitly remove photo
+          db.get().prepare('UPDATE contacts SET photo = NULL WHERE id = ?').run(id);
         }
       }
 
@@ -1013,6 +1089,23 @@ router.get('/:id/vcard', (req, res) => {
     res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(vcf);
+  } catch (err) {
+    log.error('', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+  }
+});
+
+/**
+ * GET /api/v1/contacts/:id/photo
+ * Kontakt-Foto als Daten-URL zurückliefern.
+ * Response: { data: { photo: string|null } }
+ */
+router.get('/:id/photo', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const contact = db.get().prepare('SELECT photo FROM contacts WHERE id = ?').get(id);
+    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+    res.json({ data: { photo: contact.photo || null } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

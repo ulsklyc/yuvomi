@@ -2194,6 +2194,92 @@
 }
 
 /* ================================================================
+ * color-mix() fallback for old browsers (Chrome < 111) (#2184)
+ *
+ * color-mix() is not supported in Chrome < 111. On old browsers the declaration
+ * wins the cascade but computes to initial/transparent. We use @supports to
+ * provide plain fallbacks that old browsers apply, while modern browsers skip
+ * this block and use the color-mix() versions.
+ * ================================================================ */
+@supports not (color: color-mix(in srgb, red, red)) {
+  :root {
+    /* Brand field - plain gradient with solid stops instead of color-mix */
+    --brand-field:
+      radial-gradient(circle 24rem at calc(50% - 13rem) calc(50% - 12rem),
+        var(--brand-mark-from) 0%,
+        var(--brand-mark-from) 10%,
+        var(--brand-mark-from) 20%,
+        var(--brand-mark-from) 30%,
+        var(--brand-mark-from) 40%,
+        var(--brand-mark-from) 50%,
+        var(--brand-mark-from) 60%,
+        var(--brand-mark-from) 70%,
+        var(--brand-mark-from) 80%,
+        var(--brand-mark-from) 90%,
+        transparent 100%),
+      radial-gradient(circle 22rem at calc(50% + 15rem) calc(50% - 1rem),
+        var(--brand-mark-to) 0%,
+        var(--brand-mark-to) 10%,
+        var(--brand-mark-to) 20%,
+        var(--brand-mark-to) 30%,
+        var(--brand-mark-to) 40%,
+        var(--brand-mark-to) 50%,
+        var(--brand-mark-to) 60%,
+        var(--brand-mark-to) 70%,
+        var(--brand-mark-to) 80%,
+        var(--brand-mark-to) 90%,
+        transparent 100%),
+      radial-gradient(circle 23rem at calc(50% - 1rem) calc(50% + 17rem),
+        var(--brand-mark-from) 0%,
+        var(--brand-mark-from) 10%,
+        var(--brand-mark-from) 20%,
+        var(--brand-mark-from) 30%,
+        var(--brand-mark-from) 40%,
+        var(--brand-mark-from) 40%,
+        var(--brand-mark-from) 60%,
+        var(--brand-mark-from) 70%,
+        var(--brand-mark-from) 80%,
+        var(--brand-mark-from) 90%,
+        transparent 100%);
+
+    /* Chart texture ink - plain semi-transparent surface color */
+    --chart-texture-ink: var(--color-surface);
+  }
+
+  /* Primary buttons */
+  .btn--primary {
+    background-color: var(--color-accent);
+  }
+
+  /* Selected states - sidebar, tabs, filter chips, segmented controls */
+  .nav-sidebar__indicator,
+  .sub-tab--active,
+  .filter-chip--active,
+  .segmented__item.is-active,
+  .tasks-card.is-selected {
+    background-color: var(--color-accent-subtle);
+  }
+
+  /* Modal/dialog overlays - plain dark overlay */
+  .modal-overlay,
+  dialog.modal-overlay::backdrop,
+  dialog.dialog-surface::backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  /* Search overlay background */
+  .search-overlay {
+    background: var(--color-bg);
+  }
+
+  /* Loading placeholders */
+  .skeleton,
+  .empty-state__icon {
+    background: var(--color-surface-hover);
+  }
+}
+
+/* ================================================================
  * Desktop-Gutter
  *
  * Ab der App-Layout-Grenze (--bp-desktop) atmet der Seitenrand auf

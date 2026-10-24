@@ -202,22 +202,7 @@ const HINTS = {
  * Enden geprueft: der Verstoss muss noch bestehen (sonst ist sie ueberfluessig)
  * und der Anlass auch (sonst gehoert der Rueckfall hinein).
  */
-const EXCEPTIONS = [
-  {
-    file: 'public/styles/dashboard.css',
-    selector: '.wall',
-    declaration: 'min-height: 100dvh',
-    reason: 'Wand-Modus, kein kritischer Pfad. Ein Zwilling `min-height: 100vh` waere die einzige '
-      + 'vh-Einheit in den Wand-Regeln, und die verbietet der Wand-Guard in '
-      + 'test-frontend-audit.js aus gemessenem Grund: eine Wand kann nicht gescrollt werden, und '
-      + 'auf einem mobilen Browser ohne dvh ist 100vh die GROSSE Fensterhoehe - sie schoebe '
-      + 'Datenstand und Ausstieg unter die Adressleiste, genau den Fehler, den der Wand-Guard '
-      + 'festhaelt. Ohne min-height ist die Wand so hoch wie ihr Inhalt, und nichts faellt heraus. '
-      + 'Die Wand braucht ohnehin @container (Chrome 105).',
-    stillValid: () => read('test/test-frontend-audit.js')
-      .includes("test('die Distanzskala der Wand haengt an der KNAPPEN Seite, nicht an der Hoehe'"),
-  },
-];
+const EXCEPTIONS = [];
 const isException = (file, finding) => EXCEPTIONS.some((ex) => ex.file === file
   && ex.selector === finding.selector && norm(ex.declaration) === norm(finding.declaration));
 

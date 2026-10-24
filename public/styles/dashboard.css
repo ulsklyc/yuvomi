@@ -5810,10 +5810,16 @@ button.today-cockpit__more--link {
   padding: 0;
   margin: 0;
   max-width: none;
+  /* Stretch to fill the app shell height (which uses the vh chain:
+   * 100vh / -webkit-fill-available / 100dvh). This works on all browsers
+   * including Chrome < 108 where dvh is unsupported. */
+  height: 100%;
 }
 
 .dashboard--wall .dashboard-shell {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   gap: 0;
 }
 
@@ -5843,7 +5849,8 @@ button.today-cockpit__more--link {
   display: flex;
   flex-direction: column;
   gap: var(--wall-gap);
-  min-height: 100dvh;
+  flex: 1;
+  min-height: 0;
   padding: var(--wall-pad);
   background: var(--color-bg);
   /* Container statt Viewport-Breakpoint (Token-Doktrin §11c): die Fläche fragt

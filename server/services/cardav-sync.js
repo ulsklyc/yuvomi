@@ -244,10 +244,12 @@ function parseVCard(vCardText) {
       }
 
       case 'PHOTO':
-        // Handle base64 encoded photos
+        // Handle base64 encoded photos - store as data URL for frontend use
         if (params.some(p => p.toUpperCase().includes('ENCODING=BASE64') || p.toUpperCase().includes('ENCODING=B'))) {
           // Photo might span multiple lines in old vCard format
-          vcard.photo = value;
+          // Convert to data URL format: data:image/jpeg;base64,...
+          // We assume image/jpeg as default, the frontend can use it directly
+          vcard.photo = `data:image/jpeg;base64,${value}`;
         }
         break;
 
