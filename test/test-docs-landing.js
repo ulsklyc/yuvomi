@@ -3281,7 +3281,7 @@ function sharedBarFindings(pages, siteCss, legalCss) {
   const bar = rules.find((r) => r.selector === '.topbar' && !r.at.length);
   if (!bar) found.push('site.css: .topbar fehlt');
   else {
-    for (const [re, what] of [[/position:\s*fixed/, 'fest'], [/height:\s*var\(--bar-h\)/, 'Hoehe --bar-h'], [/background:\s*var\(--glass-bg\)/, 'Glasflaeche'], [/(?:^|[;\s])backdrop-filter:\s*var\(--glass-blur\)/, 'Glas-Blur']]) {
+    for (const [re, what] of [[/position:\s*fixed/, 'fest'], [/height:\s*var\(--bar-h\)/, 'Hoehe --bar-h'], [/background:\s*var\(--bar-glass-bg\)/, 'Glasflaeche'], [/(?:^|[;\s])backdrop-filter:\s*var\(--glass-blur\)/, 'Glas-Blur']]) {
       if (!re.test(bar.body)) found.push(`site.css: .topbar nicht ${what}`);
     }
   }
@@ -3335,6 +3335,8 @@ function glassFallbackFindings(siteCss, sheets) {
     if (!sels.includes(':root') || !sels.includes(':root:not([data-theme="light"])')) found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) schlaegt nicht beide Dark-Listen (Selektoren: ${r.selector})`);
     const d = Object.fromEntries(declarations(r.body));
     if (d['--glass-bg'] !== 'var(--surface)') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst --glass-bg durchscheinend (${d['--glass-bg']})`);
+    // Die Leiste liest seit S11 ihr eigenes, dichteres Glas (--bar-glass-bg).
+    if (d['--bar-glass-bg'] !== 'var(--surface)') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst --bar-glass-bg durchscheinend (${d['--bar-glass-bg']})`);
     if (d['--glass-blur'] !== 'none') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst den Blur an (${d['--glass-blur']})`);
   }
   for (const { where, css } of sheets) {
@@ -3446,7 +3448,7 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
   const lf = sharedBarFindings(pages, read('assets/site.css'), legalOld);
   assert.ok(hit(lf, /eigene Kopfleiste zurueck/) && hit(lf, /legal\.css: \.nav-logo steht schon/), lf.join(' | '));
-  const opaque = read('assets/site.css').replace('  background: var(--glass-bg);\n  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);\n  border-bottom', '  background: var(--surface);\n  border-bottom');
+  const opaque = read('assets/site.css').replace('  background: var(--bar-glass-bg);\n  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);\n  border-bottom', '  background: var(--surface);\n  border-bottom');
   assert.notEqual(opaque, read('assets/site.css'));
   assert.ok(hit(sharedBarFindings(pages, opaque, read('assets/legal.css')), /nicht Glasflaeche/));
   // Der erste Entwurf dieser Runde: das Glas am <header> - die Pille sprang nach oben.
@@ -3472,6 +3474,10 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.notEqual(weak, site);
   assert.ok(hit(glassFallbackFindings(weak, []), /schlaegt nicht beide Dark-Listen/));
   assert.ok(hit(glassFallbackFindings(site, [{ where: 'x', css: '.time-badge { backdrop-filter: blur(18px); }' }]), /liest --glass-blur nicht/));
+  // Die Leiste bleibt unter mehr Kontrast durchscheinend: ihr eigenes Glas fehlt im Fallback.
+  const barSeeThrough = site.replace(/(@media \(prefers-contrast: more\) \{[^}]*?)\n\s*--bar-glass-bg: var\(--surface\);/, '$1');
+  assert.notEqual(barSeeThrough, site);
+  assert.ok(hit(glassFallbackFindings(barSeeThrough, []), /prefers-contrast: more\) laesst --bar-glass-bg durchscheinend/));
   // Karte und GitHub-Name: der alte 4px-Hub und das alte display:none.
   const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
   assert.notEqual(lift, html);
@@ -3651,6 +3657,12 @@ function rhythmFindings(pages, siteCss, siteJs) {
     const body = stripComments(html);
     const links = body.match(/<a class="to-top"[^>]*id="toTop"/g) || [];
     if (links.length !== 1) found.push(`${page}: ${links.length}x <a class="to-top" id="toTop">`);
+    // In einer Landmark (S11): nach </footer> stand er ausserhalb jeder, axe
+    // meldete "region" auf allen fuenf Seiten. Er wohnt in der Fusszeile;
+    // fixed haelt ihn trotzdem in der Ecke (die Fusszeile bildet keinen
+    // Containing Block: kein transform, filter oder contain).
+    const foot = (body.match(/<footer class="site-foot">[\s\S]*?<\/footer>/) || [''])[0];
+    if (links.length === 1 && !/<a class="to-top"[^>]*id="toTop"/.test(foot)) found.push(`${page}: der Nach-oben-Knopf steht ausserhalb der Fusszeile (keine Landmark, axe "region")`);
     const scripts = (body.match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []).join('\n');
     if (/toTop/.test(scripts)) found.push(`${page}: schaltet den Nach-oben-Knopf selbst (gehoert nach site.js)`);
   }
@@ -3691,6 +3703,10 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     "<script>(function(){ var b = document.getElementById('toTop'); })();</script>\n<script src=\"assets/site.js\" defer></script>");
   assert.notDeepEqual(own, pages);
   assert.ok(hit(rhythmFindings(own, css, js), /privacy\.html: schaltet den Nach-oben-Knopf selbst/));
+  // Der Knopf rutscht wieder hinter </footer>, ausserhalb jeder Landmark.
+  const outside = swap('impressum.html', /(\s*<a class="to-top"[^\n]*<\/a>)\n<\/footer>/, '\n</footer>$1');
+  assert.notDeepEqual(outside, pages);
+  assert.ok(hit(rhythmFindings(outside, css, js), /impressum\.html: der Nach-oben-Knopf steht ausserhalb der Fusszeile/));
   // Zwei Pillen am Telefon.
   const two = css.replace(/html:not\(\.pill-end\) body:has\(\.mobile-cta\) \.to-top \{[^}]*\}/, '');
   assert.notEqual(two, css);

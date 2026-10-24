@@ -239,6 +239,13 @@
      section). */
   --glass-bg: rgba(250,250,252,0.62);
   --glass-border: rgba(255,255,255,0.65);
+  /* The top bar's own glass, a step denser than the app's in light mode
+     (S11): over a dark code plate or screenshot the 0.62 glass mixed to
+     #a9a9a9 behind the bar's --text-2 labels, 3.9:1 (axe color-contrast,
+     install.html at 390px). 0.74 keeps 4.8:1 even over pure black; over the
+     light page it looks the same. The dark glass already holds, so dark
+     mode and the opaque fallbacks below hand it --glass-bg. */
+  --bar-glass-bg: rgba(250,250,252,0.74);
   --glass-blur: blur(18px) saturate(180%);
 
   /* The top bar's height, one value for all five pages: the legal pages pad
@@ -358,6 +365,7 @@
 
   --glass-bg: rgba(43,40,37,0.66);
   --glass-border: rgba(255,255,255,0.12);
+  --bar-glass-bg: var(--glass-bg);
 }
 
 /* The system preference, for visitors who never touched the toggle - the
@@ -409,6 +417,7 @@
 
     --glass-bg: rgba(43,40,37,0.66);
     --glass-border: rgba(255,255,255,0.12);
+    --bar-glass-bg: var(--glass-bg);
   }
 }
 
@@ -423,6 +432,7 @@
 @media (prefers-reduced-transparency: reduce) {
   :root, :root:not([data-theme="light"]) {
     --glass-bg: var(--surface);
+    --bar-glass-bg: var(--surface);
     --glass-blur: none;
     --glass-border: var(--border);
   }
@@ -430,6 +440,7 @@
 @media (prefers-contrast: more) {
   :root, :root:not([data-theme="light"]) {
     --glass-bg: var(--surface);
+    --bar-glass-bg: var(--surface);
     --glass-blur: none;
     --glass-border: var(--text-1);
   }
@@ -455,7 +466,7 @@
    header it jumped to the top of the screen. */
 .topbar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: var(--bar-h);
-  background: var(--glass-bg);
+  background: var(--bar-glass-bg);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border);
 }

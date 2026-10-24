@@ -497,6 +497,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The remaining loan balance stays in its card on a tablet.** In the row of four loan figures a
   long amount such as 174,644.93 ran into the next card; with a long amount the four now stand two
   by two until there is room for all of them in one row.
+- **"Back to top" on yuvomi.cloud sits inside the page footer**, so screen readers that list a
+  page by its regions no longer find it outside all of them (axe "region", all five pages); it
+  floats in the same corner as before. The top bar's glass in light mode is a little denser:
+  over a dark command block it let the language button's label fall to 3.9:1 contrast, and now
+  keeps at least 4.8:1 whatever scrolls beneath it.
 
 ## [2.79.0] - 2026-10-22
 
