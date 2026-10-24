@@ -1857,6 +1857,20 @@ const FAMILY_CLAIMS = [
     says: { en: /child/, de: /Kind/ },
     holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
     where: "server/permissions.js FAMILY_ROLES ('child')",
+  },  // Der Weg der Eingeladenen (Re-Critique R3): die Karte unter den drei
+  // Szenen nennt die Gueltigkeit des Links. Aendert sich die Frist im Dienst,
+  // stimmt die Zahl auf der Seite nicht mehr.
+  {
+    key: 'fam_inv_1', what: 'der Einladungslink gilt sieben Tage',
+    says: { en: /seven days/, de: /sieben Tage/ },
+    holds: (s) => /INVITE_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(s.invites),
+    where: 'server/services/invites.js INVITE_TTL_MS',
+  },
+  {
+    key: 'fam_inv_2', what: 'ohne Passwort-Anmeldung fragt /join kein Passwort',
+    says: { en: /single sign-on/, de: /Single Sign-on/ },
+    holds: (s) => /password_required: isPasswordLoginEnabled\(getDb\(\)\)/.test(s.auth),
+    where: 'server/auth.js GET /invites/preview password_required',
   },
 ];
 
@@ -1867,6 +1881,8 @@ function familySources() {
     sw: src('public/sw.js'),
     permissions: src('server/permissions.js'),
     spec: read('SPEC.md'),
+    invites: src('server/services/invites.js'),
+    auth: src('server/auth.js'),
   };
 }
 
@@ -1907,6 +1923,8 @@ test('der Familien-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.match(brokenFamilyClaims(html, noShopping).join('\n'), /fam_2_d \(en\): die Einkaufsliste/);
   const readOnlyTablet = { ...real, display: real.display.replace(/method: 'PATCH'/, "method: 'GET'") };
   assert.match(brokenFamilyClaims(html, readOnlyTablet).join('\n'), /fam_1_d \(de\): das Tablet hakt/);
+  const shorterInvite = { ...real, invites: real.invites.replace('INVITE_TTL_MS = 7 *', 'INVITE_TTL_MS = 3 *') };
+  assert.match(brokenFamilyClaims(html, shorterInvite).join('\n'), /fam_inv_1 \(en\): der Einladungslink gilt sieben Tage/);
   // Die Seite verschweigt die Bedingung: Push ohne HTTPS-Hinweis.
   const quiet = html.replace(/ \(your server needs HTTPS for that\)/g, '').replace(/ \(dafür braucht euer Server HTTPS\)/g, '');
   assert.notEqual(quiet, html, 'Vorbedingung: der HTTPS-Hinweis steht in beiden Sprachen woertlich so');

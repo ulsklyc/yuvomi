@@ -700,7 +700,7 @@
        Momente darunter nebeneinander - drei gleichrangige Szenen, keine Liste. */
     .family { padding: var(--sec-m) 0; }
     .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-      grid-template-areas: "head shot" "list list"; gap: 48px 56px; align-items: center; }
+      grid-template-areas: "head shot" "list list" "invite invite"; gap: 48px 56px; align-items: center; }
     /* Rahmen wie die Galerie (Radius, Kante, Schatten, Hof in der Akzentfarbe),
        aber OHNE deren Telefon-Tausch unter 860px: es gibt keine Telefon-
        Variante, das Tablet bleibt quer. */
@@ -723,11 +723,27 @@
     .fam-ico svg { width: 21px; height: 21px; }
     .fam-text h3 { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; margin: 9px 0 6px; text-wrap: balance; }
     .fam-text p { font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; max-width: var(--m-prose); }
+    /* Der Weg der Eingeladenen: eine ruhige Karte unter den drei Szenen, im
+       Material der anderen Inhaltskarten (Flaeche, Kante, --shadow-sm). Die
+       Ziffern tragen Information - es ist eine Reihenfolge -, im Ton der
+       Szenen-Symbole darueber. */
+    .fam-invited { grid-area: invite; display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 18px 44px;
+      align-items: start; padding: 26px 30px; border-radius: var(--r-lg);
+      background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .fam-invited h3 { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; text-wrap: balance; }
+    .fam-invited-head p { margin-top: 6px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.55; }
+    .fam-steps { list-style: none; counter-reset: fam-step; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 28px; }
+    .fam-steps li { counter-increment: fam-step; display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 12px;
+      font-size: var(--fs-small); color: var(--text-2); line-height: 1.55; }
+    .fam-steps li::before { content: counter(fam-step); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+      font-size: var(--fs-meta); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-on-soft); background: var(--accent-soft); }
     @media (max-width: 1024px) {
       .fam-list { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-top: 30px; }
+      .fam-invited { grid-template-columns: minmax(0, 1fr); }
+      .fam-steps { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     }
     @media (max-width: 860px) {
-      .fam-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "shot" "list"; gap: 32px; }
+      .fam-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "shot" "list" "invite"; gap: 32px; }
       .fam-shot { max-width: 640px; }
     }
     @media (max-width: 600px) {
@@ -737,6 +753,7 @@
       .fam-ico { width: 38px; height: 38px; }
       .fam-ico svg { width: 19px; height: 19px; }
       .fam-text h3 { margin-top: 6px; }
+      .fam-invited { padding: 20px; }
     }
 
     /* Eine Sektion fuer beide Stufen. Der `--bg-alt`-Streifen sass frueher an
@@ -1253,7 +1270,7 @@
       .cta-box { box-shadow: none; padding: 28px 24px; }
       .hero-frame { box-shadow: none !important; }
       .hero, section { padding: 20px 0 !important; }
-      .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item { break-inside: avoid; }
+      .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item, .fam-invited { break-inside: avoid; }
       .mod-group-head { break-after: avoid; }
       .fam-shot { break-inside: avoid; }
       /* Paper has no hover and no href, so external targets go inline. Internal
@@ -1424,6 +1441,11 @@
       fam_2_d:'It goes on the home screen straight from the browser, no app store. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.',
       fam_3_t:'An invite, and just the right access',
       fam_3_d:'An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all.',
+      fam_inv_t:'Invited by your family?',
+      fam_inv_lead:'No server and no terminal for you - only the link.',
+      fam_inv_1:'Open the invite link your admin sent you. It works for seven days; after that, ask for a new one.',
+      fam_inv_2:'Choose a username, unless the invite already set one, and your own password. If your household signs in with single sign-on, there is no password to pick.',
+      fam_inv_3:'Sign in, then put Yuvomi on your home screen: tap Install when the app offers it, or on iPhone and iPad open the Share menu and choose Add to Home Screen.',
       swap_rel:'is replaced by',
       swap_title:'Many apps, <em>one place.</em>',
       swap_desc:'Each with its own account and its own copy of your data on someone else’s server - or one place on yours. Every line here is built and shipping today.',
@@ -1546,6 +1568,11 @@
       fam_2_d:'Sie kommt direkt aus dem Browser auf den Startbildschirm, ohne App Store. Erinnerungen kommen als Mitteilung, auch wenn die App zu ist (dafür braucht euer Server HTTPS), und die zuletzt geöffnete Einkaufsliste bleibt lesbar, wenn kein Netz da ist.',
       fam_3_t:'Eine Einladung und genau die richtigen Rechte',
       fam_3_d:'Ein Admin schickt einen Link, und das neue Mitglied wählt sein Passwort selbst; ein Kind ohne Handy bekommt sein Konto direkt angelegt. Je Familienrolle ist jedes Modul voll, nur lesen oder gar nicht freigegeben.',
+      fam_inv_t:'Von eurer Familie eingeladen?',
+      fam_inv_lead:'Für euch kein Server und kein Terminal - nur der Link.',
+      fam_inv_1:'Öffnet den Einladungslink, den euer Admin geschickt hat. Er gilt sieben Tage; danach braucht ihr einen neuen.',
+      fam_inv_2:'Wählt einen Benutzernamen, falls die Einladung keinen vorgibt, und euer eigenes Passwort. Meldet sich euer Haushalt per Single Sign-on an, fällt das Passwort weg.',
+      fam_inv_3:'Meldet euch an und holt Yuvomi auf den Startbildschirm: Installieren antippen, wenn die App es anbietet, oder auf iPhone und iPad im Teilen-Menü Zum Home-Bildschirm wählen.',
       swap_rel:'wird ersetzt durch',
       swap_title:'Viele Apps, <em>ein Ort.</em>',
       swap_desc:'Jede mit eigenem Konto und eigener Kopie eurer Daten auf fremden Servern - oder ein Ort auf eurem. Jede Zeile hier ist gebaut und ausgeliefert.',
@@ -1899,6 +1926,26 @@
           </div>
         </li>
       </ul>
+      <!-- Der Weg fuer die eingeladene Person (Re-Critique R3): der Rest der
+           Seite spricht zum Admin, und wer nur einen Link bekommen hat, fand
+           hier nicht, was er tun soll. Die Schritte stehen im Code: der Link
+           gilt sieben Tage (server/services/invites.js INVITE_TTL_MS), /join
+           fragt Benutzernamen nur, wenn die Einladung keinen vorgibt, und ein
+           Passwort nur bei erlaubter Passwort-Anmeldung (server/auth.js
+           /invites/preview password_required); installiert wird ueber das
+           Banner (public/components/yuvomi-install-prompt.js) oder auf iOS
+           ueber Teilen. test:docs-landing (10) haelt die sieben Tage. -->
+      <div class="fam-invited reveal">
+        <div class="fam-invited-head">
+          <h3 data-t="fam_inv_t">Invited by your family?</h3>
+          <p data-t="fam_inv_lead">No server and no terminal for you - only the link.</p>
+        </div>
+        <ol class="fam-steps" role="list">
+          <li data-t="fam_inv_1">Open the invite link your admin sent you. It works for seven days; after that, ask for a new one.</li>
+          <li data-t="fam_inv_2">Choose a username, unless the invite already set one, and your own password. If your household signs in with single sign-on, there is no password to pick.</li>
+          <li data-t="fam_inv_3">Sign in, then put Yuvomi on your home screen: tap Install when the app offers it, or on iPhone and iPad open the Share menu and choose Add to Home Screen.</li>
+        </ol>
+      </div>
     </div>
   </div>
 </section>
