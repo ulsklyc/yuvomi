@@ -1960,6 +1960,15 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
           continue;
         }
 
+        // Ein unerreichbarer Server ist keine Absage: er hat nicht geantwortet.
+        // Aber er ist nicht erreichbar - für weitere Artikel in diesem Durchgang
+        // auch nicht (#2143).
+        if (typeof err?.status !== 'number') {
+          stop.trip(err, collection.url);
+          log.warn(`Could not carry shopping item ${now.id} to ${listUrl}: ${err.message}`);
+          continue;
+        }
+
         if (now.outbound_move_attempts + 1 >= MAX_OUTBOUND_ATTEMPTS) {
           const back = returnShoppingMove(now);
           log.error(
