@@ -5607,7 +5607,6 @@
                 "error": "Impor gagal."
             },
             "feedLink": "Berlangganan siklus yang diperkirakan di kalender",
-            "widgetHint": "Tambahkan petak siklus ke {{overview}} lewat “{{customize}}”.",
             "endBeforeStart": "Akhir tidak boleh sebelum awal.",
             "periodDeleted": "Haid dihapus.",
             "logDeleted": "Catatan harian dihapus."
@@ -5624,7 +5623,7 @@
             "title": "Gizi",
             "emptyTitle": "Belum ada catatan gizi",
             "emptyDesc": "Catat apa yang kamu makan - angkanya ada di kemasan.",
-            "add": "Tambah catatan",
+            "add": "Catat gizi",
             "edit": "Edit catatan",
             "saved": "Catatan disimpan.",
             "saveError": "Catatan tidak dapat disimpan.",

@@ -5607,7 +5607,6 @@
                 "error": "Importen misslyckades."
             },
             "feedLink": "Prenumerera på den förväntade cykeln i kalendern",
-            "widgetHint": "Lägg till cykelrutan i {{overview}} under ”{{customize}}”.",
             "endBeforeStart": "Slutet får inte vara före början.",
             "periodDeleted": "Mens raderad.",
             "logDeleted": "Dagsanteckning raderad."
@@ -5624,7 +5623,7 @@
             "title": "Näringsvärden",
             "emptyTitle": "Inga näringsvärden registrerade än",
             "emptyDesc": "Skriv upp vad du har ätit - siffrorna står på förpackningen.",
-            "add": "Lägg till post",
+            "add": "Registrera näringsvärden",
             "edit": "Redigera post",
             "saved": "Posten sparad.",
             "saveError": "Posten kunde inte sparas.",

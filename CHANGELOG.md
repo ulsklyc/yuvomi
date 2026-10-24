@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Fasting starts from the add button, and the cycle view explains only what it shows.** In
+  Health, "Start fast" is now the add button of the Fasting area, like every other area,
+  and disappears while a fast runs, when the ring offers "Finish fast". Logging a past fast and
+  the fasting settings moved into a "..." menu next to "I started earlier", replacing the gear
+  button. The cycle calendar legend now lists only the marks the shown month contains, the
+  hint about the Overview tile is gone, and adding nutrition says "Log nutrition" instead of
+  "Add entry".
 - **Empty pages no longer show a second main button next to the add button.** Tasks, Notes,
   Contacts, Budget, Recipes, the calendar agenda, Rewards and Documents now offer their "Add"
   in an empty state as a quiet outlined button, so the add button stays the one main action.

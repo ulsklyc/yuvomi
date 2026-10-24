@@ -5607,7 +5607,6 @@
                 "error": "Nhập không thành công."
             },
             "feedLink": "Đăng ký chu kỳ dự đoán trong lịch",
-            "widgetHint": "Thêm ô chu kỳ vào {{overview}} trong “{{customize}}”.",
             "endBeforeStart": "Thời điểm kết thúc không thể trước thời điểm bắt đầu.",
             "periodDeleted": "Đã xóa kỳ kinh.",
             "logDeleted": "Đã xóa ghi chép trong ngày."
@@ -5624,7 +5623,7 @@
             "title": "Dinh dưỡng",
             "emptyTitle": "Chưa ghi nhận dinh dưỡng nào",
             "emptyDesc": "Ghi lại những gì bạn đã ăn - các con số có trên bao bì.",
-            "add": "Thêm mục",
+            "add": "Ghi dinh dưỡng",
             "edit": "Sửa mục",
             "saved": "Đã lưu mục.",
             "saveError": "Không thể lưu mục.",

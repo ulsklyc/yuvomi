@@ -5607,7 +5607,6 @@
                 "error": "匯入失敗。"
             },
             "feedLink": "在日曆中訂閱預測週期",
-            "widgetHint": "可在{{overview}}的「{{customize}}」中新增週期卡片。",
             "endBeforeStart": "結束不能早於開始。",
             "periodDeleted": "經期已刪除。",
             "logDeleted": "當日記錄已刪除。"
@@ -5624,7 +5623,7 @@
             "title": "營養",
             "emptyTitle": "尚未記錄營養資料",
             "emptyDesc": "記錄你吃了什麼，數字就印在包裝上。",
-            "add": "新增記錄",
+            "add": "記錄營養",
             "edit": "編輯記錄",
             "saved": "記錄已儲存。",
             "saveError": "記錄儲存失敗。",

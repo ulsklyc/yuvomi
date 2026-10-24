@@ -3,7 +3,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { personSwitcherMarkup, wireWhoSees } from '/utils/health-person-switcher.js';
 import { readHealthPerson, writeHealthPerson } from '/utils/health-person.js';
 import { fastingHistoryQuery, fastingSections, fastingStatsQuery, formatFastingDuration, shouldLoadFastingStats } from '/utils/health-fasting.js';
@@ -22,16 +22,17 @@ const pendingDeletes = new Map();
 const currentOwners = new Map();
 const deleteKey = (owner, id) => `${owner}:${id}`;
 
-export async function mountFasting(root, { userId } = {}) {
+export async function mountFasting(root, { userId, onIntent = null } = {}) {
   if (!root) return;
   let view = panels.get(root);
+  if (view && onIntent) view.onIntent = onIntent;
   // DIE PERSON DER SITZUNG (R23, D4): das Fasten startet bei der Person, die
   // zuletzt irgendwo in der Gesundheit gewaehlt wurde. Sie ist ein Vorschlag -
   // laesst sich ihr Fasten nicht lesen, faellt die Ansicht auf mich zurueck
   // (refresh).
   const wanted = readHealthPerson(userId) ?? userId;
   if (!view) {
-    view = { root, self: userId, subject: wanted, subjectFromSession: wanted !== userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '' };
+    view = { root, self: userId, subject: wanted, subjectFromSession: wanted !== userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '', onIntent };
     panels.set(root, view);
     root.replaceChildren();
     root.insertAdjacentHTML('beforeend', `<div class="fasting-container"><div data-fasting-shell></div><p role="alert" data-fasting-load-error></p><div class="fasting-panel" data-fasting-body><p role="status">${esc(t('common.loading'))}</p></div></div>`);
@@ -213,6 +214,22 @@ async function refresh(view, { refreshStats = false } = {}) {
   }
 }
 
+/**
+ * Das „..." im Ring (R23 D14): Nachtragen und Einstellungen. Bis R23 stand das
+ * Zahnrad als dritter Knopf in der Aktionszeile (Critique G5 P3) und das
+ * Nachtragen als Geisterknopf ueber dem Verlauf.
+ */
+function fastingMoreMenuHtml() {
+  return popoverMenuHtml({
+    id: 'fasting-more-menu',
+    label: t('common.moreActionsNamed', { name: t('health.fasting.title') }),
+    items: [
+      { action: 'fasting-backfill', label: t('health.fasting.backfill'), icon: 'history', attrs: { 'data-fasting-backfill': '' } },
+      { action: 'fasting-settings', label: t('nav.settings'), icon: 'settings', attrs: { 'data-fasting-settings': '' } },
+    ],
+  });
+}
+
 function renderBody(view, stats, statsError = false) {
   const { root, state } = view;
   const writable = view.subject === view.self && state.canWrite && moduleAccess('health') === 'write';
@@ -231,7 +248,7 @@ function renderBody(view, stats, statsError = false) {
     <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content"><div class="fasting-hero__timer" data-fasting-timer>00:00:00</div><span class="fasting-dial__days" data-fasting-days></span></div></div>
     <p class="sr-only" role="status" aria-live="polite" data-fasting-announcement></p>
     ${active ? `<p class="fasting-hero__remaining" data-fasting-remaining></p><p class="fasting-hero__meta">${esc(t('health.fasting.startedAt', { date: fastingStamp(active.start_at, active.start_tzid) }))}</p>${active.goal_minutes ? `<p class="fasting-hero__meta" data-fasting-target>${esc(t('health.fasting.targetAt', { date: fastingStamp(new Date(Date.parse(active.start_at) + active.goal_minutes * 60000).toISOString(), active.start_tzid) }))}</p>` : ''}` : ''}
-    ${writable ? `<div class="fasting-hero__actions"><button class="btn btn--primary" type="button" data-fasting-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button><button class="btn btn--secondary" type="button" ${active ? 'data-fasting-edit-start' : 'data-fasting-earlier'}>${esc(t(active ? 'health.fasting.editStart' : 'health.fasting.earlier'))}</button><button class="btn btn--secondary btn--icon" type="button" data-fasting-settings aria-label="${esc(`${t('health.fasting.title')} - ${t('nav.settings')}`)}" title="${esc(t('nav.settings'))}"><i data-lucide="settings" class="icon-md" aria-hidden="true"></i></button></div>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}
+    ${writable ? `<div class="fasting-hero__actions">${active ? `<button class="btn btn--primary" type="button" data-fasting-action>${esc(t('health.fasting.finish'))}</button>` : ''}<button class="btn btn--secondary" type="button" ${active ? 'data-fasting-edit-start' : 'data-fasting-earlier'}>${esc(t(active ? 'health.fasting.editStart' : 'health.fasting.earlier'))}</button>${fastingMoreMenuHtml()}</div>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}
     <p class="form-hint" role="alert" data-fasting-error></p>
     ${state.settings?.zone_mode === 'educational' ? fastingEducationMarkup() : ''}
   </section>
@@ -246,28 +263,38 @@ function renderBody(view, stats, statsError = false) {
     title: t('health.fasting.noHistory'),
     description: t('health.fasting.emptyDesc'),
     action: writable ? { label: t('health.fasting.backfill'), icon: 'plus', tone: 'secondary', attrs: { 'data-fasting-backfill': '' } } : undefined,
-  })}</section>` : `<section id="history"><div class="fasting-card__heading"><h3 class="u-section-title">${esc(t('health.fasting.history'))}</h3>${writable ? `<button type="button" class="btn btn--ghost btn--sm" data-fasting-backfill><i data-lucide="plus" aria-hidden="true"></i>${esc(t('health.fasting.backfill'))}</button>` : ''}<a href="/api/v1/health/export/fasting${esc(fastingHistoryQuery(view))}" class="btn btn--secondary btn--sm" download>${esc(t('health.fasting.export'))}</a></div>
+  })}</section>` : `<section id="history"><div class="fasting-card__heading"><h3 class="u-section-title">${esc(t('health.fasting.history'))}</h3><a href="/api/v1/health/export/fasting${esc(fastingHistoryQuery(view))}" class="btn btn--secondary btn--sm" download>${esc(t('health.fasting.export'))}</a></div>
     ${filtersMarkup(view)}
     <div class="fasting-card" data-fasting-history></div><div class="fasting-history-more"><button class="btn btn--secondary" type="button" data-fasting-more ${view.more ? '' : 'hidden'}>${esc(t('health.fasting.loadMore'))}</button><p class="form-hint" role="alert" data-fasting-history-error></p></div>
   </section>`}`);
+  installPopoverMenus(body);
   const reload = () => refresh(view);
   const reloadStats = () => refresh(view, { refreshStats: true });
   if (writable) {
     root.querySelector('[data-fasting-settings]')?.addEventListener('click', () => openFastingSettings(view, reload));
-    root.querySelector('[data-fasting-action]').addEventListener('click', async (event) => {
-      const button = event.currentTarget; button.disabled = true;
+    const toggleFasting = async (button) => {
+      if (button) button.disabled = true;
       try {
         if (active) await finishFasting(active, reloadStats, () => root.isConnected && view.subject === view.self);
         else if (await startFasting()) { await reload(); refocusAfterRender(); }
       } catch (error) {
         const message = root.isConnected && view.subject === view.self && root.querySelector('[data-fasting-error]');
         if (message) message.textContent = fastingError(error);
-      } finally { if (button.isConnected) button.disabled = false; }
-    });
+      } finally { if (button?.isConnected) button.disabled = false; }
+    };
+    root.querySelector('[data-fasting-action]')?.addEventListener('click', (event) => void toggleFasting(event.currentTarget));
+    // „FASTEN STARTEN" IST DER FAB (R23 D14, Critique G5 P3). Der Start stand
+    // als Primaerknopf im Ring, waehrend die Gesundheit sonst ueberall ueber
+    // den FAB anlegt; das Nachtragen stand als dritter Knopf am Verlauf. Jetzt
+    // fuehrt der FAB den Start (nur ohne laufendes Fasten und nur bei mir), der
+    // Ring traegt das Beenden, Nachtragen und Einstellungen stehen im „...".
+    view.onIntent?.({ canStart: !active, start: () => toggleFasting(null) });
     root.querySelector('[data-fasting-edit-start]')?.addEventListener('click', () => openFastingEditor(active, reload));
     const creator = async (completed) => { try { await openFastingCreator(completed ? reloadStats : reload, completed); } catch (error) { window.yuvomi?.showToast(fastingError(error), 'danger'); } };
     root.querySelector('[data-fasting-earlier]')?.addEventListener('click', () => void creator(false));
     root.querySelectorAll('[data-fasting-backfill]').forEach((button) => button.addEventListener('click', () => void creator(true)));
+  } else {
+    view.onIntent?.({ canStart: false, start: null });
   }
   root.querySelector('[data-fasting-education]')?.addEventListener('click', () => openModal({ title: t('health.fasting.zoneDetails'), content: `<p>${esc(t('health.fasting.zoneVariability'))}</p><ul>${['zoneMeal', 'zoneStored', 'zoneKetones', 'zoneLater'].map((key) => `<li>${esc(t(`health.fasting.${key}`))}</li>`).join('')}</ul><p>${esc(t('health.fasting.safetyDialog'))}</p>`, size: 'lg' }));
   wireFilters(view, body);

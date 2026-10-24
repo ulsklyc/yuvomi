@@ -3674,10 +3674,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   text-underline-offset: 3px;
 }
 
-.cycle-discovery-hint__note {
-  margin: var(--space-1) 0 0;
-}
-
 /* Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
  * server/routes/health/cycle.js) - schlichte Liste in der bestehenden
  * .form-error-Box statt einer neuen Fehlerkomponente. */

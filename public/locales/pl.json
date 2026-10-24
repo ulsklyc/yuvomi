@@ -5871,7 +5871,6 @@
                 "error": "Import nie powiódł się."
             },
             "feedLink": "Subskrybuj przewidywany cykl w kalendarzu",
-            "widgetHint": "Kafelek cyklu dodasz do widoku {{overview}} w „{{customize}}”.",
             "endBeforeStart": "Koniec nie może być przed początkiem.",
             "periodDeleted": "Miesiączka usunięta.",
             "logDeleted": "Wpis dnia usunięty."
@@ -5888,7 +5887,7 @@
             "title": "Wartości odżywcze",
             "emptyTitle": "Brak zapisanych wartości odżywczych",
             "emptyDesc": "Zapisz, co zjadłeś - liczby są na opakowaniu.",
-            "add": "Dodaj wpis",
+            "add": "Zapisz wartości odżywcze",
             "edit": "Edytuj wpis",
             "saved": "Wpis zapisany.",
             "saveError": "Nie udało się zapisać wpisu.",

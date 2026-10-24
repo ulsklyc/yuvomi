@@ -5741,7 +5741,6 @@
                 "error": "Import se nezdařil."
             },
             "feedLink": "Odebírat předpokládaný cyklus v kalendáři",
-            "widgetHint": "Dlaždici cyklu přidáte do přehledu „{{overview}}“ přes „{{customize}}“.",
             "endBeforeStart": "Konec nesmí být před začátkem.",
             "periodDeleted": "Menstruace smazána.",
             "logDeleted": "Denní záznam smazán."
@@ -5758,7 +5757,7 @@
             "title": "Výživa",
             "emptyTitle": "Zatím žádné výživové údaje",
             "emptyDesc": "Zapiš, co jsi snědl - čísla najdeš na obalu.",
-            "add": "Přidat záznam",
+            "add": "Zadat výživu",
             "edit": "Upravit záznam",
             "saved": "Záznam uložen.",
             "saveError": "Záznam se nepodařilo uložit.",

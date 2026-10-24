@@ -5607,7 +5607,6 @@
                 "error": "İçe aktarma başarısız oldu."
             },
             "feedLink": "Tahmini döngüye takviminden abone ol",
-            "widgetHint": "Döngü kutucuğunu {{overview}} içinde “{{customize}}” ile ekle.",
             "endBeforeStart": "Bitiş başlangıçtan önce olamaz.",
             "periodDeleted": "Regl silindi.",
             "logDeleted": "Günlük kayıt silindi."
@@ -5624,7 +5623,7 @@
             "title": "Besin değerleri",
             "emptyTitle": "Henüz besin değeri kaydı yok",
             "emptyDesc": "Ne yediğini kaydet - sayılar ambalajın üzerinde yazıyor.",
-            "add": "Kayıt ekle",
+            "add": "Besin değerlerini kaydet",
             "edit": "Kaydı düzenle",
             "saved": "Kayıt kaydedildi.",
             "saveError": "Kayıt kaydedilemedi.",

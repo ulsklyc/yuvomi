@@ -5607,7 +5607,6 @@
                 "error": "Az importálás nem sikerült."
             },
             "feedLink": "Az előre jelzett ciklus feliratkozása a naptárban",
-            "widgetHint": "A ciklus csempét a(z) {{overview}} oldalon a „{{customize}}” alatt adhatja hozzá.",
             "endBeforeStart": "A vége nem lehet a kezdete előtt.",
             "periodDeleted": "Menstruáció törölve.",
             "logDeleted": "Napi bejegyzés törölve."
@@ -5624,7 +5623,7 @@
             "title": "Tápérték",
             "emptyTitle": "Még nincs rögzített tápérték",
             "emptyDesc": "Jegyezd fel, mit ettél - a számok a csomagoláson vannak.",
-            "add": "Bejegyzés hozzáadása",
+            "add": "Tápérték rögzítése",
             "edit": "Bejegyzés szerkesztése",
             "saved": "Bejegyzés mentve.",
             "saveError": "A bejegyzést nem sikerült menteni.",

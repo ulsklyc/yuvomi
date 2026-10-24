@@ -5607,7 +5607,6 @@
                 "error": "Importazione non riuscita."
             },
             "feedLink": "Iscriviti al ciclo previsto nel calendario",
-            "widgetHint": "Aggiungi il riquadro del ciclo a {{overview}} da «{{customize}}».",
             "endBeforeStart": "La fine non può precedere l'inizio.",
             "periodDeleted": "Ciclo eliminato.",
             "logDeleted": "Voce del giorno eliminata."
@@ -5624,7 +5623,7 @@
             "title": "Nutrizione",
             "emptyTitle": "Nessun dato nutrizionale registrato",
             "emptyDesc": "Annota cosa hai mangiato: i numeri sono sulla confezione.",
-            "add": "Aggiungi voce",
+            "add": "Registra nutrizione",
             "edit": "Modifica voce",
             "saved": "Voce salvata.",
             "saveError": "Impossibile salvare la voce.",

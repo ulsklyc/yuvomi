@@ -5607,7 +5607,6 @@
                 "error": "Nabigo ang pag-import."
             },
             "feedLink": "Mag-subscribe sa inaasahang siklo sa kalendaryo",
-            "widgetHint": "Idagdag ang tile ng siklo sa {{overview}} sa “{{customize}}”.",
             "endBeforeStart": "Hindi maaaring mauna ang pagtatapos sa simula.",
             "periodDeleted": "Nabura ang regla.",
             "logDeleted": "Nabura ang tala ng araw."
@@ -5624,7 +5623,7 @@
             "title": "Nutrisyon",
             "emptyTitle": "Wala pang naitalang nutrisyon",
             "emptyDesc": "Itala ang kinain mo - nasa pakete ang mga numero.",
-            "add": "Magdagdag ng tala",
+            "add": "Magtala ng nutrisyon",
             "edit": "I-edit ang tala",
             "saved": "Na-save ang tala.",
             "saveError": "Hindi ma-save ang tala.",

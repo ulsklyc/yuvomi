@@ -5607,7 +5607,6 @@
                 "error": "Import fehlgeschlagen."
             },
             "feedLink": "Vorhergesagten Zyklus im Kalender abonnieren",
-            "widgetHint": "Die Zyklus-Kachel blendest du in der {{overview}} unter „{{customize}}“ ein.",
             "endBeforeStart": "Das Ende darf nicht vor dem Beginn liegen.",
             "periodDeleted": "Periode gelöscht.",
             "logDeleted": "Tageseintrag gelöscht."
@@ -5624,7 +5623,7 @@
             "title": "Nährwerte",
             "emptyTitle": "Noch keine Nährwerte erfasst",
             "emptyDesc": "Trage ein, was du gegessen hast - die Zahlen stehen auf der Packung.",
-            "add": "Eintrag hinzufügen",
+            "add": "Nährwerte erfassen",
             "edit": "Eintrag bearbeiten",
             "saved": "Eintrag gespeichert.",
             "saveError": "Eintrag konnte nicht gespeichert werden.",

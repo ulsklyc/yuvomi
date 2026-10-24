@@ -5607,7 +5607,6 @@
                 "error": "Falha na importação."
             },
             "feedLink": "Subscrever o ciclo previsto no calendário",
-            "widgetHint": "Adicione o bloco do ciclo à {{overview}} em “{{customize}}”.",
             "endBeforeStart": "O fim não pode ser anterior ao início.",
             "periodDeleted": "Período eliminado.",
             "logDeleted": "Registo do dia eliminado."
@@ -5624,7 +5623,7 @@
             "title": "Nutrição",
             "emptyTitle": "Ainda sem registos de nutrição",
             "emptyDesc": "Regista o que comeste - os números estão na embalagem.",
-            "add": "Adicionar registo",
+            "add": "Registar nutrição",
             "edit": "Editar registo",
             "saved": "Registo guardado.",
             "saveError": "Não foi possível guardar o registo.",

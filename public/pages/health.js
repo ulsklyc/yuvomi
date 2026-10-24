@@ -570,6 +570,9 @@ function panelMarkup(panel, activeRoute) {
 // Routen-basierter Kontext-FAB: die Primäraktion folgt der aktiven Health-Route.
 // Auf der Übersicht (keine Erstellen-Aktion) ausgeblendet.
 let _fab = null;
+// Was der FAB im Fasten kann - pages/health-fasting.js meldet es nach jedem
+// Zeichnen (mountFasting onIntent), bis dahin ausgeblendet.
+let fastingIntent = { canStart: false, start: null };
 
 function updateHealthFab(activeRoute) {
   if (!_fab) return;
@@ -603,7 +606,14 @@ function updateHealthFab(activeRoute) {
       // Wege, die beide nach Anlegen aussahen. Jetzt steht "Fasten starten"
       // allein vorn; das Nachtragen eines abgeschlossenen Fastens ist die
       // Aktion des Leerzustands bzw. ein Knopf am Verlauf (health-fasting.js).
-      setPageFabAction(_fab, { hidden: true, dockLabel: t('health.fasting.title') }); break;
+      // R23 D14: der FAB heisst „Fasten starten" und startet - nur bei mir und
+      // ohne laufendes Fasten (pages/health-fasting.js meldet es per onIntent).
+      setPageFabAction(_fab, {
+        hidden: !fastingIntent.canStart,
+        label: t('health.fasting.start'),
+        dockLabel: t('health.fasting.start'),
+        onClick: () => void fastingIntent.start?.(),
+      }); break;
     default:
       // Das Nomen bleibt stehen: der Router dockt den Knopf am Desktop nur beim
       // Seitenaufbau an und nur mit `data-dock-label`. Wer auf der Uebersicht
@@ -7522,6 +7532,7 @@ function maybeMountFasting(activeRoute) {
   root.dataset.fastingMounted = 'true';
   import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, {
     userId: vitals.meId,
+    onIntent: (intent) => { fastingIntent = intent; refreshHealthFab(); },
   })).catch((error) => {
     // Die Ueberschrift ist der Satz. `error.message` ist der Text des Browsers
     // oder des Servers, unuebersetzt (#1909) - er gehoert in die Konsole.
@@ -8435,8 +8446,22 @@ function cycleCalendarMarkup(own, pms, canEdit = own) {
 
   let hasConfirmedOvulation = false;
   let pmsVisibleInMonth = false;
+  // DIE LEGENDE ERKLAERT NUR, WAS DER MONAT ZEIGT (R23 S10 distill, Critique
+  // G5 P3 "Zyklus drei Legenden"). Bestaetigter Eisprung und PMS folgten der
+  // Regel schon; jetzt alle Eintraege. Ein Monat ohne Vorhersage traegt keine
+  // "Vorhergesagt"-Zeile, einer ohne Blutung keine Skala der Staerken.
+  const seen = new Set();
 
   const cells = cal.weeks.flat().map((c) => {
+    if (c.inMonth) {
+      if (c.isToday) seen.add('today');
+      if (c.hasLog) seen.add('logged');
+      if (c.flow) seen.add(`flow:${c.flow}`);
+      if (c.phase === PHASE.MENSTRUATION) seen.add(c.predicted ? 'predicted' : 'period');
+      if (c.phase === PHASE.FERTILE) seen.add('fertile');
+      if (c.phase === PHASE.OVULATION && !c.confirmed) seen.add('ovulation');
+      if (intimacyDates?.has(c.dateKey)) seen.add('intimacy');
+    }
     const cls = ['cycle-cal__day'];
     if (!c.inMonth) cls.push('is-out');
     if (c.isToday) cls.push('is-today');
@@ -8510,26 +8535,29 @@ function cycleCalendarMarkup(own, pms, canEdit = own) {
           <div class="cycle-cal__grid">${cells}</div>
         </div>
         <div class="cycle-cal__rail">
-          ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own })}
+          ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own, seen })}
           ${symptomLikelihoodMarkup()}
         </div>
       </div>
     </section>`;
 }
 
-function cycleLegendMarkup({ hasConfirmedOvulation = false, showPms = false, own = false } = {}) {
+function cycleLegendMarkup({ hasConfirmedOvulation = false, showPms = false, own = false, seen = null } = {}) {
+  // `seen` (cycleCalendarMarkup): was der gerenderte Monat zeigt. Ohne die
+  // Menge (alte Aufrufer, Tests) steht die volle Legende.
+  const shows = (what) => !seen || seen.has(what);
   const items = [
     // A-9/B-1: der einfache Log-Punkt (kein Flow-Wert) bekommt endlich einen
     // eigenen Legenden-Eintrag - er stand bisher unerklärt im Kalender.
-    { cls: 'cycle-legend__swatch--dot', key: 'health.cycle.legend.logged' },
-    { cls: 'is-menstruation', key: 'health.cycle.legend.period' },
-    { cls: 'is-menstruation is-predicted', key: 'health.cycle.legend.predicted' },
-    { cls: 'is-fertile', key: 'health.cycle.legend.fertile' },
+    { cls: 'cycle-legend__swatch--dot', key: 'health.cycle.legend.logged', what: 'logged' },
+    { cls: 'is-menstruation', key: 'health.cycle.legend.period', what: 'period' },
+    { cls: 'is-menstruation is-predicted', key: 'health.cycle.legend.predicted', what: 'predicted' },
+    { cls: 'is-fertile', key: 'health.cycle.legend.fertile', what: 'fertile' },
     // T2: die Standard-Eisprung-Zelle zeigt jetzt den Umriss der Kalender-
     // methode (Vorhersage) - der Vollton ist "bestätigt" vorbehalten (s.u.).
-    { cls: 'is-ovulation is-predicted', key: 'health.cycle.legend.ovulation' },
-    { cls: 'is-today', key: 'health.cycle.legend.today' },
-  ];
+    { cls: 'is-ovulation is-predicted', key: 'health.cycle.legend.ovulation', what: 'ovulation' },
+    { cls: 'is-today', key: 'health.cycle.legend.today', what: 'today' },
+  ].filter((item) => shows(item.what));
   if (hasConfirmedOvulation) {
     // Nur eingeblendet, wenn der gerade gerenderte Monat tatsächlich eine
     // bestätigte Zelle zeigt - sonst erklärt die Legende einen Zustand, der
@@ -8547,7 +8575,7 @@ function cycleLegendMarkup({ hasConfirmedOvulation = false, showPms = false, own
     <span class="cycle-legend__item"><span class="cycle-legend__swatch ${i.cls}"></span>${esc(t(i.key))}</span>`).join('');
 
   // Eigener Eintrag NUR in der eigenen Ansicht (siehe cycleCalendarMarkup()).
-  const heartRow = own
+  const heartRow = own && shows('intimacy')
     ? `<span class="cycle-legend__item"><i data-lucide="heart" class="cycle-legend__heart-icon icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>`
     : '';
 
@@ -8559,13 +8587,15 @@ function cycleLegendMarkup({ hasConfirmedOvulation = false, showPms = false, own
 
   // B-1: eine einzige kompakte Zeile für die 4-stufige Blutungsstärke-Skala,
   // statt vier weitere Legenden-Items - "Keep the legend from exploding".
-  const flowScale = `
+  const flows = FLOW_LEVELS.filter((f) => shows(`flow:${f.value}`));
+  const flowScale = flows.length ? `
     <div class="cycle-legend__flow-row">
       <span class="cycle-legend__flow-label">${esc(t('health.cycle.flow.label'))}</span>
-      ${FLOW_LEVELS.map((f) => `
+      ${flows.map((f) => `
         <span class="cycle-legend__flow-step"><span class="cycle-legend__flow-dot" data-flow="${esc(f.value)}"></span>${esc(t(f.labelKey))}</span>`).join('')}
-    </div>`;
+    </div>` : '';
 
+  if (!rows && !heartRow && !pmsRow && !flowScale) return '';
   return `<div class="cycle-legend">${rows}${heartRow}${pmsRow}${flowScale}</div>`;
 }
 
@@ -9298,13 +9328,13 @@ function cycleHistoryMarkup(canEdit) {
  * -> Module -> Kalender abonnieren; ... ueber Anpassen einblenden"), und der
  * erste fuehrte in ein seit R14 aufgeloestes Blatt: der Zyklus-Feed steht im
  * Gesundheitsblatt (registry.js, `feed-cycle`). Jetzt ein Link mit eigenem
- * Text dorthin, darunter die Kachel als ruhiger Satz - ohne HTML im Locale.
+ * Text dorthin - ohne HTML im Locale. Der Satz zur Uebersichtskachel darunter
+ * ist seit R23 (distill) weg: "Anpassen" erklaert seine Kacheln selbst.
  */
 function cycleDiscoveryMarkup() {
   return `
     <div class="cycle-hint cycle-discovery-hint">
       <a class="cycle-discovery-hint__link" href="/settings/modules/health?section=feed-cycle" data-cycle-feed-link>${esc(t('health.cycle.feedLink'))}</a>
-      <p class="cycle-discovery-hint__note">${esc(t('health.cycle.widgetHint', { overview: t('nav.dashboard'), customize: t('dashboard.customize') }))}</p>
     </div>`;
 }
 

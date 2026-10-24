@@ -5607,7 +5607,6 @@
                 "error": "Import feilet."
             },
             "feedLink": "Abonner på den forventede syklusen i kalenderen",
-            "widgetHint": "Legg syklusflisen til i {{overview}} under «{{customize}}».",
             "endBeforeStart": "Slutten kan ikke være før starten.",
             "periodDeleted": "Mens slettet.",
             "logDeleted": "Dagsoppføring slettet."
@@ -5624,7 +5623,7 @@
             "title": "Ernæring",
             "emptyTitle": "Ingen ernæring logget ennå",
             "emptyDesc": "Logg hva du spiste - tallene står på pakken.",
-            "add": "Legg til oppføring",
+            "add": "Loggfør ernæring",
             "edit": "Rediger oppføring",
             "saved": "Oppføring lagret.",
             "saveError": "Oppføring kunne ikke lagres.",

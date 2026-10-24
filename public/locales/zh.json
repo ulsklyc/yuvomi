@@ -5607,7 +5607,6 @@
                 "error": "导入失败。"
             },
             "feedLink": "在日历中订阅预测周期",
-            "widgetHint": "可在{{overview}}的“{{customize}}”中添加周期卡片。",
             "endBeforeStart": "结束不能早于开始。",
             "periodDeleted": "经期已删除。",
             "logDeleted": "当日记录已删除。"
@@ -5624,7 +5623,7 @@
             "title": "营养",
             "emptyTitle": "尚未记录营养数据",
             "emptyDesc": "记录你吃了什么，数字就印在包装上。",
-            "add": "添加记录",
+            "add": "记录营养",
             "edit": "编辑记录",
             "saved": "记录已保存。",
             "saveError": "记录保存失败。",

@@ -5607,7 +5607,6 @@
                 "error": "Échec de l'import."
             },
             "feedLink": "S’abonner au cycle prévu dans votre calendrier",
-            "widgetHint": "Ajoutez la tuile du cycle à {{overview}} via « {{customize}} ».",
             "endBeforeStart": "La fin ne peut pas précéder le début.",
             "periodDeleted": "Règles supprimées.",
             "logDeleted": "Entrée du jour supprimée."
@@ -5624,7 +5623,7 @@
             "title": "Nutrition",
             "emptyTitle": "Aucune donnée nutritionnelle pour le moment",
             "emptyDesc": "Note ce que tu as mangé - les chiffres figurent sur l’emballage.",
-            "add": "Ajouter une entrée",
+            "add": "Enregistrer la nutrition",
             "edit": "Modifier l’entrée",
             "saved": "Entrée enregistrée.",
             "saveError": "Impossible d’enregistrer l’entrée.",

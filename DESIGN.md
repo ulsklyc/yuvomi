@@ -1883,8 +1883,13 @@ FAB bzw. Kopf-Pille tragen dasselbe Verb violett); ein leerer ABSCHNITT in einem
 Inhalt ist die ruhige Zeile `cardEmptyRowHtml` (Satz + Erfassen, wo es etwas zu erfassen gibt;
 ausserhalb einer Karte mit eigener Flaeche `--surface`). Nie ein nackter grauer Satz, nie eine
 Auswahl ohne Auswahl ("Waehle einen Befund" ohne Befund). Wo der Inhalt die Hauptaktion traegt
-(Zyklus: "Periode gestartet", Fasten: "Fasten starten"), entfaellt die Kopf-Aktion; Nachtragen
-steht am Verlauf und im Leerzustand. Der Bereichsname steht hoechstens zweimal (Liste und
+(Zyklus: "Periode gestartet"), entfaellt die Kopf-Aktion; Nachtragen steht am Verlauf und im
+Leerzustand. **Das Fasten seit R23 D14 umgekehrt:** der FAB bzw. die Kopf-Pille heisst „Fasten
+starten" und startet (nur bei mir, nur ohne laufendes Fasten - `mountFasting` meldet es per
+`onIntent`), der Ring traegt dann nur „Ich habe frueher begonnen" und ein „..." mit Nachtragen
+und Einstellungen (vorher Startknopf + Zahnrad in der Aktionszeile, Nachtragen als Geisterknopf
+am Verlauf); laeuft ein Fasten, traegt der Ring „Fasten beenden" und der FAB faellt weg. Die
+Zyklus-Legende des Kalenders nennt nur, was der Monat zeigt (R23, distill). Der Bereichsname steht hoechstens zweimal (Liste und
 Detailkopf); die Kopf-Pille nennt das OBJEKT, nie den Bereich (de „+ Untersuchung" statt
 „+ Vorsorge", R22 S10; `test:health-nav` "R14 P6" an der Referenz-Locale). "Einnehmen" heisst bei geplanter und Bedarfsdosis gleich und
 traegt auf jeder Seite und Breite Tablette UND Wort (R22-F, F4.5: die Stufe ohne Tablette unter 26rem

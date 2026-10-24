@@ -5607,7 +5607,6 @@
                 "error": "가져오기에 실패했습니다."
             },
             "feedLink": "예상 주기를 캘린더에서 구독",
-            "widgetHint": "주기 타일은 {{overview}}의 “{{customize}}”에서 추가할 수 있습니다.",
             "endBeforeStart": "종료는 시작보다 앞설 수 없습니다.",
             "periodDeleted": "생리 기록을 삭제했습니다.",
             "logDeleted": "하루 기록을 삭제했습니다."
@@ -5624,7 +5623,7 @@
             "title": "영양",
             "emptyTitle": "아직 영양 기록이 없습니다",
             "emptyDesc": "먹은 것을 기록하세요. 숫자는 포장지에 적혀 있습니다.",
-            "add": "기록 추가",
+            "add": "영양 기록",
             "edit": "기록 편집",
             "saved": "기록이 저장되었습니다.",
             "saveError": "기록을 저장할 수 없습니다.",

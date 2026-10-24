@@ -5607,7 +5607,6 @@
                 "error": "Importeren mislukt."
             },
             "feedLink": "Abonneren op de voorspelde cyclus in je agenda",
-            "widgetHint": "Voeg de cyclustegel toe aan {{overview}} via ‘{{customize}}’.",
             "endBeforeStart": "Het einde mag niet vóór het begin liggen.",
             "periodDeleted": "Menstruatie verwijderd.",
             "logDeleted": "Dagnotitie verwijderd."
@@ -5624,7 +5623,7 @@
             "title": "Voedingswaarden",
             "emptyTitle": "Nog geen voedingswaarden vastgelegd",
             "emptyDesc": "Noteer wat je hebt gegeten - de cijfers staan op de verpakking.",
-            "add": "Item toevoegen",
+            "add": "Voedingswaarden vastleggen",
             "edit": "Item bewerken",
             "saved": "Item opgeslagen.",
             "saveError": "Item kon niet worden opgeslagen.",

@@ -354,7 +354,25 @@ test('A-9/B-1: der Kalender traegt eine 4-stufige Flow-Skala + einen Log-Punkt-L
   assert.match(fn, /health\.cycle\.legend\.logged/, 'Legendeneintrag fuer den einfachen Log-Punkt fehlt');
   assert.match(fn, /cycle-legend__flow-row/, 'kompakte Flow-Skalen-Zeile fehlt');
   // Eine einzige Zeile fuer alle vier Stufen - "Keep the legend from exploding".
-  assert.match(fn, /FLOW_LEVELS\.map/, 'die vier Stufen muessen aus FLOW_LEVELS kommen, nicht hartkodiert sein');
+  assert.match(fn, /FLOW_LEVELS\.filter/, 'die Stufen muessen aus FLOW_LEVELS kommen, nicht hartkodiert sein');
+});
+
+// R23 S10 (distill, Critique G5 P3 "Zyklus drei Legenden"): die Kalender-
+// Legende erklaert nur, was der gerenderte Monat zeigt - wie bisher schon
+// "Eisprung bestaetigt" und PMS.
+test('R23: die Zyklus-Legende nennt nur, was der Monat zeigt', () => {
+  const cal = functionSource('cycleCalendarMarkup');
+  assert.match(cal, /const seen = new Set\(\);/);
+  for (const what of ['today', 'logged', 'fertile', 'ovulation', 'intimacy']) {
+    assert.match(cal, new RegExp(`seen\\.add\\('${what}'\\)`), `${what} wird gezaehlt`);
+  }
+  assert.match(cal, /seen\.add\(c\.predicted \? 'predicted' : 'period'\)/);
+  assert.match(cal, /if \(c\.inMonth\) \{/, 'nur Tage des Monats zaehlen');
+  assert.match(cal, /cycleLegendMarkup\(\{ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own, seen \}\)/);
+  const legend = functionSource('cycleLegendMarkup');
+  assert.match(legend, /\]\.filter\(\(item\) => shows\(item\.what\)\);/);
+  assert.match(legend, /FLOW_LEVELS\.filter\(\(f\) => shows\(`flow:\$\{f\.value\}`\)\)/, 'nur die Staerken, die im Monat stehen');
+  assert.match(legend, /if \(!rows && !heartRow && !pmsRow && !flowScale\) return '';/, 'ein leerer Monat traegt keine Legende');
 });
 
 test('T2: bestätigtes Fenster (BBT) traegt eine eigene Klasse, getrennt von "predicted"', () => {
@@ -376,7 +394,7 @@ test('Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke', () =
   assert.match(fn, /l\.intimacy/, 'Intimitäts-Filter auf cycle.logs fehlt');
   assert.match(fn, /cycle-cal__intimacy-icon/, 'Herz-Marker-Klasse fehlt');
   const legendFn = functionSource('cycleLegendMarkup');
-  assert.match(legendFn, /own\s*\n?\s*\?\s*`<span class="cycle-legend__item">.*heart/, 'Legendeneintrag muss own-gated sein');
+  assert.match(legendFn, /own && shows\('intimacy'\)\s*\n?\s*\?\s*`<span class="cycle-legend__item">.*heart/, 'Legendeneintrag muss own-gated sein');
 });
 
 // pmsWindow() wird nicht mehr INNERHALB von cycleCalendarMarkup() aufgerufen -
@@ -673,11 +691,17 @@ test('R22 D12: ein Leerzustand je Ebene - der leere Bereich mit Aktion, die leer
     assert.doesNotMatch(body, /emptyHintHTML\(|reminders-empty/, `${fn}: kein nackter Satz`);
   }
   assert.match(fnBody('renderActivityShell'), /cardEmptyRowHtml\(t\('health\.activity\.noData'\), \{ action: canAdd/, 'leere Woche: Zeile mit Erfassen');
-  // EIN VERB JE AKTION: Zyklus und Fasten ohne Kopf-Aktion, der Inhalt traegt sie.
+  // EIN VERB JE AKTION: der Zyklus ohne Kopf-Aktion, der Inhalt traegt sie.
+  // Das Fasten seit R23 D14 umgekehrt: der FAB heisst "Fasten starten", der
+  // Ring traegt keinen Startknopf mehr (nur noch "Beenden" bei laufendem Fasten).
   const fab = fnBody('updateHealthFab');
-  for (const route of ['cycle', 'fasting']) {
-    const at = fab.indexOf(`case '/health/${route}':`);
-    assert.match(fab.slice(at, fab.indexOf('break;', at)), /hidden: true/, `${route}: keine Kopf-Aktion neben der des Inhalts`);
+  {
+    const at = fab.indexOf(`case '/health/cycle':`);
+    assert.match(fab.slice(at, fab.indexOf('break;', at)), /hidden: true/, 'cycle: keine Kopf-Aktion neben der des Inhalts');
+    const ft = fab.indexOf(`case '/health/fasting':`);
+    const fcase = fab.slice(ft, fab.indexOf('break;', ft));
+    assert.match(fcase, /hidden: !fastingIntent\.canStart/, 'fasting: der FAB nur, wenn ein Start moeglich ist');
+    assert.match(fcase, /label: t\('health\.fasting\.start'\)/, 'fasting: der FAB heisst "Fasten starten"');
   }
   for (const [route, opener] of [['prevention', 'openPreventionModal'], ['nutrition', 'openNutritionModal']]) {
     const at = fab.indexOf(`case '/health/${route}':`);
@@ -686,8 +710,12 @@ test('R22 D12: ein Leerzustand je Ebene - der leere Bereich mit Aktion, die leer
   const fasting = readFileSync(new URL('../public/pages/health-fasting.js', import.meta.url), 'utf8');
   assert.match(fasting, /action: writable \? \{ label: t\('health\.fasting\.backfill'\), icon: 'plus', tone: 'secondary', attrs: \{ 'data-fasting-backfill': '' \} \} : undefined/,
     'Fasten: der Nachtrag ist die Aktion des Leerzustands');
-  assert.match(fasting, /<h3 class="u-section-title">\$\{esc\(t\('health\.fasting\.history'\)\)\}<\/h3>\$\{writable \? `<button type="button" class="btn btn--ghost btn--sm" data-fasting-backfill>/,
-    'Fasten: und ein Knopf im Kopf des Verlaufs');
+  // R23 D14: Nachtragen und Einstellungen im "..." des Rings, nicht als Knoepfe.
+  assert.doesNotMatch(fasting, /btn btn--ghost btn--sm" data-fasting-backfill/, 'Fasten: kein Geisterknopf mehr am Verlauf');
+  assert.match(fasting, /\{ action: 'fasting-backfill', label: t\('health\.fasting\.backfill'\)/, 'Fasten: der Nachtrag steht im Mehr-Menue');
+  assert.match(fasting, /\{ action: 'fasting-settings', label: t\('nav\.settings'\)/, 'Fasten: die Einstellungen ebenso (kein Zahnrad in der Aktionszeile)');
+  assert.doesNotMatch(fasting, /t\(active \? 'health\.fasting\.finish' : 'health\.fasting\.start'\)/, 'Fasten: kein Startknopf im Ring neben dem FAB');
+  assert.match(fasting, /view\.onIntent\?\.\(\{ canStart: !active, start: \(\) => toggleFasting\(null\) \}\)/, 'Fasten: der FAB erfaehrt, ob er starten darf');
   assert.doesNotMatch(fasting, /onCreateAction/, 'Fasten: kein Nachtrag mehr ueber den FAB');
 });
 
