@@ -281,8 +281,15 @@
   flex-wrap: wrap;
 }
 
+/* 8rem STATT 10rem (R23, Critique G1 P3 "Maps eigene Zeile mobil"). Mit
+ * 10rem passte "In Maps oeffnen" auf dem Telefon nie neben den Ort (Zeile
+ * 332px: 160 + Abstand + 138 > 304), und die Aktion stand immer allein in
+ * einer zweiten Zeile. 8rem (128px) traegt jedes Wort eines Ortsnamens bis
+ * etwa 14 Zeichen ("Zahnarztpraxis") ungeteilt; laengere Namen brechen an
+ * ihrer Leerstelle, und erst wenn auch das nicht reicht, rueckt die Aktion
+ * weiter in die eigene Zeile. */
 .detail-row:has(> .detail-row__action) > .detail-row__text {
-  flex: 1 1 10rem;
+  flex: 1 1 8rem;
 }
 
 /* Benannte Gruppe von Metazeilen (`{ group, rows }`): Abschnittstitel wie in

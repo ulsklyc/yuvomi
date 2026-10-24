@@ -6379,7 +6379,8 @@ test('R19 Popover und Tageskopf: Spanne bricht nicht, Ort nicht im Wort, ein Kop
   const wrap = rules.find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action)');
   assert(/flex-wrap:\s*wrap/.test(wrap?.body ?? ''), 'die Aktion einer Zeile rueckt bei Platzmangel darunter');
   const text = rules.find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action) > .detail-row__text');
-  assert(/flex:\s*1 1 10rem/.test(text?.body ?? ''), 'der Wert beansprucht seine Mindestbreite');
+  // R23: 8rem statt 10rem - mit 10rem passte die Aktion am Telefon nie daneben.
+  assert(/flex:\s*1 1 8rem/.test(text?.body ?? ''), 'der Wert beansprucht seine Mindestbreite');
 });
 
 // R20 (E1-Befund, Kalender 1920 CLS 0,136): die Spalte der Seitenleiste steht
@@ -6930,6 +6931,33 @@ test('R21 S9b: Monatschip und Monatsband teilen ein Polster von mindestens 3px',
   }
   assert(/--month-band-h:\s*calc\(var\(--text-xs\) \* 1\.4 \+ 2 \* var\(--cal-chip-pad-block\)\)/.test(body('.month-grid')),
     'die Spur der Monatsbaender rechnet nicht mit dem Polster des Chips');
+});
+
+// R23 (Critique G1 P3 "doppelte Kalender-Steuerung ab 1920"): neben der
+// Seitenleiste fuehrte das Filterblatt Personen und Kalender ein zweites Mal,
+// und sein Zaehler zaehlte sie mit. Eine Achse, ein Ort je Breite.
+test('R23: steht die Seitenleiste, traegt das Filterblatt nur Ebenen und Anzeige', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const fnOf = (name) => { const at = src.indexOf(`function ${name}(`); return src.slice(at, src.indexOf('\n}\n', at)); };
+  assert(/return sidebarShown\(_container\?\.querySelector\('#cal-sidebar'\)\);/.test(fnOf('railCarriesFilters')), 'die Frage ist dieselbe wie die der Leiste');
+  const sheet = fnOf('openCalendarFilters');
+  assert(/const rail = railCarriesFilters\(\);/.test(sheet), 'das Blatt fragt die Leiste');
+  assert(/if \(!rail && \(meRow \|\| peopleChips\)\) groups\.push\(\{ heading: t\('calendar\.filtersPeople'\)/.test(sheet), 'Personen nur ohne Leiste');
+  assert(/if \(!rail && \(sourceRows \|\| manageRow\)\) groups\.push\(\{ heading: t\('calendar\.filtersSources'\)/.test(sheet), 'Kalender nur ohne Leiste');
+  assert(/if \(!rail\) \{\s*state\.assignedToMe = false;\s*state\.people\.clear\(\);/.test(sheet), 'Zuruecksetzen laesst die Achsen der Leiste stehen');
+  const count = fnOf('activeFilterCount');
+  for (const axis of ['state.assignedToMe', 'state.people.size > 0', 'state.hiddenSources?.size > 0']) {
+    assert(count.includes(`if (!rail && ${axis})`), `der Zaehler zaehlt ${axis} nur ohne Leiste`);
+  }
+  assert(/if \(!first\) renderToolbar\(\);/.test(fnOf('wireSidebar')), 'erscheint oder geht die Leiste, zaehlt der Knopf neu');
+});
+
+// R23 (Critique G1 P3 "Maps eigene Zeile mobil"): mit 10rem stand "In Maps
+// oeffnen" auf dem Telefon nie neben dem Ort.
+test('R23: die Folgeaktion einer Detailzeile passt am Telefon neben ihren Wert', () => {
+  const css = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action) > .detail-row__text');
+  assert(/flex:\s*1 1 8rem/.test(rule?.body ?? ''), `Basis 8rem, nicht 10rem (${rule?.body})`);
 });
 
 // --------------------------------------------------------

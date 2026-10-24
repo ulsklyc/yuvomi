@@ -1225,11 +1225,22 @@ function calendarSources() {
 }
 
 /** Wie viele Filter gerade etwas wegnehmen - die Zahl am Filterknopf. */
+/**
+ * Steht die Seitenleiste mit Kalendern und Personen im Bild? Dann gehoeren
+ * diese beiden Achsen IHR (R23, Critique G1 P3 "doppelte Steuerung ab
+ * 1920"): das Filterblatt traegt nur noch Ebenen und Anzeige, und sein Zaehler
+ * zaehlt nur, was es selbst zeigt - eine Achse, ein Ort je Breite.
+ */
+function railCarriesFilters() {
+  return sidebarShown(_container?.querySelector('#cal-sidebar'));
+}
+
 function activeFilterCount() {
   let n = 0;
-  if (state.assignedToMe) n += 1;
-  if (state.people.size > 0) n += 1;
-  if (state.hiddenSources?.size > 0) n += 1;
+  const rail = railCarriesFilters();
+  if (!rail && state.assignedToMe) n += 1;
+  if (!rail && state.people.size > 0) n += 1;
+  if (!rail && state.hiddenSources?.size > 0) n += 1;
   const hp = state.holidayPrefs ?? {};
   if (hp.holiday_show_public && !state.layerHolidays) n += 1;
   if (hp.holiday_show_school && !state.layerSchool) n += 1;
@@ -5791,8 +5802,12 @@ function wireSidebar(signal) {
     _sidebarObserver = new ResizeObserver(() => {
       const now = sidebarShown(aside);
       if (now === shown) return;
+      const first = shown === null;
       shown = now;
       if (now) renderSidebar();
+      // Der Zaehler am Filterknopf haengt daran, ob die Leiste steht
+      // (activeFilterCount) - beim Wechsel der Breite neu, nicht beim Aufbau.
+      if (!first) renderToolbar();
     });
     _sidebarObserver.observe(page);
     signal?.addEventListener('abort', () => _sidebarObserver?.disconnect(), { once: true });
@@ -6658,8 +6673,11 @@ function openCalendarFilters() {
   const { meRow, peopleChips, sourceRows, manageRow } = calendarFilterParts({ people, sources });
 
   const groups = [];
-  if (meRow || peopleChips) groups.push({ heading: t('calendar.filtersPeople'), html: meRow + peopleChips });
-  if (sourceRows || manageRow) groups.push({ heading: t('calendar.filtersSources'), html: sourceRows + manageRow });
+  // Neben der Seitenleiste stehen Personen und Kalender dort - nicht ein
+  // zweites Mal hier (railCarriesFilters).
+  const rail = railCarriesFilters();
+  if (!rail && (meRow || peopleChips)) groups.push({ heading: t('calendar.filtersPeople'), html: meRow + peopleChips });
+  if (!rail && (sourceRows || manageRow)) groups.push({ heading: t('calendar.filtersSources'), html: sourceRows + manageRow });
 
   const layerRows = buildLayerRowsHtml(layers);
   if (layerRows) groups.push({ heading: t('calendar.filtersLayers'), html: `<div id="cal-filters-layers">${layerRows}</div>` });
@@ -6703,10 +6721,14 @@ function openCalendarFilters() {
     state.layerWaste = false;
     state.wasteVisibleTypeIds.clear();
     state.layerBirthdays = true;
-    state.assignedToMe = false;
-    state.people.clear();
-    state.hiddenSources.clear();
-    persistHiddenSources();
+    // Zurueckgesetzt wird, was das Blatt zeigt: neben der Seitenleiste
+    // gehoeren Personen und Kalender ihr und bleiben stehen.
+    if (!rail) {
+      state.assignedToMe = false;
+      state.people.clear();
+      state.hiddenSources.clear();
+      persistHiddenSources();
+    }
     try {
       localStorage.setItem(LAYER_HOLIDAYS_KEY, 'true');
       localStorage.setItem(LAYER_SCHOOL_KEY, 'true');
@@ -6714,9 +6736,9 @@ function openCalendarFilters() {
       localStorage.setItem(LAYER_WASTE_KEY, 'false');
       localStorage.removeItem(WASTE_VISIBLE_TYPES_KEY);
       localStorage.setItem(LAYER_BIRTHDAYS_KEY, 'true');
-      localStorage.setItem(ASSIGNED_TO_ME_KEY, '0');
+      if (!rail) localStorage.setItem(ASSIGNED_TO_ME_KEY, '0');
     } catch {}
-    persistPeopleFilter();
+    if (!rail) persistPeopleFilter();
     renderToolbar();
     renderView();
   };

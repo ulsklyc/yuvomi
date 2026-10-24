@@ -1053,7 +1053,8 @@ Subheadline 15, Footnote 13, Caption 2 11.
   der volle Tag sekundaer) - bis R21 14/700, eine Stufe ausserhalb der Rollen.
 - **Caption 1** (12px, `--text-xs`): nur Badges, Zaehler, Chips, Nav-Labels und
   Mikro-Labels - nie eine Lesezeile (R21, D4). Die dichte Monatszelle des Kalenders ist
-  Mikrotext und bleibt bei 12, darf aber am Tablet zwei Zeilen nehmen.
+  Mikrotext und bleibt bei 12, am Tablet wie am Desktop EINE Zeile mit Ellipse (R23, D14;
+  R21 liess dort zwei Zeilen mit Silbentrennung zu - das Raster wurde je Woche anders hoch).
 - **Versal-Mikro-Label** (semibold, 12px, Tracking 0.05em, uppercase): der Sektionskopf
   einer Grouped-Liste. 0.05em (`--tracking-label`) ist der EINE Tracking-Wert und hat sechs
   gestreute Werte abgeloest.
@@ -1790,7 +1791,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche |
 | `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
 | `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`); seit R17 EINE Liste aller Gegenstaende nach Kategorie gruppiert, die Kategorien als Filter-Chips darueber (`?category=` waehlt den Chip vor und wird ersetzt, nicht gestapelt), kein Kategorie-Zwischenschritt; kurze Angaben im Detail zweispaltig ab 35rem Spaltenbreite (`@container detail-pane`) |
-| `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche; der Tag fuehrt ab der Schwelle eine Seitenspalte mit den Folgetagen (`.day-rail`); ab 86.25rem Kalenderflaeche (ca. 1600er Fenster) steht in Monat, Woche und Tag links die Seitenleiste (Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt, „Als Naechstes“), auf der Inhaltsspalte wie jedes Modul (R23 D13; R19 rueckte die Seite dafuer noch auf den Seitenrand). Heute ist im Mini-Monat wie im Raster die gefuellte Akzent-Scheibe (`--color-accent`), der gewaehlte Tag ein Ring derselben Farbe; Personen-Chips lassen einen gemeinsamen Nachnamen weg (`sharedSurname`, Re-Kritik 2026-10-17) |
+| `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche; der Tag fuehrt ab der Schwelle eine Seitenspalte mit den Folgetagen (`.day-rail`); ab 86.25rem Kalenderflaeche (ca. 1600er Fenster) steht in Monat, Woche und Tag links die Seitenleiste (Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt, „Als Naechstes“), auf der Inhaltsspalte wie jedes Modul (R23 D13; R19 rueckte die Seite dafuer noch auf den Seitenrand). Steht die Leiste, gehoeren Kalender und Personen IHR: das Filterblatt traegt dann nur Ebenen und Anzeige, sein Zaehler zaehlt nur diese, und Zuruecksetzen laesst die Leiste stehen (`railCarriesFilters`, R23 - vorher dieselben Schalter an zwei Orten). Heute ist im Mini-Monat wie im Raster die gefuellte Akzent-Scheibe (`--color-accent`), der gewaehlte Tag ein Ring derselben Farbe; Personen-Chips lassen einen gemeinsamen Nachnamen weg (`sharedSurname`, Re-Kritik 2026-10-17) |
 | `health.js` Gesundheit | Liste + Detail | `dashboard` + `list-detail` (Uebersicht + Bereiche links, Pfad-Adresse) |
 | `settings.js` Einstellungen | Liste + Detail | eigene Shell: Liste + Blatt ab der Split-Schwelle (`settings-surface`, Kompositions-Ausnahme) |
 | `split-expenses.js` Aufteilung | Liste + Detail | `split`, eigene Geometrie |
@@ -4892,6 +4893,8 @@ nichts mehr auseinander, und „In Maps öffnen" rutschte allein in eine zweite 
 `edit.primary` gilt jetzt auch dort: Aufruferaktionen zuerst, Bearbeiten primaer am Ende. In
 286px Innenbreite teilen sich Löschen und Maps die erste Zeile, Bearbeiten steht unten am Ende -
 dasselbe Bild wie im Sheet, und kein Aktionsknopf verliert seine Beschriftung.
+**Die Folgeaktion steht neben ihrem Wert, solange er 8rem behaelt** (R23): mit 10rem passte
+„In Maps öffnen" am Telefon nie neben den Ort und stand immer in einer eigenen Zeile.
 **Ein Weg in ein anderes Modul ist eine Folgeaktion der Zeile, die ihn begruendet** (R21, D7):
 die Geburtstagszeile eines Kontakts fuehrt "In Geburtstagen anzeigen", die Datumszeile eines
 importierten Geburtstags "Kontakt anzeigen" (`birthday_id` / `contact_id`, Migration 90) - nur

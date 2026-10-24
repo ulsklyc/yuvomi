@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   phone. Saving a contact without a name now marks the first-name field instead of showing a
   message at the bottom. Initials skip a leading title such as "Dr." or "Prof.", so "Dr. Anna
   Weber" shows AW everywhere in the app.
+- **The calendar month stays even on a tablet, and wide screens show each filter once.** Between
+  640 and 1023 px an entry in the month grid is one line again, cut with an ellipsis, so every
+  week keeps the same height. With the side panel visible on a wide screen, the filter sheet
+  only holds layers and display, since calendars and people are already in the panel; its
+  counter and reset follow suit. "Open in Maps" now fits beside the place on a phone instead
+  of taking a line of its own.
 - **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
   instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
   width the meal type moves from its own column into a heading above its row, and all seven days
