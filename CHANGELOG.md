@@ -88,6 +88,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version check against GitHub, the design line speaks of a native-feeling app instead of design
   jargon, and the coloured technology badges became one line under "Under the hood". The German
   README follows, with its English link in the link row.
+- **The README gets to Install sooner on a phone and says plainly when Yuvomi reaches out.** The
+  phone screenshot at the top now takes about 60% of the width instead of filling it, about 300px
+  less to scroll; the desktop screenshot keeps its size. The kitchen-wall picture now has the
+  shopping list on a phone beside it, so the section titled "in every pocket" shows a phone on a
+  laptop too. The module groups name Notes & Contacts as one entry, as the table does, so twenty
+  modules are twenty names. The top line no longer says the version check is the only outside
+  call: it is the only one Yuvomi makes on its own, and the outbound details are now a short list
+  of what reaches out when you use a feature, when the operator turns it on and once you switch
+  it on. The same correction reaches the "What if this project stops?" answer on yuvomi.cloud.
+  The image name is one code span, and only the tour and install links in the top row are bold.
 - **yuvomi.cloud shows the app sooner and reads more evenly.** On a laptop screen the first
   screen of the landing page now shows well over a third of the overview screenshot instead of a
   thin strip at its bottom edge, with the household line and the Install button still above it.

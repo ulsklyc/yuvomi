@@ -7,8 +7,8 @@
 
   <p>
     Tasks, calendar, budget, meals, health and more for a family, a couple or just you, on a
-    server you own. Out of the box, the only call it makes to the outside is a version check
-    against GitHub.
+    server you own. On its own, it only asks GitHub whether a newer version exists; anything else
+    waits until you use a feature that needs it.
   </p>
 
   <p>
@@ -22,16 +22,16 @@
   <p>
     <a href="https://yuvomi.cloud/"><strong>→ Take the tour on yuvomi.cloud</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#install"><strong>Install&nbsp;in&nbsp;minutes</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="#documentation"><strong>Docs</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="CHANGELOG.md"><strong>Changelog</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="#documentation">Docs</a>&nbsp;&nbsp;·&nbsp;
+    <a href="CHANGELOG.md">Changelog</a>&nbsp;&nbsp;·&nbsp;
     <a href="README.de.md" hreflang="de">Auf&nbsp;Deutsch</a>
   </p>
 
   <p><b>20</b>&nbsp;modules&nbsp;&nbsp;·&nbsp; <b>27</b>&nbsp;languages&nbsp;&nbsp;·&nbsp; <b>0</b>&nbsp;trackers&nbsp;&nbsp;·&nbsp; <b>1</b>&nbsp;SQLite&nbsp;file&nbsp;&nbsp;·&nbsp; <b>256&nbsp;MB</b>&nbsp;RAM&nbsp;minimum</p>
 
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-mobile.webp">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/dashboard-light-mobile.webp">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-mobile.webp" width="200">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/dashboard-light-mobile.webp" width="200">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark-web.webp">
     <img src="docs/screenshots/dashboard-light-web.webp" alt="The Yuvomi overview: today's events, tasks and shopping for the whole family, with the family, birthdays and rewards below" width="820">
   </picture>
@@ -65,12 +65,19 @@ This is the part a folder full of separate apps cannot do:
 
 ## On the kitchen wall, in every pocket
 
-<div align="center">
+<p align="center">
   <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp" width="196">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/dashboard-wall-light-web.webp" width="196">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-wall-dark-web.webp">
-    <img src="docs/screenshots/dashboard-wall-light-web.webp" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" width="720">
+    <img src="docs/screenshots/dashboard-wall-light-web.webp" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" width="600">
+  </picture>&emsp;<picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-mobile.webp" width="68">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/shopping-light-mobile.webp" width="68">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shopping-dark-mobile.webp">
+    <img src="docs/screenshots/shopping-light-mobile.webp" alt="The shared shopping list on a phone, sorted by aisle: fruit and veg, bakery, dairy, meat and fish" width="207">
   </picture>
-</div>
+</p>
 
 - **The tablet on the kitchen wall** shows today's plan and who is up in wall mode, readable across the room. It has an account of its own: tap a task, pick who did it, and the points go to them. When it sits idle, an Immich screensaver can show your own photos.
 - **The app on every phone** goes on the home screen straight from the browser, no app store. Reminders arrive as push notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.
@@ -85,9 +92,9 @@ Waste collection and Schedule start switched off.
 
 <details>
 <summary>
-<b>Plan</b> - Tasks · Calendar · Rewards · Notes · Schedule<br>
+<b>Plan</b> - Tasks · Calendar · Rewards · Notes &amp; Contacts · Schedule<br>
 <b>Household</b> - Meals · Recipes · Shopping · Pantry · Housekeeping · Waste collection · Documents · Inventory<br>
-<b>People</b> - Health · Contacts · Birthdays<br>
+<b>People</b> - Health · Birthdays<br>
 <b>Finance</b> - Budget<br>
 <b>Settings</b> - Family · Reminders · API Tokens · Backup<br>
 <sub>Open for every module in one line</sub>
@@ -154,7 +161,7 @@ Pick your way in:
 
 Whichever way you pick:
 
-- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, about 500 MB, for amd64 and arm64 (Raspberry Pi 4/5).
+- **Image** - `ghcr.io/ulsklyc/yuvomi:latest`, about 500 MB, for amd64 and arm64 (Raspberry Pi 4/5).
 - **Needs** - 256 MB RAM and one port, 3000 by default.
 - **Encryption key** - optional, but there is no way back: a lost or changed key never opens the database again, not by you and not by us. The guided setup and Umbrel generate one for you; with Compose, TrueNAS or Unraid you set it yourself, so write it down.
 
@@ -163,7 +170,10 @@ Whichever way you pick:
 
 - **Browsers** - everything as designed from Chrome and Edge 117, Firefox 129 and Safari 17.5. Down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5) it still starts and scrolls, with a plainer look and some features missing ([measured 21 September 2026](docs/installation.md#browser-support)).
 - **Writes** - four volumes you own: data, backups, modules, documents.
-- **Outbound** - out of the box, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Everything else reaches out only when you use or switch on a feature that needs it: opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service's website, fetching your profile picture from Gravatar sends a hash of your email address to gravatar.com or the mirror the operator chose, if the operator turned it on, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.
+- **Outbound** - on its own, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Everything else reaches out only when you use or switch on a feature that needs it:
+  - **When you use it** - opening the calendar settings loads the list of holiday countries from openholidaysapi.org; finding a logo for a subscription looks up the service's website.
+  - **If the operator turns it on** - fetching your profile picture from Gravatar sends a hash of your email address to gravatar.com or the mirror the operator chose.
+  - **Once you switch them on** - weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup.
 - **Your LAN** - calendar subscriptions, notification channels (webhook, Gotify, ntfy), WebDAV document storage, recipe mirrors and waste-collection feeds on private or internal addresses stay blocked until you opt in ([how](docs/installation.md#environment-variables)). Paperless and Papra are the exception: they may reach the LAN out of the box.
 - **Your data** - one SQLite file at `/data/yuvomi.db`, plus the folder, WebDAV or Drive if you moved documents there.
 

@@ -7,8 +7,8 @@
 
   <p>
     Aufgaben, Kalender, Budget, Mahlzeiten, Gesundheit und mehr für eine Familie, ein Paar oder
-    euch allein, auf einem Server, der euch gehört. Ab Werk ruft er nach außen nur eins auf: eine
-    Versionsprüfung bei GitHub.
+    euch allein, auf einem Server, der euch gehört. Von sich aus fragt er nur bei GitHub, ob es eine
+    neuere Version gibt; alles andere wartet, bis ihr eine Funktion nutzt, die es braucht.
   </p>
 
   <p>
@@ -22,16 +22,16 @@
   <p>
     <a href="https://yuvomi.cloud/"><strong>→ Rundgang auf yuvomi.cloud</strong></a>&nbsp;&nbsp;·&nbsp;
     <a href="#installieren"><strong>In&nbsp;Minuten&nbsp;installieren</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="#dokumentation"><strong>Doku</strong></a>&nbsp;&nbsp;·&nbsp;
-    <a href="CHANGELOG.md"><strong>Changelog</strong></a>&nbsp;&nbsp;·&nbsp;
+    <a href="#dokumentation">Doku</a>&nbsp;&nbsp;·&nbsp;
+    <a href="CHANGELOG.md">Changelog</a>&nbsp;&nbsp;·&nbsp;
     <a href="README.md" hreflang="en">English&nbsp;(maßgeblich)</a>
   </p>
 
   <p><b>20</b>&nbsp;Module&nbsp;&nbsp;·&nbsp; <b>27</b>&nbsp;Sprachen&nbsp;&nbsp;·&nbsp; <b>0</b>&nbsp;Tracker&nbsp;&nbsp;·&nbsp; <b>1</b>&nbsp;SQLite&#8209;Datei&nbsp;&nbsp;·&nbsp; ab&nbsp;<b>256&nbsp;MB</b>&nbsp;RAM</p>
 
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-mobile.webp">
-    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-light-mobile.webp">
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-mobile.webp" width="200">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-light-mobile.webp" width="200">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-dark-web.webp">
     <img src="docs/screenshots/de/dashboard-light-web.webp" alt="Die Yuvomi-Übersicht: Termine, Aufgaben und Einkauf des Tages für die ganze Familie, darunter Familie, Geburtstage und Belohnungen" width="820">
   </picture>
@@ -65,12 +65,19 @@ Das ist der Teil, den ein Ordner voller Einzel-Apps nicht kann:
 
 ## An der Küchenwand, in jeder Hosentasche
 
-<div align="center">
+<p align="center">
   <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp" width="196">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/dashboard-wall-light-web.webp" width="196">
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/dashboard-wall-dark-web.webp">
-    <img src="docs/screenshots/de/dashboard-wall-light-web.webp" alt="Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp" width="720">
+    <img src="docs/screenshots/de/dashboard-wall-light-web.webp" alt="Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp" width="600">
+  </picture>&emsp;<picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/screenshots/de/shopping-dark-mobile.webp" width="68">
+    <source media="(max-width: 600px)" srcset="docs/screenshots/de/shopping-light-mobile.webp" width="68">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/shopping-dark-mobile.webp">
+    <img src="docs/screenshots/de/shopping-light-mobile.webp" alt="Die geteilte Einkaufsliste auf dem Handy, nach Gang sortiert: Obst und Gemüse, Backwaren, Milchprodukte, Fleisch und Fisch" width="207">
   </picture>
-</div>
+</p>
 
 - **Das Tablet an der Küchenwand** zeigt im Wand-Modus den Tagesplan und wer heute dran ist, lesbar quer durch den Raum. Es hat ein eigenes Konto: Aufgabe antippen, auswählen, wer sie erledigt hat, und die Punkte gehen an diese Person. Steht es still, kann ein Immich-Bildschirmschoner eure eigenen Fotos zeigen.
 - **Die App auf jedem Handy** kommt direkt aus dem Browser auf den Startbildschirm, ohne App Store. Erinnerungen kommen als Mitteilung, auch wenn die App zu ist (dafür braucht euer Server HTTPS), und die zuletzt geöffnete Einkaufsliste bleibt lesbar, wenn kein Netz da ist.
@@ -85,9 +92,9 @@ Entsorgung und Schichtplan sind anfangs aus.
 
 <details>
 <summary>
-<b>Planen</b> - Aufgaben · Kalender · Belohnungen · Notizen · Schichtplan<br>
+<b>Planen</b> - Aufgaben · Kalender · Belohnungen · Notizen &amp; Kontakte · Schichtplan<br>
 <b>Haushalt</b> - Mahlzeiten · Rezepte · Einkauf · Vorrat · Haushaltshilfe · Entsorgung · Dokumente · Inventar<br>
-<b>Menschen</b> - Gesundheit · Kontakte · Geburtstage<br>
+<b>Menschen</b> - Gesundheit · Geburtstage<br>
 <b>Finanzen</b> - Budget<br>
 <b>Einstellungen</b> - Familie · Erinnerungen · API-Tokens · Backup<br>
 <sub>Aufklappen für jedes Modul in einer Zeile</sub>
@@ -155,7 +162,7 @@ Sucht euch euren Weg aus:
 
 Egal welcher Weg:
 
-- **Image** - `ghcr.io/ulsklyc/`<wbr>`yuvomi:latest`, rund 500 MB, für amd64 und arm64 (Raspberry Pi 4/5).
+- **Image** - `ghcr.io/ulsklyc/yuvomi:latest`, rund 500 MB, für amd64 und arm64 (Raspberry Pi 4/5).
 - **Braucht** - 256 MB RAM und einen Port, standardmäßig 3000.
 - **Schlüssel** - optional, aber ohne Weg zurück: ein verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für euch noch für uns. Die geführte Einrichtung und Umbrel erzeugen ihn für euch; mit Compose, TrueNAS oder Unraid setzt ihr ihn selbst, also schreibt ihn auf.
 
@@ -164,7 +171,10 @@ Egal welcher Weg:
 
 - **Browser** - alles wie vorgesehen ab Chrome und Edge 117, Firefox 129 und Safari 17.5. Bis hinunter zu Chrome 87, Firefox 79 und Safari 14.1 (iOS 14.5) startet und scrollt es noch, schlichter und mit einzelnen fehlenden Funktionen ([gemessen am 21. September 2026](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.
-- **Nach außen** - ab Werk eine Update-Abfrage an die GitHub-Releases-API. Blockiert sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht: das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, das Holen des Profilbilds von Gravatar schickt einen Hash eurer E-Mail-Adresse an gravatar.com oder den vom Betreiber gewählten Spiegel, wenn der Betreiber es eingeschaltet hat, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.
+- **Nach außen** - von sich aus eine Update-Abfrage an die GitHub-Releases-API. Blockiert sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht:
+  - **Wenn ihr sie nutzt** - das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org; die Logo-Suche für ein Abo ruft die Website des Dienstes auf.
+  - **Wenn der Betreiber es einschaltet** - das Holen des Profilbilds von Gravatar schickt einen Hash eurer E-Mail-Adresse an gravatar.com oder den vom Betreiber gewählten Spiegel.
+  - **Sobald ihr sie einschaltet** - Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup.
 - **Euer LAN** - Kalender-Abos, Benachrichtigungskanäle (Webhook, Gotify, ntfy), WebDAV-Dokumentenspeicher, Rezept-Spiegel und Abfuhr-Feeds unter privaten oder internen Adressen bleiben blockiert, bis ihr sie freigebt ([wie](docs/installation.md#environment-variables)). Paperless und Papra sind die Ausnahme: sie dürfen ab Werk ins LAN.
 - **Eure Daten** - eine SQLite-Datei unter `/data/yuvomi.db`, dazu Ordner, WebDAV oder Drive, falls die Dokumente dort liegen.
 

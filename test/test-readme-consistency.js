@@ -285,9 +285,15 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
  * waere genau die Doppelung, die der Umbau entfernt hat. Die Homepage (#modules) zeigt dieselben
  * Gruppen, und `test-docs-landing.js` haelt sie gegen `public/router.js`. Hier:
  * README-Gruppen == Homepage-Gruppen (Name, Reihenfolge, Mitglieder), je
- * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle - eine
- * Zeile "A & B" darf als A und B in zwei Gruppen stehen (Notizen bei Planen,
- * Kontakte bei Menschen), aber nur beide zusammen.
+ * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle.
+ *
+ * Seit der Re-Critique vom 2026-10-24 nennen die Gruppenzeilen so viele Namen,
+ * wie die Tabelle Zeilen hat: vorher standen Notizen bei Planen und Kontakte bei
+ * Menschen, das <summary> zaehlte 21 Namen unter der Ueberschrift "twenty", und
+ * der Leser zaehlte nach. Eine Tabellenzeile "A & B" steht deshalb auch in den
+ * Gruppenzeilen als EIN Eintrag "A & B", an der Stelle von A; die Homepage darf
+ * A und B weiter in ihren zwei Menuegruppen zeigen, und fuer den Vergleich wird
+ * B dort aus seiner Gruppe genommen.
  */
 function readmeGroups(md) {
   const sec = md.split(/^## /m).find((s) => claimedModuleWord(`## ${s.split('\n')[0]}`)) || '';
@@ -315,7 +321,19 @@ function groupFindings(md, html, lang) {
   if (pageG.length < 4) return [`Homepage (${lang}): nur ${pageG.length} Modulgruppen gefunden - Muster veraltet?`];
   if (readmeG.length !== pageG.length) found.push(`${readmeG.length} Gruppenzeilen, die Homepage zeigt ${pageG.length} Gruppen`);
   const low = (list) => list.map((n) => n.toLowerCase()).join(' · ');
-  pageG.forEach((pg, i) => {
+  // Ein README-Eintrag "A & B" steht fuer die Homepage-Eintraege A und B: A wird
+  // zu "A & B", B faellt aus seiner Gruppe. Nur wenn die Homepage beide zeigt.
+  const pageCmp = pageG.map((g) => ({ label: g.label, names: [...g.names] }));
+  const where = (n) => pageCmp.findIndex((g) => g.names.some((x) => x.toLowerCase() === n.toLowerCase()));
+  for (const both of readmeG.flatMap((g) => g.names).filter((n) => n.includes(' & '))) {
+    const [a, b] = both.split(' & ');
+    const ia = where(a);
+    const ib = where(b);
+    if (ia < 0 || ib < 0) continue;
+    pageCmp[ia].names = pageCmp[ia].names.map((x) => (x.toLowerCase() === a.toLowerCase() ? both : x));
+    pageCmp[ib].names = pageCmp[ib].names.filter((x) => x.toLowerCase() !== b.toLowerCase());
+  }
+  pageCmp.forEach((pg, i) => {
     const rg = readmeG[i];
     if (!rg) return;
     if (rg.label !== pg.label) found.push(`Gruppe ${i + 1}: README "${rg.label}", Homepage "${pg.label}"`);
@@ -331,6 +349,8 @@ function groupFindings(md, html, lang) {
   }
   for (const n of inGroups) if (!used.has(n)) found.push(`Gruppenzeile nennt "${n}", die Tabelle nicht`);
   if (inGroups.length !== new Set(inGroups).size) found.push('ein Modul steht in zwei Gruppenzeilen');
+  const rows = moduleRows(md).length;
+  if (inGroups.length !== rows) found.push(`${inGroups.length} Namen in den Gruppenzeilen, die Tabelle hat ${rows} Zeilen`);
   return found;
 }
 
@@ -348,9 +368,16 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     assert.ok(md.includes(from), `Vorbedingung: "${from}" steht in README.md`);
     return groupFindings(md.replace(from, to), html, 'en');
   };
-  // Kontakte zurueck zu den Notizen (der Anlass von Runde 2 auf der Homepage).
-  const f1 = swap('Notes · Schedule<br>', 'Notes · Schedule · Contacts<br>');
-  assert.ok(hit(f1, /Gruppe "Plan"/) && hit(f1, /zwei Gruppenzeilen/), f1.join(' | '));
+  // Kontakte zusaetzlich zur gemeinsamen Zeile auch bei Menschen.
+  const f1 = swap('<b>People</b> - Health · Birthdays<br>', '<b>People</b> - Health · Contacts · Birthdays<br>');
+  assert.ok(hit(f1, /Gruppe "People"/) && hit(f1, /Gruppenzeile nennt "contacts", die Tabelle nicht/), f1.join(' | '));
+  // Der Stand vor der Re-Critique vom 2026-10-24: Notizen und Kontakte getrennt
+  // in ihren Menuegruppen, 21 Namen fuer 20 Tabellenzeilen.
+  const split = groupFindings(md.replace('Notes &amp; Contacts · Schedule<br>', 'Notes · Schedule<br>')
+    .replace('<b>People</b> - Health · Birthdays<br>', '<b>People</b> - Health · Contacts · Birthdays<br>'), html, 'en');
+  assert.ok(hit(split, /21 Namen in den Gruppenzeilen, die Tabelle hat 20 Zeilen/), split.join(' | '));
+  // Die gemeinsame Zeile verliert ihre zweite Haelfte.
+  assert.ok(hit(swap('Notes &amp; Contacts · Schedule<br>', 'Notes · Schedule<br>'), /Tabellenzeile "Notes & Contacts" steht in keiner Gruppenzeile/));
   // Ein Modul fehlt in den Gruppenzeilen, steht aber in der Tabelle.
   assert.ok(hit(swap(' · Waste collection', ''), /Tabellenzeile "Waste collection" steht in keiner Gruppenzeile/));
   // Eine Gruppe umbenannt.

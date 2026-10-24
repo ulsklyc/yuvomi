@@ -578,10 +578,14 @@ test('jede genannte OpenAPI-Version ist die, die der Server ausliefert', () => {
  * Spiegel, Immich, Paperless/Papra und die Benachrichtigungskanaele weg - auf
  * der Seite, deren staerkstes Argument ist, dass nichts ungefragt nach aussen
  * geht. Die README ist hier die Quelle; die Seite muss jeden Eintrag nennen.
+ *
+ * Seit der Re-Critique vom 2026-10-24 ist die README-Zeile eine Unterliste
+ * (nutzen / Betreiber schaltet ein / einschalten) statt eines Satzes mit 125
+ * Woertern; die zuschaltbaren Verbindungen stehen im letzten Unterpunkt.
  */
 const OUTBOUND = {
-  en: { readme: 'README.md', bullet: /^- \*\*Outbound\*\* - (.+)$/m, list: /, and ((?:(?!, and ).)+?) connect once you switch them on/, base: 'one update check against the GitHub releases API' },
-  de: { readme: 'README.de.md', bullet: /^- \*\*Nach außen\*\* - (.+)$/m, list: /, und ((?:(?!, und ).)+?) verbinden sich erst/, base: 'eine Update-Abfrage an die GitHub-Releases-API' },
+  en: { readme: 'README.md', bullet: /^- \*\*Outbound\*\* - (.+(?:\n {2}- .+)*)/m, list: /^ {2}- \*\*Once you switch them on\*\* - (.+?)\.?$/m, base: 'one update check against the GitHub releases API' },
+  de: { readme: 'README.de.md', bullet: /^- \*\*Nach außen\*\* - (.+(?:\n {2}- .+)*)/m, list: /^ {2}- \*\*Sobald ihr sie einschaltet\*\* - (.+?)\.?$/m, base: 'eine Update-Abfrage an die GitHub-Releases-API' },
 };
 
 function outboundItems(lang, md) {
