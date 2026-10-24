@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Bu takvimdeki etkinlikler varsayılan takvime taşınır ve ardından Apple Takvim üzerinden iCloud'a yüklenir. Dışa aktarma bağlantısı artık çalışmaz.",
         "sidebarLabel": "Takvim kenar çubuğu",
         "upNextTitle": "Sıradaki",
-        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok."
+        "upNextEmpty": "Önümüzdeki üç haftada bir şey yok.",
+        "shiftLegend": "Vardiya açıklaması"
     },
     "noteCategories": {
         "categories": "Kategoriler",
@@ -6387,7 +6388,7 @@
         "rewards": "Ödül",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Vardiya türü",
-        "scheduleEntry": "Giriş"
+        "schedulePlan": "Vardiya düzeni"
     },
     "iconPicker": {
         "title": "Simge seç",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Haftalık saat (fazla mesai işareti için)",
         "weeklyHoursHint": "Kendi tam zamanlı hedefiniz. İstatistikler sekmesi, seçilen aralıktaki herhangi 7 ardışık günün toplamı bu değeri aştığında fazla mesaiyi işaretler.",
         "shifts": "vardiya",
-        "freeDays": "Boş günler",
         "noStatistics": "Seçilen dönemde vardiya kaydı yok.",
         "statisticsFor": "{{user}} · {{from}} - {{to}}",
         "hoursValue": "{{value}} sa",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Seçilen alanlardan biri artık yok.",
         "errorPatternGone": "Bu vardiya düzeni artık yok.",
         "errorEntryGone": "Bu kayıt artık yok.",
-        "overviewPeopleCount": "Kişileri karşılaştır ({{count}})"
+        "overviewPeopleCount": "Kişileri karşılaştır ({{count}})",
+        "addPlan": "Vardiya düzeni ekle",
+        "freeDaysCount": "Boş günler: {{count}}"
     },
     "pairDisplay": {
         "title": "Tableti eşleştir",

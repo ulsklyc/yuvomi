@@ -47,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Shifts show as time blocks in the calendar, and the month view explains its shift marks.**
+  In week and day view a shift with a start and end time now sits in the hour grid like an
+  event, instead of a short code such as "N · AJ" in the all-day row. Shifts without times and
+  24-hour shifts stay in the all-day row, and "Show shifts as time blocks" in the filter sheet
+  still switches back. Under "Display" the filter sheet now lists every shift type in view with
+  its color mark, short code and name, so the colored marks in the month view can be read. In
+  the shift plan the add button says "Schedule" and is also there in the overview, the short
+  Planning tab no longer pushes the header open when you switch to it, and free days appear next
+  to the shift count instead of as a bar among the shift types.
 - **The Overview starts higher on a phone, and the wall display fits a tablet.** On a phone the
   weather now sits under the date beside the header buttons, and the "Today" sheet no longer
   carries a visible heading, so the first entry moves up by about 60 px. The titles in the sheet

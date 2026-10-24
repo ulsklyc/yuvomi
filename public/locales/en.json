@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Events from this calendar move to the default calendar and are then uploaded to iCloud through Apple Calendar. Its export link will stop working.",
         "sidebarLabel": "Calendar sidebar",
         "upNextTitle": "Up next",
-        "upNextEmpty": "Nothing coming up in the next three weeks."
+        "upNextEmpty": "Nothing coming up in the next three weeks.",
+        "shiftLegend": "Shift legend"
     },
     "noteCategories": {
         "categories": "Categories",
@@ -6387,7 +6388,7 @@
         "rewards": "Reward",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Shift type",
-        "scheduleEntry": "Entry"
+        "schedulePlan": "Schedule"
     },
     "iconPicker": {
         "title": "Choose icon",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Weekly hours (for the overtime flag)",
         "weeklyHoursHint": "Your own full-time target. The Statistics tab flags overtime when any 7 consecutive days in the selected range exceed this.",
         "shifts": "shifts",
-        "freeDays": "Free days",
         "noStatistics": "No schedule entries in the selected period.",
         "statisticsFor": "{{user}} · {{from}} to {{to}}",
         "hoursValue": "{{value}} h",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "One of the chosen fields no longer exists.",
         "errorPatternGone": "This schedule plan no longer exists.",
         "errorEntryGone": "This entry no longer exists.",
-        "overviewPeopleCount": "Compare people ({{count}})"
+        "overviewPeopleCount": "Compare people ({{count}})",
+        "addPlan": "Add schedule",
+        "freeDaysCount": "Free days: {{count}}"
     },
     "pairDisplay": {
         "title": "Pair tablet",

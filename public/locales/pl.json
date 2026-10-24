@@ -1373,7 +1373,8 @@
         "localCalendarEventCount_other": "{{count}} wydarzeń",
         "sidebarLabel": "Pasek boczny kalendarza",
         "upNextTitle": "Następne",
-        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni."
+        "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni.",
+        "shiftLegend": "Legenda zmian"
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -6697,7 +6698,7 @@
         "rewards": "Nagroda",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Rodzaj zmiany",
-        "scheduleEntry": "Wpis"
+        "schedulePlan": "Cykl zmian"
     },
     "iconPicker": {
         "title": "Wybierz ikonę",
@@ -6853,7 +6854,6 @@
         "weeklyHoursLabel": "Godziny tygodniowo (do oznaczenia nadgodzin)",
         "weeklyHoursHint": "Twój własny cel pełnego etatu. Zakładka Statystyki oznacza nadgodziny, gdy suma dowolnych 7 kolejnych dni w wybranym zakresie przekroczy tę wartość.",
         "shifts": "zmian",
-        "freeDays": "Dni wolne",
         "noStatistics": "Brak wpisów w grafiku w wybranym okresie.",
         "statisticsFor": "{{user}} · {{from}} do {{to}}",
         "hoursValue": "{{value}} h",
@@ -6903,7 +6903,9 @@
         "errorSelectedCustomFieldGone": "Jedno z wybranych pól już nie istnieje.",
         "errorPatternGone": "Ten cykl zmian już nie istnieje.",
         "errorEntryGone": "Ten wpis już nie istnieje.",
-        "overviewPeopleCount": "Porównaj osoby ({{count}})"
+        "overviewPeopleCount": "Porównaj osoby ({{count}})",
+        "addPlan": "Dodaj cykl zmian",
+        "freeDaysCount": "Dni wolne: {{count}}"
     },
     "pairDisplay": {
         "title": "Sparuj tablet",

@@ -1355,7 +1355,8 @@
         "localCalendarEventCount_other": "{{count}} событий",
         "sidebarLabel": "Боковая панель календаря",
         "upNextTitle": "Далее",
-        "upNextEmpty": "В ближайшие три недели ничего нет."
+        "upNextEmpty": "В ближайшие три недели ничего нет.",
+        "shiftLegend": "Обозначения смен"
     },
     "noteCategories": {
         "categories": "Категории",
@@ -6697,7 +6698,7 @@
         "rewards": "Награда",
         "rewardsBonus": "Бонус",
         "scheduleShiftType": "Тип смены",
-        "scheduleEntry": "Запись"
+        "schedulePlan": "Цикл смен"
     },
     "iconPicker": {
         "title": "Выбрать значок",
@@ -6853,7 +6854,6 @@
         "weeklyHoursLabel": "Часов в неделю (для отметки переработки)",
         "weeklyHoursHint": "Ваша собственная цель полной занятости. Вкладка «Статистика» отмечает переработку, как только сумма любых 7 подряд идущих дней в выбранном периоде превышает это значение.",
         "shifts": "смен",
-        "freeDays": "Выходные",
         "noStatistics": "В выбранном периоде нет записей о сменах.",
         "statisticsFor": "{{user}} · с {{from}} по {{to}}",
         "hoursValue": "{{value}} ч",
@@ -6903,7 +6903,9 @@
         "errorSelectedCustomFieldGone": "Одного из выбранных полей больше нет.",
         "errorPatternGone": "Этого цикла смен больше нет.",
         "errorEntryGone": "Этой записи больше нет.",
-        "overviewPeopleCount": "Сравнить людей ({{count}})"
+        "overviewPeopleCount": "Сравнить людей ({{count}})",
+        "addPlan": "Добавить цикл смен",
+        "freeDaysCount": "Выходные: {{count}}"
     },
     "pairDisplay": {
         "title": "Подключение планшета",

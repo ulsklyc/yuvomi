@@ -1355,7 +1355,8 @@
         "localCalendarEventCount_other": "{{count}} подій",
         "sidebarLabel": "Бічна панель календаря",
         "upNextTitle": "Далі",
-        "upNextEmpty": "У найближчі три тижні нічого немає."
+        "upNextEmpty": "У найближчі три тижні нічого немає.",
+        "shiftLegend": "Позначення змін"
     },
     "noteCategories": {
         "categories": "Категорії",
@@ -6697,7 +6698,7 @@
         "rewards": "Нагорода",
         "rewardsBonus": "Бонус",
         "scheduleShiftType": "Тип зміни",
-        "scheduleEntry": "Запис"
+        "schedulePlan": "Цикл змін"
     },
     "iconPicker": {
         "title": "Вибрати піктограму",
@@ -6853,7 +6854,6 @@
         "weeklyHoursLabel": "Годин на тиждень (для позначки понаднормових)",
         "weeklyHoursHint": "Ваша власна ціль повної зайнятості. Вкладка «Статистика» позначає понаднормові години, щойно сума будь-яких 7 послідовних днів у вибраному періоді перевищує це значення.",
         "shifts": "змін",
-        "freeDays": "Вихідні",
         "noStatistics": "У вибраному періоді немає записів про зміни.",
         "statisticsFor": "{{user}} · з {{from}} по {{to}}",
         "hoursValue": "{{value}} год",
@@ -6903,7 +6903,9 @@
         "errorSelectedCustomFieldGone": "Одного з вибраних полів більше немає.",
         "errorPatternGone": "Цього циклу змін більше немає.",
         "errorEntryGone": "Цього запису більше немає.",
-        "overviewPeopleCount": "Порівняти людей ({{count}})"
+        "overviewPeopleCount": "Порівняти людей ({{count}})",
+        "addPlan": "Додати цикл змін",
+        "freeDaysCount": "Вихідні: {{count}}"
     },
     "pairDisplay": {
         "title": "Підключення планшета",

@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Τα συμβάντα αυτού του ημερολογίου θα μεταφερθούν στο προεπιλεγμένο ημερολόγιο και στη συνέχεια θα μεταφορτωθούν στο iCloud μέσω του Apple Calendar. Ο σύνδεσμος εξαγωγής του θα πάψει να λειτουργεί.",
         "sidebarLabel": "Πλαϊνή στήλη ημερολογίου",
         "upNextTitle": "Επόμενα",
-        "upNextEmpty": "Τίποτα τις επόμενες τρεις εβδομάδες."
+        "upNextEmpty": "Τίποτα τις επόμενες τρεις εβδομάδες.",
+        "shiftLegend": "Υπόμνημα βαρδιών"
     },
     "noteCategories": {
         "categories": "Κατηγορίες",
@@ -6387,7 +6388,7 @@
         "rewards": "Βραβείο",
         "rewardsBonus": "Μπόνους",
         "scheduleShiftType": "Τύπος βάρδιας",
-        "scheduleEntry": "Καταχώριση"
+        "schedulePlan": "Κύκλος βαρδιών"
     },
     "iconPicker": {
         "title": "Επιλογή εικονιδίου",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Εβδομαδιαίες ώρες (για την επισήμανση υπερωρίας)",
         "weeklyHoursHint": "Ο δικός σας στόχος πλήρους απασχόλησης. Η καρτέλα Στατιστικά επισημαίνει υπερωρία όταν οποιεσδήποτε 7 συνεχόμενες ημέρες εντός του επιλεγμένου διαστήματος υπερβούν αυτή την τιμή.",
         "shifts": "βάρδιες",
-        "freeDays": "Ρεπό",
         "noStatistics": "Δεν υπάρχουν καταχωρίσεις βαρδιών στην επιλεγμένη περίοδο.",
         "statisticsFor": "{{user}} · {{from}} έως {{to}}",
         "hoursValue": "{{value}} ώ",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Ένα από τα επιλεγμένα πεδία δεν υπάρχει πια.",
         "errorPatternGone": "Αυτός ο κύκλος βαρδιών δεν υπάρχει πια.",
         "errorEntryGone": "Αυτή η καταχώριση δεν υπάρχει πια.",
-        "overviewPeopleCount": "Σύγκριση ατόμων ({{count}})"
+        "overviewPeopleCount": "Σύγκριση ατόμων ({{count}})",
+        "addPlan": "Προσθήκη κύκλου βαρδιών",
+        "freeDaysCount": "Ρεπό: {{count}}"
     },
     "pairDisplay": {
         "title": "Σύζευξη tablet",

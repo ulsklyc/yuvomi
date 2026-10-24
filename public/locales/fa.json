@@ -1221,7 +1221,8 @@
         "localCalendarDeleteDetailIcloud": "رویدادهای این تقویم به تقویم پیش‌فرض منتقل می‌شوند و سپس از طریق Apple Calendar در iCloud بارگذاری می‌شوند. پیوند خروجی آن دیگر کار نخواهد کرد.",
         "sidebarLabel": "نوار کناری تقویم",
         "upNextTitle": "بعدی",
-        "upNextEmpty": "در سه هفته آینده چیزی نیست."
+        "upNextEmpty": "در سه هفته آینده چیزی نیست.",
+        "shiftLegend": "راهنمای شیفت‌ها"
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",
@@ -6387,7 +6388,7 @@
         "rewards": "جایزه",
         "rewardsBonus": "پاداش",
         "scheduleShiftType": "نوع شیفت",
-        "scheduleEntry": "مورد"
+        "schedulePlan": "چرخه شیفت"
     },
     "iconPicker": {
         "title": "انتخاب آیکون",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "ساعات هفتگی (برای نشانگر اضافه‌کاری)",
         "weeklyHoursHint": "هدف تمام‌وقت خودتان. تب آمار به محض اینکه مجموع هر ۷ روز متوالی در بازه انتخابی از این مقدار فراتر رود، آن را اضافه‌کاری علامت می‌زند.",
         "shifts": "شیفت",
-        "freeDays": "روزهای آزاد",
         "noStatistics": "در بازه انتخاب‌شده ورودی شیفتی وجود ندارد.",
         "statisticsFor": "{{user}} · از {{from}} تا {{to}}",
         "hoursValue": "{{value}} ساعت",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "یکی از فیلدهای انتخاب‌شده دیگر وجود ندارد.",
         "errorPatternGone": "این چرخه شیفت دیگر وجود ندارد.",
         "errorEntryGone": "این مورد دیگر وجود ندارد.",
-        "overviewPeopleCount": "مقایسه افراد ({{count}})"
+        "overviewPeopleCount": "مقایسه افراد ({{count}})",
+        "addPlan": "افزودن چرخه شیفت",
+        "freeDaysCount": "روزهای آزاد: {{count}}"
     },
     "pairDisplay": {
         "title": "جفت‌سازی تبلت",

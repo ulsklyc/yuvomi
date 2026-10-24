@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Afspraken uit deze agenda worden naar de standaardagenda verplaatst en daarna via Apple Agenda naar iCloud geüpload. De exportlink werkt daarna niet meer.",
         "sidebarLabel": "Zijbalk van de agenda",
         "upNextTitle": "Hierna",
-        "upNextEmpty": "Niets gepland in de komende drie weken."
+        "upNextEmpty": "Niets gepland in de komende drie weken.",
+        "shiftLegend": "Legenda van diensten"
     },
     "noteCategories": {
         "categories": "Categorieën",
@@ -6387,7 +6388,7 @@
         "rewards": "Beloning",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Diensttype",
-        "scheduleEntry": "Item"
+        "schedulePlan": "Roosterpatroon"
     },
     "iconPicker": {
         "title": "Pictogram kiezen",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Wekelijkse uren (voor de overurenmarkering)",
         "weeklyHoursHint": "Je eigen fulltime-doel. Het tabblad Statistieken markeert overuren zodra een reeks van 7 opeenvolgende dagen in de gekozen periode deze waarde overschrijdt.",
         "shifts": "diensten",
-        "freeDays": "Vrije dagen",
         "noStatistics": "Geen roosteritems in de gekozen periode.",
         "statisticsFor": "{{user}} · {{from}} tot {{to}}",
         "hoursValue": "{{value}} u",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Een van de gekozen velden bestaat niet meer.",
         "errorPatternGone": "Dit roosterpatroon bestaat niet meer.",
         "errorEntryGone": "Deze vermelding bestaat niet meer.",
-        "overviewPeopleCount": "Personen vergelijken ({{count}})"
+        "overviewPeopleCount": "Personen vergelijken ({{count}})",
+        "addPlan": "Roosterpatroon toevoegen",
+        "freeDaysCount": "Vrije dagen: {{count}}"
     },
     "pairDisplay": {
         "title": "Tablet koppelen",

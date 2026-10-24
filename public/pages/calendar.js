@@ -546,7 +546,9 @@ let state = {
   // Update, das die Monatsansicht jedes Telefons ungefragt umbaut, waere die
   // falsche Art, eine zweite Lesart anzubieten.
   monthTitles: false,      // Monat am Telefon: Titelzeilen statt Punkte
-  scheduleDisplay: 'compact',
+  // Zeitbloecke sind die Vorgabe (R23 D14): eine Schicht ist eine Zeitspanne
+  // wie ein Termin; „F · LJ" als Chip war ein Code ohne Legende.
+  scheduleDisplay: 'blocks',
   // Woche mobil: Ganztags-Zeile aufgeklappt (renderWeekView). Gilt fuer die
   // Sitzung, damit Blaettern den gewaehlten Zustand behaelt.
   alldayExpanded: false,
@@ -2084,7 +2086,9 @@ export async function render(container, { user, signal } = {}) {
   // die Ebene selbst schon einmal eingeschaltet hat.
   state.layerWaste     = localStorage.getItem(LAYER_WASTE_KEY)     === 'true';
   state.wasteVisibleTypeIds = restoreWasteTypeFilter();
-  state.scheduleDisplay = localStorage.getItem(SCHEDULE_DISPLAY_KEY) === 'blocks' ? 'blocks' : 'compact';
+  // Gegen 'compact' geprueft (R23 D14): wer nie umgeschaltet hat, sieht Bloecke;
+  // wer die Chips bewusst gewaehlt hat, behaelt sie.
+  state.scheduleDisplay = localStorage.getItem(SCHEDULE_DISPLAY_KEY) === 'compact' ? 'compact' : 'blocks';
   // Gegen 'true' geprueft, nicht gegen 'false' wie die Ebenen darueber: die
   // Ebenen sind AN, solange nichts anderes dasteht, dieser Schalter ist AUS.
   state.monthTitles = localStorage.getItem(MONTH_TITLES_KEY) === 'true';
@@ -4449,6 +4453,32 @@ function renderScheduleChip(entry, className = 'allday-holiday', { showFullRange
  * Tagesliste (Telefon) bzw. der Tag (Tipp), und der Name der Zelle nennt sie.
  */
 const MONTH_SHIFT_MARKS = 3;
+
+/**
+ * DIE LEGENDE DER STRICHE (R23 D14, Critique G1 P2). Im Monat steht eine
+ * Schicht nur als Farbstrich am Tageskopf, in der Ganztagszeile als Kuerzel -
+ * beides ohne Schluessel. Das Filterblatt nennt jetzt jede Schichtart des
+ * geladenen Zeitraums einmal: derselbe Strich, das Kuerzel, der Name. Nur
+ * was die Personenwahl zeigt, nach Name sortiert; ohne Schicht keine Legende.
+ */
+function scheduleLegendHtml() {
+  if (!state.layerSchedule) return '';
+  const types = new Map();
+  for (const entry of state.scheduleEntries ?? []) {
+    const type = entry.shift_type;
+    if (!type || !passesPersonFilters(scheduleAsAssignable(entry))) continue;
+    const key = type.id ?? type.name;
+    if (!types.has(key)) types.set(key, type);
+  }
+  if (!types.size) return '';
+  const items = [...types.values()]
+    .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), getLocale()))
+    .map((type) => `<li class="cal-shift-legend__item"><span class="month-day__shift" style="--holi-color:${esc(type.color)}" aria-hidden="true"></span>`
+      + (type.short_code ? `<span class="cal-shift-legend__code">${esc(type.short_code)}</span>` : '')
+      + `<span class="cal-shift-legend__name">${esc(type.name ?? '')}</span></li>`)
+    .join('');
+  return `<ul class="cal-shift-legend" aria-label="${esc(t('calendar.shiftLegend'))}">${items}</ul>`;
+}
 function monthShiftMarksHtml(entries) {
   if (!entries.length) return '';
   const shown = entries.slice(0, MONTH_SHIFT_MARKS);
@@ -6695,7 +6725,7 @@ function openCalendarFilters() {
         checked: state.scheduleDisplay === 'blocks',
         control: 'switch',
         attrs: { 'data-filter-schedule-display': 'true' },
-      }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>`,
+      }) + `<p class="form-hint">${t('schedule.fullBlocksHint')}</p>` + scheduleLegendHtml(),
     });
   }
 

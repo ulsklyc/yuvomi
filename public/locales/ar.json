@@ -1432,7 +1432,8 @@
         "localCalendarEventCount_many": "{{count}} حدثًا",
         "sidebarLabel": "الشريط الجانبي للتقويم",
         "upNextTitle": "التالي",
-        "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة."
+        "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة.",
+        "shiftLegend": "مفتاح المناوبات"
     },
     "noteCategories": {
         "categories": "الفئات",
@@ -6853,7 +6854,7 @@
         "rewards": "جائزة",
         "rewardsBonus": "مكافأة",
         "scheduleShiftType": "نوع مناوبة",
-        "scheduleEntry": "إدخال"
+        "schedulePlan": "دورة مناوبات"
     },
     "iconPicker": {
         "title": "اختيار أيقونة",
@@ -7012,7 +7013,6 @@
         "weeklyHoursLabel": "ساعات أسبوعية (لعلامة العمل الإضافي)",
         "weeklyHoursHint": "هدفك الخاص لدوام كامل. يُعلّم تبويب الإحصاءات العمل الإضافي عندما يتجاوز مجموع أي 7 أيام متتالية ضمن الفترة المختارة هذه القيمة.",
         "shifts": "مناوبات",
-        "freeDays": "أيام الإجازة",
         "noStatistics": "لا توجد إدخالات مناوبات في الفترة المحددة.",
         "statisticsFor": "{{user}} · من {{from}} إلى {{to}}",
         "hoursValue": "{{value}} س",
@@ -7063,7 +7063,9 @@
         "errorSelectedCustomFieldGone": "أحد الحقول المختارة لم يعد موجودًا.",
         "errorPatternGone": "دورة المناوبات هذه لم تعد موجودة.",
         "errorEntryGone": "هذا الإدخال لم يعد موجودًا.",
-        "overviewPeopleCount": "مقارنة الأشخاص ({{count}})"
+        "overviewPeopleCount": "مقارنة الأشخاص ({{count}})",
+        "addPlan": "إضافة دورة مناوبات",
+        "freeDaysCount": "أيام الإجازة: {{count}}"
     },
     "pairDisplay": {
         "title": "اقتران الجهاز اللوحي",

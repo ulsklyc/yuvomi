@@ -1280,7 +1280,8 @@
         "localCalendarDeleteDetailIcloud": "Události z tohoto kalendáře se přesunou do výchozího kalendáře a poté se přes Apple Calendar nahrají do iCloudu. Jeho odkaz pro export přestane fungovat.",
         "sidebarLabel": "Postranní panel kalendáře",
         "upNextTitle": "Následuje",
-        "upNextEmpty": "V příštích třech týdnech nic není."
+        "upNextEmpty": "V příštích třech týdnech nic není.",
+        "shiftLegend": "Legenda směn"
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -6548,7 +6549,7 @@
         "rewards": "Odměna",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Typ směny",
-        "scheduleEntry": "Záznam"
+        "schedulePlan": "Cyklus směn"
     },
     "iconPicker": {
         "title": "Vybrat ikonu",
@@ -6701,7 +6702,6 @@
         "weeklyHoursLabel": "Týdenní hodiny (pro označení přesčasu)",
         "weeklyHoursHint": "Váš vlastní cíl pro plný úvazek. Karta Statistiky označí přesčas, jakmile součet libovolných 7 po sobě jdoucích dnů ve vybraném období překročí tuto hodnotu.",
         "shifts": "směn",
-        "freeDays": "Volné dny",
         "noStatistics": "Ve vybraném období nejsou žádné záznamy směn.",
         "statisticsFor": "{{user}} · {{from}} až {{to}}",
         "hoursValue": "{{value}} h",
@@ -6750,7 +6750,9 @@
         "errorSelectedCustomFieldGone": "Jedno z vybraných polí už neexistuje.",
         "errorPatternGone": "Tento cyklus směn už neexistuje.",
         "errorEntryGone": "Tento záznam už neexistuje.",
-        "overviewPeopleCount": "Porovnat osoby ({{count}})"
+        "overviewPeopleCount": "Porovnat osoby ({{count}})",
+        "addPlan": "Přidat cyklus směn",
+        "freeDaysCount": "Volné dny: {{count}}"
     },
     "pairDisplay": {
         "title": "Spárovat tablet",

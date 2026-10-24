@@ -1517,7 +1517,6 @@ function renderStatistics() {
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
-  if (summary.freeDays) countItems.push({ type: { name: t('schedule.freeDays'), short_code: '', color: 'var(--color-text-secondary)' }, count: summary.freeDays, minutes: 0, hasHours: false });
   const hourItems = summary.values.filter((item) => item.hasHours);
   const controls = range === 'months'
     ? formField(t('schedule.monthFrom'), '<input class="form-input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">', '', { star: false })
@@ -1554,7 +1553,7 @@ function renderStatistics() {
         + emptyStateHTML({ icon: 'chart-column', title: t('schedule.noStatistics') })
       : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
-      + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(t('schedule.shifts')) + '</div></article>'
+      + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(summary.freeDays ? t('schedule.shifts') + ' · ' + t('schedule.freeDaysCount', { count: summary.freeDays }) : t('schedule.shifts')) + '</div></article>'
       // Re-Critique 2026-09-28 (A2 P2-4): die Kachel zeigt die SUMME und heisst
       // so - vorher "Stunden je Schichtart" ueber einer Gesamtzahl. Die Summen
       // stehen nur hier; die Karten darunter tragen keine "Gesamt"-Zeile mehr.
@@ -2473,6 +2472,27 @@ function renderPage() {
   if (statRange) attachSegmentIndicator(statRange, { key: 'schedule-stat-range' });
   const overviewMode = body.querySelector('[data-action="overview-view-mode"]')?.parentElement;
   if (overviewMode) attachSegmentIndicator(overviewMode, { key: 'schedule-overview-mode' });
+  // EIN KURZER REITER TRAEGT DEN ANGEDOCKTEN KOPF (R23 S10, Rest aus S9).
+  // Die Planung ist mobil kuerzer als Port + Lead-Zone: der Browser kappte den
+  // Stand, der Kopf klappte auf und zog die Reiter um 35px unter dem Finger
+  // weg (zwei Spruenge 0,029/0,032). Ein Reiterwechsel ist keine Geste - er
+  // haelt den Kopf so, wie der Nutzer ihn verlassen hat. Fehlt dem neuen
+  // Reiter die Hoehe, bekommt er sie als Nachlauf am Ende (`--schedule-tail`),
+  // genau so viel wie fehlt; derselbe Reiter neu gezeichnet behaelt ihn.
+  if (!sameView) body.style.removeProperty('--schedule-tail');
+  if (scrollPort && !sameView && lead > 0) {
+    // scrollHeight steht nie unter clientHeight: ist der Reiter kuerzer als
+    // der Port, verschwindet der erste Nachlauf in der Luecke bis zur Kante -
+    // jedes weitere Messen legt den Rest nach (hoechstens vier Layouts, kein
+    // Raten an der Shell).
+    let tail = 0;
+    for (let i = 0; i < 4; i++) {
+      const deficit = lead - (scrollPort.scrollHeight - scrollPort.clientHeight);
+      if (deficit <= 0) break;
+      tail += Math.ceil(deficit);
+      body.style.setProperty('--schedule-tail', `${tail}px`);
+    }
+  }
   if (scrollPort) scrollPort.scrollTop = scrollTop;
   // Beim Oeffnen der Uebersicht (und bei "Heute") steht die Seite auf der
   // laufenden Stunde; Blaettern und Personenwahl behalten den Scrollstand.
@@ -2536,7 +2556,11 @@ function wireShiftTypeFieldSortables(body) {
  * die Entsorgung ohne Abfallart.
  */
 function scheduleFabIntent(view = activeView) {
-  const target = view === 'patterns' && planningNeedsShiftTypes() ? 'shifts' : view;
+  // DIE UEBERSICHT HAT EINEN ANLEGEWEG (R23 S10, Critique G1 P3): sie ist der
+  // Startreiter, und wer dort eine Luecke sieht, legt den Plan von hier an -
+  // derselbe Dialog wie in der Planung, kein Umweg ueber den Reiter.
+  const planned = view === 'overview' ? 'patterns' : view;
+  const target = planned === 'patterns' && planningNeedsShiftTypes() ? 'shifts' : planned;
   return { view: target };
 }
 
@@ -2549,23 +2573,26 @@ function updateScheduleFab() {
   // Verbphrase war mit 193px der breiteste Kopfknopf der App, Re-Critique
   // 2026-09-27 A8 P3-3). Nie der Tabname: ein eigenes Kurzwort ("Planning")
   // sah am Docking-Ort aus, als liesse sich der Tab selbst antippen (S-09).
+  // R23 D14: „Eintrag" sagte nicht, was entsteht - die Planung legt
+  // Schichtplaene an (Muster, Ausnahme, Zusatzschicht); das Nomen ist dasselbe
+  // Wort, das die Ueberlappungswarnung schon benutzt.
   const labels = {
     shifts: t('schedule.createShiftType'),
-    patterns: t('schedule.addEntry'),
+    patterns: t('schedule.addPlan'),
   };
   const nouns = {
     shifts: t('newLabel.scheduleShiftType'),
-    patterns: t('newLabel.scheduleEntry'),
+    patterns: t('newLabel.schedulePlan'),
   };
   setPageFabAction(scheduleFab, {
     label: labels[intent.view],
     // Auf den Lese-Tabs versteckt, aber mit Nomen: ohne `data-dock-label`
     // dockte der Knopf nach einem Einstieg ueber Statistik/Uebersicht nie an.
     dockLabel: nouns[intent.view] || scheduleFab.dataset.dockLabel || nouns.shifts,
-    // Statistics und Overview sind beide reine Leseansichten - kein "Anlegen".
-    // Ausgeblendet ist nicht dasselbe wie unerreichbar (siehe readOnly()/
+    // Die Auswertung ist eine reine Leseansicht - kein "Anlegen"; die
+    // Uebersicht legt seit R23 einen Plan an (scheduleFabIntent). Ausgeblendet ist nicht dasselbe wie unerreichbar (siehe readOnly()/
     // action()) - der Handler bleibt trotzdem gesperrt.
-    hidden: readOnly() || activeView === 'statistics' || activeView === 'overview',
+    hidden: readOnly() || activeView === 'statistics',
     onClick: () => openScheduleCreateModal(scheduleFabIntent(activeView).view),
   });
 }

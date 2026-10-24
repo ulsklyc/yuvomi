@@ -1203,7 +1203,8 @@
         "localCalendarEventCount_one": "{{count}} 个事件",
         "sidebarLabel": "日历侧边栏",
         "upNextTitle": "接下来",
-        "upNextEmpty": "未来三周没有安排。"
+        "upNextEmpty": "未来三周没有安排。",
+        "shiftLegend": "班次图例"
     },
     "noteCategories": {
         "categories": "分类",
@@ -6387,7 +6388,7 @@
         "rewards": "奖品",
         "rewardsBonus": "奖励",
         "scheduleShiftType": "班次类型",
-        "scheduleEntry": "条目"
+        "schedulePlan": "排班周期"
     },
     "iconPicker": {
         "title": "选择图标",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "每周小时数（用于加班标记）",
         "weeklyHoursHint": "你自己的全职目标。当所选时间段内任意连续7天的总时长超过此值时，统计选项卡会将其标记为加班。",
         "shifts": "个班次",
-        "freeDays": "休息日",
         "noStatistics": "所选时间段内没有排班记录。",
         "statisticsFor": "{{user}} · {{from}} 至 {{to}}",
         "hoursValue": "{{value}} 小时",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "所选字段中有一个已不存在。",
         "errorPatternGone": "此排班周期已不存在。",
         "errorEntryGone": "此条目已不存在。",
-        "overviewPeopleCount": "比较成员 ({{count}})"
+        "overviewPeopleCount": "比较成员 ({{count}})",
+        "addPlan": "添加排班周期",
+        "freeDaysCount": "休息日：{{count}}"
     },
     "pairDisplay": {
         "title": "配对平板",

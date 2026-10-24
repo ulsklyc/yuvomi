@@ -1203,7 +1203,8 @@
         "localCalendarEventCount_one": "{{count}}件の予定",
         "sidebarLabel": "カレンダーのサイドバー",
         "upNextTitle": "次の予定",
-        "upNextEmpty": "今後3週間の予定はありません。"
+        "upNextEmpty": "今後3週間の予定はありません。",
+        "shiftLegend": "シフトの凡例"
     },
     "noteCategories": {
         "categories": "カテゴリー",
@@ -6387,7 +6388,7 @@
         "rewards": "景品",
         "rewardsBonus": "ボーナス",
         "scheduleShiftType": "シフトの種類",
-        "scheduleEntry": "エントリー"
+        "schedulePlan": "シフトパターン"
     },
     "iconPicker": {
         "title": "アイコンを選ぶ",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "週あたりの時間（残業フラグ用）",
         "weeklyHoursHint": "自分自身のフルタイム目標です。選択した期間内の連続する7日間の合計がこの値を超えると、統計タブが残業としてフラグを立てます。",
         "shifts": "シフト",
-        "freeDays": "休みの日",
         "noStatistics": "選択した期間にシフトの登録はありません。",
         "statisticsFor": "{{user}} · {{from}} から {{to}} まで",
         "hoursValue": "{{value}} 時間",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "選択した項目の一つはもう存在しません。",
         "errorPatternGone": "このシフトパターンはもう存在しません。",
         "errorEntryGone": "この項目はもう存在しません。",
-        "overviewPeopleCount": "メンバーを比較 ({{count}})"
+        "overviewPeopleCount": "メンバーを比較 ({{count}})",
+        "addPlan": "シフトパターンを追加",
+        "freeDaysCount": "休みの日: {{count}}"
     },
     "pairDisplay": {
         "title": "タブレットをペアリング",

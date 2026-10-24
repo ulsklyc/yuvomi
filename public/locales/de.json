@@ -1221,7 +1221,8 @@
         "localCalendarDeleteDetailIcloud": "Termine aus diesem Kalender werden in den Standardkalender verschoben und danach über Apple Calendar zu iCloud hochgeladen. Sein Exportlink funktioniert danach nicht mehr.",
         "sidebarLabel": "Seitenleiste des Kalenders",
         "upNextTitle": "Als Nächstes",
-        "upNextEmpty": "In den nächsten drei Wochen steht nichts an."
+        "upNextEmpty": "In den nächsten drei Wochen steht nichts an.",
+        "shiftLegend": "Legende der Schichten"
     },
     "noteCategories": {
         "categories": "Kategorien",
@@ -6387,7 +6388,7 @@
         "rewards": "Prämie",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Schichtart",
-        "scheduleEntry": "Eintrag"
+        "schedulePlan": "Schichtplan"
     },
     "iconPicker": {
         "title": "Symbol wählen",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Wochenstunden (für die Überstunden-Markierung)",
         "weeklyHoursHint": "Dein eigener Vollzeit-Richtwert. Die Statistik markiert Überstunden, sobald 7 beliebige aufeinanderfolgende Tage im gewählten Zeitraum diesen Wert überschreiten.",
         "shifts": "Schichten",
-        "freeDays": "Freie Tage",
         "noStatistics": "Keine Schichteinträge im gewählten Zeitraum.",
         "statisticsFor": "{{user}} · {{from}} bis {{to}}",
         "hoursValue": "{{value}} h",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Ein gewähltes Feld gibt es nicht mehr.",
         "errorPatternGone": "Diesen Schichtplan gibt es nicht mehr.",
         "errorEntryGone": "Diesen Eintrag gibt es nicht mehr.",
-        "overviewPeopleCount": "Personen vergleichen ({{count}})"
+        "overviewPeopleCount": "Personen vergleichen ({{count}})",
+        "addPlan": "Schichtplan hinzufügen",
+        "freeDaysCount": "Freie Tage: {{count}}"
     },
     "pairDisplay": {
         "title": "Tablet koppeln",

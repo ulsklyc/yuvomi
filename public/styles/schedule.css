@@ -37,6 +37,9 @@
   display: grid;
   gap: var(--space-4);
   min-width: 0;
+  /* Nachlauf fuer einen kurzen Reiter unter angedocktem Kopf (renderPage,
+   * R23 S10): nur so hoch, wie dem Port zur Lead-Zone fehlt, sonst 0. */
+  padding-block-end: var(--schedule-tail, 0);
 }
 
 .schedule-content,

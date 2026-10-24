@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Gli eventi di questo calendario verranno spostati nel calendario predefinito e poi caricati su iCloud tramite Apple Calendar. Il suo link di esportazione smetterà di funzionare.",
         "sidebarLabel": "Barra laterale del calendario",
         "upNextTitle": "Prossimi",
-        "upNextEmpty": "Niente in programma nelle prossime tre settimane."
+        "upNextEmpty": "Niente in programma nelle prossime tre settimane.",
+        "shiftLegend": "Legenda dei turni"
     },
     "noteCategories": {
         "categories": "Categorie",
@@ -6387,7 +6388,7 @@
         "rewards": "Premio",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Tipo di turno",
-        "scheduleEntry": "Voce"
+        "schedulePlan": "Rotazione"
     },
     "iconPicker": {
         "title": "Scegli icona",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Ore settimanali (per il segnale di straordinario)",
         "weeklyHoursHint": "Il tuo obiettivo a tempo pieno. La scheda Statistiche segnala lo straordinario quando 7 giorni consecutivi qualsiasi nell'intervallo selezionato superano questo valore.",
         "shifts": "turni",
-        "freeDays": "Giorni liberi",
         "noStatistics": "Nessuna voce nei turni nel periodo selezionato.",
         "statisticsFor": "{{user}} · dal {{from}} al {{to}}",
         "hoursValue": "{{value}} h",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Uno dei campi scelti non esiste più.",
         "errorPatternGone": "Questa rotazione non esiste più.",
         "errorEntryGone": "Questa voce non esiste più.",
-        "overviewPeopleCount": "Confronta persone ({{count}})"
+        "overviewPeopleCount": "Confronta persone ({{count}})",
+        "addPlan": "Aggiungi rotazione",
+        "freeDaysCount": "Giorni liberi: {{count}}"
     },
     "pairDisplay": {
         "title": "Associa tablet",

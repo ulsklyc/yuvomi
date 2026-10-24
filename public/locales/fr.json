@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Les événements de ce calendrier seront déplacés vers le calendrier par défaut, puis envoyés vers iCloud via Apple Calendar. Son lien d’export cessera de fonctionner.",
         "sidebarLabel": "Barre latérale du calendrier",
         "upNextTitle": "À venir",
-        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines."
+        "upNextEmpty": "Rien de prévu dans les trois prochaines semaines.",
+        "shiftLegend": "Légende des postes"
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -6387,7 +6388,7 @@
         "rewards": "Récompense",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Type de poste",
-        "scheduleEntry": "Entrée"
+        "schedulePlan": "Roulement"
     },
     "iconPicker": {
         "title": "Choisir une icône",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Heures hebdomadaires (pour le repère d'heures supplémentaires)",
         "weeklyHoursHint": "Votre propre objectif temps plein. L'onglet Statistiques signale des heures supplémentaires dès que 7 jours consécutifs quelconques de la période sélectionnée dépassent cette valeur.",
         "shifts": "postes",
-        "freeDays": "Jours libres",
         "noStatistics": "Aucune entrée de planning sur la période choisie.",
         "statisticsFor": "{{user}} · du {{from}} au {{to}}",
         "hoursValue": "{{value}} h",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "L’un des champs choisis n’existe plus.",
         "errorPatternGone": "Ce roulement n’existe plus.",
         "errorEntryGone": "Cette entrée n’existe plus.",
-        "overviewPeopleCount": "Comparer des personnes ({{count}})"
+        "overviewPeopleCount": "Comparer des personnes ({{count}})",
+        "addPlan": "Ajouter un roulement",
+        "freeDaysCount": "Jours libres : {{count}}"
     },
     "pairDisplay": {
         "title": "Appairer la tablette",

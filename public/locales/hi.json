@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "इस कैलेंडर के इवेंट डिफ़ॉल्ट कैलेंडर में चले जाएंगे और उसके बाद Apple कैलेंडर के ज़रिए iCloud पर अपलोड होंगे। इसका एक्सपोर्ट लिंक काम करना बंद कर देगा।",
         "sidebarLabel": "कैलेंडर साइडबार",
         "upNextTitle": "आगे",
-        "upNextEmpty": "अगले तीन हफ़्तों में कुछ नहीं है।"
+        "upNextEmpty": "अगले तीन हफ़्तों में कुछ नहीं है।",
+        "shiftLegend": "शिफ़्टों की कुंजी"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",
@@ -6387,7 +6388,7 @@
         "rewards": "इनाम",
         "rewardsBonus": "बोनस",
         "scheduleShiftType": "शिफ़्ट का प्रकार",
-        "scheduleEntry": "प्रविष्टि"
+        "schedulePlan": "शिफ़्ट चक्र"
     },
     "iconPicker": {
         "title": "आइकन चुनें",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "साप्ताहिक घंटे (ओवरटाइम चिह्न के लिए)",
         "weeklyHoursHint": "आपका अपना पूर्णकालिक लक्ष्य। आँकड़े टैब ओवरटाइम को तब चिह्नित करता है जब चुनी गई अवधि में किन्हीं भी लगातार 7 दिनों का योग इस मान से अधिक हो जाता है।",
         "shifts": "शिफ़्ट",
-        "freeDays": "छुट्टी के दिन",
         "noStatistics": "चुनी गई अवधि में कोई शिफ़्ट प्रविष्टि नहीं।",
         "statisticsFor": "{{user}} · {{from}} से {{to}} तक",
         "hoursValue": "{{value}} घंटे",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "चुने गए फ़ील्ड में से एक अब मौजूद नहीं है।",
         "errorPatternGone": "यह शिफ़्ट चक्र अब मौजूद नहीं है।",
         "errorEntryGone": "यह प्रविष्टि अब मौजूद नहीं है।",
-        "overviewPeopleCount": "लोगों की तुलना करें ({{count}})"
+        "overviewPeopleCount": "लोगों की तुलना करें ({{count}})",
+        "addPlan": "शिफ़्ट चक्र जोड़ें",
+        "freeDaysCount": "छुट्टी के दिन: {{count}}"
     },
     "pairDisplay": {
         "title": "टैबलेट जोड़ें",

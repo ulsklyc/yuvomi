@@ -1203,7 +1203,8 @@
         "localCalendarDeleteDetailIcloud": "Os eventos deste calendário serão movidos para o calendário predefinido e depois enviados ao iCloud pelo Apple Calendar. A respetiva ligação de exportação deixará de funcionar.",
         "sidebarLabel": "Barra lateral do calendário",
         "upNextTitle": "A seguir",
-        "upNextEmpty": "Nada nas próximas três semanas."
+        "upNextEmpty": "Nada nas próximas três semanas.",
+        "shiftLegend": "Legenda dos turnos"
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -5929,7 +5930,7 @@
         "rewards": "Prêmio",
         "rewardsBonus": "Bônus",
         "scheduleShiftType": "Tipo de turno",
-        "scheduleEntry": "Registro"
+        "schedulePlan": "Escala"
     },
     "pairDisplay": {
         "title": "Conectar tablet",
@@ -6317,7 +6318,6 @@
         "weeklyHoursLabel": "Carga horária semanal (para alerta de horas extras)",
         "weeklyHoursHint": "Sua meta regular de horas semanais. A aba Estatísticas alertará sobre horas extras quando quaisquer 7 dias consecutivos no período ultrapassarem este limite.",
         "shifts": "turnos",
-        "freeDays": "Dias de folga",
         "noStatistics": "Nenhum turno registrado no período selecionado.",
         "statisticsFor": "{{user}} · {{from}} a {{to}}",
         "hoursValue": "{{value}} h",
@@ -6365,7 +6365,9 @@
         "errorSelectedCustomFieldGone": "Um dos campos escolhidos não existe mais.",
         "errorPatternGone": "Esta escala não existe mais.",
         "errorEntryGone": "Esta entrada não existe mais.",
-        "overviewPeopleCount": "Comparar pessoas ({{count}})"
+        "overviewPeopleCount": "Comparar pessoas ({{count}})",
+        "addPlan": "Adicionar escala",
+        "freeDaysCount": "Dias de folga: {{count}}"
     },
     "waste": {
         "title": "Coleta de lixo",

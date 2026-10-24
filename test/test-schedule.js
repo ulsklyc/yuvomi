@@ -1885,9 +1885,16 @@ test('the Statistics tab offers a print action that leaves nav/tabs/filters off 
   assert.match(printBlock, /\.schedule-stat-filter-actions/, 'Save/Print buttons must not print themselves');
 });
 
-test('calendar defaults to compact Schedule strips, includes their start time, and keeps 24-hour shifts in their start-day strip', () => {
+// R23 D14: Zeitbloecke sind die Vorgabe, die kompakten Chips eine bewusste Wahl;
+// die Striche im Monat haben eine Legende im Filterblatt.
+test('calendar defaults to Schedule time blocks, keeps compact strips as a choice, and keeps 24-hour shifts in their start-day strip', () => {
   const calendarPage = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert.match(calendarPage, /scheduleDisplay: 'compact'/);
+  assert.match(calendarPage, /scheduleDisplay: 'blocks'/);
+  assert.match(calendarPage, /state\.scheduleDisplay = localStorage\.getItem\(SCHEDULE_DISPLAY_KEY\) === 'compact' \? 'compact' : 'blocks';/, 'nur wer Chips gewaehlt hat, behaelt sie');
+  assert.match(calendarPage, /t\('schedule\.fullBlocksHint'\)\}<\/p>` \+ scheduleLegendHtml\(\)/, 'die Legende steht im Filterblatt beim Anzeigeschalter');
+  const legend = calendarPage.slice(calendarPage.indexOf('function scheduleLegendHtml()'), calendarPage.indexOf('function scheduleLegendHtml()') + 1400);
+  assert.match(legend, /class="month-day__shift"/, 'derselbe Strich wie am Tageskopf');
+  assert.match(legend, /passesPersonFilters\(scheduleAsAssignable\(entry\)\)/, 'nur was die Personenwahl zeigt');
   assert.match(calendarPage, /schedule-entry__start/);
   assert.match(calendarPage, /function scheduleIsFullDayShift\(entry\)/);
   assert.match(calendarPage, /scheduleHasTimes\(entry\) && !scheduleIsFullDayShift\(entry\)/);
@@ -2858,6 +2865,23 @@ test('Uebersicht: Tage rasten an der Achse ein, am Telefon ganze Tage; ein Reite
   assert.match(js, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'ein neuer Reiter beginnt oben, unter einer angedockten Leiste');
 });
 
+// R23 S10 (Rest aus S9): die Planung ist mobil kuerzer als Port + Lead-Zone -
+// der Browser kappte den Stand, der Kopf klappte beim Wechsel auf (0,029/0,032).
+test('ein kurzer Reiter bekommt unter angedocktem Kopf genau den fehlenden Nachlauf', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const js = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const body = js.slice(js.indexOf('function renderPage()'), js.indexOf('function updateScheduleFab()'));
+  assert.match(body, /if \(!sameView\) body\.style\.removeProperty\('--schedule-tail'\);/, 'ein neuer Reiter misst ohne alten Nachlauf');
+  assert.match(body, /const deficit = lead - \(scrollPort\.scrollHeight - scrollPort\.clientHeight\);/, 'gemessen an der Lead-Zone, nicht an einer Zahl');
+  assert.match(body, /body\.style\.setProperty\('--schedule-tail', `\$\{tail\}px`\);/);
+  const tailAt = body.indexOf("setProperty('--schedule-tail'");
+  const restoreAt = body.indexOf('scrollPort.scrollTop = scrollTop;');
+  assert.ok(tailAt > 0 && tailAt < restoreAt, 'der Nachlauf steht, bevor der Stand gesetzt wird');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.schedule-body' && !r.at.length);
+  assert.match(rule?.body ?? '', /padding-block-end:\s*var\(--schedule-tail, 0\)/, 'ohne Mangel kein Nachlauf');
+});
+
 test('das Gueltigkeitsfenster eines Musters steht hinter "Weitere Einstellungen", offen sobald gesetzt (W2/A2)', async () => {
   // "Zyklus beginnt am" und "Gueltig ab" standen als zwei Datumsfelder
   // untereinander - woertlich gelesen zweimal dasselbe. Das Fenster ist die
@@ -2998,6 +3022,8 @@ test('P4: planning without any shift type is ONE empty state that leads to the s
     assert.match(withType, /schedule-library--overrides/, 'mit Schichtart kommen die drei Abschnitte zurueck');
     assert.doesNotMatch(withType, /go-to-shift-types/);
     assert.equal(__test.scheduleFabIntent('patterns').view, 'patterns');
+    // R23 S10: die Uebersicht legt einen Plan an (vorher kein Anlegeweg).
+    assert.equal(__test.scheduleFabIntent('overview').view, 'patterns', 'die Uebersicht oeffnet denselben Plan-Dialog');
   } finally {
     Object.assign(st, before);
   }
@@ -3673,4 +3699,17 @@ test('R22 D5: das Kuerzel doppelt den Namen nicht, und kein Ort schreibt das Eti
     const src = readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(src, /short_code\}? ?(?:\+ ' · ' \+|· \$\{)/, `${file}: das Etikett kommt aus shiftTypeLabel()`);
   }
+});
+
+// R23 S10 (Critique G1 P3, D14): der FAB nennt den Plan, nicht "Eintrag", und
+// steht auch auf der Uebersicht; freie Tage sind kein Balken unter den Schichten.
+test('FAB nennt den Schichtplan und fehlt nur in der Auswertung; freie Tage stehen in der Notiz', () => {
+  const js = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fab = js.slice(js.indexOf('function updateScheduleFab()'), js.indexOf('function updateScheduleFab()') + 2600);
+  assert.match(fab, /patterns: t\('schedule\.addPlan'\)/);
+  assert.match(fab, /patterns: t\('newLabel\.schedulePlan'\)/);
+  assert.match(fab, /hidden: readOnly\(\) \|\| activeView === 'statistics',/, 'die Uebersicht behaelt ihren Anlegeweg');
+  const stats = js.slice(js.indexOf('function renderStatistics()'), js.indexOf('function renderStatistics()') + 6000);
+  assert.doesNotMatch(stats, /countItems\.push/, 'kein Balken fuer freie Tage');
+  assert.match(stats, /t\('schedule\.freeDaysCount', \{ count: summary\.freeDays \}\)/);
 });

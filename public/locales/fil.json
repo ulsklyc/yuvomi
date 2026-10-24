@@ -1221,7 +1221,8 @@
         "localCalendarDeleteDetailIcloud": "Ililipat ang mga kaganapan mula rito sa default na kalendaryo at pagkatapos ay ia-upload sa iCloud sa pamamagitan ng Apple Calendar. Hindi na gagana ang export link nito.",
         "sidebarLabel": "Sidebar ng kalendaryo",
         "upNextTitle": "Susunod",
-        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo."
+        "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo.",
+        "shiftLegend": "Alamat ng mga shift"
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -6387,7 +6388,7 @@
         "rewards": "Gantimpala",
         "rewardsBonus": "Bonus",
         "scheduleShiftType": "Uri ng shift",
-        "scheduleEntry": "Entry"
+        "schedulePlan": "Pattern ng shift"
     },
     "iconPicker": {
         "title": "Pumili ng icon",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "Lingguhang oras (para sa overtime flag)",
         "weeklyHoursHint": "Ang sarili mong full-time na target. Minamarkahan ng tab ng Estadistika ang overtime kapag ang kabuuan ng anumang 7 magkakasunod na araw sa loob ng napiling saklaw ay lumagpas sa halagang ito.",
         "shifts": "shift",
-        "freeDays": "Mga bakanteng araw",
         "noStatistics": "Walang entry sa iskedyul sa napiling panahon.",
         "statisticsFor": "{{user}} · {{from}} hanggang {{to}}",
         "hoursValue": "{{value}} oras",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "Wala na ang isa sa mga napiling field.",
         "errorPatternGone": "Wala na ang pattern ng shift na ito.",
         "errorEntryGone": "Wala na ang entry na ito.",
-        "overviewPeopleCount": "Ikumpara ang mga tao ({{count}})"
+        "overviewPeopleCount": "Ikumpara ang mga tao ({{count}})",
+        "addPlan": "Magdagdag ng pattern ng shift",
+        "freeDaysCount": "Mga bakanteng araw: {{count}}"
     },
     "pairDisplay": {
         "title": "Ipares ang tablet",

@@ -1221,7 +1221,8 @@
         "localCalendarEventCount_one": "일정 {{count}}개",
         "sidebarLabel": "캘린더 사이드바",
         "upNextTitle": "다음 일정",
-        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다."
+        "upNextEmpty": "앞으로 3주 동안 일정이 없습니다.",
+        "shiftLegend": "근무 범례"
     },
     "noteCategories": {
         "categories": "카테고리",
@@ -6387,7 +6388,7 @@
         "rewards": "상품",
         "rewardsBonus": "보너스",
         "scheduleShiftType": "근무 유형",
-        "scheduleEntry": "항목"
+        "schedulePlan": "근무 패턴"
     },
     "iconPicker": {
         "title": "아이콘 선택",
@@ -6537,7 +6538,6 @@
         "weeklyHoursLabel": "주간 시간(초과 근무 표시용)",
         "weeklyHoursHint": "본인의 전일제 목표입니다. 선택한 기간 내 연속된 7일의 합계가 이 값을 초과하면 통계 탭이 초과 근무로 표시합니다.",
         "shifts": "회",
-        "freeDays": "휴무일",
         "noStatistics": "선택한 기간에 근무 항목이 없습니다.",
         "statisticsFor": "{{user}} · {{from}}부터 {{to}}까지",
         "hoursValue": "{{value}}시간",
@@ -6585,7 +6585,9 @@
         "errorSelectedCustomFieldGone": "선택한 필드 중 하나는 더 이상 존재하지 않습니다.",
         "errorPatternGone": "이 근무 패턴은 더 이상 존재하지 않습니다.",
         "errorEntryGone": "이 항목은 더 이상 존재하지 않습니다.",
-        "overviewPeopleCount": "사람 비교 ({{count}})"
+        "overviewPeopleCount": "사람 비교 ({{count}})",
+        "addPlan": "근무 패턴 추가",
+        "freeDaysCount": "휴무일: {{count}}"
     },
     "pairDisplay": {
         "title": "태블릿 페어링",

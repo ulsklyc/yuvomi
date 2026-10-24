@@ -3678,7 +3678,13 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   der angedockten Leiste, die Uebersicht wieder auf der laufenden Stunde; `update()` meldet
   `'own-scroll'`, und der Router setzt den Stand bei der Soft-Navigation nicht noch einmal auf 0
   (vorher zwei Spruenge 0,035/0,038 beim Wechsel, und die Rueckkehr stand auf 00:00). Traegt
-  ein Reiter die Hoehe nicht (Planung), klappt der Kopf weiter auf.
+  ein Reiter die Hoehe nicht (Planung mobil), bekommt er seit R23 S10 genau den fehlenden
+  Nachlauf (`--schedule-tail` an `.schedule-body`, gemessen an der Lead-Zone) - der Kopf bleibt
+  angedockt (vorher klappte er auf und zog die Reiter 35px weg, 0,029 + 0,032).
+  **Der FAB nennt den Plan** (R23 D14): „+ Schichtplan" in Planung UND Uebersicht (derselbe
+  Dialog; vorher „Eintrag" und auf der Uebersicht kein Anlegeweg), nur die Auswertung bleibt
+  ohne. Freie Tage sind dort kein Balken unter den Schichtarten, sondern stehen in der Notiz der
+  Kennzahl („Schichten · Freie Tage: 9").
 - **Schichtplan: der Plan zuerst (R17, E1).** "Vergleich" ist erster Reiter und Startreiter,
   die eigene Person vorgewaehlt; ohne Schichtart oder Plan traegt er den Leerzustand, der das
   Fehlende anlegt, statt Personenwahl und Stepper ueber einem leeren Raster. "Heute" ist EINE
@@ -4264,6 +4270,12 @@ weitere" zaehlt nur Termine, Aufgaben und Feiertage, der Name der Zelle zaehlt d
 weiter. Die Agenda und die Tagesliste nennen Schicht UND Person ausgeschrieben. Das Kuerzel
 doppelt den Namen nie: `shiftTypeLabel()` (utils/shift-label.js) laesst es weg, wo der Name
 damit beginnt („24-Stunden-Schicht", „1. Stunde"). Guard `test:calendar`, `test:schedule`.
+**Seit R23 (D14) sind Zeitbloecke die Vorgabe:** eine Schicht mit Uhrzeit steht in Woche und
+Tag als Block im Raster wie ein Termin; der Ganztags-Chip bleibt fuer Schichten ohne Uhrzeit
+und fuer 24-Stunden-Schichten, und als bewusste Wahl („Schichten als Zeitbloecke anzeigen"
+aus). Die Striche im Monat haben einen Schluessel: das Filterblatt nennt unter „Darstellung"
+jede Schichtart des geladenen Zeitraums einmal (derselbe Strich, Kuerzel, Name;
+`scheduleLegendHtml`, nur was die Personenwahl zeigt).
 
 ### Das Markensiegel (Signature Component)
 Yuvomis eigene Ausweisform und die Antwort auf "Health hat die Ringe, was hat Yuvomi?" - die
