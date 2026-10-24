@@ -4487,11 +4487,10 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   /* DER TIPP AUF EINE BUCHUNG HOLT AM FINGER KEINE TASTATUR (R22, D10). Er
    * oeffnet das Bearbeiten wie bisher, aber wer eine Buchung antippt, will sie
    * meist erst ansehen - der Erstfokus im Betrag fuhr die Tastatur hoch und
-   * verdeckte 40 % des Blatts (Critique 2026-10-22, a4). Ohne Zeiger, der
-   * schweben kann, geht der Fokus deshalb auf den Titel des Blatts, wie beim
-   * Wechsel aus einer Leseansicht ins Formular (modal.js focusFirstField).
-   * Anlegen behaelt den Betrag: dort ist Tippen die Absicht. */
-  const touchEdit = isEdit && typeof matchMedia === 'function' && matchMedia('(hover: none)').matches;
+   * verdeckte 40 % des Blatts (Critique 2026-10-22, a4). Seit R23 (D13) ist
+   * das die geteilte Regel `initialFocus: 'edit'` in modal.js
+   * (resolveInitialFocus) statt eines Eigenbaus hier. Anlegen behaelt den
+   * Betrag: dort ist Tippen die Absicht. */
 
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
@@ -4500,13 +4499,8 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
     // Dieselbe Breite wie die anderen Formulardialoge (Kalender, Kontakte):
     // 400px liessen Kategorie und Unterkategorie nicht nebeneinander stehen.
     size: 'md',
-    initialFocus: touchEdit ? 'none' : 'first-field',
+    initialFocus: isEdit ? 'edit' : 'first-field',
     onSave(panel) {
-      if (touchEdit) {
-        const heading = panel.querySelector('.modal-panel__title');
-        if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
-        heading?.focus({ preventScroll: true });
-      }
       let currentType = initialTypeId;
       const saveTransfer = isEdit ? null : wireTransferForm(panel, transferDialogOptions());
 

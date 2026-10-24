@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "'{{name}}' 항목이 다시 체크되었습니다 - 되돌리지 못했습니다. 다시 시도하세요.",
         "errorNotOwner": "다른 사람이 만든 항목입니다. 볼 수는 있지만 바꿀 수는 없습니다.",
         "foreignReadOnlyHint": "{{name}}님이 만듦 - 볼 수는 있지만 바꿀 수는 없습니다.",
-        "deletedNamed": "'{{name}}' 삭제했습니다."
+        "deletedNamed": "'{{name}}' 삭제했습니다.",
+        "sortMode": "순서 변경"
     },
     "kitchen": {
         "noShoppingLists": "아직 장보기 목록이 없습니다.",
@@ -805,7 +806,8 @@
         "itemStateChecked": "체크됨",
         "tickedSection": "체크한 항목",
         "itemBackToast": "“{{name}}” 항목이 다시 목록에 있습니다.",
-        "itemStateOpen": "체크 안 됨"
+        "itemStateOpen": "체크 안 됨",
+        "itemAddedToast": "\"{{name}}\"을(를) \"{{category}}\"에 추가했습니다."
     },
     "meals": {
         "ingredientCount_one": "재료 {{count}}개",
@@ -901,7 +903,9 @@
         "deleteMealNamed": "{{title}} 삭제",
         "dragHandle": "{{title}}을(를) 다른 날로 끌기",
         "openRecipeNamed": "{{title}} 레시피 열기",
-        "viewRecipeNamed": "{{title}} 레시피 보기"
+        "viewRecipeNamed": "{{title}} 레시피 보기",
+        "recipeIngredientsLabel": "레시피 재료",
+        "recipeIngredientsEdit": "조정"
     },
     "calendar": {
         "searchOpen": "일정 검색",

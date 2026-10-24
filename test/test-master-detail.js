@@ -941,9 +941,13 @@ test('Schwelle: ein 1280er-Laptop bekommt Liste + Detail, auch mit klassischer B
   assert.ok(threshold <= surface1280,
     `Schwelle ${threshold}px > Modulflaeche ${surface1280}px bei 1280 - der Laptop bekommt kein Liste + Detail`);
   // Und nach unten begrenzt: Liste + Luecke + ein lesbares Detail muessen passen.
+  // R23 (D13): die Liste hat mindestens 480px - mit 420 blieben dem
+  // Aufgabentitel bei 1280 194px (Critique G2). Das Detail traegt dafuer an
+  // der Schwelle selbst 472px, bei 1280 gemessen 492px.
   const listMin = px('--layout-list-min', 'rem');
-  assert.ok(threshold - listMin - 24 - 2 * 32 >= 480,
-    `Schwelle ${threshold}px laesst dem Detail unter 480px - zu schmal zum Lesen`);
+  assert.ok(listMin >= 480, `Listenbahn ${listMin}px < 480px - die Titel brechen bei 1280 wieder um`);
+  assert.ok(threshold - listMin - 24 - 2 * 32 >= 460,
+    `Schwelle ${threshold}px laesst dem Detail unter 460px - zu schmal zum Lesen`);
 });
 
 test('Detailfuss: klebt unten in der Spalte, einreihig, und steht bei kurzem Inhalt an der Unterkante (L6)', () => {

@@ -6,7 +6,7 @@
 
 import { beginRowFill, drawRowIcons, flushRowFill, afterNextPaint } from '/utils/row-fill.js';
 import { api } from '/api.js';
-import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
+import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
@@ -952,6 +952,10 @@ function listToolsItems() {
       : []),
     { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
     { separator: true },
+    // Nur am Finger (layout.css): holt die Griffe der Handsortierung zurueck,
+    // die dort sonst neben dem Mehr-Knopf an der Daumenkante lagen (R23, D13,
+    // list-row.css).
+    { action: 'sort-mode', label: t('common.sortMode'), icon: 'arrow-up-down', checked: sortingMode },
     { action: 'manage-categories', label: t('shopping.manageCategories'), icon: 'tags' },
     { action: 'manage-stores', label: t('shopping.manageStores'), icon: 'store' },
     { separator: true },
@@ -962,6 +966,15 @@ function listToolsItems() {
 function renderTabs(container) {
   const bar = container.querySelector('#list-tabs-bar');
   if (!bar) return;
+  // DIE LEISTE SAGT, DASS SIE WEITERGEHT (R23, D13; Critique G3 "Listen-Chips:
+  // + Neue Liste unter ..."). Mit zwei Listen lief sie am Telefon ueber, und
+  // der Neu-Knopf stand angeschnitten hinter dem Werkzeugmenue - ohne Anriss
+  // sah die Leiste vollstaendig aus. Einmal je Leiste verdrahtet (die Leiste
+  // bleibt, nur ihr Inhalt wechselt).
+  if (bar.dataset && !bar.dataset.fadeWired) {
+    bar.dataset.fadeWired = '1';
+    wireScrollFade(bar);
+  }
 
   const tabsHtml = state.lists.map((list) => {
     const unchecked = list.item_total - list.item_checked;
@@ -1020,6 +1033,18 @@ function renderTabs(container) {
     </button>`}
   `);
   if (window.lucide) window.lucide.createIcons({ el: bar });
+  // Die gewaehlte Liste steht im Bild, auch wenn sie weiter rechts liegt -
+  // nur wenn sie WECHSELT: ein Zaehlerstand baut die Leiste auch neu, und der
+  // Daumen, der sie gerade quer geschoben hat, soll sie dort finden.
+  if (bar.dataset && bar.dataset.activeList !== String(state.activeListId)) {
+    bar.dataset.activeList = String(state.activeListId);
+    const active = bar.querySelector('.list-tab--active');
+    if (active && bar.scrollWidth > bar.clientWidth) {
+      const a = active.getBoundingClientRect();
+      const b = bar.getBoundingClientRect();
+      if (a.left < b.left || a.right > b.right) bar.scrollLeft += a.left - b.left - (b.width - a.width) / 2;
+    }
+  }
 
   // KUECHENKOPF (Kopfregel mobil, 2026-09-26): das Menue der gewaehlten Liste
   // ist das EINE Werkzeugmenue des Kopfs und steht im __actions-Slot - wie im
@@ -1392,7 +1417,12 @@ function mountItems(listEl, container) {
   // Kategorie einmal ganz gelegt ist und sich ihre Hoehe gemerkt hat
   // (shopping.css, `.items-lanes.is-sized`; Critique R22-F F2.2).
   const lanes = listEl.querySelector('.items-lanes');
-  afterNextPaint().then(() => { if (lanes?.isConnected) lanes.classList.add('is-sized'); });
+  applyLaneFreeze(lanes);
+  afterNextPaint().then(() => {
+    if (!lanes?.isConnected) return;
+    lanes.classList.add('is-sized');
+    freezeLanes(lanes);
+  });
   // Nachgekommene Zeilen bekommen Zeichen und Wischgeste wie die ersten.
   fill.start({
     onRows: (rows) => {
@@ -1400,6 +1430,64 @@ function mountItems(listEl, container) {
       if (container && !readOnly()) wireSwipeGestures(container);
     },
   });
+}
+
+/*
+ * DIE SPALTEN BLEIBEN, WIE SIE BEIM LADEN STANDEN (R23, D13; Critique G3
+ * P1/P2 "Kategorien wechseln Spalte beim Abhaken"). Am Desktop verteilt
+ * Multicol die Kategorien auf zwei Spalten und gleicht nach jeder
+ * Hoehenaenderung neu aus: ein abgehakter Artikel machte „Fleisch & Fisch"
+ * um eine Zeile kuerzer, und die Kategorie sprang in die linke Spalte - unter
+ * dem Finger, der gerade die naechste Zeile treffen wollte.
+ *
+ * Nach dem ersten Bild einer Liste merkt sich die Seite, mit welcher
+ * Kategorie die zweite Spalte beginnt, und erzwingt dort den Umbruch
+ * (`break-before: column`, shopping.css). Mit genau einem erzwungenen Umbruch
+ * und zwei Spalten kann der Ausgleich nichts mehr verschieben: links steht,
+ * was davor kommt, rechts der Rest. Neu bestimmt wird nur beim Laden und beim
+ * Listenwechsel (switchList setzt zurueck); jeder Neubau dazwischen setzt den
+ * gemerkten Umbruch wieder. Leert sich die Kategorie am Umbruch, wandert er
+ * auf die naechste sichtbare (syncGroupChrome).
+ */
+let laneBreak = { listId: null, key: null };
+
+/** Sortiermodus am Finger (R23, D13, list-row.css): Griffe nur, solange er an ist. */
+let sortingMode = false;
+
+/** Schluessel einer Gruppe fuer den Spaltenumbruch: Kategorie oder „Abgehakt". */
+function laneKey(groupEl) {
+  return groupEl.classList.contains('item-ticked') ? '\u0000ticked' : (groupEl.dataset.category ?? '');
+}
+
+function laneGroups(lanes) {
+  return Array.from(lanes?.children ?? []).filter((el) => el.classList?.contains('list-group'));
+}
+
+/** Setzt den gemerkten Umbruch auf die Gruppe mit diesem Schluessel (oder die naechste sichtbare). */
+function applyLaneFreeze(lanes) {
+  if (!lanes || laneBreak.listId !== state.activeListId || laneBreak.key == null) return;
+  const groups = laneGroups(lanes);
+  let target = groups.find((g) => laneKey(g) === laneBreak.key) ?? null;
+  if (target?.hidden) target = groups.slice(groups.indexOf(target) + 1).find((g) => !g.hidden) ?? null;
+  for (const g of groups) g.toggleAttribute('data-lane-break', g === target);
+  lanes.classList.toggle('is-frozen', Boolean(target));
+}
+
+/** Liest nach dem ersten Bild, wo die zweite Spalte beginnt - nur einmal je Liste. */
+function freezeLanes(lanes) {
+  if (laneBreak.listId === state.activeListId && laneBreak.key != null) return;
+  if (getComputedStyle(lanes).columnCount !== '2') return;
+  const box = lanes.getBoundingClientRect();
+  const mid = box.left + box.width / 2;
+  const rtl = getComputedStyle(lanes).direction === 'rtl';
+  const first = laneGroups(lanes).find((g) => {
+    if (g.hidden) return false;
+    const b = g.getBoundingClientRect();
+    return rtl ? b.right <= mid : b.left >= mid;
+  });
+  if (!first) return;
+  laneBreak = { listId: state.activeListId, key: laneKey(first) };
+  applyLaneFreeze(lanes);
 }
 
 /**
@@ -1962,6 +2050,34 @@ function resetQuickAddCategory(catSelect) {
  */
 let quickAddCategoryChosen = false;
 
+/**
+ * DIE EINGABE SAGT, WO DER ARTIKEL GELANDET IST (R23, D13; Critique G3
+ * "Quick-Add mobil ohne Rueckmeldung"). Am Telefon steht die neue Zeile in
+ * ihrer Kategorie, oft unter der Tastatur oder weit unten - das Feld leerte
+ * sich, und sonst geschah sichtbar nichts. Liegt die Zeile ausserhalb des
+ * Bilds, nennt ein Toast Artikel und Kategorie; steht sie im Bild, ist sie
+ * selbst die Rueckmeldung (kein Toast je Artikel beim schnellen Erfassen).
+ */
+function announceAddedOutOfSight(container, item) {
+  if (!item?.id) return;
+  const row = container.querySelector(`#items-list .swipe-row[data-swipe-id="${item.id}"]`);
+  const port = container.querySelector('#items-list');
+  // Ohne Zeile und Traeger laesst sich nichts sagen (kein Toast auf Verdacht).
+  if (!row || !port || typeof row.getBoundingClientRect !== 'function') return;
+  let inSight = false;
+  if (shown(row)) {
+    const r = row.getBoundingClientRect();
+    const p = port.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const bottom = Math.min(p.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight);
+    inSight = r.top >= p.top && r.bottom <= bottom;
+  }
+  if (inSight) return;
+  window.yuvomi?.showToast?.(t('shopping.itemAddedToast', {
+    name: item.name, category: categoryLabel(item.category),
+  }), 'info');
+}
+
 function wireQuickAdd(container) {
   const form = container.querySelector('#quick-add-form');
   if (!form) return;
@@ -2019,6 +2135,7 @@ function wireQuickAdd(container) {
         updateItemsList(container);
         updateListCounter(state.activeListId, 1, 0);
         renderTabs(container);
+        announceAddedOutOfSight(container, data.data);
       }
       nameInput.value = '';
       qtyInput.value  = '';
@@ -2406,6 +2523,8 @@ function syncGroupChrome(listEl) {
     if (countEl) countEl.textContent = String(count);
     groupEl.hidden = count === 0;
   });
+  // Der Spaltenumbruch folgt einer geleerten Kategorie auf die naechste.
+  applyLaneFreeze(listEl.querySelector('.items-lanes'));
 }
 
 /**
@@ -3913,6 +4032,8 @@ async function switchList(listId, container) {
   clearBulkPill();
   // Die Pause gehoert den Zeilen der alten Liste (#1816).
   resetPlacementHold();
+  // Eine andere Liste verteilt ihre Spalten neu (Spaltenumbruch, freezeLanes).
+  laneBreak = { listId: null, key: null };
   state.activeListId = listId;
   state.collapsedCategories = loadCollapsedCategories(state.currentUserId, listId);
   state.tickedOpen = loadTickedOpen(state.currentUserId, listId);
@@ -4417,6 +4538,13 @@ function wireListContentEvents(container) {
       openStoreManager(container);
     }
 
+    // ---- Sortiermodus am Finger (R23, D13) ----
+    if (action === 'sort-mode') {
+      sortingMode = !sortingMode;
+      container.querySelector('.shopping-page')?.classList.toggle('is-sorting', sortingMode);
+      renderTabs(container);
+    }
+
     if (action === 'import-meals') {
       openMealPlanImport(container);
     }
@@ -4803,6 +4931,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // und mit dem Verlassen der Seite.
   resetPlacementHold();
   routeSignal?.addEventListener?.('abort', resetPlacementHold, { once: true });
+  // Jeder Seitenaufbau verteilt die Spalten neu (freezeLanes, R23 D13) und
+  // beginnt ohne Sortiermodus.
+  laneBreak = { listId: null, key: null };
+  sortingMode = false;
   // VOR dem Laden: die erste Laufnummern-Abfrage laeuft neben dem Laden der
   // Seite. Die Reihenfolge der beiden Antworten ist damit NICHT entschieden -
   // und muss es nicht sein: die Artikel-Antwort traegt ihre Laufnummer, und

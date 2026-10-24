@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "‘{{name}}’ is weer afgevinkt - terugzetten is niet gelukt. Probeer het opnieuw.",
         "errorNotOwner": "Iemand anders heeft dit gemaakt - je kunt het bekijken, maar niet wijzigen.",
         "foreignReadOnlyHint": "Gemaakt door {{name}} - je kunt het bekijken, maar niet wijzigen.",
-        "deletedNamed": "‘{{name}}’ verwijderd."
+        "deletedNamed": "‘{{name}}’ verwijderd.",
+        "sortMode": "Volgorde wijzigen"
     },
     "kitchen": {
         "noShoppingLists": "Er is nog geen boodschappenlijst.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "afgevinkt",
         "tickedSection": "Afgevinkt",
         "itemBackToast": "„{{name}}” staat weer op de lijst.",
-        "itemStateOpen": "niet afgevinkt"
+        "itemStateOpen": "niet afgevinkt",
+        "itemAddedToast": "\"{{name}}\" toegevoegd onder \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediënt",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "{{title}} verwijderen",
         "dragHandle": "{{title}} naar een andere dag slepen",
         "openRecipeNamed": "Recept voor {{title}} openen",
-        "viewRecipeNamed": "Recept voor {{title}} bekijken"
+        "viewRecipeNamed": "Recept voor {{title}} bekijken",
+        "recipeIngredientsLabel": "Ingrediënten uit het recept",
+        "recipeIngredientsEdit": "Aanpassen"
     },
     "calendar": {
         "searchOpen": "Afspraken zoeken",

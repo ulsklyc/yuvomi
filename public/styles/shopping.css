@@ -770,6 +770,13 @@
     margin-block-end: var(--space-3);
   }
 
+  /* Der eingefrorene Spaltenumbruch (shopping.js, freezeLanes; R23 D13): die
+   * zweite Spalte beginnt dort, wo sie beim Laden begann, und der Ausgleich
+   * schiebt beim Abhaken keine Kategorie mehr hinueber. */
+  .shopping-page .items-lanes.is-frozen > .list-group[data-lane-break] {
+    break-before: column;
+  }
+
   /* IN DEN SPALTEN RECHNET NUR, WAS IN SICHT IST - MIT DER ECHTEN HOEHE
    * (Critique R22-F, F2.2). Die Gruppenregel der einen Spalte (oben) fehlt
    * hier, weil ein geschaetzter Platzhalter Kategorien beim Scrollen die Spalte

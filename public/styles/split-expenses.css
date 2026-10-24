@@ -129,6 +129,27 @@
   padding: 0 var(--space-1) var(--space-2);
 }
 
+/* DIE OFFENE SUCHE NIMMT DIE ZWEITE ZEILE, NICHT DER MEHR-KNOPF (R23, D13;
+ * Rest aus S1). Schmal steht die Gruppensuche als Icon neben Titel und „...".
+ * Aufgeklappt (Fokus oder Begriff) wuchs sie auf ihre volle Breite, und der
+ * Mehr-Knopf brach allein in eine eigene Zeile darunter - ein 48px-Kreis
+ * zwischen Suche und Segment. Jetzt rueckt die Suche selbst unter Titel und
+ * Knopf, wie zweispaltig (unten). Zwei Regeln statt einer Liste: `:has()`
+ * in einer Selektorliste verwirft ohne Unterstuetzung die ganze Liste (F4.2). */
+.split-panel-head.section-toolbar > label.split-search:focus-within {
+  order: 3;
+  flex: 1 0 100%;
+  max-width: none;
+  margin-inline-start: 0;
+}
+
+.split-panel-head.section-toolbar > label.split-search:has(input:not(:placeholder-shown)) {
+  order: 3;
+  flex: 1 0 100%;
+  max-width: none;
+  margin-inline-start: 0;
+}
+
 /* Die Gruppensuche steht im Kopf der Liste (.section-toolbar, R14 P1): mobil
  * als Icon neben „+", damit die erste Gruppe eine Zeile hoeher steht. Erst wo
  * die Gruppen eine eigene schmale Spalte bekommen (zweispaltig ab 976px

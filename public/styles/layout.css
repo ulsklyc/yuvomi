@@ -3106,6 +3106,19 @@ html.fab-steady .page-fab {
   min-width: 0;
 }
 
+/* AB 1024px GIBT DIE SUCHE NACH, NICHT DIE AKTIONEN (R23, D13; Critique G0
+ * S-P2-1). Mit `min-width: 0` schrumpften bei 1024 beide - Suche und Slot -, und
+ * der Slot schob seinen Primaerknopf 24px ueber die eigene Kante: "+ Aufgabe"
+ * stand 8 statt 32px vor dem Fensterrand. Die Aktionen sind Knoepfe fester
+ * Breite; das Suchfeld ist das Element, das schmaler werden darf (es bleibt
+ * bedienbar und waechst beim Fokus nicht ueber seinen Platz hinaus). Unter
+ * 1024px gilt die Regel oben - dort faltet der Large-Title-Kopf anders. */
+@media (min-width: 1024px) {
+  .page-toolbar__actions {
+    flex-shrink: 0;
+  }
+}
+
 /* Unter 1024px dockt nichts in den Slot (dockFabIntoToolbar), er bleibt in
  * Modulen mit Tab-Zeile leer - bricht im umbrechenden Kopf aber auf eine
  * eigene Null-Zeile und bringt deren row-gap mit: +8px Kopf in Gesundheit und
@@ -9832,6 +9845,27 @@ textarea::placeholder {
  * kein Bruch. */
 html:has(.app-page.is-selecting) .page-fab {
   display: none;
+}
+
+/* Der Sortiermodus ist ein Werkzeug fuer den Finger (list-row.css, R23 D13):
+ * am Zeiger steht der Griff ohnehin, der Eintrag haette keine Wirkung. */
+@media (hover: hover) {
+  .popover-menu__item[data-action="sort-mode"] {
+    display: none;
+  }
+}
+
+/* ANGEDOCKT HAELT ER SEINEN PLATZ (R23, D13; Critique G2 "Bulk verschiebt
+ * Kopf"). Ab 1024px steht der FAB als Textknopf im Kopf (`.page-fab--docked`,
+ * dockFabIntoToolbar). Mit `display: none` rueckten Segment und Menue um seine
+ * Breite nach rechts, sobald die Auswahl begann, und zurueck, wenn sie endete.
+ * Er wird unsichtbar und unbedienbar (visibility nimmt ihn auch aus Tab-Folge
+ * und Baum), die Zeile behaelt ihre Form. */
+@media (min-width: 1024px) {
+  html:has(.app-page.is-selecting) .page-fab.page-fab--docked {
+    display: inline-flex;
+    visibility: hidden;
+  }
 }
 
 html:has(.app-page.is-selecting) {

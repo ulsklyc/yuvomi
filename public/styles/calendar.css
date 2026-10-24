@@ -132,14 +132,11 @@
  * links und rechts blieben 420px leer, und Mini-Monat, Kalenderliste und „Als
  * Naechstes" gab es nicht. Ab 86.25rem Kalenderflaeche (das 1600er-Fenster
  * neben der ausgeklappten Seitenleiste: 1380px) wird der Kalender eine Flaeche
- * mit Seitenleiste wie Apple Kalender: Kopf und Rahmen ruecken von der
- * Inhaltsspalte auf den Seitenrand (`--page-gutter`), links steht die Leiste
- * (16.25rem, ein Mini-Monat mit 32px-Tagen), rechts das Raster.
- * Gemessen 1920: Leiste 252-512, Raster 536-1888 (vorher 430-1710).
- *
- * DAS IST DIE EINE AUSNAHME VON DER GEMEINSAMEN LINKEN KANTE (R19): die
- * Leiste nimmt den Rand ein, den die Inhaltsspalte sonst leer laesst; ihre
- * Kante ist die, die jedes Modul bei 1280 und 1440 hat. Nur die Suche steht
+ * mit Seitenleiste wie Apple Kalender: links steht die Leiste (16.25rem, ein
+ * Mini-Monat mit 32px-Tagen), rechts das Raster - beide auf der zentrierten
+ * Inhaltsspalte wie jedes Modul (R23, D13: bis dahin rueckten Kopf und Rahmen
+ * auf den Seitenrand, "die eine Ausnahme von der gemeinsamen linken Kante"
+ * aus R19; der Titel sprang beim Modulwechsel um 178px). Nur die Suche steht
  * ohne Leiste. Seit R20 behaelt auch die Agenda sie (ohne „Als Naechstes" -
  * das ist die Agenda selbst): fiel sie weg, sprang der Inhalt beim
  * Ansichtswechsel von x 536 auf 220 (1920px).
@@ -172,10 +169,13 @@
 }
 
 @container cal-page (min-width: 86.25rem) {
-  .calendar-page.has-cal-sidebar > * {
-    --page-inline-pad: var(--page-gutter);
-  }
-
+  /* AUF DER INHALTSSPALTE (R23, D13; Critique G0 S-P2-5). Kopf und Rahmen
+   * rueckten hier auf den Seitenrand (`--page-inline-pad: var(--page-gutter)`),
+   * und der Titel stand bei 1920 auf x 252 statt 430 wie in jedem anderen
+   * Modul, bei 2560 auf 252 statt 750 - er sprang beim Modulwechsel. Jetzt
+   * bleiben beide auf der zentrierten Inhaltsspalte (1280px): Leiste und
+   * Raster teilen sie sich (260 + 24 + 996px), und die Titelkante ist in allen
+   * Modulen dieselbe. */
   .calendar-page.has-cal-sidebar .cal-frame {
     gap: var(--space-6);
     padding-inline: var(--page-inline-pad);

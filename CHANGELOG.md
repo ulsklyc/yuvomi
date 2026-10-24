@@ -47,6 +47,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The meal plan shows the whole week on a laptop.** Recipes now sit in a strip below the plan
+  instead of a column beside it, so the week keeps the full width. Below about 1150 px of plan
+  width the meal type moves from its own column into a heading above its row, and all seven days
+  fit from a 1280 px window on, with Monday no longer scrolled out of view. A meal planned from a
+  recipe now lists the recipe's ingredients in its dialog; "Adjust" turns them into the meal's own
+  ingredients.
+- **Lists keep their columns and headers in place.** On the desktop Shopping list a category no
+  longer jumps to the other column when an item is checked off; the columns are set when the
+  list opens. The Tasks header no longer shifts when switching to History or starting a
+  selection, and switching to the Kanban board no longer shows a faded list first. List and
+  detail views give the list at least 480 px, so task titles wrap less at 1280 px. From a 1600 px
+  window on, the Calendar stays on the same content column as every other module.
+- **On phones, the drag handle in Tasks and Shopping appears only when reordering.** Each row
+  showed its menu and its handle side by side at the thumb's edge. The handle now comes back with
+  "Reorder" in the page menu; with a mouse it stays where it was.
+- **Smaller layout fixes.** The More sheet shows a group heading only for groups with at least
+  two entries, so Budget stands without "Finance". In the command palette, one or two letters
+  only match the start of a word for places and settings. Tapping a meal or a budget entry on a
+  phone no longer opens the keyboard. A new shopping item that lands out of view is announced
+  with its category. At 1024 px the primary button no longer sticks out of the header. The list
+  chips in Shopping fade at the edge when there are more lists than fit. The group search in
+  Split expenses no longer pushes the menu button onto a line of its own.
 - **Dates, times and distances read the same in every module.** Shift times in the Shift
   planner now follow the 12-hour setting like the Calendar does, and every time span is written
   as "06:00 - 14:00". A date leaves out the year when it is the current one ("Sat, 24.10."

@@ -1602,6 +1602,40 @@ test('Erstfokus: ein ausdrueckliches Ziel traegt dieselbe Wache, "none" plant ni
   }
 });
 
+/* R23 (D13): BEARBEITEN HOLT AM FINGER KEINE TASTATUR. Wer eine Mahlzeit oder
+ * eine Buchung antippt, will sie meist ansehen; der Feldfokus fuhr die
+ * Tastatur hoch (Critique G3, Rest S1). `initialFocus: 'edit'` gibt ohne
+ * schwebenden Zeiger dem Titel des Blatts den Fokus, am Zeiger dem ersten Feld. */
+test('Erstfokus "edit": am Finger der Titel (ohne Ring), am Zeiger das erste Feld (R23 D13)', () => {
+  const vorherMM = global.matchMedia;
+  for (const finger of [true, false]) {
+    const lage = erstfokusLage();
+    try {
+      global.matchMedia = (q) => ({ matches: finger && q === '(hover: none)' });
+      const attrs = {};
+      const titel = lage.knoten('modal-title', true);
+      Object.assign(titel, { hasAttribute: (n) => n in attrs, setAttribute: (n, v) => { attrs[n] = v; } });
+      const container = { ...lage.container, querySelector: (sel) => (sel === '.modal-panel__title' ? titel : lage.feld) };
+      global.document.activeElement = lage.knoten('karte-draussen', false);
+      modalTest.applyInitialFocus(container, 'edit');
+      lage.ausloesen();
+      if (finger) {
+        assert.equal(global.document.activeElement, titel, 'am Finger nimmt der Titel den Fokus - keine Tastatur');
+        assert.equal(attrs.tabindex, '-1', 'programmatisch fokussierbar, nicht in der Tab-Folge');
+      } else {
+        assert.equal(global.document.activeElement, lage.feld, 'am Zeiger bleibt es beim ersten Feld');
+      }
+    } finally {
+      lage.aufraeumen();
+      global.matchMedia = vorherMM;
+    }
+  }
+  const meals = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');
+  const budget = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  assert.match(meals, /initialFocus: isEdit \? 'edit' : 'first-field'/, 'die Mahlzeit-Karte oeffnet das Bearbeiten mit der Regel');
+  assert.match(budget, /initialFocus: isEdit \? 'edit' : 'first-field'/, 'die Buchung ebenso - kein Eigenbau mehr');
+});
+
 /* Review zu #1193: der Datepicker oeffnet sein Popover unter document.body und
  * fokussiert synchron hinein - AUSSERHALB des Modal-Containers. Eine Wache, die
  * nur im Modal nachsieht, riss den Fokus aus dem offenen Kalender. */
@@ -2542,7 +2576,11 @@ test('firstEntryField: Pflichtfeld zum Tippen vor Tippfeld vor Auswahl/Schalter/
 
 test('firstEntryField traegt jeden Erstfokus des Dialogs (Oeffnen, Einfahrt, Bearbeiten)', () => {
   const src = readFileSync(fileURLToPath(new URL('../public/components/modal.js', import.meta.url)), 'utf8');
-  assert.equal((src.match(/firstEntryField\((?:container|panel)\)/g) ?? []).length, 3);
+  // Oeffnen und Einfahrt fragen seit R23 (D13) beide resolveInitialFocus, das
+  // firstEntryField einmal ruft; dazu der Wechsel ins Formular (focusFirstField).
+  assert.equal((src.match(/firstEntryField\((?:container|panel)\)/g) ?? []).length, 2);
+  assert.equal((src.match(/(?<!function )resolveInitialFocus\((?:container|panel), initialFocus\)/g) ?? []).length, 2,
+    'Oeffnen und Einfahrt nehmen denselben Weg');
   assert.doesNotMatch(src, /querySelector\(FIRST_FIELD\) \?\? \w+\.querySelector\(FOCUSABLE\)/);
 });
 

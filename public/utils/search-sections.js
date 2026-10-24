@@ -245,13 +245,32 @@ function matchesVerb(query, verb) {
   return tokens.every((tok) => words.some((word) => word.startsWith(tok)));
 }
 
+/**
+ * Unter drei Zeichen zaehlt fuer Orte und Einstellungen nur ein WORTANFANG
+ * (R23, D14; Critique G0 S-P2-4). "Le" traf "Belohnungen", "Geburtstage
+ * erstellen" und ein halbes Dutzend Einstellungen mitten im Wort und schob
+ * die Datentreffer unter die Falz - wer zwei Buchstaben tippt, meint einen
+ * Anfang ("Le" -> "Leo", "Lebensmittel"). Ab drei Zeichen gilt wieder jede
+ * Fundstelle: "geld" findet "Taschengeld". Jedes Wort der Eingabe muss
+ * einen Wortanfang treffen.
+ */
+export const PALETTE_INFIX_MIN = 3;
+
+export function paletteMatchesPlace(query, label) {
+  const tokens = paletteTokens(query);
+  if (!tokens.length) return false;
+  if (tokens.join('').length >= PALETTE_INFIX_MIN) return paletteMatches(query, label);
+  const words = [...String(label ?? '')].map(foldChar).join('').split(/[^\p{L}\p{N}_]+/u);
+  return tokens.every((tok) => words.some((word) => word.startsWith(tok)));
+}
+
 export function paletteCommands(query, { places = [], settings = [], actions = [], commands = [], cap = 6 } = {}) {
   if (!paletteTokens(query).length) return { places: [], actions: [] };
-  const hitPlaces = [...places, ...commands].filter((p) => paletteMatches(query, p.label)).sort(byRank(query));
+  const hitPlaces = [...places, ...commands].filter((p) => paletteMatchesPlace(query, p.label)).sort(byRank(query));
   // Nur Einstellungen, deren NAME passt: die Einstellungssuche trifft auch
   // Beschreibungen, und ein Treffer ohne sichtbaren Grund ("sch" -> "Budget")
   // ist genau das, was die Markierung abschaffen soll.
-  const hitSettings = settings.filter((s) => paletteMatches(query, s.label)).sort(byRank(query))
+  const hitSettings = settings.filter((s) => paletteMatchesPlace(query, s.label)).sort(byRank(query))
     .slice(0, Math.max(0, cap - hitPlaces.length));
   const hitActions = actions
     .filter((a) => paletteMatches(query, a.label, a.context) || matchesVerb(query, a.verb))

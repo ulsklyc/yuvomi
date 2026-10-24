@@ -111,7 +111,8 @@
         "errorUncheckRolledBack": "„{{name}}” znowu jest odhaczone - przywrócenie się nie powiodło. Spróbuj ponownie.",
         "errorNotOwner": "Utworzył to ktoś inny - możesz to oglądać, ale nie zmieniać.",
         "foreignReadOnlyHint": "Utworzone przez {{name}} - możesz to oglądać, ale nie zmieniać.",
-        "deletedNamed": "„{{name}}” usunięte."
+        "deletedNamed": "„{{name}}” usunięte.",
+        "sortMode": "Zmień kolejność"
     },
     "kitchen": {
         "noShoppingLists": "Nie ma jeszcze listy zakupów.",
@@ -933,7 +934,8 @@
         "itemStateChecked": "odhaczone",
         "tickedSection": "Odhaczone",
         "itemBackToast": "„{{name}}” jest znowu na liście.",
-        "itemStateOpen": "nieodhaczone"
+        "itemStateOpen": "nieodhaczone",
+        "itemAddedToast": "„{{name}}” dodano do „{{category}}”."
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",
@@ -1039,7 +1041,9 @@
         "deleteMealNamed": "Usuń {{title}}",
         "dragHandle": "Przeciągnij {{title}} na inny dzień",
         "openRecipeNamed": "Otwórz przepis na {{title}}",
-        "viewRecipeNamed": "Zobacz przepis na {{title}}"
+        "viewRecipeNamed": "Zobacz przepis na {{title}}",
+        "recipeIngredientsLabel": "Składniki z przepisu",
+        "recipeIngredientsEdit": "Dostosuj"
     },
     "calendar": {
         "searchOpen": "Szukaj wydarzeń",

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "”{{name}}” är avbockad igen - att ta tillbaka den gick inte. Försök igen.",
         "errorNotOwner": "Någon annan har skapat det här - du kan se det men inte ändra det.",
         "foreignReadOnlyHint": "Skapad av {{name}} - du kan se det men inte ändra det.",
-        "deletedNamed": "”{{name}}” raderad."
+        "deletedNamed": "”{{name}}” raderad.",
+        "sortMode": "Ändra ordning"
     },
     "kitchen": {
         "noShoppingLists": "Det finns ingen inköpslista än.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "avbockad",
         "tickedSection": "Avbockat",
         "itemBackToast": "”{{name}}” är tillbaka på listan.",
-        "itemStateOpen": "inte avbockad"
+        "itemStateOpen": "inte avbockad",
+        "itemAddedToast": "”{{name}}” lades till under ”{{category}}”."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Ta bort {{title}}",
         "dragHandle": "Dra {{title}} till en annan dag",
         "openRecipeNamed": "Öppna receptet för {{title}}",
-        "viewRecipeNamed": "Visa receptet för {{title}}"
+        "viewRecipeNamed": "Visa receptet för {{title}}",
+        "recipeIngredientsLabel": "Ingredienser från receptet",
+        "recipeIngredientsEdit": "Anpassa"
     },
     "calendar": {
         "searchOpen": "Sök händelser",

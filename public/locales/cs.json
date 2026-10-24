@@ -110,7 +110,8 @@
         "errorUncheckRolledBack": "„{{name}}“ je znovu odškrtnuté - vrácení se nepodařilo. Zkuste to znovu.",
         "errorNotOwner": "Tohle vytvořil někdo jiný - můžete to zobrazit, ale ne změnit.",
         "foreignReadOnlyHint": "Vytvořil(a) {{name}} - můžete to zobrazit, ale ne změnit.",
-        "deletedNamed": "„{{name}}“ smazáno."
+        "deletedNamed": "„{{name}}“ smazáno.",
+        "sortMode": "Změnit pořadí"
     },
     "kitchen": {
         "noShoppingLists": "Nákupní seznam ještě neexistuje.",
@@ -852,7 +853,8 @@
         "itemStateChecked": "odškrtnuto",
         "tickedSection": "Odškrtnuto",
         "itemBackToast": "Položka „{{name}}“ je zpět na seznamu.",
-        "itemStateOpen": "neodškrtnuto"
+        "itemStateOpen": "neodškrtnuto",
+        "itemAddedToast": "„{{name}}“ přidáno do „{{category}}“."
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",
@@ -953,7 +955,9 @@
         "deleteMealNamed": "Smazat {{title}}",
         "dragHandle": "Přetáhnout {{title}} na jiný den",
         "openRecipeNamed": "Otevřít recept: {{title}}",
-        "viewRecipeNamed": "Zobrazit recept: {{title}}"
+        "viewRecipeNamed": "Zobrazit recept: {{title}}",
+        "recipeIngredientsLabel": "Suroviny z receptu",
+        "recipeIngredientsEdit": "Upravit"
     },
     "calendar": {
         "searchOpen": "Hledat události",

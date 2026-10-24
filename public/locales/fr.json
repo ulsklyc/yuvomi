@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "« {{name}} » est de nouveau coché - le retour n'a pas été enregistré. Réessayez.",
         "errorNotOwner": "Quelqu’un d’autre l’a créé : vous pouvez le voir, mais pas le modifier.",
         "foreignReadOnlyHint": "Créé par {{name}} : vous pouvez le voir, mais pas le modifier.",
-        "deletedNamed": "« {{name}} » supprimé."
+        "deletedNamed": "« {{name}} » supprimé.",
+        "sortMode": "Modifier l’ordre"
     },
     "kitchen": {
         "noShoppingLists": "Il n'y a encore aucune liste de courses.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "coché",
         "tickedSection": "Cochés",
         "itemBackToast": "« {{name}} » est de nouveau sur la liste.",
-        "itemStateOpen": "non coché"
+        "itemStateOpen": "non coché",
+        "itemAddedToast": "« {{name}} » ajouté dans « {{category}} »."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrédient",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Supprimer {{title}}",
         "dragHandle": "Faire glisser {{title}} vers un autre jour",
         "openRecipeNamed": "Ouvrir la recette de {{title}}",
-        "viewRecipeNamed": "Voir la recette de {{title}}"
+        "viewRecipeNamed": "Voir la recette de {{title}}",
+        "recipeIngredientsLabel": "Ingrédients de la recette",
+        "recipeIngredientsEdit": "Ajuster"
     },
     "calendar": {
         "searchOpen": "Rechercher des événements",

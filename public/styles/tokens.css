@@ -1640,8 +1640,11 @@
    * 65rem = 1040px Modulflaeche: ein 1280er-Laptop (1060px neben der
    * Seitenleiste) bekommt Liste + Detail (420 + 24 + ~560), auch mit einer
    * klassischen 15-17px-Bildlaufleiste an #main-content. Bis R10 stand hier
-   * 75rem, und 1280 fiel auf den Einspalter mit Modal zurueck (A3 P2-2). */
-  --layout-list-min: 26.25rem;
+   * 75rem, und 1280 fiel auf den Einspalter mit Modal zurueck (A3 P2-2).
+   * MINDESTENS 480px LISTE (R23, D13): mit 420px blieben dem Aufgabentitel bei
+   * 1280 194px, und 11 von 11 Titeln brachen um (Critique G2). Das Detail
+   * behaelt bei 1280 rund 500px; ab 1220px Flaeche traegt die 40-%-Formel. */
+  --layout-list-min: 30rem;
   --layout-list-max: 32.5rem;
   /* Listenbahn, sobald der Baustein auf der Content-Spalte steht (Modulflaeche
    * ab 84rem = 1280 + 2 x 32px Gutter, layout.css): dann waechst er nicht

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "“{{name}}”已恢复为已勾选 - 撤销未成功。请重试。",
         "errorNotOwner": "这是其他人创建的，你可以查看，但不能修改。",
         "foreignReadOnlyHint": "由 {{name}} 创建，你可以查看，但不能修改。",
-        "deletedNamed": "“{{name}}”已删除。"
+        "deletedNamed": "“{{name}}”已删除。",
+        "sortMode": "调整顺序"
     },
     "kitchen": {
         "noShoppingLists": "还没有购物清单。",
@@ -787,7 +788,8 @@
         "itemStateChecked": "已勾选",
         "tickedSection": "已勾选",
         "itemBackToast": "“{{name}}”已回到清单。",
-        "itemStateOpen": "未勾选"
+        "itemStateOpen": "未勾选",
+        "itemAddedToast": "已将“{{name}}”加入“{{category}}”。"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 种食材",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "删除{{title}}",
         "dragHandle": "将{{title}}拖到另一天",
         "openRecipeNamed": "打开{{title}}的食谱",
-        "viewRecipeNamed": "查看{{title}}的食谱"
+        "viewRecipeNamed": "查看{{title}}的食谱",
+        "recipeIngredientsLabel": "食谱中的食材",
+        "recipeIngredientsEdit": "调整"
     },
     "calendar": {
         "searchOpen": "搜索日程",

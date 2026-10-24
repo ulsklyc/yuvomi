@@ -1606,7 +1606,8 @@ Seitdem steht jede Seite hinter der Shell in **genau einem von drei Regimen**:
   Umsetzung: Kompositionsmodus `reading` oder `form`.
 - **Liste + Detail** - unter der Schwelle exakt wie Lesemass (die Zeile oeffnet Modal, Sheet
   oder Aufklapper). Ab einer Modulflaeche von `--layout-split-threshold` (65rem) steht links
-  die Liste auf einer Bahn zwischen `--layout-list-min` und `--layout-list-max` (420-520px),
+  die Liste auf einer Bahn zwischen `--layout-list-min` und `--layout-list-max` (480-520px;
+  seit R23 D13 mindestens 480px - mit 420 blieben dem Aufgabentitel bei 1280 194px),
   rechts das Detail der ausgewaehlten Zeile mit eigenem Kopf (Titel, Aktionen), das fuer sich
   scrollt. Die Auswahl steht in der Adresse (`?open=<id>`, Zurueck-Taste - derselbe Parameter
   wie der Deep-Link der globalen Suche und der Essenskarten, auf allen vier Seiten), Pfeil hoch/runter
@@ -1646,14 +1647,35 @@ Auf diesem Deckel (ab 84rem Modulflaeche) nimmt die Liste `--layout-list-wide` (
 1920 neun E-Mails und brachen die Chips um, waehrend das Detail 768px fuer kurze Felder hatte).
 Am Tablet unter der Schwelle (640-1023px) laeuft die Liste so breit wie ihr Kopf statt auf dem
 Lesemass (834: vorher 98px rechts leer).
-Die eine Ausnahme ist der Kalender mit Seitenleiste (R19): ab 86.25rem Kalenderflaeche nimmt
-seine Leiste den Rand ein, den die Inhaltsspalte sonst leer laesst (bei 1920 zusammen 420px), und
-Kopf, Leiste und Raster stehen von Seitenrand zu Seitenrand (252-1888). Seine Kante ist dann die,
-die jedes Modul bei 1280 und 1440 hat. Nur die Suche hat keine Leiste; die Agenda behaelt sie seit R20 ohne „Als Naechstes“ (das ist die Agenda selbst) - vorher sprang der Inhalt beim Ansichtswechsel von x 536 auf 220.
+Auch der Kalender mit Seitenleiste (R19) steht seit R23 (D13) auf der Inhaltsspalte: ab
+86.25rem Kalenderflaeche teilen sich Leiste und Raster die 1280px (260 + 24 + 996), Kopf und
+Siegel fluchten mit jedem Modul (1920: x 430, 2560: x 750). Bis dahin rueckten Kopf, Leiste
+und Raster auf den Seitenrand (252-1888), und der Titel sprang beim Modulwechsel um 178px -
+die "eine Ausnahme" gibt es nicht mehr. Nur die Suche hat keine Leiste; die Agenda behaelt sie seit R20 ohne „Als Naechstes“ (das ist die Agenda selbst) - vorher sprang der Inhalt beim Ansichtswechsel von x 536 auf 220.
 Die Uebersicht steht seit R19 (2026-10-16) auf derselben Spalte: sie polstert am Desktop mit
 `--page-inline-pad` statt mit eigenen 32/40px und ohne ihr altes Hoechstmass von 1680px. Vorher
 begann sie bei 1920 bei x 270 und jedes Modul bei x 430; jetzt 252 / 252 / 430 bei 1280 / 1440 /
 1920 auf allen Seiten (`test:dashboard-clarity`).
+
+**Die Kueche plant die Woche auf voller Breite** (R23, D13). Die Rezepte stehen als Leiste UNTER
+dem Plan (`.meals-layout`: eine Spalte, Zeilen `minmax(0, 1fr) auto`), nicht mehr als Spalte rechts
+(272/320px - genau der sechste und siebte Tag). Unter 72rem Flaeche (`@container meals-board`)
+wandert der Mahlzeittyp aus der 116px-Spalte in einen Kopf ueber seiner Reihe, und sieben Tage
+stehen mit mindestens 128px (1280: 134px, kein ausgescrollter Montag mehr). Bei 1024 bleibt das
+Fenster, mit Anriss an beiden Kanten. Ab 1440 traegt die Typspalte wieder.
+
+**Der Kopf behaelt seine Form** (R23, D13). Ab 1024px schrumpfen die Aktionen nicht
+(`.page-toolbar__actions { flex-shrink: 0 }`), die Suche gibt nach - bei 1024 ragte "+ Aufgabe"
+24px ueber seinen Slot. Ein Werkzeug, das in einer Ansicht nichts kann, wird abgeschaltet statt
+entfernt (Filter im Aufgaben-Verlauf), und der angedockte FAB tritt im Auswahlmodus unsichtbar ab
+(`visibility`), statt Segment und Menue um seine Breite zu schieben. Ein Ansichtswechsel laesst die
+alte Ansicht stehen, bis die neue geladen ist, und tauscht Kopfmass und Koerper im selben Bild
+(Aufgaben: kein gedimmtes Zwischenbild mehr).
+
+**Am Finger steht der Griff nur im Sortiermodus** (R23, D13). In Aufgaben und Einkauf lagen
+Mehr-Knopf und Griff nebeneinander an der Daumenkante (34 + 34px). Ohne schwebenden Zeiger tritt der
+Griff ab; „Reihenfolge ändern" im Werkzeugmenue (`.is-sorting` an der Seitenwurzel) holt ihn zurueck.
+Am Zeiger bleibt er immer stehen, dort ist er auch der Tastaturpfad.
 
 **Die Detailspalte ist so hoch wie ihr Inhalt** (R21 S7, D9). Sie reichte als Karte bis an den
 Fensterrand, und ein kurzes Detail trug seinen Fuss dort - gemessen 1920: Geburtstag 528px leer
@@ -1768,7 +1790,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche |
 | `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
 | `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`); seit R17 EINE Liste aller Gegenstaende nach Kategorie gruppiert, die Kategorien als Filter-Chips darueber (`?category=` waehlt den Chip vor und wird ersetzt, nicht gestapelt), kein Kategorie-Zwischenschritt; kurze Angaben im Detail zweispaltig ab 35rem Spaltenbreite (`@container detail-pane`) |
-| `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche; der Tag fuehrt ab der Schwelle eine Seitenspalte mit den Folgetagen (`.day-rail`); ab 86.25rem Kalenderflaeche (ca. 1600er Fenster) steht in Monat, Woche und Tag links die Seitenleiste (Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt, „Als Naechstes“), und die Seite rueckt dafuer von der Inhaltsspalte auf den Seitenrand (R19). Heute ist im Mini-Monat wie im Raster die gefuellte Akzent-Scheibe (`--color-accent`), der gewaehlte Tag ein Ring derselben Farbe; Personen-Chips lassen einen gemeinsamen Nachnamen weg (`sharedSurname`, Re-Kritik 2026-10-17) |
+| `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche; der Tag fuehrt ab der Schwelle eine Seitenspalte mit den Folgetagen (`.day-rail`); ab 86.25rem Kalenderflaeche (ca. 1600er Fenster) steht in Monat, Woche und Tag links die Seitenleiste (Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt, „Als Naechstes“), auf der Inhaltsspalte wie jedes Modul (R23 D13; R19 rueckte die Seite dafuer noch auf den Seitenrand). Heute ist im Mini-Monat wie im Raster die gefuellte Akzent-Scheibe (`--color-accent`), der gewaehlte Tag ein Ring derselben Farbe; Personen-Chips lassen einen gemeinsamen Nachnamen weg (`sharedSurname`, Re-Kritik 2026-10-17) |
 | `health.js` Gesundheit | Liste + Detail | `dashboard` + `list-detail` (Uebersicht + Bereiche links, Pfad-Adresse) |
 | `settings.js` Einstellungen | Liste + Detail | eigene Shell: Liste + Blatt ab der Split-Schwelle (`settings-surface`, Kompositions-Ausnahme) |
 | `split-expenses.js` Aufteilung | Liste + Detail | `split`, eigene Geometrie |
@@ -3152,8 +3174,10 @@ Gemessen: `test:child-start-permissions`, `test:edit-others-permissions`, `test:
   **Seit R22 (D14):** die Oberkante bleibt unter der Statusleiste (`max-block-size` zieht
   `max(--space-8, --safe-area-inset-top + --space-2)` ab; 390x844 mit 59px Zone: y 32 -> 67), der
   Koerper traegt die Kantenblende der Seitenleiste (`wireScrollFade(body, { axis: 'y' })`,
-  `.more-sheet__body.has-fade-*`, Blende `--space-6`), und im Blatt traegt JEDE Sektion ihren
-  Namen - auch Budget allein unter „Finanzen" (`navSectionLabelKey(..., { standalone: true })`).
+  `.more-sheet__body.has-fade-*`, Blende `--space-6`). **Seit R23 (D13)** bekommt eine Sektion
+  auch im Blatt erst ab zwei Eintraegen einen Kopf, gezaehlt an der Liste des Blatts
+  (`navSectionLabelKey(section, count)`, kein `standalone` mehr): Budget steht ohne „Finanzen",
+  der Gruppenabstand trennt es von „Menschen" (390x844: Budget y 703 -> 684).
   Die vier Ziele der Systemreihe haben keinen Innenrand in der Breite (der Raster-Gap trennt):
   „Einstellungen" steht ab 360px ganz, bei 375px brach es als „Einstel-lungen" (R22 S10).
   Guards: `test:mobile-chrome`, `test:frontend-audit` ("R22 D14"), `test:settings-navigation`.
@@ -3162,7 +3186,7 @@ Gemessen: `test:child-start-permissions`, `test:edit-others-permissions`, `test:
   Menschen = Kontakte, Geburtstage, Gesundheit; Budget. **Eine Sektion mit nur einem Eintrag
   hat keinen Kopf** (`navSectionLabelKey`, settings/module-order.js) - Budget steht ohne
   „Finanzen" mit der Luft einer Gruppe (`.nav-item--headerless`); gezaehlt wird in der
-  Seitenleiste. Das Mehr-Blatt nennt seit R22 (D14) jede Sektion (siehe dort). Eine eigene `module_order` sortiert
+  Seitenleiste. Das Mehr-Blatt liest seit R23 (D13) dieselbe Regel, gezaehlt an seiner Liste. Eine eigene `module_order` sortiert
   weiter innerhalb der Sektionen. Der Schichtplan zeichnet `briefcase-business` (Lucide) statt
   einer zweiten Kalenderform. Guard: `test:settings-navigation`.
 - **Der FAB sitzt konzentrisch in der Kapsel:** hinten derselbe Abstand wie oben und unten

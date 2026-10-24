@@ -1004,6 +1004,37 @@
   gap: var(--space-2);
 }
 
+/* Die Zutaten des Rezepts zum Lesen (R23, D13): eine ruhige Liste mit der
+ * Menge vorn, rechts im Kopf "Anpassen" (meals.js recipeIngredientsToRows). */
+.meal-recipe-ingredients__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.meal-recipe-ingredients__head .form-label {
+  margin: 0;
+}
+
+.meal-recipe-ingredients__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+
+.meal-recipe-ingredients__qty {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 /* .ingredient-row* lebt jetzt global in layout.css (geteilt mit Rezepte-Modal,
  * das im modul-fremden Overlay rendert). Hier bleibt nur der meals-eigene
  * Container .ingredient-list und der Add-Button. */
@@ -1231,10 +1262,19 @@
 @media (min-width: 1024px) {
   .meals-layout {
     display: grid;
-    /* 1024-1439px: Rezept-Sidebar schmaler (272px), damit die 7 Tagesspalten
-     * lesbare Breite behalten (Audit F-04); ab 1440px wieder volle 320px. */
-    grid-template-columns: minmax(0, 1fr) 272px;
-    gap: var(--space-4);
+    /* DIE REZEPTE STEHEN ALS LEISTE UNTER DEM PLAN (R23, D13; Critique G3
+     * "1440 mit Rezeptspalte 4,5 Tage, 1920 Spalte zu"). Als Spalte rechts
+     * kostete sie 272-320px - genau die Breite des sechsten und siebten Tags -,
+     * und weil sie deshalb von selbst einklappte, sobald die Woche nicht
+     * passte, stand sie auf keinem Laptop offen. Unter dem Plan nimmt sie der
+     * Woche keine Breite: die sieben Tage behalten die volle Inhaltsspalte,
+     * die Leiste hat ihre eigene Zeile und scrollt quer. */
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    /* Die Woche misst sich an der Flaeche (Tageszeilen statt Typspalte
+     * unter 72rem, unten). */
+    container: meals-board / inline-size;
+    gap: var(--space-3);
     /* Horizontal weiter über --page-inline-pad, sonst überschreibt dieser
      * Breakpoint den Bleed-Gutter mit dem alten Festwert (Issue #577). */
     padding-inline: var(--page-inline-pad);
@@ -1388,24 +1428,48 @@
     -webkit-mask-image: linear-gradient(to left, var(--mask-opaque) calc(100% - var(--space-6)), transparent);
   }
 
+  /* Die Leiste: Titel und Hinweis auf einer Zeile, darunter die Rezepte
+   * nebeneinander in EINEM Traeger, der quer scrollt. Die Haarlinie oben
+   * trennt sie vom Plan, wie vorher die linke Kante. */
   .recipe-sidebar {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: var(--space-3);
     min-height: 0;
-    border-left: 1px solid var(--color-border-subtle);
-    padding-left: var(--space-4);
+    min-width: 0;
+    border-top: 1px solid var(--color-border-subtle);
+    padding-top: var(--space-2);
   }
 
   .recipe-sidebar__title {
     margin: 0;
-    padding: var(--space-3) 0 var(--space-2);
+    padding: 0 0 var(--space-2);
     color: var(--color-text-primary);
   }
 
   .recipe-sidebar__hint {
-    margin: 0 0 var(--space-3);
+    margin: 0 0 var(--space-2);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--color-text-secondary);
     font-size: var(--text-sm);
+  }
+
+  /* Bis die Rezepte geladen sind, steht die Leiste nicht im Fluss. Leer und
+   * sichtbar lag ihre Oberkante unten an der Flaeche und wanderte beim
+   * Fuellen um ihre Hoehe nach oben - ein Layout-Shift (0,0086 bei 1280). So
+   * erscheint sie mit ihrem Inhalt; das Raster darueber behaelt seine
+   * Oberkante. */
+  .recipe-sidebar:empty {
+    display: none;
+  }
+
+  /* Leerzustand und Liste nehmen die ganze Breite unter der Kopfzeile. */
+  .recipe-sidebar > :not(.recipe-sidebar__title):not(.recipe-sidebar__hint) {
+    grid-column: 1 / -1;
   }
 
   /* EIN TRAEGER, N ZEILEN (Critique 2026-08-10, P2 „Karte pro Zeile").
@@ -1422,13 +1486,17 @@
    * Muster wie bei `.search-result` (eea2291b). */
   .recipe-sidebar__list {
     display: grid;
-    overflow-y: auto;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--meal-rail-card-width);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
     background: var(--color-surface);
     border-radius: var(--radius-md);
-    /* Der Radius muss die Ecken der Randzeilen tatsaechlich beschneiden -
-     * ohne das steht die Fuellung der ersten Zeile quadratisch im runden
-     * Traeger. Mit `overflow-y: auto` ist die Achse ohnehin geklemmt. */
-    overflow-x: hidden;
+    /* Der Radius muss die Ecken der Randkarten tatsaechlich beschneiden -
+     * ohne das steht die Fuellung der ersten Karte quadratisch im runden
+     * Traeger. Mit `overflow-x: auto` ist die Achse ohnehin geklemmt. */
+    overflow-y: hidden;
+    --meal-rail-card-width: 13.75rem;
   }
 
   .recipe-sidebar__card {
@@ -1470,7 +1538,7 @@
    * keine Kante ueber sich und die letzte keine unter sich, ohne dass eine
    * Regel `:first-child`/`:last-child` nachpflegen muesste. */
   .recipe-sidebar__card + .recipe-sidebar__card {
-    border-top: 1px solid var(--color-border-subtle);
+    border-inline-start: 1px solid var(--color-border-subtle);
   }
 
   .recipe-sidebar__card--dragging {
@@ -1624,9 +1692,83 @@
   }
 }
 
-@media (min-width: 1440px) {
-  .meals-layout {
-    grid-template-columns: minmax(0, 1fr) 320px;
+/* --------------------------------------------------------
+ * SIEBEN TAGE AUF DEM LAPTOP (R23, D13; Critique G3 "1280 Montag weggescrollt
+ * ohne Zeichen"). Die Typspalte links (116px) plus sieben Tage zu 140px braucht
+ * 1152px; bei 1280 hat die Woche 996px, und das Raster lief als Fenster mit
+ * ausgescrolltem Montag. Unter 72rem Flaeche wandert der Mahlzeittyp aus der
+ * Spalte in eine Zeile UEBER seine Plaetze („● Mittagessen" ueber der Reihe,
+ * wie die Abschnittskoepfe jeder Liste) - die Spalte faellt weg, und sieben
+ * Tage stehen mit mindestens 128px (bei 1280: 134px). Darunter (1024) bleibt
+ * das Fenster, mit Anriss an beiden Kanten statt der Gutter-Linie.
+ * -------------------------------------------------------- */
+@media (min-width: 1024px) {
+  @container meals-board (width < 72rem) {
+    .week-grid {
+      --meal-gutter-width: 0px;
+      /* Die Spalte 1 bleibt als Nullspalte stehen, damit Tage und Plaetze
+       * ihre Nummern (--day-col ab 2) behalten; ihre Luecke gibt der negative
+       * Rand zurueck, damit der Montag an der Titelkante steht. */
+      grid-template-columns: 0 repeat(7, minmax(128px, 1fr));
+      margin-inline-start: calc(-1 * var(--space-2));
+      scroll-padding-left: 0;
+    }
+
+    .week-grid::before {
+      display: none;
+    }
+
+    /* Der Typ als Kopf seiner Reihe: so breit wie sein Wort, ueber den
+     * Plaetzen; beim Querscrollen (1024) bleibt er an der linken Kante. */
+    .week-gutter-label {
+      grid-column: 1 / -1;
+      justify-self: start;
+      align-self: start;
+      align-items: center;
+      padding: 0;
+      margin-inline-start: var(--space-2);
+      min-block-size: var(--space-5);
+      background-color: transparent;
+    }
+
+    /* Beim Querscrollen haelt er hinter dem Anriss der Kante (24px), sonst
+     * laege sein Punkt im Verlauf. Nur dann: am Anfang steht er auf der
+     * Titelkante. */
+    .week-grid.has-fade-start .week-gutter-label {
+      left: var(--space-6);
+    }
+
+    .week-gutter-label::before {
+      margin-top: 0;
+    }
+
+    .week-grid .meal-slot {
+      margin-block-start: var(--space-6);
+    }
+
+    .week-grid.has-fade-start .week-gutter-label {
+      box-shadow: none;
+    }
+
+    .week-grid.has-fade-start {
+      mask-image: linear-gradient(to right, transparent, var(--mask-opaque) var(--space-6));
+      -webkit-mask-image: linear-gradient(to right, transparent, var(--mask-opaque) var(--space-6));
+    }
+
+    [dir="rtl"] .week-grid.has-fade-start {
+      mask-image: linear-gradient(to left, transparent, var(--mask-opaque) var(--space-6));
+      -webkit-mask-image: linear-gradient(to left, transparent, var(--mask-opaque) var(--space-6));
+    }
+
+    .week-grid.has-fade-start.has-fade-end {
+      mask-image: linear-gradient(to right, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+    }
+
+    [dir="rtl"] .week-grid.has-fade-start.has-fade-end {
+      mask-image: linear-gradient(to left, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+      -webkit-mask-image: linear-gradient(to left, transparent, var(--mask-opaque) var(--space-6), var(--mask-opaque) calc(100% - var(--space-6)), transparent);
+    }
   }
 }
 
@@ -1649,7 +1791,7 @@
 
 @media (min-width: 1024px) {
   .meals-layout--rail-hidden {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .meals-layout--rail-hidden .recipe-sidebar {

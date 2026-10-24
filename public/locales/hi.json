@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "\"{{name}}\" फिर से टिक है - वापस नहीं हो पाया। फिर से कोशिश करें।",
         "errorNotOwner": "इसे किसी और ने बनाया है - आप इसे देख सकते हैं, पर बदल नहीं सकते।",
         "foreignReadOnlyHint": "{{name}} ने बनाया - आप इसे देख सकते हैं, पर बदल नहीं सकते।",
-        "deletedNamed": "\"{{name}}\" हटाया गया।"
+        "deletedNamed": "\"{{name}}\" हटाया गया।",
+        "sortMode": "क्रम बदलें"
     },
     "kitchen": {
         "noShoppingLists": "अभी कोई खरीद सूची नहीं है.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "टिक किया गया",
         "tickedSection": "टिक किए गए",
         "itemBackToast": "“{{name}}” फिर से सूची में है।",
-        "itemStateOpen": "टिक नहीं किया गया"
+        "itemStateOpen": "टिक नहीं किया गया",
+        "itemAddedToast": "\"{{name}}\" को \"{{category}}\" में जोड़ा गया।"
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "{{title}} हटाएं",
         "dragHandle": "{{title}} को किसी दूसरे दिन पर खींचें",
         "openRecipeNamed": "{{title}} की रेसिपी खोलें",
-        "viewRecipeNamed": "{{title}} की रेसिपी देखें"
+        "viewRecipeNamed": "{{title}} की रेसिपी देखें",
+        "recipeIngredientsLabel": "रेसिपी की सामग्री",
+        "recipeIngredientsEdit": "बदलें"
     },
     "calendar": {
         "searchOpen": "इवेंट खोजें",

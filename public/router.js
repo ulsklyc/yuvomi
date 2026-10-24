@@ -1553,13 +1553,12 @@ function paintMoreSheetBadges(sheet) {
  * Die Module des Mehr-Blatts, gruppiert nach `section` in der gelieferten
  * Reihenfolge: je Sektion EINE Liste (`.more-sheet__list`), benannt wie in der
  * Seitenleiste. Ob eine Sektion einen Kopf bekommt, entscheidet ihre Groesse
- * in der SEITENLEISTE (`labelCounts`), nicht im Blatt: die Favoriten der
- * Leiste fehlen hier, und „Planen" darf nicht namenlos werden, nur weil
- * Kalender und Aufgaben unten in der Leiste stehen - die Gruppen sind
- * dieselben wie am Desktop.
+ * IM BLATT (`labelCounts`, R23 D13): erst ab zwei Eintraegen gliedert ein Kopf
+ * etwas. Die Favoriten der unteren Leiste fehlen hier; steht von „Planen" nur
+ * noch ein Ziel im Blatt, steht es ohne Kopf da wie Budget.
  *
  * @param {Array<object>} modules  bereits nach Sektion sortiert
- * @param {Map<number, number>} labelCounts  Eintraege je Sektion in der Seitenleiste
+ * @param {Map<number, number>} labelCounts  Eintraege je Sektion im Blatt
  * @returns {HTMLElement[]}
  */
 function moreSheetSections(modules, labelCounts) {
@@ -1574,12 +1573,16 @@ function moreSheetSections(modules, labelCounts) {
       list.className = 'more-sheet__list';
       const group = document.createElement('div');
       group.className = 'more-sheet__group';
-      // IM BLATT TRAEGT AUCH EINE SEKTION MIT NUR EINEM EINTRAG IHREN NAMEN
-      // (R22 D14). In der Seitenleiste haengt sich Budget ohne Kopf an, sie ist
-      // ganz zu sehen. Im Blatt stand die Zeile namenlos UNTER „Menschen", am
-      // Ende eines Scrollers, der bei 390x844 97px verbarg - sie las als
-      // vierter Eintrag der Gruppe davor, oder sie fehlte ganz.
-      const labelKey = section == null ? null : navSectionLabelKey(section, labelCounts.get(section), { standalone: true });
+      // EIN KOPF ERST AB ZWEI EINTRAEGEN - GEZAEHLT IM BLATT (R23, D13;
+      // Critique G0 S-P2-3). R22 (D14) gab jeder Sektion ihren Namen, damit
+      // Budget nicht als vierter Eintrag von „Menschen" las; der Kopf
+      // „Finanzen" ueber genau einem Ziel kostete aber die Zeile, die Budget
+      // bei 390x844 unter die Falz schob (y 703-751, Koerper endet 671). Jetzt
+      // gilt dieselbe Regel wie in der Seitenleiste, gemessen an DIESER Liste:
+      // ein einzelner Eintrag steht ohne Kopf, und der Abstand zwischen den
+      // Gruppen (`.more-sheet__group + .more-sheet__group`) trennt ihn von der
+      // Gruppe davor.
+      const labelKey = section == null ? null : navSectionLabelKey(section, labelCounts.get(section));
       if (labelKey) {
         group.setAttribute('role', 'group');
         const labelId = `more-section-${section}`;
@@ -1627,7 +1630,7 @@ function buildMoreSheetBody() {
   // hier wird sie nachgezeichnet, wie die Seitenleiste es tut - eine benannte
   // Gruppe (role="group" + aria-labelledby), damit die Ordnung auch hoerbar ist.
   const modules = secondary.filter((item) => item.module !== 'settings');
-  const labelCounts = navSectionEntryCounts(navItems().filter((item) => item.module !== 'settings'));
+  const labelCounts = navSectionEntryCounts(modules);
   nodes.push(...moreSheetSections(modules, labelCounts));
 
   // DER FUSS STEHT FEST, NICHT IM SCROLLER (R21 S7, D7: "Mehr-Blatt mit

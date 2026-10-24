@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "\"{{name}}\" đã được đánh dấu lại - chưa hoàn tác được. Hãy thử lại.",
         "errorNotOwner": "Người khác đã tạo mục này - bạn có thể xem nhưng không thể sửa.",
         "foreignReadOnlyHint": "Do {{name}} tạo - bạn có thể xem nhưng không thể sửa.",
-        "deletedNamed": "Đã xóa \"{{name}}\"."
+        "deletedNamed": "Đã xóa \"{{name}}\".",
+        "sortMode": "Sắp xếp lại"
     },
     "kitchen": {
         "noShoppingLists": "Chưa có danh sách mua sắm.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "đã đánh dấu",
         "tickedSection": "Đã đánh dấu",
         "itemBackToast": "“{{name}}” đã trở lại danh sách.",
-        "itemStateOpen": "chưa đánh dấu"
+        "itemStateOpen": "chưa đánh dấu",
+        "itemAddedToast": "Đã thêm \"{{name}}\" vào \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} nguyên liệu",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Xóa {{title}}",
         "dragHandle": "Kéo {{title}} sang ngày khác",
         "openRecipeNamed": "Mở công thức {{title}}",
-        "viewRecipeNamed": "Xem công thức {{title}}"
+        "viewRecipeNamed": "Xem công thức {{title}}",
+        "recipeIngredientsLabel": "Nguyên liệu từ công thức",
+        "recipeIngredientsEdit": "Điều chỉnh"
     },
     "calendar": {
         "searchOpen": "Tìm sự kiện",

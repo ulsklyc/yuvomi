@@ -1545,13 +1545,15 @@ test('navigation sections match the grouped desktop information architecture', (
 // Kopf - "Finanzen" stand ueber Budget allein. Die Kueche zaehlt als ein
 // Eintrag, die Uebersicht hat nie einen Kopf. Seitenleiste und Mehr-Blatt
 // lesen dieselbe Regel.
-// R22 D14: im Mehr-Blatt stand Budget namenlos am Ende des Scrollers und las
-// als vierter Eintrag von "Menschen". Dort traegt jede Sektion ihren Namen.
-test('R22 D14: im Mehr-Blatt traegt auch eine Sektion mit einem Eintrag ihren Namen', async () => {
+// R22 D14 hatte dem Mehr-Blatt jede Sektion benannt (`standalone`). R23 (D13,
+// Critique G0 S-P2-3): der Kopf "Finanzen" ueber Budget allein schob die Zeile
+// bei 390x844 unter die Falz. Das Blatt liest jetzt dieselbe Regel wie die
+// Seitenleiste, gezaehlt an SEINER Liste.
+test('R23 D13: auch im Mehr-Blatt bekommt eine Sektion erst ab zwei Eintraegen einen Kopf', async () => {
   const { navSectionLabelKey } = await import('../public/settings/module-order.js');
-  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1, { standalone: true }), 'nav.sectionFinance');
-  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1), null, 'die Seitenleiste bleibt bei der R19-Regel');
-  assert.equal(navSectionLabelKey(NAV_SECTION.overview, 1, { standalone: true }), null, 'die Uebersicht bleibt die Wurzel');
+  assert.equal(navSectionLabelKey(NAV_SECTION.finance, 1, { standalone: true }), null,
+    'kein Sonderweg mehr: Budget allein steht auch im Blatt ohne "Finanzen"');
+  assert.equal(navSectionLabelKey.length, 2, 'die Regel kennt keine Option mehr');
 });
 
 test('R19: eine Sektion mit nur einem Eintrag hat keinen Namen in der Navigation', async () => {
@@ -1574,10 +1576,11 @@ test('R19: eine Sektion mit nur einem Eintrag hat keinen Namen in der Navigation
   assert.match(sidebar, /navSectionLabelKey\(section, entryCounts\.get\(section\)\)/, 'die Seitenleiste fragt die Regel');
   assert.doesNotMatch(router, /const NAV_SECTION_LABEL_KEYS = /, 'keine Abschrift der Namen-Tabelle im Router');
   const sheet = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
-  assert.match(sheet, /navSectionLabelKey\(section, labelCounts\.get\(section\), \{ standalone: true \}\)/,
-    'das Mehr-Blatt fragt dieselbe Tabelle - und nennt seit R22 D14 auch eine Sektion mit einem Eintrag');
+  assert.match(sheet, /navSectionLabelKey\(section, labelCounts\.get\(section\)\)/,
+    'das Mehr-Blatt fragt dieselbe Regel wie die Seitenleiste (R23 D13)');
   const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('function renderPage('));
-  assert.match(body, /navSectionEntryCounts\(navItems\(\)/, 'gezaehlt wird in der Seitenleiste, nicht im Blatt ohne Favoriten');
+  assert.match(body, /const labelCounts = navSectionEntryCounts\(modules\);/,
+    'gezaehlt wird im Blatt selbst: ein Kopf gliedert erst ab zwei Eintraegen DIESER Liste');
 });
 
 test('desktop navigation order is applied only inside each section', () => {

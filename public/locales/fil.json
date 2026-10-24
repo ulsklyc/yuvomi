@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "Naka-check muli ang \"{{name}}\" - hindi natuloy ang pagbabalik. Subukan ulit.",
         "errorNotOwner": "Iba ang gumawa nito - makikita mo ito pero hindi mo mababago.",
         "foreignReadOnlyHint": "Ginawa ni {{name}} - makikita mo ito pero hindi mo mababago.",
-        "deletedNamed": "Nabura ang \"{{name}}\"."
+        "deletedNamed": "Nabura ang \"{{name}}\".",
+        "sortMode": "Baguhin ang pagkakasunod"
     },
     "kitchen": {
         "noShoppingLists": "Wala pang listahan ng pamimili.",
@@ -805,7 +806,8 @@
         "itemStateChecked": "naka-check",
         "tickedSection": "Mga naka-check",
         "itemBackToast": "Nasa listahan na ulit ang \"{{name}}\".",
-        "itemStateOpen": "hindi pa naka-check"
+        "itemStateOpen": "hindi pa naka-check",
+        "itemAddedToast": "Naidagdag ang \"{{name}}\" sa \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} sangkap",
@@ -901,7 +903,9 @@
         "deleteMealNamed": "Tanggalin ang {{title}}",
         "dragHandle": "I-drag ang {{title}} sa ibang araw",
         "openRecipeNamed": "Buksan ang resipe ng {{title}}",
-        "viewRecipeNamed": "Tingnan ang resipe ng {{title}}"
+        "viewRecipeNamed": "Tingnan ang resipe ng {{title}}",
+        "recipeIngredientsLabel": "Mga sangkap mula sa recipe",
+        "recipeIngredientsEdit": "I-adjust"
     },
     "calendar": {
         "searchOpen": "Maghanap ng kaganapan",

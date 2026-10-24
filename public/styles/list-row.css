@@ -724,6 +724,22 @@
   color: var(--color-text-tertiary);
 }
 
+/* AM FINGER STEHT DER GRIFF NUR IM SORTIERMODUS (R23, D13; Critique G2/G3
+   "Daumenzone: Mehr + Griff 34 + 34 rechts"). Auf dem Telefon lagen Mehr-Knopf
+   und Griff nebeneinander an der Daumenkante jeder Zeile - der Daumen, der das
+   Menue wollte, griff die Zeile, und umgekehrt. Umsortieren ist selten, das
+   Menue haeufig: ohne schwebenden Zeiger tritt der Griff ab und kommt mit
+   „Reihenfolge ändern" im Werkzeugmenue zurueck (`.is-sorting` an der
+   Seitenwurzel, Muster „Bearbeiten" in Apples Erinnerungen). Am Zeiger bleibt
+   er immer da, dort ist er auch der Tastaturpfad. Nur in den beiden Listen
+   mit Zeilenmenue UND Griff; Einstellungen und Uebersicht haben dort keinen
+   Mehr-Knopf, ihr Griff ist das einzige Ziel. */
+@media (hover: none) {
+  :is(.tasks-page, .shopping-page):not(.is-sorting) .list-row__drag {
+    display: none;
+  }
+}
+
 .swipe-row.sortable-chosen .list-row {
   background: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
 }

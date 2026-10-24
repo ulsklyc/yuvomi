@@ -111,7 +111,8 @@
         "errorUncheckRolledBack": "«{{name}}» снова отмечено - снять отметку не удалось. Попробуйте ещё раз.",
         "errorNotOwner": "Это создал кто-то другой - вы можете смотреть, но не изменять.",
         "foreignReadOnlyHint": "Создал(а) {{name}} - вы можете смотреть, но не изменять.",
-        "deletedNamed": "«{{name}}» удалено."
+        "deletedNamed": "«{{name}}» удалено.",
+        "sortMode": "Изменить порядок"
     },
     "kitchen": {
         "noShoppingLists": "Списка покупок ещё нет.",
@@ -915,7 +916,8 @@
         "itemStateChecked": "отмечено",
         "tickedSection": "Отмечено",
         "itemBackToast": "«{{name}}» снова в списке.",
-        "itemStateOpen": "не отмечено"
+        "itemStateOpen": "не отмечено",
+        "itemAddedToast": "«{{name}}» добавлено в «{{category}}»."
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",
@@ -1021,7 +1023,9 @@
         "deleteMealNamed": "Удалить {{title}}",
         "dragHandle": "Перетащить {{title}} на другой день",
         "openRecipeNamed": "Открыть рецепт {{title}}",
-        "viewRecipeNamed": "Посмотреть рецепт {{title}}"
+        "viewRecipeNamed": "Посмотреть рецепт {{title}}",
+        "recipeIngredientsLabel": "Ингредиенты из рецепта",
+        "recipeIngredientsEdit": "Изменить"
     },
     "calendar": {
         "searchOpen": "Поиск событий",

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "「{{name}}」はチェック済みに戻りました - 戻せませんでした。もう一度お試しください。",
         "errorNotOwner": "これは他の人が作成しました。表示はできますが、変更はできません。",
         "foreignReadOnlyHint": "{{name}} が作成 - 表示はできますが、変更はできません。",
-        "deletedNamed": "「{{name}}」を削除しました。"
+        "deletedNamed": "「{{name}}」を削除しました。",
+        "sortMode": "並べ替え"
     },
     "kitchen": {
         "noShoppingLists": "買い物リストがまだありません。",
@@ -787,7 +788,8 @@
         "itemStateChecked": "チェック済み",
         "tickedSection": "チェック済み",
         "itemBackToast": "「{{name}}」をリストに戻しました。",
-        "itemStateOpen": "未チェック"
+        "itemStateOpen": "未チェック",
+        "itemAddedToast": "「{{name}}」を「{{category}}」に追加しました。"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 品の材料",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "{{title}}を削除",
         "dragHandle": "{{title}}を別の日にドラッグ",
         "openRecipeNamed": "{{title}}のレシピを開く",
-        "viewRecipeNamed": "{{title}}のレシピを表示"
+        "viewRecipeNamed": "{{title}}のレシピを表示",
+        "recipeIngredientsLabel": "レシピの材料",
+        "recipeIngredientsEdit": "調整"
     },
     "calendar": {
         "searchOpen": "予定を検索",

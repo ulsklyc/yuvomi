@@ -3906,7 +3906,7 @@ function openHistoryEntry(id, trigger, container) {
  * die Spalte zieht dann nach (syncHistoryPane); `quiet`: die Aenderung kam
  * aus der Spalte selbst, sie zeigt sie schon.
  */
-async function loadHistory(container, { append = false, afterWrite = false, quiet = false } = {}) {
+async function loadHistory(container, { append = false, afterWrite = false, quiet = false, beforeRender = null } = {}) {
   // Ein zweiter Aufruf, waehrend einer laeuft, WARTET auf den ersten und faehrt
   // dann selbst - er wird nicht verworfen. Ein blosses `return` hier hatte den
   // Klick auf ein Personen-Chip stillschweigend geschluckt: `userId` war schon
@@ -3937,7 +3937,10 @@ async function loadHistory(container, { append = false, afterWrite = false, quie
   } finally {
     state.history.loading = null;
     release();
-    renderHistory(container, { afterWrite, quiet });
+    // `beforeRender` (setViewMode): stellt den Kopf im selben Task um, in dem
+    // der Verlauf zeichnet - oder sagt `false`, wenn inzwischen eine andere
+    // Ansicht gewaehlt ist.
+    if (!beforeRender || beforeRender() !== false) renderHistory(container, { afterWrite, quiet });
   }
 }
 
@@ -3967,6 +3970,8 @@ function renderTaskList(container, { paneQuiet = false } = {}) {
   // Kontakten): die Shell nimmt daran Kapsel und FAB weg (layout.css,
   // "Auswahlmodus"), die Zeilen ihren Wisch-Pfeil.
   container.querySelector('.tasks-page')?.classList.toggle('is-selecting', state.bulkSelectMode);
+  // Gruppieren und Auswahl entscheiden, ob es eine Handordnung gibt.
+  syncSortMode(container);
   // VOR dem Ladefehler der Aufgaben: der Verlauf hat seinen eigenen Bestand und
   // seinen eigenen Fehler. Ein gescheitertes `/tasks` sagt nichts darüber, ob
   // die Vorgänge zu haben sind - stünde die Weiche danach, zeigte der Verlauf
@@ -4105,6 +4110,11 @@ function toolsMenuItems() {
   if (!readOnly()) {
     items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
       checked: state.bulkSelectMode, disabled: !isList });
+    // Nur am Finger (layout.css): holt die Griffe der Handordnung zurueck
+    // (R23, D13, list-row.css). Abgeschaltet, wo es keine Handordnung gibt
+    // (syncSortMode).
+    items.push({ action: 'sort-mode', label: t('common.sortMode'), icon: 'arrow-up-down',
+      checked: false, disabled: !canReorderTasks(state.groupMode) });
     // Nur waehrend der Auswahl sichtbar (syncBulkMenu): die drei Sammelaktionen,
     // die in der einzeiligen Pille keinen Platz haben.
     items.push(
@@ -4971,16 +4981,20 @@ function wireTaskReorder(container) {
  * Sichtbarkeit ueber [hidden] statt style.display: ein Zustand, den auch
  * assistive Technik als „nicht vorhanden" liest.
  */
+function syncViewToggle(container) {
+  container.querySelectorAll('#view-toggle [data-view]').forEach((b) => {
+    const on = b.dataset.view === state.viewMode;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
 function syncViewChrome(container) {
   const mode = state.viewMode;
   const isList = mode === 'list';
   const isHistory = mode === 'history';
 
-  container.querySelectorAll('#view-toggle [data-view]').forEach((b) => {
-    const on = b.dataset.view === mode;
-    b.classList.toggle('is-active', on);
-    b.setAttribute('aria-pressed', String(on));
-  });
+  syncViewToggle(container);
 
   // EIN KOPF, EINE BREITE (#1012, nach der Kalender-Entscheidung vom
   // 2026-08-27): der Kopf steht ueber drei Koerpern und haelt die Kante des
@@ -5014,10 +5028,21 @@ function syncViewChrome(container) {
   // zeigt Vorgaenge - ein Statusfilter darueber waere eine Auswahl, die nichts
   // veraendern kann. Die Gruppierung steht im Filterblatt und fragt dort beim
   // Oeffnen selbst nach der Ansicht.
+  //
+  // DER KOPF BEHAELT SEINE FORM (R23, D13; Critique G2 "Verlauf verschiebt
+  // Kopf"). Der Filterknopf verschwand im Verlauf mit `hidden`, und Segment,
+  // Menue und Primaerknopf rueckten um seine 48px nach rechts - der Kopf
+  // sprang bei jedem Wechsel. Er bleibt jetzt stehen und ist nur
+  // abgeschaltet: wie ein ausgegrautes Werkzeug in Apples Werkzeugleisten, die
+  // ihre Belegung je Ansicht nicht umbauen. Die Suche steht links vor dem
+  // Segment, ihr Weggang verschiebt nichts, was rechts steht.
   const search = container.querySelector('.tasks-toolbar__search');
   if (search) search.hidden = isHistory;
   const filterBtn = container.querySelector('#tasks-filter-btn');
-  if (filterBtn) filterBtn.hidden = isHistory;
+  if (filterBtn) {
+    filterBtn.hidden = false;
+    filterBtn.disabled = isHistory;
+  }
   if (!isList) {
     state.bulkSelectMode = false;
     state.selectedTaskIds.clear();
@@ -5031,12 +5056,41 @@ function syncViewChrome(container) {
   syncPopoverMenuItem(menu, 'bulk-select', state.bulkSelectMode);
   const bulkItem = menu?.querySelector('.popover-menu__item[data-action="bulk-select"]');
   if (bulkItem) bulkItem.disabled = !isList;
+  syncSortMode(container);
   // Die Auswahl zu LEEREN raeumt die Pille nicht weg: sie steht, bis
   // updateBulkActionsBar sie abraeumt. Ohne diesen Aufruf blieb
   // „Erledigt / Archivieren / Loeschen" ueber dem Verlauf stehen - mit leerer
   // Auswahl, also Kapseln ohne Gegenstand.
   updateBulkActionsBar(container);
 }
+
+/**
+ * SORTIERMODUS AM FINGER (R23, D13). Ohne schwebenden Zeiger stehen die Griffe
+ * der Handordnung nur, solange die Seitenwurzel `.is-sorting` traegt
+ * (list-row.css) - Mehr-Knopf und Griff lagen sonst nebeneinander an der
+ * Daumenkante. Der Eintrag im Werkzeugmenue schaltet um und traegt den Haken;
+ * wo es keine Handordnung gibt (anderes Gruppieren, Brett, Verlauf, Auswahl,
+ * ohne Recht), ist er abgeschaltet und der Modus aus.
+ */
+function setSortMode(container, on) {
+  const page = container.querySelector('.tasks-page');
+  const allowed = canReorderTasks(state.groupMode);
+  page?.classList.toggle('is-sorting', Boolean(on && allowed));
+  syncSortMode(container);
+}
+
+function syncSortMode(container) {
+  const page = container.querySelector('.tasks-page');
+  const allowed = canReorderTasks(state.groupMode);
+  if (!allowed) page?.classList.remove('is-sorting');
+  const menu = container.querySelector('#tasks-tools-menu');
+  syncPopoverMenuItem(menu, 'sort-mode', Boolean(page?.classList.contains('is-sorting')));
+  const item = menu?.querySelector('.popover-menu__item[data-action="sort-mode"]');
+  if (item) item.disabled = !allowed;
+}
+
+/** Zaehler der Ansichtswechsel - nur der juengste zeichnet (setViewMode). */
+let viewSwitchSeq = 0;
 
 /** Nimmt die Ansicht die volle Content-Spalte ein? */
 function isKanbanMode() {
@@ -5074,31 +5128,40 @@ function setViewMode(container, mode) {
   // Wechsel selbst schreibt keinen Zurueck-Schritt.
   taskMd?.clear({ history: 'replace', repick: true });
   renderFilters(container);
-  syncViewChrome(container);
+  // Das Segment antwortet sofort (die Kapsel gleitet), der Koerper erst, wenn
+  // die neue Ansicht steht.
+  syncViewToggle(container);
 
-  // Skeleton-Flash: einen Frame Render-Feedback geben, dann Ansicht aufbauen
-  const listEl = container.querySelector('#task-list');
-  if (listEl) listEl.style.opacity = '0.4';
-  const restore = () => {
-    const el = container.querySelector('#task-list');
-    if (el) { el.style.transition = 'opacity var(--transition-fast)'; el.style.opacity = ''; }
+  // KEIN ZWISCHENBILD (R23, D13; Critique G2: 13-76 ms blasse Liste, Shift
+  // 0,61). Bis hier dimmte der Wechsel die alte Ansicht auf 0,4 und stellte
+  // Kopfmass und Spaltenform (`is-reading-measure`, Liste + Detail) sofort um -
+  // die alte Liste stand ein paar Frames blass in der Breite des Bretts. Jetzt
+  // bleibt die alte Ansicht unveraendert stehen, bis die neue geladen ist; dann
+  // tauschen Kopf und Koerper im selben Task, also im selben Bild (R22-D1: ein
+  // Schnitt, kein Sprung). Ein zweiter Wechsel waehrend des Ladens gewinnt:
+  // der erste zeichnet dann nichts mehr.
+  const seq = ++viewSwitchSeq;
+  const current = () => seq === viewSwitchSeq && state.viewMode === mode;
+  const swap = () => {
+    if (!current()) return false;
+    syncViewChrome(container);
+    return true;
   };
-  requestAnimationFrame(() => {
-    // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben -
-    // zwei Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
-    // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
-    // befuellt, die er gar nicht anzeigt.
-    if (state.viewMode === 'history') {
-      loadHistory(container).finally(restore);
-      return;
-    }
-    // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
-    // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
-    // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
-    loadTasks(container).catch(() => renderTaskList(container)).finally(() => {
-      updateBulkActionsBar(container);
-      restore();
-    });
+  // Der Verlauf holt Vorgaenge, die beiden anderen Ansichten Aufgaben - zwei
+  // Abfragen, und der Umschalter darf nicht die falsche fahren. Ein
+  // gemeinsames loadTasks() haette den Verlauf mit einer Aufgabenliste
+  // befuellt, die er gar nicht anzeigt.
+  if (mode === 'history') {
+    loadHistory(container, { beforeRender: swap });
+    return;
+  }
+  // Task-Menge neu laden: der Kanban lädt alle Stati (kein status-Param),
+  // die Liste wendet den Statusfilter wieder an (Audit A1-07/P3). Fällt bei
+  // Netzfehler auf ein reines Re-Render der vorhandenen Aufgaben zurück.
+  fetchTasks().catch(() => {}).then(() => {
+    if (!swap()) return;
+    renderTaskList(container);
+    updateBulkActionsBar(container);
   });
 }
 
@@ -5133,6 +5196,9 @@ function wireToolbar(container) {
         break;
       case 'bulk-select':
         toggleBulkSelect(container);
+        break;
+      case 'sort-mode':
+        setSortMode(container, !container.querySelector('.tasks-page')?.classList.contains('is-sorting'));
         break;
       case 'bulk-archive':
         runBulkAction('archive', container);

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "\"{{name}}\" yeniden işaretli - geri alma gerçekleşmedi. Tekrar deneyin.",
         "errorNotOwner": "Bunu başka biri oluşturdu - görebilirsin ama değiştiremezsin.",
         "foreignReadOnlyHint": "{{name}} oluşturdu - görebilirsin ama değiştiremezsin.",
-        "deletedNamed": "\"{{name}}\" silindi."
+        "deletedNamed": "\"{{name}}\" silindi.",
+        "sortMode": "Sırayı değiştir"
     },
     "kitchen": {
         "noShoppingLists": "Henüz alışveriş listesi yok.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "işaretlendi",
         "tickedSection": "İşaretlenenler",
         "itemBackToast": "„{{name}}” yeniden listede.",
-        "itemStateOpen": "işaretlenmedi"
+        "itemStateOpen": "işaretlenmedi",
+        "itemAddedToast": "\"{{name}}\", \"{{category}}\" altına eklendi."
     },
     "meals": {
         "ingredientCount_one": "{{count}} malzeme",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "{{title}} yemeğini sil",
         "dragHandle": "{{title}} yemeğini başka bir güne sürükle",
         "openRecipeNamed": "{{title}} tarifini aç",
-        "viewRecipeNamed": "{{title}} tarifini görüntüle"
+        "viewRecipeNamed": "{{title}} tarifini görüntüle",
+        "recipeIngredientsLabel": "Tariften malzemeler",
+        "recipeIngredientsEdit": "Düzenle"
     },
     "calendar": {
         "searchOpen": "Etkinlik ara",

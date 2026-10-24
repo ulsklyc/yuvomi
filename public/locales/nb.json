@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "«{{name}}» er krysset av igjen - å hente den tilbake gikk ikke. Prøv igjen.",
         "errorNotOwner": "Dette har noen andre laget - du kan se det, men ikke endre det.",
         "foreignReadOnlyHint": "Laget av {{name}} - du kan se det, men ikke endre det.",
-        "deletedNamed": "«{{name}}» slettet."
+        "deletedNamed": "«{{name}}» slettet.",
+        "sortMode": "Endre rekkefølge"
     },
     "kitchen": {
         "noShoppingLists": "Det finnes ingen handleliste ennå.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "avkrysset",
         "tickedSection": "Avkrysset",
         "itemBackToast": "«{{name}}» er tilbake på listen.",
-        "itemStateOpen": "ikke avkrysset"
+        "itemStateOpen": "ikke avkrysset",
+        "itemAddedToast": "«{{name}}» lagt til under «{{category}}»."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Slett {{title}}",
         "dragHandle": "Dra {{title}} til en annen dag",
         "openRecipeNamed": "Åpne oppskrift for {{title}}",
-        "viewRecipeNamed": "Vis oppskrift for {{title}}"
+        "viewRecipeNamed": "Vis oppskrift for {{title}}",
+        "recipeIngredientsLabel": "Ingredienser fra oppskriften",
+        "recipeIngredientsEdit": "Tilpass"
     },
     "calendar": {
         "searchOpen": "Søk etter hendelser",

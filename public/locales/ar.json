@@ -112,7 +112,8 @@
         "errorUncheckRolledBack": "«{{name}}» عليه علامة مجددًا - لم تتم إعادته. حاول مرة أخرى.",
         "errorNotOwner": "أنشأ هذا شخص آخر - يمكنك عرضه لكن لا يمكنك تغييره.",
         "foreignReadOnlyHint": "أنشأه {{name}} - يمكنك عرضه لكن لا يمكنك تغييره.",
-        "deletedNamed": "تم حذف «{{name}}»."
+        "deletedNamed": "تم حذف «{{name}}».",
+        "sortMode": "تغيير الترتيب"
     },
     "kitchen": {
         "noShoppingLists": "لا توجد قائمة مشتريات بعد.",
@@ -979,7 +980,8 @@
         "itemStateChecked": "تم التأشير",
         "tickedSection": "تم التأشير عليها",
         "itemBackToast": "عاد «{{name}}» إلى القائمة.",
-        "itemStateOpen": "لم يُؤشَّر عليه"
+        "itemStateOpen": "لم يُؤشَّر عليه",
+        "itemAddedToast": "أُضيف \"{{name}}\" ضمن \"{{category}}\"."
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",
@@ -1090,7 +1092,9 @@
         "deleteMealNamed": "حذف {{title}}",
         "dragHandle": "اسحب {{title}} إلى يوم آخر",
         "openRecipeNamed": "فتح وصفة {{title}}",
-        "viewRecipeNamed": "عرض وصفة {{title}}"
+        "viewRecipeNamed": "عرض وصفة {{title}}",
+        "recipeIngredientsLabel": "مكونات من الوصفة",
+        "recipeIngredientsEdit": "تعديل"
     },
     "calendar": {
         "searchOpen": "البحث عن المواعيد",

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "„{{name}}“ ist wieder abgehakt - das Zurückholen hat nicht geklappt. Versuch es noch einmal.",
         "errorNotOwner": "Das hat jemand anderes angelegt - du kannst es ansehen, aber nicht ändern.",
         "foreignReadOnlyHint": "Von {{name}} angelegt - du kannst es ansehen, aber nicht ändern.",
-        "deletedNamed": "„{{name}}“ gelöscht."
+        "deletedNamed": "„{{name}}“ gelöscht.",
+        "sortMode": "Reihenfolge ändern"
     },
     "kitchen": {
         "noShoppingLists": "Es gibt noch keine Einkaufsliste.",
@@ -805,7 +806,8 @@
         "itemStateChecked": "abgehakt",
         "tickedSection": "Abgehakt",
         "itemBackToast": "„{{name}}“ ist wieder auf der Liste.",
-        "itemStateOpen": "offen"
+        "itemStateOpen": "offen",
+        "itemAddedToast": "„{{name}}“ steht unter „{{category}}“."
     },
     "meals": {
         "ingredientCount_one": "{{count}} Zutat",
@@ -901,7 +903,9 @@
         "deleteMealNamed": "{{title}} löschen",
         "dragHandle": "{{title}} auf einen anderen Tag ziehen",
         "openRecipeNamed": "Rezept zu {{title}} öffnen",
-        "viewRecipeNamed": "Rezept zu {{title}} ansehen"
+        "viewRecipeNamed": "Rezept zu {{title}} ansehen",
+        "recipeIngredientsLabel": "Zutaten aus dem Rezept",
+        "recipeIngredientsEdit": "Anpassen"
     },
     "calendar": {
         "searchOpen": "Termine suchen",

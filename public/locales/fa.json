@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "«{{name}}» دوباره علامت خورده است - بازگرداندن انجام نشد. دوباره تلاش کنید.",
         "errorNotOwner": "این را شخص دیگری ساخته است - می‌توانید آن را ببینید اما نه تغییر دهید.",
         "foreignReadOnlyHint": "ساخته‌شده توسط {{name}} - می‌توانید آن را ببینید اما نه تغییر دهید.",
-        "deletedNamed": "«{{name}}» حذف شد."
+        "deletedNamed": "«{{name}}» حذف شد.",
+        "sortMode": "تغییر ترتیب"
     },
     "kitchen": {
         "noShoppingLists": "هنوز فهرست خریدی وجود ندارد.",
@@ -805,7 +806,8 @@
         "itemStateChecked": "تیک خورده",
         "tickedSection": "تیک‌خورده‌ها",
         "itemBackToast": "«{{name}}» دوباره در فهرست است.",
-        "itemStateOpen": "تیک نخورده"
+        "itemStateOpen": "تیک نخورده",
+        "itemAddedToast": "«{{name}}» زیر «{{category}}» اضافه شد."
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",
@@ -901,7 +903,9 @@
         "deleteMealNamed": "حذف {{title}}",
         "dragHandle": "{{title}} را به روز دیگری بکشید",
         "openRecipeNamed": "باز کردن دستور غذای {{title}}",
-        "viewRecipeNamed": "مشاهده دستور غذای {{title}}"
+        "viewRecipeNamed": "مشاهده دستور غذای {{title}}",
+        "recipeIngredientsLabel": "مواد از دستور پخت",
+        "recipeIngredientsEdit": "تنظیم"
     },
     "calendar": {
         "searchOpen": "جستجوی رویدادها",

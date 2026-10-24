@@ -1693,8 +1693,12 @@ test('A4 P1: vor der Entscheidung der Rezept-Spalte scrollt das Board nicht zu â
     mealsUi.revealToday(b.grid);
     assert(b.calls.length === 0, `das Board scrollte bei offener Spalte zu heute (${b.calls.length}x) - danach klappt die Spalte zu und der Montag liegt unter der Gutter`);
     mealsUi.wireRailToggle();
-    assert(!b.railOpen(), 'ohne Merker klappt die Spalte zu, wenn die Woche mit ihr nicht passt');
-    assert(b.calls.length === 0, 'mit zugeklappter Spalte passt die Woche - kein Scroll, der Montag bleibt stehen');
+    // R23 (D13): die Rezepte stehen als Leiste UNTER dem Plan und nehmen der
+    // Woche keine Breite - ohne Merker bleibt sie offen, nichts klappt von
+    // selbst zu. Erst nach der Entscheidung holt das Board "heute" in den Blick.
+    assert(b.railOpen(), 'ohne Merker bleibt die Leiste offen - sie kostet die Woche keine Breite mehr');
+    assert(b.calls.length === 1 && b.calls[0].inline === 'center',
+      `heute ist verdeckt und kommt genau einmal, NACH der Entscheidung, in den Blick (${b.calls.length}x)`);
   });
 });
 

@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "«{{name}}» είναι ξανά τσεκαρισμένο - η επαναφορά δεν ολοκληρώθηκε. Δοκιμάστε ξανά.",
         "errorNotOwner": "Αυτό το δημιούργησε κάποιος άλλος - μπορείτε να το δείτε αλλά όχι να το αλλάξετε.",
         "foreignReadOnlyHint": "Δημιουργήθηκε από {{name}} - μπορείτε να το δείτε αλλά όχι να το αλλάξετε.",
-        "deletedNamed": "«{{name}}» διαγράφηκε."
+        "deletedNamed": "«{{name}}» διαγράφηκε.",
+        "sortMode": "Αλλαγή σειράς"
     },
     "kitchen": {
         "noShoppingLists": "Δεν υπάρχει ακόμη λίστα αγορών.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "τσεκαρισμένο",
         "tickedSection": "Τσεκαρισμένα",
         "itemBackToast": "Το «{{name}}» είναι ξανά στη λίστα.",
-        "itemStateOpen": "μη τσεκαρισμένο"
+        "itemStateOpen": "μη τσεκαρισμένο",
+        "itemAddedToast": "Το «{{name}}» προστέθηκε στο «{{category}}»."
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Διαγραφή «{{title}}»",
         "dragHandle": "Σύρετε «{{title}}» σε άλλη ημέρα",
         "openRecipeNamed": "Άνοιγμα συνταγής για «{{title}}»",
-        "viewRecipeNamed": "Προβολή συνταγής για «{{title}}»"
+        "viewRecipeNamed": "Προβολή συνταγής για «{{title}}»",
+        "recipeIngredientsLabel": "Υλικά από τη συνταγή",
+        "recipeIngredientsEdit": "Προσαρμογή"
     },
     "calendar": {
         "searchOpen": "Αναζήτηση εκδηλώσεων",

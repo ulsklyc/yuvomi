@@ -351,7 +351,7 @@
  * oben laesst die erste Gruppe ganz stehen - eine Gruppe mit 150 Aufgaben
  * ("Ohne Datum", eine Kategorie) rechnete jede ihrer Zeilen. Die ersten 19
  * Zeilen jeder Gruppe stehen immer (sie sind die Falz), der Rest haelt als
- * Platzhalter seine Content-Box: 85px unter 640px, 80px darueber (gemessen mit
+ * Platzhalter seine Content-Box: 64px unter 640px (seit R23, vorher 85), 80px darueber (gemessen mit
  * Titel, Faelligkeit, Prioritaet und Kategorie: 84,6 mobil, 80 Tablet und
  * 1920; 1280/1440 mit Detailspalte 100,6 - seit F4.8 traegt die schmale
  * Bahn bis 27,5rem dafuer eine eigene Stufe, unten). Die Zeile ist selbst
@@ -360,12 +360,15 @@
  * umbaut, misst neu (test:frontend-audit). Neu gemessen R22 S9 nach dem
  * 12px-Einzug mobil (S4) und der Metazeile unter dem Avatar (D17), 211
  * Aufgaben: 84,6 mobil, 80 Tablet und 1920, 100,6 mit Detailspalte -
- * unveraendert. */
+ * unveraendert. R23 S8 (D13): mobil ohne Griff (Sortiermodus, list-row.css)
+ * hat der Titel 42px mehr und bricht seltener um - neu gemessen 63,8 statt
+ * 84,6 (10 von 11 Zeilen einzeilig); mit 85px zog der Aufbau die Gruppen
+ * hoch (Shift 0,0118 mobil bei 4x CPU). Tablet und Desktop unveraendert 80. */
 /* Dieselbe Content-Box traegt der Platzhalter einer Zeile, die beim ersten
  * Aufbau erst nach dem Bild kommt (Critique R22-F, F2.1; utils/row-fill.js,
  * list-row.css) - ohne @supports, er gilt in jedem Browser. */
 .task-group .row-carrier {
-  --row-pending-size: 85px;
+  --row-pending-size: 64px;
 }
 
 @media (min-width: 640px) {
@@ -377,7 +380,7 @@
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .task-group .row-carrier > .swipe-row:nth-child(n+20) {
     content-visibility: auto;
-    contain-intrinsic-size: auto none auto 85px;
+    contain-intrinsic-size: auto none auto 64px;
   }
 
   @media (min-width: 640px) {
@@ -397,7 +400,7 @@
  * ist die typische Zeile zweizeilig (1280: 7 von 11, 1350: 6 von 11), ab
  * 446px einzeilig (1440: 9 von 11). Gesetzt an der Zeile und am
  * Platzhalter selbst - ein Container fragt nur fuer seine Kinder. Unter
- * 640px gilt die Telefonzeile (85px) und ihre eigene Rechnung. */
+ * 640px gilt die Telefonzeile (64px) und ihre eigene Rechnung. */
 @media (min-width: 640px) {
   @container list-rows (max-width: 27.5rem) {
     .task-group .row-carrier > .row-pending {
@@ -1157,6 +1160,14 @@
 
   .task-card__main > .row-action--more ~ .list-row__drag {
     grid-column: 5;
+  }
+
+  /* Ohne Sortiermodus faellt der Griff am Finger weg (list-row.css, R23
+   * D13) - seine Spalte und ihre Luecke gehen mit. */
+  @media (hover: none) {
+    .tasks-page:not(.is-sorting) .swipe-row:not(:only-child) .task-card__main:has(> .row-action--more):has(> .list-row__drag) {
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+    }
   }
 
   /* Ein Long-Press ist hier eine Frage nach der Person, kein Markieren und

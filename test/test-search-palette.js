@@ -86,6 +86,29 @@ test('paletteCommands: "Schichtplan" fuehrt zum Schichtplan, "neu" zu den Anlege
   assert.equal(paletteMatches('bel', 'Belohnungen'), true);
 });
 
+// R23 (D14, Critique G0 S-P2-4): "Le" fuellte "Gehe zu" mit "Kalender",
+// "Rollen und Rechte", "Wandtabletts", "Aktive Module" - Treffer mitten im
+// Wort, vor den Datentreffern. Unter drei Zeichen zaehlt fuer Orte und
+// Einstellungen nur ein Wortanfang.
+test('R23: unter drei Zeichen treffen Orte und Einstellungen nur am Wortanfang', () => {
+  const places = [
+    { label: 'Kalender', route: '/calendar', module: 'calendar' },
+    { label: 'Lebensmittel', route: '/pantry', module: 'pantry' },
+  ];
+  const settings = [
+    { label: 'Rollen und Rechte', route: '/settings/roles' },
+    { label: 'Aktive Module', route: '/settings/modules' },
+    { label: 'Leistung', route: '/settings/performance' },
+  ];
+  assert.deepEqual(paletteCommands('Le', { places, settings }).places.map((p) => p.route), ['/pantry', '/settings/performance'],
+    '"Le" meint einen Anfang - kein "Kalender", kein "Aktive Module"');
+  assert.deepEqual(paletteCommands('ka', { places, settings }).places.map((p) => p.route), ['/calendar']);
+  assert.deepEqual(paletteCommands('len', { places, settings }).places.map((p) => p.route), ['/calendar', '/settings/roles'],
+    'ab drei Zeichen gilt wieder jede Fundstelle');
+  assert.deepEqual(paletteCommands('mo', { places, settings }).places.map((p) => p.route), ['/settings/modules'],
+    'jedes WORT zaehlt als Anfang, nicht nur das erste');
+});
+
 test('jede Anlege-Aktion zeigt auf ein Navigationsziel des Routers und hat ihr Nomen', () => {
   for (const action of NEW_ACTIONS) {
     assert.match(router, new RegExp(`path: '${action.route}',\\s+label: t\\('nav\\.${action.module}'\\)`),
@@ -423,7 +446,9 @@ test('R20: ein Anfang schlaegt ein Teilstueck, das Verb holt keine Befehle mehr 
   const places = [{ label: 'Übersicht' }, { label: 'Belohnungen' }, { label: 'Geburtstage' }];
   const settings = [{ label: 'Gesundheit' }];
   assert.deepEqual(paletteCommands('ge', { places, settings }).places.map((p) => p.label),
-    ['Geburtstage', 'Gesundheit', 'Belohnungen'], 'Anfaenge zuerst, Orte und Einstellungen in einer Rangfolge');
+    ['Geburtstage', 'Gesundheit'], 'Anfaenge zuerst, Orte und Einstellungen in einer Rangfolge; das Teilstueck faellt seit R23 (D14) unter drei Zeichen ganz weg');
+  assert.deepEqual(paletteCommands('ohn', { places, settings }).places.map((p) => p.label),
+    ['Belohnungen'], 'ab drei Zeichen findet ein Teilstueck wieder');
   const actions = [
     { label: 'Aufgabe', context: 'Aufgaben', verb: 'Neu anlegen' },
     { label: 'Termin', context: 'Kalender', verb: 'Neu anlegen' },

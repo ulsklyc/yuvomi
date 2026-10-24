@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "«{{name}}» è di nuovo spuntato - il ripristino non è andato a buon fine. Riprova.",
         "errorNotOwner": "L’ha creato qualcun altro: puoi vederlo, ma non modificarlo.",
         "foreignReadOnlyHint": "Creato da {{name}}: puoi vederlo, ma non modificarlo.",
-        "deletedNamed": "«{{name}}» eliminato."
+        "deletedNamed": "«{{name}}» eliminato.",
+        "sortMode": "Cambia ordine"
     },
     "kitchen": {
         "noShoppingLists": "Non c'è ancora una lista della spesa.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "spuntato",
         "tickedSection": "Spuntati",
         "itemBackToast": "«{{name}}» è di nuovo nella lista.",
-        "itemStateOpen": "non spuntato"
+        "itemStateOpen": "non spuntato",
+        "itemAddedToast": "\"{{name}}\" aggiunto in \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Elimina {{title}}",
         "dragHandle": "Trascina {{title}} su un altro giorno",
         "openRecipeNamed": "Apri la ricetta di {{title}}",
-        "viewRecipeNamed": "Vedi la ricetta di {{title}}"
+        "viewRecipeNamed": "Vedi la ricetta di {{title}}",
+        "recipeIngredientsLabel": "Ingredienti dalla ricetta",
+        "recipeIngredientsEdit": "Modifica"
     },
     "calendar": {
         "searchOpen": "Cerca eventi",

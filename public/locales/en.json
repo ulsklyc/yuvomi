@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "“{{name}}” is ticked off again - bringing it back didn't go through. Try again.",
         "errorNotOwner": "Someone else created this - you can view it but not change it.",
         "foreignReadOnlyHint": "Created by {{name}} - you can view it but not change it.",
-        "deletedNamed": "“{{name}}” deleted."
+        "deletedNamed": "“{{name}}” deleted.",
+        "sortMode": "Reorder"
     },
     "kitchen": {
         "noShoppingLists": "There is no shopping list yet.",
@@ -787,7 +788,8 @@
         "itemStateChecked": "checked off",
         "tickedSection": "Checked off",
         "itemBackToast": "\"{{name}}\" is back on the list.",
-        "itemStateOpen": "not checked off"
+        "itemStateOpen": "not checked off",
+        "itemAddedToast": "\"{{name}}\" added under \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingredient",
@@ -883,7 +885,9 @@
         "deleteMealNamed": "Delete {{title}}",
         "dragHandle": "Drag {{title}} to another day",
         "openRecipeNamed": "Open recipe for {{title}}",
-        "viewRecipeNamed": "View recipe for {{title}}"
+        "viewRecipeNamed": "View recipe for {{title}}",
+        "recipeIngredientsLabel": "Ingredients from the recipe",
+        "recipeIngredientsEdit": "Adjust"
     },
     "calendar": {
         "searchOpen": "Search events",

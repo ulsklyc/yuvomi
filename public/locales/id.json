@@ -109,7 +109,8 @@
         "errorUncheckRolledBack": "\"{{name}}\" tercentang lagi - pembatalan tidak tersimpan. Coba lagi.",
         "errorNotOwner": "Ini dibuat orang lain - kamu bisa melihatnya, tetapi tidak bisa mengubahnya.",
         "foreignReadOnlyHint": "Dibuat oleh {{name}} - kamu bisa melihatnya, tetapi tidak bisa mengubahnya.",
-        "deletedNamed": "\"{{name}}\" dihapus."
+        "deletedNamed": "\"{{name}}\" dihapus.",
+        "sortMode": "Ubah urutan"
     },
     "kitchen": {
         "noShoppingLists": "Belum ada daftar belanja.",
@@ -805,7 +806,8 @@
         "itemStateChecked": "dicentang",
         "tickedSection": "Sudah dicentang",
         "itemBackToast": "\"{{name}}\" kembali ada di daftar.",
-        "itemStateOpen": "belum dicentang"
+        "itemStateOpen": "belum dicentang",
+        "itemAddedToast": "\"{{name}}\" ditambahkan ke \"{{category}}\"."
     },
     "meals": {
         "ingredientCount_one": "{{count}} bahan",
@@ -901,7 +903,9 @@
         "deleteMealNamed": "Hapus {{title}}",
         "dragHandle": "Seret {{title}} ke hari lain",
         "openRecipeNamed": "Buka resep {{title}}",
-        "viewRecipeNamed": "Lihat resep {{title}}"
+        "viewRecipeNamed": "Lihat resep {{title}}",
+        "recipeIngredientsLabel": "Bahan dari resep",
+        "recipeIngredientsEdit": "Sesuaikan"
     },
     "calendar": {
         "searchOpen": "Cari acara",

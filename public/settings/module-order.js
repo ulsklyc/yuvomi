@@ -110,20 +110,18 @@ export function navSectionEntryCounts(items = []) {
  * Die Einstellungsblaetter, die ALLE Module samt abgeschalteten auflisten,
  * sind keine Navigation und benutzen weiter NAV_SECTION_LABEL_KEYS direkt.
  *
- * DAS MEHR-BLATT NENNT JEDE SEKTION (`standalone`, R22 D14). Dort steht die
- * letzte Gruppe am Ende eines Scrollers; ohne Kopf las Budget als Eintrag von
- * „Menschen" darueber. Die Seitenleiste ist ganz zu sehen und bleibt bei der
- * Regel oben.
+ * DAS MEHR-BLATT LIEST DIESELBE REGEL (R23, D13), gezaehlt an seiner eigenen
+ * Liste. R22 (D14) hatte ihm jede Sektion benannt (`standalone`); der Kopf
+ * „Finanzen" ueber Budget schob die Zeile dort unter die Falz. Die Trennung
+ * vom Eintrag davor traegt der Gruppenabstand.
  *
  * @param {number} section
  * @param {number} entryCount  Eintraege der Sektion in DERSELBEN Liste
- * @param {{standalone?: boolean}} [opts]  true: auch ein einzelner Eintrag
- *        bekommt seinen Namen (Mehr-Blatt).
  * @returns {string|null} Locale-Key
  */
-export function navSectionLabelKey(section, entryCount, { standalone = false } = {}) {
+export function navSectionLabelKey(section, entryCount) {
   if (section === NAV_SECTION.overview) return null;
-  if (!standalone && !(entryCount >= 2)) return null;
+  if (!(entryCount >= 2)) return null;
   return NAV_SECTION_LABEL_KEYS[section] ?? null;
 }
 

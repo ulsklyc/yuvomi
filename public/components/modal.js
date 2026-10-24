@@ -449,13 +449,36 @@ function trapFocus(container, initialFocus = 'first-field') {
 function applyInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return;
 
-  const target = initialFocus && typeof initialFocus.focus === 'function'
-    ? initialFocus
-    : firstEntryField(container);
+  const target = resolveInitialFocus(container, initialFocus);
   if (target) {
     const beimPlanen = document.activeElement;
     setTimeout(() => _focusInitialUnlessClaimed(container, target, beimPlanen), 50);
   }
+}
+
+/**
+ * Wohin der Erstfokus geht.
+ *
+ * `'edit'` - BEARBEITEN HOLT AM FINGER KEINE TASTATUR (R23, D13; Critique G3
+ * "Karte oeffnet Bearbeiten mit Autofokus", Rest aus S1 fuer die Buchung).
+ * Wer einen bestehenden Eintrag antippt, will ihn meist erst ansehen; ein
+ * Feldfokus fuhr die Tastatur hoch und verdeckte rund 40 % des Blatts. Ohne
+ * schwebenden Zeiger nimmt deshalb der Titel des Blatts den Fokus (tabindex
+ * -1, ohne Ring, ein Screenreader liest ihn vor) - dieselbe Regel wie beim
+ * Wechsel aus einer Leseansicht ins Formular (focusFirstField). Am Zeiger
+ * bleibt es beim ersten Feld: dort faehrt keine Tastatur hoch.
+ */
+function resolveInitialFocus(container, initialFocus) {
+  if (initialFocus === 'none') return null;
+  if (initialFocus && typeof initialFocus.focus === 'function') return initialFocus;
+  if (initialFocus === 'edit' && typeof matchMedia === 'function' && matchMedia('(hover: none)').matches) {
+    const heading = container.querySelector?.('.modal-panel__title');
+    if (heading) {
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+      return heading;
+    }
+  }
+  return firstEntryField(container);
 }
 
 function _focusInitialUnlessClaimed(container, target, beimPlanen) {
@@ -1957,7 +1980,8 @@ export function armPointerDeadTime(root, { now = () => performance.now(), durati
  * @param {Function} [opts.onClose]  - Callback, wird aufgerufen wenn das Modal geschlossen wird
  * @param {Function} [opts.onDelete] - Falls vorhanden, wird ein Löschen-Button eingebaut
  * @param {string}   [opts.size='md'] - 'sm' (400px) | 'md' (520px) | 'lg' (680px) | 'xl' (min(960px, 95vw)); Breiten siehe layout.css .modal-panel--*
- * @param {'first-field'|'none'|HTMLElement} [opts.initialFocus='first-field'] - siehe applyInitialFocus
+ * @param {'first-field'|'edit'|'none'|HTMLElement} [opts.initialFocus='first-field'] - siehe applyInitialFocus;
+ *   `'edit'` fuer das Bearbeiten eines bestehenden Eintrags (resolveInitialFocus)
  * @param {{label: string, id?: string, onClick?: Function}} [opts.headerAction] - Textbutton rechts im Kopf, links vom Schließen-X
  * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
  *   Felder sofort wirken und nichts zu speichern haben (siehe _dirtyGuardEnabled).
@@ -2287,9 +2311,7 @@ export function openModal({
       // Fokus erzwang Stil und Layout mitten in der Einfahrt. Was `onSave`
       // selbst fokussiert, gilt als Wahl und bleibt (_focusInitialUnlessClaimed).
       const planned = document.activeElement;
-      const target = initialFocus === 'none' ? null
-        : initialFocus && typeof initialFocus.focus === 'function' ? initialFocus
-          : firstEntryField(panel);
+      const target = resolveInitialFocus(panel, initialFocus);
       if (typeof onSave === 'function') onSave(panel);
       if (target) _focusInitialUnlessClaimed(panel, target, planned);
     });

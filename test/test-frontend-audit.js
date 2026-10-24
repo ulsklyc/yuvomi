@@ -22651,10 +22651,13 @@ test('Mehr-Blatt: die Module stehen als Zeilenliste in den Sektionen der Seitenl
 // R22 D14 (Critique 2026-10-22, a1 P1/P2): bei 390x844 mit Sicherheitszone
 // 59px stand das Blatt bei y 32 unter der Statusleiste, 97px Module lagen ohne
 // Hinweis unter der Kante, und Budget stand namenlos am Ende unter "Menschen".
-test('R22 D14: das Mehr-Blatt bleibt unter der Statusleiste, blendet die Kante und nennt jede Sektion', () => {
+// R23 (D13, Critique G0 S-P2-3): der Kopf "Finanzen" ueber Budget allein schob
+// die Zeile unter die Falz - seit R23 bekommt auch im Blatt erst eine Sektion
+// mit zwei Eintraegen einen Kopf (test:settings-navigation).
+test('R22 D14: das Mehr-Blatt bleibt unter der Statusleiste, blendet die Kante, Koepfe ab zwei Eintraegen (R23)', () => {
   const router = read('../public/router.js');
   const fn = router.slice(router.indexOf('function moreSheetSections('), router.indexOf('function buildMoreSheetBody()'));
-  assert.match(fn, /navSectionLabelKey\(section, labelCounts\.get\(section\), \{ standalone: true \}\)/, 'im Blatt bekommt jede Sektion ihren Kopf');
+  assert.match(fn, /navSectionLabelKey\(section, labelCounts\.get\(section\)\)/, 'dieselbe Regel wie die Seitenleiste');
   const body = router.slice(router.indexOf('function buildMoreSheetBody()'), router.indexOf('\n}\n', router.indexOf('function buildMoreSheetBody()')));
   assert.match(body, /wireScrollFade\(body, \{ axis: 'y' \}\)/, 'der Koerper meldet verborgene Module ueber die Kantenblende');
   const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length);
@@ -23403,7 +23406,8 @@ test('R22 D4: zeilenweise erst ab Zeile 20, Platzhalter = Content-Box der Zeile'
     ['../public/styles/budget.css', '.budget-list > .list-row', 45],
     // R22 S3 (D22): Aufgaben und Einkauf auch IN der Gruppe - eine Gruppe mit
     // 120 Zeilen rechnete jede. Content-Box gemessen 390-1920px.
-    ['../public/styles/tasks.css', '.task-group .row-carrier > .swipe-row', 85],
+    // R23 S8: mobil ohne Griff (Sortiermodus) 63,8 statt 84,6 gemessen.
+    ['../public/styles/tasks.css', '.task-group .row-carrier > .swipe-row', 64],
     ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group .row-carrier > .swipe-row', 48],
   ];
   for (const [file, row, contentBox] of rows) {
@@ -23505,7 +23509,7 @@ test('R22-F F2.2: Einkaufsspalten schieben erst nach dem ersten Bild auf, mit ge
   assert.equal(lazy?.selector.trim(), '.shopping-page .items-lanes.is-sized > .list-group + .list-group');
   const shop = read('../public/pages/shopping.js');
   const mount = shop.slice(shop.indexOf('function mountItems('), shop.indexOf('function renderItems('));
-  assert.match(mount, /afterNextPaint\(\)\.then\(\(\) => \{ if \(lanes\?\.isConnected\) lanes\.classList\.add\('is-sized'\); \}\);/,
+  assert.match(mount, /afterNextPaint\(\)\.then\(\(\) => \{\s*if \(!lanes\?\.isConnected\) return;\s*lanes\.classList\.add\('is-sized'\);/,
     'die Huelle bekommt is-sized nicht nach dem ersten Bild');
 });
 
