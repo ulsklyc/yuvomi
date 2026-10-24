@@ -154,7 +154,7 @@ test('R23 D6: renew/undo stellt Datum, Zaehler und Buchungen wie vor der Zahlung
   assert.equal(renew.status, 200, renew.text);
   assert.equal(renew.body.data.next_payment_date, '2030-03-10');
   assert.equal(entriesOf().length, 2, 'bezahlt + naechste');
-  assert.deepEqual(renew.body.undo, { paid_entry_id: before[0].id, next_payment_date: '2030-02-10', occurrences_done: 0, enabled: 1 });
+  assert.deepEqual(Object.keys(renew.body.undo), ['token'], 'der Client bekommt nur eine Marke, keine Buchungs-Id');
   const undo = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: renew.body.undo });
   assert.equal(undo.status, 200, undo.text);
   assert.equal(undo.body.data.next_payment_date, '2030-02-10');
@@ -184,4 +184,27 @@ test('R23 D6: renew/undo hebt einen Abschluss auf und folgt der Schreibregel', a
   assert.equal(row.next_payment_date, '2030-04-01');
   assert.ok(row.budget_entry_id, 'die naechste Zahlung ist wieder gebucht');
   assert.equal(entriesOf().length, 1);
+});
+
+test('R23 Sicherheit: renew/undo haengt keine fremde Buchung an und gilt nur fuer den, der bezahlt hat', async () => {
+  setMode('shared');
+  const sub = await createSub({ next_payment_date: '2030-05-10' });
+  const renew = await call('POST', `/${sub.id}/renew`, { as: OWNER });
+  // Eine fremde Buchung mit derselben Kategorie und dem bezahlten Datum.
+  const foreign = Number(db.prepare(`
+    INSERT INTO budget_entries (title, amount, category, subcategory, date, is_recurring, created_by, owner_id, visibility)
+    VALUES ('Fremd', -99, 'subscriptions', '', '2030-05-10', 0, ?, ?, 'private')
+  `).run(OTHER, OTHER).lastInsertRowid);
+  const forged = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: {
+    paid_entry_id: foreign, next_payment_date: '2030-05-10', occurrences_done: 0, enabled: 1,
+  } });
+  assert.equal(forged.status, 409, 'ohne Marke nimmt die Route nichts aus dem Body');
+  const otherUser = await call('POST', `/${sub.id}/renew/undo`, { as: OTHER, body: renew.body.undo });
+  assert.equal(otherUser.status, 409, 'die Marke gehoert dem, der bezahlt hat');
+  const undo = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: { ...renew.body.undo, paid_entry_id: foreign } });
+  assert.equal(undo.status, 200, undo.text);
+  const row = db.prepare('SELECT budget_entry_id FROM budget_subscriptions WHERE id = ?').get(sub.id);
+  assert.notEqual(row.budget_entry_id, foreign);
+  const fremd = db.prepare('SELECT title, amount, owner_id, visibility FROM budget_entries WHERE id = ?').get(foreign);
+  assert.deepEqual(fremd, { title: 'Fremd', amount: -99, owner_id: OTHER, visibility: 'private' }, 'die fremde Buchung ist unberuehrt');
 });

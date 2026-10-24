@@ -728,12 +728,23 @@ export const REOPEN_WINDOW_MINUTES = 10;
  *
  * Zuruecknehmen darf nur, wer entschieden hat, und nur kurz danach: das ist
  * der Rueckweg des Toasts, keine nachtraegliche Korrektur fremder Entscheidungen.
+ * Freigabe und Ablehnung nur ein Admin, eine Auto-Erfuellung nie (siehe unten).
  */
 function reopenRedemption(req, res, d, row, me) {
   if (row.status === 'pending') {
     return res.status(409).json({ error: 'This request is still open.', code: 409, reason: 'rewards_redemption_open' });
   }
   if (row.decided_by !== me) return res.status(403).json({ error: 'Only who decided can take the decision back.', code: 403 });
+  // FREIGEBEN UND ABLEHNEN NIMMT NUR EIN FREIGEBER ZURUECK, und nie eine
+  // Auto-Erfuellung (Sicherheitspruefung zu R23). Ohne Freigabepflicht traegt
+  // die Anfrage `decided_by = requested_by`: der Antragsteller haette die
+  // erfuellte Praemie wieder geoeffnet, danach zurueckgezogen und die Punkte
+  // zurueckbekommen - die Praemie hatte er da schon. Das Zurueckziehen selbst
+  // bleibt fuer den, der es tat, umkehrbar: es reserviert nur wieder, was es
+  // zurueckgegeben hat (Richtung: weniger Guthaben, nie mehr).
+  if (row.status !== 'cancelled' && (!isAdminRequest(req) || row.decided_by === row.requested_by)) {
+    return res.status(403).json({ error: 'This decision cannot be taken back here.', code: 403, reason: 'rewards_reopen_not_allowed' });
+  }
   const decidedMs = Date.parse(row.decided_at ?? '');
   if (!Number.isFinite(decidedMs) || Date.now() - decidedMs > REOPEN_WINDOW_MINUTES * 60_000) {
     return res.status(409).json({ error: 'This decision can no longer be taken back.', code: 409, reason: 'rewards_reopen_expired' });

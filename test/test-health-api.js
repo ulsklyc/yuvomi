@@ -2254,3 +2254,16 @@ test('R23 D6: /undo nach "Ausgelassen" schreibt nichts gut, ohne Bestand bleibt 
   assert.equal((await call('POST', `/logs/${neg.body.data.id}/undo`, { stock_credit: 1 })).status, 404);
   asA();
 });
+
+test('R23 Sicherheit: /undo schreibt nie mehr gut als die Dosis des Eintrags', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Undo-Deckel', stock_qty: 10 });
+  const id = med.body.data.id;
+  const taken = await call('POST', `/medications/${id}/logs`, { status: 'taken', dose_qty: 1, stock_deduct: 1 });
+  assert.equal(stockOf(id), 9);
+  await call('POST', `/logs/${taken.body.data.id}/undo`, { stock_credit: 500 });
+  assert.equal(stockOf(id), 10, 'gedeckelt auf die Dosis');
+  const noDose = await call('POST', `/medications/${id}/logs`, { status: 'taken' });
+  await call('POST', `/logs/${noDose.body.data.id}/undo`, { stock_credit: 5 });
+  assert.equal(stockOf(id), 10, 'ohne Dosis keine Gutschrift');
+});

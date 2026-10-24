@@ -724,3 +724,34 @@ test('R23 D6: reopen einer freigegebenen Geld-Einzahlung nimmt die Gutschrift zu
   assert.equal(back.body.data.status, 'pending');
   assert.equal(money(), 0, 'die Einzahlung ist zurueckgenommen');
 });
+
+test('R23 Sicherheit: eine Auto-Erfuellung laesst sich nicht oeffnen und zurueckziehen (Punkte bleiben weg)', async () => {
+  const kid = freshKid(60);
+  const item = (await call('POST', '/catalog', { body: { name: 'Undo-Auto', cost: 20 } })).body.data.id;
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('rewards_require_approval','0') ON CONFLICT(key) DO UPDATE SET value='0'").run();
+  try {
+    const req = await call('POST', '/redemptions', { actor: kid, body: { catalog_id: item } });
+    assert.equal(req.status, 201);
+    assert.equal(req.body.data.status, 'fulfilled', 'ohne Freigabepflicht sofort erfuellt');
+    const reopen = await call('PATCH', `/redemptions/${req.body.data.id}`, { actor: kid, body: { action: 'reopen' } });
+    assert.equal(reopen.status, 403);
+    const cancel = await call('PATCH', `/redemptions/${req.body.data.id}`, { actor: kid, body: { action: 'cancel' } });
+    assert.equal(cancel.status, 409, 'erfuellt bleibt erfuellt');
+    assert.equal(getBalance(db, kid.id), 40, 'die Punkte bleiben ausgegeben');
+    // Auch ein Admin, der fuer das Kind ohne Freigabe einloest, oeffnet das nicht.
+    const byAdmin = await call('POST', '/redemptions', { body: { catalog_id: item, user_id: kid.id } });
+    assert.equal(byAdmin.body.data.status, 'fulfilled');
+    assert.equal((await call('PATCH', `/redemptions/${byAdmin.body.data.id}`, { body: { action: 'reopen' } })).status, 403);
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key='rewards_require_approval'").run();
+  }
+  // Das eigene Zurueckziehen bleibt umkehrbar - es reserviert nur wieder.
+  const pend = (await call('POST', '/redemptions', { actor: kid, body: { catalog_id: item } })).body.data.id;
+  assert.equal(getBalance(db, kid.id), 0);
+  await call('PATCH', `/redemptions/${pend}`, { actor: kid, body: { action: 'cancel' } });
+  assert.equal(getBalance(db, kid.id), 20);
+  const back = await call('PATCH', `/redemptions/${pend}`, { actor: kid, body: { action: 'reopen' } });
+  assert.equal(back.status, 200);
+  assert.equal(getBalance(db, kid.id), 0, 'wieder reserviert');
+  assert.equal((await call('PATCH', `/redemptions/${pend}`, { actor: kid, body: { action: 'fulfill' } })).status, 403);
+});

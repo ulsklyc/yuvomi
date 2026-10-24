@@ -680,8 +680,8 @@ router.delete('/logs/:id', (req, res) => {
 //    loeschen hiesse, der Scheduler legte ihn beim naechsten Lauf neu an;
 //  - ein Eintrag ohne Plan (Bedarfsdosis) geht ganz, er war die Tat selbst;
 //  - der Bestand bekommt `stock_credit` gut, aber nur, wo einer gefuehrt wird.
-// Die Gutschrift ist so vertrauenswuerdig wie ein PATCH am Bestand: dieselbe
-// Person darf ihn ohnehin setzen (writableChild).
+// Die Gutschrift ist gedeckelt auf die Dosis des Eintrags, und nur, wer das
+// Medikament schreiben darf, kommt hierher (writableChild).
 // --------------------------------------------------------
 router.post('/logs/:id/undo', (req, res) => {
   try {
@@ -696,7 +696,15 @@ router.post('/logs/:id/undo', (req, res) => {
     if (logRow.status === 'pending') {
       return res.status(409).json({ error: 'This dose is not recorded.', code: 409, reason: 'health_dose_pending' });
     }
-    const credited = logRow.status === 'taken' && credit.value > 0 ? credit.value : 0;
+    // NIE MEHR ALS DIE DOSIS DES EINTRAGS (Sicherheitspruefung zu R23): die
+    // Gutschrift kommt vom Client, und ohne Deckel liesse sich ueber das
+    // Zuruecknehmen ein beliebiger Bestand buchen. Abgezogen hat die Buchung
+    // hoechstens ihre Dosis (die des Eintrags, sonst die des Zeitfensters).
+    const planned = logRow.schedule_id
+      ? db.get().prepare('SELECT dose_qty FROM medication_schedules WHERE id = ?').get(logRow.schedule_id)?.dose_qty
+      : null;
+    const cap = Number(logRow.dose_qty ?? planned ?? 0) || 0;
+    const credited = logRow.status === 'taken' && credit.value > 0 ? Math.min(credit.value, cap) : 0;
     const removed = db.get().transaction(() => {
       if (credited > 0) {
         db.get().prepare('UPDATE medications SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL')
