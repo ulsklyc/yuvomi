@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Rewards: "Bonus" is the add button on the Points tab as well.** Parents now find "Bonus" as
+  the add button on Points and History and "Reward" on Rewards, so the header button never
+  disappears when switching tabs, and the second "Grant bonus" button next to the standings is
+  gone. "Manage participants" stays in the "..." menu there.
 - **Small clarity fixes in Birthdays and Documents.** "More details" in the birthday dialog now
   lists what it holds (contact, name day, notes and reminder), and "Import from contacts" shows
   the contacts icon instead of an "add person" icon. In Documents a file that is too large is

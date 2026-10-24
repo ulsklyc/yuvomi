@@ -335,7 +335,13 @@ function updateRewardsFab() {
   if (readOnly()) { setPageFabAction(fab, { hidden: true, dockLabel: keepNoun() }); return; }
   if (state.tab === 'catalog' && isAdmin()) {
     setPageFabAction(fab, { label: t('rewards.addReward'), dockLabel: t('newLabel.rewards'), onClick: () => openRewardModal(null) });
-  } else if (state.tab === 'ledger' && isAdmin()) {
+  } else if ((state.tab === 'ledger' || (state.tab === 'overview' && balances().length)) && isAdmin()) {
+    // DER BONUS IST DER FAB, AUCH AUF "PUNKTE" (R23 S10, Critique G2 P3:
+    // "Kopfpille wechselt", "Bonus doppelt", "zwei Abschnittsaktionen"). Bis
+    // R23 stand er dort als Abschnittsknopf neben den Punktestaenden (#1787)
+    // und im Verlauf als FAB - zwei Bauformen fuer dieselbe Handlung, und auf
+    // "Punkte" fehlte die Kopfpille ganz. Jetzt traegt jeder Reiter fuer Eltern
+    // seine Pille; ohne Teilnehmende gibt es niemandem einen Bonus.
     setPageFabAction(fab, { label: t('rewards.grantBonus'), dockLabel: t('newLabel.rewardsBonus'), onClick: () => openBonusModal() });
   } else {
     setPageFabAction(fab, { hidden: true, dockLabel: keepNoun() });
@@ -699,10 +705,9 @@ function renderOverview(el) {
     icons(el);
     return;
   }
-  // Zwei Kopfaktionen fuer Eltern (#1787). Der Bonus ist die haeufigere und
-  // steht als die staerkere am Ende; er oeffnet denselben Dialog wie der FAB
-  // im Verlauf. Beide reisen als EINE Gruppe, damit ein schmaler Kopf sie
-  // gemeinsam unter den Titel legt statt eine allein in die zweite Zeile.
+  // Der Bonus steht seit R23 als FAB auf diesem Reiter (updateRewardsFab,
+  // vorher Abschnittsknopf hier, #1787). Im Kopf der Punktestaende bleibt das
+  // "..." mit "Teilnehmende verwalten".
   const adminBar = isAdmin() && !readOnly() ? `
           <div class="rw-section__actions">
             ${popoverMenuHtml({
@@ -711,7 +716,6 @@ function renderOverview(el) {
     items: [{ icon: 'users-round', label: t('rewards.manageParticipants'), action: 'manage-participants' }],
     triggerClass: 'btn btn--secondary btn--icon btn--sm rw-section-tools',
   })}
-            <button class="btn btn--secondary btn--sm rw-grant-bonus" type="button"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('rewards.grantBonus'))}</button>
           </div>` : '';
   // Anfragen und Punktestaende links, die letzten Buchungen ab der
   // Split-Schwelle rechts daneben (mobil darunter) - `.page-columns`.
@@ -754,7 +758,6 @@ function wireOverview(el) {
     document.querySelector('.rewards-tabs [data-tab-id="ledger"]')?.click();
   });
   el.querySelector('[data-action="manage-participants"]')?.addEventListener('click', openParticipantsModal);
-  el.querySelector('.rw-grant-bonus')?.addEventListener('click', () => openBonusModal());
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));
   });

@@ -757,81 +757,35 @@ function wiredEl() {
   return el;
 }
 
-test('Uebersicht: "Bonus vergeben" steht im Kopf der Punktestaende und oeffnet den Bonus-Dialog (#1787)', async () => {
-  // Der Bonus war nur ueber den FAB im Reiter Verlauf zu erreichen; Eltern
-  // suchen ihn dort, wo die Punktestaende stehen.
-  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+test('Uebersicht: der Bonus ist der FAB auf "Punkte", im Kopf der Punktestaende bleibt das Mehr-Menue (#1787, R23 S10)', async () => {
+  // #1787: der Bonus war nur ueber den FAB im Reiter Verlauf zu erreichen;
+  // Eltern suchen ihn dort, wo die Punktestaende stehen. Bis R23 stand er
+  // deshalb als Abschnittsknopf dort - und im Verlauf als FAB: zwei Bauformen,
+  // auf "Punkte" fehlte die Kopfpille (Critique G2 P3). Seit R23 traegt der
+  // Reiter "Punkte" den FAB "Bonus" (nur mit Teilnehmenden), der Kopf der
+  // Punktestaende nur noch das Mehr-Menue mit "Teilnehmende verwalten".
   const s = rewardsPage.state;
-  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions, open: globalThis.__openModal };
-  const dialoge = [];
-  globalThis.__openModal = (options) => { dialoge.push(options); };
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions };
   const kopf = (html) => (html.match(/<div class="rw-section__head">\s*<h2[^>]*>rewards\.standings<\/h2>([\s\S]*?)<\/div>\s*<ul class="row-carrier rw-standings">/) || [])[1];
   try {
     s.user = { id: 1, role: 'admin' };
     s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }] };
     s.catalog = [];
     s.redemptions = [];
-
     const el = wiredEl();
     rewardsPage.renderOverview(el);
     const head = kopf(el.html);
     assert.ok(head, 'Vorbedingung: der Kopf der Punktestaende steht da');
-    // D5 Abschnittsaktion: EINE btn--secondary btn--sm (Bonus), Nebenaktionen
-    // hinter einem rw-section-tools popover-trigger (Teilnehmer verwalten).
-    const knoepfe = [...head.matchAll(/<button class="([^"]*)" type="button">[\s\S]*?<\/i>([^<]*)<\/button>/g)].map(([, cls, label]) => ({ cls, label }));
-    assert.deepEqual(knoepfe.map((k) => k.label), ['rewards.grantBonus'],
-      'genau eine beschriftete Abschnittsaktion - Bonus; Teilnehmer verwalten steht im Mehr-Menue');
-    assert.match(knoepfe[0].cls, /\bbtn--secondary\b/, 'der Bonus ist die Abschnittsaktion');
-    assert.match(knoepfe[0].cls, /\bbtn--sm\b/, 'Abschnittsaktion traegt --sm');
-    assert.match(head, /rw-section-tools\b/, 'das Mehr-Menue fuer Teilnehmer verwalten steht im Kopf');
-    assert.match(head, /aria-label="common\.moreActions"/, 'der Mehr-Knopf traegt common.moreActions, nicht den Menue-Inhalt');
-    assert.match(head, /data-action="manage-participants"/, 'der Menue-Eintrag traegt den Aktions-Schluessel');
-    assert.equal((el.html.match(/rw-grant-bonus/g) || []).length, 1, 'genau EIN Knopf - keiner je Personenzeile');
-
-    assert.equal(typeof el.clicks.get('rw-grant-bonus'), 'function', 'der Knopf ist verdrahtet');
-    el.clicks.get('rw-grant-bonus')({ type: 'click' });
-    assert.equal(dialoge.length, 1, 'ein Klick oeffnet einen Dialog');
-    assert.equal(dialoge[0].title, 'rewards.grantBonus');
-    assert.match(dialoge[0].content, /id="rw-bonus-form"/, 'und zwar den vorhandenen Bonus-Dialog');
-    assert.match(dialoge[0].content, /<option value="2">Emma/);
-
-    // Kind: weder Knopf noch Verdrahtung.
-    s.user = { id: 2, role: 'member' };
-    const kind = wiredEl();
-    rewardsPage.renderOverview(kind);
-    assert.ok(kopf(kind.html) !== undefined, 'Vorbedingung: das Kind sieht die Punktestaende');
-    assert.doesNotMatch(kind.html, /rw-grant-bonus|rewards\.grantBonus/);
-    assert.equal(kind.clicks.has('rw-grant-bonus'), false);
-
-    // Nur lesen: der Zustand bleibt, die Handlung geht - auch fuer ein Elternteil.
-    s.user = { id: 1, role: 'admin' };
-    setPermissions({ admin: false, modules: { rewards: 'read' }, widgets: {}, capabilities: {} });
-    try {
-      const ro = wiredEl();
-      rewardsPage.renderOverview(ro);
-      assert.match(ro.html, /rewards\.standings/);
-      assert.doesNotMatch(ro.html, /rw-grant-bonus|rewards\.grantBonus/);
-    } finally {
-      clearPermissions();
-    }
-
-    // Ohne Teilnehmende gibt es keinen Kopf und damit keinen Knopf (gewollt).
-    const { installMiniDom } = await import('./mini-dom.js');
-    const domZurueck = installMiniDom();
-    try {
-      s.overview = { me: 1, balances: [], setup: { participantCount: 0, catalogCount: 1, pointedTaskCount: 1 } };
-      const leer = wiredEl();
-      rewardsPage.renderOverview(leer);
-      assert.match(leer.html, /rewards\.emptyOverviewTitle/);
-      assert.doesNotMatch(leer.html, /rw-grant-bonus/);
-    } finally {
-      domZurueck();
-    }
+    assert.doesNotMatch(head, /rw-grant-bonus|rewards\.grantBonus/, 'kein zweiter Bonus-Knopf neben dem FAB');
+    assert.match(head, /rw-section-tools\b/, 'das Mehr-Menue fuer Teilnehmende verwalten steht im Kopf');
+    assert.match(head, /data-action="manage-participants"/);
   } finally {
-    const { open, ...rest } = vorher;
-    Object.assign(s, rest);
-    globalThis.__openModal = open;
+    Object.assign(s, vorher);
   }
+  const src = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
+  const fab = src.slice(src.indexOf('function updateRewardsFab()'), src.indexOf('function renderShell('));
+  assert.match(fab, /\(state\.tab === 'ledger' \|\| \(state\.tab === 'overview' && balances\(\)\.length\)\) && isAdmin\(\)/,
+    'der FAB "Bonus" steht auf Punkte (mit Teilnehmenden) und im Verlauf');
 });
 
 test('Uebersicht ohne Teilnehmende: die offene Anfrage steht trotzdem da und ist entscheidbar (#1623)', async () => {
