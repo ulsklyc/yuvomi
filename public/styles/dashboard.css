@@ -2614,7 +2614,7 @@ svg.weather-forecast__icon {
 
 .first-steps__count {
   margin-inline-end: auto;
-  font-size: var(--text-sm);
+  font-size: var(--type-secondary);
   font-variant-numeric: tabular-nums;
   color: var(--color-text-secondary);
 }
@@ -2635,8 +2635,10 @@ svg.weather-forecast__icon {
   text-decoration: none;
 }
 
-.first-steps__step:hover {
-  background-color: var(--color-surface-raised);
+@media (hover: hover) {
+  .first-steps__step:hover {
+    background-color: var(--color-surface-raised);
+  }
 }
 
 .first-steps__step:focus-visible {

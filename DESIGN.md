@@ -2179,6 +2179,12 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
   **Kalender-Synchronisation ist ein eigenes Blatt** (`/settings/modules/calendar-sync`, direkt
   hinter dem Kalender, ohne zweite Statuszeile; die einzige benannte Ausnahme von "je Modul
   ein Blatt"): das Kalender-Blatt trug vorher 12 Karten auf 3473px.
+  Am Telefon stapelt eine Zeile, deren Bedienelement EIN Textfeld ist (Label oben, Feld
+  vollbreit; `:has()` als Verbesserung) - die einzige Ausnahme von "zweispaltig in jeder
+  Breite", Auswahl und Schalter bleiben daneben. Die Bereichszeile unter der Liste markiert
+  die Gruppe des offenen Blatts, nach eigenem Scrollen die ueber dem oberen Drittel, oben die
+  erste, am Ende die letzte. Die Wochenstart-Vorschau ist ein Wochenkopf (Kuerzel, der erste
+  Tag halbfett mit Akzentlinie), keine Reihe umrandeter Kaestchen.
   Eine Mitgliederzeile oeffnet per Tipp (der Name ist der Knopf, seine Flaeche deckt die
   Zeile) und endet in [Mehr][Griff]; der Geburtstag steht nicht in der Zeile. Was an zwei Orten
   wohnt (Wetter: Mein Wetter / Fotos und Wetter; Wand: Dieses Geraet / Wandtabletts), verweist

@@ -283,6 +283,8 @@ const PLURAL_EXCEPTIONS = {
   'health.cycle.settings.applyToAllDone': 'PARENTHETICAL',
   // R22 (D6): "Personen vergleichen (2)" - der Name des Personenknopfs im Schichtplan.
   'schedule.overviewPeopleCount': 'PARENTHETICAL',
+  // R23 S10: "Freie Tage: 9" - die Notiz der Schicht-Kennzahl.
+  'schedule.freeDaysCount': 'PARENTHETICAL',
 
   // --- numerusneutrale Abkuerzung ----------------------------------------
   'settings.calendarDurationMinutes': 'ABBREV',

@@ -3928,8 +3928,11 @@ test('R17: die gruppierte Zeile - Label links, Bedienelement rechts, der Hinweis
   const base = rules.find((r) => r.selector.trim() === '.settings-group > .settings-setting-row' && !r.at.length);
   assert.match(base?.body ?? '', /grid-template-columns:\s*minmax\(0, 1fr\) auto/);
   assert.match(base?.body ?? '', /min-height:\s*var\(--target-lg\)/, 'die Zeile ist mobil ein Fingerziel hoch');
+  // R23 S10: die EINE benannte Ausnahme stapelt nur eine Zeile, deren
+  // Bedienelement ein Textfeld ist (Konto mobil 50/50) - nie eine Auswahl.
   const narrowed = rules.filter((r) => r.at.length && /\.settings-group\b[^,{]*\.settings-setting-row\b/.test(r.selector)
-    && /grid-template-columns/.test(r.body));
+    && /grid-template-columns/.test(r.body)
+    && !/:has\(> \.settings-setting-row__control > input\.form-input:only-child:is\(\[type="text"\]/.test(r.selector));
   assert.deepEqual(narrowed.map((r) => r.selector), [],
     'keine Breitenabfrage stapelt die Zeile wieder: gestapelt war ein Auswahlfeld mit "5 Minuten" mobil vollbreit');
   const control = rules.find((r) => r.selector.trim() === '.settings-group .settings-setting-row__control' && !r.at.length);
@@ -5537,4 +5540,32 @@ test('R23: Kalender-Synchronisation als eigenes Blatt, Prosa hoechstens ein bis 
     const src = await readFile(new URL(`../public/settings/pages/${file}`, import.meta.url), 'utf8');
     assert.match(src, new RegExp(`hintFoldHtml\\(\\{ lead: t\\('settings\\.${key.replace('.', '\\.')}'\\), moreHtml: \`<p>\\$\\{esc\\(t\\('settings\\.${key.replace('.', '\\.')}More'\\)\\)\\}</p>\``), `${file}: der Rest steht hinter "Mehr dazu"`);
   }
+});
+
+// R23 S10 (Critique G6 P3 "Index-Zeile markiert falsch"): markiert ist die
+// Gruppe des offenen Blatts, bis die Leiste von Hand bewegt wird; danach die
+// Gruppe ueber dem oberen Drittel, ganz oben die erste, am Ende die letzte.
+test('R23: die Bereichszeile markiert, was man sieht', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const fn = shell.slice(shell.indexOf('function createNavigationIndex('), shell.indexOf('function createSheetSkipLink('));
+  assert.match(fn, /const active = !userScrolled && navigation\.querySelector\('\.settings-shell__navigation-link--active'\);/);
+  assert.match(fn, /const line = edge \+ \(bottom - edge\) \/ 3;/);
+  assert.match(fn, /if \(top <= line \|\| !current \|\| \(atEnd && top < bottom\)\) current = group\.dataset\.domainId;/);
+  assert.match(fn, /if \(navigation\.scrollTop <= 0\) current = /);
+  assert.match(fn, /for \(const type of \['wheel', 'touchmove', 'keydown', 'pointerdown'\]\) navigation\.addEventListener\(type, byUser/);
+});
+
+// R23 S10 (Critique G6 P3 "Konto mobil 50/50", "Wochenstart-Vorschau wirkt bedienbar").
+test('R23: Textfelder stapeln am Telefon unter ihrem Label; die Wochenstart-Vorschau ist ein Kopf, keine Knoepfe', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const stacked = rules.find((r) => r.at.some((a) => /max-width:\s*639px/.test(a))
+    && /settings-setting-row:has\(> \.settings-setting-row__control > input\.form-input:only-child/.test(r.selector)
+    && !/__control/.test(r.selector.split(':has(')[0].slice(-30)) && /grid-template-columns:\s*minmax\(0, 1fr\)/.test(r.body));
+  assert.ok(stacked, 'am Telefon eine Spalte fuer eine Zeile mit einem Textfeld');
+  const cell = rules.find((r) => r.selector.trim() === '.week-start-preview__cell' && !r.at.length);
+  assert.doesNotMatch(cell.body, /border:/, 'keine Kaestchen');
+  const start = rules.find((r) => r.selector.trim() === '.week-start-preview__cell--start' && !r.at.length);
+  assert.doesNotMatch(start.body, /background:/, 'keine Fuellung wie ein gewaehlter Knopf');
 });

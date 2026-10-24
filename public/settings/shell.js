@@ -330,9 +330,26 @@ function createNavigationIndex(navigation, domains) {
     const search = navigation.querySelector('.settings-shell__navigation-search');
     const edge = (search ?? navigation).getBoundingClientRect().bottom + 1;
     let current = null;
+    // MARKIERT IST, WAS MAN SIEHT (R23 S10, Critique G6 P3 "Index-Zeile
+    // markiert falsch"). Gezaehlt wurde die Gruppe, deren Kopf die Suchkante
+    // erreicht hatte: mit dem Blatt "Kalender-Synchronisation" offen standen
+    // Haushalt und Module im Bild, markiert war "Konto", von dem oben eine
+    // halbe Zeile hereinragte. Jetzt: vor dem ersten eigenen Scrollen die
+    // Gruppe des offenen Blatts (die Leiste hat sich zu ihm gedreht), danach
+    // die Gruppe ueber dem oberen Drittel des sichtbaren Teils, ganz oben die
+    // erste und am Ende der Liste die letzte - deren Kopf erreicht die Kante nie.
+    const active = !userScrolled && navigation.querySelector('.settings-shell__navigation-link--active');
+    const own = active?.closest?.('.settings-shell__navigation-group')?.dataset.domainId;
+    const bottom = navigation.getBoundingClientRect().bottom;
+    const line = edge + (bottom - edge) / 3;
+    const atEnd = navigation.scrollTop > 0
+      && navigation.scrollTop + navigation.clientHeight >= navigation.scrollHeight - 2;
     for (const group of navigation.querySelectorAll('.settings-shell__navigation-group')) {
-      if (group.getBoundingClientRect().top <= edge || !current) current = group.dataset.domainId;
+      const top = group.getBoundingClientRect().top;
+      if (top <= line || !current || (atEnd && top < bottom)) current = group.dataset.domainId;
     }
+    if (navigation.scrollTop <= 0) current = navigation.querySelector('.settings-shell__navigation-group')?.dataset.domainId ?? current;
+    if (own) current = own;
     for (const button of buttons) button.classList.toggle('is-current', button.dataset.domainId === current);
   };
   const syncOverflow = () => {
@@ -345,6 +362,10 @@ function createNavigationIndex(navigation, domains) {
     if (now && !was) revealActiveNavigationLink(navigation);
     markCurrent();
   };
+  // Erst eine Geste in der Leiste loest die Markierung vom offenen Blatt.
+  let userScrolled = false;
+  const byUser = () => { userScrolled = true; };
+  for (const type of ['wheel', 'touchmove', 'keydown', 'pointerdown']) navigation.addEventListener(type, byUser, { passive: true });
   navigation.addEventListener('scroll', markCurrent, { passive: true });
   if (typeof ResizeObserver === 'function') new ResizeObserver(syncOverflow).observe(navigation);
   requestAnimationFrame(syncOverflow);

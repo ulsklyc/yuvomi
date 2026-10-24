@@ -1032,6 +1032,31 @@
   max-inline-size: none;
 }
 
+/* DAS TEXTFELD AM TELEFON UNTER DEM LABEL (R23 S10, Critique G6 P3 "Konto
+ * mobil 50/50"). Neben dem Label blieb einem Textfeld am Telefon die halbe
+ * Zeile (163px bei 390px): "Telefonnummer (optional)" brach zweizeilig, eine
+ * E-Mail-Adresse lief nach 15 Zeichen weg. Unter 640px stapelt eine Zeile,
+ * deren Bedienelement EIN Textfeld ist - wie die gestapelte Zeile oben, nur
+ * ohne Umbau des Markups. Auswahl, Schalter und Zahl bleiben daneben (dort
+ * traegt die halbe Zeile den Wert). `:has()` ist hier Verbesserung: ohne
+ * bleibt die zweispaltige Zeile, die vorher galt. */
+@media (max-width: 639px) {
+  .settings-group > .settings-setting-row:has(> .settings-setting-row__control > input.form-input:only-child:is([type="text"], [type="email"], [type="tel"], [type="url"], [type="password"], :not([type]))) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1h);
+    padding-block: var(--space-3);
+  }
+
+  .settings-group > .settings-setting-row:has(> .settings-setting-row__control > input.form-input:only-child:is([type="text"], [type="email"], [type="tel"], [type="url"], [type="password"], :not([type]))) > .settings-setting-row__control {
+    grid-area: auto;
+    max-inline-size: none;
+  }
+
+  .settings-group > .settings-setting-row:has(> .settings-setting-row__control > input.form-input:only-child:is([type="text"], [type="email"], [type="tel"], [type="url"], [type="password"], :not([type]))) > .settings-setting-row__control > input.form-input {
+    inline-size: 100%;
+  }
+}
+
 /* Eine Zeile, deren Bedienelement fuer sich spricht (das Design-Segment unter
  * der Abschnittsueberschrift "Design"): der Textblock ist leer. */
 .settings-group .settings-setting-row__copy:empty {
@@ -2558,23 +2583,28 @@
   max-width: 340px;
 }
 
+/* EINE KOPFZEILE, KEINE KNOEPFE (R23 S10, Critique G6 P3). Sieben umrandete
+ * Kaestchen mit einem violett gefuellten sahen aus wie eine Auswahl, die man
+ * antippen kann - gewaehlt wird im Segment darueber. Jetzt steht die Vorschau
+ * wie der Wochenkopf des Kalenders da: Kuerzel ohne Rahmen, der erste Tag in
+ * Label-Farbe und halbfett mit einer Linie darunter. */
 .week-start-preview__cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-2) 0;
-  border-radius: var(--radius-xs);
-  border: var(--space-px) solid var(--color-border);
+  padding: var(--space-1) 0;
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  transition: color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .week-start-preview__cell--start {
-  background: var(--color-accent-light);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 calc(-1 * var(--space-0h)) 0 var(--color-accent);
 }
 
 /* --------------------------------------------------------
