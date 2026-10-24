@@ -653,8 +653,10 @@ function importActionHtml() {
     label: t('common.moreActions'),
     items: [
       // `user-plus` statt `download` (Critique R22, D7): der Eintrag holt
-      // Menschen aus dem Adressbuch, er laedt keine Datei herunter.
-      { action: 'import-contacts', label: t('birthdays.importButton'), icon: 'user-plus' },
+      // Menschen aus dem Adressbuch, er laedt keine Datei herunter. Seit R23
+      // (Critique G1 P3 "Import-Icon mehrdeutig") das Zeichen der Kontakte:
+      // `user-plus` las sich wie "Person anlegen", nicht wie "aus Kontakten".
+      { action: 'import-contacts', label: t('birthdays.importButton'), icon: 'book-user' },
     ],
   });
 }
@@ -795,6 +797,27 @@ async function onListClick(e) {
 // Ohne Bild und ohne Namen stand hier das "?" aus initials() - es las sich
 // wie ein Hilfe-Knopf (Critique 2026-09-26). Die Kamera sagt, was ein Tipp
 // auf die Flaeche tut; mit Namen bleiben die Initialen.
+/**
+ * WAS HINTER "WEITERE ANGABEN" STEHT (R23 S10, Critique G1 P3 "Aufklapper
+ * ohne Inhaltsangabe"). Der Aufklapper hiess nur "Weitere Angaben" - wer einen
+ * Namenstag oder eine Erinnerung suchte, musste ihn oeffnen, um es zu wissen.
+ * Aus denselben Beschriftungen wie die Felder (wie im Termin-Dialog,
+ * eventAdvancedTopics), als Liste der Sprache.
+ */
+function birthdayAdvancedTopics(withContact) {
+  const topics = [
+    withContact ? t('newLabel.contacts') : null,
+    t('birthdays.nameDayLabel'),
+    t('birthdays.notesLabel'),
+    t('reminders.sectionTitle'),
+  ].filter(Boolean);
+  try {
+    return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(topics);
+  } catch {
+    return topics.join(', ');
+  }
+}
+
 function birthdayPreviewHtml(name, photoData) {
   if (photoData) return `<img class="birthday-preview__image" src="${photoData}" alt="${esc(name || '')}">`;
   if (!String(name || '').trim()) return '<i data-lucide="camera" class="birthday-preview__glyph" aria-hidden="true"></i>';
@@ -1087,7 +1110,8 @@ function openBirthdayModal({ mode, birthday = null }) {
             <textarea class="form-input" id="bd-notes" rows="3" placeholder="${t('birthdays.notesPlaceholder')}">${esc(birthday?.notes || '')}</textarea>
           </div>
           ${renderBirthdayReminderSection(birthday)}`,
-          { open: isEdit && (!!birthday?.contact_id || !!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)) })}
+          { open: isEdit && (!!birthday?.contact_id || !!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)),
+            hint: birthdayAdvancedTopics(mayLinkContacts(birthday)) })}
         <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete">

@@ -2883,6 +2883,16 @@ function bindDropzone(panel) {
         : '';
     const group = nameField?.closest('.form-group');
     if (group) group.hidden = files.length > 1;
+    // DIE GROESSE GLEICH BEI DER WAHL (R23 S10, Critique G4 P3 "Groessenpruefung
+    // vorab"). Zu gross meldete sich erst beim Absenden - nachdem Name,
+    // Kategorie und Ordner ausgefuellt waren. Jetzt an der Ablage, sobald die
+    // Datei gewaehlt oder abgelegt ist; das Absenden prueft weiter (saveDocument).
+    // Nach dem laufenden `change`: der Fehler raeumt sich beim naechsten
+    // `change` an der Ablage selbst ab und darf dieses nicht mitzaehlen.
+    const maxSize = state.maxFileSize || maxUploadBytes();
+    const tooBig = files.find((file) => file.size > maxSize);
+    const form = input.closest('form');
+    if (tooBig && form) setTimeout(() => reportDropzoneError(form, t('documents.fileTooLargeNamed', { name: tooBig.name })), 0);
   };
 
   input.addEventListener('change', syncSelectedFile);

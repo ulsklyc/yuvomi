@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Small clarity fixes in Birthdays and Documents.** "More details" in the birthday dialog now
+  lists what it holds (contact, name day, notes and reminder), and "Import from contacts" shows
+  the contacts icon instead of an "add person" icon. In Documents a file that is too large is
+  reported as soon as you pick or drop it, not only after filling in the form.
 - **Settings read better on a phone.** Text fields such as display name, phone and e-mail now
   sit under their label on a phone instead of sharing the row half and half. The week start
   preview reads like the calendar's weekday header instead of a row of buttons, and the

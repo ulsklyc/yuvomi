@@ -2173,3 +2173,11 @@ test('R22 D11: Liste als Standard, Datum und Groesse auch schmal, FAB mit Plus',
   assert.ok(rules.some((r) => !r.at.length && /display:\s*none/.test(r.body)), 'breit aus dem Baum');
   assert.ok(rules.some((r) => r.at.some((a) => /list-rows \(max-width: 30rem\)/.test(a)) && /display:\s*inline-flex/.test(r.body)), 'schmal sichtbar');
 });
+
+// R23 S10 (Critique G4 P3): eine zu grosse Datei meldet sich bei der Wahl,
+// nicht erst beim Absenden.
+test('R23: die Ablage prueft die Groesse gleich bei der Wahl', () => {
+  const fn = page.slice(page.indexOf('function bindDropzone('), page.indexOf('function reportDropzoneError('));
+  assert.match(fn, /const tooBig = files\.find\(\(file\) => file\.size > maxSize\);/);
+  assert.match(fn, /setTimeout\(\(\) => reportDropzoneError\(form, t\('documents\.fileTooLargeNamed', \{ name: tooBig\.name \}\)\), 0\)/);
+});

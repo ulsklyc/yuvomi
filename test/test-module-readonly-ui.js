@@ -5501,10 +5501,11 @@ test('R8 H14: Dokument-Auswahl ist ein Auswahlkreis mit Objektnamen, keine nativ
 });
 
 // R22, D7: Geburtstag und Kontakt verknuepfen.
-test('D7: der Import-Eintrag traegt user-plus, nicht download - er holt Menschen, keine Datei', () => {
+test('D7: der Import-Eintrag traegt das Kontakte-Zeichen, nicht download - er holt Menschen, keine Datei', () => {
   withAccess({ calendar: 'write', contacts: 'read' }, () => {
     const html = birthdays.importActionHtml();
-    assert.match(html, /user-plus/);
+    // R23 S10: `book-user` (das Zeichen der Kontakte) statt `user-plus`.
+    assert.match(html, /book-user/);
     assert.doesNotMatch(html, /"download"|data-lucide="download"/);
   });
 });
@@ -5539,4 +5540,15 @@ test('D7: der Hinweis "Ein Kontakt heisst genauso" nur mit Schreibrecht und nur 
 test('D7/a3 Klein: das Datum im Detailkopf traegt sein Etikett', () => {
   const head = birthdays.birthdayDetailHead({ id: 1, name: 'Mike', next_birthday: '2026-11-02', next_age: 41, days_until: 10 });
   assert.match(head.subtitle, /^birthdays\.nextBirthdayOn/, 'zwei Daten untereinander, eins davon ohne Namen');
+});
+
+// R23 S10 (Critique G1 P3): "Weitere Angaben" im Geburtstag nennt seinen
+// Inhalt, und der Import aus den Kontakten traegt das Zeichen der Kontakte.
+test('R23: Geburtstag - der Aufklapper sagt, was drin ist; der Import zeigt das Kontakte-Zeichen', () => {
+  const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
+  assert.match(src, /hint: birthdayAdvancedTopics\(mayLinkContacts\(birthday\)\)/);
+  const fn = src.slice(src.indexOf('function birthdayAdvancedTopics('), src.indexOf('function birthdayPreviewHtml('));
+  for (const key of ['newLabel.contacts', 'birthdays.nameDayLabel', 'birthdays.notesLabel', 'reminders.sectionTitle']) assert.ok(fn.includes(`t('${key}')`), key);
+  assert.match(fn, /new Intl\.ListFormat\(getLocale\(\)/);
+  assert.match(src, /\{ action: 'import-contacts', label: t\('birthdays\.importButton'\), icon: 'book-user' \}/);
 });
