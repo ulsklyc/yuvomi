@@ -132,6 +132,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The bar shows the page you are on: on the install guide its Install button is tinted instead
   of filled. The legal pages use the site's type scale, and in their table of contents every
   number and first line in a row stand at the same height.
+- **yuvomi.cloud is sharp on high-resolution screens, and the install guide reaches the first
+  command sooner.** The opening screenshot and the two large gallery shots come in a third, wider
+  size for screens with twice the pixel density, so on a Retina laptop they are no longer drawn
+  from a file at six tenths of the needed resolution; ordinary screens keep loading the smaller
+  file, and every shot is still fetched once. The install guide's heading is shorter and its
+  introduction one sentence, so on a laptop the first command now shows on the first screen
+  instead of a screen further down, and choosing a tab whose steps start below the edge of the
+  window scrolls them into view. On a phone, the floating Install button now also gives way to
+  the footer at the end of the landing page, where "Back to top" takes its place - one floating
+  button at a time. Opening the module catalogue puts a "Hide the details" button at its top as
+  well, so closing it no longer means scrolling two and a half screens to the bottom. Sections
+  further down the landing page stay laid out once they have been shown, which takes a stutter
+  out of scrolling back up on slower phones. Buttons spring back with the app's own curve when
+  released, and the floating buttons settle into place the same way; with reduced motion turned
+  on they simply appear.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

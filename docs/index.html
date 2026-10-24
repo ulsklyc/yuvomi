@@ -84,8 +84,9 @@
          Schirm, s.u.) ein Preload mit genau dem srcset und sizes, die das
          Inline-Skript am Bild danach setzt: dieselbe Auswahl, eine Datei,
          kein zweiter Download. Breiten
-         wie scripts/build-screenshot-webp.mjs (web 700/1400, mobile-lead
-         510/1020); sizes misst den Rahmen (.hero-frame): bis 860px die
+         wie scripts/build-screenshot-webp.mjs (web-lead 700/1400/2400,
+         mobile-lead 510/1020; die 2400er-Stufe nur per w-Deskriptor, damit ein
+         DPR-1-Schirm bei 1400 bleibt und erst DPR 2 sie zieht); sizes misst den Rahmen (.hero-frame): bis 860px die
          Telefonspalte, hoechstens 418px, darueber die volle Spalte bis 1150px,
          je mit 25px Rand. data-sizes am Bild sagt dasselbe (test:docs-landing). */
       try {
@@ -93,10 +94,11 @@
           d = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches),
           base = 'screenshots/dashboard-' + (d ? 'dark' : 'light') + '-' + (n ? 'mobile' : 'web') + '.png',
           p = l === 'en' ? base : base.replace('screenshots/', 'screenshots/' + l + '/'),
-          w = n ? [510, 1020] : [700, 1400],
+          w = n ? [510, 1020] : [700, 1400, 2400],
           hero = { base: base, src: p.replace(/\.png$/, '.webp'),
             sizes: '(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, (max-width: 1199px) calc(100vw - 50px), 1150px',
-            srcset: p.replace(/\.png$/, '@1x.webp') + ' ' + w[0] + 'w, ' + p.replace(/\.png$/, '.webp') + ' ' + w[1] + 'w' },
+            srcset: p.replace(/\.png$/, '@1x.webp') + ' ' + w[0] + 'w, ' + p.replace(/\.png$/, '.webp') + ' ' + w[1] + 'w'
+              + (w[2] ? ', ' + p.replace(/\.png$/, '@2400.webp') + ' ' + w[2] + 'w' : '') },
           k = document.createElement('link');
         window.YuvomiHero = hero;
         /* Nur am breiten Schirm, wo die Aufnahme das LCP-Element ist. Am
@@ -325,6 +327,16 @@
        von content-visibility abschnitte. Der Scroll-Spy misst neu, sobald
        eine Sektion zu rendern beginnt (contentvisibilityautostatechange). */
     .handoff, .showcase, .longevity, .platforms, .cta { content-visibility: auto; }
+    /* Einmal gerendert, bleibt eine Sektion gerendert (S10). Mit `auto` wirft
+       der Browser sie beim Verlassen des Bildschirms wieder ins Ueberspringen
+       und rechnet beim Wiederkehren ihr Layout neu: beim Hochscrollen am
+       Telefon (390px, CPU 4x) kamen Katalog, Plattformen und Schluss so mit
+       einem Lifecycle-Task von 40-56ms zurueck, in der Critique 104-241ms
+       gemessen. Ganz ohne content-visibility verschwindet der Task, aber das
+       Laden kostet mehr (TBT 37 -> 80ms). Also nur der Gewinn beim Laden:
+       das Skript setzt .cv-kept, sobald eine Sektion zum ersten Mal rendert
+       (contentvisibilityautostatechange). */
+    .cv-kept { content-visibility: visible; }
     /* Die Platzhalterhoehe gilt dem Inhalt, die Polsterung kommt dazu - also
        gemessene Hoehe minus beide Sektionsabstaende. */
     .handoff { contain-intrinsic-block-size: auto calc(1250px - 2 * var(--sec-m)); }
@@ -876,17 +888,21 @@
       background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
       border-radius: var(--r-full); box-shadow: var(--shadow-sm);
       font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; cursor: pointer;
-      transition: border-color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
+      transition: border-color var(--dur-hover), transform var(--dur-spring) var(--ease-glass); }
     html.js .mod-toggle:hover { border-color: var(--border-strong); }
-    html.js .mod-toggle:active { transform: scale(var(--press-sm)); }
+    html.js .mod-toggle:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
     html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform .2s var(--ease-out); }
     /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu. */
     html.js .mod-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+    /* Der zweite, obere Knopf (S10) steht nur aufgeklappt da; [hidden] muss
+       das display:flex oben schlagen. */
+    html.js .mod-toggle[hidden] { display: none; }
+    html.js .mod-toggle-top { margin: 28px auto 0; }
     @media (max-width: 700px) {
       .mod-groups { gap: 40px; margin-top: 40px; }
       .mod-pair { gap: 40px; }
       html.js .mod-groups:not(.expanded) .mod-group-body { column-gap: 16px; }
-      html.js .mod-toggle { margin-top: 24px; }
+      html.js .mod-toggle:not(.mod-toggle-top) { margin-top: 24px; }
     }
     /* Unter 380px bleiben der Namensspalte neben dem Symbol 84-104px, und
        "Haushaltshilfe" oder "Housekeeping" liefen 2-26px darueber hinaus - bei
@@ -1089,7 +1105,8 @@
     /* ===== Footer: assets/site.css, gleich auf allen fuenf Seiten. ===== */
 
     /* ===== Back to top: assets/site.css und assets/site.js, gleich auf allen
-       fuenf Seiten; unter 700px weicht er hier der Install-Pille. ===== */
+       fuenf Seiten; unter 700px weicht er hier der Install-Pille und kommt
+       erst am Seitenende zurueck (html.pill-end, S10). ===== */
 
     /* ===== Mobile sticky CTA (thumb-zone Install) ===== */
     .mobile-cta { display: none; }
@@ -1099,8 +1116,11 @@
        opacity-0 link is still in the tab order, so keyboard users hit an
        invisible "Install Yuvomi" while the hero was still on screen. .to-top
        (site.css) does it the same way. */
+    /* Arrival and release spring with the app's curve (--ease-glass, site.css,
+       S10): the pill rises 12px into place and settles; opacity stays on
+       --ease-out. */
     html.js .mobile-cta { opacity: 0; visibility: hidden; pointer-events: none;
-      transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out), transform var(--dur-press) var(--ease-out); }
+      transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out), transform var(--dur-spring) var(--ease-glass); }
     html.js .mobile-cta.show { opacity: 1; visibility: visible; pointer-events: auto; }
 
     /* ===== Responsive ===== */
@@ -1171,7 +1191,8 @@
         border: 0;
       }
       .mobile-cta svg { width: 18px; height: 18px; }
-      .mobile-cta:active { transform: translateX(-50%) scale(var(--press-lg)); }
+      html.js .mobile-cta:not(.show) { transform: translateX(-50%) translateY(12px) scale(0.96); }
+      .mobile-cta:active { transform: translateX(-50%) scale(var(--press-lg)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
       .nav-install { display: none; } /* the sticky pill replaces it on phones */
       /* Das Seitenende haelt die Fusszeile frei (--float-band, site.css), und
          Fokus-Scrollen dasselbe Band (scroll-padding-bottom, site.css). Der
@@ -1207,7 +1228,7 @@
         scroll-behavior: auto !important;
       }
       .plat-card:hover, .plat-card:active, .nav-jump summary:active, html.js .mod-toggle:active { transform: none; }
-      .mobile-cta:active { transform: translateX(-50%); }
+      .mobile-cta:active, html.js .mobile-cta:not(.show) { transform: translateX(-50%); }
       /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
          wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
       .ho-token { display: none !important; }
@@ -1332,7 +1353,7 @@
              Pixel - genau der Fehler, den die Galerie schon behoben hatte. -->
         <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" data-sizes="(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, (max-width: 1199px) calc(100vw - 50px), 1150px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
         <script>(function(i,H){if(!i)return;if(!H){i.src=i.dataset.light;return;}i.onerror=function(){i.onerror=null;i.srcset='';i.src=H.base;};i.sizes=H.sizes;i.srcset=H.srcset;i.src=H.src;})(document.getElementById('heroShot'),window.YuvomiHero);</script>
-        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" srcset="screenshots/dashboard-light-web@1x.webp 700w, screenshots/dashboard-light-web.webp 1400w" sizes="(max-width: 1199px) calc(100vw - 50px), 1150px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
+        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" srcset="screenshots/dashboard-light-web@1x.webp 700w, screenshots/dashboard-light-web.webp 1400w, screenshots/dashboard-light-web@2400.webp 2400w" sizes="(max-width: 1199px) calc(100vw - 50px), 1150px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
       </div>
       <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
            Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
@@ -1975,6 +1996,13 @@
          Jede Gruppe beginnt mit ihrem ausfuehrlichen Modul, falls sie eines
          hat; die kompakten Eintraege stehen in .mod-list (zugeklappt eine
          Namensliste, aufgeklappt `display: contents`). -->
+    <!-- Zuklappen dort, wo das Aufklappen hinfuehrt (S10): der Knopf unter der
+         Liste stand danach rund 2.256px (1440) tiefer, 2,5 Bildschirme. Nur
+         aufgeklappt sichtbar; gleiche Funktion wie #modToggle. -->
+    <button class="mod-toggle mod-toggle-top" type="button" id="modToggleTop" aria-expanded="true" aria-controls="modGrid" hidden>
+      <span data-t="mods_less">Hide the details</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
     <div class="mod-groups" id="modGrid">
       <div class="mod-group reveal">
         <h3 class="mod-group-head" data-t="grp_plan">Plan</h3>
@@ -2383,8 +2411,11 @@
      localized WebP -> English WebP -> the original PNG. */
   /* Actual widths written by scripts/build-screenshot-webp.mjs (WIDTHS). */
   /* `lead` = data-shot-profile="lead" (Hero und Galerie): die Telefonaufnahme
-     im grossen Slot, 290-418px breit, also 1020px fuer DPR 3. */
-  var SHOT_W = { web: [700, 1400], mobile: [240, 480], lead: [510, 1020] };
+     im grossen Slot, 290-418px breit, also 1020px fuer DPR 3; die
+     Desktopaufnahme dort (`webLead`) bis 1152px breit, also eine dritte Stufe
+     @2400.webp fuer DPR 2 (S10). Muss Zeichen fuer Zeichen das srcset des
+     Hero-Kopfskripts ergeben, sonst holt applyShots() eine zweite Datei. */
+  var SHOT_W = { web: [700, 1400], webLead: [700, 1400, 2400], mobile: [240, 480], lead: [510, 1020] };
   function srcsetFor(path, sizes, lead){
     var one = path.replace(/\.png$/, '@1x.webp'), two = path.replace(/\.png$/, '.webp');
     if (!sizes) return one + ' 1x, ' + two + ' 2x';
@@ -2393,8 +2424,9 @@
        at 544px; the gallery renders at up to 1152px, where it would stretch the
        700px file over a 1152px slot and undo the point of showing it large.
        Width descriptors let the browser compare against the real slot instead. */
-    var w = SHOT_W[/-mobile\.png$/.test(path) ? (lead ? 'lead' : 'mobile') : 'web'];
-    return one + ' ' + w[0] + 'w, ' + two + ' ' + w[1] + 'w';
+    var w = SHOT_W[/-mobile\.png$/.test(path) ? (lead ? 'lead' : 'mobile') : (lead ? 'webLead' : 'web')];
+    return one + ' ' + w[0] + 'w, ' + two + ' ' + w[1] + 'w'
+      + (w[2] ? ', ' + path.replace(/\.png$/, '@2400.webp') + ' ' + w[2] + 'w' : '');
   }
   function shotSrc(img, path, englishBase){
     img.onerror = function(){
@@ -2479,10 +2511,17 @@
      traegt denselben Knopf, und die Pille schwebte bis dahin ueber ihr. Ein
      Observer fuer beide; die Pille ist fixiert und blendet nur Deckkraft und
      Sichtbarkeit, verschiebt also nichts (CLS 0). */
+  /* Seit S10 auch die Fusszeile. Am Seitenende (390px: y=13200 bis zum Ende)
+     stand die Pille wieder: die Karte war schon unter die Leiste gerutscht,
+     und genau die oberen 70px schneidet die Wurzel weg (rootMargin, die
+     Leiste verdeckt sie) - beobachtet war danach nichts mehr. Stehen Karte
+     oder Fusszeile im Bild, setzt der Observer html.pill-end: dort uebernimmt
+     "Nach oben" das Band (site.css, "Back to top"), eine Kapsel zur Zeit. */
   (function(){
     var pill = document.querySelector('.mobile-cta');
     if (!pill) return;
-    var owners = [document.querySelector('.hero-actions') || document.getElementById('top'), document.querySelector('.cta-box')].filter(Boolean);
+    var ctaBox = document.querySelector('.cta-box'), foot = document.querySelector('.site-foot');
+    var owners = [document.querySelector('.hero-actions') || document.getElementById('top'), ctaBox, foot].filter(Boolean);
     if (owners.length && 'IntersectionObserver' in window) {
       var inView = [];
       var pObs = new IntersectionObserver(function(entries){
@@ -2492,6 +2531,7 @@
           else if (!e.isIntersecting && i >= 0) inView.splice(i, 1);
         });
         pill.classList.toggle('show', inView.length === 0);
+        document.documentElement.classList.toggle('pill-end', inView.indexOf(ctaBox) >= 0 || inView.indexOf(foot) >= 0);
       }, { rootMargin: '-70px 0px 0px 0px' });
       owners.forEach(function(el){ pObs.observe(el); });
     } else { pill.classList.add('show'); }
@@ -2575,20 +2615,32 @@
   (function(){
     var btn = document.getElementById('modToggle'); if (!btn) return;
     var grid = document.getElementById('modGrid'); if (!grid) return;
+    /* Zweiter Knopf ueber der Liste (S10): aufgeklappt landet man oben, dort
+       steht jetzt auch das Zuklappen. Klappt er zu, bleibt alles ueber ihm
+       stehen (nur darunter schrumpft es) - der Abschnittsanfang bleibt also
+       im Bild, ohne Sprung; der Fokus geht auf den ersten Gruppenkopf, weil
+       der Knopf selbst verschwindet. */
+    var top = document.getElementById('modToggleTop');
     var label = btn.querySelector('[data-t]');
-    btn.addEventListener('click', function(){
+    var head = grid.querySelector('.mod-group-head');
+    function toggle(fromTop){
       var open = !grid.classList.contains('expanded');
       var before = btn.getBoundingClientRect().top;
       grid.classList.toggle('expanded', open);
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (top) top.hidden = !open;
       var key = open ? 'mods_less' : 'mods_more';
       label.setAttribute('data-t', key);
       setRich(label, T[lang][key]);
+      if (head) head.setAttribute('tabindex', '-1');
       if (open) {
-        var head = grid.querySelector('.mod-group-head');
         if (head) {
-          head.setAttribute('tabindex', '-1');
-          head.scrollIntoView({ block: 'start' });
+          (top || head).scrollIntoView({ block: 'start' });
+          head.focus({ preventScroll: true });
+        }
+      } else if (fromTop) {
+        if (head) {
+          head.scrollIntoView({ block: 'nearest' });
           head.focus({ preventScroll: true });
         }
       } else {
@@ -2601,7 +2653,9 @@
         else btn.scrollIntoView({ block: 'nearest' });
       }
       document.dispatchEvent(new Event('yuvomi:layout'));
-    });
+    }
+    btn.addEventListener('click', function(){ toggle(false); });
+    if (top) top.addEventListener('click', function(){ toggle(true); });
   })();
   /* Scroll-Spy fuers Sprungmenue: die Linie sagt "wie weit", das hier sagt
      "wo". Positionen werden gecacht - ein offsetTop-Read pro Scroll-Event
@@ -2636,7 +2690,10 @@
        Platzhalterhoehe da, bis sie rendern; dann verschieben sich die Marken
        darunter. Das Ereignis blubbert nicht, also in der Capture-Phase. */
     var cvRaf = 0;
-    document.addEventListener('contentvisibilityautostatechange', function(){
+    document.addEventListener('contentvisibilityautostatechange', function(e){
+      /* Gerendert ist gerendert (CSS .cv-kept, S10): kein zweites Layout beim
+         Wiederkehren. */
+      if (!e.skipped && e.target.tagName === 'SECTION') e.target.classList.add('cv-kept');
       cancelAnimationFrame(cvRaf); cvRaf = requestAnimationFrame(function(){ measure(); sync(); });
     }, true);
     addEventListener('scroll', sync, { passive: true });

@@ -147,8 +147,11 @@
         entries.forEach(function (e) { if (e.isIntersecting) under.add(e.target); else under.delete(e.target); });
         top.classList.toggle('yield', under.size > 0);
       }, { rootMargin: -Math.max(0, Math.round(r.top - 16)) + 'px 0px 0px ' + -Math.max(0, Math.round(r.left - 8)) + 'px' });
+      /* The landing page's install pill floats in the same band; it is the
+         other capsule, not something underneath to press (they take turns,
+         index.html: html.pill-end). */
       Array.prototype.forEach.call(document.querySelectorAll(CONTROLS), function (el) {
-        if (el !== top && !top.contains(el)) cornerObs.observe(el);
+        if (el !== top && !top.contains(el) && !el.classList.contains('mobile-cta')) cornerObs.observe(el);
       });
     };
     watchCorner();

@@ -646,18 +646,26 @@ function localeDirs() {
 }
 
 test('jede referenzierte Aufnahme hat beide WebP-Ableitungen in allen Sprachordnern', () => {
-  const bases = new Set();
+  // Desktopaufnahmen im grossen Slot (`data-shot-profile="lead"` am <img>,
+  // Profil `web-lead` in scripts/build-screenshot-webp.mjs) brauchen dazu die
+  // dritte Stufe @2400.webp (S10) - gelesen je <img>, wie das Build-Skript.
+  const bases = new Map();
   for (const page of PAGES) {
-    for (const m of read(page).matchAll(/(?:src|data-light|data-dark|data-light-m|data-dark-m)="screenshots\/([^"]+\.png)"/g)) {
-      bases.add(m[1]);
+    for (const tag of read(page).matchAll(/<img\b[^>]*>/g)) {
+      const lead = /data-shot-profile="lead"/.test(tag[0]);
+      for (const m of tag[0].matchAll(/(?:src|data-light|data-dark|data-light-m|data-dark-m)="screenshots\/([^"]+\.png)"/g)) {
+        const webLead = lead && !/-mobile\.png$/.test(m[1]);
+        bases.set(m[1], bases.get(m[1]) || webLead);
+      }
     }
   }
   assert.ok(bases.size > 0, 'keine referenzierten Screenshots gefunden - Regex veraltet?');
+  assert.ok([...bases.values()].some(Boolean), 'keine Desktopaufnahme im grossen Slot gefunden - Profil veraltet?');
 
   const missing = [];
-  for (const base of bases) {
+  for (const [base, webLead] of bases) {
     for (const dir of localeDirs()) {
-      for (const suffix of ['.webp', '@1x.webp']) {
+      for (const suffix of webLead ? ['.webp', '@1x.webp', '@2400.webp'] : ['.webp', '@1x.webp']) {
         const rel = (dir ? `${dir}/` : '') + base.replace(/\.png$/, suffix);
         if (!existsSync(resolve(SHOTS, rel))) missing.push(`screenshots/${rel}`);
       }
@@ -2386,6 +2394,7 @@ function heroDeliveryFindings(html) {
     if (/\b[12]x\b['"]|\s[12]x,|\s[12]x"/.test(code)) found.push(`Hero: Dichte-Deskriptoren (1x/2x) im ${where}`);
   }
   if (!/\+ ?' ' ?\+ ?w\[0\] ?\+ ?'w, '/.test(head) || !/w\[1\] ?\+ ?'w'/.test(head)) found.push('Hero: das Kopfskript schreibt keine Breiten-Deskriptoren (…w)');
+  if (!/'@2400\.webp'\) ?\+ ?' ' ?\+ ?w\[2\] ?\+ ?'w'/.test(head)) found.push('Hero: das Kopfskript bietet die 2400er-Stufe nicht per Breiten-Deskriptor an');
   if (!/rel = 'preload'/.test(head) || !/imagesrcset/.test(head) || !/imagesizes/.test(head)) found.push('Hero: kein Preload mit imagesrcset/imagesizes im Kopfskript');
   if (!/i\.sizes ?= ?H\.sizes/.test(inline) || !/i\.srcset ?= ?H\.srcset/.test(inline)) found.push('Hero: das Inline-Skript uebernimmt srcset/sizes des Kopfskripts nicht');
   const sizes = (head.match(/sizes: '([^']+)'/) || [])[1];
@@ -2396,7 +2405,7 @@ function heroDeliveryFindings(html) {
     const v = (img.match(new RegExp(`\\b${attr}="([^"]+)"`)) || [])[1];
     if (!stem || v !== `${stem}${file}.png`) found.push(`Hero: ${attr}="${v}" passt nicht zum Pfad im Kopfskript (${stem}${file}.png)`);
   }
-  if (!/\bsrcset="[^"]*\b700w, [^"]*\b1400w"/.test(noscript) || !/\bsizes="/.test(noscript)) found.push('Hero: noscript-Kopie ohne Breiten-srcset und sizes');
+  if (!/\bsrcset="[^"]*\b700w, [^"]*\b1400w, [^"]*@2400\.webp 2400w"/.test(noscript) || !/\bsizes="/.test(noscript)) found.push('Hero: noscript-Kopie ohne Breiten-srcset und sizes');
   return found;
 }
 
@@ -3646,8 +3655,11 @@ function rhythmFindings(pages, siteCss, siteJs) {
     if (/toTop/.test(scripts)) found.push(`${page}: schaltet den Nach-oben-Knopf selbst (gehoert nach site.js)`);
   }
   if (!/getElementById\('toTop'\)/.test(siteJs)) found.push('site.js: schaltet den Nach-oben-Knopf nicht');
+  // Seit S10 verborgen per visibility statt display (er blendet und federt
+  // ein, und site.js misst seine Ecke) und nur, solange die Pille das Band
+  // haelt: am Seitenende (html.pill-end, index.html) uebernimmt er.
   const phoneHide = [...eachRule(siteCss)].some((r) => r.at.some((a) => /max-width:\s*700px/.test(a))
-    && /\.mobile-cta\)\s*\.to-top/.test(r.selector) && /display:\s*none/.test(r.body));
+    && /\.mobile-cta\)\s*\.to-top/.test(r.selector) && /display:\s*none|visibility:\s*hidden/.test(r.body));
   if (!phoneHide) found.push('site.css: am Telefon schwebt der Nach-oben-Knopf neben der Install-Pille (zwei Pillen)');
   return found;
 }
@@ -3680,7 +3692,7 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.notDeepEqual(own, pages);
   assert.ok(hit(rhythmFindings(own, css, js), /privacy\.html: schaltet den Nach-oben-Knopf selbst/));
   // Zwei Pillen am Telefon.
-  const two = css.replace('body:has(.mobile-cta) .to-top { display: none; }', '');
+  const two = css.replace(/html:not\(\.pill-end\) body:has\(\.mobile-cta\) \.to-top \{[^}]*\}/, '');
   assert.notEqual(two, css);
   assert.ok(hit(rhythmFindings(pages, two, js), /zwei Pillen/));
   // Eine Seite legt den Knopf wieder selbst an.
@@ -3860,4 +3872,93 @@ test('der Sprachzahl-Guard erkennt den Schaden, gegen den er gebaut ist', () => 
   assert.match(languageCountFindings(stale, read(INSTALL)).join(), /Proof-Leiste nennt 26 Sprachen/);
   const install = read(INSTALL).replace(/\d+ Sprachen\b/, '3 Sprachen');
   assert.match(languageCountFindings(index, install).join(), /der Installer nennt 3 Sprachen/);
+});
+
+// ── (23) Retina-Stufe der grossen Aufnahmen: nur nach Breite, nie fuer DPR 1 ──
+
+/**
+ * Slotbreite in CSS-Pixeln, die ein sizes-Attribut bei Viewportbreite `vw`
+ * ergibt, oder null, wenn ein Eintrag nicht auswertbar ist. Kennt genau die
+ * Formen der Seite: (max-width|min-width: Npx) [and ...], Npx, Nvw,
+ * calc(100vw - Npx).
+ */
+function slotWidth(sizes, vw) {
+  for (const raw of sizes.split(/,(?![^(]*\))/).map((x) => x.trim())) {
+    const m = raw.match(/^((?:\((?:max|min)-width:\s*\d+px\)\s*(?:and\s*)?)*)(.+)$/);
+    if (!m) return null;
+    const ok = [...m[1].matchAll(/\((max|min)-width:\s*(\d+)px\)/g)]
+      .every(([, kind, n]) => (kind === 'max' ? vw <= Number(n) : vw >= Number(n)));
+    if (!ok) continue;
+    const len = m[2].trim();
+    let v;
+    if ((v = len.match(/^(\d+(?:\.\d+)?)px$/))) return Number(v[1]);
+    if ((v = len.match(/^(\d+(?:\.\d+)?)vw$/))) return (vw * Number(v[1])) / 100;
+    if ((v = len.match(/^calc\(100vw - (\d+)px\)$/))) return vw - Number(v[1]);
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Die dritte Stufe (@2400.webp, S10) holt die Desktopaufnahme im grossen Slot
+ * fuer Retina-Schirme ab. Sie darf nur ueber einen Breiten-Deskriptor
+ * erreichbar sein, und kein Slot darf bei DPR 1 breiter werden als die
+ * 1400er-Stufe - sonst laedt ein normaler Bildschirm die doppelte Datei.
+ * Dazu muessen die Breiten der Seite (SHOT_W.webLead, Hero-Kopfskript) die
+ * des Build-Skripts sein: eine Abweichung laesst den Browser nach einer Datei
+ * waehlen, die eine andere Breite hat, als ihr Deskriptor behauptet.
+ */
+function retinaTierFindings(html, build) {
+  const found = [];
+  const b = build.match(/'web-lead':\s*\{\s*xl:\s*(\d+),\s*'2x':\s*(\d+),\s*'1x':\s*(\d+)\s*\}/);
+  if (!b) return ['build-screenshot-webp.mjs: Profil web-lead nicht gefunden - Muster veraltet?'];
+  const tiers = [b[3], b[2], b[1]].map(Number);
+  const page = (html.match(/webLead:\s*\[(\d+),\s*(\d+),\s*(\d+)\]/) || []).slice(1).map(Number);
+  if (page.join() !== tiers.join()) found.push(`SHOT_W.webLead (${page.join('/')}) weicht vom Build-Skript ab (${tiers.join('/')})`);
+  const head = (heroHeadScript(html).match(/w = n \? \[[^\]]*\] : \[(\d+),\s*(\d+),\s*(\d+)\]/) || []).slice(1).map(Number);
+  if (head.join() !== tiers.join()) found.push(`Hero-Kopfskript (${head.join('/')}) weicht vom Build-Skript ab (${tiers.join('/')})`);
+  // Code und Markup (Pfad oder String-Literal), keine Kommentare.
+  for (const m of html.matchAll(/(?<=['-]web|')@2400\.webp/g)) {
+    const after = html.slice(m.index, m.index + 40);
+    if (!/^@2400\.webp(?:'\) ?\+ ?' ' ?\+ ?w\[2\] ?\+ ?'w'| 2400w)/.test(after)) found.push(`@2400.webp ohne Breiten-Deskriptor: "${after}"`);
+  }
+  let leads = 0;
+  for (const tag of html.matchAll(/<img\b[^>]*>/g)) {
+    if (!/data-shot-profile="lead"/.test(tag[0]) || !/data-light="screenshots\/[^"]+-web\.png"/.test(tag[0])) continue;
+    leads++;
+    const sizes = (tag[0].match(/\bdata-sizes="([^"]+)"/) || [])[1];
+    const name = (tag[0].match(/data-light="screenshots\/([^"]+)"/) || [])[1];
+    if (!sizes) { found.push(`${name}: grosser Slot ohne data-sizes - der Browser nimmt 100vw an`); continue; }
+    let max = 0;
+    for (let vw = 320; vw <= 3840; vw++) {
+      const w = slotWidth(sizes, vw);
+      if (w === null) { found.push(`${name}: sizes nicht auswertbar ("${sizes}")`); max = -1; break; }
+      max = Math.max(max, w);
+    }
+    if (max > tiers[1]) found.push(`${name}: Slot bis ${Math.round(max)}px - bei DPR 1 laedt das die ${tiers[2]}er-Stufe statt ${tiers[1]}`);
+  }
+  if (!leads) found.push('keine Desktopaufnahme im grossen Slot gefunden - Muster veraltet?');
+  return found;
+}
+
+const BUILD_WEBP = () => readFileSync(resolve(ROOT, 'scripts/build-screenshot-webp.mjs'), 'utf8');
+
+test('index.html: die 2400er-Stufe erreicht nur Retina-Schirme, nach Breite gewaehlt', () => {
+  assert.deepEqual(retinaTierFindings(read('index.html'), BUILD_WEBP()), []);
+});
+
+test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Ohne sizes-Grenze (100vw) wuerde ein 1920er-Schirm bei DPR 1 die 2400er-Datei ziehen.
+  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw"', 'data-sizes="100vw"');
+  assert.notEqual(wide, html);
+  assert.match(retinaTierFindings(wide, BUILD_WEBP()).join(), /bei DPR 1 laedt das die 2400er-Stufe/);
+  // Dichte- statt Breiten-Deskriptor.
+  const dense = html.replace("'@2400.webp') + ' ' + w[2] + 'w'", "'@2400.webp') + ' 2x'");
+  assert.notEqual(dense, html);
+  assert.match(retinaTierFindings(dense, BUILD_WEBP()).join(), /@2400\.webp ohne Breiten-Deskriptor/);
+  // Breiten-Drift zwischen Build-Skript und Seite.
+  const drift = BUILD_WEBP().replace("xl: 2400", "xl: 2300");
+  assert.match(retinaTierFindings(html, drift).join(), /SHOT_W\.webLead .* weicht vom Build-Skript ab/);
+  assert.equal(slotWidth('(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, 1150px', 400), 350);
 });

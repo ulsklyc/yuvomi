@@ -273,9 +273,18 @@
      under it. */
   --float-band: 84px;
 
-  /* One curve, one name. Exponential ease-out: nothing here is a glass
-     element, and overshoot on a hover reads as wobble. */
+  /* Exponential ease-out for everything that fades, slides or hovers:
+     overshoot on a hover reads as wobble. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The app's spring (tokens.css, --ease-glass, with --duration-xl as in
+     --transition-glass), S10. Only for the capsules' transform: a pressed
+     .btn/.nav-btn/.to-top/install pill springs back with a small overshoot,
+     and the floating pills arrive with it. The press itself stays on
+     --dur-press/--ease-out, so the finger gets an immediate answer; the
+     spring is the release. Never on opacity or colour (an overshoot there is
+     clipped and reads as a flash), and gone under reduced motion. */
+  --ease-glass: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-spring: 300ms;       /* --duration-xl */
 
   /* Motion steps, from the app's ladder (tokens.css, --duration-*): a press
      answers in --duration-xs, a hover in --duration-sm, an arriving block in
@@ -503,10 +512,12 @@
   min-height: 48px; padding: 14px 26px; border: 1.5px solid transparent; border-radius: var(--r-full);
   font-family: var(--ff); font-size: var(--fs-body); font-weight: 600; line-height: 1.4;
   white-space: nowrap; text-decoration: none; cursor: pointer;
-  transition: background-color var(--dur-hover), border-color var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-hover), border-color var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover), transform var(--dur-spring) var(--ease-glass);
 }
 .btn:hover { text-decoration: none; }
-.btn:active { transform: scale(var(--press-lg)); }
+/* Pressing in answers fast (the transition of the state being entered
+   applies); letting go runs the base rule's spring (--ease-glass). */
+.btn:active { transform: scale(var(--press-lg)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
 .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .btn-primary { background: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
 .btn-primary:hover { background: var(--accent-fill-hover); color: var(--accent-ink); box-shadow: var(--shadow-md); }
@@ -521,10 +532,10 @@
   padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-full);
   background: none; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap;
   font-family: var(--ff); font-size: var(--fs-meta); font-weight: 600;
-  transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-press) var(--ease-out);
+  transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-spring) var(--ease-glass);
 }
 .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
-.nav-btn:active { transform: scale(var(--press-sm)); }
+.nav-btn:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
 .nav-btn svg { width: 16px; height: 16px; }
 
 /* ===== The bar's controls ===============================================
@@ -679,17 +690,23 @@ html { scroll-padding-bottom: var(--float-band); }
   background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
   border-radius: var(--r-full); box-shadow: var(--shadow-md); font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; text-decoration: none;
   opacity: 0; visibility: hidden; transform: translateY(8px);
-  transition: opacity .2s var(--ease-out), transform .2s var(--ease-out), visibility .2s, border-color var(--dur-hover); }
+  transition: opacity .2s var(--ease-out), transform var(--dur-spring) var(--ease-glass), visibility .2s, border-color var(--dur-hover); }
 .to-top.show { opacity: 1; visibility: visible; transform: none; }
 /* Something to press lies under the pill (S8): a copy button, a tab, a
    summary row. It steps aside until that control has scrolled past, rather
    than covering it (assets/site.js, "BACK TO TOP"). Focus keeps it. */
 .to-top.show.yield:not(:focus-visible) { opacity: 0; visibility: hidden; transform: translateY(8px); }
-.to-top.show:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); }
+.to-top.show:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
 .to-top:hover { color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
 .to-top svg { width: 15px; height: 15px; }
 @media (max-width: 700px) {
-  body:has(.mobile-cta) .to-top { display: none; }
+  /* index.html: hidden while the install pill holds the band - but at the
+     end of the page, where the pill yields to the closing card and the
+     footer (html.pill-end, index.html), back to top takes the band over.
+     One floating capsule at a time (S10).
+     Hidden by visibility rather than display, so it fades and springs in
+     like everywhere else and site.js can measure its corner. */
+  html:not(.pill-end) body:has(.mobile-cta) .to-top { opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(8px); }
 }
 /* Under reduced motion the controls keep their colour feedback and lose
    only the travel and the press: no shrink, no slide. */
