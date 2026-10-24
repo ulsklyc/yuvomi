@@ -3594,9 +3594,7 @@
         "displayNameLabel": "Відображуване ім’я",
         "displayNamePlaceholder": "Іван Іваненко",
         "passwordLabel": "Пароль",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Підтвердьте пароль",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Створити обліковий запис",
         "creating": "Створення…",
         "errorPasswordMismatch": "Паролі не збігаються.",
@@ -3605,7 +3603,8 @@
         "errorUsernameTaken": "Це ім’я користувача вже зайняте.",
         "errorGeneric": "Не вдалося створити обліковий запис. Спробуйте ще раз.",
         "showPassword": "Показати пароль",
-        "hidePassword": "Сховати пароль"
+        "hidePassword": "Сховати пароль",
+        "errorRequired": "Заповніть це поле - потрібні всі поля."
     },
     "install": {
         "title": "Встановити Yuvomi",
@@ -6916,6 +6915,7 @@
         "labelHint": "Допоможе згодом розпізнати, про який пристрій ідеться.",
         "submit": "Підключити",
         "failed": "Цей код підключення недійсний.",
-        "codeRequired": "Введіть код сполучення з налаштувань."
+        "codeRequired": "Введіть код сполучення з налаштувань.",
+        "codeLength": "Код спарювання має десять символів. Перевірте, чи немає зайвого або пропущеного."
     }
 }

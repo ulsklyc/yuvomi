@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Nombre visible",
         "displayNamePlaceholder": "Juan Pérez",
         "passwordLabel": "Contraseña",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Confirmar contraseña",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Crear cuenta",
         "creating": "Creando…",
         "errorPasswordMismatch": "Las contraseñas no coinciden.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Este nombre de usuario ya está en uso.",
         "errorGeneric": "No se pudo crear la cuenta. Inténtalo de nuevo.",
         "showPassword": "Mostrar contraseña",
-        "hidePassword": "Ocultar contraseña"
+        "hidePassword": "Ocultar contraseña",
+        "errorRequired": "Rellena este campo: todos los campos son necesarios."
     },
     "install": {
         "title": "Instalar Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Ayuda a reconocer más tarde de qué dispositivo se trata.",
         "submit": "Vincular",
         "failed": "Este código de vinculación no es válido.",
-        "codeRequired": "Introduce el código de emparejamiento que aparece en Ajustes."
+        "codeRequired": "Introduce el código de emparejamiento que aparece en Ajustes.",
+        "codeLength": "El código de vinculación tiene diez caracteres. Comprueba si falta o sobra alguno."
     }
 }

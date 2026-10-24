@@ -3700,9 +3700,7 @@
         "displayNameLabel": "الاسم الظاهر",
         "displayNamePlaceholder": "محمد أحمد",
         "passwordLabel": "كلمة المرور",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "تأكيد كلمة المرور",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "إنشاء حساب",
         "creating": "جارٍ الإنشاء…",
         "errorPasswordMismatch": "كلمتا المرور غير متطابقتين.",
@@ -3711,7 +3709,8 @@
         "errorUsernameTaken": "اسم المستخدم هذا مستخدم بالفعل.",
         "errorGeneric": "تعذّر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
         "showPassword": "إظهار كلمة المرور",
-        "hidePassword": "إخفاء كلمة المرور"
+        "hidePassword": "إخفاء كلمة المرور",
+        "errorRequired": "يُرجى ملء هذا الحقل - كل الحقول مطلوبة."
     },
     "install": {
         "title": "تثبيت Yuvomi",
@@ -7076,6 +7075,7 @@
         "labelHint": "يساعد لاحقًا على معرفة الجهاز المقصود.",
         "submit": "اقتران",
         "failed": "رمز الاقتران هذا غير صالح.",
-        "codeRequired": "أدخل رمز الاقتران المعروض في الإعدادات."
+        "codeRequired": "أدخل رمز الاقتران المعروض في الإعدادات.",
+        "codeLength": "يتكون رمز الاقتران من عشرة أحرف. تحقق مما إذا كان هناك حرف ناقص أو زائد."
     }
 }

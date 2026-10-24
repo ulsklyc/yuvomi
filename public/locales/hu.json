@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Megjelenítendő név",
         "displayNamePlaceholder": "Kovács János",
         "passwordLabel": "Jelszó",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Jelszó megerősítése",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Fiók létrehozása",
         "creating": "Létrehozás…",
         "errorPasswordMismatch": "A jelszavak nem egyeznek.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Ez a felhasználónév már foglalt.",
         "errorGeneric": "A fiók létrehozása sikertelen. Kérjük, próbálja újra.",
         "showPassword": "Jelszó megjelenítése",
-        "hidePassword": "Jelszó elrejtése"
+        "hidePassword": "Jelszó elrejtése",
+        "errorRequired": "Töltsd ki ezt a mezőt - minden mező kötelező."
     },
     "install": {
         "title": "Yuvomi telepítése",
@@ -6598,6 +6597,7 @@
         "labelHint": "Segít később felismerni, melyik eszközről van szó.",
         "submit": "Párosítás",
         "failed": "Ez a párosítókód nem érvényes.",
-        "codeRequired": "Add meg a beállításokban látható párosítási kódot."
+        "codeRequired": "Add meg a beállításokban látható párosítási kódot.",
+        "codeLength": "A párosítókód tíz karakterből áll. Ellenőrizd, nem hiányzik-e vagy nincs-e több."
     }
 }

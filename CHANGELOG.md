@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Sign-in and first setup point at the field that needs fixing.** A missing username, a too
+  short password or passwords that do not match now show their message right under that field,
+  and the cursor moves there. Wrong credentials put the message and the cursor on the password,
+  which is selected for retyping. The setup form no longer shows dots as placeholders that
+  looked already filled in, and focuses the first field on a computer. Pairing a wall tablet
+  shows the app mark like the other sign-in pages and checks the ten characters before trying,
+  so a mistyped code no longer uses up an attempt. The offline page names the home server
+  instead of the internet connection.
 - **The change history shows your version, not every version.** "What's new" now lists the
   release you run, an available update and what arrived since you last looked, followed by a
   link to the full history on GitHub that says it is in English. Before, every release since

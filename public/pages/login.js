@@ -7,7 +7,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, showAuthError } from '/utils/auth-ui.js';
 
 const VERSION_URL = '/api/v1/version';
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -211,14 +211,14 @@ export async function render(container) {
     passwordInput.setAttribute('aria-invalid', String(!password));
 
     if (!username || !password) {
-      // Nicht nur rote Rahmen: einen angesagten Grund nennen (auch für SR).
-      showError(errorEl, t('login.fillAllFields'));
-      if (!username) usernameInput.focus();
-      else passwordInput.focus();
+      // Nicht nur rote Rahmen: einen angesagten Grund nennen (auch für SR) -
+      // am ersten leeren Feld, mit dem Fokus dort (R23 D14, showAuthError).
+      showAuthError(errorEl, t('login.fillAllFields'), !username ? usernameInput : passwordInput);
       return;
     }
 
     const labelEl = submitBtn.querySelector('.auth-btn__label');
+    let pendingError = null;
 
     submitBtn.disabled = true;
     usernameInput.disabled = true;
@@ -269,7 +269,6 @@ export async function render(container) {
       // liest, versucht es weiter, statt sich an seine Verwaltung zu wenden.
       else if (err.status === 403) message = t('login.accountCannotSignIn');
       else message = t('login.networkError');
-      showError(errorEl, message);
 
       if (err.status === 401) {
         // Beide Felder markieren (welches falsch ist, verrät der Server aus
@@ -282,15 +281,23 @@ export async function render(container) {
         if (forgot && !forgot.hidden) forgot.classList.add('auth-form__forgot--emphasis');
       }
 
-      // Fokus auf die Fehlermeldung, damit auch sehende Tastaturnutzer sie
-      // bemerken (nicht nur Screenreader über role="alert").
-      errorEl.focus();
+      // DIE MELDUNG STEHT AM PASSWORT, DER FOKUS AUCH (R23 D14, Critique G6
+      // P3). Bei falschen Zugangsdaten ist das Passwort das Feld, das man neu
+      // tippt (welches falsch ist, sagt der Server nicht); der Fokus lag auf
+      // dem Kasten unter dem Formular. Sperre und Verbindung gehoeren keinem
+      // Feld - dort steht die Meldung vor dem Knopf und nimmt den Fokus.
+      // `finally` gibt die Felder erst danach wieder frei: der Fokus folgt dort.
+      pendingError = { message, field: err.status === 401 ? passwordInput : null };
     } finally {
       submitBtn.disabled = false;
       usernameInput.disabled = false;
       passwordInput.disabled = false;
       labelEl.textContent = t('login.loginButton');
       spinner.remove();
+      if (pendingError) {
+        showAuthError(errorEl, pendingError.message, pendingError.field);
+        pendingError.field?.select?.();
+      }
     }
   });
 

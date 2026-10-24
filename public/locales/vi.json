@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Tên hiển thị",
         "displayNamePlaceholder": "Nguyễn Văn A",
         "passwordLabel": "Mật khẩu",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Xác nhận mật khẩu",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Tạo tài khoản",
         "creating": "Đang tạo…",
         "errorPasswordMismatch": "Mật khẩu không khớp.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Tên người dùng này đã được sử dụng.",
         "errorGeneric": "Không thể tạo tài khoản. Vui lòng thử lại.",
         "showPassword": "Hiện mật khẩu",
-        "hidePassword": "Ẩn mật khẩu"
+        "hidePassword": "Ẩn mật khẩu",
+        "errorRequired": "Vui lòng điền trường này - cần điền tất cả các trường."
     },
     "install": {
         "title": "Cài đặt Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Giúp nhận ra sau này đây là thiết bị nào.",
         "submit": "Ghép nối",
         "failed": "Mã ghép nối này không hợp lệ.",
-        "codeRequired": "Nhập mã ghép nối hiển thị trong Cài đặt."
+        "codeRequired": "Nhập mã ghép nối hiển thị trong Cài đặt.",
+        "codeLength": "Mã ghép nối có mười ký tự. Kiểm tra xem có thiếu hay thừa ký tự nào không."
     }
 }

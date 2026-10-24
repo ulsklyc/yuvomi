@@ -3402,9 +3402,7 @@
         "displayNameLabel": "표시 이름",
         "displayNamePlaceholder": "홍길동",
         "passwordLabel": "비밀번호",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "비밀번호 확인",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "계정 만들기",
         "creating": "생성 중 …",
         "errorPasswordMismatch": "비밀번호가 일치하지 않습니다.",
@@ -3413,7 +3411,8 @@
         "errorUsernameTaken": "이미 사용 중인 사용자 이름입니다.",
         "errorGeneric": "계정을 만들지 못했습니다. 다시 시도해 주세요.",
         "showPassword": "비밀번호 표시",
-        "hidePassword": "비밀번호 숨기기"
+        "hidePassword": "비밀번호 숨기기",
+        "errorRequired": "이 항목을 입력해 주세요. 모든 항목이 필요합니다."
     },
     "install": {
         "title": "Yuvomi 설치",
@@ -6598,6 +6597,7 @@
         "labelHint": "나중에 어떤 기기인지 알아보는 데 도움이 됩니다.",
         "submit": "페어링",
         "failed": "이 페어링 코드는 유효하지 않습니다.",
-        "codeRequired": "설정에 표시된 페어링 코드를 입력하세요."
+        "codeRequired": "설정에 표시된 페어링 코드를 입력하세요.",
+        "codeLength": "페어링 코드는 10자입니다. 빠지거나 더 들어간 글자가 없는지 확인하세요."
     }
 }

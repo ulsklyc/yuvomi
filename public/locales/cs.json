@@ -3490,9 +3490,7 @@
         "displayNameLabel": "Zobrazované jméno",
         "displayNamePlaceholder": "Jan Novák",
         "passwordLabel": "Heslo",
-        "passwordPlaceholder": "········",
         "confirmPasswordLabel": "Potvrdit heslo",
-        "confirmPasswordPlaceholder": "········",
         "submitButton": "Vytvořit účet",
         "creating": "Vytváření …",
         "errorPasswordMismatch": "Hesla se neshodují.",
@@ -3501,7 +3499,8 @@
         "errorUsernameTaken": "Toto uživatelské jméno je již obsazeno.",
         "errorGeneric": "Účet se nepodařilo vytvořit. Zkuste to prosím znovu.",
         "showPassword": "Zobrazit heslo",
-        "hidePassword": "Skrýt heslo"
+        "hidePassword": "Skrýt heslo",
+        "errorRequired": "Vyplňte prosím toto pole - všechna pole jsou povinná."
     },
     "install": {
         "title": "Nainstalovat Yuvomi",
@@ -6763,6 +6762,7 @@
         "labelHint": "Pomůže později poznat, o které zařízení jde.",
         "submit": "Spárovat",
         "failed": "Tento párovací kód neplatí.",
-        "codeRequired": "Zadej párovací kód zobrazený v nastavení."
+        "codeRequired": "Zadej párovací kód zobrazený v nastavení.",
+        "codeLength": "Párovací kód má deset znaků. Zkontrolujte, zda některý nechybí nebo nepřebývá."
     }
 }

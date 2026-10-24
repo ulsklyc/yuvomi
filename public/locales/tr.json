@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Görünen ad",
         "displayNamePlaceholder": "Ali Yılmaz",
         "passwordLabel": "Parola",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Parolayı onayla",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Hesap oluştur",
         "creating": "Oluşturuluyor…",
         "errorPasswordMismatch": "Parolalar eşleşmiyor.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Bu kullanıcı adı zaten alınmış.",
         "errorGeneric": "Hesap oluşturulamadı. Lütfen tekrar deneyin.",
         "showPassword": "Parolayı göster",
-        "hidePassword": "Parolayı gizle"
+        "hidePassword": "Parolayı gizle",
+        "errorRequired": "Lütfen bu alanı doldur - tüm alanlar gerekli."
     },
     "install": {
         "title": "Yuvomi'u Yükle",
@@ -6598,6 +6597,7 @@
         "labelHint": "Daha sonra hangi cihaz olduğunu anlamana yardımcı olur.",
         "submit": "Eşleştir",
         "failed": "Bu eşleştirme kodu geçerli değil.",
-        "codeRequired": "Ayarlarda gösterilen eşleştirme kodunu girin."
+        "codeRequired": "Ayarlarda gösterilen eşleştirme kodunu girin.",
+        "codeLength": "Eşleştirme kodu on karakterlidir. Eksik ya da fazla karakter olup olmadığını kontrol et."
     }
 }

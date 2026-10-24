@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Display name",
         "displayNamePlaceholder": "John Doe",
         "passwordLabel": "Password",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Confirm password",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Create account",
         "creating": "Creating…",
         "errorPasswordMismatch": "The passwords do not match.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "This username is already taken.",
         "errorGeneric": "Could not create the account. Please try again.",
         "showPassword": "Show password",
-        "hidePassword": "Hide password"
+        "hidePassword": "Hide password",
+        "errorRequired": "Please fill in this field - every field is needed."
     },
     "install": {
         "title": "Install Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Helps you recognise later which device this is.",
         "submit": "Pair",
         "failed": "This pairing code is not valid.",
-        "codeRequired": "Enter the pairing code shown in Settings."
+        "codeRequired": "Enter the pairing code shown in Settings.",
+        "codeLength": "The pairing code has ten characters. Check whether one is missing or extra."
     }
 }

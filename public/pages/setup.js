@@ -8,7 +8,7 @@
 import { auth, ApiError } from '/api.js';
 import { getLocale, t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError, showAuthError } from '/utils/auth-ui.js';
 import { browserTimeZone } from '/utils/timezone.js';
 
 const VERSION_URL = '/api/v1/version';
@@ -55,14 +55,14 @@ export async function render(container) {
             <label class="label" for="password">${esc(t('setup.passwordLabel'))}</label>
             <input class="input" type="password" id="password" name="password"
               autocomplete="new-password" minlength="8" aria-describedby="setup-password-rule"
-              placeholder="${esc(t('setup.passwordPlaceholder'))}" required />
+              required />
             ${passwordRuleHtml('setup-password-rule', t('common.passwordMinLength'))}
           </div>
           <div class="form-group">
             <label class="label" for="confirm_password">${esc(t('setup.confirmPasswordLabel'))}</label>
             <input class="input" type="password" id="confirm_password" name="confirm_password"
               autocomplete="new-password"
-              placeholder="${esc(t('setup.confirmPasswordPlaceholder'))}" required />
+              required />
           </div>
           ${authErrorHtml('setup-error')}
           <button type="submit" class="btn btn--primary auth-form__submit" id="setup-btn">
@@ -88,6 +88,12 @@ export async function render(container) {
 
   setAppBranding(storedAppName);
 
+  // Der erste Schritt ohne Klick (R23 S10, Critique G6 P2), wie die Anmeldung:
+  // nur auf Zeigegeraeten - am Telefon riss der Fokus sofort die Tastatur hoch.
+  if (window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
+    form.querySelector('#username')?.focus();
+  }
+
   fetch(VERSION_URL, { cache: 'no-store' })
     .then((r) => r.json())
     .then((d) => {
@@ -108,28 +114,26 @@ export async function render(container) {
     const password = form.password.value;
     const confirm = form.confirm_password.value;
 
-    // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js,
-    // flagField): aria-invalid und ein Verweis auf die Meldung.
+    // Jede Pruefung markiert das Feld, das sie meint, die Meldung steht an
+    // ihm und der Fokus geht hin (R23 D14, showAuthError). Leere Felder: alle
+    // markiert, Meldung und Fokus am ersten. Vorher hiess das "Account konnte
+    // nicht erstellt werden" - als waere etwas schiefgegangen.
     if (!username || !displayName || !password) {
-      if (!username) flagField(form.username, errorEl);
-      if (!displayName) flagField(form.display_name, errorEl);
-      if (!password) flagField(form.password, errorEl);
-      showError(errorEl, t('setup.errorGeneric'));
+      const empty = [!username && form.username, !displayName && form.display_name, !password && form.password].filter(Boolean);
+      for (const field of empty.slice(1)) flagField(field, errorEl);
+      showAuthError(errorEl, t('setup.errorRequired'), empty[0]);
       return;
     }
     if (!USERNAME_RE.test(username)) {
-      flagField(form.username, errorEl);
-      showError(errorEl, t('setup.errorUsernameInvalid'));
+      showAuthError(errorEl, t('setup.errorUsernameInvalid'), form.username);
       return;
     }
     if (password.length < 8) {
-      flagField(form.password, errorEl);
-      showError(errorEl, t('setup.errorPasswordTooShort'));
+      showAuthError(errorEl, t('setup.errorPasswordTooShort'), form.password);
       return;
     }
     if (password !== confirm) {
-      flagField(form.confirm_password, errorEl);
-      showError(errorEl, t('setup.errorPasswordMismatch'));
+      showAuthError(errorEl, t('setup.errorPasswordMismatch'), form.confirm_password);
       return;
     }
 
@@ -170,16 +174,15 @@ export async function render(container) {
       window.yuvomi.navigate('/', result.user);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        flagField(form.username, errorEl);
-        showError(errorEl, t('setup.errorUsernameTaken'));
+        showAuthError(errorEl, t('setup.errorUsernameTaken'), form.username);
       } else if (err instanceof ApiError && err.status === 403) {
         // Setup wurde zwischenzeitlich abgeschlossen
         window.yuvomi.navigate('/login');
         return;
       } else if (err instanceof ApiError && err.status === 429) {
-        showError(errorEl, t('login.tooManyAttempts'));
+        showAuthError(errorEl, t('login.tooManyAttempts'));
       } else {
-        showError(errorEl, t('setup.errorGeneric'));
+        showAuthError(errorEl, t('setup.errorGeneric'));
       }
     } finally {
       submitBtn.disabled = false;
@@ -193,7 +196,4 @@ export async function render(container) {
   }
 }
 
-function showError(el, message) {
-  el.textContent = message;
-  el.hidden = false;
-}
+

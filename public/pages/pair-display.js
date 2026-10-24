@@ -18,8 +18,11 @@ import { api } from '/api.js';
 import { clearApiCache } from '/sw-register.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { flagField } from '/utils/auth-ui.js';
+import { authHeroHtml, flagField, showAuthError } from '/utils/auth-ui.js';
 import { errorSentence } from '/utils/friendly-error.js';
+
+// Die Laenge des Kopplungscodes (server/services/display-accounts.js CODE_LENGTH).
+const PAIR_CODE_LENGTH = 10;
 
 function wireLinks(container) {
   container.querySelectorAll('a[data-link]').forEach((a) =>
@@ -30,6 +33,10 @@ export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <main class="auth-page" id="main-content">
+      ${/* DIE MARKE WIE AUF JEDER AUTH-SEITE (R23 S10, Critique G6 P3
+            "Kopfvarianten"): Einladung und Reset tragen sie ueber der Karte,
+            die Kopplung stand als einzige ohne. */ ''}
+      ${authHeroHtml({ heading: false })}
       <div class="auth-card card card--padded">
         <h1 class="auth-card__title">${esc(t('pairDisplay.title'))}</h1>
         <p class="auth-card__intro">${esc(t('pairDisplay.intro'))}</p>
@@ -72,10 +79,15 @@ export async function render(container) {
     // KEINE BROWSER-BLASE (Critique R21): `novalidate`; das leere Pflichtfeld
     // sagt das eine Fehlerfeld der Seite, und das Feld traegt den Bezug.
     if (!code) {
-      flagField(codeEl, errorEl);
-      errorEl.textContent = t('pairDisplay.codeRequired');
-      errorEl.hidden = false;
-      codeEl.focus();
+      showAuthError(errorEl, t('pairDisplay.codeRequired'), codeEl);
+      return;
+    }
+    // DIE LAENGE VOR DEM VERSUCH (R23 S10, Critique G1 P3). Der Code hat zehn
+    // Zeichen (Leerzeichen und Bindestriche zaehlen nicht, wie am Server,
+    // normalizePairingCode). Ein vertippter Code ging bis zum Server und kam
+    // als "gilt nicht" zurueck - und kostete einen der fuenf Versuche.
+    if (code.replace(/[\s-]/g, '').length !== PAIR_CODE_LENGTH) {
+      showAuthError(errorEl, t('pairDisplay.codeLength'), codeEl);
       return;
     }
     const btn = form.querySelector('[type=submit]');

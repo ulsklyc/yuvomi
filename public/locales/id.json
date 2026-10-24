@@ -3402,9 +3402,7 @@
         "displayNameLabel": "Nama tampilan",
         "displayNamePlaceholder": "Budi Santoso",
         "passwordLabel": "Kata sandi",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Konfirmasi kata sandi",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Buat akun",
         "creating": "Sedang membuat …",
         "errorPasswordMismatch": "Kata sandi tidak cocok.",
@@ -3413,7 +3411,8 @@
         "errorUsernameTaken": "Nama pengguna ini sudah dipakai.",
         "errorGeneric": "Akun tidak dapat dibuat. Silakan coba lagi.",
         "showPassword": "Tampilkan kata sandi",
-        "hidePassword": "Sembunyikan kata sandi"
+        "hidePassword": "Sembunyikan kata sandi",
+        "errorRequired": "Isi kolom ini - semua kolom diperlukan."
     },
     "install": {
         "title": "Instal Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Membantu mengenali nanti perangkat mana yang dimaksud.",
         "submit": "Pasangkan",
         "failed": "Kode pemasangan ini tidak berlaku.",
-        "codeRequired": "Masukkan kode pemasangan yang ditampilkan di Pengaturan."
+        "codeRequired": "Masukkan kode pemasangan yang ditampilkan di Pengaturan.",
+        "codeLength": "Kode pemasangan terdiri dari sepuluh karakter. Periksa apakah ada yang kurang atau lebih."
     }
 }

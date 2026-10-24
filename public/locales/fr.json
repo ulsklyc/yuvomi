@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Nom affiché",
         "displayNamePlaceholder": "Jean Dupont",
         "passwordLabel": "Mot de passe",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Confirmer le mot de passe",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Créer le compte",
         "creating": "Création…",
         "errorPasswordMismatch": "Les mots de passe ne correspondent pas.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Ce nom d’utilisateur est déjà pris.",
         "errorGeneric": "Impossible de créer le compte. Veuillez réessayer.",
         "showPassword": "Afficher le mot de passe",
-        "hidePassword": "Masquer le mot de passe"
+        "hidePassword": "Masquer le mot de passe",
+        "errorRequired": "Veuillez remplir ce champ - tous les champs sont nécessaires."
     },
     "install": {
         "title": "Installer Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Aide à reconnaître plus tard de quel appareil il s'agit.",
         "submit": "Appairer",
         "failed": "Ce code d'appairage n'est pas valide.",
-        "codeRequired": "Saisis le code d’appairage affiché dans les réglages."
+        "codeRequired": "Saisis le code d’appairage affiché dans les réglages.",
+        "codeLength": "Le code d’appairage compte dix caractères. Vérifiez s’il en manque un ou s’il y en a un de trop."
     }
 }

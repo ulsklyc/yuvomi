@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Visningsnamn",
         "displayNamePlaceholder": "Anna Andersson",
         "passwordLabel": "Lösenord",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Bekräfta lösenord",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Skapa konto",
         "creating": "Skapar…",
         "errorPasswordMismatch": "Lösenorden matchar inte.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Det här användarnamnet är redan upptaget.",
         "errorGeneric": "Det gick inte att skapa kontot. Försök igen.",
         "showPassword": "Visa lösenord",
-        "hidePassword": "Dölj lösenord"
+        "hidePassword": "Dölj lösenord",
+        "errorRequired": "Fyll i det här fältet - alla fält behövs."
     },
     "install": {
         "title": "Installera Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Hjälper dig att senare känna igen vilken enhet som avses.",
         "submit": "Parkoppla",
         "failed": "Den här parkopplingskoden gäller inte.",
-        "codeRequired": "Ange parkopplingskoden som visas i inställningarna."
+        "codeRequired": "Ange parkopplingskoden som visas i inställningarna.",
+        "codeLength": "Parkopplingskoden har tio tecken. Kontrollera om något saknas eller är för mycket."
     }
 }

@@ -4601,6 +4601,15 @@ Die Marke ist die Bildmarke selbst (`utils/brand-mark.js`, 64px, kompakt 48px), 
 Themes dieselbe; der Traeger gibt nur Groesse und Schatten. Der Titel ist ein Large Title
 in Label-Farbe wie jeder Seitentitel. Die Bildmarke ist als Marke gesetzt und unantastbar.
 
+**Der Fehler steht am Feld, der Fokus auch (R23 D14).** Einrichtung, Anmeldung und Koppeln
+melden einen Fehler, der ein Feld meint, unter diesem Feld: dasselbe eine Fehlerfeld
+(`authErrorHtml`, `role="alert"`) zieht dorthin, das Feld wird markiert und bekommt den
+Fokus (`showAuthError` in utils/auth-ui.js). Falsche Zugangsdaten stehen am Passwort (es
+wird markiert und ausgewaehlt); Sperre und Verbindung gehoeren keinem Feld und stehen vor
+dem Knopf. Passwortfelder tragen keine Punkte als Platzhalter (sie wirkten ausgefuellt),
+die Einrichtung sagt „Konto", und die Kopplung traegt die Marke wie jede Auth-Seite und
+prueft die zehn Zeichen vor dem Versuch.
+
 ### Erststart-Rundgang und Fehlerbildschirm (R20, Re-Critique 2026-10-17)
 Der **Rundgang** (dashboard.js `showOnboarding`) beginnt mit der Bildmarke (64px, Traeger
 `.onboarding-mark` wie `.auth-hero__mark`), nicht mit einem Lucide-Zeichen. Nennt ein Schritt

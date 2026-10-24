@@ -207,7 +207,9 @@ test('Befund 15: die Pruefungen der Auth-Seiten markieren ihr Feld', () => {
     const src = read(`../public/pages/${page}.js`);
     assert.match(src, /import \{[^}]*\bflagField\b[^}]*\} from '\/utils\/auth-ui\.js'/, `${page}.js importiert flagField nicht`);
     for (const f of fields) {
-      assert.match(src, new RegExp(`flagField\\((?:form\\.)?${f}\\b`), `${page}.js: kein flagField fuer ${f}`);
+      // R23 D14: die Einrichtung meldet am Feld mit showAuthError (markiert per
+      // flagField und setzt den Fokus) - das zaehlt wie ein flagField.
+      assert.match(src, new RegExp(`(?:flagField\\((?:form\\.)?${f}\\b|showAuthError\\(errorEl, [^\\n]*form\\.${f}\\)|form\\.${f}\\b[^\\n]*\\]\\.filter\\(Boolean\\))`), `${page}.js: kein flagField fuer ${f}`);
     }
   }
 });
@@ -367,4 +369,44 @@ test('/reset-password ohne gueltigen Link: Satz mit naechstem Schritt und Weg zu
       assert.ok(r[key], `${file}: resetPassword.${key} fehlt`);
     }
   }
+});
+
+// R23 D14 (Critique G6 P2/P3): Einrichtung und Anmeldung melden einen Fehler AM
+// Feld und setzen den Fokus dorthin - nicht im Kasten vor dem Knopf.
+test('R23: Feldfehler an Einrichtung und Anmeldung stehen am Feld, mit Fokus', async () => {
+  const { showAuthError } = await import('../public/utils/auth-ui.js');
+  const focused = [];
+  const moved = [];
+  const group = { appendChild: (el) => moved.push(el) };
+  const attrs = new Map();
+  const field = {
+    closest: () => group, focus: () => focused.push('field'), addEventListener() {},
+    setAttribute: (k, v) => attrs.set(k, v), getAttribute: (k) => attrs.get(k) ?? null,
+  };
+  const errorEl = { id: 'e', hidden: true, textContent: '', parentNode: { insertBefore() {} }, nextSibling: null, focus: () => focused.push('box') };
+  showAuthError(errorEl, 'Passt nicht', field);
+  assert.deepEqual(moved, [errorEl], 'die Meldung zieht unter das Feld');
+  assert.deepEqual(focused, ['field'], 'der Fokus geht aufs Feld, nicht auf den Kasten');
+  assert.equal(attrs.get('aria-invalid'), 'true');
+  assert.equal(errorEl.hidden, false);
+  const setup = read('../public/pages/setup.js');
+  assert.doesNotMatch(setup, /setup\.(?:password|confirmPassword)Placeholder/, 'keine Punkte als Platzhalter, die ausgefuellt wirken');
+  assert.match(setup, /showAuthError\(errorEl, t\('setup\.errorPasswordMismatch'\), form\.confirm_password\)/);
+  const login = read('../public/pages/login.js');
+  assert.match(login, /pendingError = \{ message, field: err\.status === 401 \? passwordInput : null \};/, 'falsche Zugangsdaten: am Passwort');
+  assert.doesNotMatch(login, /^\s*errorEl\.focus\(\);/m, 'kein Fokus auf den Kasten mehr');
+  const de = JSON.parse(read('../public/locales/de.json')).setup;
+  assert.doesNotMatch(JSON.stringify(de), /Account/, 'die Einrichtung sagt "Konto"');
+});
+
+// R23 S10 (Critique G1/G6 P3): /pair prueft die Laenge vor dem Versuch und
+// traegt die Marke wie jede Auth-Seite.
+test('R23: /pair prueft die zehn Zeichen vorab und traegt die Marke', () => {
+  const src = read('../public/pages/pair-display.js');
+  assert.match(src, /\$\{authHeroHtml\(\{ heading: false \}\)\}/, 'die Marke ueber der Karte');
+  assert.match(src, /code\.replace\(\/\[\\s-\]\/g, ''\)\.length !== PAIR_CODE_LENGTH/, 'Laenge wie am Server gezaehlt');
+  const server = read('../server/services/display-accounts.js');
+  const serverLen = Number(/const CODE_LENGTH = (\d+);/.exec(server)?.[1]);
+  const clientLen = Number(/const PAIR_CODE_LENGTH = (\d+);/.exec(src)?.[1]);
+  assert.equal(clientLen, serverLen, 'dieselbe Laenge wie der Server');
 });

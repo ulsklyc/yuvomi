@@ -3612,9 +3612,7 @@
         "displayNameLabel": "Nazwa wyświetlana",
         "displayNamePlaceholder": "Jan Kowalski",
         "passwordLabel": "Hasło",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Potwierdź hasło",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Utwórz konto",
         "creating": "Tworzenie…",
         "errorPasswordMismatch": "Hasła nie są zgodne.",
@@ -3623,7 +3621,8 @@
         "errorUsernameTaken": "Ta nazwa użytkownika jest już zajęta.",
         "errorGeneric": "Nie udało się utworzyć konta. Spróbuj ponownie.",
         "showPassword": "Pokaż hasło",
-        "hidePassword": "Ukryj hasło"
+        "hidePassword": "Ukryj hasło",
+        "errorRequired": "Wypełnij to pole - wszystkie pola są wymagane."
     },
     "install": {
         "title": "Zainstaluj Yuvomi",
@@ -6916,6 +6915,7 @@
         "labelHint": "Pomaga później rozpoznać, o które urządzenie chodzi.",
         "submit": "Sparuj",
         "failed": "Ten kod parowania jest nieprawidłowy.",
-        "codeRequired": "Wpisz kod parowania widoczny w ustawieniach."
+        "codeRequired": "Wpisz kod parowania widoczny w ustawieniach.",
+        "codeLength": "Kod parowania ma dziesięć znaków. Sprawdź, czy żadnego nie brakuje i żadnego nie jest za dużo."
     }
 }

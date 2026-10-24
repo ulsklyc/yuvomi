@@ -3384,9 +3384,7 @@
         "displayNameLabel": "表示名",
         "displayNamePlaceholder": "山田太郎",
         "passwordLabel": "パスワード",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "パスワードの確認",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "アカウントを作成",
         "creating": "作成中…",
         "errorPasswordMismatch": "パスワードが一致しません。",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "このユーザー名はすでに使用されています。",
         "errorGeneric": "アカウントを作成できませんでした。もう一度お試しください。",
         "showPassword": "パスワードを表示",
-        "hidePassword": "パスワードを非表示"
+        "hidePassword": "パスワードを非表示",
+        "errorRequired": "この項目を入力してください。すべての項目が必要です。"
     },
     "install": {
         "title": "Yuvomi をインストール",
@@ -6598,6 +6597,7 @@
         "labelHint": "後でどの端末かを見分けるのに役立ちます。",
         "submit": "ペアリング",
         "failed": "このペアリングコードは無効です。",
-        "codeRequired": "設定に表示されているペアリングコードを入力してください。"
+        "codeRequired": "設定に表示されているペアリングコードを入力してください。",
+        "codeLength": "ペアリングコードは10文字です。不足や余分がないか確認してください。"
     }
 }

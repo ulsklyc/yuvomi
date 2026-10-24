@@ -3594,9 +3594,7 @@
         "displayNameLabel": "Отображаемое имя",
         "displayNamePlaceholder": "Иван Иванов",
         "passwordLabel": "Пароль",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Подтвердите пароль",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Создать учётную запись",
         "creating": "Создание…",
         "errorPasswordMismatch": "Пароли не совпадают.",
@@ -3605,7 +3603,8 @@
         "errorUsernameTaken": "Это имя пользователя уже занято.",
         "errorGeneric": "Не удалось создать учётную запись. Попробуйте ещё раз.",
         "showPassword": "Показать пароль",
-        "hidePassword": "Скрыть пароль"
+        "hidePassword": "Скрыть пароль",
+        "errorRequired": "Заполните это поле - нужны все поля."
     },
     "install": {
         "title": "Установить Yuvomi",
@@ -6916,6 +6915,7 @@
         "labelHint": "Поможет позже понять, о каком устройстве идёт речь.",
         "submit": "Подключить",
         "failed": "Этот код подключения недействителен.",
-        "codeRequired": "Введите код сопряжения из настроек."
+        "codeRequired": "Введите код сопряжения из настроек.",
+        "codeLength": "Код сопряжения состоит из десяти символов. Проверьте, нет ли лишнего или пропущенного."
     }
 }

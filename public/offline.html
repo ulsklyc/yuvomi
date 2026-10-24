@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#F5F3ED" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
-  <title>Keine Verbindung – Yuvomi</title>
+  <title>Keine Verbindung - Yuvomi</title>
   <!-- Dieselbe Theme-Entscheidung wie in der App: der gespeicherte Wunsch
        (`yuvomi-theme`) schlaegt die Systemeinstellung und setzt `data-theme` auf
        <html>. Das Skript ist dasselbe, das index.html im Kopf laedt, und es
@@ -178,7 +178,9 @@
       <line x1="12" y1="20" x2="12.01" y2="20"/>
     </svg>
     <h1>Keine Verbindung</h1>
-    <p>Yuvomi ist gerade nicht erreichbar. Bitte prüfe deine Internetverbindung und versuche es erneut.</p>
+    <!-- R23 S10 (clarify): Yuvomi laeuft zu Hause, nicht im Internet - der Satz
+         nennt beide Ursachen, die es sein koennen (wie login.networkError). -->
+    <p>Yuvomi ist gerade nicht erreichbar. Prüfe, ob dein Gerät im Netz ist und der Server läuft, und versuche es erneut.</p>
     <!-- EIN LINK AUF DIE EIGENE ADRESSE, KEIN `onclick`.
          Der Knopf trug `onclick="location.reload()"` und tat damit NICHTS: die
          CSP dieses Servers setzt `script-src 'self'` ohne `unsafe-inline`, und

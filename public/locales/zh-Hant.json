@@ -3384,9 +3384,7 @@
         "displayNameLabel": "顯示名稱",
         "displayNamePlaceholder": "張偉",
         "passwordLabel": "密碼",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "確認密碼",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "建立帳戶",
         "creating": "正在建立…",
         "errorPasswordMismatch": "兩次輸入的密碼不一致。",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "該使用者名稱已被佔用。",
         "errorGeneric": "無法建立帳戶，請重試。",
         "showPassword": "顯示密碼",
-        "hidePassword": "隱藏密碼"
+        "hidePassword": "隱藏密碼",
+        "errorRequired": "請填寫此欄位，所有欄位都需要填寫。"
     },
     "install": {
         "title": "安裝 Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "有助於以後辨認是哪一臺裝置。",
         "submit": "配對",
         "failed": "此配對碼無效。",
-        "codeRequired": "請輸入設定中顯示的配對碼。"
+        "codeRequired": "請輸入設定中顯示的配對碼。",
+        "codeLength": "配對碼共有十個字元。請檢查是否少了或多了字元。"
     }
 }

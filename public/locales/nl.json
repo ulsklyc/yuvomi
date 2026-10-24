@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Weergavenaam",
         "displayNamePlaceholder": "Jan de Vries",
         "passwordLabel": "Wachtwoord",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Wachtwoord bevestigen",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Account aanmaken",
         "creating": "Aanmaken…",
         "errorPasswordMismatch": "De wachtwoorden komen niet overeen.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Deze gebruikersnaam is al in gebruik.",
         "errorGeneric": "Account kon niet worden aangemaakt. Probeer het opnieuw.",
         "showPassword": "Wachtwoord tonen",
-        "hidePassword": "Wachtwoord verbergen"
+        "hidePassword": "Wachtwoord verbergen",
+        "errorRequired": "Vul dit veld in - alle velden zijn nodig."
     },
     "install": {
         "title": "Yuvomi installeren",
@@ -6598,6 +6597,7 @@
         "labelHint": "Helpt later te herkennen welk apparaat wordt bedoeld.",
         "submit": "Koppelen",
         "failed": "Deze koppelcode is niet geldig.",
-        "codeRequired": "Voer de koppelcode in die in de instellingen staat."
+        "codeRequired": "Voer de koppelcode in die in de instellingen staat.",
+        "codeLength": "De koppelcode heeft tien tekens. Controleer of er een ontbreekt of te veel is."
     }
 }

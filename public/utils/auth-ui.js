@@ -143,6 +143,38 @@ export function flagField(field, errorEl) {
   }, { once: true });
 }
 
+/**
+ * DIE MELDUNG STEHT AM FELD, UND DER FOKUS AUCH (R23 D14, Critique G6 P2/P3).
+ * Einrichtung und Anmeldung sammelten jeden Fehler im Kasten unten vor dem
+ * Knopf, und der Fokus blieb auf dem Knopf bzw. ging auf den Kasten: wer
+ * "Die Passwoerter stimmen nicht ueberein" las, musste das Feld selbst
+ * suchen. Gehoert die Meldung zu einem Feld, zieht DASSELBE Fehlerfeld unter
+ * dieses Feld (eine Meldung, ein `role="alert"`), das Feld wird markiert
+ * (`flagField`) und bekommt den Fokus. Ohne Feld (Sperre, Verbindung) steht es
+ * wieder an seinem Platz vor dem Knopf und nimmt den Fokus selbst.
+ *
+ * @param {HTMLElement|null} errorEl  das Fehlerfeld aus `authErrorHtml()`
+ * @param {string} message            schon uebersetzt
+ * @param {HTMLElement|null} [field]  das Feld, zu dem die Meldung gehoert
+ */
+export function showAuthError(errorEl, message, field = null) {
+  if (!errorEl) return;
+  if (!errorEl._authHome) errorEl._authHome = { parent: errorEl.parentNode ?? null, next: errorEl.nextSibling ?? null };
+  const group = field?.closest?.('.form-group');
+  if (group?.appendChild) group.appendChild(errorEl);
+  else if (errorEl._authHome.parent?.insertBefore && errorEl.parentNode !== errorEl._authHome.parent) {
+    errorEl._authHome.parent.insertBefore(errorEl, errorEl._authHome.next);
+  }
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+  if (field) {
+    flagField(field, errorEl);
+    field.focus?.();
+  } else {
+    errorEl.focus?.();
+  }
+}
+
 /** Nimmt Markierung und Verweis auf die Meldung von EINEM Feld. */
 function unflagField(field, errorEl) {
   field._authFlagged = false;

@@ -3402,9 +3402,7 @@
         "displayNameLabel": "Pangalang ipapakita",
         "displayNamePlaceholder": "Juan dela Cruz",
         "passwordLabel": "Password",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Kumpirmahin ang password",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Gumawa ng account",
         "creating": "Ginagawa…",
         "errorPasswordMismatch": "Hindi magkatugma ang mga password.",
@@ -3413,7 +3411,8 @@
         "errorUsernameTaken": "Nagamit na ang username na ito.",
         "errorGeneric": "Hindi nagawa ang account. Pakisubukang muli.",
         "showPassword": "Ipakita ang password",
-        "hidePassword": "Itago ang password"
+        "hidePassword": "Itago ang password",
+        "errorRequired": "Pakipunan ang field na ito - kailangan ang lahat ng field."
     },
     "install": {
         "title": "I-install ang Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Nakakatulong itong makilala mamaya kung aling device ang tinutukoy.",
         "submit": "Ipares",
         "failed": "Hindi balido ang pairing code na ito.",
-        "codeRequired": "Ilagay ang pairing code na nasa Settings."
+        "codeRequired": "Ilagay ang pairing code na nasa Settings.",
+        "codeLength": "Sampung character ang pairing code. Tingnan kung may kulang o sobra."
     }
 }

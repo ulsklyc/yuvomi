@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Visningsnavn",
         "displayNamePlaceholder": "John Doe",
         "passwordLabel": "Passord",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Bekreft passord",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Opprett konto",
         "creating": "Oppretter…",
         "errorPasswordMismatch": "Passordene stemmer ikke overens.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Dette brukernavnet er allerede i bruk.",
         "errorGeneric": "Kunne ikke opprette kontoen. Vennligst prøv igjen.",
         "showPassword": "Vis passord",
-        "hidePassword": "Skjul passord"
+        "hidePassword": "Skjul passord",
+        "errorRequired": "Fyll ut dette feltet - alle feltene trengs."
     },
     "install": {
         "title": "Installer Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Hjelper deg å gjenkjenne hvilken enhet dette er senere.",
         "submit": "Par",
         "failed": "Denne paringskoden er ikke gyldig.",
-        "codeRequired": "Skriv inn paringskoden som vises i innstillingene."
+        "codeRequired": "Skriv inn paringskoden som vises i innstillingene.",
+        "codeLength": "Paringskoden har ti tegn. Sjekk om ett mangler eller er for mye."
     }
 }

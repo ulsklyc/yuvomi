@@ -3384,9 +3384,7 @@
         "displayNameLabel": "Nome visualizzato",
         "displayNamePlaceholder": "Mario Rossi",
         "passwordLabel": "Password",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "Conferma password",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "Crea account",
         "creating": "Creazione…",
         "errorPasswordMismatch": "Le password non corrispondono.",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "Questo nome utente è già in uso.",
         "errorGeneric": "Impossibile creare l’account. Riprova.",
         "showPassword": "Mostra password",
-        "hidePassword": "Nascondi password"
+        "hidePassword": "Nascondi password",
+        "errorRequired": "Compila questo campo: servono tutti i campi."
     },
     "install": {
         "title": "Installa Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "Aiuta a riconoscere in seguito di quale dispositivo si tratta.",
         "submit": "Associa",
         "failed": "Questo codice di associazione non è valido.",
-        "codeRequired": "Inserisci il codice di abbinamento mostrato nelle impostazioni."
+        "codeRequired": "Inserisci il codice di abbinamento mostrato nelle impostazioni.",
+        "codeLength": "Il codice di abbinamento ha dieci caratteri. Controlla se ne manca uno o ce n’è uno in più."
     }
 }

@@ -3402,9 +3402,7 @@
         "displayNameLabel": "نام نمایشی",
         "displayNamePlaceholder": "علی رضایی",
         "passwordLabel": "رمز عبور",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "تأیید رمز عبور",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "ایجاد حساب",
         "creating": "در حال ایجاد …",
         "errorPasswordMismatch": "رمزهای عبور مطابقت ندارند.",
@@ -3413,7 +3411,8 @@
         "errorUsernameTaken": "این نام کاربری قبلاً گرفته شده است.",
         "errorGeneric": "حساب ایجاد نشد. لطفاً دوباره تلاش کنید.",
         "showPassword": "نمایش رمز عبور",
-        "hidePassword": "پنهان‌سازی رمز عبور"
+        "hidePassword": "پنهان‌سازی رمز عبور",
+        "errorRequired": "لطفاً این فیلد را پر کنید - همه فیلدها لازم‌اند."
     },
     "install": {
         "title": "نصب Yuvomi",
@@ -6598,6 +6597,7 @@
         "labelHint": "کمک می‌کند بعداً بفهمید کدام دستگاه است.",
         "submit": "جفت کردن",
         "failed": "این کد جفت‌سازی معتبر نیست.",
-        "codeRequired": "کد جفت‌سازی نمایش‌داده‌شده در تنظیمات را وارد کنید."
+        "codeRequired": "کد جفت‌سازی نمایش‌داده‌شده در تنظیمات را وارد کنید.",
+        "codeLength": "کد جفت‌سازی ده نویسه دارد. بررسی کنید که نویسه‌ای کم یا زیاد نباشد."
     }
 }

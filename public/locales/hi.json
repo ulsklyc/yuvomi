@@ -3384,9 +3384,7 @@
         "displayNameLabel": "प्रदर्शित नाम",
         "displayNamePlaceholder": "राम कुमार",
         "passwordLabel": "पासवर्ड",
-        "passwordPlaceholder": "••••••••",
         "confirmPasswordLabel": "पासवर्ड की पुष्टि करें",
-        "confirmPasswordPlaceholder": "••••••••",
         "submitButton": "खाता बनाएँ",
         "creating": "बनाया जा रहा है…",
         "errorPasswordMismatch": "पासवर्ड मेल नहीं खाते।",
@@ -3395,7 +3393,8 @@
         "errorUsernameTaken": "यह उपयोगकर्ता नाम पहले से लिया जा चुका है।",
         "errorGeneric": "खाता नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
         "showPassword": "पासवर्ड दिखाएँ",
-        "hidePassword": "पासवर्ड छिपाएँ"
+        "hidePassword": "पासवर्ड छिपाएँ",
+        "errorRequired": "कृपया यह फ़ील्ड भरें - सभी फ़ील्ड ज़रूरी हैं।"
     },
     "install": {
         "title": "Yuvomi इंस्टॉल करें",
@@ -6598,6 +6597,7 @@
         "labelHint": "बाद में पहचानने में मदद करता है कि कौन सा डिवाइस है।",
         "submit": "जोड़ें",
         "failed": "यह कोड मान्य नहीं है।",
-        "codeRequired": "सेटिंग्स में दिखाया गया पेयरिंग कोड दर्ज करें।"
+        "codeRequired": "सेटिंग्स में दिखाया गया पेयरिंग कोड दर्ज करें।",
+        "codeLength": "पेयरिंग कोड में दस अक्षर होते हैं। जाँचें कि कोई कम या ज़्यादा तो नहीं है।"
     }
 }
