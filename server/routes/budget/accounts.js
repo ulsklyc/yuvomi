@@ -8,7 +8,7 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
 import {
-  budgetFilter, listAccounts, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
+  budgetFilter, listAccounts, accountHasHiddenEntries, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -154,6 +154,7 @@ router.put('/accounts/:id', (req, res) => {
 /**
  * DELETE /api/v1/budget/accounts/:id
  * Konto löschen. Zugeordnete Einträge bleiben erhalten (account_id wird geleert).
+ * 409 account_has_transfers / account_has_hidden_entries (fremde private Buchungen).
  * Response: 204 No Content
  */
 router.delete('/accounts/:id', (req, res) => {
@@ -164,6 +165,12 @@ router.delete('/accounts/:id', (req, res) => {
 
     if (db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? AND transfer_entry_id IS NOT NULL LIMIT 1').get(id)) {
       return refuse(res, [refusal('account_has_transfers', 'This account has linked transfers. Archive it instead.')], 409);
+    }
+    // Loeschen nimmt JEDER Buchung am Konto die Zuordnung - auch fremden
+    // privaten, die der Loeschende nicht sieht und ueber die er nicht
+    // entscheidet (Critique R23). Dann bleibt nur Archivieren.
+    if (accountHasHiddenEntries(id, budgetFilter(req, 'e', { scoped: false }))) {
+      return refuse(res, [refusal('account_has_hidden_entries', 'Other members have private entries on this account. Archive it instead.')], 409);
     }
 
     const tx = db.get().transaction(() => {

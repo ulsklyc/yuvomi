@@ -1948,7 +1948,8 @@
         "ledgerSortAmount": "Podle částky",
         "ledgerSortActive": "Řazení: {{sort}}",
         "ledgerAccountsAll": "Všechny účty",
-        "showAccountTransactions": "Zobrazit pohyby účtu"
+        "showAccountTransactions": "Zobrazit pohyby účtu",
+        "accountHasHiddenEntries": "K tomuto účtu patří soukromé položky jiných členů. Místo smazání jej archivujte."
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

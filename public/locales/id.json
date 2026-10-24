@@ -1883,7 +1883,8 @@
         "ledgerSortAmount": "Menurut jumlah",
         "ledgerSortActive": "Urutan: {{sort}}",
         "ledgerAccountsAll": "Semua akun",
-        "showAccountTransactions": "Tampilkan transaksi"
+        "showAccountTransactions": "Tampilkan transaksi",
+        "accountHasHiddenEntries": "Rekening ini memiliki entri pribadi anggota lain. Arsipkan alih-alih menghapusnya."
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",

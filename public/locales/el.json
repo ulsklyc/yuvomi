@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Κατά ποσό",
         "ledgerSortActive": "Ταξινόμηση: {{sort}}",
         "ledgerAccountsAll": "Όλοι οι λογαριασμοί",
-        "showAccountTransactions": "Εμφάνιση κινήσεων"
+        "showAccountTransactions": "Εμφάνιση κινήσεων",
+        "accountHasHiddenEntries": "Σε αυτόν τον λογαριασμό υπάρχουν ιδιωτικές εγγραφές άλλων μελών. Αρχειοθετήστε τον αντί να τον διαγράψετε."
     },
     "settings": {
         "healthCycleEnableLabel": "Διάθεση του κύκλου στο νοικοκυριό",

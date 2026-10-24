@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "依金額",
         "ledgerSortActive": "排序：{{sort}}",
         "ledgerAccountsAll": "所有帳戶",
-        "showAccountTransactions": "檢視交易"
+        "showAccountTransactions": "檢視交易",
+        "accountHasHiddenEntries": "此帳戶包含其他成員的私人記錄。請封存而非刪除。"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供週期",

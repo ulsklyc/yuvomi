@@ -3124,6 +3124,13 @@ function openAccountModal(account = null) {
         // nimmt ihnen die Kontozuordnung - das benennt der Dialog vorher. Ein
         // leeres Konto geht mit Rueckgaengig: geloescht wird erst, wenn die
         // Frist des Toasts endet.
+        // Haengen fremde private Buchungen daran, lehnt der Server ab (er
+        // entscheidet nicht ueber fremde Zuordnungen) - das sagt der Dialog
+        // gleich, statt erst "geloescht" und dann den Fehler zu melden.
+        if (account.has_hidden_entries) {
+          window.yuvomi?.showToast(t('budget.accountHasHiddenEntries'), 'danger');
+          return;
+        }
         if (!(Number(account.entry_count) > 0)) {
           closeModal({ force: true, context: captureModalContext() });
           deleteEmptyAccountWithUndo(account);
@@ -5506,6 +5513,7 @@ const BUDGET_REFUSALS = new Map([
   ['account_credit_bank_invalid', ['#am-credit-bank', BUDGET_SAVE_FAILED]],
   ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
   ['account_has_transfers', [null, 'budget.accountHasTransfers']],
+  ['account_has_hidden_entries', [null, 'budget.accountHasHiddenEntries']],
   ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
   // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
   ['category_name_invalid', [null, 'common.nameRequired']],

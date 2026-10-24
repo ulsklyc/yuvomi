@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Por importe",
         "ledgerSortActive": "Orden: {{sort}}",
         "ledgerAccountsAll": "Todas las cuentas",
-        "showAccountTransactions": "Ver movimientos"
+        "showAccountTransactions": "Ver movimientos",
+        "accountHasHiddenEntries": "Esta cuenta tiene movimientos privados de otros miembros. Archívala en lugar de eliminarla."
     },
     "settings": {
         "healthCycleEnableLabel": "Ofrecer el ciclo en el hogar",

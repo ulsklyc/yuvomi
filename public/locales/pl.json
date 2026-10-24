@@ -2047,7 +2047,8 @@
         "ledgerSortAmount": "Według kwoty",
         "ledgerSortActive": "Sortowanie: {{sort}}",
         "ledgerAccountsAll": "Wszystkie konta",
-        "showAccountTransactions": "Pokaż operacje konta"
+        "showAccountTransactions": "Pokaż operacje konta",
+        "accountHasHiddenEntries": "To konto zawiera prywatne wpisy innych członków. Zarchiwizuj je zamiast usuwać."
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",

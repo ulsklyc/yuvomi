@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Par montant",
         "ledgerSortActive": "Tri : {{sort}}",
         "ledgerAccountsAll": "Tous les comptes",
-        "showAccountTransactions": "Voir les écritures"
+        "showAccountTransactions": "Voir les écritures",
+        "accountHasHiddenEntries": "Ce compte contient des écritures privées d'autres membres. Archivez-le au lieu de le supprimer."
     },
     "settings": {
         "healthCycleEnableLabel": "Proposer le cycle au foyer",

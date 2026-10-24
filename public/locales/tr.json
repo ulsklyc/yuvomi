@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Tutara göre",
         "ledgerSortActive": "Sıralama: {{sort}}",
         "ledgerAccountsAll": "Tüm hesaplar",
-        "showAccountTransactions": "Hareketleri göster"
+        "showAccountTransactions": "Hareketleri göster",
+        "accountHasHiddenEntries": "Bu hesapta diğer üyelerin özel kayıtları var. Silmek yerine arşivleyin."
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

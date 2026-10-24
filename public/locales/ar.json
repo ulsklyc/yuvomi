@@ -2112,7 +2112,8 @@
         "ledgerSortAmount": "حسب المبلغ",
         "ledgerSortActive": "الترتيب: {{sort}}",
         "ledgerAccountsAll": "كل الحسابات",
-        "showAccountTransactions": "عرض الحركات"
+        "showAccountTransactions": "عرض الحركات",
+        "accountHasHiddenEntries": "يحتوي هذا الحساب على قيود خاصة لأعضاء آخرين. أرشفه بدلاً من حذفه."
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

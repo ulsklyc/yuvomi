@@ -2029,7 +2029,8 @@
         "ledgerSortAmount": "По сумме",
         "ledgerSortActive": "Сортировка: {{sort}}",
         "ledgerAccountsAll": "Все счета",
-        "showAccountTransactions": "Показать операции по счёту"
+        "showAccountTransactions": "Показать операции по счёту",
+        "accountHasHiddenEntries": "На этом счёте есть личные записи других участников. Архивируйте его вместо удаления."
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

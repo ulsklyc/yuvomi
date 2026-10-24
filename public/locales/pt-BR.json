@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Por valor",
         "ledgerSortActive": "Ordenação: {{sort}}",
         "ledgerAccountsAll": "Todas as contas",
-        "showAccountTransactions": "Ver lançamentos"
+        "showAccountTransactions": "Ver lançamentos",
+        "accountHasHiddenEntries": "Esta conta tem lançamentos privados de outros membros. Arquive-a em vez de excluí-la."
     },
     "settings": {
         "healthCycleEnableLabel": "Oferecer o ciclo na casa",

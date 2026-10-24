@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Etter beløp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle kontoer",
-        "showAccountTransactions": "Vis transaksjoner"
+        "showAccountTransactions": "Vis transaksjoner",
+        "accountHasHiddenEntries": "Denne kontoen har private posteringer fra andre medlemmer. Arkiver den i stedet for å slette den."
     },
     "settings": {
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",

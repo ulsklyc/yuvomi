@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "Efter belopp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alla konton",
-        "showAccountTransactions": "Visa transaktioner"
+        "showAccountTransactions": "Visa transaktioner",
+        "accountHasHiddenEntries": "Det här kontot har privata poster från andra medlemmar. Arkivera det i stället för att radera det."
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

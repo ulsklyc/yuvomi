@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "By amount",
         "ledgerSortActive": "Sorted: {{sort}}",
         "ledgerAccountsAll": "All accounts",
-        "showAccountTransactions": "Show transactions"
+        "showAccountTransactions": "Show transactions",
+        "accountHasHiddenEntries": "Other members have private entries on this account. Archive it instead of deleting it."
     },
     "settings": {
         "healthCycleEnableLabel": "Offer the cycle in the household",

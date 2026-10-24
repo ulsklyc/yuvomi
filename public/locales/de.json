@@ -1883,7 +1883,8 @@
         "ledgerSortAmount": "Nach Betrag",
         "ledgerSortActive": "Sortierung: {{sort}}",
         "ledgerAccountsAll": "Alle Konten",
-        "showAccountTransactions": "Buchungen anzeigen"
+        "showAccountTransactions": "Buchungen anzeigen",
+        "accountHasHiddenEntries": "An diesem Konto hängen private Buchungen anderer Mitglieder. Archiviere es, statt es zu löschen."
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

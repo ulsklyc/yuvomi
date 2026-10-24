@@ -1883,7 +1883,8 @@
         "ledgerSortAmount": "بر اساس مبلغ",
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
         "ledgerAccountsAll": "همه حساب‌ها",
-        "showAccountTransactions": "نمایش تراکنش‌ها"
+        "showAccountTransactions": "نمایش تراکنش‌ها",
+        "accountHasHiddenEntries": "این حساب تراکنش‌های خصوصی اعضای دیگر را دارد. به‌جای حذف، آن را بایگانی کنید."
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

@@ -1865,7 +1865,8 @@
         "ledgerSortAmount": "金額順",
         "ledgerSortActive": "並べ替え: {{sort}}",
         "ledgerAccountsAll": "すべての口座",
-        "showAccountTransactions": "記録を表示"
+        "showAccountTransactions": "記録を表示",
+        "accountHasHiddenEntries": "この口座には他のメンバーの非公開の記録があります。削除せずにアーカイブしてください。"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

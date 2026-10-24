@@ -372,3 +372,51 @@ test('POST/PUT /accounts weisen einen negativen Kreditrahmen ab (#541)', async (
     assert.equal(unchanged.credit_limit, 500, 'abgewiesenes Update darf nichts verändern');
   } finally { await h.close(); }
 });
+
+// Critique R23 (Rest aus S4): ein Konto zu loeschen nimmt ALLEN Buchungen die
+// Zuordnung. Im personal-Modus kann daran eine private Buchung eines anderen
+// Mitglieds haengen, die der Loeschende weder sieht noch zaehlt - sein Dialog
+// ging deshalb als "leeres Konto" ohne Rueckfrage durch, und der Server nahm
+// der fremden Buchung still Konto und Saldo. Ueber fremde Daten entscheidet
+// niemand mit: der Server lehnt ab (Archivieren bleibt), und die Kontoliste
+// sagt es vorher, damit der Dialog nicht erst "geloescht" meldet.
+test('DELETE /accounts/:id lehnt ab, solange fremde private Buchungen daran haengen (personal)', async () => {
+  cleanup();
+  const setMode = (mode) => suiteDatabase.prepare(`INSERT INTO sync_config (key, value) VALUES ('budget_mode', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
+  const otherId = Number(suiteDatabase.prepare(`
+    INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('member-b', 'B', 'x', 'member')
+  `).run().lastInsertRowid);
+  setMode('personal');
+  const a = createHarness();
+  const b = createHarness({ userId: otherId, role: 'member' });
+  try {
+    const acc = (await a.call('POST', '/accounts', { name: 'Gemeinsam', starting_balance: 0 })).body.data;
+    const foreign = await b.call('POST', '', {
+      title: 'Privat B', amount: -40, category: EXPENSE_CAT, date: PAST, account_id: acc.id, visibility: 'private',
+    });
+    assert.equal(foreign.status, 201, JSON.stringify(foreign.body));
+
+    const seenByA = (await a.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
+    assert.equal(seenByA.entry_count, 0, 'A zaehlt die fremde private Buchung nicht (kein Leck)');
+    assert.equal(seenByA.has_hidden_entries, true, 'A erfaehrt vorher, dass das Konto nicht leer ist');
+    const seenByB = (await b.call('GET', '/accounts')).body.data.accounts.find((x) => x.id === acc.id);
+    assert.equal(seenByB.has_hidden_entries, false, 'B sieht die eigene Buchung - nichts verborgen');
+
+    const del = await a.call('DELETE', `/accounts/${acc.id}`);
+    assert.equal(del.status, 409);
+    assert.equal(del.body.reason, 'account_has_hidden_entries', JSON.stringify(del.body));
+    const row = suiteDatabase.prepare('SELECT account_id FROM budget_entries WHERE id = ?').get(foreign.body.data.id);
+    assert.equal(row.account_id, acc.id, 'die fremde Buchung behaelt ihr Konto');
+    assert.ok(suiteDatabase.prepare('SELECT 1 FROM budget_accounts WHERE id = ?').get(acc.id), 'Konto steht noch');
+
+    // Wer alle Buchungen sieht, darf (nach seiner Rueckfrage) loeschen.
+    const delByB = await b.call('DELETE', `/accounts/${acc.id}`);
+    assert.equal(delByB.status, 204);
+  } finally {
+    setMode('shared');
+    await a.close();
+    await b.close();
+  }
+});
