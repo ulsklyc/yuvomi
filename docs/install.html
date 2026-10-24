@@ -312,8 +312,12 @@
     html:not(.js) .path-now { display: none; }
 
     /* Success */
+    /* Schatten wie die anderen Inhaltskarten der Seite (.env-card, Tabs):
+       --shadow-sm. --shadow-lg ist die Hoehe schwebender Flaechen; an einer
+       Karte im Fluss lag er hell als breiter grauer Hof um die Kante, dunkel
+       als zweiter Ring neben dem Rand (Re-Critique R3). */
     .success-box { text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2xl);
-      padding: 56px 36px; box-shadow: var(--shadow-lg); position: relative; overflow: hidden; }
+      padding: 56px 36px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
     .success-box::before { content: ''; position: absolute; top: -120px; left: 50%; transform: translateX(-50%); width: 520px; height: 360px;
       background: radial-gradient(50% 50% at 50% 50%, var(--accent-glow), transparent 70%); pointer-events: none; }
     .success-box > * { position: relative; }
@@ -487,6 +491,32 @@
       .tab-group:not(:first-of-type) { margin-top: 8px; }
       .success-box { padding: 44px 20px; }
       .success-url { display: flex; width: 100%; font-size: var(--fs-body); padding: 10px 12px; }
+      /* Der erste Befehl ueber der Falz (Re-Critique R3): bei 390x844 begann
+         die erste Codeplatte bei y=976 (Deutsch 1028), alles davor war Rand
+         und Rahmen. Der Hero ruecken zusammen (Rand, Titelgroesse, Satz in
+         --fs-small), die Abstaende zwischen Tabs, Voraussetzungen, Hinweis und
+         Engine-Wahl folgen einer engeren Stufe, Schritttitel und -erklaerung
+         eine Stufe kleiner (--fs-body, --fs-small wie Hinweise und Befehle),
+         und der Einleitungshinweis
+         jedes Wegs verliert am Telefon seine Platte: ein Satz mit Symbol, kein
+         Kasten zwischen zwei Kaesten. Kein Inhalt faellt weg, die Tabs bleiben
+         44px hoch. Am Schirm bleibt alles, wie es war. */
+      .hero { padding: calc(var(--bar-h) + 12px) 0 14px; }
+      .hero h1 { font-size: 2rem; margin-bottom: 6px; }
+      .hero-desc { font-size: var(--fs-small); }
+      #install { padding-top: 12px; }
+      .tab-bar { margin-bottom: 12px; }
+      .needs { margin-bottom: 14px; }
+      .needs summary { padding-block: 8px; gap: 8px; }
+      .tab-panel > .callout-info { padding: 0 2px; background: none; border-color: transparent; margin-bottom: 16px; }
+      .engine-row { margin-bottom: 14px; }
+      /* Das Raster des Schritts erbte das 18px-`gap` der Flex-Fassung auch als
+         Zeilenabstand: unter jedem Titel und jeder Erklaerung lagen 18px plus
+         deren eigene Marge. */
+      .step { row-gap: 8px; }
+      .step-title { font-size: var(--fs-body); }
+      .step-desc { font-size: var(--fs-small); margin-bottom: 10px; }
+      .tab-group, .tab-group:not(:first-of-type) { margin-top: 4px; }
     }
     @media (prefers-reduced-motion: reduce) {
       /* Animations were already fully covered; transitions were not, so the

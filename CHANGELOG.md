@@ -162,6 +162,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a username if the invite leaves it open and your own password - none with single sign-on - then
   sign in and put Yuvomi on the home screen from the app's Install offer or, on iPhone and iPad,
   from the Share menu.
+- **The install guide shows its first command on a phone screen.** At 390 by 844 the first
+  command block started well below the screen. The heading, its sentence and the spacing between
+  the tabs, the requirements, the opening note and the Docker/Podman switch are tighter on a phone,
+  the opening note of each path drops its box there, and step titles and explanations are one size
+  smaller. Nothing is left out, the tabs keep their finger size, and on a computer the page is
+  unchanged.
+- **The "Open Yuvomi" card at the end of the install guide sits on the page like the other cards.**
+  It carried the wide shadow of a floating panel, a grey haze in light mode and a second ring
+  beside its border in dark mode, and now has the same shallow shadow as the rest.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
