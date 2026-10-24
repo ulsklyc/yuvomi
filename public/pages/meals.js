@@ -8,7 +8,8 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { releaseAddressOnClose } from '/utils/master-detail.js';
-import { t, formatDate, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -366,9 +367,10 @@ function formatWeekLabel(monday) {
   // gesparte Breite ist hier der knappere Preis - eine Woche wie
   // "28.12. - 03.01." bleibt trotzdem eindeutig genug fuer den Kopf einer
   // Seite, die ohnehin "diese Woche" zeigt.
-  const from = narrow ? formatDayMonth(monday) : formatDate(monday);
-  const to = narrow ? formatDayMonth(sunday) : formatDate(sunday);
-  return `${from} - ${to}`;
+  // Breit (R23, D11): das Jahr hoechstens einmal und nur ausserhalb des
+  // laufenden - "19.10.2026 - 25.10.2026" trug es doppelt (utils/date-format.js).
+  if (!narrow) return dateRangeText(monday, sunday);
+  return `${formatDayMonth(monday)} - ${formatDayMonth(sunday)}`;
 }
 
 /**
@@ -2024,7 +2026,7 @@ function mealReadHtml(meal) {
   return `
     <div class="meal-read detail-view" data-view="read" data-meal-id="${esc(String(meal.id))}">
       <div class="detail-view__rows">
-        ${readRowHtml({ icon: 'calendar', label: t('meals.dateLabel'), value: meal.date ? formatDate(meal.date) : '' })}
+        ${readRowHtml({ icon: 'calendar', label: t('meals.dateLabel'), value: meal.date ? dateText(meal.date, { weekday: true }) : '' })}
         ${readRowHtml({ icon: 'utensils', label: t('meals.mealTypeLabel'), value: typeLabel })}
         ${cookHtml ? readRowHtml({ icon: 'cooking-pot', label: t('meals.cookLabel'), valueHtml: cookHtml }) : ''}
         ${readRowHtml({ icon: 'list', label: t('meals.ingredientsLabel'), value: ingredients, multiline: true })}
@@ -2032,7 +2034,7 @@ function mealReadHtml(meal) {
         ${readRowHtml({ icon: 'align-left', label: t('meals.notesLabel'), value: meal.notes || '', multiline: true })}
         ${readRowHtml({ icon: 'link', label: t('meals.recipeUrlLabel'), valueHtml: link })}
         ${readRowHtml({ icon: 'repeat-2', label: t('meals.recurrenceBadge'), value: meal.recurrence_template_id ? t('meals.recurrenceWeekly') : '' })}
-        ${readRowHtml({ icon: 'calendar-range', label: t('meals.recurrenceUntilLabel'), value: meal.recurrence_template_id && meal.recurrence_end_date ? formatDate(meal.recurrence_end_date) : '' })}
+        ${readRowHtml({ icon: 'calendar-range', label: t('meals.recurrenceUntilLabel'), value: meal.recurrence_template_id && meal.recurrence_end_date ? dateText(meal.recurrence_end_date) : '' })}
       </div>
     </div>`;
 }

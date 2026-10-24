@@ -3536,8 +3536,6 @@
         "hintOpen": "खोलें"
     },
     "birthdays": {
-        "inDays_one": "{{count}} दिन में",
-        "inDays": "{{count}} दिनों में",
         "turnsAge": "{{age}} का हो जाता है",
         "title": "जन्मदिन",
         "addButton": "जन्मदिन जोड़ें",

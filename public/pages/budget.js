@@ -17,6 +17,7 @@ import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } fr
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
+import { dateText, dateRangeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -1283,7 +1284,7 @@ function renderBody() {
       // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
       // Containment-Prüfung von „Aktuell" bei Auflösung „Woche".
       onPeriod: ({ from, to }) => {
-        state.reportPeriod = `${formatDate(from)} - ${formatDate(to)}`;
+        state.reportPeriod = dateRangeText(from, to);
         state.reportRangeFrom = from;
         state.reportRangeTo   = to;
         if (state.activeTab === 'reports' && state.range === 'week') {
@@ -1816,6 +1817,17 @@ function blockTotal(rows) {
   return rows.reduce((sum, r) => sum + r.amount, 0);
 }
 
+/* KEIN MINUS UNTER "AUSGABEN" (R23, Critique g4). Der Blocktitel nennt die
+ * Richtung schon - "Ausgaben -3.046,11 €" und darunter "-1.620,99 €" je Zeile
+ * sagte sie in jeder Zeile ein zweites Mal. Ausgaben und Einnahmen stehen als
+ * Betrag (Rolle `total`, die Richtung steht im Label); Umbuchungen behalten ihr
+ * Vorzeichen, denn dort IST es die Auskunft (hinein oder hinaus). */
+function blockAmountText(amount, kind) {
+  return kind === 'transfers'
+    ? amountByRole(amount, 'flow').text
+    : amountByRole(amount, 'total').text;
+}
+
 /* Wie in der Statistik: der Anteil steht nur bei Ausgaben, leise hinter dem Betrag. */
 function shareHtml(part, total) {
   return ` <span class="budget-bar-row__share">${esc(sharePercent(part, total))}</span>`;
@@ -2101,7 +2113,7 @@ function renderCategoryBars(byCategory) {
       <section class="budget-chart-block budget-chart-block--${kind}${lead ? ' budget-chart-block--lead' : ''}" aria-labelledby="${titleId}">
         <h3 class="budget-chart-block__title" id="${titleId}">
           <span>${esc(t(labelKey))}</span>
-          <span class="budget-chart-block__total">${amountByRole(blockTotal(rows), 'flow').text}</span>
+          <span class="budget-chart-block__total">${blockAmountText(blockTotal(rows), kind)}</span>
         </h3>
         <div class="budget-chart-block__rows">
           ${rows.map((r, i) => {
@@ -2132,7 +2144,7 @@ function renderCategoryBars(byCategory) {
               <span class="budget-bar-row__track" style="--bar-visible:${r.amount !== 0 ? 1 : 0}${kind === 'expenses' && categoryColor(colors, r.category) ? `;--bar-fill:${categoryColor(colors, r.category)}` : ''}">
                 <span class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"${kind === 'expenses' && categoryTexture(colors, r.category) ? ` data-texture="${categoryTexture(colors, r.category)}"` : ''} data-bar-key="${kind}:${esc(String(r.category))}"></span>
               </span>
-              <span class="budget-bar-row__amount">${amountByRole(r.amount, 'flow').text}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
+              <span class="budget-bar-row__amount">${blockAmountText(r.amount, kind)}${kind === 'expenses' ? shareHtml(r.amount, total) : ''}</span>
             </button>`;
           }).join('')}
         </div>
@@ -3894,7 +3906,7 @@ function loanInterestMeta(it, loan) {
  * Datum, auf das gebucht wird, keine Faelligkeit - die Karte bleibt beim Monat.
  */
 function loanNextDueLabel(loan) {
-  if (loan.due_day != null && loan.next_due_date) return formatDate(loan.next_due_date);
+  if (loan.due_day != null && loan.next_due_date) return dateText(loan.next_due_date);
   return loan.next_due_month ? formatMonthLabel(loan.next_due_month) : t('budget.loanPaidStatus');
 }
 
@@ -4051,8 +4063,10 @@ function renderTrend(current, prev, prevLabel) {
   });
 }
 
+// Ein Datum ausserhalb der Monatsliste (Darlehensraten, Faelligkeit): Jahr nur
+// ausserhalb des laufenden (R23, D11) - "19.10." stand neben "25.10.2026".
 function formatEntryDate(dateStr) {
-  return formatDate(dateStr);
+  return dateText(dateStr);
 }
 
 // --------------------------------------------------------
@@ -4185,7 +4199,7 @@ function entryReadSections(entry) {
     : '';
   return [
     { icon: 'banknote', label: t('budget.amountLabel'), value: amountByRole(amount, 'flow').text },
-    { icon: 'calendar', label: t('budget.detailDateLabel'), value: entry.date ? formatDate(entry.date) : '' },
+    { icon: 'calendar', label: t('budget.detailDateLabel'), value: entry.date ? dateText(entry.date, { weekday: true }) : '' },
     { icon: 'tag', label: t('budget.categoryLabel'), value: entry.category ? categoryLabel(entry.category) : '' },
     { icon: 'tags', label: t('budget.subcategoryLabel'), value: entry.subcategory ? subcategoryLabel(entry.subcategory) : '' },
     { icon: 'wallet', label: t('budget.accountLabel'), value: accountName(entry.account_id) },
@@ -5808,7 +5822,7 @@ async function markLoanPayment(id) {
   const paidDate = loanPaymentDate(loan);
   // Die Bestaetigung nennt das Datum (#1631): gebucht wird ohne Dialog, und mit
   // Faelligkeitstag ist es nicht der Tag, an dem getippt wurde.
-  const booked = t('budget.loanPaymentAddedOnToast', { date: formatDate(paidDate) });
+  const booked = t('budget.loanPaymentAddedOnToast', { date: dateText(paidDate) });
   try {
     const res = await api.post(`/budget/loans/${id}/payments`, {
       installment_number: loan.next_installment_number,

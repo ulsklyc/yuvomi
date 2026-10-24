@@ -3536,8 +3536,6 @@
         "hintOpen": "開啟"
     },
     "birthdays": {
-        "inDays_one": "{{count}} 天後",
-        "inDays": "{{count}} 天後",
         "turnsAge": "即將{{age}}歲",
         "title": "生日",
         "addButton": "新增生日",

@@ -3536,8 +3536,6 @@
         "hintOpen": "開く"
     },
     "birthdays": {
-        "inDays_one": "あと{{count}}日",
-        "inDays": "あと{{count}}日",
         "turnsAge": "{{age}}歳になります",
         "title": "誕生日",
         "addButton": "誕生日を追加",

@@ -3496,8 +3496,6 @@
         "readOnlyNotice": "Az emlékeztetők a Naptárhoz tartoznak. Ott írási jog nélkül ez a beállítás változatlan marad."
     },
     "birthdays": {
-        "inDays_one": "{{count}} nap múlva",
-        "inDays": "{{count}} nap múlva",
         "turnsAge": "betölti a(z) {{age}}. évét",
         "title": "Születésnapok",
         "addButton": "Születésnap hozzáadása",

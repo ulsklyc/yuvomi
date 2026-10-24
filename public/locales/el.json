@@ -3536,8 +3536,6 @@
         "hintOpen": "Άνοιγμα"
     },
     "birthdays": {
-        "inDays_one": "σε {{count}} ημέρα",
-        "inDays": "σε {{count}} ημέρες",
         "turnsAge": "γίνεται {{age}}",
         "title": "Γενέθλια",
         "addButton": "Προσθήκη γενεθλίων",

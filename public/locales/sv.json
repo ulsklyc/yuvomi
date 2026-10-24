@@ -3536,8 +3536,6 @@
         "hintOpen": "Öppna"
     },
     "birthdays": {
-        "inDays_one": "om {{count}} dag",
-        "inDays": "om {{count}} dagar",
         "turnsAge": "fyller {{age}}",
         "title": "Födelsedagar",
         "addButton": "Lägg till födelsedag",

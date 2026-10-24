@@ -3536,8 +3536,6 @@
         "hintOpen": "Aç"
     },
     "birthdays": {
-        "inDays_one": "{{count}} gün sonra",
-        "inDays": "{{count}} gün sonra",
         "turnsAge": "{{age}} yaşına giriyor",
         "title": "Doğum Günleri",
         "addButton": "Doğum günü ekle",

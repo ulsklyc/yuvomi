@@ -13,6 +13,7 @@
 
 import { api } from '/api.js';
 import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
+import { dateText, dateRangeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
 import { scheduleUndoableDelete, offerUndo, expandIn, drawChartOnce } from '/utils/ux.js';
@@ -992,7 +993,7 @@ const AREA_STATUS = {
     const latest = reports.reduce((best, r) => (!best || String(r.report_date) > String(best.report_date) ? r : best), null);
     if (!latest) return '';
     const sum = summarizeReport(latest);
-    const date = formatDate(String(latest.report_date).slice(0, 10));
+    const date = dateText(latest.report_date);
     return sum.hasAbnormal ? `${date} · ${t('health.labs.abnormalBadge', { count: sum.abnormal })}` : date;
   },
   async activity() {
@@ -1000,7 +1001,7 @@ const AREA_STATUS = {
     const latest = rows.reduce((best, r) => (!best || String(r.performed_at) > String(best.performed_at) ? r : best), null);
     if (!latest) return '';
     const preset = activityType(latest.type);
-    return `${preset ? t(preset.labelKey) : latest.type} · ${formatDate(String(latest.performed_at).slice(0, 10))}`;
+    return `${preset ? t(preset.labelKey) : latest.type} · ${dateText(latest.performed_at)}`;
   },
   async nutrition() {
     const summary = (await api.get('/health/nutrition/summary')).data;
@@ -1739,7 +1740,7 @@ function cardMarkup(metric, series, { phone = false } = {}) {
     metaHtml = `
       <span class="metric-card__meta">
         ${deltaMarkup(series.deltas.value_num, metric)}
-        <span>${esc(formatDate(String(latest.measured_at).slice(0, 10)))}</span>
+        <span>${esc(dateText(latest.measured_at))}</span>
       </span>`;
   } else {
     valueHtml = '<span class="metric-card__value metric-card__value--empty">-</span>';
@@ -1855,7 +1856,7 @@ function renderDetail() {
         <div class="health-chart-section__title">${esc(t(metric.labelKey))}</div>
         <div class="health-vitals__stepper">
           <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="health-vitals__period">${esc(`${formatDate(series.from)} - ${formatDate(series.to)}`)}</span>
+          <span class="health-vitals__period">${esc(dateRangeText(series.from, series.to))}</span>
           <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -2013,13 +2014,13 @@ function recentMeasurementsMarkup(metric) {
       <ul class="health-recent__list">
         ${rows.map((r) => `
           <li class="health-recent__row">
-            <span class="health-recent__date">${esc(formatDate(String(r.measured_at).slice(0, 10)))}</span>
+            <span class="health-recent__date">${esc(dateText(r.measured_at))}</span>
             <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>
             ${own ? rowActionHtml({
               icon: 'pencil',
               label: t('health.vitals.editMeasurement', {
                 value: [valueText(r), vitalUnitText(metric, r)].filter(Boolean).join(' '),
-                date: formatDate(String(r.measured_at).slice(0, 10)),
+                date: dateText(r.measured_at),
               }),
               attrs: { 'data-vital-edit': r.id },
             }) : ''}
@@ -2107,7 +2108,7 @@ function vitalSheetMarkup(metric) {
     </div>
     <div class="health-vitals__stepper health-vital-sheet__stepper">
       <button type="button" class="btn btn--icon" data-sheet-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <span class="health-vitals__period">${esc(`${formatDate(series.from)} - ${formatDate(series.to)}`)}</span>
+      <span class="health-vitals__period">${esc(dateRangeText(series.from, series.to))}</span>
       <button type="button" class="btn btn--icon" data-sheet-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
     </div>
     <div class="health-vital-sheet__chart">
@@ -4462,7 +4463,7 @@ function labReportListMarkup() {
 function labReportCardMarkup(report) {
   const sum = summarizeReport(report);
   const active = report.id === labs.selectedReportId;
-  const dateLabel = formatDate(String(report.report_date).slice(0, 10));
+  const dateLabel = dateText(report.report_date);
   const countLabel = t('health.labs.analyteCount', { count: sum.total });
   const abnormalBadge = sum.hasAbnormal
     ? `<span class="health-lab-badge health-lab-badge--warn">
@@ -4490,7 +4491,7 @@ function labDetailMarkup() {
 
   const own = canEditFor(labs.personId, labs.meId);
   const results = Array.isArray(report.results) ? report.results : [];
-  const dateLabel = formatDate(String(report.report_date).slice(0, 10));
+  const dateLabel = dateText(report.report_date);
 
   const table = results.length
     ? `
@@ -5246,7 +5247,7 @@ function renderActivityShell() {
     <div class="health-activity__toolbar">
       <div class="health-activity__stepper">
         <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.activity.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-        <span class="health-activity__period">${esc(`${formatDate(summary.from)} - ${formatDate(summary.to)}`)}</span>
+        <span class="health-activity__period">${esc(dateRangeText(summary.from, summary.to))}</span>
         <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.activity.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
       </div>
     </div>
@@ -5839,7 +5840,7 @@ function preventionDueRowMarkup(item) {
       <span class="health-prevention-due-row__icon" aria-hidden="true"><i data-lucide="${esc(item.icon || 'syringe')}"></i></span>
       <span class="health-prevention-due-row__body">
         <span class="health-prevention-due-row__name">${esc(item.type_name)}</span>
-        <span class="health-prevention-due-row__date">${esc(formatDate(item.due_on))}</span>
+        <span class="health-prevention-due-row__date">${esc(dateText(item.due_on))}</span>
       </span>
       <span class="health-prevention-due-row__chip">${esc(text)}</span>
     </li>`;
@@ -5878,7 +5879,7 @@ function preventionRowMarkup(row, own) {
     <li class="health-prevention-row" data-record-id="${esc(row.id)}">
       <span class="health-prevention-row__body">
         <span class="health-prevention-row__head">
-          <span class="health-prevention-row__when">${esc(formatDate(row.given_on))}</span>
+          <span class="health-prevention-row__when">${esc(dateText(row.given_on))}</span>
         </span>
         ${metaHtml}
         ${noteHtml}
@@ -7047,7 +7048,7 @@ function overviewCycleTileMarkup() {
     // Zyklus-Tab selbst (siehe dort für die ausführliche Begründung).
     const range = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
     value = range
-      ? `${formatDate(range.min)} - ${formatDate(range.max)}`
+      ? dateRangeText(range.min, range.max)
       : formatDate(prediction.nextStart);
     sub = range
       ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
@@ -7289,7 +7290,7 @@ function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
     metaHtml = `
       <span class="metric-card__meta">
         ${deltaMarkup(series.deltas.value_num, metric)}
-        <span>${esc(formatDate(String(latest.measured_at).slice(0, 10)))}</span>
+        <span>${esc(dateText(latest.measured_at))}</span>
       </span>`;
   } else {
     valueHtml = '<span class="metric-card__value metric-card__value--empty">-</span>';
@@ -8134,7 +8135,7 @@ function cycleStatsMarkup(prediction) {
     icon: 'calendar-heart',
     labelKey: 'health.cycle.status.nextPeriod',
     value: perimenopauseRange
-      ? `${formatDate(perimenopauseRange.min)} - ${formatDate(perimenopauseRange.max)}`
+      ? dateRangeText(perimenopauseRange.min, perimenopauseRange.max)
       : formatDate(prediction.nextStart),
     sub: perimenopauseRange
       ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
@@ -8151,7 +8152,7 @@ function cycleStatsMarkup(prediction) {
     tiles.push(cycleStatCardMarkup({
       icon: 'sparkles',
       labelKey: 'health.cycle.status.fertileWindow',
-      value: `${formatDate(prediction.fertileStart)} - ${formatDate(prediction.fertileEnd)}`,
+      value: dateRangeText(prediction.fertileStart, prediction.fertileEnd),
       sub: `${ovulationLabel}: ${formatDate(prediction.ovulationDate)}`,
     }));
   } else if (prediction.fertilitySuppressed === 'contraception') {
@@ -9242,7 +9243,7 @@ function cycleHistoryMarkup(canEdit) {
       <ul class="cycle-history__list">${rows.map((p) => {
         const start = String(p.start_date).slice(0, 10);
         const end = p.end_date ? String(p.end_date).slice(0, 10) : null;
-        const rangeLabel = end ? `${formatDate(start)} - ${formatDate(end)}` : formatDate(start);
+        const rangeLabel = end ? dateRangeText(start, end) : formatDate(start);
         const lenDays = end ? (Math.round((Date.parse(`${end}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) + 1) : null;
         const nextStart = nextStartById.get(p.id);
         const cycleLen = nextStart ? Math.round((Date.parse(`${String(nextStart).slice(0, 10)}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) : null;

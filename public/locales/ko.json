@@ -3514,8 +3514,6 @@
         "readOnlyNotice": "알림은 캘린더에 속합니다. 캘린더에 쓰기 권한이 없으면 이 설정은 변경되지 않습니다."
     },
     "birthdays": {
-        "inDays_one": "{{count}}일 후",
-        "inDays": "{{count}}일 후",
         "turnsAge": "{{age}}세가 됩니다",
         "title": "생일",
         "addButton": "생일 추가",

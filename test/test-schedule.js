@@ -2351,7 +2351,10 @@ test('R17/E1: "Today" is one line of chips, not a card of list rows', async () =
     assert.equal((html.match(/class="schedule-today__entry /g) || []).length, 2, 'one chip per entry');
     assert.doesNotMatch(html, /list-row|row-carrier|<p>/, 'no list rows, no carrier');
     assert.equal((html.match(/role="button" tabindex="0" data-action="view-schedule-entry"/g) || []).length, 2, 'each chip still opens the detail (S-17)');
-    assert.match(html, /F · Frueh<\/span><span class="schedule-today__meta">Ada · 06:00-14:00</);
+    // R23 (D11): die Spanne geht durch utils/date-format.js (12 h, Trenner der
+    // Sprache) - im Loader ist t() der Schluessel samt Parametern. Vorher stand
+    // hier die rohe Zeichenkette "06:00-14:00".
+    assert.ok(html.includes('F · Frueh</span><span class="schedule-today__meta">Ada · calendar.dayRangeLabel{&quot;from&quot;:&quot;06:00&quot;,&quot;to&quot;:&quot;14:00&quot;}<'), html);
     st.entries = [];
     assert.match(__test.renderToday(), /^<span class="schedule-today__empty">/);
   } finally {
@@ -2561,7 +2564,7 @@ test('the reminder-offset select accepts a custom value beyond the fixed presets
 test('an overnight shift\'s continuation fragment in Overview names its end time, not the full origin-day range (S-30)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const fnBody = schedulePage.slice(schedulePage.indexOf('function overviewEntryBlock('), schedulePage.indexOf('function scheduleOverviewEntryTitle('));
-  assert.match(fnBody, /entry\.__continuation\s*\n\s*\? t\('schedule\.continuesUntil', \{ time: type\.end_time \}\)/, 'a continuation block must use a distinct label naming only the end time, not clockLabel()\'s full origin-day range');
+  assert.match(fnBody, /entry\.__continuation\s*\n\s*\? t\('schedule\.continuesUntil', \{ time: clockText\(type\.end_time, \{ suffix: false \}\) \}\)/, 'a continuation block must use a distinct label naming only the end time, not clockLabel()\'s full origin-day range');
 });
 
 test('an "overtime tracking" toggle exists separate from the weekly-hours number, and turning it off suppresses the overtime card entirely (S-24)', () => {

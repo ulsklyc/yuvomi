@@ -3496,8 +3496,6 @@
         "readOnlyNotice": "Herinneringen horen bij de Agenda. Zonder schrijfrechten daar blijft deze instelling ongewijzigd."
     },
     "birthdays": {
-        "inDays_one": "over {{count}} dag",
-        "inDays": "over {{count}} dagen",
         "turnsAge": "wordt {{age}}",
         "title": "Verjaardagen",
         "addButton": "Verjaardag toevoegen",

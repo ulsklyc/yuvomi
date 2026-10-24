@@ -68,6 +68,7 @@ import { findPageFab } from '/utils/fab.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
+import { withTimeSuffix, clockText, timeSpanText, shiftTimeText, dateRangeText } from '/utils/date-format.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
@@ -4382,10 +4383,7 @@ function scheduleIsFullDayShift(entry) {
 // sie als rohe 24-Stunden-Zeichenkette mit Gedankenstrich da, auch fuer wen
 // 12 Stunden eingestellt hat. `suffix: false` im Raster, wie bei Terminen.
 function scheduleTimeLabel(type, { suffix = true } = {}) {
-  if (!type.start_time || !type.end_time) return "";
-  const crossesDay = type.end_time <= type.start_time;
-  const fullDay = type.end_time === type.start_time;
-  return timeSpanText(type.start_time, type.end_time, { suffix }) + (crossesDay ? " +1" : "") + (fullDay ? " · 24 h" : "");
+  return shiftTimeText(type, { suffix });
 }
 
 // Additiv zu Muster/Override, nie ein Ersatz (server/routes/schedule-extras.js)
@@ -5082,21 +5080,11 @@ function scrollToHour(scroll, body) {
  * seiner Uhrzeit, und jedes Zeichen fehlt dem Titel daneben. Liste,
  * Detailansicht, Schichtdetail und die gesprochenen Namen der Bloecke tragen
  * es - ein Termin klingt in jeder Ansicht gleich.
+ *
+ * Seit R23 (D11) wohnen withTimeSuffix/clockText/timeSpanText in
+ * utils/date-format.js: der Schichtplan, die Haushaltshilfe und die Uebersicht
+ * schreiben ihre Spannen jetzt mit derselben Regel.
  */
-function withTimeSuffix(text) {
-  return `${text} ${timeSuffix()}`.trimEnd();
-}
-
-function clockText(value, { suffix = true } = {}) {
-  const time = formatTime(value);
-  return suffix ? withTimeSuffix(time) : time;
-}
-
-function timeSpanText(start, end, { suffix = true } = {}) {
-  if (!end) return clockText(start, { suffix });
-  const span = t('calendar.dayRangeLabel', { from: formatTime(start), to: formatTime(end) });
-  return suffix ? withTimeSuffix(span) : span;
-}
 
 /**
  * Die Uhrzeit eines Termins fuer den Tag, auf dem er steht - in Raster

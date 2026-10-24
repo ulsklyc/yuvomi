@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Dates, times and distances read the same in every module.** Shift times in the Shift
+  planner now follow the 12-hour setting like the Calendar does, and every time span is written
+  as "06:00 - 14:00". A date leaves out the year when it is the current one ("Sat, 24.10."
+  instead of "24.10.2026"), and a week range names the year at most once. How far away a day is
+  reads "in 6 days" everywhere: Waste, Birthdays and the Overview no longer say "6 days" like a
+  duration, and beyond a month they count in weeks, months and years. Percentages follow the
+  household's number format. The category totals on the Budget overview no longer put a minus
+  in front of every amount under "Expenses".
 - **Module icons in lists look the same everywhere.** The More sheet and the module lists in
   Settings (Active modules, Navigation) now show each module's icon in the same soft tinted well
   as the sidebar. Before, the More sheet used solid colour discs and Settings used gradient tiles,

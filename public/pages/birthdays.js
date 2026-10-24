@@ -3,7 +3,8 @@ import { openModal as openSharedModal, closeModal, advancedSection, reportFieldE
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { t, formatDate, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
+import { t, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
+import { dateText, daysFromTodayText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowMenuHtml } from '/utils/row-action.js';
@@ -292,7 +293,7 @@ export function renderNameDayField(birthday = null) {
 // getrennt im Chip, damit keine Zahl doppelt erscheint. Ohne Jahr gibt es kein
 // Alter (#2095): der Server liefert `next_age: null`, die Zeile nennt nur den Tag.
 export function ageMeta(birthday) {
-  const date = formatDate(birthday.next_birthday);
+  const date = dateText(birthday.next_birthday, { weekday: true });
   return birthday.next_age != null
     ? `${date} · ${t('birthdays.turnsAge', { age: birthday.next_age })}`
     : date;
@@ -302,10 +303,10 @@ export function ageMeta(birthday) {
 // / in N Tagen. EINE Weiche fuer Geburtstag UND Namenstag - der Namenstag
 // hatte sie nicht und las „in 0 Tagen" (Critique 2026-09-26). `count` statt
 // `days`, damit t() die Pluralform der Sprache waehlt.
+// Seit R23 (D11) aus utils/date-format.js: dieselbe Stufung wie die
+// Uebersicht ("in 4 Monaten" statt "in 120 Tagen" jenseits eines Monats).
 function countdownLabel(days) {
-  if (days === 0) return t('common.today');
-  if (days === 1) return t('common.tomorrow');
-  return t('birthdays.inDays', { count: days });
+  return daysFromTodayText(days);
 }
 
 // Countdown-Chip; `mod` steuert die visuelle Stufe.
@@ -394,7 +395,7 @@ export function birthdayItemHtml(birthday, { next = false } = {}) {
   const nameDayMeta = hasNameDay
     ? `<span class="birthday-item__name-day">`
       + `${esc(countdownLabel(birthday.name_day_days_until))} · `
-      + `${esc(formatDate(birthday.next_name_day))} · ${esc(t('birthdays.celebratesNameDay'))}`
+      + `${esc(dateText(birthday.next_name_day, { weekday: true }))} · ${esc(t('birthdays.celebratesNameDay'))}`
       + '</span>'
     : '';
   // Wischbedienung (Redesign Runde 4, C-2): auf Touch tragen die beiden
@@ -1541,7 +1542,7 @@ function birthdayDetailHead(birthday) {
     // und Abstand (vorher zusaetzlich als erste Zeile darunter, R19).
     // Mit Etikett (Critique R22, a3 Klein): ohne stand "02.11.2026" ueber
     // der Zeile "Geburtsdatum 02.11.1985" - zwei Daten, eins davon namenlos.
-    subtitle: birthday.next_birthday ? t('birthdays.nextBirthdayOn', { date: formatDate(birthday.next_birthday) }) : '',
+    subtitle: birthday.next_birthday ? t('birthdays.nextBirthdayOn', { date: dateText(birthday.next_birthday, { weekday: true }) }) : '',
     facts: [
       birthday.next_age != null ? t('birthdays.turnsAge', { age: birthday.next_age }) : '',
       Number.isInteger(days) ? countdownLabel(days) : '',

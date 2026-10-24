@@ -6,7 +6,6 @@
 import { api } from '/api.js';
 import { closeModal, confirmModal, confirmOverModal, openModal, advancedSection, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import {
-  formatDate,
   getLocale,
   getNumberFormat,
   isDateInputValid,
@@ -18,6 +17,7 @@ import { isImeComposing, offerUndo, scheduleUndoableDelete } from '/utils/ux.js'
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, searchEmptyHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
+import { dateText, percentText } from '/utils/date-format.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
@@ -842,13 +842,15 @@ function renderSummary() {
          die Reihe hat damit immer drei Karten. */ ''}
       <article class="metric-card ${leadCardClass(money(used))}">
         <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
-        <div class="metric-card__value">${money(used)}${hasBudget ? ` <span class="metric-card__of">${esc(t('budget.planTargetOf', { amount: money(budget) }))}</span>` : ''}</div>
+        <div class="metric-card__value">${money(used)}</div>
         ${hasBudget ? `<div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
              role="progressbar" aria-label="${esc(t('subscriptions.monthlyBudget'))}"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${realPercentage}%">
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${esc(percentText(realPercentage))}">
           <span style="--fill:${percentage / 100}"></span>
         </div>` : ''}
-        <div class="metric-card__note">${t('subscriptions.activeCount', { count: summary.active_count })}</div>
+        ${/* "VON X" IN DER NOTIZ (R23, D12): neben dem Wert machte es die
+           Kennzahl laenger, als ihre Stufe traegt, und zwang sie kleiner. */ ''}
+        <div class="metric-card__note">${hasBudget ? `${esc(t('budget.planTargetOf', { amount: money(budget) }))} · ` : ''}${t('subscriptions.activeCount', { count: summary.active_count })}</div>
       </article>
       ${/* DIE WARNUNG STEHT EINMAL (R21 S7, Critique a4 "Warnung doppelt"): der
          Balken der Kostenkarte daneben steht ueber 100 % schon im Danger-Ton
@@ -857,7 +859,7 @@ function renderSummary() {
       <article class="metric-card">
         <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
         <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
-        <div class="metric-card__note">${hasBudget ? `${realPercentage}% ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>
+        <div class="metric-card__note">${hasBudget ? `${esc(percentText(realPercentage))} ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>
       </article>
       <article class="metric-card">
         <div class="metric-card__label">${t('subscriptions.yearlyProjection')}</div>
@@ -1025,11 +1027,12 @@ function statusMeta(subscription) {
 // Ende-Zeile in der Card (#594): abgeschlossen, Enddatum oder Restzahlungen.
 function endInfoLabel(subscription) {
   if (subscription.status === 'completed') {
-    const day = subscription.completed_at ? String(subscription.completed_at).slice(0, 10) : null;
-    return { icon: 'circle-check', text: day ? t('subscriptions.completedOn', { date: formatDate(day) }) : t('subscriptions.completed') };
+    // completed_at ist ein ZEITPUNKT: dateText rechnet ihn in die Haushaltszone
+    // (R23) - der abgeschnittene UTC-String nannte abends den Folgetag.
+    return { icon: 'circle-check', text: subscription.completed_at ? t('subscriptions.completedOn', { date: dateText(subscription.completed_at) }) : t('subscriptions.completed') };
   }
   if (subscription.end_type === 'on_date' && subscription.end_date) {
-    return { icon: 'calendar-x', text: t('subscriptions.endsOn', { date: formatDate(subscription.end_date) }) };
+    return { icon: 'calendar-x', text: t('subscriptions.endsOn', { date: dateText(subscription.end_date) }) };
   }
   if (subscription.end_type === 'after_count') {
     return { icon: 'list-ordered', text: t('subscriptions.endsAfter', { count: Number(subscription.occurrences_remaining ?? 0) }) };
@@ -1125,7 +1128,7 @@ function renderCard(subscription) {
                  ("Microsoft 365 Fa..."). Immer genau eine der beiden Fassungen
                  (subscriptions.css), wie beim Turnus. */ ''}
             <span class="subscription-card__meta-desc">${esc(subscription.description || rowCategoryLabel(subscription))}</span>
-            ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${formatDate(subscription.next_payment_date)} ·</span> <span>${dueLabel(subscription)}</span></span>`}
+            ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${esc(dateText(subscription.next_payment_date))} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             ${completed ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
@@ -1425,7 +1428,7 @@ function subscriptionReadSections(subscription) {
     { icon: 'calendar-clock', label: t('subscriptions.detailNextPaymentLabel'),
       // Abgeschlossen: keine naechste Zahlung (#2009, wie die Karte).
       value: subscription.next_payment_date && !isCompleted(subscription)
-        ? `${formatDate(subscription.next_payment_date)} · ${dueLabel(subscription)}` : '' },
+        ? `${dateText(subscription.next_payment_date, { weekday: true })} · ${dueLabel(subscription)}` : '' },
     // Abgeschlossen: keine Erinnerung (#2011) - syncReminder hat sie entfernt.
     { icon: subscription.reminder_enabled === false ? 'bell-off' : 'bell', label: t('subscriptions.reminderDaysLabel'),
       value: isCompleted(subscription) ? '' : subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days }) },
@@ -2010,7 +2013,7 @@ async function renewSubscription(subscription) {
     const completed = response.data?.status === 'completed';
     const message = completed
       ? t('subscriptions.completedNamed', { name: subscription.name })
-      : t('subscriptions.renewedNamed', { name: subscription.name, date: formatDate(response.data?.next_payment_date) });
+      : t('subscriptions.renewedNamed', { name: subscription.name, date: dateText(response.data?.next_payment_date, { weekday: true }) });
     if (!response.undo?.token) {
       window.yuvomi?.showToast(message, 'success');
       return;

@@ -3793,10 +3793,6 @@
         "hintOpen": "Відкрити"
     },
     "birthdays": {
-        "inDays_one": "через {{count}} день",
-        "inDays": "через {{count}} дн.",
-        "inDays_few": "через {{count}} дні",
-        "inDays_many": "через {{count}} дн.",
         "turnsAge": "виповнюється {{age}}",
         "title": "Дні народження",
         "addButton": "Додати день народження",

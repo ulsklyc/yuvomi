@@ -4320,9 +4320,6 @@
         "readOnlyNotice": "Připomínky patří ke Kalendáři. Bez práva k zápisu tam zůstane toto nastavení nezměněné."
     },
     "birthdays": {
-        "inDays_one": "za {{count}} den",
-        "inDays": "za {{count}} dní",
-        "inDays_few": "za {{count}} dny",
         "turnsAge": "oslaví {{age}}",
         "title": "Narozeniny",
         "addButton": "Přidat narozeniny",

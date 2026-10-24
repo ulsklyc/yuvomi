@@ -3752,10 +3752,6 @@
         "hintOpen": "Открыть"
     },
     "birthdays": {
-        "inDays_one": "через {{count}} день",
-        "inDays": "через {{count}} дн.",
-        "inDays_few": "через {{count}} дня",
-        "inDays_many": "через {{count}} дн.",
         "turnsAge": "исполняется {{age}}",
         "title": "Дни рождения",
         "addButton": "Добавить день рождения",

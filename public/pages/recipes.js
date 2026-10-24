@@ -4,7 +4,8 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
@@ -1408,7 +1409,7 @@ function pantryMatchBulkEl(recipe) {
 function pantryOptionLabel(item) {
   const teile = [item.name];
   if (item.location_name) teile.push(item.location_name);
-  if (item.expires_on) teile.push(formatDate(item.expires_on));
+  if (item.expires_on) teile.push(dateText(item.expires_on));
   return teile.join(' · ');
 }
 
@@ -2030,7 +2031,7 @@ async function planRecipe(recipe, btn) {
           await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
           closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(
-            t('recipes.planSuccess', { name: recipe.title, date: formatDate(date) }),
+            t('recipes.planSuccess', { name: recipe.title, date: dateText(date, { weekday: true }) }),
             'success',
           );
         } catch (err) {

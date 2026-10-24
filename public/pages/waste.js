@@ -12,7 +12,8 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate, getLocale } from '/i18n.js';
+import { t, formatDate } from '/i18n.js';
+import { dateText, dateRangeText, dateWithDistanceText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
@@ -29,7 +30,6 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { USER_COLORS } from '/utils/color.js';
 import { redrawList } from '/utils/list-motion.js';
-import { daysBetweenDateKeys, countdownPhrase } from '/utils/countdown.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
@@ -186,7 +186,7 @@ function originBadges(occurrence) {
   const parts = [];
   if (occurrence.moved) {
     const original = occurrence.origins.find((o) => o.kind === 'schedule' && o.original_date)?.original_date;
-    parts.push(`<span class="waste-badge waste-badge--moved">${esc(t('waste.movedFromBadge', { date: original ? formatDate(original) : '' }))}</span>`);
+    parts.push(`<span class="waste-badge waste-badge--moved">${esc(t('waste.movedFromBadge', { date: original ? dateText(original) : '' }))}</span>`);
   }
   if (occurrence.coalesced) {
     parts.push(`<span class="waste-badge waste-badge--coalesced" title="${esc(t('waste.coalescedHint'))}">${esc(t('waste.coalescedHint'))}</span>`);
@@ -222,25 +222,17 @@ const READ_SAFE_ACTIONS = new Set(['open-source', 'toggle-upcoming-rest']);
 
 /**
  * Pure: wann eine Abholung ist, so wie man danach fragt (Critique R17, E2):
- * Wochentag, Datum und der Abstand - "Fr, 09.10.2026 · 2 Tage". Bis R17 stand
+ * Wochentag, Datum und der Abstand - "Fr., 30.10. · in 6 Tagen". Bis R17 stand
  * dort nur "09.10.2026": ob das diese oder naechste Woche ist und an welchem
  * Tag die Tonne raus muss, rechnete man selbst.
  *
- * Der Abstand ist die Stufung der Uebersicht (countdownPhrase(): Heute, Morgen,
- * n Tage, ca. n Wochen), gerechnet auf den KEYS der Haushaltszone; der
- * Wochentag kommt aus dem UTC-Mittag des Keys mit `timeZone: 'UTC'` - beides
- * sieht nie eine Browserzone. Ein vergangener Tag traegt keinen Abstand.
+ * Seit R23 (D11) die Regel von utils/date-format.js: "in 6 Tagen" statt
+ * "6 Tage" (las sich wie eine Dauer), das Jahr nur ausserhalb des laufenden,
+ * heute und morgen als Wort allein. Gerechnet auf den KEYS der Haushaltszone;
+ * ein vergangener Tag traegt keinen Abstand.
  */
 function pickupWhenLabel(dateKey, today = todayKey()) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey ?? ''));
-  if (!match) return formatDate(dateKey);
-  const noon = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
-  const weekday = new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(noon);
-  const date = `${weekday}, ${formatDate(dateKey)}`;
-  const days = daysBetweenDateKeys(today, dateKey);
-  if (days === null || days < 0) return date;
-  const phrase = countdownPhrase(days);
-  return `${date} · ${t(phrase.key, phrase.count === undefined ? undefined : { count: phrase.count })}`;
+  return dateWithDistanceText(dateKey, { today, past: false });
 }
 
 function occurrenceRowHtml(occurrence) {
@@ -783,7 +775,7 @@ function sourceRowHtml(source) {
   const badge = sourceHealthBadgeInfo(source);
   const isUrl = source.kind === 'url';
   const coverage = source.coverage_start
-    ? `${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}`
+    ? esc(dateRangeText(source.coverage_start, source.coverage_end))
     : esc(t('waste.sourceNoCoverage'));
   // A URL source's own row action is a manual refresh (fetch now) or, once
   // needs_mapping is set, a review action that opens the same mapping wizard
@@ -2043,8 +2035,8 @@ function openSourceModal(source) {
     </div>
     <div class="waste-source-detail__meta">
       ${isUrl && source.url ? `<p>${esc(t('waste.sourceUrlLabel'))}: ${esc(source.url)}</p>` : ''}
-      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(formatDate(source.coverage_start))} - ${esc(formatDate(source.coverage_end))}</p>` : ''}
-      ${source.last_success_at ? `<p>${esc(t('waste.sourceLastImportedLabel'))}: ${esc(formatDate(source.last_success_at.slice(0, 10)))}</p>` : ''}
+      ${source.coverage_start ? `<p>${esc(t('waste.sourceCoverageLabel'))}: ${esc(dateRangeText(source.coverage_start, source.coverage_end))}</p>` : ''}
+      ${source.last_success_at ? `<p>${esc(t('waste.sourceLastImportedLabel'))}: ${esc(dateText(source.last_success_at))}</p>` : ''}
       ${source.last_error ? `<p class="waste-source-detail__error">${esc(lastFailureSentence(source))}</p>` : ''}
       ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}
     </div>

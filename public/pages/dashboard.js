@@ -15,6 +15,7 @@ import { hasEventIcon, eventIconHtml } from '/utils/event-icon.js';
 import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
+import { daysFromTodayText } from '/utils/date-format.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
@@ -1892,11 +1893,8 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   }
 
   const items = birthdays.map((b) => {
-    const daysLabel = b.days_until === 0
-      ? t('common.today')
-      : b.days_until === 1
-        ? t('common.tomorrow')
-        : t('dashboard.daysLeft', { count: b.days_until });
+    // "in 9 Tagen" wie im Geburtstagsmodul (R23, D11), nicht "9 Tage".
+    const daysLabel = daysFromTodayText(b.days_until);
     // Familien-Geburtstage tragen die Identitaetsfarbe des Mitglieds - dieselbe
     // Farbsprache wie die Familien-Kachel daneben; vorher trug hier jede Zeile
     // die Modul-Toenung, und dieselbe Person war in einer Kachel leuchtend und
@@ -2730,7 +2728,7 @@ function metricTileFor(id, data, currency, sheetSpeaks = new Set()) {
       const days = next.days_until;
       return {
         id, route, icon: widgetIcon('birthdays'), label: t('nav.birthdays'),
-        value: days === 0 ? t('common.today') : days === 1 ? t('common.tomorrow') : t('dashboard.daysLeft', { count: days }),
+        value: daysFromTodayText(days),
         note: next.kind === 'name_day' ? `${next.name} · ${t('birthdays.nameDay')}` : next.name,
       };
     }

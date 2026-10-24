@@ -3726,10 +3726,6 @@
         "readOnlyNotice": "Przypomnienia należą do Kalendarza. Bez prawa zapisu tam to ustawienie pozostaje bez zmian."
     },
     "birthdays": {
-        "inDays_one": "za {{count}} dzień",
-        "inDays": "za {{count}} dni",
-        "inDays_few": "za {{count}} dni",
-        "inDays_many": "za {{count}} dni",
         "turnsAge": "kończy {{age}}",
         "title": "Urodziny",
         "addButton": "Dodaj urodziny",

@@ -3536,8 +3536,6 @@
         "hintOpen": "Apri"
     },
     "birthdays": {
-        "inDays_one": "tra {{count}} giorno",
-        "inDays": "tra {{count}} giorni",
         "turnsAge": "compie {{age}}",
         "title": "Compleanni",
         "addButton": "Aggiungi compleanno",

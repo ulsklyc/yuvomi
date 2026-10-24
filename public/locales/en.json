@@ -3496,8 +3496,6 @@
         "readOnlyNotice": "Reminders belong to the Calendar. Without write access there, this setting stays unchanged."
     },
     "birthdays": {
-        "inDays_one": "in {{count}} day",
-        "inDays": "in {{count}} days",
         "turnsAge": "turns {{age}}",
         "title": "Birthdays",
         "addButton": "Add birthday",

@@ -3861,11 +3861,6 @@
         "hintOpen": "فتح"
     },
     "birthdays": {
-        "inDays_one": "خلال {{count}} يوم",
-        "inDays": "خلال {{count}} أيام",
-        "inDays_few": "خلال {{count}} أيام",
-        "inDays_two": "خلال يومين",
-        "inDays_many": "خلال {{count}} يومًا",
         "turnsAge": "يبلغ {{age}}",
         "title": "أعياد الميلاد",
         "addButton": "إضافة عيد ميلاد",

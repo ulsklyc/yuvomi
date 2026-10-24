@@ -1,5 +1,6 @@
 import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
+import { shiftTimeText, clockText, dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { swapContent } from '/utils/content-swap.js';
@@ -278,12 +279,10 @@ const canWrite = (userId) => !readOnly() && (canManageOthers || Number(userId) =
 // verlaesslich in 403.
 const canEditType = (type) => !readOnly() && (canManageOthers
   || (type?.created_by != null && Number(type.created_by) === Number(currentUserId)));
-const clockLabel = (shiftType) => {
-  if (!shiftType?.start_time || !shiftType?.end_time) return t('schedule.allDay');
-  const crossesDay = shiftType.end_time <= shiftType.start_time;
-  const fullDay = shiftType.end_time === shiftType.start_time;
-  return `${shiftType.start_time}-${shiftType.end_time}${crossesDay ? ' +1' : ''}${fullDay ? ' · 24 h' : ''}`;
-};
+// Die Spanne im Zeitformat des Nutzers (R23, D11): hier stand sie roh als
+// "22:00-06:00", auch wer 12 Stunden eingestellt hat, und anders als dieselbe
+// Schicht im Kalender. Jetzt fragen beide utils/date-format.js.
+const clockLabel = (shiftType) => shiftTimeText(shiftType) || t('schedule.allDay');
 
 // DER SATZ DER APP, NIE DER DES SERVERS (#1909). Bis dahin ordnete diese
 // Seite drei Texte des Servers an ihrem WORTLAUT einem Satz zu (S-02) und
@@ -1389,7 +1388,7 @@ function overrideRows() {
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (shiftTypeLabel(type)) : t('schedule.freeDay');
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
-    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
+    const label = dateRangeText(group.from, group.to);
     const actions = canWrite(group.user_id)
       ? editDeleteMenu({
         key: `override-${group.user_id}-${group.from}`,
@@ -1460,7 +1459,7 @@ function extraRows() {
     const swatchColor = type ? type.color : 'var(--color-border)';
     const typeLabel = type ? (shiftTypeLabel(type)) : '';
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
-    const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} - ${formatDate(group.to)}`;
+    const label = dateRangeText(group.from, group.to);
     const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
     const actions = canWrite(group.user_id)
       ? editDeleteMenu({
@@ -1939,7 +1938,7 @@ function overviewEntryBlock(entry) {
   // Schicht heute erneut um 22 Uhr. Ein eigener, kuerzerer Text nennt nur das
   // Ende und benennt die Fortsetzung, statt die Herkunftszeile zu wiederholen.
   const timeLine = entry.__continuation
-    ? t('schedule.continuesUntil', { time: type.end_time })
+    ? t('schedule.continuesUntil', { time: clockText(type.end_time, { suffix: false }) })
     : overlay ? `${clockLabel(type)} · ${overlay}` : clockLabel(type);
   return `<div class="schedule-overview__block"${entry.__continuation ? '' : ` data-start="${startMin}"`} style="top:${hourOffset(startMin)};height:calc(${hourOffset(duration)} - 2px);--schedule-color:${esc(type.color)}" title="${esc(scheduleOverviewEntryTitle(entry))}"${detailAttrs}><span class="schedule-overview__block-title">${esc(label)}</span><small class="schedule-overview__block-time">${esc(timeLine)}</small></div>`;
 }
@@ -1966,8 +1965,8 @@ function overviewPeopleButtonHtml() {
 function overviewToolbarHtml(weekDays) {
   const showsToday = weekDays.includes(todayKey());
   const weekLabel = overview.viewMode === 'day'
-    ? formatDayMonth(weekDays[0])
-    : `${formatDayMonth(weekDays[0])} - ${formatDayMonth(weekDays[weekDays.length - 1])}`;
+    ? dateText(weekDays[0])
+    : dateRangeText(weekDays[0], weekDays[weekDays.length - 1]);
   const viewToggle = `<div class="segmented schedule-overview__mode" role="group" aria-label="${esc(t('calendar.viewWeek'))}/${esc(t('calendar.viewDay'))}">
     <button type="button" class="segmented__item${overview.viewMode === 'week' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="week" aria-pressed="${overview.viewMode === 'week' ? 'true' : 'false'}">${esc(t('calendar.viewWeek'))}</button>
     <button type="button" class="segmented__item${overview.viewMode === 'day' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="day" aria-pressed="${overview.viewMode === 'day' ? 'true' : 'false'}">${esc(t('calendar.viewDay'))}</button>

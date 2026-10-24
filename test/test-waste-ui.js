@@ -926,27 +926,30 @@ test('R17/E2: die Einzelabholung steht im Werkzeugmenue, der Termin-Dialog waehl
   assert.match(modal, /const typeId = typeSelect \? Number\(typeSelect\.value\) : type\.id;/);
 });
 
-test('R17/E2: eine Abholung nennt Wochentag, Datum und Abstand', () => {
-  // t() ist im Loader der Schluessel plus seine Parameter, formatDate() gibt
-  // den Key zurueck: geprueft wird die Zusammensetzung, nicht die Uebersetzung.
+test('R17/E2 + R23/D11: eine Abholung nennt Wochentag, Datum und "in N Tagen"', () => {
+  // t() ist im Loader der Schluessel plus seine Parameter, formatDate() und
+  // formatDayMonth() geben den Key zurueck: geprueft wird die Zusammensetzung.
+  // Der Abstand kommt aus Intl.RelativeTimeFormat (getLocale() = 'de'), nicht
+  // mehr aus "dashboard.daysLeft" ("2 Tage" las sich wie eine Dauer).
   const today = '2026-10-07'; // Mittwoch
-  assert.equal(__test.pickupWhenLabel('2026-10-07', today), 'Mi, 2026-10-07 · common.today');
-  assert.equal(__test.pickupWhenLabel('2026-10-08', today), 'Do, 2026-10-08 · common.tomorrow');
-  assert.equal(__test.pickupWhenLabel('2026-10-09', today), 'Fr, 2026-10-09 · dashboard.daysLeft{"count":2}');
-  assert.equal(__test.pickupWhenLabel('2026-12-21', today), 'Mo, 2026-12-21 · dashboard.countdownMonths{"count":2}');
-  assert.equal(__test.pickupWhenLabel('2026-10-05', today), 'Mo, 2026-10-05', 'ein vergangener Tag traegt keinen Abstand');
+  const wd = (key) => new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${key}T12:00:00Z`));
+  assert.equal(__test.pickupWhenLabel('2026-10-07', today), 'common.today', 'heute: das Wort allein');
+  assert.equal(__test.pickupWhenLabel('2026-10-08', today), 'common.tomorrow');
+  assert.equal(__test.pickupWhenLabel('2026-10-09', today), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`);
+  assert.equal(__test.pickupWhenLabel('2026-12-21', today), `${wd('2026-12-21')}, 2026-12-21 · in 2 Monaten`);
+  assert.equal(__test.pickupWhenLabel('2026-10-05', today), `${wd('2026-10-05')}, 2026-10-05`, 'ein vergangener Tag traegt keinen Abstand');
   // Der Wochentag haengt am KEY, nicht an der Zone des Prozesses.
   const before = process.env.TZ;
   try {
     for (const zone of ['Pacific/Auckland', 'America/Los_Angeles']) {
       process.env.TZ = zone;
-      assert.equal(__test.pickupWhenLabel('2026-10-09', today), 'Fr, 2026-10-09 · dashboard.daysLeft{"count":2}', zone);
+      assert.equal(__test.pickupWhenLabel('2026-10-09', today), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`, zone);
     }
   } finally {
     if (before === undefined) delete process.env.TZ; else process.env.TZ = before;
   }
   const row = __test.occurrenceRowHtml({ key: 'k', type_id: 1, type_name: 'Papier', date_key: '2099-01-02', origins: [] });
-  assert.match(row, /<span class="list-row__meta">Fr, 2099-01-02 · /, 'die Abholzeile traegt das Label');
+  assert.ok(row.includes(`<span class="list-row__meta">${new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2099-01-02T12:00:00Z'))}, 2099-01-02 · `), 'die Abholzeile traegt das Label');
 });
 
 test('R17/E2: eine Abfallart mit anstehender Abholung sagt nicht "Noch kein Termin"', () => {

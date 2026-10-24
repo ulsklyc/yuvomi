@@ -3514,8 +3514,6 @@
         "readOnlyNotice": "Ang mga paalala ay nasa Kalendaryo. Kung wala kang access na magsulat doon, hindi mababago ang setting na ito."
     },
     "birthdays": {
-        "inDays_one": "sa loob ng {{count}} araw",
-        "inDays": "sa loob ng {{count}} araw",
         "turnsAge": "magiging {{age}}",
         "title": "Mga Kaarawan",
         "addButton": "Magdagdag ng kaarawan",

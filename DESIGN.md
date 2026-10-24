@@ -1065,6 +1065,25 @@ Subheadline 15, Footnote 13, Caption 2 11.
   lesbar sein muss, haengt an der Flaeche, nicht an einer Zahl.
 - Inputs nie unter 16px (`--text-base`, iOS-Zoom-Schwelle).
 
+### Datum, Zeit, Abstand, Anteil (R23, D11)
+EINE Schreibweise, aus `public/utils/date-format.js`; kein Modul setzt sie selbst zusammen.
+- **Uhrzeit** nach der 12-/24-Stunden-Einstellung (`clockText`), das Zeitwort ("Uhr") einmal
+  am Ende und nie im 12-Stunden-Format. **Spanne** "06:00 - 14:00" (`timeSpanText`,
+  Schicht `shiftTimeText` mit "+1" ueber Mitternacht) - auch im Schichtplan und in der
+  Haushaltshilfe, die bis R23 die rohe 24-Stunden-Zeichenkette schrieben.
+- **Datum** (`dateText`): Tag und Monat in der Schreibweise der Region, das Jahr nur
+  ausserhalb des laufenden; mit kurzem Wochentag ("Sa., 24.10."), wo ein Mensch nach dem
+  Tag fragt (Detailzeile, Toast, Abholung, Besuch). **Zeitraum** (`dateRangeText`): das
+  Jahr hoechstens einmal. Ausnahmen: Dokumentnamen und Exporte behalten das volle Datum,
+  Kalender-Periodenkoepfe ihre eigenen Kurzfassungen.
+- **Abstand** (`relativeDayText`/`daysFromTodayText`): "Heute", "Morgen", "Gestern", sonst
+  "in 6 Tagen"/"vor 3 Tagen" (Intl.RelativeTimeFormat), ab 31 Tagen Wochen, Monate, Jahre.
+  Nie "6 Tage" fuer einen Zeitpunkt - das liest sich wie eine Dauer. Der Countdown-Zaehler der
+  Uebersicht bleibt bewusst ein Zaehler ("9 Tage", #647).
+- **Anteil** (`percentText`) ueber Intl der Region, nie `${n}%` von Hand.
+- "Heute" ist immer der Tag der Haushaltszone; ein Zeitpunkt wird umgerechnet, ein Key gelesen.
+  Guard: `test:date-format` (de, en 12 h, fr; unter UTC, Auckland, Los Angeles).
+
 ### Named Rules
 **Ein Wort bricht an der Silbe, mit Strich (Re-Critique 2026-09-27, W1).** "Tomatensupp/e"
 und "SAUERSTOFFSAETTI/GUNG" kamen aus `overflow-wrap: break-word` neben `hyphens: manual`:

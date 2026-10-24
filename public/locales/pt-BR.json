@@ -3536,8 +3536,6 @@
         "hintOpen": "Abrir"
     },
     "birthdays": {
-        "inDays_one": "em {{count}} dia",
-        "inDays": "em {{count}} dias",
         "turnsAge": "faz {{age}}",
         "title": "Aniversários",
         "addButton": "Adicionar aniversário",

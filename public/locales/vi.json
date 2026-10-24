@@ -3496,8 +3496,6 @@
         "readOnlyNotice": "Nhắc nhở thuộc về Lịch. Nếu không có quyền ghi ở đó, cài đặt này giữ nguyên."
     },
     "birthdays": {
-        "inDays_one": "trong {{count}} ngày",
-        "inDays": "trong {{count}} ngày",
         "turnsAge": "tròn {{age}} tuổi",
         "title": "Sinh nhật",
         "addButton": "Thêm sinh nhật",

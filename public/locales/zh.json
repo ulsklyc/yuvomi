@@ -3536,8 +3536,6 @@
         "hintOpen": "打开"
     },
     "birthdays": {
-        "inDays_one": "{{count}}天后",
-        "inDays": "{{count}}天后",
         "turnsAge": "即将{{age}}岁",
         "title": "生日",
         "addButton": "添加生日",

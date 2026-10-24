@@ -77,6 +77,10 @@ const asAdmin = (visit) => ({ ...visit, can_edit: true, can_delete: true, can_ma
 const asReader = (visit) => ({ ...visit, can_edit: false, can_delete: false, can_mark_paid: false });
 const paidVisit = { id: 11, check_in: '2026-08-04T09:00:00.000Z', total_amount: 60, paid_at: '2026-08-05T10:00:00Z' };
 const openVisit = { id: 12, check_in: '2026-08-06T09:00:00.000Z', total_amount: 40, paid_at: null };
+// R23 (D11): die Zeile nennt den Tag mit kurzem Wochentag (utils/date-format.js
+// dateText). Im Loader geben formatDate/formatDayMonth den Key zurueck; der
+// Zeitpunkt oben liegt in jeder Testzone auf dem 06.08.
+const OPEN_VISIT_DAY = `${new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2026-08-06T12:00:00Z'))}, 2026-08-06`;
 
 function staffLogHtml(visits) {
   const state = hk.state();
@@ -588,7 +592,7 @@ function dashboardHtml({ lastVisit } = {}) {
 test('ein Besuch, eine Zeile: das Datum fuehrt, die Person steht im Meta - in Uebersicht, Berichten und Protokoll', async () => {
   const uebersicht = visitRows(dashboardHtml());
   assert.equal(uebersicht.length, 1, 'die Uebersicht zeigt ihren Besuch als Besuchszeile');
-  assert.equal(uebersicht[0].name, openVisit.check_in, 'Uebersicht: das Datum ist der Name');
+  assert.equal(uebersicht[0].name, OPEN_VISIT_DAY, 'Uebersicht: das Datum ist der Name');
   assert.match(uebersicht[0].meta, /^Maria Silva · /, 'Uebersicht: die Person steht im Meta');
 
   installApi();
@@ -605,7 +609,7 @@ test('ein Besuch, eine Zeile: das Datum fuehrt, die Person steht im Meta - in Ue
 
   const protokoll = visitRows(staffLogHtml([asAdmin(openVisit)]));
   assert.equal(protokoll.length, 1, 'das Personal-Protokoll baut dieselbe Zeile');
-  assert.equal(protokoll[0].name, openVisit.check_in);
+  assert.equal(protokoll[0].name, OPEN_VISIT_DAY, 'dieselbe Schreibweise wie die Uebersicht');
   assert.doesNotMatch(protokoll[0].meta, /Ana/, 'im Protokoll einer Person steht ihr Name nicht in jeder Zeile');
 });
 
@@ -681,9 +685,11 @@ test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem 
   globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
   try {
     const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr}-01-15T08:30:00Z` })), `KURZ(${jahr}-01-15T08:30:00Z)`,
+    // Seit R23 entscheidet dateText (utils/date-format.js) und gibt den KEY der
+    // Haushaltszone an die Formatierer, nicht den Zeitpunkt.
+    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr}-01-15T08:30:00Z` })), `KURZ(${jahr}-01-15)`,
       'im laufenden Jahr die Kurzform - sie passt in die Viertelzeile');
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr - 1}-12-20T08:30:00Z` })), `${jahr - 1}-12-20T08:30:00Z`,
+    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr - 1}-12-20T08:30:00Z` })), `${jahr - 1}-12-20`,
       'aus einem anderen Jahr bleibt das volle Datum - dann ist das Jahr die Auskunft');
   } finally {
     globalThis.__formatDayMonth = vorher;
@@ -704,13 +710,13 @@ test('Uebersicht: ob der letzte Besuch sein Jahr nennt, entscheidet die Haushalt
     setDisplayTimeZone('America/New_York');
     let jahr = Number(todayKey().slice(0, 4));
     const silvester = `${jahr}-01-01T00:30:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: silvester })), silvester,
+    assert.equal(wert(dashboardHtml({ lastVisit: silvester })), `${jahr - 1}-12-31`,
       'New York: der Besuch liegt am 31.12. des Vorjahrs - das Jahr bleibt stehen');
 
     setDisplayTimeZone('Asia/Tokyo');
     jahr = Number(todayKey().slice(0, 4));
     const neujahr = `${jahr - 1}-12-31T20:00:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: neujahr })), `KURZ(${neujahr})`,
+    assert.equal(wert(dashboardHtml({ lastVisit: neujahr })), `KURZ(${jahr}-01-01)`,
       'Tokio: derselbe Zeitpunkt ist dort schon der 1.1. des laufenden Jahres - Kurzform');
   } finally {
     globalThis.__formatDayMonth = vorher;
@@ -1179,7 +1185,9 @@ test('R20: ohne Betragsrecht keine Euro-Zeile, kein Zahlungsdiagramm, keine Lohn
     assert.doesNotMatch(html, /€|EUR/, 'kein Betrag, auch kein „0,00"');
     assert.match(html, /housekeeping\.notHereToday/, 'die Personenzeile sagt, ob sie da ist, statt den Lohn zu nennen');
     const [row] = visitRows(html);
-    assert.equal(row.meta, 'Maria Silva · 2026-08-06T08:00:00.000Z-2026-08-06T11:00:00.000Z', 'Person und Zeit statt Betrag und Zahlstatus');
+    // R23 (D11): die Spanne aus utils/date-format.js ("08:00 - 11:00", Trenner
+    // der Sprache); im Loader ist t() der Schluessel samt Parametern.
+    assert.equal(row.meta, 'Maria Silva · calendar.dayRangeLabel{&quot;from&quot;:&quot;2026-08-06T08:00:00.000Z&quot;,&quot;to&quot;:&quot;2026-08-06T11:00:00.000Z&quot;}', 'Person und Zeit statt Betrag und Zahlstatus');
     assert.equal(hk.visitWorkDetailsHtml(visit), '', 'der Bericht nennt keinen Tagessatz');
 
     // Und auch mit Recht: eine `null` aus einer Antwort wird nie „0,00 €".

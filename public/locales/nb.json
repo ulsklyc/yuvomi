@@ -3496,8 +3496,6 @@
         "readOnlyNotice": "Påminnelser tilhører Kalenderen. Uten skrivetilgang der, forblir denne innstillingen uendret."
     },
     "birthdays": {
-        "inDays_one": "om {{count}} dag",
-        "inDays": "om {{count}} dager",
         "turnsAge": "fyller {{age}} år",
         "title": "Bursdager",
         "addButton": "Legg til bursdag",

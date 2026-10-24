@@ -653,7 +653,11 @@ test('formatWeekLabel() trennt mit Bindestrich, nicht mit Halbgeviertstrich', ()
     try {
       const label = mealsUi.formatWeekLabel('2026-09-14');
       assert(!/[\u2013\u2014]/.test(label), `Wochenlabel (${narrow ? 'schmal' : 'breit'}) enthaelt einen Gedankenstrich: ${label}`);
-      assert(/ - /.test(label), 'die beiden Enden trennt „ - "');
+      // Breit seit R23 (D11) ueber utils/date-format.js: der Trenner kommt aus
+      // calendar.dayRangeLabel ("{{from}} - {{to}}"), im Loader der Schluessel
+      // samt Parametern - und das Jahr steht nicht an beiden Enden.
+      if (narrow) assert(/ - /.test(label), 'die beiden Enden trennt „ - "');
+      else assert(label === 'calendar.dayRangeLabel{"from":"2026-09-14","to":"2026-09-20"}', `breit: ${label}`);
     } finally {
       globalThis.window = zuvorWindow;
     }

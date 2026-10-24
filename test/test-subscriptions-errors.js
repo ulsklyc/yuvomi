@@ -722,7 +722,9 @@ test('Seite: verlaengern - keine Rueckfrage, Toast mit Name und Datum, Rueckgaen
       const { calls } = await mit({ post: async () => ({ data: renewed, undo: { token: 'abc' } }) }, () => page.renewSubscription(abo()));
       assert.equal(gefragt, 0, 'keine Rueckfrage');
       assert.deepEqual(calls.filter(([v]) => v === 'POST').map(([, p]) => p), ['/budget/subscriptions/3/renew']);
-      assert.deepEqual(toasts, [['subscriptions.renewedNamed{"name":"Netflix","date":"2026-12-05"}', 'default']]);
+      // R23 (D11): das Datum mit kurzem Wochentag (utils/date-format.js).
+      const wd = new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2026-12-05T12:00:00Z'));
+      assert.deepEqual(toasts, [[`subscriptions.renewedNamed{"name":"Netflix","date":"${wd}, 2026-12-05"}`, 'default']]);
       let body = null;
       const undo = await mit({ post: async (_p, b) => { body = b; return { data: abo() }; } }, () => lastAction.action());
       assert.deepEqual(undo.calls.filter(([v]) => v === 'POST').map(([, p]) => p), ['/budget/subscriptions/3/renew/undo']);

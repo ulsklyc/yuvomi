@@ -6,6 +6,7 @@
 
 import { api, auth } from '/api.js';
 import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
+import { dateText, timeSpanText } from '/utils/date-format.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -216,8 +217,8 @@ function amountsHidden(value) {
 /** Von-bis eines Besuchs - die Auskunft, die ohne Betraege bleibt. */
 function visitTimeText(visit) {
   if (!visit?.check_in) return '';
-  const from = formatTime(visit.check_in);
-  return visit.check_out && visit.check_out !== visit.check_in ? `${from}-${formatTime(visit.check_out)}` : from;
+  // "08:30 - 15:53" wie jede Spanne der App (R23, D11), nicht "08:30-15:53".
+  return timeSpanText(visit.check_in, visit.check_out, { suffix: false });
 }
 
 function money(value) {
@@ -705,11 +706,10 @@ function renderDashboard(content) {
   // Haushaltszone, also muss der Vergleich es auch. Mit dem Jahr des rohen
   // UTC-Strings und dem der Geraetezone erschien `2026-01-01T00:30Z` in New
   // York als „31.12." - der Tag aus 2025, das Jahr trotzdem weggelassen.
+  // Seit R23 die Regel von utils/date-format.js (dateText), die genau das sagt.
   const lastVisit = !hasLastVisit
     ? t('housekeeping.noVisits')
-    : zonedDateKey(data.last_visit.check_in).slice(0, 4) === todayKey().slice(0, 4)
-      ? formatDayMonth(data.last_visit.check_in)
-      : formatDate(data.last_visit.check_in);
+    : dateText(data.last_visit.check_in);
   const lastVisitTime = hasLastVisit ? formatTime(data.last_visit.check_in) : '';
   const maxPayment = Math.max(1, ...(data.monthly_payments || []).map((row) => row.total));
   const bars = (data.monthly_payments || []).map((row) => {
@@ -747,8 +747,11 @@ function renderDashboard(content) {
   }).join('');
 
   const recentVisits = (state.recentVisits || []).slice(0, 5);
+  // EIN DATUMSFORMAT IM MODUL (R23, D11): die letzten Besuche trugen
+  // "23.10.2026", die Berichte "23.10." - jetzt Wochentag und Tag, das Jahr
+  // nur ausserhalb des laufenden.
   const recentRows = recentVisits.map((visit) => visitRowHtml(visit, {
-    dateText: formatDate(visit.check_in),
+    dateText: dateText(visit.check_in, { weekday: true }),
     className: 'housekeeping-staff-log-row',
   })).join('');
 
@@ -1861,7 +1864,7 @@ function openVisitReportModal(visit, content = null, { onRefresh = null } = {}) 
           </div>
         </div>
         <dl class="housekeeping-report-details">
-          <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(formatDate(visit.check_in))} · ${esc(amountsHidden(visit.total_amount) ? visitTimeText(visit) : formatTime(visit.check_in))}</dd></div>
+          <div><dt>${esc(t('housekeeping.lastVisit'))}</dt><dd>${esc(dateText(visit.check_in, { weekday: true }))} · ${esc(amountsHidden(visit.total_amount) ? visitTimeText(visit) : formatTime(visit.check_in))}</dd></div>
           ${visitWorkDetailsHtml(visit)}
           ${amountsHidden(visit.total_amount) ? '' : `
           <div><dt>${esc(t('housekeeping.extras'))}</dt><dd>${esc(money(visit.extras))}</dd></div>
@@ -2010,9 +2013,9 @@ function renderStaffVisitLog() {
      * geteilten Bedienzone. Der Zahlstatus geht dabei nicht verloren: er steht
      * in der Metazeile, wo er die Zeile beschreibt, statt nur als Beschriftung
      * eines Knopfs, der ausgegraut ist. */
-    const visitDate = formatDate(visit.check_in);
     return visitRowHtml(visit, {
-      dateText: visitDate,
+      dateText: dateText(visit.check_in, { weekday: true }),
+      visitDate: formatDate(visit.check_in),
       showWorker: false,
       className: 'housekeeping-staff-log-row',
     });

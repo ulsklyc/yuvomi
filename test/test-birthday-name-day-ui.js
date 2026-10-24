@@ -65,9 +65,10 @@ test('person list renders the name-day countdown, date and label after the birth
   });
 
   assert.match(html, /birthday-item__meta--with-name-day/);
-  // Plural-`count` statt `days` (Critique 2026-09-26): "in 1 Tagen" brach in
-  // Sprachen mit anderen Pluralformen.
-  assert.match(html, /birthdays\.inDays\{&quot;count&quot;:235\}/);
+  // Seit R23 (D11) der Abstand aus utils/date-format.js: Intl.RelativeTimeFormat
+  // kennt die Pluralformen jeder Sprache, und jenseits eines Monats zaehlt es
+  // grob wie die Uebersicht (235 Tage = "in 8 Monaten").
+  assert.match(html, /in 8 Monaten/);
   assert.match(html, /2027-04-24/);
   assert.match(html, /birthdays\.celebratesNameDay/);
 });
@@ -116,24 +117,19 @@ const nameDayText = (html) => html.match(/<span class="birthday-item__name-day">
 test('name-day countdown says today and tomorrow instead of "in 0/1 days"', () => {
   assert.match(nameDayText(nameDayRow(0)), /^common\.today · /);
   assert.match(nameDayText(nameDayRow(1)), /^common\.tomorrow · /);
-  assert.match(nameDayText(nameDayRow(2)), /^birthdays\.inDays\{&quot;count&quot;:2\} · /);
+  assert.match(nameDayText(nameDayRow(2)), /^in 2 Tagen · /);
 });
 
-test('birthday and name-day countdowns pass a plural count, never a bare days number', () => {
+test('R23/D11: der Abstand spricht wie die Uebersicht ("in 10 Tagen"), kein eigener Schluessel mehr', () => {
   const html = birthdays.birthdayItemHtml({
     id: 9, name: 'Tom', birth_date: '1990-10-06', next_birthday: '2026-10-06', next_age: 36, days_until: 10,
   });
-  assert.match(html, /birthdays\.inDays\{&quot;count&quot;:10\}/);
-  assert.doesNotMatch(html + nameDayRow(5), /&quot;days&quot;/);
-});
-
-test('every locale pluralizes birthdays.inDays on {{count}}', () => {
+  assert.match(html, /in 10 Tagen/);
+  assert.doesNotMatch(html + nameDayRow(5), /birthdays\.inDays/);
   const localeDir = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {
     const block = JSON.parse(readFileSync(new URL(file, localeDir), 'utf8')).birthdays;
-    assert.match(block.inDays, /\{\{count\}\}/, `${file}: inDays`);
-    assert.doesNotMatch(block.inDays, /\{\{days\}\}/, `${file}: inDays`);
-    assert.match(block.inDays_one ?? '', /\{\{count\}\}/, `${file}: inDays_one`);
+    assert.equal(block.inDays, undefined, `${file}: birthdays.inDays ist ersetzt`);
   }
 });
 
@@ -194,7 +190,7 @@ test('Liste + Detail: die Spalte nennt wann und wie alt, Datum, Notiz - und fueh
     const head = birthdays.__test.birthdayDetailHead(BD);
     assert.ok(head.subtitle, 'das Datum des naechsten Geburtstags steht als Unterzeile im Kopf');
     assert.ok(head.media, 'der Kopf fuehrt immer ein Bild oder Monogramm');
-    assert.deepEqual(head.facts, ['birthdays.turnsAge{"age":41}', 'birthdays.inDays{"count":36}'], 'dieselben Worte wie die Kachel der Uebersicht: wie alt, wann');
+    assert.deepEqual(head.facts, ['birthdays.turnsAge{"age":41}', 'in 5 Wochen'], 'dieselben Worte wie die Kachel der Uebersicht: wie alt, wann');
     assert.deepEqual(birthdays.__test.birthdayDetailHead({ ...BD, next_age: null, days_until: 0 }).facts, ['', 'common.today'],
       'ohne Geburtsjahr kein Alter; heute heisst heute');
     assert.ok(byLabel['birthdays.birthDateLabel'].value, 'Geburtsdatum');
@@ -251,7 +247,9 @@ test('R19: die Liste gruppiert nach Monat und hebt den naechsten hervor', async 
 const { birthDateText, birthDateShort, birthDateFieldHtml } = await import('../public/utils/birth-date.js');
 
 test('ohne Jahr nennt die Zeile nur den Tag, kein Alter', () => {
-  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null }), '2027-03-15');
+  // Seit R23 (D11) mit kurzem Wochentag vorn (utils/date-format.js dateText).
+  const wd = new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2027-03-15T12:00:00Z'));
+  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null }), `${wd}, 2027-03-15`);
   assert.match(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: 41 }), /turnsAge/);
   const html = birthdays.birthdayItemHtml({
     id: 77, name: 'Ohne Jahr', birth_date: '2000-03-15', year_unknown: 1,

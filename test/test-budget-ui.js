@@ -4173,10 +4173,14 @@ test('Abo-Kennzahlen ohne Monatsbudget: keine Karte „Monatsbudget 0", drei Kar
 
     // R19 (Critique 2026-10-16, "113,60 € von 90 €"): mit Budget steht es IN
     // der Kostenkarte - Wert, "von"-Ziel und Balken -, keine eigene Karte.
+    // R23 (D12): das "von X" steht in der NOTIZ, nicht neben dem Wert - die
+    // Kennzahl behaelt ihre feste Stufe.
     abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
     const mit = abosGlance.renderSummary();
     assert.doesNotMatch(mit, /metric-card__label">subscriptions\.monthlyBudget</, 'keine eigene Budget-Karte mehr');
-    assert.match(mit, /metric-card__label">subscriptions\.monthlyCost<\/div>\s*<div class="metric-card__value">[^<]*<span class="metric-card__of">budget\.planTargetOf/, 'Kosten "von" Budget in einer Karte');
+    assert.match(mit, /metric-card__label">subscriptions\.monthlyCost<\/div>\s*<div class="metric-card__value">[^<]*<\/div>/, 'der Wert steht allein');
+    assert.doesNotMatch(mit, /metric-card__of/, 'kein Ziel neben dem Wert');
+    assert.match(mit, /<div class="metric-card__note">budget\.planTargetOf\{[^}]*\} · subscriptions\.activeCount/, 'Kosten "von" Budget in der Notiz derselben Karte');
     assert.match(mit, /role="progressbar" aria-label="subscriptions\.monthlyBudget"/, 'der Balken misst weiter das Budget');
     assert.equal(karten(mit), 3);
     assert.doesNotMatch(mit, /metric-grid--quad/);

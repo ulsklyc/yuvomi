@@ -3514,8 +3514,6 @@
         "readOnlyNotice": "Pengingat termasuk dalam Kalender. Tanpa akses tulis di sana, pengaturan ini tetap tidak berubah."
     },
     "birthdays": {
-        "inDays_one": "dalam {{count}} hari",
-        "inDays": "dalam {{count}} hari",
         "turnsAge": "berusia {{age}}",
         "title": "Ulang Tahun",
         "addButton": "Tambah ulang tahun",

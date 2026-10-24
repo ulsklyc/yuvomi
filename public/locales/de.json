@@ -3514,8 +3514,6 @@
         "readOnlyNotice": "Erinnerungen gehören zum Kalender. Ohne Schreibrecht dort bleibt diese Einstellung unverändert."
     },
     "birthdays": {
-        "inDays_one": "in {{count}} Tag",
-        "inDays": "in {{count}} Tagen",
         "turnsAge": "wird {{age}}",
         "title": "Geburtstage",
         "addButton": "Geburtstag hinzufügen",
