@@ -80,7 +80,7 @@ function birthdayCheck(check) {
   return check;
 }
 
-/** Photo-Validierung (wie Geburtstage/Inventar): max ~5MB, data URL, Inhalt stimmt. */
+/** Photo-Validierung (wie Geburtstage/Inventar): data URL, Inhalt stimmt. */
 const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
