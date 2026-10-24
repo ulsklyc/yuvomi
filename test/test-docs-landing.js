@@ -2370,7 +2370,7 @@ function heroFindings(html) {
 /** Das Kopfskript, das die Hero-Aufnahme waehlt (S7), oder ''. */
 function heroHeadScript(html) {
   const head = html.slice(0, html.indexOf('</head>'));
-  return [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((js) => /YuvomiHero/.test(js)) || '';
+  return [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\b[^>]*>/gi)].map((m) => m[1]).find((js) => /YuvomiHero/.test(js)) || '';
 }
 
 /**
