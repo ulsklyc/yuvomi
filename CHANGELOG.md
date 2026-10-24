@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A contact's own picture is shown in the list and on its card** (#2128). A contact synced from an
+  address book that carried a photo stored it in `contacts.photo`, but the frontend never drew it:
+  the list and the card showed initials, unless the contact was linked to a household member, in
+  which case they showed that member's avatar. Now a non-member contact with a photo shows it,
+  and a member's avatar stays as it is. The photo travels as a data URL: CardDAV stores `PHOTO`
+  as `data:image/...;base64,...` instead of raw base64, `POST` and `PUT /contacts` accept and
+  validate a photo (max ~5 MB, image data URL, content matches its declared type), and
+  `GET /contacts/:id/photo` serves it. The list answer no longer carries the full photo of every
+  contact.
 - **A contact with a birthday can be added to Birthdays from its detail view** (#2149). Until now
   only contacts whose birthday had been imported showed a way to Birthdays. A contact with a birth
   date but no birthday entry now offers "Add to birthdays" in its birthday row. It creates the same

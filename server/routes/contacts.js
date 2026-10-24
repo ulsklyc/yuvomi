@@ -14,6 +14,7 @@ import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown, sameNameBirthdayId } from '../services/birthdays.js';
 import { mayReadModule } from '../permissions.js';
+import { dataUrlContentMatches } from '../utils/file-signature.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -77,6 +78,20 @@ function namePartChecks(parts) {
 function birthdayCheck(check) {
   if (check.error) check.case = { reason: 'contacts_birthday_invalid' };
   return check;
+}
+
+/** Photo-Validierung (wie Geburtstage/Inventar): max ~5MB, data URL, Inhalt stimmt. */
+const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64
+const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+function validateContactPhoto(val) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '') return { value: null, error: null };
+  const s = String(val).trim();
+  if (s.length > MAX_PHOTO_LENGTH) return { value: null, error: 'Photo is too large.' };
+  if (!PHOTO_RE.test(s)) return { value: null, error: 'Photo must be a valid image data URL.' };
+  if (!dataUrlContentMatches(s)) return { value: null, error: 'Photo content does not match its image type.' };
+  return { value: s, error: null };
 }
 
 /** Verwaltbare Kontakt-Kategorien aus der DB (nach sort_order). */
@@ -576,26 +591,7 @@ router.post('/', (req, res) => {
     const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
     const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
     const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
-    // Photo validation (optional, data URL format)
-    let vPhoto = { value: undefined, error: null };
-    if (req.body.photo !== undefined) {
-      const photo = req.body.photo;
-      if (photo && typeof photo === 'string' && photo.trim().length > 0) {
-        // Validate data URL format
-        if (!photo.startsWith('data:')) {
-          vPhoto = { value: null, error: 'Photo must be a valid data URL.' };
-        } else {
-          // Check size (rough heuristic: data URLs over ~5MB are likely too large)
-          const base64Part = photo.split(',')[1];
-          if (base64Part) {
-            const sizeEstimate = (base64Part.length / 4 * 3 / 1024 / 1024);
-            if (sizeEstimate > 2) {
-              vPhoto = { value: null, error: 'Photo is too large (over 2MB).' };
-            }
-          }
-        }
-      }
-    }
+    const vPhoto = validateContactPhoto(req.body.photo);
     // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
     // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
     // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
@@ -748,26 +744,7 @@ router.put('/:id', (req, res) => {
     if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
     if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
     if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
-    // Photo validation (optional, data URL format)
-    let vPhoto = { value: undefined, error: null };
-    if (req.body.photo !== undefined) {
-      const photo = req.body.photo;
-      if (photo && typeof photo === 'string' && photo.trim().length > 0) {
-        // Validate data URL format
-        if (!photo.startsWith('data:')) {
-          vPhoto = { value: null, error: 'Photo must be a valid data URL.' };
-        } else {
-          // Check size (rough heuristic: data URLs over ~5MB are likely too large)
-          const base64Part = photo.split(',')[1];
-          if (base64Part) {
-            const sizeEstimate = (base64Part.length / 4 * 3 / 1024 / 1024);
-            if (sizeEstimate > 2) {
-              vPhoto = { value: null, error: 'Photo is too large (over 2MB).' };
-            }
-          }
-        }
-      }
-    }
+    const vPhoto = validateContactPhoto(req.body.photo);
     checks.push(vPhoto);
     // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
     // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
