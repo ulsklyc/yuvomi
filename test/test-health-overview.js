@@ -291,7 +291,11 @@ test('overview: members and data load side by side once the person is known', as
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   const mount = src.slice(src.indexOf('async function mountOverview() {'), src.indexOf('async function loadOverview() {'));
-  assert.match(mount, /const person = overview\.personId \?\? overview\.meId;/);
+  // R23 (D4): die Person kommt aus der Sitzung (utils/health-person.js). Steht
+  // dort eine fremde und ist die Liste noch nicht da, erst die Liste - sonst
+  // laufen beide nebeneinander wie bisher.
+  assert.match(mount, /const unchecked = stored != null && stored !== overview\.meId && !overview\.members\.length;/);
+  assert.match(mount, /pickHealthPerson\(\{ members: overview\.members, meId: overview\.meId, stored \}\)/);
   assert.match(mount, /await Promise\.all\(\[loadHealthMembers\(overview, healthUser\), loadOverview\(\)\]\);/);
   assert.match(mount, /\} else \{\s*await loadHealthMembers\(overview, healthUser\);\s*await loadOverview\(\);/,
     'ohne bekannte Person bestimmt weiter die Mitgliederliste, wer gezeigt wird');

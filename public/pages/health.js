@@ -73,6 +73,7 @@ import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { HEALTH_PERSON_EVENT, healthPersonIsOther, pickHealthPerson, readHealthPerson, writeHealthPerson } from '/utils/health-person.js';
 
 let _container = null;
 
@@ -1031,6 +1032,7 @@ function setAreaStatus(id, text) {
 async function refreshAreaStatus(id) {
   const load = AREA_STATUS[id];
   if (!load || !isAvailableArea(id)) return;
+  if (healthPersonIsOther(healthUser?.id)) { setAreaStatus(id, ''); return; }
   const gen = _statusGen;
   let text = '';
   try {
@@ -1055,6 +1057,13 @@ function applyOverviewStatuses() {
 function refreshAllAreaStatuses() {
   _statusGen += 1;
   _statusesRequested = true;
+  // FREMDE PERSON, KEIN EIGENER STATUS (R23, D4): die Zeilen der Bereichsliste
+  // lesen die eigenen Daten. Steht eine andere Person in der Gesundheit,
+  // sagten sie "Blutdruck 120/80" ueber die falsche - sie bleiben dann leer.
+  if (healthPersonIsOther(healthUser?.id)) {
+    for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) setAreaStatus(area.id, '');
+    return;
+  }
   // Steht die Uebersicht (oder laedt sie gerade fuer die eigene Person),
   // liefert sie ihre drei Zeilen selbst (renderOverviewShell).
   const overviewProvides = applyOverviewStatuses()
@@ -1232,6 +1241,11 @@ export async function render(container, ctx = {}) {
     signal?.addEventListener('abort', () => clearTimeout(giveUp), { once: true });
   }
   wireAreasNav(signal);
+  // Eine Personenwahl irgendwo im Modul (auch im Fasten) setzt die Zeilen der
+  // Bereichsliste neu: fremd leer, zurueck bei mir wieder mit Status (D4).
+  window.addEventListener(HEALTH_PERSON_EVENT, () => {
+    if (_statusesRequested) refreshAllAreaStatuses();
+  }, { signal });
   md = mountMasterDetail({
     root: container.querySelector('.health-split'),
     signal,
@@ -1307,6 +1321,7 @@ function maybeMountVitals(activeRoute) {
   if (activeRoute !== '/health/vitals') return;
   const root = _container?.querySelector('[data-vitals-root]');
   if (!root) return;
+  adoptSessionPerson(vitals);
   if (vitals.root === root && vitals.loaded) return;
   vitals.root = root;
   mountVitals();
@@ -1327,7 +1342,21 @@ async function loadHealthMembers(view, user) {
     const res = await api.get('/family/members');
     view.members = withChosenPeople(res.data || [], user?.id ? [user] : []);
   }
-  if (!view.personId) view.personId = view.meId ?? view.members[0]?.id ?? null;
+  // EINE PERSON FUER DAS GANZE MODUL (R23, D4): jeder Bereich startet bei der
+  // Person, die zuletzt irgendwo in der Gesundheit gewaehlt wurde - nicht bei
+  // seiner eigenen Erinnerung und nicht wieder bei mir.
+  view.personId = pickHealthPerson({ members: view.members, meId: view.meId, stored: readHealthPerson(view.meId) });
+}
+
+/**
+ * Ein schon geladener Bereich, dessen Person nicht mehr die der Sitzung ist
+ * (anderswo umgeschaltet, auch im Fasten): beim naechsten Oeffnen neu laden,
+ * statt die alte Person zu zeigen. Wird von jedem maybeMount*() gefragt.
+ */
+function adoptSessionPerson(view) {
+  if (!view.loaded || !view.members.length) return;
+  const want = pickHealthPerson({ members: view.members, meId: view.meId, stored: readHealthPerson(view.meId) });
+  if (want != null && want !== view.personId) view.loaded = false;
 }
 
 async function mountVitals() {
@@ -1419,6 +1448,8 @@ function wirePersonSwitcher(view, onSwitch) {
       const id = Number(item.dataset.personId);
       if (id === view.personId) return;
       view.personId = id;
+      // Die Wahl gilt fuer das ganze Modul (R23, D4).
+      writeHealthPerson(view.meId, id);
       await onSwitch();
       // Die neue Pille steht womoeglich schon im Kopf (health-hoist.js):
       // ueber ihr Menue finden, nicht nur im Panel.
@@ -2926,6 +2957,7 @@ function maybeMountMeds(activeRoute) {
   if (activeRoute !== '/health/meds') return;
   const root = _container?.querySelector('[data-meds-root]');
   if (!root) return;
+  adoptSessionPerson(meds);
   if (meds.root === root && meds.loaded) return;
   meds.root = root;
   mountMeds();
@@ -4248,6 +4280,7 @@ function maybeMountLabs(activeRoute) {
   if (activeRoute !== '/health/labs') return;
   const root = _container?.querySelector('[data-labs-root]');
   if (!root) return;
+  adoptSessionPerson(labs);
   if (labs.root === root && labs.loaded) return;
   labs.root = root;
   mountLabs();
@@ -5035,6 +5068,7 @@ function maybeMountActivity(activeRoute) {
   if (activeRoute !== '/health/activity') return;
   const root = _container?.querySelector('[data-activity-root]');
   if (!root) return;
+  adoptSessionPerson(activity);
   if (activity.root === root && activity.loaded) return;
   activity.root = root;
   mountActivity();
@@ -5606,6 +5640,7 @@ function maybeMountPrevention(activeRoute) {
   if (activeRoute !== '/health/prevention') return;
   const root = _container?.querySelector('[data-prevention-root]');
   if (!root) return;
+  adoptSessionPerson(prevention);
   if (prevention.root === root && prevention.loaded) return;
   prevention.root = root;
   mountPrevention();
@@ -6091,6 +6126,7 @@ function maybeMountNutrition(activeRoute) {
   if (activeRoute !== '/health/nutrition') return;
   const root = _container?.querySelector('[data-nutrition-root]');
   if (!root) return;
+  adoptSessionPerson(nutrition);
   if (nutrition.root === root && nutrition.loaded) return;
   nutrition.root = root;
   mountNutrition();
@@ -6615,6 +6651,7 @@ function maybeMountOverview(activeRoute) {
   if (activeRoute !== '/health') return;
   const root = _container?.querySelector('[data-overview-root]');
   if (!root) return;
+  adoptSessionPerson(overview);
   if (overview.root === root && overview.loaded) return;
   overview.root = root;
   mountOverview();
@@ -6632,7 +6669,16 @@ async function mountOverview() {
     // gezeigte Person nur, wenn noch keine feststeht und auch die eigene nicht
     // bekannt ist (loadHealthMembers). Sonst haengt loadOverview() nicht an ihr -
     // die Person steht dann hier schon fest, und beide laufen gleichzeitig.
-    const person = overview.personId ?? overview.meId;
+    // Steht in der Sitzung eine fremde Person und kennt die Uebersicht ihre
+    // Mitglieder noch nicht, erst die Liste: nur gegen sie laesst sich die
+    // Person pruefen (pickHealthPerson), bevor ihre Daten geladen werden.
+    const stored = readHealthPerson(overview.meId);
+    const unchecked = stored != null && stored !== overview.meId && !overview.members.length;
+    const person = unchecked
+      ? null
+      : (overview.members.length
+        ? pickHealthPerson({ members: overview.members, meId: overview.meId, stored })
+        : overview.meId);
     if (person) {
       overview.personId = person;
       await Promise.all([loadHealthMembers(overview, healthUser), loadOverview()]);
@@ -7396,6 +7442,7 @@ function maybeMountCycle(activeRoute) {
   if (activeRoute !== '/health/cycle') return;
   const root = _container?.querySelector('[data-cycle-root]');
   if (!root) return;
+  adoptSessionPerson(cycle);
   if (cycle.root === root && cycle.loaded) return;
   cycle.root = root;
   mountCycle();

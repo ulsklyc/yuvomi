@@ -257,6 +257,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **Health keeps the person you picked across all areas.** Choosing a family member in Vitals
+  and then opening Medications showed your own data again, and a value could end up with the
+  wrong person. The choice now holds for the whole Health module until the tab is closed, every
+  area names the person you are recording for, and the area list no longer shows your own latest
+  values while someone else is selected.
 - **The permissions sheet fits on a phone again.** Each name in the rights matrix took 12rem of
   height on narrow screens, which made the sheet about 12,000 pixels long.
 - **An amount typed with a thousands separator is no longer saved as a thousandth of it.** In

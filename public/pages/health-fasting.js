@@ -5,6 +5,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { personSwitcherMarkup, wireWhoSees } from '/utils/health-person-switcher.js';
+import { readHealthPerson, writeHealthPerson } from '/utils/health-person.js';
 import { fastingHistoryQuery, fastingSections, fastingStatsQuery, formatFastingDuration, shouldLoadFastingStats } from '/utils/health-fasting.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -24,11 +25,20 @@ const deleteKey = (owner, id) => `${owner}:${id}`;
 export async function mountFasting(root, { userId } = {}) {
   if (!root) return;
   let view = panels.get(root);
+  // DIE PERSON DER SITZUNG (R23, D4): das Fasten startet bei der Person, die
+  // zuletzt irgendwo in der Gesundheit gewaehlt wurde. Sie ist ein Vorschlag -
+  // laesst sich ihr Fasten nicht lesen, faellt die Ansicht auf mich zurueck
+  // (refresh).
+  const wanted = readHealthPerson(userId) ?? userId;
   if (!view) {
-    view = { root, self: userId, subject: userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '' };
+    view = { root, self: userId, subject: wanted, subjectFromSession: wanted !== userId, members: [], from: '', to: '', generation: 0, stop: null, state: null, stats: undefined, statsError: false, displayTzid: '' };
     panels.set(root, view);
     root.replaceChildren();
     root.insertAdjacentHTML('beforeend', `<div class="fasting-container"><div data-fasting-shell></div><p role="alert" data-fasting-load-error></p><div class="fasting-panel" data-fasting-body><p role="status">${esc(t('common.loading'))}</p></div></div>`);
+  } else if (wanted != null && wanted !== view.subject) {
+    view.subject = wanted;
+    view.subjectFromSession = wanted !== view.self;
+    view.state = null; view.stats = undefined; view.statsError = false; view.stop?.(); view.stop = null;
   }
   await refresh(view, { refreshStats: true });
 }
@@ -47,6 +57,16 @@ function shell(view) {
   el.replaceChildren();
   el.insertAdjacentHTML('beforeend', personSwitcherMarkup(view.members, view.subject, view.self,
     { menuId: 'health-person-menu-fasting', label: t('health.fasting.person') }));
+  // Fremde Person: derselbe Hinweis wie in jedem Bereich der Gesundheit (D4) -
+  // das Fasten anderer liest man nur.
+  if (view.subject != null && view.self != null && view.subject !== view.self) {
+    const name = view.members.find((m) => m.id === view.subject)?.display_name || '';
+    el.insertAdjacentHTML('beforeend', `
+      <div class="health-readonly-banner" role="status">
+        <i data-lucide="eye" aria-hidden="true"></i>
+        <span>${esc(t('health.readOnlyBanner', { name }))}</span>
+      </div>`);
+  }
   if (!view.state) {
     el.insertAdjacentHTML('beforeend', filtersMarkup(view));
     wireFilters(view, el);
@@ -68,6 +88,8 @@ async function onPersonPick(view, el, event) {
   const id = Number(item.dataset.personId);
   if (id === view.subject) return;
   view.subject = id;
+  view.subjectFromSession = false;
+  writeHealthPerson(view.self, id);
   view.state = null; view.stats = undefined; view.statsError = false; view.generation++; view.stop?.(); view.stop = null;
   const body = view.root.querySelector('[data-fasting-body]');
   body.replaceChildren();
@@ -150,6 +172,12 @@ async function refresh(view, { refreshStats = false } = {}) {
     view.self ??= state.settings?.user_id;
     view.subject ??= view.self;
     if (membersResult) view.members = membersResult.data || [];
+    // Die Person der Sitzung steht nicht (mehr) in der Liste: zurueck zu mir.
+    if (view.subjectFromSession && view.subject !== view.self && !view.members.some((m) => m.id === view.subject)) {
+      view.subject = view.self; view.subjectFromSession = false; view.state = null;
+      void refresh(view, { refreshStats: true });
+      return;
+    }
     currentOwners.set(view.self, view);
     view.state = state;
     view.displayTzid = state.display_tzid || '';
@@ -166,6 +194,13 @@ async function refresh(view, { refreshStats = false } = {}) {
     renderBody(view, view.stats, view.statsError);
   } catch {
     if (!current()) return;
+    // Ein Vorschlag aus der Sitzung, dessen Fasten ich nicht lesen darf: kein
+    // Ladefehler, sondern meine eigene Ansicht.
+    if (view.subjectFromSession && view.subject !== view.self && view.self != null) {
+      view.subject = view.self; view.subjectFromSession = false;
+      void refresh(view, { refreshStats: true });
+      return;
+    }
     if (!view.members.length) {
       try { view.members = (await api.get('/family/members')).data || []; } catch { /* retry remains available */ }
       if (!current()) return;

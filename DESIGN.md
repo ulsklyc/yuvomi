@@ -1799,6 +1799,13 @@ Standard-Sichtbarkeit), und dort steht, dass Betreuende auch Privates sehen - fu
 Weg zu den Mitgliedern. Ein Tipp mit Ziel ist ein Link mit eigenem Text, nie HTML aus einem
 Locale-String (`test:health-cycle`, `test:settings-navigation`).
 
+**EINE Personenwahl fuer das ganze Modul (R23, D4).** Die Person gilt je Sitzung fuer alle
+Bereiche (`utils/health-person.js`, sessionStorage je Konto): jeder Bereich liest sie beim Oeffnen
+und prueft sie gegen seine Mitgliederliste, jede Wahl schreibt sie - auch im Fasten, das bei einer
+Person ohne lesbares Fasten auf die eigene zurueckfaellt. Steht eine fremde Person, nennt jeder
+Bereich sie im Hinweis ("Du traegst fuer X ein" bzw. nur lesen, auch das Fasten), und die Zeilen
+der Bereichsliste bleiben leer, statt den eigenen Status ueber die falsche Person zu sagen.
+
 **Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
 EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
 veraendert hat, die drei zuletzt gemessenen Messarten ("Seit der letzten Messung: Gewicht -0,2 kg,
