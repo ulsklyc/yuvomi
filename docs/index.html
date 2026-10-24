@@ -147,7 +147,7 @@
        24. Senkrechtes Polster an einem Inline-Element vergroessert die Flaeche,
        die den Klick annimmt, ohne die Zeilenhoehe anzufassen - der Absatz
        bleibt, wie er ist. */
-    .plat-more a, .quick-note a, .tb-proof { padding-block: 4px; }
+    .plat-more a, .tb-proof { padding-block: 4px; }
     img { max-width: 100%; height: auto; display: block; }
     ::selection { background: var(--accent-soft); color: var(--accent-deep); }
     /* Fokusring, Skip-Link, Knoepfe, Codeplatte und Reveal stehen in
@@ -285,13 +285,13 @@
     .handoff { contain-intrinsic-block-size: auto calc(1250px - 2 * var(--sec-m)); }
     .showcase { contain-intrinsic-block-size: auto calc(2600px - 2px - 2 * var(--sec-s)); }
     .longevity { contain-intrinsic-block-size: auto calc(990px - 2 * var(--sec-m)); }
-    .platforms { contain-intrinsic-block-size: auto calc(1590px - 2 * var(--sec-m)); }
-    .cta { contain-intrinsic-block-size: auto calc(670px - 2 * var(--sec-l)); }
+    .platforms { contain-intrinsic-block-size: auto calc(1005px - 2 * var(--sec-m)); }
+    .cta { contain-intrinsic-block-size: auto calc(750px - 2 * var(--sec-l)); }
     @media (max-width: 860px) {
       .handoff { contain-intrinsic-block-size: auto calc(1600px - 2 * var(--sec-m)); }
       .showcase { contain-intrinsic-block-size: auto calc(2500px - 2px - 2 * var(--sec-s)); }
       .longevity { contain-intrinsic-block-size: auto calc(1750px - 2 * var(--sec-m)); }
-      .platforms { contain-intrinsic-block-size: auto calc(2750px - 2 * var(--sec-m)); }
+      .platforms { contain-intrinsic-block-size: auto calc(1975px - 2 * var(--sec-m)); }
     }
 
     .eyebrow {
@@ -327,7 +327,13 @@
 
     /* ===== HERO ===== */
     /* Oben: Leiste plus ein Kapitelabstand (--sec-m, site.css). */
-    .hero { padding: calc(var(--bar-h) + var(--sec-m)) 0 72px; position: relative; overflow: hidden; }
+    /* `clip`, nicht nur `hidden`: overflow:hidden macht den Hero zum
+       Scroll-Container, und die view-timeline am .hero-visual (Signatur
+       unten) haengte sich an DIESEN Container, der nie scrollt - die
+       Collage stand seit S3 bei Fortschritt 0 still (gemessen S4). `clip`
+       schneidet den Lichthof genauso, ohne Scroll-Container zu sein;
+       `hidden` davor bleibt der Fallback fuer Browser ohne `clip`. */
+    .hero { padding: calc(var(--bar-h) + var(--sec-m)) 0 72px; position: relative; overflow: hidden; overflow: clip; }
     .hero-glow {
       position: absolute; top: -240px; left: 50%; transform: translateX(-50%);
       width: 1100px; height: 900px; pointer-events: none; z-index: 0;
@@ -338,7 +344,14 @@
       background: radial-gradient(circle, color-mix(in srgb, var(--m-meals) 18%, transparent) 0%, transparent 70%);
       filter: blur(20px);
     }
-    .hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+    /* Eine Spalte auf jeder Breite (S4, 2026-10-24). Zweispaltig bekam die
+       Aufnahme 519px von 1.152px, und die 15px-Schrift der App schrumpfte auf
+       rund 6px: ein Bild, das man sieht, aber nicht liest. Jetzt steht der Text
+       zentriert darueber und die Aufnahme bekommt die volle Spalte - der
+       Beweis ist lesbar, und unten am ersten Bildschirm beginnt er schon. */
+    .hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr);
+      gap: clamp(40px, 5vw, 64px); justify-items: center; text-align: center; }
+    .hero-content { max-width: 56rem; }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 12px; border-radius: var(--r-full);
       font-size: 0.8rem; font-weight: 600; color: var(--text-2);
@@ -353,18 +366,28 @@
       letter-spacing: -0.04em; margin-bottom: 22px; text-wrap: balance;
     }
     .hero h1 em { font-style: italic; font-weight: 600; color: var(--accent); }
-    .hero-sub { font-size: 1.18rem; color: var(--text-2); max-width: 30ch; margin-bottom: 34px; line-height: 1.6; }
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    .hero-tags { display: flex; gap: 8px; margin-top: 26px; flex-wrap: wrap; }
-    .tag {
-      padding: 5px 13px; border-radius: var(--r-full); font-size: 0.74rem; font-weight: 600;
-      background: var(--surface); color: var(--text-2); border: 1px solid var(--border);
-    }
+    .hero-sub { font-size: 1.18rem; color: var(--text-2); max-width: 46ch; margin: 0 auto 34px; line-height: 1.6; text-wrap: pretty; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    /* Die Technik steht als Satz unter dem Knopf, zu dem sie gehoert, statt als
+       Chips ("Docker · Podman", "PWA") ohne Erklaerung mitten im ersten
+       Bildschirm: wer installiert, liest hier womit; wer es nicht tut,
+       ueberliest eine leise Zeile statt drei Fremdwoerter. */
+    .hero-runs { margin-top: 14px; font-size: 0.86rem; color: var(--text-2); line-height: 1.5; text-wrap: balance; }
+    /* Die Antwort auf "und der Rest der Familie?" stand erst bei ~5.200px
+       (mobil ~6.000px). Hier steht sie im ersten Bildschirm, mit der Bildmarke
+       als Zeichen: drei Kreise, ein Haushalt. Unter den Knoepfen, nicht
+       darueber - installieren bleibt die eine Hauptaktion. */
+    .hero-house { display: inline-flex; align-items: center; gap: 12px; margin-top: 28px; padding-top: 22px;
+      border-top: 1px solid var(--border); max-width: 46ch; text-align: left;
+      font-size: 1rem; font-weight: 500; line-height: 1.5; color: var(--text-1); }
+    .house-mark { flex-shrink: 0; width: 34px; height: 34px; color: var(--accent); }
+    .house-mark circle:nth-child(2) { fill-opacity: 0.62; }
+    .house-mark circle:nth-child(3) { fill-opacity: 0.44; }
 
     /* Hero visual. Flach: die 3D-Kippung (rotateY/rotateX, beim Hover
        geradegezogen) verzerrte ausgerechnet den Beleg, den das Bild liefern
        soll, und bewegte sich unter dem Mauszeiger ohne Anlass. */
-    .hero-visual { position: relative; }
+    .hero-visual { position: relative; width: 100%; }
     .hero-frame {
       border-radius: var(--r-xl); overflow: hidden; border: 1px solid var(--border);
       box-shadow: var(--shadow-hero);
@@ -376,8 +399,11 @@
        unten). Vorher standen 900x675 fuer beide, und das Telefon rechnete bis
        zum Laden mit einem Querformat. */
     .hero-frame img { width: 100%; height: auto; display: block; }
+    /* Mit der Aufnahme waechst das Telefon (bei 1.152px rund 220px statt 150px):
+       ein Fuenftel der Breite, damit es neben dem Dashboard ein zweites
+       Geraet bleibt und keine Briefmarke wird. */
     .hero-float {
-      position: absolute; bottom: -28px; right: -22px; width: 150px;
+      position: absolute; bottom: -28px; right: -22px; width: clamp(150px, 19%, 230px);
       border-radius: var(--r-phone); border: 4px solid var(--surface); box-shadow: var(--shadow-xl);
       z-index: 2; overflow: hidden; background: var(--surface);
     }
@@ -823,8 +849,8 @@
       text-transform: uppercase; color: var(--success-ink); background: color-mix(in srgb, var(--success-ink) 13%, transparent);
       padding: 4px 9px; border-radius: var(--r-full); }
     /* Six cards, three of them wearing a green "1-click" badge that reads as the
-       recommendation - while the command block directly below belongs to one of
-       the three without a badge. One card now says which one that is. Same
+       recommendation - while the guide opens on one of the cards without a
+       badge (Docker). One card now says which one that is. Same
        hue-darkening as .feat-kicker: the raw accent misses AA on the tint. */
     .plat-badge--start { color: color-mix(in srgb, var(--accent) var(--tint-ink), var(--text-1));
       background: color-mix(in srgb, var(--accent) 13%, transparent); }
@@ -848,27 +874,16 @@
       .plat-go { grid-area: go; margin-top: 12px; }
     }
 
-    /* Die 760px-Deckelung liess in einer 1.152px-Spalte 440px totes Gutter
-       rechts vom wichtigsten Block der Seite stehen, waehrend das Plattformraster
-       darueber die volle Breite nutzte. Drei Laeufe lang gemeldet. */
-    .quick-docker { margin-top: 44px; }
-    /* Codeplatte und Kopierknopf: site.css. */
-    /* Der Einzeiler (`docker compose up -d`) braucht das reservierte Band
-       nicht: sein Befehl ist auf jedem Viewport kuerzer als die Platte minus
-       Knopf, kann also nie unter den Knopf scrollen - das Band liess die
-       Platte ausgerechnet am finalen Befehl halb leer wirken. Der Knopf sitzt
-       stattdessen vertikal zentriert. Wer hier je einen laengeren Befehl
-       eintraegt, entfernt die Klasse am Wrapper und bekommt das Band zurueck.
-       Gleiche Spezifitaet wie die Regel darueber; die Quellreihenfolge
-       entscheidet, deshalb steht sie danach. */
-
-    /* What the reader is actually deciding at the moment they paste a curl into
-       the machine that will hold their family's health records: what runs, how
-       big it is, what it opens, and whether it talks to anyone. All of it lived
+    /* Die Fakten-Leiste und der Knopf in die Anleitung: was vom Schnellstart
+       blieb (S4). Die Leiste traegt ihre Haarlinie unten, der Knopf steht
+       darunter mit dem Satz zu den zwei plattformlosen Wegen daneben. */
+    .plat-facts { margin-top: 44px; }
+    .plat-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 4px; }
+    .plat-cta .plat-more { margin-top: 0; flex: 1 1 22rem; }
+    /* What the reader is actually deciding before they install on the machine
+       that will hold their family's health records: what runs, how big it is,
+       what it opens, and whether it talks to anyone. All of it lived
        elsewhere - the footprint on the other page, "0 trackers" 12.000px away. */
-    /* Above the command, not below it. It sat underneath, so the eye reached the
-       copy button and `docker compose up -d` first and the answer to "what does
-       this do to my machine" arrived after the decision was already made. */
     /* Kein auto-fit mehr: `repeat(auto-fit, minmax(196px, 1fr))` ergab bei
        1440px fuenf 211px-Spalten, und die DEUTSCHE "Nach aussen"-Zelle lief
        darin 13 Zeilen - alle fuenf Zellen standen auf 289px, vier davon zu
@@ -911,33 +926,6 @@
     /* Flex-Kind mit Block darin: ohne min-width 0 setzte das <details> die
        Mindestbreite, und der Belegs-Link lief mobil 7px ueber den Rand. */
     .trust-bar li > span { min-width: 0; }
-    /* Der Handgriff zwischen den beiden Befehlsbloecken: .env bearbeiten. Bis
-       2026-09-29 eine Warnbox in Bernstein mit dem Satz, dass ohne Schluessel
-       niemand die Datenbank wieder oeffnet - und damit die letzte Emotion vor
-       dem Schluss-CTA. Die Unumkehrbarkeit steht ausfuehrlich in install.html
-       und auf dieser Seite als dritte Frage unter "Bevor ihr euch festlegt";
-       hier bleibt der Handgriff, neutral gesetzt, mit einem ruhigen Satz zum
-       Aufbewahren des Schluessels. */
-    .quick-step { display: flex; gap: 11px; margin-top: 14px; padding: 13px 16px; border-radius: var(--r-md);
-      /* Die Box traegt Icon, Abstand, Polster und Kante NEBEN dem Text - die
-         gehen auf --m-prose obendrauf, sonst landet die Textspalte bei 62px
-         weniger als die Regel sagt. */
-      max-width: calc(var(--m-prose) + 62px);
-      background: var(--surface); border: 1px solid var(--border);
-      font-size: 0.88rem; line-height: 1.55; color: var(--text-1); }
-    .quick-step svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; color: var(--accent); }
-    .quick-step b { font-weight: 700; }
-    .quick-step code { font-family: var(--ff-mono); font-size: 0.92em; overflow-wrap: anywhere; }
-    /* The start command lives in its own block BELOW the edit step, so the .env edit
-       cannot be skipped by pasting one long chain. Same gap the step takes from
-       the block above it, so the three parts read as one sequence. */
-    .quick-step + .code-wrap { margin-top: 14px; }
-    /* Fielen beim Entfernen der Setup-Sektion mit weg, das <p> blieb stehen: der
-       Satz rutschte damit auf 16px/--text-1 ohne Abstand und las sich als
-       Fortsetzung der Codeplatte, waehrend die <code>-Chips daneben ihre
-       Toenung behielten. Dieselbe Auszeichnung, zwei Erscheinungsbilder. */
-    .quick-note { max-width: var(--m-prose); font-size: 0.9rem; color: var(--text-2); margin-top: 16px; line-height: 1.6; }
-    .quick-note code { font-family: var(--ff-mono); font-size: 0.82rem; background: var(--accent-soft); color: var(--accent-deep); padding: 2px 7px; border-radius: var(--r-xs); }
     /* The one sentence that answers the fear this audience actually has was a
        0.92rem caption in 92% white, under the CTA buttons, at 94% scroll depth.
        It gets a chapter of its own before the install block rather than after
@@ -997,6 +985,7 @@
     .cta-box::before { content: ''; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(70% 100% at 50% -20%, var(--accent-glow), transparent 65%); }
     .cta-box > * { position: relative; z-index: 1; }
+    .cta-box .house-mark { display: block; width: 58px; height: 58px; margin: 0 auto 22px; }
     .cta-box h2 { font-size: clamp(2.1rem, 4.6vw, 3.2rem); font-weight: 700; letter-spacing: -0.035em; color: var(--text-1); margin-bottom: 14px; text-wrap: balance; }
     .cta-box h2 em { font-style: italic; font-weight: 600; color: var(--accent); }
     .cta-box p { color: var(--text-2); font-size: 1.08rem; max-width: 44ch; margin: 0 auto 32px; }
@@ -1020,15 +1009,6 @@
     html.js .mobile-cta.show { opacity: 1; visibility: visible; pointer-events: auto; }
 
     /* ===== Responsive ===== */
-    @media (max-width: 1024px) {
-      .hero .wrap { grid-template-columns: 1fr; gap: 56px; text-align: center; }
-      .hero-sub { max-width: 46ch; margin-left: auto; margin-right: auto; }
-      .hero-actions, .hero-tags { justify-content: center; }
-      .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; }
-      /* c2 was hidden here but c1 kept its -30px outset. Once .hero-visual stops
-         being narrower than the column it hangs past the gutter and the hero's
-         own overflow:hidden shaves it - 6px off at 375px. It tucks in instead. */
-    }
     @media (max-width: 860px) {
       /* Unter 860px hat die Karte rund 310px Inhaltsbreite. Neben einem Telefon
          blieben dem Text 162px, also zwei Woerter pro Zeile - unlesbar. Das
@@ -1057,6 +1037,9 @@
          Querformat-PNG aus <noscript>, zeigt der Rahmen ihren oberen
          Ausschnitt statt eines Zerrbilds. */
       .hero-frame img { aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; }
+      /* Hochformat: auf Telefonbreite gedeckelt, sonst liefe die Aufnahme am
+         Tablet ueber zwei Bildschirme. */
+      .hero-visual { max-width: 420px; }
     }
     @media (max-width: 600px) {
       .hero { padding-bottom: 56px; }
@@ -1184,8 +1167,8 @@
       <ul>
         <li><a href="#screens" data-t="jump_screens">See it first</a></li>
         <li><a href="#swap" data-t="jump_swap">What it replaces</a></li>
-        <li><a href="#handoff" data-t="jump_handoff">Why one app</a></li>
         <li><a href="#family" data-t="jump_family">For the family</a></li>
+        <li><a href="#handoff" data-t="jump_handoff">Why one app</a></li>
         <li><a href="#modules" data-t="jump_modules">Everything your household needs</a></li>
         <li><a href="#longevity" data-t="jump_longevity">Before you commit</a></li>
         <li><a href="#install" data-t="jump_install">Where it runs</a></li>
@@ -1225,21 +1208,17 @@
            reached "MCP endpoint" in the first paragraph a family reads. The
            sentence closes on the claim this audience actually came for instead;
            the homelab criteria are one scroll away, in the grid that owns them. -->
-      <p class="hero-sub" data-t="hero_sub">The self-hosted family planner: tasks, calendar, budget and shopping on a server you own. For a family, a couple, or just you.</p>
+      <p class="hero-sub" data-t="hero_sub">The self-hosted family planner: tasks, calendar, budget and shopping on your own computer at home, not in someone else’s cloud. For a family, a couple, or just you.</p>
       <div class="hero-actions">
         <a href="install.html" class="btn btn-primary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-t="hero_install">Install Yuvomi</span></a>
         <a href="#screens" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span data-t="hero_demo">See it in action</span></a>
       </div>
-      <!-- Drei Chips, nicht fuenf. "MIT-Lizenz" und "24 Sprachen" standen hier
-           UND in der Proof-Leiste eine Zeile tiefer; zusammen ergaben Hero-Tags
-           und Proof-Leiste elf Metadaten-Chips im ersten Bildschirm, von denen
-           keiner sagte, was das Produkt tut. Was hier bleibt, sagt die
-           Proof-Leiste nicht. -->
-      <div class="hero-tags">
-        <span class="tag">Docker · Podman</span>
-        <span class="tag">PWA</span>
-        <span class="tag" data-t="tag_nocloud">No cloud required</span>
-      </div>
+      <!-- Statt der drei Chips ("Docker · Podman", "PWA", "Keine Cloud noetig"):
+           die Technik als Satz unter dem Install-Knopf, die Cloud im Satz
+           darueber, und die Familie bekommt ihre eigene Zeile. Fakten:
+           README "Every member joins by invite link", die 1-Klick-Karten unten. -->
+      <p class="hero-runs" data-t="hero_runs">Installs with Docker or Podman, or in one click on TrueNAS, Umbrel and Unraid.</p>
+      <p class="hero-house"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="hero_house">For the whole household: everyone gets their own login from an invite link, and the app on their phone.</span></p>
     </div>
     <div class="hero-visual">
       <div class="hero-frame">
@@ -1357,21 +1336,21 @@
       alt_f_tasks_m:"Tasks on mobile",
       alt_f_recipes_m:"Recipes on mobile",
       alt_f_budget_m:"Budget on mobile",
-      qs_c1:'# Pre-built image - Docker', qs_c2:'# two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY',
-      nav_main:'Main', foot_nav:'Footer', code_label:'Command block',
-      copy:'Copy', copied:'Copied!', copyfail:'Copy failed',
+      nav_main:'Main', foot_nav:'Footer',
       nav_gh:'GitHub', nav_install:'Install',
       meta_desc:'Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.',
       hero_badge:'Open source · free · no subscriptions',
       hero_h1_pre:'One home', hero_h1_em:'instead of many subscriptions.',
-      hero_sub:'The self-hosted family planner: tasks, calendar, budget and shopping on a server you own. For a family, a couple, or just you.',
+      hero_sub:'The self-hosted family planner: tasks, calendar, budget and shopping on your own computer at home, not in someone else’s cloud. For a family, a couple, or just you.',
       long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB, for amd64 and arm64 - Raspberry\u00a0Pi\u00a04\u00a0and\u00a05 included',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
       tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.',
       tb_out_more:'Which features', tb_out_list:'Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.',
       tb_data_k:'Your data', tb_data_v:'One SQLite file at', tb_data_v2:'Copying it is the whole export, unless documents live outside the database.',
-      hero_install:'Install Yuvomi', hero_demo:'See it in action', tag_nocloud:'No cloud required',
+      hero_install:'Install Yuvomi', hero_demo:'See it in action',
+      hero_runs:'Installs with Docker or Podman, or in one click on TrueNAS, Umbrel and Unraid.',
+      hero_house:'For the whole household: everyone gets their own login from an invite link, and the app on their phone.',
       gal_eyebrow:'See it first', gal_title:'Your family’s plans, <em>at a glance.</em>',
       gal_desc:'No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.',
       gal_meals_k:'Meals', gal_meals_c:'<b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.',
@@ -1415,9 +1394,8 @@
       plat_truenas:'In the SCALE Community Apps catalog: install from the web UI, no terminal.',
       plat_umbrel:'Available in the Umbrel App Store; everything stays on your Umbrel.',
       plat_unraid:'A Community Apps template: add it straight from the Unraid Apps tab.',
-      plat_oneclick:'1-click', plat_start:'Start here', plat_guide:'Guide', to_top:'Back to top',
-      quick_env:'<b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.',
-      quick_note:'Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy.', cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
+      plat_oneclick:'1-click', plat_start:'Start here', plat_guide:'Guide', plat_cta:'Open the install guide', to_top:'Back to top',
+      cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
       /* "Get started" brach als einziger CTA die Installieren-Verbfamilie
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
          Icon, also auch dasselbe Verb. */
@@ -1480,21 +1458,21 @@
       alt_f_tasks_m:"Aufgaben auf dem Handy",
       alt_f_recipes_m:"Rezepte auf dem Handy",
       alt_f_budget_m:"Budget auf dem Handy",
-      qs_c1:'# Fertiges Image - Docker', qs_c2:'# zwei Werte: einer für SESSION_SECRET, einer für DB_ENCRYPTION_KEY',
-      nav_main:'Hauptnavigation', foot_nav:'Fußzeile', code_label:'Befehlsblock',
-      copy:'Kopieren', copied:'Kopiert!', copyfail:'Kopieren fehlgeschlagen',
+      nav_main:'Hauptnavigation', foot_nav:'Fußzeile',
       nav_gh:'GitHub', nav_install:'Installieren',
       meta_desc:'Selbst gehosteter Planer für Familien, Paare und Alleinlebende: Aufgaben, Essen, Kalender-Sync und Budget auf eurem eigenen Server. Open Source, ohne Abo, ohne Tracker.',
       hero_badge:'Open Source · kostenlos · keine Abos',
       hero_h1_pre:'Ein Zuhause', hero_h1_em:'statt vieler Abos.',
-      hero_sub:'Der selbst gehostete Familienplaner: Aufgaben, Kalender, Budget und Einkauf auf einem Server, der euch gehört. Für eine Familie, ein Paar oder euch allein.',
+      hero_sub:'Der selbst gehostete Familienplaner: Aufgaben, Kalender, Budget und Einkauf auf eurem eigenen Rechner zu Hause statt in einer fremden Cloud. Für eine Familie, ein Paar oder euch allein.',
       long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB, für amd64 und arm64 - auch Raspberry\u00a0Pi\u00a04\u00a0und\u00a05',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
       tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
       tb_out_more:'Welche Funktionen', tb_out_list:'Das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.',
       tb_data_k:'Eure Daten', tb_data_v:'Eine einzige SQLite-Datei unter', tb_data_v2:'Kopieren ist der ganze Export, solange die Dokumente in der Datenbank liegen.',
-      hero_install:'Yuvomi installieren', hero_demo:'App ansehen', tag_nocloud:'Keine Cloud nötig',
+      hero_install:'Yuvomi installieren', hero_demo:'App ansehen',
+      hero_runs:'Installation mit Docker oder Podman, oder mit einem Klick auf TrueNAS, Umbrel und Unraid.',
+      hero_house:'Für den ganzen Haushalt: Alle bekommen per Einladungslink ein eigenes Konto und die App aufs Handy.',
       gal_eyebrow:'Erst sehen', gal_title:'Die Pläne der Familie, <em>auf einen Blick.</em>',
       gal_desc:'Kein Demo-Konto, kein Verkaufsgespräch. Die Bildschirme, die eure Familie täglich öffnet, in der Größe, in der ihr sie wirklich nutzt. Der Rest kommt weiter unten.',
       gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Alle Mahlzeiten der Woche, an einem Ort geplant.</b> Vom Frühstück bis zum Snack, per Ziehen verteilt und für alle im Haus da.',
@@ -1535,9 +1513,8 @@
       plat_truenas:'Im SCALE Community Apps Catalog: Installation über die Web-UI, kein Terminal.',
       plat_umbrel:'Im Umbrel App Store verfügbar; alles bleibt auf eurem Umbrel.',
       plat_unraid:'Ein Community-Apps-Template: direkt über den Unraid-Apps-Tab hinzufügen.',
-      plat_oneclick:'1 Klick', plat_start:'Hier starten', plat_guide:'Anleitung', to_top:'Nach oben',
-      quick_env:'<b>Öffnet jetzt <code>.env</code> und ersetzt beide <code>REPLACE_WITH_…</code>-Platzhalter</b> durch die zwei eben erzeugten Werte. Solange noch ein Platzhalter drinsteht, startet Yuvomi nicht. Legt eine Kopie des Schlüssels zu euren anderen Passwörtern. Wer ohne Verschlüsselung fahren will, leert stattdessen die Zeile <code>DB_ENCRYPTION_KEY</code>.',
-      quick_note:'Dann <code>http://localhost:3000</code> öffnen. Beim ersten Aufruf legt ihr euer Admin-Konto an. Lieber geführt? Der <a href="install.html#installer">schrittweise Installer</a> richtet SSO und Backups ein und bereitet Yuvomi auf euren HTTPS-Reverse-Proxy vor.', cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
+      plat_oneclick:'1 Klick', plat_start:'Hier starten', plat_guide:'Anleitung', plat_cta:'Zur Installationsanleitung', to_top:'Nach oben',
+      cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
       cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
       footer_heart:'Mit Sorgfalt gebaut für Haushalte, die Privatsphäre und Einfachheit schätzen.',
       foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
@@ -1742,6 +1719,73 @@
   </div>
 </section>
 
+<!-- Position (S4, 2026-10-24): die Familie steht vor "Warum eine App",
+     nicht mehr dahinter. Der erste Bildschirm verspricht ihr eigene Konten,
+     und die Einloesung lag eine ganze Kapitellaenge spaeter (Telefon
+     ~6.000px, davon 1.600px Modul-Uebergaben, die einen Admin ueberzeugen,
+     aber keinen Mitbewohner). Ein Tausch, keine Umsortierung. -->
+<!-- FUER DIE FAMILIE (Critique 2026-09-29). Bis hierher sprach die Seite zu
+     dem, der den Server betreibt; wer mit ihm am Kuechentisch sitzt, kam nicht
+     vor. Drei Momente aus Sicht der Familie, jeder am Code belegt:
+       - Wand-Modus, Display-Konto, Abhaken fuer wen:
+         SPEC "Wall mode" und "Display Accounts", CHANGELOG 2.60.0 und 2.68.0
+       - App aufs Handy, Push (nur mit HTTPS), zuletzt Gesehenes offline lesbar:
+         SPEC "PWA offline and update contract", "Read-only offline data",
+         "Web Push"; public/sw.js
+       - Einladungslink mit eigenem Passwort, Rechte je Familienrolle und
+         Modul, Kinderkonto ohne Link: SPEC "Invites" und "Roles and
+         permissions", CHANGELOG 1.75.0 und 2.62.0, server/permissions.js
+     Seit Runde 2 eine Kapitelmarke (Eyebrow + kursiver Titelteil wie die
+     anderen): ohne Marke stand die Sektion als einziger linksbuendiger Kopf
+     ausserhalb des Seitensystems. Dafuer gab das Band "Was es ersetzt" seine
+     Marke ab - hoechstens die Haelfte der Sektionen darf eine tragen.
+     Das Bild war bis v2.70.0 nur das Markenmotiv (drei Kreise), weil ein
+     leerer Bildplatz schlechter gewesen waere als keiner; seit der Aufnahme
+     nach dem Release steht dort der Wand-Modus selbst, der erste der drei
+     Momente darunter. -->
+<section class="family" id="family">
+  <div class="wrap">
+    <div class="fam-grid">
+      <!-- Der Wand-Modus selbst, seit v2.70.0 aus der Aufnahme-Pipeline
+           (dashboard-wall-*-web, Tablet quer). Er ersetzt die Kreis-Grafik, die
+           bis dahin den Platz hielt. Nur eine Web-Variante: das Motiv IST das
+           Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
+      <div class="fam-shot reveal">
+        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
+      </div>
+      <div class="sec-head lead fam-head reveal">
+        <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
+        <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, <em>for every age.</em></h2>
+        <p class="sec-desc" data-t="fam_desc">Everyone in the house gets their own login from a link and the app on their phone. A terminal, if needed at all, is only for whoever sets it up.</p>
+      </div>
+      <ul class="fam-list">
+        <li class="fam-item reveal">
+          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
+          <div class="fam-text">
+            <h3 data-t="fam_1_t">The tablet on the kitchen wall</h3>
+            <p data-t="fam_1_d">Wall mode shows today’s plan and who is up, readable across the room. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.</p>
+          </div>
+        </li>
+        <li class="fam-item reveal">
+          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
+          <div class="fam-text">
+            <h3 data-t="fam_2_t">The app on every phone</h3>
+            <p data-t="fam_2_d">It goes on the home screen straight from the browser, no app store. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.</p>
+          </div>
+        </li>
+        <li class="fam-item reveal">
+          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>
+          <div class="fam-text">
+            <h3 data-t="fam_3_t">An invite, and just the right access</h3>
+            <p data-t="fam_3_d">An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <section class="handoff" id="handoff">
   <div class="wrap">
     <div class="sec-head lead reveal">
@@ -1811,68 +1855,6 @@
         <p class="ho-note" data-t="ho_4_d">Pantry keeps amounts and best-before dates, and reminds you before something expires. What runs low or runs out goes onto the shared list from its row, and buying it books it back into stock. Household of five or household of one, the loop is the same.</p>
       </li>
     </ol>
-  </div>
-</section>
-
-<!-- FUER DIE FAMILIE (Critique 2026-09-29). Bis hierher sprach die Seite zu
-     dem, der den Server betreibt; wer mit ihm am Kuechentisch sitzt, kam nicht
-     vor. Drei Momente aus Sicht der Familie, jeder am Code belegt:
-       - Wand-Modus, Display-Konto, Abhaken fuer wen:
-         SPEC "Wall mode" und "Display Accounts", CHANGELOG 2.60.0 und 2.68.0
-       - App aufs Handy, Push (nur mit HTTPS), zuletzt Gesehenes offline lesbar:
-         SPEC "PWA offline and update contract", "Read-only offline data",
-         "Web Push"; public/sw.js
-       - Einladungslink mit eigenem Passwort, Rechte je Familienrolle und
-         Modul, Kinderkonto ohne Link: SPEC "Invites" und "Roles and
-         permissions", CHANGELOG 1.75.0 und 2.62.0, server/permissions.js
-     Seit Runde 2 eine Kapitelmarke (Eyebrow + kursiver Titelteil wie die
-     anderen): ohne Marke stand die Sektion als einziger linksbuendiger Kopf
-     ausserhalb des Seitensystems. Dafuer gab das Band "Was es ersetzt" seine
-     Marke ab - hoechstens die Haelfte der Sektionen darf eine tragen.
-     Das Bild war bis v2.70.0 nur das Markenmotiv (drei Kreise), weil ein
-     leerer Bildplatz schlechter gewesen waere als keiner; seit der Aufnahme
-     nach dem Release steht dort der Wand-Modus selbst, der erste der drei
-     Momente darunter. -->
-<section class="family" id="family">
-  <div class="wrap">
-    <div class="fam-grid">
-      <!-- Der Wand-Modus selbst, seit v2.70.0 aus der Aufnahme-Pipeline
-           (dashboard-wall-*-web, Tablet quer). Er ersetzt die Kreis-Grafik, die
-           bis dahin den Platz hielt. Nur eine Web-Variante: das Motiv IST das
-           Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
-      <div class="fam-shot reveal">
-        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
-        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
-      </div>
-      <div class="sec-head lead fam-head reveal">
-        <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
-        <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, <em>for every age.</em></h2>
-        <p class="sec-desc" data-t="fam_desc">Everyone in the house gets their own login from a link and the app on their phone. A terminal, if needed at all, is only for whoever sets it up.</p>
-      </div>
-      <ul class="fam-list">
-        <li class="fam-item reveal">
-          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
-          <div class="fam-text">
-            <h3 data-t="fam_1_t">The tablet on the kitchen wall</h3>
-            <p data-t="fam_1_d">Wall mode shows today’s plan and who is up, readable across the room. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.</p>
-          </div>
-        </li>
-        <li class="fam-item reveal">
-          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg></span>
-          <div class="fam-text">
-            <h3 data-t="fam_2_t">The app on every phone</h3>
-            <p data-t="fam_2_d">It goes on the home screen straight from the browser, no app store. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.</p>
-          </div>
-        </li>
-        <li class="fam-item reveal">
-          <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>
-          <div class="fam-text">
-            <h3 data-t="fam_3_t">An invite, and just the right access</h3>
-            <p data-t="fam_3_d">An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all.</p>
-          </div>
-        </li>
-      </ul>
-    </div>
   </div>
 </section>
 
@@ -2184,9 +2166,13 @@
          die zu keiner Plattform gehoeren, sind die sieben Tabs drueben. Vorher
          zaehlte man hier sechs und dort sieben, ohne dass etwas die Differenz
          erklaerte. -->
-    <p class="plat-more reveal" data-t="plat_more">Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
-
-    <div class="quick-docker reveal">
+    <!-- Kein Schnellstart mehr (S4, 2026-10-24). Hier stand der Docker-Weg ein
+         zweites Mal, Befehl fuer Befehl wie in install.html, und die Seite
+         endete im Terminal, direkt vor dem Familien-CTA. Was bleibt, ist was
+         ein Admin VOR dem Klick wissen will (die Leiste: Image, Bedarf,
+         Volumes, Daten, Verbindungen nach aussen) und ein Knopf in die
+         Anleitung, die jeden Weg ausfuehrlich fuehrt. -->
+    <div class="plat-facts reveal">
       <ul class="trust-bar">
         <!-- Architekturen: `platforms` in .github/workflows/docker-publish.yml
              (test:docs-landing haelt beide Seiten gleich), Raspberry Pi 4/5:
@@ -2197,25 +2183,10 @@
         <li class="tb-wide"><b data-t="tb_data_k">Your data</b> <span><span data-t="tb_data_v">One SQLite file at</span> <code>/data/yuvomi.db</code>. <span data-t="tb_data_v2">Copying it is the whole export, unless documents live outside the database.</span></span></li>
         <li class="tb-wide"><b data-t="tb_out_k">Outbound</b> <span><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">The update check in the source</a></span></li>
       </ul>
-      <div class="code-wrap"><div class="code-block"><span class="comment" data-t="qs_c1"># Pre-built image - Docker</span>
-curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example
-cp .env.example .env
-<span class="comment" data-t="qs_c2"># two values: one for SESSION_SECRET, one for DB_ENCRYPTION_KEY</span>
-openssl rand -hex 32
-openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml&#10;curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/.env.example&#10;cp .env.example .env&#10;openssl rand -hex 32&#10;openssl rand -hex 32"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-      <!-- The .env edit sits BETWEEN the two copy blocks on purpose. It used to be a
-           warning under one block that ended in `docker compose up -d`, so pasting the
-           whole thing started the container while .env still held the two
-           REPLACE_WITH_ placeholders from .env.example - on which the app refuses to
-           start (server/auth.js, server/db.js). A human step cannot be
-           a footnote to a copyable chain that has already run past it. -->
-      <p class="quick-step">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        <span data-t="quick_env"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
-      </p>
-      <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-      <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy.</p>
+    </div>
+    <div class="plat-cta reveal">
+      <a href="install.html" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span data-t="plat_cta">Open the install guide</span></a>
+      <p class="plat-more" data-t="plat_more">Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
     </div>
   </div>
 </section>
@@ -2225,6 +2196,9 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
 <section class="cta">
   <div class="wrap">
     <div class="cta-box reveal">
+      <!-- Dasselbe Zeichen wie die Haushaltszeile im Hero: die Seite beginnt
+           und endet mit dem Haushalt, nicht mit einem Terminal. -->
+      <svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>
       <h2 data-t="cta_title">Set it up once. <em>Then the whole family plans with it.</em></h2>
       <p data-t="cta_desc">After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.</p>
       <div class="cta-actions">
@@ -2241,13 +2215,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
 
 <!-- FOOTER -->
 </main>
-<!-- Die Kopier-Quittung war bisher nur SICHTBAR: flash() tauscht den
-     Knopftext, und ein Namenswechsel am fokussierten Element wird je nach
-     Screenreader gar nicht oder als neuer Knopf angesagt. Eine eigene
-     Live-Region sagt das Ergebnis, ohne den Namen des Knopfes anzutasten -
-     und sie steht statisch im Dokument, weil eine erst beim Klick erzeugte
-     Region nicht zuverlaessig beobachtet wird. -->
-<p id="copyStatus" class="sr-only" role="status" aria-live="polite"></p>
 
 <footer class="site-foot">
   <div class="foot-in">
@@ -2354,23 +2321,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   }
   narrowShots.addEventListener('change', applyShots);
   document.addEventListener('yuvomi:theme', applyShots);
-  /* Same rule as the §5 table on the privacy page: a box that scrolls has to be
-     reachable from the keyboard (SC 2.1.1) - and named, because aria-label on a
-     roleless <div> is ignored. The quick-start plate scrolls on a phone.
-     Conditional, so the desktop layout gains no dead tab stop. */
-  function syncCodeScroll(){
-    document.querySelectorAll('.code-block').forEach(function(el){
-      if (el.scrollWidth > el.clientWidth + 1) {
-        el.setAttribute('tabindex', '0');
-        el.setAttribute('role', 'group');
-        el.setAttribute('aria-label', T[lang].code_label);
-      } else {
-        el.removeAttribute('tabindex');
-        el.removeAttribute('role');
-        el.removeAttribute('aria-label');
-      }
-    });
-  }
   function applyLang(){
     document.documentElement.lang = lang;
     applyTexts(lang);
@@ -2378,7 +2328,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     var rel = document.getElementById('foot-released');
     if (rel) { var rp = (rel.getAttribute('data-released') || '').split('-'); if (rp[0]) { rel.textContent = new Date(+rp[0], (+rp[1] || 1) - 1, +rp[2] || 1).toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }); } }
     applyShots();
-    syncCodeScroll();
     /* Die deutsche Fassung ist laenger: alles, was Positionen cacht (Scroll-Spy),
        misst auf dieses Signal neu. */
     document.dispatchEvent(new Event('yuvomi:layout'));
@@ -2432,14 +2381,14 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       pObs.observe(hero);
     } else { pill.classList.add('show'); }
     /* Weichen nach Lage statt nach Scrollrichtung (Begruendung am CSS unter
-       700px): `cta-yield` steht, solange eine Codeplatte oder die CTA-Knoepfe
+       700px): `cta-yield` steht, solange ein anderer Install-Knopf (Anleitung, CTA)
        das untere Band schneiden, in dem die Pille sitzt (16px + 53px, mit
        Luft 96px), oder solange das Sprungmenue offen ist. Das
        Band ist ein Observer mit oben weggeschnittener Wurzel; seine Hoehe haengt
        an innerHeight, also wird er bei resize neu gebaut. */
     var root = document.documentElement;
     var jump = document.getElementById('navJump');
-    var zones = document.querySelectorAll('.quick-docker .code-wrap, .cta-actions');
+    var zones = document.querySelectorAll('.plat-cta .btn, .cta-actions');
     var BAND = 96, inBand = [], zObs = null;
     function update(){ root.classList.toggle('cta-yield', inBand.length > 0 || !!(jump && jump.open)); }
     function watch(){
@@ -2460,58 +2409,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     addEventListener('resize', function(){ cancelAnimationFrame(rz); rz = requestAnimationFrame(watch); });
     if (jump) jump.addEventListener('toggle', update);
     watch();
-  })();
-  /* Copy - Clipboard API with a legacy execCommand fallback and a visible
-     failure state, so it never fails silently (e.g. on an insecure origin). */
-  (function(){
-    var status = document.getElementById('copyStatus');
-    function flash(btn, cls, key){
-      var span = btn.querySelector('span');
-      var label = T[lang][key] || key;
-      btn.classList.add(cls);
-      if (span) span.textContent = label;
-      // Erst leeren, dann setzen: zweimal derselbe Text hintereinander ist fuer
-      // eine Live-Region keine Aenderung und wird stumm verschluckt.
-      if (status) { status.textContent = ''; status.textContent = label; }
-      setTimeout(function(){
-        btn.classList.remove(cls);
-        if (span) span.textContent = T[lang].copy || 'Copy';
-      }, 2000);
-    }
-    function legacyCopy(text){
-      try {
-        var ta = document.createElement('textarea');
-        ta.value = text; ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed'; ta.style.top = '-9999px';
-        document.body.appendChild(ta); ta.select();
-        var ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        return ok;
-      } catch (e) { return false; }
-    }
-    /* The failure label used to read "Press Ctrl+C" - wrong on the Mac this
-       audience largely uses, and pointless either way because nothing was
-       selected. Select the source text instead, so the shortcut the reader
-       already knows actually does something. */
-    function selectSource(btn){
-      var host = btn.closest('.code-wrap') || btn.parentNode;
-      var el = host.querySelector('.code-block') || host.querySelector('span');
-      if (!el) return;
-      try {
-        var r = document.createRange(); r.selectNodeContents(el);
-        var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      } catch (e) {}
-    }
-    document.querySelectorAll('.copy-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var text = btn.getAttribute('data-copy'); if (!text) return;
-        var onOk = function(){ flash(btn, 'copied', 'copied'); };
-        var onFail = function(){ if (legacyCopy(text)) onOk(); else { selectSource(btn); flash(btn, 'failed', 'copyfail'); } };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(onOk).catch(onFail);
-        } else { onFail(); }
-      });
-    });
   })();
   /* Fortschritt = gescrollte Strecke von der scrollbaren Gesamtstrecke. Auf
      `scroll` passiv, damit es das Scrollen nicht bremst. */
@@ -2550,7 +2447,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
       if (d.open && e.relatedTarget && !d.contains(e.relatedTarget)) d.removeAttribute('open');
     });
   })();
-  addEventListener('resize', syncCodeScroll);
   /* Papier klappt nichts auf: die Outbound-Liste gehoert auf den Ausdruck. */
   addEventListener('beforeprint', function(){ document.querySelectorAll('details.tb-more').forEach(function(d){ d.open = true; }); });
   /* Modulbeschreibungen ein- und wieder ausblenden (jede Breite). Die neuen Zeilen

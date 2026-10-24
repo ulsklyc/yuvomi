@@ -660,8 +660,10 @@ test('der Guard aus (6) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(f1, /README\.md sagt nicht mehr/) && hit(f1, /README\.md sagt wieder \/writes the shopping list/), f1.join(' | '));
   const f2 = factFindings(withReadme('de', 'richtet Single', 'richtet HTTPS, Single'));
   assert.ok(hit(f2, /README\.de\.md sagt wieder \/richtet HTTPS,/), f2.join(' | '));
-  const oldPage = real.pages['docs/index.html'].replace('sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy', 'handles HTTPS, SSO and backups for you');
-  assert.notEqual(oldPage, real.pages['docs/index.html'], 'Vorbedingung: quick_note steht so auf der Homepage');
+  // `quick_note` (der Satz von damals) ging mit dem Schnellstart der Homepage
+  // (S4, 2026-10-24); der Altsatz kommt deshalb als eigener Absatz zurueck.
+  const oldPage = real.pages['docs/index.html'].replace('</main>', '<p>The installer handles HTTPS, SSO and backups for you.</p></main>');
+  assert.notEqual(oldPage, real.pages['docs/index.html'], 'Vorbedingung: die Homepage hat ein </main>');
   assert.ok(hit(factFindings({ ...real, pages: { ...real.pages, 'docs/index.html': oldPage } }), /docs\/index\.html sagt wieder \/handles HTTPS/));
 
   // Die LAN-Zeile verliert einen Schalter, und .env.example bekommt einen neuen.

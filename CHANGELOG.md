@@ -65,6 +65,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   menu answer a press the way the app does, the jump menu and the troubleshooting answers fold
   open and closed instead of snapping, and the lower half of the landing page is laid out only
   when it comes near. With reduced motion turned on, nothing moves and everything is visible.
+- **The first screen of yuvomi.cloud speaks to the whole household, and the page ends with it.**
+  The opening screenshot used to fill half the width, too small to read the app in it; it now
+  spans the full column below the headline, with the phone beside it, and the two drift apart as
+  you scroll past - that movement was announced above but stood still until now. Under the
+  Install button one plain line says how it installs (Docker or Podman, or one click on TrueNAS,
+  Umbrel and Unraid) instead of three unexplained tags, and the next line answers the question
+  the rest of the family asks: everyone gets their own login from an invite link and the app on
+  their phone. The family section comes right after "What it replaces", well before the module
+  hand-offs - on a phone about 1,400px earlier. The landing page no longer repeats the Docker
+  quick start from the install guide: the platform cards and the facts an admin checks first
+  (image, memory, volumes, data, outbound connections) stay, with one button into the guide, and
+  the page closes on the family call to action under the same three-circle mark as the opening
+  line. On a phone the page is about 570px shorter.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

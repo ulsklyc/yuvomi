@@ -1474,12 +1474,18 @@ test('install.html: Schritt 2 und die Neustart-Hilfe nennen den Platzhalter, an 
   }
 });
 
+// Die Startseite traegt seit S4 (2026-10-24) keinen Schnellstart mehr - der
+// Docker-Weg stand dort Befehl fuer Befehl ein zweites Mal. Die Mindestzahl gilt
+// deshalb nur noch install.html (dort haelt sie den Extraktor ehrlich); die
+// Startseite wird weiter geprueft, falls sie je wieder eine Datei laedt.
+const MIN_DOWNLOADS = { 'index.html': 0, [INSTALL]: 2 };
+
 test('docs: jede heruntergeladene Datei und jede Compose-Datei existiert im Repository', () => {
   for (const page of ['index.html', INSTALL]) {
     const html = read(page);
     const fetched = [...html.matchAll(/raw\.githubusercontent\.com\/ulsklyc\/yuvomi\/main\/([\w./-]+)/g)].map((m) => m[1]);
     const composed = [...html.matchAll(/compose -f ([\w./-]+\.ya?ml)/g)].map((m) => m[1]);
-    assert.ok(fetched.length >= 2, `${page}: keine Download-URL gefunden - Muster veraltet?`);
+    assert.ok(fetched.length >= MIN_DOWNLOADS[page], `${page}: keine Download-URL gefunden - Muster veraltet?`);
     const missing = [...new Set([...fetched, ...composed])].filter((f) => !existsSync(resolve(ROOT, f)));
     assert.deepEqual(missing, [], `${page} verweist auf Dateien, die es im Repository nicht gibt`);
   }
@@ -3606,4 +3612,56 @@ test('der Ankunfts-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const everywhere = js.replace(/top\s*>=\s*fold/g, 'top >= -Infinity');
   assert.notEqual(everywhere, js);
   assert.ok(hit(motionFindings(pages, css, everywhere), /ohne Pruefung gegen den ersten Bildschirm/));
+});
+
+/* ============================================================================
+ * (21) Erster Bildschirm (S4, 2026-10-24).
+ *
+ * Die Signatur aus S3 (die Hero-Collage trennt sich beim Wegscrollen) hing an
+ * einer view-timeline am .hero-visual - und stand trotzdem still: .hero trug
+ * overflow:hidden, das macht ihn zum Scroll-Container, und view() bindet an
+ * den NAECHSTEN Scroll-Container. Der scrollt nie, die Animation blieb bei
+ * Fortschritt 0. Der Guard verlangt, dass jeder Vorfahr einer view-timeline,
+ * der etwas abschneidet, das mit `clip` tut. Dazu der Haushalt im ersten
+ * Bildschirm: die Zeile steht im Hero, nicht erst in der Familien-Sektion.
+ * ========================================================================== */
+const TIMELINE_ANCESTORS = { '.hero-visual': ['.hero'] };
+
+function firstScreenFindings(html) {
+  const found = [];
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)])
+    .filter((r) => !r.selector.startsWith('@') && !r.at.some((a) => /\bprint\b/.test(a)));
+  for (const [subject, ancestors] of Object.entries(TIMELINE_ANCESTORS)) {
+    if (!rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(subject)
+      && declarations(r.body).some(([n]) => n === 'view-timeline'))) continue;
+    for (const anc of ancestors) {
+      for (const r of rules.filter((x) => x.selector.split(',').map((s) => s.trim()).includes(anc))) {
+        const ov = declarations(r.body).filter(([n]) => /^overflow(-[xy])?$/.test(n)).map(([, v]) => v);
+        if (ov.length && ov[ov.length - 1] !== 'clip' && /hidden|auto|scroll/.test(ov[ov.length - 1])) {
+          found.push(`${anc} { overflow: ${ov[ov.length - 1]} } macht den Vorfahren von ${subject} zum Scroll-Container - die view-timeline steht still`);
+        }
+      }
+    }
+  }
+  const hero = html.match(/<header class="hero"[\s\S]*?<\/header>/)?.[0] || '';
+  if (!/data-t="hero_house"/.test(hero)) found.push('kein Haushaltssatz (hero_house) im Hero');
+  for (const lang of ['en', 'de']) {
+    const v = dictValue(dictBlock(html, lang), 'hero_house');
+    if (!v || !/invite|Einladung/i.test(v)) found.push(`hero_house (${lang}) nennt den Einladungslink nicht`);
+  }
+  return found;
+}
+
+test('index.html: die Hero-Signatur kann scrollen, und der Haushalt steht im ersten Bildschirm', () => {
+  assert.deepEqual(firstScreenFindings(read('index.html')), []);
+});
+
+test('der Erster-Bildschirm-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const s3 = html.replace('overflow: hidden; overflow: clip; }', 'overflow: hidden; }');
+  assert.notEqual(s3, html, 'Vorbedingung: .hero mit hidden/clip');
+  assert.deepEqual(firstScreenFindings(s3), ['.hero { overflow: hidden } macht den Vorfahren von .hero-visual zum Scroll-Container - die view-timeline steht still']);
+  const noHouse = html.replace(/<p class="hero-house">[\s\S]*?<\/p>/, '');
+  assert.notEqual(noHouse, html);
+  assert.deepEqual(firstScreenFindings(noHouse), ['kein Haushaltssatz (hero_house) im Hero']);
 });
