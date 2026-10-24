@@ -6131,12 +6131,15 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
   assert.equal(leadStep('-175.444,93 €'), 'long');
   assert.equal(leadStep('CHF 175’444.93'), 'xlong');
   assert.equal(leadStep('MX$ 175,444,933.00'), 'xxlong');
-  assert.equal(leadCardClass('175.444,93 €'), 'metric-card--lead metric-card--lead-long');
+  // R23 (D12): die Zeichenzahl entscheidet nur noch die Viererreihe (Layout),
+  // nicht mehr die Schrift - EINE Stufe je Ort, kleiner nur bei Ueberlauf.
+  assert.equal(leadCardClass('175.444,93 €'), 'metric-card--lead');
+  assert.equal(glanceLeadClass('MX$ 175,444,933.00'), 'budget-glance--lead');
   assert.equal(glanceLeadClass('2.503,89 €'), 'budget-glance--lead');
   // Ohne `lead` bleibt die Kurzzeile, wie sie war (Inventar, Haushaltshilfe, Aufteilung).
   assert.match(metricGlanceHtml({ label: 'a', value: '3' }), /<div class="row-carrier budget-glance">/);
   assert.match(metricGlanceHtml({ label: 'a', value: '175.444,93 €', lead: true }),
-    /<div class="row-carrier budget-glance budget-glance--lead budget-glance--lead-long">/);
+    /<div class="row-carrier budget-glance budget-glance--lead">/);
 
   // Uebersicht: Saldo fuehrt - in der Kurzzeile und als Karte; die Reihe weiss es.
   const html = uebersicht({ month: monthKey(0), entries: [zeile()], summary: summe });
@@ -6157,8 +6160,8 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
       summary: { active_count: 2, remaining_principal: 175444.93, has_interest: true, remaining_installments: 12, paid_amount: 500 },
     };
     const loans = budgetUi.renderLoansPage();
-    assert.match(loans, /budget-glance--lead budget-glance--lead-long">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile');
-    assert.match(loans, /class="metric-grid metric-grid--led[^"]*\bmetric-grid--long-lead budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead metric-card--lead-long">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
+    assert.match(loans, /budget-glance--lead">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile');
+    assert.match(loans, /class="metric-grid metric-grid--led[^"]*\bmetric-grid--long-lead budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
     // R22 S10 (aus S7): am Tablet lief „174.644,93 €" aus der Viererkarte. Die
     // Reihe mit langer Leitzahl bricht unter ~928px Zeile in zwei mal zwei.
     const quadRule = [...eachRule(budgetCss)].find((r) => r.at.some((a) => /@container\s+budget-page\s*\(max-width:\s*927px\)/.test(a))
@@ -6180,39 +6183,86 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
     abosGlance.state.summary = abosVorher;
   }
 
-  // CSS: die Stufen kommen aus Tokens und clamp(), nie als Literal; der Wert
-  // bricht nicht um; die Nebenwerte stehen unter der Zahl.
+  // CSS (R23, D12): EINE feste Stufe je Ort aus Tokens - Kurzzeile Title 1,
+  // Seitenspalte Large Title, beides semibold; kleiner nur ueber `data-fit`,
+  // das fitMetricLeads() nach einer Messung setzt. Keine Laengenstufen mehr.
   const rules = [...eachRule(read('../public/styles/panel.css'))];
   const rule = (sel) => rules.find((r) => r.at.length === 0 && r.selector.trim() === sel);
   const size = (sel) => /font-size:\s*([^;]+);?\s*(?:[a-z-]+:|$)/.exec(rule(sel)?.body.replace(/\/\*[\s\S]*?\*\//g, '') ?? '')?.[1].trim();
-  assert.equal(size('.budget-glance--lead .budget-glance__value'), 'clamp(var(--text-3xl), 11vw, var(--text-5xl))');
-  assert.equal(size('.budget-glance--lead-long .budget-glance__value'), 'clamp(var(--text-3xl), 9vw, var(--text-4xl))');
-  assert.equal(size('.budget-glance--lead-xlong .budget-glance__value'), 'clamp(var(--text-2xl), 7.5vw, var(--text-3xl))');
+  assert.equal(size('.budget-glance--lead .budget-glance__value'), 'var(--text-3xl)', 'mobil 28px, fest');
+  assert.match(rule('.budget-glance--lead .budget-glance__value').body, /font-weight:\s*var\(--font-weight-semibold\)/);
+  assert.equal(size('.budget-glance .budget-glance__row .budget-glance__value[data-fit="1"]'), 'var(--text-2xl)');
+  assert.equal(size('.budget-glance .budget-glance__row .budget-glance__value[data-fit="2"]'), 'var(--text-xl)');
+  const panelText = read('../public/styles/panel.css');
+  assert.doesNotMatch(panelText, /lead-(?:long|xlong|xxlong)\b/, 'keine Laengenstufen-Klassen mehr');
+  assert.doesNotMatch(panelText, /\d+(?:\.\d+)?(?:vw|cqi)\s*,\s*var\(--text-[345]xl\)/, 'keine Viewport-/Container-Leiter fuer die Leitzahl');
   assert.match(rule('.budget-glance__value').body, /white-space:\s*nowrap/, 'ein Betrag ueber zwei Zeilen ist keine Kennzahl');
   assert.match(rule('.budget-glance--lead .budget-glance__flows').body, /flex:\s*1 0 100%/, 'die Nebenwerte bekommen ihre eigene Zeile');
   // In der Reihe treten die anderen zurueck - in jeder Stufe der Leiter.
   const quiet = rules.filter((r) => r.selector.trim() === '.metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value');
   assert.equal(quiet.length, 3, 'Grundregel plus die zwei Container-Stufen');
   assert.match(quiet[0].body, /font-weight:\s*var\(--font-weight-semibold\)/);
-  // In der Seitenspalte steigt die Leitzahl: die Spalte sagt es mit dem leeren
-  // `--metric-rail`, EINE Regel in panel.css setzt ihn vor die Stufe. Ohne ihn
-  // ist `--_metric-lead` ungueltig und die Stufenleiter der Reihe greift.
-  const panelCss = read('../public/styles/panel.css');
+  // In der Seitenspalte steigt die Leitzahl auf Large Title: die Spalte sagt es
+  // mit dem leeren `--metric-rail`, EINE Regel in panel.css setzt ihn vor die
+  // Stufe. Ohne ihn ist `--_metric-lead` ungueltig und Title 1 greift.
+  const panelCss = panelText;
   const lead = rules.filter((r) => r.selector.trim() === '.metric-card--lead > .metric-card__value');
-  assert.equal(lead.length, 3, 'Grundregel plus die zwei Container-Stufen, wie die Stufenleiter');
-  for (const r of lead) {
-    assert.ok(r.at.some((a) => /@supports\s*\(width:\s*1cqi\)/.test(a)), 'nur wo es Container-Einheiten gibt');
-    assert.match(r.body, /font-size:\s*var\(--_metric-lead, var\(--metric-value-size, var\(--text-(?:3xl|2xl|xl)\)\)\)/);
-  }
+  assert.equal(lead.length, 1, 'EINE Regel, keine Container-Stufen mehr');
   assert.match(lead[0].body, /--_metric-lead:\s*var\(--metric-rail\) var\(--metric-lead-size\)/);
-  assert.match(rule('.metric-card--lead').body, /--metric-lead-size:\s*clamp\(var\(--text-3xl\), 13cqi, var\(--text-5xl\)\)/);
-  assert.match(rule('.metric-card--lead-long').body, /--metric-lead-size:\s*clamp\(var\(--text-3xl\), 11cqi, var\(--text-4xl\)\)/);
+  assert.match(lead[0].body, /font-size:\s*var\(--_metric-lead, var\(--text-3xl\)\)/);
+  assert.match(lead[0].body, /font-weight:\s*var\(--font-weight-semibold\)/);
+  assert.match(rule('.metric-card--lead').body, /--metric-lead-size:\s*var\(--text-4xl\)/, 'Seitenspalte 34px');
+  assert.equal(size('.metric-card .metric-card__value[data-fit="1"]'), 'var(--text-2xl)');
+  assert.equal(size('.metric-card .metric-card__value[data-fit="2"]'), 'var(--text-xl)');
   const railOn = /--metric-rail:\s*;/;
   assert.match(rule('.metric-grid--rail').body + panelCss.match(/\.metric-grid--rail \{[^}]*--metric-rail[^}]*\}/)?.[0], railOn);
-  for (const sel of ['.budget-overview__aside .metric-grid--led', '.budget-loans > .metric-grid--led']) {
-    const r = [...eachRule(budgetCss)].find((x) => x.selector.trim() === sel);
+  const subsCss = read('../public/styles/subscriptions.css');
+  for (const sel of ['.budget-overview__aside .metric-grid--led', '.budget-loans > .metric-grid--led', '.budget-page .subscriptions-summary > .metric-grid--led']) {
+    const r = [...eachRule(budgetCss + subsCss)].find((x) => x.selector.trim() === sel);
     assert(r && railOn.test(r.body), `${sel}: die Spalte meldet sich als Spalte`);
     assert.match(r.body, /--metric-quiet-size:\s*var\(--text-2xl\)/, `${sel}: die anderen stehen in Title 2`);
+  }
+});
+
+test('R23 D12: die Leitzahl wird nur kleiner, wenn sie nicht passt (fitMetricLeads)', async () => {
+  const { fitMetricLeads } = await import('../public/utils/metric-card.js');
+  // Attrappe: eine Karte, deren Inhalt bei Title 1 (28) 40px, bei Title 2
+  // (22) 10px ueberlaeuft und bei Title 3 passt - und eine, die gleich passt.
+  const card = (overflowBySteps) => {
+    const value = {
+      attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
+      closest: () => box,
+    };
+    const box = {
+      isConnected: true, clientWidth: 300,
+      get scrollWidth() { return 300 + overflowBySteps[Number(value.attrs['data-fit'] ?? 0)]; },
+      querySelector: () => value,
+    };
+    return { value, box };
+  };
+  const zuLang = card([40, 10, 0]);
+  const passt = card([0, 0, 0]);
+  const observed = [];
+  let callback = null;
+  const vorher = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class { constructor(cb) { callback = cb; } observe(t) { observed.push(t); } unobserve() {} };
+  try {
+    fitMetricLeads({ querySelectorAll: () => [zuLang.value, passt.value] });
+    assert.deepEqual(observed, [zuLang.box, passt.box], 'jede Leitzahl wird ueber ihren Traeger beobachtet');
+    callback(observed.map((target) => ({ target })));
+    assert.equal(zuLang.value.attrs['data-fit'], '2', 'zwei Stufen zurueck, bis sie passt');
+    assert.equal(passt.value.attrs['data-fit'], undefined, 'was passt, bleibt in seiner Stufe');
+    // Wird der Traeger breiter, misst er neu - von der vollen Stufe aus.
+    zuLang.box.clientWidth = 400;
+    callback([{ target: zuLang.box }]);
+    assert.equal(zuLang.value.attrs['data-fit'], undefined, 'breiter: wieder die volle Stufe');
+  } finally {
+    globalThis.ResizeObserver = vorher;
+  }
+  // Die echten Aufrufer: jedes Zeichnen im Budget und in den Abos misst.
+  for (const file of ['budget.js', 'subscriptions.js']) {
+    const src = read(`../public/pages/${file}`);
+    assert.match(src, /function setHtml\(element, html\) \{[\s\S]*?fitMetricLeads\(element\);\s*\}/, `${file}: setHtml misst die Leitzahl`);
   }
 });
 

@@ -55,6 +55,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duration, and beyond a month they count in weeks, months and years. Percentages follow the
   household's number format. The category totals on the Budget overview no longer put a minus
   in front of every amount under "Expenses".
+- **The leading figure of each money view has one fixed size.** Balance, net worth, remaining
+  debt and monthly subscription costs stand at 34 px in the side column and at 28 px in a row and
+  on the phone, instead of anywhere between 18 and 48 px depending on how long the amount is.
+  They only get smaller when they would not fit. The subscription budget ("of 90.00 EUR") moved
+  into the note below the figure. Inventory shows its figures as cards in the list column too,
+  and the cycle statistics in Health use the same figure cards as every other module. Kanban
+  cards, meals and loan cards title their items like list rows. Search fields share one
+  placeholder pattern without trailing dots, and shift times in the calendar agenda are no
+  longer printed in 10 px.
 - **Module icons in lists look the same everywhere.** The More sheet and the module lists in
   Settings (Active modules, Navigation) now show each module's icon in the same soft tinted well
   as the sidebar. Before, the More sheet used solid colour discs and Settings used gradient tiles,

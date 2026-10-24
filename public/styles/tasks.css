@@ -1677,7 +1677,7 @@
 }
 
 .kanban-card__title {
-  /* Typografie via .u-card-title.u-compact.
+  /* Typografie via .u-row-title (Zeilentitel, R23 N2).
    * <button>: einziger Tastaturzugang zu den Kartendetails — die Karte selbst
    * ist ein Drag-Div und damit nicht fokussierbar. */
   display: block;

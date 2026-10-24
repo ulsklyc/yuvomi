@@ -220,9 +220,15 @@ export function dateWithDistanceText(value, { today = householdToday(), weekday 
   if (!key) return '';
   const days = daysBetweenDateKeys(today, key);
   if (days === 0 || days === 1) return relativeDayText(key, { today });
-  const date = dateText(key, { weekday, today });
+  // Jede Haelfte bricht nicht in sich ("Fr., 30.10. · in | 6 Tagen" stand
+  // mobil so da), umbrechen darf die Zeile nur am Trenner.
+  const date = unbreakable(dateText(key, { weekday, today }));
   if (days === null || (days < 0 && !past)) return date;
-  return `${date} · ${relativeDayText(key, { today })}`;
+  return `${date} · ${unbreakable(relativeDayText(key, { today }))}`;
+}
+
+function unbreakable(text) {
+  return String(text).replace(/ /g, '\u00a0');
 }
 
 // ---------------------------------------------------------------- Anteil

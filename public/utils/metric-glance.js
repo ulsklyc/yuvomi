@@ -15,7 +15,6 @@
  * aus. Ab 640px bleibt die Kennzahl-Zeile stehen, die Zeile gibt es nicht.
  */
 import { esc } from '/utils/html.js';
-import { leadStep } from '/utils/metric-card.js';
 
 /**
  * OHNE `controls` IST DIE ZEILE EIN ZEICHEN, KEIN KNOPF (R16 Schritt 2b):
@@ -67,14 +66,13 @@ export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 
 /**
  * EINE LEITZAHL JE GELD-BILDSCHIRM (Critique R18, 2026-10-07). Mobil war das
  * groesste Element jedes Budget-Reiters das Wort "Budget" (34px), der Saldo
- * stand in 18px daneben. Mit dieser Klasse traegt die Zahl der Kurzzeile eine
- * Display-Stufe und die Nebenwerte ruecken als ruhige Zeile darunter
- * (panel.css `.budget-glance--lead`). Die Laengenstufe haelt sechsstellige
- * Betraege und lange Waehrungszeichen bei 390px in einer Zeile.
+ * stand in 18px daneben. Mit dieser Klasse traegt die Zahl der Kurzzeile
+ * Title 1 und die Nebenwerte ruecken als ruhige Zeile darunter (panel.css
+ * `.budget-glance--lead`). Seit R23 (D12) eine feste Stufe; zu lange Betraege
+ * verkleinert `fitMetricLeads` (utils/metric-card.js), nicht die Zeichenzahl.
  */
-export function glanceLeadClass(value) {
-  const step = leadStep(value);
-  return `budget-glance--lead${step ? ` budget-glance--lead-${step}` : ''}`;
+export function glanceLeadClass() {
+  return 'budget-glance--lead';
 }
 
 /**

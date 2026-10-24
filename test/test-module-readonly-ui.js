@@ -2414,7 +2414,7 @@ test('Geburtstagszeile mit `calendar: read`: beide Handlungen weg, die Auskunft 
     // Nichts davon war ein Zustand, der ohne die Knoepfe unlesbar wuerde - die
     // Zeile traegt ihre Auskunft selbst, und sie ist wirklich gerendert.
     assert.match(html, /Oma Erna/);
-    assert.match(html, /birthdays\.inDays/);
+    assert.match(html, /in 12 Tagen/, 'der Abstand bleibt (R23: utils/date-format.js)');
     assert.match(html, /birthdays\.turnsAge/);
     assert.match(html, /Mag Kuchen/);
     assert.match(html, /data-id="9"/);

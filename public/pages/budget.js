@@ -36,7 +36,7 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
 import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput } from '/utils/money.js';
 import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
-import { trendMarkup, leadCardClass, leadStep } from '/utils/metric-card.js';
+import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
@@ -549,6 +549,8 @@ function reportPeriodLabel() {
 function setHtml(element, html) {
   element.replaceChildren();
   element.insertAdjacentHTML('afterbegin', html);
+  // Leitzahl in fester Stufe, kleiner nur bei Ueberlauf (R23, D12).
+  fitMetricLeads(element);
 }
 
 // --------------------------------------------------------

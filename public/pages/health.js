@@ -7049,9 +7049,9 @@ function overviewCycleTileMarkup() {
     const range = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
     value = range
       ? dateRangeText(range.min, range.max)
-      : formatDate(prediction.nextStart);
+      : dateText(prediction.nextStart);
     sub = range
-      ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
+      ? t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) })
       : cycleCountdownText(prediction);
   }
 
@@ -7958,7 +7958,7 @@ function cycleBubbleMarkup(prediction, pms, canEdit = true, { withRing = false }
   // hormoneller Verhuetung bereits ab).
   if (!withRing && prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
     const key = prediction.ovulationConfirmed ? 'health.cycle.bubble.fertileConfirmed' : 'health.cycle.bubble.fertile';
-    return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: formatDate(prediction.fertileEnd) }))}</p>`);
+    return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: dateText(prediction.fertileEnd) }))}</p>`);
   }
 
   // Prioritaet 7: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1. Neben
@@ -7991,7 +7991,7 @@ function cyclePregnancyMarkup(prediction, canEdit) {
       <div class="cycle-preg__bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${esc(t('health.cycle.pregnancy.progressLabel'))}">
         <span class="cycle-preg__bar-fill" style="--cycle-fill:${(pct / 100).toFixed(4)}"></span>
       </div>
-      <div class="cycle-preg__due">${esc(t('health.cycle.pregnancy.dueDate', { date: formatDate(p.dueDate) }))}</div>`;
+      <div class="cycle-preg__due">${esc(t('health.cycle.pregnancy.dueDate', { date: dateText(p.dueDate) }))}</div>`;
   } else {
     detail = `<p class="cycle-preg__nodate">${esc(t('health.cycle.pregnancy.noDate'))}</p>`;
   }
@@ -8110,10 +8110,10 @@ function cycleCountdownText(prediction) {
 
 function cycleStatCardMarkup({ icon, labelKey, value, sub }) {
   return `
-    <div class="cycle-stat">
-      <span class="cycle-stat__head"><i data-lucide="${esc(icon)}" aria-hidden="true"></i>${esc(t(labelKey))}</span>
-      <span class="cycle-stat__value">${esc(value)}</span>
-      ${sub ? `<span class="cycle-stat__sub">${esc(sub)}</span>` : ''}
+    <div class="metric-card cycle-stat">
+      <span class="metric-card__label cycle-stat__head"><i data-lucide="${esc(icon)}" aria-hidden="true"></i>${esc(t(labelKey))}</span>
+      <span class="metric-card__value cycle-stat__value">${esc(value)}</span>
+      ${sub ? `<span class="metric-card__note cycle-stat__sub">${esc(sub)}</span>` : ''}
     </div>`;
 }
 
@@ -8136,9 +8136,9 @@ function cycleStatsMarkup(prediction) {
     labelKey: 'health.cycle.status.nextPeriod',
     value: perimenopauseRange
       ? dateRangeText(perimenopauseRange.min, perimenopauseRange.max)
-      : formatDate(prediction.nextStart),
+      : dateText(prediction.nextStart),
     sub: perimenopauseRange
-      ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
+      ? t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) })
       : '',
   }));
 
@@ -8153,14 +8153,14 @@ function cycleStatsMarkup(prediction) {
       icon: 'sparkles',
       labelKey: 'health.cycle.status.fertileWindow',
       value: dateRangeText(prediction.fertileStart, prediction.fertileEnd),
-      sub: `${ovulationLabel}: ${formatDate(prediction.ovulationDate)}`,
+      sub: `${ovulationLabel}: ${dateText(prediction.ovulationDate)}`,
     }));
   } else if (prediction.fertilitySuppressed === 'contraception') {
     // Ohne die fruchtbares-Fenster-Kachel bliebe die Kachel-Luecke
     // unerklaert (saehe wie ein Fehler statt einer bewussten Abschaltung aus) -
     // ein ruhiger Hinweis statt stillschweigendem Verschwinden.
     tiles.push(`
-      <div class="cycle-stat cycle-stat--note">
+      <div class="metric-card cycle-stat cycle-stat--note">
         <i data-lucide="info" aria-hidden="true"></i>
         <span>${esc(t('health.cycle.status.fertilitySuppressedNote'))}</span>
       </div>`);
@@ -8193,20 +8193,23 @@ function cycleStatsMarkup(prediction) {
     : '';
   const sourceText = cycleStatsSourceText(stats);
   tiles.push(`
-    <div class="cycle-stat cycle-stat--dual">
+    <div class="metric-card cycle-stat cycle-stat--dual">
       <div class="cycle-stat__pair-row">
         <div class="cycle-stat__pair-item">
-          <span class="cycle-stat__head"><i data-lucide="repeat" aria-hidden="true"></i>${esc(t('health.cycle.status.avgCycle'))}</span>
-          <span class="cycle-stat__value">${esc(t('health.cycle.unit.days', { value: fmtNum(stats.avgCycle), count: stats.avgCycle }))}${typicalBadge}</span>
+          <span class="metric-card__label cycle-stat__head"><i data-lucide="repeat" aria-hidden="true"></i>${esc(t('health.cycle.status.avgCycle'))}</span>
+          <span class="metric-card__value cycle-stat__value">${esc(t('health.cycle.unit.days', { value: fmtNum(stats.avgCycle), count: stats.avgCycle }))}${typicalBadge}</span>
         </div>
         <div class="cycle-stat__pair-item">
-          <span class="cycle-stat__head"><i data-lucide="droplet" aria-hidden="true"></i>${esc(t('health.cycle.status.avgPeriod'))}</span>
-          <span class="cycle-stat__value">${esc(t('health.cycle.unit.days', { value: fmtNum(stats.avgPeriod), count: stats.avgPeriod }))}</span>
+          <span class="metric-card__label cycle-stat__head"><i data-lucide="droplet" aria-hidden="true"></i>${esc(t('health.cycle.status.avgPeriod'))}</span>
+          <span class="metric-card__value cycle-stat__value">${esc(t('health.cycle.unit.days', { value: fmtNum(stats.avgPeriod), count: stats.avgPeriod }))}</span>
         </div>
       </div>
-      ${sourceText ? `<span class="cycle-stat__sub">${esc(sourceText)}</span>` : ''}
+      ${sourceText ? `<span class="metric-card__note cycle-stat__sub">${esc(sourceText)}</span>` : ''}
     </div>`);
 
+  // DIE KACHELN SIND KENNZAHLKARTEN (R23, D12): .metric-card aus panel.css -
+  // Wertstufe, Label und Notiz wie in jeder anderen Kachel, die Stufe aus der
+  // Breite der Reihe (health.css `.cycle-stats` ist ihr Container) statt 14px fett.
   return `<div class="cycle-stats">${tiles.join('')}</div>`;
 }
 

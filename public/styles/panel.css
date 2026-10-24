@@ -441,65 +441,46 @@
  * Zahl die Aussage des Reiters ist; mobil war das groesste Element jedes
  * Geld-Bildschirms das Wort "Budget". Je Reiter traegt jetzt EINE Karte
  * `.metric-card--lead` (Saldo, Nettovermoegen, Restschuld, Monatskosten), und
- * ihre Reihe `.metric-grid--led`:
+ * ihre Reihe `.metric-grid--led`: in einer REIHE treten die uebrigen eine Stufe
+ * zurueck und verlieren das Fett - die Fuehrung entsteht durch Ruhe daneben.
  *
- *   - In einer SEITENSPALTE (eine Karte je Zeile, `--metric-value-size`
- *     gesetzt) steigt die Leitzahl auf eine Display-Stufe. Die Stufe misst an
- *     der Spalte (cqi gegen `.metric-grid`), nicht am Viewport: 13cqi sind in
- *     der schmalsten Spalte (300px) 39px, "2.503,89 €" laeuft dort 226px von
- *     276px. Laengere Werte nennen ihre Stufe als Klasse
- *     (`leadStep()` in utils/metric-card.js): "175.444,93 €" bei 11cqi = 33px
- *     -> 247px, "CHF 175'444.93" bei 9cqi = 27px -> 232px.
- *   - In einer REIHE mit mehreren Karten kann die Leitzahl nicht wachsen (die
- *     Stufenleiter oben ist an der Kartenbreite gemessen). Dort treten die
- *     uebrigen eine Stufe zurueck und verlieren das Fett - die Fuehrung
- *     entsteht durch Ruhe daneben, nicht durch Lautstaerke.
+ * EINE FESTE STUFE JE ORT (R23, D12). Bis R23 waehlte die Leitzahl ihre Stufe
+ * nach ihrer LAENGE (`leadStep`, 13/11/9cqi, 18-48px) - der Saldo stand in
+ * 48px, die Restschuld daneben in 33px, dieselbe Rolle in sechs Groessen. Jetzt:
+ * in einer SEITENSPALTE Large Title (34px), in einer Reihe und in der mobilen
+ * Kurzzeile Title 1 (28px), beides semibold. KLEINER WIRD SIE NUR, WENN SIE
+ * NICHT PASST: `fitMetricLeads()` (utils/metric-card.js) misst die Karte und
+ * setzt `data-fit` (1 = Title 2, 2 = Title 3) - eine Stufe, die man sieht,
+ * statt einer, die aus der Zeichenzahl geraten wird.
  *
  * WER EINE SEITENSPALTE IST, SAGT ES MIT `--metric-rail: ;` - einem leeren
  * Wert, neben `--metric-value-size` (siehe "Eine Karte je Zeile"). Die Regel
- * der Leitzahl setzt ihn vor ihre Stufe: ist er leer, gilt die Stufe; ist er
- * nicht gesetzt, ist die ganze Zeile ungueltig und der Rueckfall dahinter
- * greift - die Stufenleiter der Reihe. So entscheidet EINE Regel hier, und
- * kein Modul-Stylesheet setzt einen eigenen Wert-Grad (Guard R16 in
- * test-frontend-audit). Ohne Container-Einheiten (Chrome < 105, Safari < 16)
- * gilt die Regel nicht, die Leitzahl bleibt dort auf der Stufenleiter. */
+ * der Leitzahl setzt ihn vor ihre Stufe: ist er leer, gilt Large Title; ist er
+ * nicht gesetzt, ist die Zeile ungueltig und Title 1 der Reihe greift. So
+ * entscheidet EINE Regel hier, und kein Modul-Stylesheet setzt einen eigenen
+ * Wert-Grad (Guard R16 in test-frontend-audit). */
 .metric-card--lead {
-  --metric-lead-size: clamp(var(--text-3xl), 13cqi, var(--text-5xl));
-}
-
-.metric-card--lead-long {
-  --metric-lead-size: clamp(var(--text-3xl), 11cqi, var(--text-4xl));
-}
-
-.metric-card--lead-xlong {
-  --metric-lead-size: clamp(var(--text-2xl), 9cqi, var(--text-3xl));
-}
-
-.metric-card--lead-xxlong {
-  --metric-lead-size: var(--text-2xl);
+  --metric-lead-size: var(--text-4xl);
 }
 
 .metric-grid--rail {
   --metric-rail: ;
 }
 
-@supports (width: 1cqi) {
-  .metric-card--lead > .metric-card__value {
-    --_metric-lead: var(--metric-rail) var(--metric-lead-size);
-    font-size: var(--_metric-lead, var(--metric-value-size, var(--text-3xl)));
-  }
+.metric-card--lead > .metric-card__value {
+  --_metric-lead: var(--metric-rail) var(--metric-lead-size);
+  font-size: var(--_metric-lead, var(--text-3xl));
+  font-weight: var(--font-weight-semibold);
+}
 
-  @container metric-grid (max-width: 600px) {
-    .metric-card--lead > .metric-card__value {
-      font-size: var(--_metric-lead, var(--metric-value-size, var(--text-2xl)));
-    }
-  }
+/* Verkleinern nur bei Ueberlauf (fitMetricLeads). Spezifischer als jede Stufe
+ * oben und in den Container-Stufen. */
+.metric-card .metric-card__value[data-fit="1"] {
+  font-size: var(--text-2xl);
+}
 
-  @container metric-grid (max-width: 400px) {
-    .metric-card--lead > .metric-card__value {
-      font-size: var(--_metric-lead, var(--metric-value-size, var(--text-xl)));
-    }
-  }
+.metric-card .metric-card__value[data-fit="2"] {
+  font-size: var(--text-xl);
 }
 
 .metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value {
@@ -1225,21 +1206,17 @@ svg.chart {
   color: var(--color-danger);
 }
 
-/* DIE KURZZEILE MIT LEITZAHL (Critique R18, 2026-10-07; `glanceLeadClass()`
- * in utils/metric-glance.js). Die Zahl steigt von 18px auf eine Display-Stufe
- * und steht allein in ihrer Zeile; die Nebenwerte ruecken als EINE ruhige
- * Zeile darunter (sie stehen im Markup vor dem Pfeil, `order` haelt den Pfeil
- * in der ersten Zeile). Neben der Zahl ist dafuer kein Platz: bei 390px
+/* DIE KURZZEILE MIT LEITZAHL (Critique R18, 2026-10-07;
+ * `glanceLeadClass()` in utils/metric-glance.js). Die Zahl steigt von 18px auf
+ * Title 1 und steht allein in ihrer Zeile; die Nebenwerte ruecken als EINE
+ * ruhige Zeile darunter (sie stehen im Markup vor dem Pfeil, `order` haelt den
+ * Pfeil in der ersten Zeile). Neben der Zahl ist dafuer kein Platz: bei 390px
  * bleiben nach Polster und Pfeil 298px, "Einnahmen 5.550,00 €" braucht 150.
  *
- * Stufen gegen den Viewport, weil die Zeile nur unter 640px existiert und dort
- * immer die volle Breite traegt (Breite minus 2 x 16px Rand, 2 x 16px Polster,
- * 28px Pfeil). Fette Systemziffern laufen rund 0,6em je Zeichen:
- *   kurz  (<= 10 Zeichen, "2.503,89 €")      11vw: 390 -> 43px = 249 von 298px
- *   long  (<= 13, "175.444,93 €")             9vw: 390 -> 34px = 240px
- *   xlong (<= 17, "CHF 175'444.93")         7,5vw: 390 -> 28px = 241px
- *   320px: 35px = 204, 29px = 204, 24px = 206 von 228px.
- * Im Browser nachgemessen, Guard: test-budget-ui.js. */
+ * FESTE STUFE, MOBIL 28px (R23, D12): bis R23 eine Leiter nach Zeichenzahl
+ * (11/9/7,5vw, 24-48px). Jetzt Title 1 semibold, wie die Leitzahl einer Reihe;
+ * passt sie nicht (sechsstellige Betraege bei 320px), setzt fitMetricLeads()
+ * `data-fit` und sie tritt eine oder zwei Stufen zurueck. */
 .budget-glance--lead .budget-glance__row {
   flex-wrap: wrap;
   row-gap: var(--space-0h);
@@ -1250,21 +1227,17 @@ svg.chart {
 }
 
 .budget-glance--lead .budget-glance__value {
-  font-size: clamp(var(--text-3xl), 11vw, var(--text-5xl));
-  font-weight: var(--font-weight-bold);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-tight);
 }
 
-.budget-glance--lead-long .budget-glance__value {
-  font-size: clamp(var(--text-3xl), 9vw, var(--text-4xl));
-}
-
-.budget-glance--lead-xlong .budget-glance__value {
-  font-size: clamp(var(--text-2xl), 7.5vw, var(--text-3xl));
-}
-
-.budget-glance--lead-xxlong .budget-glance__value {
+.budget-glance .budget-glance__row .budget-glance__value[data-fit="1"] {
   font-size: var(--text-2xl);
+}
+
+.budget-glance .budget-glance__row .budget-glance__value[data-fit="2"] {
+  font-size: var(--text-xl);
 }
 
 .budget-glance--lead .budget-glance__chevron {
@@ -1287,9 +1260,8 @@ svg.chart {
  * `balanceGlanceHtml`). Die Budget-Uebersicht stellte Saldo, Ein/Aus und
  * „Alle Kategorien" in drei Zeilen vor die erste Buchung (y=354). Eingeklappt
  * stehen jetzt Etikett und Saldo in EINER Zeile, auf der Grundlinie; Ein/Aus
- * und die Kategorien-Zeile kommen mit dem Aufklappen. Die Zahl fuehrt weiter
- * (Title 1 statt Display), damit sie neben dem Etikett in die Zeile passt -
- * die Stufen der Leiter gelten wie oben, nur eine Stufe tiefer. */
+ * und die Kategorien-Zeile kommen mit dem Aufklappen. Die Zahl fuehrt in
+ * derselben Stufe wie jede Kurzzeile (Title 1, R23). */
 .budget-glance--fold.budget-glance--lead .budget-glance__lead {
   flex-direction: row;
   align-items: baseline;
@@ -1300,18 +1272,6 @@ svg.chart {
  * Bedienelemente (R21 S9b, D4). */
 .budget-glance--fold.budget-glance--lead .budget-glance__label {
   font-size: var(--type-caption);
-}
-
-.budget-glance--fold.budget-glance--lead .budget-glance__value {
-  font-size: var(--text-3xl);
-}
-
-.budget-glance--fold.budget-glance--lead-xlong .budget-glance__value {
-  font-size: var(--text-2xl);
-}
-
-.budget-glance--fold.budget-glance--lead-xxlong .budget-glance__value {
-  font-size: var(--text-xl);
 }
 
 .budget-glance--fold .budget-glance__balance[aria-expanded="false"] .budget-glance__flows {

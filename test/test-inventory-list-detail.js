@@ -290,16 +290,17 @@ test('die geteilte Leseansicht zeichnet Gruppen mit Titel und laesst leere ganz 
   }
 });
 
-test('in der Spalte: Kennzahlen als Zeilen ohne Wortbruch, nicht als drei 136px-Kacheln (A8 P1-2)', async () => {
+test('in der Spalte: Kennzahlen als Karten zu zweit, nicht als Tabelle und nicht als drei 136px-Kacheln (A8 P1-2, R23 D12)', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
   const inSplit = [...eachRule(css)].filter((r) => r.at.some((a) => /module-surface/.test(a)));
   const body = (sel) => inSplit.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
-  assert.match(body('.inventory-list .metric-grid'), /grid-template-columns:\s*minmax\(0, 1fr\)/, 'eine Kennzahl je Zeile');
-  assert.match(body('.inventory-list .metric-grid > .metric-card'), /flex-direction:\s*row/, 'Wort links, Zahl rechts');
-  const label = body('.inventory-list .metric-grid .metric-card__label');
-  assert.match(label, /overflow-wrap:\s*normal/, 'kein Bruch mitten im Wort („AUFMERKSAMKE/IT")');
-  assert.match(label, /white-space:\s*nowrap/);
+  assert.match(body('.inventory-list .metric-grid'), /--summary-cards:\s*2/, 'zwei Karten je Zeile - keine 136px-Kacheln');
+  assert.match(body('.inventory-list .metric-grid > .metric-card:last-child:nth-child(odd)'), /grid-column:\s*1\s*\/\s*-1/, 'die dritte Karte nimmt die volle Zeile');
+  // Die Karte bleibt eine Kennzahlkarte: keine Zeilen-Umbauten, kein eigener Wertgrad.
+  const all = [...eachRule(css)].map((r) => `${r.selector} {${r.body}}`).join('\n');
+  assert.doesNotMatch(all, /\.inventory-list \.metric-grid > \.metric-card \{[^}]*flex-direction:\s*row/, 'keine Tabellenzeile');
+  assert.doesNotMatch(all, /\.inventory-list \.metric-grid \.metric-card__value \{[^}]*font-size/, 'kein eigener Wertgrad');
 });
 
 // Review R11: der Kilometerstand-Trend rechnet X nach dem Datum. Zwei

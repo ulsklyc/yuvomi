@@ -933,23 +933,26 @@ test('R17/E2 + R23/D11: eine Abholung nennt Wochentag, Datum und "in N Tagen"', 
   // mehr aus "dashboard.daysLeft" ("2 Tage" las sich wie eine Dauer).
   const today = '2026-10-07'; // Mittwoch
   const wd = (key) => new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${key}T12:00:00Z`));
+  // Jede Haelfte haelt mit geschuetzten Leerzeichen zusammen; verglichen wird der Text.
+  const label = (key) => __test.pickupWhenLabel(key, today).replace(/\u00a0/g, ' ');
   assert.equal(__test.pickupWhenLabel('2026-10-07', today), 'common.today', 'heute: das Wort allein');
   assert.equal(__test.pickupWhenLabel('2026-10-08', today), 'common.tomorrow');
-  assert.equal(__test.pickupWhenLabel('2026-10-09', today), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`);
-  assert.equal(__test.pickupWhenLabel('2026-12-21', today), `${wd('2026-12-21')}, 2026-12-21 · in 2 Monaten`);
-  assert.equal(__test.pickupWhenLabel('2026-10-05', today), `${wd('2026-10-05')}, 2026-10-05`, 'ein vergangener Tag traegt keinen Abstand');
+  assert.equal(label('2026-10-09'), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`);
+  assert.equal(label('2026-12-21'), `${wd('2026-12-21')}, 2026-12-21 · in 2 Monaten`);
+  assert.equal(label('2026-10-05'), `${wd('2026-10-05')}, 2026-10-05`, 'ein vergangener Tag traegt keinen Abstand');
+  assert.match(__test.pickupWhenLabel('2026-10-09', today), /^[^ ]+ · [^ ]+$/, 'umbrechen darf nur der Trenner');
   // Der Wochentag haengt am KEY, nicht an der Zone des Prozesses.
   const before = process.env.TZ;
   try {
     for (const zone of ['Pacific/Auckland', 'America/Los_Angeles']) {
       process.env.TZ = zone;
-      assert.equal(__test.pickupWhenLabel('2026-10-09', today), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`, zone);
+      assert.equal(label('2026-10-09'), `${wd('2026-10-09')}, 2026-10-09 · in 2 Tagen`, zone);
     }
   } finally {
     if (before === undefined) delete process.env.TZ; else process.env.TZ = before;
   }
   const row = __test.occurrenceRowHtml({ key: 'k', type_id: 1, type_name: 'Papier', date_key: '2099-01-02', origins: [] });
-  assert.ok(row.includes(`<span class="list-row__meta">${new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2099-01-02T12:00:00Z'))}, 2099-01-02 · `), 'die Abholzeile traegt das Label');
+  assert.ok(row.replace(/\u00a0/g, ' ').includes(`<span class="list-row__meta">${new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2099-01-02T12:00:00Z'))}, 2099-01-02 · `), 'die Abholzeile traegt das Label');
 });
 
 test('R17/E2: eine Abfallart mit anstehender Abholung sagt nicht "Noch kein Termin"', () => {
@@ -957,7 +960,8 @@ test('R17/E2: eine Abfallart mit anstehender Abholung sagt nicht "Noch kein Term
     { type_id: 2, date_key: '2099-01-02', origins: [{ kind: 'one_off' }] },
     { type_id: 2, date_key: '2099-02-02', origins: [{ kind: 'one_off' }] },
   ];
-  assert.match(__test.typeWithoutScheduleLine(2, occurrences), /^waste\.nextPickupLabel: Fr, 2099-01-02/, 'die naechste Abholung dieser Art');
+  const wd = new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2099-01-02T12:00:00Z'));
+  assert.ok(__test.typeWithoutScheduleLine(2, occurrences).replace(/\u00a0/g, ' ').startsWith(`waste.nextPickupLabel: ${wd}, 2099-01-02`), 'die naechste Abholung dieser Art');
   assert.equal(__test.typeWithoutScheduleLine(1, occurrences), 'waste.noSchedulesYet', 'wirklich nichts: der bisherige Satz');
   assert.match(WASTE_SRC, /const line = typeWithoutScheduleLine\(type\.id\);/, 'die Karte liest die Zeile dort (typeWithoutScheduleHtml)');
 });

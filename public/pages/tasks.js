@@ -3117,7 +3117,7 @@ function renderKanbanCard(task) {
       <!-- Button statt div: einziger Tastaturweg in die Kartendetails; der
            Board-Klick-Handler fängt ihn über die umschließende
            .kanban-card[data-task-id]. -->
-      <button type="button" class="kanban-card__title u-card-title u-compact">${esc(task.title)}</button>
+      <button type="button" class="kanban-card__title u-row-title">${esc(task.title)}</button>
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}

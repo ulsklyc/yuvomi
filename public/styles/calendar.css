@@ -4019,12 +4019,21 @@
 
 /* Zeit und Zusatz-Marke treten ueber die Sekundaertinte zurueck, nicht ueber
  * `opacity`: auf der getoenten Flaeche liesse eine 82-%-Deckung den Kontrast
- * mit der Schichtfarbe schwanken, die Sekundaertinte ist gemessen. */
-.allday-holiday .schedule-entry__start {
-  flex: 0 0 auto;
+ * mit der Schichtfarbe schwanken, die Sekundaertinte ist gemessen.
+ *
+ * JEDER CHIP, NICHT NUR DER IM RASTER (R23, Detektor undersized-ui-text): die
+ * Regel hing an `.allday-holiday`. In der Agenda traegt der Chip
+ * `.agenda-holiday`, und das `<small>` fiel dort auf die Vorgabe des Browsers
+ * zurueck - "14:00" in 10px unter der 11px-Grenze. Die Uhrzeit erbt jetzt in
+ * jeder Bauform die Schrift ihres Chips. */
+.schedule-entry__start {
   font: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-secondary);
+}
+
+.allday-holiday .schedule-entry__start {
+  flex: 0 0 auto;
 }
 
 .schedule-entry__extra-badge {

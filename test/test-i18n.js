@@ -715,3 +715,24 @@ test('der Hinweis zum Nutzerhandbuch entschuldigt sich nicht (Critique R21)', ()
     assert.doesNotMatch(hint, /zurückliegen|lag behind|veraltet|out of date/i, `${locale}: ${hint}`);
   }
 });
+
+// R23 (Critique S-P3-2): Suchplatzhalter standen in fuenf Formen - "…", "...",
+// " …", ohne Zeichen, "durchsuchen" neben "suchen" fuer dieselbe Seitensuche.
+// EIN Muster: kein Auslassungszeichen am Ende, in keiner Sprache; im Deutschen
+// heisst die Suche einer Seite "‹Gegenstand› durchsuchen".
+test('Suchplatzhalter: ein Muster, kein Auslassungszeichen am Ende (R23)', () => {
+  const files = readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
+  const isSearchKey = (key) => /(^search\.placeholder$|[sS]earch[A-Za-z]*Placeholder$|\.searchGroups$|\.searchLabel$)/.test(key);
+  for (const file of files) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(file.replace(/\.json$/, ''))))) {
+      if (!isSearchKey(key) || typeof value !== 'string') continue;
+      assert.doesNotMatch(value, /(…|\.\.\.)\s*$/, `${file}: ${key} = ${value}`);
+    }
+  }
+  const de = flatten(JSON.parse(readLocale('de')));
+  for (const key of ['tasks.searchPlaceholder', 'notes.searchPlaceholder', 'recipes.searchPlaceholder', 'birthdays.searchPlaceholder',
+    'documents.searchPlaceholder', 'subscriptions.searchPlaceholder', 'pantry.searchPlaceholder', 'inventory.searchPlaceholder',
+    'splitExpenses.searchGroups', 'settings.searchLabel']) {
+    assert.match(de.get(key), / durchsuchen$/, `de: ${key} = ${de.get(key)}`);
+  }
+});

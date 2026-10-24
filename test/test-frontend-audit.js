@@ -12396,10 +12396,14 @@ test('Schicht-Chips im Kalender: getoent wie im Schichtplan, Schrift >= 4,5:1 fu
     assert.doesNotMatch(m[1], /--holi-ink|(?:^|;)\s*color\s*:/, 'der Schicht-Chip setzt keine Inline-Tinte');
   }
   // Zeit und Zusatz-Marke: Sekundaertinte statt Deckkraft.
-  for (const selektor of ['.allday-holiday .schedule-entry__start', '.schedule-entry__extra-badge']) {
+  // R23: die Uhrzeit-Regel gilt jeder Chip-Bauform (auch der Agenda), nicht nur .allday-holiday.
+  for (const selektor of ['.schedule-entry__start', '.schedule-entry__extra-badge']) {
     assert.equal(letzte(selektor, 'color'), 'var(--color-text-secondary)', `${selektor}: Sekundaertinte`);
     assert.equal(letzte(selektor, 'opacity'), null, `${selektor}: keine Deckkraft - sie liesse den Kontrast mit der Schichtfarbe schwanken`);
   }
+  // R23 (Detektor undersized-ui-text): das <small> der Uhrzeit erbt in JEDER
+  // Bauform die Schrift seines Chips - in der Agenda fiel es auf 10px zurueck.
+  assert.equal(letzte('.schedule-entry__start', 'font'), 'inherit', 'die Uhrzeit erbt die Chip-Schrift, auch in .agenda-holiday');
 
   // --- Die Werte je Theme, aus tokens.css ------------------------------------
   const roh = (rumpf, name) => new RegExp(`(?:^|[;{\\s])${name}:\\s*(#[0-9A-Fa-f]{6})\\b`).exec(rumpf)?.[1] ?? null;

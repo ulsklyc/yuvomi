@@ -652,10 +652,12 @@ test('t() waehlt in cs, pl, ru, uk und ar die Form fuer 2, 5 und 11 (#1473)', as
 // Arabisch hat fuer ganze Zahlen die Kategorien zero, one, two, few, many, other:
 // der Basisschluessel traegt dort die few-Form (3-10, "أيام"), die fuer 2 (Dual)
 // und 11-99 ("يومًا") falsch ist. Die zwei Tageszaehler aus #1472 waren das Muster
-// fuer die Nachpflege in #1473.
+// fuer die Nachpflege in #1473. birthdays.inDays ist seit R23 (D11) ersetzt:
+// den Abstand schreibt Intl.RelativeTimeFormat (utils/date-format.js), das die
+// arabischen Formen selbst kennt.
 test('Arabisch: die Tageszaehler waehlen Dual und many statt der few-Form', async () => {
   await setLocale('ar');
-  for (const key of ['birthdays.inDays', 'inventory.deadlineChipInDays']) {
+  for (const key of ['inventory.deadlineChipInDays']) {
     const few = t(key, { count: 5, label: 'X' });
     assert.notEqual(t(key, { count: 2, label: 'X' }).replace('2', '5'), few, `${key}: 2 braucht den Dual`);
     assert.notEqual(t(key, { count: 11, label: 'X' }).replace('11', '5'), few, `${key}: 11 braucht die many-Form`);

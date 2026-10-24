@@ -246,7 +246,6 @@
  * Card-/Item-Titel
  * ------------------------------------------------------------------------ */
 .u-card-title,
-.budget-loan-card__title,
 .document-card__title,
 .document-row__title,
 .document-viewer__unsupported-title,
@@ -285,7 +284,6 @@
 .documents-folder-item__name,
 .document-dropzone__title,
 .dms-result__title,
-.meal-card__title,
 .housekeeping-section-heading span,
 .cat-row__name,
 .cat-subrow__name,
@@ -310,10 +308,13 @@
  * Registrierung darueber, obwohl sie Zeilen sind). Kanon ist der haeufigste:
  * 16px, medium.
  *
- * DIE GRENZE ZUR HEADLINE: ein KARTEN-Titel (Rezeptkarte, Darlehen, Widget,
- * Kanban-Karte, Notizkarte) bleibt Headline bzw. ihre Dichte-Variante - eine
- * Karte ist ein Objekt mit eigener Flaeche und fuehrt ihren Titel als
- * Ueberschrift. Eine ZEILE steht in einem Traeger neben ihresgleichen; ihr
+ * DIE GRENZE ZUR HEADLINE: ein KARTEN-Titel (Rezeptkarte, Widget, Notizkarte)
+ * bleibt Headline bzw. ihre Dichte-Variante - eine Karte ist ein Objekt mit
+ * eigener Flaeche und fuehrt ihren Titel als Ueberschrift. KANBAN-KARTE,
+ * MAHLZEIT UND DARLEHEN NICHT MEHR (R23, N2): ihre Karten stehen gestapelt
+ * neben ihresgleichen wie Zeilen und tragen denselben Gegenstand wie die
+ * Zeile der Nachbaransicht (Aufgabe in Liste und Kanban, Mahlzeit in Woche und
+ * Tag) - 15/600 dort neben 16/500 hier hiess: eine Aufgabe, zwei Stimmen. Eine ZEILE steht in einem Traeger neben ihresgleichen; ihr
  * Name ist Lesetext mit Betonung, keine Ueberschrift. Wer `.list-row` traegt,
  * nimmt diese Rolle - ueber `.list-row__name` am Namen oder, wo der Name ein
  * eigenes Element mit eigener Geometrie ist, ueber die Registrierung hier.
@@ -330,6 +331,8 @@
 .u-row-title,
 .settings-scope .settings-card__title,
 .list-row__name,
+.budget-loan-card__title,
+.meal-card__title,
 .agenda-event__title,
 .contact-item__name,
 .subscription-card__name,

@@ -2820,10 +2820,18 @@ button.health-med-card:hover {
 
 /* ---- Statistik-Karten ---- */
 
+/* KENNZAHLKARTEN, KEIN EIGENBAU (R23, D12). Die Kacheln sind seit R23
+ * `.metric-card` (panel.css): Flaeche, Label, Wertstufe und Notiz kommen von
+ * dort. Bis dahin baute `.cycle-stat` die Karte nach und setzte die Zahl in
+ * 14px fett - so gross wie ein Knopf, leiser als jede andere Kennzahl der
+ * App. Die Reihe ist der Container `metric-grid`, an dem die Wertstufen der
+ * Karte messen (wie `.metric-grid` selbst): zwei Kacheln in 358px tragen
+ * Title 3, am Desktop Title 2. */
 .cycle-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
+  container: metric-grid / inline-size;
 }
 
 /* KEIN LOCH IM RASTER (A6 P2-4). Die Einzelkacheln stehen zu zweit, die
@@ -2836,31 +2844,14 @@ button.health-med-card:hover {
   grid-column: 1 / -1;
 }
 
-/* Kennzahlkarte auf dem Grouped-Grund: randlose Karte. Die frühere
- * surface-2-Fläche lag im Dark UNTER dem Grund (#050507 auf #0A0A0C) und
- * verschwand dort fast vollständig. */
-.cycle-stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0h);
-  padding: var(--space-3);
-  background: var(--color-surface);
-  border: none;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-}
-
+/* Das Bereichszeichen vor dem Label. */
 .cycle-stat__head {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
 }
 
 .cycle-stat__head svg { width: 14px; height: 14px; }
-.cycle-stat__value { font-weight: 700; font-size: var(--text-sm); color: var(--color-text-primary); }
-.cycle-stat__sub { font-size: var(--type-micro); color: var(--color-text-secondary); }
 
 /* Typisch/untypisch-Badge (Phase 4d) - Statusfarben, nicht die kategorialen
  * Zyklusphasen-Farben: das ist ein Zustand (gut/Warnung), keine Identität. */

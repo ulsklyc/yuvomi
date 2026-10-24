@@ -1190,7 +1190,7 @@ test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async (
   });
   const werte = {
     'budget.amountLabel': [[/id="bm-amount"[^>]*value="1014,00"/, /id="type-expense"[^>]*aria-checked="true"/], /^-1\.014,00\s€$/],
-    'budget.detailDateLabel': [[/id="bm-date"\s+value="2026-06-03"/], /^2026-06-03$/],
+    'budget.detailDateLabel': [[/id="bm-date"\s+value="2026-06-03"/], /^[^,\s]+, 2026-06-03$/],
     'budget.categoryLabel': [[/<option value="housing" selected>budget\.categoryHousing</], /^budget\.categoryHousing$/],
     'budget.subcategoryLabel': [[/<option value="power" selected>Strom</], /^Strom$/],
     'budget.accountLabel': [[/<option value="4" selected>Girokonto</], /^Girokonto$/],
@@ -1250,7 +1250,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
     'subscriptions.descriptionLabel': [[/id="subscription-description"[^>]*value="Premium"/], /^Premium$/],
     'subscriptions.billingCycleLabel': [[/id="subscription-cycle" type="hidden" value="monthly"/, /id="subscription-interval"[^>]*value="1"/],
       /^subscriptions\.cycle\.monthly$/],
-    'subscriptions.detailNextPaymentLabel': [[/id="subscription-next-date"[^>]*value="2026-10-01"/], /^2026-10-01 · subscriptions\./],
+    'subscriptions.detailNextPaymentLabel': [[/id="subscription-next-date"[^>]*value="2026-10-01"/], /^[^,\s]+, 2026-10-01 · subscriptions\./],
     'subscriptions.reminderDaysLabel': [[/id="subscription-reminder"[^>]*value="3"/], /^subscriptions\.reminderMeta\{"count":3\}$/],
     'subscriptions.endLabel': [[/id="subscription-end-date"[^>]*value="2026-12-31"/], /^subscriptions\.endsOn\{"date":"2026-12-31"\}$/],
     'subscriptions.categoryLabel': [[/id="subscription-category" type="hidden" value="2"/], /^Streaming$/],

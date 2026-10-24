@@ -135,7 +135,8 @@ test(`TZ=${ZONE}: Abstand "in 6 Tagen" wie die Geburtstage, nicht "6 Tage" wie e
     assert.equal(fmt.relativeDayText('2026-12-01', { today }), 'in 5 Wochen');
     assert.equal(fmt.relativeDayText('2027-02-24', { today }), 'in 4 Monaten');
     assert.equal(fmt.relativeDayText('2028-10-24', { today }), 'in 2 Jahren');
-    assert.equal(fmt.dateWithDistanceText('2026-10-30', { today }), `${wd('de', '2026-10-30')}, 30.10. · in 6 Tagen`);
+    assert.equal(plain(fmt.dateWithDistanceText('2026-10-30', { today })), `${wd('de', '2026-10-30')}, 30.10. · in 6 Tagen`);
+    assert.match(fmt.dateWithDistanceText('2026-10-30', { today }), /^[^ ]+ · [^ ]+$/, 'umbrechen darf nur der Trenner');
     assert.equal(fmt.dateWithDistanceText('2026-10-25', { today }), 'Morgen');
   });
   await as({ locale: 'en' }, () => {

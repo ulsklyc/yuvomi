@@ -33,7 +33,7 @@ import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
-import { leadCardClass } from '/utils/metric-card.js';
+import { leadCardClass, fitMetricLeads } from '/utils/metric-card.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -193,6 +193,8 @@ const READ_SAFE_ACTIONS = new Set(['view']);
 function setHtml(element, html) {
   element.replaceChildren();
   element.insertAdjacentHTML('afterbegin', html);
+  // Leitzahl in fester Stufe, kleiner nur bei Ueberlauf (R23, D12).
+  fitMetricLeads(element);
 }
 
 // Format aus utils/money.js - EINE Quelle für das ganze Budget-Modul. Vorher

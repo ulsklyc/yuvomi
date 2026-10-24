@@ -1101,9 +1101,11 @@ test('#1454: die Geburtstagszeile sagt Wochentag, Tag+Monat oder Datum mit Jahr'
     ], '1x2', 4);
     assert.deepEqual(metaOf(html, 'birthday-widget-item__meta'), [
       'common.today',
-      `${wd('2026-09-26')} · dashboard.daysLeft{"count":3}`,
-      'DM:2026-10-15 · dashboard.daysLeft{"count":22}',
-      '2027-01-05 · dashboard.daysLeft{"count":104}',
+      // R23 (D11): der Abstand wie im Geburtstagsmodul ("in 3 Tagen", jenseits
+      // eines Monats grob), nicht "3 Tage" wie eine Dauer.
+      `${wd('2026-09-26')} · in 3 Tagen`,
+      'DM:2026-10-15 · in 22 Tagen',
+      '2027-01-05 · in 3 Monaten',
     ]);
   });
 });
