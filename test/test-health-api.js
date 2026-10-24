@@ -2189,3 +2189,68 @@ test('#2054: ohne schedules bleibt die Antwort die bisherige Zeile', async () =>
   assert.equal('schedules' in res.body.data, false);
   await call('DELETE', `/medications/${res.body.data.id}`);
 });
+
+// --------------------------------------------------------
+// Rueckgaengig nach "Eingenommen" nimmt Dosis UND Bestand zurueck (R23, D6)
+//
+// Bis R23 korrigierte das Zuruecknehmen nur den Eintrag (#701), nie den
+// Bestand: eine versehentlich getippte Dosis kostete eine Tablette, die noch im
+// Schrank lag. Der Toast bot gar keinen Rueckweg an.
+// --------------------------------------------------------
+
+test('R23 D6: /take meldet stock_deducted, /undo stellt Eintrag und Bestand wieder her', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Undo-Plan', stock_qty: 6 });
+  const id = med.body.data.id;
+  const sched = await call('POST', `/medications/${id}/schedules`, { time_of_day: '08:00', dose_qty: 2 });
+  assert.equal(sched.status, 201);
+  const pending = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-06T08:00', schedule_id: sched.body.data.id });
+  const lid = pending.body.data.id;
+  const taken = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
+  assert.equal(taken.body.stock_deducted, 2, 'die Antwort nennt, was abging');
+  assert.equal(stockOf(id), 4);
+  const undo = await call('POST', `/logs/${lid}/undo`, { stock_credit: taken.body.stock_deducted });
+  assert.equal(undo.status, 200);
+  assert.equal(undo.body.data.status, 'pending', 'ein geplanter Eintrag steht wieder aus');
+  assert.equal(undo.body.data.taken_at, null);
+  assert.equal(stockOf(id), 6, 'der Bestand ist wieder voll');
+  const again = await call('POST', `/logs/${lid}/undo`, { stock_credit: 2 });
+  assert.equal(again.status, 409, 'ein zweites Rueckgaengig schreibt nichts gut');
+  assert.equal(stockOf(id), 6);
+});
+
+test('R23 D6: Bedarfsdosis - /undo loescht den Eintrag und schreibt nur das wirklich Abgezogene gut', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Undo-Bedarf', prn: true, stock_qty: 0.5 });
+  const id = med.body.data.id;
+  const res = await call('POST', `/medications/${id}/logs`, { status: 'taken', dose_qty: 1, stock_deduct: 1 });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.stock_deducted, 0.5, 'nur der Rest ging ab');
+  assert.equal(stockOf(id), 0);
+  const undo = await call('POST', `/logs/${res.body.data.id}/undo`, { stock_credit: res.body.stock_deducted });
+  assert.equal(undo.status, 200);
+  assert.equal(undo.body.data.removed, true);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(id).n, 0);
+  assert.equal(stockOf(id), 0.5, 'nicht mehr als vorher');
+});
+
+test('R23 D6: /undo nach "Ausgelassen" schreibt nichts gut, ohne Bestand bleibt er leer, fremd ist 404', async () => {
+  asA();
+  const med = await call('POST', '/medications', { name: 'Undo-Skip', stock_qty: 3 });
+  const id = med.body.data.id;
+  const skipped = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-07T08:00', status: 'skipped' });
+  const undo = await call('POST', `/logs/${skipped.body.data.id}/undo`, { stock_credit: 2 });
+  assert.equal(undo.status, 200);
+  assert.equal(undo.body.data.removed, true, 'ohne Zeitplan war der Eintrag die Tat selbst');
+  assert.equal(stockOf(id), 3, 'ausgelassen hat nichts abgezogen, also nichts gutzuschreiben');
+  const bare = await call('POST', '/medications', { name: 'Undo-Ohne' });
+  const log = await call('POST', `/medications/${bare.body.data.id}/logs`, { status: 'taken', stock_deduct: 1 });
+  assert.equal(log.body.stock_deducted, 0);
+  await call('POST', `/logs/${log.body.data.id}/undo`, { stock_credit: 1 });
+  assert.equal(stockOf(bare.body.data.id), null, 'ohne gefuehrten Bestand entsteht keiner');
+  const neg = await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 1 });
+  assert.equal((await call('POST', `/logs/${neg.body.data.id}/undo`, { stock_credit: -1 })).status, 400);
+  session = { userId: userB, role: 'member' };
+  assert.equal((await call('POST', `/logs/${neg.body.data.id}/undo`, { stock_credit: 1 })).status, 404);
+  asA();
+});

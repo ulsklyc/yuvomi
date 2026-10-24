@@ -705,9 +705,68 @@ function decideMoneyRequest(res, d, row, action, me) {
   return res.json({ data: updated });
 }
 
+/** So lange nach der Entscheidung nimmt "Rueckgaengig" sie zurueck (Minuten). */
+export const REOPEN_WINDOW_MINUTES = 10;
+
+/*
+ * EINE ENTSCHEIDUNG ZURUECKNEHMEN (Critique R23, D6). "Freigegeben" stand ohne
+ * Rueckweg da, waehrend das harmlosere Ablehnen nachfragte (N4). Jetzt fragt
+ * keine der beiden vorher, und der Toast danach nimmt sie ECHT zurueck: die
+ * Anfrage steht wieder offen, und das Guthaben steht, wie es vor der
+ * Entscheidung stand.
+ *
+ *  - Praemie freigegeben: die Punkte waren schon beim Stellen reserviert, die
+ *    Freigabe hat nur den Status gesetzt (und eine Einheit verbraucht, die
+ *    `soldOut` aus den erfuellten Anfragen zaehlt). Zurueck heisst: offen.
+ *  - Praemie abgelehnt/zurueckgezogen: die Ablehnung hat die Reservierung per
+ *    `reversal` zurueckgebucht. Genau diese Zeile geht wieder - dieselbe
+ *    Reservierung, keine zweite Buchung. Reicht das Guthaben dafuer nicht mehr
+ *    (die Punkte sind inzwischen ausgegeben), bleibt die Entscheidung.
+ *  - Geld freigegeben: die Ein- oder Auszahlung (`postMoney`) geht wieder. Ein
+ *    Konto, das danach im Minus stuende, behaelt die Freigabe.
+ *  - Geld abgelehnt/zurueckgezogen: es war nichts gebucht, also nur offen.
+ *
+ * Zuruecknehmen darf nur, wer entschieden hat, und nur kurz danach: das ist
+ * der Rueckweg des Toasts, keine nachtraegliche Korrektur fremder Entscheidungen.
+ */
+function reopenRedemption(req, res, d, row, me) {
+  if (row.status === 'pending') {
+    return res.status(409).json({ error: 'This request is still open.', code: 409, reason: 'rewards_redemption_open' });
+  }
+  if (row.decided_by !== me) return res.status(403).json({ error: 'Only who decided can take the decision back.', code: 403 });
+  const decidedMs = Date.parse(row.decided_at ?? '');
+  if (!Number.isFinite(decidedMs) || Date.now() - decidedMs > REOPEN_WINDOW_MINUTES * 60_000) {
+    return res.status(409).json({ error: 'This decision can no longer be taken back.', code: 409, reason: 'rewards_reopen_expired' });
+  }
+  const refused = d.transaction(() => {
+    const money = row.kind !== 'reward';
+    const settle = money
+      ? (row.status === 'fulfilled' ? d.prepare(`SELECT id, delta FROM reward_ledger WHERE redemption_id = ? AND unit = 'money'`).all(row.id) : [])
+      : (row.status !== 'fulfilled' ? d.prepare(`SELECT id, delta FROM reward_ledger WHERE redemption_id = ? AND unit = 'points' AND type = 'reversal'`).all(row.id) : []);
+    const back = settle.reduce((sum, entry) => sum + entry.delta, 0);
+    if (back > 0) {
+      const balance = d.prepare('SELECT COALESCE(SUM(delta), 0) AS bal FROM reward_ledger WHERE user_id = ? AND unit = ?')
+        .get(row.user_id, money ? 'money' : 'points').bal;
+      if (balance < back) return money ? 'insufficient_funds' : 'insufficient_points';
+    }
+    const drop = d.prepare('DELETE FROM reward_ledger WHERE id = ?');
+    for (const entry of settle) drop.run(entry.id);
+    d.prepare(`
+      UPDATE reward_redemptions SET status = 'pending', decision_reason = NULL, decided_by = NULL, decided_at = NULL,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `).run(row.id);
+    return null;
+  })();
+  if (refused) {
+    return res.status(409).json({ error: 'The balance no longer allows taking this back.', code: 409, reason: refused });
+  }
+  return res.json({ data: d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id) });
+}
+
 // --------------------------------------------------------
 // PATCH /redemptions/:id — Anfrage entscheiden.
-// action: 'fulfill' | 'reject' (Admin) | 'cancel' (Eigentümer oder Admin).
+// action: 'fulfill' | 'reject' (Admin) | 'cancel' (Eigentümer oder Admin) | 'reopen' (wer entschieden hat, R23).
 // Bei reject/cancel werden die reservierten Punkte zurückgebucht.
 // --------------------------------------------------------
 router.patch('/redemptions/:id', (req, res) => {
@@ -727,6 +786,7 @@ router.patch('/redemptions/:id', (req, res) => {
       WHERE r.id = @id AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
     `).get({ id: toInt(req.params.id), ...moneyParams(reader) });
     if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404, reason: 'rewards_redemption_not_found' });
+    if (action === 'reopen') return reopenRedemption(req, res, d, row, me);
     if (row.status !== 'pending')
       return res.status(409).json({ error: 'Redemption already decided.', code: 409, reason: 'rewards_redemption_decided' });
 

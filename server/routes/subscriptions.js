@@ -984,6 +984,14 @@ router.post('/:id/renew', async (req, res) => {
     // bezahlten Buchung stehen im selben synchronen Schritt wie das Lesen
     // oben (#2004).
     const { paid } = renewBooking(current, resolveRenewal(current));
+    // Der Rueckweg des Toasts (R23, D6): was vor der Zahlung stand. Die Undo-
+    // Route prueft daran, dass seither nichts anderes verlaengert hat.
+    const undo = {
+      paid_entry_id: current.enabled ? (current.budget_entry_id ?? null) : null,
+      next_payment_date: current.next_payment_date,
+      occurrences_done: Number(current.occurrences_done || 0),
+      enabled: current.enabled ? 1 : 0,
+    };
     let row;
     try {
       let fetched = null;
@@ -1005,11 +1013,77 @@ router.post('/:id/renew', async (req, res) => {
       if (!row) throw new SubscriptionGoneError();
     }
     syncReminder(row);
-    res.json({ data: decorate(row) });
+    res.json({ data: decorate(row), undo });
   } catch (err) {
     if (err instanceof SubscriptionGoneError) return subscriptionGone(res);
     log.error('POST /:id/renew error:', err);
     res.status(500).json({ error: 'Subscription renewal could not be saved.', code: 500 });
+  }
+});
+
+/*
+ * EINE ZAHLUNG ZURUECKNEHMEN (Critique R23, D6). "Bezahlt" fragte vorher nach,
+ * weil ein zweiter Wisch nichts zurueckholte (N4: Rueckfrage am Rueckweg statt
+ * eines Rueckwegs). Jetzt fragt nichts vorher, und der Toast nimmt die Zahlung
+ * ECHT zurueck: Faelligkeit und Zaehler stehen wie vorher, ein Abschluss ist
+ * aufgehoben, die beim Bezahlen angelegte Buchung der naechsten Zahlung ist
+ * weg, und die bezahlte Buchung ist wieder die verknuepfte "naechste Zahlung" -
+ * der Sync schreibt sie danach aus der Zeile, wie vor dem Tipp.
+ *
+ * Body: der `undo`-Block aus der Antwort von POST /:id/renew. Er gilt nur, wenn
+ * die Zeile genau der Stand ist, den EIN Verlaengern aus ihm macht - sonst hat
+ * seither jemand anderes bezahlt oder bearbeitet, und die Antwort ist 409.
+ */
+router.post('/:id/renew/undo', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const current = loadSubscription(id);
+    if (!current) return subscriptionGone(res);
+    if (!mayEditSub(req, current)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
+    const b = req.body || {};
+    const prevDate = date(b.next_payment_date, 'next_payment_date', true);
+    const prevDone = Number(b.occurrences_done);
+    const paidId = b.paid_entry_id == null ? null : Number(b.paid_entry_id);
+    if (prevDate.error || !Number.isInteger(prevDone) || prevDone < 0 || (paidId != null && !Number.isInteger(paidId))) {
+      return res.status(400).json({ error: 'The undo block of the renewal is required.', code: 400 });
+    }
+    const prev = { ...current, next_payment_date: prevDate.value, occurrences_done: prevDone };
+    const step = resolveRenewal(prev);
+    const stale = () => res.status(409).json({ error: 'The subscription changed since this payment.', code: 409, reason: 'subscriptions_renew_undo_stale' });
+    if (step.nextDate !== current.next_payment_date || step.occurrencesDone !== Number(current.occurrences_done || 0)
+      || Boolean(step.completed) !== Boolean(current.completed_at)) return stale();
+    const paid = paidId == null ? null : db.get().prepare(`
+      SELECT id FROM budget_entries
+      WHERE id = ? AND category = 'subscriptions' AND date = ?
+        AND NOT EXISTS (SELECT 1 FROM budget_subscriptions s WHERE s.budget_entry_id = budget_entries.id)
+    `).get(paidId, prevDate.value);
+    if (paidId != null && !paid) return stale();
+    // Bis hierher kein await: Pruefen und Zuruecksetzen in einem synchronen Schritt.
+    db.get().transaction(() => {
+      if (current.budget_entry_id) db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(current.budget_entry_id);
+      db.get().prepare(`
+        UPDATE budget_subscriptions
+        SET next_payment_date = ?, occurrences_done = ?, budget_entry_id = ?,
+            enabled = CASE WHEN ? THEN ? ELSE enabled END,
+            completed_at = CASE WHEN ? THEN NULL ELSE completed_at END
+        WHERE id = ?
+      `).run(prevDate.value, prevDone, paid?.id ?? null, step.completed ? 1 : 0, b.enabled ? 1 : 0, step.completed ? 1 : 0, id);
+    })();
+    let row;
+    try {
+      row = await syncBudgetExpense(id);
+    } catch (err) {
+      if (err instanceof SubscriptionGoneError) throw err;
+      log.warn(`Undo of renewal ${id} saved; its booking amount waits for the exchange rate:`, err.message);
+      row = loadSubscription(id);
+      if (!row) throw new SubscriptionGoneError();
+    }
+    syncReminder(row);
+    res.json({ data: decorate(row) });
+  } catch (err) {
+    if (err instanceof SubscriptionGoneError) return subscriptionGone(res);
+    log.error('POST /:id/renew/undo error:', err);
+    res.status(500).json({ error: 'Subscription renewal could not be taken back.', code: 500 });
   }
 });
 

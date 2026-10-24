@@ -158,7 +158,10 @@ export function budgetPaths() {
       post: op({ summary: 'Find selectable logo options from a website URL or service name', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/{id}/renew': {
-      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', description: 'Preserves `reminder_enabled`. A renewed subscription with reminders disabled has no reminder row.', tag: 'Budget', params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Advance a subscription to its next renewal date, or complete it when its end condition is reached', description: 'Preserves `reminder_enabled`. A renewed subscription with reminders disabled has no reminder row. Besides `data` the answer carries `undo` - { paid_entry_id, next_payment_date, occurrences_done, enabled }, the state before the payment - which POST /renew/undo takes back (R23).', tag: 'Budget', params: [idParam()], stateChanging: true }),
+    },
+    '/api/v1/budget/subscriptions/{id}/renew/undo': {
+      post: op({ summary: 'Take a payment back (undo a renewal)', description: 'Body: the `undo` block from POST /renew. Due date and payment count go back, a completion is lifted, the booking of the next payment that the renewal created is deleted, and the paid booking is the linked next-payment booking again (rewritten from the subscription). Only valid while the subscription is exactly what ONE renewal makes of that block; otherwise 409 with `reason: "subscriptions_renew_undo_stale"`. Same write rule as PUT.', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/budget/subscriptions/{id}': {
       put: op({ summary: 'Update subscription', description: 'Optional boolean `reminder_enabled`: false removes the payment reminder; true schedules it using `reminder_days`. Omitting the field preserves its current value. Changing it does not pause the subscription or remove its budget expense.', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
@@ -181,6 +184,7 @@ const CASE_REASONS = {
     delete: SUBSCRIPTION_GONE,
   },
   '/api/v1/budget/subscriptions/{id}/renew': { post: `${SUBSCRIPTION_GONE}, \`subscriptions_subscription_completed\` (409, the subscription is completed; reactivate it first)` },
+  '/api/v1/budget/subscriptions/{id}/renew/undo': { post: `${SUBSCRIPTION_GONE}, \`subscriptions_renew_undo_stale\` (409, somebody renewed or edited the subscription since)` },
   '/api/v1/budget/subscriptions/categories': { post: '`subscriptions_category_exists` (409)' },
   '/api/v1/budget/subscriptions/categories/{id}': {
     put: '`subscriptions_category_not_found` (404), `subscriptions_category_exists` (409)',

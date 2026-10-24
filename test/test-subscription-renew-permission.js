@@ -138,3 +138,50 @@ test('ein Abo, das es nicht gibt: 404 wie zuvor', async () => {
   const r = await call('POST', '/999999/renew', { as: OTHER });
   assert.equal(r.status, 404);
 });
+
+// ── R23, D6: eine Zahlung zuruecknehmen ─────────────────────────────────────
+// "Bezahlt" fragte vorher nach, weil sich nichts zurueckholen liess. Jetzt
+// fragt nichts, und POST /renew/undo nimmt die Zahlung am Server ECHT zurueck.
+
+const entriesOf = () => db.prepare("SELECT id, date, amount FROM budget_entries WHERE category = 'subscriptions' ORDER BY id").all();
+
+test('R23 D6: renew/undo stellt Datum, Zaehler und Buchungen wie vor der Zahlung her', async () => {
+  setMode('shared');
+  const sub = await createSub({ next_payment_date: '2030-02-10' });
+  const before = entriesOf();
+  assert.equal(before.length, 1, 'die Buchung der naechsten Zahlung');
+  const renew = await call('POST', `/${sub.id}/renew`, { as: OWNER });
+  assert.equal(renew.status, 200, renew.text);
+  assert.equal(renew.body.data.next_payment_date, '2030-03-10');
+  assert.equal(entriesOf().length, 2, 'bezahlt + naechste');
+  assert.deepEqual(renew.body.undo, { paid_entry_id: before[0].id, next_payment_date: '2030-02-10', occurrences_done: 0, enabled: 1 });
+  const undo = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: renew.body.undo });
+  assert.equal(undo.status, 200, undo.text);
+  assert.equal(undo.body.data.next_payment_date, '2030-02-10');
+  const row = db.prepare('SELECT occurrences_done, budget_entry_id FROM budget_subscriptions WHERE id = ?').get(sub.id);
+  assert.equal(row.occurrences_done, 0);
+  assert.equal(row.budget_entry_id, before[0].id, 'die bezahlte ist wieder die verknuepfte Buchung');
+  assert.deepEqual(entriesOf(), before, 'genau die Buchung von vorher, keine zweite');
+  // Ein zweites Rueckgaengig (oder eines nach einer weiteren Zahlung) passt nicht mehr.
+  const stale = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: renew.body.undo });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.reason, 'subscriptions_renew_undo_stale');
+});
+
+test('R23 D6: renew/undo hebt einen Abschluss auf und folgt der Schreibregel', async () => {
+  setMode('shared');
+  const sub = await createSub({ next_payment_date: '2030-04-01', end_type: 'after_count', occurrence_count: 1 });
+  const renew = await call('POST', `/${sub.id}/renew`, { as: OWNER });
+  assert.equal(renew.body.data.status, 'completed');
+  setMode('personal');
+  assert.equal((await call('POST', `/${sub.id}/renew/undo`, { as: OTHER, body: renew.body.undo })).status, 403);
+  const undo = await call('POST', `/${sub.id}/renew/undo`, { as: OWNER, body: renew.body.undo });
+  assert.equal(undo.status, 200, undo.text);
+  assert.notEqual(undo.body.data.status, 'completed');
+  const row = db.prepare('SELECT enabled, completed_at, next_payment_date, budget_entry_id FROM budget_subscriptions WHERE id = ?').get(sub.id);
+  assert.equal(row.enabled, 1);
+  assert.equal(row.completed_at, null);
+  assert.equal(row.next_payment_date, '2030-04-01');
+  assert.ok(row.budget_entry_id, 'die naechste Zahlung ist wieder gebucht');
+  assert.equal(entriesOf().length, 1);
+});

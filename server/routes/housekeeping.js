@@ -1488,6 +1488,53 @@ router.post('/work-sessions/check-out', (req, res) => {
   }
 });
 
+/** So lange nach dem Auschecken nimmt "Rueckgaengig" es zurueck (Minuten). */
+const REOPEN_WINDOW_MINUTES = 10;
+
+/*
+ * AUSCHECKEN ZURUECKNEHMEN (Critique R23, D6). Das Auschecken stand ohne
+ * Rueckweg da, und danach bot die Seite "Einchecken" als Primaerknopf an: ein
+ * Fehlgriff wurde zu einem zweiten Einsatz am selben Tag. Jetzt nimmt der
+ * Toast den Check-out am Server zurueck - die Sitzung ist wieder offen, wie
+ * vor dem Tipp: ohne Ende, und bei Stundenlohn ohne die beim Auschecken
+ * gerechnete Dauer und den Betrag daraus (der Check-in schreibt dort 0).
+ * Termin und Zahlungsaufgabe haengen an der Sitzung und bleiben.
+ *
+ * Nur kurz danach, nur unbezahlt und nur, solange die Person nicht schon
+ * wieder eingecheckt ist: sonst stuenden zwei offene Sitzungen da, und die
+ * Seite kennt nur eine.
+ */
+router.post('/work-sessions/:id/reopen', (req, res) => {
+  try {
+    const vId = validateId(req.params.id, 'id');
+    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+    const session = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+    if (!session) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+    if (!session.check_out) return res.status(409).json({ error: 'This visit is still open.', code: 409, reason: 'housekeeping_visit_open' });
+    const outMs = Date.parse(session.check_out);
+    if (session.paid_at || !Number.isFinite(outMs) || Date.now() - outMs > REOPEN_WINDOW_MINUTES * 60_000) {
+      return res.status(409).json({ error: 'This check-out can no longer be taken back.', code: 409, reason: 'housekeeping_reopen_expired' });
+    }
+    if (session.worker_id && loadOpenSession(session.worker_id)) {
+      return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409, reason: 'housekeeping_already_checked_in' });
+    }
+    const hourly = session.rate_type === 'hourly';
+    db.get().prepare(`
+      UPDATE housekeeping_work_sessions
+      SET check_out = NULL,
+          minutes_worked = CASE WHEN ? THEN NULL ELSE minutes_worked END,
+          daily_rate = CASE WHEN ? THEN 0 ELSE daily_rate END
+      WHERE id = ?
+    `).run(hourly ? 1 : 0, hourly ? 1 : 0, session.id);
+    const viewer = receiptAccess(req);
+    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
+    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
+  } catch (err) {
+    log.error('POST /work-sessions/:id/reopen error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/decay-tasks', (_req, res) => {
   try {
     const rows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks ORDER BY area COLLATE NOCASE, name COLLATE NOCASE').all();

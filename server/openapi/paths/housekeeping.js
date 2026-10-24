@@ -70,6 +70,9 @@ export function housekeepingPaths() {
     '/api/v1/housekeeping/work-sessions/check-out': {
       post: op({ summary: 'Check out a housekeeper', tag: 'Housekeeping', description: AMOUNTS_WRITE_NOTE.trim(), stateChanging: true, requestBody: jsonBody(null) }),
     },
+    '/api/v1/housekeeping/work-sessions/{id}/reopen': {
+      post: op({ summary: 'Take a check-out back (undo)', tag: 'Housekeeping', params: [idParam()], description: 'The undo of a check-out (R23): the visit is open again - no end, and for an hourly rate no worked minutes and an amount of 0, as at check-in. Calendar event and payment task stay. Only within 10 minutes of the check-out, only while unpaid, and only while the housekeeper has no other open session.', stateChanging: true }),
+    },
     '/api/v1/housekeeping/visits': {
       get: op({ summary: 'List housekeeping visits for a month', tag: 'Housekeeping', description: VISIT_CAPABILITY_NOTE + RECEIPT_NOTE + AMOUNTS_NOTE }),
     },
@@ -156,6 +159,11 @@ const CASE_REASONS = {
   },
   '/api/v1/housekeeping/work-sessions/check-out': {
     post: '`housekeeping_open_session_not_found` (404, there is no open session; somebody checked out already)',
+  },
+  '/api/v1/housekeeping/work-sessions/{id}/reopen': {
+    post: `${VISIT_GONE}, \`housekeeping_visit_open\` (409, the visit has no check-out), `
+      + '`housekeeping_reopen_expired` (409, paid or checked out more than 10 minutes ago), '
+      + '`housekeeping_already_checked_in` (409, the housekeeper has another open session)',
   },
   '/api/v1/housekeeping/visits/{id}': { get: VISIT_GONE, put: VISIT_GONE, delete: VISIT_GONE },
   '/api/v1/housekeeping/visits/{id}/pay': { post: VISIT_GONE },

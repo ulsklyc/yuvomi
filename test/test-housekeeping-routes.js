@@ -1972,6 +1972,58 @@ test('Hausprofil: Geburtstag ohne Jahr bleibt ohne Jahr', async () => {
   assert.equal(withYear.body.data.birth_year_unknown, false);
 });
 
+// --------------------------------------------------------------------------
+// R23, D6: Auschecken zuruecknehmen (Rueckgaengig im Toast)
+// Vorher stand das Auschecken ohne Rueckweg da, und der Primaerknopf danach
+// hiess "Einchecken" - ein Fehlgriff wurde zum zweiten Einsatz.
+// --------------------------------------------------------------------------
+test('R23 D6: reopen nimmt den Check-out zurueck - Sitzung offen, Stundenbetrag wie beim Check-in', async () => {
+  const w = await call('POST', '/worker', { as: ADM, body: { display_name: 'Undo-Stunde', rate_type: 'hourly', hourly_rate: 20, daily_rate: 0 } });
+  assert.equal(w.status, 201, JSON.stringify(w.body));
+  const workerId = w.body.data.id;
+  const inn = await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: workerId, daily_rate: 0 } });
+  assert.equal(inn.status, 201);
+  const sid = inn.body.data.id;
+  db.prepare("UPDATE housekeeping_work_sessions SET check_in = ? WHERE id = ?").run(new Date(Date.now() - 3 * 3600_000).toISOString(), sid);
+  const out = await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: workerId } });
+  assert.equal(out.status, 200);
+  const closed = db.prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(sid);
+  assert.ok(closed.check_out && closed.minutes_worked >= 179 && closed.daily_rate > 0, 'ausgecheckt mit Dauer und Betrag');
+  const back = await call('POST', `/work-sessions/${sid}/reopen`, { as: ADM });
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  const open = db.prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(sid);
+  assert.equal(open.check_out, null, 'wieder offen');
+  assert.equal(open.minutes_worked, null);
+  assert.equal(open.daily_rate, 0, 'der Stundenbetrag faellt wie vor dem Check-out');
+  const list = await call('GET', '/workers', { as: ADM });
+  assert.equal(list.body.data.find((x) => x.id === workerId).current_session?.id, sid, 'die Seite liest sie als offene Sitzung');
+  assert.equal((await call('POST', `/work-sessions/${sid}/reopen`, { as: ADM })).body.reason, 'housekeeping_visit_open');
+  // Danach normal auschecken - und nach Ablauf der Frist bleibt es dabei.
+  await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: workerId } });
+  db.prepare("UPDATE housekeeping_work_sessions SET check_out = ? WHERE id = ?").run(new Date(Date.now() - 11 * 60_000).toISOString(), sid);
+  const late = await call('POST', `/work-sessions/${sid}/reopen`, { as: ADM });
+  assert.equal(late.status, 409);
+  assert.equal(late.body.reason, 'housekeeping_reopen_expired');
+});
+
+test('R23 D6: reopen nicht, wenn die Person schon wieder eingecheckt ist, und nicht nach der Bezahlung', async () => {
+  const w = await call('POST', '/worker', { as: ADM, body: { display_name: 'Undo-Tag', rate_type: 'daily', daily_rate: 60 } });
+  const workerId = w.body.data.id;
+  const first = (await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: workerId, daily_rate: 60 } })).body.data.id;
+  await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: workerId } });
+  const second = (await call('POST', '/work-sessions/check-in', { as: ADM, body: { worker_id: workerId, daily_rate: 60 } })).body.data.id;
+  const twice = await call('POST', `/work-sessions/${first}/reopen`, { as: ADM });
+  assert.equal(twice.status, 409);
+  assert.equal(twice.body.reason, 'housekeeping_already_checked_in');
+  await call('POST', '/work-sessions/check-out', { as: ADM, body: { worker_id: workerId } });
+  assert.equal((await call('POST', `/visits/${second}/pay`, { as: ADM })).status, 200);
+  const paid = await call('POST', `/work-sessions/${second}/reopen`, { as: ADM });
+  assert.equal(paid.status, 409);
+  assert.equal(paid.body.reason, 'housekeeping_reopen_expired');
+  const tagessatz = db.prepare('SELECT daily_rate FROM housekeeping_work_sessions WHERE id = ?').get(first).daily_rate;
+  assert.equal(tagessatz, 60, 'beim Tagessatz rechnet der Check-out nichts um, das Zuruecknehmen auch nicht');
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

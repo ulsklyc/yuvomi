@@ -71,10 +71,16 @@ function stockDeduct(raw) {
  * bekommt keinen. Laeuft in der Transaktion des Aufrufers.
  */
 function deductStock(medId, qty) {
-  if (!(qty > 0)) return;
+  if (!(qty > 0)) return 0;
+  const before = db.get().prepare('SELECT stock_qty FROM medications WHERE id = ?').get(medId)?.stock_qty;
+  if (before == null) return 0;
   db.get().prepare(
     'UPDATE medications SET stock_qty = MAX(0, stock_qty - ?) WHERE id = ? AND stock_qty IS NOT NULL'
   ).run(qty, medId);
+  // WAS WIRKLICH ABGING, nicht was verlangt war (R23, D6): bei 0,5 Tabletten
+  // Rest und einer Dosis von 1 gehen 0,5 ab. Genau das schreibt das
+  // Zuruecknehmen wieder gut - sonst stuende danach mehr da als vorher.
+  return before - Math.max(0, before - qty);
 }
 
 /**
@@ -483,7 +489,7 @@ router.post('/medications/:id/logs', (req, res) => {
     // dieselbe Regel, nach der der Scheduler selbst nur einmal anlegt. Abgezogen
     // wird dann nur beim Wechsel nach `taken`, sonst zoege ein wiederholter Tipp
     // die Dosis zweimal vom Bestand.
-    const { row, created } = db.get().transaction(() => {
+    const { row, created, deducted } = db.get().transaction(() => {
       const existing = scheduleId && scheduledAt.value
         ? db.get().prepare(
           'SELECT * FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?',
@@ -501,17 +507,17 @@ router.post('/medications/:id/logs', (req, res) => {
           nextStatus === 'taken' ? (existing.status === 'taken' && !takenAt.value ? existing.taken_at : nextTakenAt) : null,
           dose.value ?? null, b.note === undefined ? 0 : 1, note.value ?? null, existing.id,
         );
-        if (nextStatus === 'taken' && existing.status !== 'taken') deductStock(medId, deduct.value);
-        return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(existing.id), created: false };
+        const deducted = nextStatus === 'taken' && existing.status !== 'taken' ? deductStock(medId, deduct.value) : 0;
+        return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(existing.id), created: false, deducted };
       }
       const result = db.get().prepare(`
         INSERT INTO medication_logs (medication_id, schedule_id, scheduled_at, status, taken_at, dose_qty, note)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose.value, note.value);
-      if (nextStatus === 'taken') deductStock(medId, deduct.value);
-      return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid), created: true };
+      const deducted = nextStatus === 'taken' ? deductStock(medId, deduct.value) : 0;
+      return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid), created: true, deducted };
     })();
-    res.status(created ? 201 : 200).json({ data: row });
+    res.status(created ? 201 : 200).json({ data: row, stock_deducted: deducted });
   } catch (err) {
     log.error('Error creating log:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
@@ -538,15 +544,14 @@ function updateLogStatus(req, res, newStatus) {
     // genommener Eintrag zieht nicht ein zweites Mal ab: ein wiederholtes
     // /take (Doppelklick, Wiederholung nach einem Netzfehler) bucht sonst die
     // Dosis doppelt vom Bestand.
-    db.get().transaction(() => {
+    const deducted = db.get().transaction(() => {
       db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
-      if (logRow.status !== 'taken') deductStock(logRow.medication_id, deduct.value);
+      return logRow.status !== 'taken' ? deductStock(logRow.medication_id, deduct.value) : 0;
     })();
-  } else {
-    db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = NULL WHERE id = ?').run('skipped', id);
+    return res.json({ data: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id), stock_deducted: deducted });
   }
-
-  res.json({ data: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id) });
+  db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = NULL WHERE id = ?').run('skipped', id);
+  res.json({ data: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id), stock_deducted: 0 });
 }
 
 /**
@@ -659,6 +664,54 @@ router.delete('/logs/:id', (req, res) => {
     res.json({ data: { id } });
   } catch (err) {
     log.error('Error deleting log:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /logs/:id/undo (R23, D6)
+// Body: { stock_credit? }  - was die Buchung abgezogen hat (`stock_deducted`)
+//
+// DER RUECKWEG DES TOASTS nach "Eingenommen"/"Ausgelassen". Bis R23 korrigierte
+// das Zuruecknehmen nur den Eintrag, nie den Bestand (#701) - eine versehentlich
+// getippte Dosis kostete eine Tablette, die im Schrank noch lag. Jetzt geht
+// beides in EINER Transaktion zurueck:
+//  - ein geplanter Eintrag steht wieder aus (`pending`, ohne Einnahmezeit) -
+//    loeschen hiesse, der Scheduler legte ihn beim naechsten Lauf neu an;
+//  - ein Eintrag ohne Plan (Bedarfsdosis) geht ganz, er war die Tat selbst;
+//  - der Bestand bekommt `stock_credit` gut, aber nur, wo einer gefuehrt wird.
+// Die Gutschrift ist so vertrauenswuerdig wie ein PATCH am Bestand: dieselbe
+// Person darf ihn ohnehin setzen (writableChild).
+// --------------------------------------------------------
+router.post('/logs/:id/undo', (req, res) => {
+  try {
+    const viewer = viewerId(req);
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    const logRow = ownLogRow(id, viewer);
+    if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
+    const credit = v.num(req.body?.stock_credit, 'stock_credit');
+    if (credit.error) return badRequest(res, [credit.error]);
+    if (credit.value != null && credit.value < 0) return badRequest(res, ['stock_credit must not be negative.']);
+    if (logRow.status === 'pending') {
+      return res.status(409).json({ error: 'This dose is not recorded.', code: 409, reason: 'health_dose_pending' });
+    }
+    const credited = logRow.status === 'taken' && credit.value > 0 ? credit.value : 0;
+    const removed = db.get().transaction(() => {
+      if (credited > 0) {
+        db.get().prepare('UPDATE medications SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL')
+          .run(credited, logRow.medication_id);
+      }
+      if (!logRow.schedule_id) {
+        db.get().prepare('DELETE FROM medication_logs WHERE id = ?').run(id);
+        return true;
+      }
+      db.get().prepare("UPDATE medication_logs SET status = 'pending', taken_at = NULL WHERE id = ?").run(id);
+      return false;
+    })();
+    res.json({ data: removed ? { id, removed: true } : db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id) });
+  } catch (err) {
+    log.error('Error undoing dose:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });

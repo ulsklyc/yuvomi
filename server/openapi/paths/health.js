@@ -91,7 +91,7 @@ export function healthPaths() {
     },
     '/api/v1/health/medications/{id}/logs': {
       get: op({ summary: 'List a medication\'s dose log', tag: 'Health', params: [idParam()], description: 'Optional `from`/`to` filters on `scheduled_at`.' }),
-      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note?, stock_deduct? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null. `stock_deduct` (not negative) lowers the recorded stock in the same transaction as the log entry, never below 0, and only for a `taken` entry; a medication without recorded stock keeps none (#2069). One entry per planned occurrence: when an entry for the same `schedule_id` and `scheduled_at` exists, it is updated and the answer is `200`, and stock is deducted only when it turns `taken`. Send an `Idempotency-Key` to retry an as-needed dose safely.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Add a dose-log entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note?, stock_deduct? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null. `stock_deduct` (not negative) lowers the recorded stock in the same transaction as the log entry, never below 0, and only for a `taken` entry; a medication without recorded stock keeps none (#2069). One entry per planned occurrence: when an entry for the same `schedule_id` and `scheduled_at` exists, it is updated and the answer is `200`, and stock is deducted only when it turns `taken`. Send an `Idempotency-Key` to retry an as-needed dose safely. The answer carries `stock_deducted`: what actually came off the stock (0 without recorded stock, less than asked when the stock ran out) - the amount `POST /logs/{id}/undo` credits back.' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}': {
       patch: op({
@@ -111,10 +111,13 @@ export function healthPaths() {
       }),
     },
     '/api/v1/health/logs/{id}/take': {
-      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { taken_at?, stock_deduct? }. `stock_deduct` (not negative) lowers the recorded stock in the same transaction, never below 0; an entry that is already taken does not deduct a second time (#2069).' + TAKEN_NOW + WALL_CLOCK_INPUT }),
+      post: op({ summary: 'Mark a dose as taken', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { taken_at?, stock_deduct? }. `stock_deduct` (not negative) lowers the recorded stock in the same transaction, never below 0; an entry that is already taken does not deduct a second time (#2069). The answer carries `stock_deducted` (see the dose-log POST).' + TAKEN_NOW + WALL_CLOCK_INPUT }),
     },
     '/api/v1/health/logs/{id}/skip': {
       post: op({ summary: 'Mark a dose as skipped', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/health/logs/{id}/undo': {
+      post: op({ summary: 'Take a recorded dose back (undo)', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { stock_credit? } (R23). The undo of "taken" or "skipped", stock included: a scheduled entry is `pending` again without `taken_at` (deleting it would let the scheduler recreate it), an entry without a schedule (as-needed) is removed and the answer is { id, removed: true }. `stock_credit` (not negative; send the `stock_deducted` of the booking) goes back onto the recorded stock in the same transaction, only for a taken dose and only where stock is recorded. A pending entry answers 409 with `reason: "health_dose_pending"`. Restricted to who may write the medication.' }),
     },
     '/api/v1/health/labs': {
       get: op({ summary: 'List lab reports (with results)', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported.' }),
