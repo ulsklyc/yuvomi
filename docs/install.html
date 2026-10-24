@@ -54,9 +54,9 @@
     if (/^#podman$/i.test(location.hash)) document.documentElement.setAttribute('data-engine', 'podman');
   </script>
   <style>
-    /* scroll-padding-bottom: ein per Tab fokussierter Fusslink landete mobil
-       unter dem Nach-oben-Knopf (gemessen "Mitmachen", SC 2.4.11). */
-    html { scroll-behavior: smooth; scroll-padding-top: 80px; scroll-padding-bottom: 72px; -webkit-text-size-adjust: 100%; }
+    /* scroll-padding-bottom (ein per Tab fokussierter Fusslink landete mobil
+       unter dem Nach-oben-Knopf, SC 2.4.11) steht in site.css. */
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--ff); background: var(--bg); color: var(--text-1);
       line-height: 1.65; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
@@ -70,7 +70,7 @@
        Regel wie index.html. */
     a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { text-decoration-thickness: 2px; }
-    .prereq-link, .path-now a, .to-top { text-decoration: none; }
+    .prereq-link, .path-now a { text-decoration: none; }
     /* Trefferflaeche der Textlinks: 16-17px Zeile, SC 2.5.8 will 24. Das
        senkrechte Polster eines Inline-Elements nimmt Klicks an, ohne die
        Zeilenhoehe anzufassen. */
@@ -89,14 +89,16 @@
     /* Nav: die Leiste (.topbar, .bar-row, .nav-logo, .nav-controls,
        .nav-btn) steht in assets/site.css, gleich auf allen fuenf Seiten. */
     /* Section primitives */
-    section { padding: 80px 0; }
+    /* Der Sektionsabstand der Seite: --sec-s aus site.css, fliessend von 44px
+       (Telefon) bis 80px (Schirm) - dieselbe Skala wie auf der Startseite. */
+    section { padding: var(--sec-s) 0; }
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
     .section-title { font-size: clamp(1.7rem, 3.4vw, 2.4rem); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; margin: 14px 0 12px; text-wrap: balance; }
     .section-title em { font-style: italic; font-weight: 600; color: var(--accent); }
     .section-desc { font-size: 1.04rem; color: var(--text-2); line-height: 1.65; max-width: 60ch; }
 
     /* Hero */
-    .hero { padding: 150px 0 56px; text-align: center; position: relative; overflow: hidden; }
+    .hero { padding: calc(var(--bar-h) + var(--sec-s)) 0 56px; text-align: center; position: relative; overflow: hidden; }
     .hero::before { content: ''; position: absolute; top: -220px; left: 50%; transform: translateX(-50%); width: 1000px; height: 760px; pointer-events: none;
       background: radial-gradient(50% 50% at 50% 40%, var(--accent-glow) 0%, transparent 70%); }
     .hero > * { position: relative; }
@@ -241,12 +243,10 @@
     /* Codeplatte und Kopierknopf: site.css. Hier nur der Abstand zwischen
        aufeinanderfolgenden Platten eines Schritts. */
     .code-wrap { margin-bottom: 14px; }
-    /* The download plates. At 390px the plate cut both URLs exactly where
-       docker-compose.yml and podman-compose.yml differ, so the one word that
-       tells the two commands apart sat past the edge. One command per line,
-       allowed to break anywhere, with a hanging indent so a wrapped URL does
+    /* The download plates. Every plate wraps (site.css); these two carry one
+       span per command, so their hanging indent works in every browser, not
+       only where `text-indent: each-line hanging` does - a wrapped URL must
        not read as a second command. The copy payload is unchanged. */
-    .code-block.code-urls { white-space: pre-wrap; }
     .code-urls .ln { display: block; padding-left: 2ch; text-indent: -2ch; overflow-wrap: anywhere; }
 
     /* The seven tabs scope the steps per platform and then everything below
@@ -277,7 +277,9 @@
     .success-emoji { margin-bottom: 12px; color: var(--success); line-height: 0; }
     .success-emoji svg { width: 3rem; height: 3rem; }
     .success-box h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 10px; }
-    .success-box p { color: var(--text-2); margin-bottom: 18px; }
+    /* Zentriertes Lesemass: der Satz lief ueber die ganze Box, 116 Zeichen bei
+       1440px. Gemessen wie .step-desc (canvas, nicht ch). */
+    .success-box p { color: var(--text-2); margin-bottom: 18px; max-width: 52ch; margin-inline: auto; }
     /* Not a link, and it must not look like one: it points at the reader's own
        machine, so an accent-coloured pill under "navigate to:" was pure false
        affordance. It reads as a value now, with the action it actually needs. */
@@ -373,30 +375,22 @@
     summary::after { content: '+'; font-size: 1.3rem; color: var(--text-3); transition: transform .2s; line-height: 1; }
     details[open] summary::after { transform: rotate(45deg); }
     .details-body { padding: 0 20px 18px; font-size: 0.9rem; color: var(--text-2); line-height: 1.6; }
+    /* Lesemass wie .step-desc: die Antwort lief in der 816px-Box bis 114
+       Zeichen. Nur der Text; die Codeplatten behalten die Breite. */
+    .details-body p { max-width: 54ch; }
     .details-body code { font-size: 0.84em; background: var(--bg-alt); padding: 1px 5px; border-radius: var(--r-xs); border: 1px solid var(--border); }
     .details-body .code-block { margin: 10px 0; }
 
     /* Footer: assets/site.css, gleich auf allen fuenf Seiten. */
 
-    /* Back to top. The legal pages have had this since they got a table of
-       contents; this page is longer than either of them and had no way back to
-       the tab bar except a full scroll. Appears past the first screen only. */
-    .to-top { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 90;
-      display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
-      background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-      border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600;
-      opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
-    .to-top.show { opacity: 1; visibility: visible; transform: none; }
-    .to-top:hover { text-decoration: none; border-color: var(--border-strong); }
-    .to-top svg { width: 15px; height: 15px; }
+    /* Back to top: assets/site.css und assets/site.js, gleich auf allen fuenf Seiten. */
 
     @media (max-width: 760px) {
       /* On a phone the first command sat at 2798px, three screens down, behind
          a 150px hero pad and three full-size prerequisite cards (1405px) that
          the app-store reader does not need at all. Same content, row layout:
          icon beside the text instead of above it, tighter section rhythm. */
-      section { padding: 56px 0; }
-      .hero { padding: 104px 0 36px; }
+      .hero { padding-bottom: 36px; }
       .hero h1 { margin-bottom: 14px; }
       .hero-desc { font-size: 1.04rem; margin-bottom: 20px; }
       .prereq-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 24px; }
@@ -409,6 +403,18 @@
       .prereq-card .prereq-hint { margin-top: 8px; }
       .env-grid { grid-template-columns: 1fr; }
       .tab-bar { margin: 26px 0 22px; }
+      /* Die Ziffer steht neben dem Titel, nicht als eigene Spalte neben dem
+         ganzen Schritt: die kostete 56px jeder Zeile, also jeder Codeplatte,
+         auf 346px Inhaltsbreite. `display: contents` loest .step-content auf,
+         seine Kinder stehen direkt im Raster des Schritts - Ziffer und Titel
+         in der ersten Reihe, alles Weitere ueber die volle Breite. Ein div,
+         keine Semantik, die dabei verloren ginge. */
+      .step { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 12px; align-items: center; }
+      .step-content { display: contents; }
+      .step-content > * { grid-column: 1 / -1; }
+      .step-num { width: 30px; height: 30px; font-size: 0.92rem; border-radius: var(--r-sm); }
+      .step-content > .step-title { grid-column: 2; margin-bottom: 0; }
+      .step-content > .step-title + * { margin-top: 8px; }
       .tab-btn { flex: 1 1 auto; justify-content: center; }
     }
     @media (max-width: 480px) {
@@ -446,7 +452,7 @@
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; }
       .hero::before { display: none; }
-      .site-bar, .tab-bar, .to-top, .path-now, .engine-row { display: none !important; }
+      .site-bar, .tab-bar, .path-now, .engine-row { display: none !important; }
       /* Every variant on paper, each labelled: a printout has no tab or engine
          state to follow. */
       .scope, .eng-docker, .eng-podman { display: block !important; }
@@ -1605,11 +1611,6 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
       document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
     } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); }); }
 
-    (function(){
-      var b = document.getElementById('toTop'); if (!b) return;
-      function sync(){ b.classList.toggle('show', scrollY > 600); }
-      addEventListener('scroll', sync, { passive: true }); sync();
-    })();
 
     applyLang();
   })();

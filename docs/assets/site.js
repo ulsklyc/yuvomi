@@ -20,6 +20,9 @@
    (SC 2.5.3). The legal pages' language control is a plain link with static
    text and is left alone. The theme button's name follows the same event.
 
+   Since S2 it also switches the one back-to-top link and sizes the room the
+   code plates keep for their copy button (both at the end).
+
    No innerHTML anywhere: only attributes and textContent change. */
 (function () {
   'use strict';
@@ -96,4 +99,30 @@
 
   window.YuvomiSite = { isDark: isDark, mode: function () { return mode; } };
   apply();
+
+  /* BACK TO TOP (assets/site.css, "Back to top"). Every page carries the
+     link (#toTop); it shows once the first screen has scrolled away. One
+     threshold for all five pages instead of 600px here and 800px there. */
+  var top = document.getElementById('toTop');
+  if (top) {
+    var syncTop = function () { top.classList.toggle('show', window.scrollY > Math.max(600, window.innerHeight)); };
+    addEventListener('scroll', syncTop, { passive: true });
+    addEventListener('resize', syncTop);
+    syncTop();
+  }
+
+  /* COPY BUTTON ROOM. The plate's text flows around an empty float the size
+     of its copy button (assets/site.css, the code plate). The button's width
+     changes with the language and with its Copied/failed state, so each
+     wrapper carries it as --copy-w. Without ResizeObserver the CSS fallback
+     holds. */
+  if ('ResizeObserver' in window) {
+    var ro = new ResizeObserver(function (entries) {
+      entries.forEach(function (e) {
+        var w = e.target.offsetWidth;
+        if (w) e.target.parentElement.style.setProperty('--copy-w', w + 'px');
+      });
+    });
+    document.querySelectorAll('.code-wrap > .copy-btn').forEach(function (b) { ro.observe(b); });
+  }
 })();

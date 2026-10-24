@@ -117,9 +117,9 @@
       --m-prose: 52ch;    /* jeder Fliesstextabsatz - gemessen hoechstens 78 Zeichen, s.o. */
     }
 
-    /* scroll-padding-bottom: was per Tab fokussiert wird, scrollt der Browser
-       ueber den Nach-oben-Knopf (unten rechts) statt darunter (SC 2.4.11). */
-    html { scroll-behavior: smooth; scroll-padding-top: 80px; scroll-padding-bottom: 72px; -webkit-text-size-adjust: 100%; }
+    /* scroll-padding-bottom (was per Tab fokussiert wird, scrollt ueber das
+       schwebende Band statt darunter, SC 2.4.11) steht in site.css. */
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--ff);
       background: var(--bg);
@@ -142,7 +142,7 @@
        Textlink musste sich den Strich selbst holen - zwei taten es nicht. */
     a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     a:hover { text-decoration-thickness: 2px; }
-    .mobile-cta, .plat-card, .to-top { text-decoration: none; }
+    .mobile-cta, .plat-card { text-decoration: none; }
     /* Trefferflaeche der Textlinks: die Zeile gibt ihnen 17px, SC 2.5.8 will
        24. Senkrechtes Polster an einem Inline-Element vergroessert die Flaeche,
        die den Klick annimmt, ohne die Zeilenhoehe anzufassen - der Absatz
@@ -282,7 +282,8 @@
     .sec-head.lead .sec-title { font-size: clamp(2.3rem, 5.2vw, 3.9rem); }
 
     /* ===== HERO ===== */
-    .hero { padding: 150px 0 72px; position: relative; overflow: hidden; }
+    /* Oben: Leiste plus ein Kapitelabstand (--sec-m, site.css). */
+    .hero { padding: calc(var(--bar-h) + var(--sec-m)) 0 72px; position: relative; overflow: hidden; }
     .hero-glow {
       position: absolute; top: -240px; left: 50%; transform: translateX(-50%);
       width: 1100px; height: 900px; pointer-events: none; z-index: 0;
@@ -370,7 +371,9 @@
        one gets the full content column (>= 900px at every desktop width), the
        caption does the selling, and the first readable screen lands inside the
        first 1500px instead of at 71% scroll depth. */
-    .gallery { padding: 88px 0; }
+    /* Sektionsabstaende: die Skala --sec-s/-m/-l in site.css, fliessend vom
+       Telefon zum Schirm - keine Sektion schreibt mehr eigene Pixel. */
+    .gallery { padding: var(--sec-m) 0; }
     .gal-list { display: flex; flex-direction: column; gap: 56px; margin-top: 44px; }
     .gal-item { position: relative; }
     .gal-cap { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -403,7 +406,7 @@
        am Schirm zweispaltig. Deliberately no per-row module accent - the accent
        system already carries meaning in .handoff, and a second coloured list
        turns that vocabulary back into decoration. */
-    .swap { padding: 88px 0; }
+    .swap { padding: var(--sec-m) 0; }
     .swap-list { list-style: none; margin: 40px auto 0; max-width: var(--m-list); display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; border-top: 1px solid var(--border); }
     .swap-row { display: grid; grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1fr); align-items: center; gap: 16px;
@@ -433,11 +436,17 @@
     @media (max-width: 860px) {
       .swap-list { grid-template-columns: minmax(0, 1fr); }
     }
+    /* Telefon: zwei Zeilen statt drei Spalten. Rechtsbuendig in einer
+       ~150px-Spalte brach der Halbsatz an zufaelligen Stellen ("Familienkalender-
+       / App", "eine / Dokumentenverwaltung"), jede Zeile anders. Jetzt steht er
+       linksbuendig ueber die volle Breite, darunter Pfeil und Modul - jede
+       Zeile gleich gebaut, gelesen von oben nach unten wie die Beziehung. */
     @media (max-width: 600px) {
-      .swap { padding: 64px 0; }
-      .swap-row { grid-template-columns: minmax(0, 1.25fr) auto minmax(0, 1fr); gap: 10px; padding: 12px 2px; }
-      .swap-from, .swap-to { font-size: 0.94rem; }
-      .swap-arrow { width: 15px; height: 15px; }
+      .swap-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "from from" "arrow to";
+        gap: 4px 8px; padding: 12px 2px; }
+      .swap-from { grid-area: from; text-align: left; font-size: 0.94rem; }
+      .swap-arrow { grid-area: arrow; width: 15px; height: 15px; }
+      .swap-to { grid-area: to; font-size: 0.98rem; }
     }
 
     /* ===== Feature showcase (alternating) ===== */
@@ -446,7 +455,7 @@
        direction carries the meaning. The two module accents per row are the
        app's own colour vocabulary used literally - the module that produces the
        data on the left, the one that consumes it on the right. */
-    .handoff { padding: 96px 0 88px; }
+    .handoff { padding: var(--sec-m) 0; }
     /* Flush left, not centred: the head above it is a left-aligned chapter mark,
        and a centred 900px list under a 0-offset head reads as a 126px misprint. */
     .ho-list { list-style: none; margin: 56px 0 0; max-width: var(--m-list); display: grid; gap: 0; }
@@ -495,6 +504,8 @@
       100% { transform: scale(1); }
     }
     @media (max-width: 700px) {
+      .ho-list { margin-top: 36px; }
+      .ho-row { padding: 22px 0; }
       .ho-flow { flex-direction: column; align-items: flex-start; gap: 10px; }
       .ho-arrow { transform: rotate(90deg); margin-left: 8px; }
       .ho-label { font-size: 1rem; }
@@ -506,7 +517,7 @@
        Kapitelmarke wie Galerie, Handoffs und Longevity (Eyebrow, kursiver
        Titelteil); das Markenzeichen steht klein neben dem Kopf, die drei
        Momente darunter nebeneinander - drei gleichrangige Szenen, keine Liste. */
-    .family { padding: 88px 0; }
+    .family { padding: var(--sec-m) 0; }
     .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
       grid-template-areas: "head shot" "list list"; gap: 48px 56px; align-items: center; }
     /* Rahmen wie die Galerie (Radius, Kante, Schatten, Hof in der Akzentfarbe),
@@ -539,7 +550,6 @@
       .fam-shot { max-width: 640px; }
     }
     @media (max-width: 600px) {
-      .family { padding: 64px 0; }
       .fam-grid { gap: 28px; }
       .fam-shot img { border-radius: var(--r-lg); }
       .fam-item { grid-template-columns: 38px minmax(0, 1fr); gap: 13px; }
@@ -552,7 +562,7 @@
     /* Eine Sektion fuer beide Stufen. Der `--bg-alt`-Streifen sass frueher an
        der zweiten Sektion und trennte die vier ausfuehrlichen Module von den
        uebrigen Karten, obwohl beide dasselbe sagen. */
-    .showcase { padding: 80px 0; background: var(--bg-alt); border-block: 1px solid var(--border); }
+    .showcase { padding: var(--sec-s) 0; background: var(--bg-alt); border-block: 1px solid var(--border); }
     /* Gegliedert wie das Menue der App (Critique 2026-09-29): vorher standen
        vier ausfuehrliche Karten im 2x2 und darunter alle uebrigen als gleich
        grosse Karten ohne jede Ordnung, 3.693px am Schirm. Jetzt fuenf Gruppen mit
@@ -690,6 +700,11 @@
       html.js .mod-groups:not(.expanded) .mod-list { column-gap: 16px; }
       html.js .mod-groups:not(.expanded) .mod-group--flat .mod-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
       html.js .mod-toggle { margin-top: 24px; }
+      /* Zugeklappt traegt die Feature-Karte am Telefon nur Titel und Satz;
+         ihre Stichpunkte (159-272px je Karte, zusammen ~840px) kommen mit den
+         Beschreibungen ueber denselben Knopf. Am Schirm stehen sie neben der
+         Liste und kosten keine Hoehe. Ohne JS steht alles da. */
+      html.js .mod-groups:not(.expanded) .feat-list { display: none; }
     }
     /* Unter 380px bleiben der Namensspalte neben dem Symbol 84-104px, und
        "Haushaltshilfe" oder "Housekeeping" liefen 2-26px darueber hinaus - bei
@@ -702,7 +717,7 @@
 
 
     /* ===== Platform / Install anywhere ===== */
-    .platforms { padding: 100px 0; }
+    .platforms { padding: var(--sec-m) 0; }
         /* 190px liessen bei 1.152px nur fuenf Karten in die Reihe, die sechste stand
        allein darunter. 168px bringen alle sechs unter, auch bei 1.152px:
        6x168 + 5x16 = 1.088. */
@@ -751,6 +766,20 @@
     .plat-go { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 700; color: var(--accent); }
     .plat-go svg { width: 15px; height: 15px; transition: transform .2s var(--ease-out); }
     .plat-card:hover .plat-go svg { transform: translateX(4px); }
+    /* Telefon: das Logo steht neben dem Namen statt darueber, das Abzeichen
+       im Fluss darunter statt absolut in der Ecke (dort laege es auf dem
+       Namen). Fuenf Karten untereinander kosteten je 227-248px, das Logo
+       allein 58px davon. */
+    @media (max-width: 600px) {
+      .plat-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "logo head" "logo badge" "text text" "go go";
+        column-gap: 14px; row-gap: 0; align-items: center; padding: 20px; }
+      .plat-logo { grid-area: logo; }
+      .plat-card h3 { grid-area: head; grid-row: 1 / span 2; }
+      .plat-card:has(.plat-badge) h3 { grid-row: 1; align-self: end; }
+      .plat-badge { grid-area: badge; position: static; justify-self: start; align-self: start; margin-top: 4px; }
+      .plat-card p { grid-area: text; margin-top: 12px; }
+      .plat-go { grid-area: go; margin-top: 12px; }
+    }
 
     /* Die 760px-Deckelung liess in einer 1.152px-Spalte 440px totes Gutter
        rechts vom wichtigsten Block der Seite stehen, waehrend das Plattformraster
@@ -765,8 +794,7 @@
        eintraegt, entfernt die Klasse am Wrapper und bekommt das Band zurueck.
        Gleiche Spezifitaet wie die Regel darueber; die Quellreihenfolge
        entscheidet, deshalb steht sie danach. */
-    .code-wrap--single:has(> .copy-btn) .code-block { padding-top: 20px; }
-    .code-wrap--single .copy-btn { top: 50%; transform: translateY(-50%); }
+
     /* What the reader is actually deciding at the moment they paste a curl into
        the machine that will hold their family's health records: what runs, how
        big it is, what it opens, and whether it talks to anyone. All of it lived
@@ -853,7 +881,7 @@
        aussen). Das Padding stand noch auf
        `30px 0 8px` aus der Absatz-Fassung und gab der Sektion, die die Seite
        selbst als Entscheidungspunkt fuehrt, acht Pixel Luft nach unten. */
-    .longevity { padding: 96px 0; }
+    .longevity { padding: var(--sec-m) 0; }
     .long-list { margin-top: 44px; display: grid; gap: 20px; }
     /* Vier Karten untereinander liefen am Schirm ~1.450px; zwei mal zwei
        halbieren das, und jede Spalte liegt mit ~60 Zeichen im Lesemass.
@@ -871,10 +899,14 @@
     .long-item dt { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 9px; color: var(--text-1); }
     .long-item dd { margin: 0; max-width: var(--m-prose); font-size: 1rem; color: var(--text-2); line-height: 1.65; }
     .long-item dd b { color: var(--text-1); font-weight: 650; }
+    @media (max-width: 600px) {
+      .long-list { gap: 12px; }
+      .long-item { padding: 20px; }
+    }
 
 
     /* ===== CTA ===== */
-    .cta { padding: 110px 0; }
+    .cta { padding: var(--sec-l) 0; }
     /* Was a full-bleed violet gradient covering 40% of the viewport (50% on a
        phone) on a page whose design system caps violet at 10%. Drenching the
        plate also forced its own text and button palette - white ink, a white
@@ -905,18 +937,8 @@
 
     /* ===== Footer: assets/site.css, gleich auf allen fuenf Seiten. ===== */
 
-    /* ===== Back to top =====
-       The legal pages have had this since they grew a table of contents. This
-       page is 16.293px tall on desktop and 22.500px on a phone - roughly five
-       times either of them - and had no way back at all. */
-    .to-top { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 89;
-      display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
-      background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-      border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600;
-      opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
-    .to-top.show { opacity: 1; visibility: visible; transform: none; }
-    .to-top:hover { border-color: var(--border-strong); }
-    .to-top svg { width: 15px; height: 15px; }
+    /* ===== Back to top: assets/site.css und assets/site.js, gleich auf allen
+       fuenf Seiten; unter 700px weicht er hier der Install-Pille. ===== */
 
     /* ===== Mobile sticky CTA (thumb-zone Install) ===== */
     .mobile-cta { display: none; }
@@ -924,8 +946,8 @@
        duplicate the in-hero Install button above the fold. No-JS keeps it visible. */
     /* visibility, not just opacity: pointer-events keeps the mouse out but an
        opacity-0 link is still in the tab order, so keyboard users hit an
-       invisible "Install Yuvomi" while the hero was still on screen. .to-top on
-       the legal pages already does it this way. */
+       invisible "Install Yuvomi" while the hero was still on screen. .to-top
+       (site.css) does it the same way. */
     html.js .mobile-cta { opacity: 0; visibility: hidden; pointer-events: none;
       transition: opacity .3s var(--ease-out), visibility .3s var(--ease-out); }
     html.js .mobile-cta.show { opacity: 1; visibility: visible; pointer-events: auto; }
@@ -970,13 +992,15 @@
       .hero-frame img { aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; }
     }
     @media (max-width: 600px) {
-      .hero { padding: 120px 0 56px; }
+      .hero { padding-bottom: 56px; }
       /* Das Handy-Float verdeckte bei 390px rund 40% der Dashboard-Aufnahme -
          ausgerechnet deren rechte Spalte. Auf dem Telefon ist der eine Beweis
          mehr wert als die Collage. (Es zeigt seit Runde 2 die Einkaufsliste;
          die Aufgaben-Ansicht traegt allein die Planen-Karte.) */
       .hero-float { display: none; }
-      .gallery { padding: 64px 0 16px; }
+      /* Unten knapp: das Telefonbild endet schon mit eigenem Rand, und das
+         Band "Was es ersetzt" bringt seinen Kopfabstand mit. */
+      .gallery { padding-bottom: 16px; }
       .gal-cap p { font-size: 0.95rem; }
       .cta-box { padding: 52px 24px; }
       /* Zwei Knoepfe, zwei Breiten, je nach Sprache in anderer Reihenfolge
@@ -1003,15 +1027,10 @@
       .mobile-cta svg { width: 18px; height: 18px; }
       .mobile-cta:active { transform: translateX(-50%) scale(0.97); }
       .nav-install { display: none; } /* the sticky pill replaces it on phones */
-      body { padding-bottom: 84px; } /* keep footer clear of the floating pill */
-      /* Seit die Pille beim Lesen stehen bleibt, lag das per Tab fokussierte
-         Fusslogo unter ihr (gemessen). Fokus-Scrollen haelt jetzt das ganze
-         Band frei, in dem Pille und Nach-oben-Knopf sitzen. */
-      html { scroll-padding-bottom: 150px; }
-      /* The pill is centred on the same bottom edge and runs to x=296 at 375px,
-         so a right-aligned to-top would sit on top of it. It goes above instead,
-         with enough clearance that the two boxes do not touch. */
-      .to-top { bottom: calc(94px + env(safe-area-inset-bottom, 0px)); }
+      /* Das Seitenende haelt die Fusszeile frei (--float-band, site.css), und
+         Fokus-Scrollen dasselbe Band (scroll-padding-bottom, site.css). Der
+         Nach-oben-Knopf stand bis S2 als zweite Pille darueber; unter 700px
+         gibt es nur noch diese eine (site.css, "Back to top"). */
       /* Die Pille bleibt beim Lesen stehen (Critique 2026-09-29). Bis dahin
          raeumte sie bei JEDER Abwaertsbewegung das Feld (`nav-down`) - wer
          liest, scrollt abwaerts, also war sie an 0 von 41 Messpunkten zu
@@ -1023,8 +1042,6 @@
          keine Wiederkehr nach X ms Stillstand, die beim langsamen Lesen
          flackert und beim schnellen nie kommt. Fliesstext darf unter ihr
          durchlaufen; `body { padding-bottom }` haelt das Seitenende frei. */
-      .to-top { transition: transform .2s ease, opacity .2s ease, visibility .2s ease; }
-      html.cta-yield .to-top { transform: translateY(150%); opacity: 0; visibility: hidden; }
       /* Die Pille muss `html.js .mobile-cta.show` (0,3,1) schlagen, sonst bleibt
          sie sichtbar - genau das war der erste Versuch, und die Messung hat es
          gezeigt: die Klasse stand, die Deckkraft blieb 1. */
@@ -1055,8 +1072,8 @@
        over the first page and link targets that exist nowhere on paper. */
     @media print {
       html { scroll-behavior: auto; }
-      body { background: #fff; color: #000; padding-bottom: 0; }
-      .site-bar, .hero-glow, .to-top, .ho-token, .mod-toggle { display: none !important; }
+      body { background: #fff; color: #000; }
+      .site-bar, .hero-glow, .ho-token, .mod-toggle { display: none !important; }
       /* Papier hat keinen Aufklapp-Knopf: jede Modulbeschreibung steht da. */
       .mod-card p { display: block !important; }
       .mod-list { display: contents !important; }
@@ -2128,7 +2145,7 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         <span data-t="quick_env"><b>Now open <code>.env</code> and replace both <code>REPLACE_WITH_…</code> placeholders</b> with the two values you just generated. Yuvomi does not start while a placeholder is still in there. Keep a copy of the key with your other passwords. To run without encryption, clear the <code>DB_ENCRYPTION_KEY</code> line instead.</span>
       </p>
-      <div class="code-wrap code-wrap--single"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
+      <div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" type="button" data-copy="docker compose up -d"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
       <p class="quick-note" data-t="quick_note">Then open <code>http://localhost:3000</code>. The first visit walks you through creating your admin account. Prefer a guided setup? The <a href="install.html#installer">step-by-step installer</a> sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy.</p>
     </div>
   </div>
@@ -2348,14 +2365,14 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
     } else { pill.classList.add('show'); }
     /* Weichen nach Lage statt nach Scrollrichtung (Begruendung am CSS unter
        700px): `cta-yield` steht, solange eine Codeplatte oder die CTA-Knoepfe
-       das untere Band schneiden, in dem Pille (16px + ~50px) und Nach-oben-
-       Knopf (94px + 44px) sitzen, oder solange das Sprungmenue offen ist. Das
+       das untere Band schneiden, in dem die Pille sitzt (16px + 53px, mit
+       Luft 96px), oder solange das Sprungmenue offen ist. Das
        Band ist ein Observer mit oben weggeschnittener Wurzel; seine Hoehe haengt
        an innerHeight, also wird er bei resize neu gebaut. */
     var root = document.documentElement;
     var jump = document.getElementById('navJump');
     var zones = document.querySelectorAll('.quick-docker .code-wrap, .cta-actions');
-    var BAND = 150, inBand = [], zObs = null;
+    var BAND = 96, inBand = [], zObs = null;
     function update(){ root.classList.toggle('cta-yield', inBand.length > 0 || !!(jump && jump.open)); }
     function watch(){
       if (!('IntersectionObserver' in window) || !zones.length) return;
@@ -2468,11 +2485,6 @@ openssl rand -hex 32</div><button class="copy-btn" type="button" data-copy="curl
   addEventListener('resize', syncCodeScroll);
   /* Papier klappt nichts auf: die Outbound-Liste gehoert auf den Ausdruck. */
   addEventListener('beforeprint', function(){ document.querySelectorAll('details.tb-more').forEach(function(d){ d.open = true; }); });
-  (function(){
-    var b = document.getElementById('toTop'); if (!b) return;
-    function sync(){ b.classList.toggle('show', scrollY > 800); }
-    addEventListener('scroll', sync, { passive: true }); sync();
-  })();
   /* Modulbeschreibungen ein- und wieder ausblenden (jede Breite). Die neuen Zeilen
      erscheinen UEBER dem Knopf, in allen fuenf Gruppen. Beim Aufklappen geht
      es deshalb an den Anfang der Liste, und der Fokus sitzt auf dem ersten

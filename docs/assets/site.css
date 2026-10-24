@@ -233,6 +233,29 @@
      only the row lines up. test:docs-landing holds the two values equal. */
   --bar-maxw: 1200px;
 
+  /* Section rhythm: the vertical padding of every page section, on all five
+     pages. Three steps, each fluid from a phone (390px) to a desktop column
+     (1280px) and capped there. Until S2 the landing page wrote its sections
+     as fixed desktop values - 88, 96, 100, 110px, each its own literal - and a
+     phone kept almost all of it: 20.3 screens of page at 390px, a fifth of it
+     empty bands. A phone now gets a little over half of the desktop value.
+     The slope is (desktop - phone) / 890px, the intercept what is left at
+     390px; change a pair, recompute both, then measure.
+       --sec-s  44 -> 80px   bands that sit inside a chapter (install.html,
+                             the module catalogue)
+       --sec-m  52 -> 96px   a chapter (the default)
+       --sec-l  60 -> 110px  the closing call to action */
+  --sec-s: clamp(44px, calc(28.2px + 4.045vw), 80px);
+  --sec-m: clamp(52px, calc(32.7px + 4.944vw), 96px);
+  --sec-l: clamp(60px, calc(38.1px + 5.618vw), 110px);
+
+  /* The band a floating control sits in at the bottom of the viewport: 16px
+     from the edge, a 44-53px pill (back to top; the install pill on a phone),
+     at least 15px of air above it. The footer reserves it below its last row,
+     so at the end of every page the meta line rests above the pill instead of
+     under it. */
+  --float-band: 84px;
+
   /* One curve, one name. Exponential ease-out: nothing here is a glass
      element, and overshoot on a hover reads as wobble. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -510,7 +533,10 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
    copyright on the legal pages) and the three words. Until this round there
    were three: a column grid (index), a centred link row (install) and a
    one-line strip (legal pages). */
-.site-foot { border-top: 1px solid var(--border); padding: 56px 0 48px; background: var(--bg); }
+/* Bottom padding: the floating band (see --float-band). Back to top (and on a
+   phone the landing page's install pill) floats there; with 48px the pill
+   covered the meta line on every page once scrolled to the end. */
+.site-foot { border-top: 1px solid var(--border); padding: 56px 0 calc(var(--float-band) + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
 .site-foot .foot-in { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
 .foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
 .foot-brand { max-width: 320px; }
@@ -524,7 +550,7 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
   font-size: 0.82rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .foot-bottom b { color: var(--text-2); font-weight: 600; }
 @media (max-width: 560px) {
-  .site-foot { padding: 44px 0 36px; }
+  .site-foot { padding-top: 44px; }
   .foot-cols { gap: 28px 40px; }
 }
 
@@ -544,19 +570,39 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
    reader types, .val for a value, .comment for the aside. */
 .code-wrap, .code-block { --focus-ring: var(--code-accent); }
 .code-wrap { position: relative; }
+/* ONE rule for long lines, on every plate: they wrap. Until S2 the plates
+   scrolled sideways - except the download plates on install.html, which
+   wrapped, because a scrolling plate cut both URLs at 390px exactly where
+   docker-compose.yml and podman-compose.yml differ. Two behaviours for the
+   same element, and every scrolling plate needed a tab stop of its own
+   (axe: focus-order-semantics). Wrapping shows the whole command on every
+   width; the copy button carries the exact text, so a wrap never reaches
+   the clipboard. `break-word` breaks inside a token only when it cannot fit
+   whole. Where the browser can, a wrapped continuation hangs 2ch in, so it
+   does not read as the next command (Chrome cannot yet and wraps flush).
+   overflow-x stays as the net: a plate that still scrolls gets its tab stop
+   from the page script. */
 .code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-lg); padding: 20px 24px;
-  font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.85; overflow-x: auto; white-space: pre; tab-size: 2;
+  font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.85; overflow-x: auto;
+  white-space: pre-wrap; overflow-wrap: break-word; tab-size: 2;
   box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.06); }
+@supports (text-indent: 2ch each-line hanging) {
+  .code-block { text-indent: 2ch each-line hanging; }
+}
 .code-block .cmd { color: var(--code-accent); font-weight: 600; }
 .code-block .val { color: var(--code-val); }
 .code-block .comment { color: var(--code-comment); }
-/* The button gets its own band at the top of the plate instead of a
-   padding-right gutter. `padding-right` only protects the first screenful:
-   the button is absolutely positioned, so any line longer than the plate
-   scrolls straight underneath it (on the German pages "Kopieren" hid 17% of
-   the readable width at 390px). Keyed on :has(), because some plates carry no
-   button and a blanket padding would open an empty band above them. */
-.code-wrap:has(> .copy-btn) .code-block { padding-top: 52px; }
+/* The copy button floats over the plate's top right corner, and the plate's
+   text flows AROUND it: an empty float of the button's size sits in the
+   first lines, so only those lines get shorter and the rest run the full
+   width. Before S2 the plate opened a 52px band above the first line for
+   the button instead - on a one-line plate that was half the plate. The
+   float's width follows the button (its label differs per language and
+   state): assets/site.js writes --copy-w on the wrapper; the fallback fits
+   the widest label in both languages. Keyed on :has(), because some plates
+   carry no button. 34px = the button's 10px offset plus 44px height, minus
+   the plate's 20px padding. */
+.code-wrap:has(> .copy-btn) .code-block::before { content: ''; float: right; width: calc(var(--copy-w, 7.2rem) - 14px); height: 34px; margin-left: 12px; }
 .copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 44px; padding: 7px 13px; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-full);
   background: rgba(255,255,255,0.08); color: var(--code-text); cursor: pointer;
@@ -565,6 +611,32 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
 .copy-btn.copied { background: var(--code-ok); border-color: var(--code-ok); color: #fff; }
 .copy-btn.failed { background: var(--code-fail); border-color: var(--code-fail); color: #fff; }
 .copy-btn svg { width: 13px; height: 13px; }
+
+/* ===== Back to top ========================================================
+   One control for all five pages, styled here and switched by
+   assets/site.js (it shows once the first screen has scrolled away). Each
+   page kept its own copy until S2 - three stylesheets, four inline scripts,
+   thresholds of 600 and 800px - and on a phone it sat on the footer's meta
+   line. The footer now reserves the band it floats in (--float-band).
+   On a phone the landing page already floats its install pill in the same
+   band, and two pills took 17% of the viewport: there, back to top leaves
+   (the jump menu and the progress line in the bar cover "where am I"). One
+   floating pill per screen. */
+html { scroll-padding-bottom: var(--float-band); }
+.to-top { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 89;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-family: var(--ff); font-size: 0.85rem; font-weight: 600; text-decoration: none;
+  opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
+.to-top.show { opacity: 1; visibility: visible; transform: none; }
+.to-top:hover { color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
+.to-top svg { width: 15px; height: 15px; }
+@media (max-width: 700px) {
+  body:has(.mobile-cta) .to-top { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .to-top { transition: none; }
+}
 
 /* Reveal on scroll. Both pages add .vis when an element enters the viewport;
    .d1-.d3 stagger siblings. Content must never ship hidden without JS (this
@@ -577,7 +649,8 @@ html:not(.js) .reveal { opacity: 1; transform: none; }
   .reveal { opacity: 1; transform: none; }
 }
 @media print {
-  .skip-link, .copy-btn { display: none !important; }
+  .skip-link, .copy-btn, .to-top { display: none !important; }
+  .code-block::before { display: none; }
   /* Fixed elements repeat on every printed page. index and install drop the
      bar on paper; the legal pages keep their logo in the flow. */
   .topbar { position: static; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }

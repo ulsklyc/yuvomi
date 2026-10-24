@@ -43,6 +43,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   neighbours instead of the loudest element (it turned near-white in dark mode), and Install
   stays the one filled button. Moving between the pages fades the content while the bar holds
   still, in browsers that support it and only when reduced motion is off.
+- **yuvomi.cloud is shorter and calmer on a phone.** The space between sections now scales with
+  the screen: a phone gets a little over half of the desktop spacing instead of nearly all of it,
+  on every page. On the landing page the platform cards put the logo beside the name, and the
+  collapsed module catalogue keeps the feature bullets behind "Show descriptions" on a phone - the
+  page is about a tenth shorter there. Only one button floats at the bottom of a phone screen:
+  "Back to top" gives way to the Install button on the landing page and stays on the other pages,
+  and the footer keeps room for it, so it no longer covers the last line. In the install guide the
+  step number sits beside the step title instead of taking its own column, every command wraps
+  instead of some scrolling sideways, and the copy button no longer pushes the command down. The
+  legal pages read as one column: the note, the contents and the tables end where the text ends,
+  and the contents list lines up with the text below it.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at

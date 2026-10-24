@@ -125,6 +125,14 @@
  *            reduzierte Transparenz und mehr Kontrast; die Plattformkarte hebt
  *            sich hoechstens 1px wie die Karten der App.
  *
+ *       (19) Platz und Rhythmus (S2, 2026-10-24): jede Sektion der Startseite
+ *            und der Installationsseite liest ihren senkrechten Abstand aus der
+ *            fliessenden Skala --sec-s/-m/-l in site.css statt eigener Pixel
+ *            (vorher 88/96/100/110px fest, am Telefon 20,3 Bildschirme); der
+ *            Nach-oben-Knopf ist EIN Bauteil (site.css + site.js, kein
+ *            Seitenskript, keine Seitenregel), und am Telefon schwebt neben der
+ *            Install-Pille keine zweite Pille.
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -1974,7 +1982,9 @@ test('der Farb-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
 /** Selektoren, die eine Seite in ihrem eigenen Style-Block neu anlegt, obwohl ein geteiltes Blatt sie fuehrt. */
 const SHARED_SELECTORS = ['.btn', '.btn-primary', '.btn-secondary', '.nav-btn', '.code-block', '.copy-btn', '.reveal', '.reveal.vis', ':focus-visible', '.skip-link',
   // Seit Runde 2 (R3): die eine Leiste aller fuenf Seiten.
-  '.topbar', '.bar-row', '.nav-logo', '.nav-logo svg', '.nav-controls'];
+  '.topbar', '.bar-row', '.nav-logo', '.nav-logo svg', '.nav-controls',
+  // Seit S2 (19): der eine Nach-oben-Knopf aller fuenf Seiten.
+  '.to-top', '.to-top.show'];
 
 function inlineStyles(html) {
   const body = stripComments(html.split(/<\/head>/)[0]);
@@ -3424,4 +3434,99 @@ test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const always = css.replace('@media (prefers-reduced-motion: no-preference) {\n  @view-transition', '@media all {\n  @view-transition');
   assert.notEqual(always, css);
   assert.ok(hit(siteShellFindings(pages, always, js), /laeuft auch unter reduced motion/));
+});
+
+/* ============================================================================
+ * (19) Platz und Rhythmus (S2, 2026-10-24).
+ *
+ * Die Sektionen der Startseite standen auf festen Desktop-Werten (88, 96, 100,
+ * 110px, jede ein eigenes Literal), das Telefon behielt fast alles davon. Die
+ * Skala in site.css fliesst vom Telefon zum Schirm; eine Sektion, die wieder
+ * eigene Pixel schreibt, faellt hier auf. Nur `padding-bottom` darf unter einer
+ * Breitenabfrage ein Literal tragen (die Galerie endet am Telefon knapp, weil
+ * ihr Telefonbild schon Rand mitbringt).
+ *
+ * Der Nach-oben-Knopf lebte in drei Stylesheets und vier Inline-Skripten mit
+ * zwei Schwellen, und am Telefon schwebte er auf der Startseite als zweite
+ * Pille ueber der Install-Pille (zusammen 17 % des Bildschirms).
+ * ========================================================================== */
+const RHYTHM_SECTIONS = {
+  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.platforms', '.longevity', '.cta'],
+  'install.html': ['section'],
+};
+
+function rhythmFindings(pages, siteCss, siteJs) {
+  const found = [];
+  for (const step of ['--sec-s', '--sec-m', '--sec-l']) {
+    if (!new RegExp(`${step}:\\s*clamp\\(`).test(siteCss)) found.push(`site.css: ${step} fehlt oder fliesst nicht (clamp)`);
+  }
+  for (const [page, html] of pages) {
+    const want = RHYTHM_SECTIONS[page];
+    if (!want) continue;
+    const reads = new Set();
+    for (const css of inlineStyles(html)) {
+      for (const r of eachRule(css)) {
+        if (r.at.some((a) => /print/.test(a))) continue;
+        for (const sel of r.selector.split(',').map((x) => x.trim())) {
+          if (!want.includes(sel)) continue;
+          for (const [n, v] of declarations(r.body)) {
+            if (!/^padding(?:-top|-bottom|-block)?$/.test(n)) continue;
+            if (n === 'padding-bottom' && r.at.length) continue;
+            if (/var\(--sec-[slm]\)/.test(v)) { reads.add(sel); continue; }
+            if (/\d+px/.test(v)) found.push(`${page}: ${sel} { ${n}: ${v} } - eigene Pixel statt der Skala`);
+          }
+        }
+      }
+    }
+    for (const sel of want) if (!reads.has(sel)) found.push(`${page}: ${sel} liest keinen Sektionsabstand der Skala`);
+  }
+  // Der Nach-oben-Knopf: ein Bauteil.
+  for (const [page, html] of pages) {
+    const body = stripComments(html);
+    const links = body.match(/<a class="to-top"[^>]*id="toTop"/g) || [];
+    if (links.length !== 1) found.push(`${page}: ${links.length}x <a class="to-top" id="toTop">`);
+    const scripts = (body.match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []).join('\n');
+    if (/toTop/.test(scripts)) found.push(`${page}: schaltet den Nach-oben-Knopf selbst (gehoert nach site.js)`);
+  }
+  if (!/getElementById\('toTop'\)/.test(siteJs)) found.push('site.js: schaltet den Nach-oben-Knopf nicht');
+  const phoneHide = [...eachRule(siteCss)].some((r) => r.at.some((a) => /max-width:\s*700px/.test(a))
+    && /\.mobile-cta\)\s*\.to-top/.test(r.selector) && /display:\s*none/.test(r.body));
+  if (!phoneHide) found.push('site.css: am Telefon schwebt der Nach-oben-Knopf neben der Install-Pille (zwei Pillen)');
+  return found;
+}
+
+test('docs: Sektionsabstaende aus der Skala, ein Nach-oben-Knopf, am Telefon eine Pille', () => {
+  assert.deepEqual(rhythmFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
+  // Die alte Galerie mit festem Desktop-Wert.
+  const fixed = swap('index.html', '.gallery { padding: var(--sec-m) 0; }', '.gallery { padding: 88px 0; }');
+  assert.notDeepEqual(fixed, pages);
+  assert.ok(hit(rhythmFindings(fixed, css, js), /index\.html: \.gallery \{ padding: 88px 0 \} - eigene Pixel/));
+  // install.html mit der alten Telefon-Ueberschreibung.
+  const phone = swap('install.html', '@media (max-width: 760px) {', '@media (max-width: 760px) {\n      section { padding: 56px 0; }');
+  assert.notDeepEqual(phone, pages);
+  assert.ok(hit(rhythmFindings(phone, css, js), /install\.html: section \{ padding: 56px 0 \}/));
+  // Eine Stufe der Skala verliert ihr clamp().
+  const flat = css.replace(/--sec-m: clamp\([^;]*\);/, '--sec-m: 96px;');
+  assert.notEqual(flat, css);
+  assert.ok(hit(rhythmFindings(pages, flat, js), /--sec-m fehlt oder fliesst nicht/));
+  // Ein Seitenskript schaltet den Knopf wieder selbst.
+  const own = swap('privacy.html', '<script src="assets/site.js"></script>',
+    "<script>(function(){ var b = document.getElementById('toTop'); })();</script>\n<script src=\"assets/site.js\"></script>");
+  assert.notDeepEqual(own, pages);
+  assert.ok(hit(rhythmFindings(own, css, js), /privacy\.html: schaltet den Nach-oben-Knopf selbst/));
+  // Zwei Pillen am Telefon.
+  const two = css.replace('body:has(.mobile-cta) .to-top { display: none; }', '');
+  assert.notEqual(two, css);
+  assert.ok(hit(rhythmFindings(pages, two, js), /zwei Pillen/));
+  // Eine Seite legt den Knopf wieder selbst an.
+  const copy = swap('install.html', '</style>', '.to-top { position: fixed; right: 16px; }\n</style>');
+  assert.deepEqual(sharedRuleCopies(copy), ['install.html: .to-top']);
 });

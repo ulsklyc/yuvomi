@@ -13,8 +13,17 @@
    that are really its own (the key/value grid of its info blocks).
    ========================================================================= */
 
-/* Seiteneigenes Mass: ein Rechtstext ist eine Spalte, keine Landing-Page. */
-:root { --maxw: 820px; }
+/* Seiteneigenes Mass: ein Rechtstext ist EINE Lesespalte, keine Landing-Page.
+   Bis S2 war die Spalte 820px breit und nur der Fliesstext endete bei 54ch:
+   Hinweisbox, Inhaltsverzeichnis, Tabellen und Infobloecke liefen 772px,
+   die Absaetze daneben ~520px - zwei Kanten rechts auf derselben Achse. Jetzt
+   ist die Spalte selbst das Lesemass, und alles darin endet an derselben
+   Kante. 54ch (+ zweimal 24px Polster): gemessen im Schnitt ~68 und
+   hoechstens ~78 Zeichen; `ch` ist die Breite der Null, in dieser Schrift
+   deutlich breiter als ein Durchschnittszeichen (62ch ergaben 78 im
+   Schnitt). Nachmessen, nicht rechnen. Breite Tabellen scrollen in ihrer
+   .table-scroll-Box. */
+:root { --maxw: calc(54ch + 48px); }
 
 html { scroll-behavior: smooth; }
 body {
@@ -39,7 +48,9 @@ body {
    column stays the page's own 820px; bar and footer sit on the landing
    page's column (--bar-maxw), so the logo keeps its place between pages. */
 
-main { flex: 1; padding: calc(var(--bar-h) + 48px) 0 64px; }
+/* Unten der Sektionsabstand der Seite (--sec-s, site.css), oben bleibt der
+   Spaltenkopf unter der Leiste. */
+main { flex: 1; padding: calc(var(--bar-h) + 48px) 0 var(--sec-s); }
 
 h1 {
   font-size: clamp(28px, 4vw, 40px);
@@ -74,13 +85,7 @@ h3 {
 }
 
 p { margin-bottom: 12px; color: var(--text-1); }
-/* Zeilenlaenge: die 820px-Spalte liess den Rechtstext bis 129 Zeichen laufen
-   (gemessen 1440px). Die Spalte bleibt so breit - Tabellen und das
-   Inhaltsverzeichnis brauchen sie -, der Fliesstext endet bei 54ch, gemessen
-   im Schnitt ~68 und hoechstens ~78 Zeichen. `ch` ist die Breite der Null,
-   in dieser Schrift deutlich breiter als ein Durchschnittszeichen: 62ch
-   ergaben 78 im Schnitt. Nachmessen, nicht rechnen. */
-main p, main li { max-width: 54ch; }
+/* Zeilenlaenge: die Spalte selbst (--maxw oben), kein zweites Mass am Absatz. */
 ul { margin: 0 0 12px 22px; }
 li { margin-bottom: 4px; }
 address { font-style: normal; }
@@ -130,6 +135,10 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
    <table> strips its table role in the accessibility tree, so the phone
    layout used to hand screen-reader users four unrelated cell runs. */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* In der Lesespalte (seit S2) brachen die Schluessel in den Zellen am
+   Bindestrich ("yuvomi-" / "theme"). Ein Schluessel bleibt ganz; reicht die
+   Spalte nicht, scrollt die Box. */
+.table-scroll td code { white-space: nowrap; }
 @media (max-width: 600px) {
   .table-scroll table { white-space: nowrap; }
 }
@@ -138,11 +147,19 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
 
 .small { font-size: 13px; color: var(--text-3); }
 
-/* In-page table of contents (navigation aid; legal text unchanged). */
-.toc { margin: 28px 0 10px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
-.toc-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 12px; }
-.toc-list { margin: 0; padding-left: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 24px; }
-.toc-list li { margin: 0; }
+/* In-page table of contents (navigation aid; legal text unchanged).
+   Buendig mit der Spalte: keine Karte mehr, deren 22px Polster Titel und
+   Eintraege nach innen setzten, und keine haengenden Listenziffern, die
+   "1." und "10." an verschiedenen Kanten begannen. Zwei Haarlinien fassen
+   das Verzeichnis, die Ziffer ist ein Zaehler in einer festen, linksbuendigen
+   Spalte - Titel, Ziffern und Absaetze stehen auf derselben linken Kante.
+   Das <ol> traegt role="list": Safari nimmt einer Liste mit
+   list-style: none sonst ihre Listensemantik. */
+.toc { margin: 28px 0 32px; padding: 18px 0 8px; border-block: 1px solid var(--border); }
+.toc-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px; }
+.toc-list { margin: 0; padding: 0; list-style: none; counter-reset: toc; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 24px; }
+.toc-list li { margin: 0; counter-increment: toc; display: grid; grid-template-columns: 1.9em minmax(0, 1fr); align-items: baseline; }
+.toc-list li::before { content: counter(toc) "."; color: var(--text-3); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 /* 44px targets. These are a list of links, not links inside a sentence, so
    the inline exception to SC 2.5.8 does not cover them - they measured 18px.
    The row gap goes to 0 because the padding now does that work. */
@@ -151,16 +168,8 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
 .toc-list a:hover { color: var(--accent); text-decoration: underline; }
 @media (max-width: 560px) { .toc-list { grid-template-columns: 1fr; } }
 
-/* Long legal sections with the table of contents at the very top and no way
-   back to it on a phone. Appears only once you are past the first screen. */
-.to-top { position: fixed; right: 16px; bottom: 16px; z-index: 90;
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
-  background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
-  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-size: 0.85rem; font-weight: 600; text-decoration: none;
-  opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .2s, transform .2s, visibility .2s; }
-.to-top.show { opacity: 1; visibility: visible; transform: none; }
-.to-top:hover { border-color: var(--border-strong); }
-.to-top svg { width: 15px; height: 15px; }
+/* Back to top: assets/site.css and assets/site.js, the same control on all
+   five pages. */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -169,7 +178,6 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .to-top { transition: none; }
 }
 
 /* Print. A privacy notice and an Impressum are the pages on this site most
@@ -179,7 +187,6 @@ th { background: var(--bg-alt); font-weight: 600; color: var(--text-2); }
 @media print {
   html { scroll-behavior: auto; }
   body { background: #fff; color: #000; }
-  .to-top { display: none !important; }
   main { padding-top: 24px; }
   .info-block, .toc { background: transparent; }
   .info-block, .toc, table, tr { break-inside: avoid; }
