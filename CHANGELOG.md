@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Waste shows each pickup once.** The type cards under "Types & schedules" now only say how
+  often a schedule runs, since the next pickup already stands in "Upcoming pickups" beside them. A
+  card still says when a schedule is paused or has no pickup ahead. "Add type" moved from the
+  header into the "..." menu once the first type exists, so "Schedule" is the one button there,
+  and the empty texts now describe what is below them: the templates and the import.
 - **Shifts show as time blocks in the calendar, and the month view explains its shift marks.**
   In week and day view a shift with a start and end time now sits in the hour grid like an
   event, instead of a short code such as "N · AJ" in the all-day row. Shifts without times and

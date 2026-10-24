@@ -674,33 +674,19 @@ test('WASTE_TYPE_COLORS ist die geteilte Palette, und Sperrmuell traegt nicht me
 // Nur-lesen-Mitglied ins Markup rutscht.
 // -------------------------------------------------------------------------
 
-test('die Seite hat einen sichtbaren, beschrifteten Weg zur ersten Abfallart, und das Ueberlaufmenue bietet ihn nicht doppelt an', () => {
-  // Vorher lagen ALLE vier Aktionen hinter dem unbeschrifteten "..." - eine
-  // frische Installation zeigte keinen einzigen sichtbaren Weg zur ersten
-  // Abfallart.
-  //
-  // SEKUNDAER FESTGENAGELT, nicht nur "irgendein Knopf": ab 1024px dockt der
-  // FAB in dieselbe Werkzeugleiste (dockFabIntoToolbar in router.js) und
-  // rendert dort als gefuellte Primaerpille. Als `btn--primary` standen hier
-  // zwei gefuellte Violettknoepfe nebeneinander, und die Seite sagte nicht
-  // mehr, welcher der Hauptweg ist (Eine-Stimme-Regel, DESIGN.md). Keine
-  // statische Pruefung faengt das, weil beide Knoepfe je fuer sich
-  // regelkonform sind - erst ihre Nachbarschaft ist der Fehler. Deshalb steht
-  // die Variante hier ausdruecklich im Test und nicht nur im Kommentar.
-  assert.match(WASTE_SRC, /class="btn btn--secondary" id="waste-add-type-btn" data-action="add-type"/);
-  assert.doesNotMatch(WASTE_CODE, /class="btn btn--primary" id="waste-add-type-btn"/);
-  // Und genau einmal als Knopf. Seit R16 (Kopfregel mobil 1a) gibt es den
-  // Menueeintrag wieder, aber nie NEBEN dem Knopf: unter 768px traegt die
-  // Titelzeile nur Icon-Knoepfe, der beschriftete Knopf ist dort ausgeblendet
-  // und der Eintrag steht; ab 768px umgekehrt. Je Breite EIN Weg.
-  assert.equal((WASTE_SRC.match(/data-action="add-type"/g) ?? []).length, 1);
-  assert.equal((WASTE_CODE.match(/action: 'add-type'/g) ?? []).length, 1);
+test('die erste Abfallart traegt der FAB, jede weitere steht im Menue - kein Kopfknopf daneben (R23 D14)', () => {
+  // Bis R23 stand ab 768px ein beschrifteter Kopfknopf "Abfallart hinzufuegen"
+  // neben dem Primaerknopf "Termin": zwei Anlegewege im Kopf, der seltenere
+  // breiter. Jetzt: ohne Abfallart heisst der FAB "Abfallart" (fabIntent),
+  // danach ist sie ein Eintrag im "..."-Menue - in jeder Breite.
+  assert.doesNotMatch(WASTE_SRC, /id="waste-add-type-btn"/, 'kein Kopfknopf mehr');
+  assert.equal((WASTE_CODE.match(/action: 'add-type'/g) ?? []).length, 1, 'genau ein Menueeintrag');
   const wasteCss = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
-  const hides = (sel, media) => [...eachRule(wasteCss)].some((r) => r.selector.trim() === sel
+  const hides = (sel, media) => [...eachRule(wasteCss)].some((r) => r.selector.split(',').map((x) => x.trim()).includes(sel)
     && /display:\s*none/.test(r.body) && (media ? r.at.some((a) => media.test(a)) : r.at.length === 0));
-  assert.ok(hides('#waste-add-type-btn', /max-width:\s*767px/), 'unter 768px weicht der Kopfknopf dem Menueeintrag');
-  assert.ok(hides('#waste-page-menu [data-action="add-type"]', /min-width:\s*768px/), 'ab 768px weicht der Eintrag dem Knopf');
+  assert.ok(!hides('#waste-page-menu [data-action="add-type"]', /min-width:\s*768px/), 'der Eintrag steht in jeder Breite');
   assert.ok(hides('.waste-page--onboarding #waste-page-menu [data-action="add-type"]'), 'im Onboarding traegt der FAB den Weg');
+  assert.equal(fabIntent({ types: [] }).creates, 'type', 'ohne Abfallart legt der FAB sie an');
   // Die drei uebrigen Kopf-Aktionen bleiben im Menue.
   for (const a of ['open-import', 'open-url-source', 'open-reminder-settings']) {
     assert.match(WASTE_SRC, new RegExp(`action: '${a}'`), `${a} gehoert weiter ins Ueberlaufmenue`);
@@ -841,9 +827,9 @@ test('isOnboarding: nur ohne jede Abfallart, nicht beim Laden, nicht bei nur arc
 
 test('sectionVisibility: im Onboarding nur EIN Block, Abholungen und Quellen erst mit Daten', () => {
   const on = sectionVisibility({ types: [], loading: false, error: null });
-  assert.deepEqual(on, { upcoming: false, sources: false, addTypeButton: false });
+  assert.deepEqual(on, { upcoming: false, sources: false });
   const full = sectionVisibility({ types: [{ id: 1, archived: false }], loading: false, error: null });
-  assert.deepEqual(full, { upcoming: true, sources: true, addTypeButton: true });
+  assert.deepEqual(full, { upcoming: true, sources: true });
 });
 
 test('onboardingHtml: Vorlagen als direkt anlegbare Chips plus ICS-Import, ein Leerzustand', () => {
@@ -905,7 +891,7 @@ test('#1775: sind alle Abfallarten archiviert, traegt die Seite die Klasse, die 
 // ---------------------------------------------------------------------------
 
 test('R17/E2: die Einzelabholung steht im Werkzeugmenue, der Termin-Dialog waehlt seine Abfallart', () => {
-  const menu = WASTE_SRC.slice(WASTE_SRC.indexOf("id: 'waste-page-menu'"), WASTE_SRC.indexOf('id="waste-add-type-btn"'));
+  const menu = WASTE_SRC.slice(WASTE_SRC.indexOf("id: 'waste-page-menu'"), WASTE_SRC.indexOf("id: 'waste-page-menu'") + 3000);
   assert.match(menu, /\{ action: 'add-pickup', label: t\('waste\.addPickup'\), icon: 'calendar-plus' \}/);
   assert.match(WASTE_CODE, /kind === 'add-pickup'\) \{[\s\S]{0,200}?else openPickupModal\(\);/, 'der Eintrag oeffnet den Dialog der Einzelabholung');
   const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
@@ -1010,7 +996,6 @@ test('Onboarding-CSS: Abholungen, Quellen, Abschnittstitel und Kopfknopf treten 
     '.waste-page--onboarding .waste-upcoming-section',
     '.waste-page--onboarding .waste-sources-section',
     '.waste-page--onboarding .waste-types-section .waste-section-title',
-    '.waste-page--onboarding #waste-add-type-btn',
   ]) assert.ok(hidden.includes(sel), `${sel} fehlt`);
   // #1771: ab der Schwelle des Spaltenrasters ueberspannt der Leerzustand beide
   // Spuren, sonst steht er links der Mitte neben einer leeren Spalte. Die
@@ -1175,4 +1160,17 @@ test('Termin-Dialog: der Wechsel der Wiederholung tauscht das Intervall-Label mi
   assert.equal(d.label(), 'waste.intervalLabelWeekly');
   d.chooseKind('monthly_ordinal_weekday');
   assert.equal(d.label(), 'waste.intervalLabelMonthly');
+});
+
+// R23 S10 (Critique G2 P2/P3, D14): die Typkarte nennt nur die Regel - die
+// naechste Abholung steht schon in "Naechste Abholungen"; der Leertext
+// beschreibt, was darunter steht, und Nur-lesen bekommt keinen Satz ueber Vorlagen.
+test('Typkarte ohne doppelte naechste Abholung, Leertext passend zu Vorlagen und Import', () => {
+  const row = WASTE_CODE.slice(WASTE_CODE.indexOf('function scheduleRowHtml('), WASTE_CODE.indexOf('function typeWithoutScheduleLine('));
+  assert.doesNotMatch(row, /waste\.nextPickupLabel/, 'die Serie wiederholt den Termin nicht');
+  assert.match(row, /\(schedule\.active && next\) \? '' :/, 'eine Zeile darunter nur bei pausiert oder ohne Abholung');
+  const ob = WASTE_CODE.slice(WASTE_CODE.indexOf('function onboardingHtml('), WASTE_CODE.indexOf('function onboardingHtml(') + 900);
+  assert.match(ob, /description: ro \? '' : t\('waste\.emptyTypesDescription'\)/);
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).waste;
+  assert.doesNotMatch(de.emptyUpcomingDescription, /Abfallart und einen Termin/, 'die Liste erscheint erst mit Abfallart - sie verlangt keine zweite');
 });

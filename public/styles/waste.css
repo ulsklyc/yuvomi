@@ -572,33 +572,18 @@
 /* -------------------------------------------------------------------- */
 
 /* Ohne jede Abfallart haben Abholungen und Quellen nichts zu sagen, und der
-   Abschnittstitel doppelt den Titel des Leerzustands. Der Kopfknopf faellt
-   weg, weil der FAB in diesem Zustand "Abfallart" heisst (waste.js,
-   fabIntent) - zweimal derselbe Weg macht die Wahl schwerer. */
+   Abschnittstitel doppelt den Titel des Leerzustands. Der FAB heisst in
+   diesem Zustand "Abfallart" (waste.js, fabIntent). */
 .waste-page--onboarding .waste-upcoming-section,
 .waste-page--onboarding .waste-sources-section,
-.waste-page--onboarding .waste-types-section .waste-section-title,
-.waste-page--onboarding #waste-add-type-btn {
+.waste-page--onboarding .waste-types-section .waste-section-title {
   display: none;
 }
 
-/* EIN WEG ZUR ABFALLART JE BREITE (R16, Kopfregel mobil 1a). Unter 768px
-   stehen die Werkzeuge in der Titelzeile, und die traegt nur Icon-Knoepfe:
-   der beschriftete Kopfknopf (193px) wird dort zum Eintrag im "..."-Menue.
-   Ab 768px steht der Knopf und der Eintrag ist ausgeblendet. Im Onboarding
-   heisst der FAB "Abfallart" - dort entfaellt auch der Eintrag. */
-@media (max-width: 767px) {
-  #waste-add-type-btn {
-    display: none;
-  }
-}
-
-@media (min-width: 768px) {
-  #waste-page-menu [data-action="add-type"] {
-    display: none;
-  }
-}
-
+/* DIE ABFALLART IST NACH DER ERSTEN EIN MENUEEINTRAG (R23 D14), in jeder
+   Breite. Bis R23 stand ab 768px ein beschrifteter Kopfknopf neben dem
+   Primaerknopf. Im Onboarding heisst der FAB "Abfallart" - dort entfaellt
+   auch der Eintrag. */
 .waste-page--onboarding #waste-page-menu [data-action="add-type"] {
   display: none;
 }

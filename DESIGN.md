@@ -3507,8 +3507,11 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    einer wegscrollenden Titelzeile aus dem Bild gewandert; dieser Kopf hat nur die eine und
    behaelt sie. Die offene Suche (Fokus oder Begriff) nimmt die Zeile, der Titel verlaesst
    dafuer das Bild (nicht den Baum), das Siegel bleibt. Ein beschrifteter Kopfknopf zaehlt
-   nicht als Icon: er wird unter 768px nach der Label-Verlust-Regel zum Eintrag im „..."
-   (Entsorgung, „Abfallart hinzufuegen"), ab 768px steht er wieder - je Breite ein Weg.
+   nicht als Icon: er wird unter 768px nach der Label-Verlust-Regel zum Eintrag im „...",
+   ab 768px steht er wieder - je Breite ein Weg. (Die Entsorgung hatte hier „Abfallart
+   hinzufuegen"; seit R23 D14 ist das in jeder Breite ein Menueeintrag - nach der ersten Art
+   ist sie ein Werkzeug, die erste traegt der FAB. Die Typkarten nennen nur noch die Regel,
+   den naechsten Termin nennt allein „Naechste Abholungen".)
    Dasselbe gilt fuer ein Ansichts-Segment mit zwei Optionen: in den Dokumenten steht die
    Ansicht unter 768px als Einfachauswahl im Kopf-Menue (wie im Kalender), der Umschalter ab
    768px. Damit entfaellt in Notizen und Dokumenten die Zeile ueber der Chipreihe: Notizen

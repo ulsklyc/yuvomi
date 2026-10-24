@@ -435,6 +435,11 @@ function nextOccurrenceForSchedule(scheduleId) {
 }
 
 function scheduleRowHtml(schedule) {
+  // DIE KARTE NENNT DIE REGEL, NICHT DEN TERMIN (R23 D14, Critique G2 P2).
+  // „Naechste Abholung: Mo, 26.10. · in 2 Tagen" stand hier UND zwei Spalten
+  // daneben in „Naechste Abholungen" - dieselbe Zeile zweimal. Die Karte sagt
+  // jetzt nur noch, wie oft; eine Zeile darunter nur, wenn sie etwas anderes
+  // weiss als die Liste: pausiert, oder keine Abholung mehr in Sicht.
   const next = nextOccurrenceForSchedule(schedule.id);
   // Nur-lesen: die Zeile bleibt LESBAR, verliert aber jede Schreib-Affordanz -
   // auch die des Haupt-Feldes, das sonst als role="button" den Bearbeiten-Dialog
@@ -455,10 +460,10 @@ function scheduleRowHtml(schedule) {
         <i data-lucide="repeat" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(recurrenceSummary(schedule))}</span>
-          <span class="list-row__meta">
+          ${(schedule.active && next) ? '' : `<span class="list-row__meta">
             ${schedule.active ? '' : `<span class="waste-badge waste-badge--paused">${esc(t('waste.pausedBadge'))}</span>`}
-            ${next ? esc(t('waste.nextPickupLabel')) + ': ' + esc(pickupWhenLabel(next.date_key)) : esc(t('waste.noUpcomingPickup'))}
-          </span>
+            ${next ? '' : esc(t('waste.noUpcomingPickup'))}
+          </span>`}
         </span>
       </div>
       ${ro ? '' : `
@@ -598,12 +603,12 @@ function isOnboarding(s) {
  * drei "Noch nichts"-Bloecke untereinander (Abholungen, Abfallarten,
  * Quellen), der erste Weg lag mobil bei y683 unter dem Erinnerungs-Toast.
  * Abholungen und Quellen haben ohne Abfallart nichts zu sagen - sie kommen
- * mit den Daten. Der Kopfknopf "Abfallart hinzufuegen" faellt dann ebenfalls
- * weg: der FAB traegt in diesem Zustand genau diese Aktion (fabIntent).
+ * mit den Daten. Einen Kopfknopf "Abfallart hinzufuegen" gibt es seit R23
+ * nicht mehr (D14): nach der ersten steht sie im Menue, davor im FAB.
  */
 function sectionVisibility(s) {
   const onboarding = isOnboarding(s);
-  return { upcoming: !onboarding, sources: !onboarding, addTypeButton: !onboarding };
+  return { upcoming: !onboarding, sources: !onboarding };
 }
 
 /**
@@ -649,10 +654,13 @@ function presetLabel(preset) {
 function onboardingHtml({ readOnly: ro, emptyHtml = null }) {
   // `emptyHtml` nur fuer den Test (die DOM-Attrappe dort baut keinen
   // Leerzustand); die Seite laesst ihn weg.
+  // Der Satz beschreibt, was darunter steht (R23 S10, Critique G2 P3: er
+  // nannte "Restmuell, Bio, Papier" ueber Chips, die anders heissen, und
+  // keinen Import). Nur-lesen hat weder Vorlagen noch Import - dort der Titel allein.
   const empty = emptyHtml ?? emptyStateHTML({
     icon: 'trash-2',
     title: t('waste.emptyTypesTitle'),
-    description: t('waste.emptyTypesDescription'),
+    description: ro ? '' : t('waste.emptyTypesDescription'),
   });
   if (ro) return `<div class="waste-onboarding">${empty}</div>`;
   const chips = TYPE_PRESETS.map((preset) => `
@@ -2526,10 +2534,12 @@ function renderPage() {
           id: 'waste-page-menu',
           label: t('waste.moreActions'),
           items: [
-            // NUR UNTER 768px SICHTBAR (waste.css): dort hat der beschriftete
-            // Kopfknopf keine Zeile mehr und wird nach der Label-Verlust-Regel
-            // zum Eintrag seines Menues. Ab 768px steht der Knopf, und der
-            // Eintrag ist ausgeblendet - es bleibt je Breite EIN Weg.
+            // DIE ABFALLART STEHT NACH DER ERSTEN IM MENUE (R23 D14, Critique
+            // G2 Frage 3). Bis R23 stand ab 768px ein beschrifteter Kopfknopf
+            // „Abfallart hinzufuegen" neben dem Primaerknopf „Termin" - zwei
+            // Anlegewege im Kopf, und der seltenere war der breitere. Eine
+            // Abfallart legt ein Haushalt drei-, viermal an; danach ist sie
+            // ein Werkzeug. Im Onboarding traegt der FAB den Weg (waste.css).
             { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
             // Die Einzelabholung ist die Ausnahme zum Termin, den der
             // Primaerknopf anlegt (Entscheidung R17, E2) - ein Werkzeug, kein
@@ -2543,10 +2553,6 @@ function renderPage() {
             { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
           ],
         }),
-        `<button type="button" class="btn btn--secondary" id="waste-add-type-btn" data-action="add-type">
-          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
-          <span>${esc(t('waste.addType'))}</span>
-        </button>`,
       ].join('\n')),
     }),
     body: renderPageBody({
