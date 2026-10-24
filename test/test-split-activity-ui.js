@@ -761,6 +761,44 @@ test('die Gruppenzahl steht am Kopf der Liste, die Kennzahlen nennen ihre Gruppe
   assert.match(src, /class="split-panel-title u-section-title">\$\{t\('splitExpenses\.groups'\)\}<span class="list-group__count split-panel-count" id="split-group-count">/);
 });
 
+// Critique R23 P1: eine Gruppensuche ohne Treffer zeigte "Ausgeglichen 0,00 €"
+// und zweimal "Noch keine Ausgabengruppen" - falsch, es gibt Gruppen, nur
+// keine Treffer. Jetzt: EIN Such-Leerzustand an der Liste, die Kennzahl aus
+// allen Gruppen, der Hauptbereich leer.
+test('Gruppensuche ohne Treffer: Such-Leerzustand einmal, Kennzahl aus allen Gruppen', () => {
+  const vorher = { ...split.state };
+  const box = () => ({
+    html: '', hidden: false,
+    replaceChildren() { this.html = ''; }, insertAdjacentHTML(_p, h) { this.html += h; },
+    querySelector: () => null, querySelectorAll: () => [], removeAttribute() {}, setAttribute() {},
+  });
+  const boxen = { '#split-groups': box(), '#split-main': box(), '#split-glance': box(), '#split-summary': box(), '#split-groups-total': box() };
+  const root = { querySelector: (sel) => boxen[sel] ?? null };
+  try {
+    Object.assign(split.state, {
+      groupStatus: 'active', groups: [], activeGroupId: null, query: 'urlaub', user: { id: 7 },
+      balances: { balances: [] },
+      dashboard: { total_owed: [], total_owing: [{ amount: '196.14', currency: 'EUR' }] },
+      meta: { currencies: ['EUR'], default_currency: 'EUR' },
+    });
+    split.renderGroupsForTest(root);
+    const liste = boxen['#split-groups'].html;
+    assert.match(liste, /common\.searchNoResultsTitle/, 'die Liste sagt "keine Treffer"');
+    assert.match(liste, /urlaub/, 'mit dem Suchbegriff');
+    assert.match(liste, /data-split-reset-search/, 'mit dem Weg zurueck');
+    assert.doesNotMatch(liste, /emptyGroupsTitle/, 'nicht "Noch keine Gruppen"');
+    boxen['#split-main'].html = 'alt';
+    split.renderMainForTest(root);
+    assert.equal(boxen['#split-main'].html, '', 'kein zweiter Leerzustand im Hauptbereich');
+    split.renderSummaryForTest(root);
+    const glance = boxen['#split-glance'].html;
+    assert.match(glance, /196,14/, 'die Kennzahl gilt allen Gruppen');
+    assert.doesNotMatch(glance, /splitExpenses\.balanced/, 'nicht "Ausgeglichen"');
+  } finally {
+    Object.assign(split.state, vorher);
+  }
+});
+
 // Review an #1767: die Kurzzeile liest seit R17 (E5) aus `state.balances`. Der
 // Zustand lebt auf Modulebene; lud der Einstieg die Gruppendaten nur MIT
 // aktiver Gruppe, stand nach dem Verlust der letzten Gruppe der alte Saldo

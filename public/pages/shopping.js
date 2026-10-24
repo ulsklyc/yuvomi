@@ -27,6 +27,7 @@ import { findPageFab } from '/utils/fab.js';
 import { setBulkPill, clearBulkPill, bulkPillLayer } from '/utils/bulk-pill.js';
 import { makeSortable } from '/utils/sortable.js';
 import { amountPlaceholder, formatMoney, currencyFractionDigits, centsToAmountInput, amountInputToCents, toDecimalString, breaksOffAtSeparator } from '/utils/money.js';
+import { amountFieldError } from '/utils/amount-field.js';
 import { startLiveFeed } from '/utils/live-feed.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -2889,12 +2890,15 @@ function openItemDetails(itemId, container) {
         // als Gleitkomma summiert sich sichtbar falsch, und die Historie, die
         // spaeter darauf aufbaut, addiert genau solche Zahlen. Ein leeres Feld
         // heisst "kein Preis", nicht "null Cent".
-        const priceRoh = priceEl?.value.trim() ?? '';
-        const priceCents = priceRoh === '' ? null : amountInputToCents(priceRoh, state.currency);
-        if (priceRoh !== '' && priceCents === null) {
-          reportFieldError(priceEl, t('budget.validAmountRequired'));
+        // Der Grund steht benannt am Feld (D1): "1.200" unter de ist gruppiert,
+        // nicht "ungueltig". 0 ist erlaubt (gratis), leer heisst "kein Preis".
+        const priceProblem = amountFieldError(priceEl, state.currency, { sign: 'nonNegative' });
+        if (priceProblem) {
+          reportFieldError(...priceProblem);
           return;
         }
+        const priceRoh = priceEl?.value.trim() ?? '';
+        const priceCents = priceRoh === '' ? null : amountInputToCents(priceRoh, state.currency);
         const modalContext = captureModalContext();
         try {
           // Der Laden kommt als Name herein, die Zeile speichert eine ID. Ein

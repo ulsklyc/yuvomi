@@ -21,7 +21,8 @@ import { wireScrollFade, vibrate, acknowledgeCheck, scheduleUndoableDelete } fro
 import { swapContent } from '/utils/content-swap.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
+import { parseAmountInput, amountToInput } from '/utils/money.js';
+import { amountInputAttrs, amountFieldError } from '/utils/amount-field.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { isNavModuleReadOnly, canSeeHousekeepingAmounts } from '/permissions.js';
@@ -2171,14 +2172,12 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           ` : `
             <label class="housekeeping-field">
               <span>${esc(t('housekeeping.dailyRate'))}</span>
-              <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, visit.daily_rate ?? 0)}"
-                     placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.daily_rate ?? 0, state.currency))}">
+              <input name="daily_rate"${amountInputAttrs(state.currency, visit.daily_rate ?? 0)}>
             </label>
           `}
           <label class="housekeeping-field">
             <span>${esc(t('housekeeping.extras'))}</span>
-            <input name="extras" type="number" min="0" step="${amountStep(state.currency, visit.extras ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(visit.extras ?? 0, state.currency))}">
+            <input name="extras"${amountInputAttrs(state.currency, visit.extras ?? 0)}>
           </label>
         </div>
         ${receiptFieldHtml(visit)}
@@ -2201,26 +2200,17 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
         const minutesWorked = visit.rate_type === 'hourly'
           ? Number(fields.minutes_worked?.value || 0)
           : null;
+        // Die Betraege als TEXT (D1): "1.200" unter de ist abgewiesen und am
+        // Feld benannt, nie still 1,2. 0 ist erlaubt, leer zaehlt als 0. Ein
+        // Bestandswert neben dem Raster bleibt unangetastet speicherbar.
+        if (reportFieldErrors([
+          visit.rate_type !== 'hourly' && amountFieldError(fields.daily_rate, state.currency, { sign: 'nonNegative', original: visit.daily_rate ?? null }),
+          amountFieldError(fields.extras, state.currency, { sign: 'nonNegative', original: visit.extras ?? null }),
+        ])) return;
         const dailyRate = visit.rate_type === 'hourly'
           ? null
-          : Number(fields.daily_rate.value || 0);
-        const extras = Number(fields.extras.value || 0);
-        // Wie beim Mitarbeitersatz: liegt der Bestandswert neben dem Raster,
-        // gibt amountStep "any" zurück, und ohne diese Prüfung wäre aus 12,5 JPY
-        // anschliessend auch 12,555 JPY speicherbar.
-        const offGrid = [
-          [fields.daily_rate, dailyRate, visit.daily_rate],
-          [fields.extras, extras, visit.extras],
-        ].find(([field, value, original]) => field && value != null
-          && !amountIsSavable(value, state.currency, { original: original ?? null }));
-        if (offGrid) {
-          window.yuvomi?.showToast(t('common.amountPrecisionRequired', {
-            currency: state.currency,
-            step: smallestUnitLabel(state.currency),
-          }), 'danger');
-          offGrid[0].focus();
-          return;
-        }
+          : (parseAmountInput(fields.daily_rate.value) ?? 0);
+        const extras = parseAmountInput(fields.extras.value) ?? 0;
         let receiptDocumentId = visit.receipt_document_id || null;
         const modalContext = captureModalContext();
         try {
@@ -2420,13 +2410,11 @@ function openStaffModal(worker, content, options = {}) {
           </label>
           <label class="housekeeping-field" id="housekeeping-field-daily-rate">
             <span>${esc(t('housekeeping.dailyRate'))}</span>
-            <input name="daily_rate" type="number" min="0" step="${amountStep(state.currency, item.daily_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.daily_rate ?? 0, state.currency))}">
+            <input name="daily_rate"${amountInputAttrs(state.currency, item.daily_rate ?? 0)}>
           </label>
           <label class="housekeeping-field" id="housekeeping-field-hourly-rate"${(!item.rate_type || item.rate_type === 'daily') ? ' hidden' : ''}>
             <span>${esc(t('housekeeping.hourlyRate'))}</span>
-            <input name="hourly_rate" type="number" min="0" step="${amountStep(state.currency, item.hourly_rate ?? 0)}"
-                   placeholder="${amountPlaceholder(state.currency)}" inputmode="decimal" value="${esc(amountFieldValue(item.hourly_rate ?? 0, state.currency))}">
+            <input name="hourly_rate"${amountInputAttrs(state.currency, item.hourly_rate ?? 0)}>
           </label>
           <label class="housekeeping-field housekeeping-field--color">
             <span>${esc(t('housekeeping.calendarColor'))}</span>
@@ -2468,14 +2456,11 @@ function openStaffModal(worker, content, options = {}) {
         if (reportFieldErrors(constraintErrors(event.currentTarget))) return;
         const form = event.currentTarget;
         const fields = form.elements;
-        // Bei einem Bestandssatz neben dem Raster liefert amountStep "any" -
-        // sonst liesse sich der vorhandene Eintrag gar nicht mehr speichern.
-        // Dieses "any" gilt aber fürs ganze Feld, also muss der neu eingegebene
-        // Wert hier geprüft werden: sonst wäre aus 12,5 JPY auch 12,555 JPY
-        // speicherbar, mehr Bruch als die feste Schrittweite je zuliess.
+        // Der Satz als TEXT (D1): "1.200" unter de ist abgewiesen und am Feld
+        // benannt, nie still 1,2. Ein Bestandssatz neben dem Raster bleibt
+        // unangetastet speicherbar, ein neu eingegebener Wert nicht.
         const isHourly = fields.rate_type.value === 'hourly';
         const rateField = isHourly ? fields.hourly_rate : fields.daily_rate;
-        const rateValue = Number(rateField?.value || 0);
         const rateOriginal = isHourly ? item.hourly_rate : item.daily_rate;
         // Nur der Satz zum gewählten Tarif-Typ zählt. Der andere wird unten
         // trotzdem mitgesendet - dort geht der gespeicherte Wert raus, nicht
@@ -2483,15 +2468,10 @@ function openStaffModal(worker, content, options = {}) {
         // auf Stundensatz umstellt, schriebe sonst den ungeprüften Rest weg.
         const inactiveField = isHourly ? fields.daily_rate : fields.hourly_rate;
         const inactiveOriginal = isHourly ? item.daily_rate : item.hourly_rate;
-        if (inactiveField) inactiveField.value = String(inactiveOriginal ?? 0);
-        if (!amountIsSavable(rateValue, state.currency, { original: rateOriginal ?? null })) {
-          window.yuvomi?.showToast(t('common.amountPrecisionRequired', {
-            currency: state.currency,
-            step: smallestUnitLabel(state.currency),
-          }), 'danger');
-          rateField?.focus();
-          return;
-        }
+        if (inactiveField) inactiveField.value = amountToInput(inactiveOriginal ?? 0, state.currency);
+        if (reportFieldErrors([
+          amountFieldError(rateField, state.currency, { sign: 'nonNegative', original: rateOriginal ?? null }),
+        ])) return;
         const workerBirth = workerBirthField?.read() ?? { date: null, yearUnknown: false, complete: true };
         if (workerBirth.yearUnknown && !workerBirth.complete) {
           window.yuvomi?.showToast(t('birthdays.yearlessIncomplete'), 'warning');
@@ -2507,9 +2487,9 @@ function openStaffModal(worker, content, options = {}) {
             email: fields.email.value.trim() || null,
             birth_date: workerBirth.date || null,
             birth_year_unknown: workerBirth.yearUnknown,
-            daily_rate: Number(fields.daily_rate.value || 0),
+            daily_rate: parseAmountInput(fields.daily_rate.value) ?? 0,
             rate_type: fields.rate_type.value,
-            hourly_rate: Number(fields.hourly_rate?.value || 0),
+            hourly_rate: parseAmountInput(fields.hourly_rate?.value) ?? 0,
             payment_schedule: fields.payment_schedule.value,
             calendar_color: fields.calendar_color.value,
             avatar_color: fields.avatar_color.value,

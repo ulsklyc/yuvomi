@@ -4633,7 +4633,7 @@ test('Profil bei `housekeeping: read`: die Leseansicht zeigt jeden Wert des Bear
   const werte = [
     ['Ana Lopez', 'Ana Lopez'], ['ana.l', 'ana.l'], ['0151 2345', '0151 2345'],
     ['ana@example.org', 'ana@example.org'], ['1990-04-12', '1990-04-12'],
-    ['housekeeping.rateHourly', 'housekeeping.rateHourly'], ['value="14.50"', '14,50'],
+    ['housekeeping.rateHourly', 'housekeeping.rateHourly'], ['value="14,50"', '14,50'],
     ['housekeeping.scheduleTwiceMonthly', 'housekeeping.scheduleTwiceMonthly'],
     ['#12AB34', '#12AB34'], ['#FF8800', '#FF8800'], ['Schluessel beim Nachbarn', 'Schluessel beim Nachbarn'],
   ];
@@ -4666,7 +4666,7 @@ test('Besuch bei `housekeeping: read`: der Einsatzbericht zeigt jeden Wert des E
   });
   const werte = [
     ['2026-08-06', '2026-08-06'], ['value="135"', '135'], ['31,50', '31,50'],
-    ['value="4.00"', '4,00'], ['Beleg - Ana - 06.08.', 'Beleg - Ana - 06.08.'],
+    ['value="4,00"', '4,00'], ['Beleg - Ana - 06.08.', 'Beleg - Ana - 06.08.'],
   ];
 
   const [editor] = mitModal(() => withAccess({ housekeeping: 'write' }, () => hk.openVisitEditModal(stunden, hkContainer())));

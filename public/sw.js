@@ -205,6 +205,7 @@ const APP_SHELL = [
   '/utils/metric-card.js',
   '/utils/metric-glance.js',
   '/utils/money.js',
+  '/utils/amount-field.js',
   '/utils/nav-badges.js',
   '/utils/note-category-filter.js',
   '/utils/note-category-name.js',

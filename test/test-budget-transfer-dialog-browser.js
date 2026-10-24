@@ -197,18 +197,22 @@ test('saving a transfer posts a valid category and books matching account entrie
   });
 });
 
-test('transfer amount step follows the source account currency and its household fallback', async () => {
+// Since Critique R23 (D1) a money field is a text field: the source currency
+// shows in its placeholder ("0,00", "0", "0,000"), and saving checks the digits.
+test('transfer amount placeholder follows the source account currency and its household fallback', async () => {
   await withTransfer(async page => {
-    const limits = () => page.$eval('#bt-amount', el => ({ step: el.step, min: el.min }));
-    assert.deepEqual(await limits(), { step: '0.01', min: '0.01' });
+    const zero = currency => page.evaluate(async c => (await import('/utils/money.js')).amountPlaceholder(c), currency);
+    const shown = () => page.$eval('#bt-amount', el => ({ type: el.type, inputMode: el.inputMode, placeholder: el.placeholder }));
+    const field = async currency => ({ type: 'text', inputMode: 'decimal', placeholder: await zero(currency) });
+    assert.deepEqual(await shown(), await field('EUR'));
     await page.select('#bt-from', String(yenAccount));
-    assert.deepEqual(await limits(), { step: '1', min: '1' });
+    assert.deepEqual(await shown(), await field('JPY'));
     await page.select('#bt-to', String(dinarAccount));
-    assert.deepEqual(await limits(), { step: '1', min: '1' }, 'the target currency does not set the step');
+    assert.deepEqual(await shown(), await field('JPY'), 'the target currency does not set the format');
     await page.select('#bt-from', String(dinarAccount));
-    assert.deepEqual(await limits(), { step: '0.001', min: '0.001' });
+    assert.deepEqual(await shown(), await field('KWD'));
     await page.select('#bt-from', String(accounts[0]));
-    assert.deepEqual(await limits(), { step: '0.01', min: '0.01' });
+    assert.deepEqual(await shown(), await field('EUR'));
   });
 });
 
@@ -261,8 +265,8 @@ test('editing a transfer opens with the source currency amount step', async () =
     }, entry);
     await page.waitForSelector('#bt-save');
     await page.waitForFunction(() => document.querySelector('#bt-amount')?.value === '100');
-    assert.deepEqual(await page.$eval('#bt-amount', el => ({ value: el.value, step: el.step, min: el.min })),
-      { value: '100', step: '1', min: '1' });
+    assert.deepEqual(await page.$eval('#bt-amount', el => ({ value: el.value, type: el.type, placeholder: el.placeholder })),
+      { value: '100', type: 'text', placeholder: await page.evaluate(async () => (await import('/utils/money.js')).amountPlaceholder('JPY')) });
   });
 });
 
@@ -422,8 +426,10 @@ test('confirming a pending transfer uses its account currency step and preserves
     await page.waitForFunction(() => window.__ready === true);
     await page.$eval(`.budget-entry[data-id="${occurrence.id}"] [data-action="confirm"]`, el => el.click());
     await page.waitForSelector('#cb-amount');
-    assert.equal(await page.$eval('#cb-amount', el => el.step), '0.001');
-    await page.$eval('#cb-amount', el => { el.value = '2.005'; });
+    const money = (fn, ...args) => page.evaluate(async (name, rest) => (await import('/utils/money.js'))[name](...rest), fn, args);
+    assert.equal(await page.$eval('#cb-amount', el => el.placeholder), await money('amountPlaceholder', 'KWD'));
+    const corrected = await money('amountToInput', 2.005, 'KWD');
+    await page.$eval('#cb-amount', (el, value) => { el.value = value; }, corrected);
     const response = page.waitForResponse(res => res.request().method() === 'PATCH' && res.url().endsWith(`/${occurrence.id}/confirm`));
     await page.$eval('#cb-save', el => el.click());
     assert.equal((await response).status(), 200);

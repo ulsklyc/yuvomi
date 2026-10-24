@@ -5,7 +5,8 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { todayKey, monthPeriodKeys, defaultDateInPeriod } from '/utils/date.js';
-import { amountStep, amountMin, amountIsSavable, smallestUnitLabel } from '/utils/money.js';
+import { parseAmountInput, amountToInput } from '/utils/money.js';
+import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { budgetToggleHtml, budgetIntervalFieldsHtml, wireBudgetIntervalFields } from '/components/budget-recurrence-fields.js';
 
 export function transferFieldsHtml({ transfer = null, accounts, categories, month, currency, budgetMode }) {
@@ -20,7 +21,7 @@ export function transferFieldsHtml({ transfer = null, accounts, categories, mont
   const schedule = transfer?.series ?? transfer;
   const sourceCurrency = accounts.find(a => a.id === transfer?.from_account_id)?.currency || currency;
   return `
-    ${field('bt-amount', 'budget.amountLabel', `<input class="form-input budget-amount-input" id="bt-amount" type="number" step="${amountStep(sourceCurrency, transfer?.amount)}" min="${amountMin(sourceCurrency, transfer?.amount)}" inputmode="decimal" value="${transfer ? Math.abs(transfer.amount) : ''}">`)}
+    ${field('bt-amount', 'budget.amountLabel', `<input class="form-input budget-amount-input" id="bt-amount"${amountInputAttrs(sourceCurrency, transfer ? Math.abs(transfer.amount) : '')} required>`)}
     ${field('bt-title', 'budget.titleLabel', `<input class="form-input" id="bt-title" value="${esc(transfer?.title ?? '')}">`)}
     ${field('bt-from', 'budget.transferFromAccount', `<select class="form-input" id="bt-from" required>${options(transfer?.from_account_id, 'budget.transferFromAccount')}</select>`)}
     ${field('bt-to', 'budget.transferToAccount', `<select class="form-input" id="bt-to" required>${options(transfer?.to_account_id, 'budget.transferToAccount')}</select>`)}
@@ -41,11 +42,7 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
   const syncAmountCurrency = () => {
     const sourceId = Number(panel.querySelector('#bt-from').value);
     const sourceCurrency = accounts.find(a => a.id === sourceId)?.currency || currency;
-    const current = panel.querySelector('#bt-scope')?.value === 'series' ? transfer?.series : transfer;
-    const original = sourceId === current?.from_account_id ? current.amount : undefined;
-    const amount = panel.querySelector('#bt-amount');
-    amount.step = amountStep(sourceCurrency, original);
-    amount.min = amountMin(sourceCurrency, original);
+    setAmountCurrency(panel.querySelector('#bt-amount'), sourceCurrency);
   };
   panel.querySelector('#bt-from').addEventListener('change', syncAmountCurrency);
   syncAmountCurrency();
@@ -72,7 +69,8 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
   };
   if (transfer?.series && scope) {
     let defaults = transfer;
-    const text = (object, key) => String(key === 'amount' ? Math.abs(object.amount) : object[key] ?? '');
+    const sourceOf = (object) => accounts.find(a => a.id === object.from_account_id)?.currency || currency;
+    const text = (object, key) => String(key === 'amount' ? amountToInput(Math.abs(object.amount), sourceOf(object)) : object[key] ?? '');
     scope.addEventListener('change', () => {
       const target = scope.value === 'series' ? transfer.series : transfer;
       const subcategory = panel.querySelector('#bt-subcategory').value;
@@ -94,17 +92,16 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
   return async (button = panel.querySelector('#bt-save')) => {
     if (readOnly()) return;
     const value = id => panel.querySelector('#bt-' + id).value;
-    const body = { title: value('title').trim(), amount: Number(value('amount')), category: value('category'), subcategory: value('subcategory'),
+    const body = { title: value('title').trim(), amount: parseAmountInput(value('amount')), category: value('category'), subcategory: value('subcategory'),
       date: value('date'), from_account_id: Number(value('from')), to_account_id: Number(value('to')) };
     if (!body.category) return reportFieldError(panel.querySelector('#bt-category'), t('budget.categoryRequired'));
     if (panel.querySelector('#bt-subcategory').required && !body.subcategory) return reportFieldError(panel.querySelector('#bt-subcategory'), t('budget.subcategoryRequired'));
     if (!body.title) return reportFieldError(panel.querySelector('#bt-title'), t('common.titleRequired'));
-    if (!(body.amount > 0)) return reportFieldError(panel.querySelector('#bt-amount'), t('budget.validAmountRequired'));
     const sourceCurrency = accounts.find(a => a.id === body.from_account_id)?.currency || currency;
     const current = scope?.value === 'series' ? transfer?.series : transfer;
     const original = current?.from_account_id === body.from_account_id ? Math.abs(current.amount) : null;
-    if (!amountIsSavable(body.amount, sourceCurrency, { original })) return reportFieldError(panel.querySelector('#bt-amount'),
-      t('common.amountPrecisionRequired', { currency: sourceCurrency, step: smallestUnitLabel(sourceCurrency) }));
+    const amountProblem = amountFieldError(panel.querySelector('#bt-amount'), sourceCurrency, { required: true, original });
+    if (amountProblem) return reportFieldError(...amountProblem);
     if (!body.from_account_id || !body.to_account_id || body.from_account_id === body.to_account_id) return reportFieldError(panel.querySelector('#bt-to'), t('budget.transferChooseAccounts'));
     if (panel.querySelector('#bt-visibility')) body.visibility = value('visibility');
     const suffix = panel.querySelector('#bt-scope')?.value === 'series' ? '/series' : '';

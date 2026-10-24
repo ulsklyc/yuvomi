@@ -28,7 +28,8 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateEl, searchEmptyOptions } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
-import { formatMoney } from '/utils/money.js';
+import { formatMoney, parseAmountInput, amountToInput } from '/utils/money.js';
+import { amountInputAttrs, amountFieldError } from '/utils/amount-field.js';
 import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
@@ -1849,6 +1850,14 @@ function photoPreviewHtml(photoData) {
  *
  * @returns {{title: string, content: string, wire: (panel: HTMLElement) => void}}
  */
+/**
+ * Die Waehrung eines Kaufpreises: die gespeicherte des Gegenstands, sonst die
+ * des Haushalts (so legt der Server ihn auch an).
+ */
+function itemCurrency(item) {
+  return item?.currency || _householdCurrency || 'EUR';
+}
+
 function buildItemForm({ mode, item = null }) {
   const isEdit = mode === 'edit';
   // Verknuepfte Buchungen kommen aus dem Budget: ohne dessen Leserecht liefert
@@ -1910,7 +1919,7 @@ function buildItemForm({ mode, item = null }) {
           </div>
           <div class="form-group">
             <label class="form-label" for="inv-purchase-price">${esc(t('inventory.purchasePriceLabel'))}</label>
-            <input id="inv-purchase-price" class="form-input" type="number" min="0" step="0.01" inputmode="decimal">
+            <input id="inv-purchase-price" class="form-input"${amountInputAttrs(itemCurrency(item))}>
           </div>
         </div>
         ${!isEdit && showsBookings ? `
@@ -2037,7 +2046,7 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-name').value = isEdit ? item.name : '';
     panel.querySelector('#inv-category').value = isEdit ? item.category : 'other';
     panel.querySelector('#inv-location').value = isEdit && item.location_id ? String(item.location_id) : '';
-    panel.querySelector('#inv-purchase-price').value = isEdit && item.purchase_price != null ? String(item.purchase_price) : '';
+    panel.querySelector('#inv-purchase-price').value = isEdit && item.purchase_price != null ? amountToInput(item.purchase_price, itemCurrency(item)) : '';
     panel.querySelector('#inv-status').value = isEdit ? item.status : 'active';
     panel.querySelector('#inv-brand').value = isEdit && item.brand ? item.brand : '';
     panel.querySelector('#inv-model').value = isEdit && item.model ? item.model : '';
@@ -2180,7 +2189,7 @@ function buildItemForm({ mode, item = null }) {
         });
         if (window.lucide) window.lucide.createIcons({ el: chip });
         const priceInput = panel.querySelector('#inv-purchase-price');
-        if (!priceInput.value.trim()) priceInput.value = String(Math.abs(picked.entry.amount));
+        if (!priceInput.value.trim()) priceInput.value = amountToInput(Math.abs(picked.entry.amount), itemCurrency(item));
       });
     }
 
@@ -2222,7 +2231,13 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
   const name = nameInput.value.trim();
   if (!name) { reportFieldError(nameInput, t('common.nameRequired')); return; }
 
-  const priceRaw = panel.querySelector('#inv-purchase-price').value.trim();
+  // Der Kaufpreis als TEXT (D1): "1.200" unter de ist abgewiesen und benannt,
+  // nie still 1,2. 0 ist erlaubt (Geschenk), leer heisst "kein Preis".
+  const priceInput = panel.querySelector('#inv-purchase-price');
+  const priceProblem = amountFieldError(priceInput, itemCurrency(item), {
+    sign: 'nonNegative', original: item?.purchase_price ?? null, originalCurrency: item?.currency ?? null,
+  });
+  if (priceProblem) { reportFieldError(...priceProblem); return; }
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
   const category = panel.querySelector('#inv-category').value;
   // Kilometerstand ist auf odometer-tragende Kategorien begrenzt - unabhaengig
@@ -2236,7 +2251,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     category,
     location_id: panel.querySelector('#inv-location').value || null,
     purchase_date: panel.querySelector('#inv-purchase-date').value || null,
-    purchase_price: priceRaw === '' ? null : Number(priceRaw),
+    purchase_price: parseAmountInput(priceInput.value),
     status: panel.querySelector('#inv-status').value,
     brand: panel.querySelector('#inv-brand').value.trim() || null,
     model: panel.querySelector('#inv-model').value.trim() || null,

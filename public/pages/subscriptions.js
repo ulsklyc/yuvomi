@@ -16,12 +16,13 @@ import {
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, searchEmptyHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
-import { formatMoney, amountPlaceholder, amountStep, applyAmountFormat, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
+import { formatMoney, parseAmountInput } from '/utils/money.js';
+import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
@@ -1210,13 +1211,15 @@ function renderEmpty() {
   // erste braucht eine Anlegen-Aktion, der zweite einen Weg zurück. Die
   // Variante traegt den Unterschied jetzt mit: `no-results` wird als
   // `role="status"` angesagt und fuehrt einen sekundaeren CTA.
+  //
+  // Seit Critique R23 (Q4) der geteilte Leerzustand der Suche: Suchbegriff und
+  // Filter als Chips, "Suche zuruecksetzen" nimmt beides zurueck - dieselbe
+  // Form wie in Budget, Kontakten und Notizen statt eines eigenen "Filter"-Satzes.
   if (hasActiveFilters()) {
-    return emptyStateHTML({
-      variant: 'no-results',
-      icon: 'filter-x',
-      title: t('subscriptions.noMatchesTitle'),
-      description: t('subscriptions.noMatchesDescription'),
-      action: { label: t('subscriptions.resetFilters'), attrs: { id: 'subscriptions-empty-reset' } },
+    return searchEmptyHTML({
+      query: state.query,
+      filters: activeFilters().map((filter) => filter.value),
+      resetAttrs: { id: 'subscriptions-empty-reset' },
     });
   }
   // Bei `budget: read` bleibt nur der Titel: Beschreibung und CTA sind die
@@ -1601,11 +1604,7 @@ export function openSubscriptionModal(subscription = null) {
         <div class="subscription-form__billing-grid">
           <div class="form-group">
             <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}${REQUIRED_MARK}</label>
-            <input class="form-input" id="subscription-amount" type="number"
-                   min="0"
-                   step="${amountStep(formCurrency, subscription?.amount ?? '')}"
-                   placeholder="${amountPlaceholder(formCurrency)}"
-                   inputmode="decimal" required value="${esc(amountFieldValue(subscription?.amount ?? '', formCurrency))}">
+            <input class="form-input" id="subscription-amount"${amountInputAttrs(formCurrency, subscription?.amount ?? '')} required>
           </div>
           ${comboboxMarkup({
             id: 'subscription-currency',
@@ -1697,11 +1696,10 @@ export function openSubscriptionModal(subscription = null) {
         }
       };
       wireCombobox(panel, 'subscription-currency');
-      // Ohne `required`: ein Abo darf 0 kosten (Gratis-Tarif, Server prüft
-      // amount >= 0), die Untergrenze bleibt also bei null statt bei einer
-      // kleinsten Einheit.
+      // Ein Abo darf 0 kosten (Gratis-Tarif, Server prüft amount >= 0): das
+      // Speichern prueft deshalb mit `sign: 'nonNegative'`.
       panel.querySelector('#subscription-currency').addEventListener('change', (event) => {
-        applyAmountFormat(panel.querySelector('#subscription-amount'), event.target.value);
+        setAmountCurrency(panel.querySelector('#subscription-amount'), event.target.value);
       });
       wireCombobox(panel, 'subscription-cycle');
       wireCombobox(panel, 'subscription-category');
@@ -1822,23 +1820,20 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     }
     occurrenceCount = count;
   }
-  // Bei einem Bestandsbetrag neben dem Raster liefert amountStep "any", damit
-  // sich das vorhandene Abo überhaupt noch speichern lässt. Das gilt aber fürs
-  // ganze Feld: ohne diese Prüfung wäre aus 12,5 JPY anschliessend auch
-  // 12,555 JPY speicherbar, also mehr Bruch als die feste Schrittweite zuliess.
-  // Ohne Waehrung gibt es kein Raster - dann meldet nur das Waehrungsfeld.
+  // Der Betrag als TEXT (D1): "1.200" unter de ist abgewiesen und benannt,
+  // nie still 1,2. Ein Bestandsbetrag neben dem Raster bleibt unangetastet
+  // speicherbar (`original`), ein neuer nicht. Ohne Waehrung gibt es kein
+  // Raster - dann meldet fuer die Stellen nur das Waehrungsfeld. Leer meldet
+  // `constraintErrors` unten (Pflichtfeld).
   const amountInput = panel.querySelector('#subscription-amount');
-  const amountValue = Number(amountInput.value);
   const targetCurrency = currencyInput.value.trim().toUpperCase();
-  if (targetCurrency && !amountIsSavable(amountValue, targetCurrency, {
+  const amountProblem = amountFieldError(amountInput, targetCurrency || state.settings.base_currency, {
+    sign: 'nonNegative',
     original: existing?.amount ?? null,
     originalCurrency: existing?.currency ?? null,
-  })) {
-    fieldErrors.push([amountInput, t('common.amountPrecisionRequired', {
-      currency: targetCurrency,
-      step: smallestUnitLabel(targetCurrency),
-    })]);
-  }
+    precision: Boolean(targetCurrency),
+  });
+  if (amountProblem) fieldErrors.push(amountProblem);
   // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des Markups melden sich am Feld (constraintErrors, components/modal.js).
   // Was die eigenen Pruefungen oben schon nennen, steht nicht doppelt.
   for (const entry of constraintErrors(panel.querySelector('#subscription-form'))) {
@@ -1857,7 +1852,7 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     const payload = {
       name: panel.querySelector('#subscription-name').value.trim(),
       description: panel.querySelector('#subscription-description').value.trim() || null,
-      amount: Number(panel.querySelector('#subscription-amount').value),
+      amount: parseAmountInput(panel.querySelector('#subscription-amount').value),
       currency: panel.querySelector('#subscription-currency').value.trim().toUpperCase(),
       billing_cycle: panel.querySelector('#subscription-cycle').value,
       cycle_interval: Number(panel.querySelector('#subscription-interval').value),
@@ -2068,10 +2063,7 @@ async function openSettingsModal() {
     <form id="subscriptions-settings-form" novalidate>
       <div class="form-group">
         <label class="form-label" for="subscriptions-budget">${t('subscriptions.monthlyBudgetLabel')}</label>
-        <input class="form-input" id="subscriptions-budget" type="number" min="0"
-               step="${amountStep(state.settings.base_currency, state.settings.monthly_budget)}"
-               placeholder="${amountPlaceholder(state.settings.base_currency)}"
-               value="${state.settings.monthly_budget}">
+        <input class="form-input" id="subscriptions-budget"${amountInputAttrs(state.settings.base_currency, state.settings.monthly_budget)}>
       </div>
       ${comboboxMarkup({
         id: 'subscriptions-base-currency',
@@ -2096,7 +2088,7 @@ async function openSettingsModal() {
     onSave(panel) {
       wireCombobox(panel, 'subscriptions-base-currency');
       panel.querySelector('#subscriptions-base-currency').addEventListener('change', (event) => {
-        applyAmountFormat(panel.querySelector('#subscriptions-budget'), event.target.value);
+        setAmountCurrency(panel.querySelector('#subscriptions-budget'), event.target.value);
       });
       panel.querySelector('#subscriptions-settings-cancel').addEventListener('click', closeModal);
       panel.querySelector('#subscriptions-settings-form').addEventListener('submit', async (event) => {
@@ -2109,24 +2101,22 @@ async function openSettingsModal() {
           reportFieldError(panel.querySelector('#subscriptions-base-currency-search'), t('subscriptions.currencyRequired'));
           return;
         }
-        // Auch hier gilt: bei einem Bestandsbudget neben dem Raster steht das
-        // Feld auf step="any", die Prüfung muss also hier stattfinden.
-        const budgetInput = panel.querySelector('#subscriptions-budget');
-        if (!amountIsSavable(Number(budgetInput.value), baseCurrency, {
+        // Der Betrag als TEXT (D1); ein Bestandsbudget neben dem Raster bleibt
+        // unangetastet speicherbar. Leer heisst kein Budget (0).
+        const budgetProblem = amountFieldError(panel.querySelector('#subscriptions-budget'), baseCurrency, {
+          sign: 'nonNegative',
           original: state.settings.monthly_budget ?? null,
           originalCurrency: state.settings.base_currency ?? null,
-        })) {
-          reportFieldError(budgetInput, t('common.amountPrecisionRequired', {
-            currency: baseCurrency,
-            step: smallestUnitLabel(baseCurrency),
-          }));
+        });
+        if (budgetProblem) {
+          reportFieldError(...budgetProblem);
           return;
         }
         const owner = pageOwner();
         const dialog = captureModalContext();
         try {
           await api.put('/budget/subscriptions/settings', {
-            monthly_budget: Number(panel.querySelector('#subscriptions-budget').value),
+            monthly_budget: parseAmountInput(panel.querySelector('#subscriptions-budget').value) ?? 0,
             base_currency: baseCurrency,
           });
           await closeModal({ force: true, context: dialog });

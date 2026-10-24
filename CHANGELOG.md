@@ -245,6 +245,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **An amount typed with a thousands separator is no longer saved as a thousandth of it.** In
+  Budget (entries, accounts, transfers, confirmations, plans, loans), Subscriptions, Inventory
+  and Housekeeping the amount fields were number fields, and the browser read "1.200" under a
+  German region as 1.2 and saved it without a word, while "1.234,56" was refused with a hint
+  about steps of "0.01". Every money field now works like the one in Split expenses: it takes
+  the notation of the household region, shows a stored amount as "1200,50", and names the
+  problem at the field - a thousands separator with an example, not a number, not above zero,
+  or more decimals than the currency has, the smallest step written the region's way ("0,01").
+  A price in the shopping list now names the same reasons instead of "Please enter a valid
+  amount".
+- **A search in Split expenses that finds no group says so once.** It showed "No expense
+  groups yet" twice and a balance of zero next to it, although the groups exist. The list now
+  shows the usual "No results" with the search term and "Reset search", and the figure above it
+  is the total across all groups. The transaction search in Budget and the subscription search
+  use the same "No results" state with a way back.
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.

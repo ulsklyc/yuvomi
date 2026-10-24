@@ -137,84 +137,18 @@ function smallestUnit(digits) {
 }
 
 /**
- * Passt ein Betrag ins Raster der Währung? 1300 JPY ja, 12,5 JPY nein.
+ * Die kleinste erfassbare Einheit als TEXT FUER MENSCHEN, in der Schreibweise
+ * der Region: EUR/de "0,01", EUR/en "0.01", JPY "1", KWD/ar-EG "٠٫٠٠١".
  *
- * Das `step`-Attribut allein reicht dafür nicht: die Budget-Dialoge sind keine
- * `<form>`-Elemente, sie speichern über einen Button-Handler. Die native
- * Prüfung läuft also nie, und ein Feld mit step="1" nähme trotzdem 12,5
- * entgegen. Wer eine Schrittweite anzeigt, muss sie auch selbst durchsetzen.
- *
- * Über `toFixed` und nicht über `wert * 10**stellen` mit einer festen Toleranz:
- * `131072.02 * 100` ergibt `13107201.999999998`, liegt also knapp zwei
- * Milliardstel daneben. Jede feste Schranke ist damit entweder zu eng (dieser
- * gültige Betrag flöge raus) oder zu weit (bei kleinen Beträgen ginge echter
- * Bruch durch). Der Vergleich mit der gerundeten Dezimaldarstellung braucht
- * gar keine Schranke und stimmt über jede Größenordnung.
+ * Stand bis R23 als `toFixed` da und damit unter jeder Region als "0.01" - eine
+ * Fehlermeldung, die in de "Schritten von 0.01" verlangte, widersprach dem
+ * Platzhalter "0,00" direkt daneben. Fuer HTML-Attribute ist diese Funktion
+ * nicht gedacht - Geldfelder haben seit R23 ohnehin keine (utils/amount-field.js).
  */
-export function fitsCurrencyGrid(amount, currency) {
-  const value = Number(amount);
-  if (!Number.isFinite(value)) return false;
-  return Number(value.toFixed(currencyFractionDigits(currency))) === value;
-}
-
-/** Die kleinste erfassbare Einheit als Text fürs Feld: JPY "1", EUR "0.01". */
 export function smallestUnitLabel(currency) {
   const digits = currencyFractionDigits(currency);
-  return smallestUnit(digits).toFixed(digits);
-}
-
-/**
- * Darf dieser Betrag gespeichert werden? Wie `fitsCurrencyGrid`, lässt aber
- * einen unangetasteten Bestandswert durch.
- *
- * Nötig, weil `amountStep` bei einem Bestandswert neben dem Raster `"any"`
- * liefert - sonst markierte der Browser einen bereits gespeicherten Eintrag als
- * ungültig, und selbst eine Änderung am Titel liesse sich nicht mehr sichern.
- * Dieses `"any"` gilt aber fürs ganze Feld: ohne die Prüfung hier wäre aus
- * einem Alt-Betrag von 12,5 JPY anschliessend auch 12,555 JPY speicherbar,
- * also mehr Bruch als vorher. Der Bestandsschutz endet deshalb genau dort, wo
- * der Wert angefasst wird.
- *
- * Ein Währungswechsel hebt ihn ebenfalls auf: wer auf JPY umstellt, hat das
- * Raster bewusst gewechselt.
- */
-export function amountIsSavable(value, currency, { original = null, originalCurrency = null } = {}) {
-  if (fitsCurrencyGrid(value, currency)) return true;
-  if (original == null) return false;
-  if (originalCurrency != null && originalCurrency !== currency) return false;
-  return Number(original) === Number(value);
-}
-
-/**
- * Schrittweite für ein Betragsfeld, passend zur Währung: "1" bei JPY, "0.01"
- * bei EUR, "0.001" bei KWD. Immer mit Punkt - `step` und `min` sind HTML-Syntax,
- * kein Anzeigeformat.
- *
- * `currentValue` ist der Bestandswert des Feldes. Passt er nicht ins Raster,
- * entfällt die Schrittprüfung ("any"): ein in EUR erfasster Betrag von 12,50
- * oder eine Split-Teilung (10/3) würde sonst vom Browser als ungültig markiert
- * und das Speichern stillschweigend blockieren.
- */
-export function amountStep(currency, currentValue) {
-  const digits = currencyFractionDigits(currency);
-  if (currentValue !== '' && currentValue != null && Number.isFinite(Number(currentValue))) {
-    if (!fitsCurrencyGrid(currentValue, currency)) return 'any';
-  }
-  return smallestUnit(digits).toFixed(digits);
-}
-
-/**
- * Untergrenze für ein Pflicht-Betragsfeld: eine Einheit, also der kleinste
- * erfassbare positive Betrag. Liegt der Bestandswert darunter (0,50 erfasst in
- * EUR, jetzt JPY mit Untergrenze 1), gilt er selbst - sonst liesse sich ein
- * vorhandener Eintrag nicht mehr speichern.
- */
-export function amountMin(currency, currentValue) {
-  const digits = currencyFractionDigits(currency);
-  const smallest = smallestUnit(digits);
-  const value = Math.abs(Number(currentValue));
-  if (Number.isFinite(value) && value > 0 && value < smallest) return String(value);
-  return smallest.toFixed(digits);
+  return getNumberFormat({ useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits })
+    .format(smallestUnit(digits));
 }
 
 /**
@@ -448,29 +382,6 @@ export function centsToAmountInput(cents, currency) {
 }
 
 /**
- * Der Bestandswert eines Betragsfeldes vom Typ `number` in den Stellen der
- * Währung: EUR "200.00" statt "200", "38.50" statt "38.5" (Critique R21, a4:
- * "Bearbeiten zeigt 200 statt 200,00"). Das Feld bleibt Punkt-Dezimal - der
- * Browser zeigt ihn in der Schreibweise der Region ("200,00"). Aufgefüllt wird
- * nur mit Nullen, nie gerundet und nie gekappt: ein Bestandswert mit mehr
- * Stellen (12,555 EUR, 12,5 JPY) bleibt, wie er gespeichert ist - dieselbe
- * Zusage wie bei `amountToInput`, und dasselbe Arbeiten auf dem TEXT.
- * @param {number|string|null|undefined} amount
- * @param {string} currency
- * @returns {string}
- */
-export function amountFieldValue(amount, currency) {
-  if (amount === '' || amount == null) return '';
-  const text = String(amount).trim();
-  const match = /^(-?\d+)(?:\.(\d+))?$/.exec(text);
-  if (!match) return text;
-  const digits = currencyFractionDigits(currency);
-  const fraction = match[2] ?? '';
-  if (!digits || fraction.length >= digits) return text;
-  return `${match[1]}.${fraction.padEnd(digits, '0')}`;
-}
-
-/**
  * Ein Dezimalbetrag (Zahl oder Punkt-Dezimaltext vom Server, "12.50") als Wert
  * für ein Eingabefeld - das Gegenstück zu `toDecimalString`.
  *
@@ -551,17 +462,17 @@ export function amountInputToCents(text, currency) {
  * Die Stellen werden am TEXT gezählt, nicht an der Zahl: "10.000" ist unter
  * ko-KR die Zahl 10 und passt damit ins Raster von KRW, gesendet wird aber der
  * Text, und parseMoneyToMinor() auf dem Server zählt die Stellen hinter dem
- * Punkt. `fitsCurrencyGrid` sieht diese Nullen nicht.
+ * Punkt. Ein Vergleich an der Zahl saehe diese Nullen nicht.
  *
  * Ein leeres Feld hat keinen Grund - das ist Sache der Pflichtfeld-Prüfung.
  *
- * `original` ist der Bestandswert des Feldes (wie bei `amountIsSavable`): ein
+ * `original` ist der Bestandswert des Feldes: ein
  * unangetasteter Betrag neben dem Raster bleibt speicherbar, solange er nicht
  * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
  * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
  */
-export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false } = {}) {
-  const raw = String(text ?? '').trim();
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false, sign = 'positive' } = {}) {
+  const raw = withAsciiMinus(text);
   // Leer ist Sache des Pflichtfelds - ausser der Aufrufer sagt, dass ein Betrag
   // da sein muss: `required` des Browsers nimmt ein Feld aus Leerzeichen an,
   // und die Genau-Beträge einer Aufteilung haben gar kein Pflichtfeld.
@@ -573,13 +484,43 @@ export function amountInputProblem(text, currency, { original = null, originalCu
   if (!decimal || /\d\s+\d/.test(decimal)) return 'grouped';
   if (!/^-?\d+(\.\d+)?$/.test(decimal)) return 'invalid';
   const value = Number(decimal);
-  if (!(value > 0)) return 'notPositive';
+  // `sign`: was ausser "groesser als null" noch zaehlt. Ein Kreditrahmen oder
+  // ein Zuschlag darf 0 sein, ein Startsaldo auch negativ. Ein Minus, wo keines
+  // hingehoert, ist kein Betrag in der erwarteten Schreibweise ('invalid').
+  if (sign === 'any') { /* jedes Vorzeichen */ } else if (sign === 'nonNegative') {
+    if (value < 0 || decimal.startsWith('-')) return 'invalid';
+  } else if (!(value > 0)) return 'notPositive';
   const places = fractionLength(decimal);
   if (places <= currencyFractionDigits(currency)) return null;
   const untouched = original != null && Number(original) === value
     && (originalCurrency == null || originalCurrency === currency)
     && places <= fractionLength(String(original));
   return untouched ? null : 'precision';
+}
+
+/**
+ * Der Text eines Betragsfeldes mit ASCII-Minus vorn. Intl schreibt negative
+ * Zahlen in manchen Regionen mit U+2212 (sv, fi, nb) - wer die eigene Anzeige
+ * abtippt, soll nicht an einem Zeichen scheitern, das er nicht sieht.
+ */
+function withAsciiMinus(text) {
+  return String(text ?? '').trim().replace(/^[\u2212\u2012\u2013\uFE63\uFF0D]/, '-');
+}
+
+/**
+ * Der Wert eines Betrags-TEXTFELDES als Zahl - `null` bei leerem Feld, `NaN`
+ * bei allem, was `amountInputProblem` abweist. Gegenstueck zu `amountToInput`.
+ *
+ * Gelesen wird ueber `toDecimalString`, also mit dem Trenner der Region und
+ * ohne Gruppierung: "1.200" ist unter de nie still 1,2 (das war der Fehler der
+ * `type="number"`-Felder, Critique R23 P1), sondern wird abgewiesen.
+ */
+export function parseAmountInput(text) {
+  const raw = withAsciiMinus(text);
+  if (!raw) return null;
+  const decimal = toDecimalString(raw);
+  if (!/^-?\d+(\.\d+)?$/.test(decimal)) return NaN;
+  return Number(decimal);
 }
 
 /** Stellen hinter dem Punkt einer Dezimalangabe: "10.000" -> 3, "10" -> 0. */
@@ -597,32 +538,6 @@ export function amountExample(currency) {
   return getNumberFormat({
     useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits,
   }).format(1250);
-}
-
-/**
- * Ein bestehendes Betragsfeld auf eine Währung nachziehen: Platzhalter,
- * Schrittweite und - bei Pflichtfeldern - Untergrenze in einem Zug.
- *
- * Nötig überall dort, wo die Währung im selben Formular wählbar ist (Abo,
- * geteilte Ausgabe, Darlehen). Ohne das Nachziehen zeigt das Feld nach einem
- * Wechsel von EUR auf JPY weiter "0,00" und liesse Hundertstel Yen zu.
- *
- * Der Bestandswert-Schutz von amountStep/amountMin gilt hier bewusst NICHT: er
- * existiert, damit ein in EUR erfasster Betrag beim Öffnen des Dialogs nicht
- * als ungültig gilt. Wer die Währung gerade selbst auf JPY stellt, hat den
- * Wechsel dagegen bewusst ausgelöst - liesse man das Raster hier offen, wären
- * Hundertstel Yen weiter eingebbar und würden auch so gespeichert.
- *
- * @param {HTMLInputElement|null} input
- * @param {string} currency  ISO-Code
- * @param {{ required?: boolean }} [options]  required: das Feld verlangt einen
- *        Betrag > 0, bekommt also zusätzlich eine Untergrenze.
- */
-export function applyAmountFormat(input, currency, { required = false } = {}) {
-  if (!input) return;
-  input.placeholder = amountPlaceholder(currency);
-  input.step = amountStep(currency);
-  if (required) input.min = amountMin(currency);
 }
 
 /**

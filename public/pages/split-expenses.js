@@ -16,13 +16,15 @@ import { stagger } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { formatMoney, amountPlaceholder, toDecimalString, smallestUnitLabel, amountInputProblem, amountExample, amountToInput, toStoredNumber } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, toDecimalString, amountInputProblem, amountToInput, toStoredNumber } from '/utils/money.js';
+// Der Satz zu einem Grund: derselbe Baustein wie in jedem Betragsfeld (D1).
+import { amountProblemText } from '/utils/amount-field.js';
 import { todayKey } from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { findPageFab } from '/utils/fab.js';
-import { emptyStateHTML } from '/utils/empty-state.js';
+import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { CATEGORY_SERIES_COLORS } from '/utils/budget-category-colors.js';
@@ -97,6 +99,7 @@ let _onAddableChange = null;
 // Merker gilt nur fuer die schmale Bauart (split-expenses.css); breit steht
 // die Liste immer.
 let _groupPickerOpen = false;
+let _groupSearch = null;    // wirePageSearch-Handle der Gruppensuche (Zuruecksetzen aus dem Leerzustand)
 
 /**
  * Darf dieser Nutzer hier schreiben? (#467, #1265 P7)
@@ -560,7 +563,7 @@ function bindShell() {
   _container.querySelector('#split-add-expense')?.addEventListener('click', () => openExpenseModal());
   findPageFab('split-fab')?.addEventListener('click', () => openExpenseModal());
   // 250ms wie vorher: die Suche laedt die Gruppen vom Server neu.
-  wirePageSearch(_container, {
+  _groupSearch = wirePageSearch(_container, {
     id: 'split-group-search',
     delay: 250,
     onQuery: async (value) => {
@@ -659,6 +662,17 @@ function ownGroupBalance(balances = state.balances?.balances ?? [], userId = sta
   return { owed: part(1), owing: part(-1) };
 }
 
+/** Die eigene Summe ueber alle aktiven Gruppen (Dashboard des Servers), in der Form von ownGroupBalance(). */
+function allGroupsBalance() {
+  const rows = (list) => (list || []).map((row) => ({ amount: String(row.amount).replace(/^-/, ''), currency: row.currency }));
+  return { owed: rows(state.dashboard?.total_owed), owing: rows(state.dashboard?.total_owing) };
+}
+
+/** Eine Suche, die keine Gruppe trifft: ein Leerzustand an der Liste, nicht "Noch keine Gruppen". */
+function isGroupSearchMiss() {
+  return Boolean(state.query) && !state.groups.length;
+}
+
 /** "24,14 € · 12,00 $" aus Summenzeilen; ohne Zeile die Null in der Standardwaehrung. */
 function totalsText(rows) {
   return rows.length ? rows.map((r) => money(r.amount, r.currency)).join(' · ') : money(0, state.meta.default_currency);
@@ -692,7 +706,10 @@ function renderSummary() {
   // ueber dem Saldo der Gruppe "Linda schuldet Alex 24,14 €": zwei Zahlen fuer
   // scheinbar dieselbe Frage. Die Summe aller Gruppen steht jetzt in der
   // Gruppenwahl (renderGroupsTotal()).
-  const { owed, owing } = ownGroupBalance();
+  // OHNE GEWAEHLTE GRUPPE (Suche ohne Treffer, Critique R23 P1) gilt die Summe
+  // ueber ALLE aktiven Gruppen - sonst stand hier "Ausgeglichen 0,00 €", eine
+  // Aussage ueber eine Gruppe, die es in diesem Bild nicht gibt.
+  const { owed, owing } = isGroupSearchMiss() && !isArchivedView() ? allGroupsBalance() : ownGroupBalance();
   renderGroupsTotal();
   // Geteilte Kennzahlkarte des Budget-Moduls (budget.css). Die frühere eigene
   // .split-summary-card war die dritte von fünf Bauarten im selben Modul
@@ -782,6 +799,18 @@ function syncGroupSwitch() {
 function renderGroups() {
   syncGroupSwitch();
   const el = _container.querySelector('#split-groups');
+  if (isGroupSearchMiss()) {
+    setHtml(el, searchEmptyHTML({ query: state.query, className: 'split-empty-inline', resetAttrs: { 'data-split-reset-search': '' } }));
+    el.querySelector('[data-split-reset-search]')?.addEventListener('click', async () => {
+      _groupSearch?.clear();
+      state.query = '';
+      await loadGroups();
+      await loadGroupData();
+      renderAll();
+      _groupSearch?.input?.focus();
+    });
+    return;
+  }
   if (!state.groups.length) {
     setHtml(el, isArchivedView()
       ? emptyStateHTML({
@@ -878,6 +907,13 @@ function collapseSplitRow(key) {
 function drawMain(main) {
   main.removeAttribute('aria-busy');
   const group = state.groups.find((g) => g.id === state.activeGroupId);
+  // Die Suche ohne Treffer steht EINMAL, an der Liste, die gesucht wurde
+  // (renderGroups) - hier stand derselbe Satz "Noch keine Ausgabengruppen"
+  // ein zweites Mal, und er war falsch: es gibt Gruppen, nur keine Treffer.
+  if (!group && isGroupSearchMiss()) {
+    setHtml(main, '');
+    return;
+  }
   if (!group) {
     setHtml(main, isArchivedView()
       ? emptyStateHTML({
@@ -1756,15 +1792,6 @@ function updateSplitInputs(panel) {
  */
 const decimalString = toDecimalString;
 
-/**
- * Der Text zu einem Grund aus amountInputProblem() (utils/money.js).
- */
-function amountProblemText(problem, currency) {
-  if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
-  if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
-  if (problem === 'notPositive') return t('common.amountNotPositive');
-  return t('common.amountPrecisionRequired', { currency, step: smallestUnitLabel(currency) });
-}
 
 /**
  * Weist einen Betrag zurück, den der Server nicht annähme, und nennt den Grund

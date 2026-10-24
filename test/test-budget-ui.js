@@ -965,32 +965,66 @@ const withoutComments = (src) => {
   return out;
 };
 
-// Jede Seite, die ein Betragsfeld rendert - nicht nur das Budget-Modul. Die
-// Schrittweite hängt an der Währung, und eine Währung gibt es auch ausserhalb
-// von Budget (Hauspflege rechnet Tages- und Stundensätze ab).
-const MONEY_INPUT_PAGES = [...BUDGET_PAGES, ['housekeeping.js', housekeeping]];
+// Jede Seite, die ein Betragsfeld rendert - nicht nur das Budget-Modul. Eine
+// Waehrung gibt es auch ausserhalb von Budget (Hauspflege rechnet Tages- und
+// Stundensaetze ab, das Inventar fuehrt Kaufpreise, der Einkauf Preise).
+const inventory = read('../public/pages/inventory.js');
+const shoppingPage = read('../public/pages/shopping.js');
+const transferDialog = read('../public/components/budget-transfer-dialog.js');
+const MONEY_INPUT_PAGES = [...BUDGET_PAGES, ['housekeeping.js', housekeeping], ['inventory.js', inventory],
+  ['budget-transfer-dialog.js', transferDialog]];
 
-test('Betragsfelder holen ihre Schrittweite aus der Währung, nicht aus 0.01', () => {
-  // Die Regel, nicht die Liste: ein Feld mit inputmode="decimal" ist entweder
-  // ein Anteil in Prozent (dann trägt es max="100") oder ein Geldbetrag - und
-  // dann ist eine feste Schrittweite falsch, sobald die Währung keine zwei
-  // Nachkommastellen hat. Bei JPY liess step="0.01" Hundertstel Yen zu,
-  // während Platzhalter und Untergrenze schon ganze Yen zeigten.
-  // Eine Allowlist einzelner Feld-IDs würde nur die heute bekannten Felder
-  // decken; der nächste neue Dialog fiele wieder durch.
+/** Alle `.js`-Dateien unter public/, ohne vendor - die ganze App, keine Liste. */
+function publicSources() {
+  const out = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })) {
+      if (entry.name === 'vendor') continue;
+      const rel = `${dir}${entry.name}`;
+      if (entry.isDirectory()) walk(`${rel}/`);
+      else if (entry.name.endsWith('.js')) out.push([rel.replace('../public/', ''), read(rel)]);
+    }
+  };
+  walk('../public/');
+  return out;
+}
+
+// Critique R23 P1 (D1): Chrome liest "1.200" in einem `type="number"`-Feld
+// unter de als 1,2 und speichert still ein Tausendstel des Gemeinten;
+// "1.234,56" lehnt es ab. Geld nimmt deshalb nur noch der eine Baustein an
+// (utils/amount-field.js: Textfeld + amountInputProblem). Die Regel, nicht die
+// Liste: ein Zahlenfeld ist ein Geldfeld, sobald es einen Geld-Helfer ruft
+// oder sein Name es sagt (Betrag, Preis, Saldo, Rahmen, Satz, Zuschlag).
+// Prozentsaetze, Kurse und Zaehler (lm-fixed-rate, lm-exchange-rate) sind
+// keine Geldbetraege und bleiben Zahlenfelder, ebenso die "Menge" einer
+// Erinnerung (reminder-custom-amount: drei Tage vorher).
+const MONEY_FIELD_NAME = /(?:id|name)="(?![^"]*reminder)[^"]*(?:amount|price|balance|budget|credit-limit|principal|daily_rate|hourly_rate|extras)[^"]*"/;
+const MONEY_HELPER = /amount(?:Placeholder|Step|Min|FieldValue|ToInput)\(|currency/i;
+
+test('kein Geldfeld ist ein type="number" (D1)', () => {
+  const funde = [];
+  for (const [file, src] of publicSources()) {
+    for (const input of withoutComments(src).match(/<input[^>]*>/g) || []) {
+      if (!/type="number"/.test(input)) continue;
+      if (MONEY_FIELD_NAME.test(input) || MONEY_HELPER.test(input)) funde.push(`${file}: ${input.replace(/\s+/g, ' ').slice(0, 140)}`);
+    }
+  }
+  assert.deepEqual(funde, [], `Geldbetrag als type="number" - amountInputAttrs() aus utils/amount-field.js nutzen:\n${funde.join('\n')}`);
+});
+
+test('jedes Betragsfeld ist der D1-Baustein: Textfeld, Grund am Feld, Wert ueber parseAmountInput', () => {
+  const field = read('../public/utils/amount-field.js');
+  assert.match(field, /type="text" inputmode="decimal"/, 'der Baustein ist ein Textfeld mit Dezimaltastatur');
+  assert.match(field, /amountToInput\(/, 'der Bestand in der Schreibweise der Region');
   for (const [file, src] of MONEY_INPUT_PAGES) {
-    // `[^>]` schliesst Zeilenumbrueche bereits ein (anders als `.`), eine
-    // Alternative `(?:[^>]|\n)` waere also mehrdeutig - und genau das ergibt
-    // exponentielles Backtracking (CodeQL js/redos).
-    const inputs = withoutComments(src).match(/<input[^>]*>/g) || [];
-    for (const input of inputs) {
-      if (!/inputmode="decimal"/.test(input)) continue;
-      if (!/step="0\.01"/.test(input)) continue;
-      assert.match(
-        input,
-        /max="100"/,
-        `${file}: Betragsfeld mit fester Schrittweite 0.01 - amountStep(currency, wert) aus utils/money.js nutzen:\n${input.replace(/\s+/g, ' ')}`,
-      );
+    const clean = withoutComments(src);
+    if (!/amountInputAttrs\(/.test(clean)) continue;
+    assert.match(clean, /amountFieldError\(/, `${file}: Betragsfeld ohne benannten Grund im Speicherpfad`);
+    assert.match(clean, /parseAmountInput\(/, `${file}: Betragsfeld ohne parseAmountInput - Number()/parseFloat() liest "12,50" nicht`);
+    // Kein Betragsfeld wird mehr mit Number()/parseFloat() gelesen.
+    for (const id of clean.matchAll(/id="([^"$]+)"\$\{amountInputAttrs\(/g)) {
+      assert.doesNotMatch(clean, new RegExp(`(?:Number|parseFloat)\\(panel\\.querySelector\\('#${id[1]}'\\)`),
+        `${file}: #${id[1]} wird als Zahl gelesen statt ueber parseAmountInput`);
     }
   }
 });
@@ -1024,37 +1058,10 @@ test('Geldbeträge gehen als Punkt-Dezimalstring an den Server', () => {
   assert.match(impl[0], /return ''/, 'ein gruppierter Betrag muss abgewiesen werden');
 });
 
-test('jeder Speicherpfad prüft die Schrittweite selbst', () => {
-  // Die Dialoge des Moduls sind keine <form>-Elemente: sie speichern über einen
-  // Button-Handler, die native step-Prüfung des Browsers läuft also nie. Ein
-  // angezeigtes step="1" ist damit reine Behauptung - ohne eigene Prüfung nimmt
-  // das Feld trotzdem 12,5 JPY entgegen und schreibt den Wert weg, während die
-  // Anzeige ihn gerundet darstellt.
-  // Über alle Seiten mit Betragsfeldern, nicht nur die formularlosen: ein
-  // <form> hilft hier nichts, weil amountStep bei Bestandswerten neben dem
-  // Raster "any" liefert und die Browser-Prüfung damit aussetzt.
-  //
-  // Bewusst qualitativ und nicht als Zählung Felder-gegen-Aufrufe: eine Prüfung
-  // kann mehrere Felder gemeinsam abdecken, und eine Zahlengleichheit zu
-  // verlangen hiesse, den Code auf den Guard hin zu verbiegen. Er fängt damit
-  // das vollständige Vergessen einer Seite, nicht das einzelne Feld - dafür
-  // sind die Fall-Guards unten da.
-  for (const [file, src] of MONEY_INPUT_PAGES) {
-    const clean = withoutComments(src);
-    if (!/step="\$\{amountStep\(/.test(clean)) continue;
-    assert.match(
-      clean,
-      /amountIsSavable\(|rejectOffGridAmount\(/,
-      `${file}: währungsgerasterte Felder, aber keine Prüfung im Speicherpfad`,
-    );
-  }
-  assert.match(money, /export function fitsCurrencyGrid/);
-
+test('die Rasterpruefung haengt an der Dezimalschreibweise, nicht an einer Toleranz', () => {
   // Keine feste Toleranz gegen Float-Ungenauigkeit: 131072.02 * 100 ergibt
-  // 13107201.999999998, liegt also knapp zwei Milliardstel daneben. Mit einer
-  // Schranke von 1e-9 hätte jeder Speicherpfad diesen gültigen Euro-Betrag
-  // abgewiesen. Der Vergleich mit der gerundeten Dezimaldarstellung braucht
-  // gar keine Schranke und stimmt über jede Größenordnung.
+  // 13107201.999999998, liegt also knapp zwei Milliardstel daneben. Gezaehlt
+  // werden die Stellen am TEXT (amountInputProblem).
   const clean = withoutComments(money);
   assert.doesNotMatch(clean, /1e-9/, 'Rasterprüfung darf nicht an einer festen Toleranz hängen');
   assert.doesNotMatch(clean, /Math\.round\([^)]*10 \*\* /, 'Rasterprüfung über die Dezimaldarstellung, nicht über skalierte Floats');
@@ -1063,50 +1070,19 @@ test('jeder Speicherpfad prüft die Schrittweite selbst', () => {
 test('ein unangetasteter Bestandsbetrag bleibt speicherbar', () => {
   // Unter der alten Oberfläche mit fester Schrittweite 0,01 konnten Beträge
   // entstehen, die nicht ins Raster ihrer Währung passen. Eine unbedingte
-  // Prüfung sperrte an solchen Einträgen auch das Ändern von Titel oder Notiz -
-  // der Bestandswert-Schutz in amountStep wäre damit wirkungslos.
-  const clean = withoutComments(budget);
-  assert.match(clean, /original(?:Currency)?\s*[=:]/, 'rejectOffGridAmount kennt den Bestandswert nicht');
-  // Jeder Aufruf an einem bearbeitbaren Eintrag reicht den gespeicherten Wert durch.
-  //
-  // DER AUSDRUCK MISST AUFRUFE, NICHT DIE DEFINITION. Frueher begann ein Treffer
-  // auch an `function rejectOffGridAmount(` und lief ueber Funktionsgrenzen bis
-  // zum naechsten `)) return;` - das war zufaellig ein Aufruf, dessen
-  // `original:` den Treffer gruen hielt. Seit #1265 P7 steht dazwischen ein
-  // `if (readOnly()) return;`, und der Treffer endete dort. `[^;]` haelt jeden
-  // Treffer in EINER Anweisung; gemessen findet er auf main wie hier dieselben
-  // fuenf Aufrufe, jeden einzeln statt einen davon im Bauch der Definition.
-  //
-  // Seit R19 melden Buchungs- und Kontodialog alle Feldfehler zugleich
-  // (reportFieldErrors) und fragen dafuer amountIsSavable direkt - diese
-  // Aufrufe zaehlen mit und muessen den Bestandswert genauso durchreichen.
-  const calls = [
-    ...(clean.match(/(?<!function )rejectOffGridAmount\([^;]*?\)\) return;/g) || []),
-    ...(clean.match(/(?<!function )amountIsSavable\([^;]*?\{[^;]*?\}\)/g) || []),
-  ];
-  assert.ok(calls.length >= 4, `erwartet 4 Prüfungen, gefunden ${calls.length}`);
-  for (const call of calls) {
-    assert.match(call, /\boriginal\b/, `Prüfung ohne Bestandsschutz: ${call.replace(/\s+/g, ' ').slice(0, 90)}`);
-  }
-});
-
-test('jedes Formular prüft den Betrag auch selbst, nicht nur über step', () => {
-  // amountStep gibt bei einem Bestandswert neben dem Raster "any" zurück, damit
-  // sich der vorhandene Eintrag noch speichern lässt. Das gilt aber fürs ganze
-  // Feld: wer sich allein auf die Browser-Prüfung verlässt, macht aus 12,5 JPY
-  // anschliessend auch 12,555 JPY speicherbar - mehr Bruch als die feste
-  // Schrittweite je zuliess. Jede Seite mit einem Betragsfeld braucht deshalb
-  // eine eigene Prüfung, unabhängig davon, ob sie ein <form> ist.
-  assert.match(money, /export function amountIsSavable/);
+  // Prüfung sperrte an solchen Einträgen auch das Ändern von Titel oder Notiz.
+  // Jede Pruefung an einem bearbeitbaren Eintrag reicht deshalb den
+  // gespeicherten Wert durch (`original`). Der Einkauf fehlt bewusst: er
+  // speichert ganze Cent, ein Bestand neben dem Raster kann dort nicht entstehen.
+  let calls = 0;
   for (const [file, src] of MONEY_INPUT_PAGES) {
     const clean = withoutComments(src);
-    if (!/step="\$\{amountStep\(/.test(clean)) continue;
-    assert.match(
-      clean,
-      /amountIsSavable\(|rejectOffGridAmount\(/,
-      `${file}: währungsgerasterte Felder ohne eigene Prüfung im Speicherpfad`,
-    );
+    for (const call of clean.match(/(?<!function )(?:amountFieldError|rejectAmount)\([^;]*?\}\)/g) || []) {
+      calls += 1;
+      assert.match(call, /\boriginal\b/, `${file}: Prüfung ohne Bestandsschutz: ${call.replace(/\s+/g, ' ').slice(0, 110)}`);
+    }
   }
+  assert.ok(calls >= 12, `erwartet mindestens 12 Prüfungen, gefunden ${calls}`);
 });
 
 test('das inaktive Tarif-Feld ist von der Formularprüfung ausgenommen', () => {
@@ -1273,9 +1249,10 @@ test('ein Abo darf null kosten', () => {
   // Gratis-Tarife sind ein gültiger Bestand: validatePayload weist erst
   // amount < 0 ab, das Schema prüft CHECK(amount >= 0). Eine Untergrenze aus
   // der kleinsten Währungseinheit sperrte das Speichern eines 0-Abos.
-  const field = withoutComments(subscriptions).match(/<input[^>]*id="subscription-amount"[^>]*>/);
-  assert.ok(field, 'Abo-Betragsfeld nicht gefunden');
-  assert.match(field[0], /min="0"/, 'Abo-Preis braucht die Untergrenze null, nicht amountMin()');
+  const clean = withoutComments(subscriptions);
+  const check = clean.match(/amountFieldError\(amountInput,[\s\S]*?\}\);/);
+  assert.ok(check, 'Abo-Betragsprüfung nicht gefunden');
+  assert.match(check[0], /sign: 'nonNegative'/, 'Abo-Preis braucht die Untergrenze null');
 });
 
 test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
@@ -1289,27 +1266,25 @@ test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
   );
 });
 
-// R21 S9b (Critique a4): "Bearbeiten zeigt 200 statt 200,00". Ein Betragsfeld
-// vom Typ number, das einen Bestandswert zeigt, nimmt ihn ueber
-// amountFieldValue - in den Stellen der Waehrung, nur mit Nullen aufgefuellt.
+// R21 S9b (Critique a4): "Bearbeiten zeigt 200 statt 200,00". Seit R23 (D1)
+// nimmt jedes Betragsfeld seinen Bestand ueber amountInputAttrs -> amountToInput:
+// in den Stellen der Waehrung, nur mit Nullen aufgefuellt (test:money-utils).
 test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt 200)', () => {
-  const plans = read('../public/pages/budget-plans.js');
   const felder = [
-    ['budget.js', budget, 'bm-amount', /value="\$\{absAmountField\}"/],
-    ['budget.js', budget, 'cb-amount', /value="\$\{amountFieldValue\(absAmount, currency\)\}"/],
-    ['budget.js', budget, 'lm-amount', /value="\$\{loan \? amountFieldValue\(loan\.total_amount, loanCurrency\) : ''\}"/],
-    ['budget-plans.js', plans, 'plan-amount', /value="\$\{amountFieldValue\(value, view\.ctx\.currency\)\}"/],
-    ['subscriptions.js', subscriptions, 'subscription-amount', /value="\$\{esc\(amountFieldValue\(subscription\?\.amount \?\? '', formCurrency\)\)\}"/],
+    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(state\.currency, absAmount\)/],
+    ['budget.js', budget, 'cb-amount', /amountInputAttrs\(currency, absAmount\)/],
+    ['budget.js', budget, 'lm-amount', /amountInputAttrs\(loanCurrency, loan \? loan\.total_amount : ''\)/],
+    ['budget-plans.js', plans, 'plan-amount', /amountInputAttrs\(view\.ctx\.currency, value\)/],
+    ['subscriptions.js', subscriptions, 'subscription-amount', /amountInputAttrs\(formCurrency, subscription\?\.amount \?\? ''\)/],
   ];
   for (const [file, src, id, value] of felder) {
     const field = withoutComments(src).match(new RegExp(`<input[^>]*id="${id}"[^>]*>`));
     assert.ok(field, `${file}: #${id} nicht gefunden`);
-    assert.match(field[0], value, `${file}: #${id} zeigt den Bestand ohne die Stellen der Waehrung`);
+    assert.match(field[0], value, `${file}: #${id} zeigt den Bestand nicht ueber den Baustein`);
   }
-  assert.match(budget, /const absAmountField = amountFieldValue\(absAmount, state\.currency\);/);
   const raten = [...withoutComments(housekeeping).matchAll(/<input name="(daily_rate|hourly_rate|extras)"[^>]*>/g)];
   assert.ok(raten.length >= 4, `Raten der Haushaltshilfe nicht gefunden (${raten.length})`);
-  for (const [field, name] of raten) assert.match(field, /value="\$\{esc\(amountFieldValue\(/, `housekeeping.js: ${name} ohne amountFieldValue`);
+  for (const [field, name] of raten) assert.match(field, /\$\{amountInputAttrs\(state\.currency, /, `housekeeping.js: ${name} ohne amountInputAttrs`);
 });
 
 // R21 S9b (Critique a4): am Ende der Metazeile stand das Wiederkehr-Zeichen
@@ -1325,23 +1300,16 @@ test('Buchungszeile: Wiederkehr- und Belegzeichen stehen am Datum, nicht am Zeil
 
 test('wählbare Währungen ziehen das Betragsfeld nach', () => {
   // Ein Formular, in dem die Währung gewählt werden kann, muss das Betragsfeld
-  // beim Wechsel nachziehen - sonst behält es das Format der vorherigen Währung
-  // und der Platzhalter widerspricht der Auswahl direkt daneben.
-  assert.match(money, /export function applyAmountFormat/);
-  for (const [file, src] of [['budget.js', budget], ['subscriptions.js', subscriptions], ['split-expenses.js', splitExpenses]]) {
+  // beim Wechsel nachziehen - sonst behält es den Platzhalter der vorherigen
+  // Währung, der der Auswahl direkt daneben widerspricht. Die Stellen prueft
+  // das Speichern gegen die NEUE Waehrung (amountFieldError).
+  for (const [file, src] of [['budget.js', budget], ['subscriptions.js', subscriptions], ['budget-transfer-dialog.js', transferDialog], ['split-expenses.js', splitExpenses]]) {
     assert.match(
       withoutComments(src),
-      /applyAmountFormat\(|amountPlaceholder\(/,
+      /setAmountCurrency\(|amountPlaceholder\(/,
       `${file}: Währungswechsel im Formular ohne Nachziehen des Betragsfeldes`,
     );
   }
-  // Beim Wechsel gilt das strikte Raster der neuen Währung. Der
-  // Bestandswert-Schutz von amountStep/amountMin existiert nur fürs Öffnen des
-  // Dialogs: gäbe man den aktuellen Wert auch hier weiter, liefe ein von EUR
-  // auf JPY gestelltes Feld mit step="any" weiter und speicherte Hundertstel Yen.
-  const body = withoutComments(money).match(/export function applyAmountFormat[\s\S]*?\n\}/)[0];
-  assert.doesNotMatch(body, /amountStep\([^)]*input\.value/, 'applyAmountFormat darf den Bestandswert nicht weiterreichen');
-  assert.doesNotMatch(body, /amountMin\([^)]*input\.value/, 'applyAmountFormat darf den Bestandswert nicht weiterreichen');
 });
 
 test('Geldbeträge laufen über den Modul-Formatierer, nicht über eigene', () => {
@@ -2347,8 +2315,10 @@ test('Abo-Filter tragen sichtbare Labels und lassen sich zurücksetzen', () => {
   }
   assert.match(subscriptions, /function hasActiveFilters/);
   assert.match(subscriptions, /async function resetFilters/);
-  // Leere Liste durch Filter ist ein anderer Zustand als "noch keine Abos".
-  assert.match(subscriptions, /subscriptions\.noMatchesTitle/);
+  // Leere Liste durch Filter ist ein anderer Zustand als "noch keine Abos" -
+  // seit R23 der geteilte Leerzustand der Suche mit Begriff und Filtern als Chips.
+  const leer = withoutComments(subscriptions).match(/function renderEmpty\(\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(leer, /if \(hasActiveFilters\(\)\) \{\s*return searchEmptyHTML\(\{\s*query: state\.query,\s*filters: activeFilters\(\)/);
 });
 
 // --------------------------------------------------------
@@ -2363,7 +2333,7 @@ test('alle neuen Keys existieren in jeder Locale', () => {
     'budget.colorOrange', 'budget.colorGreen', 'budget.colorOcher',
     'budget.statsPointLabel', 'budget.statsPointsLabel',
     'budget.expensesOnly', 'budget.expensesOnlyHint',
-    'subscriptions.resetFilters', 'subscriptions.noMatchesTitle', 'subscriptions.noMatchesDescription',
+    'subscriptions.resetFilters',
     'subscriptions.filterLabelCategory', 'subscriptions.filterLabelMethod',
     'subscriptions.filterLabelStatus', 'subscriptions.filterLabelSort',
   ];
@@ -2450,7 +2420,7 @@ test('der Bestätigen-Dialog lässt Betrag und Datum korrigieren', () => {
   assert.ok(modal.includes('cb-date'), 'Datumsfeld fehlt');
   assert.ok(modal.includes('yuvomi-datepicker'), 'Datum über die geteilte Komponente');
   assert.match(modal, /api\.patch\(`\/budget\/\$\{id\}\/confirm`/, 'ruft die Bestätigungs-Route nicht auf');
-  assert.ok(modal.includes('rejectOffGridAmount'), 'Betrag ohne Währungsraster-Prüfung');
+  assert.ok(modal.includes('rejectAmount('), 'Betrag ohne benannte Prüfung (D1)');
 });
 
 test('was noch aussteht, steht unter den Summenkarten', () => {
@@ -3244,8 +3214,7 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.ok(pos('id="bm-amount"') < pos('id="bm-title"'), 'der Betrag steht vor dem Titel - und bekommt als erstes Feld den Erstfokus');
   assert.ok(pos('id="bm-title"') < pos('id="bm-category"'));
   assert.ok(pos('id="bm-category"') < pos('id="bm-date"'));
-  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"/);
-  assert.match(modal, /inputmode="decimal"/);
+  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(state\.currency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
   const adv = pos('${advancedSection(`');
   for (const rare of ['id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
@@ -4048,11 +4017,13 @@ test('Treffer der Suche stehen mit vollem Datum, ein leeres Ergebnis nennt die A
     assert.match(html, /2033/, 'Treffer aus anderen Monaten nennen das Jahr - "03.02." allein waere mehrdeutig');
     s.ledgerResults = [];
     const leer = budgetUi.renderEntries();
-    assert.match(leer, /ledgerSearchEmpty|arzt/);
+    // Der geteilte Leerzustand der Suche (R23): der Begriff als Chip, ein Weg zurueck.
+    assert.match(leer, /empty-state__term-text">arzt</);
+    assert.match(leer, /data-budget-reset-search/);
     assert.doesNotMatch(leer, /budget\.emptyTitle|empty-cta-budget/, 'kein leerer Monat, sondern keine Treffer');
     s.ledgerQuery = '';
     s.ledgerResults = null;
-    assert.doesNotMatch(budgetUi.renderEntries(), /ledgerSearchEmpty/);
+    assert.doesNotMatch(budgetUi.renderEntries(), /data-budget-reset-search/);
   } finally {
     s.ledgerQuery = vorher.q; s.ledgerResults = vorher.r; s.ledgerError = vorher.e; s.entries = vorher.entries;
     abraeumen();
@@ -6881,23 +6852,30 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
 // im Bild stellt reportFieldErrors her (test:modal-utils).
 test('entryFormErrors: ein leerer Dialog meldet Titel, Betrag, Kategorie und Datum zugleich', () => {
   const fields = Object.fromEntries(['bm-title', 'bm-amount', 'bm-category', 'bm-subcategory', 'bm-date']
-    .map((id) => [`#${id}`, { id }]));
+    .map((id) => [`#${id}`, { id, value: '' }]));
   const panel = { querySelector: (sel) => fields[sel] ?? null };
   const ids = (list) => list.filter(Boolean).map(([el, msg]) => [el.id, msg]);
-  assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', absVal: NaN, category: '', subcategory: '', date: '' })), [
+  assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', category: '', subcategory: '', date: '' })), [
     ['bm-title', 'common.titleRequired'],
-    ['bm-amount', 'budget.validAmountRequired'],
+    ['bm-amount', 'common.amountNotPositive'],
     ['bm-category', 'budget.categoryRequired'],
     ['bm-date', 'calendar.invalidDate'],
   ]);
   // Ein Betrag neben dem Raster der Waehrung ist ein Fehler am Betrag - neben
-  // dem fehlenden Titel, nicht erst nach ihm.
+  // dem fehlenden Titel, nicht erst nach ihm. Gelesen wird der TEXT (D1).
   const before = budgetUi.state.currency;
   budgetUi.state.currency = 'EUR';
+  const valid = { category: 'Lebensmittel', subcategory: '', date: '2026-10-16' };
   try {
-    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', absVal: 1.005, category: 'Lebensmittel', subcategory: '', date: '2026-10-16' }))
-      .map(([id]) => id), ['bm-title', 'bm-amount']);
-    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: 'Brot', absVal: 3.5, category: 'Lebensmittel', subcategory: '', date: '2026-10-16' })), []);
+    fields['#bm-amount'].value = '1,005';
+    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', ...valid })).map(([id]) => id), ['bm-title', 'bm-amount']);
+    // Critique R23 P1: "1.200" ist unter de gruppiert - benannt abgewiesen,
+    // nie still 1,20 gespeichert.
+    fields['#bm-amount'].value = '1.200';
+    const [[, grouped]] = ids(budgetUi.entryFormErrors(panel, { title: 'Brot', ...valid }));
+    assert.match(grouped, /^common\.amountGrouped/);
+    fields['#bm-amount'].value = '3,50';
+    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: 'Brot', ...valid })), []);
   } finally {
     budgetUi.state.currency = before;
   }
@@ -7650,7 +7628,7 @@ test('R22 D9: der Buchungsbetrag traegt seine Waehrung, Datum und Konto teilen e
   assert.equal(currencySymbol('XYZ'), 'XYZ', 'unbekannt: der Code');
   const html = buchungsDialog({ mode: 'edit', entry: { id: 4, title: 'REWE', amount: -40, category: 'food', subcategory: 'groceries', date: '2026-06-03', account_id: 1 } },
     { currency: 'EUR', accounts: [{ id: 1, name: 'Giro' }] }).content;
-  assert.match(html, /<div class="budget-amount-field">\s*<input type="number" class="form-input budget-amount-input" id="bm-amount"[^>]*aria-describedby="bm-amount-unit"[^>]*>\s*<span class="budget-amount-field__unit" id="bm-amount-unit">€<\/span>/);
+  assert.match(html, /<div class="budget-amount-field">\s*<input class="form-input budget-amount-input" id="bm-amount" type="text" inputmode="decimal"[^>]*aria-describedby="bm-amount-unit"[^>]*>\s*<span class="budget-amount-field__unit" id="bm-amount-unit">€<\/span>/);
   const pair = /<div class="budget-entry-pair js-entry-field">([\s\S]*?)<div class="js-entry-field">/.exec(html)?.[1] ?? '';
   assert.match(pair, /id="bm-date"/, 'das Datum steht in der Zeile');
   assert.match(pair, /id="bm-account"/, 'das Konto daneben');

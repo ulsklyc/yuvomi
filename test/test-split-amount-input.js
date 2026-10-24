@@ -181,7 +181,9 @@ test('P2b: Nachkommastellen, die die Waehrung nicht kennt, bleiben am Feld und g
     const { panel } = formular({ amount: '12,500', currency: 'EUR' });
     const { gesendet, gemeldet } = await speichern(neueAusgabe, panel);
     assert.deepEqual(gesendet, []);
-    assert.match(gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"EUR","step":"0\.01"\}/);
+    // Die kleinste Einheit in der Schreibweise der Region (Critique R23): unter
+    // de "0,01" wie der Platzhalter "0,00", nicht "0.01".
+    assert.match(gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"EUR","step":"0,01"\}/);
   });
 });
 

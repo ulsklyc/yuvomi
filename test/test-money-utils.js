@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits, amountFieldValue } from '../public/utils/money.js';
+import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits, parseAmountInput, smallestUnitLabel } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
@@ -435,17 +435,77 @@ test('roundToCurrency: Float-Rest wird 0, -0 wird 0, die Nachkommastellen folgen
   assert.equal(roundToCurrency(1.23456, 'KWD'), 1.235);
 });
 
-// R21 S9b (Critique a4): der Bestand im number-Feld in den Stellen der Waehrung.
-// Nur aufgefuellt, nie gerundet - ein Wert neben dem Raster bleibt, wie er ist.
-test('amountFieldValue fuellt auf die Stellen der Waehrung auf und rundet nie', () => {
-  assert.equal(amountFieldValue(200, 'EUR'), '200.00');
-  assert.equal(amountFieldValue('38.5', 'EUR'), '38.50');
-  assert.equal(amountFieldValue(0, 'EUR'), '0.00');
-  assert.equal(amountFieldValue('12.555', 'EUR'), '12.555', 'mehr Stellen als die Waehrung: unveraendert');
-  assert.equal(amountFieldValue(1300, 'JPY'), '1300');
-  assert.equal(amountFieldValue(12.5, 'JPY'), '12.5', 'neben dem Raster: nicht gerundet');
-  assert.equal(amountFieldValue('1.5', 'KWD'), '1.500');
-  assert.equal(amountFieldValue('', 'EUR'), '');
-  assert.equal(amountFieldValue(null, 'EUR'), '');
-  assert.equal(amountFieldValue('1e21', 'EUR'), '1e21', 'keine Dezimalschreibweise: unveraendert');
+// R21 S9b (Critique a4) "200 statt 200,00", seit R23 im TEXTfeld: der Bestand
+// steht in den Stellen der Waehrung und in der Schreibweise der Region. Nur
+// aufgefuellt, nie gerundet - ein Wert neben dem Raster bleibt, wie er ist.
+test('amountToInput fuellt auf die Stellen der Waehrung auf und rundet nie', () => {
+  withFormatLocale('de', () => {
+    assert.equal(amountToInput(200, 'EUR'), '200,00');
+    assert.equal(amountToInput('38.5', 'EUR'), '38,50');
+    assert.equal(amountToInput(0, 'EUR'), '0,00');
+    assert.equal(amountToInput('12.555', 'EUR'), '12,555', 'mehr Stellen als die Waehrung: unveraendert');
+    assert.equal(amountToInput(1300, 'JPY'), '1300');
+    assert.equal(amountToInput(12.5, 'JPY'), '12,5', 'neben dem Raster: nicht gerundet');
+    assert.equal(amountToInput('1.5', 'KWD'), '1,500');
+    assert.equal(amountToInput(-250, 'EUR'), '-250,00', 'ein negativer Startsaldo bleibt negativ');
+    assert.equal(amountToInput('', 'EUR'), '');
+    assert.equal(amountToInput(null, 'EUR'), '');
+  });
+  withFormatLocale('en-US', () => assert.equal(amountToInput(1200, 'USD'), '1200.00', 'ohne Gruppierung - sonst liest es toDecimalString nicht wieder'));
+});
+
+// Critique R23 P1 (D1): ein `type="number"`-Feld las "1.200" unter de still als
+// 1,2. Das Textfeld liest ueber toDecimalString: gruppiert ist abgewiesen,
+// nie umgedeutet.
+test('parseAmountInput liest den Text eines Betragsfeldes, nie still gruppiert', () => {
+  withFormatLocale('de', () => {
+    assert.equal(parseAmountInput('1200'), 1200);
+    assert.equal(parseAmountInput('1200,50'), 1200.5);
+    assert.ok(Number.isNaN(parseAmountInput('1.200')), '"1.200" ist unter de gruppiert, nicht 1,2');
+    assert.ok(Number.isNaN(parseAmountInput('1.234,56')));
+    assert.ok(Number.isNaN(parseAmountInput('abc')));
+    assert.equal(parseAmountInput(''), null);
+    assert.equal(parseAmountInput('  '), null);
+    assert.equal(parseAmountInput('-50,25'), -50.25);
+    assert.equal(parseAmountInput('\u221250,25'), -50.25, 'das typografische Minus der Anzeige (sv, fi) gilt');
+  });
+  withFormatLocale('en-US', () => {
+    assert.equal(parseAmountInput('1.20'), 1.2);
+    assert.ok(Number.isNaN(parseAmountInput('1,200')));
+  });
+  withFormatLocale('fa', () => assert.equal(parseAmountInput('۱۲٫۵۰'), 12.5));
+});
+
+test('amountInputProblem: Vorzeichen je Feld (sign)', () => {
+  const grund = (eingabe, sign) => {
+    let out;
+    withFormatLocale('de', () => { out = amountInputProblem(eingabe, 'EUR', { sign }); });
+    return out;
+  };
+  // positive (Standard): eine Buchung, ein Darlehen, ein Plan
+  assert.equal(grund('0', undefined), 'notPositive');
+  assert.equal(grund('-5', undefined), 'notPositive');
+  // nonNegative: Kreditrahmen, Abo (Gratis-Tarif), Kaufpreis, Zuschlag
+  assert.equal(grund('0', 'nonNegative'), null);
+  assert.equal(grund('0,00', 'nonNegative'), null);
+  assert.equal(grund('-5', 'nonNegative'), 'invalid', 'ein Minus gehoert dort nicht hin');
+  assert.equal(grund('-0', 'nonNegative'), 'invalid');
+  assert.equal(grund('1.200', 'nonNegative'), 'grouped');
+  // any: Startsaldo eines Kontos
+  assert.equal(grund('-250,50', 'any'), null);
+  assert.equal(grund('0', 'any'), null);
+  assert.equal(grund('-250,505', 'any'), 'precision');
+  assert.equal(grund('-1.200', 'any'), 'grouped');
+});
+
+// Critique R23 P1: die Meldung "nur in Schritten von 0.01" stand unter de neben
+// dem Platzhalter "0,00" - die kleinste Einheit folgt jetzt der Region.
+test('smallestUnitLabel schreibt die kleinste Einheit in der Schreibweise der Region', () => {
+  withFormatLocale('de', () => {
+    assert.equal(smallestUnitLabel('EUR'), '0,01');
+    assert.equal(smallestUnitLabel('JPY'), '1');
+    assert.equal(smallestUnitLabel('KWD'), '0,001');
+  });
+  withFormatLocale('en-US', () => assert.equal(smallestUnitLabel('EUR'), '0.01'));
+  withFormatLocale('ar-EG', () => assert.equal(smallestUnitLabel('EUR'), '٠٫٠١'));
 });

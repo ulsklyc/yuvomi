@@ -31,7 +31,8 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, amountPlaceholder, amountStep, amountMin, applyAmountFormat, amountIsSavable, smallestUnitLabel, sharePercent, roundToCurrency, amountFieldValue, currencySymbol } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput } from '/utils/money.js';
+import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass, leadStep } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -44,7 +45,7 @@ import { intervalUnitLabel } from '/rrule-ui.js';
 import { appendCurrencyOptions } from '/settings/currency.js';
 import '/components/category-manager.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
-import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, searchEmptyHTML, mountLoadError } from '/utils/empty-state.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -1520,7 +1521,14 @@ function renderBody() {
   // ihre Transition lief nie, weil der Endwert schon im Markup steht (ux.js).
   growBars(body, { selector: '.budget-bar-row__fill', memo: 'budget-categories' });
   watchAsideFit(body.querySelector('.budget-tab-panel--budget'));
-  wirePageSearch(body, { id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch });
+  const ledgerSearch = wirePageSearch(body, { id: 'budget-ledger-search', delay: 250, onQuery: runLedgerSearch });
+  // Am Listenknoten, nicht am Treffer: paintLedger() tauscht nur den Inhalt.
+  body.querySelector('#budget-list')?.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-budget-reset-search]')) return;
+    ledgerSearch?.clear();
+    runLedgerSearch('');
+    ledgerSearch?.input?.focus();
+  });
   _container.querySelector('#empty-cta-budget')?.addEventListener('click', () => {
     document.querySelector('.page-fab')?.click();
   });
@@ -2387,7 +2395,9 @@ function renderEntries() {
       return emptyStateHTML({ icon: 'cloud-off', title: t('budget.ledgerSearchError') });
     }
     if (!state.ledgerResults.length) {
-      return emptyStateHTML({ icon: 'search-x', title: t('budget.ledgerSearchEmpty', { query: state.ledgerQuery }) });
+      // Der geteilte Leerzustand der Suche (Critique R23, Q4): Begriff als
+      // Chip und "Suche zuruecksetzen", wie in jeder anderen Liste.
+      return searchEmptyHTML({ query: state.ledgerQuery, resetAttrs: { 'data-budget-reset-search': '' } });
     }
     // Treffer aus vielen Monaten: die Zeile nennt das volle Datum.
     return entryRows(sortLedger(state.ledgerResults, ledgerSort()), { fullDate: true });
@@ -3003,9 +3013,7 @@ function openAccountModal(account = null) {
     </div>
     <div class="form-group">
       <label class="form-label" for="am-balance">${t('budget.startingBalanceLabel')}</label>
-      <input type="number" class="form-input" id="am-balance"
-             step="${amountStep(accountCurrency, isEdit ? account.starting_balance : '')}" inputmode="decimal"
-             placeholder="${amountPlaceholder(accountCurrency)}" value="${isEdit ? account.starting_balance : ''}">
+      <input class="form-input" id="am-balance"${amountInputAttrs(accountCurrency, isEdit ? account.starting_balance : '')}>
       <p class="form-hint">${t('budget.startingBalanceHint')}</p>
     </div>
     <div id="am-credit-fields" ${activeType === 'credit' ? '' : 'hidden'}>
@@ -3016,12 +3024,10 @@ function openAccountModal(account = null) {
       </div>
       <div class="form-group">
         <label class="form-label" for="am-credit-limit">${t('budget.creditLimitLabel')}</label>
-        <!-- Schrittweite und Platzhalter aus der Kontowährung: bei JPY ist ein
-             Hundertstel keine Einheit, die es gibt. min bleibt 0 - ein Rahmen
-             ist nie negativ, und leer heisst "kein Rahmen gepflegt". -->
-        <input type="number" class="form-input" id="am-credit-limit" min="0" inputmode="decimal"
-               step="${amountStep(accountCurrency, isEdit ? (account.credit_limit ?? '') : '')}"
-               placeholder="${amountPlaceholder(accountCurrency)}" value="${isEdit ? (account.credit_limit ?? '') : ''}">
+        <!-- Platzhalter aus der Kontowährung: bei JPY ist ein Hundertstel keine
+             Einheit, die es gibt. Ein Rahmen ist nie negativ, 0 ist erlaubt, und
+             leer heisst "kein Rahmen gepflegt". -->
+        <input class="form-input" id="am-credit-limit"${amountInputAttrs(accountCurrency, isEdit ? (account.credit_limit ?? '') : '')}>
         <p class="form-hint">${t('budget.creditLimitHint')}</p>
       </div>
     </div>
@@ -3112,25 +3118,19 @@ function openAccountModal(account = null) {
         const saveBtn = panel.querySelector('#am-save');
         const name    = panel.querySelector('#am-name').value.trim();
         const type    = panel.querySelector('#am-type').value;
-        const rawBal  = panel.querySelector('#am-balance').value;
-        const startingBalance = rawBal === '' ? 0 : parseFloat(rawBal);
-        const rawLimit = panel.querySelector('#am-credit-limit').value.trim();
-        const creditLimit = rawLimit === '' ? null : parseFloat(rawLimit);
+        const startingBalance = parseAmountInput(panel.querySelector('#am-balance').value) ?? 0;
+        const creditLimit = parseAmountInput(panel.querySelector('#am-credit-limit').value);
 
         // Alle Felder auf einmal, Fokus aufs erste im Bild (Critique R19).
         const balanceEl = panel.querySelector('#am-balance');
-        const balanceOffGrid = !isNaN(startingBalance) && !amountIsSavable(startingBalance, accountCurrency, {
-          original: isEdit ? account.starting_balance : null,
-        });
         if (reportFieldErrors([
           !name && [panel.querySelector('#am-name'), t('common.titleRequired')],
-          isNaN(startingBalance) && [balanceEl, t('budget.validAmountRequired')],
-          balanceOffGrid && [balanceEl, t('common.amountPrecisionRequired', {
-            currency: accountCurrency,
-            step: smallestUnitLabel(accountCurrency),
-          })],
-          type === 'credit' && creditLimit !== null && (isNaN(creditLimit) || creditLimit < 0)
-            && [panel.querySelector('#am-credit-limit'), t('budget.validAmountRequired')],
+          amountFieldError(balanceEl, accountCurrency, {
+            sign: 'any', original: isEdit ? account.starting_balance : null,
+          }),
+          type === 'credit' && amountFieldError(panel.querySelector('#am-credit-limit'), accountCurrency, {
+            sign: 'nonNegative', original: isEdit ? (account.credit_limit ?? null) : null,
+          }),
         ])) return;
 
         const modalContext = captureModalContext();
@@ -4223,12 +4223,11 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // Den gespeicherten Betrag unverändert zeigen. Ein toFixed() auf die
   // Nachkommastellen der Währung schrieb hier einen Finanzwert still um: ein
   // in EUR erfasstes 12,50 wurde unter JPY zu "13", und das nächste Speichern
-  // hätte den Betrag dauerhaft auf den gerundeten Wert gesetzt. Dass ein
-  // solcher Bestandswert nicht ins Raster passt, fängt amountStep ab.
+  // hätte den Betrag dauerhaft auf den gerundeten Wert gesetzt. amountToInput
+  // (in amountInputAttrs) fuellt nur mit Nullen auf ("200" -> "200,00") und
+  // rundet nie; einen Bestandswert neben dem Raster laesst das Speichern
+  // unangetastet durch (amountFieldError mit `original`).
   const absAmount  = isEdit ? String(Math.abs(editAmount)) : '';
-  // Angezeigt in den Stellen der Waehrung ("200.00" -> "200,00"), nur mit
-  // Nullen aufgefuellt, nie gerundet (amountFieldValue).
-  const absAmountField = amountFieldValue(absAmount, state.currency);
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
@@ -4300,10 +4299,8 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
            war die einzige Zahl des Moduls ohne Waehrung. Sie steht als Suffix
            im Feld, in Sekundaerfarbe; die Ziffern tragen das Gewicht. */ ''}
       <div class="budget-amount-field">
-        <input type="number" class="form-input budget-amount-input" id="bm-amount"
-               placeholder="${amountPlaceholder(state.currency)}"
-               step="${amountStep(state.currency, absAmount)}" min="${amountMin(state.currency, absAmount)}"
-               inputmode="decimal" value="${absAmountField}" aria-describedby="bm-amount-unit" required>
+        <input class="form-input budget-amount-input" id="bm-amount"${amountInputAttrs(state.currency, absAmount)}
+               aria-describedby="bm-amount-unit" required>
         <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(state.currency))}</span>
       </div>
     </div>
@@ -4656,7 +4653,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         }
 
         const title      = panel.querySelector('#bm-title').value.trim();
-        const absVal     = parseFloat(panel.querySelector('#bm-amount').value);
+        const absVal     = parseAmountInput(panel.querySelector('#bm-amount').value);
         const category   = panel.querySelector('#bm-category').value;
         const subcategory = panel.querySelector('#bm-subcategory').value;
         const date       = panel.querySelector('#bm-date').value;
@@ -4674,7 +4671,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         // beim ersten Fehler ab, in der Reihenfolge Titel -> Betrag -> Kategorie,
         // obwohl der Betrag oben steht. Der Fokus geht aufs erste Feld im Bild.
         if (reportFieldErrors(entryFormErrors(panel, {
-          title, absVal, category, subcategory, date, original: isEdit ? Math.abs(editAmount) : null,
+          title, category, subcategory, date, original: isEdit ? Math.abs(editAmount) : null,
         }))) return;
 
         const amount = currentType === 'expense' ? -absVal : absVal;
@@ -4882,24 +4879,6 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
 // solange beide gleich sind, gibt es nichts umzurechnen. Die Option-Liste füllt
 // wireLoanCurrencyFields() nach dem Einfügen (geteilte CURRENCY_CODES).
 /**
- * Weist einen Betrag zurück, der nicht ins Raster seiner Währung passt.
- *
- * Die Dialoge des Moduls sind keine `<form>`-Elemente - sie speichern über
- * einen Button-Handler, die native `step`-Prüfung des Browsers läuft also nie.
- * Ein Feld mit step="1" nähme sonst trotzdem 12,5 JPY entgegen und schriebe
- * den Wert weg, während die Anzeige ihn gerundet darstellt. Wer eine
- * Schrittweite zeigt, muss sie auch selbst durchsetzen.
- *
- * `original` ist der gespeicherte Betrag eines bestehenden Eintrags. Liegt er
- * selbst schon neben dem Raster - unter der alten Oberfläche mit fester
- * Schrittweite 0,01 war das möglich - und wurde er nicht angefasst, bleibt er
- * erlaubt. Sonst liesse sich an einem solchen Eintrag nicht einmal mehr der
- * Titel ändern, ohne vorher den Betrag anzufassen. Neu eingegebene Werte und
- * ein Währungswechsel laufen weiter in die Prüfung.
- *
- * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
- */
-/**
  * Die Feldfehler des Buchungsdialogs, ALLE zugleich, als `[feld, meldung]`
  * fuer reportFieldErrors (Critique R19). Ein Betrag, der fehlt, und einer, der
  * in der Waehrung nicht aufgeht, sind zwei Meldungen fuer dasselbe Feld - die
@@ -4909,16 +4888,12 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
  * @param {{title: string, absVal: number, category: string, subcategory: string, date: string, original: number|null}} values
  * @returns {Array<[Element|null, string]|false>}
  */
-export function entryFormErrors(panel, { title, absVal, category, subcategory, date, original = null }) {
-  const amountEl = panel.querySelector('#bm-amount');
-  const amountMissing = Number.isNaN(absVal) || !(absVal > 0);
+export function entryFormErrors(panel, { title, category, subcategory, date, original = null }) {
   return [
     !title && [panel.querySelector('#bm-title'), t('common.titleRequired')],
-    amountMissing && [amountEl, t('budget.validAmountRequired')],
-    !amountMissing && !amountIsSavable(absVal, state.currency, { original }) && [amountEl, t('common.amountPrecisionRequired', {
-      currency: state.currency,
-      step: smallestUnitLabel(state.currency),
-    })],
+    // Der Grund kommt aus dem TEXT des Feldes (D1): gruppiert, keine Zahl,
+    // nicht positiv oder zu viele Stellen - nie ein stilles Fehllesen.
+    amountFieldError(panel.querySelector('#bm-amount'), state.currency, { required: true, original }),
     !category && [panel.querySelector('#bm-category'), t('budget.categoryRequired')],
     Boolean(category) && !subcategory && subcategoryChoice(category).required
       && [panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired')],
@@ -4926,12 +4901,22 @@ export function entryFormErrors(panel, { title, absVal, category, subcategory, d
   ];
 }
 
-function rejectOffGridAmount(input, value, currency, { original = null, originalCurrency = null } = {}) {
-  if (amountIsSavable(value, currency, { original, originalCurrency })) return false;
-  reportFieldError(input, t('common.amountPrecisionRequired', {
-    currency,
-    step: smallestUnitLabel(currency),
-  }));
+/**
+ * Weist einen Betrag zurueck, den der Server nicht annaehme, und nennt den
+ * Grund am Feld (D1, utils/amount-field.js): gruppiert ("1.200" unter de),
+ * keine Zahl, nicht positiv oder mehr Stellen, als die Waehrung kennt.
+ *
+ * `original` ist der gespeicherte Betrag eines bestehenden Eintrags: liegt er
+ * schon neben dem Raster und wurde nicht angefasst, bleibt er speicherbar -
+ * sonst liesse sich an einem solchen Eintrag nicht einmal der Titel aendern.
+ * Ein Waehrungswechsel (`originalCurrency`) hebt den Schutz auf.
+ *
+ * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
+ */
+function rejectAmount(input, currency, { original = null, originalCurrency = null } = {}) {
+  const problem = amountFieldError(input, currency, { required: true, original, originalCurrency });
+  if (!problem) return false;
+  reportFieldError(...problem);
   return true;
 }
 
@@ -4970,8 +4955,8 @@ function wireLoanCurrencyFields(panel) {
     // Kreditsumme und Darlehensbetrag stehen in der gewählten Währung, nicht in
     // der Budget-Währung: ohne das Nachziehen zeigte ein auf JPY gestelltes
     // Darlehen weiter "0,00" und liesse Hundertstel Yen zu.
-    applyAmountFormat(panel.querySelector('#lm-amount'), select.value, { required: true });
-    applyAmountFormat(panel.querySelector('#lm-principal'), select.value, { required: true });
+    setAmountCurrency(panel.querySelector('#lm-amount'), select.value);
+    setAmountCurrency(panel.querySelector('#lm-principal'), select.value);
 
     const foreign = select.value !== state.currency;
     rateGroup.hidden = !foreign;
@@ -5076,9 +5061,7 @@ function loanInterestFieldsHtml(loan) {
     <div id="lm-interest-fields" ${mode === 'none' ? 'hidden' : ''}>
       <div class="form-group">
         <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
-        <input type="number" class="form-input" id="lm-principal"
-               step="${amountStep(currency, it?.principal ?? '')}" min="${amountMin(currency, it?.principal ?? '')}"
-               placeholder="${amountPlaceholder(currency)}" inputmode="decimal" value="${v(it?.principal)}" required>
+        <input class="form-input" id="lm-principal"${amountInputAttrs(currency, it?.principal ?? '')} required>
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -5146,7 +5129,7 @@ function wireLoanInterestFields(panel, { onTerm = () => {} } = {}) {
     if (mode === 'none') { preview.textContent = ''; return; }
     const body = {
       interest_mode: mode,
-      principal: parseFloat(panel.querySelector('#lm-principal').value),
+      principal: parseAmountInput(panel.querySelector('#lm-principal').value),
       fixed_rate: parseFloat(panel.querySelector('#lm-fixed-rate').value),
       initial_repayment_rate: parseFloat(panel.querySelector('#lm-initial-repayment').value),
     };
@@ -5291,11 +5274,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
     <div class="form-grid-2" id="lm-manual-fields">
       <div class="form-group">
         <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}${REQUIRED_MARK}</label>
-        <input type="number" class="form-input" id="lm-amount"
-               step="${amountStep(loanCurrency, loan ? loan.total_amount : '')}"
-               min="${amountMin(loanCurrency, loan ? loan.total_amount : '')}"
-               placeholder="${amountPlaceholder(loanCurrency)}" inputmode="decimal"
-               value="${loan ? amountFieldValue(loan.total_amount, loanCurrency) : ''}" required>
+        <input class="form-input" id="lm-amount"${amountInputAttrs(loanCurrency, loan ? loan.total_amount : '')} required>
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
@@ -5644,15 +5623,11 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
 
   let body;
   if (mode === 'none') {
-    const total_amount = parseFloat(panel.querySelector('#lm-amount').value);
+    const total_amount = parseAmountInput(panel.querySelector('#lm-amount').value);
     const installment_count = parseInt(panel.querySelector('#lm-installments').value, 10);
-    if (isNaN(total_amount) || total_amount <= 0) {
-      reportFieldError(panel.querySelector('#lm-amount'), t('budget.validAmountRequired'));
-      return;
-    }
     // Gegen die Darlehenswährung, nicht gegen die des Budgets: ein Darlehen in
     // JPY rastert in ganzen Yen, auch wenn der Haushalt in EUR rechnet.
-    if (rejectOffGridAmount(panel.querySelector('#lm-amount'), total_amount, currency, {
+    if (rejectAmount(panel.querySelector('#lm-amount'), currency, {
       original: loan?.total_amount ?? null,
       originalCurrency: loan?.currency || (loan ? state.currency : null),
     })) return;
@@ -5669,14 +5644,14 @@ async function saveLoanFromPanel(panel, saveBtn, { loan = null, closeAfterSave =
     body = { borrower, title, start_month, notes, interest_mode: 'none', total_amount, installment_count };
     if (paid.value !== null) body.paid_installments = paid.value;
   } else {
-    const principal = parseFloat(panel.querySelector('#lm-principal').value);
+    const principal = parseAmountInput(panel.querySelector('#lm-principal').value);
     const fixed_rate = parseFloat(panel.querySelector('#lm-fixed-rate').value);
     const initial_repayment_rate = parseFloat(panel.querySelector('#lm-initial-repayment').value);
-    if (isNaN(principal) || principal <= 0) {
+    if (!String(panel.querySelector('#lm-principal').value ?? '').trim()) {
       reportFieldError(panel.querySelector('#lm-principal'), t('budget.loanPrincipalRequired'));
       return;
     }
-    if (rejectOffGridAmount(panel.querySelector('#lm-principal'), principal, currency, {
+    if (rejectAmount(panel.querySelector('#lm-principal'), currency, {
       original: loan?.interest?.principal ?? null,
       originalCurrency: loan?.currency || (loan ? state.currency : null),
     })) return;
@@ -5900,10 +5875,8 @@ async function openConfirmBookingModal(id) {
       <p class="form-hint">${esc(t('budget.confirmHint'))}</p>
     </div>
     <div class="form-group">
-      <label class="form-label" for="cb-amount">${t('budget.amountLabel')}</label>
-      <input type="number" class="form-input" id="cb-amount" inputmode="decimal"
-             step="${amountStep(currency, absAmount)}"
-             min="${amountMin(currency)}" value="${amountFieldValue(absAmount, currency)}">
+      <label class="form-label" for="cb-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
+      <input class="form-input" id="cb-amount"${amountInputAttrs(currency, absAmount)} required>
     </div>
     <div class="form-group">
       <label class="form-label" for="cb-date">${t('budget.dateLabel')}${REQUIRED_MARK}</label>
@@ -5923,12 +5896,8 @@ async function openConfirmBookingModal(id) {
       panel.querySelector('#cb-save').addEventListener('click', async () => {
         if (readOnly()) return;
         const amountEl = panel.querySelector('#cb-amount');
-        const value = parseFloat(amountEl.value);
-        if (!Number.isFinite(value) || value <= 0) {
-          reportFieldError(amountEl, t('budget.validAmountRequired'));
-          return;
-        }
-        if (rejectOffGridAmount(amountEl, value, currency, { original: absAmount })) return;
+        if (rejectAmount(amountEl, currency, { original: absAmount })) return;
+        const value = parseAmountInput(amountEl.value);
         const date = panel.querySelector('#cb-date').value;
         const modalContext = captureModalContext();
         try {

@@ -6,11 +6,13 @@
  */
 import { api } from '/api.js';
 import { t } from '/i18n.js';
+import { REQUIRED_MARK } from '/utils/html.js';
 import { openModal, closeModal, captureModalContext, reportFieldError, refocusAfterRender } from '/components/modal.js';
 import { vibrate, isImeComposing } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
-import { amountPlaceholder, amountStep, amountIsSavable, smallestUnitLabel, amountFieldValue } from '/utils/money.js';
+import { parseAmountInput } from '/utils/money.js';
+import { amountInputAttrs, amountFieldError } from '/utils/amount-field.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -328,10 +330,8 @@ function openPlanEditor({ category, savings = false }) {
 function amountFieldHtml(value) {
   return `
     <div class="form-group">
-      <label class="form-label" for="plan-amount">${t('budget.planMonthlyAmount')}</label>
-      <input id="plan-amount" class="form-input" type="number" inputmode="decimal" min="0"
-             step="${amountStep(view.ctx.currency, value)}"
-             value="${amountFieldValue(value, view.ctx.currency)}" placeholder="${amountPlaceholder(view.ctx.currency)}" />
+      <label class="form-label" for="plan-amount">${t('budget.planMonthlyAmount')}${REQUIRED_MARK}</label>
+      <input id="plan-amount" class="form-input"${amountInputAttrs(view.ctx.currency, value)} required />
     </div>`;
 }
 
@@ -343,24 +343,16 @@ function bindEnter(panel, fn) {
 
 async function savePlan(panel, category, original = null) {
   if (readOnly()) return;
-  const raw = panel.querySelector('#plan-amount').value;
-  const amount = parseFloat(raw);
-  if (isNaN(amount) || amount <= 0) {
-    // Fehler am Feld statt als ortloser Toast (geteiltes Muster, Critique P1).
-    reportFieldError(panel.querySelector('#plan-amount'), t('budget.validAmountRequired'));
+  // Fehler am Feld statt als ortloser Toast (geteiltes Muster, Critique P1),
+  // mit dem benannten Grund (D1): gruppiert, keine Zahl, nicht positiv oder
+  // mehr Stellen, als die Waehrung kennt. Ein unangetasteter Bestandswert,
+  // der schon vorher neben dem Raster lag, bleibt speicherbar.
+  const problem = amountFieldError(panel.querySelector('#plan-amount'), view.ctx.currency, { required: true, original });
+  if (problem) {
+    reportFieldError(...problem);
     return;
   }
-  // Der Dialog ist kein <form>: gespeichert wird über einen Button-Handler, die
-  // native step-Prüfung läuft also nie. Ohne diese Zeile nähme ein Feld mit
-  // step="1" trotzdem 12,5 JPY entgegen. Ein unangetasteter Bestandswert, der
-  // schon vorher neben dem Raster lag, bleibt speicherbar.
-  if (!amountIsSavable(amount, view.ctx.currency, { original })) {
-    reportFieldError(panel.querySelector('#plan-amount'), t('common.amountPrecisionRequired', {
-      currency: view.ctx.currency,
-      step: smallestUnitLabel(view.ctx.currency),
-    }));
-    return;
-  }
+  const amount = parseAmountInput(panel.querySelector('#plan-amount').value);
   const btn = panel.querySelector('#plan-save');
   // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der Anfrage
   // aufgegangen ist (#1997).

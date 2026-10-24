@@ -2487,6 +2487,15 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
 - **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
   Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
   Grenze `disabled`, der Fokus geht dann ins Feld.
+- **Betragsfeld (R23, D1, `utils/amount-field.js`):** jede Geldeingabe ist EIN Baustein -
+  Textfeld mit `inputmode="decimal"`, Platzhalter und Bestand in der Schreibweise der Region
+  ("0,00", "1200,50"), nie `type="number"` (Chrome las "1.200" unter de still als 1,2). Der
+  Speicherweg nennt den Grund am Feld (`amountFieldError`): Tausendertrenner mit Beispiel,
+  keine Zahl, nicht positiv, mehr Stellen als die Waehrung ("Schritten von 0,01", locale-
+  korrekt). Vorzeichen je Feld: positiv (Buchung, Darlehen, Plan), ab null (Rahmen, Abo,
+  Kaufpreis, Satz), beliebig (Startsaldo). Ein unangetasteter Bestand neben dem Raster
+  bleibt speicherbar. Waehrungswahl im Dialog zieht nur den Platzhalter nach
+  (test:budget-ui "kein Geldfeld ist ein type=number").
 - **Ortssuche (R20, Wetter-Standort, `settings/weather-location.js`):** gestapelte Zeile
   "Ort" mit Textfeld (`enterkeyhint="search"`, kein Seitenfilter-`type="search"`) und
   `btn--secondary` "Suchen"; gesucht wird erst auf Enter/Knopf (Server-Proxy
