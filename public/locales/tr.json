@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Uygulamanda yenilikler",
         "whatsNewSince": "En son gördüğün {{version}} sürümünden bu yana.",
         "whatsNewMore": "Aşağıdaki listede {{count}} değişiklik daha var.",
-        "whatsNewMore_one": "Aşağıdaki listede bir değişiklik daha var."
+        "whatsNewMore_one": "Aşağıdaki listede bir değişiklik daha var.",
+        "allReleases": "GitHub'daki tüm sürümler (İngilizce)"
     },
     "forgotPassword": {
         "title": "Parolayı sıfırla",

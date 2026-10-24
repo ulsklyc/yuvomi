@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "आपके ऐप में नया",
         "whatsNewSince": "संस्करण {{version}} के बाद से, जो आपने पिछली बार देखा था।",
         "whatsNewMore": "नीचे दी गई सूची में {{count}} और बदलाव हैं।",
-        "whatsNewMore_one": "नीचे दी गई सूची में {{count}} और बदलाव है।"
+        "whatsNewMore_one": "नीचे दी गई सूची में {{count}} और बदलाव है।",
+        "allReleases": "GitHub पर सभी संस्करण (अंग्रेज़ी में)"
     },
     "forgotPassword": {
         "title": "पासवर्ड रीसेट करें",

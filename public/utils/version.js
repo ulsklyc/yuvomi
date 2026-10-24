@@ -85,6 +85,27 @@ export function releasesNewForMe(releases, currentVersion, seenInstalled) {
 }
 
 /**
+ * Welche Versionen der Aenderungsverlauf als Karte zeigt (R23 D14, Critique G6
+ * P2: 43091 px Verlauf, alle Versionen in einer Sprache, die nicht jede Familie
+ * liest). Die laufende Version, ein anstehendes Update und was seit dem
+ * letzten Blick dazukam (dieselbe Menge wie "Neu in deiner App" - dessen
+ * "weitere Aenderungen stehen unten" bleibt so wahr). Der Rest steht hinter
+ * dem Link auf den vollstaendigen Verlauf. Kennt die Liste die laufende
+ * Version nicht, steht die neueste da.
+ */
+export function changelogReleasesToShow(releases, currentVersion, seenInstalled) {
+  const list = Array.isArray(releases) ? releases : [];
+  const key = (v) => String(v || '').trim().replace(/^v/i, '').toLowerCase();
+  const fresh = new Set(releasesNewForMe(list, currentVersion, seenInstalled));
+  const shown = list.filter((r) => r?.version && (
+    key(r.version) === key(currentVersion)
+    || (currentVersion && isNewerVersion(r.version, currentVersion))
+    || fresh.has(r)
+  ));
+  return shown.length ? shown : list.slice(0, 1);
+}
+
+/**
  * Die Version, auf die der Update-Hinweis zeigt - oder '' (Critique R19).
  *
  * Der Punkt am Konto, an "Mehr" und an "Aenderungen" samt dem Zusatz im

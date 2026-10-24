@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Nytt i din app",
         "whatsNewSince": "Sedan version {{version}}, den du såg senast.",
         "whatsNewMore": "Ytterligare {{count}} ändringar finns i listan nedan.",
-        "whatsNewMore_one": "Ytterligare en ändring finns i listan nedan."
+        "whatsNewMore_one": "Ytterligare en ändring finns i listan nedan.",
+        "allReleases": "Alla versioner på GitHub (på engelska)"
     },
     "forgotPassword": {
         "title": "Återställ lösenord",

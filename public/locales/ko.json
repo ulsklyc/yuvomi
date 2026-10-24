@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "내 앱의 새로운 점",
         "whatsNewSince": "마지막으로 본 버전 {{version}} 이후의 변경 사항입니다.",
         "whatsNewMore": "아래 목록에 {{count}}건의 변경이 더 있습니다.",
-        "whatsNewMore_one": "아래 목록에 1건의 변경이 더 있습니다."
+        "whatsNewMore_one": "아래 목록에 1건의 변경이 더 있습니다.",
+        "allReleases": "GitHub의 모든 버전 (영어)"
     },
     "forgotPassword": {
         "title": "비밀번호 재설정",

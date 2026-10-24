@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Mới trong ứng dụng của bạn",
         "whatsNewSince": "Kể từ phiên bản {{version}}, phiên bản bạn xem lần trước.",
         "whatsNewMore": "Còn {{count}} thay đổi nữa trong danh sách bên dưới.",
-        "whatsNewMore_one": "Còn một thay đổi nữa trong danh sách bên dưới."
+        "whatsNewMore_one": "Còn một thay đổi nữa trong danh sách bên dưới.",
+        "allReleases": "Tất cả phiên bản trên GitHub (bằng tiếng Anh)"
     },
     "forgotPassword": {
         "title": "Đặt lại mật khẩu",

@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "你的应用有什么新变化",
         "whatsNewSince": "自你上次查看的版本 {{version}} 以来。",
         "whatsNewMore": "下方列表中还有 {{count}} 项变更。",
-        "whatsNewMore_one": "下方列表中还有 1 项变更。"
+        "whatsNewMore_one": "下方列表中还有 1 项变更。",
+        "allReleases": "GitHub 上的所有版本（英文）"
     },
     "forgotPassword": {
         "title": "重置密码",

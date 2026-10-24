@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Nouveautés dans ton app",
         "whatsNewSince": "Depuis la version {{version}}, la dernière que tu as vue.",
         "whatsNewMore": "{{count}} autres changements figurent dans la liste ci-dessous.",
-        "whatsNewMore_one": "{{count}} autre changement figure dans la liste ci-dessous."
+        "whatsNewMore_one": "{{count}} autre changement figure dans la liste ci-dessous.",
+        "allReleases": "Toutes les versions sur GitHub (en anglais)"
     },
     "forgotPassword": {
         "title": "Réinitialiser le mot de passe",

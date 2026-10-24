@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Baru di aplikasimu",
         "whatsNewSince": "Sejak versi {{version}}, yang terakhir kamu lihat.",
         "whatsNewMore": "Ada {{count}} perubahan lagi di daftar di bawah.",
-        "whatsNewMore_one": "Ada satu perubahan lagi di daftar di bawah."
+        "whatsNewMore_one": "Ada satu perubahan lagi di daftar di bawah.",
+        "allReleases": "Semua versi di GitHub (dalam bahasa Inggris)"
     },
     "forgotPassword": {
         "title": "Atur ulang kata sandi",

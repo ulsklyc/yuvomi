@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Újdonságok az alkalmazásodban",
         "whatsNewSince": "A(z) {{version}} verzió óta, amelyet legutóbb láttál.",
         "whatsNewMore": "Az alábbi listában további {{count}} változás szerepel.",
-        "whatsNewMore_one": "Az alábbi listában még egy változás szerepel."
+        "whatsNewMore_one": "Az alábbi listában még egy változás szerepel.",
+        "allReleases": "Az összes verzió a GitHubon (angolul)"
     },
     "forgotPassword": {
         "title": "Jelszó visszaállítása",

@@ -59,7 +59,7 @@ import {
   applyNavBadges, setNavBadge, resetNavBadges, navBadgeRoutes,
   moduleCountsFrom, navBadgeCountsFrom,
 } from '/utils/nav-badges.js';
-import { isNewerVersion, displayVersion, releasesNewForMe, pendingUpdateFor } from '/utils/version.js';
+import { isNewerVersion, displayVersion, releasesNewForMe, pendingUpdateFor, changelogReleasesToShow } from '/utils/version.js';
 import { setMaxUploadBytes } from '/utils/upload-limit.js';
 import { syncWallMode, onWallActiveChange, isWallActive } from '/utils/wall-mode.js';
 import {
@@ -3403,7 +3403,19 @@ function renderChangelog(panel, payload) {
   // die Antwort "nichts Neues" - jedes Mal.
   const seenInstalled = changelogSeen().version || '';
   appendWhatsNew(fragment, releases, currentVersion, seenInstalled);
-  for (const release of releases) appendReleaseCard(fragment, release, currentVersion);
+  for (const release of changelogReleasesToShow(releases, currentVersion, seenInstalled)) {
+    appendReleaseCard(fragment, release, currentVersion);
+  }
+  // Der ganze Verlauf liegt auf GitHub, auf Englisch - der Link sagt beides.
+  const more = document.createElement('p');
+  more.className = 'changelog-all';
+  const link = document.createElement('a');
+  link.href = CHANGELOG_URL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = t('changelog.allReleases');
+  more.appendChild(link);
+  fragment.appendChild(more);
   list.appendChild(fragment);
   markChangelogSeen(latestVersion);
 }
@@ -3432,6 +3444,8 @@ function markChangelogSeen(latestVersion) {
   api.post('/auth/changelog-seen', latestVersion ? { latest: String(latestVersion) } : {})
     .catch(() => { /* still: siehe oben */ });
 }
+
+const CHANGELOG_URL = 'https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md';
 
 function showChangelogModal() {
   openModal({

@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Bago sa app mo",
         "whatsNewSince": "Mula sa bersyong {{version}}, ang huli mong nakita.",
         "whatsNewMore": "May {{count}} pang pagbabago sa listahan sa ibaba.",
-        "whatsNewMore_one": "May {{count}} pang pagbabago sa listahan sa ibaba."
+        "whatsNewMore_one": "May {{count}} pang pagbabago sa listahan sa ibaba.",
+        "allReleases": "Lahat ng bersyon sa GitHub (sa Ingles)"
     },
     "forgotPassword": {
         "title": "I-reset ang password",

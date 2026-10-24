@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The change history shows your version, not every version.** "What's new" now lists the
+  release you run, an available update and what arrived since you last looked, followed by a
+  link to the full history on GitHub that says it is in English. Before, every release since
+  the beginning stood in one very long English page.
 - **The housekeeping visit report can be edited from where you read it.** The visit report now
   offers "Edit" next to "Mark as paid" instead of a "Cancel" that had nothing to cancel, and
   its date row says "Visit date" rather than "Last visit". Checking in now confirms with the

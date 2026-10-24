@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "تازه‌ها در برنامه تو",
         "whatsNewSince": "از نسخه {{version}} که آخرین بار دیدی.",
         "whatsNewMore": "{{count}} تغییر دیگر در فهرست پایین هست.",
-        "whatsNewMore_one": "{{count}} تغییر دیگر در فهرست پایین هست."
+        "whatsNewMore_one": "{{count}} تغییر دیگر در فهرست پایین هست.",
+        "allReleases": "همه نسخه‌ها در GitHub (به انگلیسی)"
     },
     "forgotPassword": {
         "title": "بازنشانی رمز عبور",

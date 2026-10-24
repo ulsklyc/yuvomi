@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "あなたのアプリの新着",
         "whatsNewSince": "前回見た バージョン {{version}} 以降の変更です。",
         "whatsNewMore": "他に {{count}} 件の変更が下の一覧にあります。",
-        "whatsNewMore_one": "他に 1 件の変更が下の一覧にあります。"
+        "whatsNewMore_one": "他に 1 件の変更が下の一覧にあります。",
+        "allReleases": "GitHub のすべてのバージョン（英語）"
     },
     "forgotPassword": {
         "title": "パスワードの再設定",

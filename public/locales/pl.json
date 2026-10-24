@@ -4683,7 +4683,8 @@
         "whatsNewMore": "Na liście poniżej jest jeszcze {{count}} zmian.",
         "whatsNewMore_one": "Na liście poniżej jest jeszcze jedna zmiana.",
         "whatsNewMore_few": "Na liście poniżej są jeszcze {{count}} zmiany.",
-        "whatsNewMore_many": "Na liście poniżej jest jeszcze {{count}} zmian."
+        "whatsNewMore_many": "Na liście poniżej jest jeszcze {{count}} zmian.",
+        "allReleases": "Wszystkie wersje na GitHubie (po angielsku)"
     },
     "forgotPassword": {
         "title": "Zresetuj hasło",

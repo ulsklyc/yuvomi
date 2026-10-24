@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Novità nella tua app",
         "whatsNewSince": "Dalla versione {{version}}, l’ultima che hai visto.",
         "whatsNewMore": "Ci sono altri {{count}} cambiamenti nell’elenco qui sotto.",
-        "whatsNewMore_one": "C'è un altro cambiamento nell’elenco qui sotto."
+        "whatsNewMore_one": "C'è un altro cambiamento nell’elenco qui sotto.",
+        "allReleases": "Tutte le versioni su GitHub (in inglese)"
     },
     "forgotPassword": {
         "title": "Reimposta password",

@@ -4441,7 +4441,8 @@
         "whatsNewTitle": "Nytt i appen din",
         "whatsNewSince": "Siden versjon {{version}}, den du sist så.",
         "whatsNewMore": "Det er {{count}} flere endringer i listen nedenfor.",
-        "whatsNewMore_one": "Det er én endring til i listen nedenfor."
+        "whatsNewMore_one": "Det er én endring til i listen nedenfor.",
+        "allReleases": "Alle versjoner på GitHub (på engelsk)"
     },
     "forgotPassword": {
         "title": "Tilbakestill passord",

@@ -7430,6 +7430,20 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-text-tertiary);
 }
 
+/* Der ganze Verlauf liegt auf GitHub (R23 D14): ein Link unter der Karte der
+ * laufenden Version, unterstrichen wie jeder Link im Text (.help-guide a). */
+.changelog-all {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+}
+
+.changelog-all a {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Der Vorspann ist die Zeile, die man scannt - er traegt das Gewicht, die
  * Begruendung darunter nicht. Das Dreieck steht nur, wo es etwas aufklappt;
  * Eintraege ohne Begruendung sind schlichte Listenpunkte. */

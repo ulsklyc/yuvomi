@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import changelogRouter, { buildRouter, __test } from '../server/routes/changelog.js';
-import { compareVersions, isNewerVersion, displayVersion, releasesNewForMe } from '../public/utils/version.js';
+import { compareVersions, isNewerVersion, displayVersion, releasesNewForMe, changelogReleasesToShow } from '../public/utils/version.js';
 
 test('parseReleaseBody keeps release sections and removes GitHub noise', () => {
   const sections = __test.parseReleaseBody(`
@@ -945,4 +945,20 @@ test('pendingUpdateFor: der Update-Hinweis gilt nur fuer Admins', async () => {
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   const fn = router.slice(router.indexOf('function pendingUpdateVersion()'), router.indexOf('function toggleUpdateDot'));
   assert.match(fn, /pendingUpdateFor\(\{[\s\S]*isAdmin: routerState\.currentUser\?\.role === 'admin'/);
+});
+
+// R23 D14 (Critique G6 P2: 43091 px, alles auf Englisch): der Verlauf zeigt die
+// laufende Version, ein anstehendes Update und was seit dem letzten Blick kam -
+// der Rest steht hinter dem Link auf GitHub.
+test('R23: der Aenderungsverlauf zeigt nur die laufende Version, das Update und das Neue', () => {
+  const v = (list) => list.map((r) => r.version);
+  assert.deepEqual(v(changelogReleasesToShow(RELEASES, '2.61.0', '')), ['v2.61.0'], 'Normalfall: nur die laufende');
+  assert.deepEqual(v(changelogReleasesToShow(RELEASES, '2.60.0', '')), ['v2.61.0', 'v2.60.0'], 'mit anstehendem Update');
+  assert.deepEqual(v(changelogReleasesToShow(RELEASES, '2.60.0', '2.58.0')), ['v2.61.0', 'v2.60.0', 'v2.59.0'], 'was seit dem letzten Blick kam');
+  assert.deepEqual(v(changelogReleasesToShow(RELEASES, '9.9.9-dev', '')), ['v2.61.0'], 'unbekannte Version: die neueste');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /for \(const release of changelogReleasesToShow\(releases, currentVersion, seenInstalled\)\)/, 'der Verlauf nutzt die Auswahl');
+  assert.match(router, /link\.textContent = t\('changelog\.allReleases'\);/, 'und verlinkt den ganzen Verlauf');
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.match(de.changelog.allReleases, /auf Englisch/, 'der Link sagt, in welcher Sprache er fuehrt');
 });

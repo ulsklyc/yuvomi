@@ -4683,7 +4683,8 @@
         "whatsNewMore": "У списку нижче ще {{count}} змін.",
         "whatsNewMore_one": "У списку нижче ще {{count}} зміна.",
         "whatsNewMore_few": "У списку нижче ще {{count}} зміни.",
-        "whatsNewMore_many": "У списку нижче ще {{count}} змін."
+        "whatsNewMore_many": "У списку нижче ще {{count}} змін.",
+        "allReleases": "Усі версії на GitHub (англійською)"
     },
     "forgotPassword": {
         "title": "Скидання пароля",
