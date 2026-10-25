@@ -1186,10 +1186,17 @@
    * ist auf Kohle wirkungslos. Die Kante ist die Feldkante
    * (--color-border-control, #857F76): 3,16:1 gegen die Bahn #37332E. Heller
    * fuellen geht nicht (siehe oben, die Tinte darauf), also zeichnet ein 1px-
-   * Innenring die Form. Hell bleibt der Ring durchsichtig - dort traegt der
-   * Schatten. Guard: test-frontend-audit.js, "der Segmentdaumen hat dunkel
-   * eine 3:1-Kante". */
-  --_seg-active-ring:  transparent;
+   * Innenring die Form.
+   *
+   * HELL TRAEGT ER DIESELBE KANTE (R23 S11). Weiss auf der Bahn #EDEAE3 ist
+   * 1,20:1, und der Schatten zeichnet die Form nur optisch - als Grenze eines
+   * Zustands zaehlt er nicht (WCAG 1.4.11 gilt fuer beide Themes). Die helle
+   * Feldkante (--color-border-control, #8C8880) haelt gegen die Bahn nur
+   * 2,94:1 - sie ist gegen Weiss gerechnet. Der Ring nimmt deshalb in beiden
+   * Themes dieselbe Farbe #857F76: hell 3,30:1 gegen die Bahn, 3,97:1 gegen
+   * den Daumen; der Schatten bleibt als Tiefe. Guard: test-frontend-audit.js,
+   * "der Segmentdaumen hat in jedem Theme eine 3:1-Kante". */
+  --_seg-active-ring:  #857F76;
   --_seg-active-bg:    var(--_color-surface);
   --seg-active-bg:     var(--_seg-active-bg);
   --seg-active-shadow: inset 0 0 0 1px var(--_seg-active-ring), var(--shadow-xs);

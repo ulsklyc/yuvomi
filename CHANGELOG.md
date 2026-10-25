@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The selected segment is easier to see in light mode too.** The chosen option in segmented
+  controls and kitchen tabs now has a thin edge in both themes, so it stands out from its track at
+  the 3:1 contrast that control states need.
 - **Health, the agenda and the permissions page open faster, and four pages no longer jump while
   they load.** Health now loads each medication's plans and doses together with the medication
   list instead of two extra requests per medication (21 instead of 27 requests to open Health). The

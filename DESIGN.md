@@ -2518,13 +2518,14 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
   beiden Themes Weiss, die An-Bahn traegt `--color-btn-primary`. Innenradius konzentrisch:
   `--radius-sm` (10px) im `--radius-md`-Traeger (12px) mit 2px Polster (panel.css,
   `.segmented__item`). Kein 3px-Akzentstreifen unter aktiven Tabs.
-- **Dunkel traegt der Daumen eine Kante (R23, Critique G6-1, WCAG 1.4.11).** 1,19:1 ist ein
-  Abstand, kein Zustand, und der Schatten zeichnet auf Kohle nichts. `--seg-active-shadow` fuehrt
-  deshalb einen 1px-Innenring (`--_seg-active-ring`), dunkel in der Feldkante #857F76: 3,16:1
-  gegen die Bahn #37332E, 4,47:1 gegen den Seitengrund der Reiterleisten. Heller fuellen geht
-  nicht (die Modulton-Tinte darauf faellt sonst unter AA). Hell bleibt der Ring durchsichtig, dort
-  traegt der Schatten (1,20:1 Flaeche, offen, siehe handoff R23-S6). Guard:
-  `test-frontend-audit.js` "der Segmentdaumen hat dunkel eine 3:1-Kante".
+- **Der Daumen traegt in beiden Themes eine Kante (R23, Critique G6-1, WCAG 1.4.11).** 1,19:1
+  (dunkel) und 1,20:1 (hell) sind ein Abstand, kein Zustand, und ein Schatten zeichnet die Form
+  nur optisch. `--seg-active-shadow` fuehrt deshalb einen 1px-Innenring (`--_seg-active-ring`) in
+  #857F76: dunkel 3,16:1 gegen die Bahn #37332E (4,47:1 gegen den Seitengrund der Reiterleisten),
+  hell 3,30:1 gegen die Bahn #EDEAE3 und 3,97:1 gegen den weissen Daumen. Die helle Feldkante
+  (#8C8880) reicht nicht, sie haelt gegen die Bahn nur 2,94:1. Heller fuellen geht dunkel nicht
+  (die Modulton-Tinte darauf faellt sonst unter AA). Der Schatten bleibt als Tiefe. Guard:
+  `test-frontend-audit.js` "der Segmentdaumen hat in jedem Theme eine 3:1-Kante".
 - **EINE BEHANDLUNG PRO KONTROLLTYP.** Der Modulton erscheint genau einmal als FLAECHE
   (aktiver Filter-Chip, getoent) und einmal als TINTE (aktives Segment). Bis 2026-08-12
   war das Segment deckend gefuellt; auf `/tasks` standen dadurch vier Gruen-Behandlungen
