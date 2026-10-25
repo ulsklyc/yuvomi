@@ -1284,11 +1284,23 @@ function buildTodayHighlights(data) {
   };
 }
 
+// Nominale Slot-Zeiten der Mahlzeiten: Mahlzeiten tragen keine Uhrzeit, brauchen
+// im chronologischen Tagesprogramm aber einen Platz. Die Werte ordnen nur ein,
+// sie behaupten keine Essenszeit - deshalb erscheinen sie nie als Label.
+const MEAL_SORT_TIME = { breakfast: '08:00', lunch: '12:30', snack: '15:30', dinner: '18:30' };
+
+// Die Slots im Tagesverlauf, aus denselben nominalen Zeiten: der Snack (15:30)
+// liegt zwischen Mittag und Abend.
+const MEAL_DAY_ORDER = Object.freeze(
+  Object.keys(MEAL_SORT_TIME).sort((a, b) => MEAL_SORT_TIME[a].localeCompare(MEAL_SORT_TIME[b])),
+);
+
 // Pick the meal relevant to the current time of day (matches greeting thresholds:
 // morning → breakfast, afternoon → lunch, evening → dinner). If the target meal
-// is not planned, fall back to the next planned meal later today.
+// is not planned, fall back to the next planned meal later today - in day order,
+// snack included (#2206): seit 2.79.0 traegt `todayMeals` ihn mit an die Wand.
 function selectTodayMeal(meals) {
-  const order = ['breakfast', 'lunch', 'dinner'];
+  const order = MEAL_DAY_ORDER;
   const list = Array.isArray(meals)
     ? meals
     : meals && typeof meals === 'object'
@@ -1304,11 +1316,6 @@ function selectTodayMeal(meals) {
   }
   return { meal: null, mealType: targetType };
 }
-
-// Nominale Slot-Zeiten der Mahlzeiten: Mahlzeiten tragen keine Uhrzeit, brauchen
-// im chronologischen Tagesprogramm aber einen Platz. Die Werte ordnen nur ein,
-// sie behaupten keine Essenszeit - deshalb erscheinen sie nie als Label.
-const MEAL_SORT_TIME = { breakfast: '08:00', lunch: '12:30', snack: '15:30', dinner: '18:30' };
 
 /**
  * Tagesprogramm (Seele-Paket): heutige Termine, fällige Aufgaben und die nächste

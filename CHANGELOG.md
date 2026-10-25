@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address as text without the map link. A location that differs only by line breaks now counts
   as unchanged, so the event stays as it is in iCloud; a location you really change is still
   sent.
+- **A planned snack now shows up on the wall and in Today.** Since 2.79.0 a paired display
+  receives every meal of the day, but the choice of which meal to show only looked at breakfast,
+  lunch and dinner. A day whose only remaining plan was a snack showed no meal at all. The snack
+  now takes part in that choice at its place in the day, between lunch and dinner (#2206).
 
 ## [2.80.0] - 2026-10-25
 
