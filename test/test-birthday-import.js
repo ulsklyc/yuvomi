@@ -239,3 +239,17 @@ test('Kandidaten und Import tragen "Jahr unbekannt" vom Kontakt zum Geburtstag',
   const row = db.prepare('SELECT birth_date, year_unknown FROM birthdays WHERE contact_id = ?').get(cid);
   assert.deepEqual(row, { birth_date: '2000-07-18', year_unknown: 1 });
 });
+
+test('#2214: der Import legt fuer ein Haushaltsmitglied keinen zweiten Geburtstag an', () => {
+  const mate = db.prepare(
+    `INSERT INTO users (username, display_name, password_hash, role) VALUES ('mate2214','Mate 2214','x','member')`,
+  ).run().lastInsertRowid;
+  const cid = db.prepare(
+    "INSERT INTO contacts (name, category, birthday, family_user_id) VALUES ('Mate 2214', 'Sonstiges', '1991-04-02', ?)",
+  ).run(mate).lastInsertRowid;
+  db.prepare("INSERT INTO birthdays (name, birth_date, created_by, family_user_id) VALUES ('Mate 2214', '1991-04-02', ?, ?)")
+    .run(USER, mate);
+
+  assert.deepEqual(importBirthdaysFromContacts(db, [cid], USER), { imported: 0, skipped: 1 });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM birthdays WHERE family_user_id = ? OR contact_id = ?').get(mate, cid).n, 1);
+});

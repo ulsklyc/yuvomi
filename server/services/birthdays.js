@@ -561,13 +561,35 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
 }
 
 /**
+ * WANN EIN KONTAKT SCHON EINEN GEBURTSTAG HAT (#2214). Zwei Wege fuehren
+ * dorthin: der Import oder der Geburtstag-Dialog verknuepfen ueber
+ * `birthdays.contact_id` (Migration 90), und der Kontakt eines
+ * Haushaltsmitglieds teilt sich mit dessen Profil-Geburtstag das Konto
+ * (`family_user_id`, beide von `syncFamilyMemberArtifacts` angelegt). Der
+ * zweite Weg fehlte bis hierher: der Kontakt des Mitglieds bot "Zu
+ * Geburtstagen hinzufuegen" an, der Import nannte ihn neu und legte einen
+ * zweiten Geburtstag fuer denselben Menschen an.
+ *
+ * EIN Ausdruck fuer alle Leser (Kontaktansicht, Kandidaten, Import,
+ * Verknuepfen), damit keiner von ihnen den zweiten Weg wieder vergisst.
+ * `b` ist die Geburtstagszeile, `alias` die Kontaktzeile.
+ * @param {string} alias  Tabellenalias des Kontakts in der umgebenden Abfrage
+ * @returns {string} SQL-Bedingung
+ */
+function contactBirthdayMatch(alias) {
+  return `(b.contact_id = ${alias}.id OR (${alias}.family_user_id IS NOT NULL AND b.family_user_id = ${alias}.family_user_id))`;
+}
+
+/**
  * Liefert Kontakte als Import-Kandidaten für Geburtstage. Kontakte, die ein
  * Haushaltsmitglied im Housekeeping repräsentieren, werden ausgeschlossen (wie
  * GET /contacts). Kandidaten werden nach "mit Geburtstag" (importierbar) und
  * "ohne Geburtstag" (nur zur Information, manuell zu ergänzen) getrennt.
  *
- * `already_imported` markiert Kontakte, die über birthdays.contact_id bereits an
- * einen Geburtstag gekoppelt sind (haushaltsweit, nicht pro Nutzer).
+ * `already_imported` markiert Kontakte, die schon einen Geburtstag haben
+ * (haushaltsweit, nicht pro Nutzer): über birthdays.contact_id oder, beim
+ * Kontakt eines Haushaltsmitglieds, dessen Profil-Geburtstag
+ * (`contactBirthdayMatch`, #2214).
  *
  * @param {object} database
  * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,birthday_year_unknown:boolean,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string,already_imported:boolean}> }}
@@ -582,7 +604,7 @@ function linkSuggestionFields(database, contact) {
 function listBirthdayImportCandidates(database) {
   const rows = database.prepare(`
     SELECT c.id, c.name, c.birthday, c.birthday_year_unknown,
-           EXISTS(SELECT 1 FROM birthdays b WHERE b.contact_id = c.id) AS already_imported
+           EXISTS(SELECT 1 FROM birthdays b WHERE ${contactBirthdayMatch('c')}) AS already_imported
     FROM contacts c
     WHERE NOT EXISTS (
       SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = c.family_user_id
@@ -638,7 +660,11 @@ function importBirthdaysFromContacts(database, contactIds, userId, from = new Da
   let skipped = 0;
 
   const getContact = database.prepare('SELECT id, name, birthday, birthday_year_unknown FROM contacts WHERE id = ?');
-  const alreadyLinked = database.prepare('SELECT 1 FROM birthdays WHERE contact_id = ?');
+  // Auch der Profil-Geburtstag eines Mitglieds zaehlt (#2214): sonst entstuende
+  // fuer dieselbe Person eine zweite Zeile samt Kalendereintrag.
+  const alreadyLinked = database.prepare(`
+    SELECT 1 FROM contacts c JOIN birthdays b ON ${contactBirthdayMatch('c')} WHERE c.id = ?
+  `);
   const insert = database.prepare(`
     INSERT INTO birthdays (name, birth_date, year_unknown, created_by, contact_id, reminder_offset)
     VALUES (?, ?, ?, ?, ?, NULL)
@@ -771,6 +797,7 @@ export {
   placeholderBirthDate,
   retitleBirthdayEvents,
   birthdayLinkSuggestion,
+  contactBirthdayMatch,
   sameDateBirthday,
   sameNameBirthdayId,
   sameNameKey,

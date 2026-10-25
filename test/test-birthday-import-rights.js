@@ -448,3 +448,50 @@ test('R23 G5-P2: gleicher Tag, anderer Name - Kontakt und Import fragen "Mit X v
   assert.equal((await pick()).already_imported, true);
   assert.equal((await pick()).suggested_birthday_id, undefined);
 });
+
+// #2214: der Kontakt eines Haushaltsmitglieds und sein Profil-Geburtstag. Beide
+// haengen ueber `family_user_id` am Konto (syncFamilyMemberArtifacts), nie
+// ueber `birthdays.contact_id` (Mitglieder-Geburtstage sind nicht
+// verknuepfbar, s. o.). Bis hierher sah der Kontakt den Geburtstag nicht, bot
+// "Zu Geburtstagen hinzufuegen" an, und der Import legte einen zweiten an.
+test('#2214: der Kontakt eines Mitglieds findet seinen Profil-Geburtstag - Ansicht und Import', async () => {
+  const mate = await createUser('mitglied2214', { birth_date: '1985-06-12' });
+  setModules(member.id, {});
+  const birthday = db.prepare('SELECT id FROM birthdays WHERE family_user_id = ?').get(mate.id);
+  assert.ok(birthday, 'Vorbedingung: das Profil hat einen Geburtstag angelegt');
+  const cid = db.prepare('SELECT id FROM contacts WHERE family_user_id = ?').get(mate.id).id;
+  // Der Nutzer traegt das Datum im Kontakt nach (Schritt 4 im Issue).
+  db.prepare("UPDATE contacts SET birthday = '1985-06-12' WHERE id = ?").run(cid);
+
+  const one = (await member.as('GET', `/contacts/${cid}`)).body.data;
+  assert.equal(one.birthday_id, birthday.id, 'Detail: "In Geburtstagen zeigen" statt "Hinzufuegen"');
+  assert.equal(one.suggested_birthday_id, undefined, 'kein Verknuepfungs-Vorschlag daneben');
+  const listed = (await member.as('GET', '/contacts')).body.data.find((c) => c.id === cid);
+  assert.equal(listed.birthday_id, birthday.id, 'Liste: dieselbe Aufloesung');
+
+  const candidate = (await member.as('GET', '/birthdays/import/candidates')).body.data.withBirthday.find((c) => c.id === cid);
+  assert.equal(candidate.already_imported, true, 'der Import kennt die Person schon');
+  assert.equal(candidate.suggested_birthday_id, undefined);
+
+  const res = await member.as('POST', '/birthdays/import', { contact_ids: [cid] });
+  assert.deepEqual(res.body.data, { imported: 0, skipped: 1 }, 'kein zweiter Geburtstag');
+  assert.equal(linkedRows(cid).length, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM birthdays WHERE name = ?').get('mitglied2214').n, 1, 'eine Zeile fuer die Person');
+
+  // Die Gegenrichtung: ein von Hand angelegter Zwilling desselben Menschen
+  // bekommt den Mitgliedskontakt weder vorgeschlagen noch verknuepft.
+  const manual = await seedBirthday('mitglied2214');
+  const fromBirthday = (await member.as('GET', '/birthdays')).body.data.find((b) => b.id === manual.id);
+  assert.equal(fromBirthday.suggested_contact_id, undefined, 'kein Vorschlag auf den belegten Kontakt');
+  const link = await member.as('PUT', `/birthdays/${manual.id}`, { contact_id: cid });
+  assert.equal(link.status, 409);
+  assert.equal(link.body.reason, 'birthdays_contact_linked');
+  await admin('DELETE', `/birthdays/${manual.id}`);
+
+  // Dieselbe Schranke wie jede birthday_id: ohne Kalender-Leserecht nichts.
+  setModules(member.id, { calendar: 'none' });
+  const hidden = (await member.as('GET', `/contacts/${cid}`)).body.data;
+  assert.equal(hidden.birthday_id, null, 'ohne Kalender-Recht keine id');
+  assert.equal(hidden.birthday_link_date, null, 'und kein Datum');
+  setModules(member.id, {});
+});

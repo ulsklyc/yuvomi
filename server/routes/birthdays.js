@@ -16,6 +16,7 @@ import {
   birthDateInput,
   validateYearUnknown,
   sameNameKey,
+  contactBirthdayMatch,
 } from '../services/birthdays.js';
 
 const log = createLogger('Birthdays');
@@ -181,7 +182,8 @@ function sortHydrated(rows) {
  *     es gibt: 403 wie beim Import (`contactsHidden`, Mischstelle);
  *   - der Kontakt muss sichtbar sein wie in GET /contacts (kein Kontakt einer
  *     Haushaltshilfe): sonst 400 `birthdays_selected_contact_not_found`;
- *   - traegt er schon einen anderen Geburtstag: 409 `birthdays_contact_linked`.
+ *   - traegt er schon einen anderen Geburtstag (auch den Profil-Geburtstag
+ *     eines Mitglieds, #2214): 409 `birthdays_contact_linked`.
  *     Der eindeutige Index aus Migration 90 haelt dasselbe in der DB.
  *
  * KEIN await zwischen dieser Pruefung und dem Schreiben (CLAUDE.md): der
@@ -206,7 +208,11 @@ function checkContactLink(req, raw, existing = null) {
        AND NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = c.family_user_id)
   `).get(id);
   if (!contact) return { refused: 'unknown' };
-  const taken = db.get().prepare('SELECT id FROM birthdays WHERE contact_id = ? AND id IS NOT ?').get(id, existing?.id ?? null);
+  // Auch der Profil-Geburtstag eines Mitglieds belegt dessen Kontakt (#2214).
+  const taken = db.get().prepare(`
+    SELECT b.id FROM contacts c JOIN birthdays b ON ${contactBirthdayMatch('c')}
+     WHERE c.id = ? AND b.id IS NOT ?
+  `).get(id, existing?.id ?? null);
   if (taken) return { refused: 'taken' };
   return { value: id };
 }
@@ -237,8 +243,9 @@ function isContactLinkConflict(err) {
  * EINEM unverknuepften Kontakt gleicht, traegt `suggested_contact_id` - die
  * Seite bietet dort "Verknuepfen" an. Ein verknuepfter traegt `contact_name`,
  * damit der Dialog die Auswahl beschriften kann, bevor die Kandidaten geladen
- * sind. Beides nur fuer wer Kontakte lesen darf (sonst verriete es das
- * Adressbuch), nie fuer Mitglieder-Geburtstage, und der Vorschlag nur bei
+ * sind. Ein Mitgliedskontakt mit Profil-Geburtstag gilt als verknuepft
+ * (#2214) und wird keinem anderen vorgeschlagen. Beides nur fuer wer
+ * Kontakte lesen darf (sonst verriete es das Adressbuch), nie fuer Mitglieder-Geburtstage, und der Vorschlag nur bei
  * eindeutigem Namen: zwei gleichnamige Kontakte sind eine Frage, die der
  * Dialog beantwortet, kein Vorschlag.
  */
@@ -246,7 +253,7 @@ function withContactLinks(req, birthdays) {
   if (contactsHidden(req)) return birthdays;
   const rows = db.get().prepare(`
     SELECT c.id, c.name,
-           EXISTS (SELECT 1 FROM birthdays b WHERE b.contact_id = c.id) AS linked
+           EXISTS (SELECT 1 FROM birthdays b WHERE ${contactBirthdayMatch('c')}) AS linked
       FROM contacts c
      WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = c.family_user_id)
   `).all();

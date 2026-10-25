@@ -12,7 +12,7 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
-import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion } from '../services/birthdays.js';
+import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion, contactBirthdayMatch } from '../services/birthdays.js';
 import { mayReadModule } from '../permissions.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
@@ -439,6 +439,14 @@ router.delete('/categories/:key', (req, res) => {
   }
 });
 
+// Der Geburtstag eines Kontakts kommt ueber die Verknuepfung ODER, beim
+// Kontakt eines Haushaltsmitglieds, ueber das Konto (#2214,
+// `contactBirthdayMatch`). Gibt es aus der Zeit davor beides (ein Import legte
+// fuer das Mitglied eine zweite Zeile an), gewinnt die ausdrueckliche
+// Verknuepfung, und alle drei Felder nennen dieselbe Zeile.
+const CONTACT_BIRTHDAY = contactBirthdayMatch('contacts');
+const CONTACT_BIRTHDAY_ORDER = 'ORDER BY (b.contact_id = contacts.id) DESC, b.id ASC LIMIT 1';
+
 /**
  * EIN MENSCH, EINE FARBE - auch hier.
  *
@@ -466,16 +474,17 @@ const CONTACT_SELECT = `
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
          u.avatar_data   AS family_avatar_data,
-         (SELECT b.id FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_id,
-         (SELECT b.birth_date FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_link_date,
-         (SELECT b.year_unknown FROM birthdays b WHERE b.contact_id = contacts.id) AS birthday_link_year_unknown
+         (SELECT b.id FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_id,
+         (SELECT b.birth_date FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_link_date,
+         (SELECT b.year_unknown FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_link_year_unknown
     FROM contacts
     LEFT JOIN users u ON u.id = contacts.family_user_id`;
 
 /**
  * DER WEG ZUM GEBURTSTAG (Critique R21, D7). `birthday_id` ist der Eintrag im
  * Geburtstagsmodul, den der Import aus diesem Kontakt angelegt hat
- * (Migration 90, `birthdays.contact_id`, eindeutig je Kontakt). Die
+ * (Migration 90, `birthdays.contact_id`, eindeutig je Kontakt), beim Kontakt
+ * eines Haushaltsmitglieds dessen Profil-Geburtstag (#2214). Die
  * Kontaktseite fuehrt damit einen Link "In Geburtstagen anzeigen".
  *
  * Geburtstage gehoeren dem Modul `calendar` (server/permissions.js) - eine
