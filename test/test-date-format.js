@@ -188,3 +188,28 @@ test(`TZ=${ZONE}: Anteil ueber Intl der Region (vorher "53%" von Hand)`, async (
   });
   assert.equal(fmt.percentText(Number.NaN), '');
 });
+
+// R23 S11 (D11, Rest aus S7): die Anzeige-Daten dieser Module laufen ueber
+// dateText - Jahr nur ausserhalb des laufenden, der Tag der Haushaltszone.
+// formatDate bleibt fuer Felder, deren Aussage das Jahr ist, und fuer
+// Eingaben; die Liste der noch offenen Module steht im handoff (S11b).
+test('R23: die migrierten Module schreiben Anzeige-Daten ueber dateText', () => {
+  const MIGRATED = {
+    'public/pages/documents.js': 0,
+    'public/pages/rewards.js': 0,
+    'public/pages/pantry.js': 0,
+    'public/pages/tasks.js': 0,
+    'public/pages/housekeeping.js': 0,
+    'public/components/task-detail.js': 0,
+    // Der Tageskopf der Wand: langer Wochentag + volles Datum, eine eigene Form.
+    'public/pages/dashboard.js': 1,
+  };
+  const found = [];
+  for (const [file, allowed] of Object.entries(MIGRATED)) {
+    const code = readFileSync(path.join(root, file), 'utf8').split('\n')
+      .filter((line) => !/^\s*(\*|\/\/|import )/.test(line)).join('\n');
+    const calls = (code.match(/(?<![\w.])formatDate\(/g) || []).length;
+    if (calls !== allowed) found.push(`${file}: ${calls} formatDate-Aufrufe (erlaubt ${allowed})`);
+  }
+  assert.deepEqual(found, []);
+});

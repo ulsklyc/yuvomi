@@ -11,7 +11,8 @@ import { whenHistorySettled } from '/utils/overlay-history.js';
 import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
 import { stagger, vibrate, scheduleUndoableDelete, offerUndo, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
-import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
@@ -345,7 +346,7 @@ function renderStartDateBadge(startDateStr) {
   const startKey = String(startDateStr).slice(0, 10);
   if (startKey <= todayKey()) return '';
   return `<span class="due-date">
-    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: formatDate(startKey) })}</span>
+    <i data-lucide="calendar-clock" class="icon-sm" aria-hidden="true"></i> <span class="due-date__label">${t('tasks.startsOn', { date: dateText(startKey) })}</span>
   </span>`;
 }
 
@@ -1168,7 +1169,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Prioritaet und Kategorie stehen nicht mehr in der Zusammenfassung: sie
   // stehen offen im Hauptteil (A3 P1-2, siehe unten).
   const advancedSummary = [];
-  if (isEdit && task.start_date) advancedSummary.push(formatDate(task.start_date));
+  if (isEdit && task.start_date) advancedSummary.push(dateText(task.start_date));
   const summaryPoints = isEdit ? Number(task.points) : prefillPoints;
   if (summaryPoints > 0) advancedSummary.push(t('tasks.pointsSummary', { count: summaryPoints }));
   if (isEdit && task.tags?.length) advancedSummary.push(task.tags.join(', '));
@@ -2016,7 +2017,7 @@ function reminderWhenText(reminder) {
   if (!reminder?.remind_at) return '';
   const at = parseRemindAtAsUtc(reminder.remind_at);
   if (Number.isNaN(at.getTime())) return '';
-  return `${formatDate(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
+  return `${dateText(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
 }
 
 /**

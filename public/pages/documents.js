@@ -6,7 +6,8 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors, lastInputWasKeyboard } from '/components/modal.js';
-import { t, formatDate, getLocale } from '/i18n.js';
+import { t, getLocale } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
@@ -2189,14 +2190,14 @@ function expiryChipHtml(doc) {
  * Ablaufdatum in der Viewer-Meta - immer, wenn eines gesetzt ist, auch weit in
  * der Zukunft ("Gueltig bis 13.04.2027"). Die Zeile schweigt bei "gueltig";
  * ohne diese Angabe war das eingetragene Datum nach dem Speichern nur im
- * Bearbeiten-Dialog wiederzufinden. formatDate() liest den Tagesschluessel als
- * Wanduhrzeit (utils/timezone.js#zonedFields) - kein Umweg ueber einen
- * Zeitpunkt, der je nach Zone auf den Vortag kippt.
+ * Bearbeiten-Dialog wiederzufinden. dateText() liest den Tagesschluessel als
+ * Schluessel (utils/date-format.js) - kein Umweg ueber einen Zeitpunkt, der je
+ * nach Zone auf den Vortag kippt; das Jahr steht nur ausserhalb des laufenden.
  */
 function expiryViewerHtml(doc) {
   const spec = expiryViewerSpec(dateStatus(doc.expires_at));
   if (!spec) return '';
-  const text = esc(t(spec.key, { date: formatDate(spec.dateKey) }));
+  const text = esc(t(spec.key, { date: dateText(spec.dateKey) }));
   const icon = '<i data-lucide="calendar-clock" aria-hidden="true"></i>';
   return spec.tone
     ? `<span class="doc-badge doc-badge--${spec.tone}">${icon}${text}</span>`
@@ -2307,7 +2308,7 @@ function renderGridCard(doc) {
         <div class="document-card__meta">${renderMeta(doc)}</div>
       </div>
       <div class="document-card__foot">
-        <span class="document-card__date">${formatDate(doc.updated_at)}</span>
+        <span class="document-card__date">${dateText(doc.updated_at)}</span>
         ${state.selectMode ? renderSelectBox(doc) : `<div class="document-card__actions" role="toolbar" aria-label="${esc(t('documents.actionsFor', { name: doc.name }))}"${readBarAttr(doc)}>${renderActions(doc)}</div>`}
       </div>
     </article>
@@ -2331,10 +2332,10 @@ function renderListItem(doc) {
              Zeichen am Zeilenanfang schon, sie darf als Erste weichen (bei
              "Versicherung" fiel sonst das Datum aus der Zeile). Breit ist
              diese Fassung aus dem Baum. */ ''}
-        <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false, stats: `<span class="document-row__meta-stats">${formatDate(doc.updated_at)} · ${formatFileSize(doc.file_size)}</span>` })}</div>
+        <div class="list-row__meta document-row__meta">${renderMeta(doc, { showSize: false, stats: `<span class="document-row__meta-stats">${dateText(doc.updated_at)} · ${formatFileSize(doc.file_size)}</span>` })}</div>
       </div>
       <div class="document-row__stats">
-        <span class="document-row__date">${formatDate(doc.updated_at)}</span>
+        <span class="document-row__date">${dateText(doc.updated_at)}</span>
         <span class="document-row__size">${formatFileSize(doc.file_size)}</span>
       </div>
       ${state.selectMode ? '' : `<div class="document-row__actions" role="toolbar" aria-label="${esc(t('documents.actionsFor', { name: doc.name }))}"${readBarAttr(doc)}>${renderActions(doc)}</div>`}

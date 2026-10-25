@@ -15,7 +15,7 @@ import { hasEventIcon, eventIconHtml } from '/utils/event-icon.js';
 import { compareMembers, sortMembers } from '/utils/member-order.js';
 import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
-import { daysFromTodayText } from '/utils/date-format.js';
+import { daysFromTodayText, dateText } from '/utils/date-format.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
@@ -1040,8 +1040,8 @@ function formatDueDate(dateStr, timeStr) {
   // Die Stempel gehen als STRING an die Formatierer, nicht als Date: nur so
   // bleibt die Wanduhrzeit, was sie ist (siehe oben).
   const fullLabel = dueTime
-    ? `${formatDate(dueStamp)}, ${formatTime(dueStamp)}` // beide aus i18n.js
-    : formatDate(dayKey);
+    ? `${dateText(dueStamp)}, ${formatTime(dueStamp)}` // beide aus i18n.js
+    : dateText(dayKey);
 
   if (overdue) {
     return { text: `${t('dashboard.overdue')} - ${fullLabel}`, overdue: true };
@@ -3110,7 +3110,7 @@ function earnedWhenLabel(value) {
   const today = householdToday();
   if (day === today) return t('common.today');
   if (day === addLocalDays(today, -1)) return t('common.yesterday');
-  return day.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(value) : formatDate(value);
+  return dateText(value);
 }
 
 function renderRewardsSelf(me, rewards, spans) {
@@ -3746,7 +3746,7 @@ function renderWasteWidget(waste, size) {
       ? next.origins.find((o) => o.kind === 'schedule' && o.original_date)?.original_date
       : null;
     const moved = next.moved
-      ? `<i data-lucide="move" class="waste-widget-row__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? formatDate(movedOriginal) : '' }))}"></i>`
+      ? `<i data-lucide="move" class="waste-widget-row__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? dateText(movedOriginal) : '' }))}"></i>`
       : '';
     const coalesced = next.coalesced
       ? `<i data-lucide="layers" class="waste-widget-row__flag" aria-label="${esc(t('waste.coalescedHint'))}"></i>`

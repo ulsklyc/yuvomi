@@ -5,7 +5,7 @@
  */
 
 import { api, auth } from '/api.js';
-import { t, formatDate, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDayMonth, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { dateText, timeSpanText } from '/utils/date-format.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -270,7 +270,7 @@ function visitTextPayload(worker, dateValue, dailyRate, extras) {
     event_title: t('housekeeping.calendarVisitTitle', { name }),
     payment_title: t('housekeeping.paymentTaskTitle', { name }),
     payment_description: t('housekeeping.paymentTaskDescription', {
-      date: formatDate(visitDate),
+      date: dateText(visitDate),
       amount: money(total),
     }),
   };
@@ -1719,7 +1719,7 @@ function renderReports(content) {
   const isCurrentMonth = shownMonth === currentMonthKey();
   const rows = visits.map((visit) => {
     const paid = !!visit.paid_at;
-    const visitDate = formatDate(visit.check_in);
+    const visitDate = dateText(visit.check_in);
     // Ohne Jahr: den Monat samt Jahr nennt der Stepper darueber. Das
     // `aria-label` der Aktionen behaelt das volle Datum.
     return visitRowHtml(visit, {
@@ -2037,7 +2037,7 @@ function renderStaffVisitLog() {
      * eines Knopfs, der ausgegraut ist. */
     return visitRowHtml(visit, {
       dateText: dateText(visit.check_in, { weekday: true }),
-      visitDate: formatDate(visit.check_in),
+      visitDate: dateText(visit.check_in),
       showWorker: false,
       className: 'housekeeping-staff-log-row',
     });
@@ -2276,11 +2276,11 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
             const receipt = await api.post('/documents', {
               name: t('housekeeping.receiptDocumentName', {
                 name: worker?.display_name || t('housekeeping.unnamedWorker'),
-                date: formatDate(dateValue),
+                date: dateText(dateValue),
               }),
               description: t('housekeeping.receiptDocumentDescription', {
                 name: worker?.display_name || t('housekeeping.unnamedWorker'),
-                date: formatDate(dateValue),
+                date: dateText(dateValue),
               }),
               category: 'finance',
               visibility: 'family',

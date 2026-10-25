@@ -1151,7 +1151,8 @@ test('#1454: der letzte Besuch liest rueckwaerts, ohne Jahr', () => {
       const note = (lastVisit) => __test.selectMetricTiles({ health, housekeeping: hk(lastVisit) }, 'EUR')
         .find((tile) => tile.id === 'housekeeping').note;
       assert.equal(note('2026-09-22T07:00:00.000Z'), 'dashboard.housekeepingLastVisit{"date":"common.yesterday"}');
-      assert.equal(note('2026-09-10T07:00:00.000Z'), 'dashboard.housekeepingLastVisit{"date":"DM:2026-09-10T07:00:00.000Z"}');
+      // Seit R23 S11 ueber dateText: der Tag der Haushaltszone, dann ohne Jahr.
+      assert.equal(note('2026-09-10T07:00:00.000Z'), 'dashboard.housekeepingLastVisit{"date":"DM:2026-09-10"}');
       const widget = __test.renderHousekeepingWidget(hk('2026-09-22T07:00:00.000Z'), 'EUR');
       assert.match(widget, /dashboard\.housekeepingLastVisit\{"date":"common\.yesterday"\}/,
         'Kachel und Widget sagen dasselbe');

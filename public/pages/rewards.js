@@ -7,7 +7,8 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate, getLocale, getNumberFormat } from '/i18n.js';
+import { t, getLocale, getNumberFormat } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { initials } from '/utils/initials.js';
@@ -909,7 +910,7 @@ function ledgerRowHtml(row) {
         <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
         <div class="list-row__main">
           <p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
-          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(formatDate(row.created_at))}</p>
+          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(dateText(row.created_at))}</p>
         </div>
         <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
       </li>`;
@@ -1434,7 +1435,7 @@ async function openMemberDetail(memberId) {
     const positive = row.delta > 0;
     return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
       <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(formatDate(row.created_at))}</p></div>
+      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(dateText(row.created_at))}</p></div>
       <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
   }).join('') : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
@@ -1561,7 +1562,7 @@ function moneyPlanLine(plan) {
   const amount = fmtMoney(plan.amount_minor, plan);
   const rhythm = t(plan.frequency === 'weekly' ? 'rewards.money.planWeekly' : 'rewards.money.planMonthly', { amount });
   if (plan.paused) return `${rhythm} · ${t('rewards.money.planPaused')}`;
-  return `${rhythm} · ${t('rewards.money.nextCredit', { date: formatDate(plan.next_run_date) })}`;
+  return `${rhythm} · ${t('rewards.money.nextCredit', { date: dateText(plan.next_run_date) })}`;
 }
 
 function renderMoneyRow(account) {
@@ -2065,7 +2066,7 @@ function moneyLedgerRowHtml(row) {
   const positive = row.delta > 0;
   // Eine Gutschrift nach Plan nennt den Termin, fuer den sie gilt - nachgebucht
   // traegt sie sonst nur den Tag, an dem der Server wieder lief.
-  const when = formatDate(kind === 'allowance' ? row.allowance_date : row.created_at);
+  const when = dateText(kind === 'allowance' ? row.allowance_date : row.created_at);
   return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
       <span class="rw-ledger-row__icon rw-ledger-row__icon--${positive ? 'bonus' : 'redeem'}"><i data-lucide="${MONEY_LEDGER_ICON[kind]}" aria-hidden="true"></i></span>
       <div class="list-row__main">

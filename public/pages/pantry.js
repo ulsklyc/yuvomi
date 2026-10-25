@@ -8,7 +8,8 @@
  */
 
 import { api } from '/api.js';
-import { t, getNumberFormat, formatDate } from '/i18n.js';
+import { t, getNumberFormat } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { readRowHtml, readRowHintEl } from '/utils/read-row.js';
 import {
@@ -972,7 +973,7 @@ function rowEl(item) {
   if (item.expires_on) {
     const expiry = document.createElement('span');
     expiry.className = 'pantry-row__expiry';
-    expiry.textContent = ` · ${t('pantry.bestBefore', { date: formatDate(item.expires_on) })}`;
+    expiry.textContent = ` · ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
     meta.appendChild(expiry);
   }
   // Im gefilterten (flachen) Modus trägt die Meta-Zeile den Lagerort, den sonst
@@ -1405,7 +1406,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'hash', label: t('pantry.quantityLabel'), value: amount(item.quantity) })}
         ${readRowHtml({ icon: 'map-pin', label: t('pantry.locationLabel'), value: item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated') })}
         ${readRowHtml({ icon: 'tag', label: t('pantry.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
-        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? formatDate(item.expires_on) : '' })}
+        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? dateText(item.expires_on) : '' })}
         ${readRowHtml({ icon: 'triangle-alert', label: t('pantry.minQuantityLabel'), value: item.min_quantity != null ? amount(item.min_quantity) : '' })}
         ${readRowHtml({ icon: 'align-left', label: t('pantry.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
