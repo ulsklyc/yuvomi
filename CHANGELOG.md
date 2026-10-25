@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Birthday import offers "Select all" and "Deselect all".** Select every contact
+  with a birthday that has not already been imported, or clear the selection, with
+  one button above the list. Large selections are imported in batches. If a later
+  batch fails, the saved count remains visible in the warning and the list is
+  refreshed; retrying reports the total across successful batches.
+
 ### Fixed
+- **A new event appears at its time in the calendar right away.** After adding an event, the
+  agenda (and every other day list) showed it below all other events of that day until the next
+  reload, whatever its start time. The same happened when an edit moved an event to another time
+  of day. The event is now sorted into place as soon as it is saved.
+- **Assigning a synced iCloud event no longer turns its Apple Maps place into plain text.** A
+  place picked through Apple's location search is stored on several lines, and the single-line
+  location field in Yuvomi dropped the line breaks. Saving the event, even only to assign a
+  household member, therefore sent a changed location back to iCloud, and the iPhone showed the
+  address as text without the map link. A location that differs only by line breaks now counts
+  as unchanged, so the event stays as it is in iCloud; a location you really change is still
+  sent.
+- **A single occurrence changed on the iPhone keeps the assignment of its series.** Editing
+  one occurrence of a recurring iCloud, CalDAV or Google event in another calendar app ("This
+  event only") makes it a separate event in Yuvomi. That event only got the calendar's default
+  person, so the household member assigned to the series in Yuvomi was missing on exactly that
+  day. It now takes over the series' assignment when it first arrives (the default person still
+  applies if the series has none), and an assignment you change on it later stays. A series split
+  with "All future events" gets a new identity in Apple Calendar and is still treated as a new
+  event.
+- **A planned snack now shows up on the wall and in Today.** Since 2.79.0 a paired display
+  receives every meal of the day, but the choice of which meal to show only looked at breakfast,
+  lunch and dinner. A day whose only remaining plan was a snack showed no meal at all. The snack
+  now takes part in that choice at its place in the day, between lunch and dinner (#2206).
 - **Wall mode on older browsers: the footer sits at the bottom again.** Without `dvh` support
   (Chrome and Android WebView below 108) the wall was only as tall as its content, so "Updated",
   the kitchen timer and "Leave wall mode" floated mid-screen on a quiet day. The wall now takes

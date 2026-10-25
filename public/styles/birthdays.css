@@ -510,6 +510,12 @@
   margin-bottom: var(--space-3);
 }
 
+.bd-import__bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-1);
+}
+
 .bd-import__list {
   display: flex;
   flex-direction: column;
