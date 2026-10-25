@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Wall mode on older browsers: the footer sits at the bottom again.** Without `dvh` support
+  (Chrome and Android WebView below 108) the wall was only as tall as its content, so "Updated",
+  the kitchen timer and "Leave wall mode" floated mid-screen on a quiet day. The wall now takes
+  its height from the app shell, which works in every browser; current browsers look the same
+  ([#2183](https://github.com/ulsklyc/yuvomi/issues/2183)).
+- **Browsers without `color-mix()` no longer lose buttons, selections and colors.** On Chrome
+  and WebView below 111 and Safari below 16.2, primary buttons (Save, Sign in, Pair) and the
+  add button had no fill and their label disappeared, toasts and the search overlay were
+  see-through, holidays showed white text on nothing, and the selected task, contact, document,
+  filter or search result looked like the rest. These now get a plain color from the design
+  tokens; note and shift colors show as a colored ring, and empty checklist boxes keep their
+  edge. Tints elsewhere stay plain, as the browser table in the installation guide describes;
+  current browsers are unchanged ([#2184](https://github.com/ulsklyc/yuvomi/issues/2184)).
+
 ## [2.80.0] - 2026-10-25
 
 ### Added
