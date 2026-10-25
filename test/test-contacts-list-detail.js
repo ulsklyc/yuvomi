@@ -723,3 +723,15 @@ test('R23: die Chipreihe haelt ihren Platz, bis die Kontakte geladen sind', () =
   const fn = js.slice(js.indexOf('function renderCategoryFilters()'), js.indexOf('function openContactCategoryManager()'));
   assert.match(fn, /bar\.removeAttribute\('data-pending'\);/, 'und faellt beim ersten Zeichnen mit Daten');
 });
+
+// R23 S11b (Critique G5 P3): "Kontakt bearbeiten" hatte mobil drei Ausgaenge
+// (Zurueck, x, Abbrechen), und Abbrechen schloss das ganze Blatt. Die
+// Detailansicht erkennt ein Abbrechen nur an `data-action="close-modal"` (R19,
+// detail-view.js) - dann ist es der Weg zurueck in die Leseansicht, und das
+// Kopf-"Zurueck" faellt weg, wie in Rezepten, Notizen und Inventar.
+test('Kontakt bearbeiten: Abbrechen ist der eine Rueckweg in die Leseansicht', () => {
+  const js = read('../public/pages/contacts.js');
+  assert.match(js, /<button type="button" class="btn btn--secondary" id="cm-cancel" data-action="close-modal">/);
+  const dv = read('../public/components/detail-view.js');
+  assert.match(dv, /state\.formCancel = state\.formFooter\?\.querySelector\('\[data-action="close-modal"\]'\)/, 'daran erkennt die Detailansicht das Abbrechen');
+});

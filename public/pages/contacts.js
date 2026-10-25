@@ -1561,7 +1561,7 @@ function buildContactForm({ mode, contact = null }) {
         <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
       </button>` : '<div></div>'}
       <div class="contact-modal__footer-actions">
-        <button class="btn btn--secondary" id="cm-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--secondary" id="cm-cancel" data-action="close-modal">${t('common.cancel')}</button>
         <button class="btn btn--primary" id="cm-save">${isEdit ? t('common.save') : t('common.add')}</button>
       </div>
     </div>`;
@@ -1570,6 +1570,12 @@ function buildContactForm({ mode, contact = null }) {
     title: isEdit ? t('contacts.editContact') : t('contacts.newContact'),
     content,
     wire(panel) {
+      // EIN RUECKWEG IM BEARBEITEN (R23 S11b, Critique G5 P3; Kanon R19 in
+      // detail-view.js): mit `data-action="close-modal"` erkennt die
+      // Detailansicht das Abbrechen als den Weg zurueck in die Leseansicht und
+      // nimmt ihr Kopf-"Zurueck" weg. Vorher standen mobil drei Ausgaenge da
+      // (Zurueck, x, Abbrechen), und Abbrechen schloss das ganze Blatt. Der
+      // eigene Listener bleibt fuer den Anlege-Dialog ohne Leseansicht.
       panel.querySelector('#cm-cancel').addEventListener('click', closeModal);
 
       // Mehrwert-Gruppen: Zeile ergänzen/entfernen (Telefon + E-Mail).
