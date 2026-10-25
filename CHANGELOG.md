@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now waits instead of counting as a failure, so five such answers no longer return the item to
   its old list. After a rate limit, an outage or a dropped connection the sync sends nothing more
   to that account until the next pass.
+- **A shopping item moved away from a CalDAV list that is switched off no longer waits forever
+  (#1911).** Its entry used to stay in the old list and the move never finished. After seven days
+  the item now returns to the list its entry is in, and the entry on the server stays untouched. If
+  the old list no longer exists on the server, the item stays on its new list and is added there as
+  a new entry. This also works when every list of the old account is switched off. A list that has
+  been switched to tasks no longer counts as the old shopping list, a list switched off during the
+  move stops it, and a failed follow-up at the new place no longer forgets the old entry.
 - **A transfer arriving on the filtered account now shows in the month cards (#2207).** With the
   ledger filtered to one account, the Transfers card counted only money leaving it; a transfer
   coming in (for example savings into checking) showed in the list and the account balance, but in
