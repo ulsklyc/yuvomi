@@ -1,12 +1,14 @@
-<!-- version: 2.80.0 -->
-This update makes every module behave the same way and adds Traditional Chinese as the 27th language.
+<!-- version: 2.81.0 -->
+This update fixes calendar sync with iCloud, improves wall tablets on older browsers and brings a quicker birthday import.
 
-Switching between sections is now instant, long task and shopping lists open faster, and back and forward return to where you were in every list. Dialogs use one kind of switch, mark every required field and start in the right field. Status actions such as ticking off or archiving say what they did and can be undone, instead of asking first. Dates, times and amounts read the same in every module, and the year is left out when it is this year.
+Importing birthdays from contacts now has "Select all" and "Deselect all", so a large address book no longer has to be picked one by one. On a phone, the currency and long time zones in the appearance settings are no longer cut off.
 
-Contacts with a birthday can be added to Birthdays straight from their detail view, and a birthday can be linked to a contact by hand. A new "First steps" card follows the welcome tour. Calendar sync has its own settings page, shifts appear as time blocks in the calendar, and fasting now starts from the add button. Traditional Chinese covers the app and both installers, and TWD, HKD and MOP can be picked as currencies.
+Calendar sync keeps more of what you set: assigning a household member to an iCloud event no longer turns its Apple Maps place into plain text, and a single occurrence changed on the iPhone keeps the person assigned to its series. A new event appears at its time in the day right away. A planned snack now shows up on the wall and in Today.
 
-Several fixes are included: an amount typed with a thousands separator is no longer saved as a fraction of it, deleting a budget account no longer touches other members' private entries, putting the shopping away no longer duplicates pantry items, and SSO sign-in with Gitea works again.
+Wall tablets with an older browser that cannot be updated get their footer back at the bottom of the screen, and buttons, selections and colors no longer disappear there.
 
-One database migration runs automatically on first start: child accounts created before the previous version start without the cycle tab in Health, as new child accounts already do. The child can turn it back on. No action is needed. As always, a backup before updating is a good idea.
+Creating a recipe through an AI assistant connected over MCP works again, and requests without a body now get a clear error instead of a server error. Three dependencies were updated for published security advisories.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.80.0
+No database migration and no action is needed. As always, a backup before updating is a good idea.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.81.0
