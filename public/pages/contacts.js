@@ -107,17 +107,26 @@ function contactAvatar(c) {
   // sagte, in welcher Schublade jemand liegt, nicht wer es ist. Wie in Apples
   // Kontakten traegt jede Scheibe die Initialen, ruhig auf neutraler Flaeche;
   // die Kategorie steht als Filter darueber und im Detail.
-  if (!c.family_user_id) {
-    return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
+  // Prioritaet: 1. Haushaltsmitglied-Avatar, 2. Eigenes Foto, 3. Initialen.
+  if (c.family_user_id) {
+    const color = c.family_avatar_color || AVATAR_FALLBACK_COLOR;
+    const name  = c.family_display_name || c.name;
+    const inner = c.family_avatar_data
+      ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
+      : esc(initials(name, '?'));
+    return `<span class="contact-item__icon contact-item__icon--member"
+      style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
+      aria-hidden="true">${inner}</span>`;
   }
-  const color = c.family_avatar_color || AVATAR_FALLBACK_COLOR;
-  const name  = c.family_display_name || c.name;
-  const inner = c.family_avatar_data
-    ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
-    : esc(initials(name, '?'));
-  return `<span class="contact-item__icon contact-item__icon--member"
-    style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
-    aria-hidden="true">${inner}</span>`;
+  // Kein Haushaltsmitglied: eigenes Foto, falls vorhanden.
+  // In der Liste liefert c.has_photo (boolean) die Auskunft; die Bild-URL wird
+  // vom Browser lazy geladen. In der Detailansicht steht c.photo als data-URL.
+  if (c.photo || c.has_photo) {
+    const src = c.photo ? esc(c.photo) : `/api/v1/contacts/${c.id}/photo`;
+    return `<span class="contact-item__icon contact-item__icon--initials"
+      aria-hidden="true"><img src="${src}" alt="" loading="lazy"></span>`;
+  }
+  return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
 }
 
 // --------------------------------------------------------
