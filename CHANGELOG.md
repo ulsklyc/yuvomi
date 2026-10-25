@@ -23,7 +23,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pulls it from `main` every night, so the template never pins an older version. The installer
   schema tests check that every field exists in the stack and that no field locks a setting.
 
+### Changed
+- **A new API token now starts with an expiry and a module limit.** Until now a token created with
+  only a name never expired and could do everything the selected person may do. The form now offers
+  30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the
+  module limit is on, with the read/write table open. No expiration and full access are still
+  available, as a deliberate choice. Existing tokens and the API are unchanged: `expires_at` and
+  `scopes` stay optional for integrations that create tokens themselves.
+
 ### Fixed
+- **Yuvomi warns when local document storage would keep files only in the container layer.** With
+  `DOCUMENT_STORAGE_LOCAL_ENABLED=true` the start-up check only warned when the folder was missing.
+  The image creates `/documents` itself, though, so on the default path the folder always existed and
+  the warning never came, even with nothing mounted on it - uploads then vanished with the next
+  update while the database still listed them. A Portainer Git stack is one such setup: its documents
+  mount is commented out and cannot be enabled there. The check now asks the same question the
+  modules page asks for `/app/modules`, whether the folder sits on a volume or bind mount, and warns
+  when it does not. Outside a container, and wherever the mount table cannot be read, it stays quiet.
+- **Creating a second API token no longer switches "Acts as" to another person.** After the first
+  token the form reset the person to the first entry of the list, so the next token silently acted as
+  someone else. The token form also names the Pantry module in the scope table instead of "pantry",
+  fits the custom date and time on a phone, and labels "Acts as" in every language.
 - **The Apple Calendar card shows the app-specific password path as plain text, and it is current.**
   The hint printed `<strong>` tags around the address in every language. It now names Apple's
   current path, account.apple.com > Sign-In and Security > App-Specific Passwords, in each

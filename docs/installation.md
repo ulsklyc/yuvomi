@@ -790,7 +790,11 @@ environment:
 > points at a path nobody mounted, uploads still succeed: the folder is created inside the container
 > layer and the files are gone on the next `pull && up -d`, while the database keeps referencing them.
 > Since v2.9.0 the server checks this at startup and warns when the folder is missing or not writable,
-> naming the path it looked for. A silent start means the mount is where the app expects it.
+> naming the path it looked for. The image ships an empty `/documents` folder, though, so on the
+> default path the folder exists even with nothing mounted on it; inside a container the check
+> therefore also warns when the path is not on a volume or bind mount, using the same rule as the
+> modules folder (see [MODULES.md](../MODULES.md)). Where the mount table cannot be read, the check
+> stays quiet, so a silent start there proves nothing about the mount.
 
 ### WebDAV Document Storage (Optional)
 

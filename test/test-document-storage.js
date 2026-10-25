@@ -10,6 +10,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   truncateSync,
@@ -31,6 +32,7 @@ const {
   _setTestDatabase,
 } = await import('../server/db.js');
 const storage = await import('../server/services/document-storage.js');
+const { __setPersistenceProbeForTests: setPersistenceProbe } = await import('../server/utils/container-persistence.js');
 const googleDriveStorage = await import('../server/services/google-drive-storage.js');
 const {
   default: documentsRouter,
@@ -3026,6 +3028,17 @@ function collectingLogger() {
   return { messages, warn: (m) => messages.push(m) };
 }
 
+/**
+ * Eine Mounttabelle im Format von /proc/self/mountinfo, je Eintrag [Mountpunkt, Dateisystem].
+ * Leerzeichen im Pfad stehen dort oktal als \040 - genau wie der Kernel sie schreibt.
+ */
+function mountInfo(...mounts) {
+  return mounts.map(([mountPoint, fsType], i) => {
+    const escaped = mountPoint.replace(/ /g, '\\040');
+    return `${20 + i} 1 0:${30 + i} / ${escaped} rw,relatime shared:${i + 1} - ${fsType} ${fsType} rw`;
+  }).join('\n') + '\n';
+}
+
 test('mount check: schweigt, solange die lokale Ablage nicht eingeschaltet ist (#751)', async () => {
   for (const key of LOCAL_ENV_KEYS) delete process.env[key];
   const log = collectingLogger();
@@ -3054,14 +3067,13 @@ test('mount check: meldet einen fehlenden Ordner als fehlenden Mount (#751)', as
 
 test('mount check: schweigt bei einem vorhandenen, beschreibbaren Ordner (#751)', async () => {
   const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-mounted-'));
-  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = '1';
-  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
   try {
-    const log = collectingLogger();
-    assert.equal(await storage.checkLocalStorageMount(log), 'ok');
+    // Die Mounttabelle ist fest vorgegeben: wer die Suite in einem Container laufen
+    // laesst, haette sonst ein Overlay-Root und ein ungemountetes tmpdir.
+    const { result, log } = await checkWithMounts(dir, mountInfo(['/', 'overlay'], [realpathSync(dir), 'ext4']));
+    assert.equal(result, 'ok');
     assert.deepEqual(log.messages, [], 'eine korrekte Einrichtung darf nicht warnen');
   } finally {
-    for (const key of LOCAL_ENV_KEYS) delete process.env[key];
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -3078,6 +3090,101 @@ test('mount check: meldet eine Datei am Ziel statt eines Ordners (#751)', async 
     assert.match(log.messages[0], /not a directory/);
   } finally {
     for (const key of LOCAL_ENV_KEYS) delete process.env[key];
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Die Existenz allein beweist im Container nichts: das Dockerfile legt /documents
+// selbst an (`mkdir -p ... /documents`), der Ordner ist also auch ohne jeden Mount
+// da. Ohne Mount liegt er auf dem Overlay-Root des Containers - genau der #751-Schaden,
+// nur auf dem Standardpfad, wo der Existenz-Check nie anschlug. Ein Portainer-Git-Stack
+// zum Beispiel kann den auskommentierten Dokument-Mount gar nicht einkommentieren.
+// Die Regel teilt der Check mit der Modulseite (server/utils/container-persistence.js);
+// die /proc-Dateien sind injiziert, so laeuft dieselbe Tabelle auf jedem Host.
+async function checkWithMounts(dir, text, overrides = {}) {
+  const procDir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-proc-'));
+  const marker = nodePath.join(procDir, 'dockerenv');
+  const noFile = nodePath.join(procDir, 'does-not-exist');
+  const mountinfoPath = nodePath.join(procDir, 'mountinfo');
+  writeFileSync(marker, '');
+  if (text !== undefined) writeFileSync(mountinfoPath, text);
+  const restore = setPersistenceProbe({
+    platform: 'linux',
+    containerMarkers: [marker],
+    cgroupPath: noFile,
+    mountinfoPath: text === undefined ? noFile : mountinfoPath,
+    ...overrides,
+  });
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = '1';
+  process.env.DOCUMENT_STORAGE_LOCAL_PATH = dir;
+  const log = collectingLogger();
+  try {
+    return { result: await storage.checkLocalStorageMount(log), log, procDir };
+  } finally {
+    restore();
+    for (const key of LOCAL_ENV_KEYS) delete process.env[key];
+    rmSync(procDir, { recursive: true, force: true });
+  }
+}
+
+test('mount check: meldet einen vorhandenen Ordner auf dem Overlay-Root des Containers', async () => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-imagedir-'));
+  try {
+    const { result, log } = await checkWithMounts(dir, mountInfo(['/', 'overlay']));
+    assert.equal(result, 'not-mounted');
+    assert.equal(log.messages.length, 1);
+    assert.match(log.messages[0], /lost on the next update/);
+    assert.match(log.messages[0], /DOCUMENT_STORAGE_LOCAL_DIR/, 'beide Enden des Mounts benennen');
+    assert.ok(log.messages[0].includes(nodePath.resolve(dir)), 'der gepruefte Pfad gehoert in die Meldung');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mount check: erkennt auch rootless Podman (fuse-overlayfs, Marker /run/.containerenv)', async () => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-fuseoverlay-'));
+  try {
+    const { result } = await checkWithMounts(dir, mountInfo(['/', 'fuse.fuse-overlayfs']));
+    assert.equal(result, 'not-mounted');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mount check: schweigt, wenn ein Volume auf dem Pfad oder einem Elternordner liegt', async () => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi volume-'));
+  try {
+    const real = realpathSync(dir);
+    // Genau auf dem Pfad gemountet, mit Leerzeichen im Namen (\040 in der Tabelle).
+    let check = await checkWithMounts(dir, mountInfo(['/', 'overlay'], [real, 'ext4']));
+    assert.equal(check.result, 'ok');
+    assert.deepEqual(check.log.messages, []);
+    // Der Pfad liegt UNTER einem Mount, etwa DOCUMENT_STORAGE_LOCAL_PATH=/data/documents.
+    check = await checkWithMounts(dir, mountInfo(['/', 'overlay'], [nodePath.dirname(real), 'ext4']));
+    assert.equal(check.result, 'ok');
+    // Ein Mountpunkt, der nur mit demselben Text BEGINNT, ist kein Elternordner.
+    check = await checkWithMounts(dir, mountInfo(['/', 'overlay'], [real.slice(0, -2), 'ext4']));
+    assert.equal(check.result, 'not-mounted');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mount check: schweigt ohne Container und wo die Regel nichts weiss', async () => {
+  const dir = mkdtempSync(nodePath.join(tmpdir(), 'yuvomi-baremetal-'));
+  try {
+    // Bare-Metal-Linux: kein Marker, kein cgroup-Hinweis, das Root ist ein echtes Dateisystem.
+    let check = await checkWithMounts(dir, mountInfo(['/', 'ext4']), { containerMarkers: [] });
+    assert.equal(check.result, 'ok');
+    assert.deepEqual(check.log.messages, [], 'auf Bare-Metal darf es keinen Fehlalarm geben');
+    // macOS, Windows, BSD.
+    check = await checkWithMounts(dir, mountInfo(['/', 'overlay']), { platform: 'darwin' });
+    assert.equal(check.result, 'ok');
+    // Im Container, aber die Mounttabelle ist unlesbar: unbekannt heisst still.
+    check = await checkWithMounts(dir, undefined);
+    assert.equal(check.result, 'ok');
+    assert.deepEqual(check.log.messages, []);
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });

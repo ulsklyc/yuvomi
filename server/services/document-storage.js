@@ -12,6 +12,7 @@ import path from 'node:path';
 import * as db from '../db.js';
 import * as googleDriveStorage from './google-drive-storage.js';
 import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils/ssrf.js';
+import { isPathPersistent } from '../utils/container-persistence.js';
 import { safeRequest } from '../utils/http.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
 
@@ -83,12 +84,20 @@ export function getLocalStorageConfig() {
  * während die Datenbank sie weiter referenziert. Kein Fehler, keine Meldung,
  * keine Datei.
  *
- * Deshalb wird hier die EXISTENZ geprüft und nicht nur die Schreibbarkeit: ein
- * fehlender Ordner ist im Container das Kennzeichen des fehlenden Mounts.
- * `_DIR` (Host) und `_PATH` (Container) sind die zwei Enden einer Verbindung,
- * und sie laufen in der Praxis auseinander - im Auslöser dieses Checks zeigte
- * der Mount auf `/cosmos-storage/documents`, während der Pfad auf dem Default
- * `/documents` stand (#751).
+ * Deshalb wird hier zuerst die EXISTENZ geprüft und nicht nur die
+ * Schreibbarkeit. `_DIR` (Host) und `_PATH` (Container) sind die zwei Enden
+ * einer Verbindung, und sie laufen in der Praxis auseinander - im Auslöser
+ * dieses Checks zeigte der Mount auf `/cosmos-storage/documents`, während der
+ * Pfad auf dem Default `/documents` stand (#751).
+ *
+ * Die Existenz allein reicht aber nicht: das Dockerfile legt `/documents` selbst
+ * an, auf dem Standardpfad ist der Ordner im Container also immer da, mit oder
+ * ohne Mount. Darum fragt der Check danach `isPathPersistent()` - dieselbe Regel,
+ * mit der die Modulseite `/app/modules` prueft: im Container entscheidet der
+ * innerste Mount ueber dem Pfad, und das Root-Overlay heisst Container-Schicht.
+ * Gewarnt wird nur bei einem klaren Nein. Ausserhalb eines Containers und wo die
+ * Regel nichts weiss (`null`), bleibt es still: ein Fehlalarm auf Bare-Metal waere
+ * schlimmer als die bisherige Stille.
  *
  * Bewusst nur eine Warnung, kein Abbruch (anders als beim Backup-Verzeichnis):
  * die Dokumentablage ist ein Zusatz, und eine sonst gesunde Installation soll
@@ -96,7 +105,7 @@ export function getLocalStorageConfig() {
  * gelesen zu werden.
  *
  * @param {{ warn: (msg: string) => void }} log
- * @returns {Promise<'ok'|'missing'|'not-writable'|'disabled'>} für Tests
+ * @returns {Promise<'ok'|'missing'|'not-mounted'|'not-writable'|'disabled'>} für Tests
  */
 export async function checkLocalStorageMount(log) {
   const cfg = getLocalStorageConfig();
@@ -125,6 +134,17 @@ export async function checkLocalStorageMount(log) {
     }
     log.warn(`DOCUMENT_STORAGE_LOCAL_PATH "${resolved}" is not readable (${err.code}).`);
     return 'not-writable';
+  }
+
+  if (await isPathPersistent(resolved) === false) {
+    log.warn(
+      `DOCUMENT_STORAGE_LOCAL_PATH "${resolved}" is not a mounted volume: it exists in the image, `
+      + 'but lives in the container layer. Uploads would be lost on the next update, '
+      + 'while the database keeps referencing them. Mount a host folder or a named volume onto that exact path '
+      + '(DOCUMENT_STORAGE_LOCAL_DIR is the host side, DOCUMENT_STORAGE_LOCAL_PATH the container side - '
+      + 'they are the two ends of one mount and must match).'
+    );
+    return 'not-mounted';
   }
 
   try {
