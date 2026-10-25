@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not to API tokens or the wall display.
 
 ### Fixed
+- **The Apple Calendar card shows the app-specific password path as plain text, and it is current.**
+  The hint printed `<strong>` tags around the address in every language. It now names Apple's
+  current path, account.apple.com > Sign-In and Security > App-Specific Passwords, in each
+  language's own wording; the CalDAV and CardDAV password hints point to account.apple.com too.
 - **The currency and long time zones are no longer cut off in the appearance settings on a
   phone** (#2166). A currency read like "AED - United Arab Emirates Dirham" and ended in "…" on
   a narrow screen, and so did five time zones such as "North Dakota/New Salem". The currency
