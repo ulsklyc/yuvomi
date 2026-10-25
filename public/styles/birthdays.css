@@ -581,7 +581,7 @@
 
 .bd-import-row__hint {
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
 }
 
 /* Schon hinzugefuegt: Zuruecknehmen-Muster (tokens.css, #1230) statt
