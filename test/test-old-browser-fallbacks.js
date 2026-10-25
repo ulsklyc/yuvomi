@@ -202,22 +202,11 @@ const HINTS = {
  * Enden geprueft: der Verstoss muss noch bestehen (sonst ist sie ueberfluessig)
  * und der Anlass auch (sonst gehoert der Rueckfall hinein).
  */
-const EXCEPTIONS = [
-  {
-    file: 'public/styles/dashboard.css',
-    selector: '.wall',
-    declaration: 'min-height: 100dvh',
-    reason: 'Wand-Modus, kein kritischer Pfad. Ein Zwilling `min-height: 100vh` waere die einzige '
-      + 'vh-Einheit in den Wand-Regeln, und die verbietet der Wand-Guard in '
-      + 'test-frontend-audit.js aus gemessenem Grund: eine Wand kann nicht gescrollt werden, und '
-      + 'auf einem mobilen Browser ohne dvh ist 100vh die GROSSE Fensterhoehe - sie schoebe '
-      + 'Datenstand und Ausstieg unter die Adressleiste, genau den Fehler, den der Wand-Guard '
-      + 'festhaelt. Ohne min-height ist die Wand so hoch wie ihr Inhalt, und nichts faellt heraus. '
-      + 'Die Wand braucht ohnehin @container (Chrome 105).',
-    stillValid: () => read('test/test-frontend-audit.js')
-      .includes("test('die Distanzskala der Wand haengt an der KNAPPEN Seite, nicht an der Hoehe'"),
-  },
-];
+// Leer seit #2183. Hier stand `.wall { min-height: 100dvh }` (Wand-Modus):
+// ohne dvh war die Wand so hoch wie ihr Inhalt, und auf einem Wandrahmen mit
+// WebView 106 sass der Fuss mitten im Bild. Die Wand nimmt ihre Hoehe jetzt
+// von der Shell (eigener Test unten), eine Viewport-Einheit braucht sie nicht.
+const EXCEPTIONS = [];
 const isException = (file, finding) => EXCEPTIONS.some((ex) => ex.file === file
   && ex.selector === finding.selector && norm(ex.declaration) === norm(finding.declaration));
 
@@ -1135,4 +1124,46 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
     'Diese Regel schlaegt in einem Browser ohne Popover-API den Rueckfall `[popover] { display: none }` '
     + '(reset.css) - das Panel stuende offen. `display` an einem Popover nur unter `:popover-open`:\n'
     + offenders.join('\n'));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * (6) Wand-Modus ohne dvh (#2183)
+ *
+ * Die Wand stand mit `min-height: 100dvh` da. Chrome < 108 verwirft die
+ * Zeile, und ein vh-Zwilling ist auf der Wand verboten (test:frontend-audit,
+ * Wand-Guard: auf dem Telefon ist 100vh die GROSSE Hoehe). Ergebnis auf einem
+ * Wandrahmen mit Android-WebView 106: die Wand war so hoch wie ihr Inhalt, und
+ * Datenstand, Kuechentimer und Ausstieg standen mitten im Bild.
+ *
+ * Die Shell hat die Hoehe schon, mit Rueckfallkette (100vh ->
+ * -webkit-fill-available -> 100dvh), und `.page-transition` reicht sie als
+ * `height: 100%` durch. Die Wand fuellt diesen Platz ueber `min-height: 100%`
+ * an der Seite und Flex darunter - in jedem Browser, ohne Viewport-Einheit.
+ * ────────────────────────────────────────────────────────────────────────── */
+const wallRule = (css, selector) => [...eachRule(css)]
+  .find((r) => !r.at.length && r.selector.replace(/\s+/g, ' ').trim() === selector);
+const decl = (rule, property) => (rule ? declarations(rule.body).filter((d) => d.property === property).at(-1)?.value : undefined);
+
+test('die Wand nimmt ihre Hoehe von der Shell, nicht vom Viewport (#2183)', () => {
+  const css = read('public/styles/dashboard.css');
+  const viewportHeight = /(?<![\w.])(?:\d*\.)?\d+[dsl]?vh\b/i;
+  const wallHeights = [...eachRule(css)]
+    .filter((r) => /(^|[\s,])\.wall(?![\w-])/.test(r.selector))
+    .flatMap((r) => declarations(r.body)
+      .filter((d) => /^(min-|max-)?height$/.test(d.property) && viewportHeight.test(d.value))
+      .map((d) => `${r.selector.trim()} { ${d.text} }`));
+  assert.deepEqual(wallHeights, [],
+    'Die Wand-Flaeche haengt ihre Hoehe an eine Viewport-Einheit - ohne dvh (Chrome < 108) ist sie '
+    + 'dann so hoch wie ihr Inhalt und der Fuss steht mitten im Bild:\n' + wallHeights.join('\n'));
+
+  // Die Kette von der Shell bis zur Flaeche, Glied fuer Glied.
+  assert.equal(decl(wallRule(read('public/styles/layout.css'), '.page-transition'), 'height'), '100%',
+    '.page-transition reicht die Hoehe der Shell nicht mehr durch - min-height: 100% darunter griffe ins Leere');
+  const page = wallRule(css, '.dashboard--wall');
+  assert.equal(decl(page, 'min-height'), '100%', '.dashboard--wall fuellt die Hoehe der Shell nicht');
+  const shell = wallRule(css, '.dashboard--wall .dashboard-shell');
+  assert.equal(decl(shell, 'display'), 'flex', 'die Shell der Wand reicht die Hoehe nicht weiter (display: flex)');
+  assert.equal(decl(shell, 'flex-direction'), 'column');
+  assert.match(decl(shell, 'flex') || '', /^1\b/, 'die Shell der Wand waechst nicht in die Seite (flex: 1 ...)');
+  assert.match(decl(wallRule(css, '.wall'), 'flex') || '', /^1\b/, 'die Wand-Flaeche waechst nicht in die Shell (flex: 1 ...)');
 });
