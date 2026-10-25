@@ -934,7 +934,11 @@
         "tickedSection": "Odhaczone",
         "itemBackToast": "„{{name}}” jest znowu na liście.",
         "itemStateOpen": "nieodhaczone",
-        "itemAddedToast": "„{{name}}” dodano do „{{category}}”."
+        "itemAddedToast": "„{{name}}” dodano do „{{category}}”.",
+        "moveReturned": {
+            "refused": "„{{item}}” wrócił na listę „{{back}}”: serwer nie przyjął go na liście „{{target}}”.",
+            "waited": "„{{item}}” wrócił na listę „{{back}}”: ta lista nie jest synchronizowana od ponad tygodnia, więc produkt nie trafił na listę „{{target}}”."
+        }
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",

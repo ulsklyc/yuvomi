@@ -41,6 +41,7 @@ export const ORIGIN_MODULE = Object.freeze({
   document_expiry:        'documents',
   fasting_goal:           'health',
   fasting_next_start:     'health',
+  shopping_move_returned: 'shopping',
 });
 
 /**

@@ -788,7 +788,11 @@
         "tickedSection": "Afgevinkt",
         "itemBackToast": "„{{name}}” staat weer op de lijst.",
         "itemStateOpen": "niet afgevinkt",
-        "itemAddedToast": "\"{{name}}\" toegevoegd onder \"{{category}}\"."
+        "itemAddedToast": "\"{{name}}\" toegevoegd onder \"{{category}}\".",
+        "moveReturned": {
+            "refused": "„{{item}}” staat weer op „{{back}}”: de server heeft het niet geaccepteerd in „{{target}}”.",
+            "waited": "„{{item}}” staat weer op „{{back}}”: die lijst wordt al meer dan een week niet gesynchroniseerd, dus het artikel is niet in „{{target}}” aangekomen."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediënt",

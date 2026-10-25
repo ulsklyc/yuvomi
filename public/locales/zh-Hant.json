@@ -788,7 +788,11 @@
         "tickedSection": "已勾選",
         "itemBackToast": "「{{name}}」已回到清單。",
         "itemStateOpen": "未勾選",
-        "itemAddedToast": "已將「{{name}}」加入「{{category}}」。"
+        "itemAddedToast": "已將「{{name}}」加入「{{category}}」。",
+        "moveReturned": {
+            "refused": "「{{item}}」已回到「{{back}}」：伺服器不接受將它放入「{{target}}」。",
+            "waited": "「{{item}}」已回到「{{back}}」：此清單已超過一週未同步，因此項目未能移到「{{target}}」。"
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} 種食材",

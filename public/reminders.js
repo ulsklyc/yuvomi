@@ -189,6 +189,10 @@ const REMINDER_ORIGINS = {
   health_prevention_due:  { accent: 'var(--module-health)',    icon: 'syringe',      labelKey: 'health.tabs.prevention' },
   fasting_goal:            { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
   fasting_next_start:      { accent: 'var(--module-health)',    icon: 'timer',         labelKey: 'health.fasting.title', url: '/health/fasting' },
+  // Keine Erinnerung, sondern eine Meldung (#1912): der Toast traegt deshalb
+  // den Namen des Moduls statt "Erinnerung" (`toastTitleKey`). Das Ziel setzt
+  // der Server (`target_url`, die Liste, auf die der Artikel zurueckging).
+  shopping_move_returned:  { accent: 'var(--module-shopping)',  icon: 'shopping-cart', labelKey: 'nav.shopping', toastTitleKey: 'nav.shopping', sentence: true, url: '/shopping' },
 };
 
 function reminderTargetUrl(reminder) {
@@ -307,8 +311,22 @@ function fastingReminderBody(reminder) {
   return null;
 }
 
+/**
+ * Ein ganzer Satz statt des nackten Artikelnamens (#1912): was zurueckging,
+ * wohin, und warum. Die Namen kommen aus der Momentaufnahme der Meldung
+ * (`move_notice`), nicht aus den Listen von jetzt.
+ */
+function moveReturnedBody(reminder) {
+  if (reminder.entity_type !== 'shopping_move_returned') return null;
+  const notice = reminder.move_notice;
+  if (!notice) return null;
+  return t(notice.reason === 'waited' ? 'shopping.moveReturned.waited' : 'shopping.moveReturned.refused', {
+    item: notice.item_name, back: notice.back_list_name, target: notice.target_list_name,
+  });
+}
+
 function reminderBody(reminder) {
-  return fastingReminderBody(reminder) ?? cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
+  return moveReturnedBody(reminder) ?? fastingReminderBody(reminder) ?? cycleReminderBody(reminder) ?? reminder.entity_title ?? '';
 }
 
 /**
@@ -328,6 +346,8 @@ function showReminderToast(reminder) {
 
   const toast = document.createElement('div');
   toast.className = 'toast toast--reminder';
+  // Ein ganzer Satz bricht um, statt nach dem ersten Wort abzuschneiden (#1912).
+  if (REMINDER_ORIGINS[reminder.entity_type]?.sentence) toast.classList.add('toast--sentence');
   // Keine eigene Live-Rolle: die hoefliche Region sagt an. `role="alert"`
   // machte die Erinnerung bestimmt und liess sie doppelt ansagen.
   toast.dataset.reminderId = reminder.id;
@@ -340,7 +360,7 @@ function showReminderToast(reminder) {
   textBlock.setAttribute('type', 'button');
 
   const titleEl = document.createElement('strong');
-  titleEl.textContent = t('reminders.toastTitle');
+  titleEl.textContent = t(REMINDER_ORIGINS[reminder.entity_type]?.toastTitleKey ?? 'reminders.toastTitle');
 
   const bodyEl = document.createElement('span');
   bodyEl.textContent = reminderBody(reminder);

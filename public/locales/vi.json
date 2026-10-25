@@ -788,7 +788,11 @@
         "tickedSection": "Đã đánh dấu",
         "itemBackToast": "“{{name}}” đã trở lại danh sách.",
         "itemStateOpen": "chưa đánh dấu",
-        "itemAddedToast": "Đã thêm \"{{name}}\" vào \"{{category}}\"."
+        "itemAddedToast": "Đã thêm \"{{name}}\" vào \"{{category}}\".",
+        "moveReturned": {
+            "refused": "“{{item}}” đã trở lại “{{back}}”: máy chủ không chấp nhận mục này trong “{{target}}”.",
+            "waited": "“{{item}}” đã trở lại “{{back}}”: danh sách đó đã hơn một tuần không được đồng bộ, nên mục này không đến được “{{target}}”."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} nguyên liệu",

@@ -806,7 +806,11 @@
         "tickedSection": "تیک‌خورده‌ها",
         "itemBackToast": "«{{name}}» دوباره در فهرست است.",
         "itemStateOpen": "تیک نخورده",
-        "itemAddedToast": "«{{name}}» زیر «{{category}}» اضافه شد."
+        "itemAddedToast": "«{{name}}» زیر «{{category}}» اضافه شد.",
+        "moveReturned": {
+            "refused": "«{{item}}» به «{{back}}» برگشت: سرور آن را در «{{target}}» نپذیرفت.",
+            "waited": "«{{item}}» به «{{back}}» برگشت: این فهرست بیش از یک هفته است که همگام‌سازی نشده، برای همین مورد به «{{target}}» نرسید."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",

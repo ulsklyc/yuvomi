@@ -90,6 +90,29 @@ button.toast__reminder-text:focus-visible {
   white-space: nowrap;
 }
 
+/* EINE MELDUNG IST EIN SATZ, KEIN NAME (#1912). Die Zeile darunter traegt
+ * sonst einen Titel und darf abschneiden; "Umzug zurueckgenommen" sagt Artikel,
+ * beide Listen und den Grund, abgeschnitten nach dem ersten Wort waere die
+ * Meldung nutzlos. Hoechstens vier Zeilen, dann Auslassung - die Namen kommen
+ * vom Nutzer und koennen beliebig lang sein. */
+.toast--sentence .toast__reminder-text span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Auf dem Telefon steht der Reminder-Toast ohne Innenabstand oben und unten
+ * (layout.css, die Zielgroesse traegt die Hoehe); ein Satz ueber mehrere
+ * Zeilen stiesse dort an die Kante. */
+@media (max-width: 767px) {
+  .toast.toast--reminder.toast--sentence {
+    padding-block: var(--space-2, 8px);
+  }
+}
+
 /* Reminder-Abschnitt in Modals */
 .reminder-section {
   border-top: 1px solid var(--color-border);

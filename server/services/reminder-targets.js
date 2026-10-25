@@ -174,6 +174,8 @@ export const HOUSEHOLD_CHANNEL_POLICY = Object.freeze({
   health_prevention_due: 'personal',
   fasting_goal:          'personal',
   fasting_next_start:    'personal',
+  // Die Meldung gehoert der Person, die verschoben hat (#1912).
+  shopping_move_returned: 'personal',
   schedule_entry:        'personal',
   schedule_extra_entry:  'personal',
 });

@@ -806,7 +806,11 @@
         "tickedSection": "Abgehakt",
         "itemBackToast": "„{{name}}“ ist wieder auf der Liste.",
         "itemStateOpen": "offen",
-        "itemAddedToast": "„{{name}}“ steht unter „{{category}}“."
+        "itemAddedToast": "„{{name}}“ steht unter „{{category}}“.",
+        "moveReturned": {
+            "refused": "„{{item}}“ steht wieder auf „{{back}}“: Der Server hat den Artikel in „{{target}}“ nicht angenommen.",
+            "waited": "„{{item}}“ steht wieder auf „{{back}}“: Der Abgleich dieser Liste ist seit über einer Woche aus, deshalb kam der Artikel nicht in „{{target}}“ an."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} Zutat",

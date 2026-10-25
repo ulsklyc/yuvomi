@@ -616,7 +616,7 @@ test('jede Herkunft ist fuer den Haushaltskanal ausdruecklich eingeordnet', () =
   const of = (policy) => Object.keys(HOUSEHOLD_CHANNEL_POLICY).filter((type) => HOUSEHOLD_CHANNEL_POLICY[type] === policy).sort();
   assert.deepEqual(of('personal'), [
     'cycle_log_nudge', 'cycle_period', 'fasting_goal', 'fasting_next_start',
-    'health_prevention_due', 'schedule_entry', 'schedule_extra_entry',
+    'health_prevention_due', 'schedule_entry', 'schedule_extra_entry', 'shopping_move_returned',
   ]);
   assert.deepEqual(of('household'), ['pantry_item', 'waste_pickup']);
   assert.deepEqual(of('row'), ['document_expiry', ...TARGET_ENTITY_TYPES].sort());

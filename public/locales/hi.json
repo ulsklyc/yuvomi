@@ -788,7 +788,11 @@
         "tickedSection": "टिक किए गए",
         "itemBackToast": "“{{name}}” फिर से सूची में है।",
         "itemStateOpen": "टिक नहीं किया गया",
-        "itemAddedToast": "\"{{name}}\" को \"{{category}}\" में जोड़ा गया।"
+        "itemAddedToast": "\"{{name}}\" को \"{{category}}\" में जोड़ा गया।",
+        "moveReturned": {
+            "refused": "“{{item}}” वापस “{{back}}” में है: सर्वर ने इसे “{{target}}” में स्वीकार नहीं किया।",
+            "waited": "“{{item}}” वापस “{{back}}” में है: यह सूची एक हफ़्ते से ज़्यादा समय से सिंक नहीं हुई है, इसलिए आइटम “{{target}}” तक नहीं पहुँचा।"
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",

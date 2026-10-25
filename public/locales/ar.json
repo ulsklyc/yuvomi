@@ -980,7 +980,11 @@
         "tickedSection": "تم التأشير عليها",
         "itemBackToast": "عاد «{{name}}» إلى القائمة.",
         "itemStateOpen": "لم يُؤشَّر عليه",
-        "itemAddedToast": "أُضيف \"{{name}}\" ضمن \"{{category}}\"."
+        "itemAddedToast": "أُضيف \"{{name}}\" ضمن \"{{category}}\".",
+        "moveReturned": {
+            "refused": "عاد «{{item}}» إلى «{{back}}»: لم يقبله الخادم في «{{target}}».",
+            "waited": "عاد «{{item}}» إلى «{{back}}»: لم تُزامَن هذه القائمة منذ أكثر من أسبوع، لذلك لم يصل العنصر إلى «{{target}}»."
+        }
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",

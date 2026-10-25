@@ -853,7 +853,11 @@
         "tickedSection": "Odškrtnuto",
         "itemBackToast": "Položka „{{name}}“ je zpět na seznamu.",
         "itemStateOpen": "neodškrtnuto",
-        "itemAddedToast": "„{{name}}“ přidáno do „{{category}}“."
+        "itemAddedToast": "„{{name}}“ přidáno do „{{category}}“.",
+        "moveReturned": {
+            "refused": "Položka „{{item}}“ je zpět v seznamu „{{back}}“: server ji v seznamu „{{target}}“ nepřijal.",
+            "waited": "Položka „{{item}}“ je zpět v seznamu „{{back}}“: tento seznam se už přes týden nesynchronizuje, proto se položka do seznamu „{{target}}“ nedostala."
+        }
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",

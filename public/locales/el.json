@@ -788,7 +788,11 @@
         "tickedSection": "Τσεκαρισμένα",
         "itemBackToast": "Το «{{name}}» είναι ξανά στη λίστα.",
         "itemStateOpen": "μη τσεκαρισμένο",
-        "itemAddedToast": "Το «{{name}}» προστέθηκε στο «{{category}}»."
+        "itemAddedToast": "Το «{{name}}» προστέθηκε στο «{{category}}».",
+        "moveReturned": {
+            "refused": "Το «{{item}}» επέστρεψε στη λίστα «{{back}}»: ο διακομιστής δεν το δέχτηκε στη λίστα «{{target}}».",
+            "waited": "Το «{{item}}» επέστρεψε στη λίστα «{{back}}»: αυτή η λίστα δεν συγχρονίζεται εδώ και πάνω από μία εβδομάδα, γι’ αυτό το είδος δεν έφτασε στη λίστα «{{target}}»."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",

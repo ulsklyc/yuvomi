@@ -62,6 +62,7 @@ import {
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
+import { noteMoveTakenBack } from './shopping-move-notices.js';
 
 const log = createLogger('CalDAV-Todo-Outbound');
 
@@ -271,7 +272,8 @@ export function detachAccountRows(accountId) {
              external_object_url = NULL,${def.table === 'shopping_items' ? `
              outbound_move          = 0,
              outbound_move_attempts = 0,
-             outbound_move_since    = NULL,` : ''}
+             outbound_move_since    = NULL,
+             outbound_move_by       = NULL,` : ''}
              outbound_dirty      = 0,
              outbound_attempts   = 0
        WHERE external_source = 'caldav' AND external_account_id = ?
@@ -333,7 +335,8 @@ export function releaseShoppingMirror(row) {
            outbound_attempts      = 0,
            outbound_move          = 0,
            outbound_move_attempts = 0,
-           outbound_move_since    = NULL
+           outbound_move_since    = NULL,
+           outbound_move_by       = NULL
      WHERE id = ?
   `).run(row.id);
   return queued;
@@ -371,7 +374,7 @@ function shoppingMappingsOf(listId) {
  *
  * @returns {'none'|'carry'|'home'|'released'}
  */
-export function moveShoppingMirror(row, targetListId) {
+export function moveShoppingMirror(row, targetListId, movedBy = null) {
   if (!row || row.external_source !== 'caldav') return 'none';
   const from = collectionUrlOf(row.external_object_url);
   const mappings = isMirrored(row) ? shoppingMappingsOf(targetListId) : [];
@@ -383,13 +386,15 @@ export function moveShoppingMirror(row, targetListId) {
     (sel) => sel.account_id === row.external_account_id && sameCollection(sel.list_url, from)
   );
   // Der Beginn zählt für die Frist eines wartenden Umzugs (#1911); ein neuer
-  // Umzug beginnt sie neu.
+  // Umzug beginnt sie neu. Wer verschoben hat, bekommt die Meldung, falls der
+  // Umzug zurückgeht (#1912).
   db.get().prepare(`
     UPDATE shopping_items
        SET outbound_move = ?, outbound_move_attempts = 0,
-           outbound_move_since = CASE WHEN ? THEN NULL ELSE datetime('now') END
+           outbound_move_since = CASE WHEN ? THEN NULL ELSE datetime('now') END,
+           outbound_move_by = ?
      WHERE id = ?
-  `).run(home ? 0 : 1, home ? 1 : 0, row.id);
+  `).run(home ? 0 : 1, home ? 1 : 0, home ? null : (movedBy ?? null), row.id);
   return home ? 'home' : 'carry';
 }
 
@@ -1560,7 +1565,7 @@ export function returnMovesIntoMissingLists(accountId, listedUrls) {
     const mappings = shoppingMappingsOf(listId);
     if (!mappings.length || !mappings.every(missing)) continue;
     for (const row of pendingShoppingMoves(listId)) {
-      const back = returnShoppingMove(row);
+      const back = returnShoppingMove(row, 'refused');
       returned++;
       log.warn(
         `The reminder list that shopping item "${row.name}" (${row.id}) was moved to no longer exists on the server. `
@@ -1674,7 +1679,7 @@ export function endWaitingShoppingMoves(accountId, listedUrls) {
       continue;
     }
     if (overdue !== 1 || listIsSelected(accountId, from)) continue;
-    const back = returnShoppingMove(row);
+    const back = returnShoppingMove(row, 'waited');
     returned++;
     log.warn(
       `Shopping item "${row.name}" (${row.id}) waited more than ${SHOPPING_MOVE_WAIT_DAYS} days for its reminder list ${from}, which is not selected. `
@@ -1716,7 +1721,7 @@ function objectNameOf(objectUrl) {
 
 function clearShoppingMove(id) {
   db.get().prepare(
-    'UPDATE shopping_items SET outbound_move = 0, outbound_move_attempts = 0, outbound_move_since = NULL WHERE id = ?'
+    'UPDATE shopping_items SET outbound_move = 0, outbound_move_attempts = 0, outbound_move_since = NULL, outbound_move_by = NULL WHERE id = ?'
   ).run(id);
 }
 
@@ -1728,9 +1733,13 @@ function clearShoppingMove(id) {
  * Server führt. Gibt es die Zuordnung dieser Server-Liste nicht mehr, fällt
  * nur die Vormerkung; der nächste Abruf ordnet die Zeile wie jede andere.
  *
+ * Geht die Zeile auf eine andere Liste zurück, bekommt die Person, die
+ * verschoben hat, eine Meldung an der Glocke (#1912, `noteMoveTakenBack`).
+ *
+ * @param {'refused'|'waited'} reason  warum der Umzug zurückgeht
  * @returns {number|null} die Liste, auf die die Zeile zurückging
  */
-function returnShoppingMove(row) {
+function returnShoppingMove(row, reason) {
   const from = collectionUrlOf(row.external_object_url);
   const home = from ? db.get().prepare(`
     SELECT sel.list_url, sel.target_list_id FROM caldav_reminder_selection sel
@@ -1742,8 +1751,11 @@ function returnShoppingMove(row) {
   // hier liegt kein await.
   const now = row;
   return db.get().transaction(() => {
+    // Frisch gelesen: der Aufrufer kann eine Zeile ohne die Spalte halten.
+    const movedBy = db.get().prepare('SELECT outbound_move_by FROM shopping_items WHERE id = ?').get(now.id)?.outbound_move_by ?? null;
     clearShoppingMove(now.id);
     if (!home || home.target_list_id === now.list_id) return null;
+    noteMoveTakenBack(db.get(), { movedBy, itemId: now.id, itemName: now.name, backListId: home.target_list_id, targetListId: now.list_id, reason });
     // Ans Ende der Kategorie dort, wie bei jedem Listenwechsel (Route).
     db.get().prepare(`
       UPDATE shopping_items SET list_id = ?, sort_order = COALESCE((
@@ -2066,7 +2078,7 @@ export async function processPendingShoppingMoves(client, accountId, targets, li
         }
 
         if (now.outbound_move_attempts + 1 >= MAX_OUTBOUND_ATTEMPTS) {
-          const back = returnShoppingMove(now);
+          const back = returnShoppingMove(now, 'refused');
           log.error(
             `Giving up on moving shopping item "${now.name}" (${now.id}) to reminder list ${listUrl} after `
             + `${now.outbound_move_attempts + 1} refusal(s): ${err.message}. Its entry on the server was not touched`

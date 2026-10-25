@@ -15,6 +15,7 @@ import { emailProvider } from './notification-providers/email.js';
 import { guardedFetch } from './notification-providers/guarded-fetch.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
 import { resolveHouseholdFormats, formatDateKey, translate } from '../utils/i18n.js';
+import { moveNoticeFields } from './shopping-move-notices.js';
 import { warrantyEndDate } from './inventory-deadlines.js';
 import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
@@ -133,6 +134,9 @@ const REMINDER_ORIGINS = {
   health_prevention_due:  { titleKey: 'health.tabs.prevention', url: '/health/prevention' },
   fasting_goal:           { titleKey: 'health.fasting.title',   url: '/health/fasting' },
   fasting_next_start:     { titleKey: 'health.fasting.title',   url: '/health/fasting' },
+  // #1912: der Sprung geht auf die Liste, auf die der Artikel zurueckging
+  // (reminderPayload), sonst auf den Einkauf.
+  shopping_move_returned: { titleKey: 'nav.shopping',           url: '/shopping' },
 };
 
 /**
@@ -255,6 +259,20 @@ function fastingBody(reminder, locale) {
     : 'health.fasting.remindNext');
 }
 
+/**
+ * Body der Meldung "Umzug zurueckgenommen" (#1912): ein ganzer Satz in der
+ * Haushaltssprache, aus der Momentaufnahme der Meldung.
+ */
+function moveReturnedBody(reminder, locale) {
+  const notice = reminder.move_notice;
+  if (!notice) return reminder.entity_title;
+  return translate(locale, notice.reason === 'waited'
+    ? 'shopping.moveReturned.waited'
+    : 'shopping.moveReturned.refused', {
+    item: notice.item_name, back: notice.back_list_name, target: notice.target_list_name,
+  });
+}
+
 function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -279,6 +297,8 @@ function reminderPayload(reminder, locale, dateFormat) {
     body = preventionDueBody(reminder);
   } else if (reminder.entity_type === 'fasting_goal' || reminder.entity_type === 'fasting_next_start') {
     body = fastingBody(reminder, locale);
+  } else if (reminder.entity_type === 'shopping_move_returned') {
+    body = moveReturnedBody(reminder, locale);
   }
   // Waste is the one entity_type with a real per-occurrence deep link
   // (?type=<id>&date=<date_key>, the same contract every other Waste
@@ -287,7 +307,9 @@ function reminderPayload(reminder, locale, dateFormat) {
   // only if the anchor/type vanished between sync and delivery.
   const url = (reminder.entity_type === 'waste_pickup' && reminder.waste_type_id && reminder.waste_date_key)
     ? `/waste?type=${reminder.waste_type_id}&date=${reminder.waste_date_key}`
-    : (origin ? origin.url : '/');
+    : (reminder.entity_type === 'shopping_move_returned' && reminder.move_notice?.back_list_id)
+      ? `/shopping?list=${reminder.move_notice.back_list_id}`
+      : (origin ? origin.url : '/');
   return {
     // Ohne bekannte Herkunft bleibt der App-Name: er ist nichtssagend, aber nie
     // falsch - und ein roher `entity_type` im Titel waere beides. Das Ziel
@@ -640,6 +662,10 @@ export async function processDueNotifications({
 
   for (const reminder of due) {
     reminder.cycle_owner_name = cycleOwnerName(reminder);
+    if (reminder.entity_type === 'shopping_move_returned') {
+      reminder.move_notice = moveNoticeFields(activeDb, reminder.entity_id);
+      if (reminder.move_notice) reminder.entity_title = reminder.move_notice.item_name;
+    }
     const payload = reminderPayload(reminder, locale, dateFormat);
     // EIN KANAL DES HAUSHALTS IST EIN LESER WIE JEDER ANDERE. Er bekam jede
     // faellige Erinnerung jedes Mitglieds mit Titel - auch die an eine private

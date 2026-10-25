@@ -157,11 +157,13 @@ test('die Erinnerung einer NICHT geloeschten Aufgabe bleibt stehen', () => {
   assert.equal(reminderCount(db, 'task', keeper), 1);
 });
 
-test('beide Trigger stehen auf der voll migrierten Datenbank', () => {
+test('alle Trigger stehen auf der voll migrierten Datenbank', () => {
   const names = db.prepare(
     "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_reminders_%'",
   ).all().map((r) => r.name).sort();
-  assert.deepEqual(names, ['trg_reminders_events_ad', 'trg_reminders_tasks_ad']);
+  // Seit v260 (#1912) dazu die Meldung "Umzug zurueckgenommen": sie geht mit
+  // ihrer Momentaufnahme.
+  assert.deepEqual(names, ['trg_reminders_events_ad', 'trg_reminders_shopping_move_notices_ad', 'trg_reminders_tasks_ad']);
 });
 
 // --------------------------------------------------------

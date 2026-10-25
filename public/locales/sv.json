@@ -788,7 +788,11 @@
         "tickedSection": "Avbockat",
         "itemBackToast": "”{{name}}” är tillbaka på listan.",
         "itemStateOpen": "inte avbockad",
-        "itemAddedToast": "”{{name}}” lades till under ”{{category}}”."
+        "itemAddedToast": "”{{name}}” lades till under ”{{category}}”.",
+        "moveReturned": {
+            "refused": "”{{item}}” är tillbaka på ”{{back}}”: servern tog inte emot den i ”{{target}}”.",
+            "waited": "”{{item}}” är tillbaka på ”{{back}}”: den listan har inte synkroniserats på över en vecka, så varan kom inte fram till ”{{target}}”."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",

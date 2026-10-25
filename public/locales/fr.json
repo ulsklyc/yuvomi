@@ -788,7 +788,11 @@
         "tickedSection": "Cochés",
         "itemBackToast": "« {{name}} » est de nouveau sur la liste.",
         "itemStateOpen": "non coché",
-        "itemAddedToast": "« {{name}} » ajouté dans « {{category}} »."
+        "itemAddedToast": "« {{name}} » ajouté dans « {{category}} ».",
+        "moveReturned": {
+            "refused": "« {{item}} » est de retour dans « {{back}} » : le serveur ne l’a pas accepté dans « {{target}} ».",
+            "waited": "« {{item}} » est de retour dans « {{back}} » : cette liste n’est plus synchronisée depuis plus d’une semaine, l’article n’est donc pas arrivé dans « {{target}} »."
+        }
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrédient",

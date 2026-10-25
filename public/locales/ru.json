@@ -916,7 +916,11 @@
         "tickedSection": "Отмечено",
         "itemBackToast": "«{{name}}» снова в списке.",
         "itemStateOpen": "не отмечено",
-        "itemAddedToast": "«{{name}}» добавлено в «{{category}}»."
+        "itemAddedToast": "«{{name}}» добавлено в «{{category}}».",
+        "moveReturned": {
+            "refused": "«{{item}}» снова в списке «{{back}}»: сервер не принял его в списке «{{target}}».",
+            "waited": "«{{item}}» снова в списке «{{back}}»: этот список не синхронизируется больше недели, поэтому товар не попал в список «{{target}}»."
+        }
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",

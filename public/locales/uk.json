@@ -916,7 +916,11 @@
         "tickedSection": "Позначено",
         "itemBackToast": "«{{name}}» знову в списку.",
         "itemStateOpen": "не позначено",
-        "itemAddedToast": "«{{name}}» додано до «{{category}}»."
+        "itemAddedToast": "«{{name}}» додано до «{{category}}».",
+        "moveReturned": {
+            "refused": "«{{item}}» знову у списку «{{back}}»: сервер не прийняв його у списку «{{target}}».",
+            "waited": "«{{item}}» знову у списку «{{back}}»: цей список не синхронізується понад тиждень, тому товар не потрапив до списку «{{target}}»."
+        }
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",

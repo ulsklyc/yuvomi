@@ -629,7 +629,7 @@ router.patch('/items/:itemId', (req, res) => {
       // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
       db.get().transaction(() => {
         // VOR dem Umzug, mit der Zeile der alten Liste.
-        if (moved) moveShoppingMirror(item, targetListId);
+        if (moved) moveShoppingMirror(item, targetListId, req.authUserId || req.session.userId);
 
         db.get().prepare(`
           UPDATE shopping_items
