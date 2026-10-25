@@ -936,18 +936,29 @@ async function dropUnreachableSelection() {
   if (gone.length) log.info(`${gone.length} calendar(s) not offered by the reconnected account removed from the selection.`);
 }
 
+/** Die drei Variablen, die der Google-Abgleich zusammen braucht (.env.example). */
+const GOOGLE_ENV_KEYS = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'];
+
 /**
  * Verbindungsstatus zurückgeben.
- * @returns {{ configured: boolean, connected: boolean, lastSync: string|null }}
+ *
+ * `missingEnv` nennt die NAMEN der fehlenden Variablen, nie einen Wert: die
+ * Einstellungen machten aus "Nicht konfiguriert" bis #2221 eine Sackgasse, ohne
+ * zu sagen, was fehlt. `redirectUri` ist die eingetragene Rueckrufadresse - eine
+ * oeffentliche URL, die Google ohnehin im Browser sieht, kein Geheimnis.
+ * @returns {{ configured: boolean, connected: boolean, lastSync: string|null, missingEnv: string[], redirectUri: string|null }}
  */
 function getStatus() {
-  const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI);
+  const missingEnv = GOOGLE_ENV_KEYS.filter((key) => !process.env[key]);
+  const configured = missingEnv.length === 0;
   const connected  = !!(cfgGet('google_access_token') && cfgGet('google_refresh_token'));
   const lastSync   = cfgGet('google_last_sync');
   return {
     configured,
     connected,
     lastSync,
+    missingEnv,
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || null,
     // Tokens stehen noch, aber Google nimmt sie nicht mehr an (#2019).
     needsReauth: connected && needsReauth(),
     selectedCount: enabledCalendarIds().length,

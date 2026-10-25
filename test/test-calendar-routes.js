@@ -349,6 +349,34 @@ test('GET /google/status — configured:false ohne Config', async () => {
   assert.equal(res.body.connected, false);
 });
 
+test('GET /google/status — nennt fehlende Variablen, nie ihre Werte (#2221)', async () => {
+  const keys = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  try {
+    process.env.GOOGLE_CLIENT_ID = 'client-id-geheim-123';
+    process.env.GOOGLE_CLIENT_SECRET = 'client-secret-geheim-456';
+    delete process.env.GOOGLE_REDIRECT_URI;
+    const res = await call('GET', '/google/status', { actor: ADMIN });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.configured, false);
+    assert.deepEqual(res.body.missingEnv, ['GOOGLE_REDIRECT_URI'], 'nur der Name der fehlenden Variable');
+    assert.equal(res.body.redirectUri, null);
+    assert.doesNotMatch(JSON.stringify(res.body), /geheim/, 'kein Wert einer gesetzten Variable');
+
+    process.env.GOOGLE_REDIRECT_URI = 'https://home.example.net/api/v1/calendar/google/callback';
+    const done = await call('GET', '/google/status', { actor: ADMIN });
+    assert.equal(done.body.configured, true);
+    assert.deepEqual(done.body.missingEnv, []);
+    assert.equal(done.body.redirectUri, 'https://home.example.net/api/v1/calendar/google/callback');
+    assert.doesNotMatch(JSON.stringify(done.body), /geheim/);
+  } finally {
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+});
+
 test('GET /apple/status — configured:false ohne Config', async () => {
   const res = await call('GET', '/apple/status', { actor: MARIA });
   assert.equal(res.status, 200);

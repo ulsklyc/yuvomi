@@ -912,6 +912,10 @@ test('ein Display sieht die Verwaltungsdaten der Sync-Konten NICHT', async () =>
   assert.equal(googleDisplay.body.lastError, undefined, 'der Fehlertext fehlt');
   assert.equal(googleDisplay.body.lastErrorAt, undefined, 'und sein Zeitpunkt auch');
   assert.ok('connected' in googleDisplay.body, 'der Rest der Antwort bleibt stehen');
+  // Fehlende Variablen und Rueckrufadresse sind Einrichtung des Haushalts (#2221).
+  assert.ok(Array.isArray(alsMenschGoogle.body.missingEnv), 'Vorbedingung: die Sitzung sieht die fehlenden Variablen');
+  assert.equal(googleDisplay.body.missingEnv, undefined, 'das Display sieht sie nicht');
+  assert.equal(googleDisplay.body.redirectUri, undefined, 'und die Rueckrufadresse auch nicht');
 
   // Apple mit eigenem Fehlertext, nicht nur mit fehlendem Schluessel: ohne die
   // Zeile belegte die Probe bloss, dass das Feld leer ist - nicht, dass ein

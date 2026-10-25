@@ -913,7 +913,13 @@ the same kind, listed in the same table.
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL, `https://<YOUR-DOMAIN>/api/v1/calendar/google/callback`. Yuvomi does not derive it, so it has to be set | - | Yes when Google sync is used |
 
 The three variables belong together. As long as one of them is empty, the settings page shows
-"Not configured (missing .env variables)" instead of the connect button.
+"Not configured (missing .env variables)" instead of the connect button, and for an admin the
+Google card under **Settings → Modules → Calendar sync → More providers** turns into a short setup
+guide: which of the three variables are still missing (names only, never values), the redirect URI
+to register at Google with a copy button (the value of `GOOGLE_REDIRECT_URI` when it is set,
+otherwise the address the admin is using, with a warning when Google would refuse it), the steps
+below in short, and the ways to get a Google calendar in without any Google setup: subscribe to its
+secret address in iCal format (read only) or import it once as an `.ics` file.
 
 **Setting it up at Google.** Google renames the pages of its console from time to time, so the steps
 below say what has to exist rather than where to click; the current click path is in Google's own
