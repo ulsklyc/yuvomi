@@ -13,7 +13,7 @@ import {
   legacyColorSnapshotKey, forgetLegacyColorSnapshot, legacyColorChosenIds,
   legacyColorHealKey, legacyColorHealEnded, legacyColorCutoff,
 } from './legacy-color-snapshot.js';
-import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import {
   pruneDeletedEvents, countMirroredEvents, deleteMirroredEvents,
   countAccountEvents as countEventsOfAccount, deleteAccountEvents,
@@ -1096,6 +1096,12 @@ async function runSync({ createClient } = {}) {
        external_object_url, caldav_account_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?, ?)
   `);
+  // Die Serie einer neu angelegten Ausnahme (#2202), im selben Konto.
+  const selSeriesRow = conn.prepare(`
+    SELECT id FROM calendar_events
+    WHERE external_calendar_id = ? AND external_source = 'caldav' AND caldav_account_id IS ?
+    ORDER BY id LIMIT 1
+  `);
   // EXDATE-Ausnahmen der Serie (#489/#549). Additiv (INSERT OR IGNORE): entfernt
   // keine lokal vom Nutzer ausgenommenen Einzeltermine.
   const insException = conn.prepare(
@@ -1421,8 +1427,10 @@ async function runSync({ createClient } = {}) {
                 );
                 eventId = Number(inserted.lastInsertRowid);
                 changed = true;
-                // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
-                assignDefaultToEvent(db.get(), eventId, calDefaultAssignee);
+                // Standard-Zuweisung dieses Kalenders (#459) auf den neuen
+                // Termin; eine Ausnahme einer Serie erbt deren Zuweisung (#2202).
+                const seriesId = ev.seriesUid ? selSeriesRow.get(ev.seriesUid, account.id)?.id ?? null : null;
+                assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignee);
               }
 
               // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,

@@ -42,6 +42,54 @@ export function assignDefaultToEvent(d, eventId, userId) {
     .run(eventId, userId);
 }
 
+/**
+ * Zuweisung eines frisch angelegten Einzelvorkommens, das der Sync aus einer
+ * Ausnahme seiner Serie macht (#2202): CalDAV/Apple eine RECURRENCE-ID unter
+ * derselben UID (`<uid>::<Tag>`, normalizeRecurrenceOverrides), Google ein
+ * Event mit `recurringEventId`.
+ *
+ * Die Ausnahme erbt, was an der Serie steht. Ohne das bekam sie nur die
+ * Standard-Person des Kalenders, und wer in iOS ein Vorkommen aenderte ("Nur
+ * dieses Ereignis"), verlor an genau diesem Vorkommen die Zuweisung, die in
+ * Yuvomi an der Serie gesetzt war. Hat die Serie keine, gilt wie bisher die
+ * Standard-Person. Nur beim Anlegen: was danach an der Ausnahme selbst
+ * zugewiesen oder entfernt wird, fasst der Sync nicht mehr an.
+ *
+ * Eine Serie, die aus "Alle zukuenftigen Ereignisse" entsteht, bekommt in iOS
+ * eine neue UID und ist hier nicht als verwandt erkennbar - sie laeuft ueber
+ * die Standard-Person wie jeder neue Termin.
+ *
+ * @param {object} d               Datenbank-Handle
+ * @param {number} eventId         die neu angelegte Ausnahme
+ * @param {number|null} masterId   Zeile der Serie, falls bekannt
+ * @param {number|null} defaultUserId  Standard-Person des Kalenders
+ */
+export function assignNewOverride(d, eventId, masterId, defaultUserId) {
+  if (eventId && masterId && copyMasterAssignment(d, eventId, masterId)) return;
+  assignDefaultToEvent(d, eventId, defaultUserId);
+}
+
+function copyMasterAssignment(d, eventId, masterId) {
+  const master = d.prepare(`
+    SELECT e.assigned_to, u.id AS primary_exists
+    FROM calendar_events e LEFT JOIN users u ON u.id = e.assigned_to
+    WHERE e.id = ?
+  `).get(masterId);
+  if (!master) return false;
+  // Verwaiste Personen (Nutzer geloescht) fallen heraus, wie in assignDefaultToEvent.
+  const users = d.prepare(`
+    SELECT a.user_id FROM event_assignments a JOIN users u ON u.id = a.user_id
+    WHERE a.event_id = ? ORDER BY a.user_id
+  `).all(masterId).map((r) => r.user_id);
+  const primary = master.primary_exists != null ? master.assigned_to : (users[0] ?? null);
+  if (primary == null) return false;
+
+  d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(primary, eventId);
+  const insert = d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
+  for (const userId of new Set([primary, ...users])) insert.run(eventId, userId);
+  return true;
+}
+
 // --------------------------------------------------------
 // Nachtragen auf bereits importierte Termine (#1154).
 //

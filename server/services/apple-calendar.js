@@ -18,7 +18,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('Apple');
 
 import * as db from '../db.js';
-import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -552,8 +552,15 @@ async function runSync({ makeClient } = {}) {
               obj.url ?? null
             );
             eventId = Number(inserted.lastInsertRowid);
-            // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin.
-            assignDefaultToEvent(db.get(), eventId, calDefaultAssignee);
+            // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin;
+            // eine Ausnahme einer Serie erbt deren Zuweisung (#2202).
+            const seriesId = ev.seriesUid
+              ? db.get().prepare(`
+                  SELECT id FROM calendar_events
+                  WHERE external_calendar_id = ? AND external_source = 'apple' ORDER BY id LIMIT 1
+                `).get(ev.seriesUid)?.id ?? null
+              : null;
+            assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignee);
           }
 
           // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,
