@@ -261,7 +261,7 @@ test('PUT /calendar/:id: ein leerer oder null-Start ist ein 400, das Ende darf g
   for (const start of ['', null]) {
     const res = await call('PUT', `/calendar/${id}`, { start_datetime: start });
     assert.equal(res.status, 400, `start_datetime: ${JSON.stringify(start)}`);
-    assert.match(res.body.error, /Startdatum is required\./, JSON.stringify(res.body));
+    assert.match(res.body.error, /start_datetime is required\./, JSON.stringify(res.body));
     assert.deepEqual({ ...eventRow(id) },
       { start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00', all_day: 0 },
       'eine abgewiesene Anfrage aendert nichts');

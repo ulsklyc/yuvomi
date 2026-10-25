@@ -1225,7 +1225,10 @@
         "errorCalendarGone": "Wala na ang kalendaryong ito.",
         "errorCalendarNameInvalid": "Bigyan ang kalendaryo ng pangalang hindi hihigit sa {{limit}} na character.",
         "errorCalendarOrderChanged": "Nagbago na ang mga kalendaryo sa pansamantala.",
-        "errorDeleteFeedAdminOnly": "Ine-export ang kalendaryong ito. Admin lang ang makakapag-delete nito."
+        "errorDeleteFeedAdminOnly": "Ine-export ang kalendaryong ito. Admin lang ang makakapag-delete nito.",
+        "errorEventGone": "Wala na ang pangyayaring ito.",
+        "errorSelectedCalendarGone": "Wala na ang napiling kalendaryo.",
+        "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula."
     },
     "noteCategories": {
         "categories": "Mga kategorya",

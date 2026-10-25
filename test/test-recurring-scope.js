@@ -703,12 +703,13 @@ test('Die Schlüssel beider Rückfragen stehen in allen Locales', () => {
 
 test('Gruende eines abgelehnten Vorkommens haben einen Satz in allen Locales (#2034, #1909)', () => {
   // Die Kalenderseite exportiert ihren Uebersetzer nicht: geprueft wird, dass
-  // sie beide Gruende auf Schluessel abbildet, an allen drei Stellen fragt und
+  // sie beide Gruende auf Schluessel abbildet, an allen vier Stellen fragt und
   // dass es die Schluessel in jeder Sprache gibt.
   const page = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf-8');
   assert.match(page, /'invalid_recurrence_id'\) return t\('calendar\.occurrenceGoneError'\)/);
   assert.match(page, /'malformed_recurrence_id'\) return t\('calendar\.occurrenceMalformedError'\)/);
-  assert.equal((page.match(/occurrenceErrorMessage\(err\) \?\?/g) ?? []).length, 3, 'Speichern und beide Loeschwege');
+  // Seit #1909 fragt auch das Loeschen eines ganzen Termins: seine Serie kann weg sein.
+  assert.equal((page.match(/occurrenceErrorMessage\(err\) \?\?/g) ?? []).length, 4, 'Speichern und die drei Loeschwege');
   const dir = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
     const cal = JSON.parse(readFileSync(new URL(file, dir), 'utf-8')).calendar;

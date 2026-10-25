@@ -2351,7 +2351,7 @@ test('occurrence PUT distinguishes missing, ineligible and invalid original slot
   assert.equal(invalid.status, 400);
   assert.equal(invalid.body.code, 400);
   assert.equal(invalid.body.reason, 'invalid_recurrence_id');
-  assert.match(invalid.body.error, /Serientermin.*Datum/);
+  assert.match(invalid.body.error, /occurrence.*series/);
 });
 
 test('occurrence PUT refuses every provider-owned, imported, generated and outbound-targeted series', async () => {
@@ -2563,7 +2563,7 @@ test('restored Outlook write access never sends existing linked children through
     const event = (await call('GET', `/${childId}`)).body.data;
     await assert.rejects(requestCalendarOccurrenceDelete({ api, event, scope: 'this' }), { status: 400 });
     await assert.rejects(requestCalendarOccurrenceMutation({ api, event, scope: 'this', body: { title: 'Duplicate' } }),
-      (error) => error.status === 400 && /deaktiviere/i.test(error.data.error));
+      (error) => error.status === 400 && /switched off/i.test(error.data.error));
     assert.equal(writes.some((write) => write.method === 'post'), false);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 1);
     const disabled = await call('PATCH', `/outlook/accounts/${accountId}/calendars`, {
@@ -2722,7 +2722,7 @@ test('following rejects an empty successor before attachment persistence', async
     assert.equal(response.status, 400);
     assert.equal(response.body.code, 400);
     assert.equal(response.body.reason, 'empty_successor_series');
-    assert.match(response.body.error, /Folgeserie.*Startdatum/);
+    assert.match(response.body.error, /successor series.*start date/);
     assert.equal(db.prepare('SELECT recurrence_rule FROM calendar_events WHERE id = ?')
       .get(seriesId).recurrence_rule, 'FREQ=DAILY');
     assert.equal(db.prepare(`
@@ -3425,7 +3425,10 @@ test('occurrence mutation routes reject schema-invalid values before persistence
         body,
       });
       assert.equal(response.status, 400, `${suffix || '/only'} ${JSON.stringify(body)}`);
-      assert.doesNotMatch(response.body.error, /\bmust\b|unknown user ID|duplicate user IDs/);
+      // Englisch fuer API-Clients, ohne Grund: das Formular laesst keinen dieser
+      // Werte durch, die App sagt ihren allgemeinen Satz (#1909).
+      assert.doesNotMatch(response.body.error, /[äöüß]|Gib |Wähle/);
+      assert.equal(response.body.reason, undefined, JSON.stringify(body));
       assert.equal(db.prepare(`
         SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
       `).get(seriesId).count, 0);
@@ -3571,7 +3574,7 @@ test('whole-series rule update requires the exact orphan count and detaches conf
   });
   assert.equal(first.status, 409);
   assert.deepEqual(first.body, {
-    error: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
+    error: 'This change needs a current confirmation of the affected occurrence overrides (confirmed_orphan_count).',
     code: 409,
     conflict: 'calendar_override_orphans',
     orphaned_override_count: 1,
@@ -3795,7 +3798,7 @@ test('whole-series stale orphan confirmation is rejected after the count reaches
   assert.deepEqual(response, {
     status: 409,
     body: {
-      error: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
+      error: 'This change needs a current confirmation of the affected occurrence overrides (confirmed_orphan_count).',
       code: 409,
       conflict: 'calendar_override_orphans',
       orphaned_override_count: 0,
@@ -3821,7 +3824,7 @@ test('first-slot following update returns and accepts the exact orphan confirmat
   assert.deepEqual(first, {
     status: 409,
     body: {
-      error: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
+      error: 'This change needs a current confirmation of the affected occurrence overrides (confirmed_orphan_count).',
       code: 409,
       conflict: 'calendar_override_orphans',
       orphaned_override_count: 1,
@@ -5349,4 +5352,80 @@ test('POST /:id/reset: ein Termin, den die Person nicht sieht, ist 404 - nicht 4
 
   db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?)').run(ics, priv);
   db.prepare('DELETE FROM ics_subscriptions WHERE id = ?').run(subId);
+});
+
+// #1909, Termine: der Server benennt jeden Fall, den ein Nutzer beim Speichern,
+// Zuruecksetzen oder Loeschen erreicht, mit einem `reason`; der Text in `error`
+// ist englisch und bleibt fuer API-Clients stehen.
+test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', async () => {
+  const GERMAN = /[äöüß]|Termin|Kalender|Gib |Wähle|Serie |Fehler/;
+  const english = (res, label) => {
+    assert.equal(typeof res.body?.error, 'string', label);
+    assert.doesNotMatch(res.body.error, GERMAN, `${label}: ${res.body.error}`);
+  };
+  const missing = 999999;
+  for (const [method, route, body] of [
+    ['GET', `/${missing}`, undefined],
+    ['PUT', `/${missing}`, { title: 'Weg' }],
+    ['DELETE', `/${missing}`, undefined],
+    ['POST', `/${missing}/reset`, undefined],
+    ['POST', `/${missing}/exceptions`, { recurrence_id: '2035-03-10' }],
+  ]) {
+    const res = await call(method, route, { body });
+    assert.equal(res.status, 404, `${method} ${route}`);
+    assert.equal(res.body.reason, 'calendar_event_not_found', `${method} ${route}`);
+    english(res, `${method} ${route}`);
+  }
+  for (const [method, route] of [
+    ['DELETE', `/${missing}/occurrences/2035-03-10`],
+    ['DELETE', `/${missing}/occurrences/2035-03-10/following`],
+    ['PUT', `/${missing}/occurrences/2035-03-10`],
+  ]) {
+    const res = await call(method, route, { body: method === 'PUT' ? { title: 'Weg' } : undefined });
+    assert.equal(res.status, 404, `${method} ${route}`);
+    assert.equal(res.body.reason, 'calendar_series_not_found', `${method} ${route}`);
+    english(res, `${method} ${route}`);
+  }
+
+  // Der im Dialog gewaehlte Kalender ist inzwischen geloescht.
+  const single = insertEvent({ title: 'GRUND-EINZEL', start_datetime: '2035-03-10T09:00' });
+  const series = insertEvent({ title: 'GRUND-SERIE', start_datetime: '2035-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  try {
+    for (const [method, route, extra] of [
+      ['POST', '/', { title: 'Neu', start_datetime: '2035-03-10T09:00' }],
+      ['PUT', `/${single}`, {}],
+      ['PUT', `/${series}/occurrences/2035-03-05T09:00:00/following`, {}],
+    ]) {
+      const res = await call(method, route, { body: { ...extra, local_calendar_id: missing } });
+      assert.equal(res.status, 400, `${method} ${route}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.reason, 'calendar_selected_calendar_not_found', `${method} ${route}`);
+      english(res, `${method} ${route}`);
+    }
+    // Eine Kennung, die keine Zahl ist, schickt nur ein Aufrufer: kein Fall.
+    const malformed = await call('POST', '/', { body: { title: 'Neu', start_datetime: '2035-03-10T09:00', local_calendar_id: 'x' } });
+    assert.equal(malformed.status, 400);
+    assert.equal(malformed.body.reason, undefined);
+    english(malformed, 'local_calendar_id x');
+    // Ein leerer Titel ebenso (das Formular prueft ihn selbst).
+    const untitled = await call('POST', '/', { body: { title: '', start_datetime: '2035-03-10T09:00' } });
+    assert.equal(untitled.status, 400);
+    assert.equal(untitled.body.reason, undefined);
+    english(untitled, 'title leer');
+
+    // Eine Wiederholung ohne ein Vorkommen (#960) und ein Ende vor dem Start (#1607).
+    for (const [method, route] of [['POST', '/'], ['PUT', `/${single}`]]) {
+      const none = await call(method, route, { body: {
+        title: 'Leer', start_datetime: '2035-01-15T09:00', recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20350120',
+      } });
+      assert.equal(none.status, 400, `${method}: ${JSON.stringify(none.body)}`);
+      assert.equal(none.body.reason, 'calendar_series_no_occurrence', method);
+      const before = await call(method, route, { body: {
+        title: 'Vorher', start_datetime: '2035-01-15T09:00', recurrence_rule: 'FREQ=DAILY;UNTIL=20350110',
+      } });
+      assert.equal(before.status, 400, `${method}: ${JSON.stringify(before.body)}`);
+      assert.equal(before.body.reason, 'calendar_series_ends_before_start', method);
+    }
+  } finally {
+    db.prepare("DELETE FROM calendar_events WHERE title IN ('GRUND-EINZEL', 'GRUND-SERIE')").run();
+  }
 });

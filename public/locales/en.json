@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "This calendar no longer exists.",
         "errorCalendarNameInvalid": "Give the calendar a name of at most {{limit}} characters.",
         "errorCalendarOrderChanged": "The calendars have changed in the meantime.",
-        "errorDeleteFeedAdminOnly": "This calendar is being exported. Only an admin can delete it."
+        "errorDeleteFeedAdminOnly": "This calendar is being exported. Only an admin can delete it.",
+        "errorEventGone": "This event no longer exists.",
+        "errorSelectedCalendarGone": "The chosen calendar no longer exists.",
+        "errorSeriesNoOccurrence": "With this repeat there would be no event at all from the start date."
     },
     "noteCategories": {
         "categories": "Categories",

@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "此日历已不存在。",
         "errorCalendarNameInvalid": "日历名称最多 {{limit}} 个字符。",
         "errorCalendarOrderChanged": "日历在此期间已更改。",
-        "errorDeleteFeedAdminOnly": "此日历正在导出。只有管理员可以删除它。"
+        "errorDeleteFeedAdminOnly": "此日历正在导出。只有管理员可以删除它。",
+        "errorEventGone": "此日程已不存在。",
+        "errorSelectedCalendarGone": "所选的日历已不存在。",
+        "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。"
     },
     "noteCategories": {
         "categories": "分类",

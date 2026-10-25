@@ -320,3 +320,94 @@ test('renaming a calendar has the same length limit as creating one (#1909)', ()
     assert.match(html, /class="form-input cal-calendar-row__name"[^>]*maxlength="80"/);
   } finally { setPermissions(permissions); }
 });
+
+// #1909, Termine: Speichern, Zuruecksetzen und Loeschen sagen den Satz der App,
+// nie den Text des Servers (hier der deutsche von vor #1909).
+test('saving an event says the app sentence, never the server text (#1909)', () => {
+  const cases = [
+    [apiError(404, { error: 'Termin nicht gefunden', code: 404, reason: 'calendar_event_not_found' }), 'calendar.errorEventGone'],
+    [apiError(404, { error: 'Terminserie nicht gefunden. Lade den Kalender erneut.', code: 404, reason: 'calendar_series_not_found' }), 'calendar.errorEventGone'],
+    [apiError(400, { error: 'Kalender: Dieser Kalender existiert nicht mehr.', code: 400, reason: 'calendar_selected_calendar_not_found' }), 'calendar.errorSelectedCalendarGone'],
+    [apiError(400, { error: 'recurrence_rule: the rule has no occurrence on or after the start date.', code: 400, reason: 'calendar_series_no_occurrence' }), 'calendar.errorSeriesNoOccurrence'],
+    [apiError(400, { error: 'Die Folgeserie enthält ab ihrem Startdatum keinen Termin.', code: 400, reason: 'empty_successor_series' }), 'calendar.errorSeriesNoOccurrence'],
+    [apiError(400, { error: 'recurrence_rule: the series ends before the start date.', code: 400, reason: 'calendar_series_ends_before_start' }), 'calendar.recurrenceEndBeforeStart'],
+    // Ohne eigenen Satz: der allgemeine der Stelle.
+    [apiError(400, { error: 'Titel: Gib einen gültigen Text ein.', code: 400 }), 'calendar.saveError'],
+    [apiError(400, { error: 'Die Einzelausnahme konnte nicht geändert werden.', code: 400, reason: 'invalid_override_fields' }), 'calendar.saveError'],
+  ];
+  for (const [err, key] of cases) assert.equal(calendar.calendarSaveErrorMessage(err), key, err.data.error);
+});
+
+test('an event that is gone counts as deleted, every other failure stays one (#1909)', async () => {
+  const gone = apiError(404, { error: 'Termin nicht gefunden', code: 404, reason: 'calendar_event_not_found' });
+  const seriesGone = apiError(404, { error: 'Calendar series not found.', code: 404, reason: 'calendar_series_not_found' });
+  for (const err of [gone, seriesGone]) {
+    assert.equal(calendar.eventGone(err), true);
+    await calendar.deleteUnlessGone(async () => { throw err; });
+  }
+  const others = [
+    apiError(403, { error: 'Nope', code: 403, reason: 'calendar_event_not_found' }),
+    apiError(404, { error: 'Not found', code: 404 }),
+    apiError(400, { error: 'x', code: 400, reason: 'calendar_selected_calendar_not_found' }),
+    apiError(400, { error: 'x', code: 400, reason: 'invalid_recurrence_id' }),
+  ];
+  for (const err of others) {
+    assert.equal(calendar.eventGone(err), false, JSON.stringify(err.data));
+    await assert.rejects(calendar.deleteUnlessGone(async () => { throw err; }), err);
+  }
+  // Der Satz eines gescheiterten Loeschens.
+  assert.equal(calendar.occurrenceErrorMessage(seriesGone), 'calendar.errorEventGone');
+  assert.equal(calendar.occurrenceErrorMessage(others[3]), 'calendar.occurrenceGoneError');
+  assert.equal(calendar.occurrenceErrorMessage(others[1]), null);
+});
+
+test('the three event delete paths: gone is done, any other failure says the app sentence (#1909)', async () => {
+  const previous = { window: globalThis.window, apiStub: globalThis.__apiStub, undoStub: globalThis.__undoStub,
+    events: calendar.localCalendarState.events };
+  const toasts = [];
+  let expire = null;
+  globalThis.window = { yuvomi: { showToast(message, type) { toasts.push([message, type]); } } };
+  // Der Undo-Toast (utils/ux.js, im Loader ersetzt): sein Ablauf schreibt.
+  globalThis.__undoStub = ({ commit, restore }) => {
+    expire = async () => { try { await commit({ keepalive: false }); } catch (err) { restore(err); } };
+  };
+  calendar.setContainerForTest({ isConnected: false, querySelector: () => null, querySelectorAll: () => [] });
+  const single = { id: 41, title: 'Arzt', start_datetime: '2035-05-02T09:00', visibility: 'all' };
+  const occurrence = { id: 42, series_id: 42, title: 'Turnen', start_datetime: '2035-05-02T09:00',
+    recurrence_id: '2035-05-02T09:00:00', recurrence_rule: 'FREQ=WEEKLY', can_override_occurrence: true, visibility: 'all' };
+  const GONE = apiError(404, { error: 'Termin nicht gefunden', code: 404, reason: 'calendar_event_not_found' });
+  const SERIES_GONE = apiError(404, { error: 'Terminserie nicht gefunden.', code: 404, reason: 'calendar_series_not_found' });
+  const OTHER = apiError(400, { error: 'Der Termin konnte nicht gelöscht werden.', code: 400 });
+  try {
+    for (const [label, run, event, err] of [
+      ['deleteEvent', calendar.deleteEvent, single, GONE],
+      ['deleteThisAndFollowing', calendar.deleteThisAndFollowing, occurrence, SERIES_GONE],
+      ['deleteSingleOccurrence', calendar.deleteSingleOccurrence, occurrence, SERIES_GONE],
+    ]) {
+      for (const [thrown, expected] of [[err, []], [OTHER, [['calendar.deleteError', 'danger']]]]) {
+        toasts.length = 0;
+        expire = null;
+        calendar.localCalendarState.events = [{ ...event }];
+        globalThis.__apiStub = {
+          delete: async () => { throw thrown; },
+          post: async () => { throw thrown; },
+          put: async () => { throw thrown; },
+          get: async () => ({ data: [] }),
+        };
+        await run(event);
+        assert.equal(typeof expire, 'function', `${label}: the undo toast holds the delete`);
+        await expire();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(toasts, expected, `${label}: ${thrown.data.error}`);
+        assert.equal(calendar.localCalendarState.events.length, thrown === OTHER ? 1 : 0,
+          `${label}: ${thrown === OTHER ? 'a failed delete brings the event back' : 'a gone event stays gone'}`);
+      }
+    }
+  } finally {
+    calendar.localCalendarState.events = previous.events;
+    calendar.setContainerForTest(null);
+    globalThis.window = previous.window;
+    if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
+    if (previous.undoStub === undefined) delete globalThis.__undoStub; else globalThis.__undoStub = previous.undoStub;
+  }
+});

@@ -44,16 +44,22 @@ function localCalendarById(conn, id) {
   return conn.prepare('SELECT * FROM local_calendars WHERE id = ?').get(numeric) ?? null;
 }
 
+// Ein gewaehlter Kalender, den es inzwischen nicht mehr gibt, ist ein Fall, den
+// ein Nutzer im Termin-Dialog erreicht (jemand hat ihn in der Verwaltung
+// geloescht): er traegt `reason` (#1909). Eine Kennung, die keine Zahl ist,
+// schickt nur ein Aufrufer der API.
 function validateCalendarId(conn, raw, { required = false } = {}) {
   if (raw === undefined || raw === null || raw === '') {
-    return { value: required ? null : undefined, error: required ? 'Kalender: Wähle einen gültigen Kalender aus.' : null };
+    return { value: required ? null : undefined, error: required ? 'Calendar: choose a valid calendar.' : null };
   }
   const id = Number(raw);
   if (!Number.isInteger(id) || id < 1) {
-    return { value: null, error: 'Kalender: Wähle einen gültigen Kalender aus.' };
+    return { value: null, error: 'Calendar: choose a valid calendar.' };
   }
   const row = localCalendarById(conn, id);
-  if (!row) return { value: null, error: 'Kalender: Dieser Kalender existiert nicht mehr.' };
+  if (!row) {
+    return { value: null, error: 'Calendar: this calendar no longer exists.', reason: 'calendar_selected_calendar_not_found' };
+  }
   return { value: row.id, error: null };
 }
 

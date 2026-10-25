@@ -1833,7 +1833,7 @@ async function openTaskFromCalendar(taskId) {
     });
   } catch (err) {
     console.error('[Calendar] Aufgabe konnte nicht geöffnet werden:', err);
-    window.yuvomi?.showToast(err.message ?? t('tasks.loadError'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err, 'tasks.loadError'), 'danger');
   }
 }
 
@@ -7220,7 +7220,9 @@ export const __test = {
   buildEventModalContent, eventAdvancedTopics, wireVisibilityWarning,
   // #1974: die Detailzeile der Wiederholung, gemessen an der echten Verdrahtung.
   renderEventDetail,
-  calendarSaveErrorMessage,
+  calendarSaveErrorMessage, occurrenceErrorMessage, eventGone, deleteUnlessGone,
+  // #1909: die drei Loeschwege eines Termins, am echten Undo-Ablauf.
+  deleteEvent, deleteThisAndFollowing, deleteSingleOccurrence,
   hasCurrentAttachment,
   attachmentNode,
   fetchWindow,
@@ -7824,9 +7826,16 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
           else await notifyAwayChanged();
           window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
         } catch (err) {
-          // Server-Meldung bevorzugen (nutzerorientiert), sonst lokalisierter
-          // Fallback - nie den rohen JS-/Netzwerk-Fehlertext zeigen.
-          window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+          // Der Satz der App, nie der Text des Servers (#1909). Gibt es den
+          // Termin nicht mehr, schliesst die Ansicht und der Kalender laedt nach.
+          window.yuvomi?.showToast(errorSentence(err, 'calendar.saveError'), 'danger');
+          if (eventGone(err)) {
+            await close({ force: true });
+            if (await reloadEventsAfterGone()) {
+              renderView();
+              refocusAfterRender();
+            }
+          }
         }
       },
     });
@@ -9478,28 +9487,65 @@ function confirmLocalWholeSeriesDelete(event) {
 }
 
 /**
- * Die Meldung zu einem abgewiesenen Speichern. Die beiden Anhang-Absagen
- * (#1358) tragen einen `reason` und bekommen einen uebersetzten Satz statt
- * des englischen Servertexts; alles andere wie bisher.
+ * Die Meldung zu einem abgewiesenen Speichern - nie der Text des Servers
+ * (#1909). Die beiden Anhang-Absagen (#1358) liest nur diese Seite, die Gruende
+ * einer Einzelausnahme occurrenceErrorMessage; alles andere kommt aus
+ * CASE_MESSAGES oder ist der allgemeine Satz.
  */
 function calendarSaveErrorMessage(err) {
   const reason = err?.data?.reason;
   if (reason === 'ATTACHMENT_CHANGE_REFUSED') return t('calendar.attachmentChangeRefused');
   if (reason === 'ATTACHMENT_UPLOAD_REFUSED') return t('calendar.attachmentUploadRefused');
-  return occurrenceErrorMessage(err) ?? err?.data?.error ?? t('calendar.saveError');
+  return occurrenceErrorMessage(err) ?? errorSentence(err, 'calendar.saveError');
 }
 
 /**
  * Der Satz fuer die Gruende, mit denen der Server ein Vorkommen ablehnt
- * (#2034, #1909-Muster) - oder nichts, dann gilt der bisherige Text. Erreicht
- * wird er, wenn der Kalender veraltet ist: das gewaehlte Vorkommen gibt es
- * nicht mehr, oder sein Schluessel kam nicht lesbar an.
+ * (#2034, #1909-Muster) - oder nichts, dann gilt errorSentence. Erreicht wird
+ * er, wenn der Kalender veraltet ist: das gewaehlte Vorkommen oder die ganze
+ * Serie gibt es nicht mehr, sein Schluessel kam nicht lesbar an, oder die
+ * Folgeserie haette ab ihrem Start keinen Termin.
  */
 function occurrenceErrorMessage(err) {
   const reason = err?.data?.reason;
   if (reason === 'invalid_recurrence_id') return t('calendar.occurrenceGoneError');
   if (reason === 'malformed_recurrence_id') return t('calendar.occurrenceMalformedError');
+  if (err?.status === 404 && reason === 'calendar_series_not_found') return t('calendar.errorEventGone');
+  if (reason === 'empty_successor_series') return t('calendar.errorSeriesNoOccurrence');
   return null;
+}
+
+/**
+ * Gibt es den Termin (oder seine Serie) nicht mehr? Geloescht von jemand
+ * anderem im Haushalt, oder fuer diese Person nicht mehr sichtbar (#1909).
+ * Ein Loeschen mit diesem Grund hat erreicht, was es wollte.
+ */
+function eventGone(err) {
+  return isAlreadyDeleted(err, 'calendar_event_not_found')
+    || (err?.status === 404 && err?.data?.reason === 'calendar_series_not_found');
+}
+
+/**
+ * Nach einem Termin, den es nicht mehr gibt: der Kalender holt seine Termine
+ * frisch (reloadForView laedt nur bei geaendertem Bereich) - true heisst, der
+ * Aufrufer zeichnet neu; ueber einer fremden Seite frischt diese sich auf.
+ */
+async function reloadEventsAfterGone() {
+  if (!hostedHere()) {
+    await notifyAwayChanged();
+    return false;
+  }
+  await reloadAfterSave(() => reloadCalendarEventsOnly());
+  return true;
+}
+
+/** Ein Loeschen, das schon jemand anderes erledigt hat, ist kein Fehler (#1909). */
+async function deleteUnlessGone(request) {
+  try {
+    await request();
+  } catch (err) {
+    if (!eventGone(err)) throw err;
+  }
 }
 
 /**
@@ -9877,6 +9923,20 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     window.yuvomi?.showToast(calendarSaveErrorMessage(err), 'danger');
     saveBtn.disabled    = false;
     saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.add');
+    if (eventGone(err)) {
+      // Den Termin gibt es nicht mehr: nichts mehr zu speichern, der Dialog
+      // schliesst, und der Kalender zeigt den aktuellen Stand (#1909).
+      closeModal({ force: true, context: dialog });
+      if (await reloadEventsAfterGone()) {
+        renderView();
+        refocusAfterRender();
+      }
+    } else if (isGone(err) && err.data.reason === 'calendar_selected_calendar_not_found') {
+      // Der gewaehlte Kalender wurde inzwischen geloescht: der Dialog bleibt
+      // mit allen Eingaben offen und bietet die aktuellen Kalender an.
+      await loadLocalCalendars();
+      populateLocalCalendarSelect(overlay.querySelector('#event-local-calendar'), event);
+    }
   }
 }
 
@@ -9934,12 +9994,12 @@ async function deleteEvent(event) {
       // verloren, sein stummes `catch` verschluckte ein 403, und er loeschte nur
       // die EIGENEN Zeilen - die per #921 an Zugewiesene verteilten blieben
       // stehen.
-      await api.delete(target.path, { keepalive });
+      await deleteUnlessGone(() => api.delete(target.path, { keepalive }));
       if (!keepalive) refreshReminders();
     },
     ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
-      err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? errorSentence(err, 'calendar.deleteError'),
       'danger',
     ),
   });
@@ -10160,12 +10220,12 @@ async function deleteThisAndFollowing(event) {
     deleteScope,
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
-    requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
+    requestDelete: ({ keepalive }) => deleteUnlessGone(() => requestCalendarOccurrenceDelete({
       api, event, scope: 'following', keepalive,
-    }),
+    })),
     ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
-      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? errorSentence(err, 'calendar.deleteError'),
       'danger',
     ),
   });
@@ -10187,12 +10247,12 @@ async function deleteSingleOccurrence(event) {
     deleteScope,
     message: t('calendar.deletedToast'),
     schedule: scheduleUndoableDelete,
-    requestDelete: ({ keepalive }) => requestCalendarOccurrenceDelete({
+    requestDelete: ({ keepalive }) => deleteUnlessGone(() => requestCalendarOccurrenceDelete({
       api, event, scope: 'this', keepalive,
-    }),
+    })),
     ...deleteViewHooks(deleteScope),
     handleError: (err) => window.yuvomi?.showToast(
-      occurrenceErrorMessage(err) ?? err.data?.error ?? t('calendar.deleteError'),
+      occurrenceErrorMessage(err) ?? errorSentence(err, 'calendar.deleteError'),
       'danger',
     ),
   });

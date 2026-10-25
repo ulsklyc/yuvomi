@@ -1436,7 +1436,10 @@
         "errorCalendarGone": "هذا التقويم لم يعد موجودًا.",
         "errorCalendarNameInvalid": "أعطِ التقويم اسمًا لا يتجاوز {{limit}} حرفًا.",
         "errorCalendarOrderChanged": "تغيّرت التقويمات في هذه الأثناء.",
-        "errorDeleteFeedAdminOnly": "يتم تصدير هذا التقويم. يمكن للمسؤول فقط حذفه."
+        "errorDeleteFeedAdminOnly": "يتم تصدير هذا التقويم. يمكن للمسؤول فقط حذفه.",
+        "errorEventGone": "هذا الموعد لم يعد موجودًا.",
+        "errorSelectedCalendarGone": "التقويم المختار لم يعد موجودًا.",
+        "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية."
     },
     "noteCategories": {
         "categories": "الفئات",

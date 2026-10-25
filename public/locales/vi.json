@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "Lịch này không còn tồn tại.",
         "errorCalendarNameInvalid": "Đặt tên lịch tối đa {{limit}} ký tự.",
         "errorCalendarOrderChanged": "Các lịch đã thay đổi trong lúc đó.",
-        "errorDeleteFeedAdminOnly": "Lịch này đang được xuất. Chỉ quản trị viên mới có thể xóa."
+        "errorDeleteFeedAdminOnly": "Lịch này đang được xuất. Chỉ quản trị viên mới có thể xóa.",
+        "errorEventGone": "Sự kiện này không còn tồn tại.",
+        "errorSelectedCalendarGone": "Lịch đã chọn không còn tồn tại.",
+        "errorSeriesNoOccurrence": "Với kiểu lặp lại này sẽ không có sự kiện nào từ ngày bắt đầu."
     },
     "noteCategories": {
         "categories": "Danh mục",

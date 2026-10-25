@@ -1225,7 +1225,10 @@
         "errorCalendarGone": "این تقویم دیگر وجود ندارد.",
         "errorCalendarNameInvalid": "برای تقویم نامی با حداکثر {{limit}} نویسه بگذارید.",
         "errorCalendarOrderChanged": "تقویم‌ها در این فاصله تغییر کرده‌اند.",
-        "errorDeleteFeedAdminOnly": "این تقویم در حال خروجی گرفتن است. فقط مدیر می‌تواند آن را حذف کند."
+        "errorDeleteFeedAdminOnly": "این تقویم در حال خروجی گرفتن است. فقط مدیر می‌تواند آن را حذف کند.",
+        "errorEventGone": "این رویداد دیگر وجود ندارد.",
+        "errorSelectedCalendarGone": "تقویم انتخاب‌شده دیگر وجود ندارد.",
+        "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

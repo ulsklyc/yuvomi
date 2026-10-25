@@ -1359,7 +1359,10 @@
         "errorCalendarGone": "Цього календаря більше немає.",
         "errorCalendarNameInvalid": "Дайте календарю назву не довшу за {{limit}} символів.",
         "errorCalendarOrderChanged": "Тим часом календарі змінилися.",
-        "errorDeleteFeedAdminOnly": "Цей календар експортується. Видалити його може лише адміністратор."
+        "errorDeleteFeedAdminOnly": "Цей календар експортується. Видалити його може лише адміністратор.",
+        "errorEventGone": "Цієї події більше немає.",
+        "errorSelectedCalendarGone": "Вибраного календаря більше немає.",
+        "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події."
     },
     "noteCategories": {
         "categories": "Категорії",

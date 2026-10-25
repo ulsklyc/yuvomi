@@ -1225,7 +1225,10 @@
         "errorCalendarGone": "Kalender ini sudah tidak ada.",
         "errorCalendarNameInvalid": "Beri kalender nama dengan paling banyak {{limit}} karakter.",
         "errorCalendarOrderChanged": "Kalender telah berubah sementara itu.",
-        "errorDeleteFeedAdminOnly": "Kalender ini sedang diekspor. Hanya admin yang dapat menghapusnya."
+        "errorDeleteFeedAdminOnly": "Kalender ini sedang diekspor. Hanya admin yang dapat menghapusnya.",
+        "errorEventGone": "Acara ini sudah tidak ada.",
+        "errorSelectedCalendarGone": "Kalender yang dipilih sudah tidak ada.",
+        "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai."
     },
     "noteCategories": {
         "categories": "Kategori",

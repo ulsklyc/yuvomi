@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "Den här kalendern finns inte längre.",
         "errorCalendarNameInvalid": "Ge kalendern ett namn på högst {{limit}} tecken.",
         "errorCalendarOrderChanged": "Kalendrarna har ändrats under tiden.",
-        "errorDeleteFeedAdminOnly": "Den här kalendern exporteras. Bara en administratör kan ta bort den."
+        "errorDeleteFeedAdminOnly": "Den här kalendern exporteras. Bara en administratör kan ta bort den.",
+        "errorEventGone": "Den här händelsen finns inte längre.",
+        "errorSelectedCalendarGone": "Den valda kalendern finns inte längre.",
+        "errorSeriesNoOccurrence": "Med den här upprepningen skulle det inte finnas en enda händelse från startdatumet."
     },
     "noteCategories": {
         "categories": "Kategorier",

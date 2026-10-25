@@ -5111,7 +5111,7 @@ test('Termin-Dialog: Anhang-Absagen des Servers kommen uebersetzt, der Entfernen
     'calendar.attachmentChangeRefused');
   assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Attaching a file needs write access to documents.', reason: 'ATTACHMENT_UPLOAD_REFUSED' })),
     'calendar.attachmentUploadRefused');
-  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Titel fehlt' })), 'Titel fehlt', 'andere Meldungen wie bisher');
+  assert.equal(calendar.calendarSaveErrorMessage(fehler({ error: 'Titel fehlt' })), 'calendar.saveError', 'der Text des Servers nie (#1909)');
   assert.equal(calendar.calendarSaveErrorMessage(new Error('x')), 'calendar.saveError');
 
   const mit = { attachment_document_id: 12, attachment_name: 'befund.pdf' };

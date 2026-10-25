@@ -1225,7 +1225,10 @@
         "errorCalendarGone": "Diesen Kalender gibt es nicht mehr.",
         "errorCalendarNameInvalid": "Gib dem Kalender einen Namen mit höchstens {{limit}} Zeichen.",
         "errorCalendarOrderChanged": "Die Kalender wurden inzwischen geändert.",
-        "errorDeleteFeedAdminOnly": "Dieser Kalender wird exportiert. Nur ein Admin kann ihn löschen."
+        "errorDeleteFeedAdminOnly": "Dieser Kalender wird exportiert. Nur ein Admin kann ihn löschen.",
+        "errorEventGone": "Diesen Termin gibt es nicht mehr.",
+        "errorSelectedCalendarGone": "Den gewählten Kalender gibt es nicht mehr.",
+        "errorSeriesNoOccurrence": "Mit dieser Wiederholung gäbe es ab dem Startdatum keinen einzigen Termin."
     },
     "noteCategories": {
         "categories": "Kategorien",

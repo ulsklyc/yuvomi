@@ -22112,14 +22112,14 @@ const SERVER_TEXT_OWNERS = new Set([
 // deshalb stieg hier die Zahl (pages/calendar.js 5 -> 7, components/modal.js
 // 0 -> 1) statt dass die Stellen blind umgestellt wurden. Die Kalender-Scheibe
 // von #1909 raeumt sie mit eigenen Gruenden und Saetzen ab. Die beiden Toasts
-// des Kalender-Managers sind abgeraeumt (calendar 7 -> 5).
+// des Kalender-Managers sind abgeraeumt (calendar 7 -> 5), danach Speichern,
+// ICS-Zuruecksetzen und die drei Loeschwege eines Termins (calendar 5 -> 0).
 //
 // `settings/module-install-errors.js` liest den Text nur noch an EINER Stelle,
 // und bewusst: `bad_manifest` setzt die Angabe des Modul-Laders (welches Feld
 // in module.json fehlt) in einen uebersetzten Satz - eine Angabe zum Modul fuer
 // den, der es installiert, kein Satz an seiner Stelle (#1909).
 const SERVER_TEXT_OPEN = new Map([
-  ['pages/calendar.js', 5],
   ['pages/meals.js', 5],
   ['pages/pantry.js', 6],
   ['settings/module-install-errors.js', 1],
@@ -22184,7 +22184,7 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
     'pages/documents.js', 'utils/document-folder-delete.js', 'pages/recipes.js', 'pages/subscriptions.js',
     'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js',
     'components/task-detail.js', 'components/modal.js', 'pages/schedule.js',
-    'components/quick-links-manager.js', 'settings/pages/modules-kitchen.js']) {
+    'components/quick-links-manager.js', 'settings/pages/modules-kitchen.js', 'pages/calendar.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
@@ -22226,6 +22226,7 @@ const ERROR_MESSAGE_CLEAN = [
   'pages/shopping.js',
   'components/quick-links-manager.js',
   'settings/pages/modules-kitchen.js',
+  'pages/calendar.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

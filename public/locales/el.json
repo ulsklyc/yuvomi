@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "Αυτό το ημερολόγιο δεν υπάρχει πια.",
         "errorCalendarNameInvalid": "Δώστε στο ημερολόγιο όνομα έως {{limit}} χαρακτήρες.",
         "errorCalendarOrderChanged": "Τα ημερολόγια άλλαξαν στο μεταξύ.",
-        "errorDeleteFeedAdminOnly": "Αυτό το ημερολόγιο εξάγεται. Μόνο ένας διαχειριστής μπορεί να το διαγράψει."
+        "errorDeleteFeedAdminOnly": "Αυτό το ημερολόγιο εξάγεται. Μόνο ένας διαχειριστής μπορεί να το διαγράψει.",
+        "errorEventGone": "Αυτό το συμβάν δεν υπάρχει πια.",
+        "errorSelectedCalendarGone": "Το επιλεγμένο ημερολόγιο δεν υπάρχει πια.",
+        "errorSeriesNoOccurrence": "Με αυτή την επανάληψη δεν θα υπήρχε κανένα συμβάν από την ημερομηνία έναρξης."
     },
     "noteCategories": {
         "categories": "Κατηγορίες",

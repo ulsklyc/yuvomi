@@ -1377,7 +1377,10 @@
         "errorCalendarGone": "Ten kalendarz już nie istnieje.",
         "errorCalendarNameInvalid": "Nadaj kalendarzowi nazwę o długości najwyżej {{limit}} znaków.",
         "errorCalendarOrderChanged": "W międzyczasie kalendarze się zmieniły.",
-        "errorDeleteFeedAdminOnly": "Ten kalendarz jest eksportowany. Usunąć go może tylko administrator."
+        "errorDeleteFeedAdminOnly": "Ten kalendarz jest eksportowany. Usunąć go może tylko administrator.",
+        "errorEventGone": "To wydarzenie już nie istnieje.",
+        "errorSelectedCalendarGone": "Wybrany kalendarz już nie istnieje.",
+        "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia."
     },
     "noteCategories": {
         "categories": "Kategorie",

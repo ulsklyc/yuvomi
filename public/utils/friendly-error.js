@@ -358,6 +358,19 @@ export const CASE_MESSAGES = new Map([
   ['calendar_calendar_not_found', 'calendar.errorCalendarGone'],
   ['calendar_name_invalid', 'calendar.errorCalendarNameInvalid'],
   ['calendar_order_changed', 'calendar.errorCalendarOrderChanged'],
+  // Termine (#1909). Den Termin gibt es nicht mehr (geloescht, oder fuer diese
+  // Person nicht mehr sichtbar): die Seite laedt nach, ein Loeschen mit diesem
+  // Grund ist ein Erfolg. Der im Termin-Dialog GEWAEHLTE Kalender fehlt: der
+  // Dialog bleibt offen und bietet die aktuellen an. Die Gruende einer
+  // Einzelausnahme ohne Praefix (invalid_recurrence_id ...) liest die Seite
+  // selbst (occurrenceErrorMessage in pages/calendar.js).
+  ['calendar_event_not_found', 'calendar.errorEventGone'],
+  ['calendar_selected_calendar_not_found', 'calendar.errorSelectedCalendarGone'],
+  // Eine Wiederholung ohne ein einziges Vorkommen ab dem Start (#960) und ein
+  // Serienende vor dem Start (#1607): das Formular prueft das zweite selbst,
+  // dieser Satz ist derselbe wie dort.
+  ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
+  ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
 ]);
 
 /**
@@ -503,6 +516,8 @@ export const GONE_REASONS = new Set([
   'quick_links_link_not_found',
   'recipe_providers_account_not_found',
   'calendar_calendar_not_found',
+  'calendar_event_not_found',
+  'calendar_selected_calendar_not_found',
 ]);
 
 /**

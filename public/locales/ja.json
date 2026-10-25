@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "このカレンダーはもう存在しません。",
         "errorCalendarNameInvalid": "カレンダー名は{{limit}}文字以内で入力してください。",
         "errorCalendarOrderChanged": "その間にカレンダーが変更されました。",
-        "errorDeleteFeedAdminOnly": "このカレンダーは書き出し中です。削除できるのは管理者だけです。"
+        "errorDeleteFeedAdminOnly": "このカレンダーは書き出し中です。削除できるのは管理者だけです。",
+        "errorEventGone": "この予定はもう存在しません。",
+        "errorSelectedCalendarGone": "選んだカレンダーはもう存在しません。",
+        "errorSeriesNoOccurrence": "この繰り返しでは、開始日以降に予定が1件もありません。"
     },
     "noteCategories": {
         "categories": "カテゴリー",

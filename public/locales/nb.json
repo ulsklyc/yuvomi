@@ -1207,7 +1207,10 @@
         "errorCalendarGone": "Denne kalenderen finnes ikke lenger.",
         "errorCalendarNameInvalid": "Gi kalenderen et navn på høyst {{limit}} tegn.",
         "errorCalendarOrderChanged": "Kalenderne er endret i mellomtiden.",
-        "errorDeleteFeedAdminOnly": "Denne kalenderen eksporteres. Bare en administrator kan slette den."
+        "errorDeleteFeedAdminOnly": "Denne kalenderen eksporteres. Bare en administrator kan slette den.",
+        "errorEventGone": "Denne avtalen finnes ikke lenger.",
+        "errorSelectedCalendarGone": "Den valgte kalenderen finnes ikke lenger.",
+        "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen."
     },
     "noteCategories": {
         "categories": "Kategorier",

@@ -1284,7 +1284,10 @@
         "errorCalendarGone": "Tento kalendář už neexistuje.",
         "errorCalendarNameInvalid": "Dejte kalendáři název s nejvýše {{limit}} znaky.",
         "errorCalendarOrderChanged": "Kalendáře se mezitím změnily.",
-        "errorDeleteFeedAdminOnly": "Tento kalendář se exportuje. Smazat ho může jen správce."
+        "errorDeleteFeedAdminOnly": "Tento kalendář se exportuje. Smazat ho může jen správce.",
+        "errorEventGone": "Tento termín už neexistuje.",
+        "errorSelectedCalendarGone": "Vybraný kalendář už neexistuje.",
+        "errorSeriesNoOccurrence": "S tímto opakováním by od data zahájení nebyl žádný termín."
     },
     "noteCategories": {
         "categories": "Kategorie",

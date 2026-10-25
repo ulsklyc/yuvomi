@@ -317,6 +317,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kalender-Verwaltung (#1909); die echte Antwort misst
     // test:calendar-local-calendars.
     '../server/routes/calendar/local-calendars.js', '../server/services/local-calendars.js',
+    // Termine speichern, zuruecksetzen, loeschen (#1909); die echte Antwort
+    // misst test:calendar-routes.
+    '../server/routes/calendar/crud.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -365,7 +368,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'rewards_money_account_not_found', 'rewards_money_plan_not_found',
     'quick_links_link_not_found',
     'recipe_providers_account_not_found',
-    'calendar_calendar_not_found',
+    'calendar_calendar_not_found', 'calendar_event_not_found', 'calendar_selected_calendar_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);

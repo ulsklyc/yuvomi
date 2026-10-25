@@ -71,6 +71,39 @@ import {
 const log = createLogger('Calendar');
 const router = express.Router();
 
+// #1909: die Faelle, die ein Nutzer beim Speichern, Zuruecksetzen oder Loeschen
+// eines Termins erreicht, tragen einen `reason`; die App sagt dazu ihren Satz
+// (utils/friendly-error.js, pages/calendar.js). `error` bleibt englisch fuer
+// API-Clients und Logs.
+function sendEventGone(res) {
+  return res.status(404).json({ error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+}
+
+// Der im Dialog gewaehlte Kalender ist inzwischen geloescht (validateCalendarId):
+// nur dieser Fall einer Pruefung traegt einen Grund, alles andere schickt nur
+// ein Aufrufer an der Oberflaeche vorbei.
+function selectedCalendarGone(checks) {
+  return checks.some((check) => check?.reason === 'calendar_selected_calendar_not_found');
+}
+
+function sendValidationErrors(res, checks) {
+  return res.status(400).json({
+    error: collectErrors(checks).join(' '),
+    code: 400,
+    ...(selectedCalendarGone(checks) ? { reason: 'calendar_selected_calendar_not_found' } : {}),
+  });
+}
+
+// Eine Serie ohne ein einziges Vorkommen (#960) erreicht das Formular mit einer
+// Regel wie "am Monatsletzten, bis zum 20." ab dem 15.
+function sendSeriesWithoutOccurrence(res) {
+  return res.status(400).json({
+    error: 'recurrence_rule: the rule has no occurrence on or after the start date.',
+    code: 400,
+    reason: 'calendar_series_no_occurrence',
+  });
+}
+
 /**
  * Was dieser Aufrufer mit Anhang-Dokumenten tun darf (#1358): die Sichtbarkeit
  * des Termins aufs Dokument uebertragen nur mit Dokumente-Schreibrecht, Sicht
@@ -209,17 +242,17 @@ function validateOccurrenceAssignments(database, value) {
   if (value === null) return { value: [], error: null };
   const ids = Array.isArray(value) ? value : [value];
   if (ids.some((id) => !Number.isInteger(id) || id < 1)) {
-    return { value: null, error: 'Zuweisung: Wähle Personen mit gültigen positiven Benutzer-IDs aus.' };
+    return { value: null, error: 'Assignment: choose people by valid positive user IDs.' };
   }
   if (new Set(ids).size !== ids.length) {
-    return { value: null, error: 'Zuweisung: Wähle jede Person höchstens einmal aus.' };
+    return { value: null, error: 'Assignment: choose each person at most once.' };
   }
   if (ids.length > 0) {
     const found = database.prepare(`
       SELECT COUNT(*) AS count FROM users WHERE id IN (${ids.map(() => '?').join(',')})
     `).get(...ids).count;
     if (Number(found) !== ids.length) {
-      return { value: null, error: 'Eine zugewiesene Person existiert nicht mehr. Lade die Personenauswahl erneut.' };
+      return { value: null, error: 'An assigned person no longer exists.' };
     }
   }
   return { value: ids, error: null };
@@ -367,14 +400,14 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
       return;
     }
     if (typeof body[field] !== 'string') {
-      errors.push(`${label} muss als Text angegeben werden${nullable ? ' oder leer bleiben' : ''}.`);
+      errors.push(`${label} must be text${nullable ? ' or null' : ''}.`);
       return;
     }
     const result = str(body[field], label, {
       max: options.max,
       required: options.required !== false,
     });
-    if (result.error) errors.push(`${label}: Gib einen gültigen Text mit höchstens ${options.max} Zeichen ein.`);
+    if (result.error) errors.push(`${label}: enter valid text of at most ${options.max} characters.`);
     else values[field] = result.value;
   };
   const validateDateTime = (field, label, { nullable = false } = {}) => {
@@ -384,49 +417,49 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
       return;
     }
     if (typeof body[field] !== 'string' || body[field].trim() === '') {
-      errors.push(`${label}: Gib ein Datum mit optionaler Uhrzeit an${nullable ? ' oder lasse das Feld leer' : ''}.`);
+      errors.push(`${label}: enter a date with an optional time${nullable ? ', or null' : ''}.`);
       return;
     }
     const result = datetime(body[field], label, true, { to: 'wall', zone, allDay });
-    if (result.error) errors.push(`${label}: Gib ein gültiges Datum mit optionaler Uhrzeit an.`);
+    if (result.error) errors.push(`${label}: enter a valid date with an optional time.`);
     else if (!isPossibleCalendarDateTime(body[field])) {
-      errors.push(`${label}: Gib ein gültiges Datum mit optionaler Uhrzeit an.`);
+      errors.push(`${label}: enter a valid date with an optional time.`);
     } else values[field] = result.value;
   };
 
-  validateString('title', 'Titel', { max: MAX_TITLE });
-  validateString('description', 'Beschreibung', { max: MAX_TEXT, required: false, nullable: true });
-  validateDateTime('start_datetime', 'Startdatum');
-  validateDateTime('end_datetime', 'Enddatum', { nullable: true });
-  validateString('location', 'Ort', { max: MAX_TITLE, required: false, nullable: true });
+  validateString('title', 'title', { max: MAX_TITLE });
+  validateString('description', 'description', { max: MAX_TEXT, required: false, nullable: true });
+  validateDateTime('start_datetime', 'start_datetime');
+  validateDateTime('end_datetime', 'end_datetime', { nullable: true });
+  validateString('location', 'location', { max: MAX_TITLE, required: false, nullable: true });
 
   if (Object.hasOwn(body, 'color')) {
     if (body.color !== null && typeof body.color !== 'string') {
-      errors.push('Farbe muss als Text angegeben werden oder leer bleiben.');
+      errors.push('color must be text or null.');
     } else {
-      const result = color(body.color, 'Farbe');
-      if (result.error) errors.push('Farbe: Wähle eine gültige Farbe im Format #RRGGBB aus.');
+      const result = color(body.color, 'color');
+      if (result.error) errors.push('color: choose a valid color in the format #RRGGBB.');
       else values.color = result.value;
     }
   }
   if (following && Object.hasOwn(body, 'recurrence_rule')) {
     if (body.recurrence_rule !== null && typeof body.recurrence_rule !== 'string') {
-      errors.push('Die Wiederholungsregel muss als Text angegeben werden oder leer bleiben.');
+      errors.push('recurrence_rule must be text or null.');
     } else {
-      const result = rrule(body.recurrence_rule, 'Wiederholung');
-      if (result.error) errors.push('Die Wiederholungsregel ist ungültig. Prüfe die Wiederholungseinstellungen.');
+      const result = rrule(body.recurrence_rule, 'recurrence_rule');
+      if (result.error) errors.push('recurrence_rule is invalid.');
       else values.recurrence_rule = result.value;
     }
   }
   for (const field of ['all_day', 'countdown']) {
     if (Object.hasOwn(body, field)) {
-      if (typeof body[field] !== 'boolean') errors.push(`${field === 'all_day' ? 'Ganztägig' : 'Countdown'} muss aktiviert oder deaktiviert sein (true oder false).`);
+      if (typeof body[field] !== 'boolean') errors.push(`${field} must be true or false.`);
       else values[field] = body[field];
     }
   }
   if (Object.hasOwn(body, 'visibility')) {
     if (!['all', 'assignees', 'private'].includes(body.visibility)) {
-      errors.push('Sichtbarkeit: Wähle alle Personen, zugewiesene Personen oder privat (all, assignees, private).');
+      errors.push('visibility must be one of: all, assignees, private.');
     } else values.visibility = body.visibility;
   }
   const assignments = validateOccurrenceAssignments(database, body.assigned_to);
@@ -435,7 +468,7 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
   if (localCalendar.error) errors.push(localCalendar.error);
   if (localCalendar.value !== undefined) values.local_calendar_id = localCalendar.value;
 
-  return { values, assignments: assignments.value, errors };
+  return { values, assignments: assignments.value, errors, calendarGone: selectedCalendarGone([localCalendar]) };
 }
 
 // --------------------------------------------------------
@@ -484,7 +517,7 @@ router.get('/:id', (req, res) => {
         AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
     `).get(id, getUserId(req), getUserId(req), getUserId(req));
 
-    if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (!event) return sendEventGone(res);
     const database = db.get();
     const resolved = resolveProjectedEventRows(database, [event])[0];
     res.json({ data: serializeEvent(resolved, {
@@ -495,7 +528,7 @@ router.get('/:id', (req, res) => {
     }) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -527,32 +560,32 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
 
-    const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
-    const vDesc  = str(req.body.description, 'Beschreibung', { max: MAX_TEXT, required: false });
+    const vTitle = str(req.body.title, 'title', { max: MAX_TITLE });
+    const vDesc  = str(req.body.description, 'description', { max: MAX_TEXT, required: false });
     // Ein Wert mit `Z` oder Offset wird in die Haushaltszone umgerechnet statt
     // abgeschnitten (#1364); ganztaegig zaehlt nur sein Datum.
     const zoneOpts = { to: 'wall', zone: householdTimeZone(db.get()), allDay: !!req.body.all_day };
-    const vStart = datetime(req.body.start_datetime, 'Startdatum', true, zoneOpts);
-    const vEnd   = datetime(req.body.end_datetime, 'Enddatum', false, zoneOpts);
+    const vStart = datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts);
+    const vEnd   = datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts);
     // Kein Fallback auf eine Palettenfarbe: fehlt die Angabe, bekommt der Termin
     // KEINE eigene Farbe (NULL) und leiht sich die der zugewiesenen Person
     // (#891). `color()` liefert fuer undefined/null/'' bereits value: null.
-    const vColor = color(req.body.color, 'Farbe');
+    const vColor = color(req.body.color, 'color');
     const vIcon  = eventIcon(req.body.icon);
-    const vLoc   = str(req.body.location, 'Ort', { max: MAX_TITLE, required: false });
-    const vRrule = rrule(req.body.recurrence_rule, 'Wiederholung');
+    const vLoc   = str(req.body.location, 'location', { max: MAX_TITLE, required: false });
+    const vRrule = rrule(req.body.recurrence_rule, 'recurrence_rule');
     // Erst die Form, dann der Inhalt: ein Paar aus der eingeschalteten Auswahl (#1860).
     const vCaldavForm = caldavTarget(req.body);
     const vCaldav = vCaldavForm.error ? vCaldavForm : caldavTargetOffered(db.get(), vCaldavForm.value);
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
-    const errors = collectErrors([vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
+    if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (req.body.local_calendar_id !== undefined
         && ((req.body.external_source && req.body.external_source !== 'local')
           || vCaldav.value.accountId || vGoogle.value)) {
-      return res.status(400).json({ error: 'Lokale Kalender können nur eigene Termine enthalten.', code: 400 });
+      return res.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 });
     }
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     // Teilnehmen lassen nur Haushaltsmitglieder (#1207).
@@ -572,16 +605,13 @@ router.post('/', async (req, res) => {
     // beantwortet die Expansion (`expandRecurringEvents`); nach aussen bleibt
     // das DTSTART damit uneindeutig, das ist bekannt und ein eigener Vorgang.
     if (!hasAnyOccurrence(vStart.value, vRrule.value)) {
-      return res.status(400).json({
-        error: 'recurrence_rule: the rule has no occurrence on or after the start date.',
-        code: 400,
-      });
+      return sendSeriesWithoutOccurrence(res);
     }
     // EIN ENDE VOR DEM START IST EIN WIDERSPRUCH, KEINE SERIE (#1607). Der
     // Validator sieht nur die Form der Regel; gespeichert stand der Termin
     // danach als "taeglich, bis 30.09." an einem 2. Oktober.
     if (endsBeforeStart(vStart.value, vRrule.value)) {
-      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400 });
+      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
     }
 
     const { all_day = 0 } = req.body;
@@ -603,7 +633,7 @@ router.post('/', async (req, res) => {
     const calendarCheck = validateCalendarId(db.get(), vLocalCalendar.value);
     if (calendarCheck.error) {
       if (stagedUpload) await cleanupStagedUpload(stagedUpload);
-      return res.status(400).json({ error: calendarCheck.error, code: 400 });
+      return sendValidationErrors(res, [calendarCheck]);
     }
     const rights = attachmentRights(req);
     const eventId = db.get().transaction(() => {
@@ -705,7 +735,7 @@ router.post('/', async (req, res) => {
         );
       }
     }
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -747,23 +777,23 @@ function refuseForeignEvent(req, res, event) {
 }
 
 const CALENDAR_OCCURRENCE_ERRORS = {
-  calendar_series_not_found: 'Terminserie nicht gefunden. Lade den Kalender erneut.',
-  not_authorized: 'Du darfst diese Terminserie nicht bearbeiten.',
-  ineligible_series: 'Einzelausnahmen sind nur für lokale Terminserien ohne aktive externe Synchronisierung verfügbar. Hat eine lokale Serie bereits verknüpfte Einzelausnahmen, deaktiviere zuerst ihren Outlook-Zielkalender. Danach kannst du sie wieder bearbeiten, ohne Ausnahmen zu löschen.',
-  invalid_recurrence_id: 'Der ausgewählte Serientermin gehört nicht zu diesem Datum. Lade den Kalender erneut und wähle den Termin noch einmal aus.',
-  malformed_recurrence_id: 'Der Serientermin ist nicht richtig angegeben. Lade den Kalender erneut und wähle den Termin noch einmal aus.',
-  ambiguous_recurrence_id:'An diesem Tag liegen zwei Termine der Serie (Zeitumstellung). Lade den Kalender erneut und wähle den Termin noch einmal aus.',
-  invalid_override_fields: 'Die Angaben zur Einzelausnahme sind ungültig. Prüfe die geänderten Felder.',
-  invalid_occurrence_interval: 'Das Ende darf nicht vor dem Beginn liegen. Prüfe Datum und Uhrzeit der Einzelausnahme.',
-  calendar_override_orphans: 'Die Änderung benötigt eine aktuelle Bestätigung. Prüfe die Anzahl der betroffenen Einzelausnahmen und bestätige, dass sie als eigenständige Termine erhalten bleiben sollen.',
-  calendar_occurrence_route_required: 'Öffne den Serientermin im Kalender und wähle den gewünschten Änderungsumfang, um diese Einzelausnahme zu bearbeiten.',
-  empty_successor_series: 'Die Folgeserie enthält ab ihrem Startdatum keinen Termin. Passe das Startdatum oder die Wiederholungsregel an.',
-  invalid_successor_override: 'Eine Einzelausnahme passt nicht zur Folgeserie. Prüfe die Wiederholungsregel und die betroffene Einzelausnahme.',
+  calendar_series_not_found: 'Calendar series not found.',
+  not_authorized: 'Not authorized to change this calendar series.',
+  ineligible_series: 'Occurrence overrides are only available for local series without an active external sync. A local series that already has linked overrides needs its Outlook target calendar switched off first.',
+  invalid_recurrence_id: 'The selected occurrence does not belong to this series.',
+  malformed_recurrence_id: 'The occurrence key is malformed.',
+  ambiguous_recurrence_id: 'Two occurrences of the series fall on this day (clock change); send the exact recurrence_id.',
+  invalid_override_fields: 'The occurrence override fields are invalid.',
+  invalid_occurrence_interval: 'The end of the occurrence must not lie before its start.',
+  calendar_override_orphans: 'This change needs a current confirmation of the affected occurrence overrides (confirmed_orphan_count).',
+  calendar_occurrence_route_required: 'Use the occurrence endpoint to change a linked recurring occurrence.',
+  empty_successor_series: 'The successor series has no occurrence on or after its start date.',
+  invalid_successor_override: 'An occurrence override does not fit the successor series.',
 };
 
 function sendCalendarOccurrenceError(res, error) {
   return res.status(error.status).json({
-    error: CALENDAR_OCCURRENCE_ERRORS[error.code] || 'Die Einzelausnahme konnte nicht geändert werden. Lade den Kalender erneut und prüfe deine Angaben.',
+    error: CALENDAR_OCCURRENCE_ERRORS[error.code] || 'The occurrence could not be changed.',
     code: error.status,
     ...(error.conflict ? { conflict: error.conflict } : { reason: error.code }),
     ...(error.orphanedOverrideCount !== undefined
@@ -818,7 +848,7 @@ router.put('/:id', async (req, res) => {
     }
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
-    if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (!event) return sendEventGone(res);
     if (refuseForeignEvent(req, res, event)) return;
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
     const rights = attachmentRights(req);
@@ -843,15 +873,15 @@ router.put('/:id', async (req, res) => {
       allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!event.all_day,
     };
     const vStart = req.body.start_datetime !== undefined
-      ? datetime(req.body.start_datetime, 'Startdatum', true, zoneOpts) : null;
+      ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
     const vEnd = req.body.end_datetime !== undefined
-      ? datetime(req.body.end_datetime, 'Enddatum', false, zoneOpts) : null;
-    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'Titel', { max: MAX_TITLE, required: false }));
-    if (req.body.description    !== undefined) checks.push(str(req.body.description, 'Beschreibung', { max: MAX_TEXT, required: false }));
+      ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
+    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
+    if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
     if (vStart) checks.push(vStart);
     if (vEnd)   checks.push(vEnd);
-    if (req.body.color          !== undefined) checks.push(color(req.body.color, 'Farbe'));
-    if (req.body.location       !== undefined) checks.push(str(req.body.location, 'Ort', { max: MAX_TITLE, required: false }));
+    if (req.body.color          !== undefined) checks.push(color(req.body.color, 'color'));
+    if (req.body.location       !== undefined) checks.push(str(req.body.location, 'location', { max: MAX_TITLE, required: false }));
     // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
     // bereits so in der Datenbank, und der Validator kennt nur das Vokabular der
     // eigenen Oberfläche (FREQ/INTERVAL/BYDAY/UNTIL/COUNT, ohne „RRULE:"-Präfix).
@@ -862,7 +892,7 @@ router.put('/:id', async (req, res) => {
     // zulässt.
     if (req.body.recurrence_rule !== undefined
         && req.body.recurrence_rule !== event.recurrence_rule) {
-      checks.push(rrule(req.body.recurrence_rule, 'Wiederholung'));
+      checks.push(rrule(req.body.recurrence_rule, 'recurrence_rule'));
     }
     // CalDAV-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
     const caldavProvided = req.body.target_caldav_account_id !== undefined
@@ -882,19 +912,18 @@ router.put('/:id', async (req, res) => {
     if (vOutlook) checks.push(vOutlook);
     const localCalendarProvided = req.body.local_calendar_id !== undefined;
     if (localCalendarProvided && resolveLocalCalendarId(db.get(), event.id) === null) {
-      return res.status(400).json({ error: 'Lokale Kalender können nur eigene Termine enthalten.', code: 400 });
+      return res.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 });
     }
     const vLocalCalendar = localCalendarProvided
       ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
       : null;
     if (vLocalCalendar) checks.push(vLocalCalendar);
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (event.recurrence_rule && req.body.confirmed_orphan_count !== undefined
         && (!Number.isInteger(req.body.confirmed_orphan_count)
           || req.body.confirmed_orphan_count < 0)) {
       return res.status(400).json({
-        error: 'Die bestätigte Anzahl der betroffenen Einzelausnahmen muss eine ganze Zahl ab 0 sein. Prüfe die aktuelle Anzahl und bestätige erneut.',
+        error: 'confirmed_orphan_count must be a whole number from 0.',
         code: 400,
       });
     }
@@ -905,7 +934,7 @@ router.put('/:id', async (req, res) => {
       && typeof req.body.remove_attachment !== 'boolean'
     ) {
       return res.status(400).json({
-        error: 'remove_attachment: muss ein Boolean sein.',
+        error: 'remove_attachment must be a boolean.',
         code: 400,
       });
     }
@@ -960,10 +989,7 @@ router.put('/:id', async (req, res) => {
     const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), event.tzid, zoneOpts.zone);
     if (serieBeruehrt
       && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
-      return res.status(400).json({
-        error: 'recurrence_rule: the rule has no occurrence on or after the start date.',
-        code: 400,
-      });
+      return sendSeriesWithoutOccurrence(res);
     }
     // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
     // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
@@ -995,7 +1021,7 @@ router.put('/:id', async (req, res) => {
       : [startTag];
     const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
     if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
-      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400 });
+      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
     }
 
     // JEDE ABWEISUNG GEHOERT VOR DAS STAGING. Ab hier laedt
@@ -1011,7 +1037,7 @@ router.put('/:id', async (req, res) => {
       || (attachmentDataProvided && req.body.attachment_data === null);
     if (replacementRequested && removalRequested) {
       return res.status(400).json({
-        error: 'attachment_data und remove_attachment widersprechen sich.',
+        error: 'attachment_data and remove_attachment contradict each other.',
         code: 400,
       });
     }
@@ -1383,7 +1409,7 @@ router.put('/:id', async (req, res) => {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1431,7 +1457,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
       return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     }
     if (req.body.remove_attachment !== undefined && typeof req.body.remove_attachment !== 'boolean') {
-      return res.status(400).json({ error: 'remove_attachment: muss ein Boolean sein.', code: 400 });
+      return res.status(400).json({ error: 'remove_attachment must be a boolean.', code: 400 });
     }
     if (req.body.reminder_offsets !== undefined
         && (!Array.isArray(req.body.reminder_offsets)
@@ -1440,7 +1466,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
       return res.status(400).json({
-        error: 'Erinnerungen: Wähle höchstens fünf unterschiedliche Vorlaufzeiten in ganzen Minuten ab 0.',
+        error: 'reminder_offsets: at most five distinct lead times in whole minutes from 0.',
         code: 400,
       });
     }
@@ -1452,7 +1478,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
       || (attachmentDataProvided && req.body.attachment_data === null);
     if (replacementRequested && removalRequested) {
       return res.status(400).json({
-        error: 'attachment_data und remove_attachment widersprechen sich.',
+        error: 'attachment_data and remove_attachment contradict each other.',
         code: 400,
       });
     }
@@ -1551,7 +1577,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
       }
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1600,19 +1626,25 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       // Ein NEUES Ziel muss angeboten sein; das der Serie kommt durch (#1860).
       ...(vCaldav && !vCaldav.error ? [caldavTargetOffered(db.get(), vCaldav.value, master)] : []),
     ].flatMap((result) => typeof result === 'string' ? [result] : (result.error ? [result.error] : []));
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (errors.length) {
+      return res.status(400).json({
+        error: errors.join(' '),
+        code: 400,
+        ...(mutation.calendarGone ? { reason: 'calendar_selected_calendar_not_found' } : {}),
+      });
+    }
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : undefined;
     if (req.body.icon !== undefined && !vIcon) {
       return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     }
     if (req.body.remove_attachment !== undefined && typeof req.body.remove_attachment !== 'boolean') {
-      return res.status(400).json({ error: 'remove_attachment: muss ein Boolean sein.', code: 400 });
+      return res.status(400).json({ error: 'remove_attachment must be a boolean.', code: 400 });
     }
     if (req.body.confirmed_orphan_count !== undefined
         && (!Number.isInteger(req.body.confirmed_orphan_count)
           || req.body.confirmed_orphan_count < 0)) {
       return res.status(400).json({
-        error: 'Die bestätigte Anzahl der betroffenen Einzelausnahmen muss eine ganze Zahl ab 0 sein. Prüfe die aktuelle Anzahl und bestätige erneut.',
+        error: 'confirmed_orphan_count must be a whole number from 0.',
         code: 400,
       });
     }
@@ -1623,7 +1655,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
       return res.status(400).json({
-        error: 'Erinnerungen: Wähle höchstens fünf unterschiedliche Vorlaufzeiten in ganzen Minuten ab 0.',
+        error: 'reminder_offsets: at most five distinct lead times in whole minutes from 0.',
         code: 400,
       });
     }
@@ -1642,7 +1674,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       || (Object.hasOwn(req.body, 'attachment_data') && req.body.attachment_data === null);
     if (replacementRequested && removalRequested) {
       return res.status(400).json({
-        error: 'attachment_data und remove_attachment widersprechen sich.',
+        error: 'attachment_data and remove_attachment contradict each other.',
         code: 400,
       });
     }
@@ -1766,7 +1798,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1791,7 +1823,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
     log.error('DELETE occurrence failed:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1816,7 +1848,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
     log.error('DELETE occurrence following failed:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1829,7 +1861,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
 router.post('/:id/reset', (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
     const event = db.get().prepare(`
       SELECT e.*, s.created_by AS sub_created_by
       FROM calendar_events e
@@ -1840,14 +1872,14 @@ router.post('/:id/reset', (req, res) => {
     // sonst verriete die 400 einen fremden privaten Termin und die 403 einen
     // Termin aus einem fremden ungeteilten Abo, und ein Admin setzte einen
     // Termin zurueck, den er nicht sieht. Die Rechteregel darunter bleibt.
-    if (!event || !loadVisibleEvent(id, req)) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (!event || !loadVisibleEvent(id, req)) return sendEventGone(res);
     if (event.external_source !== 'ics')
-      return res.status(400).json({ error: 'Nur ICS-Events können zurückgesetzt werden.', code: 400 });
+      return res.status(400).json({ error: 'Only events from an ICS subscription can be reset.', code: 400 });
 
     const userId  = getUserId(req);
     const isAdmin = isAdminUser(req);
     if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
-      return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
+      return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
     // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
     // Termin wieder", und das schliesst seine Farbe ein (#899).
@@ -1855,7 +1887,7 @@ router.post('/:id/reset', (req, res) => {
     res.json({ data: { reset: true } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1873,7 +1905,7 @@ router.post('/:id/reset', (req, res) => {
 router.post('/:id/exceptions', (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
 
     const requested = req.body?.recurrence_id ?? req.body?.date;
     // Beide Formfehler tragen einen Grund (#1909-Muster): der Browser sagt dazu
@@ -1889,15 +1921,15 @@ router.post('/:id/exceptions', (req, res) => {
     }
 
     const event = loadVisibleEvent(id, req);
-    if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (!event) return sendEventGone(res);
     if (refuseForeignEvent(req, res, event)) return;
     const eligibility = isEligibleLocalSeries(db.get(), event, getUserId(req));
     if (!isLocallyOwnedSeries(db.get(), event)) {
       const notSeries = !event.recurrence_rule;
       return res.status(400).json({
         error: notSeries
-          ? 'Termin ist keine Serie.'
-          : 'Diese Serie kann keine einzelnen Ausnahmen verwenden.',
+          ? 'The event is not a series.'
+          : 'This series cannot use single exceptions.',
         code: 400,
         reason: eligibility.reason,
       });
@@ -1917,7 +1949,7 @@ router.post('/:id/exceptions', (req, res) => {
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 
@@ -1932,7 +1964,7 @@ router.delete('/:id', (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);
-    if (!event) return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (!event) return sendEventGone(res);
     if (refuseForeignEvent(req, res, event)) return;
     if (rejectLinkedOccurrenceResource(res, event, req)) return;
     const queued = queueEventDeletion(event);
@@ -1958,8 +1990,7 @@ router.delete('/:id', (req, res) => {
       }
       return db.get().prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
     })();
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Termin nicht gefunden', code: 404 });
+    if (result.changes === 0) return sendEventGone(res);
 
     res.status(204).end();
 
@@ -1972,7 +2003,7 @@ router.delete('/:id', (req, res) => {
     }
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
 

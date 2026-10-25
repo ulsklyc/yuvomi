@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **Saving, resetting or deleting an event speaks your language when something goes wrong** (#1909).
+  These toasts showed the server's German text in every language. They now say the app's own
+  sentence: an event someone else deleted in the meantime (the dialog closes and the calendar
+  reloads; deleting it counts as done), a calendar chosen in the dialog that was deleted meanwhile
+  (the dialog stays open with the current calendars), a repeat that would leave no event from the
+  start date, and a series end before the start. Everything else says the general save or delete
+  sentence. The API keeps its `error` text, now in English, and adds a `reason` for each case.
 - **Calendar management speaks your language when something goes wrong** (#1909). Creating,
   renaming, reordering or deleting a calendar showed the server's German text in the toast, in every
   language. The dialog now says its own sentence: a calendar someone else deleted in the meantime

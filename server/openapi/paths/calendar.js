@@ -35,7 +35,7 @@ const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents
 // Ein Serienende vor dem Start (#1607). Steht an POST und PUT, weil beide es
 // abweisen - und PUT nur dann, wenn die Anfrage die Serie anfasst.
 const SERIES_END_INPUT = ' A `recurrence_rule` whose `UNTIL` day lies before the start day is rejected with 400 '
-  + '(`recurrence_rule: the series ends before the start date.`); an `UNTIL` on the start day is a series with one '
+  + '(`recurrence_rule: the series ends before the start date.`, `reason: calendar_series_ends_before_start`); an `UNTIL` on the start day is a series with one '
   + 'occurrence and is accepted. PUT checks this only when the request changes the rule or the start day, so an '
   + 'imported series that already carries such a rule stays editable; the start day is compared as the household calendar '
   + 'day, so sending the wall-clock form of a stored instant is not a change. For an event with a time zone of its own, whose '
@@ -435,12 +435,30 @@ export function calendarPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // `error` - je Operation der Satz, der sie nennt.
 const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only events you created or are assigned to can be changed or deleted - R23)';
+const EVENT_GONE = '`calendar_event_not_found` (404, the event does not exist or is not visible to the caller)';
+const SERIES_GONE = '`calendar_series_not_found` (404, the series does not exist or is not visible to the caller)';
+const SELECTED_CALENDAR_GONE = '`calendar_selected_calendar_not_found` (400, the `local_calendar_id` names a local calendar that no longer exists)';
+const SERIES_CASES = '`calendar_series_no_occurrence` (400, the `recurrence_rule` has no occurrence on or after the start date), '
+  + '`calendar_series_ends_before_start` (400, its `UNTIL` lies before the start day)';
 const CASE_REASONS = {
-  '/api/v1/calendar/{id}': { put: NOT_OWNER, delete: NOT_OWNER },
-  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}': { put: NOT_OWNER, delete: NOT_OWNER },
-  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following': { put: NOT_OWNER, delete: NOT_OWNER },
+  '/api/v1/calendar': { post: `${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}` },
+  '/api/v1/calendar/{id}': {
+    get: EVENT_GONE,
+    put: `${NOT_OWNER}, ${EVENT_GONE}, ${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}`,
+    delete: `${NOT_OWNER}, ${EVENT_GONE}`,
+  },
+  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}': {
+    put: `${NOT_OWNER}, ${SERIES_GONE}`,
+    delete: `${NOT_OWNER}, ${SERIES_GONE}`,
+  },
+  '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following': {
+    put: `${NOT_OWNER}, ${SERIES_GONE}, ${SELECTED_CALENDAR_GONE}, `
+      + '`empty_successor_series` (400, the successor series has no occurrence on or after its start date)',
+    delete: `${NOT_OWNER}, ${SERIES_GONE}`,
+  },
+  '/api/v1/calendar/{id}/reset': { post: EVENT_GONE },
   '/api/v1/calendar/{id}/exceptions': {
-    post: `${NOT_OWNER}, `
+    post: `${NOT_OWNER}, ${EVENT_GONE}, `
       + '`malformed_recurrence_id` (400, `recurrence_id` or `date` is not an occurrence key), '
       + '`invalid_recurrence_id` (400, the key names no occurrence of this series), '
       + '`ambiguous_recurrence_id` (409, a date-only key matches two occurrences)',
