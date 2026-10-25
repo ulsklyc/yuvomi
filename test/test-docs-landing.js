@@ -491,7 +491,7 @@ test('ein Zahlwort steht nur dort, wo die Suite es nachzaehlt', () => {
   const html = read('index.html');
   const counted = countedKeys(html);
   assert.equal(counted.swap_title, 6, 'Vorbedingung: das Band hat sechs Paare');
-  assert.equal(counted.long_title, 4, 'Vorbedingung: die Longevity-Sektion stellt vier Fragen');
+  assert.equal(counted.long_title, 8, 'Vorbedingung: die Longevity-Sektion stellt acht Fragen');
   for (const lang of ['en', 'de']) {
     const block = dictBlock(html, lang);
     assert.ok(block, `${lang}-Woerterbuch nicht gefunden`);
@@ -527,7 +527,10 @@ test('der Zahlwort-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     [`long_title: "drei" (gezaehlt: ${questions})`]);
   // Die richtige Zahl ist erlaubt, und ausserhalb der gezaehlten Schluessel
   // bleiben kleine Zahlwoerter frei.
-  assert.deepEqual(unheldNumbers(html, "long_title:'The four questions worth asking first',"), []);
+  assert.deepEqual(unheldNumbers(html, "long_title:'The eight questions worth asking first',"), []);
+  // Der Stand vor den Fragen 5-8 (2026-10-25): "four" waere jetzt falsch.
+  assert.deepEqual(unheldNumbers(html, "long_title:'Die vier Fragen, die man vorher stellen sollte',"),
+    [`long_title: "vier" (gezaehlt: ${questions})`]);
   assert.deepEqual(unheldNumbers(html, "swap_desc:'Six apps, six accounts.',"), []);
   assert.deepEqual(unheldNumbers(html, "qs_c2:'# two values: one for each secret',"), []);
   // Umlaut-Grenze: "zwölf" und "fünfzehn" werden gefunden, "Elfenbein" nicht.
@@ -3156,6 +3159,144 @@ test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(r2Findings(html, no2fa), /long_a4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
   // Die Frage verschwindet aus dem Markup.
   assert.ok(hit(r2Findings(html.replace('<dt data-t="long_q4">', '<dt>'), real), /long_q4\/long_a4 fehlen im Markup/));
+});
+
+
+// ── (16b) Die Fragen aus den Kommentaren (5-8) ──────────────────────────────
+
+/**
+ * Unter Caschys Artikel (24.10.2026) und dem Deployn-Video kamen vier Fragen
+ * immer wieder: gibt es eine Store-App, geht es offline, braucht es den
+ * CalDAV-/Nextcloud-Server noch, geht Home Assistant. Die Longevity-Sektion
+ * beantwortet sie als long_q5..long_q8. Jede Zusage haengt hier an der Stelle
+ * im Code, die sie haelt - wie (16) fuer long_a4.
+ */
+const FAQ_CLAIMS = [
+  { where: 'long_a5', says: { en: /starts full screen like any other app/, de: /startet sie im Vollbild wie jede andere App/ },
+    holds: (s) => /"display": "standalone"/.test(s.manifest),
+    what: 'Vollbild nach der Installation (public/manifest.json display standalone)' },
+  { where: 'long_a5', says: { en: /push notifications even while it is closed; for that your server needs HTTPS/, de: /Push-Benachrichtigung, auch wenn sie geschlossen ist; dafür braucht euer Server HTTPS/ },
+    holds: (s) => /self\.addEventListener\('push'/.test(s.sw),
+    what: "Push im Service Worker (public/sw.js addEventListener('push'))" },
+  { where: 'long_a6', says: { en: /Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded/, de: /Kalender, Aufgaben, Einkaufsliste, Kontakte und die Übersicht behalten den Stand, den euer Handy zuletzt geladen hat/ },
+    holds: (s) => {
+      const list = s.sw.match(/API_CACHE_WHITELIST = \[([^\]]*)\]/);
+      return !!list && ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard'].every((p) => list[1].includes(`'${p}'`));
+    },
+    what: 'Read-only-Cache der fuenf Module (public/sw.js API_CACHE_WHITELIST)' },
+  { where: 'long_a6', says: { en: /ticking something off while offline is refused with a note/, de: /Abhaken ohne Netz lehnt Yuvomi mit einem Hinweis ab/ },
+    holds: (s) => /err\?\.status === 0\) return 'common\.errorOfflineMutation'/.test(s.friendlyError),
+    what: 'Offline-Hinweis bei Aenderungen (public/utils/friendly-error.js common.errorOfflineMutation)' },
+  { where: 'long_a7', says: { en: /It is not a CalDAV server itself/, de: /Ein CalDAV-Server ist es selbst aber nicht/ },
+    // `client.propfind(...)` in cardav-sync.js ist der ausgehende Abgleich und
+    // zaehlt nicht; gesucht ist ein Endpunkt, der selbst DAV beantwortet.
+    holds: (s) => !s.serverSources.some((src) => /well-known\/(caldav|carddav)|\b(app|router)\.propfind\(|req\.method === 'PROPFIND'/.test(src)),
+    what: 'kein CalDAV-/CardDAV-Endpunkt unter server/ (kein .well-known, kein PROPFIND-Handler)' },
+  { where: 'long_a7', says: { en: /events both ways, tasks and shopping items through CalDAV reminders, and contacts it fetches over CardDAV/, de: /Termine in beide Richtungen, Aufgaben und Einkauf über CalDAV-Erinnerungen, Kontakte holt es per CardDAV/ },
+    holds: (s) => s.caldavOutbound && /Tasks & Shopping/.test(s.caldavReminders) && s.carddavSync,
+    what: 'CalDAV hin und zurueck, VTODO in Aufgaben/Einkauf, CardDAV-Abgleich (server/services/caldav-outbound.js, caldav-reminders-sync.js, cardav-sync.js)' },
+  { where: 'long_a7', says: { en: /its ICS feed is enough/, de: /reicht sein ICS-Feed/ },
+    holds: (s) => /^function getFeedToken\(/m.test(s.icsExport) && /^\s+getFeedToken,/m.test(s.icsExport),
+    what: 'ICS-Export-Feed (server/services/ics-export.js getFeedToken)' },
+  { where: 'long_a7', says: { en: /WebDAV storage for documents and backups/, de: /WebDAV-Ablage für Dokumente und Backups/ },
+    holds: (s) => s.backupWebdav && /DOCUMENT_STORAGE_WEBDAV_URL=/.test(s.envExample),
+    what: 'WebDAV fuer Backups und Dokumente (server/services/backup-webdav.js, .env.example DOCUMENT_STORAGE_WEBDAV_URL)' },
+  { where: 'long_a8', says: { en: /Calendar, waste collection and birthdays come as ICS feeds/, de: /Kalender, Müllabfuhr und Geburtstage gibt es als ICS-Feeds/ },
+    holds: (s) => /FEED_TOKEN_COLUMNS = new Set\(\['calendar_feed_token', 'waste_feed_token', 'birthday_feed_token'\]\)/.test(s.icsExport),
+    what: 'drei Feed-Tokens (server/services/ics-export.js FEED_TOKEN_COLUMNS)' },
+  { where: 'long_a8', says: { en: /Reminders can go to a webhook/, de: /Erinnerungen können an einen Webhook gehen/ },
+    holds: (s) => s.webhookProvider,
+    what: 'Webhook-Kanal (server/services/notification-providers/webhook.js)' },
+  { where: 'long_a8', says: { en: /tokens you can limit to single modules, read or write/, de: /Tokens, die sich auf einzelne Module beschränken lassen, lesend oder schreibend/ },
+    holds: (s) => /\[`\$\{key\}:read`, `\$\{key\}:write`\]/.test(s.scopes),
+    what: 'Token-Scopes je Modul lesen/schreiben (server/scopes.js ALL_SCOPES)' },
+];
+
+/** Saetze, die nicht kommen duerfen: eine Store-App oder Offline-Schreiben zusagen. */
+const FAQ_NEVER = [
+  /available (in|on) the (App Store|Play Store)/i, /im (App|Play) Store erhältlich/,
+  /works fully offline/i, /komplett offline/,
+];
+
+function serverSources(dir = resolve(ROOT, 'server')) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = resolve(dir, e.name);
+    if (e.isDirectory()) out.push(...serverSources(p));
+    else if (e.name.endsWith('.js')) out.push(readFileSync(p, 'utf8'));
+  }
+  return out;
+}
+
+function faqSources() {
+  const src = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+  const has = (p) => existsSync(resolve(ROOT, p));
+  return {
+    manifest: src('public/manifest.json'),
+    sw: src('public/sw.js'),
+    friendlyError: src('public/utils/friendly-error.js'),
+    serverSources: serverSources(),
+    caldavOutbound: has('server/services/caldav-outbound.js'),
+    caldavReminders: src('server/services/caldav-reminders-sync.js'),
+    carddavSync: has('server/services/cardav-sync.js'),
+    icsExport: src('server/services/ics-export.js'),
+    backupWebdav: has('server/services/backup-webdav.js'),
+    envExample: src('.env.example'),
+    webhookProvider: has('server/services/notification-providers/webhook.js'),
+    scopes: src('server/scopes.js'),
+  };
+}
+
+/** Alles, was an (16b) nicht stimmt, als lesbare Zeilen. */
+function faqFindings(html, sources) {
+  const found = [];
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const c of FAQ_CLAIMS) {
+      const raw = dictValue(block, c.where);
+      const text = raw === null ? '' : stripTags(unescapeJs(raw));
+      if (!c.says[lang].test(text)) found.push(`${c.where} (${lang}) sagt nicht mehr ${c.says[lang]} - FAQ_CLAIMS nachziehen`);
+      else if (!c.holds(sources)) found.push(`${c.where} (${lang}): haengt an ${c.what}, und das haelt nicht mehr`);
+    }
+    for (const [key, text] of dictEntries(block)) {
+      for (const re of FAQ_NEVER) if (re.test(text)) found.push(`${key} (${lang}) sagt ${re}`);
+    }
+  }
+  // Ohne JS steht das Markup: jede Frage auch dort, nicht nur im Woerterbuch.
+  for (const n of [5, 6, 7, 8]) {
+    if (!html.includes(`<dt data-t="long_q${n}">`) || !html.includes(`<dd data-t="long_a${n}">`)) found.push(`long_q${n}/long_a${n} fehlen im Markup`);
+  }
+  return found;
+}
+
+test('index.html: die Fragen 5-8 sagen nur, was der Code haelt', () => {
+  assert.deepEqual(faqFindings(read('index.html'), faqSources()), []);
+});
+
+test('der Guard aus (16b) erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const real = faqSources();
+  const hit = (list, re) => list.some((l) => re.test(l));
+  // Offline-Schreiben zugesagt.
+  const offline = html.replace('<b>For reading, yes.</b>', '<b>Yes, it works fully offline.</b>');
+  assert.notEqual(offline, html, 'Vorbedingung: long_a6 beginnt so');
+  assert.ok(hit(faqFindings(offline, real), /long_a6 \(en\) sagt \/works fully offline\/i/));
+  // Der Code verliert, woran die Zusagen haengen.
+  const noShopCache = { ...real, sw: real.sw.replace("'/shopping', ", '') };
+  assert.notEqual(noShopCache.sw, real.sw, "Vorbedingung: '/shopping' steht in API_CACHE_WHITELIST");
+  assert.ok(hit(faqFindings(html, noShopCache), /long_a6 \(de\): haengt an Read-only-Cache/), 'Offline-Guard blind');
+  const davServer = { ...real, serverSources: [...real.serverSources, "app.use('/.well-known/caldav', dav);"] };
+  assert.ok(hit(faqFindings(html, davServer), /long_a7 \(en\): haengt an kein CalDAV/), 'CalDAV-Server-Guard blind');
+  const propfind = { ...real, serverSources: [...real.serverSources, "router.propfind('/dav/:user', handler);"] };
+  assert.ok(hit(faqFindings(html, propfind), /long_a7 \(de\): haengt an kein CalDAV/), 'PROPFIND-Guard blind');
+  const noFeed = { ...real, icsExport: real.icsExport.replace('function getFeedToken(', 'function getToken(') };
+  assert.ok(hit(faqFindings(html, noFeed), /long_a7 \(en\): haengt an ICS-Export-Feed/), 'Feed-Guard blind');
+  const noScopes = { ...real, scopes: real.scopes.replaceAll('`${key}:write`', '`${key}:all`') };
+  assert.ok(hit(faqFindings(html, noScopes), /long_a8 \(de\): haengt an Token-Scopes/), 'Scope-Guard blind');
+  const noWebhook = { ...real, webhookProvider: false };
+  assert.ok(hit(faqFindings(html, noWebhook), /long_a8 \(en\): haengt an Webhook-Kanal/), 'Webhook-Guard blind');
+  // Eine Frage verschwindet aus dem Markup.
+  assert.ok(hit(faqFindings(html.replace('<dt data-t="long_q7">', '<dt>'), real), /long_q7\/long_a7 fehlen im Markup/));
 });
 
 

@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one button above the list. Large selections are imported in batches. If a later
   batch fails, the saved count remains visible in the warning and the list is
   refreshed; retrying reports the total across successful batches.
+- **yuvomi.cloud answers the four questions people ask most before they install.** "Before you
+  commit" now also says whether there is an app in the store (no, it installs from the browser and
+  sends push reminders, with HTTPS), what works without signal (reading the last loaded calendar,
+  tasks, shopping list, contacts and overview; changes need a connection), whether a CalDAV or
+  Nextcloud server is still needed (only to keep editing in other apps; Yuvomi syncs with it but is
+  no CalDAV server itself) and how Home Assistant fits in (ICS feeds, webhooks and the REST API with
+  per-module tokens, no official integration). Each answer is held against the code by the landing
+  page tests.
 
 ### Fixed
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
