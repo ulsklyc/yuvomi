@@ -1010,6 +1010,26 @@
   }
 }
 
+/* GANZE TAGE AUCH NEBEN DER SEITENLEISTE (R23 S11b). Bei 1024px fehlten der
+ * Woche 108px: der Weg war kuerzer als ein Tag (112px), das Einrasten auf
+ * heute hielt am Ende des Wegs, und vom ersten Tag stand ein 4px-Streifen
+ * neben der Achse, der Rest darunter (1100px: 80px Streifen). Jetzt passen
+ * so viele GANZE Tage, wie das Mindestmass erlaubt, und sie teilen sich die
+ * Breite - bei 1024px sechs Tage zu 113px, der siebte liegt einen Tag weit
+ * daneben. Gemessen wird der Abschnitt selbst (`cqi`), nicht der Viewport:
+ * die Seitenleiste nimmt ihm 220px. Ohne Rechnen mit Laengen (`px / px`)
+ * bleibt das Mindestmass von oben stehen. */
+@supports (width: calc(1px * round(down, 7px / 2px, 1))) {
+  @media (min-width: 768px) {
+    .schedule-overview {
+      container-type: inline-size;
+      --schedule-day-room: calc(100cqi - var(--cal-gutter-width));
+      --schedule-day-fit: max(1, min(var(--schedule-days, 7), round(down, var(--schedule-day-room) / (var(--schedule-lanes, 1) * var(--schedule-lane-min)), 1)));
+      --schedule-columns: var(--cal-gutter-width) repeat(var(--schedule-days, 7), calc(var(--schedule-day-room) / var(--schedule-day-fit)));
+    }
+  }
+}
+
 .schedule-overview__lanes {
   position: absolute;
   inset: 0;

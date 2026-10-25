@@ -3694,7 +3694,10 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   (Ganztagszone, Feiertag), wie die Schicht-Chips des Kalenders. **Tage rasten an der Achse
   ein** (`scroll-snap`, Polster = Achsenbreite), und am Telefon ist ein Tag so breit, dass
   ganze Tage ins Bild passen (drei bei einer Person, sonst einer; vorher 2,8 und der erste
-  halb unter der Achse). **Ein Reiterwechsel haelt den Kopf**: der neue Reiter beginnt unter
+  halb unter der Achse). Neben der Seitenleiste ebenso **ganze Tage**: so viele, wie das
+  Mindestmass (7rem je Spur) erlaubt, gemessen am Abschnitt (`container-type`, `cqi`) - bei
+  1024px sechs Tage zu 113px statt sieben zu 112px mit einem 4px-Streifen des ersten neben der
+  Achse (R23 S11b). **Ein Reiterwechsel haelt den Kopf**: der neue Reiter beginnt unter
   der angedockten Leiste, die Uebersicht wieder auf der laufenden Stunde; `update()` meldet
   `'own-scroll'`, und der Router setzt den Stand bei der Soft-Navigation nicht noch einmal auf 0
   (vorher zwei Spruenge 0,035/0,038 beim Wechsel, und die Rueckkehr stand auf 00:00). Traegt

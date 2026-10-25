@@ -2865,6 +2865,22 @@ test('Uebersicht: Tage rasten an der Achse ein, am Telefon ganze Tage; ein Reite
   assert.match(js, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'ein neuer Reiter beginnt oben, unter einer angedockten Leiste');
 });
 
+// R23 S11b (Rest aus S9): bei 1024px war der Weg (108px) kuerzer als ein Tag
+// (112px) - vom ersten Tag stand ein 4px-Streifen neben der Achse, der Rest
+// darunter. Neben der Seitenleiste passen jetzt so viele GANZE Tage, wie das
+// Mindestmass erlaubt; gemessen am Abschnitt (cqi), nicht am Viewport.
+test('Uebersicht neben der Seitenleiste: ganze Tage, gemessen am Abschnitt', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const wide = [...eachRule(css)].find((r) => r.selector.trim() === '.schedule-overview' && r.at.some((a) => /min-width:\s*768px/.test(a)));
+  assert.ok(wide, 'eine Regel ab 768px');
+  assert.ok(wide.at.some((a) => /@supports/.test(a)), 'nur wo Laengen geteilt werden koennen');
+  assert.match(wide.body, /container-type:\s*inline-size/, 'der Abschnitt ist sein eigenes Mass');
+  assert.match(wide.body, /--schedule-day-room:\s*calc\(100cqi - var\(--cal-gutter-width\)\)/);
+  assert.match(wide.body, /--schedule-day-fit:\s*max\(1, min\(var\(--schedule-days, 7\), round\(down, var\(--schedule-day-room\) \/ \(var\(--schedule-lanes, 1\) \* var\(--schedule-lane-min\)\), 1\)\)\)/, 'so viele ganze Tage, wie das Mindestmass erlaubt');
+  assert.match(wide.body, /--schedule-columns:[^;]*calc\(var\(--schedule-day-room\) \/ var\(--schedule-day-fit\)\)/, 'die ganzen Tage teilen sich die Breite');
+});
+
 // R23 S10 (Rest aus S9): die Planung ist mobil kuerzer als Port + Lead-Zone -
 // der Browser kappte den Stand, der Kopf klappte beim Wechsel auf (0,029/0,032).
 test('ein kurzer Reiter bekommt unter angedocktem Kopf genau den fehlenden Nachlauf', async () => {

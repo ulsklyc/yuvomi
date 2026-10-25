@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **More dates drop the year when it is this year.** Documents, Rewards, Pantry, task details and
   comments, Housekeeping and the Overview now write dates the way the rest of the app does:
   "24.10." in the current year, the full date only for other years.
+- **Whole days in the shift schedule next to the sidebar.** At 1024 px the week showed a 4 px
+  sliver of its first day beside the hour column; it now shows as many whole days as fit and
+  scrolls by full days.
 - **Quieter lists and dialogs.** When a list shows "No results" or has nothing in it yet, the
   empty detail column beside it no longer asks you to pick something. The Tasks view switch reads
   "List · Kanban · History" instead of repeating "view", the button that moves a Kanban card to "In
