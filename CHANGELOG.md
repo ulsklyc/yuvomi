@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applies if the series has none), and an assignment you change on it later stays. A series split
   with "All future events" gets a new identity in Apple Calendar and is still treated as a new
   event.
+- **A planned snack now shows up on the wall and in Today.** Since 2.79.0 a paired display
+  receives every meal of the day, but the choice of which meal to show only looked at breakfast,
+  lunch and dinner. A day whose only remaining plan was a snack showed no meal at all. The snack
+  now takes part in that choice at its place in the day, between lunch and dinner (#2206).
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The

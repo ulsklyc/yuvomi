@@ -249,6 +249,73 @@ test('Today-Highlights wählt die Mahlzeit passend zur Tageszeit', async () => {
   assert(onlyDinner.meal.title === 'Suppe', 'Ohne Frühstück sollte die nächste geplante Mahlzeit gezeigt werden');
 });
 
+/* DER SNACK NIMMT AN DER AUSWAHL TEIL (#2206). Seit 2.79.0 traegt `todayMeals`
+ * auch den Snack an die Wand, `selectTodayMeal()` lief aber nur Fruehstueck,
+ * Mittag und Abend ab: ein Tag, dessen einzige offene Mahlzeit der Snack war,
+ * zeigte keine Mahlzeit. Eingeordnet wird er an seiner nominalen Slot-Zeit
+ * (MEAL_SORT_TIME, 15:30) zwischen Mittag und Abend.
+ *
+ * Zone und Uhr stehen still (Europe/Berlin, Juli = UTC+2), ohne `await`
+ * zwischen Stellen und Zuruecksetzen - die Tests laufen verschraenkt. */
+test('Today-Highlights: ein geplanter Snack erscheint (#2206)', async () => {
+  const tz = await import('/utils/timezone.js');
+  const { __test } = await import('../public/pages/dashboard.js');
+
+  // Ab hier synchron.
+  const RealDate = Date;
+  let fixedMs = 0;
+  class FrozenDate extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [fixedMs])); }
+    static now() { return fixedMs; }
+  }
+  // Wanduhr Berlin: Stunde h am 03.07.2026 = (h - 2) Uhr UTC.
+  const atBerlin = (hour, fn) => {
+    fixedMs = RealDate.UTC(2026, 6, 3, hour - 2, 0);
+    return fn();
+  };
+  const snack = { id: 41, meal_type: 'snack', title: 'Apfelschnitze' };
+  const lunch = { id: 42, meal_type: 'lunch', title: 'Salat' };
+  const dinner = { id: 43, meal_type: 'dinner', title: 'Suppe' };
+
+  try {
+    globalThis.Date = FrozenDate;
+    tz.setDisplayTimeZone('Europe/Berlin');
+    nodeAssert.equal(atBerlin(13, () => tz.nowFields().hour), 13, 'die Uhr steht auf 13:00 Berlin');
+
+    const onlySnack = atBerlin(13, () => __test.buildTodayHighlights({ todayMeals: [snack] }));
+    nodeAssert.equal(onlySnack.meal?.id, 41, 'nur ein Snack geplant: er ist die Mahlzeit des Tages');
+    nodeAssert.equal(onlySnack.mealType, 'snack');
+
+    const snackBeforeDinner = atBerlin(13, () => __test.buildTodayHighlights({ todayMeals: [snack, dinner] }));
+    nodeAssert.equal(snackBeforeDinner.meal?.id, 41, 'ohne Mittag kommt der Snack (15:30) vor dem Abendessen');
+
+    const morning = atBerlin(8, () => __test.buildTodayHighlights({ todayMeals: [dinner, snack] }));
+    nodeAssert.equal(morning.meal?.id, 41, 'morgens ohne Fruehstueck und Mittag: der Snack ist das Naechste');
+
+    const lunchFirst = atBerlin(13, () => __test.buildTodayHighlights({ todayMeals: [snack, lunch] }));
+    nodeAssert.equal(lunchFirst.meal?.id, 42, 'mittags mit Mittagessen bleibt es beim Mittagessen');
+
+    const objectShape = atBerlin(13, () => __test.buildTodayHighlights({ meals: { snack: { id: 41, title: 'Apfelschnitze' } } }));
+    nodeAssert.equal(objectShape.meal?.id, 41, 'auch die Objektform kennt den Snack');
+
+    // Nach dem Abendessen-Schwellwert ist der Snack vorbei - wie das Fruehstueck.
+    const evening = atBerlin(20, () => __test.buildTodayHighlights({ todayMeals: [snack] }));
+    nodeAssert.equal(evening.meal, null, 'abends ist der Nachmittagssnack vorbei');
+
+    // Die Zeile, die Uebersicht und Wand gemeinsam lesen.
+    const program = atBerlin(13, () => __test.buildTodayProgram(
+      { todayMeals: [snack], upcomingEvents: [], urgentTasks: [] },
+      { includeTasks: false, includeCalendar: false, now: new FrozenDate() },
+    ));
+    const row = program.rows.find((r) => r.kind === 'meal');
+    nodeAssert.equal(row?.objectId, 41, 'das Tagesprogramm traegt die Snack-Zeile');
+    nodeAssert.equal(row.sortKey, '15:30', 'eingeordnet an der nominalen Snack-Zeit');
+  } finally {
+    globalThis.Date = RealDate;
+    tz.setDisplayTimeZone(null);
+  }
+});
+
 test('Today-Highlights filtert Termine auf den heutigen Tag', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   const todayStr = toLocalDateKey(new Date());
