@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
+  an assistant put the recipe fields next to `operation_key` instead of into `payload`,
+  `call_api_operation` sent the request without a body and the recipe routes failed on it. The
+  bridge now answers that the body belongs in `payload`, and a required body that is missing goes
+  out as an empty object, so the route says which field is missing. The recipe routes themselves
+  answer a request without a body, or with ingredients that are not a list, with 400 instead of
+  500. Events, shopping items and tasks were not affected because they have MCP tools of their
+  own; recipes are only reachable through the bridge.
+
 ## [2.80.0] - 2026-10-25
 
 ### Added
