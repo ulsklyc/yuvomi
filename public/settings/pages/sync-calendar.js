@@ -1075,6 +1075,29 @@ function googleAcceptsRedirect(uri) {
   return url.protocol === 'https:' && !isIp;
 }
 
+/**
+ * Kopiert den Wert eines Feldes und sagt, ob es wirklich geklappt hat. Ueber
+ * http im Heimnetz - genau dort, wo die Einrichtung meist passiert - gibt es
+ * `navigator.clipboard` nicht; dann bleibt der Auswahl-Weg, und das Feld steht
+ * markiert, falls auch der scheitert. Dasselbe Muster wie `copyInviteLink`
+ * (admin-family.js).
+ */
+async function copyFieldValue(input) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(input.value);
+      return true;
+    } catch { /* auf den Auswahl-Weg zurueckfallen */ }
+  }
+  try {
+    input.focus();
+    input.select();
+    return document.execCommand('copy') === true;
+  } catch {
+    return false;
+  }
+}
+
 function iconNote(icon, ...content) {
   const note = document.createElement('p');
   note.className = 'settings-provider-note settings-provider-note--hint';
@@ -1140,12 +1163,8 @@ function buildGoogleSetupGuide(googleStatus) {
   copy.className = 'btn btn--secondary';
   copy.textContent = t('settings.googleSetupCopy');
   copy.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard?.writeText(redirectUri);
-      showToast(t('settings.googleSetupCopied'), 'success');
-    } catch (err) {
-      showToast(err?.message || t('common.errorGeneric'), 'danger');
-    }
+    const copied = await copyFieldValue(uriInput);
+    showToast(t(copied ? 'settings.googleSetupCopied' : 'settings.googleSetupCopyFailed'), copied ? 'success' : 'danger');
   });
   uriRow.append(uriInput, copy);
   uriStep.appendChild(uriRow);
@@ -1879,4 +1898,4 @@ export async function render(container, { user, query } = {}) {
 }
 
 // Für die Suite: die Google-Karte für sich, ohne die ganze Seite (#2019).
-export const __test = { buildGoogleProvider, bindCalDAVAddButton, googleAcceptsRedirect };
+export const __test = { buildGoogleProvider, bindCalDAVAddButton, googleAcceptsRedirect, copyFieldValue };

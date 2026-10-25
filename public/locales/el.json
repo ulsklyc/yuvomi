@@ -2099,6 +2099,7 @@
         "googleSetupRedirectLabel": "URI ανακατεύθυνσης για το Google",
         "googleSetupCopy": "Αντιγραφή",
         "googleSetupCopied": "Η διεύθυνση αντιγράφηκε.",
+        "googleSetupCopyFailed": "Η αντιγραφή δεν ήταν δυνατή. Η διεύθυνση είναι επιλεγμένη, αντιγράψτε την χειροκίνητα.",
         "googleSetupRedirectHttps": "Το Google δέχεται μόνο διευθύνσεις HTTPS με όνομα κεντρικού υπολογιστή, όχι διεύθυνση IP. Χρησιμοποιήστε τη διεύθυνση στην οποία το Yuvomi είναι προσβάσιμο μέσω HTTPS.",
         "googleSetupStepEnv": "Καταχωρίστε το αναγνωριστικό πελάτη, το μυστικό πελάτη και την ίδια διεύθυνση στο .env και επανεκκινήστε το Yuvomi:",
         "googleSetupGuideLink": "Οδηγός βήμα προς βήμα",

@@ -2099,6 +2099,7 @@
         "googleSetupRedirectLabel": "Google için yönlendirme URI’si",
         "googleSetupCopy": "Kopyala",
         "googleSetupCopied": "Adres kopyalandı.",
+        "googleSetupCopyFailed": "Kopyalama yapılamadı. Adres seçili, elle kopyalayın.",
         "googleSetupRedirectHttps": "Google yalnızca ana makine adı olan HTTPS adreslerini kabul eder, IP adresini kabul etmez. Yuvomi’ye HTTPS üzerinden ulaşılan adresi kullanın.",
         "googleSetupStepEnv": "İstemci kimliğini, istemci gizli anahtarını ve aynı adresi .env dosyasına yazın ve Yuvomi’yi yeniden başlatın:",
         "googleSetupGuideLink": "Adım adım kılavuz",

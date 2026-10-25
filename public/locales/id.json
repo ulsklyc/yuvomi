@@ -2255,6 +2255,7 @@
         "googleSetupRedirectLabel": "URI pengalihan untuk Google",
         "googleSetupCopy": "Salin",
         "googleSetupCopied": "Alamat disalin.",
+        "googleSetupCopyFailed": "Gagal menyalin. Alamat sudah dipilih, salin secara manual.",
         "googleSetupRedirectHttps": "Google hanya menerima alamat HTTPS dengan nama host, bukan alamat IP. Gunakan alamat tempat Yuvomi dapat diakses melalui HTTPS.",
         "googleSetupStepEnv": "Masukkan ID klien, rahasia klien, dan alamat yang sama ke .env, lalu mulai ulang Yuvomi:",
         "googleSetupGuideLink": "Panduan langkah demi langkah",

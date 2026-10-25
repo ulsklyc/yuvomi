@@ -2099,6 +2099,7 @@
         "googleSetupRedirectLabel": "Google 的重新導向 URI",
         "googleSetupCopy": "複製",
         "googleSetupCopied": "已複製地址。",
+        "googleSetupCopyFailed": "無法複製。位址已選取，請手動複製。",
         "googleSetupRedirectHttps": "Google 只接受帶有主機名稱的 HTTPS 位址，不接受 IP 位址。請使用可透過 HTTPS 存取 Yuvomi 的位址。",
         "googleSetupStepEnv": "將用戶端 ID、用戶端密鑰和同一位址填入 .env，然後重新啟動 Yuvomi：",
         "googleSetupGuideLink": "逐步指南",

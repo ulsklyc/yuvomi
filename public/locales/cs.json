@@ -2323,6 +2323,7 @@
         "googleSetupRedirectLabel": "URI přesměrování pro Google",
         "googleSetupCopy": "Kopírovat",
         "googleSetupCopied": "Adresa zkopírována.",
+        "googleSetupCopyFailed": "Kopírování se nepodařilo. Adresa je označená, zkopírujte ji ručně.",
         "googleSetupRedirectHttps": "Google přijímá jen adresy HTTPS s názvem hostitele, ne IP adresu. Použijte adresu, na které je Yuvomi dostupné přes HTTPS.",
         "googleSetupStepEnv": "Zapište ID klienta, tajný klíč klienta a stejnou adresu do .env a Yuvomi restartujte:",
         "googleSetupGuideLink": "Návod krok za krokem",

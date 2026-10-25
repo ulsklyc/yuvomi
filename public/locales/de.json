@@ -2255,6 +2255,7 @@
         "googleSetupRedirectLabel": "Weiterleitungs-URI für Google",
         "googleSetupCopy": "Kopieren",
         "googleSetupCopied": "Adresse kopiert.",
+        "googleSetupCopyFailed": "Kopieren war nicht möglich. Die Adresse ist markiert, kopiere sie von Hand.",
         "googleSetupRedirectHttps": "Google nimmt nur HTTPS-Adressen mit Hostnamen an, keine IP-Adresse. Nimm die Adresse, unter der Yuvomi per HTTPS erreichbar ist.",
         "googleSetupStepEnv": "Client-ID, Clientschlüssel und dieselbe Adresse in die .env eintragen und Yuvomi neu starten:",
         "googleSetupGuideLink": "Anleitung Schritt für Schritt",

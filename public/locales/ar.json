@@ -2352,6 +2352,7 @@
         "googleSetupRedirectLabel": "عنوان URI لإعادة التوجيه إلى Google",
         "googleSetupCopy": "نسخ",
         "googleSetupCopied": "تم نسخ العنوان.",
+        "googleSetupCopyFailed": "تعذّر النسخ. العنوان محدَّد، انسخه يدويًا.",
         "googleSetupRedirectHttps": "تقبل Google فقط عناوين HTTPS ذات اسم مضيف، ولا تقبل عنوان IP. استخدم العنوان الذي يمكن الوصول فيه إلى Yuvomi عبر HTTPS.",
         "googleSetupStepEnv": "أدخل معرّف العميل وسرّ العميل والعنوان نفسه في ‎.env ثم أعد تشغيل Yuvomi:",
         "googleSetupGuideLink": "دليل خطوة بخطوة",

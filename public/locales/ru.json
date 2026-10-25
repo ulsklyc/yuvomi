@@ -2267,6 +2267,7 @@
         "googleSetupRedirectLabel": "URI перенаправления для Google",
         "googleSetupCopy": "Копировать",
         "googleSetupCopied": "Адрес скопирован.",
+        "googleSetupCopyFailed": "Скопировать не удалось. Адрес выделен, скопируйте его вручную.",
         "googleSetupRedirectHttps": "Google принимает только адреса HTTPS с именем хоста, а не IP-адрес. Укажите адрес, по которому Yuvomi доступен через HTTPS.",
         "googleSetupStepEnv": "Впишите в .env идентификатор клиента, секрет клиента и тот же адрес, затем перезапустите Yuvomi:",
         "googleSetupGuideLink": "Пошаговая инструкция",

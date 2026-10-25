@@ -2255,6 +2255,7 @@
         "googleSetupRedirectLabel": "نشانی URI تغییر مسیر برای Google",
         "googleSetupCopy": "کپی",
         "googleSetupCopied": "نشانی کپی شد.",
+        "googleSetupCopyFailed": "کپی انجام نشد. نشانی انتخاب شده است، آن را دستی کپی کنید.",
         "googleSetupRedirectHttps": "Google فقط نشانی‌های HTTPS دارای نام میزبان را می‌پذیرد، نه نشانی IP. نشانی‌ای را به کار ببرید که Yuvomi از طریق HTTPS در آن در دسترس است.",
         "googleSetupStepEnv": "شناسهٔ کلاینت، رمز کلاینت و همین نشانی را در ‎.env وارد کنید و Yuvomi را دوباره راه‌اندازی کنید:",
         "googleSetupGuideLink": "راهنمای گام‌به‌گام",

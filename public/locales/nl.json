@@ -2210,6 +2210,7 @@
         "googleSetupRedirectLabel": "Omleidings-URI voor Google",
         "googleSetupCopy": "Kopiëren",
         "googleSetupCopied": "Adres gekopieerd.",
+        "googleSetupCopyFailed": "Kopiëren is niet gelukt. Het adres is geselecteerd, kopieer het met de hand.",
         "googleSetupRedirectHttps": "Google accepteert alleen HTTPS-adressen met een hostnaam, geen IP-adres. Gebruik het adres waarop Yuvomi via HTTPS bereikbaar is.",
         "googleSetupStepEnv": "Zet de client-ID, het clientgeheim en hetzelfde adres in .env en start Yuvomi opnieuw:",
         "googleSetupGuideLink": "Stapsgewijze handleiding",

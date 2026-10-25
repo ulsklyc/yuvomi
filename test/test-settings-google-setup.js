@@ -98,3 +98,33 @@ test('#2221: welche Rueckrufadresse Google annimmt', () => {
   assert.equal(ok('https://[fd00::1]/api/v1/calendar/google/callback'), false, 'IPv6');
   assert.equal(ok('kein url'), false);
 });
+
+test('#2221: Kopieren meldet nur Erfolg, wenn wirklich kopiert wurde (http ohne Zwischenablage)', async () => {
+  const copy = __test.copyFieldValue;
+  const field = () => ({ value: 'http://192.168.1.20:3000/api/v1/calendar/google/callback', focus() {}, select() { this.selected = true; } });
+  const setNavigator = (value) => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true });
+  const savedNavigator = globalThis.navigator;
+  const savedExec = globalThis.document.execCommand;
+  try {
+    // http im Heimnetz: keine Clipboard-API, und auch der Auswahl-Weg scheitert.
+    setNavigator({});
+    globalThis.document.execCommand = () => false;
+    const f1 = field();
+    assert.equal(await copy(f1), false, 'kein "kopiert", wenn nichts kopiert wurde');
+    assert.equal(f1.selected, true, 'das Feld steht markiert, damit man von Hand kopieren kann');
+
+    // Ohne Clipboard-API, aber der Auswahl-Weg klappt.
+    globalThis.document.execCommand = (cmd) => cmd === 'copy';
+    assert.equal(await copy(field()), true);
+
+    // Mit Clipboard-API.
+    let written = null;
+    setNavigator({ clipboard: { writeText: async (v) => { written = v; } } });
+    globalThis.document.execCommand = () => { throw new Error('nicht gebraucht'); };
+    assert.equal(await copy(field()), true);
+    assert.match(written, /google\/callback$/);
+  } finally {
+    setNavigator(savedNavigator);
+    globalThis.document.execCommand = savedExec;
+  }
+});

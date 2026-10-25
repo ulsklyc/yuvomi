@@ -2099,6 +2099,7 @@
         "googleSetupRedirectLabel": "Google के लिए रीडायरेक्ट URI",
         "googleSetupCopy": "कॉपी करें",
         "googleSetupCopied": "पता कॉपी हो गया।",
+        "googleSetupCopyFailed": "कॉपी नहीं हो सका। पता चुना हुआ है, उसे हाथ से कॉपी करें।",
         "googleSetupRedirectHttps": "Google केवल होस्ट नाम वाले HTTPS पते स्वीकार करता है, IP पता नहीं। वह पता इस्तेमाल करें जिस पर Yuvomi HTTPS से पहुँचा जा सकता है।",
         "googleSetupStepEnv": "क्लाइंट ID, क्लाइंट सीक्रेट और वही पता .env में डालें और Yuvomi को फिर से शुरू करें:",
         "googleSetupGuideLink": "चरण-दर-चरण गाइड",

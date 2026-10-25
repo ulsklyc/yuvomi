@@ -2210,6 +2210,7 @@
         "googleSetupRedirectLabel": "Átirányítási URI a Google-höz",
         "googleSetupCopy": "Másolás",
         "googleSetupCopied": "Cím kimásolva.",
+        "googleSetupCopyFailed": "A másolás nem sikerült. A cím ki van jelölve, másold ki kézzel.",
         "googleSetupRedirectHttps": "A Google csak hosztnévvel rendelkező HTTPS-címeket fogad el, IP-címet nem. Azt a címet használd, amelyen a Yuvomi HTTPS-en elérhető.",
         "googleSetupStepEnv": "Írd be a .env-be az ügyfélazonosítót, az ügyfélkulcsot és ugyanezt a címet, majd indítsd újra a Yuvomit:",
         "googleSetupGuideLink": "Lépésről lépésre útmutató",

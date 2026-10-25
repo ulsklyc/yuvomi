@@ -2255,6 +2255,7 @@
         "googleSetupRedirectLabel": "Redirect URI para sa Google",
         "googleSetupCopy": "Kopyahin",
         "googleSetupCopied": "Nakopya ang address.",
+        "googleSetupCopyFailed": "Hindi nakopya. Naka-select na ang address, kopyahin ito nang mano-mano.",
         "googleSetupRedirectHttps": "Tumatanggap lang ang Google ng mga HTTPS address na may host name, hindi IP address. Gamitin ang address kung saan naaabot ang Yuvomi sa HTTPS.",
         "googleSetupStepEnv": "Ilagay ang client ID, client secret at ang parehong address sa .env, at i-restart ang Yuvomi:",
         "googleSetupGuideLink": "Gabay na hakbang-hakbang",

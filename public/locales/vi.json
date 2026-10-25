@@ -2210,6 +2210,7 @@
         "googleSetupRedirectLabel": "URI chuyển hướng cho Google",
         "googleSetupCopy": "Sao chép",
         "googleSetupCopied": "Đã sao chép địa chỉ.",
+        "googleSetupCopyFailed": "Không sao chép được. Địa chỉ đã được chọn, hãy sao chép thủ công.",
         "googleSetupRedirectHttps": "Google chỉ chấp nhận địa chỉ HTTPS có tên máy chủ, không chấp nhận địa chỉ IP. Hãy dùng địa chỉ mà Yuvomi truy cập được qua HTTPS.",
         "googleSetupStepEnv": "Điền ID ứng dụng khách, mã bí mật ứng dụng khách và cùng địa chỉ đó vào .env rồi khởi động lại Yuvomi:",
         "googleSetupGuideLink": "Hướng dẫn từng bước",
