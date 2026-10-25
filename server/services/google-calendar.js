@@ -32,7 +32,7 @@ import {
 import { localDayEndUtc, utcStamp } from '../utils/rrule-until.js';
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { alignmentMoved, googleReading, isEcho, sentSnapshot } from './outbound-echo.js';
-import { assignDefaultToEvent, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { rruleValue } from './recurrence.js';
@@ -1466,7 +1466,10 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
            location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'google', ?, ?, ?, ?)
       `).run(title, description, startDt, endDt, allDay ? 1 : 0, location, evColor, item.id, rrule, tzid, calRefId, createdBy);
-      assignDefaultToEvent(db.get(), inserted.lastInsertRowid, defaultAssignee);
+      // Ein geaendertes Einzelvorkommen erbt die Zuweisung seiner Serie (#2202),
+      // sonst gilt die Standard-Person des Kalenders.
+      const series = item.recurringEventId ? findLocal.get(item.recurringEventId) : null;
+      assignNewOverride(db.get(), Number(inserted.lastInsertRowid), series?.id ?? null, defaultAssignee);
     }
 
     // EXDATEs, die Google an der Serie selbst führt, als Ausnahmen ablegen.

@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address as text without the map link. A location that differs only by line breaks now counts
   as unchanged, so the event stays as it is in iCloud; a location you really change is still
   sent.
+- **A single occurrence changed on the iPhone keeps the assignment of its series.** Editing
+  one occurrence of a recurring iCloud, CalDAV or Google event in another calendar app ("This
+  event only") makes it a separate event in Yuvomi. That event only got the calendar's default
+  person, so the household member assigned to the series in Yuvomi was missing on exactly that
+  day. It now takes over the series' assignment when it first arrives (the default person still
+  applies if the series has none), and an assignment you change on it later stays. A series split
+  with "All future events" gets a new identity in Apple Calendar and is still treated as a new
+  event.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The
