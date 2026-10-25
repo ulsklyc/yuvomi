@@ -14,6 +14,7 @@ import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion, contactBirthdayMatch } from '../services/birthdays.js';
 import { mayReadModule } from '../permissions.js';
+import { dataUrlContentMatches } from '../utils/file-signature.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -71,6 +72,20 @@ function namePartChecks(parts) {
     limitedStr(parts.namePrefix, 'namePrefix',   MAX_SHORT, { reason: 'contacts_name_too_long' }),
     limitedStr(parts.nameSuffix, 'nameSuffix',   MAX_SHORT, { reason: 'contacts_name_too_long' }),
   ];
+}
+
+/** Foto-Validierung (wie Geburtstage): max ~5 MB, data-URL, Inhalt stimmt. */
+const MAX_PHOTO_LENGTH = 6_990_507;
+const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+function validateContactPhoto(val) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '') return { value: null, error: null };
+  const s = String(val).trim();
+  if (s.length > MAX_PHOTO_LENGTH) return { value: null, error: 'Contact photo is too large.' };
+  if (!PHOTO_RE.test(s)) return { value: null, error: 'Contact photo must be a valid image data URL.' };
+  if (!dataUrlContentMatches(s)) return { value: null, error: 'Contact photo content does not match its declared image type.' };
+  return { value: s, error: null };
 }
 
 /** Ein Geburtstag, den der Server als Datum abweist, benennt seinen Fall (#1909). */
@@ -474,6 +489,7 @@ const CONTACT_SELECT = `
          u.display_name  AS family_display_name,
          u.avatar_color  AS family_avatar_color,
          u.avatar_data   AS family_avatar_data,
+         (contacts.photo IS NOT NULL) AS has_photo,
          (SELECT b.id FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_id,
          (SELECT b.birth_date FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_link_date,
          (SELECT b.year_unknown FROM birthdays b WHERE ${CONTACT_BIRTHDAY} ${CONTACT_BIRTHDAY_ORDER}) AS birthday_link_year_unknown
@@ -562,7 +578,10 @@ router.get('/', (req, res) => {
     // `category` sonst mehrdeutig.
     sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
 
-    const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
+    const contacts = db.get().prepare(sql).all(...params).map((c) => {
+      const { photo: _photo, ...rest } = c;
+      return withBirthdayLink(req, rest);
+    });
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
@@ -592,7 +611,8 @@ router.post('/', (req, res) => {
     // Platzhalter, die Anzeige laesst es weg.
     const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
     const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'birthday', false));
-    const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
+    const vPhoto    = validateContactPhoto(req.body.photo);
+    const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday, vPhoto,
                       ...namePartChecks(nameParts.parts)];
     const errors   = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
@@ -682,6 +702,10 @@ router.post('/', (req, res) => {
 
     const contactId = transaction();
 
+    if (vPhoto.value !== undefined) {
+      db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(vPhoto.value, contactId);
+    }
+
     // Query the created contact with multi-value fields
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
     const multiValueFields = loadMultiValueFields(contactId);
@@ -726,6 +750,8 @@ router.put('/:id', (req, res) => {
     if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' }));
     if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
     if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
+    const vPhoto = validateContactPhoto(req.body.photo);
+    checks.push(vPhoto);
     // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
     // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
     // echten Geburtsjahr.
@@ -898,6 +924,10 @@ router.put('/:id', (req, res) => {
 
     transaction();
 
+    if (vPhoto.value !== undefined) {
+      db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(vPhoto.value, id);
+    }
+
     // Query the updated contact with multi-value fields
     const updated = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
     const multiValueFields = loadMultiValueFields(id);
@@ -981,6 +1011,37 @@ router.get('/:id', (req, res) => {
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * GET /api/v1/contacts/:id/photo
+ * Kontakt-Foto als Bild-Bytes zurückliefern.
+ * Sendet den gespeicherten data-URL-Inhalt als rohe Bild-Bytes; setzt ETag
+ * für Browser-Caching (kein separater Upload-Endpunkt nötig).
+ */
+router.get('/:id/photo', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const row = db.get().prepare('SELECT photo FROM contacts WHERE id = ?').get(id);
+    if (!row) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+    if (!row.photo) return res.status(404).json({ error: 'Contact has no photo.', code: 404, reason: 'contacts_no_photo' });
+
+    const match = row.photo.match(/^data:(image\/[a-z]+);base64,(.+)$/is);
+    if (!match) return res.status(500).json({ error: 'Stored photo is invalid.', code: 500 });
+
+    const [, mime, b64] = match;
+    const buf = Buffer.from(b64, 'base64');
+    const etag = `"${buf.length.toString(16)}"`;
+
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.setHeader('ETag', etag);
+    res.send(buf);
+  } catch (err) {
+    log.error('GET /:id/photo', err);
+    res.status(500).json({ error: 'Interner Fehler', code: 500 });
   }
 });
 
