@@ -28,6 +28,9 @@
  *          row-primary-count   hoechstens EINE sichtbare Handlung je Zeile
  *          row-chevron-with-menu  Chevron nur an reiner Navigation
  *          form-novalidate     ein Formular mit Feldregeln traegt novalidate
+ *        #2119 (2026-10-25, Haken mit Gegenstueck):
+ *          action-hook         ein `[data-action="x"]` im Listener hat ein `x` im Markup
+ *          cta-hook            eine Leerzustand-Aktion ohne onClick traegt einen gebundenen Haken
  *
  * DAS IST EIN RATCHET, KEINE ALLOWLIST. `PENDING` ist der Bestand vom
  * 2026-09-26 (Datei -> Anzahl), fuer die sechs Regeln der Runde 7 der vom
@@ -978,33 +981,109 @@ export function scanNativeDate(src, file = '') {
   return found;
 }
 
+/** Ende des Elements, dessen Tag bei `openIdx` beginnt (balancierte div-Tiefe); ohne Schluss +800. */
+function elementEnd(src, openIdx) {
+  const re = /<div\b|<\/div>/g;
+  re.lastIndex = openIdx;
+  let depth = 0;
+  let m;
+  while ((m = re.exec(src))) {
+    depth += m[0] === '</div>' ? -1 : 1;
+    if (depth === 0) return m.index + m[0].length;
+    if (m.index - openIdx > 6000) break;
+  }
+  return Math.min(src.length, openIdx + 800);
+}
+
 /**
- * D5 Abschnittsaktion: in einem Abschnittskopf-Container
+ * Der Initialisierer von `const name = ...` bis zum `;` auf oberster Ebene
+ * (Template-Literals und `${}` zaehlen nicht mit) - Start-Index und Text.
+ */
+function constInitializer(src, name) {
+  const re = new RegExp(`\\b(?:const|let)\\s+${reEsc(name)}\\s*=`, 'g');
+  const m = re.exec(src);
+  if (!m) return null;
+  const from = m.index + m[0].length;
+  const stack = [];
+  for (let i = from; i < src.length && i - from < 4000; i++) {
+    const c = src[i];
+    const top = stack[stack.length - 1];
+    if (top === '`') {
+      if (c === '\\') i++;
+      else if (c === '`') stack.pop();
+      else if (c === '$' && src[i + 1] === '{') { stack.push('{'); i++; }
+    } else if (c === '`') stack.push('`');
+    else if (c === '{' || c === '(' || c === '[') stack.push(c);
+    else if (c === '}' || c === ')' || c === ']') stack.pop();
+    else if (c === ';' && !stack.length) return { index: from, text: src.slice(from, i) };
+  }
+  return null;
+}
+
+/**
+ * Die Knoepfe eines Kopf-Ausschnitts - inline UND hinter `${name}`: ein Kopf,
+ * der seinen Knopf vorher als Konstante baut (`${setUp}`, `${adminBar}`,
+ * `${balanceActions}`), traegt ihn genauso (#2119). Index absolut zur Quelle.
+ */
+function headControls(src, from, to) {
+  const out = [];
+  const segment = src.slice(from, to);
+  for (const c of templateControls(segment)) out.push({ ...c, at: from + c.index });
+  const seen = new Set();
+  for (const ref of segment.matchAll(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g)) {
+    const name = ref[1];
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const init = constInitializer(src, name);
+    if (!init) continue;
+    for (const c of templateControls(init.text)) out.push({ ...c, at: init.index + c.index });
+  }
+  return out;
+}
+
+/**
+ * D5 Abschnittsaktion: im Abschnittskopf (`<modul>-section-head`,
+ * `<modul>-section__head`) und seinem Aktions-Container
  * (`split-section-actions`, `rw-section__actions`) darf nur `btn--secondary`
  * mit `btn--sm` stehen - kein `btn--secondary` ohne `btn--sm`, kein
  * `btn--ghost`. Genau EINE `btn--secondary btn--sm` (Icon + Wort), seltene
  * Nebenaktionen hinter `popover-menu__trigger` (`<modul>-section-tools`).
+ * Der Kopf zaehlt mit, seit #2119: `split-recurring-add` stand direkt im
+ * `split-section-head`, `rw-money-setup` hinter `${setUp}` im
+ * `rw-section__head` - beide durften unbemerkt zurueck auf `btn--ghost`.
  * Guard: `test:control-dialect` `section-action`
  */
 export function scanSectionAction(src) {
   const found = [];
-  const re = /class="(?:split-section-actions|rw-section__actions)"/g;
+  const reported = new Set();
+  const counted = new Set();
+  const re = /class="(?:[^"]*\s)?(?:split-section-actions|rw-section__actions|[a-z][a-z-]*-section-head|[a-z][a-z-]*-section__head)(?![\w-])[^"]*"/g;
   let m;
   while ((m = re.exec(src))) {
     if (inComment(src, m.index)) continue;
-    const chunk = src.slice(m.index, m.index + 800);
-    let labelledCount = 0;
-    for (const c of templateControls(chunk)) {
+    // Ein Kopf, der zugleich `section-toolbar` ist (Suche + Filter in der
+    // Hoehe des Suchfelds, Abo-Liste), ist eine Werkzeugleiste, kein
+    // D5-Abschnittskopf - dort gilt `section-toolbar-create`.
+    if (/\bsection-toolbar\b/.test(m[0])) continue;
+    const open = src.lastIndexOf('<', m.index);
+    const labelled = [];
+    for (const c of headControls(src, m.index, elementEnd(src, open))) {
+      const item = /\bpopover-menu__item\b/.test(c.cls);
+      const line = lineOf(src, c.at);
       if (/\bbtn--ghost\b/.test(c.cls)) {
-        found.push({ line: lineOf(src, m.index + c.index), what: `btn--ghost in Abschnittsaktion: ${c.cls}` });
-      } else if (/\bbtn--secondary\b/.test(c.cls) && !/\bbtn--sm\b/.test(c.cls) && !/\bpopover-menu__item\b/.test(c.cls)) {
-        found.push({ line: lineOf(src, m.index + c.index), what: `btn--secondary ohne --sm in Abschnittsaktion: ${c.cls}` });
-      } else if (/\bbtn--secondary\b/.test(c.cls) && /\bbtn--sm\b/.test(c.cls) && !/\bbtn--icon\b/.test(c.cls) && !/\bpopover-menu__item\b/.test(c.cls)) {
-        labelledCount++;
+        if (!reported.has(c.at)) found.push({ line, what: `btn--ghost in Abschnittsaktion: ${c.cls}` });
+        reported.add(c.at);
+      } else if (/\bbtn--secondary\b/.test(c.cls) && !/\bbtn--sm\b/.test(c.cls) && !item) {
+        if (!reported.has(c.at)) found.push({ line, what: `btn--secondary ohne --sm in Abschnittsaktion: ${c.cls}` });
+        reported.add(c.at);
+      } else if (/\bbtn--secondary\b/.test(c.cls) && /\bbtn--sm\b/.test(c.cls) && !/\bbtn--icon\b/.test(c.cls) && !item) {
+        labelled.push(c.at);
       }
     }
-    if (labelledCount > 1) {
-      found.push({ line: lineOf(src, m.index), what: `mehr als eine beschriftete btn--secondary btn--sm im Abschnittskopf (${labelledCount})` });
+    const key = [...new Set(labelled)].sort((a, b) => a - b).join(',');
+    if (new Set(labelled).size > 1 && !counted.has(key)) {
+      counted.add(key);
+      found.push({ line: lineOf(src, m.index), what: `mehr als eine beschriftete btn--secondary btn--sm im Abschnittskopf (${new Set(labelled).size})` });
     }
   }
   return found;
@@ -1012,14 +1091,135 @@ export function scanSectionAction(src) {
 
 export function scanSectionToolbarCreate(src) {
   const found = [];
+  const seen = new Set();
   const re = /\b(?:section-toolbar|[a-z-]+-section-head|[a-z-]+-section__head|[a-z-]+-section-actions|[a-z-]+-section__actions)\b/g;
   let m;
   while ((m = re.exec(src))) {
     if (inComment(src, m.index)) continue;
-    const chunk = src.slice(m.index, m.index + 800);
-    for (const c of templateControls(chunk)) {
-      if (/\bbtn--icon\b/.test(c.cls) && c.icon === 'plus' && !/\bpopover-menu__trigger\b/.test(c.cls)) {
-        found.push({ line: lineOf(src, m.index + c.index), what: `nackter Erstell-Knopf (btn--icon plus) im Abschnittskopf: ${c.cls}` });
+    // Auch hinter `${name}` (#2119): ein vorher gebauter Knopf steht genauso im Kopf.
+    for (const c of headControls(src, m.index, m.index + 800)) {
+      if (/\bbtn--icon\b/.test(c.cls) && c.icon === 'plus' && !/\bpopover-menu__trigger\b/.test(c.cls) && !seen.has(c.at)) {
+        seen.add(c.at);
+        found.push({ line: lineOf(src, c.at), what: `nackter Erstell-Knopf (btn--icon plus) im Abschnittskopf: ${c.cls}` });
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Haken ohne Gegenstueck, Richtung Listener -> Markup (#2119, #2210): ein
+ * `[data-action="x"]` im Selektor einer Datei braucht ein `x`, das dort (oder
+ * in einem Modul, das sie importiert) als Markup oder String-Literal steht -
+ * `data-action="x"`, `action: 'x'` (Menueeintrag), `'data-action': 'x'`,
+ * `id: 'x'` (Leerzustand-Helfer der Gesundheit). Faellt das Gegenstueck weg
+ * (`action: 'add-group'` umbenannt, `items: []`), bindet der Listener ins
+ * Leere, und der Knopf ist weg oder tot. `close-modal` ist Kanon des Dialogs
+ * (components/modal.js) und gilt in jeder Datei als gesendet.
+ * Guard: `test:control-dialect` `action-hook`
+ */
+const SHARED_ACTIONS = new Set(['close-modal']);
+const SELECTOR_ACTION = /\[data-action=(["'])([\w-]+)\1\]/g;
+
+export function scanActionHook(src, imported = []) {
+  const found = [];
+  const strip = (s) => s.replace(SELECTOR_ACTION, '');
+  const pool = [strip(src), ...imported.map(strip)].join('\n');
+  const reported = new Set();
+  let m;
+  SELECTOR_ACTION.lastIndex = 0;
+  while ((m = SELECTOR_ACTION.exec(src))) {
+    const name = m[2];
+    if (reported.has(name) || SHARED_ACTIONS.has(name) || inComment(src, m.index)) continue;
+    const esc = reEsc(name);
+    if (new RegExp(`(['"\`])${esc}\\1|data-action="${esc}"`).test(pool)) continue;
+    reported.add(name);
+    found.push({ line: lineOf(src, m.index), what: `[data-action="${name}"] bindet, aber nichts traegt "${name}"` });
+  }
+  return found;
+}
+
+/** Die Quellen der Module, die `src` per absolutem (`/utils/x.js`) oder relativem Pfad importiert. */
+function importedSources(src, file, byFile) {
+  const out = [];
+  for (const m of src.matchAll(/\bfrom\s+['"]([^'"]+\.js)['"]/g)) {
+    const spec = m[1];
+    let target;
+    if (spec.startsWith('/')) target = `public${spec}`;
+    else if (spec.startsWith('.')) target = join(file, '..', spec).split(sep).join('/');
+    if (target && byFile.has(target)) out.push(byFile.get(target));
+  }
+  return out;
+}
+
+/**
+ * Haken ohne Gegenstueck, Richtung Markup -> Listener (#2210): die Aktion
+ * eines Leerzustands (`action: {...}`, `actions: [...]`, `const action = ...`)
+ * ohne `onClick` lebt nur ueber ihren Haken - eine Klasse, ein `data-action`,
+ * eine `id` oder ein `data-*` aus `attrs`. Mindestens einer davon muss in der
+ * Datei wieder vorkommen (Selektor, Delegation, Helfer). Der Knopf im
+ * Rewards-Leerzustand trug nur `className: 'rw-manage-participants'`, die
+ * niemand band: er sah aus wie der einzige Weg zur ersten Teilnehmenden und
+ * tat nichts. Menueeintraege (`action: 'x'`), Menues (`items`), Links und
+ * Werte, die erst zur Laufzeit feststehen, laufen durch.
+ * Guard: `test:control-dialect` `cta-hook`
+ */
+export function scanCtaHook(src) {
+  const found = [];
+  const seen = new Set();
+  const ctx = /\baction\s*:|\bactions\s*:\s*\[|\b(?:const|let)\s+\w*(?:[aA]ction|[cC]ta)\w*\s*=/g;
+  let m;
+  while ((m = ctx.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const from = m.index + m[0].length;
+    let depth = 0;
+    for (let i = from; i < src.length && i - from < 600; i++) {
+      const c = src[i];
+      if (c === ';' && depth === 0) break;
+      if (c === '(' || c === '[') depth++;
+      else if (c === ')' || c === ']' || c === '}') { depth--; if (depth < 0) break; }
+      else if (c === '{') {
+        let d = 0;
+        let e = i;
+        for (; e < src.length; e++) {
+          if (src[e] === '{') d++;
+          else if (src[e] === '}') { d--; if (!d) break; }
+        }
+        const obj = src.slice(i, e + 1);
+        const at = i;
+        i = e;
+        if (seen.has(at) || !/(?:^|[?:,[=(])\s*$/.test(src.slice(from, at))) continue;
+        seen.add(at);
+        if (!/\blabel\s*:/.test(obj) || /\b(?:action|items|onClick|href|route|key)\s*:/.test(obj)) continue;
+        const hooks = [];
+        let dynamic = false;
+        const cls = obj.match(/\bclassName\s*:\s*(?:(['"])([^'"]*)\1|(\S))/);
+        if (cls?.[3]) dynamic = true;
+        for (const tok of (cls?.[2] ?? '').split(/\s+/).filter((x) => x && !/^btn(?:--|$)/.test(x))) {
+          hooks.push(src.includes(`.${tok}`));
+        }
+        const attrs = obj.match(/\battrs\s*:\s*\{([^{}]*)\}/)?.[1] ?? '';
+        const own = obj.replace(/\battrs\s*:\s*\{[^{}]*\}/, '');
+        const entries = [...attrs.matchAll(/(['"]?)([\w-]+)\1\s*:\s*([^,]+)/g)];
+        const topId = own.match(/(?:^|[\s{,])id\s*:\s*([^,}]+)/);
+        if (topId) entries.push([null, null, 'id', topId[1]]);
+        for (const [, , name, rawValue] of entries) {
+          const lit = rawValue.trim().match(/^(['"])([\w-]*)\1$/);
+          if (!lit) { if (name === 'data-action' || name === 'id' || name.startsWith('data-')) dynamic = true; continue; }
+          const value = lit[2];
+          if (name === 'data-action' || name === 'id') hooks.push(src.split(value).length - 1 > 1);
+          else if (name.startsWith('data-')) {
+            const camel = name.slice(5).replace(/-(\w)/g, (_, x) => x.toUpperCase());
+            hooks.push(src.split(name).length - 1 > 1 || src.includes(`dataset.${camel}`));
+          }
+        }
+        if (dynamic || hooks.some(Boolean)) continue;
+        found.push({
+          line: lineOf(src, at),
+          what: hooks.length
+            ? `Aktion ohne Listener: kein Haken aus ${obj.replace(/\s+/g, ' ').slice(0, 90)} wird in der Datei gebunden`
+            : `Aktion ohne Haken (weder onClick noch Klasse, data-action oder id): ${obj.replace(/\s+/g, ' ').slice(0, 90)}`,
+        });
       }
     }
   }
@@ -1379,6 +1579,78 @@ test('Scanner: section-toolbar-create faengt nackten Erstell-Knopf im Abschnitts
   assert.deepEqual(scanSectionToolbarCreate(good), []);
 });
 
+test('Scanner: section-action sieht den Abschnittskopf selbst und den Knopf hinter ${name} (#2119)', () => {
+  const inline = `
+    <div class="split-section-head">
+      <h3 class="split-section-title">\${t('a')}</h3>
+      \${canAct ? \`<button type="button" class="btn btn--ghost btn--sm split-recurring-add" data-recurring-add>
+        <i data-lucide="plus" aria-hidden="true"></i>\${t('b')}
+      </button>\` : ''}
+    </div>`;
+  assert.equal(scanSectionAction(inline).length, 1, 'btn--ghost direkt im *-section-head');
+  const viaConst = `
+  const setUp = canOpen ? \`
+          <button class="btn btn--ghost btn--sm rw-money-setup" type="button">\${t('x')}</button>\` : '';
+  return \`
+      <section class="rw-section">
+        <div class="rw-section__head">
+          <h2 class="rw-section__title">\${t('y')}</h2>
+          \${setUp}
+        </div>
+        <ul class="row-carrier"><li><button class="btn btn--ghost row-x">\${t('z')}</button></li></ul>
+      </section>\`;`;
+  const hits = scanSectionAction(viaConst);
+  assert.equal(hits.length, 1, 'btn--ghost hinter ${setUp} im *__head - und nichts aus der Liste darunter');
+  assert.match(hits[0].what, /rw-money-setup/);
+  const nested = `
+  const bar = \`
+          <div class="split-section-actions">
+            <button class="btn btn--secondary btn--sm" id="a">\${t('a')}</button>
+            <button class="btn btn--secondary btn--sm" id="b">\${t('b')}</button>
+          </div>\`;
+  html(\`<div class="split-section-head"><div class="split-section-head__lead"><h3>\${t('c')}</h3></div>\${bar}</div>\`);`;
+  assert.equal(scanSectionAction(nested).length, 1, 'zwei beschriftete Aktionen, einmal gemeldet, obwohl Kopf und Container sie beide sehen');
+  const good = viaConst.replace('btn btn--ghost btn--sm rw-money-setup', 'btn btn--secondary btn--sm rw-money-setup');
+  assert.deepEqual(scanSectionAction(good), []);
+  const toolbar = `<div class="x-section-head section-toolbar"><button class="btn btn--secondary x-filter">\${t('f')}</button></div>`;
+  assert.deepEqual(scanSectionAction(toolbar), [], 'ein Kopf, der section-toolbar ist, ist Werkzeugleiste (Suche + Filter)');
+});
+
+test('Scanner: action-hook faengt den Listener ohne Markup und laesst Menueeintrag, Helfer-id, Import und Dialog-Kanon durch (#2119)', () => {
+  const bad = `
+    const menu = popoverMenuHtml({ items: [{ icon: 'plus', label: t('a'), action: 'add-groupx' }] });
+    root.querySelector('[data-action="add-group"]')?.addEventListener('click', open);`;
+  assert.equal(scanActionHook(bad).length, 1);
+  const empty = `const menu = popoverMenuHtml({ items: [] });\nroot.querySelector('[data-action="add-group"]')?.addEventListener('click', open);`;
+  assert.equal(scanActionHook(empty).length, 1, 'ein leeres Menue traegt nichts');
+  const good = bad.replace("'add-groupx'", "'add-group'");
+  assert.deepEqual(scanActionHook(good), []);
+  assert.deepEqual(scanActionHook(`x = \`<button data-action="go">\`;\ny.querySelector('[data-action="go"]');`), []);
+  assert.deepEqual(scanActionHook(`areaEmptyHtml('/r', { action: { id: 'go-first', label } });\ny.querySelector('[data-action="go-first"]');`), []);
+  assert.deepEqual(scanActionHook(`y.querySelector('[data-action="remove-x"]');`, [`({ action: 'remove-x' })`]), [], 'Gegenstueck im importierten Modul');
+  assert.deepEqual(scanActionHook(`y.querySelector('[data-action="close-modal"]');`), []);
+  assert.deepEqual(scanActionHook(`// '[data-action="old"]' war frueher hier`), [], 'Kommentar zaehlt nicht');
+});
+
+test('Scanner: cta-hook faengt die Leerzustand-Aktion mit ungebundenem Haken und laesst gebundene, onClick und Menues durch (#2210)', () => {
+  const bad = `
+    const action = isAdmin() ? { label: t('a'), icon: 'user-plus', className: 'rw-manage-participants' } : null;
+    el.insertAdjacentHTML('beforeend', emptyState('trophy', t('b'), t('c'), action));
+    el.querySelectorAll('[data-action="manage-participants"]').forEach(bind);`;
+  assert.equal(scanCtaHook(bad).length, 1);
+  const noHook = `mountEmptyState(el, { title: t('a'), action: { label: t('b'), icon: 'plus' } });`;
+  assert.equal(scanCtaHook(noHook).length, 1, 'ohne onClick und ohne Haken');
+  const good = bad.replace("className: 'rw-manage-participants'", "attrs: { 'data-action': 'manage-participants' }");
+  assert.deepEqual(scanCtaHook(good), []);
+  const byClass = `const action = { label: t('a'), className: 'rw-add-reward' };\nel.querySelector('.rw-add-reward')?.addEventListener('click', go);`;
+  assert.deepEqual(scanCtaHook(byClass), []);
+  const byData = `x({ action: { label: t('a'), attrs: { 'data-fasting-backfill': '' } } });\nel.querySelector('[data-fasting-backfill]');`;
+  assert.deepEqual(scanCtaHook(byData), []);
+  assert.deepEqual(scanCtaHook(`mountEmptyState(el, { action: { label: t('a'), onClick: go } });`), []);
+  assert.deepEqual(scanCtaHook(`popoverMenuHtml({ items: [{ action: 'x', label: t('a'), icon: 'plus' }] });`), []);
+  assert.deepEqual(scanCtaHook(`f({ action: { label: a.label, attrs: { 'data-action': a.id } } });`), [], 'Laufzeit-Wert: nicht beurteilbar');
+});
+
 test('Scanner: sheet-drag faengt Touch-Gesten an Blatt und Tafel ausserhalb des Helfers', () => {
   const bad = `
     panel.addEventListener('touchstart', (e) => {}, { passive: true });
@@ -1697,9 +1969,13 @@ const PENDING = {
   'section-action': {},
   // Kein nackter btn--icon mit Plus-Icon in einer section-toolbar (#2042).
   'section-toolbar-create': {},
+  // --- Issue #2119 (2026-10-25): Haken mit Gegenstueck - leer ab Beginn. ---
+  'action-hook': {},
+  'cta-hook': {},
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);
+const JS_BY_FILE = new Map(JS.map(({ file, src }) => [file, src]));
 
 const RULES = {
   'row-action': { files: JS, scan: (s) => scanRowAction(s), canon: '`.row-action` / `.row-action--danger` (utils/row-action.js `rowActionHtml`)' },
@@ -1728,6 +2004,8 @@ const RULES = {
   'native-date': { files: JS, scan: (s, f) => scanNativeDate(s, f), canon: '`<yuvomi-datepicker type="date">` (components/datepicker.js)' },
   'section-action': { files: JS, scan: (s) => scanSectionAction(s), canon: 'genau EINE `btn--secondary btn--sm` (Icon + Wort) im Abschnittskopf; Nebenaktionen hinter `popover-menu__trigger` mit `<modul>-section-tools` (DESIGN.md D5)' },
   'section-toolbar-create': { files: JS, scan: (s) => scanSectionToolbarCreate(s), canon: 'Erstell-Aktion im Abschnittskopf hinter `popover-menu__trigger`, kein nackter `btn--icon` mit Plus-Icon (DESIGN.md D5)' },
+  'action-hook': { files: JS, scan: (s, f) => scanActionHook(s, importedSources(s, f, JS_BY_FILE)), canon: 'jedes `[data-action="x"]` im Listener hat ein `x` im Markup derselben Datei oder eines importierten Moduls (#2119)' },
+  'cta-hook': { files: JS, scan: (s) => scanCtaHook(s), canon: 'eine Leerzustand-Aktion ohne `onClick` traegt einen Haken (`attrs: { \'data-action\' }`, `id`, Klasse), den die Datei bindet (#2210)' },
 };
 
 function census(rule) {

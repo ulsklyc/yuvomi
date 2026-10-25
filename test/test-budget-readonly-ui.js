@@ -838,7 +838,10 @@ test('Geteilte Ausgaben: Kopfknopf und Gruppe-Anlegen haengen am Recht', () => {
     split.state.groupStatus = 'archived';
     withAccess({ budget: 'write' }, () => assert.equal(split.canAddSplitExpense(), false, 'im Archiv keine neue Ausgabe'));
   } finally { split.state.groupStatus = status; }
-  assert.match(render, /readOnly\(\) \|\| isSplitGuest\(\) \? '' : popoverMenuHtml\(/, 'Gruppe anlegen ist hinter readOnly/isSplitGuest und popoverMenuHtml');
+  // Der Kopf der Gruppenliste steht seit #2119 in `groupsPanelHeadHtml` (der
+  // Test in test-split-recurring-ui.js liest sein Markup); render zeichnet ihn.
+  assert.match(render, /\$\{groupsPanelHeadHtml\(embedded\)\}/, 'render zeichnet den Kopf der Gruppenliste');
+  assert.match(fn(SPLIT_CODE, 'groupsPanelHeadHtml'), /readOnly\(\) \|\| isSplitGuest\(\) \? '' : popoverMenuHtml\(/, 'Gruppe anlegen ist hinter readOnly/isSplitGuest und popoverMenuHtml');
 });
 
 // -------------------------------------------------------------------------

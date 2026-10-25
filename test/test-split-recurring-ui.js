@@ -321,33 +321,60 @@ test('Klick auf [data-recurring-add] im Abschnittskopf oeffnet den Anlagen-Dialo
       removeAttribute() {},
       replaceChildren() { this.html = ''; },
       insertAdjacentHTML(_p, m) { this.html += m; },
-      querySelector(sel) { return sel === '[data-recurring-add]' ? addBtn : null; },
+      // Den Knopf gibt es nur, wenn das gezeichnete Markup ihn traegt (#2119):
+      // vorher kam er fuer den Selektor immer zurueck, und der Test sah nie,
+      // ob der Kopf ihn ueberhaupt zeichnet.
+      querySelector(sel) { return sel === '[data-recurring-add]' && /<button [^>]*\bdata-recurring-add[\s>]/.test(this.html) ? addBtn : null; },
       querySelectorAll: () => [],
     };
     split.renderMainForTest({ querySelector: (sel) => (sel === '#split-main' ? main : null) });
     split.renderMainForTest(_stumm); // Seitencontainer zurueckstellen
-    assert.ok(clickHandler !== null, '[data-recurring-add] hat keinen click-Hoerer bekommen');
+    assert.ok(clickHandler !== null, '[data-recurring-add] fehlt im Markup oder hat keinen click-Hoerer bekommen');
     clickHandler();
     assert.equal(spur.dialoge.length, 1, 'Klick auf [data-recurring-add] hat openRecurringModal() nicht aufgerufen');
     assert.equal(spur.dialoge[0].title, 'splitExpenses.recurring.add');
   });
 });
 
-test('Klick auf [data-action="add-group"] in bindShell oeffnet den Gruppe-Anlegen-Dialog (#2042)', async () => {
+/** Ein Shell-Container, der fuer `[data-action="x"]` nur antwortet, wenn das Markup `x` traegt. */
+function shellAus(html, knopf) {
+  return {
+    querySelector(sel) {
+      const aktion = /^\[data-action="([\w-]+)"\]$/.exec(sel)?.[1];
+      return aktion && new RegExp(`<button [^>]*\\bdata-action="${aktion}"`).test(html) ? knopf : null;
+    },
+  };
+}
+
+// #2119: vorher gab der Stub den Knopf fuer den Selektor immer her - ein
+// umbenanntes `action: 'add-group'` oder ein leeres Menue blieb gruen, und in
+// der App war "Gruppe anlegen" weg oder tot. Jetzt liest der Test den echten
+// Kopf der Gruppenliste und bindet nur, was dort steht.
+test('Das "..." der Gruppenliste traegt "Gruppe anlegen", und genau dieser Eintrag oeffnet den Dialog (#2042, #2119)', async () => {
   await buehne({}, async (spur) => {
     split.state.meta = { ...split.state.meta, group_types: ['household', 'other'] };
+    const html = split.groupsPanelHeadHtml(true);
+    assert.match(html, /<button [^>]*class="popover-menu__item"[^>]*\bdata-action="add-group"[^>]*>[\s\S]*?<span>splitExpenses\.addGroup<\/span>/,
+      'kein Menueeintrag [data-action="add-group"] mit "Gruppe anlegen" im Kopf der Gruppenliste');
     let clickHandler = null;
     const addBtn = { addEventListener(typ, fn) { if (typ === 'click') clickHandler = fn; } };
-    const shell = { querySelector(sel) { return sel === '[data-action="add-group"]' ? addBtn : null; } };
-    split.bindShellForTest(shell);
-    assert.ok(clickHandler !== null, '[data-action="add-group"] hat keinen click-Hoerer bekommen');
+    split.bindShellForTest(shellAus(html, addBtn));
+    assert.ok(clickHandler !== null, 'bindShell bindet keinen Eintrag, den der Kopf zeichnet');
     await clickHandler();
     assert.equal(spur.dialoge.length, 1, 'Klick hat openGroupModal() nicht aufgerufen');
     assert.equal(spur.dialoge[0].title, 'splitExpenses.addGroup');
   });
+  await buehne({ modus: 'read' }, () => {
+    assert.doesNotMatch(split.groupsPanelHeadHtml(true), /data-action="add-group"/, '`budget: read`: kein Anlegen');
+  });
 });
 
-test('Der Riegel haengt nicht am Markup: ein Bearbeiten-Klick ohne Recht oeffnet die Leseansicht, Anlegen und Umschalten tun nichts', async () => {
+// Anlegen gehoert seit #2042 nicht mehr zu diesem Hoerer: `onRecurringClick`
+// kennt `recurring-add` gar nicht, ein Klick damit bewies bei jedem Recht
+// "kein Dialog" (#2119). Den Riegel fuer Anlegen haelt `renderMain` - ohne
+// Recht zeichnet es den Knopf nicht ("`budget: read` und Archiv: keine
+// Handlung"), mit Recht bindet es ihn ("Klick auf [data-recurring-add]").
+test('Der Riegel haengt nicht am Markup: ein Bearbeiten-Klick ohne Recht oeffnet die Leseansicht, Umschalten tut nichts', async () => {
   const lagen = [
     { name: 'budget: read', lage: { modus: 'read' }, id: '11' },
     { name: 'Archiv', lage: { archiviert: true }, id: '11' },
@@ -360,10 +387,6 @@ test('Der Riegel haengt nicht am Markup: ein Bearbeiten-Klick ohne Recht oeffnet
       assert.equal(spur.leseansichten.length, 1, `${name}: Leseansicht`);
       await split.onRecurringClick(klick({ 'recurring-toggle': id }));
       assert.deepEqual(spur.gesendet, [], `${name}: nichts gesendet`);
-      if (id === '11') {
-        await split.onRecurringClick(klick({ 'recurring-add': '' }));
-        assert.equal(spur.dialoge.length, 0, `${name}: kein Anlegen`);
-      }
     });
   }
 });

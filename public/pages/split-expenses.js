@@ -160,6 +160,33 @@ function groupIcon(type) {
   }[type] || 'users';
 }
 
+/**
+ * Kopf der Gruppenliste: Titel mit Zahl, Suche und das "..." mit "Gruppe
+ * anlegen" (`data-action="add-group"`, gebunden in `bindShell`). Eigene
+ * Funktion, damit der Test das echte Markup liest statt eines Selektors,
+ * den er sich selbst zurueckgibt (#2119).
+ */
+function groupsPanelHeadHtml(embedded) {
+  return `
+          <div class="split-panel-head section-toolbar">
+            <${embedded ? 'h3' : 'h2'} class="split-panel-title u-section-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></${embedded ? 'h3' : 'h2'}>
+            ${renderPageSearch({
+    id: 'split-group-search',
+    label: t('splitExpenses.searchGroups'),
+    placeholder: t('splitExpenses.searchGroups'),
+    value: state.query,
+    clearLabel: t('common.searchClear'),
+    className: 'split-search',
+  })}
+            ${readOnly() || isSplitGuest() ? '' : popoverMenuHtml({
+    id: 'split-section-tools',
+    label: t('common.moreActions'),
+    items: [{ icon: 'plus', label: t('splitExpenses.addGroup'), action: 'add-group' }],
+    triggerClass: 'btn btn--secondary btn--icon btn--sm split-section-tools',
+  })}
+          </div>`;
+}
+
 export async function render(container, { user, embedded = false, onAddableChange = null } = {}) {
   _container = container;
   _embedded = embedded;
@@ -217,23 +244,7 @@ export async function render(container, { user, embedded = false, onAddableChang
                der Liste, die es filtert (.section-toolbar wie das Hauptbuch,
                R14 P1): mobil in seiner Icon-Form statt einer eigenen 48px-Zeile
                vor der ersten Gruppe. -->
-          <div class="split-panel-head section-toolbar">
-            <${embedded ? 'h3' : 'h2'} class="split-panel-title u-section-title">${t('splitExpenses.groups')}<span class="list-group__count split-panel-count" id="split-group-count"></span></${embedded ? 'h3' : 'h2'}>
-            ${renderPageSearch({
-    id: 'split-group-search',
-    label: t('splitExpenses.searchGroups'),
-    placeholder: t('splitExpenses.searchGroups'),
-    value: state.query,
-    clearLabel: t('common.searchClear'),
-    className: 'split-search',
-  })}
-            ${readOnly() || isSplitGuest() ? '' : popoverMenuHtml({
-    id: 'split-section-tools',
-    label: t('common.moreActions'),
-    items: [{ icon: 'plus', label: t('splitExpenses.addGroup'), action: 'add-group' }],
-    triggerClass: 'btn btn--secondary btn--icon btn--sm split-section-tools',
-  })}
-          </div>
+          ${groupsPanelHeadHtml(embedded)}
           <!-- Geteilter Umschalter-Baustein des Budget-Moduls statt eigener
                Pillen-Optik, und role="radiogroup" statt role="group": eine
                Einfachauswahl, die ihren Zustand ansagt und über die geteilte
@@ -2876,6 +2887,8 @@ export const __test = {
   renderMainForTest(container) { _container = container; renderMain(); },
   renderGroupsForTest(container) { _container = container; renderGroups(); },
   bindShellForTest(container) { _container = container; bindShell(); _statusTablist = null; },
+  // #2119: der Kopf der Gruppenliste als echtes Markup (test-split-recurring-ui.js).
+  groupsPanelHeadHtml,
   // R10 L11: die Gruppenzahl steht am Kopf der Liste (test-split-activity-ui.js).
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
