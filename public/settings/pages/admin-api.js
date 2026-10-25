@@ -34,6 +34,22 @@ function clearError(element) {
   element.hidden = true;
 }
 
+/**
+ * SICHERE VORGABE STATT LEERFELD (Greenlit-Kritik, 25.10.2026): ein neues Token
+ * lief ohne Eingabe nie ab und durfte alles. Die Gueltigkeit ist jetzt eine
+ * Auswahl mit 90 Tagen vorn, "Kein Ablauf" bleibt waehlbar, aber als bewusste
+ * Wahl. Die API selbst bleibt unveraendert (`expires_at` optional, /api/v1 ist
+ * zugesagt) - der Schutz sitzt dort, wo Menschen Tokens anlegen.
+ */
+export const TOKEN_VALIDITY_DAYS = { 30: 30, 90: 90, 365: 365 };
+export const TOKEN_VALIDITY_DEFAULT = '90';
+
+/** ISO-Zeitpunkt fuer eine Vorgabe in Tagen, gerechnet ab `now`. */
+export function validityExpiresAt(choice, now = Date.now()) {
+  const days = TOKEN_VALIDITY_DAYS[choice];
+  return days ? new Date(now + days * 86400000).toISOString() : null;
+}
+
 function datetimeLocalToIso(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -184,19 +200,32 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
               control: '<select class="form-input" id="api-token-subject" required></select>',
             })}
             ${settingRowHtml({
+              label: t('settings.apiTokenValidityLabel'), labelFor: 'api-token-validity',
+              description: t('settings.apiTokenValidityUntil', { date: formatTokenTime(validityExpiresAt(TOKEN_VALIDITY_DEFAULT)) }),
+              descriptionId: 'api-token-validity-hint',
+              control: `<select class="form-input" id="api-token-validity" aria-describedby="api-token-validity-hint">
+                <option value="30">${t('settings.apiTokenValidity30')}</option>
+                <option value="90" selected>${t('settings.apiTokenValidity90')}</option>
+                <option value="365">${t('settings.apiTokenValidity365')}</option>
+                <option value="custom">${t('settings.apiTokenValidityCustom')}</option>
+                <option value="never">${t('settings.apiTokenValidityNever')}</option>
+              </select>`,
+            })}
+            ${settingRowHtml({
               label: t('settings.apiTokenExpiresLabel'), labelFor: 'api-token-expires',
-              description: t('settings.apiTokenExpiresHint'),
               wide: true,
+              attrs: { id: 'api-token-expires-row', hidden: '' },
               control: '<yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>',
             })}
             ${settingSwitchRowHtml({
               label: t('settings.apiTokenScopeLimit'),
               description: t('settings.apiTokenScopeHint'),
               descriptionId: 'api-token-scope-hint',
+              checked: true,
               attrs: { id: 'api-token-scope-limit' },
             })}
           </div>
-          <div id="api-token-scope-grid" class="api-token-scopes" hidden>
+          <div id="api-token-scope-grid" class="api-token-scopes">
             <div class="api-token-scopes__head">
               <span>${t('settings.apiTokenScopeModule')}</span>
               <span>${t('settings.apiTokenScopeRead')}</span>
@@ -248,6 +277,26 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     subject.appendChild(option);
   }
 
+  const validity = container.querySelector('#api-token-validity');
+  const validityHint = container.querySelector('#api-token-validity-hint');
+  const expiresRow = container.querySelector('#api-token-expires-row');
+  const expiresPicker = container.querySelector('#api-token-expires');
+  // Die Zeile unter der Auswahl sagt, was die Wahl bedeutet: das Ablaufdatum
+  // einer Vorgabe, "bis zum Widerruf" ohne Ablauf; beim eigenen Datum steht das
+  // Datumsfeld darunter und der Hinweis schweigt.
+  const syncValidity = () => {
+    const choice = validity.value;
+    expiresRow.hidden = choice !== 'custom';
+    const until = validityExpiresAt(choice);
+    const text = until
+      ? t('settings.apiTokenValidityUntil', { date: formatTokenTime(until) })
+      : choice === 'never' ? t('settings.apiTokenValidityNeverHint') : '';
+    validityHint.textContent = text;
+    validityHint.hidden = !text;
+  };
+  validity.addEventListener('change', syncValidity);
+  syncValidity();
+
   const scopeLimit = container.querySelector('#api-token-scope-limit');
   const scopeGrid = container.querySelector('#api-token-scope-grid');
   if (scopeLimit && scopeGrid) {
@@ -275,11 +324,15 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     output.hidden = true;
 
     const name = container.querySelector('#api-token-name').value.trim();
-    const expiresValue = container.querySelector('#api-token-expires').value;
-    const expires_at = datetimeLocalToIso(expiresValue);
-    if (expiresValue && !expires_at) {
-      showError(errorEl, t('settings.apiTokenInvalidExpiration'));
-      return;
+    let expires_at = null;
+    if (validity.value === 'custom') {
+      expires_at = datetimeLocalToIso(expiresPicker.value);
+      if (!expires_at) {
+        showError(errorEl, t('settings.apiTokenInvalidExpiration'));
+        return;
+      }
+    } else {
+      expires_at = validityExpiresAt(validity.value);
     }
 
     // scopes: nur senden, wenn „auf Module beschränken" aktiv ist. Sonst voller Zugriff.
@@ -301,8 +354,10 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       tokens.unshift(res.data);
       renderApiTokenList(container, tokens);
       form.reset();
+      expiresPicker.value = '';
+      syncValidity();
       if (scopeGrid) {
-        scopeGrid.hidden = true;
+        scopeGrid.hidden = !scopeLimit.checked;
         scopeGrid.querySelectorAll('input[data-scope]').forEach((box) => { box.disabled = false; });
       }
       // The raw token is shown exactly once, only from the creation response.
