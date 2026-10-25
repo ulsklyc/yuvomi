@@ -44,16 +44,38 @@ function clearError(element) {
 export const TOKEN_VALIDITY_DAYS = { 30: 30, 90: 90, 365: 365 };
 export const TOKEN_VALIDITY_DEFAULT = '90';
 
-/** ISO-Zeitpunkt fuer eine Vorgabe in Tagen, gerechnet ab `now`. */
+/**
+ * ISO-Zeitpunkt fuer eine Vorgabe in Tagen, gerechnet ab `now` in KALENDERTAGEN:
+ * "1 Jahr" endet zur selben Uhrzeit, auch wenn dazwischen eine Zeitumstellung
+ * liegt (365 x 24 h landete eine Stunde daneben).
+ */
 export function validityExpiresAt(choice, now = Date.now()) {
   const days = TOKEN_VALIDITY_DAYS[choice];
-  return days ? new Date(now + days * 86400000).toISOString() : null;
+  if (!days) return null;
+  const date = new Date(now);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
 }
 
 function datetimeLocalToIso(value) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/**
+ * Was das Formular als `expires_at` schickt. Nur "Kein Ablauf" ergibt `null`;
+ * ein eigenes Datum ohne gueltigen Wert ist ein Fehler und NIE stillschweigend
+ * "kein Ablauf" - genau so entstand frueher das unbefristete Token.
+ */
+export function resolveTokenExpiry(choice, customValue, now = Date.now()) {
+  if (choice === 'never') return { expires_at: null };
+  if (choice === 'custom') {
+    const iso = datetimeLocalToIso(customValue);
+    return iso ? { expires_at: iso } : { error: 'settings.apiTokenInvalidExpiration' };
+  }
+  const iso = validityExpiresAt(choice, now);
+  return iso ? { expires_at: iso } : { error: 'settings.apiTokenInvalidExpiration' };
 }
 
 /**
@@ -213,7 +235,9 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
             })}
             ${settingRowHtml({
               label: t('settings.apiTokenExpiresLabel'), labelFor: 'api-token-expires',
-              wide: true,
+              // Datum UND Uhrzeit passen auf dem Telefon nicht neben das Label
+              // ("TT.M", "H"); `wide` kennt settingRowHtml nicht, es wirkte nie.
+              stacked: true,
               attrs: { id: 'api-token-expires-row', hidden: '' },
               control: '<yuvomi-datepicker type="datetime" id="api-token-expires"></yuvomi-datepicker>',
             })}
@@ -273,7 +297,10 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     const option = document.createElement('option');
     option.value = String(member.id);
     option.textContent = member.display_name || member.username;
-    option.selected = Number(member.id) === Number(currentUserId);
+    // defaultSelected, nicht nur selected: form.reset() nach dem Anlegen kehrt zur
+    // VORGABE zurueck. Mit `selected` allein sprang "Handelt als" auf die erste
+    // Person der Liste, und das naechste Token handelte still als jemand anderes.
+    option.selected = option.defaultSelected = Number(member.id) === Number(currentUserId);
     subject.appendChild(option);
   }
 
@@ -324,16 +351,12 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     output.hidden = true;
 
     const name = container.querySelector('#api-token-name').value.trim();
-    let expires_at = null;
-    if (validity.value === 'custom') {
-      expires_at = datetimeLocalToIso(expiresPicker.value);
-      if (!expires_at) {
-        showError(errorEl, t('settings.apiTokenInvalidExpiration'));
-        return;
-      }
-    } else {
-      expires_at = validityExpiresAt(validity.value);
+    const expiry = resolveTokenExpiry(validity.value, expiresPicker.value);
+    if (expiry.error) {
+      showError(errorEl, t(expiry.error));
+      return;
     }
+    const { expires_at } = expiry;
 
     // scopes: nur senden, wenn „auf Module beschränken" aktiv ist. Sonst voller Zugriff.
     const payload = { name, expires_at, subject_user_id: Number(subject.value) };
@@ -489,3 +512,5 @@ export async function render(container, { user } = {}) {
   await loadTokens(container, user?.id);
   window.lucide?.createIcons({ el: container });
 }
+
+export const __test = { renderPage };
