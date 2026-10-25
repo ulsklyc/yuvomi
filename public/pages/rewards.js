@@ -689,8 +689,12 @@ function renderOverview(el) {
   el.replaceChildren();
   const list = balances();
   if (!list.length) {
+    /* EIN HAKEN FUER BEIDE KNOEPFE (#2210): der Menueeintrag im Kopf der
+     * Punktestaende traegt `data-action="manage-participants"`, und genau das
+     * bindet `wireOverview`. Hier stand nur eine eigene Klasse - der Knopf im
+     * Leerzustand, der einzige Weg zur ersten Teilnehmenden, tat nichts. */
     const action = isAdmin() && !readOnly()
-      ? { label: t('rewards.manageParticipants'), icon: 'user-plus', className: 'rw-manage-participants' }
+      ? { label: t('rewards.manageParticipants'), icon: 'user-plus', attrs: { 'data-action': 'manage-participants' } }
       : null;
     /* DAS ANFRAGEN-PANEL HAENGT NICHT AN DEN PUNKTESTAENDEN (#1623). Wird die
      * letzte Teilnehmende mit offener Anfrage ausgetragen, ist `balances` leer -

@@ -822,7 +822,7 @@ test('Uebersicht ohne Teilnehmende: die offene Anfrage steht trotzdem da und ist
       rewardsPage.renderOverview(ro);
       assert.match(ro.html, /rw-pending-panel/);
       assert.doesNotMatch(ro.html, /data-decide=/);
-      assert.doesNotMatch(ro.html, /rw-manage-participants/);
+      assert.doesNotMatch(ro.html, /data-action="manage-participants"/);
     } finally {
       clearPermissions();
     }
@@ -833,6 +833,71 @@ test('Uebersicht ohne Teilnehmende: die offene Anfrage steht trotzdem da und ist
     rewardsPage.renderOverview(leer);
     assert.doesNotMatch(leer.html, /rw-pending/);
     assert.match(leer.html, /rewards\.emptyOverviewTitle/);
+  } finally {
+    Object.assign(s, vorher);
+    domZurueck();
+  }
+});
+
+/**
+ * Die oeffnenden Tags aller Knoepfe im Markup, je als Attributtabelle. Nur so
+ * viel Selektor, wie `wireOverview` fragt: `.klasse`, `[attr]`, `[attr="wert"]`.
+ */
+function buttonTags(html) {
+  return [...html.matchAll(/<button\b([^>]*)>/g)].map((m) => {
+    const attrs = new Map();
+    for (const a of m[1].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs.set(a[1], a[2] ?? '');
+    return attrs;
+  });
+}
+function tagMatches(attrs, selector) {
+  const cls = /^\.([\w-]+)$/.exec(selector);
+  if (cls) return (attrs.get('class') ?? '').split(/\s+/).includes(cls[1]);
+  const attr = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(selector);
+  if (attr) return attrs.has(attr[1]) && (attr[2] === undefined || attrs.get(attr[1]) === attr[2]);
+  return false;
+}
+
+/** Ein Inhaltsknoten, der merkt, welcher Selektor welchen Klick-Handler bekommt - nur fuer Knoepfe, die das Markup wirklich traegt. */
+function listeningEl() {
+  const el = markupEl();
+  el.bound = [];
+  const stub = (selector) => ({
+    addEventListener: (type, fn) => { if (type === 'click') el.bound.push({ selector, fn }); },
+  });
+  el.querySelector = (selector) => (buttonTags(el.html).some((a) => tagMatches(a, selector)) ? stub(selector) : null);
+  el.querySelectorAll = (selector) => buttonTags(el.html).filter((a) => tagMatches(a, selector)).map(() => stub(selector));
+  return el;
+}
+
+test('#2210: "Teilnehmende verwalten" oeffnet den Dialog - im Leerzustand UND im Mehr-Menue', async () => {
+  // Seit #2052 trug der Knopf im Leerzustand nur `rw-manage-participants`,
+  // `wireOverview` band aber allein `[data-action="manage-participants"]` (das
+  // Attribut des Menueeintrags). Der Klick lief ins Leere, und ohne Teilnehmende
+  // ist dieser Knopf der einzige Weg, jemanden einzutragen.
+  const { installMiniDom } = await import('./mini-dom.js');
+  const domZurueck = installMiniDom();
+  const s = rewardsPage.state;
+  const vorher = { user: s.user, overview: s.overview, catalog: s.catalog, redemptions: s.redemptions, recentLedger: s.recentLedger };
+  const oeffnet = (el) => buttonTags(el.html)
+    .filter((attrs) => el.bound.some((b) => b.fn === rewardsPage.openParticipantsModal && tagMatches(attrs, b.selector)));
+  try {
+    s.user = { id: 1, role: 'admin' };
+    s.catalog = [];
+    s.redemptions = [];
+    s.recentLedger = [];
+
+    s.overview = { me: 1, balances: [], setup: { participantCount: 0, catalogCount: 0, pointedTaskCount: 0 } };
+    const leer = listeningEl();
+    rewardsPage.renderOverview(leer);
+    const cta = buttonTags(leer.html).filter((a) => (a.get('class') ?? '').split(/\s+/).includes('empty-state__cta'));
+    assert.equal(cta.length, 1, 'Vorbedingung: der Leerzustand traegt genau einen Knopf');
+    assert.deepEqual(oeffnet(leer), cta, 'der Knopf im Leerzustand ist an openParticipantsModal gebunden');
+
+    s.overview = { me: 1, balances: [{ id: 2, display_name: 'Emma', balance: 30 }] };
+    const voll = listeningEl();
+    rewardsPage.renderOverview(voll);
+    assert.equal(oeffnet(voll).length, 1, 'der Menueeintrag im Kopf der Punktestaende oeffnet denselben Dialog');
   } finally {
     Object.assign(s, vorher);
     domZurueck();
