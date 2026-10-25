@@ -247,9 +247,13 @@ test('R19: die Liste gruppiert nach Monat und hebt den naechsten hervor', async 
 const { birthDateText, birthDateShort, birthDateFieldHtml } = await import('../public/utils/birth-date.js');
 
 test('ohne Jahr nennt die Zeile nur den Tag, kein Alter', () => {
-  // Seit R23 (D11) mit kurzem Wochentag vorn (utils/date-format.js dateText).
+  // Seit R23 (D11) mit kurzem Wochentag vorn (utils/date-format.js dateText) -
+  // seit S12 nur in den naechsten zwei Wochen: weiter weg kappte er bei 390 px
+  // das Alter ("Mo, 08.02.2027 · wird" ohne Zahl).
   const wd = new Intl.DateTimeFormat('de', { weekday: 'short', timeZone: 'UTC' }).format(new Date('2027-03-15T12:00:00Z'));
-  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null }), `${wd}, 2027-03-15`);
+  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null, days_until: 9 }), `${wd}, 2027-03-15`);
+  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null, days_until: 146 }), '2027-03-15', 'weit weg: kein Wochentag');
+  assert.equal(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: null }), '2027-03-15');
   assert.match(birthdays.ageMeta({ next_birthday: '2027-03-15', next_age: 41 }), /turnsAge/);
   const html = birthdays.birthdayItemHtml({
     id: 77, name: 'Ohne Jahr', birth_date: '2000-03-15', year_unknown: 1,

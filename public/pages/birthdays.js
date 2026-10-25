@@ -292,8 +292,15 @@ export function renderNameDayField(birthday = null) {
 // Datum + Alter in einer Zeile: „12.08.2026 · wird 30". Der Countdown lebt
 // getrennt im Chip, damit keine Zahl doppelt erscheint. Ohne Jahr gibt es kein
 // Alter (#2095): der Server liefert `next_age: null`, die Zeile nennt nur den Tag.
+// Der Wochentag nur, solange er beim Planen hilft (die naechsten zwei Wochen):
+// "in 3 Monaten · Mo, 08.02.2027 · wird 42" war bei 390 px breiter als die
+// Zeile und kappte das Alter (R23 S12, Sichtpruefung; seit D11 stand der
+// Wochentag an jedem Eintrag).
+const WEEKDAY_WITHIN_DAYS = 14;
+
 export function ageMeta(birthday) {
-  const date = dateText(birthday.next_birthday, { weekday: true });
+  const near = Number.isFinite(birthday.days_until) && birthday.days_until < WEEKDAY_WITHIN_DAYS;
+  const date = dateText(birthday.next_birthday, { weekday: near });
   return birthday.next_age != null
     ? `${date} · ${t('birthdays.turnsAge', { age: birthday.next_age })}`
     : date;
