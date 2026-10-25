@@ -407,3 +407,43 @@ test('D7: die Kandidatenliste nennt auch Kontakte ohne Datum mit ihrer Verknuepf
   await seedBirthday('Kandidat Verknuepft', { contact_id: cid });
   assert.equal((await pick()).already_imported, true);
 });
+
+test('R23 G5-P2: gleicher Tag, anderer Name - Kontakt und Import fragen "Mit X verknuepfen?"', async () => {
+  // "Tante Ingrid" im Adressbuch, "Ingrid Mueller" in den Geburtstagen: der
+  // Namensschluessel fand nichts, der Import legte still eine zweite Zeile an.
+  setModules(member.id, {});
+  const birthday = await seedBirthday('Ingrid Mueller', { birth_date: '1961-09-17' });
+  const contact = await admin('POST', '/contacts', { name: 'Tante Ingrid', category: 'misc', birthday: '1961-09-17' });
+  const cid = contact.body.data.id;
+  const read = async () => (await member.as('GET', `/contacts/${cid}`)).body.data;
+  const pick = async () => (await member.as('GET', '/birthdays/import/candidates')).body.data.withBirthday.find((c) => c.id === cid);
+
+  let seen = await read();
+  assert.equal(seen.suggested_birthday_id, birthday.id, 'der Kontakt schlaegt den Geburtstag am selben Tag vor');
+  assert.equal(seen.suggested_birthday_name, 'Ingrid Mueller', 'und nennt ihn beim Namen');
+  const candidate = await pick();
+  assert.equal(candidate.suggested_birthday_id, birthday.id, 'die Importzeile fragt statt anzulegen');
+  assert.equal(candidate.suggested_birthday_name, 'Ingrid Mueller');
+
+  // Anderes Jahr ist ein anderer Mensch; ein unbekanntes Jahr passt zu jedem.
+  await admin('PUT', `/contacts/${cid}`, { name: 'Tante Ingrid', category: 'misc', birthday: '1962-09-17' });
+  assert.equal((await read()).suggested_birthday_id, undefined, 'anderes Jahr: kein Vorschlag');
+  await admin('PUT', `/contacts/${cid}`, { name: 'Tante Ingrid', category: 'misc', birthday: '2000-09-17', birthday_year_unknown: true });
+  assert.equal((await read()).suggested_birthday_id, birthday.id, 'Jahr unbekannt: Tag und Monat reichen');
+
+  // Zwei Geburtstage am selben Tag sind eine Frage, kein Vorschlag.
+  const twin = await seedBirthday('Ingo Mueller', { birth_date: '1961-09-17' });
+  assert.equal((await read()).suggested_birthday_id, undefined, 'zwei am selben Tag: kein Vorschlag');
+  await admin('DELETE', `/birthdays/${twin.id}`);
+
+  setModules(member.id, { calendar: 'none' });
+  assert.equal((await read()).suggested_birthday_id, undefined, 'ohne Kalender-Recht kein Hinweis');
+  setModules(member.id, {});
+
+  await member.as('PUT', `/birthdays/${birthday.id}`, { contact_id: cid });
+  seen = await read();
+  assert.equal(seen.birthday_id, birthday.id, 'verknuepft');
+  assert.equal(seen.suggested_birthday_id, undefined, 'danach kein Hinweis mehr');
+  assert.equal((await pick()).already_imported, true);
+  assert.equal((await pick()).suggested_birthday_id, undefined);
+});

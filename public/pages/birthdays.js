@@ -1342,6 +1342,20 @@ function importCandidateRowHtml(c) {
         <span class="bd-import-row__badge">${t('birthdays.importAlreadyAdded')}</span>
       </div>`;
   }
+  // Gibt es den Menschen schon als Geburtstag (gleicher Name oder Tag, vom
+  // Server als `suggested_birthday_id`), legte der Haken eine zweite Zeile an.
+  // Die Zeile fragt stattdessen "Mit X verknuepfen?" (R23, G5-P2).
+  if (c.suggested_birthday_id) {
+    return `
+      <div class="bd-import-row bd-import-row--suggest">
+        <span class="bd-import-row__text">
+          <span class="bd-import-row__name">${esc(c.name)}</span>
+          <span class="bd-import-row__hint">${esc(t('birthdays.importLinkSuggest', { name: c.suggested_birthday_name ?? '' }))}</span>
+        </span>
+        <span class="bd-import-row__date">${esc(birthDateShort(c.birthday, c.birthday_year_unknown))}</span>
+        <button class="btn btn--secondary btn--sm" type="button" data-import-link="${c.suggested_birthday_id}" data-contact-id="${c.id}">${t('birthdays.linkContact')}</button>
+      </div>`;
+  }
   return `
     <label class="bd-import-row">
       <input type="checkbox" value="${c.id}">
@@ -1417,6 +1431,32 @@ async function openImportModal() {
       refresh();
 
       panel.querySelector('#bd-import-cancel').addEventListener('click', closeModal);
+
+      // "Verknuepfen" statt einer zweiten Zeile: der Dialog bleibt offen, die
+      // Zeile wird zu "Bereits uebernommen", die Liste dahinter laedt neu.
+      panel.querySelectorAll('[data-import-link]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const owner = _container;
+          const candidate = withBirthday.find((c) => c.id === Number(btn.dataset.contactId));
+          btn.disabled = true;
+          try {
+            await api.put(`/birthdays/${Number(btn.dataset.importLink)}`, { contact_id: Number(btn.dataset.contactId) });
+            window.yuvomi?.showToast(t('birthdays.linkedToast'), 'success');
+            const row = btn.closest('.bd-import-row');
+            if (row && candidate) {
+              row.insertAdjacentHTML('afterend', importCandidateRowHtml({ ...candidate, already_imported: true }));
+              const done = row.nextElementSibling;
+              row.remove();
+              if (done && window.lucide) window.lucide.createIcons({ el: done });
+            }
+            await reloadAfterSave(() => loadData());
+            if (_container === owner) renderList({ repaint: true });
+          } catch (err) {
+            if (btn.isConnected) btn.disabled = false;
+            window.yuvomi?.showToast(errorSentence(err), 'danger');
+          }
+        });
+      });
 
       submitBtn.addEventListener('click', async () => {
         const ids = selectedIds();
@@ -1792,5 +1832,7 @@ export const __test = {
   openBirthdayFromQueryNarrow,
   // #1909: Speichern, Loeschen und Import, wenn der Server ablehnt.
   deleteBirthday, openImportModal,
+  // R23 G5-P2: gleicher Name oder Tag - die Importzeile fragt statt anzulegen.
+  importCandidateRowHtml,
   setContainerForTest(container) { _container = container; },
 };

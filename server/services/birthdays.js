@@ -572,6 +572,13 @@ function syncAllBirthdayReminders(database, userId, from = new Date()) {
  * @param {object} database
  * @returns {{ withBirthday: Array<{id:number,name:string,birthday:string,birthday_year_unknown:boolean,already_imported:boolean}>, withoutBirthday: Array<{id:number,name:string,already_imported:boolean}> }}
  */
+function linkSuggestionFields(database, contact) {
+  const hit = birthdayLinkSuggestion(database, contact);
+  if (!hit) return {};
+  const name = hit.name ?? database.prepare('SELECT name FROM birthdays WHERE id = ?').get(hit.id)?.name ?? null;
+  return { suggested_birthday_id: hit.id, suggested_birthday_name: name };
+}
+
 function listBirthdayImportCandidates(database) {
   const rows = database.prepare(`
     SELECT c.id, c.name, c.birthday, c.birthday_year_unknown,
@@ -595,6 +602,10 @@ function listBirthdayImportCandidates(database) {
         // nicht, der Import uebernimmt die Marke.
         birthday_year_unknown: r.birthday_year_unknown === 1,
         already_imported: r.already_imported === 1,
+        // Gibt es den Menschen schon als Geburtstag (gleicher Name oder Tag),
+        // fragt die Zeile "Mit X verknuepfen?" statt still eine zweite
+        // anzulegen (R23, G5-P2).
+        ...(r.already_imported === 1 ? {} : linkSuggestionFields(database, r)),
       });
     } else {
       // Auch ohne Datum verknuepfbar (R22, D7: der Geburtstag-Dialog bietet
@@ -690,6 +701,54 @@ function sameNameBirthdayId(database, name) {
   return hits.length === 1 ? hits[0].id : null;
 }
 
+/**
+ * DER GLEICHE TAG (Critique R23, G5-P2; Ulas 25.10.). Heisst der Kontakt
+ * anders als der Geburtstag ("Tante Ingrid" gegen "Ingrid Mueller"), fand der
+ * Namensschluessel nichts, und "Hinzufuegen" oder der Import legten still eine
+ * zweite Zeile fuer denselben Menschen an. Jetzt fragt die Seite "Mit X
+ * verknuepfen?", wenn GENAU EIN unverknuepfter Geburtstag (kein
+ * Mitglieder-Geburtstag) auf denselben Tag faellt. Ein Vorschlag, kein
+ * Riegel: Zwillinge teilen das Datum, der Import bleibt moeglich.
+ *
+ * Gleich heisst: Monat und Tag gleich, und das Jahr gleich, sobald beide eins
+ * kennen. Ein Platzhalterjahr (2000 im Geburtstag, 1604 aus alten vCards) ist
+ * kein Jahr.
+ * @param {import('better-sqlite3').Database} database
+ * @param {{birthday?: unknown, birthday_year_unknown?: unknown}} contact
+ * @returns {{id: number, name: string}|null}
+ */
+function sameDateBirthday(database, contact) {
+  const mine = birthDayParts(contact?.birthday, contact?.birthday_year_unknown === 1 || contact?.birthday_year_unknown === true);
+  if (!mine) return null;
+  const rows = database.prepare('SELECT id, name, birth_date, year_unknown FROM birthdays WHERE contact_id IS NULL AND family_user_id IS NULL').all();
+  const hits = rows.filter((row) => {
+    const theirs = birthDayParts(row.birth_date, row.year_unknown === 1);
+    return theirs && theirs.monthDay === mine.monthDay
+      && (theirs.year === null || mine.year === null || theirs.year === mine.year);
+  });
+  return hits.length === 1 ? { id: hits[0].id, name: hits[0].name } : null;
+}
+
+/** `YYYY-MM-DD` in Monat-Tag und Jahr (null = unbekannt); Unlesbares ist null. */
+function birthDayParts(date, yearUnknown) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date ?? '').trim());
+  if (!m) return null;
+  const year = yearUnknown || m[1] === '1604' ? null : m[1];
+  return { monthDay: `${m[2]}-${m[3]}`, year };
+}
+
+/**
+ * Der eine Verknuepfungs-Vorschlag fuer einen Kontakt: zuerst der Name (R22),
+ * sonst der Tag (R23). `by` sagt der Seite, welcher Satz passt.
+ * @returns {{id: number, name: string|null, by: 'name'|'date'}|null}
+ */
+function birthdayLinkSuggestion(database, contact) {
+  const byName = sameNameBirthdayId(database, contact?.name);
+  if (byName) return { id: byName, name: null, by: 'name' };
+  const byDate = sameDateBirthday(database, contact);
+  return byDate ? { ...byDate, by: 'date' } : null;
+}
+
 export {
   BIRTHDAY_COLOR,
   BIRTHDAY_RRULE,
@@ -711,6 +770,8 @@ export {
   nextNameDayDate,
   placeholderBirthDate,
   retitleBirthdayEvents,
+  birthdayLinkSuggestion,
+  sameDateBirthday,
   sameNameBirthdayId,
   sameNameKey,
   syncAllBirthdayReminders,

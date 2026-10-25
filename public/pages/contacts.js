@@ -2150,7 +2150,11 @@ function birthdaySuggestionRow(contact, onLinked = null) {
   return {
     icon: 'cake',
     label: t('nav.birthdays'),
-    value: t('contacts.birthdaySuggestValue'),
+    // Gleicher Tag, anderer Name (R23): der Satz nennt den Geburtstag, weil
+    // der Leser ihn sonst nicht wiedererkennt.
+    value: contact.suggested_birthday_name
+      ? t('contacts.birthdaySuggestSameDate', { name: contact.suggested_birthday_name })
+      : t('contacts.birthdaySuggestValue'),
     action: {
       id: 'contact-detail-birthday-link',
       label: t('birthdays.linkContact'),

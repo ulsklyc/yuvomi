@@ -559,6 +559,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Gleicher Name oder Tag wie ein Geburtstag (R23, G5-P2): kein Haken, sondern
+ * die Frage "Mit X verknuepfen?" unter dem Namen und der Knopf dazu. Die Zeile
+ * selbst ist kein Ziel mehr, also kein Zeiger und keine Hover-Flaeche. */
+.bd-import-row--suggest {
+  cursor: default;
+}
+
+.bd-import-row--suggest:hover,
+.bd-import-row--suggest:focus-within {
+  background: transparent;
+}
+
+.bd-import-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0h);
+}
+
+.bd-import-row__hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
 /* Schon hinzugefuegt: Zuruecknehmen-Muster (tokens.css, #1230) statt
  * `opacity: 0.7`. Das Badge sagt den Zustand und bleibt voll. */
 .bd-import-row--done {

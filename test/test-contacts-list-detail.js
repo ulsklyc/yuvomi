@@ -543,6 +543,10 @@ test('R22 D7: gleichnamiger Geburtstag - der Kontakt zeigt den Hinweis mit "Verk
     assert.equal(hint.action.icon, 'link');
     const dateRow = contacts.renderContactDetail(SAME).find((r) => r?.icon === 'cake' && r.label === 'contacts.birthdayLabel');
     assert.equal(dateRow?.action ?? null, null, 'kein "Hinzufuegen" neben dem Hinweis - es legte einen zweiten Geburtstag an');
+    // R23 G5-P2: gleicher Tag, anderer Name - der Satz nennt den Geburtstag.
+    const sameDay = hintOf({ ...SAME, suggested_birthday_name: 'Ingrid Mueller' });
+    assert.equal(sameDay?.value, 'contacts.birthdaySuggestSameDate{"name":"Ingrid Mueller"}', 'gleicher Tag: "Mit X verknuepfen?"');
+    assert.equal(sameDay.action.label, 'birthdays.linkContact');
     assert.ok(hintOf({ ...SAME, birthday: null }), 'auch ohne eigenes Datum');
     assert.equal(hintOf({ ...SAME, suggested_birthday_id: undefined }), null, 'ohne Vorschlag keine Zeile');
     assert.equal(hintOf({ ...SAME, birthday_id: 31 }), null, 'verknuepft keine Zeile');

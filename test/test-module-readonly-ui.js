@@ -5564,3 +5564,16 @@ test('R23: Geburtstag - der Aufklapper sagt, was drin ist; der Import zeigt das 
   assert.match(fn, /new Intl\.ListFormat\(getLocale\(\)/);
   assert.match(src, /\{ action: 'import-contacts', label: t\('birthdays\.importButton'\), icon: 'book-user' \}/);
 });
+
+// R23 G5-P2 (Ulas 25.10.): heisst ein Kontakt anders, hat aber denselben
+// Geburtstag wie ein Eintrag, legte der Haken im Import still eine zweite Zeile
+// an. Die Zeile fragt jetzt "Mit X verknuepfen?" und hat keinen Haken.
+test('R23 G5-P2: Importzeile mit Vorschlag fragt "Mit X verknuepfen?" statt anzulegen', () => {
+  const plain = { id: 4, name: 'Tante Ingrid', birthday: '1961-09-17', birthday_year_unknown: false, already_imported: false };
+  assert.match(birthdays.importCandidateRowHtml(plain), /type="checkbox" value="4"/, 'ohne Vorschlag: der Haken');
+  const html = birthdays.importCandidateRowHtml({ ...plain, suggested_birthday_id: 31, suggested_birthday_name: 'Ingrid <b>' });
+  assert.doesNotMatch(html, /type="checkbox"/, 'kein Haken, der eine zweite Zeile anlegt');
+  assert.match(html, /data-import-link="31" data-contact-id="4"/);
+  assert.match(html, /birthdays\.importLinkSuggest/);
+  assert.match(html, /birthdays\.linkContact/);
+});

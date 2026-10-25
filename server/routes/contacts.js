@@ -12,7 +12,7 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
-import { birthDateInput, placeholderBirthDate, validateYearUnknown, sameNameBirthdayId } from '../services/birthdays.js';
+import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion } from '../services/birthdays.js';
 import { mayReadModule } from '../permissions.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
@@ -515,8 +515,13 @@ function withBirthdaySuggestion(req, contact) {
   if (contact.family_user_id && db.get().prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(contact.family_user_id)) {
     return contact;
   }
-  const id = sameNameBirthdayId(db.get(), contact.name);
-  return id ? { ...contact, suggested_birthday_id: id } : contact;
+  // Erst der Name (R22), sonst derselbe Tag (R23): dann nennt die Ansicht den
+  // Geburtstag beim Namen ("Mit X verknuepfen?"), weil er anders heisst.
+  const hit = birthdayLinkSuggestion(db.get(), contact);
+  if (!hit) return contact;
+  return hit.by === 'date'
+    ? { ...contact, suggested_birthday_id: hit.id, suggested_birthday_name: hit.name }
+    : { ...contact, suggested_birthday_id: hit.id };
 }
 
 /**

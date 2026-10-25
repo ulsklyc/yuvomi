@@ -489,6 +489,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **A birthday under another name is no longer added twice.** A contact called "Aunt Ingrid"
+  whose birth date matched the birthday "Ingrid Miller" was added as a second entry for the same
+  person, because only equal names were recognised. When exactly one unlinked birthday falls on
+  the same day (and in the same year, if both know it), the contact now asks "Link to Ingrid
+  Miller?" instead of offering "Add to birthdays", and the import from contacts shows "Link" in
+  that row instead of a checkbox. Twins and other people sharing a date can still be added by hand.
 - **A PDF opened with the mouse keeps the focus you give it.** After switching pages, the document
   viewer could take a mouse click for a key press and pull the focus back out of the PDF, so text
   could not be selected. It now goes by your last input, like every other dialog. Settings >
