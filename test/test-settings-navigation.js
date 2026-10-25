@@ -5599,3 +5599,85 @@ test('R23: das Rechte-Blatt rutscht nicht und rechnet nur die Gruppen in Sicht',
   assert.match(cv?.body ?? '', /contain-intrinsic-size:\s*auto none auto/);
   assert.match(cv?.body ?? '', /overflow-clip-margin/, 'der Fokusring darf ueber die Gruppenkante');
 });
+
+// #2166 (Rest aus #2151): auf "Darstellung" waren bei 390 px noch zwei
+// Auswahlen gekappt - die Waehrung ("AED - United Arab Emirates Dirham", im
+// gemessenen Fall in 17 von 26 Sprachen) und fuenf Zeitzonen ("North
+// Dakota/New Salem"). Dasselbe Muster wie #2151: der Wert ist kurz, der volle
+// Name steht vorn in der Hinweiszeile, die R17-Zeile bleibt, wie sie ist.
+// Gemessen wird das, was das Blatt rendert, je Sprache, mit dem Zeichenbudget
+// aus #2151 (selectBudget/selectUnits oben).
+function optionTexts(html, id) {
+  const select = html.match(new RegExp(`<select\\b[^>]*\\bid="${id}"[^>]*>([\\s\\S]*?)</select>`));
+  assert.ok(select, `#${id} fehlt im Markup`);
+  const groups = [];
+  const body = select[1].replace(/<optgroup\b[^>]*>([\s\S]*?)<\/optgroup>/g, (_m, inner) => { groups.push(inner); return ''; });
+  const texts = (part) => [...part.matchAll(/<option\b[^>]*>([^<]*)<\/option>/g)].map((m) => unescapeHtml(m[1]));
+  return [texts(body), ...groups.map(texts)];
+}
+
+test('#2166: Waehrung und Zeitzone passen in jeder Sprache in die geschlossene Auswahl - und keine zwei heissen gleich', async (t) => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  const locales = (await readdir(dir)).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+  assert.ok(locales.length >= 20, 'die Locales sind da');
+  t.after(() => { delete globalThis.__locale; });
+  const offenders = [];
+  for (const locale of locales) {
+    globalThis.__locale = locale;
+    const html = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'AED', region: 'ar-AE' });
+    const [currencies] = optionTexts(html, 'currency-select');
+    if (currencies.length !== CURRENCY_CODES.length) offenders.push(`${locale}: ${currencies.length} statt ${CURRENCY_CODES.length} Waehrungen im Markup`);
+    const zoneGroups = optionTexts(html, 'timezone-select');
+    assert.ok(zoneGroups.flat().length > 300, `${locale}: die Zonen sind da`);
+    for (const label of [...currencies, ...zoneGroups.flat()]) {
+      if (label.startsWith('settings.')) continue; // "Automatisch" haelt R21 S9c
+      if (selectUnits(label) > selectBudget(label)) offenders.push(`${locale}: "${label}" hat ${selectUnits(label)} Zeichen, Budget ${selectBudget(label)}`);
+    }
+    if (new Set(currencies).size !== currencies.length) offenders.push(`${locale}: zwei Waehrungen heissen gleich`);
+    for (const group of zoneGroups) {
+      const dupes = group.filter((z, i) => group.indexOf(z) !== i);
+      if (dupes.length) offenders.push(`${locale}: zwei Zonen einer Gruppe heissen gleich (${dupes.join(', ')})`);
+    }
+  }
+  assert.deepEqual([...new Set(offenders)], []);
+});
+
+test('#2166: Darstellung - Waehrung und Zone stehen kurz in der Auswahl, voll vorn in der Hinweiszeile', async (t) => {
+  t.after(() => { delete globalThis.__locale; });
+  globalThis.__locale = 'de';
+  const symbol = (locale, code) => new Intl.NumberFormat(locale, { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' })
+    .formatToParts(0).find((p) => p.type === 'currency').value;
+  const name = (locale, code) => new Intl.DisplayNames([locale], { type: 'currency' }).of(code);
+  const html = await renderAppearance({
+    ...APPEARANCE_PREFS, currency: 'GBP', region: 'en-GB', timezone: 'America/North_Dakota/New_Salem',
+  });
+  assert.equal(selectedOptionText(html, 'currency-select'), `GBP ${symbol('de', 'GBP')}`, 'Code und Symbol, kein Name');
+  assert.equal(textById(html, 'currency-hint'),
+    withValues('settings.hintWithCurrent', { value: name('de', 'GBP'), hint: 'settings.currencyHint' }),
+    'der volle Name steht vorn in der Hinweiszeile');
+  assert.equal(selectedOptionText(html, 'timezone-select'), 'New Salem', 'die Zone heisst nach ihrer Stadt');
+  assert.equal(textById(html, 'timezone-hint'),
+    withValues('settings.hintWithCurrent', { value: 'America/North Dakota/New Salem', hint: 'settings.timezoneHint' }));
+
+  // Ein Code ohne eigenes Symbol steht allein, nicht doppelt ("AED AED").
+  globalThis.__locale = 'en';
+  const aed = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'AED', region: 'ar-AE' });
+  assert.equal(selectedOptionText(aed, 'currency-select'), 'AED');
+  assert.equal(textById(aed, 'currency-hint'),
+    withValues('settings.hintWithCurrent', { value: name('en', 'AED'), hint: 'settings.currencyHint' }));
+
+  // Der Kreditdialog im Budget hat die volle Breite und behaelt "Code - Name".
+  const { appendCurrencyOptions } = await import('../public/settings/currency.js');
+  const select = { children: [], appendChild(c) { this.children.push(c); } };
+  const prevDoc = globalThis.document;
+  globalThis.document = fakeDocument();
+  try { appendCurrencyOptions(select, 'AED'); } finally { globalThis.document = prevDoc; }
+  assert.equal(select.children.find((o) => o.value === 'AED').textContent, `AED - ${name('en', 'AED')}`);
+
+  // Die Hinweiszeile folgt der Auswahl: beim Wechsel sofort, beim
+  // Zuruecksetzen nach einem Fehler und wenn die Region die Waehrung setzt.
+  const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
+  assert.match(page, /currencySelect\?\.addEventListener\('change', async \(\) => \{\s*if \(currencySelect\.disabled\) return;\s*(?:\/\/[^\n]*\n\s*)*syncCurrencyHint\(container\);/);
+  assert.match(page, /\} catch \(error\) \{\s*syncCurrencyHint\(container\);\s*showError\(errorElement, error\.message\);/);
+  assert.match(page, /if \(currencySelect\) currencySelect\.value = preset\.currency;\s*syncCurrencyHint\(container\);/);
+});
