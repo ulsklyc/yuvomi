@@ -71,7 +71,7 @@ const AUSNAHMEN = new Map([
     anzahl: 1, grund: 'DNS-Pruefung im lookup-Callback, keine DB',
   }],
   ['server/index.js|checkLocalStorageMount', {
-    anzahl: 1, grund: 'einmal beim Start, nur Dateisystem (stat/access), keine DB',
+    anzahl: 1, grund: 'einmal beim Start, nur Dateisystem (stat/access, Mounttabelle), keine DB',
   }],
 ]);
 

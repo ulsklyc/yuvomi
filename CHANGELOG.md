@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not to API tokens or the wall display.
 
 ### Fixed
+- **Yuvomi warns when local document storage would keep files only in the container layer.** With
+  `DOCUMENT_STORAGE_LOCAL_ENABLED=true` the start-up check only warned when the folder was missing.
+  The image creates `/documents` itself, though, so on the default path the folder always existed and
+  the warning never came, even with nothing mounted on it - uploads then vanished with the next
+  update while the database still listed them. A Portainer Git stack is one such setup: its documents
+  mount is commented out and cannot be enabled there. The check now asks the same question the
+  modules page asks for `/app/modules`, whether the folder sits on a volume or bind mount, and warns
+  when it does not. Outside a container, and wherever the mount table cannot be read, it stays quiet.
 - **The currency and long time zones are no longer cut off in the appearance settings on a
   phone** (#2166). A currency read like "AED - United Arab Emirates Dirham" and ended in "…" on
   a narrow screen, and so did five time zones such as "North Dakota/New Salem". The currency

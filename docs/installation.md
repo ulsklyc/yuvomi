@@ -772,6 +772,12 @@ environment:
 
 > Ensure the mounted folder is writable by the container (adjust ownership/permissions as needed).
 
+> **Without a mount the files are lost on the next update.** The image ships an empty `/documents`
+> folder, so the path exists even when nothing is mounted on it, and uploads then land in the
+> container layer while the database keeps referencing them. On start Yuvomi logs a warning when
+> `DOCUMENT_STORAGE_LOCAL_PATH` does not exist or, inside a container, is not on a volume or bind
+> mount. The same check guards the modules folder (see [MODULES.md](../MODULES.md)).
+
 ### Upload Size
 
 | Variable | Description | Default | Required |
