@@ -210,3 +210,20 @@ test('ein Mail-Kanal startet ohne Basis-URL und ohne Geheimnisfeld (#944)', () =
   assert.equal(Object.hasOwn(defaults.config, 'baseUrl'), false,
     'die Defaults sind die eine Quelle dafuer, ob ein Anbieter einen Endpunkt hat');
 });
+
+// R23 S11 (Critique G6 P2 "Leerzustand nackter Satz"): ohne Kanal stand ein
+// Hinweissatz, wo jede andere leere Liste den Leerzustand zeigt.
+test('R23: ohne Kanal zeigt die Liste den kompakten Leerzustand', async () => {
+  const { installMiniDom } = await import('./mini-dom.js');
+  let html = '';
+  const list = { replaceChildren: () => { html = ''; }, insertAdjacentHTML: (_pos, chunk) => { html += chunk; } };
+  const restore = installMiniDom();
+  try {
+    __test.renderChannelList({ querySelector: (sel) => (sel === '#notification-channel-list' ? list : null) }, []);
+  } finally {
+    restore();
+  }
+  assert.match(html, /class="[^"]*empty-state[^"]*empty-state--compact/, html);
+  assert.match(html, /settings\.notificationChannelEmpty/);
+  assert.doesNotMatch(html, /^<p class="form-hint">/);
+});

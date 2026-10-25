@@ -170,6 +170,9 @@ const STUBS = {
   `,
   '/components/modal.js': `
     export const openModal = (...args) => globalThis.__openModal?.(...args);
+    // Die letzte Eingabe (Taste oder Zeiger); wer den Tastaturweg meint, setzt
+    // globalThis.__lastInputKeyboard = true.
+    export const lastInputWasKeyboard = () => globalThis.__lastInputKeyboard === true;
     // Suiten, die pruefen wollen, OB und WANN ein Handler schliesst (das
     // Formular bleibt nach einem Abbrechen offen), setzen globalThis.__closeModal.
     // Liefert, was der Haken liefert: das Original sagt mit false, dass das

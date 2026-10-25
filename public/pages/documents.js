@@ -5,7 +5,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors, lastInputWasKeyboard } from '/components/modal.js';
 import { t, formatDate, getLocale } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -4104,12 +4104,12 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
   // der Liste, den der vorige Betrachter weiterreicht (Codex zu #2142).
   const trigger = document.activeElement;
   const opener = listOpener ?? trigger;
-  // Per Tastatur geoeffnet? Der Browser weiss es: er zeigt den Fokusring am
-  // Ausloeser nur dann. Ein alter Browser ohne den Selektor wirft - dann gilt
-  // "nein", und der Fokus-Waechter des PDFs nimmt nichts zurueck. Beim
+  // Per Tastatur geoeffnet? Die letzte Eingabe sagt es (modal.js,
+  // lastInputWasKeyboard) - derselbe Zeuge wie der Erstfokus der Dialoge. Der
+  // `:focus-visible` des Ausloesers taugte nicht: nach einem Seitenwechsel
+  // traegt ihn die Seitenwurzel auch nach einem Mausklick (R23 S6/S11). Beim
   // Blaettern zaehlt der Knopf oder die Taste des Schritts, nicht die Liste.
-  let openedByKeyboard = false;
-  try { openedByKeyboard = trigger?.matches?.(':focus-visible') === true; } catch { /* Selektor unbekannt */ }
+  const openedByKeyboard = lastInputWasKeyboard();
 
   // VOR UND ZURUECK IM BETRACHTER (Critique R21, Persona Alex): wer zehn
   // Belege durchsieht, musste je Dokument schliessen und das naechste oeffnen.

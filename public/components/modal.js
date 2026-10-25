@@ -529,6 +529,17 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 }
 
 /**
+ * War die letzte Eingabe eine Taste? Der EINE Zeuge fuer "per Tastatur
+ * geoeffnet" (R23 S6/S11). Der `:focus-visible` des Ausloesers taugt nicht:
+ * nach einem Seitenwechsel traegt ihn die Seitenwurzel auch nach Mausklick.
+ * Ohne jede Eingabe gilt "Tastatur", wie beim Erstfokus der Dialoge.
+ * @returns {boolean}
+ */
+export function lastInputWasKeyboard() {
+  return _lastInput === 'keyboard';
+}
+
+/**
  * Fokus nach einem Pane-Wechsel innerhalb eines offenen Modals (Detailansicht →
  * Formular). `trapFocus` läuft nur beim Öffnen; ohne diesen Aufruf bliebe der
  * Fokus auf dem verschwundenen „Bearbeiten"-Button und Screenreader verlören

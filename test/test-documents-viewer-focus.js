@@ -61,8 +61,12 @@ const PDF = { id: 3, name: 'Zeugnis', original_name: 'zeugnis.pdf', category: 's
  * @param {object} opts
  * @param {boolean} opts.keyboard - der Ausloeser traegt den Fokusring des Browsers
  */
-function openViewer({ keyboard }) {
-  const opener = element('opener', { matches: (sel) => sel === ':focus-visible' && keyboard });
+function openViewer({ keyboard, staleRing = false }) {
+  // Der Zeuge ist die letzte Eingabe (modal.js, lastInputWasKeyboard), nicht
+  // der Fokusring des Ausloesers: `staleRing` stellt die Seitenwurzel nach
+  // einem Seitenwechsel nach, die ihn auch nach einem Mausklick traegt.
+  globalThis.__lastInputKeyboard = keyboard;
+  const opener = element('opener', { matches: (sel) => sel === ':focus-visible' && (keyboard || staleRing) });
   doc.activeElement = opener;
   let options = null;
   const previous = globalThis.__openModal;
@@ -311,4 +315,13 @@ test('Betrachter: Blaettern reicht den Ausloeser in der Liste weiter, ueber mehr
     globalThis.__openModal = previous;
     documentsPage.state.documents = [];
   }
+});
+
+// R23 S11 (Rest aus S6): nach einem Seitenwechsel traegt der Ausloeser den
+// Fokusring auch nach einem Mausklick - der Waechter hielt den Zeiger dann
+// fuer eine Taste und nahm den Fokus aus dem PDF zurueck.
+test('per Zeiger geoeffnet, aber mit altem Fokusring: der Zeiger zaehlt', async () => {
+  const v = openViewer({ keyboard: false, staleRing: true });
+  assert.equal(await v.frameTakesFocus(), v.frame, 'der Fokus darf im angeklickten PDF bleiben');
+  v.close_();
 });

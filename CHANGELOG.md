@@ -472,6 +472,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **A PDF opened with the mouse keeps the focus you give it.** After switching pages, the document
+  viewer could take a mouse click for a key press and pull the focus back out of the PDF, so text
+  could not be selected. It now goes by your last input, like every other dialog. Settings >
+  Notifications shows its empty channel list like every other empty list.
 - **A deleted dose no longer lingers in the Health overview.** Deleting a dose entry in Medications
   removed it there at once, but the Health overview kept counting and listing it until the undo
   window was over.
