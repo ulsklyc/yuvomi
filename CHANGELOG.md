@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A new event appears at its time in the calendar right away.** After adding an event, the
+  agenda (and every other day list) showed it below all other events of that day until the next
+  reload, whatever its start time. The same happened when an edit moved an event to another time
+  of day. The event is now sorted into place as soon as it is saved.
 - **Assigning a synced iCloud event no longer turns its Apple Maps place into plain text.** A
   place picked through Apple's location search is stored on several lines, and the single-line
   location field in Yuvomi dropped the line breaks. Saving the event, even only to assign a

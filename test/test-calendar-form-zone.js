@@ -426,3 +426,33 @@ test('#1997: Termin speichern - eine spaete Antwort schliesst nur mit dem Kontex
     }
   }
 });
+
+// Die Tageslisten (Agenda, Monatsliste am Telefon, Tagesansicht) folgen der
+// Reihenfolge von state.events. Sortiert hat die nur der Server; ein neuer
+// Termin wurde angehaengt, ein geaenderter an alter Stelle ersetzt - bis zum
+// Neuladen stand er am Ende seines Tages. saveEvent sortiert danach selbst.
+test('Termin speichern - der Termin steht danach nach seinem Beginn in state.events', async () => {
+  const state = calendar.localCalendarState;
+  const vorher = state.events;
+  const titel = () => state.events.map((e) => e.title);
+  try {
+    await inZone(SERVER_ZONE, async () => {
+      const neun = asEvent(row(insertEvent({ title: 'Neun', start: '2026-10-21T09:00', end: '2026-10-21T10:00', source: 'local' })));
+      const drei = asEvent(row(insertEvent({ title: 'Drei', start: '2026-10-21T15:00', end: '2026-10-21T16:00', source: 'local' })));
+
+      state.events = [neun, drei];
+      const panel = openDialog(null, { date: '2026-10-21', time: '12:00' });
+      userSets(panel.querySelector('#modal-title'), 'Mittag', 'input');
+      await save(panel, null, 'create');
+      assert.deepEqual(titel(), ['Neun', 'Mittag', 'Drei'], 'ein neuer Termin steht an seiner Uhrzeit, nicht am Ende des Tages');
+
+      state.events = [neun, drei];
+      const verschoben = openDialog(neun);
+      userSets(verschoben.querySelector('#modal-start-time'), '17:00');
+      await save(verschoben, neun);
+      assert.deepEqual(titel(), ['Drei', 'Neun'], 'ein auf spaeter verschobener Termin rueckt hinter die anderen');
+    });
+  } finally {
+    state.events = vorher;
+  }
+});
