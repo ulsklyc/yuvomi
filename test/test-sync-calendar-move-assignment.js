@@ -19,6 +19,9 @@
  * `event_assignments`, `reminders` und die Dokumentrechte eines Anhangs an - ein
  * schlankes Testschema haette den halben Schreibweg verschwiegen.
  *
+ * Seit #2202 auch: die Ausnahme einer Serie erbt beim ersten Import deren
+ * Zuweisung (Block am Ende der Datei).
+ *
  * Ausfuehren: npm run test:sync-calendar-move-assignment
  */
 
@@ -657,5 +660,159 @@ describe('#1358 - der Umzug oeffnet kein Anhang-Dokument', () => {
     const { id, documentId } = seedWithDocument(refA, 'family', 'private');
     assert.equal(move(id, refA, refB), true);
     assert.deepEqual(docState(documentId), { visibility: 'family', access: [] });
+  });
+});
+
+// ── #2202: ein geaendertes Einzelvorkommen erbt die Zuweisung seiner Serie ───────
+//
+// Wer in iOS ein Vorkommen einer Serie aendert ("Nur dieses Ereignis"), legt eine
+// RECURRENCE-ID-Ausnahme unter derselben UID ab. Der Inbound fuehrt sie als eigene
+// Zeile `<uid>::<Tag>` (normalizeRecurrenceOverrides), Google als eigenes Event
+// mit `recurringEventId`. Diese Zeile bekam bisher nur die Standard-Person des
+// Kalenders - die Zuweisung, die jemand in Yuvomi an der Serie gesetzt hatte,
+// fehlte an genau dem Vorkommen, das gerade bearbeitet wurde.
+//
+// Regel: beim ERSTEN Import erbt die Ausnahme die Zuweisung des Masters; hat der
+// Master keine, gilt wie bisher die Standard-Person. Was danach an der Ausnahme
+// selbst zugewiesen wird, fasst kein weiterer Lauf an.
+
+const SERIES_UID = 'weekly@example.org';
+const OVERRIDE_ID = `${SERIES_UID}::2026-04-08`;
+
+const seriesObject = (withOverride) => [
+  'BEGIN:VCALENDAR', 'VERSION:2.0',
+  'BEGIN:VEVENT', `UID:${SERIES_UID}`, 'SUMMARY:Schwimmen',
+  'DTSTART:20260401T090000Z', 'DTEND:20260401T100000Z', 'RRULE:FREQ=WEEKLY',
+  'END:VEVENT',
+  ...(withOverride ? [
+    'BEGIN:VEVENT', `UID:${SERIES_UID}`, 'SUMMARY:Schwimmen',
+    'RECURRENCE-ID:20260408T090000Z',
+    'DTSTART:20260408T090000Z', 'DTEND:20260408T100000Z',
+    'LOCATION:Hallenbad\\nBadstrasse 1',
+    'END:VEVENT',
+  ] : []),
+  'END:VCALENDAR',
+].join('\r\n');
+
+/** Ein Kalender A mit einem Serienobjekt; `state.withOverride` schaltet die Ausnahme zu. */
+const seriesClient = (state) => async () => ({
+  fetchCalendars: async () => [
+    { url: CAL_A, displayName: 'Kalender A', components: ['VEVENT'], calendarColor: '#FF0000' },
+  ],
+  fetchCalendarObjects: async ({ calendar }) => (calendar.url === CAL_A
+    ? [{ data: seriesObject(state.withOverride), url: `${CAL_A}weekly.ics` }]
+    : []),
+  createCalendarObject: async () => ({}),
+});
+
+function rowOf(externalId) {
+  return db.prepare('SELECT id, assigned_to FROM calendar_events WHERE external_calendar_id = ?').get(externalId);
+}
+
+/** So, wie die Route eine Zuweisung von Hand schreibt: primaer + Liste. */
+function assignByHand(eventId, users) {
+  db.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(users[0] ?? null, eventId);
+  db.prepare('DELETE FROM event_assignments WHERE event_id = ?').run(eventId);
+  for (const u of users) db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(eventId, u);
+}
+
+const DAV_PROVIDERS = [
+  { name: 'CalDAV', source: 'caldav', setup: seedCaldavAccount, run: (state) => caldavSync({ createClient: seriesClient(state) }) },
+  { name: 'Apple', source: 'apple', setup: () => {}, run: (state) => appleSync({ makeClient: seriesClient(state) }) },
+];
+
+describe('#2202 - eine Ausnahme der Serie erbt beim ersten Import deren Zuweisung', () => {
+  beforeEach(resetTables);
+
+  for (const p of DAV_PROVIDERS) {
+    it(`${p.name}: die Ausnahme uebernimmt die Zuweisung, die an der Serie von Hand steht`, async () => {
+      externalCalendar(p.source, CAL_A, 'Kalender A', ANNA);
+      p.setup();
+      const state = { withOverride: false };
+
+      await p.run(state);
+      const master = rowOf(SERIES_UID);
+      assert.ok(master, 'die Serie wurde importiert');
+      assignByHand(master.id, [BEN, CHRIS]);
+
+      state.withOverride = true;
+      await p.run(state);
+      const override = rowOf(OVERRIDE_ID);
+      assert.ok(override, 'die Ausnahme ist eine eigene Zeile');
+      assert.equal(Number(override.assigned_to), BEN, 'primaer wie an der Serie, nicht die Standard-Person');
+      assert.deepEqual(assignmentsOf(override.id), [BEN, CHRIS].sort((a, b) => a - b));
+      assert.deepEqual(assignmentsOf(master.id), [BEN, CHRIS].sort((a, b) => a - b), 'die Serie behaelt ihre');
+    });
+
+    it(`${p.name}: eine spaeter an der Ausnahme gesetzte Zuweisung bleibt bei weiteren Laeufen`, async () => {
+      externalCalendar(p.source, CAL_A, 'Kalender A', ANNA);
+      p.setup();
+      const state = { withOverride: false };
+      await p.run(state);
+      assignByHand(rowOf(SERIES_UID).id, [BEN]);
+      state.withOverride = true;
+      await p.run(state);
+
+      const override = rowOf(OVERRIDE_ID);
+      assignByHand(override.id, [CHRIS]);
+      await p.run(state);
+      assert.equal(Number(rowOf(OVERRIDE_ID).assigned_to), CHRIS);
+      assert.deepEqual(assignmentsOf(override.id), [CHRIS]);
+
+      assignByHand(override.id, []);
+      await p.run(state);
+      assert.equal(rowOf(OVERRIDE_ID).assigned_to, null, 'eine entfernte Zuweisung kehrt nicht zurueck');
+      assert.deepEqual(assignmentsOf(override.id), []);
+    });
+
+    it(`${p.name}: ohne Zuweisung an der Serie gilt die Standard-Person des Kalenders`, async () => {
+      externalCalendar(p.source, CAL_A, 'Kalender A', ANNA);
+      p.setup();
+      const state = { withOverride: false };
+      await p.run(state);
+      assignByHand(rowOf(SERIES_UID).id, []);
+      state.withOverride = true;
+      await p.run(state);
+      const override = rowOf(OVERRIDE_ID);
+      assert.equal(Number(override.assigned_to), ANNA);
+      assert.deepEqual(assignmentsOf(override.id), [ANNA]);
+    });
+  }
+
+  const gMaster = {
+    id: 'gseries', status: 'confirmed', summary: 'Schwimmen',
+    start: { dateTime: '2026-04-01T09:00:00Z' }, end: { dateTime: '2026-04-01T10:00:00Z' },
+    recurrence: ['RRULE:FREQ=WEEKLY'],
+  };
+  const gOverride = {
+    id: 'gseries_20260408T090000Z', status: 'confirmed', summary: 'Schwimmen',
+    recurringEventId: 'gseries', originalStartTime: { dateTime: '2026-04-08T09:00:00Z' },
+    start: { dateTime: '2026-04-08T09:00:00Z' }, end: { dateTime: '2026-04-08T10:00:00Z' },
+  };
+
+  it('Google: die Ausnahme (recurringEventId) uebernimmt die Zuweisung der Serie', () => {
+    const refA = externalCalendar('google', GCAL_A, 'Kalender A', ANNA);
+    google.upsertGoogleEvents([gMaster], refA, '#4A90E2', {});
+    const master = rowOf('gseries');
+    assert.ok(master);
+    assignByHand(master.id, [BEN, CHRIS]);
+
+    google.upsertGoogleEvents([gOverride], refA, '#4A90E2', {});
+    const override = rowOf(gOverride.id);
+    assert.ok(override, 'die Ausnahme ist eine eigene Zeile');
+    assert.equal(Number(override.assigned_to), BEN);
+    assert.deepEqual(assignmentsOf(override.id), [BEN, CHRIS].sort((a, b) => a - b));
+
+    assignByHand(override.id, [CHRIS]);
+    google.upsertGoogleEvents([gMaster, gOverride], refA, '#4A90E2', {});
+    assert.deepEqual(assignmentsOf(override.id), [CHRIS], 'eine eigene Zuweisung bleibt');
+  });
+
+  it('Google: ohne Zuweisung an der Serie gilt die Standard-Person', () => {
+    const refA = externalCalendar('google', GCAL_A, 'Kalender A', ANNA);
+    google.upsertGoogleEvents([gMaster], refA, '#4A90E2', {});
+    assignByHand(rowOf('gseries').id, []);
+    google.upsertGoogleEvents([gOverride], refA, '#4A90E2', {});
+    assert.deepEqual(assignmentsOf(rowOf(gOverride.id).id), [ANNA]);
   });
 });

@@ -275,7 +275,10 @@ function normalizeRecurrenceOverrides(events) {
     }
     for (const ov of overrides) {
       const key = ov.recurrenceId || ov.dtstart?.slice(0, 10);
-      out.push({ ...ov, uid: `${uid}::${key}`, rrule: null, exdates: [] });
+      // `seriesUid`: der Sync findet darüber die Serie, deren Zuweisung eine
+      // neu angelegte Ausnahme erbt (#2202). Nur gesetzt, wenn das Objekt die
+      // Serie selbst mitliefert - eine losgelöste Instanz hat keine.
+      out.push({ ...ov, uid: `${uid}::${key}`, rrule: null, exdates: [], seriesUid: master ? uid : null });
     }
   }
   return out;
