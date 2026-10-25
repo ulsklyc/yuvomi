@@ -417,6 +417,7 @@ test('R23 G5-P2: gleicher Tag, anderer Name - Kontakt und Import fragen "Mit X v
   const cid = contact.body.data.id;
   const read = async () => (await member.as('GET', `/contacts/${cid}`)).body.data;
   const pick = async () => (await member.as('GET', '/birthdays/import/candidates')).body.data.withBirthday.find((c) => c.id === cid);
+  assert.equal(contact.body.data.suggested_birthday_name, 'Ingrid Mueller', 'schon die Antwort auf das Anlegen fragt');
 
   let seen = await read();
   assert.equal(seen.suggested_birthday_id, birthday.id, 'der Kontakt schlaegt den Geburtstag am selben Tag vor');

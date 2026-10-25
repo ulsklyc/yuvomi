@@ -677,9 +677,11 @@ router.post('/', (req, res) => {
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
     const multiValueFields = loadMultiValueFields(contactId);
 
+    // Beim Anlegen schon der Vorschlag (R23, G5-P2): wer "Tante Ingrid" mit
+    // dem Datum von "Ingrid Mueller" anlegt, sieht die Frage sofort.
     res.status(201).json({
       data: {
-        ...contact,
+        ...withBirthdaySuggestion(req, contact),
         ...multiValueFields
       }
     });
