@@ -381,7 +381,7 @@
 }
 
 /* Zeilen-Aktionen (Anrufen/Mehr) nutzen die geteilte .row-action-Grammatik aus
- * layout.css (Audit F1). Anrufen trägt row-action--success (grün, semantisch);
+ * layout.css (Audit F1), seit R23 auch Anrufen neutral wie jede Zeilenaktion;
  * der tel:-Link braucht nur noch text-decoration: none. */
 .contact-item__actions .row-action[href] {
   text-decoration: none;

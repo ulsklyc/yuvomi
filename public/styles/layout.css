@@ -8252,15 +8252,6 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-danger-ink);
 }
 
-.row-action--success {
-  color: var(--color-success);
-}
-
-.row-action--success:hover {
-  background: var(--color-success-light);
-  color: var(--color-success-ink);
-}
-
 /* Die Nadel der Notizkarte ist eine Zeilenaktion in eigener Lage (oben in
  * der Ecke): sie zeichnet in derselben Groesse wie der Mehr-Knopf daneben
  * (R19, Critique 2026-10-16 "Notizen-Pin-Gewichte") - vorher 12px gegen 18px,

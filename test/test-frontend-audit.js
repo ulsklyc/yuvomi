@@ -10494,9 +10494,11 @@ test('contacts keep one primary call action and disclose the rest through a labe
   const contactsCss = read('../public/styles/contacts.css');
 
   // Genau eine stets sichtbare Primäraktion pro Zeile: Anrufen (falls Telefon da).
-  // Nutzt die geteilte .row-action-Grammatik mit semantischer Erfolgs-Färbung
-  // (grün) über row-action--success (Audit F1).
-  assert.match(contactsPage, /href="tel:[\s\S]*class="row-action row-action--success"/);
+  // Nutzt die geteilte .row-action-Grammatik, seit R23 (Ulas 25.10.) NEUTRAL wie
+  // jede Zeilenaktion - kein Gruen mehr (Audit F1 abgeloest), die Leseansicht
+  // traegt "Anrufen" in der Modulfarbe.
+  assert.match(contactsPage, /href="tel:[^`]*class="row-action" aria-label="\$\{esc\(t\('contacts\.callNamed'/);
+  assert.doesNotMatch(contactsPage, /row-action--success/, 'Anrufen in der Zeile ohne eigene Farbe');
   // Sekundäraktionen leben im „Mehr"-Menü als BESCHRIFTETE Einträge (Icon + Text),
   // identisch auf Desktop und Mobile. Seit R16 (Re-Critique 2026-09-28) ist es
   // das geteilte Menü aus utils/popover-menu.js - Popover, Pfeiltasten und

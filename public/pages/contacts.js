@@ -896,10 +896,12 @@ function renderContactItem(c) {
   }
 
   // Primäre, stets sichtbare Zeilenaktion: Anrufen (falls Telefon vorhanden).
+  // Neutral wie jede Zeilenaktion (R23, Ulas 25.10.; bis dahin gruen nach
+  // Audit F1) - die Modulfarbe traegt "Anrufen" in der Leseansicht.
   // Der Name nennt die Person: zwoelf Zeilen, die alle "Anrufen" heissen, sind
   // fuer einen Screenreader eine Zeile.
   const callBtn = c.phone
-    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action row-action--success" aria-label="${esc(t('contacts.callNamed', { name: c.name }))}">
+    ? `<a href="tel:${esc(c.phone)}" data-phone-raw="${esc(c.phone)}" class="row-action" aria-label="${esc(t('contacts.callNamed', { name: c.name }))}">
          <i data-lucide="phone" aria-hidden="true"></i>
        </a>`
     : '';

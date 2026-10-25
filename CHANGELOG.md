@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **The call button in the contact list is no longer green.** It now looks like every other row
+  action, so a list full of phone numbers reads calmer. The contact's detail view still shows
+  "Call" in the module colour as its main action.
 - **More dates drop the year when it is this year.** Documents, Rewards, Pantry, task details and
   comments, Housekeeping and the Overview now write dates the way the rest of the app does:
   "24.10." in the current year, the full date only for other years.
