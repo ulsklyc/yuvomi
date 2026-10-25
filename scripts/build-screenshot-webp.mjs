@@ -3,7 +3,8 @@
  *
  * Die GitHub-Pages-Seite lädt jeden Screenshot als WebP in zwei Breiten
  * (`<name>@1x.webp` 1x, `<name>.webp` 2x) und fällt per onerror auf das PNG
- * zurück (docs/index.html, shotSrc). Die PNGs sind 5-10x größer als der Slot,
+ * zurück (docs/index.html, shotSrc). Desktopaufnahmen im großen Slot bekommen
+ * eine dritte Breite (`<name>@2400.webp`, Profil `web-lead`, s. WIDTHS). Die PNGs sind 5-10x größer als der Slot,
  * in dem sie landen - ohne die Derivate zieht die Startseite mehrere Megabyte.
  *
  * Bis hierher entstanden sie von Hand, was nach jedem Screenshot-Lauf einen
@@ -51,11 +52,26 @@ const SHOTS = resolve(DOCS, 'screenshots');
 // Welche Aufnahme im großen Slot steht, entscheidet nicht dieses Skript, sondern
 // das Markup: `data-shot-profile="lead"` am <img>. Eine Liste hier wäre die
 // zweite Quelle, vor der schon der Kopf dieser Datei warnt.
+//
+// `web-lead` kam mit S10 (Website-Critique 24.10.) dazu, aus demselben Grund
+// eine Ebene höher: Hero und Galerie zeigen die Desktopaufnahme am breiten
+// Schirm bis 1150/1152px breit. Mit 1400px als größter Stufe bekam ein
+// Retina-Schirm (DPR 2) 0,61 der nötigen Pixel. Die dritte Stufe (`xl`, Datei
+// `<name>@2400.webp`) deckt 1152px x DPR 2 aus den 2752px-PNGs. Sie ist NUR
+// über einen Breiten-Deskriptor erreichbar (docs/index.html, SHOT_W und das
+// Hero-Kopfskript): ein DPR-1-Schirm nimmt weiter die 1400px-Datei. Welche
+// Aufnahme im großen Slot steht, sagt wieder das Markup
+// (`data-shot-profile="lead"` an einer Desktopaufnahme).
 const WIDTHS = {
+  'web-lead':    { xl: 2400, '2x': 1400, '1x': 700 },  // 1152px Slot x DPR2
   web:           { '2x': 1400, '1x': 700 },
   'mobile-lead': { '2x': 1020, '1x': 510 },  // 340px Slot x DPR3
   mobile:        { '2x': 480,  '1x': 240 },  // 176px Slot, mit Reserve
 };
+/** Dateiname je Stufe; `2x` ist der Name ohne Zusatz (Altbestand). */
+const SUFFIX = { xl: '@2400.webp', '2x': '.webp', '1x': '@1x.webp' };
+/** Größte Stufe eines Profils - für "der größere Slot gewinnt". */
+const maxWidth = (profile) => Math.max(...Object.values(WIDTHS[profile]));
 const QUALITY = 0.82;
 
 /**
@@ -85,12 +101,12 @@ function referencedShots() {
       const lead = /data-shot-profile="lead"/.test(tag[0]);
       for (const m of tag[0].matchAll(SHOT_ATTR)) {
         const name = m[1];
-        const profile = !IS_MOBILE.test(name.replace(/\.png$/, '')) ? 'web'
-          : lead ? 'mobile-lead' : 'mobile';
+        const mobile = IS_MOBILE.test(name.replace(/\.png$/, ''));
+        const profile = mobile ? (lead ? 'mobile-lead' : 'mobile') : (lead ? 'web-lead' : 'web');
         // Steht dieselbe Datei in zwei Slots, gewinnt der GRÖSSERE: zu scharf
         // kostet Bytes, zu unscharf ist nicht reparierbar.
         const seen = shots.get(name);
-        if (!seen || WIDTHS[profile]['2x'] > WIDTHS[seen]['2x']) shots.set(name, profile);
+        if (!seen || maxWidth(profile) > maxWidth(seen)) shots.set(name, profile);
       }
     }
   }
@@ -103,7 +119,7 @@ function shotsWithExistingWebp(dir) {
   const names = new Set();
   if (!existsSync(dir)) return names;
   for (const f of readdirSync(dir)) {
-    const m = f.match(/^(.+?)(?:@1x)?\.webp$/);
+    const m = f.match(/^(.+?)(?:@1x|@2400)?\.webp$/);
     if (m) names.add(`${m[1]}.png`);
   }
   return names;
@@ -180,10 +196,12 @@ async function main() {
           continue;
         }
         const stem = name.replace(/\.png$/, '');
-        await convert(page, png, resolve(dir, `${stem}.webp`), WIDTHS[profile]['2x']);
-        await convert(page, png, resolve(dir, `${stem}@1x.webp`), WIDTHS[profile]['1x']);
-        written += 2;
-        console.log(`  ✓ ${stem}.webp + @1x.webp  (${profile}: ${WIDTHS[profile]['2x']}/${WIDTHS[profile]['1x']}px)`);
+        const tiers = Object.entries(WIDTHS[profile]);
+        for (const [tier, width] of tiers) {
+          await convert(page, png, resolve(dir, stem + SUFFIX[tier]), width);
+        }
+        written += tiers.length;
+        console.log(`  ✓ ${stem}: ${tiers.map(([t]) => SUFFIX[t]).join(' + ')}  (${profile}: ${tiers.map(([, w]) => w).join('/')}px)`);
       }
     }
   } finally {

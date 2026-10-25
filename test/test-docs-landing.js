@@ -125,6 +125,14 @@
  *            reduzierte Transparenz und mehr Kontrast; die Plattformkarte hebt
  *            sich hoechstens 1px wie die Karten der App.
  *
+ *       (19) Platz und Rhythmus (S2, 2026-10-24): jede Sektion der Startseite
+ *            und der Installationsseite liest ihren senkrechten Abstand aus der
+ *            fliessenden Skala --sec-s/-m/-l in site.css statt eigener Pixel
+ *            (vorher 88/96/100/110px fest, am Telefon 20,3 Bildschirme); der
+ *            Nach-oben-Knopf ist EIN Bauteil (site.css + site.js, kein
+ *            Seitenskript, keine Seitenregel), und am Telefon schwebt neben der
+ *            Install-Pille keine zweite Pille.
+ *
  * Ausführen: node --test test/test-docs-landing.js   (bzw. npm run test:docs-landing)
  */
 
@@ -570,10 +578,14 @@ test('jede genannte OpenAPI-Version ist die, die der Server ausliefert', () => {
  * Spiegel, Immich, Paperless/Papra und die Benachrichtigungskanaele weg - auf
  * der Seite, deren staerkstes Argument ist, dass nichts ungefragt nach aussen
  * geht. Die README ist hier die Quelle; die Seite muss jeden Eintrag nennen.
+ *
+ * Seit der Re-Critique vom 2026-10-24 ist die README-Zeile eine Unterliste
+ * (nutzen / Betreiber schaltet ein / einschalten) statt eines Satzes mit 125
+ * Woertern; die zuschaltbaren Verbindungen stehen im letzten Unterpunkt.
  */
 const OUTBOUND = {
-  en: { readme: 'README.md', bullet: /^- \*\*Outbound\*\* - (.+)$/m, list: /, and ((?:(?!, and ).)+?) connect once you switch them on/, base: 'one update check against the GitHub releases API' },
-  de: { readme: 'README.de.md', bullet: /^- \*\*Nach außen\*\* - (.+)$/m, list: /, und ((?:(?!, und ).)+?) verbinden sich erst/, base: 'eine Update-Abfrage an die GitHub-Releases-API' },
+  en: { readme: 'README.md', bullet: /^- \*\*Outbound\*\* - (.+(?:\n {2}- .+)*)/m, list: /^ {2}- \*\*Once you switch them on\*\* - (.+?)\.?$/m, base: 'one update check against the GitHub releases API' },
+  de: { readme: 'README.de.md', bullet: /^- \*\*Nach außen\*\* - (.+(?:\n {2}- .+)*)/m, list: /^ {2}- \*\*Sobald ihr sie einschaltet\*\* - (.+?)\.?$/m, base: 'eine Update-Abfrage an die GitHub-Releases-API' },
 };
 
 function outboundItems(lang, md) {
@@ -634,18 +646,26 @@ function localeDirs() {
 }
 
 test('jede referenzierte Aufnahme hat beide WebP-Ableitungen in allen Sprachordnern', () => {
-  const bases = new Set();
+  // Desktopaufnahmen im grossen Slot (`data-shot-profile="lead"` am <img>,
+  // Profil `web-lead` in scripts/build-screenshot-webp.mjs) brauchen dazu die
+  // dritte Stufe @2400.webp (S10) - gelesen je <img>, wie das Build-Skript.
+  const bases = new Map();
   for (const page of PAGES) {
-    for (const m of read(page).matchAll(/(?:src|data-light|data-dark|data-light-m|data-dark-m)="screenshots\/([^"]+\.png)"/g)) {
-      bases.add(m[1]);
+    for (const tag of read(page).matchAll(/<img\b[^>]*>/g)) {
+      const lead = /data-shot-profile="lead"/.test(tag[0]);
+      for (const m of tag[0].matchAll(/(?:src|data-light|data-dark|data-light-m|data-dark-m)="screenshots\/([^"]+\.png)"/g)) {
+        const webLead = lead && !/-mobile\.png$/.test(m[1]);
+        bases.set(m[1], bases.get(m[1]) || webLead);
+      }
     }
   }
   assert.ok(bases.size > 0, 'keine referenzierten Screenshots gefunden - Regex veraltet?');
+  assert.ok([...bases.values()].some(Boolean), 'keine Desktopaufnahme im grossen Slot gefunden - Profil veraltet?');
 
   const missing = [];
-  for (const base of bases) {
+  for (const [base, webLead] of bases) {
     for (const dir of localeDirs()) {
-      for (const suffix of ['.webp', '@1x.webp']) {
+      for (const suffix of webLead ? ['.webp', '@1x.webp', '@2400.webp'] : ['.webp', '@1x.webp']) {
         const rel = (dir ? `${dir}/` : '') + base.replace(/\.png$/, suffix);
         if (!existsSync(resolve(SHOTS, rel))) missing.push(`screenshots/${rel}`);
       }
@@ -1466,12 +1486,18 @@ test('install.html: Schritt 2 und die Neustart-Hilfe nennen den Platzhalter, an 
   }
 });
 
+// Die Startseite traegt seit S4 (2026-10-24) keinen Schnellstart mehr - der
+// Docker-Weg stand dort Befehl fuer Befehl ein zweites Mal. Die Mindestzahl gilt
+// deshalb nur noch install.html (dort haelt sie den Extraktor ehrlich); die
+// Startseite wird weiter geprueft, falls sie je wieder eine Datei laedt.
+const MIN_DOWNLOADS = { 'index.html': 0, [INSTALL]: 2 };
+
 test('docs: jede heruntergeladene Datei und jede Compose-Datei existiert im Repository', () => {
   for (const page of ['index.html', INSTALL]) {
     const html = read(page);
     const fetched = [...html.matchAll(/raw\.githubusercontent\.com\/ulsklyc\/yuvomi\/main\/([\w./-]+)/g)].map((m) => m[1]);
     const composed = [...html.matchAll(/compose -f ([\w./-]+\.ya?ml)/g)].map((m) => m[1]);
-    assert.ok(fetched.length >= 2, `${page}: keine Download-URL gefunden - Muster veraltet?`);
+    assert.ok(fetched.length >= MIN_DOWNLOADS[page], `${page}: keine Download-URL gefunden - Muster veraltet?`);
     const missing = [...new Set([...fetched, ...composed])].filter((f) => !existsSync(resolve(ROOT, f)));
     assert.deepEqual(missing, [], `${page} verweist auf Dateien, die es im Repository nicht gibt`);
   }
@@ -1552,6 +1578,43 @@ test('die Installationsseiten-Guards erkennen den Schaden, gegen den sie gebaut 
   const anchors = markdownAnchors('### Option G \u2014 Portainer (Stack or Git/GitOps)\n## Backup & Restore\n');
   assert.ok(anchors.has('option-g--portainer-stack-or-gitgitops') && anchors.has('backup--restore'));
   assert.deepEqual(brokenGuideAnchors('installation.md#option-g-portainer', anchors), ['option-g-portainer']);
+});
+
+/**
+ * Die Wahl zuerst (S8, Re-Critique 24.10.). Die Plattformwahl ist der Zweck
+ * der Seite, und sie begann bei 1440x900 erst bei y=1426 und am Telefon nach
+ * anderthalb Bildschirmen: zwischen Hero und `#install` stand eine eigene
+ * Sektion mit drei Voraussetzungs-Karten. Jetzt folgt `#install` direkt auf
+ * den Hero, die Tab-Leiste steht vor den Voraussetzungen, und die
+ * Voraussetzungen sind eine Zeile (<details>) unter den Tabs.
+ */
+function choiceFirstFindings(html) {
+  const body = stripComments(html.split('</head>')[1] || html).replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ');
+  const found = [];
+  const heroEnd = body.indexOf('</header>', body.indexOf('class="hero"'));
+  const install = body.indexOf('id="install"');
+  const tabs = body.indexOf('role="tablist"');
+  const needs = body.indexOf('data-t="prereq_title"');
+  if (heroEnd < 0 || install < 0 || tabs < 0 || needs < 0) return ['Hero, #install, Tab-Leiste oder Voraussetzungen nicht gefunden - Muster veraltet?'];
+  if (/<section\b/.test(body.slice(heroEnd, body.lastIndexOf('<', install)))) found.push('zwischen Hero und #install steht eine Sektion');
+  if (needs < tabs) found.push('die Voraussetzungen stehen vor der Tab-Leiste');
+  return found;
+}
+
+test('install.html: die Plattformwahl folgt direkt auf den Hero, vor den Voraussetzungen', () => {
+  assert.deepEqual(choiceFirstFindings(read(INSTALL)), []);
+});
+
+test('der Wahl-zuerst-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Der Stand vor S8, im Gerippe.
+  const alt = '<head></head><body><header class="hero"><h1>Install</h1></header>'
+    + '<section id="prerequisites"><h2 data-t="prereq_title">What you need</h2></section>'
+    + '<section class="alt" id="install"><div class="tab-bar" role="tablist"></div></section>';
+  assert.deepEqual(choiceFirstFindings(alt), ['zwischen Hero und #install steht eine Sektion', 'die Voraussetzungen stehen vor der Tab-Leiste']);
+  // Ein Kommentar oder Skript zaehlt nicht als Struktur.
+  const ok = '<head></head><body><header class="hero"></header><!-- <section> -->'
+    + '<section id="install"><div role="tablist"></div><details><summary data-t="prereq_title">x</summary></details></section>';
+  assert.deepEqual(choiceFirstFindings(ok), []);
 });
 
 // ── (9) Die Modulsektion ist gegliedert wie das Menue der App ────────────────
@@ -1658,6 +1721,47 @@ test('index.html: die Modulgruppen sind die Menuegruppen des Routers, in seiner 
   assert.deepEqual(navGroupProblems(read('index.html'), ROUTER()), []);
 });
 
+/**
+ * Der Modulkatalog startet als Inhaltsangabe (S7, Entscheidung Ulas
+ * 2026-10-24): zugeklappt nur Gruppenkoepfe mit Symbol und Namen je Modul,
+ * die vier Feature-Karten (Behauptung, Satz, Stichpunkte, Telefon) und alle
+ * Beschreibungen erst mit dem Knopf. Vorher blieben die Karten stehen, und
+ * die Sektion lief bei 1440px 2.595px. Die Regeln gelten nur am Bildschirm,
+ * damit der Ausdruck alles zeigt; ohne JS (kein html.js) steht ohnehin alles.
+ */
+const COLLAPSED = 'html.js .mod-groups:not(.expanded)';
+function showcaseCollapsedFindings(html) {
+  const found = [];
+  const body = stripComments(html);
+  const grid = (body.match(/<div class="([^"]*)" id="modGrid">/) || [])[1];
+  if (grid === undefined) return ['#modGrid nicht gefunden'];
+  if (/\bexpanded\b/.test(grid)) found.push('#modGrid startet aufgeklappt');
+  const btn = (body.match(/<button\b[^>]*\bid="modToggle"[^>]*>/) || [])[0] || '';
+  if (!/aria-expanded="false"/.test(btn) || !/aria-controls="modGrid"/.test(btn)) found.push('#modToggle ohne aria-expanded="false" / aria-controls="modGrid"');
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)]);
+  const hides = (part) => rules.some((r) => /display:\s*none/.test(r.body)
+    && r.at.some((a) => a.replace(/\s+/g, '') === '@mediascreen')
+    && r.selector.split(',').map((x) => x.trim()).includes(`${COLLAPSED} ${part}`));
+  for (const part of ['.feat-visual', '.feat-info > h4', '.feat-info > p', '.feat-list', '.mod-card p']) {
+    if (!hides(part)) found.push(`zugeklappt sichtbar: ${part} (keine Regel ${COLLAPSED} ${part} { display: none } unter @media screen)`);
+  }
+  return found;
+}
+
+test('index.html: der Modulkatalog startet zugeklappt als Inhaltsangabe', () => {
+  assert.deepEqual(showcaseCollapsedFindings(read('index.html')), []);
+});
+
+test('der Inhaltsangabe-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const open = html.replace('<div class="mod-groups" id="modGrid">', '<div class="mod-groups expanded" id="modGrid">');
+  assert.notEqual(open, html);
+  assert.deepEqual(showcaseCollapsedFindings(open), ['#modGrid startet aufgeklappt']);
+  const cards = html.replace(`      ${COLLAPSED} .feat-visual,\n`, '');
+  assert.notEqual(cards, html);
+  assert.ok(showcaseCollapsedFindings(cards).some((f) => /zugeklappt sichtbar: \.feat-visual/.test(f)));
+});
+
 test('index.html: die Gruppenkoepfe heissen wie im Menue der App', () => {
   const html = read('index.html');
   const LOCALE_KEY = { plan: 'sectionPlan', household: 'sectionHousehold', people: 'sectionPeople',
@@ -1753,6 +1857,20 @@ const FAMILY_CLAIMS = [
     says: { en: /child/, de: /Kind/ },
     holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
     where: "server/permissions.js FAMILY_ROLES ('child')",
+  },  // Der Weg der Eingeladenen (Re-Critique R3): die Karte unter den drei
+  // Szenen nennt die Gueltigkeit des Links. Aendert sich die Frist im Dienst,
+  // stimmt die Zahl auf der Seite nicht mehr.
+  {
+    key: 'fam_inv_1', what: 'der Einladungslink gilt sieben Tage',
+    says: { en: /seven days/, de: /sieben Tage/ },
+    holds: (s) => /INVITE_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(s.invites),
+    where: 'server/services/invites.js INVITE_TTL_MS',
+  },
+  {
+    key: 'fam_inv_2', what: 'ohne Passwort-Anmeldung fragt /join kein Passwort',
+    says: { en: /single sign-on/, de: /Single Sign-on/ },
+    holds: (s) => /password_required: isPasswordLoginEnabled\(getDb\(\)\)/.test(s.auth),
+    where: 'server/auth.js GET /invites/preview password_required',
   },
 ];
 
@@ -1763,6 +1881,8 @@ function familySources() {
     sw: src('public/sw.js'),
     permissions: src('server/permissions.js'),
     spec: read('SPEC.md'),
+    invites: src('server/services/invites.js'),
+    auth: src('server/auth.js'),
   };
 }
 
@@ -1803,6 +1923,8 @@ test('der Familien-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.match(brokenFamilyClaims(html, noShopping).join('\n'), /fam_2_d \(en\): die Einkaufsliste/);
   const readOnlyTablet = { ...real, display: real.display.replace(/method: 'PATCH'/, "method: 'GET'") };
   assert.match(brokenFamilyClaims(html, readOnlyTablet).join('\n'), /fam_1_d \(de\): das Tablet hakt/);
+  const shorterInvite = { ...real, invites: real.invites.replace('INVITE_TTL_MS = 7 *', 'INVITE_TTL_MS = 3 *') };
+  assert.match(brokenFamilyClaims(html, shorterInvite).join('\n'), /fam_inv_1 \(en\): der Einladungslink gilt sieben Tage/);
   // Die Seite verschweigt die Bedingung: Push ohne HTTPS-Hinweis.
   const quiet = html.replace(/ \(your server needs HTTPS for that\)/g, '').replace(/ \(dafür braucht euer Server HTTPS\)/g, '');
   assert.notEqual(quiet, html, 'Vorbedingung: der HTTPS-Hinweis steht in beiden Sprachen woertlich so');
@@ -1974,7 +2096,9 @@ test('der Farb-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
 /** Selektoren, die eine Seite in ihrem eigenen Style-Block neu anlegt, obwohl ein geteiltes Blatt sie fuehrt. */
 const SHARED_SELECTORS = ['.btn', '.btn-primary', '.btn-secondary', '.nav-btn', '.code-block', '.copy-btn', '.reveal', '.reveal.vis', ':focus-visible', '.skip-link',
   // Seit Runde 2 (R3): die eine Leiste aller fuenf Seiten.
-  '.topbar', '.bar-row', '.nav-logo', '.nav-logo svg', '.nav-controls'];
+  '.topbar', '.bar-row', '.nav-logo', '.nav-logo svg', '.nav-controls',
+  // Seit S2 (19): der eine Nach-oben-Knopf aller fuenf Seiten.
+  '.to-top', '.to-top.show'];
 
 function inlineStyles(html) {
   const body = stripComments(html.split(/<\/head>/)[0]);
@@ -2042,9 +2166,10 @@ test('der legal.css-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Der Anlass: ein Zwilling bekommt seinen Block zurueck.
   const back = { ...files, 'privacy.html': files['privacy.html'].replace('</head>', '<style>.toc { padding: 0; }</style>\n</head>') };
   assert.match(legalSheetFindings(back, legal).join('\n'), /privacy\.html: traegt wieder einen eigenen Style-Block/);
-  // Das Impressum kopiert eine geteilte Regel zurueck.
-  const dup = { ...files, 'impressum.html': files['impressum.html'].replace('</style>', 'h2 { font-size: 20px; }\n</style>') };
-  assert.match(legalSheetFindings(dup, legal).join('\n'), /impressum\.html: h2 \{ font-size: 20px \}/);
+  // Das Impressum kopiert eine geteilte Regel zurueck (der Wert ist der aus
+  // legal.css - seit S8 in rem statt px).
+  const dup = { ...files, 'impressum.html': files['impressum.html'].replace('</style>', 'h2 { font-size: 1.25rem; }\n</style>') };
+  assert.match(legalSheetFindings(dup, legal).join('\n'), /impressum\.html: h2 \{ font-size: 1\.25rem \}/);
   // Ein Rechtstext laedt das geteilte Blatt nicht mehr.
   const unlinked = { ...files, 'datenschutz.html': files['datenschutz.html'].replace('<link rel="stylesheet" href="assets/legal.css">', '') };
   assert.match(legalSheetFindings(unlinked, legal).join('\n'), /datenschutz\.html: laedt assets\/legal\.css nicht/);
@@ -2238,8 +2363,10 @@ function heroFindings(html) {
     const src = pngSize(resolve(DOCS, web));
     if (Math.abs(w / h - src.w / src.h) > 0.01) found.push(`heroShot ${w}x${h} passt nicht zur Desktopaufnahme ${src.w}x${src.h}`);
   }
-  const bp = (html.match(/id="heroShot">\s*<script>[\s\S]*?matchMedia\('\(max-width:(\d+)px\)'\)/) || [])[1];
-  if (!bp) found.push('Bildtausch-Schwelle im Inline-Skript nicht gefunden');
+  // Seit S7 waehlt das Kopfskript die Aufnahme (und startet sie als Preload);
+  // die Schwelle steht dort.
+  const bp = (heroHeadScript(html).match(/matchMedia\('\(max-width: ?(\d+)px\)'\)/) || [])[1];
+  if (!bp) found.push('Bildtausch-Schwelle im Kopfskript nicht gefunden');
   const rule = inlineStyles(html).flatMap((css) => [...eachRule(css)])
     .find((r) => r.selector === '.hero-frame img' && r.at.some((a) => a.replace(/\s+/g, '') === `@media(max-width:${bp}px)`));
   if (!rule || !/aspect-ratio:\s*var\(--ar-phone\)/.test(rule.body)) found.push(`kein .hero-frame img { aspect-ratio: var(--ar-phone) } unter max-width:${bp}px`);
@@ -2257,6 +2384,68 @@ function heroFindings(html) {
   }
   return found;
 }
+
+/** Das Kopfskript, das die Hero-Aufnahme waehlt (S7), oder ''. */
+function heroHeadScript(html) {
+  const head = html.slice(0, html.indexOf('</head>'));
+  return [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\b[^>]*>/gi)].map((m) => m[1]).find((js) => /YuvomiHero/.test(js)) || '';
+}
+
+/**
+ * Die Hero-Aufnahme in der Schaerfe ihres Rahmens (S7). Bis dahin schrieb das
+ * Inline-Skript Dichte-Deskriptoren ("@1x.webp 1x, .webp 2x"): ein Schirm mit
+ * DPR 1 nahm die 700px-Datei fuer den 1150px-Rahmen (gemessen 0,61 der
+ * noetigen Pixel), waehrend die Galerie laengst nach Breite waehlte. Jetzt:
+ * Breiten-Deskriptoren mit sizes, gewaehlt im Kopfskript und dort als Preload
+ * gestartet (das <img> steht rund 30 KB komprimiert hinter dem Anfang), und
+ * dieselben Werte am Bild - sonst waehlte applyShots() spaeter anders und
+ * holte eine zweite Datei. Die Pfade im Kopfskript muessen die des Bildes sein.
+ */
+function heroDeliveryFindings(html) {
+  const found = [];
+  const img = (html.match(/<img\b[^>]*\bid="heroShot"[^>]*>/) || [])[0] || '';
+  const inline = (html.match(/id="heroShot">\s*<script>([\s\S]*?)<\/script>/) || [])[1] || '';
+  const noscript = (html.match(/id="heroShot">\s*<script>[\s\S]*?<\/script>\s*<noscript>([\s\S]*?)<\/noscript>/) || [])[1] || '';
+  const head = heroHeadScript(html);
+  if (!head) return ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)'];
+  for (const [where, code] of [['Kopfskript', head], ['Inline-Skript am Bild', inline], ['noscript-Kopie', noscript]]) {
+    if (/\b[12]x\b['"]|\s[12]x,|\s[12]x"/.test(code)) found.push(`Hero: Dichte-Deskriptoren (1x/2x) im ${where}`);
+  }
+  if (!/\+ ?' ' ?\+ ?w\[0\] ?\+ ?'w, '/.test(head) || !/w\[1\] ?\+ ?'w'/.test(head)) found.push('Hero: das Kopfskript schreibt keine Breiten-Deskriptoren (…w)');
+  if (!/'@2400\.webp'\) ?\+ ?' ' ?\+ ?w\[2\] ?\+ ?'w'/.test(head)) found.push('Hero: das Kopfskript bietet die 2400er-Stufe nicht per Breiten-Deskriptor an');
+  if (!/rel = 'preload'/.test(head) || !/imagesrcset/.test(head) || !/imagesizes/.test(head)) found.push('Hero: kein Preload mit imagesrcset/imagesizes im Kopfskript');
+  if (!/i\.sizes ?= ?H\.sizes/.test(inline) || !/i\.srcset ?= ?H\.srcset/.test(inline)) found.push('Hero: das Inline-Skript uebernimmt srcset/sizes des Kopfskripts nicht');
+  const sizes = (head.match(/sizes: '([^']+)'/) || [])[1];
+  const dataSizes = (img.match(/\bdata-sizes="([^"]+)"/) || [])[1];
+  if (!sizes || sizes !== dataSizes) found.push(`Hero: sizes im Kopfskript (${sizes}) und data-sizes am Bild (${dataSizes}) weichen ab`);
+  const stem = (head.match(/base = '(screenshots\/[^']+-)' \+/) || [])[1];
+  for (const [attr, file] of [['data-light', 'light-web'], ['data-dark', 'dark-web'], ['data-light-m', 'light-mobile'], ['data-dark-m', 'dark-mobile']]) {
+    const v = (img.match(new RegExp(`\\b${attr}="([^"]+)"`)) || [])[1];
+    if (!stem || v !== `${stem}${file}.png`) found.push(`Hero: ${attr}="${v}" passt nicht zum Pfad im Kopfskript (${stem}${file}.png)`);
+  }
+  if (!/\bsrcset="[^"]*\b700w, [^"]*\b1400w, [^"]*@2400\.webp 2400w"/.test(noscript) || !/\bsizes="/.test(noscript)) found.push('Hero: noscript-Kopie ohne Breiten-srcset und sizes');
+  return found;
+}
+
+test('index.html: die Hero-Aufnahme waehlt nach Breite, frueh und genau einmal', () => {
+  assert.deepEqual(heroDeliveryFindings(read('index.html')), []);
+});
+
+test('der Hero-Schaerfe-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Der Stand vor S7: Dichte-Deskriptoren im Inline-Skript, kein Kopfskript.
+  const old = html.replace(/<script>\(function\(i,H\)[\s\S]*?<\/script>/, "<script>document.getElementById('heroShot')&&(function(i){var p='x.png';i.srcset=p.replace(/\\.png$/,'@1x.webp')+' 1x, '+p.replace(/\\.png$/,'.webp')+' 2x';})(document.getElementById('heroShot'));</script>");
+  assert.notEqual(old, html);
+  assert.ok(heroDeliveryFindings(old).some((f) => /Dichte-Deskriptoren \(1x\/2x\) im Inline-Skript/.test(f)));
+  assert.ok(heroDeliveryFindings(old).some((f) => /uebernimmt srcset\/sizes/.test(f)));
+  const noHead = html.replace(/window\.YuvomiHero = hero;/, '').replace(/YuvomiHero/g, 'Other');
+  assert.deepEqual(heroDeliveryFindings(noHead), ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)']);
+  const drift = html.replace('data-sizes="(max-width: 467px)', 'data-sizes="(max-width: 468px)');
+  assert.notEqual(drift, html);
+  assert.ok(heroDeliveryFindings(drift).some((f) => /weichen ab/.test(f)));
+  const renamed = html.replace('data-dark-m="screenshots/dashboard-dark-mobile.png"', 'data-dark-m="screenshots/home-dark-mobile.png"');
+  assert.ok(heroDeliveryFindings(renamed).some((f) => /data-dark-m=.*passt nicht/.test(f)));
+});
 
 test('index.html: das LCP-Bild hat Vorrang und reservierten Platz in beiden Formaten', () => {
   assert.deepEqual(heroFindings(read('index.html')), []);
@@ -2799,7 +2988,9 @@ test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () =
     .replace('pveam update&#10;', '').replace('pveam update\n', '')
     .replace(/docker-compose curl openssl/g, 'docker-compose-v2 curl openssl')
     .replace('"local:vztmpl/$TEMPLATE"', 'local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst')
-    .replace('<a href="#open">', '<a href="#docker">');
+    // Im Panel, nicht im Woerterbuch: das steht seit S8 VOR den Panels (fruehe
+    // Uebersetzung), und ein schlichtes replace traefe dort den ersten Treffer.
+    .replace(/(id="panel-proxmox"[\s\S]*?)<a href="#open">/, '$1<a href="#docker">');
   const px = proxmoxFindings(pxOld);
   for (const re of [/pveam update/, /docker-compose-v2/, /feste[rn]? Versionsnummer/, /Docker-Tab/]) assert.ok(hit(px, re), `Proxmox-Guard blind fuer ${re}: ${px.join(' | ')}`);
   // Ein Docker-Schritt, der im Proxmox-Panel fehlt, faellt auf.
@@ -3108,7 +3299,7 @@ function sharedBarFindings(pages, siteCss, legalCss) {
   const bar = rules.find((r) => r.selector === '.topbar' && !r.at.length);
   if (!bar) found.push('site.css: .topbar fehlt');
   else {
-    for (const [re, what] of [[/position:\s*fixed/, 'fest'], [/height:\s*var\(--bar-h\)/, 'Hoehe --bar-h'], [/background:\s*var\(--glass-bg\)/, 'Glasflaeche'], [/(?:^|[;\s])backdrop-filter:\s*var\(--glass-blur\)/, 'Glas-Blur']]) {
+    for (const [re, what] of [[/position:\s*fixed/, 'fest'], [/height:\s*var\(--bar-h\)/, 'Hoehe --bar-h'], [/background:\s*var\(--bar-glass-bg\)/, 'Glasflaeche'], [/(?:^|[;\s])backdrop-filter:\s*var\(--glass-blur\)/, 'Glas-Blur']]) {
       if (!re.test(bar.body)) found.push(`site.css: .topbar nicht ${what}`);
     }
   }
@@ -3162,6 +3353,8 @@ function glassFallbackFindings(siteCss, sheets) {
     if (!sels.includes(':root') || !sels.includes(':root:not([data-theme="light"])')) found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) schlaegt nicht beide Dark-Listen (Selektoren: ${r.selector})`);
     const d = Object.fromEntries(declarations(r.body));
     if (d['--glass-bg'] !== 'var(--surface)') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst --glass-bg durchscheinend (${d['--glass-bg']})`);
+    // Die Leiste liest seit S11 ihr eigenes, dichteres Glas (--bar-glass-bg).
+    if (d['--bar-glass-bg'] !== 'var(--surface)') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst --bar-glass-bg durchscheinend (${d['--bar-glass-bg']})`);
     if (d['--glass-blur'] !== 'none') found.push(`site.css: Fallback (${q.replace('\\s*', ' ')}) laesst den Blur an (${d['--glass-blur']})`);
   }
   for (const { where, css } of sheets) {
@@ -3185,11 +3378,15 @@ function platLiftFindings(html) {
   return found;
 }
 
-/** Der GitHub-Knopf verliert unter 600px seine Beschriftung nur sichtbar - mit display:none hiess er "★ 1.6k". */
-function ghNameFindings(html) {
-  return inlineStyles(html).flatMap((css) => [...eachRule(css)])
-    .filter((r) => /\.nav-gh span|#gh-stars-nav/.test(r.selector) && /display:\s*none/.test(r.body))
-    .map((r) => `${r.selector} nimmt dem GitHub-Link den Namen (display: none)`);
+/**
+ * Die Leistenknoepfe verlieren auf dem Telefon ihre Beschriftung nur sichtbar -
+ * mit display:none hiess der GitHub-Link "★ 1.6k". Seit der Rahmen-Runde
+ * stehen die Regeln in site.css (GitHub und Installieren).
+ */
+function ghNameFindings(cssList) {
+  return cssList.flatMap((css) => [...eachRule(css)])
+    .filter((r) => /\.nav-gh span|\.nav-gh-label|\.nav-install-label|\.nav-lang-label|#gh-stars-nav/.test(r.selector) && /display:\s*none/.test(r.body))
+    .map((r) => `${r.selector} nimmt dem Leistenknopf den Namen (display: none)`);
 }
 
 function siteSheets() {
@@ -3221,7 +3418,7 @@ test('site.css: das Glas hat die Fallbacks der App, und jeder Blur haengt am Sch
 
 test('index.html: die Plattformkarte hebt sich wie die App, der GitHub-Knopf behaelt seinen Namen', () => {
   const html = read('index.html');
-  assert.deepEqual([...platLiftFindings(html), ...ghNameFindings(html)], []);
+  assert.deepEqual([...platLiftFindings(html), ...ghNameFindings([read('assets/site.css'), ...inlineStyles(html)])], []);
 });
 
 test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () => {
@@ -3261,20 +3458,22 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.ok(hit(rowTrackFindings(badTracks), /nennt 2 Spuren/));
   // Leiste: die alte Kopfzeile der Rechtsseiten und ihre Regeln in legal.css.
   const pages = PAGES.map((p) => [p, read(p)]);
-  const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">').replace('class="nav-btn nav-back"', 'class="back-link"') : h]);
+  const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">') : h]);
   assert.ok(hit(sharedBarFindings(oldHead, read('assets/site.css'), read('assets/legal.css')), /privacy\.html: 0x <header class="site-bar">/));
-  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn" hreflang="en"', 'class="lang-link" hreflang="en"') : h]);
+  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn nav-lang" id="langBtn" hreflang="en"', 'class="lang-link" id="langBtn" hreflang="en"') : h]);
+  assert.notDeepEqual(oldBtn, pages, 'Vorbedingung: datenschutz.html traegt den Sprachlink als .nav-btn');
   assert.ok(hit(sharedBarFindings(oldBtn, read('assets/site.css'), read('assets/legal.css')), /datenschutz\.html: <a class="lang-link"> in der Leiste ist keine \.nav-btn/));
   const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
   const lf = sharedBarFindings(pages, read('assets/site.css'), legalOld);
   assert.ok(hit(lf, /eigene Kopfleiste zurueck/) && hit(lf, /legal\.css: \.nav-logo steht schon/), lf.join(' | '));
-  const opaque = read('assets/site.css').replace('  background: var(--glass-bg);\n  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);\n  border-bottom', '  background: var(--surface);\n  border-bottom');
+  const opaque = read('assets/site.css').replace('  background: var(--bar-glass-bg);\n  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);\n  border-bottom', '  background: var(--surface);\n  border-bottom');
   assert.notEqual(opaque, read('assets/site.css'));
   assert.ok(hit(sharedBarFindings(pages, opaque, read('assets/legal.css')), /nicht Glasflaeche/));
   // Der erste Entwurf dieser Runde: das Glas am <header> - die Pille sprang nach oben.
   const onHeader = read('assets/site.css') + '\n.site-bar { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }\n';
   assert.ok(hit(sharedBarFindings(pages, onHeader, read('assets/legal.css')), /Bezugsrahmen der fixierten Install-Pille/));
-  const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<div class="topbar">', '<div>') : h]);
+  const noTop = pages.map(([p, h]) => [p, p === 'impressum.html' ? h.replace('<nav class="topbar" ', '<nav ') : h]);
+  assert.notDeepEqual(noTop, pages, 'Vorbedingung: impressum.html traegt <nav class="topbar">');
   assert.ok(hit(sharedBarFindings(noTop, read('assets/site.css'), read('assets/legal.css')), /impressum\.html: Leiste ohne \.topbar/));
   // Zeilenkante: die Regel fehlt (Rechtsseiten zurueck auf 820px), oder die
   // Startseite wird breiter und --bar-maxw bleibt stehen.
@@ -3293,11 +3492,507 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.notEqual(weak, site);
   assert.ok(hit(glassFallbackFindings(weak, []), /schlaegt nicht beide Dark-Listen/));
   assert.ok(hit(glassFallbackFindings(site, [{ where: 'x', css: '.time-badge { backdrop-filter: blur(18px); }' }]), /liest --glass-blur nicht/));
+  // Die Leiste bleibt unter mehr Kontrast durchscheinend: ihr eigenes Glas fehlt im Fallback.
+  const barSeeThrough = site.replace(/(@media \(prefers-contrast: more\) \{[^}]*?)\n\s*--bar-glass-bg: var\(--surface\);/, '$1');
+  assert.notEqual(barSeeThrough, site);
+  assert.ok(hit(glassFallbackFindings(barSeeThrough, []), /prefers-contrast: more\) laesst --bar-glass-bg durchscheinend/));
   // Karte und GitHub-Name: der alte 4px-Hub und das alte display:none.
   const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
   assert.notEqual(lift, html);
   assert.ok(hit(platLiftFindings(lift), /hebt die Karte 4px/));
-  const nameless = html.replace('.nav-gh span:not(#gh-stars-nav) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '.nav-gh span:not(#gh-stars-nav) { display: none; }');
-  assert.notEqual(nameless, html);
-  assert.ok(hit(ghNameFindings(nameless), /nimmt dem GitHub-Link den Namen/));
+  const nameless = site.replace('  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '  .nav-gh-label { display: none; }');
+  assert.notEqual(nameless, site);
+  assert.ok(hit(ghNameFindings([nameless]), /nimmt dem Leistenknopf den Namen/));
+});
+
+// ── (18) Ein Seitenrahmen: dieselbe Kopf- und Fussleiste auf allen fuenf Seiten ──
+/**
+ * Anlass (Critique 2026-10-24): vier Kopfleisten-, drei Fusszeilen- und drei
+ * Sprachknopf-Varianten. "Install" fuehrte in der Leiste der Startseite zu zwei
+ * Zielen, der Theme-Knopf kam nach dem ersten Klick nie mehr auf "System"
+ * zurueck, und der zugaengliche Name des Sprachknopfs ("Auf Deutsch
+ * umschalten") begann nicht mit dem sichtbaren "DE" (SC 2.5.3).
+ *
+ * Verglichen wird das Geruest: Elemente, Klassen, IDs und Ziele - ohne Text,
+ * Namen und Sprachattribute (die Rechtsseiten sprechen je eine Sprache, index
+ * und install uebersetzen). Was eine Seite weglassen darf, steht hier:
+ * Sprungmenue, Fortschrittslinie und Install-Pille (nur die Startseite), der
+ * Sprachknopf (nur impressum.html - es gibt keine zweite Fassung). Die
+ * Metazeile der Fusszeile ist inhaltlich seitenweise (Version oder Copyright).
+ */
+const LANG_OPTIONAL = ['impressum.html'];
+
+function shellSkeleton(block) {
+  return block
+    .replace(/<div class="nav-progress"[\s\S]*?<\/div>\s*/, '')
+    .replace(/<details class="nav-jump"[\s\S]*?<\/details>\s*/, '')
+    .replace(/<a href="install\.html" class="mobile-cta"[\s\S]*?<\/a>\s*/, '')
+    .replace(/<(a|button)\b[^>]*\bid="langBtn"[\s\S]*?<\/\1>\s*/, '')
+    .replace(/<span class="foot-meta">[\s\S]*?<\/span>(?=\s*<span data-t="foot_madewith")/, '<span class="foot-meta"></span>')
+    .replace(/>[^<]*</g, '><')
+    .replace(/\s(?:aria-label|title|lang|hreflang|data-href-en|data-href-de|aria-current)="[^"]*"/g, '')
+    .replace(/href="#top"/g, 'href="index.html"')
+    .replace(/href="#/g, 'href="index.html#')
+    .replace(/datenschutz\.html/g, 'privacy.html')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function siteShellFindings(pages, siteCss, siteJs) {
+  const found = [];
+  const sk = {};
+  for (const [page, html] of pages) {
+    const masked = stripComments(html);
+    const head = masked.match(/<header class="site-bar">[\s\S]*?<\/header>/);
+    const foot = masked.match(/<footer class="site-foot">[\s\S]*?<\/footer>/g) || [];
+    if (!head) { found.push(`${page}: keine <header class="site-bar">`); continue; }
+    if (foot.length !== 1) { found.push(`${page}: ${foot.length}x <footer class="site-foot"> statt einmal`); continue; }
+    if (/<footer(?![^>]*class="site-foot")/.test(masked)) found.push(`${page}: eine zweite Fusszeile neben .site-foot`);
+    sk[page] = { head: shellSkeleton(head[0]), foot: shellSkeleton(foot[0]) };
+    // Sprachknopf: eine ID, eine Klasse, der Name beginnt mit dem Sichtbaren.
+    const lb = head[0].match(/<(a|button)\b([^>]*\bid="langBtn"[^>]*)>([\s\S]*?)<\/\1>/);
+    if (!lb) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne #langBtn`); }
+    else {
+      if (!/class="nav-btn nav-lang"/.test(lb[2])) found.push(`${page}: #langBtn ohne class="nav-btn nav-lang"`);
+      const vis = (lb[3].match(/<span class="nav-lang-label">([^<]*)<\/span>/) || [])[1];
+      const name = (lb[2].match(/aria-label="([^"]*)"/) || [])[1];
+      if (!vis) found.push(`${page}: #langBtn ohne .nav-lang-label`);
+      else if (name !== undefined && !name.startsWith(vis.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${vis.trim()}" (SC 2.5.3)`);
+      if (!/\blang="(?:de|en)"/.test(lb[2])) found.push(`${page}: #langBtn nennt seine Sprache nicht (lang)`);
+    }
+    // Ein Label, ein Ziel: "Install" der Leiste fuehrt nach install.html, und
+    // das Sprungmenue traegt keinen zweiten Install-Eintrag.
+    const inst = head[0].match(/<a href="([^"]*)" class="nav-btn nav-install"/);
+    if (!inst || inst[1] !== 'install.html') found.push(`${page}: der Install-Knopf der Leiste fuehrt nicht nach install.html`);
+    const jump = head[0].match(/<details class="nav-jump"[\s\S]*?<\/details>/);
+    if (jump && />\s*Install[^<]*</i.test(jump[0])) found.push(`${page}: das Sprungmenue nennt ein zweites "Install"-Ziel`);
+    // Das Theme gehoert site.js: keine Seite schreibt es selbst (dort fehlte "System").
+    // Mit defer (S7): am Ende des Body blockierte es den Parser vor dem
+    // Seitenskript. Das Theme haengt nicht daran, es setzt das Kopfskript.
+    if (!/<script src="assets\/site\.js"( defer)?><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js nicht`);
+    else if (!/<script src="assets\/site\.js" defer><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js ohne defer (blockiert den Parser)`);
+    if (/lsSet\('theme'|setItem\('yuvomi-theme'/.test(masked)) found.push(`${page}: schreibt das Theme selbst statt ueber assets/site.js`);
+    if (!/id="themeBtn"[^>]*data-mode="system"/.test(head[0])) found.push(`${page}: Theme-Knopf ohne data-mode="system"`);
+  }
+  const ref = sk['index.html'];
+  for (const [page] of pages) {
+    if (!sk[page] || !ref || page === 'index.html') continue;
+    if (sk[page].head !== ref.head) found.push(`${page}: Kopfleiste weicht vom Geruest der Startseite ab`);
+    if (sk[page].foot !== ref.foot) found.push(`${page}: Fusszeile weicht vom Geruest der Startseite ab`);
+  }
+  if (!/ORDER = \['system', 'light', 'dark'\]/.test(siteJs)) found.push('site.js: kein Zyklus System -> Hell -> Dunkel');
+  if (!/removeItem\(KEY\)/.test(siteJs)) found.push('site.js: "System" loescht den gespeicherten Wert nicht');
+  const vt = [...eachRule(siteCss)];
+  if (!/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*@view-transition\s*\{\s*navigation:\s*auto;/.test(siteCss)) found.push('site.css: @view-transition fehlt oder laeuft auch unter reduced motion');
+  if (!vt.some((r) => r.selector === '.topbar' && /view-transition-name:\s*site-bar/.test(r.body))) found.push('site.css: die Leiste hat keinen view-transition-name');
+  return found;
+}
+
+test('docs: ein Seitenrahmen - Kopf- und Fussleiste, Sprach- und Theme-Knopf gleich auf allen fuenf Seiten', () => {
+  assert.deepEqual(siteShellFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css'), js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
+  // install.html verliert den GitHub-Knopf: Geruest weicht ab.
+  const noGh = swap('install.html', /\s*<a href="https:\/\/github\.com\/ulsklyc\/yuvomi" class="nav-btn nav-gh"[\s\S]*?<\/a>/, '');
+  assert.notDeepEqual(noGh, pages);
+  assert.ok(hit(siteShellFindings(noGh, css, js), /install\.html: Kopfleiste weicht ab|install\.html: Kopfleiste weicht vom Geruest/));
+  // Die alte Fusszeile der Rechtsseiten.
+  const oldFoot = swap('privacy.html', '<footer class="site-foot">', '<footer class="bot">');
+  assert.ok(hit(siteShellFindings(oldFoot, css, js), /privacy\.html: 0x <footer class="site-foot">/));
+  // Der alte Sprachknopfname (2.5.3) und der fehlende Sprachknopf.
+  const oldName = swap('index.html', 'aria-label="DE - Auf Deutsch lesen"', 'aria-label="Auf Deutsch umschalten"');
+  assert.notDeepEqual(oldName, pages);
+  assert.ok(hit(siteShellFindings(oldName, css, js), /index\.html: Name "Auf Deutsch umschalten" beginnt nicht mit dem sichtbaren "DE"/));
+  const noLang = swap('privacy.html', /<a href="datenschutz\.html" class="nav-btn nav-lang"[\s\S]*?<\/a>\s*/, '');
+  assert.notDeepEqual(noLang, pages);
+  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne #langBtn/));
+  // Install mit zwei Zielen: der alte Sprungmenue-Eintrag.
+  const twoInstall = swap('index.html', 'data-t="jump_install">Where it runs<', 'data-t="jump_install">Install it<');
+  assert.notDeepEqual(twoInstall, pages);
+  assert.ok(hit(siteShellFindings(twoInstall, css, js), /zweites "Install"-Ziel/));
+  // Der alte Umschalter: eine Seite schreibt hell/dunkel selbst.
+  const oldToggle = swap('install.html', "lsSet('lang', lang); applyLang(); });", "lsSet('lang', lang); applyLang(); });\n    lsSet('theme', 'dark');");
+  assert.notDeepEqual(oldToggle, pages);
+  assert.ok(hit(siteShellFindings(oldToggle, css, js), /install\.html: schreibt das Theme selbst/));
+  // site.js ohne "System", site.css ohne Bremse unter reduced motion.
+  assert.ok(hit(siteShellFindings(pages, css, js.replace("ORDER = ['system', 'light', 'dark']", "ORDER = ['light', 'dark']")), /kein Zyklus/));
+  const always = css.replace('@media (prefers-reduced-motion: no-preference) {\n  @view-transition', '@media all {\n  @view-transition');
+  assert.notEqual(always, css);
+  assert.ok(hit(siteShellFindings(pages, always, js), /laeuft auch unter reduced motion/));
+});
+
+/* ============================================================================
+ * (19) Platz und Rhythmus (S2, 2026-10-24).
+ *
+ * Die Sektionen der Startseite standen auf festen Desktop-Werten (88, 96, 100,
+ * 110px, jede ein eigenes Literal), das Telefon behielt fast alles davon. Die
+ * Skala in site.css fliesst vom Telefon zum Schirm; eine Sektion, die wieder
+ * eigene Pixel schreibt, faellt hier auf. Nur `padding-bottom` darf unter einer
+ * Breitenabfrage ein Literal tragen (die Galerie endet am Telefon knapp, weil
+ * ihr Telefonbild schon Rand mitbringt).
+ *
+ * Der Nach-oben-Knopf lebte in drei Stylesheets und vier Inline-Skripten mit
+ * zwei Schwellen, und am Telefon schwebte er auf der Startseite als zweite
+ * Pille ueber der Install-Pille (zusammen 17 % des Bildschirms).
+ * ========================================================================== */
+const RHYTHM_SECTIONS = {
+  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.platforms', '.longevity', '.cta'],
+  'install.html': ['section'],
+};
+
+function rhythmFindings(pages, siteCss, siteJs) {
+  const found = [];
+  for (const step of ['--sec-s', '--sec-m', '--sec-l']) {
+    if (!new RegExp(`${step}:\\s*clamp\\(`).test(siteCss)) found.push(`site.css: ${step} fehlt oder fliesst nicht (clamp)`);
+  }
+  for (const [page, html] of pages) {
+    const want = RHYTHM_SECTIONS[page];
+    if (!want) continue;
+    const reads = new Set();
+    for (const css of inlineStyles(html)) {
+      for (const r of eachRule(css)) {
+        if (r.at.some((a) => /print/.test(a))) continue;
+        for (const sel of r.selector.split(',').map((x) => x.trim())) {
+          if (!want.includes(sel)) continue;
+          for (const [n, v] of declarations(r.body)) {
+            if (!/^padding(?:-top|-bottom|-block)?$/.test(n)) continue;
+            if (n === 'padding-bottom' && r.at.length) continue;
+            if (/var\(--sec-[slm]\)/.test(v)) { reads.add(sel); continue; }
+            if (/\d+px/.test(v)) found.push(`${page}: ${sel} { ${n}: ${v} } - eigene Pixel statt der Skala`);
+          }
+        }
+      }
+    }
+    for (const sel of want) if (!reads.has(sel)) found.push(`${page}: ${sel} liest keinen Sektionsabstand der Skala`);
+  }
+  // Der Nach-oben-Knopf: ein Bauteil.
+  for (const [page, html] of pages) {
+    const body = stripComments(html);
+    const links = body.match(/<a class="to-top"[^>]*id="toTop"/g) || [];
+    if (links.length !== 1) found.push(`${page}: ${links.length}x <a class="to-top" id="toTop">`);
+    // In einer Landmark (S11): nach </footer> stand er ausserhalb jeder, axe
+    // meldete "region" auf allen fuenf Seiten. Er wohnt in der Fusszeile;
+    // fixed haelt ihn trotzdem in der Ecke (die Fusszeile bildet keinen
+    // Containing Block: kein transform, filter oder contain).
+    const foot = (body.match(/<footer class="site-foot">[\s\S]*?<\/footer>/) || [''])[0];
+    if (links.length === 1 && !/<a class="to-top"[^>]*id="toTop"/.test(foot)) found.push(`${page}: der Nach-oben-Knopf steht ausserhalb der Fusszeile (keine Landmark, axe "region")`);
+    const scripts = (body.match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []).join('\n');
+    if (/toTop/.test(scripts)) found.push(`${page}: schaltet den Nach-oben-Knopf selbst (gehoert nach site.js)`);
+  }
+  if (!/getElementById\('toTop'\)/.test(siteJs)) found.push('site.js: schaltet den Nach-oben-Knopf nicht');
+  // Seit S10 verborgen per visibility statt display (er blendet und federt
+  // ein, und site.js misst seine Ecke) und nur, solange die Pille das Band
+  // haelt: am Seitenende (html.pill-end, index.html) uebernimmt er.
+  const phoneHide = [...eachRule(siteCss)].some((r) => r.at.some((a) => /max-width:\s*700px/.test(a))
+    && /\.mobile-cta\)\s*\.to-top/.test(r.selector) && /display:\s*none|visibility:\s*hidden/.test(r.body));
+  if (!phoneHide) found.push('site.css: am Telefon schwebt der Nach-oben-Knopf neben der Install-Pille (zwei Pillen)');
+  return found;
+}
+
+test('docs: Sektionsabstaende aus der Skala, ein Nach-oben-Knopf, am Telefon eine Pille', () => {
+  assert.deepEqual(rhythmFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
+  // Die alte Galerie mit festem Desktop-Wert.
+  const fixed = swap('index.html', '.gallery { padding: var(--sec-m) 0; }', '.gallery { padding: 88px 0; }');
+  assert.notDeepEqual(fixed, pages);
+  assert.ok(hit(rhythmFindings(fixed, css, js), /index\.html: \.gallery \{ padding: 88px 0 \} - eigene Pixel/));
+  // install.html mit der alten Telefon-Ueberschreibung.
+  const phone = swap('install.html', '@media (max-width: 760px) {', '@media (max-width: 760px) {\n      section { padding: 56px 0; }');
+  assert.notDeepEqual(phone, pages);
+  assert.ok(hit(rhythmFindings(phone, css, js), /install\.html: section \{ padding: 56px 0 \}/));
+  // Eine Stufe der Skala verliert ihr clamp().
+  const flat = css.replace(/--sec-m: clamp\([^;]*\);/, '--sec-m: 96px;');
+  assert.notEqual(flat, css);
+  assert.ok(hit(rhythmFindings(pages, flat, js), /--sec-m fehlt oder fliesst nicht/));
+  // Ein Seitenskript schaltet den Knopf wieder selbst.
+  const own = swap('privacy.html', '<script src="assets/site.js" defer></script>',
+    "<script>(function(){ var b = document.getElementById('toTop'); })();</script>\n<script src=\"assets/site.js\" defer></script>");
+  assert.notDeepEqual(own, pages);
+  assert.ok(hit(rhythmFindings(own, css, js), /privacy\.html: schaltet den Nach-oben-Knopf selbst/));
+  // Der Knopf rutscht wieder hinter </footer>, ausserhalb jeder Landmark.
+  const outside = swap('impressum.html', /(\s*<a class="to-top"[^\n]*<\/a>)\n<\/footer>/, '\n</footer>$1');
+  assert.notDeepEqual(outside, pages);
+  assert.ok(hit(rhythmFindings(outside, css, js), /impressum\.html: der Nach-oben-Knopf steht ausserhalb der Fusszeile/));
+  // Zwei Pillen am Telefon.
+  const two = css.replace(/html:not\(\.pill-end\) body:has\(\.mobile-cta\) \.to-top \{[^}]*\}/, '');
+  assert.notEqual(two, css);
+  assert.ok(hit(rhythmFindings(pages, two, js), /zwei Pillen/));
+  // Eine Seite legt den Knopf wieder selbst an.
+  const copy = swap('install.html', '</style>', '.to-top { position: fixed; right: 16px; }\n</style>');
+  assert.deepEqual(sharedRuleCopies(copy), ['install.html: .to-top']);
+});
+
+// ── (20) Ankuenfte: nie im ersten Bildschirm, nie unter reduzierter Bewegung ──
+//
+// Bis S3 (Website-Kette 24.10.) startete JEDER .reveal-Kandidat bei opacity 0
+// und wartete auf den Observer seiner Seite - auch der Kopf der
+// Installationsanleitung im ersten Bildschirm. Dessen Absatz war das
+// LCP-Element und malte 600-750ms nach dem ersten Bild (gemessen 728ms
+// Desktop, 2.032ms am Telefon bei 4x CPU + Fast 4G). Seitdem gilt: `.reveal`
+// ist nur ein Kandidat und sichtbar; versteckt wird allein `.rv`, und das
+// setzt assets/site.js nur unterhalb des ersten Bildschirms und nie unter
+// reduzierter Bewegung. Jede versteckende oder scroll-gebundene Regel steht
+// in `prefers-reduced-motion: no-preference`.
+const MOTION_PROPS = /^(opacity|translate|scale|transform|animation|animation-name|animation-timeline)$/;
+
+function motionFindings(pages, siteCss, siteJs) {
+  const found = [];
+  const sheets = [['assets/site.css', siteCss], ...pages.flatMap(([p, h]) => inlineStyles(h).map((css) => [p, css]))];
+  for (const [where, css] of sheets) {
+    for (const r of eachRule(css)) {
+      if (r.selector.startsWith('@') || r.at.some((a) => /\bprint\b/.test(a))) continue;
+      const moving = declarations(r.body).filter(([n, v]) => MOTION_PROPS.test(n) && !/^(none|1|auto)(\s*!important)?$/.test(v));
+      const gated = r.at.some((a) => /prefers-reduced-motion:\s*no-preference/.test(a));
+      const sels = r.selector.split(',').map((s) => s.trim());
+      if (sels.some((s) => /\.reveal\b/.test(s)) && moving.some(([n, v]) => n !== 'opacity' || /^0(\.0*)?$/.test(v))) {
+        found.push(`${where}: ${r.selector} bewegt oder versteckt jeden Kandidaten (.reveal), auch im ersten Bildschirm`);
+      }
+      if (!gated && sels.some((s) => /\.rv\b/.test(s)) && moving.length) {
+        found.push(`${where}: ${r.selector} bewegt eine Ankunft (.rv) ausserhalb von prefers-reduced-motion: no-preference`);
+      }
+      if (!gated && moving.some(([n]) => n === 'animation-timeline')) {
+        found.push(`${where}: ${r.selector} bindet eine Animation an den Scroll ausserhalb von prefers-reduced-motion: no-preference`);
+      }
+      // S6: eine Ankunft spielt einmal. An einer view()-Zeitleiste lief sie
+      // beim Hochscrollen rueckwaerts - was unten am Rand stand, blendete aus
+      // und blieb in Ruhe halb durchsichtig (gemessen: eine .ho-row bei 841px
+      // mit opacity 0, nachdem sie schon gelesen war).
+      if (sels.some((s) => /\.rv\b/.test(s)) && moving.some(([n]) => n === 'animation-timeline')) {
+        found.push(`${where}: ${r.selector} bindet eine Ankunft (.rv) an den Scroll - sie spielt beim Hochscrollen rueckwaerts`);
+      }
+    }
+  }
+  for (const [p, h] of pages) {
+    const scripts = (stripComments(h).match(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi) || []).join('\n');
+    if (/querySelectorAll\(\s*['"]\.reveal['"]\s*\)/.test(scripts)) found.push(`${p}: schaltet die Ankuenfte selbst statt assets/site.js`);
+  }
+  const arm = siteJs.indexOf("classList.add('rv')");
+  if (arm < 0) found.push('site.js: setzt keine Ankunft (.rv)');
+  else {
+    const before = siteJs.slice(0, arm);
+    if (!/prefers-reduced-motion: reduce\)'\)\.matches\) return;/.test(before.slice(before.lastIndexOf('ARRIVALS')))) found.push('site.js: schaltet Ankuenfte auch unter reduzierter Bewegung scharf');
+    if (!/top\s*>=\s*fold/.test(before) || !/fold\s*=\s*window\.innerHeight/.test(before)) found.push('site.js: schaltet Ankuenfte ohne Pruefung gegen den ersten Bildschirm scharf');
+  }
+  return found;
+}
+
+test('docs: keine Ankunft im ersten Bildschirm, reduzierte Bewegung schaltet alles ab', () => {
+  assert.deepEqual(motionFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css'), read('assets/site.js')), []);
+});
+
+test('der Ankunfts-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const js = read('assets/site.js');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  // Der alte Stand: jeder Kandidat startet unsichtbar, ganz oben im Blatt.
+  const old = css + '\n.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s, transform .6s; }\n';
+  assert.ok(hit(motionFindings(pages, old, js), /\.reveal bewegt oder versteckt jeden Kandidaten/));
+  // Eine Ankunft ohne die Bewegungsbremse.
+  const ungated = css + '\nhtml.js .rv:not(.vis) { opacity: 0; translate: 0 12px; }\n';
+  assert.ok(hit(motionFindings(pages, ungated, js), /bewegt eine Ankunft \(\.rv\) ausserhalb/));
+  // Ein Scroll-Effekt, der auch unter reduzierter Bewegung laeuft.
+  const sda = pages.map(([p, h]) => [p, p === 'index.html' ? h.replace('</style>', '.hero-frame { animation: x linear both; animation-timeline: view(); }\n</style>') : h]);
+  assert.ok(hit(motionFindings(sda, css, js), /index\.html: \.hero-frame bindet eine Animation an den Scroll/));
+  // Der S3-Stand: Ankunft an der view()-Zeitleiste, auch gebremst ein Befund.
+  const scrubbed = css + '\n@media (prefers-reduced-motion: no-preference) { html.js .rv { animation: rv-rise both; animation-timeline: view(); } }\n';
+  assert.ok(hit(motionFindings(pages, scrubbed, js), /bindet eine Ankunft \(\.rv\) an den Scroll/));
+  // Der alte Observer der Installationsseite.
+  const own = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('</body>', "<script>document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });</script>\n</body>") : h]);
+  assert.ok(hit(motionFindings(own, css, js), /install\.html: schaltet die Ankuenfte selbst/));
+  // site.js ohne Bremse und ohne Falz.
+  const always = js.replace("if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;", '');
+  assert.notEqual(always, js);
+  assert.ok(hit(motionFindings(pages, css, always), /auch unter reduzierter Bewegung/));
+  const everywhere = js.replace(/top\s*>=\s*fold/g, 'top >= -Infinity');
+  assert.notEqual(everywhere, js);
+  assert.ok(hit(motionFindings(pages, css, everywhere), /ohne Pruefung gegen den ersten Bildschirm/));
+});
+
+/* ============================================================================
+ * (21) Erster Bildschirm (S4, 2026-10-24).
+ *
+ * Die Signatur aus S3 (die Hero-Collage trennt sich beim Wegscrollen) hing an
+ * einer view-timeline am .hero-visual - und stand trotzdem still: .hero trug
+ * overflow:hidden, das macht ihn zum Scroll-Container, und view() bindet an
+ * den NAECHSTEN Scroll-Container. Der scrollt nie, die Animation blieb bei
+ * Fortschritt 0. Der Guard verlangt, dass jeder Vorfahr einer view-timeline,
+ * der etwas abschneidet, das mit `clip` tut. Dazu der Haushalt im ersten
+ * Bildschirm: die Zeile steht im Hero, nicht erst in der Familien-Sektion.
+ * ========================================================================== */
+const TIMELINE_ANCESTORS = { '.hero-visual': ['.hero'] };
+
+function firstScreenFindings(html) {
+  const found = [];
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)])
+    .filter((r) => !r.selector.startsWith('@') && !r.at.some((a) => /\bprint\b/.test(a)));
+  for (const [subject, ancestors] of Object.entries(TIMELINE_ANCESTORS)) {
+    if (!rules.some((r) => r.selector.split(',').map((s) => s.trim()).includes(subject)
+      && declarations(r.body).some(([n]) => n === 'view-timeline'))) continue;
+    for (const anc of ancestors) {
+      for (const r of rules.filter((x) => x.selector.split(',').map((s) => s.trim()).includes(anc))) {
+        const ov = declarations(r.body).filter(([n]) => /^overflow(-[xy])?$/.test(n)).map(([, v]) => v);
+        if (ov.length && ov[ov.length - 1] !== 'clip' && /hidden|auto|scroll/.test(ov[ov.length - 1])) {
+          found.push(`${anc} { overflow: ${ov[ov.length - 1]} } macht den Vorfahren von ${subject} zum Scroll-Container - die view-timeline steht still`);
+        }
+      }
+    }
+  }
+  const hero = html.match(/<header class="hero"[\s\S]*?<\/header>/)?.[0] || '';
+  if (!/data-t="hero_house"/.test(hero)) found.push('kein Haushaltssatz (hero_house) im Hero');
+  for (const lang of ['en', 'de']) {
+    const v = dictValue(dictBlock(html, lang), 'hero_house');
+    if (!v || !/invite|Einladung/i.test(v)) found.push(`hero_house (${lang}) nennt den Einladungslink nicht`);
+  }
+  return found;
+}
+
+test('index.html: die Hero-Signatur kann scrollen, und der Haushalt steht im ersten Bildschirm', () => {
+  assert.deepEqual(firstScreenFindings(read('index.html')), []);
+});
+
+test('der Erster-Bildschirm-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const s3 = html.replace('overflow: hidden; overflow: clip; }', 'overflow: hidden; }');
+  assert.notEqual(s3, html, 'Vorbedingung: .hero mit hidden/clip');
+  assert.deepEqual(firstScreenFindings(s3), ['.hero { overflow: hidden } macht den Vorfahren von .hero-visual zum Scroll-Container - die view-timeline steht still']);
+  const noHouse = html.replace(/<p class="hero-house">[\s\S]*?<\/p>/, '');
+  assert.notEqual(noHouse, html);
+  assert.deepEqual(firstScreenFindings(noHouse), ['kein Haushaltssatz (hero_house) im Hero']);
+});
+
+// ── (22) Sprachzahlen der Website = Locale-Dateien ──────────────────────────
+//
+// Die README prueft ihre Sprachzahl gegen public/locales/ (test:readme-
+// consistency), die Website nicht: mit zh-Hant (#2178) kam die 27. Sprache,
+// und die Proof-Leiste der Startseite sagte weiter 26, der Web-Installer auf
+// install.html ebenso (gemessen S6, 24.10.). Die App-Zahl ist die Zahl der
+// Dateien in public/locales/, die des Installers die in
+// tools/installer/locales/ (ohne den cli-Ordner).
+function languageCountFindings(index, install) {
+  const count = (dir) => readdirSync(resolve(ROOT, dir)).filter((f) => f.endsWith('.json')).length;
+  const app = count('public/locales');
+  const wizard = count('tools/installer/locales');
+  const found = [];
+  const proof = index.match(/<b>(\d+)<\/b> <span data-t="proof_langs">/);
+  if (!proof) found.push('index.html: Sprachzahl der Proof-Leiste nicht gefunden - Muster veraltet?');
+  else if (Number(proof[1]) !== app) found.push(`index.html: Proof-Leiste nennt ${proof[1]} Sprachen, public/locales/ hat ${app}`);
+  const claims = [...install.matchAll(/(\d+) (?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
+  if (claims.length < 3) found.push(`install.html: nur ${claims.length} Sprachangaben des Installers gefunden - Muster veraltet?`);
+  for (const c of claims) if (c !== wizard) found.push(`install.html: der Installer nennt ${c} Sprachen, tools/installer/locales/ hat ${wizard}`);
+  return found;
+}
+
+test('docs: die Sprachzahlen der Website sind die Zahl der Locale-Dateien', () => {
+  assert.deepEqual(languageCountFindings(read('index.html'), read(INSTALL)), []);
+});
+
+test('der Sprachzahl-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const index = read('index.html');
+  const stale = index.replace(/<b>\d+<\/b> <span data-t="proof_langs">/, '<b>26</b> <span data-t="proof_langs">');
+  assert.notEqual(stale, index);
+  assert.match(languageCountFindings(stale, read(INSTALL)).join(), /Proof-Leiste nennt 26 Sprachen/);
+  const install = read(INSTALL).replace(/\d+ Sprachen\b/, '3 Sprachen');
+  assert.match(languageCountFindings(index, install).join(), /der Installer nennt 3 Sprachen/);
+});
+
+// ── (23) Retina-Stufe der grossen Aufnahmen: nur nach Breite, nie fuer DPR 1 ──
+
+/**
+ * Slotbreite in CSS-Pixeln, die ein sizes-Attribut bei Viewportbreite `vw`
+ * ergibt, oder null, wenn ein Eintrag nicht auswertbar ist. Kennt genau die
+ * Formen der Seite: (max-width|min-width: Npx) [and ...], Npx, Nvw,
+ * calc(100vw - Npx).
+ */
+function slotWidth(sizes, vw) {
+  for (const raw of sizes.split(/,(?![^(]*\))/).map((x) => x.trim())) {
+    const m = raw.match(/^((?:\((?:max|min)-width:\s*\d+px\)\s*(?:and\s*)?)*)(.+)$/);
+    if (!m) return null;
+    const ok = [...m[1].matchAll(/\((max|min)-width:\s*(\d+)px\)/g)]
+      .every(([, kind, n]) => (kind === 'max' ? vw <= Number(n) : vw >= Number(n)));
+    if (!ok) continue;
+    const len = m[2].trim();
+    let v;
+    if ((v = len.match(/^(\d+(?:\.\d+)?)px$/))) return Number(v[1]);
+    if ((v = len.match(/^(\d+(?:\.\d+)?)vw$/))) return (vw * Number(v[1])) / 100;
+    if ((v = len.match(/^calc\(100vw - (\d+)px\)$/))) return vw - Number(v[1]);
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Die dritte Stufe (@2400.webp, S10) holt die Desktopaufnahme im grossen Slot
+ * fuer Retina-Schirme ab. Sie darf nur ueber einen Breiten-Deskriptor
+ * erreichbar sein, und kein Slot darf bei DPR 1 breiter werden als die
+ * 1400er-Stufe - sonst laedt ein normaler Bildschirm die doppelte Datei.
+ * Dazu muessen die Breiten der Seite (SHOT_W.webLead, Hero-Kopfskript) die
+ * des Build-Skripts sein: eine Abweichung laesst den Browser nach einer Datei
+ * waehlen, die eine andere Breite hat, als ihr Deskriptor behauptet.
+ */
+function retinaTierFindings(html, build) {
+  const found = [];
+  const b = build.match(/'web-lead':\s*\{\s*xl:\s*(\d+),\s*'2x':\s*(\d+),\s*'1x':\s*(\d+)\s*\}/);
+  if (!b) return ['build-screenshot-webp.mjs: Profil web-lead nicht gefunden - Muster veraltet?'];
+  const tiers = [b[3], b[2], b[1]].map(Number);
+  const page = (html.match(/webLead:\s*\[(\d+),\s*(\d+),\s*(\d+)\]/) || []).slice(1).map(Number);
+  if (page.join() !== tiers.join()) found.push(`SHOT_W.webLead (${page.join('/')}) weicht vom Build-Skript ab (${tiers.join('/')})`);
+  const head = (heroHeadScript(html).match(/w = n \? \[[^\]]*\] : \[(\d+),\s*(\d+),\s*(\d+)\]/) || []).slice(1).map(Number);
+  if (head.join() !== tiers.join()) found.push(`Hero-Kopfskript (${head.join('/')}) weicht vom Build-Skript ab (${tiers.join('/')})`);
+  // Code und Markup (Pfad oder String-Literal), keine Kommentare.
+  for (const m of html.matchAll(/(?<=['-]web|')@2400\.webp/g)) {
+    const after = html.slice(m.index, m.index + 40);
+    if (!/^@2400\.webp(?:'\) ?\+ ?' ' ?\+ ?w\[2\] ?\+ ?'w'| 2400w)/.test(after)) found.push(`@2400.webp ohne Breiten-Deskriptor: "${after}"`);
+  }
+  let leads = 0;
+  for (const tag of html.matchAll(/<img\b[^>]*>/g)) {
+    if (!/data-shot-profile="lead"/.test(tag[0]) || !/data-light="screenshots\/[^"]+-web\.png"/.test(tag[0])) continue;
+    leads++;
+    const sizes = (tag[0].match(/\bdata-sizes="([^"]+)"/) || [])[1];
+    const name = (tag[0].match(/data-light="screenshots\/([^"]+)"/) || [])[1];
+    if (!sizes) { found.push(`${name}: grosser Slot ohne data-sizes - der Browser nimmt 100vw an`); continue; }
+    let max = 0;
+    for (let vw = 320; vw <= 3840; vw++) {
+      const w = slotWidth(sizes, vw);
+      if (w === null) { found.push(`${name}: sizes nicht auswertbar ("${sizes}")`); max = -1; break; }
+      max = Math.max(max, w);
+    }
+    if (max > tiers[1]) found.push(`${name}: Slot bis ${Math.round(max)}px - bei DPR 1 laedt das die ${tiers[2]}er-Stufe statt ${tiers[1]}`);
+  }
+  if (!leads) found.push('keine Desktopaufnahme im grossen Slot gefunden - Muster veraltet?');
+  return found;
+}
+
+const BUILD_WEBP = () => readFileSync(resolve(ROOT, 'scripts/build-screenshot-webp.mjs'), 'utf8');
+
+test('index.html: die 2400er-Stufe erreicht nur Retina-Schirme, nach Breite gewaehlt', () => {
+  assert.deepEqual(retinaTierFindings(read('index.html'), BUILD_WEBP()), []);
+});
+
+test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  // Ohne sizes-Grenze (100vw) wuerde ein 1920er-Schirm bei DPR 1 die 2400er-Datei ziehen.
+  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw"', 'data-sizes="100vw"');
+  assert.notEqual(wide, html);
+  assert.match(retinaTierFindings(wide, BUILD_WEBP()).join(), /bei DPR 1 laedt das die 2400er-Stufe/);
+  // Dichte- statt Breiten-Deskriptor.
+  const dense = html.replace("'@2400.webp') + ' ' + w[2] + 'w'", "'@2400.webp') + ' 2x'");
+  assert.notEqual(dense, html);
+  assert.match(retinaTierFindings(dense, BUILD_WEBP()).join(), /@2400\.webp ohne Breiten-Deskriptor/);
+  // Breiten-Drift zwischen Build-Skript und Seite.
+  const drift = BUILD_WEBP().replace("xl: 2400", "xl: 2300");
+  assert.match(retinaTierFindings(html, drift).join(), /SHOT_W\.webLead .* weicht vom Build-Skript ab/);
+  assert.equal(slotWidth('(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, 1150px', 400), 350);
 });

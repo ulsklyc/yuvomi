@@ -282,6 +282,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time span and offers "Check in again" as a secondary button, so a second tap no longer starts a
   second visit by accident. In the API, the answers of dose bookings carry `stock_deducted`, and
   the undo routes are documented in the OpenAPI description.
+- **The five pages of yuvomi.cloud share one header and one footer.** The landing page, the
+  install guide and the three legal pages had four different top bars, three footers and three
+  kinds of language switch between them. Every page now carries the same bar - logo, language,
+  theme, GitHub and Install, in that order - and the same footer with its three link columns;
+  only the landing page adds its jump menu. The GitHub link in the bar is a quiet capsule like its
+  neighbours instead of the loudest element (it turned near-white in dark mode), and Install
+  stays the one filled button. Moving between the pages fades the content while the bar holds
+  still, in browsers that support it and only when reduced motion is off.
+- **yuvomi.cloud is shorter and calmer on a phone.** The space between sections now scales with
+  the screen: a phone gets a little over half of the desktop spacing instead of nearly all of it,
+  on every page. On the landing page the platform cards put the logo beside the name, and the
+  collapsed module catalogue keeps the feature bullets behind "Show descriptions" on a phone - the
+  page is about a tenth shorter there. Only one button floats at the bottom of a phone screen:
+  "Back to top" gives way to the Install button on the landing page and stays on the other pages,
+  and the footer keeps room for it, so it no longer covers the last line. In the install guide the
+  step number sits beside the step title instead of taking its own column, every command wraps
+  instead of some scrolling sideways, and the copy button no longer pushes the command down. The
+  legal pages read as one column: the note, the contents and the tables end where the text ends,
+  and the contents list lines up with the text below it.
+- **yuvomi.cloud shows its first screen at once and moves with more care.** Every block used to
+  slide up from below the same way, including the top of the install guide, whose title and
+  introduction painted well after the rest of the page - on a slow phone about a second later.
+  What is on screen when a page opens now stands there immediately; only what lies further down
+  arrives as you scroll. Headings and text fade in with a short rise, screenshots settle into
+  place, and cards in a row follow each other left to right. Where the browser supports it the
+  arrival follows the scroll position itself. On a wide screen the two devices of the opening
+  picture drift apart a little as you scroll past them. Buttons, tabs, copy buttons and the jump
+  menu answer a press the way the app does, the jump menu and the troubleshooting answers fold
+  open and closed instead of snapping, and the lower half of the landing page is laid out only
+  when it comes near. With reduced motion turned on, nothing moves and everything is visible.
+- **The first screen of yuvomi.cloud speaks to the whole household, and the page ends with it.**
+  The opening screenshot used to fill half the width, too small to read the app in it; it now
+  spans the full column below the headline, with the phone beside it, and the two drift apart as
+  you scroll past - that movement was announced above but stood still until now. Under the
+  Install button one plain line says how it installs (Docker or Podman, or one click on TrueNAS,
+  Umbrel and Unraid) instead of three unexplained tags, and the next line answers the question
+  the rest of the family asks: everyone gets their own login from an invite link and the app on
+  their phone. The family section comes right after "What it replaces", well before the module
+  hand-offs - on a phone about 1,400px earlier. The landing page no longer repeats the Docker
+  quick start from the install guide: the platform cards and the facts an admin checks first
+  (image, memory, volumes, data, outbound connections) stay, with one button into the guide, and
+  the page closes on the family call to action under the same three-circle mark as the opening
+  line. On a phone the page is about 570px shorter.
+- **The README reads on a phone and leads with the easiest install.** On a phone the opening
+  screenshot was the desktop view shrunk to 324px, too small to read; a phone now gets the phone
+  screenshot, in light or dark. The figures line (modules, languages, trackers, now also the one
+  SQLite file and 256 MB RAM) sits above the screenshot in normal size, and the badges show the
+  image, amd64 and arm64 and the licence in one violet. The module groups are the line you open
+  for one sentence per module instead of a second list above it. Install starts with the NAS app
+  stores, Docker comes before the Podman note, the outbound sentence at the top names the one
+  version check against GitHub, the design line speaks of a native-feeling app instead of design
+  jargon, and the coloured technology badges became one line under "Under the hood". The German
+  README follows, with its English link in the link row.
+- **The README gets to Install sooner on a phone and says plainly when Yuvomi reaches out.** The
+  phone screenshot at the top now takes about 60% of the width instead of filling it, about 300px
+  less to scroll; the desktop screenshot keeps its size. The kitchen-wall picture now has the
+  shopping list on a phone beside it, so the section titled "in every pocket" shows a phone on a
+  laptop too. The module groups name Notes & Contacts as one entry, as the table does, so twenty
+  modules are twenty names. The top line no longer says the version check is the only outside
+  call: it is the only one Yuvomi makes on its own, and the outbound details are now a short list
+  of what reaches out when you use a feature, when the operator turns it on and once you switch
+  it on. The same correction reaches the "What if this project stops?" answer on yuvomi.cloud.
+  The image name is one code span, and only the tour and install links in the top row are bold.
+- **yuvomi.cloud shows the app sooner and reads more evenly.** On a laptop screen the first
+  screen of the landing page now shows well over a third of the overview screenshot instead of a
+  thin strip at its bottom edge, with the household line and the Install button still above it.
+  The phone beside the screenshot moved off the Rewards card. Running text, labels and buttons on
+  the site use five type sizes instead of twenty. The four feature blocks in the module catalogue
+  open with the module's icon and name like every entry next to them, instead of a row of capital
+  letters above the heading. The meals screenshot no longer shows an empty lower third. In the
+  install guide the "~10 minutes" note no longer looks like a button, the extras and the
+  troubleshooting answers are lists instead of cards that held code and warnings inside, and the
+  ten extras fill their grid without empty places. Sections that fade in as you scroll do it once:
+  scrolling back up no longer fades out the text at the bottom of the screen.
+- **yuvomi.cloud is sharper, shorter and easier to move through with the keyboard.** The overview
+  screenshot at the top of the landing page is picked by the width it is shown at, so a laptop
+  screen gets the large file instead of one stretched to almost twice its size, and on a computer
+  the screenshot starts loading with the page instead of after most of it. The meal and calendar
+  screenshots on a phone are sharp at three times the pixel density. The module catalogue starts
+  as a list of every module with its icon and name, grouped as in the app, and "Show what each
+  module does" opens the four feature cards and all descriptions; the landing page is about one and
+  a half screens shorter on a laptop. "Why one app" uses the full width on a wide screen. The
+  Install button that floats on a phone stays away while the closing card with the same button is
+  on screen. The five platform links name their platform ("Docker guide" instead of "Guide"). The
+  skip link, the jump menu, "Back to top" and the other links within a page now move the keyboard
+  focus to where they lead instead of leaving it at the top of the page. The shared script no
+  longer holds up the pages while it loads.
+- **The install guide opens with the choice of platform.** The tabs for Docker, Proxmox, the web
+  installer, TrueNAS, Umbrel and the rest now follow the heading directly, on a laptop and on a
+  phone within the first screen; until now three cards with the requirements came first, and the
+  choice started a screen and a half down on a phone. The requirements are one line under the
+  tabs - "Docker or Podman, a terminal, 256 MB RAM" - that opens to the full text and the Docker
+  install links. The key decision stays in the steps, right before the first start. "Back to top"
+  steps aside while a copy button, a tab or another control lies under it, on all five pages.
+  The bar shows the page you are on: on the install guide its Install button is tinted instead
+  of filled. The legal pages use the site's type scale, and in their table of contents every
+  number and first line in a row stand at the same height.
+- **yuvomi.cloud is sharp on high-resolution screens, and the install guide reaches the first
+  command sooner.** The opening screenshot and the two large gallery shots come in a third, wider
+  size for screens with twice the pixel density, so on a Retina laptop they are no longer drawn
+  from a file at six tenths of the needed resolution; ordinary screens keep loading the smaller
+  file, and every shot is still fetched once. The install guide's heading is shorter and its
+  introduction one sentence, so on a laptop the first command now shows on the first screen
+  instead of a screen further down, and choosing a tab whose steps start below the edge of the
+  window scrolls them into view. On a phone, the floating Install button now also gives way to
+  the footer at the end of the landing page, where "Back to top" takes its place - one floating
+  button at a time. Opening the module catalogue puts a "Hide the details" button at its top as
+  well, so closing it no longer means scrolling two and a half screens to the bottom. Sections
+  further down the landing page stay laid out once they have been shown, which takes a stutter
+  out of scrolling back up on slower phones. Buttons spring back with the app's own curve when
+  released, and the floating buttons settle into place the same way; with reduced motion turned
+  on they simply appear.
+- **The README puts the kitchen wall back to full width on a phone and opens with what Yuvomi
+  does.** On a phone the wall-mode picture and the phone beside it had shrunk to about 200 and 70
+  pixels wide, too small to read; the wall picture now fills the column and the phone stands
+  centred below it, while on a laptop the two stay side by side. The opening paragraph says only
+  what Yuvomi does; the note on the one update check it makes on its own moved to "Before you
+  commit" as "Does it phone home?", with a pointer to the full list. The module list's hint is
+  now its first line in normal size instead of small grey text at the end, the guided setup names
+  the Node.js versions the installer accepts (22.14+ or 23.6+, it said 22+), and the install link
+  in the top row is plain "Install", since only the NAS route takes minutes.
+- **yuvomi.cloud tells an invited family member what to do.** The page spoke to whoever sets
+  Yuvomi up, and someone who only got a link found no word for them. Under the three family
+  scenes a small card now walks through it: open the invite link (it works for seven days), choose
+  a username if the invite leaves it open and your own password - none with single sign-on - then
+  sign in and put Yuvomi on the home screen from the app's Install offer or, on iPhone and iPad,
+  from the Share menu.
+- **The install guide shows its first command on a phone screen.** At 390 by 844 the first
+  command block started well below the screen. The heading, its sentence and the spacing between
+  the tabs, the requirements, the opening note and the Docker/Podman switch are tighter on a phone,
+  the opening note of each path drops its box there, and step titles and explanations are one size
+  smaller. Nothing is left out, the tabs keep their finger size, and on a computer the page is
+  unchanged.
+- **The "Open Yuvomi" card at the end of the install guide sits on the page like the other cards.**
+  It carried the wide shadow of a floating panel, a grey haze in light mode and a second ring
+  beside its border in dark mode, and now has the same shallow shadow as the rest.
+- **The README's install section fits on one screen of a laptop.** It was the longest part of the
+  page. It now shows the app stores as one line with links and the Docker way as the commands to
+  run, with the key warning between them; Podman, Proxmox, the guided setup and the encryption key
+  details fold away below, next to requirements and network, and the full guides are linked. The
+  module groups show the app's Kitchen (Meals, Recipes, Shopping, Pantry) under Household, a short
+  paragraph tells an invited family member how to join, and the language count and the RAM figure
+  each appear once.
 - **Contacts, birthdays and notes read more alike.** The category chips in Contacts stay in one
   row on a wide screen too and scroll sideways with a fade at the edge, also with the mouse wheel,
   instead of taking a second row. An opened note ends like an opened contact: a quiet Delete at
@@ -559,6 +702,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dates are the same or one is empty. The message now offers Undo, which takes back what was
   added to the pantry and brings the items back onto the list. The bar for checked items no
   longer stands over the dialog it opened, or over any other dialog.
+- **yuvomi.cloud names all 27 languages.** The landing page and the web installer section of the
+  install guide still said 26 after Traditional Chinese arrived. On the platform cards "Start here"
+  in German no longer covers the Docker and Podman logos, and the README's number row says
+  "256 MB RAM minimum" (German "ab 256 MB RAM"), which is the minimum the install guide names,
+  not what the app uses.
+- **The website's theme button returns to the system setting.** It used to switch between light
+  and dark only, so after one click the page never followed the system again. It now cycles
+  System, Light, Dark, names the current and the next mode, and keeps the choice on all five
+  pages. The install guide also applies a stored theme before it first paints instead of flashing
+  the system one.
+- **The German install guide no longer jumps while it loads.** It painted in English and switched
+  to German only after the last byte, so on a slow connection the bar and the first section
+  moved. German texts are now in place before the first paint, as on the landing page. The German
+  headline keeps its dash at the end of the first line on a phone instead of opening the second.
+- **One name, one target in the website's bar.** "Install" in the landing page's bar led to the
+  install guide, while the jump menu's "Install it" scrolled to the platform section; that entry is
+  now "Where it runs". The language switch's accessible name now starts with the letters it shows
+  ("DE - Auf Deutsch lesen"), so voice control finds it by what is on screen.
 - **"Transfer" no longer runs into the edge of the booking type switch on a phone.** The four
   booking types shared the width equally, so the longest word ran over its segment - in German
   "Umbuchung" touched the edge, in Italian, Spanish, Portuguese and Vietnamese it ran past it.
@@ -681,6 +842,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The remaining loan balance stays in its card on a tablet.** In the row of four loan figures a
   long amount such as 174,644.93 ran into the next card; with a long amount the four now stand two
   by two until there is room for all of them in one row.
+- **"Back to top" on yuvomi.cloud sits inside the page footer**, so screen readers that list a
+  page by its regions no longer find it outside all of them (axe "region", all five pages); it
+  floats in the same corner as before. The top bar's glass in light mode is a little denser:
+  over a dark command block it let the language button's label fall to 3.9:1 contrast, and now
+  keeps at least 4.8:1 whatever scrolls beneath it.
 
 ## [2.79.0] - 2026-10-22
 

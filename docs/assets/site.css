@@ -57,6 +57,23 @@
   --ff: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
   --ff-mono: ui-monospace, 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
 
+  /* Type scale for running text, labels and controls (S6). The page's own,
+     not the app's ramp: an editorial page reads at a larger body than a dense
+     app screen. Five steps where the pages had grown 20 distinct sizes
+     between 11 and 19px (0.94, 0.95, 0.96, 0.97, 0.98rem side by side), each
+     one a local guess. Display sizes (h1, section titles, feature headings)
+     stay fluid clamps in their pages; everything else picks a step here.
+       --fs-label  12px  uppercase labels, badges, chips
+       --fs-meta   13px  control captions, footer meta, the hero pill
+       --fs-small  14px  secondary text: card copy, lists, notes, bar buttons
+       --fs-body   16px  reading text and card titles
+       --fs-lead   18px  section intros, lead paragraphs, small headings */
+  --fs-label: 0.75rem;
+  --fs-meta: 0.8125rem;
+  --fs-small: 0.875rem;
+  --fs-body: 1rem;
+  --fs-lead: 1.125rem;
+
   /* Warm neutral surfaces, from the app's neutral ramp.
      The ladder runs surface > bg > bg-alt so a card stays visible on both
      grounds - the alternating section band is the app's own page background,
@@ -222,6 +239,13 @@
      section). */
   --glass-bg: rgba(250,250,252,0.62);
   --glass-border: rgba(255,255,255,0.65);
+  /* The top bar's own glass, a step denser than the app's in light mode
+     (S11): over a dark code plate or screenshot the 0.62 glass mixed to
+     #a9a9a9 behind the bar's --text-2 labels, 3.9:1 (axe color-contrast,
+     install.html at 390px). 0.74 keeps 4.8:1 even over pure black; over the
+     light page it looks the same. The dark glass already holds, so dark
+     mode and the opaque fallbacks below hand it --glass-bg. */
+  --bar-glass-bg: rgba(250,250,252,0.74);
   --glass-blur: blur(18px) saturate(180%);
 
   /* The top bar's height, one value for all five pages: the legal pages pad
@@ -233,9 +257,54 @@
      only the row lines up. test:docs-landing holds the two values equal. */
   --bar-maxw: 1200px;
 
-  /* One curve, one name. Exponential ease-out: nothing here is a glass
-     element, and overshoot on a hover reads as wobble. */
+  /* Section rhythm: the vertical padding of every page section, on all five
+     pages. Three steps, each fluid from a phone (390px) to a desktop column
+     (1280px) and capped there. Until S2 the landing page wrote its sections
+     as fixed desktop values - 88, 96, 100, 110px, each its own literal - and a
+     phone kept almost all of it: 20.3 screens of page at 390px, a fifth of it
+     empty bands. A phone now gets a little over half of the desktop value.
+     The slope is (desktop - phone) / 890px, the intercept what is left at
+     390px; change a pair, recompute both, then measure.
+       --sec-s  44 -> 80px   bands that sit inside a chapter (install.html,
+                             the module catalogue)
+       --sec-m  52 -> 96px   a chapter (the default)
+       --sec-l  60 -> 110px  the closing call to action */
+  --sec-s: clamp(44px, calc(28.2px + 4.045vw), 80px);
+  --sec-m: clamp(52px, calc(32.7px + 4.944vw), 96px);
+  --sec-l: clamp(60px, calc(38.1px + 5.618vw), 110px);
+
+  /* The band a floating control sits in at the bottom of the viewport: 16px
+     from the edge, a 44-53px pill (back to top; the install pill on a phone),
+     at least 15px of air above it. The footer reserves it below its last row,
+     so at the end of every page the meta line rests above the pill instead of
+     under it. */
+  --float-band: 84px;
+
+  /* Exponential ease-out for everything that fades, slides or hovers:
+     overshoot on a hover reads as wobble. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The app's spring (tokens.css, --ease-glass, with --duration-xl as in
+     --transition-glass), S10. Only for the capsules' transform: a pressed
+     .btn/.nav-btn/.to-top/install pill springs back with a small overshoot,
+     and the floating pills arrive with it. The press itself stays on
+     --dur-press/--ease-out, so the finger gets an immediate answer; the
+     spring is the release. Never on opacity or colour (an overshoot there is
+     clipped and reads as a flash), and gone under reduced motion. */
+  --ease-glass: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-spring: 300ms;       /* --duration-xl */
+
+  /* Motion steps, from the app's ladder (tokens.css, --duration-*): a press
+     answers in --duration-xs, a hover in --duration-sm, an arriving block in
+     a little more than --duration-2xl. The press scales are the app's two
+     (--press-scale-sm for capsules and small controls, -lg for wide buttons
+     and cards, where 0.95 reads as a lurch). --stagger is the gap between
+     siblings that arrive in one row; site.js caps the row at six. */
+  --dur-press: 120ms;        /* --duration-xs */
+  --dur-hover: 150ms;        /* --duration-sm */
+  --dur-reveal: 420ms;       /* --duration-2xl plus the tail of the curve */
+  --press-sm: 0.95;          /* --press-scale-sm */
+  --press-lg: 0.98;          /* --press-scale-lg */
+  --stagger: 50ms;
 }
 
 /* The explicit choice from the theme toggle. First of the two dark lists. */
@@ -296,6 +365,7 @@
 
   --glass-bg: rgba(43,40,37,0.66);
   --glass-border: rgba(255,255,255,0.12);
+  --bar-glass-bg: var(--glass-bg);
 }
 
 /* The system preference, for visitors who never touched the toggle - the
@@ -347,6 +417,7 @@
 
     --glass-bg: rgba(43,40,37,0.66);
     --glass-border: rgba(255,255,255,0.12);
+    --bar-glass-bg: var(--glass-bg);
   }
 }
 
@@ -361,6 +432,7 @@
 @media (prefers-reduced-transparency: reduce) {
   :root, :root:not([data-theme="light"]) {
     --glass-bg: var(--surface);
+    --bar-glass-bg: var(--surface);
     --glass-blur: none;
     --glass-border: var(--border);
   }
@@ -368,6 +440,7 @@
 @media (prefers-contrast: more) {
   :root, :root:not([data-theme="light"]) {
     --glass-bg: var(--surface);
+    --bar-glass-bg: var(--surface);
     --glass-blur: none;
     --glass-border: var(--text-1);
   }
@@ -381,15 +454,19 @@
    install guide to the privacy notice changed websites for one click.
    Markup: <header class="site-bar"> (the banner landmark, unstyled) holds
    .topbar (this rule), inside it .bar-row on the landing page's column
-   (--bar-maxw, whatever column class it carries); the controls on its right are .nav-btn capsules in a
-   .nav-controls group (index.html groups its larger set as .nav-right).
+   (--bar-maxw); the controls on its right are .nav-btn capsules in one
+   .nav-controls group, in the same order on every page: language, theme,
+   GitHub, Install. The markup is the same on all five pages
+   (test:docs-landing compares it); a page may only leave out the jump menu
+   and the progress line (index.html) and the language control (impressum.html,
+   which has no second language).
    The glass sits on .topbar, NOT on the header: backdrop-filter makes an
    element the containing block of its fixed descendants, and index.html's
    install pill is fixed to the thumb zone from inside that header - on the
    header it jumped to the top of the screen. */
 .topbar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: var(--bar-h);
-  background: var(--glass-bg);
+  background: var(--bar-glass-bg);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--border);
 }
@@ -405,7 +482,9 @@
   font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--text-1); text-decoration: none; }
 .nav-logo:hover { color: var(--text-1); text-decoration: none; }
 .nav-logo svg { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px var(--accent-glow)); }
-.nav-controls { display: flex; align-items: center; gap: 8px; }
+.nav-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
+/* The bar stays put while the page under it changes (view transitions below). */
+.topbar { view-transition-name: site-bar; }
 /* More contrast: the bar's lower edge in the text colour, as the app does
    with its glass edge. After the base rule, which sets the whole border. */
 @media (prefers-contrast: more) {
@@ -418,10 +497,19 @@
 
 /* Skip link: index and install put two dozen focusable nodes between the top
    of the page and the content, so keyboard users need a way past the nav. */
-.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none; }
-.skip-link:focus { left: 8px; top: 8px; padding: 12px 18px; display: inline-flex; align-items: center; min-height: 44px;
+/* The box (44px target) belongs to the link itself, not to :focus: it was
+   measured 26px high off screen (S7), and only the position should change. */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 200; text-decoration: none;
+  display: inline-flex; align-items: center; min-height: 44px; padding: 12px 18px;
   background: var(--surface); color: var(--text-1);
   border: 1px solid var(--border); border-radius: var(--r-full); box-shadow: var(--shadow-md); font-weight: 600; }
+.skip-link:focus { left: 8px; top: 8px; }
+/* A target focused by script (tabindex=-1: #main-content, a section reached
+   by an in-page link - site.js, "IN-PAGE TARGETS") carries the ring inside
+   its box, so the keyboard user sees where they landed without the outline
+   being clipped by the page edge. A mouse click shows none (:focus-visible). */
+[tabindex="-1"]:focus { outline: none; }
+[tabindex="-1"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 
 /* Buttons. ONE shape, as in the app (DESIGN.md "Die Eine-Buttonform-Regel"):
    the capsule, for every element that triggers an action and carries its own
@@ -433,12 +521,14 @@
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   min-height: 48px; padding: 14px 26px; border: 1.5px solid transparent; border-radius: var(--r-full);
-  font-family: var(--ff); font-size: 1rem; font-weight: 600; line-height: 1.4;
+  font-family: var(--ff); font-size: var(--fs-body); font-weight: 600; line-height: 1.4;
   white-space: nowrap; text-decoration: none; cursor: pointer;
-  transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s, transform .15s;
+  transition: background-color var(--dur-hover), border-color var(--dur-hover), box-shadow var(--dur-hover), color var(--dur-hover), transform var(--dur-spring) var(--ease-glass);
 }
 .btn:hover { text-decoration: none; }
-.btn:active { transform: scale(0.98); }
+/* Pressing in answers fast (the transition of the state being entered
+   applies); letting go runs the base rule's spring (--ease-glass). */
+.btn:active { transform: scale(var(--press-lg)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
 .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .btn-primary { background: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
 .btn-primary:hover { background: var(--accent-fill-hover); color: var(--accent-ink); box-shadow: var(--shadow-md); }
@@ -452,55 +542,234 @@
   min-height: 44px; min-width: 44px; /* WCAG touch target (both axes) */
   padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-full);
   background: none; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap;
-  font-family: var(--ff); font-size: 0.82rem; font-weight: 600;
-  transition: background-color .15s, color .15s, border-color .15s, transform .15s;
+  font-family: var(--ff); font-size: var(--fs-meta); font-weight: 600;
+  transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-spring) var(--ease-glass);
 }
 .nav-btn:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
-.nav-btn:active { transform: scale(0.95); }
+.nav-btn:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
 .nav-btn svg { width: 16px; height: 16px; }
+
+/* ===== The bar's controls ===============================================
+   Language: a button on the two translated pages, a link to the other
+   document on privacy/datenschutz - same id, class and look. The visible text
+   is the target language ("DE"/"EN"); the accessible name STARTS with that
+   text (SC 2.5.3: a voice user says what they see) and then spells it out in
+   the target language, which the control's lang attribute names.
+   Theme: one button cycling System -> Light -> Dark -> System; data-mode
+   picks the icon, the name says the current mode and the next one
+   (assets/site.js). Without JS both buttons do nothing, so they leave; the
+   language link keeps working. */
+html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
+.nav-theme svg { display: none; }
+.nav-theme[data-mode="system"] .ico-system,
+.nav-theme[data-mode="light"] .ico-light,
+.nav-theme[data-mode="dark"] .ico-dark { display: block; }
+/* GitHub is a way out, not the goal: the same quiet capsule as language and
+   theme. It used to be a solid text-colour pill, the loudest thing in the
+   bar - inverted to near-white in dark mode. */
+.nav-gh { position: relative; }
+/* Install is the bar's one primary: the flat accent surface of .btn-primary
+   at bar size, no glow. */
+.nav-install { background: var(--accent-fill); color: var(--accent-ink); border-color: transparent; }
+.nav-install:hover { background: var(--accent-fill-hover); color: var(--accent-ink); border-color: transparent; }
+/* The page you are on (S8). install.html marked its own Install button with
+   aria-current="page", and it looked exactly like the call to action on
+   every other page - a primary that leads nowhere. The current page wears
+   the tint instead of the fill: still the voice, no longer the push. Any
+   bar control may carry the mark. */
+.nav-btn[aria-current="page"], .nav-btn[aria-current="page"]:hover {
+  background: var(--accent-soft); color: var(--accent-on-soft); border-color: transparent; box-shadow: none; }
+/* Phones. Each step takes away only what is seen, never a name: the hidden
+   labels stay in the accessibility tree (clip, not display: none). */
+@media (max-width: 700px) {
+  .nav-gh { padding: 0; }
+  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
+  .nav-lang svg { display: none; }
+}
+@media (max-width: 380px) {
+  .nav-controls { gap: 6px; }
+  .nav-install { padding: 0; }
+  .nav-install-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* ===== Footer ==============================================================
+   ONE footer for all five pages: brand and line, three link columns, and a
+   bottom row with the meta line (version and date on index and install, the
+   copyright on the legal pages) and the three words. Until this round there
+   were three: a column grid (index), a centred link row (install) and a
+   one-line strip (legal pages). */
+/* Bottom padding: the floating band (see --float-band). Back to top (and on a
+   phone the landing page's install pill) floats there; with 48px the pill
+   covered the meta line on every page once scrolled to the end. */
+.site-foot { border-top: 1px solid var(--border); padding: 56px 0 calc(var(--float-band) + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+.site-foot .foot-in { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
+.foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.foot-brand { max-width: 320px; }
+.foot-brand .nav-logo { margin-bottom: 14px; }
+.foot-brand p { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; margin: 0; }
+.foot-cols { display: flex; gap: 56px; flex-wrap: wrap; }
+.foot-col h2 { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 14px; }
+.foot-col a { display: flex; align-items: center; min-height: 44px; font-size: var(--fs-small); color: var(--text-2); text-decoration: none; transition: color .15s; }
+.foot-col a:hover { color: var(--accent); }
+.foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-size: var(--fs-meta); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.foot-bottom b { color: var(--text-2); font-weight: 600; }
+@media (max-width: 560px) {
+  .site-foot { padding-top: 44px; }
+  .foot-cols { gap: 28px 40px; }
+}
+
+/* ===== Page changes =======================================================
+   Crossing between the five pages is a cross-document view transition: the
+   bar (view-transition-name above) holds still, the page under it fades.
+   Only when motion is welcome - under reduced motion the browser swaps
+   pages the old way. Browsers without it ignore the rule. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  /* The old page leaves faster than the new one arrives (S3): .16s out, .24s
+     in, on the one curve. Equal lengths read as a blink between two pages. */
+  ::view-transition-old(root) { animation-duration: .16s; animation-timing-function: var(--ease-out); }
+  ::view-transition-new(root) { animation-duration: .24s; animation-timing-function: var(--ease-out); }
+  ::view-transition-group(site-bar) { animation-duration: .24s; }
+}
 
 /* The code plate and its copy button, identical on both pages that draw one.
    The span classes are the page's own syntax colours: .cmd for the command a
    reader types, .val for a value, .comment for the aside. */
 .code-wrap, .code-block { --focus-ring: var(--code-accent); }
 .code-wrap { position: relative; }
+/* ONE rule for long lines, on every plate: they wrap. Until S2 the plates
+   scrolled sideways - except the download plates on install.html, which
+   wrapped, because a scrolling plate cut both URLs at 390px exactly where
+   docker-compose.yml and podman-compose.yml differ. Two behaviours for the
+   same element, and every scrolling plate needed a tab stop of its own
+   (axe: focus-order-semantics). Wrapping shows the whole command on every
+   width; the copy button carries the exact text, so a wrap never reaches
+   the clipboard. `break-word` breaks inside a token only when it cannot fit
+   whole. Where the browser can, a wrapped continuation hangs 2ch in, so it
+   does not read as the next command (Chrome cannot yet and wraps flush).
+   overflow-x stays as the net: a plate that still scrolls gets its tab stop
+   from the page script. */
 .code-block { background: var(--code-bg); color: var(--code-text); border-radius: var(--r-lg); padding: 20px 24px;
-  font-family: var(--ff-mono); font-size: 0.84rem; line-height: 1.85; overflow-x: auto; white-space: pre; tab-size: 2;
+  font-family: var(--ff-mono); font-size: var(--fs-small); line-height: 1.85; overflow-x: auto;
+  white-space: pre-wrap; overflow-wrap: break-word; tab-size: 2;
   box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.06); }
+@supports (text-indent: 2ch each-line hanging) {
+  .code-block { text-indent: 2ch each-line hanging; }
+}
 .code-block .cmd { color: var(--code-accent); font-weight: 600; }
 .code-block .val { color: var(--code-val); }
 .code-block .comment { color: var(--code-comment); }
-/* The button gets its own band at the top of the plate instead of a
-   padding-right gutter. `padding-right` only protects the first screenful:
-   the button is absolutely positioned, so any line longer than the plate
-   scrolls straight underneath it (on the German pages "Kopieren" hid 17% of
-   the readable width at 390px). Keyed on :has(), because some plates carry no
-   button and a blanket padding would open an empty band above them. */
-.code-wrap:has(> .copy-btn) .code-block { padding-top: 52px; }
+/* The copy button floats over the plate's top right corner, and the plate's
+   text flows AROUND it: an empty float of the button's size sits in the
+   first lines, so only those lines get shorter and the rest run the full
+   width. Before S2 the plate opened a 52px band above the first line for
+   the button instead - on a one-line plate that was half the plate. The
+   float's width follows the button (its label differs per language and
+   state): assets/site.js writes --copy-w on the wrapper; the fallback fits
+   the widest label in both languages. Keyed on :has(), because some plates
+   carry no button. 34px = the button's 10px offset plus 44px height, minus
+   the plate's 20px padding. */
+.code-wrap:has(> .copy-btn) .code-block::before { content: ''; float: right; width: calc(var(--copy-w, 7.2rem) - 14px); height: 34px; margin-left: 12px; }
 .copy-btn { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 44px; padding: 7px 13px; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-full);
   background: rgba(255,255,255,0.08); color: var(--code-text); cursor: pointer;
-  font-family: var(--ff); font-size: 0.75rem; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
+  font-family: var(--ff); font-size: var(--fs-label); font-weight: 600;
+  transition: background-color var(--dur-hover), color var(--dur-hover), border-color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
 .copy-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+.copy-btn:active { transform: scale(var(--press-sm)); }
 .copy-btn.copied { background: var(--code-ok); border-color: var(--code-ok); color: #fff; }
 .copy-btn.failed { background: var(--code-fail); border-color: var(--code-fail); color: #fff; }
 .copy-btn svg { width: 13px; height: 13px; }
 
-/* Reveal on scroll. Both pages add .vis when an element enters the viewport;
-   .d1-.d3 stagger siblings. Content must never ship hidden without JS (this
-   audience often disables it), under reduced motion, or on paper. */
-.reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
-.reveal.vis { opacity: 1; transform: none; }
-.d1 { transition-delay: .08s; } .d2 { transition-delay: .16s; } .d3 { transition-delay: .24s; }
-html:not(.js) .reveal { opacity: 1; transform: none; }
+/* ===== Back to top ========================================================
+   One control for all five pages, styled here and switched by
+   assets/site.js (it shows once the first screen has scrolled away). Each
+   page kept its own copy until S2 - three stylesheets, four inline scripts,
+   thresholds of 600 and 800px - and on a phone it sat on the footer's meta
+   line. The footer now reserves the band it floats in (--float-band).
+   On a phone the landing page already floats its install pill in the same
+   band, and two pills took 17% of the viewport: there, back to top leaves
+   (the jump menu and the progress line in the bar cover "where am I"). One
+   floating pill per screen. */
+html { scroll-padding-bottom: var(--float-band); }
+.to-top { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 89;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  background: var(--surface); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--r-full); box-shadow: var(--shadow-md); font-family: var(--ff); font-size: var(--fs-small); font-weight: 600; text-decoration: none;
+  opacity: 0; visibility: hidden; transform: translateY(8px);
+  transition: opacity .2s var(--ease-out), transform var(--dur-spring) var(--ease-glass), visibility .2s, border-color var(--dur-hover); }
+.to-top.show { opacity: 1; visibility: visible; transform: none; }
+/* Something to press lies under the pill (S8): a copy button, a tab, a
+   summary row. It steps aside until that control has scrolled past, rather
+   than covering it (assets/site.js, "BACK TO TOP"). Focus keeps it. */
+.to-top.show.yield:not(:focus-visible) { opacity: 0; visibility: hidden; transform: translateY(8px); }
+.to-top.show:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
+.to-top:hover { color: var(--text-1); border-color: var(--border-strong); text-decoration: none; }
+.to-top svg { width: 15px; height: 15px; }
+@media (max-width: 700px) {
+  /* index.html: hidden while the install pill holds the band - but at the
+     end of the page, where the pill yields to the closing card and the
+     footer (html.pill-end, index.html), back to top takes the band over.
+     One floating capsule at a time (S10).
+     Hidden by visibility rather than display, so it fades and springs in
+     like everywhere else and site.js can measure its corner. */
+  html:not(.pill-end) body:has(.mobile-cta) .to-top { opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(8px); }
+}
+/* Under reduced motion the controls keep their colour feedback and lose
+   only the travel and the press: no shrink, no slide. */
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; }
+  .to-top { transition: none; }
+  .btn:active, .nav-btn:active, .copy-btn:active, .to-top.show:active { transform: none; }
+}
+
+/* ===== Arrivals ==========================================================
+   `.reveal` in the markup is only a candidate. Until S3 every candidate
+   started at opacity 0 and slid up 22px over 600ms, everywhere the same - so
+   the install guide's first screen (its title and the paragraph under it,
+   the page's LCP element) waited for the observer and painted 600-750ms
+   after the first paint. Now a candidate is visible by default, and
+   assets/site.js arms it (.rv) only when it starts BELOW the first screen
+   and motion is welcome. What the visitor sees on arrival is never held
+   back; without JS, under reduced motion and on paper nothing is armed.
+
+   Three kinds, chosen by what arrives (site.js sets the modifier):
+   - text and heads (.rv): a fade and 12px of travel, nothing else;
+   - pictures (.rv-media: the gallery shots, the family's wall screen): a
+     settle from 96.5% scale, as if the shot were set down on the page;
+   - a row of cards: each card as text, delayed by its column (--i, at most
+     five steps of --stagger), so a row arrives left to right and a second
+     row does not wait for the first.
+
+   The arrival plays ONCE: site.js's IntersectionObserver adds .vis and the
+   transition runs. Until S6 the browsers that have scroll-driven animations
+   bound it to the view timeline instead (the first 160px of the entry), and
+   a timeline runs both ways: scrolling back up, whatever sat in the bottom
+   160px of the screen faded out again and stayed half-transparent at rest -
+   text the reader had just read, dimming at the edge of the screen. Only
+   opacity, translate and scale move. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The transition sits on .vis only: on .rv itself, arming a candidate
+     (visible by default) would fade it OUT over 420ms, below the fold where
+     nobody sees it, but still work for the compositor. Hiding is instant,
+     arriving is animated. */
+  html.js .rv.vis {
+    transition: opacity var(--dur-reveal) var(--ease-out), translate var(--dur-reveal) var(--ease-out), scale var(--dur-reveal) var(--ease-out);
+    transition-delay: calc(var(--i, 0) * var(--stagger));
+  }
+  html.js .rv:not(.vis) { opacity: 0; translate: 0 12px; }
+  html.js .rv.rv-media { transform-origin: 50% 100%; }
+  html.js .rv.rv-media:not(.vis) { translate: none; scale: 0.965; }
 }
 @media print {
-  .skip-link, .copy-btn { display: none !important; }
+  .skip-link, .copy-btn, .to-top { display: none !important; }
+  .code-block::before { display: none; }
   /* Fixed elements repeat on every printed page. index and install drop the
      bar on paper; the legal pages keep their logo in the flow. */
   .topbar { position: static; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .topbar .nav-btn { display: none; }
-  .reveal { opacity: 1 !important; transform: none !important; }
+  .rv { opacity: 1 !important; translate: none !important; scale: none !important; animation: none !important; }
 }

@@ -202,7 +202,9 @@ function claimedModuleWord(md) {
 
 /** Die Ziffer aus der Kennzahlenzeile (`<b>18</b> modules` / `… Module`). */
 function claimedModuleDigit(md) {
-  const m = md.match(/<b>(\d+)<\/b>\s*(?:modules|Module)\b/);
+  // `&nbsp;` zaehlt als Leerraum: die Kennzahlenzeile haelt Zahl und Wort
+  // zusammen, sonst brach sie am Telefon zwischen "1" und "SQLite file" (S5, 2026-10-24).
+  const m = md.match(/<b>(\d+)<\/b>(?:\s|&nbsp;)*(?:modules|Module)\b/);
   return m ? Number(m[1]) : null;
 }
 
@@ -226,8 +228,13 @@ for (const lang of Object.keys(READMES)) {
     const md = readme(lang);
     const locales = readdirSync(resolve(ROOT, 'public/locales')).filter((f) => f.endsWith('.json')).length;
 
-    const claims = [...md.matchAll(/(\d+)\s*(?:<\/b>\s*)?(?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
-    assert.ok(claims.length >= 2, `nur ${claims.length} Sprachangaben gefunden - Muster veraltet?`);
+    // Seit der Re-Critique R3 (2026-10-24) nennt jede README die Zahl genau
+    // einmal, in der Kennzahlenzeile; vorher stand sie dreimal da und las sich
+    // als Fuellung. Die Mindestzahl war nur die Wache gegen ein veraltetes
+    // Muster und verlangte zwei Nennungen - sie haette die Wiederholung
+    // erzwungen. Die Wache bleibt: keine Nennung heisst Muster veraltet.
+    const claims = [...md.matchAll(/(\d+)\s*(?:<\/b>(?:\s|&nbsp;)*)?(?:languages|Sprachen)\b/g)].map((m) => Number(m[1]));
+    assert.ok(claims.length >= 1, `keine Sprachangabe gefunden - Muster veraltet?`);
 
     for (const claimed of claims) {
       assert.equal(claimed, locales,
@@ -274,18 +281,59 @@ test('jeder Modulname der Homepage steht in der README-Modultabelle', () => {
 
 /**
  * Seit der Critique vom 2026-09-30 steht die Modultabelle in einem <details>,
- * und sichtbar bleiben fuenf Gruppenzeilen in der Reihenfolge des App-Menues
- * (`- **Plan** - Tasks · Calendar · …`). Die Homepage (#modules) zeigt dieselben
+ * und sichtbar bleiben fuenf Gruppenzeilen in der Reihenfolge des App-Menues.
+ * Seit der README-Critique vom 2026-10-24 sind sie das <summary> genau dieses
+ * <details> (`<b>Plan</b> - Tasks · Calendar · …<br>`): vorher standen sie als
+ * eigene Liste ueber einer Klappe "Every module in one line", und die Module
+ * standen mit der Tauschtabelle dreimal auf der Seite. Eine Gruppenliste
+ * AUSSERHALB des <summary> zaehlt deshalb nicht mehr als Gruppenzeile - sie
+ * waere genau die Doppelung, die der Umbau entfernt hat. Die Homepage (#modules) zeigt dieselben
  * Gruppen, und `test-docs-landing.js` haelt sie gegen `public/router.js`. Hier:
  * README-Gruppen == Homepage-Gruppen (Name, Reihenfolge, Mitglieder), je
- * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle - eine
- * Zeile "A & B" darf als A und B in zwei Gruppen stehen (Notizen bei Planen,
- * Kontakte bei Menschen), aber nur beide zusammen.
+ * Sprache, und die Gruppenzeilen nennen genau die Module der Tabelle.
+ *
+ * Seit der Re-Critique vom 2026-10-24 nennen die Gruppenzeilen so viele Namen,
+ * wie die Tabelle Zeilen hat: vorher standen Notizen bei Planen und Kontakte bei
+ * Menschen, das <summary> zaehlte 21 Namen unter der Ueberschrift "twenty", und
+ * der Leser zaehlte nach. Eine Tabellenzeile "A & B" steht deshalb auch in den
+ * Gruppenzeilen als EIN Eintrag "A & B", an der Stelle von A; die Homepage darf
+ * A und B weiter in ihren zwei Menuegruppen zeigen, und fuer den Vergleich wird
+ * B dort aus seiner Gruppe genommen.
+ */
+/*
+ * Seit der Re-Critique R3 (2026-10-24) traegt die Haushaltszeile die
+ * Kuechen-Gruppe der App: `Kitchen (Meals · Recipes · Shopping · Pantry)`.
+ * Am Telefon und in der Seitenleiste stehen diese vier als EIN Eintrag
+ * "Kueche" (public/router.js `kitchenGroup`). Die Klammer ist eine
+ * Beschriftung, kein Modul: die Namen darin zaehlen wie jeder andere, die
+ * Unterlabel stehen in `subgroups` und werden unten gegen Router und Locale
+ * geprueft.
  */
 function readmeGroups(md) {
   const sec = md.split(/^## /m).find((s) => claimedModuleWord(`## ${s.split('\n')[0]}`)) || '';
-  return [...sec.matchAll(/^- \*\*(.+?)\*\* - (.+)$/gm)]
-    .map((m) => ({ label: m[1].trim(), names: m[2].split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()) }));
+  const summary = (sec.match(/<details>\s*<summary>([\s\S]*?)<\/summary>/) || [, ''])[1];
+  return [...summary.matchAll(/^<b>(.+?)<\/b> - (.+?)(?:<br>)?$/gm)].map((m) => {
+    const subgroups = [];
+    const flat = m[2].replace(/([^·()]+?) \(([^()]+)\)/g, (_, label, inner) => {
+      subgroups.push({ label: label.trim(), names: inner.split(' · ').map((n) => n.trim()) });
+      return inner;
+    });
+    return { label: m[1].trim(), names: flat.split(' · ').map((n) => n.replace(/&amp;/g, '&').trim()), subgroups };
+  });
+}
+
+/** Die Kuechen-Klammer der README gegen `kitchenGroup` im Router und `nav.kitchen` der Locale. */
+function kitchenFindings(md, lang, routerSrc, nav) {
+  const subs = readmeGroups(md).flatMap((g) => g.subgroups.map((sg) => ({ ...sg, group: g.label })));
+  const kitchen = [...routerSrc.matchAll(/module: '(\w+)',[^\n]*kitchenGroup: true/g)].map((x) => nav[x[1]]);
+  if (kitchen.length < 2) return ['public/router.js: keine kitchenGroup-Eintraege gefunden - Muster veraltet?'];
+  const found = [];
+  if (subs.length !== 1) found.push(`${subs.length} Unterklammern in den Gruppenzeilen, erwartet genau die Kueche`);
+  for (const sg of subs) {
+    if (sg.label !== nav.kitchen) found.push(`Unterklammer "${sg.label}" heisst in der App "${nav.kitchen}" (nav.kitchen, ${lang})`);
+    if (sg.names.join(' · ') !== kitchen.join(' · ')) found.push(`Kueche: README ${sg.names.join(' · ')} / App ${kitchen.join(' · ')}`);
+  }
+  return found;
 }
 
 function pageGroups(html, lang) {
@@ -307,7 +355,19 @@ function groupFindings(md, html, lang) {
   if (pageG.length < 4) return [`Homepage (${lang}): nur ${pageG.length} Modulgruppen gefunden - Muster veraltet?`];
   if (readmeG.length !== pageG.length) found.push(`${readmeG.length} Gruppenzeilen, die Homepage zeigt ${pageG.length} Gruppen`);
   const low = (list) => list.map((n) => n.toLowerCase()).join(' · ');
-  pageG.forEach((pg, i) => {
+  // Ein README-Eintrag "A & B" steht fuer die Homepage-Eintraege A und B: A wird
+  // zu "A & B", B faellt aus seiner Gruppe. Nur wenn die Homepage beide zeigt.
+  const pageCmp = pageG.map((g) => ({ label: g.label, names: [...g.names] }));
+  const where = (n) => pageCmp.findIndex((g) => g.names.some((x) => x.toLowerCase() === n.toLowerCase()));
+  for (const both of readmeG.flatMap((g) => g.names).filter((n) => n.includes(' & '))) {
+    const [a, b] = both.split(' & ');
+    const ia = where(a);
+    const ib = where(b);
+    if (ia < 0 || ib < 0) continue;
+    pageCmp[ia].names = pageCmp[ia].names.map((x) => (x.toLowerCase() === a.toLowerCase() ? both : x));
+    pageCmp[ib].names = pageCmp[ib].names.filter((x) => x.toLowerCase() !== b.toLowerCase());
+  }
+  pageCmp.forEach((pg, i) => {
     const rg = readmeG[i];
     if (!rg) return;
     if (rg.label !== pg.label) found.push(`Gruppe ${i + 1}: README "${rg.label}", Homepage "${pg.label}"`);
@@ -323,14 +383,36 @@ function groupFindings(md, html, lang) {
   }
   for (const n of inGroups) if (!used.has(n)) found.push(`Gruppenzeile nennt "${n}", die Tabelle nicht`);
   if (inGroups.length !== new Set(inGroups).size) found.push('ein Modul steht in zwei Gruppenzeilen');
+  const rows = moduleRows(md).length;
+  if (inGroups.length !== rows) found.push(`${inGroups.length} Namen in den Gruppenzeilen, die Tabelle hat ${rows} Zeilen`);
   return found;
 }
+
+const ROUTER_SRC = () => read('public/router.js');
+const NAV = (lang) => JSON.parse(read(`public/locales/${lang}.json`)).nav;
 
 for (const lang of Object.keys(READMES)) {
   test(`${READMES[lang]}: die Gruppenzeilen sind die Menuegruppen der Homepage und nennen jedes Modul der Tabelle`, () => {
     assert.deepEqual(groupFindings(readme(lang), read('docs/index.html'), lang), []);
   });
+  test(`${READMES[lang]}: die Kuechen-Klammer ist die Kuechen-Gruppe der App`, () => {
+    assert.deepEqual(kitchenFindings(readme(lang), lang, ROUTER_SRC(), NAV(lang)), []);
+  });
 }
+
+test('der Kuechen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const md = readme('en');
+  const hit = (list, re) => list.some((l) => re.test(l));
+  assert.ok(md.includes('Kitchen (Meals · Recipes · Shopping · Pantry)'), 'Vorbedingung: die Kuechen-Klammer steht in README.md');
+  const noBracket = kitchenFindings(md.replace('Kitchen (Meals · Recipes · Shopping · Pantry)', 'Meals · Recipes · Shopping · Pantry'), 'en', ROUTER_SRC(), NAV('en'));
+  assert.ok(hit(noBracket, /0 Unterklammern/), noBracket.join(' | '));
+  const renamed = kitchenFindings(md.replace('Kitchen (', 'Food ('), 'en', ROUTER_SRC(), NAV('en'));
+  assert.ok(hit(renamed, /Unterklammer "Food" heisst in der App "Kitchen"/), renamed.join(' | '));
+  // Ein Modul wandert in der App aus der Kuechen-Gruppe, die README bleibt stehen.
+  const router = ROUTER_SRC().replace(/(module: 'pantry',[^\n]*?), kitchenGroup: true/, '$1');
+  assert.notEqual(router, ROUTER_SRC(), 'Vorbedingung: pantry traegt kitchenGroup im Router');
+  assert.ok(hit(kitchenFindings(md, 'en', router, NAV('en')), /Kueche: README Meals · Recipes · Shopping · Pantry \/ App Meals · Recipes · Shopping$/));
+});
 
 test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const md = readme('en');
@@ -340,13 +422,28 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
     assert.ok(md.includes(from), `Vorbedingung: "${from}" steht in README.md`);
     return groupFindings(md.replace(from, to), html, 'en');
   };
-  // Kontakte zurueck zu den Notizen (der Anlass von Runde 2 auf der Homepage).
-  const f1 = swap('Notes · Schedule\n', 'Notes · Schedule · Contacts\n');
-  assert.ok(hit(f1, /Gruppe "Plan"/) && hit(f1, /zwei Gruppenzeilen/), f1.join(' | '));
+  // Kontakte zusaetzlich zur gemeinsamen Zeile auch bei Menschen.
+  const f1 = swap('<b>People</b> - Health · Birthdays<br>', '<b>People</b> - Health · Contacts · Birthdays<br>');
+  assert.ok(hit(f1, /Gruppe "People"/) && hit(f1, /Gruppenzeile nennt "contacts", die Tabelle nicht/), f1.join(' | '));
+  // Der Stand vor der Re-Critique vom 2026-10-24: Notizen und Kontakte getrennt
+  // in ihren Menuegruppen, 21 Namen fuer 20 Tabellenzeilen.
+  const split = groupFindings(md.replace('Notes &amp; Contacts · Schedule<br>', 'Notes · Schedule<br>')
+    .replace('<b>People</b> - Health · Birthdays<br>', '<b>People</b> - Health · Contacts · Birthdays<br>'), html, 'en');
+  assert.ok(hit(split, /21 Namen in den Gruppenzeilen, die Tabelle hat 20 Zeilen/), split.join(' | '));
+  // Die gemeinsame Zeile verliert ihre zweite Haelfte.
+  assert.ok(hit(swap('Notes &amp; Contacts · Schedule<br>', 'Notes · Schedule<br>'), /Tabellenzeile "Notes & Contacts" steht in keiner Gruppenzeile/));
   // Ein Modul fehlt in den Gruppenzeilen, steht aber in der Tabelle.
   assert.ok(hit(swap(' · Waste collection', ''), /Tabellenzeile "Waste collection" steht in keiner Gruppenzeile/));
   // Eine Gruppe umbenannt.
-  assert.ok(hit(swap('- **People** - ', '- **Persons** - '), /Gruppe 3: README "Persons", Homepage "People"/));
+  assert.ok(hit(swap('<b>People</b> - ', '<b>Persons</b> - '), /Gruppe 3: README "Persons", Homepage "People"/));
+  // Die alte Form kommt zurueck: Gruppen als eigene Liste vor einer Klappe mit
+  // anderem <summary>. Dann fehlen die Gruppenzeilen, statt doppelt zu zaehlen.
+  const summary = md.match(/<details>\s*<summary>[\s\S]*?<\/summary>/)[0];
+  // Die erste Zeile des <summary> ist der Aufklapp-Hinweis, keine Gruppe.
+  const asList = summary.replace(/<details>\s*<summary>\n?/, '').replace(/^(?!<b>).*<br>\n/m, '').replace(/<br>|<\/summary>/g, '')
+    .replace(/^<b>(.+?)<\/b> - /gm, '- **$1** - ');
+  const oldForm = groupFindings(md.replace(summary, `${asList}\n<details>\n<summary><b>Every module in one line</b></summary>`), html, 'en');
+  assert.ok(hit(oldForm, /0 Gruppenzeilen, die Homepage zeigt 5 Gruppen/), oldForm.join(' | '));
   // Die Homepage bekommt ein Modul, das die Gruppenzeilen nicht kennen.
   const more = html.replace('<h4 data-t="m_backup_t">', '<h4 data-t="m_backup_t">x</h4></div><div class="mod-card"><h4 data-t="m_bday_t">');
   assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als <h4> im Markup');
@@ -548,7 +645,13 @@ const README_FACTS = [
     what: 'SSO als einziger Weg (server/auth.js isPasswordLoginEnabled, .env.example AUTH_ALLOW_PASSWORD_LOGIN)' },
   { says: { en: /signed out from any of your other devices/, de: /von jedem eurer anderen Ger[aä]te aus ab/ },
     holds: (s) => /router\.post\('\/logout-others'/.test(s.auth),
-    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },
+    what: 'andere Sitzungen beenden (server/auth.js POST /logout-others)' },  // Der Weg der Eingeladenen (Re-Critique R3), wie die Karte fam_inv_* der Homepage.
+  { says: { en: /it works for seven days/, de: /er gilt sieben Tage/ },
+    holds: (s) => /INVITE_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(s.invites),
+    what: 'Einladungslink sieben Tage gueltig (server/services/invites.js INVITE_TTL_MS)' },
+  { says: { en: /none if your household signs in with single sign-on/, de: /keins, wenn sich\s+euer Haushalt per Single Sign-on anmeldet/ },
+    holds: (s) => /password_required: isPasswordLoginEnabled\(getDb\(\)\)/.test(s.auth),
+    what: '/join fragt ohne Passwort-Anmeldung kein Passwort (server/auth.js GET /invites/preview)' },
 ];
 
 /** Saetze, die nicht zurueckkommen duerfen - in beiden READMEs. */
@@ -611,6 +714,7 @@ function factSources() {
     sw: src('public/sw.js'),
     permissions: src('server/permissions.js'),
     twoFactor: src('server/services/two-factor.js'),
+    invites: src('server/services/invites.js'),
     pages: { 'docs/index.html': src('docs/index.html'), 'docs/install.html': src('docs/install.html') },
   };
 }
@@ -662,8 +766,10 @@ test('der Guard aus (6) erkennt den Schaden, gegen den er gebaut ist', () => {
   assert.ok(hit(f1, /README\.md sagt nicht mehr/) && hit(f1, /README\.md sagt wieder \/writes the shopping list/), f1.join(' | '));
   const f2 = factFindings(withReadme('de', 'richtet Single', 'richtet HTTPS, Single'));
   assert.ok(hit(f2, /README\.de\.md sagt wieder \/richtet HTTPS,/), f2.join(' | '));
-  const oldPage = real.pages['docs/index.html'].replace('sets up SSO and backups and prepares Yuvomi for your HTTPS reverse proxy', 'handles HTTPS, SSO and backups for you');
-  assert.notEqual(oldPage, real.pages['docs/index.html'], 'Vorbedingung: quick_note steht so auf der Homepage');
+  // `quick_note` (der Satz von damals) ging mit dem Schnellstart der Homepage
+  // (S4, 2026-10-24); der Altsatz kommt deshalb als eigener Absatz zurueck.
+  const oldPage = real.pages['docs/index.html'].replace('</main>', '<p>The installer handles HTTPS, SSO and backups for you.</p></main>');
+  assert.notEqual(oldPage, real.pages['docs/index.html'], 'Vorbedingung: die Homepage hat ein </main>');
   assert.ok(hit(factFindings({ ...real, pages: { ...real.pages, 'docs/index.html': oldPage } }), /docs\/index\.html sagt wieder \/handles HTTPS/));
 
   // Die LAN-Zeile verliert einen Schalter, und .env.example bekommt einen neuen.
