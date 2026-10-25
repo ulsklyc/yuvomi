@@ -272,7 +272,9 @@ test('editing a transfer opens with the source currency amount step', async () =
 
 test('transfer recurrence uses the entry toggles, interval controls and shared maximum', async () => {
   await withTransfer(async page => {
-    assert.equal(await page.$eval('#bt-recurring', el => el.closest('label').className), 'toggle');
+    // R23: die Schalter sind die eine Switch-Zeile der Dialoge (formSwitchRowHtml).
+    assert.deepEqual(await page.$eval('#bt-recurring', el => ({ role: el.getAttribute('role'), row: el.closest('label')?.classList.contains('toggle-row--switch') })),
+      { role: 'switch', row: true });
     for (const selector of ['#bt-from', '#bt-to']) {
       assert.deepEqual(await page.$eval(selector, (el, none) => ({ required: el.required,
         none: [...el.options].some(option => option.textContent === none), emptyEnabled: [...el.options].some(option => !option.value && !option.disabled) }), tr('budget.noAccount')),
@@ -285,7 +287,8 @@ test('transfer recurrence uses the entry toggles, interval controls and shared m
     await page.select('#bt-interval', 'weekly');
     await page.$eval('#bt-interval-count', el => { el.value = '2'; el.dispatchEvent(new Event('input', { bubbles: true })); });
     assert.equal(await page.$eval('#bt-interval-unit', el => el.textContent), tr('rrule.unitWeeks'));
-    assert.equal(await page.$eval('#bt-confirm', el => el.closest('label').className), 'toggle');
+    assert.deepEqual(await page.$eval('#bt-confirm', el => ({ role: el.getAttribute('role'), row: el.closest('label')?.classList.contains('toggle-row--switch') })),
+      { role: 'switch', row: true });
     // The ordinary entry uses the same rendered controls.
     assert.equal(await page.$eval('#bm-interval-count', el => el.max), '99');
   });
@@ -376,7 +379,8 @@ test('series edits from an anchor or occurrence keep the current accounts, amoun
       await page.$eval('#bt-title', (el, value) => { el.value = value; }, title);
       await page.select('#bt-scope', 'series');
       assert.equal(await page.$eval('#bt-title', el => el.value), title, 'the edit made before choosing a scope is retained');
-      assert.equal(await page.$eval('#bt-amount', el => el.value), '175');
+      // R23: das Geldfeld ist Text in Regionsschreibweise mit zwei Nachkommastellen.
+      assert.equal(await page.$eval('#bt-amount', el => el.value), '175.00');
       assert.equal(await page.$eval('#bt-to', el => el.value), String(target));
       const response = page.waitForResponse(res => res.request().method() === 'PUT' && res.url().endsWith(`/transfers/${entry.id}/series`));
       await page.$eval('#bt-save', el => el.click());
