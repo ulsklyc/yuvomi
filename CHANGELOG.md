@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no CalDAV server itself) and how Home Assistant fits in (ICS feeds, webhooks and the REST API with
   per-module tokens, no official integration). Each answer is held against the code by the landing
   page tests.
+- **Yuvomi has a Portainer app template.** `deploy/portainer/portainer-template.json` deploys the
+  existing Portainer stack (`docs/docker-compose.portainer.yml`) and asks only for the session
+  secret, the database encryption key, the host port and the base URL. It is meant for the
+  [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates) catalog, which
+  pulls it from `main` every night, so the template never pins an older version. The installer
+  schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Fixed
 - **The currency and long time zones are no longer cut off in the appearance settings on a
