@@ -5030,15 +5030,17 @@ function resultFormMarkup(editing = null) {
 
 function resultEditRowMarkup(r, { editing = false } = {}) {
   const unit = r.unit ? ` ${esc(r.unit)}` : '';
+  // DIE ZEILE OEFFNET (R23 S11b): Analyt, Wert und Markierung sind der Knopf,
+  // der den Wert ins Formular darueber holt - vorher ein Stift neben dem
+  // Papierkorb. Loeschen bleibt das eine zweite Ziel.
   return `
-    <li class="health-results-row${editing ? ' is-editing' : ''}" data-result-id="${esc(r.id)}"${editing ? ' aria-current="true"' : ''}>
-      <span class="health-results-row__analyte">${esc(r.analyte)}</span>
-      <span class="health-results-row__value">${esc(fmtNum(r.value_num))}${unit}</span>
-      <span class="health-results-row__flag">${flagIndicatorMarkup(r.flag)}</span>
-      <span class="row-actions">
-        ${rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: r.analyte }), attrs: { 'data-result-edit': r.id } })}
-        ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('common.deleteNamed', { name: r.analyte }), attrs: { 'data-result-del': r.id } })}
-      </span>
+    <li class="list-row health-results-row${editing ? ' is-editing' : ''}" data-result-id="${esc(r.id)}"${editing ? ' aria-current="true"' : ''}>
+      <button type="button" class="list-row__main list-row__main--interactive health-results-row__open" data-result-edit="${esc(r.id)}">
+        <span class="health-results-row__analyte">${esc(r.analyte)}</span>
+        <span class="health-results-row__value">${esc(fmtNum(r.value_num))}${unit}</span>
+        <span class="health-results-row__flag">${flagIndicatorMarkup(r.flag)}</span>
+      </button>
+      ${rowActionHtml({ icon: 'trash-2', tone: 'danger', label: t('common.deleteNamed', { name: r.analyte }), attrs: { 'data-result-del': r.id } })}
     </li>`;
 }
 
@@ -5918,19 +5920,23 @@ function preventionRowMarkup(row, own) {
     ? `<span class="health-prevention-row__meta">${meta.map((m) => `<span class="health-prevention-row__chip">${esc(m)}</span>`).join('')}</span>`
     : '';
   const noteHtml = row.note ? `<span class="health-prevention-row__note">${esc(row.note)}</span>` : '';
-  const editBtn = own
-    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${preventionRecordLabel(row)}, ${dateText(row.given_on)}` }), attrs: { 'data-prevention-edit': row.id } })
-    : '';
-  return `
-    <li class="health-prevention-row" data-record-id="${esc(row.id)}">
-      <span class="health-prevention-row__body">
+  // DIE ZEILE OEFFNET (R23 S11b, wie Trainings-Log und Messungen seit S9):
+  // der Koerper ist der Knopf und streckt sich ueber die Zeile
+  // (`.list-row__main--interactive`, list-row.css) - vorher war ein Stift am
+  // Ende das einzige Ziel. Sein Name ist der Inhalt der Zeile; die Impfung
+  // nennt die Gruppenueberschrift darueber.
+  const body = `
         <span class="health-prevention-row__head">
           <span class="health-prevention-row__when">${esc(dateText(row.given_on))}</span>
         </span>
         ${metaHtml}
-        ${noteHtml}
-      </span>
-      ${editBtn}
+        ${noteHtml}`;
+  const main = own
+    ? `<button type="button" class="list-row__main list-row__main--interactive health-prevention-row__body" data-prevention-edit="${esc(row.id)}">${body}</button>`
+    : `<span class="list-row__main health-prevention-row__body">${body}</span>`;
+  return `
+    <li class="list-row health-prevention-row" data-record-id="${esc(row.id)}">
+      ${main}
     </li>`;
 }
 
@@ -6416,20 +6422,21 @@ function nutritionRowMarkup(row, own) {
     ? `<span class="health-nutrition-row__meta">${meta.map((m) => `<span class="health-nutrition-row__chip">${esc(m)}</span>`).join('')}</span>`
     : '';
   const noteHtml = row.note ? `<span class="health-nutrition-row__note">${esc(row.note)}</span>` : '';
-  const editBtn = own
-    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${row.title}, ${nutritionWhenText(row.consumed_at)}` }), attrs: { 'data-nutrition-edit': row.id } })
-    : '';
-  return `
-    <li class="health-nutrition-row" data-entry-id="${esc(row.id)}">
-      <span class="health-nutrition-row__body">
+  // DIE ZEILE OEFFNET (R23 S11b, wie Trainings-Log seit S9): der Koerper ist
+  // der Knopf, sein Name ist der Inhalt (Mahlzeit, Zeitpunkt, Werte).
+  const body = `
         <span class="health-nutrition-row__head">
-          <span class="health-nutrition-row__title">${esc(row.title)}</span>
+          <span class="list-row__name health-nutrition-row__title">${esc(row.title)}</span>
           <span class="health-nutrition-row__when">${esc(nutritionWhenText(row.consumed_at))}</span>
         </span>
         ${metaHtml}
-        ${noteHtml}
-      </span>
-      ${editBtn}
+        ${noteHtml}`;
+  const main = own
+    ? `<button type="button" class="list-row__main list-row__main--interactive health-nutrition-row__body" data-nutrition-edit="${esc(row.id)}">${body}</button>`
+    : `<span class="list-row__main health-nutrition-row__body">${body}</span>`;
+  return `
+    <li class="list-row health-nutrition-row" data-entry-id="${esc(row.id)}">
+      ${main}
     </li>`;
 }
 
@@ -9322,17 +9329,18 @@ function cycleHistoryMarkup(canEdit) {
           const level = flowLevel(flowSummary.heaviest);
           meta.push(t('health.cycle.history.flowHeaviest', { value: level ? t(level.labelKey) : flowSummary.heaviest }));
         }
-        const editBtn = canEdit
-          ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${t('newLabel.healthCycle')} ${rangeLabel}` }), attrs: { 'data-cycle-edit': p.id } })
-          : '';
-        return `
-          <li class="cycle-history__row">
-            <span class="cycle-history__dot" aria-hidden="true"></span>
-            <span class="cycle-history__body">
+        // DIE ZEILE OEFFNET (R23 S11b, wie Trainings-Log seit S9): der
+        // Koerper ist der Knopf, sein Name ist der Inhalt (Zeitraum, Dauer).
+        const body = `
               <span class="cycle-history__range">${esc(rangeLabel)}</span>
-              <span class="cycle-history__meta">${meta.map((m) => `<span class="cycle-history__chip">${esc(m)}</span>`).join('')}</span>
-            </span>
-            ${editBtn}
+              <span class="cycle-history__meta">${meta.map((m) => `<span class="cycle-history__chip">${esc(m)}</span>`).join('')}</span>`;
+        const main = canEdit
+          ? `<button type="button" class="list-row__main list-row__main--interactive cycle-history__body" data-cycle-edit="${esc(p.id)}">${body}</button>`
+          : `<span class="list-row__main cycle-history__body">${body}</span>`;
+        return `
+          <li class="list-row cycle-history__row">
+            <span class="cycle-history__dot" aria-hidden="true"></span>
+            ${main}
           </li>`;
       }).join('')}</ul>
     </section>`;

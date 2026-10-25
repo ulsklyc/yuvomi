@@ -1627,7 +1627,6 @@ const PENDING = {
     'public/components/task-detail.js': 1,
     'public/pages/documents.js': 2,
     'public/pages/health-fasting.js': 1,
-    'public/pages/health.js': 1,
     'public/pages/housekeeping.js': 1,
     'public/settings/pages/personal-calendar-subscriptions.js': 1,
   },

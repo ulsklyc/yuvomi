@@ -1717,6 +1717,14 @@ button.health-med-card:hover {
 
 .health-results-row__flag { flex: 0 0 auto; }
 
+/* Der Oeffner der Wertzeile (R23 S11b): ein Knopf ueber Analyt, Wert und
+ * Markierung, in der Reihe wie vorher die Zeile selbst. */
+.health-results-row__open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .health-results-add {
   display: flex;
   flex-direction: column;
@@ -1927,9 +1935,8 @@ button.health-med-card:hover {
  * nicht mehr stillschweigend mitzieht. Nur die Regeln, die die Vorsorge-Zeile
  * tatsaechlich braucht (kein __icon/__type - sie hat kein Icon je Zeile). */
 .health-prevention-row {
-  display: flex;
+  /* Seit R23 S11b eine `.list-row` (ihr Knopf streckt sich ueber sie). */
   align-items: flex-start;
-  gap: var(--space-3);
   padding: var(--space-3) 0;
   border: none;
   background: transparent;
@@ -3613,9 +3620,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 
 .cycle-history__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  /* Seit R23 S11b eine `.list-row` (ihr Knopf streckt sich ueber sie). */
   padding: var(--space-2) 0;
   border: none;
 }
@@ -4173,9 +4178,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 
 .health-nutrition-row {
-  display: flex;
+  /* Seit R23 S11b eine `.list-row` (ihr Knopf streckt sich ueber sie). */
   align-items: flex-start;
-  gap: var(--space-3);
   padding: var(--space-3) 0;
 }
 
@@ -4200,7 +4204,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 
 .health-nutrition-row__title {
-  font-weight: var(--font-weight-semibold, 600);
+  /* Zeilentitel-Stufe (R23, N2): 16/500 wie jede Listenzeile, nicht 600. */
+  font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;
 }
 

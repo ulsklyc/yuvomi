@@ -3483,8 +3483,11 @@ test('Codex an #1485: ein Blutdruck in kPa bleibt beim Speichern einer Notiz kPa
 test('R8 H9: ein Laborwert laesst sich korrigieren, nicht nur loeschen', () => {
   const analyt = { id: 3, analyte: 'Ferritin', value_num: 88, unit: 'ng/ml', ref_low: 30, ref_high: 300, flag: 'normal' };
   const zeile = health.resultEditRowMarkup(analyt);
-  assert.match(zeile, /data-result-edit="3"/, 'die Zeile traegt einen Stift');
-  assert.match(zeile, /common\.editNamed/, 'mit dem Objektnamen');
+  assert.match(zeile, /data-result-edit="3"/, 'die Zeile oeffnet den Wert');
+  // R23 S11b: DIE ZEILE OEFFNET - Analyt, Wert und Markierung sind der Knopf
+  // (`.list-row__main--interactive`), sein Name ist der Inhalt; kein Stift.
+  assert.match(zeile, /<li class="list-row health-results-row"[^>]*>\s*<button type="button" class="list-row__main list-row__main--interactive health-results-row__open" data-result-edit="3">\s*<span class="health-results-row__analyte">Ferritin<\/span>/);
+  assert.doesNotMatch(zeile, /data-lucide="pencil"|common\.editNamed/, 'kein Stift neben dem Papierkorb');
   assert.match(zeile, /data-result-del="3"/);
   const form = health.resultFormMarkup(analyt);
   assert.match(form, /id="res-analyte"[^>]*value="Ferritin"/, 'das Formular traegt den Bestand');
@@ -3709,7 +3712,12 @@ test('Aktivitaetszeile: Bearbeiten weg, Strecke und Dauer bleiben', () => {
 
 test('Vorsorge-Zeile: Bearbeiten weg, Datum und Charge bleiben', () => {
   const zeile = { id: 33, given_on: '2026-03-02', dose_number: 2, provider: 'Dr. Meier', batch: 'X-42', note: 'gut vertragen' };
-  assert.match(health.preventionRowMarkup(zeile, true), /data-prevention-edit="33"/);
+  const eigen = health.preventionRowMarkup(zeile, true);
+  assert.match(eigen, /data-prevention-edit="33"/);
+  // R23 S11b: DIE ZEILE OEFFNET wie Trainings-Log und Messungen (S9) - der
+  // Koerper ist der Knopf, kein Stift am Ende.
+  assert.match(eigen, /<li class="list-row health-prevention-row"[^>]*>\s*<button type="button" class="list-row__main list-row__main--interactive health-prevention-row__body" data-prevention-edit="33">/);
+  assert.doesNotMatch(eigen, /row-action|data-lucide="pencil"/, 'kein Stift als einziges Ziel');
   const html = health.preventionRowMarkup(zeile, false);
   assert.doesNotMatch(html, /data-prevention-edit/);
   assert.doesNotMatch(html, /<button/);
@@ -3824,7 +3832,11 @@ test('Zyklus-Kalender: die eigene Zelle bleibt ansagbar, die fremde bleibt verst
 
 test('Zyklus-Historie und -Fuss: Bearbeiten, Einfuhr und Einstellungen weg, der Export bleibt', () => {
   mitView('cycle', { meId: 1, personId: 1, periods: [periode()], logs: [], settings: {}, __reset: { periods: [], logs: [] } }, () => {
-    assert.match(health.cycleHistoryMarkup(true), /data-cycle-edit="55"/);
+    const eigen = health.cycleHistoryMarkup(true);
+    assert.match(eigen, /data-cycle-edit="55"/);
+    // R23 S11b: DIE ZEILE OEFFNET - Zeitraum und Dauer sind der Knopf.
+    assert.match(eigen, /<li class="list-row cycle-history__row">[\s\S]*?<button type="button" class="list-row__main list-row__main--interactive cycle-history__body" data-cycle-edit="55">/);
+    assert.doesNotMatch(eigen, /row-action|data-lucide="pencil"/, 'kein Stift als einziges Ziel');
     const historie = health.cycleHistoryMarkup(false);
     assert.doesNotMatch(historie, /data-cycle-edit/);
     assert.doesNotMatch(historie, /<button/);

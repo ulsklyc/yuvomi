@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   year and the full date only for other years, chart axes included. "Last synced" and similar
   stamps add "Uhr" after the time where your language uses it, and day, week and agenda headings
   in the Calendar keep the year as orientation.
+- **Health entries open with a tap on the whole row.** Vaccinations, nutrition entries, past
+  periods and the values inside a lab report open for editing anywhere on the row, like the
+  training log and measurements - no small pencil to aim for.
 - **Quieter lists and dialogs.** When a list shows "No results" or has nothing in it yet, the
   empty detail column beside it no longer asks you to pick something. The Tasks view switch reads
   "List · Kanban · History" instead of repeating "view", the button that moves a Kanban card to "In

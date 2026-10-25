@@ -624,6 +624,10 @@ test('die Zeilen des Tabs werden wirklich gerendert und lassen einen nicht angeg
 
   assert.match(zeile, /data-entry-id="7"/);
   assert.match(zeile, /data-nutrition-edit="7"/, 'mit Schreibrecht muss der Bearbeiten-Knopf da sein');
+  // R23 S11b: DIE ZEILE OEFFNET wie Trainings-Log (S9) - der Koerper ist der
+  // Knopf, kein Stift am Ende.
+  assert.match(zeile, /<li class="list-row health-nutrition-row"[^>]*>\s*<button type="button" class="list-row__main list-row__main--interactive health-nutrition-row__body" data-nutrition-edit="7">/);
+  assert.doesNotMatch(zeile, /row-action|data-lucide="pencil"/, 'kein Stift als einziges Ziel');
   // User-Daten laufen durch esc() (CLAUDE.md-Invariante).
   assert.ok(!zeile.includes('<b>'), 'der Titel muss escaped sein');
   assert.match(zeile, /&lt;b&gt;/);

@@ -1865,8 +1865,10 @@ nennt die Person im Namen), ab 768px die Pille mit Namen. **Der Bereichskopf ist
 die Uebersicht:** Rueckweg als Zeichen, Bereichsname als Titel, die Person rechts, kein Siegel -
 der Tipp in einen Bereich hob den Kopf sonst von 65 auf 113px (Shift 0,97 bei 390, 0,51 bei
 768); jetzt 65/69px in jeder Ansicht. **Verlaufszeilen oeffnen als Ganzes** (Trainings-Log,
-Letzte Messungen): `.list-row` mit `.list-row__main--interactive` statt Eigenbau mit Stift als
-einzigem Ziel; der Typ in der Zeilentitel-Stufe 16/500.
+Letzte Messungen, seit S11b auch Vorsorge, Naehrwerte, Zyklus-Historie und die Wertzeilen im
+Laborbefund - dort bleibt der Papierkorb das eine zweite Ziel): `.list-row` mit
+`.list-row__main--interactive` statt Eigenbau mit Stift als einzigem Ziel; der Titel in der
+Zeilentitel-Stufe 16/500.
 
 **Gesundheit als Briefing (R21, Critique 2026-10-21, D6).** Ueber den Karten der Uebersicht steht
 EIN Satz aus vorhandenen Daten (`.health-brief`, Body 17): was sich seit der letzten Messung
