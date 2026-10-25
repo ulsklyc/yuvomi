@@ -304,9 +304,13 @@ export function t(key, params = {}) {
       ?? resolve(fallbackTranslations, key)
       ?? key;
   }
-  const fill = (text) => text.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (
-    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
-  ));
+  // Endet der eingesetzte Wert auf einen Punkt und der Satz auch ("am
+  // {{date}}." mit "30.09."), verschmelzen beide zu einem: "30.09..".
+  const fill = (text) => text.replace(/\{\{(\w+)\}\}(\.?)/g, (placeholder, name, dot) => {
+    if (!Object.prototype.hasOwnProperty.call(params, name)) return placeholder;
+    const value = String(params[name]);
+    return dot && value.endsWith('.') ? value : value + dot;
+  });
   // Koreanisch schreibt hinter einen Platzhalter beide Formen der Partikel
   // (`{{name}}이(가)`), weil die richtige am eingesetzten Wort haengt (#1607).
   // Die Regel steht in utils/korean-particles.js; jede andere Sprache zahlt

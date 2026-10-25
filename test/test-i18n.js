@@ -767,3 +767,44 @@ test('kein Eingabedialog fragt mit einem Doppelpunkt am Ende', () => {
   }
   assert.deepEqual(hits, []);
 });
+
+test('ein Wert mit Schlusspunkt am Satzende ergibt keinen doppelten Punkt', async () => {
+  const GLOBALS = ['localStorage', 'fetch', 'document', 'window', 'navigator', 'CustomEvent'];
+  const saved = new Map(GLOBALS.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const store = new Map([['yuvomi-locale', 'de']]);
+  const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  define('localStorage', {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: (key) => { store.delete(key); },
+  });
+  define('fetch', async (url) => {
+    const file = String(url).replace(/^\/locales\//, '');
+    return { ok: true, json: async () => JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8')) };
+  });
+  define('document', { documentElement: { lang: '', dir: '' } });
+  define('window', { dispatchEvent: () => true });
+  define('navigator', { languages: ['de'], language: 'de' });
+  define('CustomEvent', class { constructor(type, init) { this.type = type; this.detail = init?.detail; } });
+  const i18n = await import('../public/i18n.js');
+  try {
+    await i18n.initI18n();
+    await i18n.setLocale('de');
+    // R23: dateText schreibt im laufenden Jahr "30.09." - vorher "30.09..".
+    assert.equal(i18n.t('subscriptions.renewedNamed', { name: 'Netz', date: '30.09.' }),
+      '„Netz“ bezahlt - nächste Zahlung am 30.09.');
+    assert.equal(i18n.t('subscriptions.renewedNamed', { name: 'Netz', date: '30.09.2027' }),
+      '„Netz“ bezahlt - nächste Zahlung am 30.09.2027.');
+    // Nur der Punkt direkt hinter dem Platzhalter verschmilzt.
+    assert.equal(i18n.t('housekeeping.paymentTaskDescription', { date: '30.09.', amount: '5 €' }),
+      'Besuch am 30.09. Offener Betrag: 5 €.');
+    // Ein fehlender Parameter bleibt samt Satzpunkt sichtbar stehen.
+    assert.equal(i18n.t('subscriptions.renewedNamed', { name: 'Netz' }),
+      '„Netz“ bezahlt - nächste Zahlung am {{date}}.');
+  } finally {
+    for (const [name, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});

@@ -256,11 +256,11 @@ export function monthEndHintText(startDate, { expandsFromStart = false, rule = n
   }
 
   if (dateKey === firstDate) {
-    return t('rrule.lastDayOfMonthHintSame', { date: dateText(dateKey) });
+    return t('rrule.lastDayOfMonthHintSame', { date: dateText(dateKey, { year: true }) });
   }
   return t('rrule.lastDayOfMonthHintOverride', {
-    startDate: dateText(dateKey),
-    firstDate: dateText(firstDate),
+    startDate: dateText(dateKey, { year: true }),
+    firstDate: dateText(firstDate, { year: true }),
   });
 }
 
