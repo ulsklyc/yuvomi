@@ -1221,7 +1221,11 @@
         "sidebarLabel": "캘린더 사이드바",
         "upNextTitle": "다음 일정",
         "upNextEmpty": "앞으로 3주 동안 일정이 없습니다.",
-        "shiftLegend": "근무 범례"
+        "shiftLegend": "근무 범례",
+        "errorCalendarGone": "이 캘린더는 더 이상 없습니다.",
+        "errorCalendarNameInvalid": "캘린더 이름은 최대 {{limit}}자로 입력하세요.",
+        "errorCalendarOrderChanged": "그사이 캘린더가 변경되었습니다.",
+        "errorDeleteFeedAdminOnly": "이 캘린더는 내보내는 중입니다. 관리자만 삭제할 수 있습니다."
     },
     "noteCategories": {
         "categories": "카테고리",

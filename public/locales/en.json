@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Calendar sidebar",
         "upNextTitle": "Up next",
         "upNextEmpty": "Nothing coming up in the next three weeks.",
-        "shiftLegend": "Shift legend"
+        "shiftLegend": "Shift legend",
+        "errorCalendarGone": "This calendar no longer exists.",
+        "errorCalendarNameInvalid": "Give the calendar a name of at most {{limit}} characters.",
+        "errorCalendarOrderChanged": "The calendars have changed in the meantime.",
+        "errorDeleteFeedAdminOnly": "This calendar is being exported. Only an admin can delete it."
     },
     "noteCategories": {
         "categories": "Categories",

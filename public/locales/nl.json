@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Zijbalk van de agenda",
         "upNextTitle": "Hierna",
         "upNextEmpty": "Niets gepland in de komende drie weken.",
-        "shiftLegend": "Legenda van diensten"
+        "shiftLegend": "Legenda van diensten",
+        "errorCalendarGone": "Deze agenda bestaat niet meer.",
+        "errorCalendarNameInvalid": "Geef de agenda een naam van hoogstens {{limit}} tekens.",
+        "errorCalendarOrderChanged": "De agenda’s zijn intussen gewijzigd.",
+        "errorDeleteFeedAdminOnly": "Deze agenda wordt geëxporteerd. Alleen een beheerder kan hem verwijderen."
     },
     "noteCategories": {
         "categories": "Categorieën",

@@ -1373,7 +1373,11 @@
         "sidebarLabel": "Pasek boczny kalendarza",
         "upNextTitle": "Następne",
         "upNextEmpty": "Nic w ciągu najbliższych trzech tygodni.",
-        "shiftLegend": "Legenda zmian"
+        "shiftLegend": "Legenda zmian",
+        "errorCalendarGone": "Ten kalendarz już nie istnieje.",
+        "errorCalendarNameInvalid": "Nadaj kalendarzowi nazwę o długości najwyżej {{limit}} znaków.",
+        "errorCalendarOrderChanged": "W międzyczasie kalendarze się zmieniły.",
+        "errorDeleteFeedAdminOnly": "Ten kalendarz jest eksportowany. Usunąć go może tylko administrator."
     },
     "noteCategories": {
         "categories": "Kategorie",

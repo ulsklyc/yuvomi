@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Kalenderens sidepanel",
         "upNextTitle": "Neste",
         "upNextEmpty": "Ingenting de neste tre ukene.",
-        "shiftLegend": "Forklaring av vakter"
+        "shiftLegend": "Forklaring av vakter",
+        "errorCalendarGone": "Denne kalenderen finnes ikke lenger.",
+        "errorCalendarNameInvalid": "Gi kalenderen et navn på høyst {{limit}} tegn.",
+        "errorCalendarOrderChanged": "Kalenderne er endret i mellomtiden.",
+        "errorDeleteFeedAdminOnly": "Denne kalenderen eksporteres. Bare en administrator kan slette den."
     },
     "noteCategories": {
         "categories": "Kategorier",

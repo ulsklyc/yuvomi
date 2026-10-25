@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Thanh bên lịch",
         "upNextTitle": "Sắp tới",
         "upNextEmpty": "Không có gì trong ba tuần tới.",
-        "shiftLegend": "Chú thích ca"
+        "shiftLegend": "Chú thích ca",
+        "errorCalendarGone": "Lịch này không còn tồn tại.",
+        "errorCalendarNameInvalid": "Đặt tên lịch tối đa {{limit}} ký tự.",
+        "errorCalendarOrderChanged": "Các lịch đã thay đổi trong lúc đó.",
+        "errorDeleteFeedAdminOnly": "Lịch này đang được xuất. Chỉ quản trị viên mới có thể xóa."
     },
     "noteCategories": {
         "categories": "Danh mục",

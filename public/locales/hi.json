@@ -1203,7 +1203,11 @@
         "sidebarLabel": "कैलेंडर साइडबार",
         "upNextTitle": "आगे",
         "upNextEmpty": "अगले तीन हफ़्तों में कुछ नहीं है।",
-        "shiftLegend": "शिफ़्टों की कुंजी"
+        "shiftLegend": "शिफ़्टों की कुंजी",
+        "errorCalendarGone": "यह कैलेंडर अब मौजूद नहीं है।",
+        "errorCalendarNameInvalid": "कैलेंडर को अधिकतम {{limit}} अक्षरों का नाम दें।",
+        "errorCalendarOrderChanged": "इस बीच कैलेंडर बदल गए हैं।",
+        "errorDeleteFeedAdminOnly": "यह कैलेंडर निर्यात हो रहा है। केवल एक व्यवस्थापक इसे हटा सकता है।"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",

@@ -1432,7 +1432,11 @@
         "sidebarLabel": "الشريط الجانبي للتقويم",
         "upNextTitle": "التالي",
         "upNextEmpty": "لا شيء في الأسابيع الثلاثة القادمة.",
-        "shiftLegend": "مفتاح المناوبات"
+        "shiftLegend": "مفتاح المناوبات",
+        "errorCalendarGone": "هذا التقويم لم يعد موجودًا.",
+        "errorCalendarNameInvalid": "أعطِ التقويم اسمًا لا يتجاوز {{limit}} حرفًا.",
+        "errorCalendarOrderChanged": "تغيّرت التقويمات في هذه الأثناء.",
+        "errorDeleteFeedAdminOnly": "يتم تصدير هذا التقويم. يمكن للمسؤول فقط حذفه."
     },
     "noteCategories": {
         "categories": "الفئات",

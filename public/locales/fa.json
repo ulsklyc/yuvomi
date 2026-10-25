@@ -1221,7 +1221,11 @@
         "sidebarLabel": "نوار کناری تقویم",
         "upNextTitle": "بعدی",
         "upNextEmpty": "در سه هفته آینده چیزی نیست.",
-        "shiftLegend": "راهنمای شیفت‌ها"
+        "shiftLegend": "راهنمای شیفت‌ها",
+        "errorCalendarGone": "این تقویم دیگر وجود ندارد.",
+        "errorCalendarNameInvalid": "برای تقویم نامی با حداکثر {{limit}} نویسه بگذارید.",
+        "errorCalendarOrderChanged": "تقویم‌ها در این فاصله تغییر کرده‌اند.",
+        "errorDeleteFeedAdminOnly": "این تقویم در حال خروجی گرفتن است. فقط مدیر می‌تواند آن را حذف کند."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

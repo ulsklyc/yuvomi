@@ -1355,7 +1355,11 @@
         "sidebarLabel": "Бічна панель календаря",
         "upNextTitle": "Далі",
         "upNextEmpty": "У найближчі три тижні нічого немає.",
-        "shiftLegend": "Позначення змін"
+        "shiftLegend": "Позначення змін",
+        "errorCalendarGone": "Цього календаря більше немає.",
+        "errorCalendarNameInvalid": "Дайте календарю назву не довшу за {{limit}} символів.",
+        "errorCalendarOrderChanged": "Тим часом календарі змінилися.",
+        "errorDeleteFeedAdminOnly": "Цей календар експортується. Видалити його може лише адміністратор."
     },
     "noteCategories": {
         "categories": "Категорії",

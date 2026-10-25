@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Πλαϊνή στήλη ημερολογίου",
         "upNextTitle": "Επόμενα",
         "upNextEmpty": "Τίποτα τις επόμενες τρεις εβδομάδες.",
-        "shiftLegend": "Υπόμνημα βαρδιών"
+        "shiftLegend": "Υπόμνημα βαρδιών",
+        "errorCalendarGone": "Αυτό το ημερολόγιο δεν υπάρχει πια.",
+        "errorCalendarNameInvalid": "Δώστε στο ημερολόγιο όνομα έως {{limit}} χαρακτήρες.",
+        "errorCalendarOrderChanged": "Τα ημερολόγια άλλαξαν στο μεταξύ.",
+        "errorDeleteFeedAdminOnly": "Αυτό το ημερολόγιο εξάγεται. Μόνο ένας διαχειριστής μπορεί να το διαγράψει."
     },
     "noteCategories": {
         "categories": "Κατηγορίες",

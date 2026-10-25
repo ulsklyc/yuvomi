@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Kalenderns sidofält",
         "upNextTitle": "Härnäst",
         "upNextEmpty": "Inget de närmaste tre veckorna.",
-        "shiftLegend": "Förklaring av skift"
+        "shiftLegend": "Förklaring av skift",
+        "errorCalendarGone": "Den här kalendern finns inte längre.",
+        "errorCalendarNameInvalid": "Ge kalendern ett namn på högst {{limit}} tecken.",
+        "errorCalendarOrderChanged": "Kalendrarna har ändrats under tiden.",
+        "errorDeleteFeedAdminOnly": "Den här kalendern exporteras. Bara en administratör kan ta bort den."
     },
     "noteCategories": {
         "categories": "Kategorier",

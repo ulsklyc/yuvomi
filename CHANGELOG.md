@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **Calendar management speaks your language when something goes wrong** (#1909). Creating,
+  renaming, reordering or deleting a calendar showed the server's German text in the toast, in every
+  language. The dialog now says its own sentence: a calendar someone else deleted in the meantime
+  (the list reloads itself, and deleting it counts as done), a name that is empty or too long (the
+  rename field now has the same 80-character limit as the create field), an order that changed in
+  the meantime (the current order is shown), and a calendar only an admin may delete because it is
+  exported. The API keeps its `error` text, now in English, and adds a `reason` for each case.
 - **A CalDAV rate limit or outage no longer sends a moved shopping item back (#2137).** When a
   target reminder list responds with 429 or 5xx while a shopping item is being moved there, the move
   now waits instead of counting as a failure, so five such answers no longer return the item to

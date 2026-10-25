@@ -22111,14 +22111,15 @@ const SERVER_TEXT_OWNERS = new Set([
 // Der allgemeine Satz naehme dort z. B. der Namenspruefung (400) die Ursache,
 // deshalb stieg hier die Zahl (pages/calendar.js 5 -> 7, components/modal.js
 // 0 -> 1) statt dass die Stellen blind umgestellt wurden. Die Kalender-Scheibe
-// von #1909 raeumt sie mit eigenen Gruenden und Saetzen ab.
+// von #1909 raeumt sie mit eigenen Gruenden und Saetzen ab. Die beiden Toasts
+// des Kalender-Managers sind abgeraeumt (calendar 7 -> 5).
 //
 // `settings/module-install-errors.js` liest den Text nur noch an EINER Stelle,
 // und bewusst: `bad_manifest` setzt die Angabe des Modul-Laders (welches Feld
 // in module.json fehlt) in einen uebersetzten Satz - eine Angabe zum Modul fuer
 // den, der es installiert, kein Satz an seiner Stelle (#1909).
 const SERVER_TEXT_OPEN = new Map([
-  ['pages/calendar.js', 7],
+  ['pages/calendar.js', 5],
   ['pages/meals.js', 5],
   ['pages/pantry.js', 6],
   ['settings/module-install-errors.js', 1],

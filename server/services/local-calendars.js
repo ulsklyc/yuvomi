@@ -57,18 +57,28 @@ function validateCalendarId(conn, raw, { required = false } = {}) {
   return { value: row.id, error: null };
 }
 
+const CALENDAR_NAME_MAX = 80;
+
+// Ein leerer oder zu langer Name ist ein Fall, den ein Nutzer im Dialog
+// erreicht: er traegt `reason` und die Grenze (#1909). Ein Name, der kein Text
+// ist, kommt nur von einem Aufrufer der API.
 function validateCalendarName(value) {
-  if (typeof value !== 'string') return { value: null, error: 'Name muss als Text angegeben werden.' };
+  if (typeof value !== 'string') return { value: null, error: 'Name must be text.' };
   const name = value.trim();
-  if (!name || name.length > 80) {
-    return { value: null, error: 'Name: Gib einen Namen mit höchstens 80 Zeichen ein.' };
+  if (!name || name.length > CALENDAR_NAME_MAX) {
+    return {
+      value: null,
+      error: `Name: enter a name of at most ${CALENDAR_NAME_MAX} characters.`,
+      reason: 'calendar_name_invalid',
+      params: { limit: CALENDAR_NAME_MAX },
+    };
   }
   return { value: name, error: null };
 }
 
 function validateCalendarColor(value) {
   if (typeof value !== 'string' || !HEX_COLOR_RE.test(value.trim())) {
-    return { value: null, error: 'Farbe: Gib eine gültige Hex-Farbe an.' };
+    return { value: null, error: 'Color: enter a valid hex color.' };
   }
   return { value: value.trim().toUpperCase(), error: null };
 }
@@ -96,6 +106,7 @@ function clearCalendarFeedToken(conn, calendarId) {
 }
 
 export {
+  CALENDAR_NAME_MAX,
   DEFAULT_CALENDAR_NAME,
   DEFAULT_CALENDAR_COLOR,
   ensureDefaultCalendar,

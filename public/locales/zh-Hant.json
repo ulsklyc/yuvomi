@@ -1203,7 +1203,11 @@
         "sidebarLabel": "日曆側邊欄",
         "upNextTitle": "接下來",
         "upNextEmpty": "未來三週沒有安排。",
-        "shiftLegend": "班次圖例"
+        "shiftLegend": "班次圖例",
+        "errorCalendarGone": "此日曆已不存在。",
+        "errorCalendarNameInvalid": "日曆名稱最多 {{limit}} 個字元。",
+        "errorCalendarOrderChanged": "日曆在此期間已變更。",
+        "errorDeleteFeedAdminOnly": "此日曆正在匯出。只有管理員可以刪除它。"
     },
     "noteCategories": {
         "categories": "分類",

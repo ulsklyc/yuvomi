@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Barre latérale du calendrier",
         "upNextTitle": "À venir",
         "upNextEmpty": "Rien de prévu dans les trois prochaines semaines.",
-        "shiftLegend": "Légende des postes"
+        "shiftLegend": "Légende des postes",
+        "errorCalendarGone": "Ce calendrier n’existe plus.",
+        "errorCalendarNameInvalid": "Donnez au calendrier un nom de {{limit}} caractères au maximum.",
+        "errorCalendarOrderChanged": "Les calendriers ont changé entre-temps.",
+        "errorDeleteFeedAdminOnly": "Ce calendrier est exporté. Seul un administrateur peut le supprimer."
     },
     "noteCategories": {
         "categories": "Catégories",

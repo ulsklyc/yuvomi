@@ -1280,7 +1280,11 @@
         "sidebarLabel": "Postranní panel kalendáře",
         "upNextTitle": "Následuje",
         "upNextEmpty": "V příštích třech týdnech nic není.",
-        "shiftLegend": "Legenda směn"
+        "shiftLegend": "Legenda směn",
+        "errorCalendarGone": "Tento kalendář už neexistuje.",
+        "errorCalendarNameInvalid": "Dejte kalendáři název s nejvýše {{limit}} znaky.",
+        "errorCalendarOrderChanged": "Kalendáře se mezitím změnily.",
+        "errorDeleteFeedAdminOnly": "Tento kalendář se exportuje. Smazat ho může jen správce."
     },
     "noteCategories": {
         "categories": "Kategorie",

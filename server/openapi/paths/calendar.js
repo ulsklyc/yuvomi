@@ -137,7 +137,7 @@ export function calendarPaths() {
       post: op({
         summary: 'Create local calendar',
         tag: 'Calendar',
-        description: 'Requires write access to the calendar module.',
+        description: 'Requires write access to the calendar module. An empty name or one longer than 80 characters returns 400 with `reason: calendar_name_invalid` and `params: { limit }`.',
         stateChanging: true,
         responses: {
           201: { description: 'Local calendar created' },
@@ -153,7 +153,7 @@ export function calendarPaths() {
       patch: op({
         summary: 'Reorder local calendars',
         tag: 'Calendar',
-        description: 'Requires calendar write access. Supply every current calendar ID exactly once in `order`; all sort_order values are updated atomically to consecutive values starting at zero. An incomplete, duplicate or stale list returns 400 without changes.',
+        description: 'Requires calendar write access. Supply every current calendar ID exactly once in `order`; all sort_order values are updated atomically to consecutive values starting at zero. An incomplete, duplicate or stale list returns 400 without changes; a list of distinct IDs that no longer matches the current calendars carries `reason: calendar_order_changed`.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/LocalCalendarReorderInput'),
       }),
@@ -162,7 +162,7 @@ export function calendarPaths() {
       put: op({
         summary: 'Update local calendar',
         tag: 'Calendar',
-        description: 'Requires write access to the calendar module.',
+        description: 'Requires write access to the calendar module. An empty name or one longer than 80 characters returns 400 with `reason: calendar_name_invalid` and `params: { limit }`; an unknown calendar returns 404 with `reason: calendar_calendar_not_found`.',
         params: [idParam()],
         stateChanging: true,
         responses: {
@@ -178,7 +178,7 @@ export function calendarPaths() {
       delete: op({
         summary: 'Delete local calendar and reassign events to the default calendar',
         tag: 'Calendar',
-        description: 'Requires calendar write access. An active feed link also requires admin access.',
+        description: 'Requires calendar write access. An active feed link also requires admin access: otherwise 403 with `reason: calendar_feed_admin_only`. An unknown calendar returns 404 with `reason: calendar_calendar_not_found`.',
         params: [idParam()],
         stateChanging: true,
         responses: {

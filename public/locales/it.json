@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Barra laterale del calendario",
         "upNextTitle": "Prossimi",
         "upNextEmpty": "Niente in programma nelle prossime tre settimane.",
-        "shiftLegend": "Legenda dei turni"
+        "shiftLegend": "Legenda dei turni",
+        "errorCalendarGone": "Questo calendario non esiste più.",
+        "errorCalendarNameInvalid": "Dai al calendario un nome di al massimo {{limit}} caratteri.",
+        "errorCalendarOrderChanged": "Nel frattempo i calendari sono cambiati.",
+        "errorDeleteFeedAdminOnly": "Questo calendario viene esportato. Solo un amministratore può eliminarlo."
     },
     "noteCategories": {
         "categories": "Categorie",

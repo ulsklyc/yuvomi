@@ -1203,7 +1203,11 @@
         "sidebarLabel": "カレンダーのサイドバー",
         "upNextTitle": "次の予定",
         "upNextEmpty": "今後3週間の予定はありません。",
-        "shiftLegend": "シフトの凡例"
+        "shiftLegend": "シフトの凡例",
+        "errorCalendarGone": "このカレンダーはもう存在しません。",
+        "errorCalendarNameInvalid": "カレンダー名は{{limit}}文字以内で入力してください。",
+        "errorCalendarOrderChanged": "その間にカレンダーが変更されました。",
+        "errorDeleteFeedAdminOnly": "このカレンダーは書き出し中です。削除できるのは管理者だけです。"
     },
     "noteCategories": {
         "categories": "カテゴリー",

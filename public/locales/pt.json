@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Barra lateral do calendário",
         "upNextTitle": "A seguir",
         "upNextEmpty": "Nada nas próximas três semanas.",
-        "shiftLegend": "Legenda dos turnos"
+        "shiftLegend": "Legenda dos turnos",
+        "errorCalendarGone": "Este calendário já não existe.",
+        "errorCalendarNameInvalid": "Dê ao calendário um nome com no máximo {{limit}} caracteres.",
+        "errorCalendarOrderChanged": "Entretanto, os calendários foram alterados.",
+        "errorDeleteFeedAdminOnly": "Este calendário está a ser exportado. Só um administrador o pode eliminar."
     },
     "noteCategories": {
         "categories": "Categorias",

@@ -73,7 +73,7 @@ import { withTimeSuffix, clockText, timeSpanText, shiftTimeText, dateRangeText, 
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
-import { loadErrorSentence } from '/utils/friendly-error.js';
+import { errorSentence, isAlreadyDeleted, isGone, loadErrorSentence } from '/utils/friendly-error.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { isPermAdmin, moduleAccess } from '/permissions.js';
 import { pathAccess } from '/utils/module-access.js';
@@ -6373,7 +6373,7 @@ function renderLocalCalendarRow(calendar) {
   return `
     <div class="cal-calendar-row" data-calendar-id="${calendar.id}">
       <span class="cal-calendar-row__swatch" style="background-color:${esc(calendar.color)}" aria-hidden="true"></span>
-      ${writable ? `<input class="form-input cal-calendar-row__name" value="${esc(calendar.name)}" aria-label="${esc(t('calendar.localCalendarName'))}">
+      ${writable ? `<input class="form-input cal-calendar-row__name" maxlength="80" value="${esc(calendar.name)}" aria-label="${esc(t('calendar.localCalendarName'))}">
       <input class="form-input cal-calendar-row__color" type="color" value="${esc(calendar.color)}" aria-label="${esc(t('calendar.localCalendarColor'))}">` : ''}
       <span class="cal-calendar-row__count">${t('calendar.localCalendarEventCount', { count: calendar.event_count ?? 0 })}</span>
       <div class="cal-calendar-row__actions">
@@ -6475,6 +6475,28 @@ async function moveLocalCalendar(id, direction) {
   return true;
 }
 
+/**
+ * Der Satz zu einem gescheiterten Schritt der Kalender-Verwaltung (#1909) -
+ * nie der Text des Servers. Die Absage beim Loeschen eines geteilten Kalenders
+ * liest nur diese Seite (das Mitglied sieht den Abo-Link nicht); alles andere
+ * kommt aus CASE_MESSAGES oder ist der allgemeine Satz.
+ */
+function localCalendarErrorSentence(err) {
+  if (err?.status === 403 && err?.data?.reason === 'calendar_feed_admin_only') {
+    return t('calendar.errorDeleteFeedAdminOnly');
+  }
+  return errorSentence(err, 'calendar.saveError');
+}
+
+/**
+ * Ist der Stand der Verwaltung veraltet? Ein Kalender ist weg, oder die Liste
+ * hat sich beim Umsortieren inzwischen geaendert: dann holt sie sich selbst
+ * den aktuellen Stand, statt dem Nutzer dazu zu raten (#1909).
+ */
+function localCalendarsStale(err) {
+  return isGone(err) || (err?.status === 400 && err?.data?.reason === 'calendar_order_changed');
+}
+
 async function openLocalCalendarsModal() {
   if (moduleAccess('calendar') !== 'write') return;
   // Laden die Kalender erst, nachdem der Nutzer einen anderen Dialog geoeffnet
@@ -6506,7 +6528,7 @@ async function openLocalCalendarsModal() {
       await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
       refocusAfterRender();
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+      window.yuvomi?.showToast(localCalendarErrorSentence(err), 'danger');
     }
   });
 
@@ -6563,13 +6585,20 @@ async function openLocalCalendarsModal() {
           danger: true,
         });
         if (!ok) return;
-        await api.delete(`/calendar/calendars/${id}`);
+        try {
+          await api.delete(`/calendar/calendars/${id}`);
+        } catch (err) {
+          // Schon geloescht (von jemand anderem im Haushalt): das ist, was
+          // der Nutzer wollte - kein Fehler (#1909).
+          if (!isAlreadyDeleted(err, 'calendar_calendar_not_found')) throw err;
+        }
         window.yuvomi?.showToast(t('calendar.localCalendarDeleted'), 'success');
         await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
         refocusAfterRender();
       }
     } catch (err) {
-      window.yuvomi?.showToast(err.data?.error ?? t('calendar.saveError'), 'danger');
+      window.yuvomi?.showToast(localCalendarErrorSentence(err), 'danger');
+      if (localCalendarsStale(err)) await reloadAfterSave(() => refreshLocalCalendarsPanel(panel));
     }
   });
 }

@@ -1221,7 +1221,11 @@
         "sidebarLabel": "Bilah sisi kalender",
         "upNextTitle": "Berikutnya",
         "upNextEmpty": "Tidak ada apa pun dalam tiga minggu ke depan.",
-        "shiftLegend": "Keterangan shift"
+        "shiftLegend": "Keterangan shift",
+        "errorCalendarGone": "Kalender ini sudah tidak ada.",
+        "errorCalendarNameInvalid": "Beri kalender nama dengan paling banyak {{limit}} karakter.",
+        "errorCalendarOrderChanged": "Kalender telah berubah sementara itu.",
+        "errorDeleteFeedAdminOnly": "Kalender ini sedang diekspor. Hanya admin yang dapat menghapusnya."
     },
     "noteCategories": {
         "categories": "Kategori",

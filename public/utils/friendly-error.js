@@ -351,6 +351,13 @@ export const CASE_MESSAGES = new Map([
   ['recipe_providers_sync_unreachable', 'settings.recipeProviderErrorSyncUnreachable'],
   ['recipe_providers_sync_certificate', 'settings.recipeProviderErrorSyncCertificate'],
   ['recipe_providers_sync_bad_response', 'settings.recipeProviderErrorSyncBadResponse'],
+  // Kalender-Verwaltung (#1909). Der Kalender, der weg ist, steht auch in
+  // GONE_REASONS: die Verwaltung laedt dann nach, ein Loeschen mit diesem Grund
+  // ist ein Erfolg. Eine geaenderte Liste beim Umsortieren laedt ebenso nach
+  // (pages/calendar.js). Die Grenze des Namens traegt ihre Zahl (CASE_PARAMS).
+  ['calendar_calendar_not_found', 'calendar.errorCalendarGone'],
+  ['calendar_name_invalid', 'calendar.errorCalendarNameInvalid'],
+  ['calendar_order_changed', 'calendar.errorCalendarOrderChanged'],
 ]);
 
 /**
@@ -389,6 +396,7 @@ export const CASE_PARAMS = new Map([
   ['contacts_address_label_too_long', ['limit']],
   ['contacts_address_part_too_long', ['limit']],
   ['recipe_providers_sync_http_status', ['status']],
+  ['calendar_name_invalid', ['limit']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -494,6 +502,7 @@ export const GONE_REASONS = new Set([
   'rewards_money_plan_not_found',
   'quick_links_link_not_found',
   'recipe_providers_account_not_found',
+  'calendar_calendar_not_found',
 ]);
 
 /**

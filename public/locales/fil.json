@@ -1221,7 +1221,11 @@
         "sidebarLabel": "Sidebar ng kalendaryo",
         "upNextTitle": "Susunod",
         "upNextEmpty": "Walang nakatakda sa susunod na tatlong linggo.",
-        "shiftLegend": "Alamat ng mga shift"
+        "shiftLegend": "Alamat ng mga shift",
+        "errorCalendarGone": "Wala na ang kalendaryong ito.",
+        "errorCalendarNameInvalid": "Bigyan ang kalendaryo ng pangalang hindi hihigit sa {{limit}} na character.",
+        "errorCalendarOrderChanged": "Nagbago na ang mga kalendaryo sa pansamantala.",
+        "errorDeleteFeedAdminOnly": "Ine-export ang kalendaryong ito. Admin lang ang makakapag-delete nito."
     },
     "noteCategories": {
         "categories": "Mga kategorya",

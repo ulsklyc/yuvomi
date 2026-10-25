@@ -607,6 +607,9 @@ and fallback on deletion. It also drives whole iCloud and Google sync runs again
 client and moves an event through the write route while its upload is in flight (#1926): the row
 must stay local and keep its calendar, and the next run must delete the copy at the provider;
 the same holds for a series that gets its first single-occurrence override in that moment.
+The calendar manager cases (gone calendar, invalid name, changed order, export only an admin may
+delete) carry a `reason` at the route and reach the toast as the app's sentence, never the server
+text (#1909).
 It runs independently in the main test chain.
 
 Run `npm run test:calendar-occurrence-overrides`

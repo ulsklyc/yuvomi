@@ -225,7 +225,7 @@ test('member write access manages calendars; feeds and linked deletion require a
     actor = MEMBER;
     const refusal = await call('DELETE', `/calendars/${calendar.id}`);
     assert.equal(refusal.status, 403);
-    assert.deepEqual(refusal.body, { error: 'Admin access required.', code: 403 });
+    assert.deepEqual(refusal.body, { error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
     const listed = (await call('GET', '/calendars')).body.data.find(row => row.id === calendar.id);
     assert.equal(listed.feed_token, null);
     actor = ADMIN;
@@ -890,4 +890,70 @@ test('an event deleted while its Google upload is in flight leaves no entry behi
     assert.deepEqual(inserts, ['Deleted while uploading to Google']);
     assert.deepEqual(queued(), [{ calendar_external_id: TARGET, event_external_id: 'created-1926-1' }]);
   });
+});
+
+// #1909, Kalender-Verwaltung: der Server benennt jeden Fall, den ein Nutzer im
+// Dialog erreicht, mit einem `reason`; der Text in `error` ist englisch und
+// bleibt fuer API-Clients stehen.
+test('the calendar manager cases carry a reason and an English error text (#1909)', async () => {
+  const GERMAN = /[äöüß]|Kalender|Gib |Reihenfolge|Farbe/;
+  const missing = 999999;
+  for (const [method, route, body] of [
+    ['PUT', `/calendars/${missing}`, { name: 'Gone' }],
+    ['DELETE', `/calendars/${missing}`, undefined],
+    ['POST', `/calendars/${missing}/feed/regenerate`, undefined],
+    ['DELETE', `/calendars/${missing}/feed`, undefined],
+  ]) {
+    const res = await call(method, route, { body });
+    assert.equal(res.status, 404, `${method} ${route}`);
+    assert.equal(res.body.reason, 'calendar_calendar_not_found', `${method} ${route}`);
+    assert.equal(res.body.code, 404);
+    assert.equal(typeof res.body.error, 'string');
+    assert.doesNotMatch(res.body.error, GERMAN, `${method} ${route}: ${res.body.error}`);
+  }
+
+  const calendar = await createCalendar('Reasons', '#123456');
+  try {
+    for (const name of ['', '   ', 'x'.repeat(81)]) {
+      for (const [method, route] of [['POST', '/calendars'], ['PUT', `/calendars/${calendar.id}`]]) {
+        const res = await call(method, route, { body: { name, color: '#123456' } });
+        assert.equal(res.status, 400, `${method} "${name.slice(0, 5)}"`);
+        assert.equal(res.body.reason, 'calendar_name_invalid', `${method} "${name.slice(0, 5)}"`);
+        assert.deepEqual(res.body.params, { limit: 80 });
+        assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
+      }
+    }
+    // Eine Farbe, die nur ein Aufrufer an der Oberflaeche vorbei schickt: kein Fall.
+    const color = await call('PUT', `/calendars/${calendar.id}`, { body: { color: 'blue' } });
+    assert.equal(color.status, 400);
+    assert.equal(color.body.reason, undefined);
+    assert.doesNotMatch(color.body.error, GERMAN, color.body.error);
+
+    // Die Liste hat sich inzwischen geaendert (ein Kalender kam dazu oder ging).
+    const ids = (await call('GET', '/calendars')).body.data.map(row => row.id);
+    for (const stale of [ids.slice(1), [...ids, missing], ids.map((id, index) => (index ? id : missing))]) {
+      const res = await call('PATCH', '/calendars/reorder', { body: { order: stale } });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.reason, 'calendar_order_changed', JSON.stringify(stale));
+      assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
+    }
+    // Was nur ein Aufrufer schickt (keine Liste, doppelte, Texte): kein Fall.
+    for (const invalid of [undefined, ids.map(() => ids[0]), ids.map(String)]) {
+      const res = await call('PATCH', '/calendars/reorder', { body: { order: invalid } });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.reason, undefined, JSON.stringify(invalid));
+      assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
+    }
+
+    // Ein Mitglied loescht einen Kalender, den ein Admin als Abo-Link teilt.
+    assert.equal((await call('POST', `/calendars/${calendar.id}/feed/regenerate`)).status, 200);
+    actor = MEMBER;
+    const refusal = await call('DELETE', `/calendars/${calendar.id}`);
+    assert.equal(refusal.status, 403);
+    assert.equal(refusal.body.reason, 'calendar_feed_admin_only');
+    assert.equal(refusal.body.error, 'Admin access required.', 'der Text fuer API-Clients bleibt');
+  } finally {
+    actor = ADMIN;
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
 });

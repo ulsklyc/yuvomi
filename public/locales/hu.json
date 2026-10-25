@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Naptár oldalsáv",
         "upNextTitle": "Következik",
         "upNextEmpty": "A következő három hétben nincs semmi.",
-        "shiftLegend": "Műszakok jelmagyarázata"
+        "shiftLegend": "Műszakok jelmagyarázata",
+        "errorCalendarGone": "Ez a naptár már nem létezik.",
+        "errorCalendarNameInvalid": "Adj a naptárnak legfeljebb {{limit}} karakteres nevet.",
+        "errorCalendarOrderChanged": "A naptárak időközben megváltoztak.",
+        "errorDeleteFeedAdminOnly": "Ez a naptár exportálva van. Csak egy rendszergazda törölheti."
     },
     "noteCategories": {
         "categories": "Kategóriák",

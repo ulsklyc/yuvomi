@@ -1203,7 +1203,11 @@
         "sidebarLabel": "日历侧边栏",
         "upNextTitle": "接下来",
         "upNextEmpty": "未来三周没有安排。",
-        "shiftLegend": "班次图例"
+        "shiftLegend": "班次图例",
+        "errorCalendarGone": "此日历已不存在。",
+        "errorCalendarNameInvalid": "日历名称最多 {{limit}} 个字符。",
+        "errorCalendarOrderChanged": "日历在此期间已更改。",
+        "errorDeleteFeedAdminOnly": "此日历正在导出。只有管理员可以删除它。"
     },
     "noteCategories": {
         "categories": "分类",

@@ -1355,7 +1355,11 @@
         "sidebarLabel": "Боковая панель календаря",
         "upNextTitle": "Далее",
         "upNextEmpty": "В ближайшие три недели ничего нет.",
-        "shiftLegend": "Обозначения смен"
+        "shiftLegend": "Обозначения смен",
+        "errorCalendarGone": "Этого календаря больше нет.",
+        "errorCalendarNameInvalid": "Дайте календарю название не длиннее {{limit}} символов.",
+        "errorCalendarOrderChanged": "Тем временем календари изменились.",
+        "errorDeleteFeedAdminOnly": "Этот календарь экспортируется. Удалить его может только администратор."
     },
     "noteCategories": {
         "categories": "Категории",

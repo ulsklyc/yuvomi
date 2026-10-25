@@ -1221,7 +1221,11 @@
         "sidebarLabel": "Seitenleiste des Kalenders",
         "upNextTitle": "Als Nächstes",
         "upNextEmpty": "In den nächsten drei Wochen steht nichts an.",
-        "shiftLegend": "Legende der Schichten"
+        "shiftLegend": "Legende der Schichten",
+        "errorCalendarGone": "Diesen Kalender gibt es nicht mehr.",
+        "errorCalendarNameInvalid": "Gib dem Kalender einen Namen mit höchstens {{limit}} Zeichen.",
+        "errorCalendarOrderChanged": "Die Kalender wurden inzwischen geändert.",
+        "errorDeleteFeedAdminOnly": "Dieser Kalender wird exportiert. Nur ein Admin kann ihn löschen."
     },
     "noteCategories": {
         "categories": "Kategorien",

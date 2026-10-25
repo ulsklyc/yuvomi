@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Takvim kenar çubuğu",
         "upNextTitle": "Sıradaki",
         "upNextEmpty": "Önümüzdeki üç haftada bir şey yok.",
-        "shiftLegend": "Vardiya açıklaması"
+        "shiftLegend": "Vardiya açıklaması",
+        "errorCalendarGone": "Bu takvim artık yok.",
+        "errorCalendarNameInvalid": "Takvime en fazla {{limit}} karakterlik bir ad verin.",
+        "errorCalendarOrderChanged": "Bu arada takvimler değişti.",
+        "errorDeleteFeedAdminOnly": "Bu takvim dışa aktarılıyor. Yalnızca bir yönetici silebilir."
     },
     "noteCategories": {
         "categories": "Kategoriler",

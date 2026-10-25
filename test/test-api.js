@@ -820,6 +820,9 @@ const publicSource = (rel) => readFileSync(new URL(`../public/${rel}`, import.me
 const REASONS_READ_BY_A_PAGE = new Map([
   ['ATTACHMENT_CHANGE_REFUSED', 'pages/calendar.js'],
   ['ATTACHMENT_UPLOAD_REFUSED', 'pages/calendar.js'],
+  // Ein Mitglied loescht einen Kalender, den ein Admin exportiert (#1909): das
+  // Mitglied sieht den Abo-Link nicht, die Verwaltung sagt es ihm.
+  ['calendar_feed_admin_only', 'pages/calendar.js'],
   ['FOLDER_DOCUMENTS_NOT_MANAGEABLE', 'utils/document-folder-delete.js'],
   // Gravatar-Import (#1791): GRAVATAR_REASON_KEYS auf der Kontoseite. Einen
   // Gast erreicht der Knopf gar nicht (gravatarAvailable), der Satz steht fuer
@@ -897,6 +900,8 @@ const REASONS_PASSED_THROUGH = new Map([
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
   ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/calendar/local-calendars.js: withReason.reason', { sites: 1, at403: [],
+    why: 'sendValidationErrors: feste 400 (calendar_name_invalid)' }],
   // SMTP (Re-Critique 2026-10-17): die Absage beim Speichern und der Fall der
   // Testmail. Beides reist an einer festen 400 bzw. in einer 200, nie an 403.
   ['routes/email.js: refusal.reason', { sites: 1, at403: [], why: 'emailConfigRefusal: feste 400' }],

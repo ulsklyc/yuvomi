@@ -1203,7 +1203,11 @@
         "sidebarLabel": "Barra lateral del calendario",
         "upNextTitle": "A continuación",
         "upNextEmpty": "Nada en las próximas tres semanas.",
-        "shiftLegend": "Leyenda de turnos"
+        "shiftLegend": "Leyenda de turnos",
+        "errorCalendarGone": "Este calendario ya no existe.",
+        "errorCalendarNameInvalid": "Ponle al calendario un nombre de {{limit}} caracteres como máximo.",
+        "errorCalendarOrderChanged": "Los calendarios han cambiado mientras tanto.",
+        "errorDeleteFeedAdminOnly": "Este calendario se está exportando. Solo un administrador puede eliminarlo."
     },
     "noteCategories": {
         "categories": "Categorías",
