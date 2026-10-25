@@ -8047,13 +8047,14 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * nicht. Die 88%/76%-Abdunklung bleibt: sie reproduziert die
  * „Action"-Abstufung des bisherigen --color-btn-primary. */
 .btn--primary {
-  background-color: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950));
+  /* Abdunklung im Token, Vollton ohne color-mix() (tokens.css, #2184). */
+  background-color: var(--btn-primary-fill);
   color: var(--color-ink-on-vivid);
   box-shadow: var(--shadow-sm);
 }
 
 .btn--primary:hover {
-  background-color: color-mix(in srgb, var(--color-accent) 76%, var(--neutral-950));
+  background-color: var(--btn-primary-fill-hover);
   box-shadow: var(--shadow-md);
 }
 

@@ -5941,10 +5941,23 @@ button.today-cockpit__more--link {
   padding: 0;
   margin: 0;
   max-width: none;
+  /* DIE HOEHE KOMMT VON DER SHELL, NICHT VOM VIEWPORT (#2183). Hier stand an
+   * `.wall` `min-height: 100dvh`. Chrome < 108 verwirft die Zeile, ein
+   * vh-Zwilling ist auf der Wand verboten (auf dem Telefon ist 100vh die GROSSE
+   * Hoehe, test:frontend-audit) - auf einem Wandrahmen mit WebView 106 war die
+   * Wand deshalb so hoch wie ihr Inhalt, und der Fuss stand mitten im Bild.
+   * `.app-shell` traegt die Hoehe mit Rueckfallkette, `.page-transition`
+   * reicht sie als `height: 100%` durch; die Seite fuellt sie, Shell und
+   * Flaeche wachsen per Flex hinein. Nebenbei zieht das das Offline-Banner ab
+   * (Polster an `.app-content`), das 100dvh ueberragte. Guard:
+   * test:old-browser-fallbacks. */
+  min-height: 100%;
 }
 
 .dashboard--wall .dashboard-shell {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
   gap: 0;
 }
 
@@ -5974,7 +5987,8 @@ button.today-cockpit__more--link {
   display: flex;
   flex-direction: column;
   gap: var(--wall-gap);
-  min-height: 100dvh;
+  /* Fuellt die Shell der Wand (Hoehe von `.dashboard--wall`, #2183). */
+  flex: 1 0 auto;
   padding: var(--wall-pad);
   background: var(--color-bg);
   /* Container statt Viewport-Breakpoint (Token-Doktrin §11c): die Fläche fragt

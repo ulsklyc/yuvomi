@@ -197,7 +197,7 @@ which version:
 
 | Feature | Chrome | Firefox | Safari | Without it |
 |---|---|---|---|---|
-| `color-mix()` | 111 | 113 | 16.2 | Tinted surfaces, selected and hover states lose their color; the dialog backdrop loses its tint |
+| `color-mix()` | 111 | 113 | 16.2 | Tinted surfaces and hover states lose their color; the dialog backdrop loses its tint. Where that would lose information, a plain color stands in: primary buttons, the add button, toasts, holidays, selected rows and filters, the search overlay, note and shift colors (as a ring) and empty checklist boxes |
 | `:has()` | 105 | 121 | 15.4 | Layout details: toolbar wrapping, the space kept free above the bottom navigation, full-height split pages |
 | Container queries | 105 | 110 | 16 | Cards and lists keep their narrow layout; split views stay in one column |
 | Popover | 114 | 125 | 17 | The menus behind a button are not available and stay hidden: every "more" menu (module tools, list rows, documents), the account menu at the foot of the sidebar, the Overview's New and tools menus, the calendar's view menu. Their buttons do nothing; Log out is also under Settings > Account. The date field's calendar does not open (typing a date works, touch devices get the system picker) |
