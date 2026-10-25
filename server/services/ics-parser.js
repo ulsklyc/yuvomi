@@ -112,6 +112,26 @@ function parseRelations(block) {
   return { parentUid, childUids };
 }
 
+// Wert einer Property im Block. Der Doppelpunkt vor dem Wert ist der erste
+// ausserhalb eines gequoteten Parameters: ALTREP="data:text/html,..." enthaelt
+// selbst Doppelpunkte und darf den Wert nicht abschneiden (#2189).
+function propertyValue(block, prop) {
+  const lines  = block.split(/\r?\n/);
+  const needle = prop.toUpperCase();
+  for (const line of lines) {
+    if (!line.toUpperCase().startsWith(needle)) continue;
+    const after = line[needle.length];
+    if (after !== ':' && after !== ';') continue;
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') inQuotes = !inQuotes;
+      if (ch === ':' && !inQuotes) return line.slice(i + 1).trim();
+    }
+  }
+  return null;
+}
+
 /**
  * @param {string} ics
  * @param {{onSkip?: (info: {uid: string|null, reason: string, summary: string|null}) => void, allowMissingUid?: boolean}} [opts]
@@ -134,11 +154,7 @@ function parseICS(ics, { onSkip, allowMissingUid = false } = {}) {
   let match;
   while ((match = vEventRe.exec(unfolded)) !== null) {
     const block = match[1];
-    const get   = (prop) => {
-      const re = new RegExp(`^${prop}(?:;[^:]*)?:(.*)$`, 'im');
-      const m  = re.exec(block);
-      return m ? m[1].trim() : null;
-    };
+    const get = (prop) => propertyValue(block, prop);
     const uid         = get('UID');
     const summary     = unescapeICSText(get('SUMMARY') || '(kein Titel)');
     const description = unescapeICSText(get('DESCRIPTION')) || null;
@@ -311,11 +327,7 @@ function parseVTODO(ics) {
   let match;
   while ((match = vTodoRe.exec(unfolded)) !== null) {
     const block = match[1];
-    const get   = (prop) => {
-      const re = new RegExp(`^${prop}(?:;[^:]*)?:(.*)$`, 'im');
-      const m  = re.exec(block);
-      return m ? m[1].trim() : null;
-    };
+    const get = (prop) => propertyValue(block, prop);
     const uid = get('UID');
     if (!uid) continue;
     const summary     = unescapeICSText(get('SUMMARY') || '(kein Titel)');

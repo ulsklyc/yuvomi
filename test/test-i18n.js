@@ -579,6 +579,20 @@ test('jede Gedankenstrich-Ausnahme trifft einen Wert, der den Strich wirklich tr
   }
 });
 
+// Kein Locale-Wert traegt HTML. Die Aufrufer setzen t() als Text (textContent,
+// esc() in settingRowHtml); ein Tag in der Uebersetzung steht dann woertlich da.
+// Gefunden 25.10.2026: der Apple-Passworthinweis zeigte "<strong>appleid...</strong>"
+// in allen 27 Sprachen. Hervorhebung gehoert ins Markup des Aufrufers, nie in die Locale.
+test('kein Locale-Wert traegt ein HTML-Tag', () => {
+  const hits = [];
+  for (const locale of LOCALES) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      if (/<\/?[a-zA-Z][^>]*>/.test(value)) hits.push(`${locale}: ${key}`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});
+
 // Dasselbe fuer Texte, die NICHT aus einer Locale kommen: Template- und
 // String-Literale im Frontend-JS (Re-Critique 2026-09-28, F7). Gefunden: der
 // Halbgeviertstrich zwischen "Ueberfaellig" und Datum sowie zwischen "Heute"

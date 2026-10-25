@@ -86,6 +86,25 @@ test('parseICS: unescape text fields', () => {
   assert(ev.location === 'Main St, City', `location: ${ev.location}`);
 });
 
+test('parseICS: DESCRIPTION mit ALTREP (quoted param with colon) (#2189)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:altrep@x\r\nSUMMARY:Spritzen\r\nDESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen\r\nDTSTART:20260615T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(ev.description === 'Spritzen', `description: ${ev.description}`);
+  assert(ev.summary === 'Spritzen', `summary: ${ev.summary}`);
+});
+
+test('parseICS: SUMMARY mit quoted param (#2189)', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:altrep2@x\r\nSUMMARY;ALTREP="data:text/html,Title":Title\r\nDTSTART:20260615T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(ev.summary === 'Title', `summary: ${ev.summary}`);
+});
+
+test('parseICS: DESCRIPTION-X wird nicht als DESCRIPTION gelesen', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:descx@x\r\nSUMMARY:Titel\r\nDESCRIPTION-X:irrelevant\r\nDTSTART:20260615T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR';
+  const [ev] = parseICS(ics);
+  assert(ev.description === null, `description: ${ev.description}`);
+});
+
 test('expandRRULE: null rrule → leeres Array', () => {
   const v = { uid: 'x', summary: 'x', description: null, location: null,
               dtstart: '2026-04-20', dtend: null, rrule: null, allDay: true };

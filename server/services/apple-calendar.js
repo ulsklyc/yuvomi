@@ -6,7 +6,7 @@
  * Konfiguration (.env):
  *   APPLE_CALDAV_URL              - z.B. https://caldav.icloud.com
  *   APPLE_USERNAME                - Apple-ID E-Mail
- *   APPLE_APP_SPECIFIC_PASSWORD   - App-spezifisches Passwort aus appleid.apple.com
+ *   APPLE_APP_SPECIFIC_PASSWORD   - App-spezifisches Passwort aus account.apple.com
  *
  * sync_config-Schlüssel:
  *   apple_last_sync - ISO-8601-Timestamp des letzten Syncs
