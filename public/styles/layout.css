@@ -278,11 +278,13 @@
  *     darueber waere ihr Geist.
  *   - `kitchen-tabs` (kitchen-tabs.css): derselbe Knoten vorher und nachher,
  *     ebenso nur lebend - seine Kapsel gleitet dort zum Ziel.
- *   - `page-toolbar` (per Inline-Stil am ersten Kopf): Kopf steht, sein
- *     Inhalt blendet mit der Wurzel ueber. Die Gruppe selbst bewegt sich
- *     nicht (`animation: none`) - kein Kopf gleitet.
- * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), blendet
- * er wie die Wurzel (`:only-child` laesst die Standard-Blende stehen).
+ *   - `page-toolbar` (per Inline-Stil am ersten Kopf): Kopf steht, die
+ *     Gruppe bewegt sich nicht (`animation: none`) - kein Kopf gleitet. Beim
+ *     Seitenwechsel schneidet sein Inhalt mit der Wurzel (`html.page-cut`);
+ *     ueberblendet wird er nur beim Theme-Wechsel.
+ * Kommt ein Name nur auf EINER Seite vor (Kueche betreten/verlassen), folgt
+ * er der Wurzel (`:only-child` laesst ihre Regel stehen: Schnitt beim
+ * Seitenwechsel, Blende beim Theme).
  * -------------------------------------------------------- */
 /* Die Chrome-Namen stehen NUR waehrend des Wechsels:
  * swapPage setzt `html.page-swapping` vor startViewTransition und nimmt es nach
@@ -9372,7 +9374,7 @@ textarea::placeholder {
     transparent 75%
   );
   transform: translateX(-100%);
-  animation: skeleton-shimmer 1.5s var(--ease-in-out) var(--duration-sm) infinite;
+  animation: skeleton-shimmer var(--shimmer-period) var(--ease-in-out) var(--duration-sm) infinite;
 }
 
 @keyframes skeleton-in {
@@ -10741,7 +10743,7 @@ button.btn--loading:is(:enabled, :disabled) {
 }
 
 .swipe-row--hint > :first-child {
-  animation: swipe-nudge 800ms var(--ease-out) 1200ms both;
+  animation: swipe-nudge var(--hint-nudge) var(--ease-out) var(--hint-delay) both;
 }
 
 [dir='rtl'] .swipe-row--hint > :first-child {

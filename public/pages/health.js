@@ -6838,7 +6838,11 @@ async function loadOverview() {
   const medPlans = splitMedPlans(mRes.data, OVERVIEW_ADHERENCE_DAYS);
   overview.meds = medPlans.list;
   overview.schedulesByMed = medPlans.schedulesByMed;
-  overview.logsByMed = medPlans.logsByMed;
+  // Ein Dosis-Eintrag in der Loeschfrist fehlt auch hier (R23 S11, Rest aus
+  // S4): reloadMedViews zeichnet die Uebersicht neu, und der Server kennt den
+  // Eintrag noch - er stand fuenf Sekunden weiter in Zaehlern und Liste.
+  overview.logsByMed = Object.fromEntries(Object.entries(medPlans.logsByMed)
+    .map(([id, rows]) => [id, visibleRows('medLogs', rows)]));
   overview.cyclePeriods = cpRes.data || [];
   overview.cycleLogs = clRes.data || [];
   overview.cycleSettings = cycleSettings;

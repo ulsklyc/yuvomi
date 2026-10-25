@@ -467,6 +467,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in step 2 and only promises swiping where lists swipe.
 
 ### Fixed
+- **A deleted dose no longer lingers in the Health overview.** Deleting a dose entry in Medications
+  removed it there at once, but the Health overview kept counting and listing it until the undo
+  window was over.
 - **Open tasks no longer look done in Calendar.** Task chips in week, day and agenda views showed
   a ticked box; they now show the open circle that tasks use.
 - **Opening a document with a tap no longer rings the close button.** Dialogs without fields, like

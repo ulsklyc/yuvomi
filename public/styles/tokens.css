@@ -1863,6 +1863,14 @@
    * noch" in drei Stimmen. Eine Schleife, kein Uebergang: deshalb ausserhalb
    * der --duration-Stufen. Unter reduzierter Bewegung dreht er weiter (reset.css). */
   --spin-period: 700ms;
+  /* DIE ANDEREN BEIDEN ZEITEN AUSSERHALB DER STUFEN (R23 S11, Critique G0
+   * S-P3-3): sie standen als Literale in layout.css. Der Lade-Schimmer ist
+   * eine Schleife wie der Spinner (eine Bahn ueber das Skelett); der
+   * Wisch-Hinweis ist ein einmaliger Stups an einer neuen Zeile - seine
+   * Dauer und die Wartezeit davor, damit er erst nach dem Aufbau kommt. */
+  --shimmer-period: 1.5s;
+  --hint-nudge: 800ms;
+  --hint-delay: 1200ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Symmetrische Kurve fuer Hoehenwechsel (Einklappen/Aufziehen von Zeilen und

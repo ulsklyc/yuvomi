@@ -250,7 +250,6 @@ const MOTION_EXCEPTIONS = new Map([
   ['calendar.css: .cal-press-ghost', 'Fortschritt des Langdrucks: laeuft linear mit der Haltezeit (--cal-press-ms), keine Bewegungskurve'],
   ['layout.css: .search-overlay', '`visibility 0s linear <Verzoegerung>`: diskreter Schalter nach der Blende, keine Bewegung'],
   ['layout.css: .swipe-reveal', 'folgt dem Finger: die Deckkraft wird je Frame gesetzt, linear glaettet nur'],
-  ['layout.css: .swipe-row--hint > :first-child', 'einmaliger Wisch-Hinweis (Onboarding), nicht im Arbeitsfluss'],
   ['dashboard.css: .dashboard-icon-btn--hint', 'einmaliger Hinweis-Puls (3 Wiederholungen), nicht im Arbeitsfluss'],
   ['health.css: .cycle-ring__now', 'Hinweis-Puls am heutigen Tag (3 Wiederholungen), nicht im Arbeitsfluss'],
   ['screensaver.css: .photo-screensaver img', 'Bildschirmschoner: langsame Ueberblendung zwischen Fotos, kein Bedienmoment'],
@@ -3169,4 +3168,21 @@ test('R22: Chips, Segmente, Menueeintraege und Karten quittieren den Druck mit i
     }
   }
   assert.deepEqual(failures, [], failures.join('\n'));
+});
+
+// R23 S11 (Critique G0 S-P3-3): Schimmer und Wisch-Hinweis standen als
+// Literale in layout.css (1.5s, 800ms, 1200ms) - auch die Schleife traegt
+// ihre Zeit aus tokens.css, wie der Spinner (--spin-period).
+test('R23: Lade-Schimmer und Wisch-Hinweis lesen ihre Zeiten aus Tokens', () => {
+  const layout = [...eachRule(css('layout.css'))];
+  const shimmer = layout.filter((r) => /skeleton-shimmer/.test(r.body));
+  const nudge = layout.filter((r) => /swipe-nudge/.test(r.body) && /animation:/.test(r.body));
+  assert.ok(shimmer.length && nudge.length, 'beide Stellen gefunden');
+  for (const r of [...shimmer, ...nudge]) {
+    const anim = /animation:\s*([^;]+)/.exec(r.body)?.[1] ?? '';
+    assert.doesNotMatch(anim, /(?<![\w.-])\d*\.?\d+m?s\b/, `${r.selector}: Literal-Zeit in "${anim}"`);
+  }
+  for (const name of ['--shimmer-period', '--hint-nudge', '--hint-delay']) {
+    assert.match(css('tokens.css'), new RegExp(`${name}:\\s*\\d*\\.?\\d+m?s;`), `${name} fehlt in tokens.css`);
+  }
 });

@@ -192,7 +192,7 @@ test('R17: schmal bekommt der Medikamentenname die Zeile, die Aktionen stehen da
 // Test es sagt - so ist sichtbar, welche Abrufe gleichzeitig offen sind.
 // --------------------------------------------------------
 
-async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [] }) {
+async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [], hidden = {} }) {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
   const start = src.indexOf('async function loadOverview() {');
@@ -213,13 +213,15 @@ async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [] }) 
   const overview = { personId, meId, vitals: null, meds: null, cyclePeriods: null, cycleLogs: null, cycleSettings: undefined };
   const AsyncFunction = (async () => {}).constructor;
   const run = new AsyncFunction(
-    'overview', 'api', 'cycleEnabled', 'todayKey', 'addLocalDays', 'medLogWindowDays', 'OVERVIEW_ADHERENCE_DAYS', 'doseAttempts',
+    'overview', 'api', 'cycleEnabled', 'todayKey', 'addLocalDays', 'medLogWindowDays', 'OVERVIEW_ADHERENCE_DAYS', 'doseAttempts', 'visibleRows',
     `${body}\nreturn loadOverview();`,
   );
   // Seit #2069 klaert ein gelungenes Laden offene Dosis-Versuche; die Wellen
   // betrifft das nicht, deshalb hier nur ein Stellvertreter.
   const doseAttempts = { confirmedBy() {} };
-  const done = run(overview, api, cycleEnabled, () => '2026-10-07', (key) => key, () => 30, 30, doseAttempts);
+  // Wie health.js: ein Eintrag in der Loeschfrist faellt aus der Liste.
+  const visibleRows = (area, rows) => (rows ?? []).filter((row) => !(hidden[area] ?? new Set()).has(row.id));
+  const done = run(overview, api, cycleEnabled, () => '2026-10-07', (key) => key, () => 30, 30, doseAttempts, visibleRows);
   // Eine Welle = alles, was offen ist, sobald der Code nicht mehr weiterkommt.
   const settle = () => new Promise((resolve) => setImmediate(resolve));
   const answer = (pick) => {
@@ -281,6 +283,18 @@ test('overview: each medication keeps its own log window from the bundled answer
   assert.deepEqual(h.overview.schedulesByMed[9].map((row) => row.id), [5]);
   assert.deepEqual(h.overview.schedulesByMed[10], []);
   assert.equal('logs' in h.overview.meds[0], false, 'die Liste traegt die Zusaetze nicht weiter');
+});
+
+// R23 S11 (Rest aus S4): ein geloeschter Dosis-Eintrag stand fuer die Dauer
+// der Loeschfrist weiter in der Uebersicht - reloadMedViews zeichnet sie neu,
+// und der Server kennt den Eintrag noch.
+test('overview: a dose entry in its undo window is left out like in the meds area', async () => {
+  const meds = [{ id: 9, logs: [{ id: 1, scheduled_at: '2026-10-07T08:00' }, { id: 2, scheduled_at: '2026-10-07T20:00' }], schedules: [] }];
+  const h = await loadOverviewHarness({ cycleEnabled: false, personId: 4, meId: 4, meds, hidden: { medLogs: new Set([2]) } });
+  await h.settle();
+  h.answer();
+  await h.finished();
+  assert.deepEqual(h.overview.logsByMed[9].map((row) => row.id), [1]);
 });
 
 test('overview: the cycle rule still decides what is requested at all', async () => {

@@ -28,7 +28,9 @@
  *     im Inhalt. Ein Name darf je Zustand nur EINMAL vorkommen, sonst verwirft
  *     der Browser die ganze Transition - und manche Seiten tragen einen
  *     zweiten Kopf (`.page-toolbar--in-group` unter der Kuechen-Leiste).
- *     Sein Inhalt blendet ueber, der Kopf selbst gleitet nicht.
+ *     Der Kopf gleitet nicht; beim Seitenwechsel schneidet auch sein Inhalt
+ *     (`html.page-cut`, unten), uebergeblendet wird er nur noch beim
+ *     Theme-Wechsel.
  *
  * DER SEITENWECHSEL SCHNEIDET (Critique R22, D1): zwischen gleichrangigen
  * Zielen blendet nichts mehr, weder Wurzel noch Kopf (`html.page-cut` in
