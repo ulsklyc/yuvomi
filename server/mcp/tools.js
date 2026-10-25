@@ -731,15 +731,41 @@ const OPENAPI_TOOLS = [
       const contentType = contentTypes.includes('application/octet-stream')
         ? 'application/octet-stream'
         : contentTypes[0];
+      const sendsBody = !['GET', 'HEAD'].includes(operation.method);
+      const hasContent = args.content_data !== undefined && args.content_data !== null;
+      let payload = args.payload;
+      // DER BODY GEHOERT IN `payload` (#2197). Ein Assistent, der die Felder
+      // neben `operation_key` legte ({ operation_key, title }), schickte einen
+      // POST ohne Body - die Felder fielen still weg, und die Route antwortete
+      // mit 500. Fremde Schluessel auf oberster Ebene sind dann fast sicher der
+      // gemeinte Body: lieber sagen, wohin er gehoert, als ohne ihn anfragen.
+      if (sendsBody && payload === undefined && !hasContent) {
+        const stray = Object.keys(args).filter((key) => !CALL_API_ARGUMENTS.has(key));
+        if (stray.length) {
+          throw new ToolError(
+            `Unknown argument(s) ${stray.join(', ')}. Put the request body of ${operation.method} ${operation.path} into "payload", `
+            + `for example { "operation_key": "${operation.operation_key}", "payload": { ... } }.`,
+          );
+        }
+        // Ein Pflicht-Body ohne Felder geht als `{}` raus, so wie Express 4
+        // ihn der Route gegeben haette: dann sagt deren Validierung, was fehlt.
+        if (operation.request_body_required && contentType === 'application/json') payload = {};
+      }
       return internalApiRequest(ctx, operation.method, path, {
         query: args.query,
-        payload: args.payload,
+        payload,
         contentData: args.content_data,
         contentType,
       });
     },
   },
 ];
+
+// Die Argumente von `call_api_operation`, gelesen aus seinem eigenen
+// inputSchema - alles andere auf oberster Ebene ist ein verirrter Body (#2197).
+const CALL_API_ARGUMENTS = new Set(Object.keys(
+  OPENAPI_TOOLS.find((tool) => tool.name === 'call_api_operation').inputSchema.properties,
+));
 
 const ALL_TOOLS = [...CORE_TOOLS, ...OPENAPI_TOOLS];
 

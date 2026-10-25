@@ -628,6 +628,59 @@ test('call_api_operation POST: string-serialisiertes Payload wird nicht doppelt 
   }
 });
 
+// #2197: die Felder neben `operation_key` statt in `payload` - vorher ging der
+// POST ohne Body raus, die Felder fielen still weg, die Route antwortete 500.
+test('call_api_operation POST: Body-Felder auf oberster Ebene → isError mit Hinweis auf payload (kein fetch)', async () => {
+  const calls = installFetchMock(() => jsonResponse({}));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'post_recipes', title: 'error-probe' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, true);
+    assert.match(res.result.content[0].text, /Unknown argument\(s\) title/);
+    assert.match(res.result.content[0].text, /"payload"/);
+    assert.equal(calls.length, 0, 'ohne payload darf kein Request ohne Body abgehen');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation POST: Pflicht-Body ohne payload geht als {} raus, mit JSON-Content-Type (#2197)', async () => {
+  const calls = installFetchMock(() => jsonResponse({ error: 'Titel is required.' }, { ok: false, status: 400 }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'post_recipes' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, true);
+    assert.match(res.result.content[0].text, /Titel is required/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.headers['Content-Type'], 'application/json');
+    assert.equal(calls[0].options.body, '{}');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation GET: fremde Schluessel bleiben ohne Wirkung (kein Body-Hinweis)', async () => {
+  const calls = installFetchMock(() => jsonResponse({ data: [] }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'get_recipes', title: 'egal' },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.body, undefined);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
 test('call_api_operation POST: unparsbares String-Payload → isError (kein fetch)', async () => {
   const calls = installFetchMock(() => jsonResponse({}));
   try {

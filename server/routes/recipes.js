@@ -184,17 +184,45 @@ function validateRecipeImage(val) {
   return { value: s, error: null };
 }
 
+/* OHNE BODY KEIN 500 (#2197).
+ *
+ * Express 5 laesst `req.body` undefined, wenn eine Anfrage keinen JSON-Body
+ * traegt (Express 4 setzte `{}`). Jede Schreibroute unten las daraus unbesehen,
+ * und ein POST ohne Body - so kam er ueber die MCP-Bruecke, wenn ein Assistent
+ * die Felder neben `payload` legte - endete als TypeError und 500 "Internal
+ * error". Mit dem leeren Objekt greift die Validierung der Route und sagt, was
+ * fehlt. Ein Array ist kein Body dieser Routen und zaehlt wie keiner.
+ */
+function bodyOf(req) {
+  const body = req.body;
+  return body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+}
+
+/* Die Zutaten muessen eine Liste sein. Ein Objekt an ihrer Stelle lief in der
+ * Transaktion als "not iterable" auf und war ebenfalls ein 500; ein PUT hatte
+ * die alten Zutaten da schon geloescht (die Transaktion rollte zurueck). Jetzt
+ * scheitert es vorher, mit 400. Eintraege, die kein Objekt sind, ueberspringt
+ * die Schleife wie einen leeren Namen.
+ */
+function validateIngredients(val) {
+  if (val === undefined || val === null) return { value: [], error: null };
+  if (!Array.isArray(val)) return { value: [], error: 'Ingredients must be a list.' };
+  return { value: val.filter((ing) => ing && typeof ing === 'object'), error: null };
+}
+
 router.post('/', (req, res) => {
   try {
-    const { ingredients = [] } = req.body;
+    const body = bodyOf(req);
+    const vIngredients = validateIngredients(body.ingredients);
+    const ingredients = vIngredients.value;
 
-    const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
-    const vNotes = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
-    const vRecipeUrl = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
-    const mealTypes = normalizeRecipeMealTypes(req.body.meal_types);
+    const vTitle = str(body.title, 'Titel', { max: MAX_TITLE });
+    const vNotes = str(body.notes, 'Notizen', { max: MAX_TEXT, required: false });
+    const vRecipeUrl = str(body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const mealTypes = normalizeRecipeMealTypes(body.meal_types);
 
-    const vImage = validateRecipeImage(req.body.image_data);
-    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
+    const vImage = validateRecipeImage(body.image_data);
+    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const recipeId = db.transaction(() => {
@@ -247,20 +275,22 @@ router.put('/:id', (req, res) => {
     // Provider-Account angelegt hat (und damit als created_by dieser Rezepte gilt).
     if (existing.provider_account_id) return res.status(403).json({ error: 'Mirrored recipes are managed by their source provider and cannot be edited here.', code: 403, reason: 'recipe_mirrored' });
 
-    const { ingredients = [] } = req.body;
+    const body = bodyOf(req);
+    const vIngredients = validateIngredients(body.ingredients);
+    const ingredients = vIngredients.value;
 
-    const vTitle = str(req.body.title, 'Titel', { max: MAX_TITLE });
-    const vNotes = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
-    const vRecipeUrl = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const vTitle = str(body.title, 'Titel', { max: MAX_TITLE });
+    const vNotes = str(body.notes, 'Notizen', { max: MAX_TEXT, required: false });
+    const vRecipeUrl = str(body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
     // Fehlt das Feld, bleibt die gespeicherte Auswahl stehen - ein Teil-Update
     // darf sie nicht mitnehmen. Ohne den Rückgriff schriebe jeder Aufruf ohne
     // meal_types wieder alle vier Mahlzeiten hin und machte eine bewusst leere
     // Auswahl (#750) beim nächsten Speichern zunichte.
     const mealTypes = normalizeRecipeMealTypes(
-      req.body.meal_types === undefined ? existing.meal_types : req.body.meal_types
+      body.meal_types === undefined ? existing.meal_types : body.meal_types
     );
-    const vImage = validateRecipeImage(req.body.image_data);
-    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
+    const vImage = validateRecipeImage(body.image_data);
+    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     db.transaction(() => {
@@ -523,7 +553,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
     const recipe = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(id);
     if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
 
-    const vList = num(req.body.listId, 'Listen-ID', { required: true });
+    const vList = num(bodyOf(req).listId, 'Listen-ID', { required: true });
     const errors = collectErrors([vList]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -590,7 +620,7 @@ router.put('/:id/ingredient-match', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
-    const vName = str(req.body.name, 'Zutat', { max: MAX_TITLE });
+    const vName = str(bodyOf(req).name, 'Zutat', { max: MAX_TITLE });
     const errors = collectErrors([vName]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -609,7 +639,7 @@ router.put('/:id/ingredient-match', (req, res) => {
     // der Abgleich mit der Rezeptquelle hat seine Zutaten ersetzt.
     if (!treffer) return res.status(404).json({ error: 'Ingredient not found in this recipe.', code: 404, reason: 'recipes_ingredient_not_found' });
 
-    const raw = req.body.pantryItemId;
+    const raw = bodyOf(req).pantryItemId;
     if (raw === null || raw === undefined || raw === '') {
       db.get().prepare(
         'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',

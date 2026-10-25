@@ -46,6 +46,10 @@ app.use((req, _res, next) => {
 });
 app.use('/shopping', shoppingRouter);
 app.use('/meals', mealsRouter);
+// Derselbe Router noch einmal unter seinem echten Pfad: die MCP-Bruecke ruft
+// `/api/v1/recipes` per Loopback auf (#2197), und genau diesen Weg nimmt der
+// Test am Ende dieser Datei.
+app.use('/api/v1/recipes', recipesRouter);
 app.use('/', recipesRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
@@ -757,4 +761,102 @@ test('POST /recipes: ein Bild, dessen Inhalt nicht zum Typ passt -> 400', async 
   const gelogen = PNG_1X1.replace('image/png', 'image/jpeg');
   const r = await call('POST', '/', { title: 'Gelogen', image_data: gelogen });
   assert.equal(r.status, 400);
+});
+
+// --------------------------------------------------------------------------
+// Ohne Body (#2197): Express 5 laesst `req.body` undefined, wenn eine Anfrage
+// keinen JSON-Body traegt. Jede Schreibroute las daraus unbesehen und
+// antwortete mit 500 "Internal error" statt mit ihrer eigenen Validierung.
+// --------------------------------------------------------------------------
+test('POST /: ohne Body → 400 mit der Titel-Meldung, nicht 500 (#2197)', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
+  const r = await call('POST', '/');
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.match(r.body.error, /Titel/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before);
+});
+
+test('PUT /:id: ohne Body → 400, das Rezept bleibt unveraendert (#2197)', async () => {
+  const created = await call('POST', '/', { title: 'OhneBody', ingredients: [{ name: 'Bleibt' }] });
+  const id = created.body.data.id;
+  const r = await call('PUT', `/${id}`);
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.match(r.body.error, /Titel/);
+  assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Bleibt']);
+});
+
+test('POST /:id/to-shopping-list und PUT /:id/ingredient-match: ohne Body → 400 (#2197)', async () => {
+  const created = await call('POST', '/', { title: 'OhneBodyZiel', ingredients: [{ name: 'Mehl' }] });
+  const id = created.body.data.id;
+  const transfer = await call('POST', `/${id}/to-shopping-list`);
+  assert.equal(transfer.status, 400, JSON.stringify(transfer.body));
+  const match = await call('PUT', `/${id}/ingredient-match`);
+  assert.equal(match.status, 400, JSON.stringify(match.body));
+});
+
+test('POST / und PUT /:id: Zutaten, die keine Liste sind → 400, nichts geschrieben (#2197)', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
+  const post = await call('POST', '/', { title: 'Zutatenobjekt', ingredients: { name: 'Mehl' } });
+  assert.equal(post.status, 400, JSON.stringify(post.body));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before);
+
+  const created = await call('POST', '/', { title: 'ZutatenBleiben', ingredients: [{ name: 'Salz' }] });
+  const id = created.body.data.id;
+  const put = await call('PUT', `/${id}`, { title: 'ZutatenBleiben', ingredients: { name: 'Mehl' } });
+  assert.equal(put.status, 400, JSON.stringify(put.body));
+  assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Salz']);
+
+  const nullItem = await call('POST', '/', { title: 'NullZutat', ingredients: [null, { name: 'Zucker' }] });
+  assert.equal(nullItem.status, 201, JSON.stringify(nullItem.body));
+  assert.deepEqual(ingredientRows(nullItem.body.data.id).map((x) => x.name), ['Zucker']);
+});
+
+// --------------------------------------------------------------------------
+// Ueber die MCP-Bruecke (#2197): `call_api_operation` geht per Loopback an
+// genau diesen Router. Ein Assistent, der die Rezeptfelder neben
+// `operation_key` statt in `payload` legt, schickte einen POST ohne Body und
+// bekam "Internal error". Termine, Einkauf und Aufgaben haben eigene
+// MCP-Werkzeuge mit flachen Argumenten, Rezepte nur die Bruecke - deshalb traf
+// es nur sie.
+// --------------------------------------------------------------------------
+test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldung, kein Request (#2197)', async () => {
+  const { callTool } = await import('../server/mcp/tools.js');
+  const previous = process.env.MCP_INTERNAL_BASE_URL;
+  process.env.MCP_INTERNAL_BASE_URL = baseUrl;
+  actor = { id: ADMIN, role: 'admin' };
+  const ctx = { actor: { id: ADMIN, role: 'admin' }, requestHeaders: {} };
+  try {
+    const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
+    await assert.rejects(
+      callTool(ctx, 'call_api_operation', { operation_key: 'post_recipes', title: 'error-probe' }),
+      (err) => {
+        assert.doesNotMatch(err.message, /Internal error/);
+        assert.match(err.message, /payload/);
+        assert.match(err.message, /title/);
+        return true;
+      },
+    );
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before, 'kein Rezept ohne payload');
+
+    // Ganz ohne payload: die Route antwortet mit ihrer eigenen Validierung.
+    await assert.rejects(
+      callTool(ctx, 'call_api_operation', { operation_key: 'post_recipes' }),
+      (err) => {
+        assert.doesNotMatch(err.message, /Internal error/);
+        assert.match(err.message, /Titel/);
+        return true;
+      },
+    );
+
+    const created = await callTool(ctx, 'call_api_operation', {
+      operation_key: 'post_recipes',
+      payload: { title: 'error-probe', ingredients: [{ name: 'Mehl' }] },
+    });
+    assert.equal(created.data.title, 'error-probe');
+    assert.deepEqual(ingredientRows(created.data.id).map((x) => x.name), ['Mehl']);
+  } finally {
+    actor = { id: OWNER, role: 'member' };
+    if (previous === undefined) delete process.env.MCP_INTERNAL_BASE_URL;
+    else process.env.MCP_INTERNAL_BASE_URL = previous;
+  }
 });
