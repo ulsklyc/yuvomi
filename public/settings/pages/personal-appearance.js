@@ -7,7 +7,8 @@ import {
 } from '/i18n.js';
 import { api } from '/api.js';
 import { esc } from '/utils/html.js';
-import { appendCurrencyOptions, persistCurrencySelection } from '/settings/currency.js';
+import { currencyName, currencyShortLabel, persistCurrencySelection } from '/settings/currency.js';
+import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
@@ -111,13 +112,40 @@ function formatOptions(selected) {
  * ohne Inhalt. Bis R21 stand sie im Label selbst und wurde mobil gekappt
  * ("Automatisch (Eur…").
  */
-function timeZoneOptions(selected) {
+function timeZoneList(selected) {
   let zones = [];
   try { zones = Intl.supportedValuesOf('timeZone'); } catch { zones = []; }
   // Eine gespeicherte Zone, die dieses ICU nicht (mehr) kennt, muss sichtbar
   // bleiben: sonst zeigte das Feld "Automatisch", während der Server weiter die
   // alte Zone benutzt - ein Select, das die Wahrheit verschweigt.
   if (selected && !zones.includes(selected)) zones = [...zones, selected].sort();
+  return zones;
+}
+
+const zoneArea = (zone) => (zone.includes('/') ? zone.slice(0, zone.indexOf('/')) : 'Other');
+// Was nach der Region (der optgroup) uebrig bleibt: "Argentina/Buenos Aires".
+const zoneRest = (zone) => (zone.includes('/') ? zone.slice(zone.indexOf('/') + 1) : zone).replace(/_/g, ' ');
+
+/**
+ * Name einer Zone in der Auswahl (#2166): die Stadt ("New Salem" statt
+ * "North Dakota/New Salem", das am Telefon gekappt war). Teilen sich zwei
+ * Zonen einer Gruppe die Stadt, behalten beide den Rest mit Zwischenstufe -
+ * die Liste bleibt unterscheidbar. Der volle Name steht dann in der
+ * Hinweiszeile (`timezoneHintText`).
+ */
+function timeZoneLabels(zones) {
+  const city = (zone) => zone.slice(zone.lastIndexOf('/') + 1).replace(/_/g, ' ');
+  const seen = new Map();
+  for (const zone of zones) {
+    const key = `${zoneArea(zone)}/${city(zone)}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return new Map(zones.map((zone) => [zone, seen.get(`${zoneArea(zone)}/${city(zone)}`) > 1 ? zoneRest(zone) : city(zone)]));
+}
+
+function timeZoneOptions(selected) {
+  const zones = timeZoneList(selected);
+  const labels = timeZoneLabels(zones);
 
   const auto = `<option value=""${selected ? '' : ' selected'}>${esc(t('settings.timezoneAuto'))}</option>`;
 
@@ -132,17 +160,17 @@ function timeZoneOptions(selected) {
   const groups = new Map();
   for (const zone of zones) {
     if (zone === 'UTC') continue; // steht schon oben
-    const area = zone.includes('/') ? zone.slice(0, zone.indexOf('/')) : 'Other';
+    const area = zoneArea(zone);
     if (!groups.has(area)) groups.set(area, []);
     groups.get(area).push(zone);
   }
   const body = [...groups.entries()].map(([area, list]) => {
     const opts = list.map((zone) => {
       // Das Label laesst die Region weg - die steht schon an der optgroup, und
-      // "America > America/New York" liest sich wie ein Fehler. Was uebrig
-      // bleibt, behaelt seine restlichen Schraegstriche
-      // ("Argentina/Buenos Aires"); der VALUE bleibt die volle IANA-Kennung.
-      const label = (zone.includes('/') ? zone.slice(zone.indexOf('/') + 1) : zone).replace(/_/g, ' ');
+      // "America > America/New York" liest sich wie ein Fehler. Seit #2166
+      // auch eine Zwischenstufe ("Argentina/", "North Dakota/"): die Stadt
+      // allein, siehe `timeZoneLabels`. Der VALUE bleibt die volle IANA-Kennung.
+      const label = labels.get(zone);
       return `<option value="${esc(zone)}"${zone === selected ? ' selected' : ''}>${esc(label)}</option>`;
     }).join('');
     return `<optgroup label="${esc(area)}">${opts}</optgroup>`;
@@ -251,9 +279,37 @@ export function dataLanguageHintText(selected, auto_) {
   return hintWithCurrent(t('settings.dataLanguageHint'), full === localeShortLabel(selected) ? null : full);
 }
 
-/** Die Hinweiszeile der Haushaltszone: bei "automatisch" mit der Zone, die gilt. */
+/**
+ * Die Hinweiszeile der Haushaltszone: bei "automatisch" mit der Zone, die gilt.
+ * Eine gewaehlte Zone, die in der Auswahl nur als Stadt steht ("New Salem"),
+ * nennt hier ihren vollen Namen (#2166).
+ */
 export function timezoneHintText(selected, effective) {
-  return hintWithCurrent(t('settings.timezoneHint'), selected ? null : (effective || 'UTC'));
+  if (!selected) return hintWithCurrent(t('settings.timezoneHint'), effective || 'UTC');
+  const short = timeZoneLabels(timeZoneList(selected)).get(selected);
+  return hintWithCurrent(t('settings.timezoneHint'), short === zoneRest(selected) ? null : selected.replace(/_/g, ' '));
+}
+
+/**
+ * Die Waehrungen der Auswahl (#2166): Code und Symbol ("GBP £"), der Code
+ * haelt jede Option unterscheidbar. "AED - Dirham der Vereinigten Arabischen
+ * Emirate" war am Telefon in 17 von 26 Sprachen gekappt; der volle Name steht
+ * jetzt vorn in der Hinweiszeile (`currencyHintText`). Der Kreditdialog im
+ * Budget hat die volle Breite und behaelt "Code - Name".
+ */
+function currencyOptions(selected) {
+  return CURRENCY_CODES.map((code) => (
+    `<option value="${esc(code)}"${code === selected ? ' selected' : ''}>${esc(currencyShortLabel(code))}</option>`
+  )).join('');
+}
+
+/** Die Hinweiszeile der Waehrung: beginnt mit ihrem vollen Namen. */
+export function currencyHintText(code) {
+  return hintWithCurrent(t('settings.currencyHint'), code ? currencyName(code) : null);
+}
+
+function syncCurrencyHint(container) {
+  setHint(container, 'currency-hint', currencyHintText(container.querySelector('#currency-select')?.value));
 }
 
 /** Setzt den Text einer Hinweiszeile (per id), wenn es sie gibt. */
@@ -450,10 +506,12 @@ function renderPage(container, preferences, isAdmin) {
         ${settingRowHtml({
           label: t('settings.currencyLabel'),
           labelFor: 'currency-select',
-          description: t('settings.currencyHint'),
+          description: currencyHintText(preferences.currency),
           descriptionId: 'currency-hint',
           extra: '<div id="currency-error" class="form-error" role="alert" hidden></div>',
-          control: '<select class="form-input" id="currency-select" aria-describedby="currency-hint currency-error"></select>',
+          control: `<select class="form-input" id="currency-select" aria-describedby="currency-hint currency-error">
+            ${currencyOptions(preferences.currency)}
+          </select>`,
         })}
         <!-- Eigene Zeile, nicht im Formatblock darunter: die Zeitzone ist
              keine Formatierung. Datum und Uhrzeit dort ändern nur, WIE ein Wert
@@ -923,6 +981,7 @@ function bindEvents(container, user) {
       });
       const currencySelect = container.querySelector('#currency-select');
       if (currencySelect) currencySelect.value = preset.currency;
+      syncCurrencyHint(container);
       const dateSelect = container.querySelector('#date-format-select');
       if (dateSelect) dateSelect.value = preset.date_format;
       const timeSelect = container.querySelector('#time-format-select');
@@ -958,6 +1017,8 @@ function bindEvents(container, user) {
   let persistedCurrency = currencySelect?.value;
   currencySelect?.addEventListener('change', async () => {
     if (currencySelect.disabled) return;
+    // Der volle Name gehoert zur Auswahl, nicht zum Speichern: er folgt sofort.
+    syncCurrencyHint(container);
     const errorElement = container.querySelector('#currency-error');
     clearError(errorElement);
     try {
@@ -988,6 +1049,7 @@ function bindEvents(container, user) {
       applyNumberLocale(readFormatState(container));
       window.yuvomi?.showToast(t('settings.currencySaved'), 'success');
     } catch (error) {
+      syncCurrencyHint(container);
       showError(errorElement, error.message);
     }
   });
@@ -1067,9 +1129,6 @@ export async function render(container, { user }) {
     applyNumberLocale(preferences);
     const isAdmin = user?.role === 'admin';
     renderPage(container, preferences, isAdmin);
-    if (isAdmin) {
-      appendCurrencyOptions(container.querySelector('#currency-select'), preferences.currency);
-    }
     bindEvents(container, user);
     mountTimezoneMismatch(container, preferences, isAdmin);
     window.lucide?.createIcons({ el: container });

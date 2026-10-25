@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed; retrying reports the total across successful batches.
 
 ### Fixed
+- **The currency and long time zones are no longer cut off in the appearance settings on a
+  phone** (#2166). A currency read like "AED - United Arab Emirates Dirham" and ended in "…" on
+  a narrow screen, and so did five time zones such as "North Dakota/New Salem". The currency
+  now shows its code and symbol ("GBP £"), a time zone its city ("New Salem"), and the hint
+  below starts with the full name ("Currently British Pound."). The currency list in the loan
+  dialog of the budget keeps the full names.
 - **A write request without a body gets the route's own answer instead of a server error** (#2209).
   Since the move to Express 5, a POST, PUT or PATCH without a body left the request body empty
   and most routes - meals, tasks, shopping, notes, calendar, budget, reminders, pantry, contacts

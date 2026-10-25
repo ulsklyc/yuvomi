@@ -259,6 +259,8 @@ const NUMBER_FORMAT_PLACES = [
     why: 'misst Dezimal- und Gruppentrenner JEDER Region für die Eingabe, zeigt nichts an' },
   { file: 'public/utils/digits.js', fn: 'buildDigitMap',
     why: 'liest die Ziffern jedes Ziffernsystems über das neutrale en, zeigt nichts an' },
+  { file: 'public/settings/currency.js', fn: 'currencyShortLabel',
+    why: 'liest nur das Währungssymbol für die Auswahl ("GBP £", #2166), formatiert keine Zahl' },
 ];
 
 // `style: 'unit'` macht aus einer Zahl ein Wort, und das Wort gehört der
