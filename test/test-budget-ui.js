@@ -3417,7 +3417,8 @@ test('Abo-Zeile: ein abgeschlossenes Abo zeigt keine naechste Zahlung', async ()
   assert.match(liveCard, /subscriptions\.reminderMeta/, 'laufend: der Erinnerungs-Chip bleibt');
   assert.notEqual(reminderRow(active).value, '', 'laufend: die Leseansicht nennt die Erinnerung');
   assert.match(liveCard, /subscription-card__due/, 'laufend: die Faelligkeit bleibt');
-  assert.match(liveCard, /subscriptions\.dueInDays/);
+  // 2099 ist weiter als ein Monat: die grobe Stufe statt "in N Tagen" (R23 S11).
+  assert.doesNotMatch(liveCard, /subscriptions\.dueInDays/);
   assert.notEqual(nextRow(active).value, '', 'laufend: die Leseansicht nennt die naechste Zahlung');
 
   // Der Bearbeiten-Dialog zeigt das Datum weiter - es ist der Tag, an dem ein
@@ -7741,4 +7742,34 @@ test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zu
   } finally {
     if (previous === undefined) delete globalThis.__reportFieldError; else globalThis.__reportFieldError = previous;
   }
+});
+
+// R23 S11 (Rest aus S1): die Belohnungen fuehrten einen eigenen Satzbaustein
+// fuer Geldfehler (moneyAmountProblemText), weil ihr kleinster Schritt den
+// Stellen des SERVERS folgt. Jetzt nimmt der EINE Baustein diese Stellen an.
+test('R23: ein Satzbaustein fuer Geldfehler, auch mit den Stellen des Servers', async () => {
+  const { amountProblemText } = await import('/utils/amount-field.js');
+  const precision = (digits) => amountProblemText('precision', 'EUR', { digits });
+  assert.notEqual(precision(3), precision(2), 'die Stellen des Servers bestimmen den Schritt');
+  assert.equal(amountProblemText('precision', 'EUR'), amountProblemText('precision', 'EUR', {}), 'ohne Stellen die der Waehrung');
+  const rewards = withoutComments(read('../public/pages/rewards.js'));
+  assert.doesNotMatch(rewards, /function moneyAmountProblemText/, 'kein zweiter Baustein in den Belohnungen');
+  assert.match(rewards, /amountProblemText\(problem, moneyCurrencyCode\(ctx\), \{ digits: moneyDigits\(ctx\) \}\)/);
+});
+
+// R23 S11 (Rest aus S7, D11): "Faellig in 140 Tagen" verlangte Kopfrechnen.
+// Bis 30 Tage genau, darueber die grobe Stufe wie jeder Abstand der App.
+test('R23: die Abo-Faelligkeit nennt ueber einen Monat Wochen, Monate oder Jahre', async () => {
+  const { __test: abos } = await import('../public/pages/subscriptions.js');
+  const { todayKey } = await import('/utils/date.js');
+  const { addLocalDays } = await import('/utils/date.js');
+  const { daysFromTodayText } = await import('/utils/date-format.js');
+  const due = (days) => abos.dueLabel({ next_payment_date: addLocalDays(todayKey(), days) });
+  assert.match(due(6), /subscriptions\.dueInDays/, 'bis 30 Tage genau');
+  assert.match(due(30), /subscriptions\.dueInDays/);
+  assert.equal(due(140), daysFromTodayText(140), '140 Tage: Monate');
+  assert.doesNotMatch(due(140), /subscriptions\.dueInDays/);
+  assert.equal(due(400), daysFromTodayText(400), 'mehr als ein Jahr: Jahre');
+  assert.match(due(0), /subscriptions\.dueToday/);
+  assert.match(due(-3), /subscriptions\.overdueDays/);
 });

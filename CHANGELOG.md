@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Deleting a subtask can be undone instead of asking first, and far-off subscription payments
+  read in months.** A deleted subtask disappears at once with "Undo" in the notice, like a task. A
+  subscription due in more than a month now says "in 5 months" next to its date instead of "Due in
+  140 days". A money amount with too many decimals in Rewards is explained in the same words as
+  everywhere else.
 - **The selected segment is easier to see in light mode too.** The chosen option in segmented
   controls and kitchen tabs now has a thin edge in both themes, so it stands out from its track at
   the 3:1 contrast that control states need.

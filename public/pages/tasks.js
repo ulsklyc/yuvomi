@@ -2974,27 +2974,32 @@ async function handleRenameSubtask(id, currentTitle, container) {
   }
 }
 
-async function handleDeleteSubtask(id, title, container) {
-  // Rückfrage, weil Löschen der einzige Weg ohne Rückweg ist - abhaken lässt
-  // sich zurücknehmen, das hier nicht.
-  const ok = await confirmModal(t('tasks.subtaskDeleteConfirm', { title }), {
-    confirmLabel: t('common.delete'),
-    danger: true,
-    detail: t('tasks.subtaskDeleteDetail'),
+function handleDeleteSubtask(id, title, container) {
+  // LOESCHEN MIT RUECKWEG STATT RUECKFRAGE (R23 D6, Rest aus S5). Eine
+  // Teilaufgabe ist kein Behaelter - nichts haengt an ihr, also keine Kaskade,
+  // die eine Rueckfrage rechtfertigte. Wie die Aufgabe selbst: sofort weg,
+  // fuenf Sekunden "Rueckgaengig", erst dann der Server. Ausgeblendet wird
+  // jede Darstellung der Zeile (Liste und Detailspalte).
+  const els = [...container.querySelectorAll(`[data-subtask-id="${CSS.escape(String(id))}"]`)];
+  for (const el of els) el.hidden = true;
+  refocusAfterRender();
+  scheduleUndoableDelete({
+    message: t('common.deletedNamed', { name: title }),
+    commit: async ({ keepalive }) => {
+      try {
+        await api.delete(`/tasks/${id}`, { keepalive });
+      } catch (err) {
+        // SCHON GELOESCHT IST EIN ERFOLG (#1909): jemand anderes war schneller.
+        if (!isAlreadyDeleted(err, 'tasks_task_not_found')) throw err;
+      }
+      if (keepalive) return;
+      await loadTasks(container);
+    },
+    restore: (err) => {
+      for (const el of els) el.hidden = false;
+      if (err) window.yuvomi.showToast(errorSentence(err), 'danger');
+    },
   });
-  if (!ok) return;
-  try {
-    try {
-      await api.delete(`/tasks/${id}`);
-    } catch (err) {
-      // SCHON GELOESCHT IST EIN ERFOLG (#1909): jemand anderes war schneller.
-      if (!isAlreadyDeleted(err, 'tasks_task_not_found')) throw err;
-    }
-    await loadTasks(container);
-    refocusAfterRender();
-  } catch (err) {
-    window.yuvomi.showToast(errorSentence(err), 'danger');
-  }
 }
 
 // --------------------------------------------------------
@@ -5839,7 +5844,7 @@ function wireTaskList(container) {
     }
 
     if (action === 'delete-subtask') {
-      await handleDeleteSubtask(id, target.dataset.title, container);
+      handleDeleteSubtask(id, target.dataset.title, container);
     }
   });
 }

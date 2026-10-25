@@ -27,9 +27,10 @@ import { renderPageColumns } from '/utils/page-layout.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
 import {
-  formatMoney, amountPlaceholder, amountExample, amountInputProblem,
+  formatMoney, amountPlaceholder, amountInputProblem,
   amountToInput, currencyFractionDigits, toDecimalString,
 } from '/utils/money.js';
+import { amountProblemText } from '/utils/amount-field.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { errorSentence, isAlreadyDeleted, isGone } from '/utils/friendly-error.js';
 
@@ -1675,17 +1676,6 @@ function wireMoney(el) {
 }
 
 /** Der Satz zu einem Grund aus amountInputProblem() - dieselben Texte wie in den geteilten Ausgaben. */
-function moneyAmountProblemText(problem, ctx) {
-  const currency = moneyCurrencyCode(ctx);
-  if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
-  if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
-  if (problem === 'notPositive') return t('common.amountNotPositive');
-  // Der kleinste Schritt nach den Stellen des SERVERS, nicht nach `Intl`.
-  const digits = moneyDigits(ctx);
-  const step = getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1 / 10 ** digits);
-  return t('common.amountPrecisionRequired', { currency, step });
-}
-
 /**
  * Warum der Text im Betragsfeld nicht gesendet werden kann - oder `null`.
  * Gruppierung, Schreibweise und Vorzeichen prueft `amountInputProblem()`; wie
@@ -1705,7 +1695,9 @@ function moneyAmountProblem(text, ctx) {
 function readMoneyAmount(input, errEl, ctx) {
   const problem = moneyAmountProblem(input.value, ctx);
   if (problem) {
-    errEl.textContent = moneyAmountProblemText(problem, ctx);
+    // Der EINE Satzbaustein (utils/amount-field.js, D1); die Stellen des
+    // kleinsten Schritts nach dem SERVER, nicht nach `Intl`.
+    errEl.textContent = amountProblemText(problem, moneyCurrencyCode(ctx), { digits: moneyDigits(ctx) });
     errEl.hidden = false;
     input.setAttribute('aria-invalid', 'true');
     return null;

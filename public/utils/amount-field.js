@@ -19,7 +19,7 @@
  *
  * Ein `type="number"` an einem Geldfeld haelt `test:budget-ui` auf.
  */
-import { t } from '/i18n.js';
+import { t, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { amountPlaceholder, amountToInput, amountExample, amountInputProblem, smallestUnitLabel } from '/utils/money.js';
 
@@ -44,12 +44,21 @@ export function setAmountCurrency(input, currency) {
   if (input) input.placeholder = amountPlaceholder(currency);
 }
 
-/** Der Satz zu einem Grund aus `amountInputProblem()`. */
-export function amountProblemText(problem, currency) {
+/**
+ * Der Satz zu einem Grund aus `amountInputProblem()`.
+ * @param {string} problem
+ * @param {string} currency
+ * @param {{ digits?: number }} [options]  `digits`: die Stellen, die der SERVER
+ *   fuer diesen Betrag fuehrt (Belohnungen-Geld) - sonst die der Waehrung.
+ */
+export function amountProblemText(problem, currency, { digits = null } = {}) {
   if (problem === 'grouped') return t('common.amountGrouped', { example: amountExample(currency) });
   if (problem === 'invalid') return t('common.amountInvalid', { example: amountExample(currency) });
   if (problem === 'notPositive') return t('common.amountNotPositive');
-  return t('common.amountPrecisionRequired', { currency, step: smallestUnitLabel(currency) });
+  const step = Number.isInteger(digits) && digits >= 0
+    ? getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(1 / 10 ** digits)
+    : smallestUnitLabel(currency);
+  return t('common.amountPrecisionRequired', { currency, step });
 }
 
 /**

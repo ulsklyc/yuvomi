@@ -17,7 +17,8 @@ import { isImeComposing, offerUndo, scheduleUndoableDelete } from '/utils/ux.js'
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, searchEmptyHTML, mountLoadError } from '/utils/empty-state.js';
 import { todayKey } from '/utils/date.js';
-import { dateText, percentText } from '/utils/date-format.js';
+import { dateText, percentText, daysFromTodayText } from '/utils/date-format.js';
+import { COUNTDOWN_EXACT_DAYS } from '/utils/countdown.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
@@ -307,6 +308,11 @@ function dueLabel(subscription) {
   if (days < 0) return t('subscriptions.overdueDays', { count: Math.abs(days) });
   if (days === 0) return t('subscriptions.dueToday');
   if (days === 1) return t('subscriptions.dueTomorrow');
+  // UEBER EINEN MONAT DIE GROBE STUFE (R23 D11, Rest aus S7): "Faellig in
+  // 140 Tagen" verlangte Kopfrechnen fuer eine Jahreszahlung. Wie jeder
+  // Abstand in der App (utils/date-format.js): bis 30 Tage genau, dann
+  // Wochen, Monate, Jahre - das Datum davor nennt den Tag.
+  if (days > COUNTDOWN_EXACT_DAYS) return daysFromTodayText(days);
   return t('subscriptions.dueInDays', { count: days });
 }
 
@@ -2545,6 +2551,7 @@ export const __test = {
   reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
   // #2152: die Zeilen des Verwalten-Dialogs (test:manager-endzone).
   metadataRows, persistMetaOrder,
+  dueLabel,
   // Eine neue Instanz der Seite, wie ein render() sie anlegt.
   setContainerForTest: (target) => { container = target; pageGeneration += 1; },
 };

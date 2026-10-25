@@ -17433,8 +17433,13 @@ test('ein Teilschritt lässt sich korrigieren und entfernen, nicht nur abhaken (
   assert.match(tasksPage, /action === 'rename-subtask'[\s\S]{0,120}handleRenameSubtask/);
   assert.match(tasksPage, /action === 'delete-subtask'[\s\S]{0,120}handleDeleteSubtask/);
 
-  // Löschen ist der einzige Weg ohne Rückweg und fragt deshalb zurück.
-  assert.match(tasksPage, /handleDeleteSubtask[\s\S]{0,400}confirmModal/);
+  // Seit R23 (D6, S11) loescht sie mit Rueckweg statt Rueckfrage: keine
+  // Kaskade, also keine Frage - wie die Aufgabe selbst.
+  const del = tasksPage.slice(tasksPage.indexOf('function handleDeleteSubtask('), tasksPage.indexOf('// Kanban-Ansicht'));
+  assert.doesNotMatch(del, /confirmModal/, 'keine Rueckfrage mehr');
+  assert.match(del, /scheduleUndoableDelete\(\{[\s\S]*common\.deletedNamed/, 'Toast "„Titel“ geloescht." mit Rueckgaengig');
+  assert.match(del, /\[data-subtask-id=/, 'jede Darstellung der Zeile tritt sofort ab');
+  assert.match(del, /restore:[\s\S]*el\.hidden = false/, 'Rueckgaengig holt sie zurueck');
 
   // Und die Zielgröße stimmt mit der Aufgabenzeile darüber überein, statt eine
   // zweite Größe für dieselbe Rolle einzuführen.
