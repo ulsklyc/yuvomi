@@ -74,7 +74,7 @@ function namePartChecks(parts) {
   ];
 }
 
-/** Foto-Validierung (wie Geburtstage): max ~5 MB, data-URL, Inhalt stimmt. */
+/** Foto-Validierung (wie Geburtstage): data-URL, Inhalt und Größe stimmt. */
 const MAX_PHOTO_LENGTH = 6_990_507;
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
