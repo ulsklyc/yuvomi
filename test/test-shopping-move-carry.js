@@ -1201,6 +1201,11 @@ test('Die alte Liste ist inzwischen den Aufgaben zugeordnet: aus ihr wird nichts
   assert.equal(dav.seen('PUT').length, 0);
   assert.equal(objectsWith(dav, a.url)[0]?.data, original());
   assert.deepEqual([row(item.id).list_id, row(item.id).outbound_move], [b.listId, 1]);
+
+  // Der Lauf liest die alte Liste jetzt als Aufgabenliste: fuer den Prune des
+  // Einkaufs ist sie nicht gelesen, der wartende Artikel bleibt stehen.
+  await remindersSync.sync();
+  assert.deepEqual([row(item.id)?.list_id, row(item.id)?.outbound_move], [b.listId, 1], 'der Prune nimmt den wartenden Artikel nicht fort');
 });
 
 test('Die alte Liste wird abgeschaltet, waehrend das Original gelesen wird: am neuen Platz wird nichts abgelegt, der Umzug wartet', async () => {

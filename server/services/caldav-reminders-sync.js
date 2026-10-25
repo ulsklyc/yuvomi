@@ -850,8 +850,14 @@ async function runSync({ createClient: makeClient } = {}) {
           // der Prune räumte jeden Einkaufsartikel des Kontos ab.
           // Scheitert das Lesen der wartenden Umzüge, geht der Fehler hoch und
           // dieser Lauf prunt gar nicht - es gibt hier keinen leeren Ersatzwert.
+          // Gelesen heisst: als Einkaufsliste gelesen. Eine inzwischen den
+          // Aufgaben zugeordnete Quelle liefert ihre UID nur an die Aufgaben
+          // (#1911), für den Einkauf bleibt sie ungelesen.
           const shielded = seenByModule.shopping.length
-            ? todoOutbound.uidsOfMovesFromUnfetchedLists(account.id, enabledLists.map((s) => s.list_url))
+            ? todoOutbound.uidsOfMovesFromUnfetchedLists(
+              account.id,
+              enabledLists.filter((s) => s.target_module === 'shopping').map((s) => s.list_url),
+            )
             : [];
           pruneRemoved(db.get(), 'shopping_items', account.id, [...seenByModule.shopping, ...shielded]);
         }
