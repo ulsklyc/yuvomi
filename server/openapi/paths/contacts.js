@@ -283,6 +283,7 @@ export function contactsPaths() {
       delete: withValidationRefusal(op({ summary: 'Delete contact', tag: 'Contacts', params: [contactId()], stateChanging: true })),
     },
     '/api/v1/contacts/{id}/vcard': { get: withValidationRefusal(op({ summary: 'Download contact as vCard', tag: 'Contacts', description: 'vCard 3.0. A birthday without a year is written the way Apple and sabre/vobject write it in 3.0, `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`.', params: [contactId()] })) },
+    '/api/v1/contacts/{id}/photo': { get: withValidationRefusal(op({ summary: 'Get contact photo', tag: 'Contacts', description: 'Returns the raw image bytes with `Content-Type` and an `ETag` for caching (`Cache-Control: private, max-age=31536000, immutable`). Responds 404 when the contact has no photo.', params: [contactId()] })) },
   });
 }
 
