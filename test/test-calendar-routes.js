@@ -1853,6 +1853,83 @@ test('PUT /:id — externes Event wird als user_modified markiert', async () => 
   assert.equal(res.body.data.user_modified, 1, 'Bearbeitung eines externen Events setzt user_modified');
 });
 
+// ── Mehrzeiliger Ort eines gespiegelten Termins (#2202) ────────────────────────
+//
+// Apple legt einen ueber die Ortssuche gewaehlten Ort mehrzeilig ab ("Name\n
+// Strasse\nOrt"). Das Ortsfeld im Formular ist ein <input type="text">, und das
+// entfernt beim Setzen des Werts jeden Zeilenumbruch (HTML-Wertbereinigung).
+// Das Formular schickt `location` bei jedem Speichern mit - eine reine
+// Zuweisung kam deshalb als geaenderter Ort an, ging als PUT nach iCloud, und
+// iOS zeigte danach nur noch Text statt des verknuepften Orts.
+//
+// Ohne `external_object_url` und ohne Kalenderauswahl fasst der Sofortversuch
+// nichts an: der Test misst die Vormerkung, kein Netz.
+function seedMultilineLocationEvent(title) {
+  const accountId = Number(db.prepare(`
+    INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES (?, ?, 'u', 'p')
+  `).run(title, `https://dav.example/${title}/`).lastInsertRowid);
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, created_by, external_source, external_calendar_id,
+       caldav_account_id, location, recurrence_rule)
+    VALUES (?, '2041-06-03T09:00', '2041-06-03T10:00', ?, 'caldav', ?, ?, ?, 'FREQ=WEEKLY')
+  `).run(title, ADMIN.id, `${title}@icloud`, accountId, 'Apple Park\nOne Apple Park Way\nCupertino CA 95014').lastInsertRowid);
+  const cleanup = () => {
+    db.prepare('DELETE FROM event_assignments WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+    db.prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
+  };
+  return { id, cleanup };
+}
+
+/** Was <input type="text"> aus dem Wert macht, plus das `.trim()` des Formulars. */
+const asSingleLineInput = (value) => value.replace(/[\r\n]/g, '').trim();
+
+test('PUT /:id - eine reine Zuweisung laesst den mehrzeiligen Ort eines gespiegelten Termins stehen (#2202)', async () => {
+  const { id, cleanup } = seedMultilineLocationEvent('loc-2202-assign');
+  try {
+    const stored = db.prepare('SELECT location FROM calendar_events WHERE id = ?').get(id).location;
+    const res = await call('PUT', `/${id}`, {
+      body: {
+        title: 'loc-2202-assign',
+        location: asSingleLineInput(stored),
+        assigned_to: [MARIA.id],
+        recurrence_rule: 'FREQ=WEEKLY',
+      },
+    });
+    assert.equal(res.status, 200, `bekommen ${res.status}: ${JSON.stringify(res.body)}`);
+    const row = db.prepare('SELECT location, outbound_dirty, assigned_to FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.assigned_to, MARIA.id, 'die Zuweisung kommt an');
+    assert.equal(row.outbound_dirty, 0, 'eine reine Zuweisung darf keinen PUT zum Anbieter vormerken');
+    assert.equal(row.location, stored, 'der Ort bleibt Zeichen fuer Zeichen, samt Zeilenumbruechen');
+  } finally {
+    cleanup();
+  }
+});
+
+test('PUT /:id - Gegenprobe: ein wirklich geaenderter Ort geht weiter hinaus (#2202)', async () => {
+  const { id, cleanup } = seedMultilineLocationEvent('loc-2202-change');
+  try {
+    const res = await call('PUT', `/${id}`, {
+      body: { title: 'loc-2202-change', location: 'Rathaus, Marktplatz 1', assigned_to: [MARIA.id] },
+    });
+    assert.equal(res.status, 200, `bekommen ${res.status}: ${JSON.stringify(res.body)}`);
+    const row = db.prepare('SELECT location, outbound_dirty FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.location, 'Rathaus, Marktplatz 1');
+    assert.equal(row.outbound_dirty, 1, 'eine echte Ortsaenderung muss vorgemerkt werden');
+
+    // Ein geleerter Ort ist ebenfalls eine Aenderung, kein Zeilenumbruch-Rest.
+    db.prepare("UPDATE calendar_events SET outbound_dirty = 0, location = 'A\nB' WHERE id = ?").run(id);
+    const leer = await call('PUT', `/${id}`, { body: { location: null } });
+    assert.equal(leer.status, 200);
+    const geleert = db.prepare('SELECT location, outbound_dirty FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(geleert.location, null);
+    assert.equal(geleert.outbound_dirty, 1);
+  } finally {
+    cleanup();
+  }
+});
+
 // ── color_modified: die Farbe fuehrt ihren eigenen Zustand (#899) ──────────────
 //
 // `user_modified` heisst "an diesem Termin wurde etwas bearbeitet". Der Inbound

@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Birthday import offers "Select all" and "Deselect all".** Select every contact
+  with a birthday that has not already been imported, or clear the selection, with
+  one button above the list. Large selections are imported in batches. If a later
+  batch fails, the saved count remains visible in the warning and the list is
+  refreshed; retrying reports the total across successful batches.
+
 ### Fixed
 - **A new event appears at its time in the calendar right away.** After adding an event, the
   agenda (and every other day list) showed it below all other events of that day until the next
   reload, whatever its start time. The same happened when an edit moved an event to another time
   of day. The event is now sorted into place as soon as it is saved.
+- **Assigning a synced iCloud event no longer turns its Apple Maps place into plain text.** A
+  place picked through Apple's location search is stored on several lines, and the single-line
+  location field in Yuvomi dropped the line breaks. Saving the event, even only to assign a
+  household member, therefore sent a changed location back to iCloud, and the iPhone showed the
+  address as text without the map link. A location that differs only by line breaks now counts
+  as unchanged, so the event stays as it is in iCloud; a location you really change is still
+  sent.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The

@@ -205,6 +205,38 @@ test('ein leeres Feld entfernt die Property, ein neues wird ergänzt', () => {
   assert.match(out, /DESCRIPTION:Frisch\\, mit Komma\\; und Semikolon/);
 });
 
+// #2202: Ein ueber die Apple-Ortssuche gewaehlter Ort ist zweiteilig - LOCATION
+// traegt den Text (mehrzeilig), X-APPLE-STRUCTURED-LOCATION die Verknuepfung zur
+// Karte. Yuvomi verwaltet nur LOCATION. Geht der Termin aus anderem Grund hinaus
+// (Titel), muss der gespeicherte Ort als derselbe LOCATION-Text zurueckkommen
+// und die Apple-Zeile unberuehrt bleiben.
+test('ein Titel-Push laesst LOCATION und X-APPLE-STRUCTURED-LOCATION eines Apple-Orts stehen (#2202)', async () => {
+  const { parseICS } = await import('../server/services/ics-parser.js');
+  const structured = 'X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-APPLE-RADIUS=70;X-TITLE="Apple Park\\nOne Apple Park Way":geo:37.334900,-122.009020';
+  const original = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Apple Inc.//iOS 26//EN',
+    'BEGIN:VEVENT',
+    'UID:apple-loc@t',
+    'DTSTAMP:20260101T090000Z',
+    'SUMMARY:Alter Titel',
+    'DTSTART;TZID=Europe/Berlin:20350310T090000',
+    'DTEND;TZID=Europe/Berlin:20350310T100000',
+    'RRULE:FREQ=WEEKLY',
+    'LOCATION:Apple Park\\nOne Apple Park Way\\nCupertino CA 95014',
+    structured,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const stored = parseICS(original)[0].location;
+  assert.equal(stored, 'Apple Park\nOne Apple Park Way\nCupertino CA 95014', 'der Import haelt die Zeilen');
+
+  const out = unfoldICS(patchICSEvent(original, 'apple-loc@t', { SUMMARY: 'Neuer Titel', LOCATION: stored }));
+  assert.match(out, /SUMMARY:Neuer Titel/);
+  assert.ok(out.split('\n').includes('LOCATION:Apple Park\\nOne Apple Park Way\\nCupertino CA 95014'),
+    `LOCATION muss als derselbe Text zurueckgehen:\n${out}`);
+  assert.ok(out.split('\n').includes(structured), 'die Apple-Verknuepfung bleibt Zeichen fuer Zeichen');
+});
+
 test('ergänzte Properties stehen vor der ersten Subkomponente', () => {
   const out = patchICSEvent(serverObject('e@t'), 'e@t', { DESCRIPTION: 'Text' });
   const lines = unfoldICS(out).split('\n');

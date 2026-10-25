@@ -311,6 +311,27 @@ async function sendNonMemberAssignment(res, err, staged) {
   return res.status(400).json({ error: err.message, code: 400 });
 }
 
+/**
+ * Der Ort, der nach einer Bearbeitung gilt (#2202).
+ *
+ * Ein ueber die Apple-Ortssuche gewaehlter Ort steht mehrzeilig in der Zeile
+ * ("Name\nStrasse\nOrt"). Ein einzeiliges Eingabefeld - das Formular nimmt
+ * <input type="text"> - entfernt beim Setzen des Werts jeden Zeilenumbruch,
+ * und das Formular schickt `location` bei jedem Speichern mit. Eine reine
+ * Zuweisung kam so als geaenderter Ort an, wurde als PUT zum Anbieter
+ * vorgemerkt, und iOS verlor die Verknuepfung zum Ort.
+ *
+ * Unterscheidet sich der geschickte Wert vom gespeicherten nur um
+ * Zeilenumbrueche und Raender, hat niemand den Ort angefasst: es gilt der
+ * gespeicherte. Die Regel haengt bewusst nicht am Eingabefeld, sondern an dem,
+ * was ankommt - jeder Client mit einzeiligem Feld macht dasselbe.
+ */
+function locationAfterEdit(sent, stored) {
+  if (typeof sent !== 'string' || typeof stored !== 'string') return sent;
+  const flat = (value) => value.replace(/[\r\n]/g, '').trim();
+  return flat(sent) === flat(stored) ? stored : sent;
+}
+
 function isPossibleCalendarDateTime(value) {
   const match = String(value).trim().match(
     /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):?(\d{2}))?)?$/
@@ -890,8 +911,9 @@ router.put('/:id', async (req, res) => {
     }
     const {
       title, description,
-      all_day, location, color: colorVal, recurrence_rule,
+      all_day, color: colorVal, recurrence_rule,
     } = req.body;
+    const location = locationAfterEdit(req.body.location, event.location);
     // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
     // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
     const start_datetime = vStart ? vStart.value : undefined;
