@@ -4318,9 +4318,10 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
          *
          * Einkauf dockt seit der Kopfregel mobil (2026-09-26) an, Aufgaben,
          * Notizen, Kontakte, Kalender und Budget seit #1483 ("one add button"),
-         * die Uebersicht seit R14. Eingeklappt ist keiner mehr. */
+         * die Uebersicht seit R14, Punkte mit "Bonus vergeben" seit R23. Eingeklappt
+         * ist keiner mehr. */
         const ANGEDOCKT_AM_ZEIGER = ['dashboard', 'tasks', 'calendar', 'shopping', 'meals', 'recipes',
-          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents'];
+          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents', 'rewards'];
         assert.deepEqual({ angedockt: [...angedockt].sort(), eingeklappt },
           { angedockt: [...ANGEDOCKT_AM_ZEIGER].sort(), eingeklappt: [] },
           `Erwartet auf dem Zeiger: ${ANGEDOCKT_AM_ZEIGER.length} FABs in der Kopfleiste und kein eingeklappter, `
