@@ -3602,8 +3602,14 @@
 
 /* ── Rollen & Rechte (Permissions-Matrix, #467) ───────────────────────────── */
 
+/* KEIN NEGATIVER RAND OBEN (R23 S11). Er stammt aus der Zeit, als ein
+ * Abschnittstitel darueber stand; seit der Blattkopf zentral steht, ist die
+ * Einleitung das erste Kind des Blatts, und ihr -8px kollabierte erst mit dem
+ * Kopfrand, wenn das Skelett wich: das ganze Blatt rutschte 8px hoch
+ * (Load-Shift 0,0068 mobil, 0,0022 Desktop, 4x CPU). Jetzt beginnt das Blatt
+ * mit dem Kopfabstand wie jedes andere. */
 .settings-section__intro {
-  margin: calc(var(--space-2) * -1) 0 var(--space-4);
+  margin: 0 0 var(--space-4);
   max-width: 60ch;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -3746,6 +3752,22 @@
 }
 
 .perm-modgroup + .perm-modgroup { border-top: var(--space-px) solid var(--color-border); }
+
+/* DIE MATRIX RECHNET NUR, WAS IN SICHT IST (R23 S11; wie die Agenda,
+ * calendar.css). 16 Modulgruppen, rund 1100 Knoten und 3600px am Laptop
+ * (mobil 5000px): das Oeffnen des Blatts hielt das Bild 146-180 ms (4x CPU),
+ * davon 72 ms erzwungenes Layout, als die Kapsel des Umschalters oben ihre
+ * Lage las - fuer Gruppen, die erst nach Bildlauf kommen. Ab der zweiten
+ * Gruppe ueberspringt der Browser, was ausser Sicht steht; `auto` merkt sich
+ * danach die echte Hoehe. Der Fokusring einer Zeile darf ueber die
+ * Gruppenkante (overflow-clip-margin). */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .perm-modgroup + .perm-modgroup {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 220px;
+    overflow-clip-margin: var(--space-2);
+  }
+}
 
 .perm-modgroup__widgets {
   padding-inline-start: var(--space-8);

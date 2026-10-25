@@ -2004,9 +2004,22 @@
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .agenda-day + .agenda-day {
     content-visibility: auto;
-    contain-intrinsic-size: auto none auto 160px;
+    contain-intrinsic-size: auto none auto var(--agenda-day-estimate);
     overflow-clip-margin: var(--space-2);
   }
+}
+
+/* Die Schaetzhoehe eines Tages ausser Sicht - EINE Zahl fuer zwei Stellen:
+ * `contain-intrinsic-size` oben und den Platzhalter eines Tages, der im
+ * ersten Aufbau erst nachkommt (R23 S11, utils/row-fill.js). So hat der
+ * Bildlauf vom ersten Bild an dieselbe Laenge wie danach. */
+.agenda-view {
+  --agenda-day-estimate: 160px;
+}
+
+.agenda-view > .row-pending {
+  block-size: var(--agenda-day-estimate);
+  margin-bottom: var(--space-4);
 }
 
 

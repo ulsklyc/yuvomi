@@ -3034,21 +3034,12 @@ async function mountMeds() {
 async function loadMeds() {
   const startedAt = Date.now();
   const query = meds.personId ? `?user_id=${encodeURIComponent(meds.personId)}` : '';
-  const res = await api.get(`/health/medications${query}`);
-  meds.list = res.data || [];
-  meds.schedulesByMed = {};
-  meds.logsByMed = {};
-
-  const today = todayKey();
-  await Promise.all(meds.list.map(async (m) => {
-    const from = addLocalDays(today, -(medLogWindowDays(m, meds.adherenceDays) - 1));
-    const [sRes, lRes] = await Promise.all([
-      api.get(`/health/medications/${m.id}/schedules`),
-      api.get(`/health/medications/${m.id}/logs?from=${from}T00:00&to=${today}T23:59`),
-    ]);
-    meds.schedulesByMed[m.id] = sRes.data || [];
-    meds.logsByMed[m.id] = visibleRows('medLogs', lRes.data);
-  }));
+  const res = await api.get(medsWithPlansPath(query, meds.adherenceDays));
+  const plans = splitMedPlans(res.data, meds.adherenceDays);
+  meds.list = plans.list;
+  meds.schedulesByMed = plans.schedulesByMed;
+  meds.logsByMed = Object.fromEntries(Object.entries(plans.logsByMed)
+    .map(([id, rows]) => [id, visibleRows('medLogs', rows)]));
   // Der Stand ist da: offene Dosis-Versuche fuer diese Medikamente sind geklaert (#2069).
   doseAttempts.confirmedBy(startedAt, meds.list.map((m) => m.id));
 }
@@ -3068,6 +3059,48 @@ function medLogWindowDays(med, baseDays) {
   const hours = Number(med?.min_interval_hours);
   if (!med?.prn || !Number.isFinite(hours) || hours <= 0) return baseDays;
   return Math.max(baseDays, Math.ceil(hours / 24) + 1);
+}
+
+/** Das weiteste Fenster, das medLogWindowDays je verlangen kann (Server: 28 Tage Abstand). */
+const MED_LOG_WINDOW_MAX_DAYS = 28 + 1;
+
+/**
+ * EINE ANFRAGE FUER ALLE MEDIKAMENTE (R23 S11, N+1). Die Liste bringt Plaene
+ * und Dosis-Eintraege mit (`include=schedules,logs`); vorher kamen je
+ * Medikament zwei Anfragen dazu, der Einstieg in die Gesundheit schickte 27.
+ * Gelesen wird das weiteste moegliche Fenster, `splitMedPlans` schneidet jedem
+ * Medikament dann sein eigenes zu - dieselbe Grenze wie vorher je Anfrage.
+ * @param {string} query  `?user_id=…` oder leer
+ * @param {number} baseDays
+ */
+function medsWithPlansPath(query, baseDays) {
+  const today = todayKey();
+  const from = addLocalDays(today, -(Math.max(baseDays, MED_LOG_WINDOW_MAX_DAYS) - 1));
+  return `/health/medications${query}${query ? '&' : '?'}include=schedules,logs&logs_from=${from}T00:00&logs_to=${today}T23:59`;
+}
+
+/** Zeitpunkt eines Dosis-Eintrags wie im Server (LOG_WHEN), auf Minuten. */
+function medLogWhen(row) {
+  return String(row?.scheduled_at ?? row?.taken_at ?? row?.created_at ?? '').slice(0, 16);
+}
+
+/**
+ * Teilt die Antwort von medsWithPlansPath in Liste, Plaene und Eintraege je
+ * Medikament; die Eintraege auf das Fenster des Medikaments zugeschnitten.
+ * @returns {{ list: object[], schedulesByMed: Record<number, object[]>, logsByMed: Record<number, object[]> }}
+ */
+function splitMedPlans(rows, baseDays) {
+  const today = todayKey();
+  const list = [];
+  const schedulesByMed = {};
+  const logsByMed = {};
+  for (const { schedules, logs, ...med } of rows || []) {
+    const from = `${addLocalDays(today, -(medLogWindowDays(med, baseDays) - 1))}T00:00`;
+    list.push(med);
+    schedulesByMed[med.id] = schedules || [];
+    logsByMed[med.id] = (logs || []).filter((row) => medLogWhen(row) >= from);
+  }
+  return { list, schedulesByMed, logsByMed };
 }
 
 // Nur die Plaene der Medikamente, die heute zaehlen (#1950): die Regel selbst
@@ -6794,7 +6827,7 @@ async function loadOverview() {
   // Einstellungen), jeder andere bricht das Laden ab wie vorher.
   const [vRes, mRes, cpRes, clRes, cycleSettings] = await Promise.all([
     api.get(`/health/vitals${query}`),
-    api.get(`/health/medications${query}`),
+    api.get(medsWithPlansPath(query, OVERVIEW_ADHERENCE_DAYS)),
     cycleEnabled ? api.get(`/health/cycle/periods${query}`) : empty,
     cycleEnabled ? api.get(`/health/cycle/logs${query}`) : empty,
     cycleEnabled && ownView
@@ -6802,23 +6835,14 @@ async function loadOverview() {
       : null,
   ]);
   overview.vitals = vRes.data || [];
-  overview.meds = mRes.data || [];
-  overview.schedulesByMed = {};
-  overview.logsByMed = {};
+  const medPlans = splitMedPlans(mRes.data, OVERVIEW_ADHERENCE_DAYS);
+  overview.meds = medPlans.list;
+  overview.schedulesByMed = medPlans.schedulesByMed;
+  overview.logsByMed = medPlans.logsByMed;
   overview.cyclePeriods = cpRes.data || [];
   overview.cycleLogs = clRes.data || [];
   overview.cycleSettings = cycleSettings;
 
-  const today = todayKey();
-  await Promise.all(overview.meds.map(async (m) => {
-    const from = addLocalDays(today, -(medLogWindowDays(m, OVERVIEW_ADHERENCE_DAYS) - 1));
-    const [sRes, lRes] = await Promise.all([
-      api.get(`/health/medications/${m.id}/schedules`),
-      api.get(`/health/medications/${m.id}/logs?from=${from}T00:00&to=${today}T23:59`),
-    ]);
-    overview.schedulesByMed[m.id] = sRes.data || [];
-    overview.logsByMed[m.id] = lRes.data || [];
-  }));
   doseAttempts.confirmedBy(startedAt, overview.meds.map((m) => m.id));
 }
 

@@ -2267,3 +2267,35 @@ test('R23 Sicherheit: /undo schreibt nie mehr gut als die Dosis des Eintrags', a
   await call('POST', `/logs/${noDose.body.data.id}/undo`, { stock_credit: 5 });
   assert.equal(stockOf(id), 10, 'ohne Dosis keine Gutschrift');
 });
+
+test('R23 S11: GET /medications?include=schedules,logs bringt Plaene und Eintraege der gelisteten Medikamente mit', async () => {
+  // N+1: der Einstieg in die Gesundheit schickte je Medikament zwei Anfragen.
+  // Die Liste traegt sie jetzt selbst - und nur fuer die Medikamente, die der
+  // Betrachter ohnehin lesen darf.
+  asA();
+  const mine = (await call('POST', '/medications', { name: 'Buendel-Eigen' })).body.data.id;
+  await call('POST', `/medications/${mine}/schedules`, { time_of_day: '07:30' });
+  const inWindow = (await call('POST', `/medications/${mine}/logs`, { scheduled_at: '2031-03-10T07:30' })).body.data.id;
+  await call('POST', `/medications/${mine}/logs`, { scheduled_at: '2031-01-01T07:30' });
+  asB();
+  const shared = (await call('POST', '/medications', { name: 'Buendel-Familie', visibility: 'family' })).body.data.id;
+  const sharedLog = (await call('POST', `/medications/${shared}/logs`, { scheduled_at: '2031-03-11T09:00' })).body.data.id;
+  const hidden = (await call('POST', '/medications', { name: 'Buendel-Privat' })).body.data.id;
+  await call('POST', `/medications/${hidden}/logs`, { scheduled_at: '2031-03-11T09:00' });
+
+  asA();
+  const res = await call('GET', '/medications?include=schedules,logs&logs_from=2031-03-01T00:00&logs_to=2031-03-31T23:59');
+  assert.equal(res.status, 200);
+  const byId = new Map(res.body.data.map((m) => [m.id, m]));
+  assert.equal(byId.has(hidden), false, 'Bobs privates Medikament bleibt draussen');
+  assert.deepEqual(byId.get(mine).schedules.map((s) => s.time_of_day), ['07:30']);
+  assert.deepEqual(byId.get(mine).logs.map((l) => l.id), [inWindow], 'nur Eintraege im Fenster');
+  assert.deepEqual(byId.get(shared).logs.map((l) => l.id), [sharedLog]);
+  assert.deepEqual(byId.get(shared).schedules, []);
+  const allLogIds = res.body.data.flatMap((m) => m.logs.map((l) => l.medication_id));
+  assert.ok(!allLogIds.includes(hidden), 'kein Eintrag eines fremden privaten Medikaments');
+
+  const plain = await call('GET', '/medications');
+  assert.ok(plain.body.data.every((m) => !('schedules' in m) && !('logs' in m)), 'ohne include bleibt die Liste, wie sie war');
+  for (const id of [mine, shared, hidden]) db.prepare('DELETE FROM medications WHERE id = ?').run(id);
+});

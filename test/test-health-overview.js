@@ -198,7 +198,13 @@ async function loadOverviewHarness({ cycleEnabled, personId, meId, meds = [] }) 
   const start = src.indexOf('async function loadOverview() {');
   const end = src.indexOf('\nfunction overviewAllSchedules()');
   assert.ok(start > 0 && end > start, 'loadOverview() nicht gefunden');
-  const body = src.slice(start, end);
+  // Die Helfer der gebuendelten Anfrage (R23 S11) laufen mit: ohne sie gaebe
+  // es im Stand davor nichts zu laden, und der Fall unten wuerde dort nicht
+  // rot, sondern stolperte.
+  const helpersStart = src.indexOf('const MED_LOG_WINDOW_MAX_DAYS');
+  const helpersEnd = src.indexOf('// Nur die Plaene der Medikamente, die heute zaehlen');
+  const helpers = helpersStart > 0 && helpersEnd > helpersStart ? src.slice(helpersStart, helpersEnd) : '';
+  const body = `${helpers}\n${src.slice(start, end)}`;
 
   const open = [];
   const api = {
@@ -247,13 +253,34 @@ test('overview: vitals, medications and all three cycle requests are one wave', 
     '/health/medications', '/health/vitals',
   ], 'fuenf Abrufe gleichzeitig offen, keiner wartet auf einen anderen');
 
+  // KEINE ZWEITE WELLE JE MEDIKAMENT (R23 S11, N+1): die Liste bringt Plaene
+  // und Eintraege mit (`include=schedules,logs`). Vorher folgten ihr je
+  // Medikament zwei Anfragen - der Einstieg schickte 27.
+  const medsReq = h.open.find((req) => req.path.startsWith('/health/medications'));
+  assert.match(medsReq.path, /[?&]include=schedules,logs(&|$)/);
+  assert.match(medsReq.path, /[?&]logs_from=\d{4}-\d{2}-\d{2}T00:00&logs_to=2026-10-07T23:59$/);
   h.answer();
   await h.settle();
-  assert.deepEqual(paths(h.open), ['/health/medications/9/logs', '/health/medications/9/schedules'],
-    'erst die zweite Welle haengt an der Medikamentenliste');
-  h.answer();
+  assert.deepEqual(paths(h.open), [], 'nach der einen Welle ist nichts mehr offen');
   await h.finished();
   assert.deepEqual(h.overview.cycleSettings, {});
+});
+
+test('overview: each medication keeps its own log window from the bundled answer', async () => {
+  const meds = [
+    { id: 9, logs: [{ id: 1, scheduled_at: '2026-10-07T08:00' }, { id: 2, scheduled_at: '2026-09-01T08:00' }], schedules: [{ id: 5 }] },
+    { id: 10, prn: 1, min_interval_hours: 600, logs: [{ id: 3, taken_at: '2026-09-15T10:00' }] },
+  ];
+  const h = await loadOverviewHarness({ cycleEnabled: false, personId: 4, meId: 4, meds });
+  await h.settle();
+  h.answer();
+  await h.finished();
+  // addLocalDays im Harness ist die Identitaet: die Grenze ist dann der Tag
+  // selbst - Eintraege davor fallen, der Rest bleibt je Medikament.
+  assert.deepEqual(h.overview.logsByMed[9].map((row) => row.id), [1]);
+  assert.deepEqual(h.overview.schedulesByMed[9].map((row) => row.id), [5]);
+  assert.deepEqual(h.overview.schedulesByMed[10], []);
+  assert.equal('logs' in h.overview.meds[0], false, 'die Liste traegt die Zusaetze nicht weiter');
 });
 
 test('overview: the cycle rule still decides what is requested at all', async () => {
@@ -268,7 +295,7 @@ test('overview: the cycle rule still decides what is requested at all', async ()
   await other.settle();
   assert.deepEqual(paths(other.open), ['/health/cycle/logs', '/health/cycle/periods', '/health/medications', '/health/vitals'],
     'fremde Person: die privaten Einstellungen werden nicht angefragt');
-  assert.ok(other.open.every((req) => req.path.endsWith('?user_id=5')));
+  assert.ok(other.open.every((req) => /\?user_id=5(&|$)/.test(req.path)));
   other.answer();
   await other.finished();
   assert.equal(other.overview.cycleSettings, null);

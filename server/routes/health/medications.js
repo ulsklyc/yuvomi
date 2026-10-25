@@ -23,6 +23,9 @@ const router = express.Router();
 // erst im Formular (#700).
 const MAX_INTERVAL_HOURS = 24 * 28;
 
+/** Zeitpunkt eines Dosis-Eintrags fuer Filter und Reihenfolge (GET .../logs). */
+const LOG_WHEN = 'COALESCE(scheduled_at, taken_at, created_at)';
+
 /**
  * Bedarfsdosis: leer erlaubt, sonst nicht negativ.
  *
@@ -147,7 +150,48 @@ function medicationWritable(medId, viewer) {
     .get(medId, ...w.params) || null;
 }
 
-// GET /medications?user_id=&active=
+/**
+ * `?include=schedules,logs` (R23 S11, N+1): die Liste bringt Plaene und
+ * Dosis-Eintraege ihrer Medikamente gleich mit, je zwei Abfragen fuer ALLE
+ * statt zwei Anfragen je Medikament. Gemessen schickte der Einstieg in die
+ * Gesundheit 27 Anfragen, sechs davon nur fuer drei Medikamente; mit jedem
+ * weiteren wuchs die Zahl um zwei.
+ *
+ * Die Rechte erben die Zeilen vom Medikament: in der Liste steht nur, was der
+ * Betrachter lesen darf (careAwareClause, dieselbe Menge wie
+ * medicationForRead), und Plaene und Eintraege werden nur fuer genau diese Ids
+ * gelesen. `logs_from`/`logs_to` filtern wie GET /medications/:id/logs.
+ */
+function attachPlansAndLogs(meds, query) {
+  const include = new Set(String(query.include || '').split(',').map((part) => part.trim()));
+  const withSchedules = include.has('schedules');
+  const withLogs = include.has('logs');
+  if (!meds.length || (!withSchedules && !withLogs)) return;
+  const ids = meds.map((m) => m.id);
+  const marks = ids.map(() => '?').join(',');
+  const byMed = (rows) => {
+    const out = new Map(ids.map((id) => [id, []]));
+    for (const row of rows) out.get(row.medication_id)?.push(row);
+    return out;
+  };
+  if (withSchedules) {
+    const rows = byMed(db.get().prepare(
+      `SELECT * FROM medication_schedules WHERE medication_id IN (${marks}) ORDER BY time_of_day ASC, id ASC`
+    ).all(...ids));
+    for (const med of meds) med.schedules = rows.get(med.id);
+  }
+  if (withLogs) {
+    const params = [...ids];
+    let sql = `SELECT * FROM medication_logs WHERE medication_id IN (${marks})`;
+    if (query.logs_from) { sql += ` AND substr(${LOG_WHEN}, 1, 16) >= ?`; params.push(String(query.logs_from).slice(0, 16)); }
+    if (query.logs_to)   { sql += ` AND substr(${LOG_WHEN}, 1, 16) <= ?`; params.push(String(query.logs_to).slice(0, 16)); }
+    sql += ` ORDER BY ${LOG_WHEN} DESC, id DESC`;
+    const rows = byMed(db.get().prepare(sql).all(...params));
+    for (const med of meds) med.logs = rows.get(med.id);
+  }
+}
+
+// GET /medications?user_id=&active=&include=schedules,logs&logs_from=&logs_to=
 router.get('/medications', (req, res) => {
   try {
     const viewer   = viewerId(req);
@@ -160,7 +204,9 @@ router.get('/medications', (req, res) => {
     if (activeBit !== undefined) { sql += ' AND m.active = ?'; params.push(activeBit); }
 
     sql += ' ORDER BY m.active DESC, m.name COLLATE NOCASE ASC, m.id DESC';
-    res.json({ data: db.get().prepare(sql).all(...params) });
+    const meds = db.get().prepare(sql).all(...params);
+    attachPlansAndLogs(meds, req.query);
+    res.json({ data: meds });
   } catch (err) {
     log.error('Error listing medications:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
@@ -426,7 +472,7 @@ router.get('/medications/:id/logs', (req, res) => {
     // Zone, `created_at` endet auf 'Z' und traegt Sekunden. Ohne den Schnitt
     // waere '…T23:59:30Z' groesser als die Obergrenze '…T23:59' und die Dosis
     // der letzten Minute des Tages fiele aus ihrem eigenen Tag heraus.
-    const WHEN = 'COALESCE(scheduled_at, taken_at, created_at)';
+    const WHEN = LOG_WHEN;
     const params = [medId];
     let sql = `SELECT * FROM medication_logs WHERE medication_id = ?`;
     if (req.query.from) { sql += ` AND substr(${WHEN}, 1, 16) >= ?`; params.push(String(req.query.from).slice(0, 16)); }

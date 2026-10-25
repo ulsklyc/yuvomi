@@ -70,9 +70,26 @@ export function dayHeading(dayKey) {
   else if (dayKey === addLocalDays(today, -1)) relative = t('common.yesterday');
   const proxy = zonedUTCProxy(`${dayKey}T12:00:00`);
   if (!proxy) return { relative, full: formatDate(dayKey) };
-  const options = { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
-  if (String(dayKey).slice(0, 4) !== today.slice(0, 4)) options.year = 'numeric';
-  return { relative, full: new Intl.DateTimeFormat(getLocale(), options).format(proxy) };
+  const withYear = String(dayKey).slice(0, 4) !== today.slice(0, 4);
+  return { relative, full: headingFormatter(withYear).format(proxy) };
+}
+
+/**
+ * EIN FORMATIERER JE SPRACHE UND JAHRESFORM (R23 S11). Die Agenda fragt je
+ * Tag nach ihrem Kopf, und ein neues Intl.DateTimeFormat kostet - gemessen
+ * 8 ms der Agenda-Wechsel bei 4x CPU, nur fuer 31 gleich gebaute Objekte.
+ */
+const _headingFormatters = new Map();
+function headingFormatter(withYear) {
+  const key = `${getLocale()}|${withYear ? 'y' : ''}`;
+  let fmt = _headingFormatters.get(key);
+  if (!fmt) {
+    const options = { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
+    if (withYear) options.year = 'numeric';
+    fmt = new Intl.DateTimeFormat(getLocale(), options);
+    _headingFormatters.set(key, fmt);
+  }
+  return fmt;
 }
 
 /** `dayHeading` als ein Wort: das relative, sonst das volle. */

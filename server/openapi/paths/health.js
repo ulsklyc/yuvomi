@@ -74,7 +74,7 @@ export function healthPaths() {
       delete: op({ summary: 'Delete a vital measurement', tag: 'Health', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/health/medications': {
-      get: op({ summary: 'List medications', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` and `?active=` filters supported.' }),
+      get: op({ summary: 'List medications', tag: 'Health', description: 'Scoped to the viewer; `?user_id=` and `?active=` filters supported. `?include=schedules,logs` attaches each medication\'s `schedules` and `logs` (the same rows as the per-medication endpoints, read for exactly the listed medications); `logs_from`/`logs_to` filter the attached logs like `from`/`to` on the logs endpoint.' }),
       post: op({ summary: 'Create a medication', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Optional `schedules`: an array of up to 48 intake schedules ({ time_of_day, days_mask?, dose_qty?, start_date?, end_date?, active? }, same rules as the schedules endpoint). The medication and its schedules are written in one transaction: if any schedule is invalid or fails, nothing is created. When `schedules` is sent, the response row carries the created `schedules`.' }),
     },
     '/api/v1/health/medications/{id}': {

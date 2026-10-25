@@ -5583,3 +5583,19 @@ test('R23: die Einstellungssuche findet Synonyme ("Dark Mode", "Kennwort", "Kios
   assert.ok(found('kiosk').includes('settings.wallModeLabel'));
   assert.ok(found('24 stunden').includes('settings.timeFormatLabel'));
 });
+
+// R23 S11 (optimize): zwei Load-Shifts im Rechte-Blatt.
+test('R23: das Rechte-Blatt rutscht nicht und rechnet nur die Gruppen in Sicht', async () => {
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  // Der -8px-Rand der Einleitung kollabierte erst mit dem Kopfrand, wenn das
+  // Skelett wich: das ganze Blatt rutschte 8px hoch (0,0068 mobil).
+  const intro = rules.filter((r) => r.selector.trim() === '.settings-section__intro');
+  assert.ok(intro.length > 0);
+  for (const r of intro) assert.doesNotMatch(r.body, /margin[^;]*-1|margin[^;]*calc\([^)]*\*\s*-1/, `kein negativer Rand: ${r.body}`);
+  // 16 Gruppen, 3600px: ausser Sicht ueberspringt der Browser sie.
+  const cv = rules.find((r) => r.selector.trim() === '.perm-modgroup + .perm-modgroup' && /content-visibility/.test(r.body));
+  assert.match(cv?.body ?? '', /content-visibility:\s*auto/);
+  assert.match(cv?.body ?? '', /contain-intrinsic-size:\s*auto none auto/);
+  assert.match(cv?.body ?? '', /overflow-clip-margin/, 'der Fokusring darf ueber die Gruppenkante');
+});

@@ -764,6 +764,10 @@ export async function render(container, { user }) {
   // (PR #1200 Review, Befund 5). startWeek() korrigiert beides nach dem Laden.
   state.currentWeek = getWeekStartOf(today);
   syncTodayButton();
+  // Der Wert steht vom ersten Bild an (R23 S11): leer schob der Stepper „›"
+  // beim ersten renderWeekGrid() um die Breite des Labels nach rechts
+  // (Load-Shift #week-next 0,0019 mobil, 4x CPU).
+  updateWeekLabel();
 
   // Listenressourcen parallel zu loadPreferences() starten; loadWeek()
   // wartet, bis startWeek() den korrekten Wochenanfang gesetzt hat.

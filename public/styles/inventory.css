@@ -85,6 +85,18 @@
   scrollbar-width: none;
 }
 
+/* Platzhalter waehrend des Ladens (R23 S11): eine Chiphoehe plus Polster,
+ * dieselbe Rechnung wie .page-chip-row. */
+.inventory-filters[data-pending] {
+  min-block-size: calc(var(--target-md) + 2 * var(--space-3));
+}
+
+@media (hover: none) {
+  .inventory-filters[data-pending] {
+    min-block-size: calc(var(--target-base) + 2 * var(--space-3));
+  }
+}
+
 .inventory-filters::-webkit-scrollbar {
   display: none;
 }

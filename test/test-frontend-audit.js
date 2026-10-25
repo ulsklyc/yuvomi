@@ -23575,13 +23575,16 @@ test('R21 S8: Agenda, Vorrat, Inventar, Budget und Einkauf rechnen nur, was in S
     ['../public/styles/inventory.css', '.inventory-list > .list-group + .list-group'],
     ['../public/styles/budget.css', '.budget-list > .list-row:nth-child(n+20), .budget-ledger-section__rows > .list-row:nth-child(n+20)'],
     ['../public/styles/shopping.css', '.shopping-page .items-lanes > .list-group + .list-group'],
+    ['../public/styles/settings.css', '.perm-modgroup + .perm-modgroup'],
   ];
   for (const [file, selector] of expect) {
     const rule = [...eachRule(read(file))].find((r) => r.selector.replace(/\s+/g, ' ').trim() === selector
       && r.at.some((at) => /@supports \(content-visibility: auto\)/.test(at)));
     assert.ok(rule, `${file}: ${selector} ohne content-visibility unter @supports`);
     assert.match(rule.body, /content-visibility:\s*auto/);
-    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto \d+px/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
+    // Die Hoehe als Zahl oder als Eigenschaft, die sie traegt (die Agenda teilt
+    // sie seit R23 S11 mit dem Platzhalter ihres Tages).
+    assert.match(rule.body, /contain-intrinsic-size:\s*auto none auto (\d+px|var\(--[\w-]+\))/, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
     assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')), `${selector}: @supports prueft contain-intrinsic-size nicht mit`);
     assert.match(rule.body, /overflow-clip-margin:\s*var\(--space-\d\)/, `${selector}: Schatten und Fokusring des Traegers wuerden an der Kante abgeschnitten`);
   }

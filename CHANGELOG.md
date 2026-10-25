@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Health, the agenda and the permissions page open faster, and four pages no longer jump while
+  they load.** Health now loads each medication's plans and doses together with the medication
+  list instead of two extra requests per medication (21 instead of 27 requests to open Health). The
+  calendar agenda draws the days on screen first and the rest right after, and the roles and
+  permissions page only lays out the module groups in view. The Inventory category chips, the
+  meal plan's week label and the top of the permissions page hold their place from the first
+  frame instead of pushing the page down or up when the data arrives.
 - **Rewards: "Bonus" is the add button on the Points tab as well.** Parents now find "Bonus" as
   the add button on Points and History and "Reward" on Rewards, so the header button never
   disappears when switching tabs, and the second "Grant bonus" button next to the standings is

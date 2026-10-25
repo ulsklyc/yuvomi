@@ -3307,9 +3307,12 @@ function fakeAgendaContainer() {
   const container = fakeContainer();
   // Seit R10 (L5) steht die Agenda in Liste + Detail: `.calendar-agenda-split`
   // gibt es im Textstub nicht, der Baustein haengt sich dann nicht ein.
+  // Seit R23 S11 setzt die Agenda ihre Tage IN die Liste (`#agenda-view`,
+  // utils/row-fill.js): der Stub haengt sie an denselben Text.
+  const list = { ...fakeDomElement(), insertAdjacentHTML: (pos, chunk) => container.insertAdjacentHTML(pos, chunk), isConnected: false };
   return {
     ...container,
-    querySelector: (sel) => (sel === '.calendar-agenda-split' ? null : container.querySelector(sel)),
+    querySelector: (sel) => (sel === '.calendar-agenda-split' ? null : sel === '#agenda-view' ? list : container.querySelector(sel)),
     querySelectorAll: () => [],
     get html() { return container.html; },
   };
@@ -6958,6 +6961,46 @@ test('R23: die Folgeaktion einer Detailzeile passt am Telefon neben ihren Wert',
   const css = readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8');
   const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.detail-row:has(> .detail-row__action) > .detail-row__text');
   assert(/flex:\s*1 1 8rem/.test(rule?.body ?? ''), `Basis 8rem, nicht 10rem (${rule?.body})`);
+});
+
+// R23 S11 (optimize): der Wechsel in die Agenda hielt das alte Bild 205 ms
+// (1440, 4x CPU) - 31 Tage Markup fuer ein Bild, das fuenf zeigt. Die Tage
+// ausser Sicht kommen in Happen (utils/row-fill.js), ihr Platzhalter hat
+// dieselbe Schaetzhoehe wie `content-visibility`. Ein Neuzeichnen IN der
+// Agenda und ein Sprungziel (`?open=`) zeichnen ganz.
+test('R23: die Agenda zeichnet beim Wechsel erst die Tage im Bild, der Platzhalter misst wie content-visibility', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const fnOf = (name) => { const at = src.indexOf(`function ${name}(`); return src.slice(at, src.indexOf('\n}\n', at)); };
+  const view = fnOf('renderAgendaView');
+  assert(/beginRowFill\(agenda, \{ progressive: agendaFillWanted\(\) \}\)/.test(view), 'die Agenda baut ueber beginRowFill');
+  assert(/fill\.rows\(groups, agendaDayHtml\)/.test(view) && /fill\.start\(\{ onRows: drawRowIcons \}\)/.test(view),
+    'Einheit ist der Tag, nachkommende Tage bekommen ihre Zeichen');
+  const wanted = fnOf('agendaFillWanted');
+  assert(/_renderedView === 'agenda'\) return false/.test(wanted), 'ein Neuzeichnen in der Agenda zeichnet ganz');
+  assert(/get\('open'\)/.test(wanted), 'ein Sprungziel zeichnet ganz');
+  assert(/_renderedView = state\.view;/.test(fnOf('renderView')), 'renderView merkt sich die gezeichnete Ansicht');
+  assert(/_renderedView = null;/.test(src.slice(src.indexOf('export async function render('), src.indexOf('bindPageListeners();', src.indexOf('export async function render(')))),
+    'jeder Seitenaufbau beginnt ohne gezeichnete Ansicht');
+  const css = readFileSync(new URL('../public/styles/calendar.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const cv = rules.find((r) => r.selector.trim() === '.agenda-day + .agenda-day' && /content-visibility/.test(r.body));
+  const ph = rules.find((r) => r.selector.trim() === '.agenda-view > .row-pending');
+  assert(/contain-intrinsic-size:\s*auto none auto var\(--agenda-day-estimate\)/.test(cv?.body ?? ''), `content-visibility liest die Schaetzhoehe (${cv?.body})`);
+  assert(/block-size:\s*var\(--agenda-day-estimate\)/.test(ph?.body ?? ''), `der Platzhalter liest dieselbe (${ph?.body})`);
+});
+
+// R23 S11: ein Intl.DateTimeFormat je Sprache und Jahresform, nicht je Tag.
+test('R23: dayHeading baut seinen Formatierer einmal', () => {
+  const Real = Intl.DateTimeFormat;
+  let built = 0;
+  Intl.DateTimeFormat = function (...args) { built += 1; return new Real(...args); };
+  try {
+    const today = headToday();
+    for (let i = 2; i < 40; i++) dayHeading(headAddDays(today, i));
+  } finally {
+    Intl.DateTimeFormat = Real;
+  }
+  assert(built <= 2, `38 Tage, ${built} Formatierer`);
 });
 
 // --------------------------------------------------------

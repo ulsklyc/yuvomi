@@ -1995,12 +1995,20 @@ test('R19: die Rezeptsuche ist mobil ein Feld, keine Lupe in einer eigenen Zeile
   assert(phone.some((r) => /\.page-toolbar \.page-search\.page-search--field/.test(r.selector) && /flex:\s*1 1 auto/.test(r.body)), 'das Feld fuellt die Zeile');
 });
 
-// --------------------------------------------------------
-// Ergebnis
-// --------------------------------------------------------
-console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
-if (failed > 0) process.exit(1);
 
+// R23 S11 (optimize): leer bis nach dem Laden schob das Wochenlabel den
+// Pfeil „›" beim ersten Zeichnen um seine Breite (Load-Shift #week-next
+// 0,0019 mobil, 4x CPU). Der Wert steht jetzt vor dem ersten await.
+test('R23: das Wochenlabel steht vor dem ersten Laden', () => {
+  const at = mealsSource.indexOf('export async function render(');
+  const body = mealsSource.slice(at, mealsSource.indexOf('\n}\n', at));
+  const label = body.indexOf('updateWeekLabel();');
+  const firstAwait = body.indexOf('await ');
+  assert(label > 0 && label < firstAwait, 'updateWeekLabel() laeuft vor dem ersten await in render()');
+});
+
+// Stand bis R23 S11 HINTER dem Ergebnis: lief, zaehlte aber nie - rot
+// waere die Suite trotzdem gruen gewesen.
 // R20 (Re-Critique 2026-10-17 a2 P3): die Typ-Chips im Mahlzeit- und im
 // Rezept-Dialog standen ohne die Mahlzeit-Toene des Plans.
 test('R20: die Typ-Chips tragen den Punkt ihres Mahlzeit-Tons, in beiden Dialogen', () => {
@@ -2015,3 +2023,9 @@ test('R20: die Typ-Chips tragen den Punkt ihres Mahlzeit-Tons, in beiden Dialoge
   const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
   assert(/class="filter-chip recipe-meal-types__chip" data-meal-type=/.test(recipes), 'der Rezept-Dialog ebenso');
 });
+
+// --------------------------------------------------------
+// Ergebnis
+// --------------------------------------------------------
+console.log(`\n[Meals-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);
+if (failed > 0) process.exit(1);

@@ -119,3 +119,24 @@ test('die Fixture haengt an dieser Suite und an keiner Kette', () => {
   assert.ok(referenced && readdirSync(TEST_DIR).includes(referenced),
     'test/exit-code-fixture.js fehlt - die Programmlaeufe oben pruefen nichts mehr.');
 });
+
+// R23 S11: in test-meals.js stand ein Fall HINTER `if (failed > 0)
+// process.exit(1);` - er lief und druckte sein ✗, aber die Suite endete
+// trotzdem mit 0. Eigene Zaehl-Harnische (`let failed`, `finish()`) werten
+// nur aus, was VOR dieser Zeile registriert ist.
+test('kein Fall steht hinter der Auswertung einer Suite mit eigenem Zaehler', () => {
+  const offenders = [];
+  for (const name of readdirSync(TEST_DIR).filter((n) => /^test-.*\.js$/.test(n))) {
+    const source = readFileSync(join(TEST_DIR, name), 'utf8');
+    // node:test zaehlt selbst; dort steht die Zeile hoechstens in einer Vorlage.
+    if (/from 'node:test'/.test(source)) continue;
+    const lines = source.split('\n');
+    // Nur die Auswertung auf oberster Ebene (Zeilenanfang), nicht die
+    // Programm-Vorlagen in Strings (test-plain-harness.js).
+    const last = lines.findLastIndex((line) => /^if \(failed( > 0)?\) process\.exit\(1\);/.test(line));
+    if (last < 0) continue;
+    const late = lines.slice(last + 1).findIndex((line) => /^(test|run)\(['`]/.test(line));
+    if (late >= 0) offenders.push(`${name}:${last + 2 + late}`);
+  }
+  assert.deepEqual(offenders, []);
+});

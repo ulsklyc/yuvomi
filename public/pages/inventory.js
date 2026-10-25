@@ -401,6 +401,7 @@ function updateFilterChips() {
   const host = _container?.querySelector('#inventory-filters');
   if (!host) return;
   const chips = categoryChips();
+  host.removeAttribute('data-pending');
   host.hidden = chips.length === 0;
   host.replaceChildren();
   if (!chips.length) return;
@@ -2458,7 +2459,11 @@ export async function render(container, { signal, user } = {}) {
   filters.id = 'inventory-filters';
   filters.setAttribute('role', 'group');
   filters.setAttribute('aria-label', t('inventory.filterGroupLabel'));
-  filters.hidden = true;
+  // Die Reihe haelt ihren Platz, bis die Daten da sind (R23 S11, wie die
+  // Kontakte): versteckt geladen erschien sie mit den Chips und schob Liste
+  // und Detail um ihre Hoehe nach unten (1440x900, 4x CPU: Layout-Shift
+  // 0,035). Ob es Chips gibt, entscheidet erst updateFilterChips().
+  filters.dataset.pending = '';
 
   const list = document.createElement('div');
   list.className = 'inventory-list split-view__list';

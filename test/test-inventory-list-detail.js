@@ -581,3 +581,20 @@ test('R22: `?open=` oeffnet auch am Telefon das Blatt des Gegenstands', async ()
   assert.match(mount, /deepLinkNarrow: true,/);
   assert.match(mount, /openNarrow: openItemNarrow,/, 'das Blatt, das der Link oeffnet');
 });
+
+// R23 S11 (optimize): versteckt geladen erschien die Chipreihe mit den Daten
+// und schob Liste und Detail um ihre Hoehe nach unten (1440x900, 4x CPU:
+// Layout-Shift 0,035). Sie haelt ihren Platz, bis die Chips entschieden sind.
+test('R23: die Kategorie-Reihe haelt ihren Platz, bis die Daten da sind', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const src = readFileSync(new URL('../public/pages/inventory.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('export async function render('));
+  assert.match(render.slice(0, render.indexOf("page.append(toolbar, filters, split, fab);")), /filters\.dataset\.pending = '';/);
+  assert.doesNotMatch(render.slice(0, render.indexOf("page.append(toolbar, filters, split, fab);")), /filters\.hidden = true;/, 'nicht versteckt starten');
+  const update = src.slice(src.indexOf('function updateFilterChips()'), src.indexOf('function computeMetrics('));
+  assert.ok(update.indexOf("host.removeAttribute('data-pending');") > 0 && update.indexOf("host.removeAttribute('data-pending');") < update.indexOf('host.hidden ='),
+    'erst mit den Daten entscheidet sich, ob es Chips gibt');
+  const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
+  const pending = [...eachRule(css)].filter((r) => r.selector.trim() === '.inventory-filters[data-pending]');
+  assert.ok(pending.some((r) => /min-block-size:\s*calc\(var\(--target-md\) \+ 2 \* var\(--space-3\)\)/.test(r.body)), 'eine Chiphoehe plus Polster');
+});

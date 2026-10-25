@@ -11,6 +11,7 @@ import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { mountMasterDetail, splitViewDetailHtml, releaseAddressOnClose } from '/utils/master-detail.js';
+import { beginRowFill, drawRowIcons } from '/utils/row-fill.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
 import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
@@ -1965,6 +1966,7 @@ function applyEventFormPreferences(prefs = {}, documentOptions = {}) {
 
 export async function render(container, { user, signal } = {}) {
   _container = container;
+  _renderedView = null;
   bindPageListeners();
   // Die Uhr des Haushalts: state.today markiert die Heute-Zelle, die Jetzt-Linie
   // und den Vorschlag fuer einen neuen Termin - alle drei muessen denselben Tag
@@ -3165,6 +3167,7 @@ function renderView() {
     if (state.view === 'agenda') renderAgendaView(body);
   } finally {
     _dayIndex.active = false;
+    _renderedView = state.view;
   }
   if (window.lucide) lucide.createIcons({ el: body });
   updateOfflineNotice();
@@ -6102,6 +6105,27 @@ function agendaDayHeadHtml(dayKey) {
     : `<span class="agenda-day__date">${esc(full)}</span>`;
 }
 
+function agendaDayHtml(group) {
+  return `
+          <div class="agenda-day">
+            <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
+                 /calendar hatte genau EIN h-Element im ganzen Dokument. -->
+            <h2 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
+              ${agendaDayHeadHtml(group.date)}
+            </h2>
+            ${dayGroupHtml(group)}
+            ${dayGroupIsEmpty(group) ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
+          </div>`;
+}
+
+/** Welche Ansicht zuletzt im Koerper stand (renderView) - der Wechsel IN die Agenda fuellt in Happen. */
+let _renderedView = null;
+
+function agendaFillWanted() {
+  if (_renderedView === 'agenda') return false;
+  return !new URLSearchParams(globalThis.location?.search ?? '').get('open');
+}
+
 function renderAgendaView(container) {
   const { from, to } = getAgendaRange(state.cursor);
   const days = Array.from({ length: 31 }, (_, i) => addDays(from, i));
@@ -6128,26 +6152,7 @@ function renderAgendaView(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="split-view calendar-agenda-split">
-    <div class="agenda-view page-scrollport split-view__list" data-scroll-port="calendar-agenda" id="agenda-view">
-      ${groups.length === 0
-        ? emptyStateHTML({
-          icon: 'calendar-plus',
-          title: t('calendar.agendaEmpty'),
-          action: readOnly() ? undefined : { tone: 'secondary', label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
-        })
-        : groups.map((group) => `
-          <div class="agenda-day">
-            <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
-                 /calendar hatte genau EIN h-Element im ganzen Dokument. -->
-            <h2 class="agenda-day__header ${group.date === state.today ? 'agenda-day__header--today' : ''}">
-              ${agendaDayHeadHtml(group.date)}
-            </h2>
-            ${dayGroupHtml(group)}
-            ${dayGroupIsEmpty(group) ? `<p class="agenda-day__empty">${t('calendar.agendaDayEmpty')}</p>` : ''}
-          </div>
-        `).join('')
-      }
-    </div>
+    <div class="agenda-view page-scrollport split-view__list" data-scroll-port="calendar-agenda" id="agenda-view"></div>
     ${splitViewDetailHtml({
       id: 'calendar',
       label: t('calendar.detailPaneLabel'),
@@ -6156,9 +6161,27 @@ function renderAgendaView(container) {
     </div>
   `);
 
+  const agenda = container.querySelector('#agenda-view');
+  // ERST DIE TAGE IM BILD, DER REST IN HAPPEN (R23 S11; utils/row-fill.js wie
+  // Aufgaben und Einkauf). Der Wechsel in die Agenda hielt das alte Bild
+  // 205 ms (1440, 4x CPU): 31 Tage Markup parsen und stylen, obwohl das Bild
+  // fuenf zeigt. Die Einheit ist der TAG: sein Platzhalter hat die Schaetzhoehe,
+  // die `content-visibility` ohnehin fuer Tage ausser Sicht annimmt
+  // (calendar.css) - der Bildlauf ist vom ersten Bild an derselbe. Nur beim
+  // WECHSEL in die Agenda und ohne Sprungziel (`?open=` sucht seine Zeile
+  // sofort); ein Neuzeichnen in der Agenda zeichnet ganz.
+  const fill = beginRowFill(agenda, { progressive: agendaFillWanted() });
+  agenda.insertAdjacentHTML('beforeend', groups.length === 0
+    ? emptyStateHTML({
+      icon: 'calendar-plus',
+      title: t('calendar.agendaEmpty'),
+      action: readOnly() ? undefined : { tone: 'secondary', label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
+    })
+    : fill.rows(groups, agendaDayHtml));
+  fill.start({ onRows: drawRowIcons });
+
   stagger(container.querySelectorAll('.agenda-event'), { host: container });
 
-  const agenda = container.querySelector('#agenda-view');
   agenda.addEventListener('click', (e) => {
     if (e.target.closest('#agenda-empty-cta')) {
       openEventModal({ mode: 'create', date: newEventDate() });
