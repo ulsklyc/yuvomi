@@ -143,6 +143,124 @@ img, svg, video {
   }
 }
 
+/* OHNE COLOR-MIX() BLEIBT LESBAR, WAS NUR AN DER TONUNG HING (#2184).
+ *
+ * Chrome < 111, Firefox < 113 und Safari < 16.2 kennen color-mix() nicht -
+ * darunter Wandrahmen mit einer WebView, die sich nicht aktualisieren laesst.
+ * Fast jede der rund 270 Stellen traegt ein var(): die Deklaration gilt beim
+ * Parsen als gueltig, gewinnt die Kaskade und faellt erst beim Berechnen auf
+ * ihren Anfangswert. Eine Flaeche wird durchsichtig, ein `border` verschwindet
+ * ganz; ein Zwilling davor (das dvh-Muster) wirkt deshalb nicht.
+ *
+ * GEZIELT, NICHT VOLLSTAENDIG (Entscheidung 25.10.2026). Die meisten Stellen
+ * kosten dort nur Tonung - das ist die Zusage "startet, schlichter" der
+ * Browser-Tabelle (docs/installation.md). Hier steht nur, was Information
+ * verliert: Schrift, die ohne ihre Flaeche unlesbar wird, eine Auswahl, die
+ * nur an der Tonung hing, eine Flaeche, die Inhalt verdecken muss, eine vom
+ * Nutzer gewaehlte Farbe ohne andere Spur, eine leere Checkbox ohne Rand.
+ * Kalendertermine behalten ihre farbige Kante, Segmente und Reiter ihre eigene
+ * Flaeche - die stehen bewusst nicht hier.
+ *
+ * Nur Token-Werte, keine neue Farbe: Vollton statt Abdunklung, die Tints
+ * --color-accent-subtle/-light statt der Modultonung (wie unter
+ * prefers-reduced-transparency in glass.css), ein Ring in der Nutzerfarbe
+ * statt ihrer Tonung. `:root ` davor, weil die Modulblaetter spaeter laden und
+ * ihre color-mix-Regel bei gleicher Spezifitaet gewaenne. Wer color-mix()
+ * kennt, sieht den Block nicht. Liste und Wirkung haelt
+ * test:old-browser-fallbacks (COLOR_MIX_FALLBACKS). */
+@supports not (color: color-mix(in srgb, red, red)) {
+  /* Schrift auf einer Fuellung. Den Primaerknopf traegt sein Token
+   * (--btn-primary-fill, tokens.css). */
+  :root .page-fab:not(.page-fab--docked) {
+    background-color: var(--color-accent);
+  }
+
+  :root .toast:not(.toast--danger):not(.toast--warning),
+  :root .list-bulkbar {
+    background-color: var(--toast-bg);
+  }
+
+  :root .month-day__holiday,
+  :root .allday-holiday {
+    background: var(--holi-color);
+  }
+
+  :root .dms-result__open {
+    background: var(--color-text-secondary);
+  }
+
+  :root .document-viewer__pdf-indicator {
+    background: var(--color-surface-2);
+  }
+
+  /* Flaechen, die Inhalt verdecken. */
+  :root .search-overlay {
+    background-color: var(--color-bg);
+  }
+
+  @media (min-width: 768px) {
+    :root .search-overlay {
+      background-color: var(--color-overlay-glass);
+    }
+  }
+
+  /* Auswahl, die nur an der Tonung hing. */
+  :root .search-result[aria-selected="true"],
+  :root .tasks-page .task-card--selected > .task-card__main,
+  :root .contact-item--selected,
+  :root .document-row.is-selected,
+  :root .split-group--active,
+  :root .budget-bar-row.is-category-selected {
+    background-color: var(--color-accent-subtle);
+  }
+
+  @container module-surface (min-width: 65rem) {
+    :root .split-view [data-md-id].is-selected {
+      background-color: var(--color-accent-subtle);
+    }
+  }
+
+  :root .filter-chip--active {
+    background-color: var(--color-accent-light);
+    border-color: var(--color-accent);
+  }
+
+  @media (max-width: 1023px) {
+    :root .documents-folder-chip[data-folder-active] {
+      background-color: var(--color-accent-light);
+      border-color: var(--color-accent);
+    }
+  }
+
+  @media (max-width: 767px) {
+    :root .documents-folder-chip[data-category-active] {
+      background-color: var(--color-accent-light);
+      border-color: var(--color-accent);
+    }
+  }
+
+  /* Die Farbe, die jemand gewaehlt hat: als Ring statt als Tonung. */
+  :root .note-card {
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm), inset 0 0 0 1.5px var(--note-color, transparent);
+  }
+
+  :root .dashboard .note-item {
+    background-color: var(--color-fill-well);
+    box-shadow: inset 0 0 0 1.5px var(--note-color, var(--module-notes));
+  }
+
+  :root .schedule-overview__block {
+    background: var(--color-surface-work);
+    box-shadow: inset 0 0 0 1.5px var(--schedule-color);
+  }
+
+  /* Die offene Checkbox einer Notiz-Checkliste. */
+  :root .note-md-box {
+    border: 1px solid var(--color-border-control);
+  }
+}
+
 /* `color: inherit` ist hier die WICHTIGSTE Zeile, und sie hat gefehlt: `a` und
  * `input, textarea, select` erben ihre Farbe direkt darunter, `button` als
  * einziges der vier tat es nicht. Ohne sie nimmt ein Button die UA-Farbe

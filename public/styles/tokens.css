@@ -530,6 +530,17 @@
   --color-btn-primary:        var(--_color-btn-primary);    /* Weißes Label 6.1:1 — WCAG AA */
   --_color-btn-primary-hover: #5B2FD4;
   --color-btn-primary-hover:  var(--_color-btn-primary-hover);
+  /* Fuellung von `.btn--primary` (#2184). Hier der Vollton der Stimme fuer
+   * Browser ohne color-mix() (Chrome < 111, Safari < 16.2): mit color-mix()
+   * direkt an der Regel war die Flaeche dort durchsichtig und die Beschriftung
+   * (--color-ink-on-vivid) verschwand - Speichern, Anmelden, Koppeln. Die
+   * Abdunklung 88 %/76 % setzt der @supports-Block "Primaerknopf" weiter
+   * unten, wie --viewport-height. Kontrast des Rueckfalls: Weiss auf #6C3AED
+   * 5.9:1, Dunkel auf #A78BFA 7.6:1. Als Token und nicht als Rueckfall in
+   * reset.css, weil der Hover sonst ueber die Rueckmelde-Zustaende der Knoepfe
+   * stiege (test:frontend-audit, #2180). */
+  --btn-primary-fill:         var(--color-accent);
+  --btn-primary-fill-hover:   var(--color-accent-hover);
 
   /* --------------------------------------------------------
    * 3. Farben - Semantisch (Apple-Vokabular, AA-vertieft)
@@ -2219,6 +2230,21 @@
 @supports (height: 100dvh) {
   :root {
     --viewport-height: 100dvh;
+  }
+}
+
+/* ================================================================
+ * Primaerknopf: die Abdunklung, wo der Browser color-mix() kennt (#2184)
+ *
+ * Steht HINTER dem :root-Block oben, wie --viewport-height. Ohne color-mix()
+ * bleibt der Vollton aus --btn-primary-fill; die Werte hier sieht so ein
+ * Browser gar nicht erst. --color-accent wird nur an der Wurzel gesetzt
+ * (auch im Dark), deshalb darf der Token hier mischen.
+ * ================================================================ */
+@supports (color: color-mix(in srgb, red, red)) {
+  :root {
+    --btn-primary-fill:       color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950));
+    --btn-primary-fill-hover: color-mix(in srgb, var(--color-accent) 76%, var(--neutral-950));
   }
 }
 
