@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Tutara göre",
         "ledgerSortActive": "Sıralama: {{sort}}",
         "ledgerAccountsAll": "Tüm hesaplar",
-        "showAccountTransactions": "Hareketleri göster"
+        "showAccountTransactions": "Hareketleri göster",
+        "summaryTransfersIn": "Gelen",
+        "summaryTransfersOut": "Giden"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Etter beløp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle kontoer",
-        "showAccountTransactions": "Vis transaksjoner"
+        "showAccountTransactions": "Vis transaksjoner",
+        "summaryTransfersIn": "Inngående",
+        "summaryTransfersOut": "Utgående"
     },
     "settings": {
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",

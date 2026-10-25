@@ -3138,6 +3138,26 @@ test('the transfer summary is conditional and stays outside the balance card gri
   }
 });
 
+test('#2207: filtered to one account, the transfer card shows incoming and outgoing apart', () => {
+  const at = (html) => html.slice(html.indexOf('budget-transfer-summary'));
+  // Ohne Kontofilter: eine Zahl wie bisher, kein Eingang/Ausgang.
+  const unfiltered = uebersicht({ entries: [zeile()], summary: { ...summe, transfers: 120 } });
+  assert.match(unfiltered, /class="metric-card budget-transfer-summary"/);
+  assert.doesNotMatch(unfiltered, /summaryTransfersIn|budget-transfer-summary__flow/);
+  // Gefiltert, nur eingehend: die Karte erscheint trotz transfers = 0.
+  const nurEin = uebersicht({ entries: [zeile()], accountFilterId: 7, summary: { ...summe, transfers: 0, transfers_in: 500 } });
+  assert.match(nurEin, /class="metric-card budget-transfer-summary budget-transfer-summary--split"/);
+  // Beide Richtungen getrennt, Eingang vor Ausgang, mit Vorzeichen.
+  const beide = at(uebersicht({ entries: [zeile()], accountFilterId: 7, summary: { ...summe, transfers: 200, transfers_in: 500 } }));
+  const ein = beide.indexOf('summaryTransfersIn');
+  const aus = beide.indexOf('summaryTransfersOut');
+  assert.ok(ein > 0 && ein < aus, beide);
+  assert.match(beide.slice(ein, aus), /\+\D*500/);
+  assert.match(beide.slice(aus), /[-−]\D*200/);
+  // Gefiltert ohne Umbuchung: keine Karte.
+  assert.doesNotMatch(uebersicht({ entries: [zeile()], accountFilterId: 7, summary: { ...summe, transfers: 0, transfers_in: 0 } }), /budget-transfer-summary/);
+});
+
 test('transfer ledger rows are marked and show source to destination with a neutral amount', () => {
   const html = uebersicht({ entries: [zeile({ transfer_entry_id: 42, transfer_account_id: 2, account_id: 1 })],
     accounts: [{ id: 1, name: '<Checking>' }, { id: 2, name: 'Savings' }], summary: { ...summe, transfers: 950 } });

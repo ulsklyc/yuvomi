@@ -1885,7 +1885,9 @@
         "ledgerSortAmount": "Ayon sa halaga",
         "ledgerSortActive": "Pagkakasunod: {{sort}}",
         "ledgerAccountsAll": "Lahat ng account",
-        "showAccountTransactions": "Ipakita ang mga transaksyon"
+        "showAccountTransactions": "Ipakita ang mga transaksyon",
+        "summaryTransfersIn": "Papasok",
+        "summaryTransfersOut": "Palabas"
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",

@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Összeg szerint",
         "ledgerSortActive": "Rendezés: {{sort}}",
         "ledgerAccountsAll": "Minden számla",
-        "showAccountTransactions": "Tételek megjelenítése"
+        "showAccountTransactions": "Tételek megjelenítése",
+        "summaryTransfersIn": "Bejövő",
+        "summaryTransfersOut": "Kimenő"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",

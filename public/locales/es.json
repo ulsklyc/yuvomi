@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Por importe",
         "ledgerSortActive": "Orden: {{sort}}",
         "ledgerAccountsAll": "Todas las cuentas",
-        "showAccountTransactions": "Ver movimientos"
+        "showAccountTransactions": "Ver movimientos",
+        "summaryTransfersIn": "Entrantes",
+        "summaryTransfersOut": "Salientes"
     },
     "settings": {
         "healthCycleEnableLabel": "Ofrecer el ciclo en el hogar",

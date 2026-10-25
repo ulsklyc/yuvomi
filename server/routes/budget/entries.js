@@ -53,7 +53,7 @@ function intervalCountCheck(value) {
  * GET /api/v1/budget/summary
  * Monatsübersicht: Einnahmen, Ausgaben, Saldo, Aufschlüsselung nach Kategorie.
  * Query: ?month=YYYY-MM  (default: aktueller Monat), optional &account_id=
- * Response: { data: { month, income, expenses, balance, byCategory: [] } }
+ * Response: { data: { month, income, expenses, balance, byCategory: [], transfers, transfers_in? } }
  *
  * `account_id` grenzt alle Summen auf ein Konto ein, wie die Liste
  * (Re-Critique 2026-10-17): mit gefiltertem Hauptbuch blieben Saldo und
@@ -94,7 +94,8 @@ router.get('/summary', (req, res) => {
         SUM(CASE WHEN transfer_entry_id IS NULL AND amount > 0 THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN transfer_entry_id IS NULL AND amount < 0 THEN amount ELSE 0 END) AS expenses,
         SUM(CASE WHEN transfer_entry_id IS NULL THEN amount ELSE 0 END) AS balance,
-        SUM(CASE WHEN transfer_entry_id IS NOT NULL AND amount < 0 THEN -amount ELSE 0 END) AS transfers
+        SUM(CASE WHEN transfer_entry_id IS NOT NULL AND amount < 0 THEN -amount ELSE 0 END) AS transfers,
+        SUM(CASE WHEN transfer_entry_id IS NOT NULL AND amount > 0 THEN amount ELSE 0 END) AS transfers_in
       FROM budget_entries
       WHERE date BETWEEN ? AND ?${filter.clause}${bookedOnly()}
     `).get(from, to, ...filter.params);
@@ -158,6 +159,12 @@ router.get('/summary', (req, res) => {
         balance:    totals.balance  || 0,
         byCategory,
         transfers: totals.transfers || 0,
+        // EINGEHENDE UMBUCHUNGEN NUR IM KONTOFILTER (#2207). Gefiltert auf das
+        // Zielkonto stand eine Umbuchung in Liste und Kontostand, aber in
+        // keiner Karte. Ohne Filter heben sich beide Haelften auf, die Zahl
+        // waere dieselbe wie `transfers` - das Feld fehlt dort, die Antwort
+        // bleibt fuer Bestandsclients unveraendert.
+        ...(accountFiltered ? { transfers_in: totals.transfers_in || 0 } : {}),
         pending: {
           count:    pending.count + expected.count,
           income:   cents(pending.income + expected.income),

@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now waits instead of counting as a failure, so five such answers no longer return the item to
   its old list. After a rate limit, an outage or a dropped connection the sync sends nothing more
   to that account until the next pass.
+- **A transfer arriving on the filtered account now shows in the month cards (#2207).** With the
+  ledger filtered to one account, the Transfers card counted only money leaving it; a transfer
+  coming in (for example savings into checking) showed in the list and the account balance, but in
+  no card. Filtered to one account, the card now shows incoming and outgoing transfers apart. The
+  Balance card stays income minus expenses, and the unfiltered month is unchanged. The summary API
+  adds `transfers_in` when `account_id` is set.
 - **An iCalendar feed with a quoted parameter containing a colon is no longer mis-parsed (#2189).**
   A property such as `DESCRIPTION;ALTREP="data:text/html,Spritzen":Spritzen` was split on the first
   colon, so the description shown was the whole `ALTREP="data:text/html,Spritzen"` value instead of

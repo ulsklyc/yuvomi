@@ -1950,7 +1950,9 @@
         "ledgerSortAmount": "Podle částky",
         "ledgerSortActive": "Řazení: {{sort}}",
         "ledgerAccountsAll": "Všechny účty",
-        "showAccountTransactions": "Zobrazit pohyby účtu"
+        "showAccountTransactions": "Zobrazit pohyby účtu",
+        "summaryTransfersIn": "Příchozí",
+        "summaryTransfersOut": "Odchozí"
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

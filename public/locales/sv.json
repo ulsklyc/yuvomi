@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Efter belopp",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alla konton",
-        "showAccountTransactions": "Visa transaktioner"
+        "showAccountTransactions": "Visa transaktioner",
+        "summaryTransfersIn": "Inkommande",
+        "summaryTransfersOut": "Utgående"
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

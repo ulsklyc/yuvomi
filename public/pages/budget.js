@@ -471,6 +471,28 @@ function formatAmount(n, currency = state.currency) {
   return formatMoney(n, currency);
 }
 
+/* DIE UMBUCHUNGS-KARTE (#2207). Ohne Kontofilter eine Zahl: was den Monat
+ * ueber Umbuchungen verlassen hat; eingehend waere dieselbe Summe, weil sich
+ * beide Haelften aufheben. Auf EIN Konto gefiltert zaehlt die Richtung: eine
+ * Umbuchung, die auf dem Konto ankommt, stand bis dahin in Liste und
+ * Kontostand, aber in keiner Karte. Dann zwei Zeilen, Eingang und Ausgang,
+ * mit Vorzeichen und bewusst ohne Netto - die Bilanz bleibt Einnahmen minus
+ * Ausgaben. Der Server liefert `transfers_in` nur im Kontofilter. */
+function transferSummaryHtml(s) {
+  const out = Number(s?.transfers) || 0;
+  const filtered = state.accountFilterId && s?.transfers_in !== undefined;
+  if (!filtered) {
+    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total').text}</div></div>` : '';
+  }
+  const incoming = Number(s.transfers_in) || 0;
+  if (!(incoming > 0) && !(out > 0)) return '';
+  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow').text}</dd></div>`;
+  return `<div class="metric-card budget-transfer-summary budget-transfer-summary--split">
+      <div class="metric-card__label" id="budget-transfer-summary-label">${t('budget.summaryTransfers')}</div>
+      <dl class="budget-transfer-summary__flows" aria-labelledby="budget-transfer-summary-label">${flow('budget.summaryTransfersIn', incoming)}${flow('budget.summaryTransfersOut', -out)}</dl>
+    </div>`;
+}
+
 // Betrag mit Rolle: die Rolle entscheidet Vorzeichen und Farbe gemeinsam.
 // Siehe die Rollentabelle in utils/money.js.
 function amountByRole(n, role, { currency = state.currency, tone, block } = {}) {
@@ -1467,7 +1489,7 @@ function renderBody() {
     <div class="metric-grid${expensesOnly ? ' metric-grid--expenses-only' : ' metric-grid--led'}">
       ${expensesOnly ? expensesCard : incomeCard + expensesCard + balanceCard}
     </div>
-    ${s.transfers > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(s.transfers, 'total').text}</div></div>` : ''}
+    ${transferSummaryHtml(s)}
     </div>
     ${pendingNote}
 

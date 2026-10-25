@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Op bedrag",
         "ledgerSortActive": "Sortering: {{sort}}",
         "ledgerAccountsAll": "Alle rekeningen",
-        "showAccountTransactions": "Boekingen tonen"
+        "showAccountTransactions": "Boekingen tonen",
+        "summaryTransfersIn": "Inkomend",
+        "summaryTransfersOut": "Uitgaand"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",

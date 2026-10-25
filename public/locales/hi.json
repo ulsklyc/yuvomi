@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "राशि के अनुसार",
         "ledgerSortActive": "क्रम: {{sort}}",
         "ledgerAccountsAll": "सभी खाते",
-        "showAccountTransactions": "लेन-देन दिखाएं"
+        "showAccountTransactions": "लेन-देन दिखाएं",
+        "summaryTransfersIn": "आने वाले",
+        "summaryTransfersOut": "जाने वाले"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",

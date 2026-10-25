@@ -1885,7 +1885,9 @@
         "ledgerSortAmount": "Nach Betrag",
         "ledgerSortActive": "Sortierung: {{sort}}",
         "ledgerAccountsAll": "Alle Konten",
-        "showAccountTransactions": "Buchungen anzeigen"
+        "showAccountTransactions": "Buchungen anzeigen",
+        "summaryTransfersIn": "Eingang",
+        "summaryTransfersOut": "Ausgang"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

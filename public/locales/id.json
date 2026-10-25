@@ -1885,7 +1885,9 @@
         "ledgerSortAmount": "Menurut jumlah",
         "ledgerSortActive": "Urutan: {{sort}}",
         "ledgerAccountsAll": "Semua akun",
-        "showAccountTransactions": "Tampilkan transaksi"
+        "showAccountTransactions": "Tampilkan transaksi",
+        "summaryTransfersIn": "Masuk",
+        "summaryTransfersOut": "Keluar"
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",

@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "依金額",
         "ledgerSortActive": "排序：{{sort}}",
         "ledgerAccountsAll": "所有帳戶",
-        "showAccountTransactions": "檢視交易"
+        "showAccountTransactions": "檢視交易",
+        "summaryTransfersIn": "轉入",
+        "summaryTransfersOut": "轉出"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供週期",

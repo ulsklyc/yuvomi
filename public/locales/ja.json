@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "金額順",
         "ledgerSortActive": "並べ替え: {{sort}}",
         "ledgerAccountsAll": "すべての口座",
-        "showAccountTransactions": "記録を表示"
+        "showAccountTransactions": "記録を表示",
+        "summaryTransfersIn": "入金",
+        "summaryTransfersOut": "出金"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

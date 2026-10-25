@@ -2031,7 +2031,9 @@
         "ledgerSortAmount": "По сумме",
         "ledgerSortActive": "Сортировка: {{sort}}",
         "ledgerAccountsAll": "Все счета",
-        "showAccountTransactions": "Показать операции по счёту"
+        "showAccountTransactions": "Показать операции по счёту",
+        "summaryTransfersIn": "Входящие",
+        "summaryTransfersOut": "Исходящие"
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

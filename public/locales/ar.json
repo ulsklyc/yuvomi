@@ -2114,7 +2114,9 @@
         "ledgerSortAmount": "حسب المبلغ",
         "ledgerSortActive": "الترتيب: {{sort}}",
         "ledgerAccountsAll": "كل الحسابات",
-        "showAccountTransactions": "عرض الحركات"
+        "showAccountTransactions": "عرض الحركات",
+        "summaryTransfersIn": "وارد",
+        "summaryTransfersOut": "صادر"
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

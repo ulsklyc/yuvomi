@@ -3410,6 +3410,39 @@ button.budget-entry__title {
 }
 
 .budget-transfer-summary { margin-block-start: var(--space-3); }
+.budget-transfer-summary__flows {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+}
+/* Zwei Zeilen statt zwei Spalten: am Telefon (390px) bleibt jeder Betrag in
+ * einer Zeile, und Eingang/Ausgang lesen sich wie ein Kontoauszug. */
+.budget-transfer-summary__flow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.budget-transfer-summary__flow-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+.budget-transfer-summary__flow-value {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .budget-entry__amount--transfer { color: var(--color-text-primary); }
 .budget-entry__indicator--transfer { background-color: var(--color-text-secondary); }
 .budget-entry--upcoming .budget-entry__indicator--transfer { color: var(--color-text-secondary); }

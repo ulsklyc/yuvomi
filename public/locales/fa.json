@@ -1885,7 +1885,9 @@
         "ledgerSortAmount": "بر اساس مبلغ",
         "ledgerSortActive": "مرتب‌سازی: {{sort}}",
         "ledgerAccountsAll": "همه حساب‌ها",
-        "showAccountTransactions": "نمایش تراکنش‌ها"
+        "showAccountTransactions": "نمایش تراکنش‌ها",
+        "summaryTransfersIn": "ورودی",
+        "summaryTransfersOut": "خروجی"
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

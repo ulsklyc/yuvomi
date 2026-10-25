@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Per importo",
         "ledgerSortActive": "Ordinamento: {{sort}}",
         "ledgerAccountsAll": "Tutti i conti",
-        "showAccountTransactions": "Mostra i movimenti"
+        "showAccountTransactions": "Mostra i movimenti",
+        "summaryTransfersIn": "In entrata",
+        "summaryTransfersOut": "In uscita"
     },
     "settings": {
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",

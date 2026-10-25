@@ -2049,7 +2049,9 @@
         "ledgerSortAmount": "Według kwoty",
         "ledgerSortActive": "Sortowanie: {{sort}}",
         "ledgerAccountsAll": "Wszystkie konta",
-        "showAccountTransactions": "Pokaż operacje konta"
+        "showAccountTransactions": "Pokaż operacje konta",
+        "summaryTransfersIn": "Przychodzące",
+        "summaryTransfersOut": "Wychodzące"
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",

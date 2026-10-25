@@ -1867,7 +1867,9 @@
         "ledgerSortAmount": "Theo số tiền",
         "ledgerSortActive": "Sắp xếp: {{sort}}",
         "ledgerAccountsAll": "Tất cả tài khoản",
-        "showAccountTransactions": "Xem giao dịch"
+        "showAccountTransactions": "Xem giao dịch",
+        "summaryTransfersIn": "Chuyển đến",
+        "summaryTransfersOut": "Chuyển đi"
     },
     "settings": {
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",
