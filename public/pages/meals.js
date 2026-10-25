@@ -8,7 +8,7 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { releaseAddressOnClose } from '/utils/master-detail.js';
-import { t, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid, getNumberFormat } from '/i18n.js';
 import { dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
@@ -27,7 +27,7 @@ import { pageToolsMenuHtml, installPopoverMenus, syncPopoverMenuItem } from '/ut
 import { zonedWeekday, nowFields } from '/utils/timezone.js';
 import { mealTypeList, primeMealTypeNames, MEAL_TYPE_KEYS } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
-import { toDecimalString, breaksOffAtSeparator, toStoredNumber } from '/utils/money.js';
+import { scaleQuantityText, createRowScaler } from '/utils/scale-quantity.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
@@ -1256,6 +1256,12 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     // Luft; der Avatar steht davor. Bei `read` bleibt er stehen: er ist
     // Zustand, keine Handlung (Regel 2).
     const cookMark = mealCookMarkHtml(meal);
+    // DER FAKTOR STEHT NEBEN DEM KOCH (v259): "x2" sagt auf einen Blick, dass
+    // diese Mahlzeit nicht in der Grundmenge des Rezepts geplant ist. Nur mit
+    // Rezept - ohne gibt es keine Grundmenge, von der er abweicht.
+    const scaleMark = meal.recipe_id && meal.recipe_scale
+      ? `<span class="meal-card__scale" title="${esc(t('meals.recipeScaleBadgeLabel', { factor: formatScale(meal.recipe_scale) }))}"><span aria-hidden="true">${esc(t('meals.recipeScaleBadge', { factor: formatScale(meal.recipe_scale) }))}</span><span class="sr-only">${esc(t('meals.recipeScaleBadgeLabel', { factor: formatScale(meal.recipe_scale) }))}</span></span>`
+      : '';
     const recurrenceBadge = meal.recurrence_template_id
       ? `<span class="meal-card__recurrence" aria-label="${t('meals.recurrenceBadge')}"><i data-lucide="repeat-2" class="icon-sm" aria-hidden="true"></i></span>`
       : '';
@@ -1295,8 +1301,8 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
             className: 'meal-card__thumb',
           }) : ''}
           <span class="meal-card__title"><span class="meal-card__type">${esc(type.label)}</span><span class="meal-card__title-text">${esc(meal.title)}</span>${recurrenceBadge}</span>
-          ${ingLabel || cookMark ? `<span class="meal-card__meta">
-            ${cookMark}${ingLabel ? `<span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>` : ''}
+          ${ingLabel || cookMark || scaleMark ? `<span class="meal-card__meta">
+            ${cookMark}${scaleMark}${ingLabel ? `<span class="meal-card__ingredients-count">${ingLabel}${esc(ingDoneLabel)}</span>` : ''}
           </span>` : ''}${ro ? readRowHintHtml() : ''}
         </button>
         ${ro ? '' : `<span class="meal-card__drag" role="img"
@@ -1310,7 +1316,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
         <div class="meal-card__actions">
           ${meal.recipe_id && recipesReachable() ? `<a class="meal-card__action-btn meal-card__action-btn--recipe"
             data-action="open-linked-recipe"
-            href="/recipes?open=${encodeURIComponent(meal.recipe_id)}"
+            href="/recipes?open=${encodeURIComponent(meal.recipe_id)}${meal.recipe_scale ? `&scale=${encodeURIComponent(meal.recipe_scale)}` : ''}"
             aria-label="${esc(t('meals.viewRecipeNamed', { title: meal.title }))}"
             title="${esc(t('meals.openRecipe'))}"
           ><i data-lucide="chef-hat" class="icon-md" aria-hidden="true"></i></a>`
@@ -1885,122 +1891,6 @@ async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekG
 // --------------------------------------------------------
 
 /**
- * Eine skalierte Zutatenmenge, in der Schreibweise der eingestellten Region.
- *
- * Die Menge ist Freitext („250 g", „1 1/2 Tassen", „eine Prise"), also wird nur
- * die fuehrende Zahl angefasst und der Rest der Zeile unveraendert angehaengt.
- * Erkannt werden gemischte Brueche, einfache Brueche und Dezimalzahlen; alles
- * andere bleibt, wie es dasteht.
- *
- * LESEN UND SCHREIBEN haengen beide an der Region, und das ist der Kern. Vorher
- * las die Funktion mit einem eigenen `replace(',', '.')` und schrieb mit einem
- * `useComma`, das sie sich aus der Eingabe abgeschaut hatte. Beides war still
- * falsch: unter en-US gruppiert das Komma Tausender, „1,000 g" wurde also zur
- * Basis 1 und danach mit dem Faktor multipliziert - eine Zutat, die um den
- * Faktor tausend zu klein im Rezept stand. Unter fa oder ar-EG traf die Regex
- * gar nicht erst (`\d` ist ASCII), die Zeile blieb ungeskaliert zwischen
- * skalierten Geschwistern stehen. Und das abgeschaute `useComma` konnte den
- * Trenner nur wiederholen, den die gespeicherte Zutat zufaellig trug - eine aus
- * Mealie gespiegelte „1.5" blieb in einer deutschen Oberflaeche „1.5".
- *
- * Die Umschrift ist dieselbe wie bei Preis und Einkaufsmenge
- * (`toDecimalString`), die Ausgabe geht durch `toStoredNumber`. Damit
- * liest die Funktion ihre eigene Ausgabe wieder ein, was sie muss: der
- * gerenderte Wert landet in einer Zutatenzeile, wird gespeichert und beim
- * naechsten Anwenden des Rezepts erneut skaliert. Deshalb auch ohne
- * Gruppierung - ein gruppierter Wert kaeme nicht wieder herein.
- *
- * Eine gruppierte Eingabe wird abgewiesen und die Zeile bleibt UNVERAENDERT
- * stehen. Das ist bewusst ein anderer Ausgang als beim Einkauf, wo ein nicht
- * verstandener Wert auf „1 Stueck" faellt: dort ist die Menge ein Vorschlag in
- * einem korrigierbaren Feld, hier ist sie der Text der Zutat selbst, und der
- * Originaltext ist die einzige Antwort, die nichts erfindet.
- */
-function scaleQuantityText(quantity, factor) {
-  if (!quantity || factor === 1) return quantity;
-
-  // Erst umschreiben, dann lesen: sonst sieht die ASCII-Regex unter fa/ar-EG
-  // ueberhaupt keine Ziffer, und zwar auch nicht in einem Bruch wie „1 1/2".
-  // `freeText`, weil nur die fuehrende Zahl gerechnet wird: eine Gruppierung im
-  // Rest („2 Dosen à 1.000 ml") darf die Zeile nicht ungeskaliert stehen lassen.
-  const original = String(quantity).trim();
-  const text = toDecimalString(original, { freeText: true });
-  if (!text) return quantity;
-
-  // Der Rest der Zeile kommt aus dem ORIGINAL, nicht aus der umgeschriebenen
-  // Fassung: umgeschrieben wird nur, was auch gerechnet wird. Sonst verloere ein
-  // zweiter Zahlenteil im Text seine Ziffern - unter fa wurde „۲ x ۵۰۰ g" zu
-  // „۴ x 500 g", also zu einer Zeile in zwei Schriften. Der Offset stimmt, weil
-  // toDecimalString positionstreu ist (ein Zeichen hinein, ein Zeichen hinaus);
-  // die Zusicherung steht dort im Kopf und haengt an einem Guard.
-  // In CODEPOINTS, nicht in UTF-16-Einheiten: die Ziffern von 40 der 77 Systeme
-  // liegen ausserhalb der BMP und belegen zwei Einheiten, ihr ASCII-Ergebnis nur
-  // eine. Mit `.length` verrutschte der Schnitt genau dort und schnitt mitten in
-  // ein Zeichen - gemessen ergab „𞥒 x 500 g" ein „4\uDD52 x 500 g" mit einer
-  // halben Ersatzzeichen-Paarung, und dieser kaputte Text wurde in die
-  // Zutatenzeile geschrieben.
-  const zeichen = [...original];
-  const restOf = (match, tailGroup) => zeichen.slice([...match[0]].length - [...match[tailGroup]].length).join('');
-
-  // Der Abbruch-im-Trenner gilt fuer ALLE drei Formen, nicht nur fuer die
-  // Dezimalzahl unten. Bricht ein Nenner in einem Trenner ab, ist der Bruch nicht
-  // gelesen, sondern abgeschnitten: aus „1/2,5 cup" wurde 1/2, mal Faktor, und der
-  // Rest „,5 cup" dahinter - also „1,5 cup", eine plausible und falsche Menge.
-  // Dann lieber gar nichts anfassen, wie bei „eine Prise".
-  const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)(.*)$/);
-  if (mixed) {
-    if (breaksOffAtSeparator(mixed[4])) return quantity;
-    const whole = Number(mixed[1]);
-    const num = Number(mixed[2]);
-    const den = Number(mixed[3]);
-    if (den > 0) return `${formatScaledQuantity((whole + (num / den)) * factor)}${restOf(mixed, 4)}`;
-  }
-
-  const frac = text.match(/^(\d+)\/(\d+)(.*)$/);
-  if (frac) {
-    if (breaksOffAtSeparator(frac[3])) return quantity;
-    const num = Number(frac[1]);
-    const den = Number(frac[2]);
-    if (den > 0) return `${formatScaledQuantity((num / den) * factor)}${restOf(frac, 3)}`;
-  }
-
-  const dec = text.match(/^(\d+(?:\.\d+)?)(.*)$/);
-  if (dec) {
-    // Bricht die Zahl mitten in einem Trennzeichen ab, ist sie nicht gelesen,
-    // sondern abgeschnitten. Unter fa ist das ASCII-Komma kein Dezimaltrenner:
-    // aus „1,5 kg" waere sonst die Basis 1 geworden und die Ausgabe „۲,5 kg",
-    // also eine halbierte Zutat in einer Schreibweise, die es nicht gibt.
-    // Ueber dieselbe geteilte Pruefung wie im Einkauf: sie kennt die Trennzeichen
-    // der waehlbaren Regionen. „Irgendein Zeichen zwischen zwei Ziffern" war zu
-    // breit und liess „2x500 g" ungeskaliert stehen - ein `x` trennt nichts.
-    const abgeschnitten = breaksOffAtSeparator(dec[2]);
-    const base = Number(dec[1]);
-    if (!abgeschnitten && Number.isFinite(base)) {
-      return `${formatScaledQuantity(base * factor)}${restOf(dec, 2)}`;
-    }
-  }
-
-  // „eine Prise", „nach Geschmack": nichts zu rechnen, also nichts anfassen.
-  return quantity;
-}
-
-/**
- * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Ziffern in
- * ASCII, Trenner aus der Region soweit serverlesbar, ohne Gruppierung.
- *
- * Warum die Ziffern NICHT der Region folgen, obwohl der Trenner es tut: dieser
- * Text wird in die Zutatenzeile geschrieben und gespeichert, und beim Uebertrag
- * in die Einkaufsliste liest ihn `parseQuantity` in
- * server/services/shopping-import.js mit einer ASCII-Regex wieder ein. Eine in
- * nativen Ziffern geschriebene Menge („۲۰۰۰ g") kaeme dort nicht an - die Zutat
- * liesse sich nicht mehr mit anderen zusammenzaehlen. Begruendung und der Weg zu
- * einem saubereren Endzustand stehen bei `toStoredNumber` in utils/money.js.
- */
-function formatScaledQuantity(value) {
-  return toStoredNumber(value);
-}
-
-/**
  * Die Mahlzeit bei `meals: read`: Leseansicht, sonst nichts (Regel 9, Bauart
  * `itemReadHtml()` in pantry.js und shopping.js). Alles, was der
  * Bearbeiten-Dialog zeigt - Datum, Mahlzeit, Zutaten samt Menge und Kategorie,
@@ -2157,12 +2047,49 @@ function openMealModal(opts) {
       // stehen Titel, Zutaten und Notizen gleich da.
       if (opts.recipeId) chooseRecipe(opts.recipeId);
 
+      // DER GESPEICHERTE FAKTOR (v259) steht beim Oeffnen im Feld. Aendert ihn
+      // jemand an einer schon geplanten Mahlzeit, gehen die Zutaten mit - und
+      // zwar von dem Stand aus, mit dem der Dialog geoeffnet wurde, nicht von
+      // Tastendruck zu Tastendruck (sonst summierte sich die Rundung). Eigene
+      // Aenderungen an Name und Kategorie bleiben stehen; nur die Menge rechnet.
+      // Eine von Hand getippte Menge wird fuer ihre Zeile die neue Basis
+      // (createRowScaler) - ein weiterer Faktorwechsel ueberschreibt sie nicht.
+      let scaleBase = null;
+      const rowsOf = (qtyOf) => [...ingList.querySelectorAll('.ingredient-row')]
+        .map((row, i) => ({ key: row, qty: qtyOf(row, i) }));
+      ingList.addEventListener('input', (e) => {
+        if (!scaleBase || !e.target.classList?.contains('ingredient-row__qty')) return;
+        const factor = Number(recipeScaleInput?.value || 1);
+        if (!Number.isFinite(factor) || factor <= 0) return;
+        scaleBase.note(e.target.closest('.ingredient-row'), e.target.value, Math.max(factor, 0.1));
+      });
+      const rescaleMealRows = (factor) => {
+        const readList = panel.querySelector('#meal-own-ingredients');
+        if (readList?.hidden === true) {
+          // Noch die Leseliste des Rezepts: als eigene Zeilen in der neuen Menge
+          // uebernehmen, sonst ginge der Faktor beim Einkauf verloren.
+          const base = recipeIngredientsOf(meal);
+          recipeIngredientsToRows(panel, base.map((ing) => ({ ...ing, quantity: scaleQuantityText(ing.quantity ?? '', factor) })));
+          scaleBase = createRowScaler(rowsOf((_row, i) => base[i]?.quantity ?? ''), 1);
+          return;
+        }
+        scaleBase ??= createRowScaler(
+          rowsOf((row) => row.querySelector('.ingredient-row__qty')?.value ?? ''), mealScale(meal));
+        for (const { key: row, qty } of scaleBase.scaled(factor)) {
+          const input = row.isConnected ? row.querySelector('.ingredient-row__qty') : null;
+          if (input) input.value = qty;
+        }
+      };
+
       recipeScaleInput?.addEventListener('input', () => {
         const currentRecipeId = Number(recipeSelect?.value || 0);
-        if (!currentRecipeId || !currentAppliedRecipe) return;
-
         const factor = Number(recipeScaleInput.value || 1);
         if (!Number.isFinite(factor) || factor <= 0) return;
+        if (currentRecipeId && !currentAppliedRecipe && isEdit && meal?.recipe_id === currentRecipeId) {
+          rescaleMealRows(Math.max(factor, 0.1));
+          return;
+        }
+        if (!currentRecipeId || !currentAppliedRecipe) return;
 
         ingList.replaceChildren();
         ingList.insertAdjacentHTML('beforeend', (currentAppliedRecipe.ingredients || [])
@@ -2505,6 +2432,17 @@ function wireMealTypeChips(panel) {
  * Die Zutaten, die fuer eine Mahlzeit aus dem REZEPT gelten: nur solange sie
  * keine eigenen hat (dieselbe Regel wie der Server, mealPlanSource).
  */
+/** Der gespeicherte Faktor einer Mahlzeit, 1 wenn sie nicht skaliert ist (v259). */
+function mealScale(meal) {
+  const n = Number(meal?.recipe_scale);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/** Ein Faktor in der Schreibweise der Region, ohne ueberfluessige Nullen. */
+function formatScale(value) {
+  return getNumberFormat({ maximumFractionDigits: 2 }).format(value);
+}
+
 function recipeIngredientsOf(meal) {
   if (!meal?.recipe_id || meal.ingredients?.length) return [];
   const recipe = state.recipes.find((r) => r.id === meal.recipe_id);
@@ -2632,7 +2570,7 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
     <div class="modal-grid modal-grid--2">
       <div class="form-group">
         <label class="form-label" for="modal-recipe-scale">${t('meals.recipeScaleLabel')}</label>
-        <input type="number" class="form-input" id="modal-recipe-scale" min="0.1" step="0.1" value="1">
+        <input type="number" class="form-input" id="modal-recipe-scale" min="0.1" max="100" step="0.1" value="${esc(String(isEdit && meal.recipe_scale ? meal.recipe_scale : 1))}">
       </div>
       <div class="form-group" style="display:flex;align-items:flex-end;">
         <button class="btn btn--secondary" id="modal-save-as-recipe" type="button">${t('meals.saveAsRecipe')}</button>
@@ -2720,7 +2658,10 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
         <button type="button" class="btn btn--ghost btn--sm" id="meal-recipe-ingredients-edit">${t('meals.recipeIngredientsEdit')}</button>
       </div>
       <ul class="meal-recipe-ingredients__list" aria-labelledby="meal-recipe-ingredients-label">
-        ${recipeIngs.map((ing) => `<li>${ing.quantity ? `<span class="meal-recipe-ingredients__qty">${esc(ing.quantity)}</span> ` : ''}${esc(ing.name)}</li>`).join('')}
+        ${recipeIngs.map((ing) => {
+          const qty = scaleQuantityText(ing.quantity ?? '', mealScale(meal));
+          return `<li>${qty ? `<span class="meal-recipe-ingredients__qty">${esc(qty)}</span> ` : ''}${esc(ing.name)}</li>`;
+        }).join('')}
       </ul>
       <div id="meal-own-ingredients" hidden>${ingFieldsHtml}</div>
     </div>`
@@ -2797,6 +2738,9 @@ async function saveModal(overlay) {
   const recipe_url = overlay.querySelector('#modal-recipe-url').value.trim() || null;
   const recipe_id = overlay.querySelector('#modal-recipe-id')?.value || null;
   const cook_user_id = selectedCookId(overlay);
+  // Der Faktor zaehlt nur mit Rezept: ohne gibt es nichts, was er skaliert.
+  const scaleRaw = Number(overlay.querySelector('#modal-recipe-scale')?.value);
+  const recipe_scale = recipe_id && Number.isFinite(scaleRaw) && scaleRaw > 0 && scaleRaw !== 1 ? scaleRaw : null;
   const repeat_weekly = state.modal?.mode === 'create'
     ? Boolean(overlay.querySelector('#modal-repeat-weekly')?.checked)
     : false;
@@ -2834,7 +2778,7 @@ async function saveModal(overlay) {
     const { mode, meal } = state.modal;
 
     if (mode === 'create') {
-      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, ingredients, repeat_weekly, repeat_until });
+      const res     = await api.post('/meals', { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, recipe_scale, ingredients, repeat_weekly, repeat_until });
       state.meals.push(res.data);
     } else {
       if (scope === 'series') {
@@ -2844,12 +2788,12 @@ async function saveModal(overlay) {
         // (#1679, `cookTouched` - siehe wireCookPicker()). Der Server schreibt
         // einen mitgeschickten Koch auf die Vorlage und auf JEDE Mahlzeit der
         // Serie; ein fehlendes Feld laesst alle, wie sie sind.
-        const seriesBody = { meal_type, title, notes, recipe_url, recipe_id, ingredients, repeat_until };
+        const seriesBody = { meal_type, title, notes, recipe_url, recipe_id, recipe_scale, ingredients, repeat_until };
         if (state.modal.cookTouched) seriesBody.cook_user_id = cook_user_id;
         await api.put(`/meals/${meal.id}?scope=series`, seriesBody);
       } else {
         // Nur diese Instanz
-        await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id });
+        await api.put(`/meals/${meal.id}`, { date, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, recipe_scale });
 
         // Zutaten synchronisieren
         const existingIds = new Set((meal.ingredients ?? []).map((i) => i.id));

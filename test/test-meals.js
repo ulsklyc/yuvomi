@@ -20,6 +20,7 @@ import { eachRule } from './css-rules.js';
 // das Griff-Label wird gegen genau das t()/esc() verglichen, das es erzeugt hat.
 import { t as pageT } from '/i18n.js';
 import { esc as pageEsc } from '/utils/html.js';
+import { createRowScaler } from '/utils/scale-quantity.js';
 
 const mealsSource = readFileSync(new URL('../public/pages/meals.js', import.meta.url), 'utf8');
 
@@ -702,6 +703,20 @@ function scaled(locale, quantity, factor, erwartet) {
   withFormatLocale(locale, () => { ist = mealsUi.scaleQuantityText(quantity, factor); });
   assert(ist === erwartet, `${locale}: "${quantity}" x${factor} -> "${ist}", erwartet "${erwartet}"`);
 }
+
+test('Skalieren: was nur durch Rundung neben einer ganzen Zahl liegt, wird die ganze Zahl', () => {
+  // Pro Person gespeicherte Rezepte tragen gerundete Drittel: 0,33 x 3 ist eine Paprika.
+  scaled('de', '0,33', 3, '1');
+  scaled('de', '0,33 Paprika', 3, '1 Paprika');
+  scaled('de', '63,33 ml', 3, '190 ml');
+  scaled('de', '0,66 Zwiebel', 3, '2 Zwiebel');
+  scaled('en', '0.33 cup', 3, '1 cup');
+  // Gewollte Mengen bleiben: der Abstand ist groesser als die Rundung.
+  scaled('de', '16,5 g', 3, '49,5 g');
+  scaled('de', '0,5 Bund', 3, '1,5 Bund');
+  scaled('de', '0,17 Bund', 3, '0,51 Bund');
+  scaled('de', '1,45 l', 2, '2,9 l');
+});
 
 test('Skalieren: die gewoehnlichen Zutatenmengen rechnen wie bisher', () => {
   scaled('de', '250 g', 2, '500 g');
@@ -2022,6 +2037,69 @@ test('R20: die Typ-Chips tragen den Punkt ihres Mahlzeit-Tons, in beiden Dialoge
   assert(/class="filter-chip meal-type-chip[^"]*"[^>]*data-meal-type="dinner"/.test(html), 'der Mahlzeit-Dialog baut die Chips mit data-meal-type');
   const recipes = readFileSync(new URL('../public/pages/recipes.js', import.meta.url), 'utf8');
   assert(/class="filter-chip recipe-meal-types__chip" data-meal-type=/.test(recipes), 'der Rezept-Dialog ebenso');
+});
+
+// v259: der Faktor, mit dem eine Mahlzeit geplant ist, steht auf der Karte und
+// geht mit der Kochmuetze ins Rezept; ohne Rezept oder ohne Faktor steht nichts.
+test('v259: eine skaliert geplante Mahlzeit zeigt ihren Faktor und oeffnet das Rezept damit', () => {
+  // Die Kochmuetze fragt `recipesReachable()` (window.yuvomi) - hier ist das Modul offen.
+  const zuvorWindow = globalThis.window;
+  globalThis.window = { yuvomi: { isModuleDisabled: () => false } };
+  try {
+    const type = { key: 'dinner', label: 'Abendessen' };
+    const scaled = mealsUi.renderSlot('2026-10-26', type,
+      [{ id: 41, date: '2026-10-26', meal_type: 'dinner', title: 'Pfannkuchen', recipe_id: 9, recipe_scale: 2.5, ingredients: [] }], 1, 1);
+    const mark = scaled.match(/<span class="meal-card__scale"[\s\S]*?<\/span><\/span>/);
+    assert(mark, 'keine .meal-card__scale auf einer skalierten Mahlzeit');
+    const factor = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(2.5);
+    assert(mark[0].includes(pageEsc(pageT('meals.recipeScaleBadge', { factor }))) || /×2[.,]5/.test(mark[0]),
+      `der Faktor steht als t('meals.recipeScaleBadge') auf der Karte, gefunden: ${mark[0]}`);
+    assert(mark[0].includes('class="sr-only"'), 'der Vorleser bekommt den Satz, nicht nur das Zeichen');
+    assert(/href="\/recipes\?open=9&scale=2\.5"/.test(scaled), 'die Kochmuetze traegt den Faktor in die Adresse');
+
+    const plain = mealsUi.renderSlot('2026-10-26', type,
+      [{ id: 42, date: '2026-10-26', meal_type: 'dinner', title: 'Suppe', recipe_id: 9, recipe_scale: null, ingredients: [] }], 1, 1);
+    assert(!plain.includes('meal-card__scale'), 'eine unskalierte Mahlzeit traegt kein Zeichen');
+    assert(/href="\/recipes\?open=9"/.test(plain), 'und ihre Kochmuetze keinen scale-Parameter');
+
+    const noRecipe = mealsUi.renderSlot('2026-10-26', type,
+      [{ id: 43, date: '2026-10-26', meal_type: 'dinner', title: 'Reste', recipe_id: null, recipe_scale: 3, ingredients: [] }], 1, 1);
+    assert(!noRecipe.includes('meal-card__scale'), 'ohne Rezept gibt es keine Grundmenge, von der ein Faktor abweicht');
+  } finally {
+    globalThis.window = zuvorWindow;
+  }
+});
+
+test('v259: der Dialog startet mit dem gespeicherten Faktor und schickt ihn beim Speichern mit', () => {
+  const html = mealsUi.buildModalContent({ mode: 'edit', date: '2026-10-26', mealType: 'dinner',
+    meal: { id: 41, date: '2026-10-26', meal_type: 'dinner', title: 'Pfannkuchen', recipe_id: 9, recipe_scale: 2.5, ingredients: [] } });
+  assert(/id="modal-recipe-scale"[^>]*value="2\.5"/.test(html), 'das Feld startet mit dem gespeicherten Faktor');
+  const fresh = mealsUi.buildModalContent({ mode: 'create', date: '2026-10-26', mealType: 'dinner' });
+  assert(/id="modal-recipe-scale"[^>]*value="1"/.test(fresh), 'eine neue Mahlzeit startet unskaliert');
+  const save = mealsSource.slice(mealsSource.indexOf('async function saveModal('));
+  for (const call of ["api.post('/meals', {", 'const seriesBody = {', 'await api.put(`/meals/${meal.id}`, {']) {
+    const at = save.indexOf(call);
+    assert(at > 0, `${call} nicht gefunden`);
+    assert(save.slice(at, save.indexOf(';', at)).includes('recipe_scale'), `${call} schickt recipe_scale mit`);
+  }
+});
+
+// #2235: aendert jemand den Faktor einer schon geplanten Mahlzeit, rechnen die
+// Zeilen von ihrem Stand beim Oeffnen - eine danach von Hand getippte Menge wird
+// aber die Basis ihrer Zeile und geht beim naechsten Faktor nicht verloren.
+test('#2235: eine von Hand geaenderte Menge ueberlebt den naechsten Faktorwechsel', () => {
+  withFormatLocale('de-DE', () => {
+    const scaler = createRowScaler([{ key: 'mehl', qty: '300 g' }, { key: 'milch', qty: '600 ml' }], 3);
+    const at = (factor) => Object.fromEntries(scaler.scaled(factor).map(({ key, qty }) => [key, qty]));
+    assert(at(2).mehl === '200 g' && at(2).milch === '400 ml', `von 3 auf 2: ${JSON.stringify(at(2))}`);
+    assert(at(3).mehl === '300 g', 'zurueck auf den gespeicherten Faktor ergibt den Stand beim Oeffnen');
+    // Bei Faktor 2 tippt jemand 250 g Mehl; die Milch bleibt unberuehrt.
+    scaler.note('mehl', '250 g', 2);
+    assert(at(4).mehl === '500 g', `die getippte Menge ist die neue Basis, gefunden ${at(4).mehl}`);
+    assert(at(4).milch === '800 ml', 'die andere Zeile rechnet weiter vom Stand beim Oeffnen');
+    scaler.note('unbekannt', '1 kg', 2);
+    assert(scaler.scaled(1).length === 2, 'eine Zeile, die beim Oeffnen nicht da war, kommt nicht hinzu');
+  });
 });
 
 // --------------------------------------------------------

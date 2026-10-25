@@ -1575,6 +1575,13 @@ const MIGRATIONS_SQL = {
       SELECT 'saving', key, 'Savings', 5 FROM budget_categories
       WHERE key = 'financial_other';
   `,
+  // v259: der Skalierungsfaktor einer Mahlzeit und einer Wochenserie. Die
+  // Meals-Routen schreiben und lesen die Spalte, also braucht sie jede Suite,
+  // die deren Abfragen gegen dieses Schema faehrt.
+  259: `
+    ALTER TABLE meals ADD COLUMN recipe_scale REAL;
+    ALTER TABLE meal_recurrence_templates ADD COLUMN recipe_scale REAL;
+  `,
 };
 
 export { MIGRATIONS_SQL };

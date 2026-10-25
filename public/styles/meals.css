@@ -581,6 +581,15 @@
   flex: none;
 }
 
+/* Der Skalierungsfaktor (v259) steht wie der Koch vor der Zutatenzahl: kurz
+ * ("x2"), in gleich breiten Ziffern, nie umgebrochen. */
+.meal-card__scale {
+  flex: none;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .meal-card__ingredients-count {
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;

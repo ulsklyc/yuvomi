@@ -662,3 +662,24 @@ button.recipe-detail__ingredient-match:hover {
   gap: var(--space-4);
   padding: 0;
 }
+
+/* Zutaten skalieren (v259): der Regler ueber der Zutatenliste. Er rechnet nur
+ * die Anzeige um, das Rezept bleibt, wie es geschrieben ist. */
+.recipe-detail__scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.recipe-detail__scale-label {
+  color: var(--color-text-secondary);
+  margin-inline-end: var(--space-1);
+}
+
+.recipe-detail__scale-value {
+  min-width: var(--space-12);
+  text-align: center;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}

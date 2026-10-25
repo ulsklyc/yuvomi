@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates) catalog, which
   pulls it from `main` every night, so the template never pins an older version. The installer
   schema tests check that every field exists in the stack and that no field locks a setting.
+- **A meal remembers how much it was planned for** (#2235). The "Scale ingredients" factor in the
+  meal dialog is now saved with the meal instead of falling back to 1. The card shows it
+  next to the cook ("×2"), and the chef hat opens the recipe with its ingredients already
+  at that amount. The recipe detail has a small stepper to scale the ingredient list while
+  cooking; the recipe itself stays as written. A weekly series keeps the factor for every
+  new week.
 
 ### Changed
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with

@@ -220,6 +220,7 @@ const APP_SHELL = [
   '/utils/page-layout.js',
   '/utils/page-lifecycle.js',
   '/utils/page-search.js',
+  '/utils/scale-quantity.js',
   '/utils/search-sections.js',
   '/utils/palette-combobox.js',
   '/utils/period-stepper.js',

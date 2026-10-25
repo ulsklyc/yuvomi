@@ -1697,7 +1697,10 @@ test('#936: ein verknuepftes Rezept hat von der Essenskarte aus einen Ausgang', 
   // Der Knopf existiert und zeigt auf die Deep-Link-Schreibweise, die Kontakte
   // und Startseite schon benutzen - kein dritter eigener Parameter.
   assert.match(meals, /data-action="open-linked-recipe"/);
-  assert.match(meals, /href="\/recipes\?open=\$\{encodeURIComponent\(meal\.recipe_id\)\}"/);
+  // Eine skaliert geplante Mahlzeit (v259) haengt ihren Faktor an
+  // (`&scale=`), damit das Rezept in dieser Menge aufgeht.
+  assert.match(meals, /href="\/recipes\?open=\$\{encodeURIComponent\(meal\.recipe_id\)\}(\$\{meal\.recipe_scale \? `&scale=\$\{encodeURIComponent\(meal\.recipe_scale\)\}` : ''\})?"/);
+  assert.match(recipes, /params\.get\('scale'\)/, 'die Rezeptseite liest den Faktor aus der Adresse');
 
   // Und die Gegenseite liest ihn. Ohne das waere der Link eine Adresse, die
   // niemand auswertet: /recipes oeffnete sich, das Rezept bliebe zugeklappt.

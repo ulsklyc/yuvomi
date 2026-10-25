@@ -58,6 +58,25 @@ function weekEnd(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
+const MAX_RECIPE_SCALE = 100;
+
+/**
+ * Der Skalierungsfaktor einer Mahlzeit (v259). `given` unterscheidet "nicht
+ * mitgeschickt" (alles bleibt) von "mitgeschickt" - wie `cookField()`.
+ * Faktor 1 und ein leerer Wert speichern NULL: nicht skaliert ist der
+ * Normalfall, und eine Spalte voller Einsen saehe aus wie eine Entscheidung.
+ */
+function recipeScaleField(raw) {
+  if (raw === undefined) return { given: false, value: null, error: null };
+  if (raw === null || raw === '') return { given: true, value: null, error: null };
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_RECIPE_SCALE) {
+    return { given: true, value: null, error: `recipe_scale must be greater than 0 and at most ${MAX_RECIPE_SCALE}.` };
+  }
+  const rounded = Math.round(n * 100) / 100;
+  return { given: true, value: rounded === 1 ? null : rounded, error: null };
+}
+
 function insertMealIngredients(mealId, ingredients) {
   const insertIng = db.get().prepare(`
     INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, ?, ?)
@@ -197,8 +216,8 @@ function materializeRecurringMeals(from, to) {
     // `cookForNewOccurrence()` fragt dasselbe Praedikat wie die Schreibrouten;
     // die Vorlage selbst und die schon bestehenden Mahlzeiten bleiben unberuehrt.
     const insertMeal = db.get().prepare(`
-      INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, recipe_scale, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const ingredientsByTemplate = new Map();
@@ -217,6 +236,7 @@ function materializeRecurringMeals(from, to) {
         template.recipe_id,
         template.id,
         cookByTemplate.get(template.id),
+        template.recipe_scale ?? null,
         template.created_by
       );
       insertMealIngredients(result.lastInsertRowid, ingredientsByTemplate.get(template.id));
@@ -391,13 +411,14 @@ router.post('/', (req, res) => {
     const vRecipeUrl  = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
     const vRecipeId   = num(req.body.recipe_id, 'Rezept-ID', { required: false });
     const vCook       = cookField(req.body.cook_user_id);
+    const vScale      = recipeScaleField(req.body.recipe_scale);
     const repeatWeekly = req.body.repeat_weekly === true;
     // Leeres/fehlendes repeat_until heißt „ohne Ende" - die Serie bleibt dann
     // unbegrenzt, wie vor #619, aber jetzt als bewusste Wahl statt als einziger Zustand.
     const vRepeatUntil = repeatWeekly
       ? date(req.body.repeat_until, 'Wiederholungs-Ende')
       : { value: null, error: null };
-    const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook, vRepeatUntil]);
+    const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook, vRepeatUntil, vScale]);
     if (!req.body.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
     if (vRepeatUntil.value && vDate.value && vRepeatUntil.value < vDate.value) {
       errors.push('Wiederholungs-Ende darf nicht vor dem Datum liegen.');
@@ -424,8 +445,8 @@ router.post('/', (req, res) => {
       if (repeatWeekly) {
         const template = db.get().prepare(`
           INSERT INTO meal_recurrence_templates
-            (start_date, end_date, weekday, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, created_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (start_date, end_date, weekday, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, recipe_scale, created_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           vDate.value,
           vRepeatUntil.value,
@@ -436,6 +457,7 @@ router.post('/', (req, res) => {
           vRecipeUrl.value,
           vRecipeId.value,
           vCook.value,
+          vScale.value,
           req.authUserId || req.session.userId
         );
         recurrenceTemplateId = template.lastInsertRowid;
@@ -450,9 +472,9 @@ router.post('/', (req, res) => {
       }
 
       const result = db.get().prepare(`
-        INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, recurrenceTemplateId, vCook.value, req.authUserId || req.session.userId);
+        INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, recipe_scale, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, recurrenceTemplateId, vCook.value, vScale.value, req.authUserId || req.session.userId);
 
       const mealId = result.lastInsertRowid;
 
@@ -601,6 +623,8 @@ router.put('/:id', (req, res) => {
     if (req.body.recipe_id  !== undefined) checks.push(num(req.body.recipe_id, 'Rezept-ID', { required: false }));
     const vCook = cookField(req.body.cook_user_id);
     checks.push(vCook);
+    const vScale = recipeScaleField(req.body.recipe_scale);
+    checks.push(vScale);
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -685,6 +709,14 @@ router.put('/:id', (req, res) => {
             .run(vCook.value, templateId);
         }
 
+        // Der Faktor wie der Koch: nur mitgeschickt gilt er fuer Vorlage und Serie.
+        if (vScale.given) {
+          db.get().prepare('UPDATE meal_recurrence_templates SET recipe_scale = ? WHERE id = ?')
+            .run(vScale.value, templateId);
+          db.get().prepare('UPDATE meals SET recipe_scale = ? WHERE recurrence_template_id = ?')
+            .run(vScale.value, templateId);
+        }
+
         if (Array.isArray(req.body.ingredients)) {
           const cleanIngredients = sanitizedIngredients(req.body.ingredients);
 
@@ -731,7 +763,8 @@ router.put('/:id', (req, res) => {
           notes      = ?,
           recipe_url = ?,
           recipe_id  = ?,
-          cook_user_id = ?
+          cook_user_id = ?,
+          recipe_scale = ?
       WHERE id = ?
     `).run(
       req.body.date      ?? null,
@@ -741,6 +774,7 @@ router.put('/:id', (req, res) => {
       req.body.recipe_url  !== undefined ? (req.body.recipe_url || null)  : meal.recipe_url,
       req.body.recipe_id   !== undefined ? (req.body.recipe_id || null)   : meal.recipe_id,
       vCook.given ? vCook.value : meal.cook_user_id,
+      vScale.given ? vScale.value : meal.recipe_scale,
       id
     );
 

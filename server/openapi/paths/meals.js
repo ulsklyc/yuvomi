@@ -30,6 +30,7 @@ function mealBody({ required = [], create = false } = {}) {
             recipe_url: { type: ['string', 'null'] },
             recipe_id: { type: ['integer', 'null'] },
             cook_user_id: COOK_PROPERTY,
+            recipe_scale: { type: ['number', 'null'], exclusiveMinimum: 0, maximum: 100, description: 'The factor the ingredients were scaled by when the meal was planned (the "Scale ingredients" field). Stored with two decimals; `1`, `null` and an empty value mean "not scaled" and are stored as `null`. A value of 0 or below, above 100 or not a number is refused with 400. On a weekly series the series stores it as well, and every meal created from it starts with it.' },
             ...(create ? {
               repeat_weekly: { type: 'boolean', default: false, description: 'Create a weekly series from this meal. The series stores the cook as well, and every meal created from it starts with that cook.' },
               repeat_until: { type: ['string', 'null'], format: 'date', description: 'Last date of the series; empty or missing means it never ends.' },
@@ -51,7 +52,7 @@ export function mealsPaths() {
       get: op({
         summary: 'List meal plan entries',
         tag: 'Meals',
-        description: `Returns the meals of one week (\`?week=YYYY-MM-DD\`, any date of that week; default: the current week) with their ingredients. ${COOK_READ_NOTE}`,
+        description: `Returns the meals of one week (\`?week=YYYY-MM-DD\`, any date of that week; default: the current week) with their ingredients. Each meal carries \`recipe_scale\`, the factor it was planned at, or \`null\` when it was not scaled. ${COOK_READ_NOTE}`,
       }),
       post: op({
         summary: 'Create meal plan entry',
@@ -66,7 +67,7 @@ export function mealsPaths() {
       put: op({
         summary: 'Update meal plan entry',
         tag: 'Meals',
-        description: 'Changes this meal alone. With `?scope=series` on a meal of a weekly series, the content fields are written to the series and to every meal created from it. `cook_user_id` follows the same choice: without `scope` it changes the cook of this meal and leaves the series untouched; with `scope=series` it reaches the series and all its meals. A missing `cook_user_id` leaves every cook as it is - in a series edit as well, so a meal whose cook was changed on its own keeps it. `repeat_until` and `ingredients` are read with `scope=series` only.',
+        description: 'Changes this meal alone. With `?scope=series` on a meal of a weekly series, the content fields are written to the series and to every meal created from it. `cook_user_id` follows the same choice: without `scope` it changes the cook of this meal and leaves the series untouched; with `scope=series` it reaches the series and all its meals. A missing `cook_user_id` leaves every cook as it is - in a series edit as well, so a meal whose cook was changed on its own keeps it. `recipe_scale` follows the same rules as `cook_user_id`. `repeat_until` and `ingredients` are read with `scope=series` only.',
         params: [idParam()],
         stateChanging: true,
         requestBody: mealBody(),

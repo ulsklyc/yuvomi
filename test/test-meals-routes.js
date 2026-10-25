@@ -1031,3 +1031,72 @@ test('D2 "Aus dem Essensplan": Vorschau zaehlt Rezept-Mahlzeiten ohne zu schreib
   const again = await call('POST', `/shopping/${list}/import-meal-plan`, { from: '2027-03-01', to: '2027-03-07' });
   assert.equal(again.body.data.added, 2, 'derselbe Import geht nach dem Undo erneut');
 });
+
+// --------------------------------------------------------------------------
+// recipe_scale (v259): der Faktor, mit dem eine Mahlzeit geplant wurde
+// --------------------------------------------------------------------------
+test('recipe_scale: POST speichert den Faktor, GET liefert ihn je Mahlzeit', async () => {
+  const r = await createMeal({ date: '2027-05-03', recipe_id: RECIPE, recipe_scale: 2.5 });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.recipe_scale, 2.5);
+  const week = await call('GET', '/?week=2027-05-03');
+  assert.equal(week.body.data.find((m) => m.id === r.body.data.id).recipe_scale, 2.5);
+});
+
+test('recipe_scale: Faktor 1, null und leer heissen "nicht skaliert" und werden NULL', async () => {
+  for (const value of [1, null, '']) {
+    const r = await createMeal({ date: '2027-05-04', recipe_scale: value });
+    assert.equal(r.status, 201, `Wert ${JSON.stringify(value)}`);
+    assert.equal(r.body.data.recipe_scale, null, `Wert ${JSON.stringify(value)}`);
+  }
+  const ohne = await createMeal({ date: '2027-05-04' });
+  assert.equal(ohne.body.data.recipe_scale, null, 'ohne Feld bleibt die Mahlzeit unskaliert');
+});
+
+test('recipe_scale: 0, negativ, ueber 100 und keine Zahl werden mit 400 abgewiesen', async () => {
+  for (const value of [0, -1, 100.5, 'viel']) {
+    const r = await createMeal({ date: '2027-05-05', recipe_scale: value });
+    assert.equal(r.status, 400, `Wert ${JSON.stringify(value)}`);
+    assert.match(r.body.error, /recipe_scale/);
+  }
+  const grenze = await createMeal({ date: '2027-05-05', recipe_scale: 100 });
+  assert.equal(grenze.status, 201, '100 ist die Obergrenze und noch erlaubt');
+});
+
+test('recipe_scale: PUT ohne Feld laesst den Faktor stehen, mit Feld aendert oder loescht er ihn', async () => {
+  const id = (await createMeal({ date: '2027-05-06', recipe_scale: 3 })).body.data.id;
+  const titel = await call('PUT', `/${id}`, { title: 'Pasta fuer viele' });
+  assert.equal(titel.body.data.recipe_scale, 3, 'ein anderes Feld fasst den Faktor nicht an');
+  const neu = await call('PUT', `/${id}`, { recipe_scale: 1.333 });
+  assert.equal(neu.body.data.recipe_scale, 1.33, 'auf zwei Nachkommastellen gerundet');
+  const weg = await call('PUT', `/${id}`, { recipe_scale: null });
+  assert.equal(weg.body.data.recipe_scale, null);
+  const falsch = await call('PUT', `/${id}`, { recipe_scale: 0 });
+  assert.equal(falsch.status, 400);
+});
+
+test('recipe_scale: neue Vorkommen einer Serie erben den Faktor, scope=series schreibt Vorlage und Instanzen', async () => {
+  const start = '2027-06-07';
+  const r = await createMeal({ date: start, title: 'Wochensuppe', repeat_weekly: true, recipe_scale: 4 });
+  assert.equal(r.status, 201);
+  const tpl = r.body.data.recurrence_template_id;
+  assert.equal(db.prepare('SELECT recipe_scale FROM meal_recurrence_templates WHERE id = ?').get(tpl).recipe_scale, 4);
+
+  const naechste = await call('GET', `/?week=${addDays(start, 7)}`);
+  const vorkommen = naechste.body.data.find((m) => m.recurrence_template_id === tpl);
+  assert.equal(vorkommen.recipe_scale, 4, 'das materialisierte Vorkommen startet mit dem Faktor der Serie');
+
+  // Nur diese Mahlzeit: die Serie bleibt.
+  await call('PUT', `/${vorkommen.id}`, { recipe_scale: 2 });
+  assert.equal(db.prepare('SELECT recipe_scale FROM meal_recurrence_templates WHERE id = ?').get(tpl).recipe_scale, 4);
+
+  // Ganze Serie: Vorlage und alle Instanzen.
+  await call('PUT', `/${r.body.data.id}?scope=series`, { recipe_scale: 1.5 });
+  assert.equal(db.prepare('SELECT recipe_scale FROM meal_recurrence_templates WHERE id = ?').get(tpl).recipe_scale, 1.5);
+  const alle = db.prepare('SELECT recipe_scale FROM meals WHERE recurrence_template_id = ?').all(tpl);
+  assert.ok(alle.length >= 2 && alle.every((m) => m.recipe_scale === 1.5), 'jede Instanz traegt den neuen Faktor');
+
+  // Eine Serienaenderung ohne das Feld laesst die Faktoren stehen.
+  await call('PUT', `/${r.body.data.id}?scope=series`, { title: 'Wochensuppe neu' });
+  assert.equal(db.prepare('SELECT recipe_scale FROM meal_recurrence_templates WHERE id = ?').get(tpl).recipe_scale, 1.5);
+});

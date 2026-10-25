@@ -11293,6 +11293,28 @@ const MIGRATIONS = [
       `).run();
     },
   },
+  {
+    version: 259,
+    description: 'meals: a planned meal keeps the scale it was planned at',
+    // DER FAKTOR DER MAHLZEIT, NICHT DES REZEPTS. Der Dialog skaliert die
+    // Zutaten eines gewaehlten Rezepts, vergass den Faktor aber beim Speichern:
+    // wer "fuer sechs" plante, sah die Karte danach ohne jeden Hinweis, und die
+    // Kochmuetze oeffnete das Rezept in seiner Grundmenge. Die Spalte haelt den
+    // Faktor fest; die Karte zeigt ihn, und das Rezeptdetail oeffnet damit.
+    //
+    // NULL heisst "nicht skaliert" (Faktor 1), so wie jede Mahlzeit vor dieser
+    // Migration. Ein Rezept bekommt bewusst KEINE Portionenzahl: der Faktor
+    // gehoert zum Plan, ein Rezept wird in vielen Wochen verschieden gekocht.
+    //
+    // Die Serie traegt ihn wie den Koch (v235): neue Vorkommen erben ihn, eine
+    // Aenderung "fuer die ganze Serie" schreibt Vorlage und Instanzen.
+    // Ein kuenftiger Rebuild von meals oder meal_recurrence_templates muss die
+    // Spalte mitnehmen.
+    up: `
+      ALTER TABLE meals ADD COLUMN recipe_scale REAL;
+      ALTER TABLE meal_recurrence_templates ADD COLUMN recipe_scale REAL;
+    `,
+  },
 ];
 
 /**

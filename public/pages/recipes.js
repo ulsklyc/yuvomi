@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDateInput, parseDateInput, isDateInputValid, getNumberFormat } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
@@ -29,6 +29,7 @@ import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from
 import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
+import { scaleQuantityText } from '/utils/scale-quantity.js';
 
 let _container = null;
 /**
@@ -398,6 +399,7 @@ function fabEl() {
 export async function render(container, { signal } = {}) {
   _container = container;
   _md = null;
+  adoptScaleFromQuery();
 
   // `state` ueberlebt den Seitenwechsel. Wer zuletzt nach "Suppe" gesucht oder
   // auf Mealie gefiltert hat, kaeme sonst per Deep-Link auf eine Liste zurueck,
@@ -1257,6 +1259,8 @@ function ingredientsSectionEl(recipe) {
   const section = detailSectionEl(t('recipes.ingredientsLabel'));
   section.classList.add('recipe-detail__ingredients-section');
   section.dataset.recipeId = String(recipe.id);
+  const factor = recipeScale(recipe.id);
+  if (ingredients.length) section.appendChild(scaleStepperEl(recipe, factor));
   const ul = document.createElement('ul');
   ul.className = 'recipe-detail__ingredients';
   for (const ing of ingredients) {
@@ -1271,7 +1275,7 @@ function ingredientsSectionEl(recipe) {
     // steht auch ohne Menge da (leer), damit der Name seine Spalte haelt.
     const quantity = document.createElement('span');
     quantity.className = 'recipe-detail__ingredient-quantity';
-    quantity.textContent = ing.quantity ?? '';
+    quantity.textContent = scaleQuantityText(ing.quantity ?? '', factor) ?? '';
     item.appendChild(quantity);
     label.textContent = ing.name;
     item.appendChild(label);
@@ -1292,6 +1296,94 @@ function ingredientsSectionEl(recipe) {
   const bulk = pantryMatchBulkEl(recipe);
   if (bulk) section.appendChild(bulk);
   return section;
+}
+
+/* DIE MENGE ZUM KOCHEN (v259). Eine Mahlzeit merkt sich, mit welchem Faktor
+ * sie geplant ist; die Kochmuetze im Essensplan oeffnet das Rezept mit
+ * `?open=<id>&scale=<faktor>`, und das Detail zeigt die Zutaten in genau der
+ * Menge - nicht in der Grundmenge, die beim Kochen erst umgerechnet werden
+ * muesste. Der Regler rechnet nur die Anzeige um: das Rezept selbst bleibt,
+ * wie es geschrieben ist. Der Faktor gilt fuer die Sitzung, je Rezept. */
+// Der Regler zaehlt in ganzen Schritten ab 1 - beim Kochen heisst das "fuer
+// zwei, fuer drei". Ein krummer Faktor aus dem Plan (z. B. 0,5 oder 2,5) wird
+// angezeigt, wie er ist; der naechste Schritt rastet auf eine ganze Zahl ein.
+const SCALE_MIN = 0.1;
+const SCALE_MAX = 100;
+const SCALE_STEP = 1;
+const SCALE_STEP_MIN = 1;
+const recipeScales = new Map();
+
+function recipeScale(recipeId) {
+  return recipeScales.get(String(recipeId)) ?? 1;
+}
+
+function setRecipeScale(recipeId, value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return;
+  const clamped = Math.min(SCALE_MAX, Math.max(SCALE_MIN, Math.round(n * 100) / 100));
+  if (clamped === 1) recipeScales.delete(String(recipeId));
+  else recipeScales.set(String(recipeId), clamped);
+}
+
+/** `?open=<id>&scale=<faktor>` aus dem Essensplan: das Rezept startet in dieser Menge. */
+function adoptScaleFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('open');
+  const scale = params.get('scale');
+  if (id && scale) setRecipeScale(id, scale);
+}
+
+function formatScale(value) {
+  return getNumberFormat({ maximumFractionDigits: 2 }).format(value);
+}
+
+/** "Zutaten skalieren  [-] 2 [+]" ueber der Zutatenliste. */
+function scaleStepperEl(recipe, factor) {
+  const wrap = document.createElement('div');
+  wrap.className = 'recipe-detail__scale';
+  const label = document.createElement('span');
+  label.className = 'recipe-detail__scale-label';
+  label.id = `recipe-scale-label-${recipe.id}`;
+  label.textContent = t('meals.recipeScaleLabel');
+  const value = document.createElement('output');
+  value.className = 'recipe-detail__scale-value';
+  value.setAttribute('aria-live', 'polite');
+  value.setAttribute('aria-labelledby', label.id);
+  // Nur die Zahl: neben "Zutaten skalieren" und den Knoepfen ist klar, was sie
+  // zaehlt - ein "x" davor las sich zwischen Minus und Plus wie ein drittes Zeichen.
+  value.textContent = formatScale(factor);
+  const button = (delta, icon, labelKey) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--icon btn--icon-sm recipe-detail__scale-btn';
+    btn.dataset.scaleDelta = String(delta);
+    btn.setAttribute('aria-label', t(labelKey));
+    btn.title = t(labelKey);
+    btn.insertAdjacentHTML('beforeend', `<i data-lucide="${icon}" class="icon-sm" aria-hidden="true"></i>`);
+    // Ein krummer Faktor rastet auf die naechste ganze Zahl ein (2,5 -> 3 bzw. 2).
+    const next = delta > 0 ? Math.floor(factor) + SCALE_STEP : Math.ceil(factor) - SCALE_STEP;
+    btn.disabled = next < SCALE_STEP_MIN || next > SCALE_MAX;
+    btn.addEventListener('click', () => {
+      setRecipeScale(recipe.id, next);
+      // Das Leseblatt liegt nicht zwingend in `_container`: der eigene Abschnitt
+      // wird direkt ersetzt, die Kopie in der Detailspalte ueber den Sammelweg.
+      const own = btn.closest('.recipe-detail__ingredients-section');
+      if (own) {
+        const fresh = ingredientsSectionEl(recipe);
+        own.replaceWith(fresh);
+        if (window.lucide) window.lucide.createIcons({ el: fresh });
+        // Am Rand ist der eigene Knopf gesperrt: der Fokus geht zum anderen,
+        // statt mit dem ersetzten Abschnitt verloren zu gehen.
+        (fresh.querySelector(`.recipe-detail__scale-btn[data-scale-delta="${delta}"]:not(:disabled)`)
+          ?? fresh.querySelector('.recipe-detail__scale-btn:not(:disabled)'))?.focus();
+      }
+      renderIngredientSections(recipe);
+    });
+    return btn;
+  };
+  wrap.append(label, button(-SCALE_STEP, 'minus', 'recipes.scaleDecrease'), value,
+    button(SCALE_STEP, 'plus', 'recipes.scaleIncrease'));
+  return wrap;
 }
 
 /** Baut jeden Zutaten-Abschnitt dieses Rezepts neu (Aufklapper + Spalte). */
