@@ -1,6 +1,7 @@
 /** Shared fasting preferences and record dialog, on Health, Settings and Dashboard. */
 import { api } from '/api.js';
-import { t, formatDate, formatTime } from '/i18n.js';
+import { t, formatTime } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender, captureModalContext, isModalContextCurrent, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { FASTING_PRESETS, normalizeGoalHours, fastingDisplayModel, fastingNotificationAvailability, fastingServerDate, fastingServerClock, formatFastingClock } from '/utils/health-fasting.js';
@@ -22,7 +23,7 @@ export function fastingStamp(value, zone = 'UTC') {
   if (!value) return '-';
   const wall = wallTimeValue(value, zone);
   if (!editableWallTime(wall)) return `${wall} (${zone})`;
-  return `${formatDate(wall)} · ${formatTime(wall)}`;
+  return `${dateText(wall)} · ${formatTime(wall)}`;
 }
 
 // Native datetime-local cannot represent astronomical year zero or BCE.

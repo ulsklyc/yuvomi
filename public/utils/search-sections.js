@@ -27,7 +27,7 @@
  * @property {(item: object, fmt: object) => string} [meta]
  */
 
-const dateMeta = (field) => (item, fmt) => (item[field] ? fmt.formatDate(item[field]) : '');
+const dateMeta = (field) => (item, fmt) => (item[field] ? fmt.dateText(item[field]) : '');
 
 /** @type {ReadonlyArray<SearchSection>} */
 export const SEARCH_SECTIONS = Object.freeze([
@@ -43,7 +43,7 @@ export const SEARCH_SECTIONS = Object.freeze([
       return day ? `/calendar?open=${i.id}&date=${day}` : `/calendar?open=${i.id}`;
     },
     meta: (i, fmt) => (i.start_datetime
-      ? `${fmt.formatDate(i.start_datetime)}${i.all_day ? '' : ` · ${fmt.formatTime(i.start_datetime)}`}`
+      ? `${fmt.dateText(i.start_datetime)}${i.all_day ? '' : ` · ${fmt.formatTime(i.start_datetime)}`}`
       : '') },
   { bucket: 'notes', labelKey: 'nav.notes', module: 'notes', route: (i) => `/notes?open=${i.id}` },
   { bucket: 'contacts', labelKey: 'nav.contacts', module: 'contacts', route: (i) => `/contacts?open=${i.id}` },

@@ -22880,7 +22880,7 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
   assert.match(cell, /<div class="month-day__visual" aria-hidden="true">/);
   assert.match(read('../public/styles/calendar.css'), /\.month-day__visual \{\s*display: contents;/, 'die Geometrie bleibt');
 
-  assert.match(read('../public/pages/health.js'), /const parts = \[String\(Number\(String\(c\.dateKey\)\.slice\(8, 10\)\)\), formatDate\(c\.dateKey\)\];/, 'Zyklustag: die Ziffer zuerst');
+  assert.match(read('../public/pages/health.js'), /const parts = \[String\(Number\(String\(c\.dateKey\)\.slice\(8, 10\)\)\), dateText\(c\.dateKey\)\];/, 'Zyklustag: die Ziffer zuerst');
   assert.match(read('../public/utils/sub-tabs.js'), /btn\.append\(document\.createTextNode\(' '\), badge\);/, '„Einkauf 23" statt „Einkauf23"');
   const budget = read('../public/pages/budget.js');
   assert.match(budget, /<button class="budget-account__main" type="button" data-drill="\$\{a\.id\}">/, 'Kontozeile ohne aria-label');

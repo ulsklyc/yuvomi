@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, getLocale, t } from '/i18n.js';
+import { getLocale, t } from '/i18n.js';
+import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { bindInstantSwitch, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
@@ -35,7 +36,7 @@ function formatSyncTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t('settings.holidayNeverSynced');
   return t('settings.holidayLastSync', {
-    date: `${formatDate(date)} ${formatTime(date)}`.trim(),
+    date: dateTimeText(date),
   });
 }
 

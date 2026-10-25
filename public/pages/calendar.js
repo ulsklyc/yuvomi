@@ -13,7 +13,7 @@ import { openDetailView, visibilityRow, assignedRow } from '/components/detail-v
 import { mountMasterDetail, splitViewDetailHtml, releaseAddressOnClose } from '/utils/master-detail.js';
 import { beginRowFill, drawRowIcons } from '/utils/row-fill.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
-import { t, getLocale, formatDate as formatPreferredDate, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapRegion } from '/utils/content-swap.js';
@@ -69,7 +69,7 @@ import { findPageFab } from '/utils/fab.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
-import { withTimeSuffix, clockText, timeSpanText, shiftTimeText, dateRangeText } from '/utils/date-format.js';
+import { withTimeSuffix, clockText, timeSpanText, shiftTimeText, dateRangeText, dateText, dateTimeText } from '/utils/date-format.js';
 import { maxUploadBytes, maxUploadMb } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
@@ -732,13 +732,16 @@ function startOfWeekOf(dateStr, weekStart = state.weekStart) {
   return isoDate(d);
 }
 
-function formatDate(dateStr, { long = false, weekday = false } = {}) {
-  if (weekday) {
-    const d = new Date(dateStr + 'T00:00:00');
-    const wd = long ? DAY_NAMES_LONG()[d.getDay()] : DAY_NAMES_SHORT()[d.getDay()];
-    return `${wd}, ${formatPreferredDate(dateStr)}`;
-  }
-  return formatPreferredDate(dateStr);
+// Ein Tag mit Wochentag fuer Tageskoepfe und Zellen-Labels ("Samstag, 24.10.").
+// Der Datumsteil kommt aus dateText (utils/date-format.js): das Jahr nur
+// ausserhalb des laufenden, wie ueberall in der App. Ohne Wochentag schreibt
+// der Kalender direkt dateText. Die Periodenkoepfe (Tag, Woche, Agenda)
+// tragen das Jahr immer, wie "Oktober 2026" im Monat: beim Blaettern ist
+// es die Orientierung (benannte Ausnahme, DESIGN.md).
+function dayHeadingText(dateStr, { long = false, year = false } = {}) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const wd = long ? DAY_NAMES_LONG()[d.getDay()] : DAY_NAMES_SHORT()[d.getDay()];
+  return `${wd}, ${dateText(dateStr, { year })}`;
 }
 
 // hourGutterLabel()/compactHourLabel(): die Beschriftung der Stundenachse
@@ -749,7 +752,7 @@ function formatDateTime(datetimeStr) {
   const date    = localDate(datetimeStr);
   const hasTime = datetimeStr.length > 10;
   const time    = hasTime ? formatTime(datetimeStr) : '';
-  return time ? `${formatDate(date)} ${time} ${timeSuffix()}`.trimEnd() : formatDate(date);
+  return time ? `${dateText(date)} ${time} ${timeSuffix()}`.trimEnd() : dateText(date);
 }
 
 function calendarMetaIconHtml(icon) {
@@ -2416,7 +2419,7 @@ function renderToolbar() {
   // versteckt, und eine Warnung, die man erst oeffnen muss, ist keine.
   const scheduleWarningHtml = (scheduleEnabled() && state.scheduleWarnings.length) ? `
     <span class="cal-toolbar__schedule-warning" role="status"
-          title="${esc(t('schedule.overlapWarning', { date: formatPreferredDate(state.scheduleWarnings[0].date_key), user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
+          title="${esc(t('schedule.overlapWarning', { date: dateText(state.scheduleWarnings[0].date_key), user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
       <i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>
       <span>${t('schedule.overlapWarningShort')}</span>
     </span>
@@ -2619,7 +2622,7 @@ function watchToolbarFit(bar) {
  */
 function periodLabelFallbacks() {
   const year = state.today.slice(0, 4);
-  if (state.view === 'day') return [formatDate(state.cursor, { weekday: true })];
+  if (state.view === 'day') return [dayHeadingText(state.cursor, { year: true })];
   const span = state.view === 'agenda'
     ? getAgendaRange(state.cursor)
     : state.view === 'week' && window.matchMedia(MOBILE_MEDIA_QUERY).matches
@@ -2659,21 +2662,21 @@ function updateLabel() {
     // ein "KW 30"-Label würde dann einen Bereich behaupten, der nicht zu sehen
     // ist (Audit A1-19). Das Label nennt stattdessen den sichtbaren Bereich.
     lbl.textContent = window.matchMedia(MOBILE_MEDIA_QUERY).matches
-      ? t('calendar.dayRangeLabel', { from: formatDayMonth(mobileWeekDays(state.cursor)[0]), to: formatPreferredDate(mobileWeekDays(state.cursor)[2]) })
+      ? t('calendar.dayRangeLabel', { from: formatDayMonth(mobileWeekDays(state.cursor)[0]), to: dateText(mobileWeekDays(state.cursor)[2], { year: true }) })
       : t('calendar.weekNumberLabel', { week: getWeekNumber(state.cursor), month: mon, year });
   }
   // Mobil der kurze Wochentag: „Donnerstag, 24.09.2026" brauchte 186px und
   // lief damit ueber die feste Breite des Labels hinaus - der Weiter-Pfeil
   // stand in der Tagesansicht 30px weiter rechts als in den drei anderen
   // (Critique 2026-09-24). „Do, 24.09.2026" traegt dieselbe Auskunft.
-  if (state.view === 'day')    lbl.textContent = formatDate(state.cursor, { weekday: true, long: !window.matchMedia(MOBILE_MEDIA_QUERY).matches });
+  if (state.view === 'day')    lbl.textContent = dayHeadingText(state.cursor, { long: !window.matchMedia(MOBILE_MEDIA_QUERY).matches, year: true });
   // DIE AGENDA NENNT IHRE SPANNE, nicht nur ihren Anfang. „Ab 24.09.2026"
   // sagte nicht, wie weit die Liste reicht, und „Weiter" sprang dann still
   // auf „Ab 24.10.2026" (Critique 2026-09-24). Die Spanne ist die, die
   // getAgendaRange() laedt und renderAgendaView() zeigt.
   if (state.view === 'agenda') {
     const { from, to } = getAgendaRange(state.cursor);
-    lbl.textContent = t('calendar.dayRangeLabel', { from: formatDayMonth(from), to: formatPreferredDate(to) });
+    lbl.textContent = t('calendar.dayRangeLabel', { from: formatDayMonth(from), to: dateText(to, { year: true }) });
   }
   fitPeriodLabel(lbl);
 
@@ -2892,7 +2895,7 @@ function updateOfflineNotice() {
     return;
   }
 
-  const stamp = `${formatPreferredDate(state.offlineSince)} ${formatTime(state.offlineSince)}`.trim();
+  const stamp = dateTimeText(state.offlineSince);
   const label = t('offline.staleData', { time: stamp });
 
   if (existing) {
@@ -3816,7 +3819,7 @@ function announceMonthDay(date) {
   const group = dayGroup(date);
   const count = group.events.length + group.tasks.length + group.holidays.length
     + group.schedule.length + group.waste.length;
-  const text = `${formatDate(date, { long: true, weekday: true })}, ${count
+  const text = `${dayHeadingText(date, { long: true })}, ${count
     ? t('calendar.monthDayEntries', { count }) : t('calendar.agendaDayEmpty')}`;
   live.textContent = '';
   requestAnimationFrame(() => { live.textContent = text; });
@@ -4548,7 +4551,7 @@ function renderWasteChip(occurrence, { className = 'allday-holiday', icon = true
     ? occurrence.origins?.find((o) => o.kind === 'schedule' && o.original_date)?.original_date
     : null;
   const moved = occurrence.moved
-    ? `<i data-lucide="move" class="waste-occurrence-chip__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? formatPreferredDate(movedOriginal) : '' }))}"></i>`
+    ? `<i data-lucide="move" class="waste-occurrence-chip__flag" aria-label="${esc(t('waste.movedFromBadge', { date: movedOriginal ? dateText(movedOriginal) : '' }))}"></i>`
     : '';
   const coalesced = occurrence.coalesced
     ? `<i data-lucide="layers" class="waste-occurrence-chip__flag" aria-label="${esc(t('waste.coalescedHint'))}"></i>`
@@ -4558,7 +4561,7 @@ function renderWasteChip(occurrence, { className = 'allday-holiday', icon = true
   // renderAgendaEvent()). In Monat/Woche/Tag bleibt der Chip ein reines
   // Klickziel ohne eigenen Tab-Stopp, wie .month-day__event/.schedule-entry.
   const button = interactive
-    ? ` role="button" tabindex="0" aria-label="${esc(occurrence.type_name)}, ${esc(formatPreferredDate(occurrence.date_key))}"`
+    ? ` role="button" tabindex="0" aria-label="${esc(occurrence.type_name)}, ${esc(dateText(occurrence.date_key))}"`
     : '';
   return `<div class="${className} waste-occurrence-chip" style="--holi-color:${esc(color)};--holi-ink:${esc(getReadableTextColor(color))}"
        data-deep-link="${esc(occurrence.deep_link)}"${button}
@@ -4667,7 +4670,7 @@ function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], 
     ? `${titles.join(', ')}${rest > 0 ? ` ${t('calendar.monthDayMoreTitles', { count: rest })}` : ''}`
     : '';
   return [
-    formatDate(date, { long: true, weekday: true }),
+    dayHeadingText(date, { long: true }),
     isToday ? t('calendar.today') : '',
     entries && named ? `${entries}: ${named}` : entries,
   ].filter(Boolean).join(', ');
@@ -4746,7 +4749,7 @@ function renderWeekView(container) {
             dayName: DAY_NAMES_SHORT()[dt.getDay()],
             dayNum: dt.getDate(),
             isToday: d === state.today,
-            attrs: { 'data-date': d, role: 'button', tabindex: '0', 'aria-label': t('calendar.monthOpenDay', { date: formatDate(d, { long: true, weekday: true }) }) },
+            attrs: { 'data-date': d, role: 'button', tabindex: '0', 'aria-label': t('calendar.monthOpenDay', { date: dayHeadingText(d, { long: true }) }) },
           });
         }).join('')}
       </div>
@@ -7381,7 +7384,7 @@ function agendaEventAriaLabel(ev, timeStr, dayText = '') {
 // der Block steht, gesprochen wie die Monatszelle ("Montag, 28.09.2026") -
 // HINTER der Uhrzeit, damit "Titel, Zeit" in jeder Ansicht gleich beginnt.
 function eventBlockAttrs(ev, timeText, dayStr = null) {
-  const dayText = dayStr ? formatDate(dayStr, { long: true, weekday: true }) : '';
+  const dayText = dayStr ? dayHeadingText(dayStr, { long: true }) : '';
   return ` role="button" tabindex="0" aria-label="${esc(agendaEventAriaLabel(ev, timeText, dayText))}"`;
 }
 
@@ -7489,14 +7492,12 @@ function reminderSummary(ev, reminders) {
 function eventWhenText(ev) {
   const multiDay = isMultiDayEvent(ev);
   if (ev.all_day) {
-    const startDate = formatPreferredDate(localDate(ev.start_datetime));
-    const dates = multiDay
-      ? t('calendar.dayRangeLabel', { from: startDate, to: formatPreferredDate(eventEndDate(ev)) })
-      : startDate;
+    const startDate = localDate(ev.start_datetime);
+    const dates = multiDay ? dateRangeText(startDate, eventEndDate(ev)) : dateText(startDate);
     return `${dates} · ${t('calendar.allDay')}`;
   }
   if (!ev.end_datetime) return formatDateTime(ev.start_datetime);
-  const startDate = formatDate(localDate(ev.start_datetime));
+  const startDate = dateText(localDate(ev.start_datetime));
   // Ein Tag: das Datum einmal, dann die Spanne im EINEN Zeitformat des
   // Kalenders (timeSpanText) - „24.09.2026 10:00 - 11:30 Uhr", nicht mehr
   // „10:00 Uhr - 11:30 Uhr".
@@ -7509,7 +7510,7 @@ function eventWhenText(ev) {
   // Das Suffix steht auch hier nur einmal, am Ende.
   return withTimeSuffix(t('calendar.dayRangeLabel', {
     from: `${startDate} ${formatTime(ev.start_datetime)}`,
-    to: `${formatDate(localDate(ev.end_datetime))} ${formatTime(ev.end_datetime)}`,
+    to: `${dateText(localDate(ev.end_datetime))} ${formatTime(ev.end_datetime)}`,
   }));
 }
 
@@ -7978,7 +7979,7 @@ function reminderWhenText(reminder) {
   if (!reminder?.remind_at) return '';
   const at = parseRemindAtAsUtc(reminder.remind_at);
   if (Number.isNaN(at.getTime())) return '';
-  return `${formatPreferredDate(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
+  return dateTimeText(at);
 }
 
 function customReminderMinutes(amount, unit) {
@@ -9949,7 +9950,7 @@ function renderRecurringScopeChoices(action, event, allowOccurrence = true) {
         <button type="button" class="btn ${tone}" data-scope="${scope}">${esc(t(key))}</button>`).join('');
   const occurrence = esc(t('calendar.recurringScopeOccurrence', {
     title: event?.title ?? '',
-    date: formatDate(localDate(event?.start_datetime)),
+    date: dateText(localDate(event?.start_datetime)),
   }));
   return `
     <p class="modal-confirm__detail" id="recurring-scope-occurrence">${occurrence}</p>

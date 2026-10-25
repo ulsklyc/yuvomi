@@ -16,7 +16,7 @@ import { openDetailView } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { t, formatDate, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { dateText, dateRangeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
@@ -4656,7 +4656,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         folderName: t('documents.budgetFolder'),
         documentName: (file) => t('budget.receiptDocumentName', {
           title: panel.querySelector('#bm-title').value.trim() || file.name,
-          date: formatDate(panel.querySelector('#bm-date').value),
+          date: dateText(panel.querySelector('#bm-date').value, { year: true }),
         }),
       });
       panel.querySelector('#bm-category').addEventListener('change', () => updateSubcategoryOptions());

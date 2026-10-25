@@ -10,7 +10,8 @@ import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extensio
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
 import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
-import { initI18n, getLocale, t, formatDate, formatTime } from '/i18n.js';
+import { initI18n, getLocale, t, formatTime } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
@@ -4163,7 +4164,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
-  const fmt = { formatDate, formatTime, activityLabel, dateKey: zonedDateKey };
+  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey };
   if (data) {
     SEARCH_SECTIONS.forEach((section) => {
       const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];

@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Whole days in the shift schedule next to the sidebar.** At 1024 px the week showed a 4 px
   sliver of its first day beside the hour column; it now shows as many whole days as fit and
   scrolls by full days.
+- **Every date in the app follows the same rule.** Health, Shift schedule, Inventory, Calendar,
+  Split expenses, search results and the settings pages now also write "24.10." in the current
+  year and the full date only for other years, chart axes included. "Last synced" and similar
+  stamps add "Uhr" after the time where your language uses it, and day, week and agenda headings
+  in the Calendar keep the year as orientation.
 - **Quieter lists and dialogs.** When a list shows "No results" or has nothing in it yet, the
   empty detail column beside it no longer asks you to pick something. The Tasks view switch reads
   "List · Kanban · History" instead of repeating "view", the button that moves a Kanban card to "In

@@ -12,7 +12,7 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
+import { t, formatMonthYear, formatTime, getLocale, getNumberFormat } from '/i18n.js';
 import { dateText, dateRangeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY, niceDomain, calmDomain, chartTimePositions, chartTimeLabelsMarkup } from '/utils/chart.js';
@@ -431,7 +431,7 @@ function axisTickText(metric, value, wholeTicks) {
 
 // Die Auswahl der drei Marken und ihre Ausrichtung stehen in `utils/chart.js`;
 // hier steht nur, dass die Beschriftung dieses Moduls ein DATUM ist.
-const chartXLabels = (dates, geo) => chartXLabelsMarkup(dates.map((d) => formatDate(d)), geo);
+const chartXLabels = (dates, geo) => chartXLabelsMarkup(dates.map((d) => dateText(d)), geo);
 /**
  * Wie ein Punkt der Vitalwerte-Serie heisst: ein Tag als Datum, ein Monat als
  * Monat. Die Jahresansicht fuehrt zwoelf MONATS-Buckets, deren `date` der
@@ -439,9 +439,9 @@ const chartXLabels = (dates, geo) => chartXLabelsMarkup(dates.map((d) => formatD
  * unter einem Mittelwert ueber den ganzen Juni (Critique 2026-10-05, R16).
  */
 function vitalPointLabel(series, point) {
-  if (series.gran !== 'month') return formatDate(point.date);
+  if (series.gran !== 'month') return dateText(point.date);
   const [year, month] = String(point.date).split('-');
-  return formatMonthYear(Number(year), Number(month), { month: 'short' }) || formatDate(point.date);
+  return formatMonthYear(Number(year), Number(month), { month: 'short' }) || dateText(point.date);
 }
 
 // Panel-Definitionen je Route. Icons folgen den Sub-Tab-Icons (health-tabs.js).
@@ -3307,7 +3307,7 @@ function prnWhenLabel(at) {
   // `at` ist ein Zeitpunkt: sein Kalendertag kommt aus der Anzeigezone, nicht aus
   // den Browser-Gettern - sonst vergleicht die Zeile zwei verschiedene Uhren.
   const sameDay = zonedDateKey(at) === todayKey();
-  return sameDay ? formatTime(at) : `${formatDate(at)} ${formatTime(at)}`;
+  return sameDay ? formatTime(at) : `${dateText(at)} ${formatTime(at)}`;
 }
 
 /** Restdauer als „5 Std. 20 Min." bzw. „20 Min.". */
@@ -3655,8 +3655,8 @@ function medLogHistoryMarkup() {
     // der Tag deshalb ueber `zonedDateKey`, nicht ueber die ersten zehn Zeichen.
     const d = String(e.at);
     const timeLabel = d.length >= 16
-      ? `${formatDate(zonedDateKey(d))} · ${formatTime(d)}`
-      : formatDate(d.slice(0, 10));
+      ? `${dateText(zonedDateKey(d))} · ${formatTime(d)}`
+      : dateText(d.slice(0, 10));
     // Drei Staende, nicht zwei: das Protokoll kannte nur "uebersprungen" und
     // "sonst genommen" und schrieb damit "Genommen" unter jede ausstehende
     // Dosis. Solange es keinen Weg zurueck gab, fiel das kaum auf - seit es
@@ -4715,7 +4715,7 @@ function labTrendChart(points, analyteName) {
   const dots = points.map((p, i) => {
     const color = FLAG_DOT_COLORS[p.flag] || 'var(--module-health)';
     const val = unit ? `${fmtNum(p.value)} ${unit}` : fmtNum(p.value);
-    return `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(`${formatDate(p.date)}: ${val}`)}</title></circle>`;
+    return `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(`${dateText(p.date)}: ${val}`)}</title></circle>`;
   }).join('');
 
   // Screenreader-Tabelle: Datum, Wert, Referenz, Einordnung — dieselben Daten wie
@@ -4727,7 +4727,7 @@ function labTrendChart(points, analyteName) {
     return '-';
   };
   const tableRows = points.map((p) => [
-    formatDate(p.date),
+    dateText(p.date),
     unit ? `${fmtNum(p.value)} ${unit}` : fmtNum(p.value),
     refText(p.refLow, p.refHigh),
     p.flag ? t(LAB_FLAG_LABEL_KEYS[p.flag]) : '-',
@@ -4740,7 +4740,7 @@ function labTrendChart(points, analyteName) {
 
   const grid = chartGridFor(min, max, undefined, undefined, steps);
   const xLabels = timed
-    ? chartTimeLabelsMarkup(from, to, formatDate)
+    ? chartTimeLabelsMarkup(from, to, dateText)
     : chartXLabels(points.map((p) => p.date));
 
   return `
@@ -5919,7 +5919,7 @@ function preventionRowMarkup(row, own) {
     : '';
   const noteHtml = row.note ? `<span class="health-prevention-row__note">${esc(row.note)}</span>` : '';
   const editBtn = own
-    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${preventionRecordLabel(row)}, ${formatDate(row.given_on)}` }), attrs: { 'data-prevention-edit': row.id } })
+    ? rowActionHtml({ icon: 'pencil', label: t('common.editNamed', { name: `${preventionRecordLabel(row)}, ${dateText(row.given_on)}` }), attrs: { 'data-prevention-edit': row.id } })
     : '';
   return `
     <li class="health-prevention-row" data-record-id="${esc(row.id)}">
@@ -6445,7 +6445,7 @@ function nutritionWhenText(consumedAt) {
   const raw = String(consumedAt || '');
   const day = raw.slice(0, 10);
   const time = raw.slice(11, 16);
-  return time ? `${formatDate(day)} ${time}` : formatDate(day);
+  return time ? `${dateText(day)} ${time}` : dateText(day);
 }
 
 function wireNutrition() {
@@ -8389,7 +8389,7 @@ function cycleDayLabel(c, { symptom = null, pms = false, intimacy = false } = {}
   // DIE SICHTBARE ZIFFER ZUERST (R20, WCAG 2.5.3 Label in Name): die Zelle
   // zeigt „1", ihr Name begann mit „01.10.2026" - wer per Sprache „1"
   // ansagt, traf nichts. Danach das volle Datum, wie bisher.
-  const parts = [String(Number(String(c.dateKey).slice(8, 10))), formatDate(c.dateKey)];
+  const parts = [String(Number(String(c.dateKey).slice(8, 10))), dateText(c.dateKey)];
   if (c.isToday) parts.push(t('health.cycle.legend.today'));
   if (c.phase === PHASE.MENSTRUATION) parts.push(t('health.cycle.legend.period'));
   else if (c.phase === PHASE.FERTILE) parts.push(t('health.cycle.legend.fertile'));
@@ -8676,7 +8676,7 @@ function dateScaledXLabelsMarkup(points, xFor, geo = CHART) {
     : [...new Set([0, Math.floor((n - 1) / 3), Math.floor((2 * (n - 1)) / 3), n - 1])];
   return picks.map((i) => {
     const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
-    return `<text x="${xFor(i).toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(points[i].date))}</text>`;
+    return `<text x="${xFor(i).toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(dateText(points[i].date))}</text>`;
   }).join('');
 }
 
@@ -8761,9 +8761,9 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
     `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-health)"><title>${esc(formatPointTooltip(p))}</title></circle>`).join('');
 
   const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : fmtNum(val))), geo, steps);
-  const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x, geo) : chartXLabelsMarkup(points.map((p) => formatDate(p.date)), geo);
+  const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x, geo) : chartXLabelsMarkup(points.map((p) => dateText(p.date)), geo);
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), tableHeader],
-    points.map((p) => [formatDate(p.date), formatTableValue(p.value)]));
+    points.map((p) => [dateText(p.date), formatTableValue(p.value)]));
 
   return `
     <div class="health-chart-section">
@@ -8830,7 +8830,7 @@ function cycleLengthTrendChartMarkup(trend) {
     const by = y(e.days);
     const typical = isTypicalCycleLength(e.days);
     const color = typical ? 'var(--module-health)' : 'var(--color-warning)';
-    const label = `${formatDate(e.date)}: ${t('health.cycle.unit.days', { value: fmtNum(e.days), count: e.days })} (${typicalLabel(typical)})`;
+    const label = `${dateText(e.date)}: ${t('health.cycle.unit.days', { value: fmtNum(e.days), count: e.days })} (${typicalLabel(typical)})`;
     return `<rect class="chart__bar" x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="${color}"><title>${esc(label)}</title></rect>`;
   }).join('');
 
@@ -8854,11 +8854,11 @@ function cycleLengthTrendChartMarkup(trend) {
   const xLabels = trend.map((e, i) => {
     if (i !== 0 && i !== n - 1 && i % labelStride !== 0) return '';
     const anchor = i === 0 ? (dense ? 'start' : 'middle') : i === n - 1 ? (dense ? 'end' : 'middle') : 'middle';
-    return `<text x="${xFor(i).toFixed(1)}" y="${H - 7}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(e.date))}</text>`;
+    return `<text x="${xFor(i).toFixed(1)}" y="${H - 7}" class="chart__axis" text-anchor="${anchor}">${esc(dateText(e.date))}</text>`;
   }).join('');
   const titleText = t('health.cycle.trends.cycleLength');
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), titleText],
-    trend.map((e) => [formatDate(e.date), `${t('health.cycle.unit.days', { value: fmtNum(e.days), count: e.days })} (${typicalLabel(isTypicalCycleLength(e.days))})`]));
+    trend.map((e) => [dateText(e.date), `${t('health.cycle.unit.days', { value: fmtNum(e.days), count: e.days })} (${typicalLabel(isTypicalCycleLength(e.days))})`]));
   // Ohne Legende war die Bar-Farbe die einzige Auskunft "typisch/untypisch" -
   // sichtbar nur im Hover-Tooltip, auf einem Touch-Geraet also gar nicht.
   // Dieselbe .cycle-legend-Komponente wie Kalender und Symptom-Haeufigkeit,
@@ -8888,7 +8888,7 @@ function bbtTrendChartMarkup(series) {
   return simpleLineChartMarkup({
     points: series.map((e) => ({ date: e.date, value: e.celsius })),
     titleText: t('health.cycle.bbt.label'),
-    formatPointTooltip: (p) => `${formatDate(p.date)}: ${fmtNum(p.value, BBT_DECIMALS)} ${t('health.cycle.bbt.celsius')}`,
+    formatPointTooltip: (p) => `${dateText(p.date)}: ${fmtNum(p.value, BBT_DECIMALS)} ${t('health.cycle.bbt.celsius')}`,
     formatTableValue: (v) => `${fmtNum(v, BBT_DECIMALS)} ${t('health.cycle.bbt.celsius')}`,
     tableHeader: t('health.cycle.bbt.label'),
     // BBT-Spannen liegen typischerweise unter 1 °C - hier ist die Nachkommastelle
@@ -8925,7 +8925,7 @@ function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
   return simpleLineChartMarkup({
     points: trend.map((e) => ({ date: e.date, value: e.intensity })),
     titleText: symptomLabel,
-    formatPointTooltip: (p) => `${formatDate(p.date)}: ${t(symptomIntensityLabelKey(p.value))}`,
+    formatPointTooltip: (p) => `${dateText(p.date)}: ${t(symptomIntensityLabelKey(p.value))}`,
     formatTableValue: (v) => t(symptomIntensityLabelKey(v)),
     tableHeader: t('health.cycle.trends.severity'),
     formatTick: (val) => (Number.isInteger(val) && val >= 1 && val <= 3 ? t(symptomIntensityLabelKey(val)) : ''),
@@ -8976,7 +8976,7 @@ function symptomCyclePatternMarkup(pattern, symptomLabel) {
     }).join('');
     return `
       <div class="cycle-pattern-grid__row">
-        <span class="cycle-pattern-grid__label">${esc(formatDate(c.cycleStart))}</span>
+        <span class="cycle-pattern-grid__label">${esc(dateText(c.cycleStart))}</span>
         <div class="cycle-pattern-grid__days">${cells}</div>
       </div>`;
   }).join('');
@@ -9107,7 +9107,7 @@ function flowLoadTrendChartMarkup(trend) {
     // Last aus 2 geloggten Tagen ist etwas anderes als dieselbe Last aus 5,
     // das darf im Hover/der Tabelle nicht verschwinden.
     const daysText = t('health.cycle.unit.days', { value: fmtNum(e.loggedDays), count: e.loggedDays });
-    const label = `${formatDate(e.date)}: ${t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })}`;
+    const label = `${dateText(e.date)}: ${t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })}`;
     return `<rect class="chart__bar" x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
   }).join('');
 
@@ -9118,14 +9118,14 @@ function flowLoadTrendChartMarkup(trend) {
   const xLabels = trend.map((e, i) => {
     if (i !== 0 && i !== n - 1 && i % labelStride !== 0) return '';
     const anchor = i === 0 ? (dense ? 'start' : 'middle') : i === n - 1 ? (dense ? 'end' : 'middle') : 'middle';
-    return `<text x="${xFor(i).toFixed(1)}" y="${H - 7}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(e.date))}</text>`;
+    return `<text x="${xFor(i).toFixed(1)}" y="${H - 7}" class="chart__axis" text-anchor="${anchor}">${esc(dateText(e.date))}</text>`;
   }).join('');
 
   const titleText = t('health.cycle.trends.flowLoad');
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), t('health.cycle.trends.flowLoadColumn')],
     trend.map((e) => {
       const daysText = t('health.cycle.unit.days', { value: fmtNum(e.loggedDays), count: e.loggedDays });
-      return [formatDate(e.date), t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })];
+      return [dateText(e.date), t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })];
     }));
 
   return `
@@ -9307,7 +9307,7 @@ function cycleHistoryMarkup(canEdit) {
       <ul class="cycle-history__list">${rows.map((p) => {
         const start = String(p.start_date).slice(0, 10);
         const end = p.end_date ? String(p.end_date).slice(0, 10) : null;
-        const rangeLabel = end ? dateRangeText(start, end) : formatDate(start);
+        const rangeLabel = end ? dateRangeText(start, end) : dateText(start);
         const lenDays = end ? (Math.round((Date.parse(`${end}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) + 1) : null;
         const nextStart = nextStartById.get(p.id);
         const cycleLen = nextStart ? Math.round((Date.parse(`${String(nextStart).slice(0, 10)}T00:00Z`) - Date.parse(`${start}T00:00Z`)) / 86400000) : null;
@@ -9841,7 +9841,7 @@ function openDayLogModal(dateKey) {
     // DER PUNKT HAENGT AM TITEL (R22, Critique a5): im schmalen Blatt brach
     // die Zeile vor dem Trenner, und die zweite begann mit "· 22.10.2026".
     // Das geschuetzte Leerzeichen davor laesst den Umbruch nur NACH ihm zu.
-    title: `${t('health.cycle.dayLog.title')}\u00A0· ${formatDate(key)}`,
+    title: `${t('health.cycle.dayLog.title')}\u00A0· ${dateText(key)}`,
     size: 'md',
     // A-2: kein Autofokus auf das erste Formularfeld (das waere ohne dieses
     // Flag die Basaltemperatur weiter unten, siehe FIRST_FIELD in modal.js) -

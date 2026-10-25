@@ -7,7 +7,8 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
-import { t, formatDate, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
@@ -1148,7 +1149,7 @@ function renderExpenses(asList = false) {
       <div class="split-expense__icon budget-tile"${categoryTone(expense.category)}><i data-lucide="${categoryIcon(expense.category)}" aria-hidden="true"></i></div>
       <div class="split-expense__body">
         <strong>${esc(expense.title)}</strong>
-        <span>${t('splitExpenses.paidBy')}: ${esc(expense.payer_name || '')} · ${formatDate(expense.expense_date)}${receiptMark}</span>
+        <span>${t('splitExpenses.paidBy')}: ${esc(expense.payer_name || '')} · ${dateText(expense.expense_date)}${receiptMark}</span>
       </div>
       <div class="split-expense__amount">${money(expense.amount, expense.currency)}</div>
     `;
@@ -1231,7 +1232,7 @@ function renderRecurring(asList = false) {
     const paused = Boolean(recurring.paused_at);
     const when = paused
       ? `<span class="split-recurring__state">${esc(t('splitExpenses.recurring.paused'))}</span>`
-      : `<span>${esc(`${t('splitExpenses.recurring.nextDate')}: ${formatDate(recurring.next_run_date)}`)}</span>`;
+      : `<span>${esc(`${t('splitExpenses.recurring.nextDate')}: ${dateText(recurring.next_run_date)}`)}</span>`;
     const reason = recurring.blocked_reason
       ? `<span class="split-recurring__reason">${esc(t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`))}</span>`
       : '';
@@ -1315,7 +1316,7 @@ function recurringResumeChoice(recurring) {
       closeModal({ force: true });
       resolve(value);
     };
-    const detail = t('splitExpenses.recurring.missedDetail', { count: recurring.missed_count, date: formatDate(recurring.next_run_date) });
+    const detail = t('splitExpenses.recurring.missedDetail', { count: recurring.missed_count, date: dateText(recurring.next_run_date) });
     openSharedModal({
       pointerDeadTime: true,
       title: t('splitExpenses.recurring.missedQuestion'),
@@ -1324,8 +1325,8 @@ function recurringResumeChoice(recurring) {
         <p class="modal-confirm__detail" id="split-resume-detail">${esc(detail)}</p>
         <div class="modal-actions modal-actions--stack">
           <div class="modal-actions modal-actions--stack split-resume-choices" role="group" aria-labelledby="split-resume-detail">
-            <button type="button" class="btn btn--primary" data-resume="skip">${esc(t('splitExpenses.recurring.missedSkip', { date: formatDate(recurring.resume_date) }))}</button>
-            <button type="button" class="btn btn--secondary" data-resume="book">${esc(t('splitExpenses.recurring.missedBook', { date: formatDate(recurring.next_run_date) }))}</button>
+            <button type="button" class="btn btn--primary" data-resume="skip">${esc(t('splitExpenses.recurring.missedSkip', { date: dateText(recurring.resume_date) }))}</button>
+            <button type="button" class="btn btn--secondary" data-resume="book">${esc(t('splitExpenses.recurring.missedBook', { date: dateText(recurring.next_run_date) }))}</button>
           </div>
           <button type="button" class="btn btn--secondary" id="split-resume-cancel">${esc(t('common.cancel'))}</button>
         </div>`,
@@ -1508,7 +1509,7 @@ function activityItemHtml(item, actionable) {
       <div>
         <strong>${esc(t(`splitExpenses.activityType.${item.type}`))}</strong>
         ${detail}
-        <span>${esc(item.actor_name || t('splitExpenses.system'))} · ${esc(formatDate(zonedDateKey(item.created_at)))}</span>
+        <span>${esc(item.actor_name || t('splitExpenses.system'))} · ${esc(dateText(zonedDateKey(item.created_at)))}</span>
         ${reversed}
       </div>
       ${action}
@@ -2133,7 +2134,7 @@ function expenseReadSections(expense) {
   return [
     { icon: 'banknote', label: t('splitExpenses.amount'), value: money(expense.amount, expense.currency) },
     { icon: 'user', label: t('splitExpenses.paidBy'), value: expense.payer_name || '' },
-    { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? formatDate(expense.expense_date) : '' },
+    { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? dateText(expense.expense_date) : '' },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
     { icon: 'users', label: t('splitExpenses.participants'), value: shares, multiline: true },
@@ -2406,7 +2407,7 @@ function recurringReadSections(recurring) {
     { icon: 'banknote', label: t('splitExpenses.amount'), value: money(recurring.amount, recurring.currency) },
     { icon: 'user', label: t('splitExpenses.paidBy'), value: recurring.payer_name || '' },
     { icon: 'repeat', label: t('budget.recurringIntervalLabel'), value: frequencyLabel(recurring.frequency) },
-    { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : formatDate(recurring.next_run_date) },
+    { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : dateText(recurring.next_run_date) },
     { icon: 'circle-pause', label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
@@ -2569,7 +2570,7 @@ function openRecurringModal(recurring = null) {
           // Dialog bleibt offen.
           if (err?.data?.reason === 'next_run_not_after_last_booking') {
             reportFieldError(form.querySelector('[name="next_run_date"]'),
-              t('splitExpenses.recurring.dateBooked', { date: formatDate(err.data.last_booked) }));
+              t('splitExpenses.recurring.dateBooked', { date: dateText(err.data.last_booked) }));
             return;
           }
           throw err;

@@ -133,6 +133,19 @@ export function dateText(value, { weekday = false, year = false, today = househo
 }
 
 /**
+ * Ein Zeitpunkt mit Tag und Uhrzeit: "24.10. 14:30 Uhr", ausserhalb des
+ * laufenden Jahres "08.01.2027 14:30 Uhr", im 12-Stunden-Format ohne
+ * Zeitwort. Die Stempel "zuletzt synchronisiert", "zuletzt gesehen",
+ * "installiert am" der Einstellungen schrieben das vorher achtmal von Hand,
+ * immer mit Jahr und ohne "Uhr".
+ */
+export function dateTimeText(value, { suffix = true, today = householdToday() } = {}) {
+  const date = dateText(value, { today });
+  const time = clockText(value, { suffix });
+  return [date, time].filter(Boolean).join(' ');
+}
+
+/**
  * Ein Zeitraum zweier Tage: das Jahr hoechstens einmal. "19.10. - 25.10." im
  * laufenden Jahr, "19.10.2027 - 25.10.2027" -> "19.10. - 25.10.2027" in einem
  * anderen, "28.12.2026 - 03.01.2027" ueber den Jahreswechsel.

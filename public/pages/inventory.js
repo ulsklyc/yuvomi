@@ -9,6 +9,7 @@
 
 import { api } from '/api.js';
 import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
 import {
@@ -30,7 +31,7 @@ import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/util
 import { formatMoney, parseAmountInput, amountToInput } from '/utils/money.js';
 import { amountInputAttrs, amountFieldError } from '/utils/amount-field.js';
 import { todayKey } from '/utils/date.js';
-import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
+import { getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { pathAccess, mayWritePath } from '/utils/module-access.js';
 import { canChangeRecord, canSeeInventoryPrices } from '/permissions.js';
@@ -596,7 +597,7 @@ function renderGroupedItems(groups) {
 function deadlineChipHtml(item) {
   const spec = deadlineChipSpec(item);
   if (!spec) return '';
-  const date = formatDate(spec.endDateKey);
+  const date = dateText(spec.endDateKey);
   let text;
   if (spec.kind === 'warranty') {
     text = spec.state === 'expired' ? t('inventory.warrantyChipExpired') : t('inventory.warrantyChipUntil', { date });
@@ -922,7 +923,7 @@ function warrantyDetailValue(item) {
   // Der Key direkt, ohne Date-Umweg: `new Date(key + 'T00:00:00')` ist
   // Mitternacht der BROWSER-Zone, und in einer Haushaltszone westlich davon
   // faellt der angezeigte Tag dann auf den Vortag (#829 Teil 3).
-  const formattedDate = formatDate(status.endDateKey);
+  const formattedDate = dateText(status.endDateKey);
   let stand;
   if (status.state === 'expired') stand = t('inventory.warrantyStatusExpired', { date: formattedDate });
   else if (status.state === 'expiring') stand = t('inventory.warrantyStatusExpiringSoon', { count: status.days });
@@ -955,7 +956,7 @@ function trackedDateDetailEntries(item) {
     const distanceHint = d.interval_distance
       ? t('inventory.trackedDateDistanceHint', { value: formatOdometer(d.interval_distance), count: d.interval_distance, unit: odometerUnitLabel(item.odometer_unit) })
       : '';
-    const sub = [countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date), distanceHint, ...trackedDateFormOnlyValues(d)]
+    const sub = [countdown ? `${dateText(d.date)} · ${countdown}` : dateText(d.date), distanceHint, ...trackedDateFormOnlyValues(d)]
       .filter(Boolean).join(' · ');
     return { text: d.label, sub };
   });
@@ -1023,7 +1024,7 @@ function historyEntryLine(entry, odometerUnit) {
   label.textContent = entry.label;
   main.appendChild(label);
 
-  const subParts = [formatDate(entry.date)];
+  const subParts = [dateText(entry.date)];
   if (entry.type === 'service_log') {
     if (entry.vendor) subParts.push(entry.vendor);
     if (entry.odometer != null) {
@@ -1088,13 +1089,13 @@ function odometerChartMarkup(points, unit) {
 
   const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
-  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${dateText(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
 
   const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)), CHART, steps);
-  const xLabels = chartTimeLabelsMarkup(from, to, formatDate);
+  const xLabels = chartTimeLabelsMarkup(from, to, dateText);
   const titleText = t('inventory.odometerChartTitle');
   const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
-    points.map((p) => [formatDate(p.date), `${formatOdometer(p.value)} ${unit}`]));
+    points.map((p) => [dateText(p.date), `${formatOdometer(p.value)} ${unit}`]));
 
   return `
     <div class="inventory-chart-section">
@@ -1202,7 +1203,7 @@ function attachmentDetailEntries(attachments) {
 function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
   const bookingEntries = (item.linked_entries || []).map((link) => ({
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
-    sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
+    sub: `${roleLabel(link.role)} · ${dateText(link.date)}`,
   }));
   const attachmentEntries = attachmentDetailEntries(item.attachments);
 
@@ -1220,7 +1221,7 @@ function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
         { icon: 'building-2', label: t('inventory.brandLabel'), value: item.brand || '' },
         { icon: 'package', label: t('inventory.modelLabel'), value: item.model || '' },
         { icon: 'hash', label: t('inventory.serialNumberLabel'), value: item.serial_number || '' },
-        { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? formatDate(item.purchase_date) : '' },
+        { icon: 'calendar', label: t('inventory.purchaseDateLabel'), value: item.purchase_date ? dateText(item.purchase_date) : '' },
         { icon: 'banknote', label: t('inventory.purchasePriceLabel'), value: canSeeInventoryPrices() && item.purchase_price != null ? formatMoney(item.purchase_price, item.currency) : '' },
         { icon: 'store', label: t('inventory.vendorLabel'), value: item.vendor || '' },
         // Konto, unter dem das Geraet registriert ist (#1004) - eine Adresse oder ein
@@ -1276,7 +1277,7 @@ function formatOdometer(value) {
 function odometerDetailValue(item) {
   if (item.odometer == null) return '';
   const value = `${formatOdometer(item.odometer)} ${odometerUnitLabel(item.odometer_unit)}`;
-  return item.odometer_on ? `${value} · ${formatDate(item.odometer_on)}` : value;
+  return item.odometer_on ? `${value} · ${dateText(item.odometer_on)}` : value;
 }
 
 /**
@@ -1626,7 +1627,7 @@ function openBookingPicker(panel, { initialMonth, includeRole = false } = {}) {
         listEl.insertAdjacentHTML('beforeend', `
           <button class="inventory-booking-picker__item" type="button" data-picker-item="${entry.id}">
             <span class="inventory-booking-picker__item-title">${esc(entry.title)}</span>
-            <span class="inventory-booking-picker__item-meta">${esc(formatDate(entry.date))}</span>
+            <span class="inventory-booking-picker__item-meta">${esc(dateText(entry.date))}</span>
             <span class="inventory-booking-picker__item-amount">${esc(formatMoney(entry.amount, _householdCurrency))}</span>
           </button>`);
       }
@@ -1702,7 +1703,7 @@ function renderLinkedEntries(panel, item) {
     <div class="inventory-linked-entry-row" data-entry-id="${link.entry_id}">
       <span class="inventory-linked-entry-row__title">${esc(link.title)}</span>
       <span class="inventory-linked-entry-row__role">${esc(roleLabel(link.role))}</span>
-      <span class="inventory-linked-entry-row__date">${esc(formatDate(link.date))}</span>
+      <span class="inventory-linked-entry-row__date">${esc(dateText(link.date))}</span>
       <span class="inventory-linked-entry-row__amount">${esc(formatMoney(link.amount, _householdCurrency))}</span>
       <button class="btn btn--icon btn--sm" type="button" data-remove-entry="${link.entry_id}"
               aria-label="${esc(t('inventory.removeBookingAction', { title: link.title }))}">
@@ -1738,7 +1739,7 @@ function updateWarrantyStatus(panel) {
   // Der Key direkt, ohne Date-Umweg: `new Date(key + 'T00:00:00')` ist
   // Mitternacht der BROWSER-Zone, und in einer Haushaltszone westlich davon
   // faellt der angezeigte Tag dann auf den Vortag (#829 Teil 3).
-  const formattedDate = formatDate(status.endDateKey);
+  const formattedDate = dateText(status.endDateKey);
   if (status.state === 'expired') {
     statusEl.textContent = t('inventory.warrantyStatusExpired', { date: formattedDate });
   } else if (status.state === 'expiring') {

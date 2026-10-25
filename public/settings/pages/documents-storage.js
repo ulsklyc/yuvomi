@@ -1,5 +1,6 @@
 import { api } from "/api.js";
-import { formatDate, formatTime, t } from "/i18n.js";
+import { dateTimeText } from '/utils/date-format.js';
+import { t } from "/i18n.js";
 import { confirmModal, refocusAfterRender } from "/components/modal.js";
 import {
   createDisclosure,
@@ -16,7 +17,7 @@ function formatSyncTime(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return `${formatDate(date)} ${formatTime(date)}`.trim();
+  return dateTimeText(date);
 }
 
 function showToast(message, tone = "default") {

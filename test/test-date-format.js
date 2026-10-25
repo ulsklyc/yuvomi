@@ -189,27 +189,62 @@ test(`TZ=${ZONE}: Anteil ueber Intl der Region (vorher "53%" von Hand)`, async (
   assert.equal(fmt.percentText(Number.NaN), '');
 });
 
-// R23 S11 (D11, Rest aus S7): die Anzeige-Daten dieser Module laufen ueber
-// dateText - Jahr nur ausserhalb des laufenden, der Tag der Haushaltszone.
-// formatDate bleibt fuer Felder, deren Aussage das Jahr ist, und fuer
-// Eingaben; die Liste der noch offenen Module steht im handoff (S11b).
-test('R23: die migrierten Module schreiben Anzeige-Daten ueber dateText', () => {
-  const MIGRATED = {
-    'public/pages/documents.js': 0,
-    'public/pages/rewards.js': 0,
-    'public/pages/pantry.js': 0,
-    'public/pages/tasks.js': 0,
-    'public/pages/housekeeping.js': 0,
-    'public/components/task-detail.js': 0,
+test(`TZ=${ZONE}: Zeitpunkt mit Tag und Uhrzeit, Jahr nur ausserhalb des laufenden`, async () => {
+  const today = '2026-10-24';
+  await as({ locale: 'de' }, () => {
+    assert.equal(fmt.dateTimeText('2026-10-24T09:30', { today }), '24.10. 09:30 Uhr');
+    assert.equal(fmt.dateTimeText('2027-01-08T09:30', { today }), '08.01.2027 09:30 Uhr');
+    assert.equal(fmt.dateTimeText('2026-10-24T09:30', { today, suffix: false }), '24.10. 09:30');
+    assert.equal(fmt.dateTimeText('', { today }), '');
+  });
+  await as({ locale: 'en', time: '12h', date: 'mdy' }, () => {
+    assert.equal(fmt.dateTimeText('2026-10-24T21:15', { today }), '10/24 9:15 PM');
+  });
+});
+
+// R23 S11/S11b (D11): JEDES Anzeige-Datum der App laeuft ueber
+// utils/date-format.js - Jahr nur ausserhalb des laufenden, der Tag der
+// Haushaltszone. Ein roher `formatDate(` aus i18n.js schrieb das Jahr immer
+// hin ("24.10.2026" neben "24.10."), ein `toLocaleDateString` folgte weder der
+// Datumsformat-Einstellung noch der Haushaltszone. Vor S11b standen ~100 rohe
+// Aufrufe in 30 Dateien. Erlaubt sind nur die Bausteine selbst und benannte
+// Formen mit eigener Aussage.
+test('R23: kein rohes formatDate/toLocaleDateString ausserhalb der Datums-Bausteine', async () => {
+  const { readdirSync, statSync } = await import('node:fs');
+  const ALLOWED = {
+    // Definition und interne Nutzer.
+    'public/i18n.js': Infinity,
+    'public/utils/date-format.js': Infinity,
+    // Tagesbezeichnung mit eigenem Proxy ("Heute", "Morgen", sonst Datum).
+    'public/utils/day-label.js': Infinity,
+    // Geburtsdatum: das Jahr IST die Aussage (oder fehlt bewusst).
+    'public/utils/birth-date.js': Infinity,
     // Der Tageskopf der Wand: langer Wochentag + volles Datum, eine eigene Form.
     'public/pages/dashboard.js': 1,
   };
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) { if (name !== 'vendor') walk(full); continue; }
+      if (name.endsWith('.js')) files.push(full);
+    }
+  };
+  walk(path.join(root, 'public'));
   const found = [];
-  for (const [file, allowed] of Object.entries(MIGRATED)) {
-    const code = readFileSync(path.join(root, file), 'utf8').split('\n')
-      .filter((line) => !/^\s*(\*|\/\/|import )/.test(line)).join('\n');
-    const calls = (code.match(/(?<![\w.])formatDate\(/g) || []).length;
-    if (calls !== allowed) found.push(`${file}: ${calls} formatDate-Aufrufe (erlaubt ${allowed})`);
+  for (const full of files) {
+    const rel = path.relative(root, full).split(path.sep).join('/');
+    const allowed = ALLOWED[rel] ?? 0;
+    const code = readFileSync(full, 'utf8').split('\n')
+      .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line)).join('\n');
+    const raw = (code.match(/(?<![\w.$])formatDate\(/g) || []).length;
+    // Ein Alias ("formatDate as x") oder eine Weitergabe als Wert umginge die Zaehlung.
+    const body = code.replace(/^import\s[^;]*;/gms, '');
+    const alias = /formatDate\s+as\s+\w+/.test(code) || /[(,{:]\s*formatDate\s*[,)}]/.test(body);
+    const locale = (code.match(/\.toLocale(Date|Time)?String\(/g) || []).length;
+    if (raw > allowed) found.push(`${rel}: ${raw} formatDate-Aufrufe (erlaubt ${allowed === Infinity ? 'alle' : allowed})`);
+    if (alias && allowed !== Infinity && !(rel in ALLOWED)) found.push(`${rel}: formatDate als Alias oder Wert`);
+    if (locale && allowed !== Infinity) found.push(`${rel}: ${locale} toLocale*String-Aufrufe`);
   }
   assert.deepEqual(found, []);
 });

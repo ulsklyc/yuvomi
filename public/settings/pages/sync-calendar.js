@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, t } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateText, dateTimeText } from '/utils/date-format.js';
 import {
   captureModalContext,
   captureOpenContext,
@@ -41,7 +42,7 @@ function formatSyncTime(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return `${formatDate(date)} ${formatTime(date)}`.trim();
+  return dateTimeText(date);
 }
 
 function lastSyncDetail(value) {
@@ -230,7 +231,7 @@ function bindDefaultAssigneeBackfill(container) {
 function movedCandidateMeta(entry) {
   const value = String(entry.start_datetime || '');
   const timed = !entry.all_day && value.length > 10;
-  const when = timed ? `${formatDate(value)} ${formatTime(value)}`.trim() : formatDate(value);
+  const when = timed ? dateTimeText(value) : dateText(value);
   return [when, entry.calendar_name].filter(Boolean).join(' · ');
 }
 

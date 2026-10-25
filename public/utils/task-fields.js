@@ -14,7 +14,8 @@
  * auseinanderlaeuft.
  */
 
-import { t, formatDate, formatDayMonth, formatTime } from '/i18n.js';
+import { t, formatTime } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { parseLocalDateKey } from '/utils/date.js';
 import { nowFields } from '/utils/timezone.js';
 import { isPreviewable } from '/utils/document-preview.js';
@@ -230,12 +231,10 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
    * einzige Angabe, die nichts beitrug: eine Aufgabe, die dieses Jahr fällig
    * ist, sagt mit „11.08." dasselbe in 35px weniger.
    *
-   * Über `formatDayMonth` und nicht per slice: die Reihenfolge und das
-   * Trennzeichen hängen an der Datumsformat-Präferenz (dmy, mdy, ymd), und ein
-   * abgeschnittener String hätte sie in drei von sieben Formaten verdreht. */
-  const dateLabel = dayKey.slice(0, 4) === todayDay.slice(0, 4)
-    ? formatDayMonth(dayKey)
-    : formatDate(dayKey);
+   * Seit R23 sagt das `dateText` (utils/date-format.js) fuer die ganze App:
+   * Reihenfolge und Trenner der Datumsformat-Praeferenz, das Jahr nur
+   * ausserhalb des laufenden. */
+  const dateLabel = dateText(dayKey, { today: todayDay });
   const fullLabel = dueTime ? `${dateLabel}, ${formatTime(dueStamp)}` : dateLabel;
 
   // Erledigte/archivierte Aufgaben können nicht überfällig sein - neutrales Datum.

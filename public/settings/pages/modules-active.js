@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, t } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { rowMenuHtml } from '/utils/row-action.js';
@@ -277,7 +278,7 @@ function rowHtml(row) {
 function installedAtText(install) {
   const date = install?.installedAt ? new Date(install.installedAt) : null;
   if (!date || Number.isNaN(date.getTime())) return t('settings.moduleDetailUnknown');
-  return `${formatDate(date)} ${formatTime(date)}`.trim();
+  return dateTimeText(date);
 }
 
 /**

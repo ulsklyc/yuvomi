@@ -4,8 +4,8 @@
  */
 import { CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categoryColor, categoryTexture } from '/utils/budget-category-colors.js';
 import { api } from '/api.js';
-import { t, formatDate, getLocale } from '/i18n.js';
-import { dateRangeText } from '/utils/date-format.js';
+import { t, getLocale } from '/i18n.js';
+import { dateRangeText, dateText } from '/utils/date-format.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
@@ -821,7 +821,7 @@ function periodLabel(period) {
     const [y, m] = period.split('-').map(Number);
     return new Intl.DateTimeFormat(getLocale(), { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1));
   }
-  return formatDate(period);
+  return dateText(period);
 }
 
 // Ableselinie + Roving-Tabindex über den Datenpunkten. Ein Tabstopp für die

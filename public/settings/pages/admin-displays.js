@@ -12,7 +12,8 @@
  */
 
 import { api, auth } from '/api.js';
-import { formatDate, formatTime, getLocale, t } from '/i18n.js';
+import { getLocale, t } from '/i18n.js';
+import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
@@ -22,7 +23,7 @@ function formatSeen(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return `${formatDate(date)} ${formatTime(date)}`.trim();
+  return dateTimeText(date);
 }
 
 function showError(element, message) {

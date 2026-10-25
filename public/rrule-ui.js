@@ -4,7 +4,8 @@
  * Abhängigkeiten: /i18n.js
  */
 
-import { t, formatDate, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { hasExplicitZone, isValidTimeZone, wallTimeValue } from '/utils/timezone.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 
@@ -255,11 +256,11 @@ export function monthEndHintText(startDate, { expandsFromStart = false, rule = n
   }
 
   if (dateKey === firstDate) {
-    return t('rrule.lastDayOfMonthHintSame', { date: formatDate(dateKey) });
+    return t('rrule.lastDayOfMonthHintSame', { date: dateText(dateKey) });
   }
   return t('rrule.lastDayOfMonthHintOverride', {
-    startDate: formatDate(dateKey),
-    firstDate: formatDate(firstDate),
+    startDate: dateText(dateKey),
+    firstDate: dateText(firstDate),
   });
 }
 
@@ -490,7 +491,7 @@ export function describeRRule(rule, opts = {}) {
   let rhythm = parts.join(' ');
   if (opts.fromCompletion) rhythm += ` · ${t('rrule.summaryFromCompletion')}`;
   if (p.count) return `${rhythm} · ${t('rrule.summaryCount', { count: p.count })}`;
-  if (p.until) return `${rhythm} · ${t('rrule.summaryUntil', { date: formatDate(p.until) })}`;
+  if (p.until) return `${rhythm} · ${t('rrule.summaryUntil', { date: dateText(p.until) })}`;
   return rhythm;
 }
 

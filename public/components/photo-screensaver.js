@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { formatDate, formatTime } from '/i18n.js';
+import { formatTime } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import {
   isScreensaverClockOn,
   isScreensaverCoverOn,
@@ -70,7 +71,7 @@ function caption(photo) {
   if (!photo.takenAt) return place;
   const date = new Date(photo.takenAt);
   // Follows the date-format preference like every other date in the app.
-  const formatted = Number.isNaN(date.getTime()) ? '' : formatDate(date);
+  const formatted = Number.isNaN(date.getTime()) ? '' : dateText(date);
   return [formatted, place].filter(Boolean).join(' · ');
 }
 

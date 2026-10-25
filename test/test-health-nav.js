@@ -939,7 +939,7 @@ test('R22 D12: das Erfassen-Formular steht in EINEM Traeger, der Tag-Titel brich
   assert.equal(groups.length, 1, 'Art, Werte, Zeitpunkt und Sichtbarkeit in einem Traeger - durchgehende Haarlinien');
   assert.match(fn, /formRowsHtml\(\[\s*formRowHtml\(\{\s*label: t\('health\.vitals\.field\.type'\)[\s\S]*?`<div class="form-rows" id="vital-value-fields">/,
     'die Werte stehen als Glied in der Gruppe');
-  assert.match(HEALTH_JS, /title: `\$\{t\('health\.cycle\.dayLog\.title'\)\}\\u00A0· \$\{formatDate\(key\)\}`/, 'geschuetztes Leerzeichen vor dem Trenner');
+  assert.match(HEALTH_JS, /title: `\$\{t\('health\.cycle\.dayLog\.title'\)\}\\u00A0· \$\{dateText\(key\)\}`/, 'geschuetztes Leerzeichen vor dem Trenner');
 });
 
 // Sammel-Ticket R22-F, F4.5: der Einnehmen-Knopf trug seine Tablette am Desktop

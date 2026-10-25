@@ -47,7 +47,8 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { isPreviewable } from '/utils/document-preview.js';
@@ -568,7 +569,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
 
 /** Zweitzeile eines Picker-Eintrags: Ordner und Datum, soweit vorhanden. */
 function pickerMeta(doc) {
-  return [doc.folder_name, doc.created_at ? formatDate(doc.created_at) : '']
+  return [doc.folder_name, doc.created_at ? dateText(doc.created_at) : '']
     .filter(Boolean)
     .join(' · ');
 }

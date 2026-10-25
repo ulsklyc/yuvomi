@@ -1,10 +1,10 @@
 import { api, auth } from '/api.js';
 import {
-  formatDate,
   isDateInputValid,
   parseDateInput,
   t,
 } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
@@ -696,7 +696,7 @@ function inviteHtml(invite) {
       <div class="settings-member__info">
         <span class="settings-member__name">${esc(primary)}</span>
         ${meta ? `<span class="settings-member__meta">${meta}</span>` : ''}
-        <span class="settings-member__meta">${esc(t('settings.invites.expires', { date: formatDate(invite.expires_at) }))}</span>
+        <span class="settings-member__meta">${esc(t('settings.invites.expires', { date: dateText(invite.expires_at) }))}</span>
       </div>
       ${rowMenuHtml({
     // D10 (#2152): auch das Widerrufen ist destruktiv und steht im Mehr-Knopf.

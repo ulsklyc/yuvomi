@@ -12,7 +12,7 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
 import { dateText, dateRangeText, dateWithDistanceText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
@@ -276,7 +276,7 @@ function occurrenceRowHtml(occurrence) {
   // sehen"). Dieselbe Bedingung traegt deshalb jetzt beides: Knopf und Menue.
   // Der Name des Menueknopfs nennt Art UND Tag: dieselbe Abfallart steht in
   // der aufgeklappten Liste mehrfach.
-  const occurrenceName = `${occurrence.type_name ?? ''}, ${formatDate(occurrence.date_key)}`;
+  const occurrenceName = `${occurrence.type_name ?? ''}, ${dateText(occurrence.date_key)}`;
   const actions = (readOnly() || !menuItems) ? '' : `
       <div class="row-actions">
         <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: occurrenceName }))}">

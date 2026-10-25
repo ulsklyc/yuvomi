@@ -415,9 +415,9 @@ export function chartTimePositions(dateKeys, geo = CHART) {
  * Zeitachse steht sie genau dort, wo sie hingehoert.
  * @param {string} fromKey
  * @param {string} toKey
- * @param {(dateKey: string) => string} formatDate
+ * @param {(dateKey: string) => string} labelOf
  */
-export function chartTimeLabelsMarkup(fromKey, toKey, formatDate, geo = CHART) {
+export function chartTimeLabelsMarkup(fromKey, toKey, labelOf, geo = CHART) {
   const { H } = geo;
   const y = H - 7;
   const a = dayNumber(fromKey);
@@ -431,6 +431,6 @@ export function chartTimeLabelsMarkup(fromKey, toKey, formatDate, geo = CHART) {
   return keys.map((key, idx) => {
     const anchor = idx === 0 ? 'start' : idx === keys.length - 1 ? 'end' : 'middle';
     const px = chartTimeX(key, fromKey, toKey, geo);
-    return `<text x="${px.toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(key))}</text>`;
+    return `<text x="${px.toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(labelOf(key))}</text>`;
   }).join('');
 }

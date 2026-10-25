@@ -1,5 +1,6 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, t } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateTimeText } from '/utils/date-format.js';
 import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
 import {
@@ -215,7 +216,7 @@ async function loadBackupSchedulerStatus(container) {
 
     let lastBackupText = t('settings.backupSchedulerNever');
     if (lastBackup?.timestamp) {
-      const date = `${formatDate(lastBackup.timestamp)} ${formatTime(lastBackup.timestamp)}`;
+      const date = dateTimeText(lastBackup.timestamp);
       lastBackupText = lastBackup.success
         ? t('settings.backupSchedulerLastSuccess', { date })
         : t('settings.backupSchedulerLastFail', { date });
@@ -276,7 +277,7 @@ function renderWebdavStatus(grid, container, d) {
   if (!d.configured) { grid.replaceChildren(); return; }
 
   const lastUploadValue = d.lastUpload
-    ? `${formatDate(d.lastUpload)} ${formatTime(d.lastUpload)}`
+    ? dateTimeText(d.lastUpload)
     : t('settings.backupWebdavNeverUploaded');
 
   const rows = [

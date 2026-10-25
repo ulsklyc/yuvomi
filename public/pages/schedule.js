@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
+import { t, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { shiftTimeText, clockText, dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -1549,9 +1549,9 @@ function renderStatistics() {
       // LEER IST EIN ZUSTAND, KEINE ZWEI LEEREN KARTEN (R19): ohne einen
       // Eintrag im Zeitraum standen "0 Schichten", "0 h" und zwei Karten mit
       // "Keine Daten". Jetzt EIN Leerzustand, der Zeitraum und Person nennt.
-      ? '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
+      ? '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: dateText(bounds.from), to: dateText(bounds.to) })) + '</p>'
         + emptyStateHTML({ icon: 'chart-column', title: t('schedule.noStatistics') })
-      : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
+      : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: dateText(bounds.from), to: dateText(bounds.to) })) + '</p>'
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(summary.freeDays ? t('schedule.shifts') + ' · ' + t('schedule.freeDaysCount', { count: summary.freeDays }) : t('schedule.shifts')) + '</div></article>'
       // Re-Critique 2026-09-28 (A2 P2-4): die Kachel zeigt die SUMME und heisst
@@ -2030,7 +2030,7 @@ function renderOverview() {
       .map((h) => `<div class="schedule-overview__holiday" style="--holi-color:${esc(h.color)}" title="${esc(h.name)}"><span>${esc(h.name)}</span></div>`).join('');
     // Der Tageskopf fuehrt in den Tag, wie im Kalender - nur in der Woche.
     const attrs = overview.viewMode === 'week'
-      ? { role: 'button', tabindex: '0', 'data-action': 'overview-open-day', 'data-date': dateKey, 'aria-label': t('calendar.monthOpenDay', { date: formatDate(dateKey) }) }
+      ? { role: 'button', tabindex: '0', 'data-action': 'overview-open-day', 'data-date': dateKey, 'aria-label': t('calendar.monthOpenDay', { date: dateText(dateKey) }) }
       : { 'data-date': dateKey };
     const laneCells = lanes.map((lane) => `<div class="schedule-overview__lane-cell" data-user="${lane.userId}">${showLaneHeads ? overviewLaneHeader(lane.userId, surname) : ''}${lane.entries.filter((entry) => !overviewIsTimed(entry)).map(overviewEntryBlock).join('')}</div>`).join('');
     return `<div class="schedule-overview__day-head">${timeGridDayHeadHtml({
@@ -2238,7 +2238,7 @@ function openOverviewPeople() {
 
 function renderScheduleWarnings() {
   if (!state.warnings.length) return '';
-  return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: formatDate(warning.date_key), user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
+  return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: dateText(warning.date_key), user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
 }
 
 // Ein Reiterwechsel ist eine Navigation: Adresse UND Verlaufseintrag. Bis R17
@@ -2930,7 +2930,7 @@ async function saveCreatedSchedule(event) {
           // Ende von saveCreatedSchedule() schliesst stattdessen.
           const confirmed = await confirmOverModal(
             t('schedule.fillRangeConfirmTitle'),
-            { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }), closeOnConfirm: false },
+            { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: dateText(data.range_from), to: dateText(data.range_to), type: typeLabel }), closeOnConfirm: false },
           );
           if (!confirmed) return;
           await api.post('/schedule/overrides/fill', { user_id: userId, from: data.range_from, to: data.range_to, shift_type_id: shiftTypeId, note: data.note, field_values: fieldValues });
@@ -2964,7 +2964,7 @@ async function saveCreatedSchedule(event) {
       // noch vorfinden, nicht ein bereits geschlossenes Modal.
       const confirmed = await confirmOverModal(
         t('schedule.fillRangeConfirmTitle'),
-        { confirmLabel: t('schedule.save'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.from), to: formatDate(data.to), type: typeLabel }), closeOnConfirm: false },
+        { confirmLabel: t('schedule.save'), detail: t('schedule.fillRangeConfirmDetail', { from: dateText(data.from), to: dateText(data.to), type: typeLabel }), closeOnConfirm: false },
       );
       if (!confirmed) return;
       await api.post('/schedule/overrides/fill', { user_id: userId, from: data.from, to: data.to, shift_type_id: shiftTypeId, note: data.note, field_values: fieldValues });
@@ -3640,7 +3640,7 @@ async function action(event) {
       const { from, to, userId } = button.dataset;
       const confirmed = await confirmModal(
         t('schedule.deleteOverrideRangeTitle'),
-        { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: formatDate(from), to: formatDate(to), user: userName(userId) }) },
+        { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: dateText(from), to: dateText(to), user: userName(userId) }) },
       );
       if (!confirmed) return;
       gefragt = true;
@@ -3666,7 +3666,7 @@ async function action(event) {
       const { from, to, userId } = button.dataset;
       const confirmed = await confirmModal(
         t('schedule.deleteOverrideRangeTitle'),
-        { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: formatDate(from), to: formatDate(to), user: userName(userId) }) },
+        { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: dateText(from), to: dateText(to), user: userName(userId) }) },
       );
       if (!confirmed) return;
       gefragt = true;

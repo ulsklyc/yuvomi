@@ -17,7 +17,8 @@
  * sind der übliche Suchbegriff. Eine sprachunabhängige Indizierung wäre für den
  * Nutzen unverhältnismäßig.
  */
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 
 /**
  * Übersetzt Titel/Beschreibung eines Geburtstags-Termins in die aktive Sprache.
@@ -39,7 +40,7 @@ export function localizeBirthdayEvent(ev) {
     ...ev,
     title: t('birthdays.calendarEventTitle', { name }),
     description: ev.birthday_date
-      ? t('birthdays.calendarEventDescription', { name, date: formatDate(ev.birthday_date) })
+      ? t('birthdays.calendarEventDescription', { name, date: dateText(ev.birthday_date, { year: true }) })
       : t('birthdays.calendarEventDescriptionNoDate', { name }),
   };
 }
