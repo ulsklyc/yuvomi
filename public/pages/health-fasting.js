@@ -92,6 +92,9 @@ async function onPersonPick(view, el, event) {
   view.subjectFromSession = false;
   writeHealthPerson(view.self, id);
   view.state = null; view.stats = undefined; view.statsError = false; view.generation++; view.stop?.(); view.stop = null;
+  // Der FAB startet nur mein Fasten: solange die neue Person laedt, bietet er
+  // nichts an (renderBody meldet danach, was gilt).
+  view.onIntent?.({ canStart: false, start: null });
   const body = view.root.querySelector('[data-fasting-body]');
   body.replaceChildren();
   body.insertAdjacentHTML('beforeend', `<p role="status">${esc(t('common.loading'))}</p>`);
@@ -206,6 +209,10 @@ async function refresh(view, { refreshStats = false } = {}) {
       try { view.members = (await api.get('/family/members')).data || []; } catch { /* retry remains available */ }
       if (!current()) return;
     }
+    // Kein Start ueber den FAB ohne gezeichnete Ansicht: er hielte sonst den
+    // Start der vorigen (eigenen) Ansicht, waehrend ein fremdes, verweigertes
+    // Fasten mit Ladefehler dasteht.
+    view.onIntent?.({ canStart: false, start: null });
     shell(view);
     const error = view.root.querySelector('[data-fasting-load-error]');
     error.replaceChildren();
