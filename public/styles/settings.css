@@ -2100,6 +2100,42 @@
   color: var(--color-text-primary);
 }
 
+/* Einrichtung eines Anbieters, solange Zugangsdaten fehlen (#2221). Die
+   Schritte haben eine Reihenfolge, deshalb Ziffern - dieselbe Liste wie die
+   Zwei-Faktor-Einrichtung (.settings-2fa__steps). */
+.settings-provider__steps {
+  list-style: decimal;
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.settings-provider__steps li + li {
+  margin-top: var(--space-2);
+}
+
+.settings-provider__steps code,
+.settings-provider-note code {
+  overflow-wrap: anywhere;
+}
+
+/* Die Rueckrufadresse: Feld und Kopieren in einer Zeile, auf dem Handy
+   untereinander, damit die lange Adresse nicht abgeschnitten wird. */
+.settings-provider__copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.settings-provider__copy-row .form-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-legacy-badge {
   background: var(--color-warning-light);
   color: var(--color-warning-ink);

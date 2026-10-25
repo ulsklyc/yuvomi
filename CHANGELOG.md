@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no CalDAV server itself) and how Home Assistant fits in (ICS feeds, webhooks and the REST API with
   per-module tokens, no official integration). Each answer is held against the code by the landing
   page tests.
+- **Google Calendar explains its own setup instead of stopping at "Not configured"** (#2221). An admin
+  whose server has no Google credentials yet used to see only "Not configured (missing .env
+  variables)", twice. The Google card now names the variables that are still missing, shows the
+  redirect URI to register at Google with a copy button and warns when Google would refuse it (an IP
+  address or plain HTTP), lists the four steps, links the full guide and offers the ways that need
+  no Google setup at all: subscribe to the calendar's secret iCal address or import it once as an
+  .ics file. The status route reports only the names of missing variables, never their values, and
+  not to API tokens or the wall display.
 - **Yuvomi has a Portainer app template.** `deploy/portainer/portainer-template.json` deploys the
   existing Portainer stack (`docs/docker-compose.portainer.yml`) and asks only for the session
   secret, the database encryption key, the host port and the base URL. It is meant for the

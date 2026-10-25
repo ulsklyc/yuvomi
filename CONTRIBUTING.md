@@ -509,7 +509,9 @@ That is worth stating plainly rather than leaving to inference. An automated rev
 
 ### What a human guarantees
 
-**Nothing reaches `main` without a human deciding that it should.** Every merge in this repository is performed by the maintainer, including automated dependency updates and contributions from others. There is no path by which an agent merges its own work.
+**Nothing reaches `main` without a human deciding that it should.** Contributions from others and automated dependency updates are merged by the maintainer, by hand.
+
+**For the maintainer's own work, that decision comes earlier.** The maintainer decides what gets built and hands it to an agent; an agent does not merge work nobody asked for. Once that pull request is open, the agent may turn on GitHub's auto-merge, which merges only after the required test runs have passed, and it turns it on only after the automated review has come back without an open finding. Three kinds of change never go in that way and wait for the maintainer to merge them: database migrations, changes that touch something sensitive (see below), and changes with a design question still open. GitHub enforces the test runs; the rest is a rule the agents follow under the maintainer's account, not a technical barrier. Every auto-merge shows up as such in the pull request's history, so the rule can be checked against it.
 
 Beyond that decision, three things are mechanical and hold for every change regardless of who or what wrote it:
 
@@ -517,7 +519,7 @@ Beyond that decision, three things are mechanical and hold for every change rega
 - The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - a framework import or an `innerHTML` call fails the build.
 - Behaviour that is claimed to be fixed carries a test that fails against the state before the fix. A guard that was never seen red is not evidence.
 
-**On "a human has read and understood every merged line":** for a one-person project shipping several releases a week, that sentence would be a promise nobody could keep, and a promise that cannot be kept is worse than none - it invites exactly the trust it does not earn. What is true instead: the maintainer reviews every change before merging it, decides whether it goes in, and is answerable for it either way. Where a change touches something sensitive - authentication, permissions, storage, anything reaching the network - that review goes line by line.
+**On "a human has read and understood every merged line":** for a one-person project shipping several releases a week, that sentence would be a promise nobody could keep, and a promise that cannot be kept is worse than none - it invites exactly the trust it does not earn. What is true instead: the maintainer decides what gets built and whether it goes in, and is answerable for it either way. Where a change touches something sensitive - authentication, permissions, storage, anything reaching the network - the maintainer reads it line by line and merges it by hand.
 
 ### If you contribute
 

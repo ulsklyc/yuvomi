@@ -852,7 +852,12 @@ function buildGoogleProvider(googleStatus, user) {
     : null;
 
   if (!googleStatus?.configured) {
-    section.appendChild(buildProviderHint(t('settings.notConfigured')));
+    // Fuer den Admin eine Anleitung statt der Sackgasse (#2221); die
+    // Statuszeile oben sagt "Nicht konfiguriert" schon, ein zweites Mal
+    // derselbe Satz half niemandem weiter.
+    section.appendChild(user?.role === 'admin'
+      ? buildGoogleSetupGuide(googleStatus)
+      : buildProviderHint(t('settings.notConfigured')));
     if (cleanup) section.appendChild(cleanup);
     return section;
   }
@@ -1048,6 +1053,157 @@ function buildMirroredCleanup({ count, endpoint }) {
   group.appendChild(actions);
 
   return group;
+}
+
+const GOOGLE_SETUP_GUIDE_URL = 'https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#google-calendar-sync-optional';
+const GOOGLE_CALLBACK_PATH = '/api/v1/calendar/google/callback';
+const CALENDAR_SUBSCRIPTIONS_HREF = '/settings/modules/calendar?section=personal-calendar-subscriptions';
+const GOOGLE_ENV_KEYS = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'];
+
+/**
+ * Nimmt Google diese Rueckrufadresse an? Google verlangt HTTPS und einen
+ * Hostnamen, `localhost` ist ausgenommen (docs/installation.md, "Setting it up
+ * at Google"). Eine IP-Adresse oder http faellt dort erst nach dem Eintragen
+ * auf - hier soll es vorher auffallen.
+ */
+function googleAcceptsRedirect(uri) {
+  let url;
+  try { url = new URL(uri); } catch { return false; }
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  if (host === 'localhost') return true;
+  const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');
+  return url.protocol === 'https:' && !isIp;
+}
+
+/**
+ * Kopiert den Wert eines Feldes und sagt, ob es wirklich geklappt hat. Ueber
+ * http im Heimnetz - genau dort, wo die Einrichtung meist passiert - gibt es
+ * `navigator.clipboard` nicht; dann bleibt der Auswahl-Weg, und das Feld steht
+ * markiert, falls auch der scheitert. Dasselbe Muster wie `copyInviteLink`
+ * (admin-family.js).
+ */
+async function copyFieldValue(input) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(input.value);
+      return true;
+    } catch { /* auf den Auswahl-Weg zurueckfallen */ }
+  }
+  try {
+    input.focus();
+    input.select();
+    return document.execCommand('copy') === true;
+  } catch {
+    return false;
+  }
+}
+
+function iconNote(icon, ...content) {
+  const note = document.createElement('p');
+  note.className = 'settings-provider-note settings-provider-note--hint';
+  const glyph = document.createElement('i');
+  glyph.dataset.lucide = icon;
+  glyph.setAttribute('aria-hidden', 'true');
+  const text = document.createElement('span');
+  text.append(...content);
+  note.append(glyph, text);
+  return note;
+}
+
+function envName(name) {
+  const code = document.createElement('code');
+  code.textContent = name;
+  return code;
+}
+
+/**
+ * Die Google-Karte, solange die OAuth-Zugangsdaten fehlen (#2221): was fehlt,
+ * welche Rueckrufadresse bei Google hingehoert, die vier Schritte, und daneben
+ * die Wege ganz ohne Google-Einrichtung. Nur Namen von Variablen, nie Werte.
+ */
+function buildGoogleSetupGuide(googleStatus) {
+  const guide = document.createElement('div');
+  guide.className = 'settings-provider__setup';
+
+  const missing = Array.isArray(googleStatus?.missingEnv) && googleStatus.missingEnv.length
+    ? googleStatus.missingEnv
+    : GOOGLE_ENV_KEYS;
+  const names = [];
+  missing.forEach((name, i) => {
+    if (i) names.push(', ');
+    names.push(envName(name));
+  });
+  guide.appendChild(iconNote('key-round', `${t('settings.googleSetupMissing')} `, ...names));
+
+  const steps = document.createElement('ol');
+  steps.className = 'settings-provider__steps';
+  const step = (...content) => {
+    const li = document.createElement('li');
+    li.append(...content);
+    steps.appendChild(li);
+    return li;
+  };
+  step(t('settings.googleSetupStepApi'));
+  step(t('settings.googleSetupStepConsent'));
+
+  const redirectUri = googleStatus?.redirectUri || `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
+  const uriId = 'google-setup-redirect-uri';
+  const uriStep = step(t('settings.googleSetupStepClient'));
+  const uriRow = document.createElement('div');
+  uriRow.className = 'settings-provider__copy-row';
+  const uriInput = document.createElement('input');
+  uriInput.id = uriId;
+  uriInput.className = 'form-input';
+  uriInput.type = 'text';
+  uriInput.readOnly = true;
+  uriInput.value = redirectUri;
+  uriInput.setAttribute('aria-label', t('settings.googleSetupRedirectLabel'));
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn--secondary';
+  copy.textContent = t('settings.googleSetupCopy');
+  copy.addEventListener('click', async () => {
+    const copied = await copyFieldValue(uriInput);
+    showToast(t(copied ? 'settings.googleSetupCopied' : 'settings.googleSetupCopyFailed'), copied ? 'success' : 'danger');
+  });
+  uriRow.append(uriInput, copy);
+  uriStep.appendChild(uriRow);
+  if (!googleAcceptsRedirect(redirectUri)) {
+    const warn = document.createElement('p');
+    warn.className = 'form-hint';
+    warn.textContent = t('settings.googleSetupRedirectHttps');
+    uriStep.appendChild(warn);
+  }
+
+  step(t('settings.googleSetupStepEnv'), ' ', envName('GOOGLE_CLIENT_ID'), ', ', envName('GOOGLE_CLIENT_SECRET'), ', ', envName('GOOGLE_REDIRECT_URI'));
+  guide.appendChild(steps);
+
+  const more = document.createElement('p');
+  more.className = 'settings-provider-note';
+  const link = document.createElement('a');
+  link.href = GOOGLE_SETUP_GUIDE_URL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = t('settings.googleSetupGuideLink');
+  more.appendChild(link);
+  guide.appendChild(more);
+
+  guide.appendChild(iconNote('calendar-plus', t('settings.googleSetupWithout')));
+  const actions = document.createElement('div');
+  actions.className = 'settings-sync-actions';
+  const alt = document.createElement('a');
+  alt.className = 'btn btn--secondary';
+  alt.href = CALENDAR_SUBSCRIPTIONS_HREF;
+  alt.textContent = t('settings.googleSetupWithoutAction');
+  alt.addEventListener('click', (event) => {
+    if (!window.yuvomi?.navigate) return;
+    event.preventDefault();
+    window.yuvomi.navigate(CALENDAR_SUBSCRIPTIONS_HREF);
+  });
+  actions.appendChild(alt);
+  guide.appendChild(actions);
+
+  return guide;
 }
 
 function buildProviderHint(text) {
@@ -1742,4 +1898,4 @@ export async function render(container, { user, query } = {}) {
 }
 
 // Für die Suite: die Google-Karte für sich, ohne die ganze Seite (#2019).
-export const __test = { buildGoogleProvider, bindCalDAVAddButton };
+export const __test = { buildGoogleProvider, bindCalDAVAddButton, googleAcceptsRedirect, copyFieldValue };

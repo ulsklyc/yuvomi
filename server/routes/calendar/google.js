@@ -110,7 +110,7 @@ router.post('/google/sync', requireAdmin, async (req, res) => {
 
 /**
  * GET /api/v1/calendar/google/status
- * Response: { configured, connected, lastSync }
+ * Response: { configured, connected, lastSync, missingEnv, redirectUri, ... }
  */
 router.get('/google/status', (req, res) => {
   try {
@@ -120,7 +120,9 @@ router.get('/google/status', (req, res) => {
     // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
     // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
     // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
-    const { lastError, lastErrorAt, ...rest } = status;
+    // Fehlende Variablen und Rueckrufadresse sind Einrichtung des Haushalts
+    // (#2221) und gehen denselben Weg wie der Fehlertext.
+    const { lastError, lastErrorAt, missingEnv, redirectUri, ...rest } = status;
     res.json(integrationDetailsVisible(req) ? status : rest);
   } catch (err) {
     log.error('', err);
