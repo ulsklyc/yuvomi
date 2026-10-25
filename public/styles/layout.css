@@ -3795,6 +3795,15 @@ html.fab-steady .page-fab {
     outline-offset: var(--focus-ring-offset-inset);
   }
 
+  /* NICHTS ZU WAEHLEN, KEINE AUFFORDERUNG (R23 S11, Critique G2 P3 "Verlauf
+   * leer: Waehle eine Aufgabe"). Zeigt die Liste ihren Leerzustand (nichts
+   * erledigt, keine Treffer, leeres Modul), bat die Spalte daneben trotzdem
+   * "Waehle eine Aufgabe" - eine Bitte ohne Gegenstand. Dann tritt die Karte
+   * ab und haelt nur ihren Platz; steht doch ein Eintrag darin, bleibt sie. */
+  .split-view:has(> .split-view__list .empty-state) > .split-view__detail:has(> .split-view__empty:not([hidden])) {
+    visibility: hidden;
+  }
+
   /* Die ausgewaehlte Zeile - „das steht rechts". Nur in der Spaltenform;
    * darunter gibt es keine Auswahl, nur ein Oeffnen.
    *

@@ -315,3 +315,13 @@ test('R22: eine Spalte zeigt hoechstens KANBAN_COL_CAP Karten, darunter "N weite
   assert.equal((ganz.match(/class="kanban-card /g) ?? []).length, cap + 13, 'nach dem Tipp steht die ganze Spalte');
   assert.doesNotMatch(ganz, /kanban-col__more/);
 });
+
+// R23 S11 (Critique G2 P3 "Kanban ⏵ mehrdeutig"): "In Bearbeitung setzen"
+// trug das Abspielzeichen eines Medienspielers. Der Knopf sagt einen STATUS
+// an wie seine Geschwister (Haken = erledigt, Pfeil zurueck = wieder offen).
+test('R23: der Weiterschalt-Knopf der Karte traegt kein Abspielzeichen', async () => {
+  const src = await readFile(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
+  const line = src.split('\n').find((l) => /next === 'in_progress' \? '/.test(l)) ?? '';
+  assert.match(line, /next === 'in_progress' \? 'circle-dot-dashed'/, line);
+  assert.doesNotMatch(src, /'circle-play'/);
+});

@@ -736,3 +736,34 @@ test('Suchplatzhalter: ein Muster, kein Auslassungszeichen am Ende (R23)', () =>
     assert.match(de.get(key), / durchsuchen$/, `de: ${key} = ${de.get(key)}`);
   }
 });
+
+// R23 S11 (Critique G2 P3 "Ansicht dreifach"): die Ansichtswahl der Aufgaben
+// heisst "Ansicht", und ihre Eintraege hiessen "Listenansicht" und
+// "Kanban-Ansicht" - dreimal dasselbe Wort in einer Leiste. Die Eintraege
+// nennen nur noch, WAS angezeigt wird.
+test('die Ansichten der Aufgaben wiederholen den Namen der Ansichtswahl nicht', () => {
+  const hits = [];
+  for (const locale of LOCALES) {
+    const map = flatten(JSON.parse(readLocale(locale)));
+    const group = String(map.get('tasks.viewToggleLabel') ?? '').trim().toLowerCase();
+    if (!group) continue;
+    for (const key of ['tasks.listView', 'tasks.kanbanView']) {
+      const value = String(map.get(key) ?? '').toLowerCase();
+      if (value.includes(group)) hits.push(`${locale}: ${key} "${map.get(key)}" enthaelt "${group}"`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});
+
+// R23 S11 (Critique G3 P3 "Listenname-Dialog Doppelpunkt"): die Fragen der
+// Eingabedialoge stammten aus window.prompt() und endeten auf einen
+// Doppelpunkt. Im Dialog sind sie Ueberschrift und Feldname - ohne ihn.
+test('kein Eingabedialog fragt mit einem Doppelpunkt am Ende', () => {
+  const hits = [];
+  for (const locale of LOCALES) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      if (/Prompt$/.test(key) && /[:：]\s*$/.test(String(value))) hits.push(`${locale}: ${key} "${value}"`);
+    }
+  }
+  assert.deepEqual(hits, []);
+});

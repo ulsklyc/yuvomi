@@ -1366,3 +1366,19 @@ test('R22-F: unter splitMedia fragt der Baustein die Box nicht ab', () => {
   const agenda = cal.slice(cal.indexOf('function mountAgendaDetail('), cal.indexOf('function mountAgendaDetail(') + 1200);
   assert.match(agenda, /splitMedia: '\(min-width: 65rem\)'/, 'die Agenda nennt die Schwelle von module-surface (layout.css)');
 });
+
+// R23 S11 (Critique G2 P3): zeigt die Liste ihren Leerzustand, bat die Spalte
+// daneben trotzdem "Waehle eine Aufgabe". Dann tritt die leere Karte ab.
+test('R23: ohne etwas zu waehlen steht keine Aufforderung in der Spalte', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.replace(/\s+/g, ' ').trim()
+    === '.split-view:has(> .split-view__list .empty-state) > .split-view__detail:has(> .split-view__empty:not([hidden]))');
+  assert.ok(rule, 'die Regel fehlt');
+  assert.match(rule.body, /visibility:\s*hidden/, 'die Karte haelt ihren Platz, zeigt aber nichts');
+  assert.ok(rule.at.some((at) => /@container module-surface \(min-width: 65rem\)/.test(at)), 'nur in der Spaltenform');
+  // Die Klasse des Leerzustands der Spalte selbst darf die Regel nicht ausloesen:
+  // sie steht in der Detailspalte, nicht in der Liste.
+  const md = readFileSync(new URL('../public/utils/master-detail.js', import.meta.url), 'utf8');
+  assert.match(md, /<div class="split-view__empty" data-md-empty>/);
+});

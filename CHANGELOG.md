@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   D/M/YYYY. TWD, HKD and MOP can now be picked anywhere a currency is chosen.
 
 ### Changed
+- **Quieter lists and dialogs.** When a list shows "No results" or has nothing in it yet, the
+  empty detail column beside it no longer asks you to pick something. The Tasks view switch reads
+  "List · Kanban · History" instead of repeating "view", the button that moves a Kanban card to "In
+  progress" no longer looks like a play button, and naming dialogs (new list, new category, rename)
+  no longer end their question with a colon.
 - **Deleting a subtask can be undone instead of asking first, and far-off subscription payments
   read in months.** A deleted subtask disappears at once with "Undo" in the notice, like a task. A
   subscription due in more than a month now says "in 5 months" next to its date instead of "Due in

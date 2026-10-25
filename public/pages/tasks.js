@@ -3091,7 +3091,7 @@ function renderKanbanCard(task) {
   // die Aufgabe die ganze Zeit behalten hat.
   const next = archived ? task.status : kanbanNextStatus(task.status);
   const icon = archived ? 'archive-restore'
-    : next === 'done' ? 'check' : next === 'in_progress' ? 'circle-play' : 'rotate-ccw';
+    : next === 'done' ? 'check' : next === 'in_progress' ? 'circle-dot-dashed' : 'rotate-ccw';
   const nextLabel = archived
     ? t('tasks.unarchiveButton')
     : next === 'done'
