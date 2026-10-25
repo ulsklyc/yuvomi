@@ -43,15 +43,27 @@ const seedCompletedFast = (page) => call(page, 'post', '/health/fasting', {
 // eine "gewoehnliche Aktualisierung" ist ein neuer Zeitraum.
 let filterDay = 0;
 const changeFilter = (page) => fill(page, '[data-fasting-from]', `2020-01-${String(++filterDay).padStart(2, '0')}`);
+// "Fasten starten" ist seit R23 D14 der FAB der Gesundheit - nur ohne laufendes
+// Fasten und nur bei mir; `[data-fasting-action]` steht im Ring nur noch als
+// "Beenden". Einstellungen und Nachtragen stehen im "..." des Rings.
+const FAB = '#health-fab:not([hidden])';
+const fabShown = (page) => page.$eval('#health-fab', (el) => !el.hidden && getComputedStyle(el).display !== 'none');
 const openFastingSettings = async (page) => {
   if (await page.$('.modal-panel [data-fasting-preferences]')) return;
   // Abfrage und Klick in EINEM Schritt im Dokument: ein Neubau des Inhalts
   // (Filter, Rueckkehr) zwischen beiden liesse den Knoten sonst losgeloest.
+  // Erst das "..." oeffnen, dann den Eintrag waehlen - wie von Hand.
   await page.waitForFunction(() => {
-    const el = document.querySelector('[data-fasting-settings]');
-    if (!el) return false;
-    el.scrollIntoView({ block: 'center', behavior: 'instant' });
-    el.click();
+    const trigger = document.querySelector('[popovertarget="fasting-more-menu"]');
+    const menu = document.getElementById('fasting-more-menu');
+    const item = menu?.querySelector('[data-fasting-settings]');
+    if (!trigger || !item) return false;
+    if (!menu.matches(':popover-open')) {
+      trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+      trigger.click();
+      if (!menu.matches(':popover-open')) return false;
+    }
+    item.click();
     return true;
   });
   await page.waitForSelector('.modal-panel [data-fasting-preferences] [data-fasting-preset]');
@@ -73,7 +85,7 @@ test('history filters use the app date picker, apply on change and wait for a fi
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector(FAB);
     assert.equal(await page.$('[data-fasting-filters]'), null, 'ohne Fasten gibt es nichts zu filtern');
     assert.equal(await page.$$eval('[data-fasting-body] .empty-state', (els) => els.length), 1, 'EIN Leerzustand');
     await seedCompletedFast(page);
@@ -227,7 +239,7 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     await harness.reset();
     const page = await openPage(harness, { device: 'desktop', locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector(FAB);
     assert.ok(await page.$('[data-fasting-earlier]'), 'earlier start is available');
     await call(page, 'post', '/health/fasting/acknowledge-safety', {});
     await call(page, 'put', '/health/visibility-defaults', { defaults: { fasting: 'family' } });
@@ -268,10 +280,14 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     await page.waitForFunction(() => document.querySelector('[data-fasting-edit-start]'));
     active = (await call(page, 'get', '/health/fasting/state')).data.active;
     assert.equal(active.id, edited.id);
-    // Nachtragen sitzt seit R22 (D12) am Verlauf bzw. Leerzustand, nicht mehr im FAB.
-    assert.ok(await page.$('[data-fasting-backfill]'));
+    // Nachtragen sitzt seit R22 (D12) im Leerzustand und seit R23 (D14) im "..."
+    // des Rings, nicht im FAB. Hier der Leerzustand; der Weg ueber das "..."
+    // steht in der Probe zur Server-Uhr.
+    const emptyBackfill = '[data-fasting-body] .empty-state [data-fasting-backfill]';
+    assert.ok(await page.$(emptyBackfill));
+    assert.ok(await page.$('#fasting-more-menu [data-fasting-backfill]'));
     assert.equal(await page.$('[data-fasting-from]'), null, 'ohne abgeschlossenes Fasten kein Filter');
-    await page.click('[data-fasting-backfill]');
+    await page.click(emptyBackfill);
     await page.waitForSelector('#fast-start'); await settle(page);
     await fill(page, '#fast-start', '2025-01-01T06:00:00');
     await fill(page, '#fast-end', '2025-01-01T08:00:00');
@@ -297,7 +313,7 @@ test('completed-entry default uses server time while the phone clock stays ahead
       await harness.reset();
       const page = await openPage(harness, { locale: 'cs' });
       await gotoRoute(page, '/health/fasting');
-      await page.waitForSelector('[data-fasting-backfill]');
+      await page.waitForSelector('[popovertarget="fasting-more-menu"]');
       await call(page, 'post', '/health/fasting/acknowledge-safety', {});
       await page.evaluate((offset) => {
         const RealDate = Date;
@@ -307,7 +323,10 @@ test('completed-entry default uses server time while the phone clock stays ahead
           static now() { return RealDate.now() + offset; }
         };
       }, offsetMinutes * 60 * 1000);
-      await page.click('[data-fasting-backfill]');
+      // Nachtragen ueber das "..." des Rings (R23 D14).
+      await page.click('[popovertarget="fasting-more-menu"]');
+      await page.waitForSelector('#fasting-more-menu:popover-open [data-fasting-backfill]');
+      await page.click('#fasting-more-menu [data-fasting-backfill]');
       await page.waitForSelector('[data-fasting-edit-form]');
       await page.$eval('[data-fasting-edit-form]', (form) => form.requestSubmit());
       await settle(page);
@@ -384,7 +403,7 @@ test('delete expiry and failed pagehide flush settle pending identity; stale Und
     assert.equal((await deleted).status(), 204);
     assert.equal((await call(page, 'get', '/health/fasting/history')).data.length, 0, await page.$$eval('.toast', (els) => els.map((el) => el.textContent).join(' | ')));
     await settle(page);
-    await page.click('[data-fasting-action]'); await page.waitForSelector('[data-fasting-edit-start]');
+    await page.waitForSelector(FAB); await page.click(FAB); await page.waitForSelector('[data-fasting-edit-start]');
     await page.click('[data-fasting-action]'); await page.waitForSelector('[data-fasting-edit-form]');
     await page.evaluate(async () => {
       const { api } = await import('/api.js');
@@ -424,6 +443,7 @@ test('denied family views clear private data, retain filters, and discard late s
     await page.waitForSelector('[data-fasting-retry]');
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-action]'), null);
+    assert.equal(await fabShown(page), false, 'ein verweigertes fremdes Fasten bietet keinen Start an');
     assert.equal(await page.$('a[download]'), null);
     assert.ok(await page.$('[data-fasting-filters]'));
     assert.equal(await page.$eval('[data-fasting-body]', (el) => el.textContent.includes('SELF PRIVATE')), false);
@@ -436,7 +456,7 @@ test('denied family views clear private data, retain filters, and discard late s
     await page.evaluate(() => { window.fastingReleaseA(); window.fastingRestoreGet(); });
     await settle(page);
     assert.equal(await currentPerson(page), self);
-    assert.ok(await page.$('[data-fasting-action]'));
+    assert.equal(await fabShown(page), true, 'zurueck bei mir: der FAB startet wieder');
     await page.evaluate(async () => {
       const { setPermissions } = await import('/permissions.js');
       const { mountFasting } = await import('/pages/health-fasting.js');
@@ -444,6 +464,7 @@ test('denied family views clear private data, retain filters, and discard late s
       await mountFasting(document.querySelector('[data-fasting-root]'));
     });
     assert.equal(await page.$('[data-fasting-action]'), null);
+    assert.equal(await fabShown(page), false, 'nur lesen: kein Start ueber den FAB');
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-preferences]'), null);
   } finally { await harness.close(); }
@@ -454,7 +475,7 @@ test('family reading renders API-redacted state and remains read-only even with 
   try {
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
-    await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[data-fasting-action]');
+    await gotoRoute(page, '/health/fasting'); await page.waitForSelector(FAB);
     const self = Number(await currentPerson(page));
     const members = (await call(page, 'get', '/auth/users')).data;
     const member = members.find((entry) => entry.id !== self);
@@ -475,6 +496,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.canWrite, true);
     assert.equal(await page.$('[data-fasting-action]'), null);
+    assert.equal(await fabShown(page), false, 'fremdes Fasten: kein Start ueber den FAB, auch mit Betreuung');
     assert.equal(await page.$('[data-fast-edit]'), null);
     assert.equal(await page.$('[data-fasting-preferences]'), null);
     await call(page, 'put', `/health/caregivers/${member.id}`, { caregiver_ids: [] });
@@ -490,7 +512,7 @@ test('family reading renders API-redacted state and remains read-only even with 
     await page.waitForFunction(() => document.querySelector('[data-fasting-history]')?.textContent.includes('FAMILY SHARED'));
     assert.equal((await call(page, 'get', `/health/fasting/state?user_id=${member.id}`)).data.settings, null);
     assert.match(await page.$eval('a[download]', (el) => el.href), new RegExp(`user_id=${member.id}`));
-    await choosePerson(page, self); await page.waitForSelector('[data-fasting-action]');
+    await choosePerson(page, self); await page.waitForSelector(FAB);
   } finally { await harness.close(); }
 });
 
@@ -501,7 +523,7 @@ test('a failed own-person write cannot update a switched or detached subject pan
     const page = await openPage(harness, { locale: 'cs' }), errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await call(page, 'post', '/health/fasting/acknowledge-safety', {});
-    await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[data-fasting-action]');
+    await gotoRoute(page, '/health/fasting'); await page.waitForSelector(FAB);
     await page.evaluate(async () => {
       const { api } = await import('/api.js'); const post = api.post;
       api.post = async (path, ...args) => {
@@ -510,7 +532,7 @@ test('a failed own-person write cannot update a switched or detached subject pan
         api.post = post; throw new Error('Unavailable');
       };
     });
-    await page.click('[data-fasting-action]');
+    await page.click(FAB);
     await page.waitForFunction(() => typeof window.fastingRejectWrite === 'function');
     await page.evaluate(() => {
       const root = document.querySelector('[data-fasting-root]');
@@ -560,7 +582,7 @@ test('family selector, offline resume and undo deletion survive route remount', 
     await harness.reset();
     const page = await openPage(harness, { device: 'mobile', theme: 'dark', locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector(FAB);
     assert.ok(await page.$(PERSON), 'family selector remains available');
     await call(page, 'post', '/health/fasting', { start_at: '2025-01-01T00:00Z', end_at: '2025-01-01T01:00Z', start_tzid: 'UTC', acknowledge_safety: true });
     await gotoRoute(page, '/health/fasting');
@@ -568,15 +590,19 @@ test('family selector, offline resume and undo deletion survive route remount', 
     await page.click('[data-fast-delete]');
     await page.evaluate(async () => {
       const { mountFasting } = await import('/pages/health-fasting.js');
+      const { setPageFabAction } = await import('/utils/fab.js');
       const old = document.querySelector('[data-fasting-root]');
       const root = document.createElement('div'); root.dataset.fastingRoot = '';
-      old.replaceWith(root); await mountFasting(root);
+      // Der Neuaufbau von Hand umgeht maybeMountFasting (health.js) - die
+      // Probe haengt den FAB deshalb so an, wie die Gesundheit es tut.
+      const onIntent = (intent) => setPageFabAction(document.getElementById('health-fab'), { hidden: !intent.canStart, label: 'start', onClick: () => void intent.start?.() });
+      old.replaceWith(root); await mountFasting(root, { onIntent });
     });
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector('[data-fasting-earlier]');
     assert.equal(await page.$('[data-fast-delete]'), null, 'pending delete stays hidden after remount');
     await page.click('.toast__undo');
     await page.waitForSelector('[data-fast-delete]');
-    await page.click('[data-fasting-action]');
+    await page.waitForSelector(FAB); await page.click(FAB);
     await page.waitForSelector('[data-fasting-edit-start]');
     await page.click('[data-fasting-clock-mode="elapsed"]');
     const before = await page.$eval('[data-fasting-timer]', (el) => el.textContent);

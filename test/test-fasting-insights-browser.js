@@ -23,7 +23,8 @@ test('weekly chart distinguishes absent records and captured goals', async () =>
     await harness.reset();
     const page = await openPage(harness, { locale: 'cs' });
     await gotoRoute(page, '/health/fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    // Ohne laufendes Fasten startet der FAB (R23 D14); er steht, sobald das Panel gezeichnet ist.
+    await page.waitForSelector('#health-fab:not([hidden])');
     assert.equal(await page.$('.fasting-stats'), null, 'ohne ein Fasten keine Statistik aus Nullen');
     await seedFastOutsideWeek(page);
     await gotoRoute(page, '/health/fasting');

@@ -10,14 +10,24 @@ async function clickFasting(page, selector) {
   assert.equal(exposed, true, `${selector} is not covered by the sticky toolbar`);
   await page.click(selector);
 }
+// "Fasten starten" ist seit R23 D14 der FAB der Gesundheit (nur ohne laufendes
+// Fasten und nur bei mir); im Ring steht `[data-fasting-action]` nur noch als
+// "Beenden". Angedockt traegt der FAB seinen Satz in `data-action-label`,
+// schwebend im `aria-label` (utils/fab.js fabActionLabel).
+const FAB = '#health-fab:not([hidden])';
+const fabLabel = (page) => page.$eval(FAB, (el) => el.dataset.actionLabel || el.getAttribute('aria-label'));
+const MORE = '[popovertarget="fasting-more-menu"]';
 // Die Fasten-Einstellungen (Ziel, Uhr, Erinnerungen) stehen seit R14 (Re-Critique
-// 2026-09-28, A6 P2-1) in einem Blatt hinter dem Zahnrad im Hero, nicht mehr
-// mitten im Inhalt; das Ziel ist die Kanon-Segmentleiste (role=radio,
-// aria-checked, "Ohne Ziel" = `none`). Die Proben oeffnen das Blatt, pruefen
-// dort dieselbe Regel wie vorher und schliessen es wieder.
+// 2026-09-28, A6 P2-1) in einem Blatt, nicht mehr mitten im Inhalt; seit R23
+// D14 oeffnet es der Eintrag im "..." des Rings (vorher ein Zahnrad). Das Ziel
+// ist die Kanon-Segmentleiste (role=radio, aria-checked, "Ohne Ziel" = `none`).
+// Die Proben oeffnen das Blatt, pruefen dort dieselbe Regel wie vorher und
+// schliessen es wieder.
 async function openFastingSettings(page) {
   if (await page.$('.modal-panel [data-fasting-preferences]')) return;
-  await clickFasting(page, '[data-fasting-settings]');
+  await clickFasting(page, MORE);
+  await page.waitForSelector('#fasting-more-menu:popover-open [data-fasting-settings]');
+  await page.click('#fasting-more-menu [data-fasting-settings]');
   await page.waitForSelector('.modal-panel [data-fasting-preferences] [data-fasting-preset]');
   await settle(page);
 }
@@ -81,7 +91,7 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
         return api[method](path, body);
       }, { method, path, body });
       await gotoRoute(page, '/health/fasting');
-      await page.waitForSelector('[data-fasting-settings]');
+      await page.waitForSelector(MORE);
       assert.equal(await page.$('[data-fasting-body] [data-fasting-preferences]'), null, 'die Einstellungen stehen nicht im Inhalt');
       await openFastingSettings(page);
       assert.equal(await page.$eval('[data-fasting-custom]', (el) => el.hidden), true);
@@ -105,22 +115,29 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
       await closeFastingSettings(page);
       assert.equal(await page.$eval('.fasting-panel', (el) => el.lastElementChild.id), 'history');
       assert.equal(await page.$eval('.fasting-hero', (el) => el.querySelectorAll('a').length), 0);
-      const button = await page.$eval('[data-fasting-action]', (el) => {
+      // Ohne laufendes Fasten kein Knopf im Ring: der Start ist der FAB.
+      assert.equal(await page.$('[data-fasting-action]'), null, 'kein Startknopf im Ring neben dem FAB');
+      const styled = (selector) => page.$eval(selector, (el) => {
         const css = getComputedStyle(el); return { radius: css.borderRadius, background: css.backgroundColor, height: el.getBoundingClientRect().height };
       });
+      const button = await styled(FAB);
       assert.notEqual(button.background, 'rgba(0, 0, 0, 0)');
       assert.notEqual(button.radius, '0px');
       assert.ok(button.height >= 32);
-      // Preferences disclosure shortens the page; keep the click below its sticky toolbar.
-      await page.$eval('[data-fasting-action]', (el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      assert.equal(await fabLabel(page), 'Začít půst');
       await settle(page);
-      await clickFasting(page, '[data-fasting-action]');
+      await clickFasting(page, FAB);
       await page.waitForSelector('.modal-panel');
       await settle(page);
       assert.match(await page.$eval('.modal-panel', (el) => el.textContent), /Než začnete/);
       await page.click('.modal-panel .btn--primary');
       await page.waitForFunction(() => !document.querySelector('.modal-panel'));
       await page.waitForFunction(() => document.querySelector('[data-fasting-action]')?.textContent === 'Ukončit půst');
+      assert.equal(await page.$(FAB), null, 'laufendes Fasten: kein FAB "Fasten starten"');
+      const finishButton = await styled('[data-fasting-action]');
+      assert.notEqual(finishButton.background, 'rgba(0, 0, 0, 0)');
+      assert.notEqual(finishButton.radius, '0px');
+      assert.ok(finishButton.height >= 32);
       assert.equal((await call('get', '/health/fasting/state')).data.active.goal_minutes, 960, 'selected default becomes the running goal');
       await openFastingSettings(page);
       await clickFasting(page, '[data-fasting-preset="20"]');
@@ -157,7 +174,8 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
       await page.click('.modal-panel [type="submit"]');
       await page.waitForFunction(() => !document.querySelector('.modal-panel'));
       assert.equal((await call('get', '/health/fasting/state')).data.history[0].rating, null);
-      await clickFasting(page, '[data-fasting-action]');
+      await page.waitForSelector(FAB);
+      await clickFasting(page, FAB);
       await page.waitForFunction(() => document.querySelector('[data-fasting-action]')?.textContent === 'Ukončit půst');
       assert.equal(await page.$('.modal-panel'), null, 'acknowledgement is not repeated');
       assert.equal(await page.$eval('#search-overlay', (el) => el.classList.contains('search-overlay--visible')), false, 'fasting actions must not open search');
@@ -198,7 +216,8 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
         await response;
         await settle(page);
         assert.equal(await page.$eval('#fast-note', (el) => el.value), dirtyNote, 'delayed finish must not replace a dirty history editor');
-        assert.equal(await page.$eval('[data-fasting-action]', (el) => el.textContent), 'Začít půst', 'persisted finish refreshes the page even when another dialog stays open');
+        assert.equal(await page.$('[data-fasting-action]'), null, 'persisted finish refreshes the page even when another dialog stays open');
+        assert.equal(await fabLabel(page), 'Začít půst', 'persisted finish offers the start again (FAB)');
         let heldSave;
         page.__yuvomiRequestInterceptor = (request) => {
           if (request.method() === 'PATCH' && request.url().includes('/health/fasting/')) { heldSave = request; return true; }
@@ -292,7 +311,7 @@ test('health areas: every area has its address, old ?tab= links redirect, fastin
 
     // Mobil: die alte Adresse landet im Bereich, der Kopf nennt ihn und fuehrt zurueck.
     await gotoRoute(page, '/health?tab=fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector(FAB);
     assert.deepEqual(await shown(), { path: '/health/fasting', panels: ['/health/fasting'], title: 'Fasten', back: true, tabBars: 0 });
 
     // Zurueck zur Uebersicht: dort steht die Liste aller Bereiche.
@@ -313,11 +332,11 @@ test('health areas: every area has its address, old ?tab= links redirect, fastin
     await page.waitForFunction(() => document.querySelector('.health-priority-region')?.getBoundingClientRect().height > 0);
     await clickFasting(page, '.health-areas__list [data-md-id="fasting"]');
     await page.waitForFunction(() => location.pathname === '/health/fasting');
-    await page.waitForSelector('[data-fasting-action]');
+    await page.waitForSelector(FAB);
     // Das Fasten-Panel zeichnet nach dem ersten Bild noch einmal (Statistik):
     // erst nach der Ruhe steht der Knopf, der geklickt wird.
     await settle(page);
-    await clickFasting(page, '[data-fasting-action]');
+    await clickFasting(page, FAB);
     await page.waitForSelector('.modal-panel');
     await settle(page);
     await page.click('.modal-panel .btn--primary');

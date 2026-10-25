@@ -24,9 +24,12 @@ test('reminder availability and help retain preferences across goal changes', as
       }, { method, path, body });
       await call('post', '/health/fasting', { start_at: new Date(Date.now() - 3600000).toISOString(), start_tzid: 'UTC', goal_minutes: 960, acknowledge_safety: true });
       await call('put', '/health/fasting/settings', { remind_goal: true, remind_next_start: true });
-      // Die Einstellungen stehen seit R14 (A6 P2-1) im Blatt hinter dem Zahnrad.
-      await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[data-fasting-settings]');
-      await clickFasting(page, '[data-fasting-settings]');
+      // Die Einstellungen stehen seit R14 (A6 P2-1) in einem Blatt, seit R23 D14
+      // hinter dem Eintrag im "..." des Rings (vorher ein Zahnrad).
+      await gotoRoute(page, '/health/fasting'); await page.waitForSelector('[popovertarget="fasting-more-menu"]');
+      await clickFasting(page, '[popovertarget="fasting-more-menu"]');
+      await page.waitForSelector('#fasting-more-menu:popover-open [data-fasting-settings]');
+      await page.click('#fasting-more-menu [data-fasting-settings]');
       await page.waitForSelector('.modal-panel [data-fasting-preset="custom"]'); await settle(page);
       await clickFasting(page, '[data-fasting-preset="custom"]');
       assert.equal(await page.$eval('[data-fasting-custom]', (el) => el.hidden), false);
