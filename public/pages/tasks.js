@@ -2982,8 +2982,11 @@ function handleDeleteSubtask(id, title, container) {
   // fuenf Sekunden "Rueckgaengig", erst dann der Server. Ausgeblendet wird
   // jede Darstellung der Zeile (Liste und Detailspalte).
   const els = [...container.querySelectorAll(`[data-subtask-id="${CSS.escape(String(id))}"]`)];
+  // Der Fokus stand auf dem Menue der Zeile, die gleich abtritt: er geht an
+  // den Fortschritts-Umschalter der Elternaufgabe, nicht ins Leere.
+  const parentToggle = els[0]?.closest('[data-task-id]')?.querySelector('[data-action="toggle-subtasks"]');
   for (const el of els) el.hidden = true;
-  refocusAfterRender();
+  if (els.some((el) => el.contains(document.activeElement)) || document.activeElement === document.body) parentToggle?.focus();
   scheduleUndoableDelete({
     message: t('common.deletedNamed', { name: title }),
     commit: async ({ keepalive }) => {

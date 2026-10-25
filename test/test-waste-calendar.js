@@ -74,6 +74,9 @@ function listenerContainer() {
     getBoundingClientRect: () => ({ height: 1440 }),
     scrollTop: 0,
     observe() {}, disconnect() {},
+    // Seit R23 S11 setzt die Agenda ihre Tage IN die Liste (`#agenda-view`,
+    // utils/row-fill.js) - der Stub haengt sie an denselben Text.
+    insertAdjacentHTML: (_pos, chunk) => { html += chunk; },
   });
   return {
     replaceChildren: () => { html = ''; },
