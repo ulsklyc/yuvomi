@@ -42,6 +42,36 @@ export function shoppingPaths() {
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
+    '/api/v1/shopping/price-history': {
+      get: op({
+        summary: 'Get purchase price history for an item',
+        description: 'Returns recorded purchase history facts (item_name, price_cents, store_name, purchased_at) matching item name case-insensitively, ordered by purchased_at DESC.',
+        tag: 'Shopping',
+        params: [
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            description: 'Item name to look up purchases for (matched case-insensitively).',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            description: 'Maximum number of recorded purchases to return (1-50, defaults to 10).',
+            schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+          },
+          {
+            name: 'exclude_item_id',
+            in: 'query',
+            required: false,
+            description: 'Optional shopping item ID to exclude its current purchase from results.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        ],
+      }),
+    },
     '/api/v1/shopping/suggestions': {
       get: op({
         summary: 'Get shopping suggestions',

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
+  shopping item records the purchase: item name, price paid in cents, the shop, and the date.
+  Purchases match by item name, case-insensitively, and remain after the item is cleared.
+  The item details sheet displays the last purchase for known items. CalDAV completion sync
+  does not record purchases immediately, but clearing checked items records them dated at the clean-up.
+
 - **Stock: the minimum belongs to the product, and running low is read over all its batches**
   (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
   longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum
