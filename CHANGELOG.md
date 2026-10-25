@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refreshed; retrying reports the total across successful batches.
 
 ### Fixed
+- **A write request without a body gets the route's own answer instead of a server error** (#2209).
+  Since the move to Express 5, a POST, PUT or PATCH without a body left the request body empty
+  and most routes - meals, tasks, shopping, notes, calendar, budget, reminders, pantry, contacts
+  and more - answered 500. The server now treats a missing body as an empty one in one place, so
+  each route says which field is missing (400). The MCP endpoint still answers a call without a
+  body with a JSON-RPC parse error, and an `Idempotency-Key` stored before the update keeps
+  matching its retry.
 - **Creating a recipe through the MCP bridge no longer ends in "Internal error"** (#2197). When
   an assistant put the recipe fields next to `operation_key` instead of into `payload`,
   `call_api_operation` sent the request without a body and the recipe routes failed on it. The

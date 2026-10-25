@@ -25,6 +25,7 @@ process.env.SESSION_SECRET = 'idempotency-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: idempotencyMiddleware, canonicalize, fingerprint } = await import('../server/middleware/idempotency.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -66,6 +67,8 @@ const BOB   = seedUser('bob', 'admin');
 let actor = { id: ALICE, role: 'admin' };
 const app = express();
 app.use(express.json());
+// Wie server/index.js: ohne Rumpf `{}` statt undefined (#2209).
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -168,6 +171,41 @@ test('canonicalize: gleiche Daten, gleiche Zeichenkette', () => {
   assert.notEqual(canonicalize([1, 2]), canonicalize([2, 1]), 'die Reihenfolge einer Liste ist Inhalt');
   assert.equal(canonicalize(null), 'null');
   assert.equal(canonicalize(undefined), 'null');
+});
+
+// #2209: server/index.js setzt ohne Rumpf `{}`. Der Fingerabdruck darf das
+// nicht sehen - ein vor dem Fix gespeicherter Schluessel (Rumpf `null`) liefe
+// sonst beim Retry nach dem Update in den Konflikt "different request".
+test('ohne Rumpf bleibt der Fingerabdruck der von vor #2209', () => {
+  const before = fingerprint({ method: 'POST', path: '/tasks/', body: undefined });
+  const req = { method: 'POST', path: '/tasks/', body: undefined };
+  defaultEmptyBody(req, null, () => {});
+  assert.deepEqual(req.body, {}, 'die Middleware setzt den leeren Rumpf');
+  assert.equal(fingerprint(req), before, 'derselbe Hash wie ohne die Middleware');
+  assert.notEqual(
+    fingerprint({ method: 'POST', path: '/tasks/', body: {} }),
+    before,
+    'ein ausdruecklich gesendetes {} bleibt ein anderer Rumpf',
+  );
+});
+
+test('ein vor #2209 gespeicherter Schluessel ohne Rumpf spielt seine Antwort ab', async () => {
+  const key = randomUUID();
+  db.prepare(`
+    INSERT INTO idempotency_keys (user_id, key, method, path, request_hash, status, response_body, completed_at)
+    VALUES (?, ?, 'POST', '/tasks/', ?, 201, ?, datetime('now'))
+  `).run(ALICE, key, fingerprint({ method: 'POST', path: '/tasks/', body: undefined }),
+    JSON.stringify({ data: { id: 4242 } }));
+
+  const r = await call('POST', '/tasks/', { as: { id: ALICE, role: 'admin' }, key });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.replayed, 'true');
+  assert.equal(r.body.data.id, 4242);
+});
+
+test('POST ohne Rumpf mit Schluessel ist ein 400 der Route, kein 500', async () => {
+  const r = await call('POST', '/tasks/', { as: { id: ALICE, role: 'admin' }, key: randomUUID() });
+  assert.equal(r.status, 400, JSON.stringify(r.body));
 });
 
 // --------------------------------------------------------

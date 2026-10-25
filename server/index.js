@@ -17,6 +17,7 @@ import * as db from './db.js';
 import { router as authRouter, sessionMiddleware, requireAuth, requireAdmin, isPasswordLoginEnabled } from './auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
+import { defaultEmptyBody } from './middleware/empty-body.js';
 import { createRestoreWriteGate, trackAdmittedWrite } from './middleware/restore-gate.js';
 import { runExternalJob } from './utils/restore-state.js';
 import { createErrorHandler } from './middleware/error-handler.js';
@@ -193,6 +194,10 @@ app.use(compression());
 app.use(createRestoreWriteGate(db.isRestoreRunning, db.isDatabaseOpen));
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
+// Ohne Rumpf `{}` statt undefined (#2209): Express 5 setzt nichts, und jede
+// Route, die `req.body` destrukturiert, antwortete dann 500 statt 400. Wer
+// "kein Rumpf" erkennen muss (MCP, Idempotenz), fragt hadNoBody().
+app.use(defaultEmptyBody);
 
 // JSON-Parse-Fehler abfangen (gibt sonst HTML zurück). Benannt, weil
 // test/test-restore-gate-routes.js globale Middleware am Namen erkennt (#1531).

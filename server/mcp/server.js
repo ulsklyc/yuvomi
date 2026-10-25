@@ -18,6 +18,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { handleMcpRequest, PARSE_ERROR } from './protocol.js';
 import { isDisplayAccount } from '../services/display-accounts.js';
+import { hadNoBody } from '../middleware/empty-body.js';
 
 const log = createLogger('MCP');
 const router = express.Router();
@@ -50,7 +51,9 @@ function isDisplay(userId) {
 // POST: einzelne JSON-RPC-Nachricht → einzelne JSON-Antwort (oder 202 bei Notification).
 router.post('/', async (req, res) => {
   try {
-    if (req.body === undefined || req.body === null || typeof req.body !== 'object') {
+    // hadNoBody: server/index.js setzt ohne Rumpf `{}` (#2209); das bleibt hier
+    // ein Parse-Error und wird keine Anfrage ohne Methode.
+    if (hadNoBody(req) || req.body === undefined || req.body === null || typeof req.body !== 'object') {
       return res.status(400).json({
         jsonrpc: '2.0', id: null,
         error: { code: PARSE_ERROR, message: 'Parse error: expected a JSON-RPC 2.0 body.' },
