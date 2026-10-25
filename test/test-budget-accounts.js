@@ -399,7 +399,11 @@ test('DELETE /accounts/:id: fremde private Buchungen behalten ihr Konto, und der
       title: 'Privat B', amount: -40, category: EXPENSE_CAT, date: PAST, account_id: shared.id, visibility: 'private',
     });
     assert.equal(foreign.status, 201, JSON.stringify(foreign.body));
-    const strip = ({ id, name, sort_order, ...rest }) => rest;
+    // Zeitstempel gehoeren nicht zum Vergleich: die beiden Konten entstehen
+    // nacheinander, und faellt eine Sekundengrenze dazwischen, unterschieden
+    // sie sich nur darin (CI-Flake an #2208). Verglichen wird, was eine fremde
+    // private Buchung verraten koennte - Salden, Zaehler, Rahmen.
+    const strip = ({ id, name, sort_order, created_at, updated_at, ...rest }) => rest;
     assert.deepEqual(strip((await listA()).accounts.find((x) => x.id === shared.id)),
       strip((await listA()).accounts.find((x) => x.id === plain.id)), 'vorher: beide Konten sehen fuer A gleich aus');
 
