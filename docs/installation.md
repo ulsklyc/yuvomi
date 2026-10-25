@@ -1014,7 +1014,7 @@ One-way push **Yuvomi → Outlook.com** for personal Microsoft accounts (outlook
 |----------|-------------|---------|----------|
 | `APPLE_CALDAV_URL` | CalDAV server URL | `https://caldav.icloud.com` | No |
 | `APPLE_USERNAME` | Apple ID email | - | No |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password (generate at [appleid.apple.com](https://appleid.apple.com/)) | - | No |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password (generate at [account.apple.com](https://account.apple.com/) > Sign-In and Security > App-Specific Passwords) | - | No |
 
 ### Sync
 
