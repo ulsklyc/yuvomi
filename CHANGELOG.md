@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Health vitals show every reading, not only a daily average** (#1699, #1798). Week, month and
+  year draw a low-high band per day (per month in the year) with the mean as the dot on it, so a 55
+  in the morning and a 190 at lunch no longer become one unremarkable point; a day with a single
+  reading looks as before. A new Day range shows one date on an hour axis with each reading at its
+  time. Blood pressure is one bar per reading from diastolic to systolic, readings of the same day
+  side by side, a value without its pair as a point; the pulse keeps its own chart below. "Recent
+  measurements" now shows the time and the note of each reading.
 - **A shared-expenses group shows what each person paid and where the money went** (#1888, #1941).
   Below the balances, each person has one line per currency with what they paid at the till and,
   under it, their own share - paid minus share is their balance before any payment between members.
