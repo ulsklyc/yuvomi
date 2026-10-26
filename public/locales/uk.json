@@ -5212,6 +5212,7 @@
             "saveError": "Не вдалося зберегти вимірювання.",
             "invalidValue": "Введіть коректні значення.",
             "range": {
+                "day": "День",
                 "week": "Тиждень",
                 "month": "Місяць",
                 "year": "Рік"
@@ -5251,6 +5252,7 @@
                 "family": "Родина"
             },
             "sparse": "Замало вимірювань, щоб показати тренд.",
+            "bandValue": "{{mean}}, від {{low}} до {{high}}",
             "recentMeasurements": "Останні вимірювання",
             "deleteMeasurement": "Видалити вимірювання {{value}} від {{date}}",
             "measurementDeleted": "Вимірювання видалено",

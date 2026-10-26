@@ -4960,6 +4960,7 @@
             "saveError": "मापन सहेजा नहीं जा सका।",
             "invalidValue": "कृपया मान्य मान दर्ज करें।",
             "range": {
+                "day": "दिन",
                 "week": "सप्ताह",
                 "month": "माह",
                 "year": "वर्ष"
@@ -4999,6 +5000,7 @@
                 "family": "परिवार"
             },
             "sparse": "रुझान दिखाने के लिए बहुत कम माप।",
+            "bandValue": "{{mean}}, {{low}} से {{high}} तक",
             "recentMeasurements": "हाल की मापें",
             "deleteMeasurement": "{{date}} का माप {{value}} हटाएँ",
             "measurementDeleted": "माप हटाई गई",

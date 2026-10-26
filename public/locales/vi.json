@@ -4960,6 +4960,7 @@
             "saveError": "Không thể lưu chỉ số đo.",
             "invalidValue": "Vui lòng nhập giá trị hợp lệ.",
             "range": {
+                "day": "Ngày",
                 "week": "Tuần",
                 "month": "Tháng",
                 "year": "Năm"
@@ -4999,6 +5000,7 @@
                 "family": "Gia đình"
             },
             "sparse": "Quá ít số đo để hiển thị xu hướng.",
+            "bandValue": "{{mean}}, từ {{low}} đến {{high}}",
             "recentMeasurements": "Các lần đo gần đây",
             "deleteMeasurement": "Xóa lần đo {{value}} ngày {{date}}",
             "measurementDeleted": "Đã xóa lần đo",

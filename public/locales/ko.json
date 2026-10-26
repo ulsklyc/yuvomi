@@ -4960,6 +4960,7 @@
             "saveError": "측정값을 저장하지 못했습니다.",
             "invalidValue": "유효한 값을 입력하세요.",
             "range": {
+                "day": "일",
                 "week": "주",
                 "month": "월",
                 "year": "년"
@@ -4999,6 +5000,7 @@
                 "family": "가족"
             },
             "sparse": "추세를 표시하기에 측정값이 너무 적습니다.",
+            "bandValue": "{{mean}}, {{low}}~{{high}}",
             "recentMeasurements": "최근 측정",
             "deleteMeasurement": "{{date}} 측정값 {{value}} 삭제",
             "measurementDeleted": "측정이 삭제되었습니다",

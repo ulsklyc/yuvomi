@@ -4960,6 +4960,7 @@
             "saveError": "Meting kon niet worden opgeslagen.",
             "invalidValue": "Voer geldige waarden in.",
             "range": {
+                "day": "Dag",
                 "week": "Week",
                 "month": "Maand",
                 "year": "Jaar"
@@ -4999,6 +5000,7 @@
                 "family": "Gezin"
             },
             "sparse": "Te weinig metingen om een trend te tonen.",
+            "bandValue": "{{mean}}, van {{low}} tot {{high}}",
             "recentMeasurements": "Recente metingen",
             "deleteMeasurement": "Meting {{value}} van {{date}} verwijderen",
             "measurementDeleted": "Meting verwijderd",

@@ -5339,6 +5339,7 @@
             "saveError": "تعذّر حفظ القياس.",
             "invalidValue": "يرجى إدخال قيم صحيحة.",
             "range": {
+                "day": "يوم",
                 "week": "أسبوع",
                 "month": "شهر",
                 "year": "سنة"
@@ -5378,6 +5379,7 @@
                 "family": "العائلة"
             },
             "sparse": "قياسات قليلة جدًا لعرض اتجاه.",
+            "bandValue": "{{mean}}، من {{low}} إلى {{high}}",
             "recentMeasurements": "آخر القياسات",
             "deleteMeasurement": "حذف القياس {{value}} ({{date}})",
             "measurementDeleted": "تم حذف القياس",

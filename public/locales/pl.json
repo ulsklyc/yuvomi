@@ -5212,6 +5212,7 @@
             "saveError": "Nie udało się zapisać pomiaru.",
             "invalidValue": "Wprowadź prawidłowe wartości.",
             "range": {
+                "day": "Dzień",
                 "week": "Tydzień",
                 "month": "Miesiąc",
                 "year": "Rok"
@@ -5251,6 +5252,7 @@
                 "family": "Rodzina"
             },
             "sparse": "Za mało pomiarów, aby pokazać trend.",
+            "bandValue": "{{mean}}, od {{low}} do {{high}}",
             "recentMeasurements": "Ostatnie pomiary",
             "deleteMeasurement": "Usuń pomiar {{value}} z {{date}}",
             "measurementDeleted": "Pomiar usunięty",

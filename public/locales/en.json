@@ -4960,6 +4960,7 @@
             "saveError": "Measurement could not be saved.",
             "invalidValue": "Please enter valid values.",
             "range": {
+                "day": "Day",
                 "week": "Week",
                 "month": "Month",
                 "year": "Year"
@@ -4999,6 +5000,7 @@
                 "family": "Family"
             },
             "sparse": "Too few readings to show a trend.",
+            "bandValue": "{{mean}}, from {{low}} to {{high}}",
             "recentMeasurements": "Recent measurements",
             "deleteMeasurement": "Delete measurement {{value}} from {{date}}",
             "measurementDeleted": "Measurement deleted",

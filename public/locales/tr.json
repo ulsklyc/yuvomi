@@ -4960,6 +4960,7 @@
             "saveError": "Ölçüm kaydedilemedi.",
             "invalidValue": "Lütfen geçerli değerler girin.",
             "range": {
+                "day": "Gün",
                 "week": "Hafta",
                 "month": "Ay",
                 "year": "Yıl"
@@ -4999,6 +5000,7 @@
                 "family": "Aile"
             },
             "sparse": "Bir eğilim göstermek için ölçüm sayısı çok az.",
+            "bandValue": "{{mean}}, {{low}} ile {{high}} arası",
             "recentMeasurements": "Son ölçümler",
             "deleteMeasurement": "Ölçümü sil: {{value}} ({{date}})",
             "measurementDeleted": "Ölçüm silindi",

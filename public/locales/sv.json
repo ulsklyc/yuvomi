@@ -4960,6 +4960,7 @@
             "saveError": "Mätvärdet kunde inte sparas.",
             "invalidValue": "Ange giltiga värden.",
             "range": {
+                "day": "Dag",
                 "week": "Vecka",
                 "month": "Månad",
                 "year": "År"
@@ -4999,6 +5000,7 @@
                 "family": "Familj"
             },
             "sparse": "För få mätvärden för att visa en trend.",
+            "bandValue": "{{mean}}, från {{low}} till {{high}}",
             "recentMeasurements": "Senaste mätningar",
             "deleteMeasurement": "Ta bort mätning {{value}} från {{date}}",
             "measurementDeleted": "Mätning borttagen",

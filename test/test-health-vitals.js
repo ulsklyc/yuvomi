@@ -375,7 +375,7 @@ test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messlis
 
     const html = health.vitalSheetMarkup(vitalMetric('weight'));
     assert.match(html, /class="health-vitals__ranges health-vital-sheet__ranges" role="tablist"/);
-    assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['week', 'month', 'year'],
+    assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year'],
       'der Zeitraum-Umschalter steht IM Blatt');
     assert.match(html, /data-sheet-step="-1"[\s\S]*data-sheet-step="1"/);
     assert.match(html, /data-vital-edit="9"/, 'die Messliste mit dem Bearbeiten-Weg aus R8');
@@ -1088,7 +1088,9 @@ test('R21 D6: Achsen mit Einheit und Mindestspanne, der Puls auf eigener Achse, 
   const svgs = html.match(/<svg class="chart health-chart[^"]*"/g) ?? [];
   assert.equal(svgs.length, 2, 'Blutdruck und Puls je eine Achse');
   const [druck, puls] = html.split(/<svg class="chart health-chart/).slice(1);
-  assert.equal((druck.match(/<polyline/g) ?? []).length, 2, 'auf der mmHg-Achse nur Systole und Diastole');
+  // Seit #1798 ein Balken je Messung statt zweier Kurven.
+  assert.equal((druck.match(/<polyline/g) ?? []).length, 0, 'auf der mmHg-Achse keine Kurven');
+  assert.ok((druck.match(/<line class="health-chart__bp"/g) ?? []).length >= 2, 'auf der mmHg-Achse die Balken von Systole bis Diastole');
   assert.equal((puls.match(/<polyline/g) ?? []).length, 1, 'der Puls hat seine eigene');
   assert.match(druck, /class="chart__axis-unit"> mmHg</, 'die Einheit steht am obersten Wert');
   assert.match(puls, /class="chart__axis-unit"> \/min</);
@@ -1174,7 +1176,7 @@ test('#1699: Woche und Monat zeichnen je Tag ein Band vom kleinsten zum groesste
   assert.equal(baender.length, 1, 'nur der Tag mit Spanne bekommt ein Band; der Einzelwert bleibt Punkt');
   const ticks = yTicks(svg);
   assert.ok(Math.min(...ticks) <= 55 && Math.max(...ticks) >= 190, `die Achse ${ticks.join('/')} schneidet das Band ab`);
-  assert.match(svg, /health\.vitals\.chart\.band/, 'Tooltip und Tabelle nennen die Spanne');
+  assert.match(svg, /health\.vitals\.bandValue/, 'Tooltip und Tabelle nennen die Spanne');
 });
 
 test('#1798: Blutdruck in Woche/Monat ist ein Balken JE MESSUNG von diastolisch bis systolisch', () => {

@@ -4960,6 +4960,7 @@
             "saveError": "Messwert konnte nicht gespeichert werden.",
             "invalidValue": "Bitte gültige Werte eingeben.",
             "range": {
+                "day": "Tag",
                 "week": "Woche",
                 "month": "Monat",
                 "year": "Jahr"
@@ -4999,6 +5000,7 @@
                 "family": "Familie"
             },
             "sparse": "Zu wenige Messwerte für einen Trend.",
+            "bandValue": "{{mean}}, von {{low}} bis {{high}}",
             "recentMeasurements": "Letzte Messungen",
             "deleteMeasurement": "Messung {{value}} vom {{date}} löschen",
             "measurementDeleted": "Messung gelöscht",

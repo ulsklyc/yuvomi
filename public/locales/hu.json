@@ -4960,6 +4960,7 @@
             "saveError": "A mérés nem menthető.",
             "invalidValue": "Adj meg érvényes értékeket.",
             "range": {
+                "day": "Nap",
                 "week": "Hét",
                 "month": "Hónap",
                 "year": "Év"
@@ -4999,6 +5000,7 @@
                 "family": "Család"
             },
             "sparse": "Túl kevés mérés a trend megjelenítéséhez.",
+            "bandValue": "{{mean}}, {{low}} és {{high}} között",
             "recentMeasurements": "Legutóbbi mérések",
             "deleteMeasurement": "Mérés törlése: {{value}} ({{date}})",
             "measurementDeleted": "Mérés törölve",

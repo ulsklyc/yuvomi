@@ -5088,6 +5088,7 @@
             "saveError": "Měření se nepodařilo uložit.",
             "invalidValue": "Zadejte platné hodnoty.",
             "range": {
+                "day": "Den",
                 "week": "Týden",
                 "month": "Měsíc",
                 "year": "Rok"
@@ -5127,6 +5128,7 @@
                 "family": "Rodina"
             },
             "sparse": "Příliš málo měření pro zobrazení trendu.",
+            "bandValue": "{{mean}}, od {{low}} do {{high}}",
             "recentMeasurements": "Poslední měření",
             "deleteMeasurement": "Smazat měření {{value}} z {{date}}",
             "measurementDeleted": "Měření smazáno",

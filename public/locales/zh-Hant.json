@@ -4960,6 +4960,7 @@
             "saveError": "無法儲存測量值。",
             "invalidValue": "請輸入有效的數值。",
             "range": {
+                "day": "日",
                 "week": "週",
                 "month": "月",
                 "year": "年"
@@ -4999,6 +5000,7 @@
                 "family": "家庭"
             },
             "sparse": "測量資料太少，無法顯示趨勢。",
+            "bandValue": "{{mean}}，{{low}} 至 {{high}}",
             "recentMeasurements": "最近的測量",
             "deleteMeasurement": "刪除測量 {{value}}（{{date}}）",
             "measurementDeleted": "測量已刪除",

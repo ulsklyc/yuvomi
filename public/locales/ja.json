@@ -4960,6 +4960,7 @@
             "saveError": "測定値を保存できませんでした。",
             "invalidValue": "有効な値を入力してください。",
             "range": {
+                "day": "日",
                 "week": "週",
                 "month": "月",
                 "year": "年"
@@ -4999,6 +5000,7 @@
                 "family": "家族"
             },
             "sparse": "傾向を表示するには測定値が少なすぎます。",
+            "bandValue": "{{mean}}（{{low}}～{{high}}）",
             "recentMeasurements": "最近の測定",
             "deleteMeasurement": "測定 {{value}}（{{date}}）を削除",
             "measurementDeleted": "測定を削除しました",

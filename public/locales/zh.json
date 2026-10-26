@@ -4960,6 +4960,7 @@
             "saveError": "无法保存测量值。",
             "invalidValue": "请输入有效的数值。",
             "range": {
+                "day": "日",
                 "week": "周",
                 "month": "月",
                 "year": "年"
@@ -4999,6 +5000,7 @@
                 "family": "家庭"
             },
             "sparse": "测量数据太少，无法显示趋势。",
+            "bandValue": "{{mean}}，{{low}} 至 {{high}}",
             "recentMeasurements": "最近的测量",
             "deleteMeasurement": "删除测量 {{value}}（{{date}}）",
             "measurementDeleted": "测量已删除",
