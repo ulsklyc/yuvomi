@@ -7163,7 +7163,12 @@ test('#1797: der Kalenderkopf traegt die Shell-Variante "Zeitraum als Titel", da
   assert(/class="period-stepper__value [^"]*\bpage-toolbar__period-title\b/.test(html), 'der Zeitraum traegt die Titelrolle der Variante');
   const hidden = desktopRules(layoutCssV).find((r) => /\.page-toolbar--period-as-title[^,{]*>\s*\.page-toolbar__title\s*$/.test(r.selector.trim()));
   assert(hidden, 'die Shell blendet das <h1> der Variante ab 1024px aus');
-  assert(/clip-path:\s*inset\(50%\)/.test(hidden.body) && /position:\s*absolute/.test(hidden.body), `per Clip versteckt (${hidden.body})`);
+  assert(/clip-path:\s*inset\(50%\)/.test(hidden.body) && /width:\s*1px/.test(hidden.body), `per Clip versteckt (${hidden.body})`);
+  // IM FLUSS, NICHT ABSOLUT (Sonde 19, uk 1280): ein absolut gesetztes <h1>
+  // stand in einem zweizeiligen Kopf mittig zwischen den Zeilen und zaehlte als
+  // eigene Zeile der Titelzeile. Als 1px-Flex-Element steht es IN Zeile 1.
+  assert(!/position:\s*absolute/.test(hidden.body), 'das versteckte <h1> bleibt ein Element der Titelzeile');
+  assert(/margin-inline-end:\s*calc\(-1 \* var\(--page-toolbar-gap\)/.test(hidden.body), 'und kostet die Zeile keine Luecke');
   assert(!/display:\s*none|visibility:\s*hidden/.test(hidden.body), 'nie aus dem Baum: der Screenreader sagt weiter "Kalender"');
   const order = (part) => {
     const rule = desktopRules(layoutCssV).find((r) => r.selector.includes('.page-toolbar--period-as-title') && r.selector.includes(part) && /order:/.test(r.body));
@@ -7219,6 +7224,53 @@ test('#1462: die Ueberlappungswarnung steht im Status-Slot der Titelzeile, nicht
   const tabletTitle = [...eachRule(calendarCss)].find((r) => r.at.some((a) => /min-width:\s*768px\)\s*and\s*\(max-width:\s*1023px/.test(a))
     && /> \.page-toolbar__title$/.test(r.selector.trim()));
   assert(/--page-status-lead/.test(tabletTitle?.body ?? ''), 'am Tablet rechnet die Titelbasis das Zeichen ab, die Zeile bricht nicht um');
+});
+
+/* DER STATUS GIBT SEIN WORT AB, BEVOR DIE TITELZEILE BRICHT (Sonde 19, #1462).
+ * Am Desktop steht die Ueberlappung mit kurzem Text. Passt die eine Zeile nur
+ * ohne ihn - oder bricht ohne ihn sogar die Titelzeile -, steht nur das
+ * Zeichen (Name: der volle Satz). Gemessen gegen den Text, nicht gegen die
+ * gerade gezeigte Form, damit die Entscheidung nicht pendelt. */
+test('#1462: am Desktop wird der Status zum Zeichen, wenn die Zeile sonst nicht passt', () => {
+  const box = (width, extra = {}) => ({ getBoundingClientRect: () => ({ width }), classList: { contains: () => false }, ...extra });
+  const make = (inner) => {
+    const classes = new Set();
+    const status = box(200);
+    const kids = [box(36), box(120), box(340), box(160), status];
+    const barEl = { classList: { contains: (c) => c === 'page-toolbar__bar' }, getBoundingClientRect: () => ({ width: 600 }) };
+    return {
+      isConnected: true,
+      clientWidth: inner + 64,
+      children: [...kids, barEl],
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), remove: (...c) => c.forEach((x) => classes.delete(x)), contains: (c) => classes.has(c) },
+      querySelector: (sel) => ({ '.cal-toolbar__views': { scrollWidth: 280 }, '#cal-filters': box(40), '.page-toolbar__status-btn': status }[sel] ?? null),
+      classes,
+    };
+  };
+  const prevWindow = globalThis.window;
+  const prevGcs = globalThis.getComputedStyle;
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    globalThis.getComputedStyle = () => ({ paddingInlineStart: '32', paddingInlineEnd: '32', columnGap: '8', display: 'flex' });
+    // Titelzeile 856 + 5 Luecken = 896; kompakte Bar 280 + 8 + 8 + 40 + 44 = 380.
+    const text = make(1276);
+    calendarHelpers.syncToolbarFit(text);
+    assert(text.classes.has('cal-toolbar--compact') && !text.classes.has('page-toolbar--status-icon'), 'passt mit Text: der Text bleibt');
+    // Ohne Text (Zeichen 40 statt 200): 736 + 380 = 1116.
+    const icon = make(1200);
+    calendarHelpers.syncToolbarFit(icon);
+    assert(icon.classes.has('cal-toolbar--one-row') && icon.classes.has('page-toolbar--status-icon'), 'eine Zeile nur ohne Text: das Zeichen');
+    calendarHelpers.syncToolbarFit(icon);
+    assert(icon.classes.has('page-toolbar--status-icon'), 'die Entscheidung pendelt nicht');
+    const tight = make(800);
+    calendarHelpers.syncToolbarFit(tight);
+    assert(!tight.classes.has('cal-toolbar--one-row') && tight.classes.has('page-toolbar--status-icon'), 'bricht sonst die Titelzeile, steht nur das Zeichen');
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.getComputedStyle = prevGcs;
+  }
+  const iconRule = desktopRules(layoutCssV).find((r) => /\.page-toolbar--status-icon .*\.page-toolbar__status-text$/.test(r.selector.trim()));
+  assert(/display:\s*none/.test(iconRule?.body ?? ''), 'die Shell kennt die Zeichen-Form am Desktop');
 });
 
 // --------------------------------------------------------
