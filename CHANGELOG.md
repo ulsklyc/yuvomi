@@ -84,6 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   says "Internal server error.". The OpenAPI description now lists `cross_module_access` (403
   without write access to the calendar) at creating, reordering, renaming and deleting a calendar
   and at `GET /calendar/sync-targets`, where the routes already sent it.
+- **The reminders API refuses in English and names its reason in the API description** (#1695,
+  #2267). `/api/v1/reminders` still sent its refusals in German ("entity_type und entity_id sind
+  erforderlich.", "Erinnerung nicht gefunden."); every `error` there is English now, with the same
+  status codes. The OpenAPI description now lists `module_access_denied` (403 when the caller may
+  not read or write the module the reminder's entry belongs to) at every reminders route that
+  already sent it.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

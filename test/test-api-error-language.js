@@ -27,6 +27,8 @@
  *        deutschen Wort. Ebenso fuer die Google- und Outlook-Konten
  *        (calendar/google.js, calendar/outlook.js): `google.js: 23`,
  *        `outlook.js: 3`, und jede der 19 gefuehrten Anfragen deutsch.
+ *        Ebenso fuer die Erinnerungen (reminders.js): `reminders.js: 10
+ *        (erlaubt 0)`, und Bein 2 nennt jede Absage mit Satz der Route.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -71,7 +73,6 @@ const GERMAN_LEFT = new Map([
   ['push.js', 3],
   ['quick-links.js', 10],
   ['recipes.js', 2],
-  ['reminders.js', 10],
   ['shopping.js', 17],
   ['tasks.js', 4],
   ['weather.js', 2],
@@ -340,5 +341,64 @@ test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortla
     assertRefusedInEnglish(seen);
   } finally {
     calServer.close();
+  }
+});
+
+test('keine Absage der Erinnerungs-Routen traegt deutschen Wortlaut', async () => {
+  const { default: remindersRouter } = await import('../server/routes/reminders.js');
+  const scopes = { current: null };
+  const remApp = express();
+  remApp.use(express.json());
+  remApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.authScopes = scopes.current;
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  remApp.use('/reminders', remindersRouter);
+  const remServer = remApp.listen(0, '127.0.0.1');
+  const remUrl = await new Promise((r) => remServer.on('listening', () => r(`http://127.0.0.1:${remServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body, tokenScopes = null) => {
+      scopes.current = tokenScopes;
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${remUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const task = db.prepare("INSERT INTO tasks (title, created_by) VALUES ('Probe', ?)").run(ADMIN).lastInsertRowid;
+    const forTask = `/reminders?entity_type=task&entity_id=${task}`;
+    const notesOnly = ['notes:read'];
+
+    await run('all-params', 'GET', '/reminders/all');
+    await run('all-module', 'GET', `/reminders/all?entity_type=task&entity_id=${task}`, undefined, notesOnly);
+    await run('get-params', 'GET', '/reminders');
+    await run('get-module', 'GET', forTask, undefined, notesOnly);
+    await run('post-empty', 'POST', '/reminders', {});
+    await run('post-derived', 'POST', '/reminders', { entity_type: 'pantry_item', entity_id: 1, remind_at: '2026-11-01T09:00:00' });
+    await run('post-module', 'POST', '/reminders', { entity_type: 'task', entity_id: task, remind_at: '2026-11-01T09:00:00' }, notesOnly);
+    await run('post-target', 'POST', '/reminders', { entity_type: 'task', entity_id: 987654, remind_at: '2026-11-01T09:00:00' });
+    await run('put-params', 'PUT', '/reminders', { remind_ats: [] });
+    await run('put-derived', 'PUT', '/reminders?entity_type=pantry_item&entity_id=1', { remind_ats: [] });
+    await run('put-module', 'PUT', forTask, { remind_ats: [] }, notesOnly);
+    await run('put-array', 'PUT', forTask, { remind_ats: 'nope' });
+    await run('put-entry', 'PUT', forTask, { remind_ats: ['nope'] });
+    await run('put-many', 'PUT', forTask, { remind_ats: [1, 2, 3, 4, 5, 6].map((d) => `2026-11-0${d}T09:00:00`) });
+    await run('dismiss-id', 'PATCH', '/reminders/abc/dismiss', {});
+    await run('dismiss-gone', 'PATCH', '/reminders/987654/dismiss', {});
+    await run('delete-id', 'DELETE', '/reminders/abc');
+    await run('delete-gone', 'DELETE', '/reminders/987654');
+    await run('delete-params', 'DELETE', '/reminders');
+    await run('delete-derived', 'DELETE', '/reminders?entity_type=pantry_item&entity_id=1');
+    await run('delete-module', 'DELETE', forTask, undefined, notesOnly);
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    remServer.close();
   }
 });
