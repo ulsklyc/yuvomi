@@ -8571,7 +8571,23 @@ async function loadSyncTargets(selectElement, currentEvent = null) {
     }
     selectElement.value = value;
   } else if (currentEvent?.target_caldav_account_id && currentEvent?.target_caldav_calendar_url) {
-    selectElement.value = caldavTargetValue(currentEvent.target_caldav_account_id, currentEvent.target_caldav_calendar_url);
+    const value = caldavTargetValue(currentEvent.target_caldav_account_id, currentEvent.target_caldav_calendar_url);
+    // Wie bei Google: ein gespeichertes Ziel, das die Liste nicht mehr nennt
+    // (inzwischen nur lesbar geteilt, #1840, oder abgewaehlt), bleibt als
+    // Option stehen. Sonst stuende das Feld leer, und schon das Umbenennen
+    // des Termins schickte `null` und leerte sein Ziel still. Der Server
+    // nimmt das unveraenderte Ziel an (`caldavTargetOffered`) und schickt
+    // nichts dorthin, solange der Kalender keine neuen Termine annimmt.
+    if (!Array.from(selectElement.options).some((o) => o.value === value)) {
+      const group = document.createElement('optgroup');
+      group.label = t('calendar.syncTargetCaldavGroup');
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = currentEvent.target_caldav_calendar_url;
+      group.appendChild(option);
+      selectElement.appendChild(group);
+    }
+    selectElement.value = value;
   } else if (currentEvent?.target_outlook_account_id && currentEvent?.target_outlook_calendar_id) {
     selectElement.value = outlookTargetValue(currentEvent.target_outlook_account_id, currentEvent.target_outlook_calendar_id);
   } else if (!currentEvent) {

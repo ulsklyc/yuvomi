@@ -138,12 +138,12 @@ export function caldavTarget(body) {
  * dieses eine Konto.
  *
  * EIN UNVERÄNDERTES ZIEL kommt ohne Prüfung durch, wie die unveränderte
- * Wiederholungsregel in der Route. Das Formular selbst schickt für ein Ziel
- * ausserhalb der Auswahl `null` (es bietet nur die eingeschalteten Kalender
- * an); diese Ausnahme ist für API-Clients, die das gespeicherte Altziel
- * unverändert zurückschicken, damit ein inzwischen abgewählter Kalender nicht
- * jede Bearbeitung des Termins verhindert. Gesendet wird an ein solches Ziel
- * trotzdem nichts.
+ * Wiederholungsregel in der Route. Das Formular trägt ein gespeichertes Ziel,
+ * das die Liste nicht mehr nennt (abgewählt, oder nur lesbar geteilt, #1840),
+ * als eigene Option nach und schickt es unverändert zurück, wie API-Clients
+ * auch: ein inzwischen abgewählter oder nur lesbarer Kalender verhindert so
+ * keine Bearbeitung des Termins und wird nicht still geleert. Gesendet wird an
+ * ein solches Ziel trotzdem nichts.
  *
  * @param {object} database
  * @param {{accountId: number|null, calendarUrl: string|null}} target  Ergebnis von `caldavTarget`
