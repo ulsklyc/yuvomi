@@ -1177,7 +1177,6 @@
         "pickOne": "选择一个日程",
         "pickOneHint": "时间、地点和提醒会显示在这里。",
         "syncTargetAssigneeAmbiguous": "多个日历将此人设为默认分配对象。请自行选择目标。",
-        "syncTargetSeveralAssignees": "已分配多人，因此不会根据分配选择日历。改为使用：{{target}}",
         "filtersSources": "日历",
         "filterUnassigned": "未分配",
         "dateSpanSpoken": "{{from}}至{{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所选的日历已不存在。",
         "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。",
-        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。"
+        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。",
+        "syncTargetNoCalendarForPeople": "没有日历的默认分配恰好是这些人，因此分配不会选择日历。改用：{{target}}。"
     },
     "noteCategories": {
         "categories": "分类",
@@ -2284,7 +2284,10 @@
             "allDuplicates": "没有新活动——全部已存在。",
             "dropzoneTitle": "将 ICS 文件拖到此处或选择文件",
             "dropzoneTitleTouch": "点按以选择 ICS 文件",
-            "dropzoneHint": "仅限 .ics 文件"
+            "dropzoneHint": "仅限 .ics 文件",
+            "assigneesLabel": "分配给",
+            "assigneesHint": "新活动会分配给这些人。以相同 ID 已导入的活动会额外加上他们，即使其分配曾被手动移除。",
+            "successWithAssigned": "已导入：{{imported}}，已存在：{{skipped}}，其中现已分配：{{assigned}}。"
         },
         "memberPhoneLabel": "电话号码（可选）",
         "memberEmailLabel": "电子邮件（可选）",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "今后不会再有任何通知通过该渠道发出，紧急通知也不例外。新建渠道需要重新完整填写地址和登录凭据。",
         "apiTokensMcpHint": "这些令牌也可用作 /mcp 上 MCP 端点的 Bearer 令牌（例如在 Claude Desktop 中，通过 AI 创建任务、购物项和日程）。",
         "sync": {
-            "defaultAssignee": "默认分配",
             "defaultAssigneeNone": "无",
-            "defaultAssigneeHint": "新同步的日程会自动分配给此人。",
-            "defaultAssigneeRoutingHint": "默认分配: 日历中的事件会分配给在此选择的人，仅分配给此人的新事件会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。",
             "backfillTitle": "补充分配",
             "backfillDescription": "默认分配只适用于设置之后导入的日程。你可以在这里将其一次性应用到所有账户中已导入的日程。",
             "backfillAction": "应用到现有日程",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "显示下一批",
             "backfillMovedAll": "全选",
             "backfillMovedChange": "从 {{from}} 改为 {{to}}",
-            "backfillDescriptionMore": "未分配的日程会直接获得默认分配。仍带有其他日历默认分配的日程会逐条列出，供你选择。其他任何分配保持不变。"
+            "backfillDescriptionMore": "未分配的日程会直接获得默认分配。仍带有其他日历默认分配的日程会逐条列出，供你选择。其他任何分配保持不变。",
+            "defaultAssignees": "默认分配",
+            "defaultAssigneesHint": "新同步的活动会自动分配给这些人。第一位决定颜色。",
+            "defaultAssigneesRoutingHint": "默认分配：日历中的活动会分配给在那里选择的人，而恰好分配给这些人的新活动会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。"
         },
         "calendarAssignMeLabel": "将新事件分配给我",
         "calendarDefaultRemindersLabel": "默认提醒",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个日程不会送达",
         "reminderListReadOnly": "只读：无法在此保存新条目",
         "reminderListReadOnlyWaiting_one": "只读：等待上传到这里的 {{count}} 个条目不会送达",
-        "reminderListReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个条目不会送达"
+        "reminderListReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个条目不会送达",
+        "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
+        "syncAssigneeNotMember": "这里只能选择家庭成员。",
+        "syncAssigneeUnknown": "此人已不存在。请重新加载页面。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

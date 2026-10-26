@@ -1195,7 +1195,6 @@
         "pickOne": "Wähle einen Termin",
         "pickOneHint": "Zeit, Ort und Erinnerungen erscheinen hier.",
         "syncTargetAssigneeAmbiguous": "Mehrere Kalender haben diese Person als Standard-Zuweisung. Wähle das Ziel selbst.",
-        "syncTargetSeveralAssignees": "Mehrere Personen sind zugewiesen, darum wählt die Zuweisung keinen Kalender. Stattdessen gilt: {{target}}.",
         "filtersSources": "Kalender",
         "filterUnassigned": "Nicht zugewiesen",
         "dateSpanSpoken": "{{from}} bis {{to}}",
@@ -1235,7 +1234,8 @@
         "errorEventGone": "Diesen Termin gibt es nicht mehr.",
         "errorSelectedCalendarGone": "Den gewählten Kalender gibt es nicht mehr.",
         "errorSeriesNoOccurrence": "Mit dieser Wiederholung gäbe es ab dem Startdatum keinen einzigen Termin.",
-        "localCalendarUploadsHint": "Termine in diesem Kalender werden über Apple Calendar zu iCloud hochgeladen."
+        "localCalendarUploadsHint": "Termine in diesem Kalender werden über Apple Calendar zu iCloud hochgeladen.",
+        "syncTargetNoCalendarForPeople": "Kein Kalender hat genau diese Personen als Standard-Zuweisung, darum wählt die Zuweisung keinen. Stattdessen gilt: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorien",
@@ -2477,7 +2477,10 @@
             "errorNoCalendarName": "Gib einen Namen für den neuen Kalender ein.",
             "dropzoneTitle": "ICS-Datei hierher ziehen oder auswählen",
             "dropzoneTitleTouch": "Tippen, um eine ICS-Datei auszuwählen",
-            "dropzoneHint": "Nur .ics-Dateien"
+            "dropzoneHint": "Nur .ics-Dateien",
+            "assigneesLabel": "Zuweisen an",
+            "assigneesHint": "Neue Termine bekommen diese Personen. Ein schon importierter Termin mit derselben Kennung bekommt sie dazu - auch wenn seine Zuweisung von Hand entfernt wurde.",
+            "successWithAssigned": "Importiert: {{imported}}, bereits vorhanden: {{skipped}}, davon jetzt zugewiesen: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonnummer (optional)",
         "memberEmailLabel": "E-Mail (optional)",
@@ -3108,10 +3111,7 @@
         "notificationChannelDeleteConfirmDetail": "Über diesen Kanal geht ab sofort keine Benachrichtigung mehr raus, auch keine dringende. Adresse und Zugangsdaten müssen für einen neuen Kanal neu eingegeben werden.",
         "apiTokensMcpHint": "Diese Tokens funktionieren auch als Bearer-Token für den MCP-Endpoint unter /mcp (z. B. in Claude Desktop, um Aufgaben, Einkaufsartikel und Termine per KI anzulegen).",
         "sync": {
-            "defaultAssignee": "Standard-Zuweisung",
             "defaultAssigneeNone": "Keine",
-            "defaultAssigneeHint": "Neu synchronisierte Termine werden automatisch dieser Person zugewiesen.",
-            "defaultAssigneeRoutingHint": "Standard-Zuweisung: Termine aus einem Kalender bekommen die dort gewählte Person, und ein neuer Termin, der nur dieser Person zugewiesen ist, wird in diesem Kalender angelegt. Das gilt für Google- und CalDAV-Kalender, nicht für Apple oder Outlook.",
             "backfillTitle": "Zuweisung nachtragen",
             "backfillDescription": "Eine Standard-Zuweisung gilt nur für Termine, die nach dem Setzen übernommen werden. Hier lässt sie sich einmalig auf die schon übernommenen Termine aller Konten anwenden.",
             "backfillAction": "Auf bestehende Termine anwenden",
@@ -3131,7 +3131,10 @@
             "backfillMovedNext": "Nächste anzeigen",
             "backfillMovedAll": "Alle auswählen",
             "backfillMovedChange": "Von {{from}} zu {{to}}",
-            "backfillDescriptionMore": "Termine ohne Zuweisung bekommen sie direkt. Termine, die noch die Standard-Zuweisung eines anderen Kalenders tragen, stehen einzeln zur Auswahl. Jede andere Zuweisung bleibt unverändert."
+            "backfillDescriptionMore": "Termine ohne Zuweisung bekommen sie direkt. Termine, die noch die Standard-Zuweisung eines anderen Kalenders tragen, stehen einzeln zur Auswahl. Jede andere Zuweisung bleibt unverändert.",
+            "defaultAssignees": "Standard-Zuweisung",
+            "defaultAssigneesHint": "Neu synchronisierte Termine werden automatisch diesen Personen zugewiesen. Die erste bestimmt die Farbe.",
+            "defaultAssigneesRoutingHint": "Standard-Zuweisung: Termine aus einem Kalender bekommen die dort gewählten Personen, und ein neuer Termin, der genau diesen Personen zugewiesen ist, wird in diesem Kalender angelegt. Das gilt für Google- und CalDAV-Kalender, nicht für Apple oder Outlook."
         },
         "calendarAssignMeLabel": "Neue Termine mir zuweisen",
         "calendarDefaultRemindersLabel": "Standard-Erinnerungen",
@@ -3423,7 +3426,10 @@
         "caldavCalendarReadOnlyWaiting": "Nur lesbar: {{count}} Termine, die hierher hochgeladen werden sollen, kommen nicht an",
         "reminderListReadOnly": "Nur lesbar: neue Einträge lassen sich hier nicht speichern",
         "reminderListReadOnlyWaiting_one": "Nur lesbar: {{count}} Eintrag, der hierher hochgeladen werden soll, kommt nicht an",
-        "reminderListReadOnlyWaiting": "Nur lesbar: {{count}} Einträge, die hierher hochgeladen werden sollen, kommen nicht an"
+        "reminderListReadOnlyWaiting": "Nur lesbar: {{count}} Einträge, die hierher hochgeladen werden sollen, kommen nicht an",
+        "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
+        "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
+        "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

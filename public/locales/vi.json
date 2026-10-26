@@ -1177,7 +1177,6 @@
         "pickOne": "Chọn một sự kiện",
         "pickOneHint": "Thời gian, địa điểm và lời nhắc sẽ hiện ở đây.",
         "syncTargetAssigneeAmbiguous": "Nhiều lịch đặt người này làm người được giao mặc định. Hãy tự chọn đích.",
-        "syncTargetSeveralAssignees": "Có nhiều người được giao, nên việc giao không chọn lịch nào. Thay vào đó dùng: {{target}}.",
         "filtersSources": "Lịch",
         "filterUnassigned": "Chưa được giao",
         "dateSpanSpoken": "từ {{from}} đến {{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "Sự kiện này không còn tồn tại.",
         "errorSelectedCalendarGone": "Lịch đã chọn không còn tồn tại.",
         "errorSeriesNoOccurrence": "Với kiểu lặp lại này sẽ không có sự kiện nào từ ngày bắt đầu.",
-        "localCalendarUploadsHint": "Sự kiện trong lịch này được tải lên iCloud qua Apple Calendar."
+        "localCalendarUploadsHint": "Sự kiện trong lịch này được tải lên iCloud qua Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "Không có lịch nào có đúng những người này làm người được giao mặc định, nên việc giao không chọn lịch nào. Thay vào đó dùng: {{target}}."
     },
     "noteCategories": {
         "categories": "Danh mục",
@@ -2395,7 +2395,10 @@
             "errorNoCalendarName": "Nhập tên cho lịch mới.",
             "dropzoneTitle": "Kéo tệp ICS vào đây hoặc chọn một tệp",
             "dropzoneTitleTouch": "Chạm để chọn tệp ICS",
-            "dropzoneHint": "Chỉ tệp .ics"
+            "dropzoneHint": "Chỉ tệp .ics",
+            "assigneesLabel": "Giao cho",
+            "assigneesHint": "Sự kiện mới nhận những người này. Sự kiện đã nhập với cùng ID sẽ được thêm họ - kể cả khi việc giao đã bị gỡ thủ công.",
+            "successWithAssigned": "Đã nhập: {{imported}}, đã có: {{skipped}}, trong đó vừa được giao: {{assigned}}."
         },
         "memberPhoneLabel": "Số điện thoại (tùy chọn)",
         "memberEmailLabel": "Email (tùy chọn)",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "Từ nay không thông báo nào đi qua kênh này nữa, kể cả loại khẩn. Địa chỉ và thông tin đăng nhập phải nhập lại từ đầu cho kênh mới.",
         "apiTokensMcpHint": "Các token này cũng hoạt động như token Bearer cho điểm cuối MCP tại /mcp (ví dụ trong Claude Desktop, để tạo công việc, món hàng cần mua và sự kiện bằng AI).",
         "sync": {
-            "defaultAssignee": "Người được giao mặc định",
             "defaultAssigneeNone": "Không có",
-            "defaultAssigneeHint": "Các sự kiện mới đồng bộ sẽ tự động được giao cho người này.",
-            "defaultAssigneeRoutingHint": "Người được giao mặc định: sự kiện từ một lịch được giao cho người đã chọn ở đó, và sự kiện mới chỉ giao cho người đó sẽ được tạo trong lịch ấy. Áp dụng cho lịch Google và CalDAV, không áp dụng cho Apple hay Outlook.",
             "backfillTitle": "Bổ sung người được giao",
             "backfillDescription": "Người được giao mặc định chỉ áp dụng cho các lịch hẹn được nhập sau khi thiết lập. Tại đây bạn có thể áp dụng một lần cho các lịch hẹn đã được nhập từ tất cả tài khoản.",
             "backfillAction": "Áp dụng cho lịch hẹn hiện có",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "Hiện tiếp",
             "backfillMovedAll": "Chọn tất cả",
             "backfillMovedChange": "Từ {{from}} sang {{to}}",
-            "backfillDescriptionMore": "Các lịch hẹn chưa có người được giao sẽ nhận trực tiếp. Các lịch hẹn vẫn mang người được giao mặc định của lịch khác được liệt kê từng mục để bạn chọn. Mọi việc giao khác sẽ giữ nguyên."
+            "backfillDescriptionMore": "Các lịch hẹn chưa có người được giao sẽ nhận trực tiếp. Các lịch hẹn vẫn mang người được giao mặc định của lịch khác được liệt kê từng mục để bạn chọn. Mọi việc giao khác sẽ giữ nguyên.",
+            "defaultAssignees": "Người được giao mặc định",
+            "defaultAssigneesHint": "Sự kiện mới đồng bộ được tự động giao cho những người này. Người đầu tiên quyết định màu.",
+            "defaultAssigneesRoutingHint": "Người được giao mặc định: sự kiện từ một lịch nhận những người đã chọn ở đó, và sự kiện mới được giao đúng cho những người này sẽ được tạo trong lịch đó. Áp dụng cho lịch Google và CalDAV, không áp dụng cho Apple hay Outlook."
         },
         "calendarAssignMeLabel": "Giao sự kiện mới cho tôi",
         "calendarDefaultRemindersLabel": "Nhắc nhở mặc định",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "Chỉ đọc: {{count}} sự kiện đang chờ tải lên đây sẽ không đến nơi",
         "reminderListReadOnly": "Chỉ đọc: không thể lưu mục mới tại đây",
         "reminderListReadOnlyWaiting_one": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi",
-        "reminderListReadOnlyWaiting": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi"
+        "reminderListReadOnlyWaiting": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi",
+        "reminderListAssigneesTasksOnly": "Chỉ đặt được người cho danh sách đi vào Công việc.",
+        "syncAssigneeNotMember": "Ở đây chỉ chọn được thành viên trong gia đình.",
+        "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

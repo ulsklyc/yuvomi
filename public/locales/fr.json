@@ -1177,7 +1177,6 @@
         "pickOne": "Choisissez un événement",
         "pickOneHint": "L’heure, le lieu et les rappels apparaissent ici.",
         "syncTargetAssigneeAmbiguous": "Plusieurs calendriers ont cette personne comme attribution par défaut. Choisis toi-même la destination.",
-        "syncTargetSeveralAssignees": "Plusieurs personnes sont assignées, l'attribution ne choisit donc aucun calendrier. Utilisé à la place : {{target}}.",
         "filtersSources": "Calendriers",
         "filterUnassigned": "Non attribués",
         "dateSpanSpoken": "du {{from}} au {{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "Cet événement n’existe plus.",
         "errorSelectedCalendarGone": "Le calendrier choisi n’existe plus.",
         "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début.",
-        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar."
+        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "Aucun calendrier n’a exactement ces personnes comme attribution par défaut, l’attribution n’en choisit donc aucun. Utilisé à la place : {{target}}."
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -2284,7 +2284,10 @@
             "errorNoCalendarName": "Saisis un nom pour le nouveau calendrier.",
             "dropzoneTitle": "Déposez un fichier ICS ici ou choisissez-en un",
             "dropzoneTitleTouch": "Touchez pour choisir un fichier ICS",
-            "dropzoneHint": "Fichiers .ics uniquement"
+            "dropzoneHint": "Fichiers .ics uniquement",
+            "assigneesLabel": "Attribuer à",
+            "assigneesHint": "Les nouveaux événements reçoivent ces personnes. Un événement déjà importé avec le même identifiant les reçoit en plus - même si son attribution a été retirée à la main.",
+            "successWithAssigned": "Importés : {{imported}}, déjà présents : {{skipped}}, dont attribués maintenant : {{assigned}}."
         },
         "memberPhoneLabel": "Numéro de téléphone (facultatif)",
         "memberEmailLabel": "E-mail (facultatif)",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "Plus aucune notification ne partira par ce canal, pas même les urgentes. Adresse et identifiants devront être ressaisis intégralement pour un nouveau canal.",
         "apiTokensMcpHint": "Ces jetons fonctionnent aussi comme jetons Bearer pour le point de terminaison MCP sur /mcp (p. ex. dans Claude Desktop, pour créer des tâches, des articles de courses et des événements via l'IA).",
         "sync": {
-            "defaultAssignee": "Attribution par défaut",
             "defaultAssigneeNone": "Aucune",
-            "defaultAssigneeHint": "Les événements nouvellement synchronisés sont automatiquement attribués à cette personne.",
-            "defaultAssigneeRoutingHint": "Attribution par défaut: les événements d'un calendrier reçoivent la personne choisie pour lui, et un nouvel événement attribué uniquement à cette personne est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook.",
             "backfillTitle": "Compléter les attributions",
             "backfillDescription": "L’attribution par défaut ne s’applique qu’aux rendez-vous importés après sa définition. Ici, vous pouvez l’appliquer une fois aux rendez-vous déjà importés de tous les comptes.",
             "backfillAction": "Appliquer aux rendez-vous existants",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "Afficher les suivants",
             "backfillMovedAll": "Tout sélectionner",
             "backfillMovedChange": "De {{from}} à {{to}}",
-            "backfillDescriptionMore": "Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée."
+            "backfillDescriptionMore": "Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée.",
+            "defaultAssignees": "Attribution par défaut",
+            "defaultAssigneesHint": "Les événements nouvellement synchronisés sont attribués automatiquement à ces personnes. La première définit la couleur.",
+            "defaultAssigneesRoutingHint": "Attribution par défaut : les événements d’un calendrier reçoivent les personnes choisies pour lui, et un nouvel événement attribué exactement à ces personnes est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook."
         },
         "calendarAssignMeLabel": "M'attribuer les nouveaux événements",
         "calendarDefaultRemindersLabel": "Rappels par défaut",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "Lecture seule : {{count}} événements en attente d’envoi ici n’arriveront pas",
         "reminderListReadOnly": "Lecture seule : impossible d’enregistrer de nouvelles entrées ici",
         "reminderListReadOnlyWaiting_one": "Lecture seule : {{count}} entrée en attente d’envoi ici n’arrivera pas",
-        "reminderListReadOnlyWaiting": "Lecture seule : {{count}} entrées en attente d’envoi ici n’arriveront pas"
+        "reminderListReadOnlyWaiting": "Lecture seule : {{count}} entrées en attente d’envoi ici n’arriveront pas",
+        "reminderListAssigneesTasksOnly": "Les personnes ne se définissent que pour les listes qui vont dans les Tâches.",
+        "syncAssigneeNotMember": "Seuls les membres du foyer peuvent être choisis ici.",
+        "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

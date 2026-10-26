@@ -1177,7 +1177,6 @@
         "pickOne": "Velg en begivenhet",
         "pickOneHint": "Tid, sted og påminnelser vises her.",
         "syncTargetAssigneeAmbiguous": "Flere kalendere har denne personen som standardansvarlig. Velg målet selv.",
-        "syncTargetSeveralAssignees": "Flere personer er tildelt, så tildelingen velger ikke en kalender. Brukte i stedet: {{target}}.",
         "filtersSources": "Kalendere",
         "filterUnassigned": "Ikke tildelt",
         "dateSpanSpoken": "{{from}} til {{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "Denne avtalen finnes ikke lenger.",
         "errorSelectedCalendarGone": "Den valgte kalenderen finnes ikke lenger.",
         "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen.",
-        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar."
+        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "Ingen kalender har nøyaktig disse personene som standardansvarlige, så tildelingen velger ingen. Brukes i stedet: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -2432,7 +2432,10 @@
             "errorNoCalendarName": "Skriv inn et navn på den nye kalenderen.",
             "dropzoneTitle": "Dra en ICS-fil hit eller velg en",
             "dropzoneTitleTouch": "Trykk for å velge en ICS-fil",
-            "dropzoneHint": "Bare .ics-filer"
+            "dropzoneHint": "Bare .ics-filer",
+            "assigneesLabel": "Tildel til",
+            "assigneesHint": "Nye hendelser får disse personene. En hendelse som allerede er importert med samme ID, får dem i tillegg - også om tildelingen ble fjernet for hånd.",
+            "successWithAssigned": "Importert: {{imported}}, fantes allerede: {{skipped}}, av disse nå tildelt: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonnummer (valgfritt)",
         "memberEmailLabel": "E-post (valgfritt)",
@@ -3090,10 +3093,7 @@
         "notificationChannelDeleteConfirmDetail": "Ingen varslinger vil bli sendt gjennom denne kanalen fra nå av, ikke en gang hastevarsler. Adresse og påloggingsinformasjon må legges inn på nytt for en ny kanal.",
         "apiTokensMcpHint": "Disse tokenene fungerer også som Bearer-tokens for MCP-endepunktet på /mcp (f.eks. i Claude Desktop, for å opprette oppgaver, handlevarer og hendelser via AI).",
         "sync": {
-            "defaultAssignee": "Standardansvarlig",
             "defaultAssigneeNone": "Ingen",
-            "defaultAssigneeHint": "Nytt synkroniserte hendelser blir automatisk tildelt denne personen.",
-            "defaultAssigneeRoutingHint": "Standardansvarlig: hendelser fra en kalender får personen som er valgt der, og en ny hendelse tildelt kun til den personen blir opprettet i den kalenderen. Dette gjelder for Google- og CalDAV-kalendere, ikke for Apple eller Outlook.",
             "backfillTitle": "Fyll ut tildelinger",
             "backfillDescription": "En standardansvarlig gjelder kun for avtaler som er importert etter at den ble satt. Her kan du bruke den én gang på avtaler som allerede er importert fra alle kontoer.",
             "backfillAction": "Bruk på eksisterende avtaler",
@@ -3113,7 +3113,10 @@
             "backfillMovedNext": "Vis neste",
             "backfillMovedAll": "Velg alle",
             "backfillMovedChange": "Fra {{from}} til {{to}}",
-            "backfillDescriptionMore": "Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er."
+            "backfillDescriptionMore": "Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er.",
+            "defaultAssignees": "Standardansvarlige",
+            "defaultAssigneesHint": "Nylig synkroniserte hendelser tildeles automatisk disse personene. Den første bestemmer fargen.",
+            "defaultAssigneesRoutingHint": "Standardansvarlige: hendelser fra en kalender får personene som er valgt der, og en ny hendelse tildelt nøyaktig disse personene opprettes i den kalenderen. Dette gjelder Google- og CalDAV-kalendere, ikke Apple eller Outlook."
         },
         "calendarAssignMeLabel": "Tildel nye hendelser til meg",
         "calendarDefaultRemindersLabel": "Standardpåminnelser",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "Skrivebeskyttet: {{count}} avtaler som venter på opplasting hit, kommer ikke frem",
         "reminderListReadOnly": "Skrivebeskyttet: nye oppføringer kan ikke lagres her",
         "reminderListReadOnlyWaiting_one": "Skrivebeskyttet: {{count}} oppføring som venter på opplasting hit, kommer ikke frem",
-        "reminderListReadOnlyWaiting": "Skrivebeskyttet: {{count}} oppføringer som venter på opplasting hit, kommer ikke frem"
+        "reminderListReadOnlyWaiting": "Skrivebeskyttet: {{count}} oppføringer som venter på opplasting hit, kommer ikke frem",
+        "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
+        "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
+        "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

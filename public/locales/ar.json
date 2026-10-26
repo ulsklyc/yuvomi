@@ -1399,7 +1399,6 @@
         "pickOne": "اختر موعدًا",
         "pickOneHint": "يظهر الوقت والمكان والتذكيرات هنا.",
         "syncTargetAssigneeAmbiguous": "لدى عدة تقويمات هذا الشخص كإسناد افتراضي. اختر الوجهة بنفسك.",
-        "syncTargetSeveralAssignees": "تم إسناد عدة أشخاص، لذلك لا يختار الإسناد أي تقويم. المستخدَم بدلًا من ذلك: {{target}}.",
         "filtersSources": "التقويمات",
         "filterUnassigned": "غير مُسندة",
         "dateSpanSpoken": "من {{from}} إلى {{to}}",
@@ -1446,7 +1445,8 @@
         "errorEventGone": "هذا الموعد لم يعد موجودًا.",
         "errorSelectedCalendarGone": "التقويم المختار لم يعد موجودًا.",
         "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية.",
-        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar."
+        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "لا يوجد تقويم إسناده الافتراضي هؤلاء الأشخاص تمامًا، لذلك لا يختار الإسناد تقويمًا. المستخدم بدلًا من ذلك: {{target}}."
     },
     "noteCategories": {
         "categories": "الفئات",
@@ -2546,7 +2546,10 @@
             "errorNoCalendarName": "أدخل اسمًا للتقويم الجديد.",
             "dropzoneTitle": "اسحب ملف ICS إلى هنا أو اختر ملفًا",
             "dropzoneTitleTouch": "اضغط لاختيار ملف ICS",
-            "dropzoneHint": "ملفات .ics فقط"
+            "dropzoneHint": "ملفات .ics فقط",
+            "assigneesLabel": "إسناد إلى",
+            "assigneesHint": "تحصل الأحداث الجديدة على هؤلاء الأشخاص. ويُضافون إلى الحدث المستورد سابقًا بالمعرّف نفسه - حتى لو أُزيل إسناده يدويًا.",
+            "successWithAssigned": "تم الاستيراد: {{imported}}، موجودة بالفعل: {{skipped}}، أُسند منها الآن: {{assigned}}."
         },
         "memberPhoneLabel": "رقم الهاتف (اختياري)",
         "memberEmailLabel": "البريد الإلكتروني (اختياري)",
@@ -3345,10 +3348,7 @@
         "notificationChannelDeleteConfirmDetail": "لن يخرج عبر هذه القناة أي إشعار بعد الآن، ولا حتى العاجل منها. ويجب إدخال العنوان وبيانات الدخول من جديد كليًا لأي قناة أخرى.",
         "apiTokensMcpHint": "تعمل هذه الرموز أيضًا كرموز Bearer لنقطة نهاية MCP على /mcp (على سبيل المثال في Claude Desktop، لإنشاء المهام وعناصر التسوق والمواعيد باستخدام الذكاء الاصطناعي).",
         "sync": {
-            "defaultAssignee": "الإسناد الافتراضي",
             "defaultAssigneeNone": "بلا",
-            "defaultAssigneeHint": "تُسنَد الأحداث المُزامَنة حديثًا تلقائيًا إلى هذا الشخص.",
-            "defaultAssigneeRoutingHint": "الإسناد الافتراضي: تحصل مواعيد التقويم على الشخص المختار له، والموعد الجديد المُسند إلى هذا الشخص وحده يُنشأ في ذلك التقويم. ينطبق ذلك على تقويمات Google وCalDAV، وليس على Apple أو Outlook.",
             "backfillTitle": "استكمال الإسناد",
             "backfillDescription": "لا يسري الإسناد الافتراضي إلا على المواعيد المستوردة بعد تعيينه. يمكنك هنا تطبيقه مرة واحدة على المواعيد المستوردة بالفعل من جميع الحسابات.",
             "backfillAction": "تطبيق على المواعيد الموجودة",
@@ -3377,7 +3377,10 @@
             "backfillMovedNext": "عرض التالي",
             "backfillMovedAll": "تحديد الكل",
             "backfillMovedChange": "من {{from}} إلى {{to}}",
-            "backfillDescriptionMore": "تحصل المواعيد غير المسندة عليه مباشرة. أما المواعيد التي لا تزال تحمل الإسناد الافتراضي لتقويم آخر فتُعرض واحدًا واحدًا لتختار منها. أي إسناد آخر يبقى دون تغيير."
+            "backfillDescriptionMore": "تحصل المواعيد غير المسندة عليه مباشرة. أما المواعيد التي لا تزال تحمل الإسناد الافتراضي لتقويم آخر فتُعرض واحدًا واحدًا لتختار منها. أي إسناد آخر يبقى دون تغيير.",
+            "defaultAssignees": "الإسناد الافتراضي",
+            "defaultAssigneesHint": "تُسند الأحداث المتزامنة حديثًا تلقائيًا إلى هؤلاء الأشخاص. أولهم يحدد اللون.",
+            "defaultAssigneesRoutingHint": "الإسناد الافتراضي: تحصل الأحداث من التقويم على الأشخاص المختارين هناك، ويُنشأ الحدث الجديد المسند إلى هؤلاء الأشخاص تمامًا في ذلك التقويم. ينطبق هذا على تقويمات Google وCalDAV، وليس على Apple أو Outlook."
         },
         "calendarAssignMeLabel": "إسناد الأحداث الجديدة إليّ",
         "calendarDefaultRemindersLabel": "التذكيرات الافتراضية",
@@ -3727,7 +3730,10 @@
         "caldavCalendarReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} حدثًا بانتظار الرفع إلى هنا",
         "reminderListReadOnlyWaiting_two": "للقراءة فقط: لن يصل إدخالان ({{count}}) بانتظار الرفع إلى هنا",
         "reminderListReadOnlyWaiting_few": "للقراءة فقط: لن تصل {{count}} إدخالات بانتظار الرفع إلى هنا",
-        "reminderListReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} إدخالًا بانتظار الرفع إلى هنا"
+        "reminderListReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} إدخالًا بانتظار الرفع إلى هنا",
+        "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
+        "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
+        "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

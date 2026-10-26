@@ -1177,7 +1177,6 @@
         "pickOne": "Kies een afspraak",
         "pickOneHint": "Tijd, plaats en herinneringen verschijnen hier.",
         "syncTargetAssigneeAmbiguous": "Meerdere agenda's hebben deze persoon als standaardtoewijzing. Kies het doel zelf.",
-        "syncTargetSeveralAssignees": "Er zijn meerdere personen toegewezen, dus de toewijzing kiest geen agenda. In plaats daarvan geldt: {{target}}.",
         "filtersSources": "Agenda's",
         "filterUnassigned": "Niet toegewezen",
         "dateSpanSpoken": "{{from}} tot en met {{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "Deze afspraak bestaat niet meer.",
         "errorSelectedCalendarGone": "De gekozen agenda bestaat niet meer.",
         "errorSeriesNoOccurrence": "Met deze herhaling zou er vanaf de begindatum geen enkele afspraak zijn.",
-        "localCalendarUploadsHint": "Afspraken in deze agenda worden via Apple Calendar naar iCloud geüpload."
+        "localCalendarUploadsHint": "Afspraken in deze agenda worden via Apple Calendar naar iCloud geüpload.",
+        "syncTargetNoCalendarForPeople": "Geen agenda heeft precies deze personen als standaardtoewijzing, dus de toewijzing kiest er geen. In plaats daarvan: {{target}}."
     },
     "noteCategories": {
         "categories": "Categorieën",
@@ -2395,7 +2395,10 @@
             "errorNoCalendarName": "Voer een naam in voor de nieuwe agenda.",
             "dropzoneTitle": "Sleep een ICS-bestand hierheen of kies er een",
             "dropzoneTitleTouch": "Tik om een ICS-bestand te kiezen",
-            "dropzoneHint": "Alleen .ics-bestanden"
+            "dropzoneHint": "Alleen .ics-bestanden",
+            "assigneesLabel": "Toewijzen aan",
+            "assigneesHint": "Nieuwe afspraken krijgen deze personen. Een al geïmporteerde afspraak met dezelfde ID krijgt ze erbij - ook als de toewijzing met de hand was verwijderd.",
+            "successWithAssigned": "Geïmporteerd: {{imported}}, bestonden al: {{skipped}}, daarvan nu toegewezen: {{assigned}}."
         },
         "memberPhoneLabel": "Telefoonnummer (optioneel)",
         "memberEmailLabel": "E-mail (optioneel)",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "Via dit kanaal gaat er voortaan geen melding meer uit, ook geen urgente. Adres en inloggegevens moeten voor een nieuw kanaal helemaal opnieuw worden ingevoerd.",
         "apiTokensMcpHint": "Deze tokens werken ook als Bearer-tokens voor het MCP-eindpunt op /mcp (bijv. in Claude Desktop, om taken, boodschappen en afspraken via AI aan te maken).",
         "sync": {
-            "defaultAssignee": "Standaardtoewijzing",
             "defaultAssigneeNone": "Geen",
-            "defaultAssigneeHint": "Nieuw gesynchroniseerde afspraken worden automatisch aan deze persoon toegewezen.",
-            "defaultAssigneeRoutingHint": "Standaardtoewijzing: afspraken uit een agenda krijgen de daar gekozen persoon, en een nieuwe afspraak die alleen aan die persoon is toegewezen, wordt in die agenda aangemaakt. Dit geldt voor Google- en CalDAV-agenda's, niet voor Apple of Outlook.",
             "backfillTitle": "Toewijzingen aanvullen",
             "backfillDescription": "Een standaardtoewijzing geldt alleen voor afspraken die na het instellen zijn opgehaald. Hier kun je haar eenmalig toepassen op de afspraken die al uit alle accounts zijn opgehaald.",
             "backfillAction": "Toepassen op bestaande afspraken",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "Volgende tonen",
             "backfillMovedAll": "Alles selecteren",
             "backfillMovedChange": "Van {{from}} naar {{to}}",
-            "backfillDescriptionMore": "Afspraken zonder toewijzing krijgen haar direct. Afspraken die nog de standaardtoewijzing van een andere agenda dragen, staan één voor één ter keuze. Elke andere toewijzing blijft ongewijzigd."
+            "backfillDescriptionMore": "Afspraken zonder toewijzing krijgen haar direct. Afspraken die nog de standaardtoewijzing van een andere agenda dragen, staan één voor één ter keuze. Elke andere toewijzing blijft ongewijzigd.",
+            "defaultAssignees": "Standaardtoewijzing",
+            "defaultAssigneesHint": "Nieuw gesynchroniseerde afspraken worden automatisch aan deze personen toegewezen. De eerste bepaalt de kleur.",
+            "defaultAssigneesRoutingHint": "Standaardtoewijzing: afspraken uit een agenda krijgen de personen die daar gekozen zijn, en een nieuwe afspraak die precies aan deze personen is toegewezen, wordt in die agenda aangemaakt. Dit geldt voor Google- en CalDAV-agenda’s, niet voor Apple of Outlook."
         },
         "calendarAssignMeLabel": "Nieuwe afspraken aan mij toewijzen",
         "calendarDefaultRemindersLabel": "Standaardherinneringen",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "Alleen-lezen: {{count}} afspraken die hierheen moeten worden geüpload, komen niet aan",
         "reminderListReadOnly": "Alleen-lezen: hier kunnen geen nieuwe items worden opgeslagen",
         "reminderListReadOnlyWaiting_one": "Alleen-lezen: {{count}} item dat hierheen moet worden geüpload, komt niet aan",
-        "reminderListReadOnlyWaiting": "Alleen-lezen: {{count}} items die hierheen moeten worden geüpload, komen niet aan"
+        "reminderListReadOnlyWaiting": "Alleen-lezen: {{count}} items die hierheen moeten worden geüpload, komen niet aan",
+        "reminderListAssigneesTasksOnly": "Personen kunnen alleen worden ingesteld voor lijsten die naar Taken gaan.",
+        "syncAssigneeNotMember": "Hier kunnen alleen leden van het huishouden worden gekozen.",
+        "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

@@ -9022,7 +9022,7 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
           // wenn der nicht (mehr) angeboten wird. Der Kalendername kommt vom
           // Anbieter, deshalb textContent.
           const gilt = Array.from(syncTargetSelect.options).find((o) => o.value === syncTargetSelect.value);
-          mehrerePersonenHint.textContent = t('calendar.syncTargetSeveralAssignees', { target: gilt?.textContent ?? '' });
+          mehrerePersonenHint.textContent = t('calendar.syncTargetNoCalendarForPeople', { target: gilt?.textContent ?? '' });
           mehrerePersonenHint.closest('details')?.setAttribute('open', '');
         }
       }

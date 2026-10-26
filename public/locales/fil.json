@@ -1195,7 +1195,6 @@
         "pickOne": "Pumili ng event",
         "pickOneHint": "Dito lalabas ang oras, lugar at mga paalala.",
         "syncTargetAssigneeAmbiguous": "Ilang kalendaryo ang may taong ito bilang default na nakatalaga. Piliin mismo ang target.",
-        "syncTargetSeveralAssignees": "Maraming tao ang nakatalaga, kaya walang kalendaryong pinipili ang pagtatalaga. Ginagamit sa halip: {{target}}.",
         "filtersSources": "Mga kalendaryo",
         "filterUnassigned": "Walang nakatalaga",
         "dateSpanSpoken": "{{from}} hanggang {{to}}",
@@ -1235,7 +1234,8 @@
         "errorEventGone": "Wala na ang pangyayaring ito.",
         "errorSelectedCalendarGone": "Wala na ang napiling kalendaryo.",
         "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula.",
-        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito."
+        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito.",
+        "syncTargetNoCalendarForPeople": "Walang kalendaryong may eksaktong mga taong ito bilang default na naaatasan, kaya walang pinipili ang pag-aatas. Ginagamit sa halip: {{target}}."
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -2477,7 +2477,10 @@
             "errorNoCalendarName": "Maglagay ng pangalan para sa bagong kalendaryo.",
             "dropzoneTitle": "I-drag dito ang ICS file o pumili ng isa",
             "dropzoneTitleTouch": "I-tap para pumili ng ICS file",
-            "dropzoneHint": "Mga .ics file lang"
+            "dropzoneHint": "Mga .ics file lang",
+            "assigneesLabel": "Iatas kay",
+            "assigneesHint": "Makukuha ng mga bagong kaganapan ang mga taong ito. Idaragdag sila sa kaganapang na-import na may parehong ID - kahit inalis nang manu-mano ang pag-aatas nito.",
+            "successWithAssigned": "Na-import: {{imported}}, umiiral na: {{skipped}}, sa mga ito ay naiatas na ngayon: {{assigned}}."
         },
         "memberPhoneLabel": "Numero ng telepono (opsyonal)",
         "memberEmailLabel": "Email (opsyonal)",
@@ -3108,10 +3111,7 @@
         "notificationChannelDeleteConfirmDetail": "Wala nang abisong lalabas sa channel na ito mula ngayon, kahit ang mga agaran. Kailangang ilagay muli ang address at mga kredensyal para sa bagong channel.",
         "apiTokensMcpHint": "Gumagana rin ang mga token na ito bilang Bearer token para sa MCP endpoint sa /mcp (hal. sa Claude Desktop, para gumawa ng mga gawain, item sa pamimili at kaganapan sa pamamagitan ng AI).",
         "sync": {
-            "defaultAssignee": "Default na naaatasan",
             "defaultAssigneeNone": "Wala",
-            "defaultAssigneeHint": "Awtomatikong inaatasan sa taong ito ang mga bagong naka-sync na kaganapan.",
-            "defaultAssigneeRoutingHint": "Default na naaatasan: ang mga event mula sa kalendaryo ay itinatalaga sa taong pinili rito, at ang bagong event na itinalaga lamang sa taong iyon ay nilikha sa kalendaryong iyon. Para sa mga kalendaryong Google at CalDAV, hindi para sa Apple o Outlook.",
             "backfillTitle": "Punan ang mga pag-aatas",
             "backfillDescription": "Ang default na naaatasan ay nalalapat lamang sa mga appointment na na-import matapos itong itakda. Dito ay maaari mong ilapat ito nang minsan sa mga appointment na na-import na mula sa lahat ng account.",
             "backfillAction": "Ilapat sa mga kasalukuyang appointment",
@@ -3131,7 +3131,10 @@
             "backfillMovedNext": "Ipakita ang susunod",
             "backfillMovedAll": "Piliin lahat",
             "backfillMovedChange": "Mula kay {{from}} papunta kay {{to}}",
-            "backfillDescriptionMore": "Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas."
+            "backfillDescriptionMore": "Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas.",
+            "defaultAssignees": "Mga default na naaatasan",
+            "defaultAssigneesHint": "Awtomatikong iaatas sa mga taong ito ang mga bagong na-sync na kaganapan. Ang una ang nagtatakda ng kulay.",
+            "defaultAssigneesRoutingHint": "Mga default na naaatasan: nakukuha ng mga kaganapan mula sa isang kalendaryo ang mga taong pinili roon, at ang bagong kaganapang iniatas sa eksaktong mga taong ito ay nililikha sa kalendaryong iyon. Para ito sa mga kalendaryong Google at CalDAV, hindi sa Apple o Outlook."
         },
         "calendarAssignMeLabel": "Iatas sa akin ang mga bagong kaganapan",
         "calendarDefaultRemindersLabel": "Mga default na paalala",
@@ -3423,7 +3426,10 @@
         "caldavCalendarReadOnlyWaiting": "Read-only: hindi darating ang {{count}} event na naghihintay ma-upload dito",
         "reminderListReadOnly": "Read-only: hindi maaaring mag-save ng bagong entry dito",
         "reminderListReadOnlyWaiting_one": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
-        "reminderListReadOnlyWaiting": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito"
+        "reminderListReadOnlyWaiting": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
+        "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
+        "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
+        "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

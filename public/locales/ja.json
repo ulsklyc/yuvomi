@@ -1177,7 +1177,6 @@
         "pickOne": "予定を選択",
         "pickOneHint": "時間、場所、リマインダーがここに表示されます。",
         "syncTargetAssigneeAmbiguous": "複数のカレンダーでこの人が既定の割り当てになっています。保存先を自分で選んでください。",
-        "syncTargetSeveralAssignees": "複数の人が割り当てられているため、割り当てではカレンダーを選びません。代わりに使用: {{target}}",
         "filtersSources": "カレンダー",
         "filterUnassigned": "割り当てなし",
         "dateSpanSpoken": "{{from}}から{{to}}まで",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "この予定はもう存在しません。",
         "errorSelectedCalendarGone": "選んだカレンダーはもう存在しません。",
         "errorSeriesNoOccurrence": "この繰り返しでは、開始日以降に予定が1件もありません。",
-        "localCalendarUploadsHint": "このカレンダーの予定は Apple Calendar を通じて iCloud にアップロードされます。"
+        "localCalendarUploadsHint": "このカレンダーの予定は Apple Calendar を通じて iCloud にアップロードされます。",
+        "syncTargetNoCalendarForPeople": "ちょうどこれらの人を既定の割り当て先にしているカレンダーがないため、割り当てからはカレンダーを選びません。代わりに使用: {{target}}。"
     },
     "noteCategories": {
         "categories": "カテゴリー",
@@ -2284,7 +2284,10 @@
             "errorNoCalendarName": "新しいカレンダーの名前を入力してください。",
             "dropzoneTitle": "ICS ファイルをここにドロップするか選択",
             "dropzoneTitleTouch": "タップしてICSファイルを選択",
-            "dropzoneHint": ".ics ファイルのみ"
+            "dropzoneHint": ".ics ファイルのみ",
+            "assigneesLabel": "割り当て先",
+            "assigneesHint": "新しい予定にはこれらの人が割り当てられます。同じ ID ですでにインポートされた予定には追加されます（割り当てが手動で外されていた場合も）。",
+            "successWithAssigned": "インポート: {{imported}} 件、既存: {{skipped}} 件、そのうち今回割り当て: {{assigned}} 件。"
         },
         "memberPhoneLabel": "電話番号（任意）",
         "memberEmailLabel": "メールアドレス（任意）",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "このチャネルからは今後いっさい通知が送られません。緊急のものも同様です。新しいチャネルには宛先と認証情報を一から入力し直す必要があります。",
         "apiTokensMcpHint": "これらのトークンは、/mcp の MCP エンドポイント用の Bearer トークンとしても機能します（例: Claude Desktop で、AI によりタスク・買い物リスト・予定を作成）。",
         "sync": {
-            "defaultAssignee": "既定の割り当て先",
             "defaultAssigneeNone": "なし",
-            "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。",
-            "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。",
             "backfillTitle": "割り当てを補完",
             "backfillDescription": "既定の割り当て先は、設定後に取り込まれた予定にだけ適用されます。ここでは、すべてのアカウントからすでに取り込まれた予定に一度だけ適用できます。",
             "backfillAction": "既存の予定に適用",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "次を表示",
             "backfillMovedAll": "すべて選択",
             "backfillMovedChange": "{{from}} から {{to}} へ",
-            "backfillDescriptionMore": "割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。"
+            "backfillDescriptionMore": "割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。",
+            "defaultAssignees": "既定の割り当て先",
+            "defaultAssigneesHint": "新しく同期された予定は自動的にこれらの人に割り当てられます。最初の人が色を決めます。",
+            "defaultAssigneesRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、ちょうどこれらの人に割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple や Outlook は対象外です。"
         },
         "calendarAssignMeLabel": "新しい予定を自分に割り当てる",
         "calendarDefaultRemindersLabel": "既定のリマインダー",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている予定 {{count}} 件は届きません",
         "reminderListReadOnly": "読み取り専用：ここには新しい項目を保存できません",
         "reminderListReadOnlyWaiting_one": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません",
-        "reminderListReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません"
+        "reminderListReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません",
+        "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
+        "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
+        "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

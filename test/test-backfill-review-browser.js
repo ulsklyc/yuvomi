@@ -37,10 +37,12 @@ const MOVED = [
   {
     event_id: 41, title: 'Zahnarzt <Probe>', start_datetime: '2036-02-04T10:00', all_day: 0,
     calendar_name: 'Familie', from_user_id: 2, from_name: 'Maria', to_user_id: 3, to_name: 'Tom',
+    from_user_ids: [2], from_names: ['Maria'], to_user_ids: [3], to_names: ['Tom'],
   },
   {
     event_id: 42, title: 'Schwimmen', start_datetime: '2036-02-05', all_day: 1,
     calendar_name: 'Familie', from_user_id: 2, from_name: 'Maria', to_user_id: 3, to_name: 'Tom',
+    from_user_ids: [2], from_names: ['Maria'], to_user_ids: [3], to_names: ['Tom'],
   },
 ];
 
@@ -109,7 +111,7 @@ test('die Rueckfrage listet jeden umgezogenen Termin und schickt nur die abgehak
     assert.deepEqual(posts[0], {
       expected_count: 3,
       expected_token: TOKEN,
-      moves: [{ event_id: 42, from_user_id: 2, to_user_id: 3 }],
+      moves: [{ event_id: 42, from_user_ids: [2], to_user_ids: [3] }],
     });
   } finally {
     await page.close();
@@ -163,6 +165,7 @@ test('eine gekuerzte Liste sagt, wie viele es insgesamt sind (#1307)', async () 
 const THIRD = {
   event_id: 43, title: 'Chor', start_datetime: '2036-02-06T18:00', all_day: 0,
   calendar_name: 'Familie', from_user_id: 2, from_name: 'Maria', to_user_id: 3, to_name: 'Tom',
+    from_user_ids: [2], from_names: ['Maria'], to_user_ids: [3], to_names: ['Tom'],
 };
 const PAGES = {
   '': { moved: MOVED, moved_total: 3, moved_offset: 0, moved_next: '42:2036-02-05' },
@@ -187,7 +190,7 @@ test('hinter der ersten Seite wird geblaettert, ohne sie zu uebernehmen (#1307)'
 
     await clickPastDeadTime(page, '#backfill-review-ok');
     await page.waitForFunction(() => !document.querySelector('#backfill-review-form'));
-    assert.deepEqual(posts.map((p) => p.moves), [[{ event_id: 43, from_user_id: 2, to_user_id: 3 }]]);
+    assert.deepEqual(posts.map((p) => p.moves), [[{ event_id: 43, from_user_ids: [2], to_user_ids: [3] }]]);
   } finally {
     await page.close();
   }

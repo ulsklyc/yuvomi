@@ -1177,7 +1177,6 @@
         "pickOne": "Scegli un evento",
         "pickOneHint": "Orario, luogo e promemoria appaiono qui.",
         "syncTargetAssigneeAmbiguous": "Più calendari hanno questa persona come assegnazione predefinita. Scegli tu la destinazione.",
-        "syncTargetSeveralAssignees": "Sono assegnate più persone, quindi l'assegnazione non sceglie alcun calendario. Si usa invece: {{target}}.",
         "filtersSources": "Calendari",
         "filterUnassigned": "Non assegnati",
         "dateSpanSpoken": "dal {{from}} al {{to}}",
@@ -1217,7 +1216,8 @@
         "errorEventGone": "Questo evento non esiste più.",
         "errorSelectedCalendarGone": "Il calendario scelto non esiste più.",
         "errorSeriesNoOccurrence": "Con questa ripetizione non ci sarebbe nessun evento a partire dalla data di inizio.",
-        "localCalendarUploadsHint": "Gli eventi di questo calendario vengono caricati su iCloud tramite Apple Calendar."
+        "localCalendarUploadsHint": "Gli eventi di questo calendario vengono caricati su iCloud tramite Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "Nessun calendario ha esattamente queste persone come assegnazione predefinita, quindi l’assegnazione non ne sceglie nessuno. Usato invece: {{target}}."
     },
     "noteCategories": {
         "categories": "Categorie",
@@ -2284,7 +2284,10 @@
             "errorNoCalendarName": "Inserisci un nome per il nuovo calendario.",
             "dropzoneTitle": "Trascina qui un file ICS o sceglilo",
             "dropzoneTitleTouch": "Tocca per scegliere un file ICS",
-            "dropzoneHint": "Solo file .ics"
+            "dropzoneHint": "Solo file .ics",
+            "assigneesLabel": "Assegna a",
+            "assigneesHint": "I nuovi eventi ricevono queste persone. Un evento già importato con lo stesso ID le riceve in aggiunta - anche se la sua assegnazione è stata rimossa a mano.",
+            "successWithAssigned": "Importati: {{imported}}, già presenti: {{skipped}}, di cui ora assegnati: {{assigned}}."
         },
         "memberPhoneLabel": "Numero di telefono (opzionale)",
         "memberEmailLabel": "E-mail (opzionale)",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "Da questo canale non partirà più alcuna notifica, nemmeno quelle urgenti. Indirizzo e credenziali andranno reinseriti da capo per un nuovo canale.",
         "apiTokensMcpHint": "Questi token funzionano anche come token Bearer per l'endpoint MCP su /mcp (ad es. in Claude Desktop, per creare attività, articoli della spesa ed eventi tramite IA).",
         "sync": {
-            "defaultAssignee": "Assegnazione predefinita",
             "defaultAssigneeNone": "Nessuno",
-            "defaultAssigneeHint": "Gli eventi appena sincronizzati vengono assegnati automaticamente a questa persona.",
-            "defaultAssigneeRoutingHint": "Assegnazione predefinita: gli eventi di un calendario ricevono la persona scelta lì, e un nuovo evento assegnato solo a quella persona viene creato in quel calendario. Vale per i calendari Google e CalDAV, non per Apple o Outlook.",
             "backfillTitle": "Completa le assegnazioni",
             "backfillDescription": "L’assegnazione predefinita vale solo per gli appuntamenti importati dopo averla impostata. Qui puoi applicarla una volta agli appuntamenti già importati da tutti gli account.",
             "backfillAction": "Applica agli appuntamenti esistenti",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "Mostra i successivi",
             "backfillMovedAll": "Seleziona tutti",
             "backfillMovedChange": "Da {{from}} a {{to}}",
-            "backfillDescriptionMore": "Gli appuntamenti senza assegnazione la ricevono direttamente. Quelli che portano ancora l’assegnazione predefinita di un altro calendario compaiono uno per uno da scegliere. Ogni altra assegnazione resta invariata."
+            "backfillDescriptionMore": "Gli appuntamenti senza assegnazione la ricevono direttamente. Quelli che portano ancora l’assegnazione predefinita di un altro calendario compaiono uno per uno da scegliere. Ogni altra assegnazione resta invariata.",
+            "defaultAssignees": "Assegnazione predefinita",
+            "defaultAssigneesHint": "I nuovi eventi sincronizzati vengono assegnati automaticamente a queste persone. La prima determina il colore.",
+            "defaultAssigneesRoutingHint": "Assegnazione predefinita: gli eventi di un calendario ricevono le persone scelte lì, e un nuovo evento assegnato esattamente a queste persone viene creato in quel calendario. Vale per i calendari Google e CalDAV, non per Apple o Outlook."
         },
         "calendarAssignMeLabel": "Assegna a me i nuovi eventi",
         "calendarDefaultRemindersLabel": "Promemoria predefiniti",
@@ -3405,7 +3408,10 @@
         "caldavCalendarReadOnlyWaiting": "Sola lettura: {{count}} eventi in attesa di caricamento qui non arriveranno",
         "reminderListReadOnly": "Sola lettura: qui non si possono salvare nuove voci",
         "reminderListReadOnlyWaiting_one": "Sola lettura: {{count}} voce in attesa di caricamento qui non arriverà",
-        "reminderListReadOnlyWaiting": "Sola lettura: {{count}} voci in attesa di caricamento qui non arriveranno"
+        "reminderListReadOnlyWaiting": "Sola lettura: {{count}} voci in attesa di caricamento qui non arriveranno",
+        "reminderListAssigneesTasksOnly": "Le persone si impostano solo per liste che finiscono nelle Attività.",
+        "syncAssigneeNotMember": "Qui si possono scegliere solo membri della famiglia.",
+        "syncAssigneeUnknown": "Questa persona non esiste più. Ricarica la pagina."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

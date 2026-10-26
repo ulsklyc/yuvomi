@@ -376,6 +376,13 @@ export const CASE_MESSAGES = new Map([
   // dieser Satz ist derselbe wie dort.
   ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
   ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
+  // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
+  // Auswahl bietet nur Mitglieder an, beide Saetze erreicht nur ein veralteter
+  // Stand (Person entfernt, Konto geloescht). Die Einkaufsliste nennt, warum
+  // sie keine Personen traegt.
+  ['calendar_assignee_not_member', 'settings.syncAssigneeNotMember'],
+  ['calendar_assignee_unknown', 'settings.syncAssigneeUnknown'],
+  ['reminder_list_assignee_not_tasks', 'settings.reminderListAssigneesTasksOnly'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
   // Eingaben, die der Server beim Speichern abweist, und was der
   // Verbindungstest von Immich zurueckbekommt: ein abgelehnter API-Schluessel

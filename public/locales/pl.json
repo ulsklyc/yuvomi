@@ -1343,7 +1343,6 @@
         "pickOne": "Wybierz wydarzenie",
         "pickOneHint": "Tutaj pojawią się godzina, miejsce i przypomnienia.",
         "syncTargetAssigneeAmbiguous": "Kilka kalendarzy ma tę osobę jako domyślne przypisanie. Wybierz cel samodzielnie.",
-        "syncTargetSeveralAssignees": "Przypisano kilka osób, więc przypisanie nie wybiera kalendarza. Zamiast tego obowiązuje: {{target}}.",
         "filtersSources": "Kalendarze",
         "filterUnassigned": "Nieprzypisane",
         "dateSpanSpoken": "od {{from}} do {{to}}",
@@ -1387,7 +1386,8 @@
         "errorEventGone": "To wydarzenie już nie istnieje.",
         "errorSelectedCalendarGone": "Wybrany kalendarz już nie istnieje.",
         "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia.",
-        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar."
+        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar.",
+        "syncTargetNoCalendarForPeople": "Żaden kalendarz nie ma dokładnie tych osób jako domyślnego przypisania, więc przypisanie nie wybiera kalendarza. Zamiast tego: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -2616,7 +2616,10 @@
             "errorNoCalendarName": "Podaj nazwę nowego kalendarza.",
             "dropzoneTitle": "Przeciągnij tu plik ICS lub wybierz go",
             "dropzoneTitleTouch": "Dotknij, aby wybrać plik ICS",
-            "dropzoneHint": "Tylko pliki .ics"
+            "dropzoneHint": "Tylko pliki .ics",
+            "assigneesLabel": "Przypisz do",
+            "assigneesHint": "Nowe wydarzenia dostają te osoby. Wydarzenie już zaimportowane z tym samym ID dostaje je dodatkowo - nawet jeśli jego przypisanie usunięto ręcznie.",
+            "successWithAssigned": "Zaimportowano: {{imported}}, już istniało: {{skipped}}, z tego teraz przypisano: {{assigned}}."
         },
         "memberPhoneLabel": "Numer telefonu (opcjonalnie)",
         "memberEmailLabel": "E-mail (opcjonalnie)",
@@ -3265,10 +3268,7 @@
         "notificationChannelDeleteConfirmDetail": "Tym kanałem nie wyjdzie już żadne powiadomienie, nawet pilne. Adres i dane logowania trzeba będzie wprowadzić od nowa dla kolejnego kanału.",
         "apiTokensMcpHint": "Te tokeny działają również jako tokeny Bearer dla punktu końcowego MCP pod adresem /mcp (np. w Claude Desktop, aby tworzyć zadania, produkty na liście zakupów i wydarzenia za pomocą AI).",
         "sync": {
-            "defaultAssignee": "Domyślne przypisanie",
             "defaultAssigneeNone": "Brak",
-            "defaultAssigneeHint": "Nowo zsynchronizowane wydarzenia są automatycznie przypisywane do tej osoby.",
-            "defaultAssigneeRoutingHint": "Domyślne przypisanie: wydarzenia z kalendarza otrzymują wybraną tam osobę, a nowe wydarzenie przypisane tylko tej osobie jest tworzone w tym kalendarzu. Dotyczy kalendarzy Google i CalDAV, nie Apple ani Outlook.",
             "backfillTitle": "Uzupełnij przypisania",
             "backfillDescription": "Domyślne przypisanie dotyczy tylko terminów pobranych po jego ustawieniu. Tutaj możesz jednorazowo zastosować je do terminów już pobranych ze wszystkich kont.",
             "backfillAction": "Zastosuj do istniejących terminów",
@@ -3294,7 +3294,10 @@
             "backfillMovedNext": "Pokaż następne",
             "backfillMovedAll": "Zaznacz wszystkie",
             "backfillMovedChange": "Z {{from}} na {{to}}",
-            "backfillDescriptionMore": "Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian."
+            "backfillDescriptionMore": "Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian.",
+            "defaultAssignees": "Domyślne przypisanie",
+            "defaultAssigneesHint": "Nowo zsynchronizowane wydarzenia są automatycznie przypisywane tym osobom. Pierwsza określa kolor.",
+            "defaultAssigneesRoutingHint": "Domyślne przypisanie: wydarzenia z kalendarza dostają wybrane tam osoby, a nowe wydarzenie przypisane dokładnie tym osobom powstaje w tym kalendarzu. Dotyczy kalendarzy Google i CalDAV, nie Apple ani Outlook."
         },
         "calendarAssignMeLabel": "Przypisuj nowe wydarzenia do mnie",
         "calendarDefaultRemindersLabel": "Domyślne przypomnienia",
@@ -3637,7 +3640,10 @@
         "caldavCalendarReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wydarzenia czekające na przesłanie tutaj nie dotrą",
         "caldavCalendarReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wydarzeń czekających na przesłanie tutaj nie dotrze",
         "reminderListReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wpisy czekające na przesłanie tutaj nie dotrą",
-        "reminderListReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wpisów czekających na przesłanie tutaj nie dotrze"
+        "reminderListReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wpisów czekających na przesłanie tutaj nie dotrze",
+        "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
+        "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
+        "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

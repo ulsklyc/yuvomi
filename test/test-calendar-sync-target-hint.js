@@ -178,7 +178,7 @@ const SEVERAL = '#event-sync-target-several-hint';
 const AMBIGUOUS = '#event-sync-target-assignee-hint';
 
 // Der Loader-Stub von t() gibt den Schluessel zurueck, mit Werten dahinter.
-const severalText = (target) => `calendar.syncTargetSeveralAssignees${JSON.stringify({ target })}`;
+const severalText = (target) => `calendar.syncTargetNoCalendarForPeople${JSON.stringify({ target })}`;
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
