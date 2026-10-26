@@ -22,8 +22,10 @@
  * behaelt die alte Form - er wirkt dann genau wie bisher, nie schlechter.
  */
 
-import { occurrenceClock, seriesReadingZone } from './calendar-events.js';
-import { hasExplicitZone, localToUTCOccurrence } from '../utils/timezone.js';
+import {
+  MAX_EXPANSION_ITERATIONS, expandRecurringEvents, occurrenceClock, occurrenceSlotOf, seriesReadingZone,
+} from './calendar-events.js';
+import { hasExplicitZone, localToUTCOccurrence, shiftDateKey } from '../utils/timezone.js';
 
 const RAW_DATE_TIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z?)$/i;
 
@@ -94,11 +96,12 @@ export function occurrenceKeyFromRaw(raw, series, { householdZone = null, clock 
  * Legt die eingelesenen Ausnahmen einer Serie ab und heilt die alte Form.
  *
  * Additiv wie bisher (`INSERT OR IGNORE`): eine lokal ausgenommene Ausnahme
- * bleibt stehen. Geheilt wird genau die Zeile, die der Importer bis Schritt 5
- * fuer DENSELBEN Rohwert geschrieben hat - nur wenn der Schluessel jetzt ein
- * anderer ist und kein anderer Rohwert dieser Lieferung die alte Form noch
- * braucht. Jeder Empfang heilt so, was er liefert; was er nicht mehr liefert,
- * bleibt bis zur Migration (Schritt 6) in der alten Form.
+ * bleibt stehen. Geheilt wird die Zeile, die der Importer bis Schritt 5 fuer
+ * DENSELBEN Rohwert geschrieben hat - nur wenn der Schluessel jetzt ein anderer
+ * ist, kein anderer Rohwert dieser Lieferung die alte Form noch braucht und die
+ * alte Zeile kein ANDERES Vorkommen der Serie meinen kann (`healable`). Jeder
+ * Empfang heilt so, was er liefert; was er nicht mehr liefert oder was offen
+ * bleibt, bleibt bis zur Migration (Schritt 6) in der alten Form.
  *
  * Synchron, kein `await`: Lesen und Schreiben derselben Serie in einem Zug.
  *
@@ -112,9 +115,7 @@ export function storeImportedExceptions(database, eventId, ev) {
     ? ev.exdateRaws
     : (Array.isArray(ev?.exdates) ? ev.exdates.map((legacy) => ({ value: null, legacy })) : []);
   if (!raws.length) return 0;
-  const series = database.prepare(
-    'SELECT id, start_datetime, all_day, tzid FROM calendar_events WHERE id = ?',
-  ).get(eventId);
+  const series = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(eventId);
   if (!series) return 0;
   let householdZone = null;
   let clock = null;
@@ -137,7 +138,38 @@ export function storeImportedExceptions(database, eventId, ev) {
   let changes = 0;
   for (const key of keys) changes += insert.run(eventId, key).changes;
   for (const { key, legacy } of pairs) {
-    if (key !== legacy && !keys.has(legacy)) changes += heal.run(eventId, legacy).changes;
+    if (key !== legacy && !keys.has(legacy) && healable(series, clock, householdZone, key, legacy)) {
+      changes += heal.run(eventId, legacy).changes;
+    }
   }
   return changes;
+}
+
+/**
+ * Darf die alte Zeile `legacy` beim Empfang von `key` fort?
+ *
+ * Eine alte Zeile verraet nicht, wer sie schrieb: derselbe Tag kann die Absage
+ * sein, die der Importer frueher fuer diesen Rohwert ablegte, oder eine lokal
+ * ausgenommene Ausnahme eines Nachbarvorkommens (Review zu #2300: New York
+ * taeglich 19:30, lokal abgesagt der 13.11. als `2035-11-13`, vom Anbieter
+ * abgesagt der 12.11. mit demselben alten Tag). Fort darf sie deshalb nur, wenn
+ * sie in der alten Lesart kein anderes Vorkommen der Serie trifft als das, das
+ * jetzt unter `key` liegt - dann geht beim Loeschen nichts verloren. Sonst
+ * bleibt sie stehen und wirkt wie bisher (Schritt 6 entscheidet).
+ */
+function healable(series, clock, householdZone, key, legacy) {
+  const own = new Set(clock.dayCandidatesOfKey(key));
+  const others = clock.dayCandidatesOfKey(legacy).filter((day) => !own.has(day));
+  for (const day of others) {
+    let hits;
+    try {
+      hits = expandRecurringEvents([series], shiftDateKey(day, -1), shiftDateKey(day, 1), null, {
+        householdZone, maxIterations: MAX_EXPANSION_ITERATIONS, resumeNear: day,
+      });
+    } catch {
+      return false;
+    }
+    if (hits.some((instance) => occurrenceSlotOf(instance)?.day === day)) return false;
+  }
+  return true;
 }

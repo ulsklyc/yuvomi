@@ -454,9 +454,17 @@ function expandRRULE(vevent, windowStart, windowEnd) {
   const exRaws = Array.isArray(vevent.exdateRaws)
     ? vevent.exdateRaws
     : (vevent.exdates || []).map((legacy) => ({ value: null, legacy }));
+  // Ein Originalstart zaehlt nur, wenn die Schleife ihn an seinem Ortstag selbst
+  // erzeugt (Review zu #2300): faellt DTSTART in eine Umstellung, liest
+  // `formatICSDate` den Start mit der alten Uhr, die Vorkommen stehen dann eine
+  // Stunde neben der Absage - dort bleibt es beim alten Tag, wie auf main.
+  const loopMakes = (key) => {
+    const day = utcToWall(key, vevent.tzid)?.date;
+    return !!day && instantKey(localToUTCOccurrence(`${day}T${wall.time}`, vevent.tzid)) === key;
+  };
   for (const raw of exRaws) {
     const key = (tzAware && !vevent.allDay && raw.value) ? rawOccurrenceKey(raw, vevent.tzid) : null;
-    if (key && key.length > 10) exactKeys.add(key);
+    if (key && key.length > 10 && loopMakes(key)) exactKeys.add(key);
     else if (raw.legacy) exdateSet.add(raw.legacy);
   }
   // UNTIL ALS ZEITPUNKT, WO ES EINER IST (#1269) - dieselbe Unterscheidung wie

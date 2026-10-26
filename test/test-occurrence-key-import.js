@@ -192,6 +192,20 @@ test('ICS-Abo, Berlin 01:30: ein geaendertes Einzelvorkommen ersetzt genau sein 
   assert.deepEqual(days, ['2035-03-24', '2035-03-25', '2035-03-27']);
 });
 
+test('ICS-Abo, Start in der Umstellungsnacht: die Absage greift wie auf main', () => {
+  // Review zu #2300: `formatICSDate` liest einen DTSTART am Umstellungstag mit
+  // der alten Uhr, die Vorkommen stehen eine Stunde neben dem Originalstart der
+  // Absage. Dann bleibt es beim alten Tag.
+  const ics = vcalendar(...vevent('dst@test', {
+    start: 'TZID=America/New_York:20350311T033000', end: 'TZID=America/New_York:20350311T043000',
+    rule: 'FREQ=DAILY;COUNT=3', exdates: ['TZID=America/New_York:20350312T033000'],
+  }));
+  const [master] = normalizeRecurrenceOverrides(parseICS(ics));
+  const days = expandRRULE(master, '2035-03-10', '2035-03-15T23:59:59Z')
+    .map((instance) => dayIn(instance.dtstart, 'America/New_York'));
+  assert.deepEqual(days, ['2035-03-11', '2035-03-13']);
+});
+
 // ── CalDAV und iCloud: gespeichert, gelesen ueber Kalender und Countdown ────────
 
 const STORED = {
@@ -231,6 +245,24 @@ for (const [way, w] of Object.entries(STORED)) {
     await w.sync();
     assert.ok(!exceptionsOf(series.id).includes(NEW_YORK.legacy), 'die alte Zeile ist fort');
     assert.deepEqual(shownDays(NEW_YORK.zone, NEW_YORK.window), NEW_YORK.expected);
+  });
+
+  test(`${way}, New York taeglich: eine lokale Absage am UTC-Tag der Lieferung bleibt stehen`, async () => {
+    // Review zu #2300: die alte Zeile `2035-11-13` kann die lokale Absage des
+    // 13.11. sein - das Heilen fuer die Absage des 12.11. darf sie nicht nehmen.
+    setHousehold(NEW_YORK.zone);
+    const url = w.setup();
+    const ics = NEW_YORK.ics({ rule: 'FREQ=DAILY' });
+    dav.putObject(url, 'series.ics', ics);
+    await w.sync();
+    const series = seriesRow();
+    db.prepare('DELETE FROM calendar_event_exceptions WHERE event_id = ?').run(series.id);
+    db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+      .run(series.id, '2035-11-13');
+    dav.putObject(url, 'series.ics', ics);
+    await w.sync();
+    const days = shownDays(NEW_YORK.zone, ['2035-11-11', '2035-11-14']);
+    assert.deepEqual(days, ['2035-11-11', '2035-11-14'], 'weder der 12.11. noch der 13.11.');
   });
 
   test(`${way}, Berlin: zwei Absagen auf einem UTC-Tag bleiben zwei`, async () => {
