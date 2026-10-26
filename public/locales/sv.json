@@ -1288,7 +1288,11 @@
         "checklistDone": "Klart",
         "checklistOpen": "Öppet",
         "errorNoteGone": "Den här anteckningen finns inte längre.",
-        "errorSelectedCategoryGone": "En vald kategori finns inte längre."
+        "errorSelectedCategoryGone": "En vald kategori finns inte längre.",
+        "lockedToggle": "Lås redigering",
+        "lockedBadge": "Låst",
+        "lockedHint": "Bara du och administratörer kan ändra, fästa eller ta bort den här anteckningen - även bocka av punkter i listan. Alla andra kan fortfarande läsa den.",
+        "errorLocked": "Den här anteckningen är låst. Bara den som skapade den och administratörer kan ändra den."
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",

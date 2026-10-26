@@ -1288,7 +1288,11 @@
         "checklistDone": "已完成",
         "checklistOpen": "待處理",
         "errorNoteGone": "這則便籤已不存在。",
-        "errorSelectedCategoryGone": "所選的其中一個分類已不存在。"
+        "errorSelectedCategoryGone": "所選的其中一個分類已不存在。",
+        "lockedToggle": "鎖定編輯",
+        "lockedBadge": "已鎖定",
+        "lockedHint": "只有你和管理員可以變更、釘選或刪除這則筆記，包括勾選清單項目。其他人仍可閱讀。",
+        "errorLocked": "這則筆記已鎖定。只有建立者和管理員可以變更。"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",

@@ -1288,7 +1288,11 @@
         "checklistDone": "Kész",
         "checklistOpen": "Nyitott",
         "errorNoteGone": "Ez a jegyzet már nem létezik.",
-        "errorSelectedCategoryGone": "Az egyik kiválasztott kategória már nem létezik."
+        "errorSelectedCategoryGone": "Az egyik kiválasztott kategória már nem létezik.",
+        "lockedToggle": "Szerkesztés zárolása",
+        "lockedBadge": "Zárolva",
+        "lockedHint": "Ezt a jegyzetet csak te és a rendszergazdák módosíthatjátok, tűzhetitek ki vagy törölhetitek - a lista elemeinek kipipálását is beleértve. Mindenki más továbbra is olvashatja.",
+        "errorLocked": "Ez a jegyzet zárolva van. Csak az módosíthatja, aki létrehozta, és a rendszergazdák."
     },
     "markdown": {
         "bold": "Félkövér (Ctrl+B)",

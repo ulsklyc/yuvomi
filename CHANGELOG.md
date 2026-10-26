@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A note can be private, and a note can be locked to its author** (#1514, #1602). The note
+  editor has Visibility - "All family members" or "Only me" - and "Lock editing", next to colour
+  and pin. A private note is gone for everybody else, administrators included: from Notes, the
+  Overview tile and its counts, and search. A locked note can still be read by everyone, but only
+  its creator and administrators can change, pin, file into categories or delete it - ticking its
+  checklist items included, unlike a locked task. Only the creator changes the visibility; the
+  lock is the creator's and the administrators'. Cards show a lock or a crossed-out eye next to the
+  name. Existing notes stay visible to everyone and unlocked. For API clients the fields are
+  `visibility` and `locked` on `/api/v1/notes`; a locked note answers `403` with reason
+  `note_locked`.
 - **Health vitals show every reading, not only a daily average** (#1699, #1798). Week, month and
   year draw a low-high band per day (per month in the year) with the mean as the dot on it, so a 55
   in the morning and a 190 at lunch no longer become one unremarkable point; a day with a single

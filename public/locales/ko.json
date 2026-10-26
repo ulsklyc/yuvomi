@@ -1306,7 +1306,11 @@
         "checklistDone": "완료",
         "checklistOpen": "미완료",
         "errorNoteGone": "이 메모는 더 이상 없습니다.",
-        "errorSelectedCategoryGone": "선택한 카테고리 중 하나가 더 이상 존재하지 않습니다."
+        "errorSelectedCategoryGone": "선택한 카테고리 중 하나가 더 이상 존재하지 않습니다.",
+        "lockedToggle": "편집 잠금",
+        "lockedBadge": "잠김",
+        "lockedHint": "이 메모는 나와 관리자만 변경, 고정, 삭제할 수 있습니다. 체크리스트 항목 체크도 포함됩니다. 다른 사람은 계속 읽을 수 있습니다.",
+        "errorLocked": "이 메모는 잠겨 있습니다. 만든 사람과 관리자만 변경할 수 있습니다."
     },
     "markdown": {
         "bold": "굵게 (Ctrl+B)",

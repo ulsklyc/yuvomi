@@ -1288,7 +1288,11 @@
         "checklistDone": "Tamamlandı",
         "checklistOpen": "Açık",
         "errorNoteGone": "Bu not artık yok.",
-        "errorSelectedCategoryGone": "Seçilen kategorilerden biri artık mevcut değil."
+        "errorSelectedCategoryGone": "Seçilen kategorilerden biri artık mevcut değil.",
+        "lockedToggle": "Düzenlemeyi kilitle",
+        "lockedBadge": "Kilitli",
+        "lockedHint": "Bu notu yalnızca sen ve yöneticiler değiştirebilir, sabitleyebilir veya silebilir - listedeki öğeleri işaretlemek de buna dahildir. Diğer herkes okumaya devam edebilir.",
+        "errorLocked": "Bu not kilitli. Yalnızca onu oluşturan kişi ve yöneticiler değiştirebilir."
     },
     "markdown": {
         "bold": "Kalın (Ctrl+B)",

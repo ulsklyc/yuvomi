@@ -1306,7 +1306,11 @@
         "checklistDone": "Tapos",
         "checklistOpen": "Bukas",
         "errorNoteGone": "Wala na ang talang ito.",
-        "errorSelectedCategoryGone": "Wala na ang isa sa mga napiling kategorya."
+        "errorSelectedCategoryGone": "Wala na ang isa sa mga napiling kategorya.",
+        "lockedToggle": "I-lock ang pag-edit",
+        "lockedBadge": "Naka-lock",
+        "lockedHint": "Ikaw at ang mga administrator lang ang makakapagbago, makakapag-pin o makakapagbura ng talang ito - kasama ang pag-tsek ng mga item sa checklist nito. Mababasa pa rin ito ng iba.",
+        "errorLocked": "Naka-lock ang talang ito. Ang gumawa nito at ang mga administrator lang ang makakapagbago nito."
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",

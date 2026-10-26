@@ -1288,7 +1288,11 @@
         "checklistDone": "Klaar",
         "checklistOpen": "Open",
         "errorNoteGone": "Deze notitie bestaat niet meer.",
-        "errorSelectedCategoryGone": "Een gekozen categorie bestaat niet meer."
+        "errorSelectedCategoryGone": "Een gekozen categorie bestaat niet meer.",
+        "lockedToggle": "Bewerken vergrendelen",
+        "lockedBadge": "Vergrendeld",
+        "lockedHint": "Alleen jij en beheerders kunnen deze notitie wijzigen, vastzetten of verwijderen - ook het afvinken van items in de lijst. Iedereen kan hem nog steeds lezen.",
+        "errorLocked": "Deze notitie is vergrendeld. Alleen degene die hem heeft gemaakt en beheerders kunnen hem wijzigen."
     },
     "markdown": {
         "bold": "Vet (Ctrl+B)",

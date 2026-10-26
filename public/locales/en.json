@@ -1288,7 +1288,11 @@
         "checklistDone": "Done",
         "checklistOpen": "Open",
         "errorNoteGone": "This note no longer exists.",
-        "errorSelectedCategoryGone": "A selected category no longer exists."
+        "errorSelectedCategoryGone": "A selected category no longer exists.",
+        "lockedToggle": "Lock editing",
+        "lockedBadge": "Locked",
+        "lockedHint": "Only you and administrators can change, pin or delete this note - ticking its checklist items included. Everyone else can still read it.",
+        "errorLocked": "This note is locked. Only the person who created it and administrators can change it."
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",

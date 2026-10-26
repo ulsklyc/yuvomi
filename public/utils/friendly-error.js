@@ -25,6 +25,7 @@ export const REFUSAL_MESSAGES = new Map([
   ['module_access_denied', 'common.errorModuleNoAccess'],
   ['module_read_only', 'settings.permReadOnlyBanner'],
   ['task_locked', 'tasks.errorLocked'],
+  ['note_locked', 'notes.errorLocked'],
   ['recipe_mirrored', 'recipes.errorMirrored'],
   // api.js holt bei einer 403 auf einen Schreibzugriff einmal ein frisches
   // Token und wiederholt. Diesen Satz sieht also nur, wem das nicht half.

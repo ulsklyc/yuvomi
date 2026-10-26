@@ -1460,7 +1460,11 @@
         "checklistDone": "Zrobione",
         "checklistOpen": "Otwarte",
         "errorNoteGone": "Ta notatka już nie istnieje.",
-        "errorSelectedCategoryGone": "Jedna z wybranych kategorii już nie istnieje."
+        "errorSelectedCategoryGone": "Jedna z wybranych kategorii już nie istnieje.",
+        "lockedToggle": "Zablokuj edycję",
+        "lockedBadge": "Zablokowana",
+        "lockedHint": "Tylko ty i administratorzy możecie zmieniać, przypinać lub usuwać tę notatkę - również odhaczać pozycje jej listy. Pozostali nadal mogą ją czytać.",
+        "errorLocked": "Ta notatka jest zablokowana. Zmienić ją może tylko osoba, która ją utworzyła, i administratorzy."
     },
     "markdown": {
         "bold": "Pogrubienie (Ctrl+B)",

@@ -1288,7 +1288,11 @@
         "checklistDone": "已完成",
         "checklistOpen": "待处理",
         "errorNoteGone": "这条便签已不存在。",
-        "errorSelectedCategoryGone": "所选的一个类别已不存在。"
+        "errorSelectedCategoryGone": "所选的一个类别已不存在。",
+        "lockedToggle": "锁定编辑",
+        "lockedBadge": "已锁定",
+        "lockedHint": "只有你和管理员可以更改、置顶或删除这条笔记，包括勾选清单项目。其他人仍可阅读。",
+        "errorLocked": "这条笔记已锁定。只有创建者和管理员可以更改。"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",

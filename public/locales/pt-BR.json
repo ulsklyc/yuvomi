@@ -1288,7 +1288,11 @@
         "checklistDone": "Concluído",
         "checklistOpen": "Aberto",
         "errorNoteGone": "Esta nota não existe mais.",
-        "errorSelectedCategoryGone": "Uma categoria selecionada não existe mais."
+        "errorSelectedCategoryGone": "Uma categoria selecionada não existe mais.",
+        "lockedToggle": "Bloquear a edição",
+        "lockedBadge": "Bloqueada",
+        "lockedHint": "Só você e os administradores podem alterar, fixar ou excluir esta nota, inclusive marcar os itens da lista. Os demais continuam podendo lê-la.",
+        "errorLocked": "Esta nota está bloqueada. Só a pessoa que a criou e os administradores podem alterá-la."
     },
     "markdown": {
         "bold": "Negrito (Ctrl+B)",

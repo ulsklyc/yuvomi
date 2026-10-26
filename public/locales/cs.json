@@ -1366,7 +1366,11 @@
         "checklistDone": "Hotovo",
         "checklistOpen": "Otevřeno",
         "errorNoteGone": "Tato poznámka už neexistuje.",
-        "errorSelectedCategoryGone": "Jedna z vybraných kategorií už neexistuje."
+        "errorSelectedCategoryGone": "Jedna z vybraných kategorií už neexistuje.",
+        "lockedToggle": "Zamknout úpravy",
+        "lockedBadge": "Zamčeno",
+        "lockedHint": "Tuto poznámku můžete měnit, připínat nebo mazat jen vy a správci - včetně odškrtávání položek seznamu. Ostatní ji mohou dál číst.",
+        "errorLocked": "Tato poznámka je zamčená. Měnit ji může jen osoba, která ji vytvořila, a správci."
     },
     "markdown": {
         "bold": "Tučné (Ctrl+B)",

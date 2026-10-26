@@ -1306,7 +1306,11 @@
         "checklistDone": "Erledigt",
         "checklistOpen": "Offen",
         "errorNoteGone": "Diese Notiz gibt es nicht mehr.",
-        "errorSelectedCategoryGone": "Eine gewählte Kategorie gibt es nicht mehr."
+        "errorSelectedCategoryGone": "Eine gewählte Kategorie gibt es nicht mehr.",
+        "lockedToggle": "Bearbeiten sperren",
+        "lockedBadge": "Gesperrt",
+        "lockedHint": "Nur du und Administratoren können diese Notiz ändern, anpinnen oder löschen - auch die Haken einer Checkliste. Alle anderen können sie weiterhin lesen.",
+        "errorLocked": "Diese Notiz ist gesperrt. Ändern können sie nur die Person, die sie angelegt hat, und Admins."
     },
     "markdown": {
         "bold": "Fett (Strg+B)",

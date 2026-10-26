@@ -1288,7 +1288,11 @@
         "checklistDone": "Ferdig",
         "checklistOpen": "Åpen",
         "errorNoteGone": "Dette notatet finnes ikke lenger.",
-        "errorSelectedCategoryGone": "En valgt kategori finnes ikke lenger."
+        "errorSelectedCategoryGone": "En valgt kategori finnes ikke lenger.",
+        "lockedToggle": "Lås redigering",
+        "lockedBadge": "Låst",
+        "lockedHint": "Bare du og administratorer kan endre, feste eller slette dette notatet - også krysse av punkter i listen. Alle andre kan fortsatt lese det.",
+        "errorLocked": "Dette notatet er låst. Bare personen som opprettet det og administratorer kan endre det."
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",

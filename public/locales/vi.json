@@ -1288,7 +1288,11 @@
         "checklistDone": "Hoàn thành",
         "checklistOpen": "Mở",
         "errorNoteGone": "Ghi chú này không còn nữa.",
-        "errorSelectedCategoryGone": "Một danh mục đã chọn không còn tồn tại."
+        "errorSelectedCategoryGone": "Một danh mục đã chọn không còn tồn tại.",
+        "lockedToggle": "Khoá chỉnh sửa",
+        "lockedBadge": "Đã khoá",
+        "lockedHint": "Chỉ bạn và quản trị viên mới có thể thay đổi, ghim hoặc xoá ghi chú này - kể cả đánh dấu các mục trong danh sách. Những người khác vẫn có thể đọc.",
+        "errorLocked": "Ghi chú này đã bị khoá. Chỉ người tạo và quản trị viên mới có thể thay đổi."
     },
     "markdown": {
         "bold": "In đậm (Ctrl+B)",

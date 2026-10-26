@@ -1306,7 +1306,11 @@
         "checklistDone": "Selesai",
         "checklistOpen": "Terbuka",
         "errorNoteGone": "Catatan ini sudah tidak ada.",
-        "errorSelectedCategoryGone": "Salah satu kategori yang dipilih sudah tidak ada."
+        "errorSelectedCategoryGone": "Salah satu kategori yang dipilih sudah tidak ada.",
+        "lockedToggle": "Kunci penyuntingan",
+        "lockedBadge": "Terkunci",
+        "lockedHint": "Hanya kamu dan administrator yang dapat mengubah, menyematkan, atau menghapus catatan ini - termasuk mencentang item daftarnya. Yang lain tetap dapat membacanya.",
+        "errorLocked": "Catatan ini terkunci. Hanya orang yang membuatnya dan administrator yang dapat mengubahnya."
     },
     "markdown": {
         "bold": "Tebal (Ctrl+B)",

@@ -1288,7 +1288,11 @@
         "checklistDone": "完了",
         "checklistOpen": "未完了",
         "errorNoteGone": "このメモはもうありません。",
-        "errorSelectedCategoryGone": "選択したカテゴリの一つがもう存在しません。"
+        "errorSelectedCategoryGone": "選択したカテゴリの一つがもう存在しません。",
+        "lockedToggle": "編集をロックする",
+        "lockedBadge": "ロック中",
+        "lockedHint": "このメモを変更・ピン留め・削除できるのは、あなたと管理者だけです。チェックリストの項目にチェックを入れることも含みます。ほかの人は引き続き読むことができます。",
+        "errorLocked": "このメモはロックされています。変更できるのは作成した人と管理者だけです。"
     },
     "markdown": {
         "bold": "太字 (Ctrl+B)",
