@@ -39,6 +39,7 @@ import { normalizeCalColor, calendarDisplayName } from '../utils/calendar-meta.j
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
+import { storeImportedExceptions } from './imported-occurrence-key.js';
 
 // Reused functions from apple-calendar.js
 import {
@@ -1152,11 +1153,6 @@ async function runSync({ createClient } = {}) {
     WHERE external_calendar_id = ? AND external_source = 'caldav' AND caldav_account_id IS ?
     ORDER BY id LIMIT 1
   `);
-  // EXDATE-Ausnahmen der Serie (#489/#549). Additiv (INSERT OR IGNORE): entfernt
-  // keine lokal vom Nutzer ausgenommenen Einzeltermine.
-  const insException = conn.prepare(
-    'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
-  );
   // Besitzer (created_by-Fallback) einmal auflösen — konstant über den ganzen Sync.
   const ownerRow = conn.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
   const createdBy = ownerRow ? ownerRow.id : 1;
@@ -1490,10 +1486,10 @@ async function runSync({ createClient } = {}) {
               // damit die Expansion diese Vorkommen überspringt (#489/#549).
               // INSERT OR IGNORE meldet changes = 0, wenn die Ausnahme schon
               // steht, sodass auch hier nur echter Zuwachs als Änderung zählt.
+              // Schluessel in Format A, die alte Zeile desselben Rohwerts heilt
+              // (#2000, #2034 Schritt 5).
               if (ev.rrule && Array.isArray(ev.exdates)) {
-                for (const exDate of ev.exdates) {
-                  if (insException.run(eventId, exDate).changes > 0) changed = true;
-                }
+                if (storeImportedExceptions(conn, eventId, ev) > 0) changed = true;
               }
 
               accountEventCount++;

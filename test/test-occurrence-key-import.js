@@ -246,7 +246,7 @@ for (const [way, w] of Object.entries(STORED)) {
 
 // ── Einmaliger ICS-Import: lokale Zeile ohne `tzid` ────────────────────────────
 
-test('ICS-Import, Berlin 01:30 ganztaegig: eine Datums-Absage bleibt ihr Tag', async () => {
+test('ICS-Import ganztaegig: eine Datums-Absage bleibt ihr Tag', async () => {
   setHousehold('Europe/Berlin');
   const ics = vcalendar(
     'BEGIN:VEVENT', 'UID:allday@test', 'DTSTAMP:20350101T000000Z', 'SUMMARY:Ganztags',

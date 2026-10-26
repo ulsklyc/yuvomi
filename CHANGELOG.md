@@ -145,6 +145,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **An occurrence cancelled in a subscribed or synced calendar stays cancelled after a clock
+  change** (#2000). For a series with its own time zone, an occurrence the provider cancelled -
+  or moved, in CalDAV and iCloud - could stay visible once its UTC day and its local day fell
+  apart: a New York series at 19:30 kept showing a cancelled winter occurrence, a daily Berlin
+  series at 01:30 hid the occurrence before the cancelled one after the switch to summer time, and
+  the countdown named a different next occurrence than the calendar. ICS subscriptions, the ICS
+  import, CalDAV and iCloud now store a cancellation under the occurrence's original start, and
+  the next sync corrects one stored the old way. Google Calendar and cancellations a provider no
+  longer sends follow separately.
 - **A long reminder list name no longer squeezes the module picker in the sync settings** (#2284).
   The picker keeps the width of its value; next to a long name on a phone it moves below the name,
   and a long name wraps instead of running past the row.

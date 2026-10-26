@@ -719,8 +719,9 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
       const ex = d.prepare(
         'SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ? ORDER BY exception_date'
       ).all(master.id).map((r) => r.exception_date);
-      assert.ok(ex.includes('2026-07-21'), 'Original-Slot des Overrides ausgenommen');
-      assert.ok(ex.includes('2026-08-03'), 'EXDATE (Feiertag) übernommen');
+      // Seit #2034 Schritt 5 im Schluessel der Serie (Format A: Originalstart).
+      assert.ok(ex.includes('2026-07-21T08:00:00Z'), 'Original-Slot des Overrides ausgenommen');
+      assert.ok(ex.includes('2026-08-03T08:00:00Z'), 'EXDATE (Feiertag) übernommen');
     } finally {
       _resetTestDatabase();
       d.close();
