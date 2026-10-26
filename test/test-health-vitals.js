@@ -1124,3 +1124,102 @@ test('R21: der Laborbefund zeigt kein "-" fuer eine fehlende Bewertung, die Akti
   const oben = svg.match(/class="chart__axis chart__axis--y"[^>]*>([^<]*)</)?.[1] ?? '';
   assert.match(oben, /health\.activity\.unit\.min/, `oberster Achsenwert ohne Einheit: "${oben}"`);
 });
+
+// --------------------------------------------------------
+// #1699 + #1798: Tagesband, Tagesansicht, Blutdruck als Balken je Messung,
+// Uhrzeit und Notiz in der Messliste.
+// --------------------------------------------------------
+
+const { stepVitalAnchor } = await import('../public/utils/health-vitals.js');
+
+const zuckerTag = [
+  { id: 21, type: 'glucose', value_num: 55, unit: 'mg/dL', measured_at: '2026-09-15T07:00', note: 'vor dem Fruehstueck' },
+  { id: 22, type: 'glucose', value_num: 190, unit: 'mg/dL', measured_at: '2026-09-15T13:00', note: '2 Knoppers' },
+  { id: 23, type: 'glucose', value_num: 100, unit: 'mg/dL', measured_at: '2026-09-18T08:00' },
+];
+
+test('#1699: ein Bucket traegt neben dem Mittel den kleinsten und den groessten Wert', () => {
+  const s = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'month', anchor: '2026-09-27', today: '2026-10-05' });
+  const tag = s.points.find((p) => p.key === '2026-09-15');
+  assert.equal(tag.value_num, 122.5);
+  assert.equal(tag.min.value_num, 55);
+  assert.equal(tag.max.value_num, 190);
+  const einzeln = s.points.find((p) => p.key === '2026-09-18');
+  assert.equal(einzeln.min.value_num, 100, 'eine Messung: das Band faellt auf den Punkt');
+  assert.equal(einzeln.max.value_num, 100);
+  const leer = s.points.find((p) => p.key === '2026-09-16');
+  assert.equal(leer.min.value_num, null);
+});
+
+test('#1699: die Serie fuehrt jede Messung des Fensters mit Uhrzeit und Bucket', () => {
+  const s = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'month', anchor: '2026-09-27', today: '2026-10-05' });
+  assert.deepEqual(s.readings.map((r) => [r.id, r.minutes, r.index]), [[21, 420, 14], [22, 780, 14], [23, 480, 17]]);
+});
+
+test('#1699: die Tagesansicht ist EIN Datum mit jeder Messung als eigener Punkt', () => {
+  const s = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'day', anchor: '2026-09-15', today: '2026-10-05' });
+  assert.equal(s.from, '2026-09-15');
+  assert.equal(s.to, '2026-09-15');
+  assert.equal(s.gran, 'hour');
+  assert.deepEqual(s.readings.map((r) => r.id), [21, 22]);
+  assert.equal(s.hasData, true);
+  assert.equal(stepVitalAnchor('day', '2026-09-15', -1), '2026-09-14');
+  assert.equal(stepVitalAnchor('day', '2026-09-30', 1), '2026-10-01');
+});
+
+test('#1699: Woche und Monat zeichnen je Tag ein Band vom kleinsten zum groessten Wert', () => {
+  const s = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'month', anchor: '2026-09-27', today: '2026-10-05' });
+  const svg = health.chartMarkup(vitalMetric('glucose'), s);
+  const baender = [...svg.matchAll(/<line class="health-chart__range"[^>]*y1="([\d.]+)"[^>]*y2="([\d.]+)"/g)];
+  assert.equal(baender.length, 1, 'nur der Tag mit Spanne bekommt ein Band; der Einzelwert bleibt Punkt');
+  const ticks = yTicks(svg);
+  assert.ok(Math.min(...ticks) <= 55 && Math.max(...ticks) >= 190, `die Achse ${ticks.join('/')} schneidet das Band ab`);
+  assert.match(svg, /health\.vitals\.chart\.band/, 'Tooltip und Tabelle nennen die Spanne');
+});
+
+test('#1798: Blutdruck in Woche/Monat ist ein Balken JE MESSUNG von diastolisch bis systolisch', () => {
+  const rows = [
+    { id: 1, type: 'bp', value_num: 130, value_num2: 85, value_num3: 70, measured_at: '2026-09-15T07:00' },
+    { id: 2, type: 'bp', value_num: 150, value_num2: 95, value_num3: 80, measured_at: '2026-09-15T19:00' },
+    { id: 3, type: 'bp', value_num: 120, value_num2: 80, value_num3: 65, measured_at: '2026-09-18T08:00' },
+    { id: 4, type: 'bp', value_num: 125, value_num2: null, value_num3: null, measured_at: '2026-09-20T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'bp', range: 'month', anchor: '2026-09-27', today: '2026-10-05' });
+  const svg = health.chartMarkup(vitalMetric('bp'), s);
+  const primaer = svg.split('health-chart--secondary')[0];
+  const balken = [...primaer.matchAll(/<line class="health-chart__bp"[^>]*x1="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(balken.length, 3, 'drei Paare, drei Balken - zwei am selben Tag nebeneinander');
+  assert.notEqual(balken[0], balken[1], 'zwei Messungen eines Tages liegen nicht uebereinander');
+  assert.doesNotMatch(primaer, /<polyline/, 'Systole und Diastole sind keine zwei Kurven mehr');
+  assert.match(primaer, /<circle class="health-chart__bp-point"/, 'ein Wert ohne Paar faellt auf einen Punkt zurueck');
+  assert.match(svg, /health-chart--secondary/, 'der Puls bleibt seine eigene Achse darunter');
+});
+
+test('#1699: die Tagesansicht legt jede Messung an ihre Uhrzeit auf einer Stundenachse', () => {
+  const s = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'day', anchor: '2026-09-15', today: '2026-10-05' });
+  const svg = health.chartMarkup(vitalMetric('glucose'), s);
+  const { left, right } = chartScales();
+  const cx = [...svg.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(cx.length, 2);
+  assert.ok(Math.abs(cx[0] - (left + (420 / 1440) * (right - left))) < 1, `07:00 steht bei ${cx[0]}`);
+  assert.ok(Math.abs(cx[1] - (left + (780 / 1440) * (right - left))) < 1, `13:00 steht bei ${cx[1]}`);
+  // Eine einzelne Messung am Tag ist in dieser Ansicht genau die Auskunft.
+  const eine = computeVitalSeries(zuckerTag, { type: 'glucose', range: 'day', anchor: '2026-09-18', today: '2026-10-05' });
+  assert.doesNotMatch(health.chartMarkup(vitalMetric('glucose'), eine), /health\.vitals\.sparse/);
+});
+
+test('#1699: die Messliste nennt Uhrzeit und Notiz', async () => {
+  await imBlatt(() => {
+    const html = health.recentMeasurementsMarkup(vitalMetric('glucose'));
+    assert.match(html, /class="health-recent__time"[^>]*>13:00</);
+    assert.match(html, /class="health-recent__note"[^>]*>2 Knoppers</);
+    assert.equal((html.match(/health-recent__note/g) || []).length, 2, 'ohne Notiz keine leere Zeile');
+  }, { view: { rows: zuckerTag } });
+});
+
+test('#1699: der Zeitraum-Umschalter beginnt mit "Tag"', async () => {
+  await imBlatt(() => {
+    const html = health.vitalSheetMarkup(vitalMetric('weight'));
+    assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year']);
+  });
+});
