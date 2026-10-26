@@ -7139,6 +7139,88 @@ test('R23: dayHeading baut seinen Formatierer einmal', () => {
 });
 
 // --------------------------------------------------------
+// #1797 + #1462: der Zeitraum ist der Titel, die Ueberlappung ein Status-Zeichen
+// --------------------------------------------------------
+
+/* DIE SHELL-VARIANTE „ZEITRAUM ALS TITEL" (#1797, Ulas 2026-10-26). Ab 1024px
+ * ist der Zeitraum der sichtbare Titel des Kopfs, das <h1> nennt das Modul nur
+ * noch der Hilfstechnik - versteckt per Clip, nicht per display/visibility,
+ * sonst fiele die Seitenueberschrift aus dem Baum. Die Pfeile stehen direkt am
+ * Titel (vor ihm, damit sie bei wechselnder Textbreite stillstehen), "Heute"
+ * dahinter. */
+const layoutCssV = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+const typographyCssV = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+const desktopRules = (css) => [...eachRule(css)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)));
+const phoneTabletRules = (css) => [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
+
+test('#1797: der Kalenderkopf traegt die Shell-Variante "Zeitraum als Titel", das <h1> nennt das Modul', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const renderSrc = src.slice(src.indexOf('export async function render('), src.indexOf('export async function render(') + 4000);
+  assert(/class="page-toolbar [^"]*\bpage-toolbar--period-as-title\b[^"]*" id="cal-toolbar"/.test(renderSrc), 'der Kopf ist als Variante markiert, nicht geraten');
+  const html = calendarHelpers.toolbarHtml();
+  assert(/<h1 class="page-toolbar__title">calendar\.title<\/h1>/.test(html), 'das <h1> bleibt und nennt das Modul');
+  assert(/class="period-stepper__value [^"]*\bpage-toolbar__period-title\b/.test(html), 'der Zeitraum traegt die Titelrolle der Variante');
+  const hidden = desktopRules(layoutCssV).find((r) => /\.page-toolbar--period-as-title[^,{]*>\s*\.page-toolbar__title\s*$/.test(r.selector.trim()));
+  assert(hidden, 'die Shell blendet das <h1> der Variante ab 1024px aus');
+  assert(/clip-path:\s*inset\(50%\)/.test(hidden.body) && /position:\s*absolute/.test(hidden.body), `per Clip versteckt (${hidden.body})`);
+  assert(!/display:\s*none|visibility:\s*hidden/.test(hidden.body), 'nie aus dem Baum: der Screenreader sagt weiter "Kalender"');
+  const order = (part) => {
+    const rule = desktopRules(layoutCssV).find((r) => r.selector.includes('.page-toolbar--period-as-title') && r.selector.includes(part) && /order:/.test(r.body));
+    return Number(/order:\s*(\d+)/.exec(rule?.body ?? '')?.[1] ?? NaN);
+  };
+  assert(order('.period-stepper__value') > 0, 'der Titel steht hinter beiden Pfeilen, direkt am naechsten');
+  assert(order('.period-stepper__reset') > order('.period-stepper__value'), '"Heute" steht hinter dem Titel');
+  const label = desktopRules(calendarCss).filter((r) => r.selector.trim() === '.cal-toolbar__label');
+  assert(label.length && label.every((r) => !/11\.75rem|15rem/.test(r.body)), 'keine feste Labelbreite mehr, die die Pfeile vom Zeitraum trennt');
+  const role = desktopRules(typographyCssV).find((r) => r.selector.includes('.page-toolbar--period-as-title') && r.selector.includes('.page-toolbar__period-title'));
+  assert(/font-size:\s*var\(--type-toolbar-title\)/.test(role?.body ?? '') && /font-weight:\s*var\(--font-weight-bold\)/.test(role?.body ?? ''),
+    'der Zeitraum ist die groesste Schrift des Kopfs: die Titelrolle (22px fett)');
+  const year = desktopRules(typographyCssV).find((r) => r.selector.includes('.page-toolbar__period-year'));
+  assert(/color:\s*var\(--color-text-secondary\)/.test(year?.body ?? ''), 'das Jahr steht in der Sekundaerfarbe');
+});
+
+test('#1797: das Jahr eines Zeitraum-Titels ist ein eigenes Wort, und nur dann', () => {
+  const { periodTitleParts } = calendarHelpers;
+  assert.deepEqual(periodTitleParts('Oktober 2026', '2026'), { before: 'Oktober ', year: '2026', after: '' });
+  assert.deepEqual(periodTitleParts('KW 42 · Oktober 2026', '2026'), { before: 'KW 42 · Oktober ', year: '2026', after: '' });
+  assert.deepEqual(periodTitleParts('2026년 10월', '2026'), { before: '', year: '2026년', after: ' 10월' });
+  assert.deepEqual(periodTitleParts('2026年10月', '2026'), { before: '', year: '2026年', after: '10月' });
+  assert.equal(periodTitleParts('Mittwoch, 21.10.2026', '2026'), null, 'in einem Datum bleibt das Jahr Teil des Datums');
+  assert.equal(periodTitleParts('07.10. - 06.11.2026', '2026'), null);
+});
+
+/* DIE UEBERLAPPUNG IST EIN STATUS-ZEICHEN IN DER TITELZEILE (#1462). Sie stand
+ * im Aktions-Slot und baute mobil eine eigene Kopfzeile. Jetzt traegt sie der
+ * Status-Slot der Shell direkt hinter dem Zeitraum: unter 1024px ein
+ * Icon-Knopf, dessen Name der volle Satz ist, ab 1024px mit kurzem Text. */
+test('#1462: die Ueberlappungswarnung steht im Status-Slot der Titelzeile, nicht im Aktions-Slot', () => {
+  const { scheduleStatusHtml, toolbarHtml } = calendarHelpers;
+  assert.equal(scheduleStatusHtml([]), '', 'ohne Ueberlappung kein Slot, also keine Breite');
+  const status = scheduleStatusHtml([{ date_key: '2026-10-21', user_id: 1 }]);
+  const html = toolbarHtml({ statusHtml: status });
+  const at = (needle) => html.indexOf(needle);
+  const slot = at('class="page-toolbar__status"');
+  assert(slot > at('class="page-toolbar__center') && slot < at('class="page-toolbar__actions"'), 'der Slot folgt dem Zeitraum in der Titelzeile');
+  assert(!html.slice(at('class="page-toolbar__actions"'), at('class="page-toolbar__bar')).includes('overlap'), 'die Warnung steht nicht mehr im Aktions-Slot');
+  const btn = /<button[^>]*id="cal-overlap"[^>]*>/.exec(status)?.[0] ?? '';
+  assert(/aria-label="schedule\.overlapWarning\{/.test(btn), `der Name ist der volle Satz (${btn})`);
+  assert(/aria-haspopup="dialog"/.test(btn), 'ein Tipp oeffnet den vollen Satz als Blatt oder Popover');
+  assert(/class="page-toolbar__status-text">schedule\.overlapWarningShort</.test(status), 'am Desktop bleibt der kurze Text');
+  const base = [...eachRule(layoutCssV)].find((r) => !r.at.length && r.selector.trim() === '.page-toolbar__status');
+  assert(/flex-shrink:\s*0/.test(base?.body ?? ''), 'die Shell kennt den Slot');
+  const compact = phoneTabletRules(layoutCssV);
+  assert(/display:\s*none/.test(compact.find((r) => r.selector.trim() === '.page-toolbar__status-text')?.body ?? ''), 'unter 1024px nur das Zeichen');
+  assert(![...eachRule(layoutCssV), ...eachRule(calendarCss)].some((r) => r.selector.includes('page-toolbar__status') && /flex-basis:\s*100%|order:\s*[1-9]/.test(r.body)),
+    'der Slot oeffnet keine eigene Zeile');
+  const actions = phoneTabletRules(calendarCss).find((r) => /^\.cal-toolbar > \.page-toolbar__actions/.test(r.selector.trim()));
+  assert(actions && !/schedule-warning/.test(actions.selector) && /display:\s*none/.test(actions.body),
+    'unter 1024px steht der Aktions-Slot nie als Zeile da - auch nicht mit einer Warnung');
+  const tabletTitle = [...eachRule(calendarCss)].find((r) => r.at.some((a) => /min-width:\s*768px\)\s*and\s*\(max-width:\s*1023px/.test(a))
+    && /> \.page-toolbar__title$/.test(r.selector.trim()));
+  assert(/--page-status-lead/.test(tabletTitle?.body ?? ''), 'am Tablet rechnet die Titelbasis das Zeichen ab, die Zeile bricht nicht um');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 const { failed } = await finish();
