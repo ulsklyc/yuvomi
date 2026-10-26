@@ -1656,3 +1656,113 @@ test('R22: der Rundgang zeigt in Schritt 2 Module und verspricht das Wischen nur
   const en = JSON.parse(readFileSync(new URL('../public/locales/en.json', import.meta.url), 'utf8')).onboarding.step3Body;
   assert.match(en, /In Tasks, Shopping and Pantry/);
 });
+
+// "+ NEU > AUFGABE" OEFFNET DAS ANLEGEN-BLATT (DW-P1-1, Critique 2026-10-26).
+// Pille und Speed-Dial wechseln ins Modul und klicken dort dessen Anlegen-Knopf.
+// Die Aufgaben-Seite heisst ihn seit #1483 `fab-new-task`, die Uebersicht suchte
+// weiter `#btn-new-task` - der Tipp landete in der Liste, und nichts ging auf.
+// Gemessen wird die Map aus dem geladenen Modul gegen das Markup der Zielseite
+// (welche Datei, sagt die Routentabelle des Routers) und die Verdrahtung beider
+// Wege mit dem echten `findPageFab()`.
+function stubEl(extra = {}) {
+  const listeners = [];
+  return {
+    dataset: {}, listeners, tabIndex: 0, hidden: false,
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    setAttribute() {}, getAttribute: () => null, focus() {},
+    addEventListener(type, fn, opts) { listeners.push({ type, fn, opts }); },
+    querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    ...extra,
+  };
+}
+
+async function withNewTargets(fn) {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const prevWindow = globalThis.window;
+  const prevDocument = globalThis.document;
+  const visited = [];
+  const clicked = [];
+  // Jeder Knopf, den die Zielseite tatsaechlich traegt, ist per Id auffindbar -
+  // eine andere Id liefert wie im Browser `null`.
+  const pageIds = new Set();
+  const byId = (id) => (pageIds.has(id) ? { click: () => clicked.push(id) } : null);
+  globalThis.document = {
+    getElementById: byId,
+    // Auch der Selektor-Weg sieht nur Knoepfe, die es gibt - so misst die Probe
+    // das Ziel, nicht die Art der Suche.
+    querySelector: (sel) => (sel.startsWith('#') ? byId(sel.slice(1)) : null),
+    addEventListener() {},
+  };
+  globalThis.window = {
+    yuvomi: { navigate: async (route) => { visited.push(route); }, isModuleDisabled: () => false },
+    matchMedia: () => ({ matches: false }),
+  };
+  setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+  try {
+    return await fn({ visited, clicked, pageIds });
+  } finally {
+    clearPermissions();
+    globalThis.window = prevWindow;
+    globalThis.document = prevDocument;
+  }
+}
+
+test('DW-P1-1: jedes "+ Neu"-Ziel nennt eine Id, die seine Zielseite traegt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const targets = __test.FAB_NEW_BTN;
+  assert.ok(targets && typeof targets === 'object', 'FAB_NEW_BTN ist nicht erreichbar');
+  await withNewTargets(async () => {
+    const offered = __test.FAB_ACTIONS().map((a) => a.route);
+    assert.deepEqual(offered.slice().sort(), Object.keys(targets).sort(),
+      'Speed-Dial und Pille bieten genau die Ziele an, fuer die die Map einen Knopf kennt');
+  });
+  for (const [route, id] of Object.entries(targets)) {
+    assert.match(id, /^[a-z][\w-]*$/, `${route}: "${id}" ist eine Id fuer findPageFab(), kein Selektor`);
+    const page = new RegExp(`\\{ path: '${route}',\\s*page: '([^']+)'`).exec(router)?.[1];
+    assert.ok(page, `${route}: keine Seite in der Routentabelle`);
+    const src = readFileSync(new URL(`../public${page}`, import.meta.url), 'utf8');
+    assert.ok(src.includes(`id="${id}"`), `${route}: ${page} traegt keinen Knopf mit id="${id}" - "+ Neu" oeffnet dort nichts`);
+  }
+});
+
+test('DW-P1-1: Pille und Speed-Dial klicken nach dem Wechsel den Knopf der Zielseite', async () => {
+  const targets = __test.FAB_NEW_BTN;
+  assert.ok(targets, 'FAB_NEW_BTN ist nicht erreichbar');
+  // Die Zielseiten tragen die Knoepfe, die ihr Markup traegt (vorige Probe).
+  const real = ['fab-new-task', 'fab-new-event', 'fab-new-item', 'fab-new-note'];
+  await withNewTargets(async ({ visited, clicked, pageIds }) => {
+    real.forEach((id) => pageIds.add(id));
+    // Pille (Desktop): Klick auf einen Menuepunkt im Seiten-Container.
+    const container = stubEl();
+    __test.wireNewMenu(container, new AbortController().signal);
+    const onClick = container.listeners.find((l) => l.type === 'click' && !l.opts?.capture)?.fn;
+    assert.ok(onClick, 'wireNewMenu haengt keinen Klick an den Container');
+    for (const route of Object.keys(targets)) {
+      const item = stubEl({ dataset: { newRoute: route } });
+      await onClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
+    }
+    assert.deepEqual(visited, Object.keys(targets));
+    assert.deepEqual(clicked, real, 'Pille: jedes Ziel oeffnet sein Anlegen-Blatt');
+
+    // Speed-Dial (Telefon): der Knopf lebt in der Shell-Layer, findPageFab findet ihn.
+    visited.length = 0;
+    clicked.length = 0;
+    const items = Object.keys(targets).map((route) => stubEl({ dataset: { route } }));
+    const fabActions = stubEl({ querySelectorAll: (sel) => (sel === '[data-route]' ? items : []) });
+    const group = stubEl({ querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
+    const fabMain = stubEl({ closest: (sel) => (sel === '.page-fab-group' ? group : null) });
+    const getById = globalThis.document.getElementById;
+    globalThis.document.getElementById = (id) => (id === 'fab-main' ? fabMain : getById(id));
+    __test.initFab(new AbortController().signal);
+    for (const el of items) {
+      const go = el.listeners.find((l) => l.type === 'click')?.fn;
+      assert.ok(go, `Speed-Dial: ${el.dataset.route} ist nicht verdrahtet`);
+      await go();
+      // `go` wartet auf den Wechsel und klickt dann - einen Takt Luft fuer den Klick.
+      await new Promise((r) => setImmediate(r));
+    }
+    assert.deepEqual(visited, Object.keys(targets));
+    assert.deepEqual(clicked, real, 'Speed-Dial: jedes Ziel oeffnet sein Anlegen-Blatt');
+  });
+});
