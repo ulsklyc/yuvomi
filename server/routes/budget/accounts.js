@@ -149,6 +149,17 @@ router.put('/accounts/:id', (req, res) => {
       req.body.starting_balance !== undefined ? cents(req.body.starting_balance) : null,
       currency, color, archived, creditBank, creditLimit, id
     );
+    // ABOS MIT DIESEM KONTO (#1277): die Buchung ihrer naechsten Zahlung
+    // folgt dem Abo, und ein Abo auf einem archivierten Konto bucht ohne Konto
+    // (bookingAccountId in routes/subscriptions.js). Archivieren nimmt ihr das
+    // Konto, Zurueckholen gibt es ihr wieder; bezahlte Buchungen sind nicht
+    // mehr verknuepft und bleiben, wie sie sind.
+    if (Boolean(archived) !== Boolean(existing.archived)) {
+      db.get().prepare(`UPDATE budget_entries SET account_id = ?
+        WHERE id IN (SELECT budget_entry_id FROM budget_subscriptions
+                     WHERE account_id = ? AND budget_entry_id IS NOT NULL)`)
+        .run(archived ? null : id, id);
+    }
 
     const account = listAccounts(true, budgetFilter(req, 'e', { scoped: false })).find((a) => a.id === id);
     res.json({ data: account });
@@ -192,6 +203,14 @@ router.delete('/accounts/:id', (req, res) => {
       // Dasselbe für das Standardkonto eines Darlehens (#638) - künftige Raten
       // landen dann wieder ohne Kontobezug statt auf einer toten ID.
       db.get().prepare('UPDATE budget_loans SET account_id = NULL WHERE account_id = ?').run(id);
+      // Ebenso die Vorgabe eines Abos (#1277) samt der Buchung seiner naechsten
+      // Zahlung, die ihr folgt - ueber alle Abos, wie beim Darlehen: eine
+      // Vorgabe ist keine gebuchte Tatsache, und die wartende Buchung haette
+      // sonst allein eine Huelle stehen lassen.
+      db.get().prepare(`UPDATE budget_entries SET account_id = NULL
+        WHERE account_id = ? AND id IN (SELECT budget_entry_id FROM budget_subscriptions WHERE account_id = ?)`)
+        .run(id, id);
+      db.get().prepare('UPDATE budget_subscriptions SET account_id = NULL WHERE account_id = ?').run(id);
       const rest = db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? LIMIT 1').get(id);
       if (rest) {
         db.get().prepare('UPDATE budget_accounts SET archived = ? WHERE id = ?').run(ACCOUNT_SHELL, id);
