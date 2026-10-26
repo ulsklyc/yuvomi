@@ -227,7 +227,7 @@ router.get('/', (req, res) => {
     res.json({ data: hydrateNotesWithCategories(db.get(), notes, actorId(req)) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -240,9 +240,9 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const { pinned = 0 } = req.body;
-    const vContent = str(req.body.content, 'Inhalt', { max: MAX_TEXT });
-    const vTitle   = str(req.body.title,   'Titel',  { max: MAX_TITLE, required: false });
-    const vColor   = color(req.body.color || '#FFEB3B', 'Farbe');
+    const vContent = str(req.body.content, 'content', { max: MAX_TEXT });
+    const vTitle   = str(req.body.title,   'title',  { max: MAX_TITLE, required: false });
+    const vColor   = color(req.body.color || '#FFEB3B', 'color');
     const errors   = collectErrors([vContent, vTitle, vColor]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -276,7 +276,7 @@ router.post('/', (req, res) => {
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -297,9 +297,9 @@ router.put('/:id', (req, res) => {
 
     const { pinned } = req.body;
     const checks = [];
-    if (req.body.content !== undefined) checks.push(str(req.body.content, 'Inhalt', { max: MAX_TEXT, required: false }));
-    if (req.body.title !== undefined)   checks.push(str(req.body.title,   'Titel',  { max: MAX_TITLE, required: false }));
-    if (req.body.color !== undefined)   checks.push(color(req.body.color, 'Farbe'));
+    if (req.body.content !== undefined) checks.push(str(req.body.content, 'content', { max: MAX_TEXT, required: false }));
+    if (req.body.title !== undefined)   checks.push(str(req.body.title,   'title',  { max: MAX_TITLE, required: false }));
+    if (req.body.color !== undefined)   checks.push(color(req.body.color, 'color'));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -313,8 +313,10 @@ router.put('/:id', (req, res) => {
           pinned  = COALESCE(?, pinned)
       WHERE id = ?
       `).run(
-      req.body.content?.trim() ?? null,
-      req.body.title !== undefined ? (req.body.title?.trim() || null) : note.title,
+      // Wie `str()` oben: der geprüfte Wert ist ein String daraus, auch wenn
+      // eine Zahl kam - ein `.trim()` am Rohwert warf dort eine 500.
+      req.body.content != null ? String(req.body.content).trim() : null,
+      req.body.title !== undefined ? ((req.body.title != null ? String(req.body.title).trim() : '') || null) : note.title,
       req.body.color ?? null,
       pinned !== undefined ? (pinned ? 1 : 0) : null,
         id
@@ -341,7 +343,7 @@ router.put('/:id', (req, res) => {
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -362,7 +364,7 @@ router.patch('/:id/pin', (req, res) => {
     res.json({ data: { id, pinned: newPinned } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -395,16 +397,16 @@ router.patch('/:id/check', (req, res) => {
 
     const { line, checked, expect } = req.body;
     if (!Number.isInteger(line) || line < 0)
-      return res.status(400).json({ error: 'Ungültige Zeilennummer.', code: 400 });
+      return res.status(400).json({ error: 'Invalid line number.', code: 400 });
     if (typeof checked !== 'boolean')
-      return res.status(400).json({ error: 'Ungültiger Zustand.', code: 400 });
+      return res.status(400).json({ error: 'checked must be true or false.', code: 400 });
     if (expect !== undefined && expect !== null && typeof expect !== 'string')
-      return res.status(400).json({ error: 'Ungültige Zeilenprüfung.', code: 400 });
+      return res.status(400).json({ error: 'expect must be a string.', code: 400 });
 
     const result = toggleChecklistLine(note.content, line, checked, expect);
     if (!result.ok) {
       return res.status(409).json({
-        error: 'Die Notiz hat sich inzwischen geändert.',
+        error: 'The note has changed in the meantime. Refresh and try again.',
         code:  409,
         reason: result.reason,
       });
@@ -425,7 +427,7 @@ router.patch('/:id/check', (req, res) => {
     res.json({ data: oneWithCategories(updated, req) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -446,7 +448,7 @@ router.delete('/:id', (req, res) => {
     res.status(204).end();
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

@@ -71,7 +71,13 @@ const CASE_REASONS = {
   '/api/v1/notes': { post: CATEGORY_GONE },
   '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}, ${NOT_OWNER} (a body with only \`category_ids\` stays open)`, delete: `${NOTE_GONE}, ${NOT_OWNER}` },
   '/api/v1/notes/{id}/pin': { patch: `${NOTE_GONE}, ${NOT_OWNER}` },
-  '/api/v1/notes/{id}/check': { patch: NOTE_GONE },
+  // Die 409 des Haken-Setzens nennt, warum die Zeile nicht mehr passt (#2267).
+  '/api/v1/notes/{id}/check': {
+    patch: `${NOTE_GONE}, `
+      + '`stale` (409, the line no longer reads as `expect` - the note was edited meanwhile), '
+      + '`out_of_range` (409, the note has no line with this number), '
+      + '`not_a_checklist_line` (409, the line is not a checklist item)',
+  },
   '/api/v1/notes/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/notes/categories/{id}': { put: '`category_exists` (409, a category with this name already exists)' },
 };

@@ -90,6 +90,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status codes. The OpenAPI description now lists `module_access_denied` (403 when the caller may
   not read or write the module the reminder's entry belongs to) at every reminders route that
   already sent it.
+- **The notes API refuses in English** (#1695, #2267). `/api/v1/notes` still answered in German or
+  with German field names ("Inhalt is required.", "Die Notiz hat sich inzwischen geändert.",
+  "Interner Fehler"); every `error` there is English now and names the request field (`content`,
+  `title`, `color`), with the same status codes. The OpenAPI description now lists the reasons of a
+  refused checklist tick (`stale`, `out_of_range`, `not_a_checklist_line`). Editing a note with a
+  number as its text or title no longer fails with a server error; it is saved as text, as creating
+  a note already did.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

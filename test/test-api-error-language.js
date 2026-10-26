@@ -29,6 +29,8 @@
  *        `outlook.js: 3`, und jede der 19 gefuehrten Anfragen deutsch.
  *        Ebenso fuer die Erinnerungen (reminders.js): `reminders.js: 10
  *        (erlaubt 0)`, und Bein 2 nennt jede Absage mit Satz der Route.
+ *        Ebenso fuer die Notizen (notes.js): `notes.js: 14 (erlaubt 0)`, und
+ *        Bein 2 nennt jede der 13 gefuehrten Absagen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -68,7 +70,6 @@ const GERMAN_LEFT = new Map([
   ['inventory/items.js', 9],
   ['inventory/service-log.js', 6],
   ['meals.js', 34],
-  ['notes.js', 14],
   ['pantry.js', 5],
   ['push.js', 3],
   ['quick-links.js', 10],
@@ -400,5 +401,52 @@ test('keine Absage der Erinnerungs-Routen traegt deutschen Wortlaut', async () =
     assertRefusedInEnglish(seen);
   } finally {
     remServer.close();
+  }
+});
+
+test('keine Absage der Notizen traegt deutschen Wortlaut', async () => {
+  const { default: notesRouter } = await import('../server/routes/notes.js');
+  const notesApp = express();
+  notesApp.use(express.json());
+  notesApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  notesApp.use('/notes', notesRouter);
+  const notesServer = notesApp.listen(0, '127.0.0.1');
+  const notesUrl = await new Promise((r) => notesServer.on('listening', () => r(`http://127.0.0.1:${notesServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${notesUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const note = db.prepare("INSERT INTO notes (content, created_by) VALUES ('Liste\n- [ ] Milch', ?)").run(ADMIN).lastInsertRowid;
+    const long = 'x'.repeat(100000);
+
+    await run('post-content', 'POST', '/notes', {});
+    await run('post-content-long', 'POST', '/notes', { content: long });
+    await run('post-title-long', 'POST', '/notes', { content: 'C', title: long });
+    await run('post-color', 'POST', '/notes', { content: 'C', color: 'red' });
+    await run('put-content-long', 'PUT', `/notes/${note}`, { content: long });
+    await run('put-title', 'PUT', `/notes/${note}`, { title: long });
+    await run('put-color', 'PUT', `/notes/${note}`, { color: 'red' });
+    await run('check-line', 'PATCH', `/notes/${note}/check`, { line: -1, checked: true });
+    await run('check-state', 'PATCH', `/notes/${note}/check`, { line: 1, checked: 'yes' });
+    await run('check-expect', 'PATCH', `/notes/${note}/check`, { line: 1, checked: true, expect: 5 });
+    await run('check-stale', 'PATCH', `/notes/${note}/check`, { line: 1, checked: true, expect: '- [ ] Brot' });
+    await run('check-range', 'PATCH', `/notes/${note}/check`, { line: 9, checked: true });
+    await run('check-not-item', 'PATCH', `/notes/${note}/check`, { line: 0, checked: true });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    notesServer.close();
   }
 });
