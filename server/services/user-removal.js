@@ -88,6 +88,11 @@ export const PRIVATE_USER_COLUMNS = new Set([
   // Erinnerungen sind Zustellungen AN das Konto, keine Daten des Haushalts.
   'reminders.created_by',
   'reminders.assigned_from',
+  // Die Meldung "Umzug zurueckgenommen" (#1912) ist eine Zustellung wie die
+  // Erinnerung daran; wer einen Umzug angestossen hat, steht nur fuer diese
+  // Meldung an der Zeile und faellt mit dem Umzug ohnehin.
+  'shopping_move_notices.user_id',
+  'shopping_items.outbound_move_by',
   // Gesundheit und Zyklus.
   'health_activities.user_id',
   'health_fasting_settings.user_id',

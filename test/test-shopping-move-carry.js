@@ -1364,3 +1364,19 @@ test('Wer verschoben hat, darf den Einkauf nicht mehr sehen: keine Meldung', asy
   assert.equal(row(item.id).list_id, a.listId);
   assert.deepEqual(notices(), []);
 });
+
+test('Meldung und Absender eines Umzugs halten ein Konto nicht fest: es bleibt loeschbar (#1912)', async () => {
+  const { userTraces } = await import('../server/services/user-removal.js');
+  const { a, b, item } = await mirroredItem();
+  const member = Number(db.prepare(
+    "INSERT INTO users (username, display_name, password_hash, role) VALUES (?, 'Mitglied', 'x', 'member')"
+  ).run(`mitglied-${Date.now()}`).lastInsertRowid);
+  dav.removeCollection(b.url);
+  await patch(item.id, { list_id: b.listId });
+  db.prepare('UPDATE shopping_items SET outbound_move_by = ? WHERE id = ?').run(member, item.id);
+  assert.deepEqual(userTraces(db, member), [], 'der wartende Umzug ist keine Spur in geteilten Daten');
+  await remindersSync.sync();
+  assert.equal(row(item.id).list_id, a.listId);
+  assert.equal(notices().filter((n) => n.user_id === member).length, 1);
+  assert.deepEqual(userTraces(db, member), [], 'die Meldung ist eine Zustellung an das Konto, keine Spur');
+});
