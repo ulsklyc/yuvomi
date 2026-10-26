@@ -26,7 +26,8 @@ export const GERMAN = new RegExp(
   + 'Konto|Kontotyp|Startsaldo|Kreditlimit|Farbe|Waehrung|Typ|Darlehen|Buchung|Eintrag|Serie|'
   + 'Interner|Fehler|Erlaubt|erwartet|Mahlzeit|Zeitzone|Sprache|Wochenstart|Anbieter|Einheit|'
   + 'Authentifizierung|Abrufen|Notiz|Kontakt|Inhalt|Termin|Kalender|Abonnement|Kilometerstand|'
-  + 'Ländercode|Regionscode|Gruppencode|Erinnerungen|maximal|enthält|beim|bei|der|das'
+  + 'Ländercode|Regionscode|Gruppencode|Erinnerungen|maximal|enthält|beim|bei|der|das|'
+  + 'Unbekannte|Unbekannter|Nutzer|Aufgaben|zu|nur'
   + ')\\b',
   'i',
 );

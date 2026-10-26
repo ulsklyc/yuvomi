@@ -48,15 +48,15 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
 const GERMAN_LEFT = new Map([
   ['calendar/apple.js', 6],
   ['calendar/feed.js', 5],
-  ['calendar/google.js', 22],
-  ['calendar/helpers.js', 6],
+  ['calendar/google.js', 23],
+  ['calendar/helpers.js', 9],
   ['calendar/local-calendars.js', 7],
   ['calendar/outlook.js', 3],
   ['calendar/read.js', 4],
-  ['calendar/subscriptions.js', 22],
+  ['calendar/subscriptions.js', 24],
   ['contacts.js', 13],
   ['health/activities.js', 2],
-  ['health/caregivers.js', 3],
+  ['health/caregivers.js', 4],
   ['health/cycle.js', 3],
   ['health/helpers.js', 2],
   ['health/labs.js', 6],
@@ -74,7 +74,7 @@ const GERMAN_LEFT = new Map([
   ['recipes.js', 2],
   ['reminders.js', 10],
   ['shopping.js', 17],
-  ['tasks.js', 3],
+  ['tasks.js', 4],
   ['weather.js', 2],
 ]);
 
@@ -110,6 +110,8 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'Inhalt is required.',
     'Fehler beim Abrufen der Länderliste.',
     'calendar_default_target: maximal 300 Zeichen',
+    'Unbekannte Nutzer-ID.',
+    'target_google_calendar_id: zu lang.',
   ]) assert.ok(germanIn(old), `nicht erkannt: ${old}`);
   for (const fine of [
     'Internal server error.',
