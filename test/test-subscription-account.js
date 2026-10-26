@@ -463,3 +463,17 @@ test('Server: ein Kontowechsel waehrend des Kursabrufs - ein Verlaengern dazwisc
     subscriptions._setRatesForTest(null);
   }
 });
+
+test('Server: eine einzeln umgestellte Zahlung zieht die Folgezahlungen nicht mit - sie stehen unter dem Konto des Abos, ein archiviertes ergibt keins', async () => {
+  const giro = await account('Giro');
+  const karte = await account('Karte');
+  const created = await sub({ account_id: giro });
+  db.prepare('UPDATE budget_entries SET account_id = ? WHERE id = ?').run(karte, created.budget_entry_id);
+  const feb = (await call('GET', '/?month=2030-02')).body.data.filter((e) => e.expected);
+  assert.equal(feb[0].account_id, giro, 'die Folgezahlung bucht das Verlaengern auf die Vorgabe');
+  assert.equal((await call('GET', `/?month=2030-02&account_id=${karte}`)).body.data.filter((e) => e.expected).length, 0);
+  assert.equal((await call('GET', `/summary?month=2030-02&account_id=${giro}`)).body.data.pending.count, 1);
+  await call('PUT', `/accounts/${giro}`, { archived: true });
+  assert.equal((await call('GET', '/?month=2030-02')).body.data.filter((e) => e.expected)[0].account_id, null);
+  assert.equal((await call('GET', `/?month=2030-02&account_id=${giro}`)).body.data.filter((e) => e.expected).length, 0);
+});

@@ -308,15 +308,17 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
     SELECT sub.id, sub.name, sub.amount, sub.currency, sub.billing_cycle, sub.cycle_interval,
            sub.next_payment_date, sub.enabled, sub.completed_at, sub.end_type, sub.end_date,
            sub.occurrence_count, sub.occurrences_done, sub.created_by,
-           b.owner_id, b.visibility, b.amount AS booked_amount, b.account_id,
+           b.owner_id, b.visibility, b.amount AS booked_amount,
+           CASE WHEN acc.archived = 0 THEN sub.account_id END AS account_id,
            COALESCE(c.budget_subcategory_key, '') AS subcategory,
            u.display_name AS creator_name
     FROM budget_subscriptions sub
     JOIN budget_entries b ON b.id = sub.budget_entry_id
     LEFT JOIN subscription_categories c ON c.id = sub.category_id
     LEFT JOIN users u ON u.id = sub.created_by
+    LEFT JOIN budget_accounts acc ON acc.id = sub.account_id
     WHERE sub.enabled = 1 AND sub.completed_at IS NULL AND sub.next_payment_date < ?${f.clause}
-      ${accountId != null ? 'AND b.account_id = ?' : ''}
+      ${accountId != null ? 'AND sub.account_id = ? AND acc.archived = 0' : ''}
   `).all(to, ...f.params, ...(accountId != null ? [accountId] : []));
   if (!subscriptions.length) return { entries: [], omitted: false, until };
 
@@ -352,9 +354,10 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
         is_recurring: 0,
         recurrence_parent_id: null,
         is_pending: 1,
-        // DAS KONTO DER GEBUCHTEN ZEILE (#1277), wie Art und Betrag: das Abo
-        // bucht jede Folgezahlung dorthin, und auf einem archivierten Konto
-        // traegt schon die gebuchte keins (bookingAccountId).
+        // DAS KONTO DES ABOS (#1277), nicht das der gebuchten Zeile: die darf
+        // fuer diese eine Zahlung umgestellt sein, das Verlaengern bucht die
+        // folgenden aber wieder auf die Vorgabe. Ein archiviertes Konto ergibt
+        // keins - dieselbe Regel wie bookingAccountId in routes/subscriptions.js.
         account_id: subscription.account_id ?? null,
         created_by: subscription.created_by,
         creator_name: subscription.creator_name ?? null,
