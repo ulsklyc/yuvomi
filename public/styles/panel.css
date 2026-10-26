@@ -373,12 +373,19 @@
  * Der Wert bleibt in der schmalsten Spalte lesbar, weil er nicht umbrechen
  * DARF: `--text-3xl` mit dem Tracking von Title 1, und lange Beträge klemmen
  * sich über die Container-Query weiter unten auf Title 2 herunter statt in
- * zwei Zeilen zu fallen. Ein Betrag über zwei Zeilen ist keine Kennzahl mehr. */
+ * zwei Zeilen zu fallen. Ein Betrag über zwei Zeilen ist keine Kennzahl mehr.
+ *
+ * SEMIBOLD, NICHT FETT (Entscheidung 2026-10-26, DW-P2-7 Nachtrag). Seit R23
+ * D12 standen Leitzahl und ruhige Werte auf 600, alle anderen Kennzahlen auf
+ * 700 - eine Rolle in zwei Gewichten, je nachdem, ob die Reihe fuehrt. Die
+ * Kennzahl hebt sich durch ihre GROESSE ab, wie bei Apple (Health, Wallet);
+ * ein Betrag in einer Zeile ist ebenfalls semibold und eine Stufe kleiner.
+ * Guard: test:typography "Title 1 traegt semibold". */
 .metric-card__value {
   /* `--metric-value-size` ist die Zusage einer SEITENSPALTE (siehe unten,
    * "Eine Karte je Zeile traegt Title 1"); ohne sie gilt die Stufenleiter. */
   font-size: var(--metric-value-size, var(--text-3xl));
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
@@ -439,7 +446,8 @@
  * Geld-Bildschirms das Wort "Budget". Je Reiter traegt jetzt EINE Karte
  * `.metric-card--lead` (Saldo, Nettovermoegen, Restschuld, Monatskosten), und
  * ihre Reihe `.metric-grid--led`: in einer REIHE treten die uebrigen eine Stufe
- * zurueck und verlieren das Fett - die Fuehrung entsteht durch Ruhe daneben.
+ * zurueck (eine Groessenstufe; das Gewicht ist seit 2026-10-26 ohnehin fuer
+ * jede Kennzahl semibold) - die Fuehrung entsteht durch Ruhe daneben.
  *
  * EINE FESTE STUFE JE ORT (R23, D12). Bis R23 waehlte die Leitzahl ihre Stufe
  * nach ihrer LAENGE (`leadStep`, 13/11/9cqi, 18-48px) - der Saldo stand in

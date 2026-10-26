@@ -3821,13 +3821,13 @@ test('DW-P2-7: die Kennzahlreihe ist aus dem Material der Widgets und ein metric
     `die Kennzahlkachel steht in DERSELBEN Materialregel wie die Widgets (gefunden: ${parts(material).join(' | ')})`);
   assert(has('.metric-tiles > .metric-card', 'padding', /^var\(--space-4\)$/),
     'Polster der Kachel = Polster des Widget-Koerpers (16px), nicht die 12px der Budget-Karte');
-  // Kopf im Widget-Dialekt, Wert semibold.
+  // Kopf im Widget-Dialekt.
   assert(has('.metric-tiles .metric-card__label', 'font-weight', /--font-weight-semibold/)
     && has('.metric-tiles .metric-card__label', 'color', /--color-text-primary/)
     && has('.metric-tiles .metric-card__label', 'font-size', /--type-secondary/),
     'der Kachelkopf nennt den Absender wie ein Widget-Kopf: Label-Farbe, semibold, Headline-Dichtestufe');
-  assert(has('.metric-tiles .metric-card__value', 'font-weight', /--font-weight-semibold/),
-    'der Wert steht in Title 1 semibold wie die Leitzahl, nicht in 700');
+  // Das Gewicht des Werts (semibold) haelt seit p6b die Rolle selbst:
+  // test:typography "Title 1 traegt semibold" - keine eigene Regel hier.
   // Gleicher Rhythmus: Luecke und Zeilenminimum kommen aus dem Raster.
   assert(has('.metric-tiles', 'gap', /^var\(--dashboard-grid-gap\)$/) && has('.dashboard__grid', 'gap', /^var\(--dashboard-grid-gap\)$/),
     'die Kacheln stehen mit der Rasterluecke nebeneinander, nicht mit eigenen 10px');

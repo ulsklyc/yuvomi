@@ -854,8 +854,9 @@
 /* DIE BETRAGSREGEL (Critique 2026-10-05, R16): ein Betrag in einer Zeile oder
  * Karte steht semibold und in Tabellenziffern - Buchung, Rate, Kontosaldo,
  * Planwert, geteilte Ausgabe. Gemessen standen 600 (Buchung), 700 (Konto,
- * Plan) und 900 (Aufteilung) nebeneinander. Fett bleibt der KENNZAHL
- * (`.metric-card__value`, Title 1) vorbehalten. Guard: test-budget-ui.js. */
+ * Plan) und 900 (Aufteilung) nebeneinander. Die KENNZAHL (`.metric-card__value`,
+ * Title 1) ist seit 2026-10-26 ebenfalls semibold und hebt sich durch ihre
+ * Groesse ab, nicht durch ihr Gewicht. Guard: test-budget-ui.js. */
 .budget-account__balance {
   font-size: var(--text-lg);
   font-weight: var(--font-weight-semibold);

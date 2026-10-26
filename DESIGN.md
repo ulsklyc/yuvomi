@@ -75,7 +75,7 @@ typography:
   title-1:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif"
     fontSize: "1.75rem"
-    fontWeight: 700
+    fontWeight: 600
     lineHeight: 1.21
     letterSpacing: "-0.015em"
   title-2:
@@ -996,11 +996,15 @@ Subheadline 15, Footnote 13, Caption 2 11.
 - **Large Title** (bold, 34px, lh 1.21, Tracking -0.015em): Seitentitel, Dashboard-Gruss und
   seit Runde 3 auch der Anmelde-Titel; bleibt auf Desktop stabil 34px. Traegt IMMER
   Label-Farbe.
-- **Title 1** (bold, 28px, lh 1.21, Tracking -0.015em, `tabular-nums`): die KENNZAHL einer
+- **Title 1** (semibold, 28px, lh 1.21, Tracking -0.015em, `tabular-nums`): die KENNZAHL einer
   Karte, nicht eine Ueberschrift - der Kontosaldo, die Temperatur, die Uhrzeit der
   Uhr-Kachel. Sie steht gestapelt (kleines Label darueber, Zahl darunter), nie als Zahl am
   rechten Ende einer Beschriftungszeile: so gebaut ist sie anatomisch dasselbe wie die
-  Nebenzeile darunter, und die Hauptaussage der Karte sieht aus wie ihre Fussnote.
+  Nebenzeile darunter, und die Hauptaussage der Karte sieht aus wie ihre Fussnote. **Semibold
+  seit 2026-10-26** (DW-P2-7 Nachtrag, Entscheidung Ulas): Leitzahl und ruhige Werte standen seit
+  R23 D12 auf 600, alle anderen Kennzahlen auf 700 - eine Rolle in zwei Gewichten. Wie bei Apple
+  (Health, Wallet) hebt sich die Kennzahl durch ihre Groesse ab; Guard `test:typography` "Title 1
+  traegt semibold" (jede Regel mit Title-1-Groesse oder auf `.metric-card__value`).
 - **Title 2** (bold, 22px, Tracking -0.015em, `text-wrap: balance`): Modul-Kopf-Titel im
   Canonical Page Head - EINE Rolle fuer alle Module, Settings-Leaf und Split.
 - **Title 3** (semibold, 20px, lh 1.3): Bereichs-Ueberschrift in Satzschreibung.
@@ -2104,7 +2108,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Name einer Zeile | Rolle **Zeilentitel**: 16px medium (Abschnitt Typography) | `.list-row__name` / `.u-row-title` (typography.css) | 15/600, 16/400, 17/600 je Modul |
 | Abschnitt als Auszug eines Reiters | der Abschnittstitel IST der Weg: Knopf im `h2.u-section-title` mit Pfeil | `.section-title-link` (layout.css) | "Alle anzeigen"-Knopf daneben, Nachbau je Modul |
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien), Wort plus Zaehlstand, OHNE Zeichen (R23 D10: Einkauf, Vorrat, Inventar trugen das Kategorie-/Ort-Icon; es bleibt im Kategorie-Verwalter und in den Auswahlen; Guard `test:control-dialect` "D10: kein Gruppentitel ..."). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
-| Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Fett bleibt der Kennzahl (`.metric-card__value`, Title 1) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
+| Betrag in Zeile oder Karte | semibold, `tabular-nums`; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Die Kennzahl (`.metric-card__value`, Title 1) ist ebenfalls semibold und hebt sich durch ihre Groesse ab (seit 2026-10-26) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
 | Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Seit R21 blaettern Links/Rechts, solange der Fokus auf dem Stepper steht** (Pfeil, Wert oder Reset; RTL gespiegelt, `aria-keyshortcuts` an den Pfeilen): `wirePeriodArrowKeys()` am Traeger der Pfeile, nie am Seitencontainer - im Kalender gelten die Pfeile seitenweit (router.js). Derselbe Griff blaettert im Dokumentbetrachter durch die sichtbare Liste (Vor/Zurueck-Paar vorn in der Leiste; seit R22 ein eigenes Kind der Meta-Zeile, am Listenrand der fehlende Pfeil gedimmt statt einer Luecke, mobil in der Zeile des Kategorie-Knopfs). **Steht statt des Steppers eine Notiz (Budget: Konten, Abos, Darlehen), haelt ihr Slot die Breite des Steppers** (R22: mobil 2 x `--target-base` + 96px, Tablet + 144px; vorher wuchs er in die freie Zeile, Layout-Shift beim Reiterwechsel 0,0005 / 0,012 -> 0) **und beginnt am Desktop, wo der Monat beginnt** (`text-align: start`; `test:budget-ui` "Kopfnotiz"). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
 | Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`). Seit R18 FUEHRT je Geld-Reiter eine Zahl: `lead: true` in der Kurzzeile, `.metric-card--lead` in der Reihe `.metric-grid--led` (Large Title 34 in der Seitenspalte, sonst Title 1, kleiner nur bei Ueberlauf - R23 D12; die uebrigen treten zurueck). **Eine Saldo-Aussage (R22, D9):** die Aufteilung nennt die Richtung, die nicht null ist ("Du schuldest", "Du bekommst" oder "Ausgeglichen"), EINE Karte - beide nur bei zwei Waehrungen in beide Richtungen. Eine Seitenspalte beginnt an der Werkzeuglinie der Liste und stapelt Karten in Inhaltshoehe (`grid-auto-rows: auto`, `padding-block: 0`; Abos wie Darlehen). Eine Darlehenskarte fuehrt mit ihrer Zahl, "Restschuld" steht leise in der Bezugszeile, kein Versal-Eyebrow | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js, utils/metric-card.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
 | Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
@@ -4423,7 +4427,7 @@ Flaeche, Radius 12 und shadow-md aus der einen Materialregel `.dashboard .widget
 wie der Widget-Koerper, Luecke = Rasterluecke (`--dashboard-grid-gap`); der Kopf spricht den
 Widget-Dialekt (Siegel + Modulname in Label-Farbe, semibold, Headline-Dichtestufe 15px - eine
 Stufe unter dem 17px-Widget-Titel, weil die Kachel ein halbes Widget ist), der Wert Title 1
-semibold. Die Reihe ist der Container `metric-grid` (Wertstufen 28/22/20 nach ihrer Breite),
+semibold wie jede Kennzahl. Die Reihe ist der Container `metric-grid` (Wertstufen 28/22/20 nach ihrer Breite),
 `fitMetricLeads()` verkleinert, was auf der Stufe nicht passt, und per Subgrid teilen die
 Kacheln Kopf-, Wert- und Fusszeile - ein umbrechender Modulname verschiebt keinen Wert mehr.
 Ab 1024px fuellt die Reihe genau eine Rasterzeile (`--dashboard-row-min`), der Abstand zur
@@ -5295,8 +5299,8 @@ Angabe braeuchte einen zweiten Timer, nur damit sie sich selbst aktuell haelt.
   Ort (R23, D12), semibold:** in einer Seitenspalte Large Title 34 (`.metric-card--lead`, die
   Spalte meldet sich mit `--metric-rail: ;`), in einer Reihe und mobil in der Kurzzeile Title 1
   28 (`metricGlanceHtml({ lead: true })`, `.budget-glance--lead`, die Nebenwerte als EINE ruhige
-  Zeile darunter); in einer Reihe mit mehreren Karten treten die uebrigen eine Stufe zurueck und
-  verlieren das Fett (`.metric-grid--led`). **Kleiner nur bei Ueberlauf:** `fitMetricLeads()`
+  Zeile darunter); in einer Reihe mit mehreren Karten treten die uebrigen eine Groessenstufe
+  zurueck (`.metric-grid--led`; das Gewicht ist seit 2026-10-26 fuer jede Kennzahl semibold). **Kleiner nur bei Ueberlauf:** `fitMetricLeads()`
   (utils/metric-card.js) misst Karte bzw. Kurzzeile per ResizeObserver vor dem ersten Bild und
   setzt `data-fit` (Title 2, dann Title 3). Bis R23 waehlte die Zahl ihre Stufe nach ihrer
   Zeichenzahl (18-48px, sechs Groessen derselben Rolle). Ein Ziel ("von 90,00 €") steht in der

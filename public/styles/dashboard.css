@@ -227,12 +227,6 @@
   color: var(--color-text-primary);
 }
 
-/* Title 1 semibold wie die Leitzahl (R23, D12): die Kachel nennt EINE Zahl,
- * und Fett war die Gewichtsstufe ueber dem Widget-Titel, nicht seine. */
-.metric-tiles .metric-card__value {
-  font-weight: var(--font-weight-semibold);
-}
-
 /* EINE RASTERZEILE HOCH, NICHT 21PX DARUNTER (DW-P2-7, G1-P3-2). Ab 1024px
  * ist jede Rasterzeile mindestens `--dashboard-row-min` hoch. Die Reihe
  * (111px) stand oben in ihrer 132px-Zeile, und bis zur naechsten Kachel
@@ -1980,8 +1974,11 @@ svg.weather-forecast__icon {
   padding-right: var(--target-base);
 }
 
+/* In der kleinen Kachel ist die Temperatur Title 1 - und traegt dann auch
+ * deren Gewicht (semibold, test:typography), nicht das der Anzeige-Stufe. */
 .widget-size--1x1 > .weather-widget .weather-widget__temp {
   font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* One-row weather cards prioritize scan density; taller sizes keep the richer
@@ -5530,10 +5527,12 @@ button.today-cockpit__more--link {
   font-weight: var(--font-weight-medium);
 }
 
+/* Der Kontosaldo ist die Kennzahl der Karte: Title 1 semibold wie
+ * `.metric-card__value` (Guard test:typography "Title 1 traegt semibold"). */
 .budget-widget__balance {
   color: var(--color-text-primary);
   font-size: var(--text-3xl);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;

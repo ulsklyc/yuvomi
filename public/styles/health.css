@@ -4011,7 +4011,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-panel { display: grid; gap: var(--space-6); }
 .fasting-card { padding: var(--space-5); border-radius: var(--radius-md); background: var(--color-surface-work); box-shadow: var(--shadow-sm); }
 .fasting-hero { text-align: center; align-items: center; padding: var(--space-5); }
-.fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
+/* Der Timer ist die Kennzahl der Karte: Title 1 semibold (test:typography). */
+.fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .fasting-dial__days { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
 .fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); }

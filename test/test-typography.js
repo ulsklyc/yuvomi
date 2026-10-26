@@ -1289,3 +1289,31 @@ test('R21 Inge: am Tablet keine Lesezeile unter 13, Nav-Label 12; R23: Monatstit
     assert.match(base?.body ?? '', /font-size:\s*var\(--type-caption\)/, `${sel}: Footnote 13 statt 12`);
   }
 });
+
+/* EINE ROLLE, EIN GEWICHT: TITLE 1 IST SEMIBOLD (DW-P2-7 Nachtrag p6b,
+ * Entscheidung Ulas 2026-10-26). Die Leitzahl und die ruhigen Werte einer
+ * gefuehrten Reihe standen seit R23 D12 auf semibold, die Kachelreihe der
+ * Uebersicht seit p6 - die uebrigen Kennzahlen (Gesundheit, Inventar,
+ * Haushaltshilfe, Abos, Aufteilung) und die anderen Nutzer der Rolle
+ * (Kontosaldo der Budget-Kachel, Fasten-Timer) weiter auf 700: dieselbe Rolle
+ * in zwei Gewichten. Gefragt wird jede Regel, die eine Groesse der Rolle setzt
+ * oder den Wert der Kennzahlkarte trifft - keine Dateiliste. Gegen den Stand
+ * davor rot gelaufen (Dateikopie). */
+test('Title 1 traegt semibold: keine Kennzahl und kein Wert der Rolle steht in 700', () => {
+  const title1 = /font-size:\s*var\(--(?:text-3xl|metric-value-size\s*,\s*var\(--text-3xl\))\)/;
+  const bold = [];
+  let base = null;
+  for (const file of cssFiles) {
+    const css = readFileSync(new URL(file, STYLES_DIR), 'utf8');
+    for (const { selector, body, at } of eachRule(css)) {
+      const weight = lastDeclaration(body, 'font-weight');
+      const valueRule = /\.metric-card__value\b/.test(selector);
+      if (file === 'panel.css' && at.length === 0 && selector.trim() === '.metric-card__value' && title1.test(body)) base = weight;
+      if (!weight || !(valueRule || title1.test(body))) continue;
+      if (/--font-weight-(?:bold|heavy|black)\b|\b[789]00\b/.test(weight)) bold.push(`${file}: ${[...at, selector.trim().replace(/\s+/g, ' ')].join(' | ')}`);
+    }
+  }
+  assert.ok(base !== null, 'die Grundregel `.metric-card__value` in panel.css muss es geben - sonst prueft dieser Guard nichts');
+  assert.equal(base, 'var(--font-weight-semibold)', 'die Kennzahl der geteilten Karte steht semibold');
+  assert.deepEqual(bold, [], 'diese Regeln setzen eine Title-1-Groesse oder den Kennzahlwert in Fett');
+});
