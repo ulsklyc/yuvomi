@@ -21,7 +21,6 @@
   height: 100%;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 1.2s ease;
 }
 
 .photo-screensaver img.photo-screensaver__visible { opacity: 1; }
@@ -40,8 +39,31 @@
 .photo-screensaver p[data-position="2"] { right: 1.25rem; top: 1.25rem; }
 .photo-screensaver p[data-position="3"] { left: 1.25rem; top: 1.25rem; }
 
+/* NACHTS GEDIMMT (#1901): in den Nachtstunden dieses Geraets (Vorgabe 22 bis
+   6 Uhr, utils/night-hours.js) traegt der Schoner `data-night`. Foto, Uhr und
+   Beschriftung dunkeln um dasselbe Mass ab, ueber `brightness` statt
+   `opacity`: die Deckkraft des Fotos ist schon die Ueberblendung zwischen zwei
+   Bildern. Halbe Helligkeit laesst ein Foto auf kleinster Hintergrund-
+   beleuchtung noch erkennen, und Weiss wird zu einem mittleren Grau auf der
+   dunklen Platte - lesbar, ohne den Flur auszuleuchten. Der Wechsel um 22:00
+   gleitet ueber zwei Sekunden, statt zu springen. */
+.photo-screensaver {
+  --screensaver-night-brightness: 0.5;
+}
+
+.photo-screensaver img,
+.photo-screensaver p {
+  transition: opacity 1.2s ease, filter 2s ease;
+}
+
+.photo-screensaver[data-night] img,
+.photo-screensaver[data-night] p {
+  filter: brightness(var(--screensaver-night-brightness));
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .photo-screensaver img { transition: none; }
+  .photo-screensaver img,
+  .photo-screensaver p { transition: none; }
 }
 
 /* Full-bleed photos, chosen per device (#1766). Off by default: `cover` crops a

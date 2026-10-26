@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
+  Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
+  as before unless you change it, on the household's clock and for this device only. Wall mode dims
+  in these hours, and the photo screensaver now does as well, with or without wall mode: photos,
+  clock and caption at half brightness, so the hallway stays dark at night. A screensaver that is
+  already showing dims and brightens again by itself at the next photo. A reload at night no longer
+  briefly shows the day state on a device whose own clock is in another time zone.
 - **The Calendar tile can show only the calendars you choose** (#2062). Its options now list the
   household's calendars - your own, synced ones and subscriptions - for a multi-select; with nothing
   selected it shows every calendar, as before. The choice applies to the list, the week strip and

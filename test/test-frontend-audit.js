@@ -15785,6 +15785,9 @@ test('index.html and offline.html declare color-scheme before any stylesheet', (
  */
 test('theme-init.js pins the color-scheme meta to an explicit theme', () => {
   const source = read('../public/theme-init.js');
+  // Die Nacht fragt theme-init.js bei /night-hours.js (#2234), das im Kopf
+  // davor laeuft - hier wie dort zuerst geladen.
+  new Function(read('../public/night-hours.js'))();
   const run = (entries, hours = 12) => {
     const map = new Map(Object.entries(entries));
     const storage = {
@@ -17185,8 +17188,8 @@ test('der Wand-Modus laesst die Shell abtreten - und versteckt den FAB NICHT per
 
 test('der Vorab-Wand-Modus in theme-init.js driftet nicht von utils/wall-mode.js', () => {
   // theme-init.js laeuft als klassisches <script> im <head>, vor jedem Modul -
-  // es KANN nicht importieren und traegt die Werte deshalb als Literale. Die
-  // Quelle der Wahrheit bleibt utils/wall-mode.js; hier steht die Naht.
+  // es KANN nicht importieren und traegt Schluessel und Route deshalb als
+  // Literale. Die Quelle der Wahrheit bleibt utils/wall-mode.js; hier steht die Naht.
   const init = read('../public/theme-init.js');
   const mod = read('../public/utils/wall-mode.js');
 
@@ -17194,19 +17197,48 @@ test('der Vorab-Wand-Modus in theme-init.js driftet nicht von utils/wall-mode.js
   assert.equal(modKey, 'yuvomi-wall-mode', 'der Schluessel steht in wall-mode.js');
   assert.ok(init.includes(`'${modKey}'`), `theme-init.js liest denselben Schluessel (${modKey})`);
 
-  const from = Number(mod.match(/export const WALL_NIGHT_FROM = (\d+)/)?.[1]);
-  const to = Number(mod.match(/export const WALL_NIGHT_TO = (\d+)/)?.[1]);
-  assert.equal(from, 22);
-  assert.equal(to, 6);
-
-  const initWindow = init.match(/hour >= (\d+) \|\| hour < (\d+)/);
-  assert.ok(initWindow, 'theme-init.js traegt ein Nachtfenster');
-  assert.equal(Number(initWindow[1]), from, 'dieselbe Nachtgrenze wie wall-mode.js');
-  assert.equal(Number(initWindow[2]), to, 'dieselbe Morgengrenze wie wall-mode.js');
-
   // Und die Route: der Modus ist ein Zustand des Dashboards, kein zweiter Ort.
   assert.match(mod, /export function isWallRoute\(path\) \{\s*return path === '\/';/);
   assert.ok(init.includes("location.pathname !== '/'"), 'theme-init.js kennt dieselbe Route');
+});
+
+test('die Nacht hat EINE Rechnung: theme-init.js und isWallNight fragen /night-hours.js (#2234)', () => {
+  // Bis #2234 standen die Stunden zweimal da (Konstanten im Modul, Literale im
+  // Kopf) und lasen zwei Uhren. Jetzt rechnet nur /night-hours.js; der Kopf
+  // fragt es mit Stunden und Zone aus dem Storage, die Module ueber
+  // utils/night-hours.js.
+  const init = read('../public/theme-init.js');
+  const core = read('../public/night-hours.js');
+  const mod = read('../public/utils/night-hours.js');
+  const wall = read('../public/utils/wall-mode.js');
+
+  const initCode = init.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
+  assert.doesNotMatch(initCode, /getHours\(\)|hour >= \d+/, 'kein eigenes Nachtfenster und keine Geraeteuhr im Kopf');
+  assert.match(init, /night\.isNight\(new Date\(\), night\.readZone\(localStorage\), night\.read\(localStorage\)\)/,
+    'theme-init.js fragt die geteilte Funktion mit Zone und Stunden dieses Geraets');
+  assert.match(mod, /import '\.\.\/night-hours\.js';/, 'das Modul laedt dieselbe Datei');
+  assert.match(mod, /core\.isNight\(now, displayTimeZone\(\), getNightHours\(\)\)/);
+  assert.match(wall, /export function isWallNight\(now = new Date\(\)\) \{\s*return isNightHours\(now\);/,
+    'die Wand fragt dieselbe Funktion');
+  assert.doesNotMatch(core, /^\s*(?:import|export)\b/m, 'klassisch ladbar: kein import/export');
+  assert.match(core, /DEFAULT_FROM = 22;/);
+  assert.match(core, /DEFAULT_TO = 6;/);
+
+  // Derselbe Zonen-Schluessel wie utils/timezone.js.
+  const zoneKey = read('../public/utils/timezone.js').match(/const STORAGE_KEY = '([^']+)'/)?.[1];
+  assert.equal(zoneKey, 'yuvomi-timezone');
+  assert.ok(core.includes(`var ZONE_KEY = '${zoneKey}'`), 'night-hours.js liest dieselbe Haushaltszone');
+
+  // Beide Dokumente laden die Rechnung VOR theme-init.js, und offline liegt sie im Precache.
+  for (const doc of ['index.html', 'offline.html']) {
+    const html = read(`../public/${doc}`);
+    const at = html.indexOf('<script src="/night-hours.js"></script>');
+    assert.ok(at !== -1 && at < html.indexOf('<script src="/theme-init.js"></script>'),
+      `${doc} laedt /night-hours.js vor /theme-init.js`);
+  }
+  const sw = read('../public/sw.js');
+  assert.ok(sw.includes("'/night-hours.js',"), 'im Precache des Service Workers');
+  assert.ok(sw.includes("'/utils/night-hours.js',"));
 });
 
 test('the early screensaver delay in theme-init.js does not drift from utils/screensaver-idle.js (#885)', () => {

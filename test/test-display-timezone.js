@@ -372,17 +372,15 @@ test('ausser utils/timezone.js liest kein Modul eine Uhrzeit aus einem Instant',
  * Minutentakt der Uhr-Kachel etwa. `getMinutes` dagegen steht drin, denn es gibt
  * Zonen mit halben und viertel Stunden (Indien +05:30, Nepal +05:45).
  *
- * Ohne Ausnahmeliste, mit zwei Ausnahmen, die keine sind:
+ * Ohne Ausnahmeliste, mit einer Ausnahme, die keine ist:
  *   - utils/timezone.js beantwortet die Frage, es darf sie stellen.
- *   - theme-init.js laeuft als erstes Skript im <head>, vor jedem Modul und vor
- *     der gespiegelten Zone. Es hat keine Anzeigezone, die es fragen koennte,
- *     und was es entscheidet (Nachtthema) haengt an dem Geraet, vor dem jemand
- *     sitzt - nicht am Haushalt.
+ * theme-init.js stand bis #2234 auch hier, fuer seine Geraeteuhr beim
+ * Nachtthema. Seitdem fragt es /night-hours.js nach der Haushaltszone wie die
+ * Wand, und die Ausnahme ist weg.
  */
 test('kein Frontend-Modul baut sich sein eigenes "jetzt" aus der Browser-Uhr', () => {
   const allowed = new Set([
     path.join('utils', 'timezone.js'),
-    'theme-init.js',
   ]);
 
   const offenders = [];
@@ -456,15 +454,43 @@ test('utils/timezone.js ist die einzige Stelle mit einem zonenbehafteten Formatt
   // Uhr. Erlaubt ist `timeZone: 'UTC'` - das ist keine Zone, sondern die
   // Zusicherung, NICHT umzurechnen (i18n.js formatiert damit die bereits in der
   // Anzeigezone berechneten Felder, datepicker.js ein reines Kalenderraster).
+  //
+  // EINE Ausnahme mit Gegenprobe: /night-hours.js (#2234) laeuft als
+  // klassisches Skript vor jedem Modul, fuer das erste Bild der Wand, und kann
+  // utils/timezone.js nicht importieren. Dass seine Stunde dieselbe ist wie
+  // `nowFields().hour`, haelt der Test direkt darunter.
+  const allowed = new Set([path.join('utils', 'timezone.js'), 'night-hours.js']);
   const offenders = [];
   for (const s of SOURCES) {
-    if (s.rel === path.join('utils', 'timezone.js')) continue;
+    if (allowed.has(s.rel)) continue;
     for (const m of s.code.matchAll(/timeZone:\s*([^,\n}]+)/g)) {
       const value = m[1].trim();
       if (value !== "'UTC'" && value !== '"UTC"') offenders.push(`${s.rel}: ${value}`);
     }
   }
   assert.deepEqual(offenders, [], 'zweiter zonenbehafteter Formatter neben utils/timezone.js');
+});
+
+test('/night-hours.js liest dieselbe Stunde wie nowFields() (#2234)', async () => {
+  // Die Gegenprobe zur Ausnahme oben: die Stunde, nach der die Wand im ersten
+  // Bild abdunkelt, ist die, nach der der Router es danach tut.
+  await import('../public/night-hours.js');
+  const core = globalThis.yuvomiNightHours;
+  const tz = await import('../public/utils/timezone.js');
+  const zones = ['Europe/Berlin', 'Asia/Kolkata', 'Asia/Kathmandu', 'America/St_Johns', 'Pacific/Chatham', 'UTC'];
+  const off = [];
+  for (const zone of zones) {
+    for (let hour = 0; hour < 48; hour += 1) {
+      // Zwei Tage in Viertelstunden-Versatz: Mitternacht, halbe und
+      // Dreiviertel-Zonen, ein Sommerzeit-Wechsel (Europa, 25.10.2026).
+      const now = new Date(Date.UTC(2026, 9, 24, hour, 15 * (hour % 4)));
+      const want = tz.zonedFields(now, zone).hour;
+      const got = core.hourIn(now, zone);
+      if (want !== got) off.push(`${zone} ${now.toISOString()}: ${got} statt ${want}`);
+    }
+  }
+  assert.deepEqual(off, []);
+  assert.equal(core.hourIn(new Date(), 'Not/AZone'), new Date().getHours(), 'unbekannte Zone: Geraeteuhr');
 });
 
 test('i18n.js formatiert ueber zonedFields, nicht ueber die Browser-Getter', () => {

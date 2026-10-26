@@ -2881,7 +2881,9 @@ test('Wand-Modus und Cockpit erzählen denselben Tag (ein Modell, zwei Formen)',
 });
 
 test('Wand-Modus: das Nachtfenster läuft über Mitternacht (22:00 bis 06:00)', async () => {
-  const { isWallNight, isWallRoute, WALL_NIGHT_FROM, WALL_NIGHT_TO } = await import('../public/utils/wall-mode.js');
+  const { isWallNight, isWallRoute } = await import('../public/utils/wall-mode.js');
+  // Die Vorgabe der Nachtstunden; je Geraet waehlbar seit #2234 (test:screensaver-device).
+  const { NIGHT_FROM_DEFAULT, NIGHT_TO_DEFAULT } = await import('../public/utils/night-hours.js');
   const at = (h, m = 0) => new Date(2026, 7, 11, h, m);
   const probe = [
     [21, 59, false], [22, 0, true], [23, 30, true],
@@ -2891,8 +2893,8 @@ test('Wand-Modus: das Nachtfenster läuft über Mitternacht (22:00 bis 06:00)', 
     .map(([h, m]) => `${h}:${String(m).padStart(2, '0')}`);
   nodeAssert.equal(probe.length, 8, 'acht Uhrzeiten geprüft');
   nodeAssert.deepEqual(falsch, [], 'ODER statt UND - sonst reißt das Fenster um Mitternacht');
-  nodeAssert.equal(WALL_NIGHT_FROM, 22);
-  nodeAssert.equal(WALL_NIGHT_TO, 6);
+  nodeAssert.equal(NIGHT_FROM_DEFAULT, 22);
+  nodeAssert.equal(NIGHT_TO_DEFAULT, 6);
 
   // Der Modus ist ein Zustand DES DASHBOARDS, keine eigene Route.
   nodeAssert.equal(isWallRoute('/'), true);
@@ -2951,11 +2953,16 @@ test('Wand-Modus: nach einem Reload in der Nacht ist die Wand dunkel (#1453)', a
     try { return fn(); } finally { globalThis.Date = RealDate; }
   }
 
-  // Die Nacht: 23:00 in Berlin (Haushalt) - und auf der Geraeteuhr, die
-  // theme-init liest, ebenfalls Nacht, damit alle drei Stellen dasselbe sehen.
+  // Die Nacht: 23:00 in Berlin (Haushalt). theme-init fragt seit #2234
+  // dieselbe Uhr wie syncWallMode (die Haushaltszone, /night-hours.js), also
+  // steht sein `new Date()` auf demselben Zeitpunkt - alle drei Stellen sehen
+  // dieselbe Nacht.
   const NIGHT = '2026-09-23T21:00:00Z';
   const MORNING = '2026-09-24T04:00:00Z'; // 06:00 in Berlin
-  const deviceNight = class extends RealDate { getHours() { return 23; } };
+  const nightAt = RealDate.parse(NIGHT);
+  const deviceNight = class extends RealDate {
+    constructor(...args) { if (args.length === 0) super(nightAt); else super(...args); }
+  };
 
   const results = [];
   for (const stored of [null, 'light', 'dark']) {

@@ -77,17 +77,24 @@
 // Routenwechsel nach (utils/wall-mode.js, syncWallMode), das hier ist der
 // Anfangszustand.
 //
-// Die Werte stehen als Literale da und nicht als Import: dieses Skript laeuft
-// als klassisches <script> im <head>, vor jedem Modul. Die eine Quelle bleibt
-// `utils/wall-mode.js`; dass die beiden nicht auseinanderlaufen, haelt ein Guard
-// in test-frontend-audit.js.
+// Schluessel und Route stehen als Literale da und nicht als Import: dieses
+// Skript laeuft als klassisches <script> im <head>, vor jedem Modul. Die eine
+// Quelle bleibt `utils/wall-mode.js`; dass die beiden nicht auseinanderlaufen,
+// haelt ein Guard in test-frontend-audit.js.
+//
+// DIE NACHT FRAGT DIESELBE FUNKTION WIE DER ROUTER (#2234). Bis dahin stand
+// hier `new Date().getHours()` gegen zwei Literale - die Geraeteuhr, waehrend
+// `isWallNight()` die des Haushalts las. `/night-hours.js` laeuft als Skript
+// direkt davor und rechnet beides: die Stunden dieses Geraets, die Zone des
+// Haushalts. Fehlt es (Skript nicht geladen), bleibt das erste Bild Tag, und
+// `syncWallMode` holt die Nacht beim ersten Routing nach.
 (function () {
   try {
     if (localStorage.getItem('yuvomi-wall-mode') !== '1') return;
     if (location.pathname !== '/') return;
     document.documentElement.setAttribute('data-wall-mode', '');
-    var hour = new Date().getHours();
-    if (hour >= 22 || hour < 6) {
+    var night = typeof yuvomiNightHours !== 'undefined' ? yuvomiNightHours : null;
+    if (night && night.isNight(new Date(), night.readZone(localStorage), night.read(localStorage))) {
       document.documentElement.setAttribute('data-wall-night', '');
       // Nachts erzwungen dunkel - ohne `yuvomi-theme` anzufassen.
       document.documentElement.setAttribute('data-theme', 'dark');

@@ -36,6 +36,9 @@
   <!-- Theme: explizite Nutzer-Overrides vor CSS-Rendering anwenden (Flash-Prevention).
        System-Präferenz wird durch @media (prefers-color-scheme: dark) in tokens.css
        direkt per CSS behandelt — kein JS-matchMedia erforderlich. -->
+  <!-- Die Nachtstunden dieses Geraets (#2234): theme-init.js fragt sie fuer
+       das erste Bild, die Module dieselbe Datei (utils/night-hours.js). -->
+  <script src="/night-hours.js"></script>
   <script src="/theme-init.js"></script>
 
   <!-- Lang: echte Nutzer-Locale vor dem Render setzen, damit Chromium-Browser nicht

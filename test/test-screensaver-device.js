@@ -583,9 +583,187 @@ test('without Immich the device sheet shows one row instead of three dead option
         assert.equal(/id="screensaver-connect" href="\/settings\/admin\/integrations"/.test(c.html), role === 'admin', 'nur Admins bekommen den Weg zu Immich');
       }
       assert.match(c.html, /wall-mode-toggle/, 'der Wand-Modus bleibt immer');
+      // Die Nachtstunden gelten auch fuer die Wand, also auch ohne Immich (#2234).
+      assert.match(c.html, /id="night-hours-row"[\s\S]*id="night-hours-from"[\s\S]*id="night-hours-until"/,
+        'die Nachtstunden stehen immer da');
     }
   } finally {
     resetPreferencesCache();
     if (keep === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = keep;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Night hours (#1901, #2234). ONE window for wall and screensaver, chosen on
+// this device, read on the household's clock - by theme-init.js for the first
+// paint and by the modules afterwards, through the same function.
+
+const night = await import('../public/utils/night-hours.js');
+const { setDisplayTimeZone: setZone } = await import('../public/utils/timezone.js');
+
+// The real Date, taken while the module loads: page() mocks it later, and the
+// mock's constructor hands back a plain Date, so a subclass of the mock would
+// lose its getHours().
+const RealDate = Date;
+
+/** A `Date` whose `new Date()` is `iso` and whose DEVICE hour is always `deviceHour`. */
+function deviceClock(iso, deviceHour) {
+  const Base = RealDate;
+  const fixed = Base.parse(iso);
+  return class extends Base {
+    constructor(...args) { if (args.length === 0) super(fixed); else super(...args); }
+    getHours() { return deviceHour; }
+  };
+}
+
+/** The real theme-init.js on `/` with wall mode on, as the page head runs it. */
+function themeInitNight(entries, DateImpl) {
+  const attrs = new Map();
+  const root = {
+    setAttribute: (k, v) => { attrs.set(k, String(v)); },
+    getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+    removeAttribute: (k) => { attrs.delete(k); },
+    hasAttribute: (k) => attrs.has(k),
+  };
+  const doc = { documentElement: root, querySelectorAll: () => [], querySelector: () => null };
+  new Function('localStorage', 'sessionStorage', 'document', 'location', 'Date', read('../public/theme-init.js'))(
+    makeStorage({ 'yuvomi-wall-mode': '1', ...entries }), makeStorage(), doc, { pathname: '/' }, DateImpl,
+  );
+  return root.hasAttribute('data-wall-night');
+}
+
+test('night hours: 22 to 6 unless chosen, stored on this device, the default as no key', async () => {
+  await page();
+  assert.equal(night.NIGHT_HOURS_KEY, 'yuvomi-night-hours');
+  assert.deepEqual(night.getNightHours(), { from: 22, to: 6 });
+  assert.deepEqual(night.setNightHours(23, 5), { from: 23, to: 5 });
+  assert.equal(pageStorage.getItem(night.NIGHT_HOURS_KEY), '23-5');
+  assert.deepEqual(night.getNightHours(), { from: 23, to: 5 });
+  night.setNightHours(22, 6);
+  assert.equal(pageStorage.map.has(night.NIGHT_HOURS_KEY), false, 'back to the default leaves no key');
+  for (const junk of ['', 'abc', '22', '24-6', '7-7', '-1-5']) {
+    pageStorage.setItem(night.NIGHT_HOURS_KEY, junk);
+    assert.deepEqual(night.getNightHours(), { from: 22, to: 6 }, `${junk} falls back to the default`);
+  }
+  pageStorage.removeItem(night.NIGHT_HOURS_KEY);
+});
+
+test('night hours: across midnight and within one day, on the household clock', async () => {
+  await page();
+  const at = (iso) => new Date(Date.parse(iso));
+  setZone('Asia/Kolkata'); // +05:30
+  try {
+    // 16:45 UTC = 22:15 Kolkata; 00:15 UTC = 05:45 Kolkata; 01:00 UTC = 06:30 Kolkata
+    assert.equal(night.isNightHours(at('2026-10-08T16:45:00Z')), true);
+    assert.equal(night.isNightHours(at('2026-10-09T00:15:00Z')), true);
+    assert.equal(night.isNightHours(at('2026-10-09T01:00:00Z')), false);
+    night.setNightHours(1, 5); // the same day: an AND, not an OR
+    assert.equal(night.isNightHours(at('2026-10-08T16:45:00Z')), false, '22:15 is not in 1-5');
+    assert.equal(night.isNightHours(at('2026-10-08T21:00:00Z')), true, '02:30 is');
+  } finally {
+    night.setNightHours(22, 6);
+    setZone(null);
+  }
+});
+
+test('the wall dims in the hours chosen on this device (#2234)', async () => {
+  await page();
+  const { isWallNight } = await import('../public/utils/wall-mode.js');
+  const at = new Date(Date.parse('2026-10-08T14:30:00Z')); // 20:00 in Kolkata
+  setZone('Asia/Kolkata');
+  try {
+    assert.equal(isWallNight(at), false, '20:00 is day by default');
+    night.setNightHours(19, 7);
+    assert.equal(isWallNight(at), true, 'and night once the device dims from 19:00');
+  } finally {
+    night.setNightHours(22, 6);
+    setZone(null);
+  }
+});
+
+test('theme-init.js paints the night on the household clock and the hours of this device (#2234)', async () => {
+  await page(); // the module above has put the shared function on globalThis
+  // 17:30 UTC is 23:00 in Kolkata, while the device's own clock says noon.
+  const noonOnDevice = deviceClock('2026-10-08T17:30:00Z', 12);
+  assert.equal(themeInitNight({ 'yuvomi-timezone': 'Asia/Kolkata' }, noonOnDevice), true,
+    'the household is at 23:00 - the device clock (noon) does not decide');
+  assert.equal(themeInitNight({ 'yuvomi-timezone': 'Asia/Kolkata', 'yuvomi-night-hours': '1-5' }, noonOnDevice), false,
+    '23:00 is outside 1-5, chosen on this device');
+  assert.equal(themeInitNight({}, deviceClock('2026-10-08T17:30:00Z', 11)), false,
+    'without a household zone the device hour applies: 11:00 is day');
+  assert.equal(themeInitNight({ 'yuvomi-night-hours': '10-14' }, deviceClock('2026-10-08T17:30:00Z', 11)), true,
+    'and the chosen hours too');
+  // And the module agrees with the first paint at that instant.
+  setZone('Asia/Kolkata');
+  try {
+    assert.equal(night.isNightHours(new noonOnDevice()), true);
+  } finally {
+    setZone(null);
+  }
+});
+
+test('the screensaver dims at night without wall mode, and the hour turns it while it shows (#1901)', async () => {
+  await page();
+  assert.equal(pageRoot.hasAttribute('data-wall-mode'), false, 'no wall mode on this page');
+  setZone('UTC');
+  try {
+    const hour = new Date().getUTCHours();
+    // A window that holds the current hour, and then one that does not.
+    night.setNightHours(hour, (hour + 2) % 24);
+    const node = await openScreensaver();
+    assert.equal(node.dataset.night, '', 'dimmed from the first photo');
+    night.setNightHours((hour + 3) % 24, (hour + 5) % 24);
+    mock.timers.tick(20_000);
+    assert.equal('night' in node.dataset, false, 'the next photo is back to full brightness, without a touch');
+    night.setNightHours(hour, (hour + 2) % 24);
+    mock.timers.tick(20_000);
+    assert.equal(node.dataset.night, '', 'and dims again on the next photo');
+    gesture();
+  } finally {
+    night.setNightHours(22, 6);
+    setZone(null);
+  }
+});
+
+test('the night rule dims photo, clock and caption alike, and glides only with motion allowed', () => {
+  const css = read('../public/styles/screensaver.css');
+  const rule = css.match(/\.photo-screensaver\[data-night\] img,\s*\.photo-screensaver\[data-night\] p \{([^}]*)\}/);
+  assert.ok(rule, 'one rule for the photo and both texts (the clock is a p)');
+  assert.match(rule[1], /filter: brightness\(var\(--screensaver-night-brightness\)\)/);
+  const level = Number(css.match(/--screensaver-night-brightness: ([\d.]+)/)?.[1]);
+  assert.ok(level > 0 && level < 1, `darker, not black: ${level}`);
+  assert.match(css, /\.photo-screensaver img,\s*\.photo-screensaver p \{\s*transition: opacity 1\.2s ease, filter 2s ease;/);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.photo-screensaver img,\s*\.photo-screensaver p \{ transition: none; \}/);
+});
+
+test('the night-hours selects under Appearance open on the stored hours, store and confirm', async () => {
+  await page();
+  const { nightHourOptions, bindNightHoursSelects } = await import('../public/settings/pages/personal-appearance.js');
+  const html = nightHourOptions(22, 6);
+  assert.equal((html.match(/<option /g) || []).length, 24, 'every whole hour');
+  assert.match(html, /<option value="22" selected>/);
+  assert.match(html, /<option value="6" disabled>/, 'the hour of the other end cannot be picked: no empty window');
+
+  const option = (value) => ({ value: String(value), disabled: false });
+  const makeSelect = (value) => ({
+    value: String(value),
+    options: Array.from({ length: 24 }, (_, hour) => option(hour)),
+    handlers: {},
+    addEventListener(name, handler) { this.handlers[name] = handler; },
+  });
+  const from = makeSelect(22);
+  const until = makeSelect(6);
+  bindNightHoursSelects(from, until);
+  toasts.length = 0;
+  from.value = '23';
+  from.handlers.change();
+  assert.equal(pageStorage.getItem(night.NIGHT_HOURS_KEY), '23-6');
+  assert.equal(until.options[23].disabled, true, 'until now locks 23');
+  assert.equal(from.options[6].disabled, true, 'from keeps 6 locked');
+  assert.equal(from.options[22].disabled, false);
+  assert.deepEqual(toasts.map((toast) => toast.type), ['success']);
+  assert.match(toasts[0].message, /^settings\.nightHoursSaved/);
+  from.value = '22';
+  from.handlers.change();
+  assert.equal(pageStorage.map.has(night.NIGHT_HOURS_KEY), false, 'back to the default leaves no key');
 });

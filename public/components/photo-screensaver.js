@@ -7,6 +7,7 @@ import {
   syncScreensaverIdleFromStorage,
 } from '/utils/screensaver-idle.js';
 import { ensureStyle } from '/utils/component-style.js';
+import { isNightHours } from '/utils/night-hours.js';
 
 // Not linked in index.html (Critique R19): the screensaver is the last thing a
 // start needs. It loads with the first start, alongside the photo request, and
@@ -146,8 +147,22 @@ async function start() {
     document.body.append(overlay);
 
     let index = Math.floor(Math.random() * photos.length);
+    // NACHTS GEDIMMT, AUCH OHNE WAND (#1901). Die Nachtstunden dieses Geraets
+    // (utils/night-hours.js) - dieselben, in denen die Wand abdunkelt, aber
+    // nicht an `data-wall-night` gebunden: das gibt es nur im Wand-Modus auf
+    // `/`, und ein Tablet ohne Wand-Modus oder auf einer anderen Seite stuende
+    // um drei Uhr hell im Flur. Gefragt bei jedem Bildwechsel, so erreicht der
+    // Wechsel um 22:00 und 06:00 einen laufenden Schoner ohne Beruehrung und
+    // ohne eigenen Takt; die Dimmung selbst steht in screensaver.css.
+    const markNight = () => {
+      if (!overlay) return;
+      if (isNightHours()) overlay.dataset.night = '';
+      else delete overlay.dataset.night;
+    };
+    markNight();
     const show = () => {
       if (!overlay) return;
+      markNight();
       const photo = photos[index++ % photos.length];
       image.classList.remove('photo-screensaver__visible');
       image.onload = () => image.classList.add('photo-screensaver__visible');

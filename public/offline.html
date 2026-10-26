@@ -13,6 +13,9 @@
        liegt im Precache des Service Workers - ohne Netz laeuft es also auch.
        Faellt es aus, greift die prefers-color-scheme-Regel unten.
        KEIN Inline-Skript: die CSP dieses Servers erlaubt nur `script-src 'self'`. -->
+  <!-- Die Nachtstunden dieses Geraets (#2234): theme-init.js fragt sie fuer
+       das erste Bild, die Module dieselbe Datei (utils/night-hours.js). -->
+  <script src="/night-hours.js"></script>
   <script src="/theme-init.js"></script>
   <style>
     /* Lokale Spiegel der App-Tokens (styles/tokens.css).
