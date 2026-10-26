@@ -51,7 +51,6 @@ const GERMAN_LEFT = new Map([
   ['calendar/apple.js', 6],
   ['calendar/feed.js', 5],
   ['calendar/helpers.js', 9],
-  ['calendar/local-calendars.js', 7],
   ['calendar/read.js', 4],
   ['calendar/subscriptions.js', 24],
   ['contacts.js', 13],

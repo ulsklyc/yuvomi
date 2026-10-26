@@ -30,6 +30,7 @@ import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml, fileDropzoneHtml, 
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -524,7 +525,10 @@ function bindCalendarImport(container, calendars = []) {
           console.warn('[Calendar import] Could not remove calendar after failed import:', cleanupErr);
         }
       }
-      errorEl.textContent = err.message || t('common.errorGeneric');
+      // Ein Serverfehler beim Anlegen des Kalenders oder beim Import sagt den
+      // Satz der App (#1695), nie den des Servers. Die 400 des Imports nennen
+      // weiter ihre Ursache, bis dessen Scheibe kommt.
+      errorEl.textContent = (err?.status >= 500 && loadErrorSentence(err)) || err.message || t('common.errorGeneric');
       errorEl.hidden = false;
     } finally {
       submitBtn.disabled = false;

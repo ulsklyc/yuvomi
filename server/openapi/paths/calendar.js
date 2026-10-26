@@ -470,7 +470,14 @@ const SERIES_GONE = '`calendar_series_not_found` (404, the series does not exist
 const SELECTED_CALENDAR_GONE = '`calendar_selected_calendar_not_found` (400, the `local_calendar_id` names a local calendar that no longer exists)';
 const SERIES_CASES = '`calendar_series_no_occurrence` (400, the `recurrence_rule` has no occurrence on or after the start date), '
   + '`calendar_series_ends_before_start` (400, its `UNTIL` lies before the start day)';
+// Die Verwaltung der eigenen Kalender und die Liste der Sync-Ziele brauchen
+// Schreibzugriff auf den Kalender (#2267) - ein Leser bekommt sie nicht.
+const CALENDAR_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the calendar module - for API tokens a `calendar:write` scope)';
 const CASE_REASONS = {
+  '/api/v1/calendar/calendars': { post: CALENDAR_WRITE_REQUIRED },
+  '/api/v1/calendar/calendars/reorder': { patch: CALENDAR_WRITE_REQUIRED },
+  '/api/v1/calendar/calendars/{id}': { put: CALENDAR_WRITE_REQUIRED, delete: CALENDAR_WRITE_REQUIRED },
+  '/api/v1/calendar/sync-targets': { get: CALENDAR_WRITE_REQUIRED },
   '/api/v1/calendar': { post: `${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}` },
   '/api/v1/calendar/{id}': {
     get: EVENT_GONE,

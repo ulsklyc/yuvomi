@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The calendar sync settings no longer show that text: a failed Google or Outlook action says so in
   your language, and an expired Google sign-in that cannot be reconnected on the spot says to
   reconnect.
+- **Managing local calendars refuses in English and names its reason in the API description**
+  (#1695, #2267). `/api/v1/calendar/calendars` answered a server error with "Interner Fehler"; it now
+  says "Internal server error.". The OpenAPI description now lists `cross_module_access` (403
+  without write access to the calendar) at creating, reordering, renaming and deleting a calendar
+  and at `GET /calendar/sync-targets`, where the routes already sent it.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the
