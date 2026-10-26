@@ -2733,6 +2733,312 @@ svg.weather-forecast__icon {
   color: var(--color-text-primary);
 }
 
+/* Titel und Summe teilen eine Grundlinie: „Heute wichtig  9 Termine · 1 Aufgabe
+ * ueberfaellig". Die Summe ist Sekundaerstimme, kein zweiter Titel; bricht sie
+ * in einer langen Sprache um, geht sie unter den Titel. */
+.today-cockpit__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: var(--space-0h);
+  min-width: 0;
+}
+
+.today-cockpit__summary {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* DIE ZEITLEISTE DES TAGES (Entwurf „Heute wichtig", 2026-10-26;
+ * renderTodayTimeline). Sie steht im selben Traeger wie die Zeilen, ueber
+ * ihnen, und trennt sich per Haarlinie - eine Flaeche, zwei Lesarten des
+ * Tages. Links die Namensspalte, rechts die Achse; jede Spur ist eine Zeile
+ * des Rasters (`display: contents` auf der Spur), damit Name und Balken auf
+ * einer Hoehe stehen.
+ *
+ * Der Block ist das Terminrezept des Kalenders (calendar.css, `.week-event`):
+ * 16-%-Fuellung, 35-%-Tinte, Vollton-Kante in der Farbe des Termins. Ein
+ * zweites Rezept fuer dieselbe Nutzerfarbe waere die Streuung, die die
+ * Toenungsleiter aufgeraeumt hat. */
+.today-timeline {
+  --tl-pad-inline: var(--space-4);
+  --tl-pad-top: var(--space-3);
+  --tl-pad-bottom: var(--space-4);
+  --tl-axis: var(--space-6);
+  --tl-label: calc(var(--space-16) * 2);
+  --tl-lane: var(--space-12);
+  position: relative;
+  display: none;
+  grid-template-columns: var(--tl-label) minmax(0, 1fr);
+  padding: var(--tl-pad-top) var(--tl-pad-inline) var(--tl-pad-bottom);
+}
+
+/* Im Solo-Haushalt gibt es eine Spur und niemanden zu benennen. */
+.today-timeline--solo {
+  --tl-label: 0%;
+}
+
+.today-timeline__axis {
+  grid-column: 2;
+  position: relative;
+  block-size: var(--tl-axis);
+  color: var(--color-text-tertiary);
+  font-size: var(--type-micro);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-tight);
+}
+
+.today-timeline__hour {
+  position: absolute;
+  inset-inline-start: calc(var(--tl-at) * 100%);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* Die erste Stunde steht an der Kante und ragte sonst in die Namensspalte. */
+.today-timeline__hour:first-child {
+  transform: none;
+}
+
+.today-timeline__lane {
+  display: contents;
+}
+
+.today-timeline__who {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  block-size: var(--tl-lane);
+  padding-inline-end: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.today-timeline__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* „Alle": dieselbe Scheibe wie ein Avatar, neutral, mit dem Zeichen fuer den
+ * Haushalt statt Initialen. */
+.today-timeline__everyone {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: calc(var(--space-6) + var(--space-1));
+  block-size: calc(var(--space-6) + var(--space-1));
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+}
+
+/* Die Spur: Haarlinie oben, eine feine Linie je Stunde. Ihre Hoehe ist eine
+ * Reihe je gleichzeitigem Termin (packLane). */
+.today-timeline__track {
+  grid-column: 2;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  block-size: calc(var(--tl-rows, 1) * var(--tl-lane));
+  border-top: 1px solid var(--color-border-subtle);
+  background-image: linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px);
+  background-size: calc(100% / var(--tl-hours, 15)) 100%;
+}
+
+.today-timeline__slot {
+  /* Der Block fragt seine eigene Breite (unten): schmal traegt er zwei
+   * Titelzeilen statt Titel und Uhrzeit. */
+  container: tl-slot / inline-size;
+  position: absolute;
+  inset-block-start: calc(var(--tl-row, 0) * var(--tl-lane) + var(--space-1));
+  inset-inline-start: calc(var(--tl-left) * 100%);
+  inline-size: calc(var(--tl-width) * 100% - var(--space-0h));
+  block-size: calc(var(--tl-lane) - var(--space-2));
+}
+
+.today-timeline__event {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-0h);
+  block-size: 100%;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
+  background: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface));
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
+  line-height: var(--line-height-tight);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: clip;
+  transition: background-color var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .today-timeline__event:hover {
+    background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface));
+  }
+}
+
+/* Ring aussen wie am Kalenderblock: innen laege er auf der Toenung. */
+.today-timeline__event:focus-visible {
+  position: relative;
+  z-index: 3;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.today-timeline__title,
+.today-timeline__time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-timeline__title {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.today-timeline__time {
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-secondary));
+  font-size: var(--type-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+/* EIN SCHMALER BLOCK TRAEGT DEN TITEL, NICHT DIE UHRZEIT. Eine Stunde ist bei
+ * 1440px rund 66px breit; „Zahnarzt" stand dort als „Zahn…" ueber einer Uhrzeit,
+ * die die Achse ohnehin sagt. Unter der Schwelle bricht der Titel mit
+ * Silbentrennung in zwei Zeilen, die Uhrzeit geht - der zugaengliche Name
+ * behaelt sie (sie bleibt im Dokument). */
+@container tl-slot (max-width: 7.5rem) {
+  .today-timeline__event {
+    padding-inline: var(--space-1h);
+  }
+
+  .today-timeline__title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .today-timeline__time {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* VORBEI TRITT ZURUECK, ES VERSCHWINDET NICHT. Die Liste darunter verspricht,
+ * was noch kommt (#1449); die Leiste zeigt, was der Tag war. Fuellung und
+ * Schrift gehen ins Neutrale, die Kante behaelt eine Andeutung der Farbe -
+ * man erkennt den Termin noch, er spricht nicht mehr. */
+.today-timeline__event--past {
+  border-inline-start-color: color-mix(in srgb, var(--ev-color) var(--tint-hint), var(--color-surface-3));
+  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+}
+
+.today-timeline__event--past .today-timeline__time {
+  color: var(--color-text-secondary);
+}
+
+@media (hover: hover) {
+  .today-timeline__event--past:hover {
+    background: var(--color-surface-elevated-hover);
+  }
+}
+
+/* Der Strich und das Vergangene liegen ueber den Spuren, unter den Bloecken
+ * (pointer-events: none). Ihre Lage rechnet sich aus der Namensspalte und dem
+ * Anteil `--tl-now`, den der Minutentakt nachfuehrt (updateTodayTimelineNow). */
+.today-timeline__past,
+.today-timeline__now {
+  position: absolute;
+  inset-block-end: var(--tl-pad-bottom);
+  pointer-events: none;
+}
+
+.today-timeline__past {
+  inset-block-start: calc(var(--tl-pad-top) + var(--tl-axis));
+  inset-inline-start: calc(var(--tl-pad-inline) + var(--tl-label));
+  inline-size: calc((100% - 2 * var(--tl-pad-inline) - var(--tl-label)) * var(--tl-now, 0));
+  background: color-mix(in srgb, var(--color-text-primary) calc(var(--tint-wash) / 3), transparent);
+}
+
+/* Der Jetzt-Strich spricht die Grammatik des Kalenders: 2px in der Gefahrfarbe
+ * (time-grid.css, `.week-view__now-line`), hier mit der Uhrzeit als Pille in
+ * der Achse statt des Punkts. */
+.today-timeline__now {
+  z-index: 2;
+  inset-block-start: var(--tl-pad-top);
+  inset-inline-start: calc(var(--tl-pad-inline) + var(--tl-label) + (100% - 2 * var(--tl-pad-inline) - var(--tl-label)) * var(--tl-now, 0));
+  inline-size: 2px;
+  margin-inline-start: -1px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+}
+
+.today-timeline__now-time {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-0h) var(--space-1h);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-ink-on-vivid);
+  font-size: var(--type-micro);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+/* AB 720PX CONTAINERBREITE - dieselbe Schwelle, ab der die Zeilen zweispaltig
+ * laufen. Darunter (Tablet hochkant, schmale Spalte neben offener Seitenleiste)
+ * waere eine Stunde schmaler als ihre Beschriftung. */
+@container today-cockpit (min-width: 720px) {
+  .today-timeline {
+    display: grid;
+  }
+
+  .today-timeline + .today-cockpit__rows,
+  .today-timeline + .today-cockpit-card {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+}
+
+/* Bis 1000px traegt jede zweite Stunde ihre Zahl - die Linie bleibt. */
+@container today-cockpit (max-width: 1000px) {
+  .today-timeline__hour--odd {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-timeline__event {
+    transition: none;
+  }
+}
+
 /* Inset-Grouped-Liste (Apple-Systemapp-Muster, z.B. Erinnerungen-Widget):
  * EINE gruppierte Sektion auf opaker neutraler Flaeche statt vier pastell-
  * gefuellter Stat-Kacheln. Die Modulzugehoerigkeit traegt die getoente

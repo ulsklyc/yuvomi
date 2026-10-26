@@ -444,7 +444,15 @@
         "nutritionEntries_one": "{{count}} رکورد امروز",
         "weatherUnavailable": "آب‌وهوا در حال حاضر در دسترس نیست",
         "wallScreensaverNone": "محافظ صفحه در دسترس نیست.",
-        "wallScreensaverStart": "محافظ صفحه"
+        "wallScreensaverStart": "محافظ صفحه",
+        "todaySummaryEvents": "{{count}} رویداد",
+        "todaySummaryEvents_one": "{{count}} رویداد",
+        "todaySummaryOverdue": "{{count}} کار معوق",
+        "todaySummaryOverdue_one": "{{count}} کار معوق",
+        "todayTimelineLabel": "روند امروز",
+        "todayTimelineEveryone": "همه",
+        "todayTimelinePast": "تمام‌شده",
+        "todayTimelineRunning": "در جریان"
     },
     "tasks": {
         "resetOrder": "مرتب‌سازی خودکار",

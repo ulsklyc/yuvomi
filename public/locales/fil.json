@@ -444,7 +444,15 @@
         "nutritionEntries_one": "{{count}} tala ngayong araw",
         "weatherUnavailable": "Hindi available ang panahon sa ngayon",
         "wallScreensaverNone": "Hindi available ang screensaver.",
-        "wallScreensaverStart": "Screensaver"
+        "wallScreensaverStart": "Screensaver",
+        "todaySummaryEvents": "{{count}} kaganapan",
+        "todaySummaryEvents_one": "{{count}} kaganapan",
+        "todaySummaryOverdue": "{{count}} gawaing lampas na sa taning",
+        "todaySummaryOverdue_one": "{{count}} gawaing lampas na sa taning",
+        "todayTimelineLabel": "Takbo ng araw",
+        "todayTimelineEveryone": "Lahat",
+        "todayTimelinePast": "tapos na",
+        "todayTimelineRunning": "kasalukuyang nagaganap"
     },
     "tasks": {
         "resetOrder": "Awtomatikong ayusin",

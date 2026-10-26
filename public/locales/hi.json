@@ -426,7 +426,15 @@
         "nutritionEntries_one": "आज {{count}} प्रविष्टि",
         "weatherUnavailable": "मौसम अभी उपलब्ध नहीं है",
         "wallScreensaverNone": "स्क्रीनसेवर उपलब्ध नहीं है।",
-        "wallScreensaverStart": "स्क्रीनसेवर"
+        "wallScreensaverStart": "स्क्रीनसेवर",
+        "todaySummaryEvents": "{{count}} कार्यक्रम",
+        "todaySummaryEvents_one": "{{count}} कार्यक्रम",
+        "todaySummaryOverdue": "{{count}} कार्य अतिदेय",
+        "todaySummaryOverdue_one": "{{count}} कार्य अतिदेय",
+        "todayTimelineLabel": "आज की समयरेखा",
+        "todayTimelineEveryone": "सभी",
+        "todayTimelinePast": "समाप्त",
+        "todayTimelineRunning": "अभी चल रहा है"
     },
     "tasks": {
         "resetOrder": "अपने-आप क्रमबद्ध करें",

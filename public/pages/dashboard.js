@@ -34,7 +34,7 @@ import { pantryQuantityLabel } from '/utils/pantry-units.js';
 import { findPageFab } from '/utils/fab.js';
 import { setLeaveGuard } from '/utils/leave-guard.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
-import { renderAvatarStack } from '/components/user-multi-select.js';
+import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { swapContent } from '/utils/content-swap.js';
@@ -77,6 +77,8 @@ import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { nextRewardGoal } from '/utils/reward-goal.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
+import { layoutTodayTimeline } from '/utils/today-timeline.js';
+import { hourGutterLabel } from '/utils/time-grid.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
@@ -4313,7 +4315,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda };
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
@@ -4408,6 +4410,173 @@ function wireTodayMore(root) {
   });
 }
 
+/** Minute des Tages (0-1439) aus einem Wert, gelesen in der Wanduhr des Haushalts. */
+function householdMinuteOf(value) {
+  const [hour, minute] = String(zonedTimeKey(value) || '').split(':').map(Number);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+}
+
+/**
+ * DIE TERMINE VON HEUTE, EINMAL (Entwurf „Heute wichtig", 2026-10-26).
+ *
+ * Aus BEIDEN Terminlisten der Antwort: `upcomingEvents` haelt die Kachel-
+ * Liste samt ihrem Deckel von fuenf Kommenden, `familyEvents` je Mitglied die
+ * heute beendeten und die naechsten (#1449). Erst zusammen tragen sie einen
+ * vollen Tag - der Schultag eines Kindes stand sonst hinter dem Deckel der
+ * Kachel. Doppelte fallen ueber denselben Schluessel wie serverseitig
+ * (`id@start`). Beendete bleiben hier stehen: die Leiste zeigt den Tag, die
+ * Liste darunter nur, was noch kommt.
+ *
+ * @returns {{ timed: object[], count: number }}  `timed` fuer die Leiste
+ *   (Minuten in der Haushaltszone), `count` alle Termine des Tages fuer die
+ *   Summe im Kopf, ganztaegige eingeschlossen
+ */
+function todayEventsForTimeline(data, now = new Date()) {
+  const todayKey = zonedDateKey(now);
+  const seen = new Set();
+  const timed = [];
+  let count = 0;
+  for (const key of ['upcomingEvents', 'familyEvents']) {
+    for (const event of Array.isArray(data?.[key]) ? data[key] : []) {
+      const id = `${event.id}@${event.start_datetime}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const span = overviewEventSpan(event, todayKey);
+      if (span.day !== todayKey) continue;
+      count += 1;
+      if (span.allDay) continue;
+      const start = span.carried ? 0 : householdMinuteOf(event.start_datetime);
+      if (start == null) continue;
+      const endRaw = String(event.end_datetime || '');
+      // Was ueber Mitternacht reicht, endet auf der Achse am Tagesende.
+      const end = endRaw.length > 10
+        ? (zonedDateKey(endRaw) > todayKey ? 24 * 60 : householdMinuteOf(endRaw))
+        : start;
+      timed.push({
+        id: event.id,
+        start,
+        end: end ?? start,
+        peopleIds: (event.assigned_users ?? []).map((user) => user.id),
+        title: event.title,
+        // Der Beginn allein, wie in der Terminzeile: das Ende bleibt der Wand
+        // vorbehalten (#1698), hier traegt es die Breite des Blocks.
+        timeLabel: overviewEventTime(event, span),
+        route: calendarEventRoute(event),
+        color: resolveEventColor(event),
+      });
+    }
+  }
+  return { timed, count };
+}
+
+/** Die Leiste als Modell - null, wenn heute kein Termin eine Uhrzeit hat. */
+function buildTodayTimeline(data, { now = new Date() } = {}) {
+  const { timed } = todayEventsForTimeline(data, now);
+  const members = (Array.isArray(data?.users) ? data.users : []).map((user) => ({
+    ...user,
+    // renderAvatarStack liest `color`, die Mitgliederliste traegt `avatar_color`.
+    color: user.color ?? user.avatar_color,
+  }));
+  return layoutTodayTimeline(timed, {
+    nowMinute: householdMinuteOf(now),
+    members,
+    solo: isSoloHousehold(),
+  });
+}
+
+/* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
+ * („9 Termine · 1 Aufgabe ueberfaellig"). Nur, was das Blatt selbst spricht:
+ * Termine, wenn der Kalender im Blatt spricht (Kein-Echo-Regel), Ueberfaelliges,
+ * wenn die Aufgaben es tun. Ohne beides steht keine Summe da - „0 Termine"
+ * waere ein Satz ueber nichts. */
+function todaySummary(data, model, now = new Date()) {
+  const parts = [];
+  const events = model.includeCalendar ? todayEventsForTimeline(data, now).count : 0;
+  if (events > 0) parts.push(t('dashboard.todaySummaryEvents', { count: events }));
+  if (model.includeTasks) {
+    const overdue = model.allRows
+      .flatMap((row) => (row.kind === 'overdue' ? row.members ?? [] : [row]))
+      .filter((row) => row.kind === 'task' && row.overdue).length;
+    if (overdue > 0) parts.push(t('dashboard.todaySummaryOverdue', { count: overdue }));
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * DIE ZEITLEISTE DES TAGES (Entwurf „Heute wichtig", 2026-10-26; Modell in
+ * utils/today-timeline.js). Eine Spur fuer den Haushalt, eine je Person mit
+ * einem Termin heute; Vergangenes tritt zurueck, ein Strich sagt „jetzt".
+ *
+ * NUR AUF DER BREITEN BUEHNE. Auf dem Telefon gehoert der erste Schirm den
+ * Zeilen (R21, D5 „Uebersicht als Briefing"), und zehn unbeschriftete Balken
+ * sagten dort weniger als eine Zeile. Unter 720px Containerbreite blendet
+ * dashboard.css sie aus - dieselbe Schwelle, ab der die Zeilen zweispaltig
+ * laufen.
+ *
+ * Jeder Block ist ein Link auf sein Vorkommen im Kalender, wie die Terminzeile
+ * darunter; sein zugaenglicher Name ist Titel, Zeit und Zustand. Die Achse und
+ * der Jetzt-Strich sind Bild.
+ */
+function renderTodayTimeline(timeline, now = new Date()) {
+  if (!timeline) return '';
+  const span = timeline.end - timeline.start;
+  const hours = timeline.hours.map((minute, index) => `<span class="today-timeline__hour${index % 2 ? ' today-timeline__hour--odd' : ''}" style="--tl-at:${(minute - timeline.start) / span}">${esc(hourGutterLabel(minute / 60))}</span>`).join('');
+  const stateLabel = { past: t('dashboard.todayTimelinePast'), now: t('dashboard.todayTimelineRunning') };
+  const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
+  // Der geteilte Nachname steht nicht in jeder Spur (R19): „Johnson" viermal
+  // unterscheidet niemanden und kuerzte jeden Namen auf „Alex Johns…". Der
+  // volle Name bleibt der zugaengliche Name der Spur.
+  const surname = sharedSurname(timeline.lanes.map((lane) => lane.member).filter(Boolean));
+  const shortName = (full) => (surname && full.endsWith(` ${surname}`) ? full.slice(0, -(surname.length + 1)) : full);
+  const lanes = timeline.lanes.map((lane) => {
+    const name = lane.member ? lane.member.display_name ?? '' : t('dashboard.todayTimelineEveryone');
+    const face = lane.member
+      ? renderAvatarStack([lane.member], { size: 28, maxVisible: 1 })
+      : `<span class="today-timeline__everyone" aria-hidden="true"><i data-lucide="users" class="icon-sm"></i></span>`;
+    const label = solo ? '' : `<span class="today-timeline__who" aria-hidden="true">${face}<span class="today-timeline__name">${esc(shortName(name))}</span></span>`;
+    const items = lane.items.map((item) => `
+          <li class="today-timeline__slot" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--ev-color:${esc(item.color)}">
+            <a href="${esc(item.route)}" class="today-timeline__event today-timeline__event--${item.state}" data-route="${esc(item.route)}" data-object-kind="event" data-object-id="${esc(String(item.id))}">
+              <span class="today-timeline__title">${esc(item.title)}</span>
+              <span class="today-timeline__time">${esc(item.timeLabel)}</span>${stateLabel[item.state] ? `<span class="sr-only">, ${esc(stateLabel[item.state])}</span>` : ''}
+            </a>
+          </li>`).join('');
+    return `
+        <div class="today-timeline__lane" style="--tl-rows:${lane.rows}">
+          ${label}
+          <ul class="today-timeline__track" aria-label="${esc(name)}">${items}</ul>
+        </div>`;
+  }).join('');
+  const nowMarker = timeline.now == null ? '' : `
+      <div class="today-timeline__past" aria-hidden="true"></div>
+      <div class="today-timeline__now" aria-hidden="true"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
+  return `
+    <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
+         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-hours:${timeline.hours.length}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
+      <div class="today-timeline__axis" aria-hidden="true">${hours}</div>
+      ${lanes}
+      ${nowMarker}
+    </div>`;
+}
+
+/**
+ * Der Jetzt-Strich wandert mit dem Minutentakt, ohne das Blatt neu zu bauen:
+ * der Fingerabdruck des Tages (todayFingerprint) aendert sich erst, wenn ein
+ * Termin endet - dann baut die Uebersicht ohnehin neu. Dazwischen setzt diese
+ * Funktion nur die Lage und die Uhrzeit.
+ */
+function updateTodayTimelineNow(root, now = new Date()) {
+  const timeline = root?.querySelector?.('.today-timeline');
+  if (!timeline) return;
+  const start = Number(timeline.dataset.timelineStart);
+  const end = Number(timeline.dataset.timelineEnd);
+  const minute = householdMinuteOf(now);
+  if (!(end > start) || minute == null || minute < start || minute > end) return;
+  timeline.style.setProperty('--tl-now', String((minute - start) / (end - start)));
+  const label = timeline.querySelector('.today-timeline__now-time');
+  if (label) label.textContent = formatTime(now);
+}
+
 function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, cap } = {}) {
   const model = buildTodayCockpitModel(data, cfg, { now, ...(cap ? { cap } : {}) });
 
@@ -4421,7 +4590,15 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
    * schmaler Buehne haben die Klassen keine Wirkung, das Blatt bleibt eine
    * Liste in unveraenderter Hoehe. */
   const listRows = [];
-  if (model.state) listRows.push(renderTodayStateRow(model.state));
+  // Die Leiste nur auf der breiten Buehne und nur, wenn der Kalender im Blatt
+  // spricht: neben einer sichtbaren Termin-Kachel waere sie deren Echo.
+  const timeline = model.includeCalendar && !onPhoneStage() ? buildTodayTimeline(data, { now }) : null;
+  // „Heute frei" unter einer Leiste voller beendeter Termine widerspraeche ihr:
+  // der Tag war nicht frei, er ist durch.
+  const state = model.state && timeline && model.state.icon === 'sparkles'
+    ? { ...model.state, title: t('dashboard.todayNothingElse') }
+    : model.state;
+  if (state) listRows.push(renderTodayStateRow(state));
   // Die Sammelzeile gibt es nur auf dem Telefon; dort teilt sich die Liste nie.
   const grouped = model.rows.some((row) => row.kind === 'overdue');
   const split = model.rows.length >= 2 && !grouped;
@@ -4441,6 +4618,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     : renderTodayRow(row, columnClass(index)))));
   const parts = [];
   const foldShopping = Boolean(model.shopping) && model.overflow > 0 && !model.moreRoute && onPhoneStage();
+  if (timeline) parts.push(renderTodayTimeline(timeline, now));
   if (listRows.length) {
     parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
   }
@@ -4488,6 +4666,8 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       <i data-lucide="eye-off" aria-hidden="true"></i>
     </button>` : '';
 
+  const summary = todaySummary(data, model, now);
+
   // Mobil klappt das Band im Anpassen-Modus auf diese Kopfzeile zusammen
   // (dashboard.css, `.today-cockpit--editing`): angeordnet wird dort nichts,
   // und sein Inhalt schob das erste Rasterwidget bis an den Bildschirmrand.
@@ -4499,7 +4679,10 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   return `
     <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
       <div class="today-cockpit__header">
-        <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
+        <div class="today-cockpit__heading">
+          <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
+          ${summary ? `<p class="today-cockpit__summary">${esc(summary)}</p>` : ''}
+        </div>
         ${hideBtn}
       </div>
       <div class="today-cockpit__grid">
@@ -8616,6 +8799,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   startClockTicker(container, signal, () => {
     if (wallMode) syncWallMode(location.pathname);
     followDayBoundaries();
+    updateTodayTimelineNow(container);
   });
 
   // 30-Minuten Auto-Refresh für Wetter (inkl. optionaler Standort-Aktualisierung).

@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} oppføring i dag",
         "weatherUnavailable": "Været er ikke tilgjengelig akkurat nå",
         "wallScreensaverNone": "Skjermsparer ikke tilgjengelig.",
-        "wallScreensaverStart": "Skjermsparer"
+        "wallScreensaverStart": "Skjermsparer",
+        "todaySummaryEvents": "{{count}} hendelser",
+        "todaySummaryEvents_one": "{{count}} hendelse",
+        "todaySummaryOverdue": "{{count}} forfalte oppgaver",
+        "todaySummaryOverdue_one": "{{count}} forfalt oppgave",
+        "todayTimelineLabel": "Dagens forløp",
+        "todayTimelineEveryone": "Alle",
+        "todayTimelinePast": "over",
+        "todayTimelineRunning": "pågår nå"
     },
     "tasks": {
         "resetOrder": "Sorter automatisk",

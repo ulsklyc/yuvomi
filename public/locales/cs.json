@@ -466,7 +466,19 @@
         "nutritionEntries_few": "Dnes {{count}} záznamy",
         "weatherUnavailable": "Počasí momentálně není k dispozici",
         "wallScreensaverNone": "Spořič obrazovky není dostupný.",
-        "wallScreensaverStart": "Spořič obrazovky"
+        "wallScreensaverStart": "Spořič obrazovky",
+        "todaySummaryEvents": "{{count}} událostí",
+        "todaySummaryEvents_one": "{{count}} událost",
+        "todaySummaryEvents_few": "{{count}} události",
+        "todaySummaryEvents_many": "{{count}} události",
+        "todaySummaryOverdue": "{{count}} úkolů po termínu",
+        "todaySummaryOverdue_one": "{{count}} úkol po termínu",
+        "todaySummaryOverdue_few": "{{count}} úkoly po termínu",
+        "todaySummaryOverdue_many": "{{count}} úkolu po termínu",
+        "todayTimelineLabel": "Průběh dne",
+        "todayTimelineEveryone": "Všichni",
+        "todayTimelinePast": "skončilo",
+        "todayTimelineRunning": "právě probíhá"
     },
     "tasks": {
         "resetOrder": "Řadit automaticky",

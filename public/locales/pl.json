@@ -524,7 +524,19 @@
         "nutritionEntries_many": "Dzisiaj {{count}} wpisów",
         "weatherUnavailable": "Pogoda jest obecnie niedostępna",
         "wallScreensaverNone": "Wygaszacz ekranu jest niedostępny.",
-        "wallScreensaverStart": "Wygaszacz ekranu"
+        "wallScreensaverStart": "Wygaszacz ekranu",
+        "todaySummaryEvents": "{{count}} wydarzenia",
+        "todaySummaryEvents_one": "{{count}} wydarzenie",
+        "todaySummaryEvents_few": "{{count}} wydarzenia",
+        "todaySummaryEvents_many": "{{count}} wydarzeń",
+        "todaySummaryOverdue": "{{count}} zadania przeterminowanego",
+        "todaySummaryOverdue_one": "{{count}} zadanie przeterminowane",
+        "todaySummaryOverdue_few": "{{count}} zadania przeterminowane",
+        "todaySummaryOverdue_many": "{{count}} zadań przeterminowanych",
+        "todayTimelineLabel": "Przebieg dnia",
+        "todayTimelineEveryone": "Wszyscy",
+        "todayTimelinePast": "zakończone",
+        "todayTimelineRunning": "w toku"
     },
     "tasks": {
         "resetOrder": "Sortuj automatycznie",

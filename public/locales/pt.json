@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} registo hoje",
         "weatherUnavailable": "Clima indisponível no momento",
         "wallScreensaverNone": "Proteção de ecrã não disponível.",
-        "wallScreensaverStart": "Proteção de ecrã"
+        "wallScreensaverStart": "Proteção de ecrã",
+        "todaySummaryEvents": "{{count}} eventos",
+        "todaySummaryEvents_one": "{{count}} evento",
+        "todaySummaryOverdue": "{{count}} tarefas atrasadas",
+        "todaySummaryOverdue_one": "{{count}} tarefa atrasada",
+        "todayTimelineLabel": "Cronologia do dia",
+        "todayTimelineEveryone": "Todos",
+        "todayTimelinePast": "terminado",
+        "todayTimelineRunning": "a decorrer"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",

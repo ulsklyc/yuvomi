@@ -1043,3 +1043,69 @@ test('R22 D16 + R23: die Anfrage folgt den Punkten - im Kindkonto wie in der Elt
   assert.match(last.selector, /^\s*\.dashboard \.rewards-widget > \.rewards-widget__footer\s*$/, 'die Regel gilt jeder Belohnungskachel, nicht nur der eigenen');
   assert.match(last.body, /margin-block-start:\s*0/, 'kein margin-block-start: auto unter Punkten und Balken');
 });
+
+// DIE ZEITLEISTE DES HEUTE-BLATTS (Entwurf „Heute wichtig", 2026-10-26).
+// Gegen die echte Darstellung: Spuren je Person aus BEIDEN Terminlisten,
+// Vergangenes zurueckgetreten statt verschwunden, ganztaegig nur in der Summe,
+// und die Leiste schweigt, wo sie Echo waere (sichtbare Termin-Kachel) oder
+// keinen Platz hat (Telefon). Das reine Layout prueft test:today-timeline.
+const TIMELINE_USERS = [
+  { id: 1, display_name: 'Alex Johnson', avatar_color: '#0A84FF' },
+  { id: 2, display_name: 'Linda Johnson', avatar_color: '#FF2D55' },
+  { id: 3, display_name: 'Emma Johnson', avatar_color: '#BF5AF2' },
+  { id: 4, display_name: 'Leo Johnson', avatar_color: '#FF9500' },
+];
+const person = (id) => ({ id, display_name: TIMELINE_USERS.find((u) => u.id === id).display_name, color: '#0A84FF' });
+const timelineDay = () => ({
+  upcomingEvents: [
+    ev(11, 'Zahnarzt', '2026-09-24T08:30', '2026-09-24T09:30', { assigned_users: [person(1)] }),
+    ev(12, 'Schule', '2026-09-24T08:00', '2026-09-24T13:00', { assigned_users: [person(3)] }),
+    ev(13, 'Ausflug', '2026-09-24', '2026-09-24', { all_day: 1 }),
+    ev(14, 'Filmabend', '2026-09-24T20:15', '2026-09-24T22:00'),
+  ],
+  // Die Familienliste traegt die Schule noch einmal und den Fussball, den der
+  // Deckel der Kachel abgeschnitten haette.
+  familyEvents: [
+    ev(12, 'Schule', '2026-09-24T08:00', '2026-09-24T13:00', { assigned_users: [person(3)] }),
+    ev(15, 'Fussball', '2026-09-24T16:00', '2026-09-24T17:30', { assigned_users: [person(4)] }),
+  ],
+  urgentTasks: [{ id: 21, title: 'Stromrechnung', due_date: '2026-09-22', status: 'open', assigned_users: [] }],
+  users: TIMELINE_USERS,
+});
+const { sharedSurname: realSharedSurname } = await import("../public/components/user-multi-select.js");
+const timelineOf = (html) => (/<div class="today-timeline[\s\S]*?<\/div>\s*<div class="today-cockpit__rows/.exec(html) || [''])[0];
+
+test('Heute-Blatt: die Zeitleiste zeigt den ganzen Tag je Person, die Summe nennt ihn in einem Satz', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const before = globalThis.__sharedSurname;
+  globalThis.__sharedSurname = realSharedSurname;
+  let sheet;
+  try { sheet = dash.renderTodayCockpit(timelineDay(), []); } finally { globalThis.__sharedSurname = before; }
+  const timeline = timelineOf(sheet);
+  assert.ok(timeline, 'auf der breiten Buehne steht die Leiste ueber den Zeilen');
+  // „Alle" zuerst, dann die Mitglieder in Haushaltsreihenfolge; Linda hat heute nichts.
+  assert.deepEqual([...timeline.matchAll(/today-timeline__name">([^<]*)</g)].map((m) => m[1]), ['dashboard.todayTimelineEveryone', 'Alex', 'Emma', 'Leo']);
+  assert.match(timeline, /aria-label="Alex Johnson"/, 'der volle Name bleibt der zugaengliche Name der Spur');
+  // Beide Listen, ein Termin: die Schule einmal, der Fussball aus der Familienliste.
+  assert.equal(timeline.match(/today-timeline__title">Schule</g)?.length, 1);
+  assert.match(timeline, /today-timeline__title">Fussball</);
+  // Vorbei tritt zurueck und sagt es, laufend sagt es auch; Ganztaegiges hat keinen Block.
+  assert.match(timeline, /today-timeline__event--past"[^>]*>\s*<span class="today-timeline__title">Zahnarzt<[\s\S]*?dashboard\.todayTimelinePast/);
+  assert.match(timeline, /today-timeline__event--now"[^>]*>\s*<span class="today-timeline__title">Schule</);
+  assert.ok(!timeline.includes('Ausflug'));
+  // Nur der Beginn (#1698), das Ende traegt die Breite.
+  assert.ok(!timeline.includes('2026-09-24T13:00'));
+  // 10:00 auf der Achse 07-22.
+  assert.match(timeline, /--tl-now:0\.2(?![\d])|--tl-now:0\.19999/);
+  assert.match(sheet, /today-cockpit__summary">dashboard\.todaySummaryEvents\{&quot;count&quot;:5\} · dashboard\.todaySummaryOverdue\{&quot;count&quot;:1\}</,
+    'fuenf Termine samt ganztaegigem, eine ueberfaellige Aufgabe');
+}));
+
+test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel und keine auf dem Telefon', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const withTile = dash.renderTodayCockpit(timelineDay(), [{ id: 'calendar', visible: true }]);
+  assert.ok(!withTile.includes('today-timeline'), 'die Leiste waere das Echo der Kachel');
+  assert.ok(!withTile.includes('todaySummaryEvents'), 'und die Termine zaehlt die Kachel');
+  assert.match(withTile, /todaySummaryOverdue/, 'das Ueberfaellige spricht weiter, solange die Aufgaben im Blatt sprechen');
+  global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
+  const phone = dash.renderTodayCockpit(timelineDay(), []);
+  assert.ok(!phone.includes('today-timeline'), 'der erste Schirm des Telefons gehoert den Zeilen (R21 D5)');
+}));

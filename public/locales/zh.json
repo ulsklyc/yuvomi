@@ -426,7 +426,15 @@
         "nutritionEntries_one": "今天 {{count}} 条记录",
         "weatherUnavailable": "天气暂时不可用",
         "wallScreensaverNone": "屏幕保护程序不可用。",
-        "wallScreensaverStart": "屏幕保护"
+        "wallScreensaverStart": "屏幕保护",
+        "todaySummaryEvents": "{{count}} 个日程",
+        "todaySummaryEvents_one": "{{count}} 个日程",
+        "todaySummaryOverdue": "{{count}} 项任务已逾期",
+        "todaySummaryOverdue_one": "{{count}} 项任务已逾期",
+        "todayTimelineLabel": "今日时间轴",
+        "todayTimelineEveryone": "所有人",
+        "todayTimelinePast": "已结束",
+        "todayTimelineRunning": "进行中"
     },
     "tasks": {
         "resetOrder": "自动排序",

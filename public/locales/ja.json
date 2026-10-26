@@ -426,7 +426,15 @@
         "nutritionEntries_one": "今日の記録 {{count}} 件",
         "weatherUnavailable": "現在、天気を取得できません",
         "wallScreensaverNone": "スクリーンセーバーを開始できません。",
-        "wallScreensaverStart": "スクリーンセーバー"
+        "wallScreensaverStart": "スクリーンセーバー",
+        "todaySummaryEvents": "予定 {{count}} 件",
+        "todaySummaryEvents_one": "予定 {{count}} 件",
+        "todaySummaryOverdue": "期限切れのタスク {{count}} 件",
+        "todaySummaryOverdue_one": "期限切れのタスク {{count}} 件",
+        "todayTimelineLabel": "今日のタイムライン",
+        "todayTimelineEveryone": "全員",
+        "todayTimelinePast": "終了",
+        "todayTimelineRunning": "進行中"
     },
     "tasks": {
         "resetOrder": "自動で並べ替え",

@@ -426,7 +426,15 @@
         "eventsEndedMore": "+{{count}} mais cedo hoje",
         "eventsEndedMore_one": "+{{count}} mais cedo hoje",
         "wallScreensaverNone": "Protetor de tela não disponível.",
-        "wallScreensaverStart": "Protetor de tela"
+        "wallScreensaverStart": "Protetor de tela",
+        "todaySummaryEvents": "{{count}} eventos",
+        "todaySummaryEvents_one": "{{count}} evento",
+        "todaySummaryOverdue": "{{count}} tarefas atrasadas",
+        "todaySummaryOverdue_one": "{{count}} tarefa atrasada",
+        "todayTimelineLabel": "Linha do tempo do dia",
+        "todayTimelineEveryone": "Todos",
+        "todayTimelinePast": "encerrado",
+        "todayTimelineRunning": "em andamento"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",

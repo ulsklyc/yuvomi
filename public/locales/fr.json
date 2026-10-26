@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} entrée aujourd’hui",
         "weatherUnavailable": "Météo momentanément indisponible",
         "wallScreensaverNone": "Économiseur d'écran non disponible.",
-        "wallScreensaverStart": "Économiseur d'écran"
+        "wallScreensaverStart": "Économiseur d'écran",
+        "todaySummaryEvents": "{{count}} événements",
+        "todaySummaryEvents_one": "{{count}} événement",
+        "todaySummaryOverdue": "{{count}} tâches en retard",
+        "todaySummaryOverdue_one": "{{count}} tâche en retard",
+        "todayTimelineLabel": "Déroulé de la journée",
+        "todayTimelineEveryone": "Tous",
+        "todayTimelinePast": "terminé",
+        "todayTimelineRunning": "en cours"
     },
     "tasks": {
         "resetOrder": "Trier automatiquement",

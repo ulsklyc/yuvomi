@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} item vandaag",
         "weatherUnavailable": "Weer momenteel niet beschikbaar",
         "wallScreensaverNone": "Schermbeveiliging niet beschikbaar.",
-        "wallScreensaverStart": "Schermbeveiliging"
+        "wallScreensaverStart": "Schermbeveiliging",
+        "todaySummaryEvents": "{{count}} evenementen",
+        "todaySummaryEvents_one": "{{count}} evenement",
+        "todaySummaryOverdue": "{{count}} taken verlopen",
+        "todaySummaryOverdue_one": "{{count}} taak verlopen",
+        "todayTimelineLabel": "Verloop van de dag",
+        "todayTimelineEveryone": "Iedereen",
+        "todayTimelinePast": "afgelopen",
+        "todayTimelineRunning": "bezig"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

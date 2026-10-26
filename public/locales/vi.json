@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} mục hôm nay",
         "weatherUnavailable": "Hiện không có dữ liệu thời tiết",
         "wallScreensaverNone": "Trình bảo vệ màn hình không khả dụng.",
-        "wallScreensaverStart": "Trình bảo vệ màn hình"
+        "wallScreensaverStart": "Trình bảo vệ màn hình",
+        "todaySummaryEvents": "{{count}} sự kiện",
+        "todaySummaryEvents_one": "{{count}} sự kiện",
+        "todaySummaryOverdue": "{{count}} nhiệm vụ quá hạn",
+        "todaySummaryOverdue_one": "{{count}} nhiệm vụ quá hạn",
+        "todayTimelineLabel": "Dòng thời gian hôm nay",
+        "todayTimelineEveryone": "Mọi người",
+        "todayTimelinePast": "đã kết thúc",
+        "todayTimelineRunning": "đang diễn ra"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

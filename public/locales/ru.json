@@ -506,7 +506,19 @@
         "nutritionEntries_many": "Сегодня {{count}} записей",
         "weatherUnavailable": "Погода сейчас недоступна",
         "wallScreensaverNone": "Заставка недоступна.",
-        "wallScreensaverStart": "Заставка"
+        "wallScreensaverStart": "Заставка",
+        "todaySummaryEvents": "{{count}} события",
+        "todaySummaryEvents_one": "{{count}} событие",
+        "todaySummaryEvents_few": "{{count}} события",
+        "todaySummaryEvents_many": "{{count}} событий",
+        "todaySummaryOverdue": "{{count}} задачи просрочено",
+        "todaySummaryOverdue_one": "{{count}} задача просрочена",
+        "todaySummaryOverdue_few": "{{count}} задачи просрочены",
+        "todaySummaryOverdue_many": "{{count}} задач просрочено",
+        "todayTimelineLabel": "Ход дня",
+        "todayTimelineEveryone": "Все",
+        "todayTimelinePast": "завершено",
+        "todayTimelineRunning": "идёт сейчас"
     },
     "tasks": {
         "resetOrder": "Сортировать автоматически",

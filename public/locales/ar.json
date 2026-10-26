@@ -546,7 +546,21 @@
         "nutritionEntries_many": "{{count}} سجلًا اليوم",
         "weatherUnavailable": "الطقس غير متاح حاليًا",
         "wallScreensaverNone": "شاشة التوقف غير متاحة.",
-        "wallScreensaverStart": "شاشة التوقف"
+        "wallScreensaverStart": "شاشة التوقف",
+        "todaySummaryEvents": "المواعيد: {{count}}",
+        "todaySummaryEvents_one": "المواعيد: {{count}}",
+        "todaySummaryEvents_two": "المواعيد: {{count}}",
+        "todaySummaryEvents_few": "المواعيد: {{count}}",
+        "todaySummaryEvents_many": "المواعيد: {{count}}",
+        "todaySummaryOverdue": "مهام متأخرة: {{count}}",
+        "todaySummaryOverdue_one": "مهام متأخرة: {{count}}",
+        "todaySummaryOverdue_two": "مهام متأخرة: {{count}}",
+        "todaySummaryOverdue_few": "مهام متأخرة: {{count}}",
+        "todaySummaryOverdue_many": "مهام متأخرة: {{count}}",
+        "todayTimelineLabel": "مخطط اليوم",
+        "todayTimelineEveryone": "الجميع",
+        "todayTimelinePast": "انتهى",
+        "todayTimelineRunning": "جارٍ الآن"
     },
     "tasks": {
         "resetOrder": "الترتيب التلقائي",

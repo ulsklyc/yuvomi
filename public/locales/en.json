@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} entry today",
         "weatherUnavailable": "Weather currently unavailable",
         "wallScreensaverNone": "Screensaver not available.",
-        "wallScreensaverStart": "Screensaver"
+        "wallScreensaverStart": "Screensaver",
+        "todaySummaryEvents": "{{count}} events",
+        "todaySummaryEvents_one": "{{count}} event",
+        "todaySummaryOverdue": "{{count}} tasks overdue",
+        "todaySummaryOverdue_one": "{{count}} task overdue",
+        "todayTimelineLabel": "Today’s timeline",
+        "todayTimelineEveryone": "Everyone",
+        "todayTimelinePast": "over",
+        "todayTimelineRunning": "in progress"
     },
     "tasks": {
         "resetOrder": "Sort automatically",

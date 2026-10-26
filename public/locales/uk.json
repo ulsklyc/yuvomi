@@ -506,7 +506,19 @@
         "nutritionEntries_many": "Сьогодні {{count}} записів",
         "weatherUnavailable": "Погода зараз недоступна",
         "wallScreensaverNone": "Заставка недоступна.",
-        "wallScreensaverStart": "Заставка"
+        "wallScreensaverStart": "Заставка",
+        "todaySummaryEvents": "{{count}} події",
+        "todaySummaryEvents_one": "{{count}} подія",
+        "todaySummaryEvents_few": "{{count}} події",
+        "todaySummaryEvents_many": "{{count}} подій",
+        "todaySummaryOverdue": "{{count}} завдання прострочено",
+        "todaySummaryOverdue_one": "{{count}} завдання прострочене",
+        "todaySummaryOverdue_few": "{{count}} завдання прострочені",
+        "todaySummaryOverdue_many": "{{count}} завдань прострочено",
+        "todayTimelineLabel": "Перебіг дня",
+        "todayTimelineEveryone": "Усі",
+        "todayTimelinePast": "завершено",
+        "todayTimelineRunning": "триває"
     },
     "tasks": {
         "resetOrder": "Сортувати автоматично",

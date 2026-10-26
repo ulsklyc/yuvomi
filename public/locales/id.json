@@ -444,7 +444,15 @@
         "nutritionEntries_one": "{{count}} catatan hari ini",
         "weatherUnavailable": "Cuaca sedang tidak tersedia",
         "wallScreensaverNone": "Screensaver tidak tersedia.",
-        "wallScreensaverStart": "Screensaver"
+        "wallScreensaverStart": "Screensaver",
+        "todaySummaryEvents": "{{count}} acara",
+        "todaySummaryEvents_one": "{{count}} acara",
+        "todaySummaryOverdue": "{{count}} tugas terlambat",
+        "todaySummaryOverdue_one": "{{count}} tugas terlambat",
+        "todayTimelineLabel": "Linimasa hari ini",
+        "todayTimelineEveryone": "Semua",
+        "todayTimelinePast": "selesai",
+        "todayTimelineRunning": "sedang berlangsung"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

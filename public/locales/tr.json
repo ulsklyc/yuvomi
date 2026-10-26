@@ -426,7 +426,15 @@
         "nutritionEntries_one": "Bugün {{count}} kayıt",
         "weatherUnavailable": "Hava durumu şu anda kullanılamıyor",
         "wallScreensaverNone": "Ekran koruyucu kullanılamıyor.",
-        "wallScreensaverStart": "Ekran koruyucu"
+        "wallScreensaverStart": "Ekran koruyucu",
+        "todaySummaryEvents": "{{count}} etkinlik",
+        "todaySummaryEvents_one": "{{count}} etkinlik",
+        "todaySummaryOverdue": "{{count}} gecikmiş görev",
+        "todaySummaryOverdue_one": "{{count}} gecikmiş görev",
+        "todayTimelineLabel": "Günün akışı",
+        "todayTimelineEveryone": "Herkes",
+        "todayTimelinePast": "bitti",
+        "todayTimelineRunning": "sürüyor"
     },
     "tasks": {
         "resetOrder": "Otomatik sırala",

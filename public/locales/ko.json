@@ -444,7 +444,15 @@
         "nutritionEntries_one": "오늘 기록 {{count}}건",
         "weatherUnavailable": "현재 날씨를 불러올 수 없습니다",
         "wallScreensaverNone": "화면 보호기를 사용할 수 없습니다.",
-        "wallScreensaverStart": "화면 보호기"
+        "wallScreensaverStart": "화면 보호기",
+        "todaySummaryEvents": "일정 {{count}}개",
+        "todaySummaryEvents_one": "일정 {{count}}개",
+        "todaySummaryOverdue": "기한 초과 할 일 {{count}}개",
+        "todaySummaryOverdue_one": "기한 초과 할 일 {{count}}개",
+        "todayTimelineLabel": "오늘의 타임라인",
+        "todayTimelineEveryone": "모두",
+        "todayTimelinePast": "종료됨",
+        "todayTimelineRunning": "진행 중"
     },
     "tasks": {
         "resetOrder": "자동으로 정렬",

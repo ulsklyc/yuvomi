@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} καταχώριση σήμερα",
         "weatherUnavailable": "Ο καιρός δεν είναι διαθέσιμος αυτή τη στιγμή",
         "wallScreensaverNone": "Η προφύλαξη οθόνης δεν είναι διαθέσιμη.",
-        "wallScreensaverStart": "Προφύλαξη οθόνης"
+        "wallScreensaverStart": "Προφύλαξη οθόνης",
+        "todaySummaryEvents": "{{count}} συμβάντα",
+        "todaySummaryEvents_one": "{{count}} συμβάν",
+        "todaySummaryOverdue": "{{count}} εκπρόθεσμες εργασίες",
+        "todaySummaryOverdue_one": "{{count}} εκπρόθεσμη εργασία",
+        "todayTimelineLabel": "Η μέρα σε χρονολόγιο",
+        "todayTimelineEveryone": "Όλοι",
+        "todayTimelinePast": "ολοκληρώθηκε",
+        "todayTimelineRunning": "σε εξέλιξη"
     },
     "tasks": {
         "resetOrder": "Αυτόματη ταξινόμηση",

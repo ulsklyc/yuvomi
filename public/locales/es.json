@@ -426,7 +426,15 @@
         "nutritionEntries_one": "{{count}} registro hoy",
         "weatherUnavailable": "El tiempo no está disponible en este momento",
         "wallScreensaverNone": "Salvapantallas no disponible.",
-        "wallScreensaverStart": "Salvapantallas"
+        "wallScreensaverStart": "Salvapantallas",
+        "todaySummaryEvents": "{{count}} eventos",
+        "todaySummaryEvents_one": "{{count}} evento",
+        "todaySummaryOverdue": "{{count}} tareas vencidas",
+        "todaySummaryOverdue_one": "{{count}} tarea vencida",
+        "todayTimelineLabel": "Cronología del día",
+        "todayTimelineEveryone": "Todos",
+        "todayTimelinePast": "terminado",
+        "todayTimelineRunning": "en curso"
     },
     "tasks": {
         "resetOrder": "Ordenar automáticamente",

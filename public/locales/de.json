@@ -444,7 +444,15 @@
         "nutritionEntries_one": "{{count}} Eintrag heute",
         "weatherUnavailable": "Wetter gerade nicht verfügbar",
         "wallScreensaverNone": "Bildschirmschoner nicht verfügbar.",
-        "wallScreensaverStart": "Bildschirmschoner"
+        "wallScreensaverStart": "Bildschirmschoner",
+        "todaySummaryEvents": "{{count}} Termine",
+        "todaySummaryEvents_one": "{{count}} Termin",
+        "todaySummaryOverdue": "{{count}} Aufgaben überfällig",
+        "todaySummaryOverdue_one": "{{count}} Aufgabe überfällig",
+        "todayTimelineLabel": "Tagesverlauf",
+        "todayTimelineEveryone": "Alle",
+        "todayTimelinePast": "vorbei",
+        "todayTimelineRunning": "läuft gerade"
     },
     "tasks": {
         "resetOrder": "Automatisch sortieren",
