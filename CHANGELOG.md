@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the "more" hint, and to the wall, which follows the same tile setting. Appointments that belong to
   no calendar, such as birthdays, stay; birthdays keep their own switch. A calendar that is removed
   later drops out of the choice by itself, and if none of the chosen ones is left the tile shows all
-  calendars again.
+  calendars again. For API clients the choice is `events_calendar` on `GET /dashboard` and its
+  catalogue is `sources` on `GET /calendar/calendars`; the OpenAPI description lists both.
 - **A shopping item that jumps back to its old list now says why** (#1912). When a mirrored item is
   moved to another list and the CalDAV server keeps refusing it there, the new list is gone from the
   server, or the old list stays switched off for a week, the item goes back to the list it came from.

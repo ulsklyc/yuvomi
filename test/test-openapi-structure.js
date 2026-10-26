@@ -575,3 +575,31 @@ test('#2048 provider-thumbnail deklariert ?v= und das 304 strukturell', () => {
   assert.ok(get.responses[200]?.content?.['image/webp'], '200 nennt die Bildtypen');
   assert.doesNotMatch(get.description, /max-age|immutable/, 'die Beschreibung verspricht kein Cache-Jahr');
 });
+
+// Nachtrag zu #2268 (#2062): die Kalender-Auswahl der Kachel reist als
+// `?events_calendar=` zu `GET /dashboard`, ihr Katalog als `sources` neben
+// `data` von `GET /calendar/calendars`. Beides stand bis hier nur im Code.
+test('#2062 events_calendar an GET /dashboard ist als Query-Parameter deklariert', () => {
+  const get = buildOpenApiSpec({}).paths['/api/v1/dashboard'].get;
+  const param = (get.parameters ?? []).find((p) => p.name === 'events_calendar');
+  assert.ok(param, 'Query-Parameter events_calendar fehlt');
+  assert.equal(param.in, 'query');
+  assert.equal(param.required, false);
+  assert.equal(param.schema?.type, 'array');
+  assert.equal(param.schema.maxItems, 50);
+  assert.equal(param.schema.items?.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
+  assert.equal(param.explode, true);
+  assert.match(param.description, /GET \/calendar\/calendars/, 'nennt den Katalog');
+});
+
+test('#2062 GET /calendar/calendars beschreibt sources neben data', () => {
+  const get = buildOpenApiSpec({}).paths['/api/v1/calendar/calendars'].get;
+  const schema = get.responses?.[200]?.content?.['application/json']?.schema;
+  assert.ok(schema, '200 ohne Schema');
+  assert.deepEqual(schema.required, ['data', 'sources']);
+  const item = schema.properties?.sources?.items;
+  assert.ok(item, 'sources ohne items');
+  assert.deepEqual(item.required, ['key', 'name', 'color']);
+  assert.equal(item.properties.key.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
+  assert.match(get.description, /`sources`/);
+});

@@ -55,6 +55,15 @@ export function dashboardPaths() {
             explode: true,
           },
           {
+            name: 'events_calendar',
+            in: 'query',
+            required: false,
+            description: 'Which calendars the appointments come from, under the keys of the calendar module: `local:<id>` for an own calendar, `cal:<id>` for a synced one (CalDAV, Google), `sub:<id>` for an ICS subscription - the `key` values of `sources` from `GET /calendar/calendars`, the catalogue the selection is checked against. Repeatable, deduplicated and capped at 50; a value of any other shape is dropped. Applies to `upcomingEvents` and `weekEvents` before the cap (`events_limit`), not to `familyEvents`. Appointments that belong to no calendar (birthdays, housekeeping visits) always pass; birthdays have `events_birthdays`. Keys the caller cannot choose (a deleted calendar, a removed subscription, a disconnected account, another member\'s private subscription) are dropped; when none is left the request answers like one without the parameter, never with an empty list.',
+            schema: { type: 'array', items: { type: 'string', pattern: '^(local|cal|sub):[1-9][0-9]{0,14}$' }, maxItems: 50 },
+            style: 'form',
+            explode: true,
+          },
+          {
             name: 'events_limit',
             in: 'query',
             required: false,

@@ -132,7 +132,37 @@ export function calendarPaths() {
       get: op({
         summary: 'List local calendars',
         tag: 'Calendar',
-        description: 'Feed URLs and tokens are included only for administrators. `uploads_to_icloud` is true on the default calendar while the legacy Apple Calendar connection is configured: its events upload to iCloud, events in other local calendars stay local.',
+        description: 'Feed URLs and tokens are included only for administrators. `uploads_to_icloud` is true on the default calendar while the legacy Apple Calendar connection is configured: its events upload to iCloud, events in other local calendars stay local. Beside `data` (the local calendars) the answer carries `sources`: every calendar the caller can pick for the calendar tile of the overview, under the keys `GET /dashboard` takes as `events_calendar` - own calendars first in their managed order, then synced calendars that hold an appointment the caller may see and the ICS subscriptions the caller sees (shared or own), sorted by name.',
+        responses: {
+          200: {
+            description: 'Local calendars and the catalogue of selectable calendars',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['data', 'sources'],
+                  properties: {
+                    data: { type: 'array', items: { type: 'object', additionalProperties: true } },
+                    sources: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: ['key', 'name', 'color'],
+                        properties: {
+                          key: { type: 'string', pattern: '^(local|cal|sub):[1-9][0-9]{0,14}$', description: '`local:<id>`, `cal:<id>` or `sub:<id>`' },
+                          name: { type: 'string' },
+                          color: { type: ['string', 'null'] },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
       post: op({
         summary: 'Create local calendar',
