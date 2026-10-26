@@ -598,7 +598,8 @@ test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das
   const fn = src.slice(src.indexOf('  function rebuildDashboard(cfg) {'));
   const body = fn.slice(0, fn.indexOf('\n  }\n')).split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/.test(line)).join('\n');
   const capture = body.indexOf('const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);');
-  const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const paint = body.indexOf('setHtml(shell, html);');
   // R19: mobil steht der Anpassen-Einstieg im Menue (`.dashboard-tools-btn`) -
   // der Knopf ist dort nicht gerendert, das Menue ist der Rueckweg.
   // R20 (D, Wand-Modus): nach dem Verlassen der Wand steht danach der
@@ -929,7 +930,8 @@ test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - nur 
   const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0];
   assert.ok(body, 'rebuildDashboard() nicht gefunden - die Signatur greift nicht mehr');
   const capture = body.search(/const tileRectsBefore = isCustomizing && renderedCustomizing === true \? captureTileRects\(shell\) : null;/);
-  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const rebuild = body.search(/setHtml\(shell, html\);/);
   const play = body.search(/playTileFlip\(shell, tileRectsBefore\)/);
   assert.ok(capture > -1 && rebuild > -1 && play > -1, 'Messen, Neuaufbau und Abspielen stehen alle drei im Neuaufbau');
   assert.ok(capture < rebuild && rebuild < play, 'erst messen, dann neu bauen, dann abspielen');
@@ -965,7 +967,8 @@ test('Anpassen-Modus betreten/verlassen: das Raster gleitet als Ganzes, ohne Fed
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0] ?? '';
   const capture = body.search(/const gridTopBefore = modeChanged\s*\?/);
-  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const rebuild = body.search(/setHtml\(shell, html\);/);
   const play = body.search(/playGridShift\(shell, gridTopBefore\)/);
   assert.ok(capture > -1 && capture < rebuild && rebuild < play, 'nur beim Moduswechsel: vorher messen, neu bauen, gleiten');
 });
@@ -1603,7 +1606,9 @@ test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge d
   assert.match(render, /= memo\s*\? \[memo\.data, memo\.weatherRes, \{ data: memo\.prefs \}, memo\.data\.pendingReminders\]\s*: await Promise\.all\(/,
     'der gemerkte Stand wird nicht ohne Anfrage gezeichnet');
   assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
-  assert.match(render, /if \(!unchanged\) rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
+  // Seit DW-P1-2 klappen gehende Zeilen vorher aus (closeLeavingRows) - gebaut
+  // wird weiterhin nur bei geaenderter Antwort.
+  assert.match(render, /if \(unchanged\) return;\n[\s\S]{0,700}?rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
 });
 
 // Review zu R21 (PR #2142): der gemerkte Stand traegt die eigenen Slices

@@ -513,7 +513,7 @@ test('die Leseansicht ist nicht an ihr Modul genagelt (#918)', async () => {
   // Und die zwei Ansichten, die vorher eine kleinere Fassung bauten oder
   // wegnavigierten, oeffnen jetzt genau diese.
   const dash = await dashboardJs();
-  assert.match(dash, /openTaskById\(taskId, \{ user, container, onChanged: rerender \}\)/,
+  assert.match(dash, /openTaskById\(taskId, \{ user, container, onChanged: refresh \}\)/,
     'die Uebersicht oeffnet die geteilte Ansicht');
   assert.doesNotMatch(dash, /openTaskQuickAction/,
     'das Zwei-Knopf-Kaertchen ist ersetzt, nicht daneben stehen geblieben');
