@@ -5026,10 +5026,36 @@ const cssWords = (value) => splitTopLevel(value, (ch) => /\s/.test(ch));
  * `var(--x, 0 1px 0 2px)` ist fuer cssWords() EIN Wort, greift der Fallback,
  * sind es vier (#1709). Geschachtelte Fallbacks werden mit aufgeloest.
  */
-const withVarFallbacks = (value) => cssWords(value).map((word) => {
-  const fallback = /^var\(\s*--[\w-]+\s*,([\s\S]*)\)$/i.exec(word);
-  return fallback ? withVarFallbacks(fallback[1]) : word;
-}).join(' ');
+function withVarFallbacks(value) {
+  // Jeder var()-Aufruf bis zu SEINER schliessenden Klammer - ein Wort kann
+  // mehrere tragen (`var(--a, 1px)/var(--b, 2px)`), Strings zaehlen nicht mit.
+  let out = '';
+  let i = 0;
+  while (i < value.length) {
+    const call = /^var\(/i.test(value.slice(i, i + 4)) && !/[\w-]/.test(value[i - 1] ?? '');
+    if (!call) {
+      out += value[i];
+      i += 1;
+      continue;
+    }
+    let depth = 0;
+    let quote = '';
+    let comma = -1;
+    let end = i + 3;
+    for (; end < value.length; end += 1) {
+      const ch = value[end];
+      if (ch === '\\') { end += 1; continue; }
+      if (quote) { if (ch === quote) quote = ''; continue; }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')') { depth -= 1; if (depth === 0) break; }
+      else if (ch === ',' && depth === 1 && comma < 0) comma = end;
+    }
+    out += comma < 0 ? value.slice(i, end + 1) : withVarFallbacks(value.slice(comma + 1, end)).trim();
+    i = end + 1;
+  }
+  return out;
+}
 /** `[{ prop, value, text }]` eines Regelrumpfs aus eachRule(), ohne `!important`. */
 function cssDeclarations(body) {
   return splitTopLevel(body, (ch) => ch === ';').flatMap((decl) => {
@@ -5148,6 +5174,7 @@ test('RTL-Leser: var()-Fallback, background-position-x und ein Zeilenende im Str
     ['margin: var(--a, var(--b, 0 1px 0 2px))', 'margin: var(--a, var(--b, 0 1px 0 2px))'],
     ['scroll-margin: var(--x,0 1px 0 2px)', 'scroll-margin: var(--x,0 1px 0 2px)'],
     ['border-radius: var(--r, 1px 0)', 'border-radius: var(--r, 1px 0)'],
+    ['border-radius: var(--r, 1px 0)/var(--s, 2px)', 'border-radius: var(--r, 1px 0)/var(--s, 2px)'],
     // Die Achsen-Langform nennt die Seite genauso wie die Kurzform.
     ['background-position-x: left', 'background-position-x: left'],
     ['background-position-x: right 4px', 'background-position-x: right 4px'],
@@ -5166,6 +5193,8 @@ test('RTL-Leser: var()-Fallback, background-position-x und ein Zeilenende im Str
     'padding: var(--x, 0) 1px',
     'border-radius: var(--r, 4px)',
     'border-radius: var(--r, 1px 1px 2px 2px)',
+    'border-radius: var(--r, 1px 1px)/var(--r, 1px 1px)',
+    'margin: var(--a, 1px) var(--b, 2px) var(--c, 3px) var(--b, 2px)',
     'background-position-x: center',
     'background-position-y: top',
     'content: "a\\\rb; margin-left: 1px"; color: red',
@@ -5215,6 +5244,8 @@ test('eachRule(): ein String schneidet keine Regel ab, und ein Kommentarzeichen 
     ['.a { background: url(a}b.png); margin-left: 1px }', ['.a => margin-left: 1px']],
     ['.a[title="}"] { margin-left: 1px }', ['.a[title="}"] => margin-left: 1px']],
     ['.a[title=";"] { margin-left: 1px }', ['.a[title=";"] => margin-left: 1px']],
+    // Ein maskiertes Anfuehrungszeichen ausserhalb eines Strings oeffnet keinen.
+    ['.foo\\"bar { margin-left: 1px } .b { float: right }', ['.foo\\"bar => margin-left: 1px', '.b => float: right']],
     ['@media (min-width: 1px) { .a { content: "}"; margin-left: 1px } .b { float: right } }',
       ['@media (min-width: 1px) > .a => margin-left: 1px', '@media (min-width: 1px) > .b => float: right']],
     // Ein Zeilenende beendet einen offenen String, die Klammer danach zaehlt.

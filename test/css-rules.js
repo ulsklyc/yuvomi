@@ -50,13 +50,16 @@ import { readFileSync } from 'node:fs';
 const AT_RULES_WITH_RULES = /^@(?:media|supports|container|layer|scope)\b/;
 
 /**
- * Ende eines Textstuecks, das bei `i` beginnt - eines Strings oder eines
- * `url(` ohne Anfuehrungszeichen -, sonst -1. Ein Backslash nimmt das
+ * Ende eines Textstuecks, das bei `i` beginnt - eines Strings, eines
+ * `url(` ohne Anfuehrungszeichen oder eines maskierten Zeichens -, sonst -1. Ein Backslash nimmt das
  * naechste Zeichen mit (CRLF als eines); ein Zeilenende beendet den String
  * und gehoert nicht mehr dazu.
  */
 function literalEnd(src, i) {
   const ch = src[i];
+  // Ein Backslash ausserhalb eines Strings maskiert das naechste Zeichen:
+  // `.foo\"bar` ist ein Selektor, kein Stringanfang.
+  if (ch === '\\') return Math.min(src.length, i + (src.startsWith('\r\n', i + 1) ? 3 : 2));
   let close;
   if (ch === '"' || ch === "'") {
     close = ch;
