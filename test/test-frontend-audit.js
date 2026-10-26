@@ -22186,7 +22186,7 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
     'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js',
     'components/task-detail.js', 'components/modal.js', 'pages/schedule.js',
     'components/quick-links-manager.js', 'settings/pages/modules-kitchen.js', 'pages/calendar.js',
-    'settings/pages/admin-immich.js']) {
+    'settings/pages/admin-immich.js', 'pages/dashboard.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
@@ -22230,6 +22230,7 @@ const ERROR_MESSAGE_CLEAN = [
   'settings/pages/modules-kitchen.js',
   'pages/calendar.js',
   'settings/pages/admin-immich.js',
+  'pages/dashboard.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

@@ -17,6 +17,7 @@ import { buildWeekStrip } from '/utils/week-strip.js';
 import { relativeDateLabel, housekeepingSinceLabel } from '/utils/day-label.js';
 import { daysFromTodayText, dateText } from '/utils/date-format.js';
 import { esc, fmtLocation, renderMarkdownLight } from '/utils/html.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { initials } from '/utils/initials.js';
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
@@ -7049,7 +7050,7 @@ async function openTaskFromOverview(taskId, container, rerender, user) {
     await openTaskById(taskId, { user, container, onChanged: rerender });
   } catch (err) {
     console.error('[Dashboard] Aufgabe konnte nicht geöffnet werden:', err);
-    window.yuvomi?.showToast(err.message ?? t('tasks.loadError'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err, 'tasks.loadError'), 'danger');
   }
 }
 
@@ -7605,7 +7606,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       markLoaded(requestDay);
     }
   } catch (err) {
-    console.error('[Dashboard] Ladefehler:', err.message, 'Status:', err.status ?? 'network');
+    console.error('[Dashboard] Ladefehler:', err, 'Status:', err.status ?? 'network');
     loadFailed = true;
     loadErrorStatus = Number.isFinite(err?.status) ? err.status : null;
   }
@@ -7625,7 +7626,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ]);
       data.cycle = { periods: periodsRes.data || [], settings: settingsRes.data || {} };
     } catch (err) {
-      console.error('[Dashboard] Zyklus-Slice Ladefehler:', err?.message);
+      console.error('[Dashboard] Zyklus-Slice Ladefehler:', err);
       data.cycle = null;
     }
   }
@@ -7641,7 +7642,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     try {
       data.schedule = await loadScheduleSlice(householdToday());
     } catch (err) {
-      console.error('[Dashboard] Schedule-Slice Ladefehler:', err?.message);
+      console.error('[Dashboard] Schedule-Slice Ladefehler:', err);
       data.schedule = null;
     }
   }
@@ -7670,7 +7671,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         needsRefresh: (sourcesRes.data ?? []).some((s) => s.needs_refresh),
       };
     } catch (err) {
-      console.error('[Dashboard] Waste-Slice Ladefehler:', err?.message);
+      console.error('[Dashboard] Waste-Slice Ladefehler:', err);
       data.waste = null;
     }
   }

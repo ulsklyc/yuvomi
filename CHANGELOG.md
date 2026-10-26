@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A task that fails to open from the home screen says why in your language.** When a
+  task tapped on a home screen tile could not be opened, the toast showed the server's text or an
+  English code message. It now says the app's own sentence (offline, not found, no permission, or
+  that the task could not be loaded) in your language (#1909).
 - **The error screen and the toast for an unhandled error no longer show raw technical text** (#1909).
   When a page failed to open or an action failed without its own message, the app could show the
   server's text or an English code message such as "foo is not defined" as its sentence. Both now
