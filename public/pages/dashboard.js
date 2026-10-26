@@ -4376,10 +4376,7 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  // Die Termine, die das Blatt als Text erreicht (sichtbar und hinter „+N
-  // weitere"): unter der breiten Buehne zaehlt der Kopf genau sie (todaySummary).
-  const eventCount = rowsFromTimeline ? sheet.allRows.filter((row) => row.kind === 'event').length : null;
-  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks, eventCount };
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
@@ -4525,9 +4522,8 @@ function relativeWhen(minuteOfDay, now, clock = '') {
  * (`id@start`). Beendete bleiben hier stehen: die Leiste zeigt den Tag, die
  * Liste darunter nur, was noch kommt.
  *
- * @returns {{ timed: object[], allDay: object[], count: number }}  `timed` fuer
- *   die Achse (Minuten in der Haushaltszone), `allDay` fuer das Band ueber ihr,
- *   `count` alle Termine des Tages fuer die Summe im Kopf
+ * @returns {{ timed: object[], allDay: object[] }}  `timed` fuer die Achse
+ *   (Minuten in der Haushaltszone), `allDay` fuer das Band ueber ihr
  */
 function todayEventsForTimeline(data, now = new Date()) {
   const todayKey = zonedDateKey(now);
@@ -4535,7 +4531,6 @@ function todayEventsForTimeline(data, now = new Date()) {
   const seen = new Set();
   const timed = [];
   const allDay = [];
-  let count = 0;
   for (const key of ['upcomingEvents', 'familyEvents']) {
     for (const event of Array.isArray(data?.[key]) ? data[key] : []) {
       const id = `${event.id}@${event.start_datetime}`;
@@ -4543,7 +4538,6 @@ function todayEventsForTimeline(data, now = new Date()) {
       seen.add(id);
       const span = overviewEventSpan(event, todayKey);
       if (span.day !== todayKey) continue;
-      count += 1;
       const peopleIds = (event.assigned_users ?? []).map((user) => user.id);
       const base = {
         id: event.id,
@@ -4580,7 +4574,7 @@ function todayEventsForTimeline(data, now = new Date()) {
       });
     }
   }
-  return { timed, allDay, count };
+  return { timed, allDay };
 }
 
 /**
@@ -4771,6 +4765,20 @@ function timelineSheetRows(data, timeline, now = new Date()) {
   return rows;
 }
 
+/**
+ * DER KOPF ZAEHLT, WAS NOCH KOMMT - AUF JEDER BUEHNE (Ulas, 2026-10-26, D5).
+ * Breit zaehlte er den ganzen Tag samt Vergangenem („11 Termine"), darunter
+ * nur die kommenden Zeilen („6 Termine"): dieselbe Familie, derselbe Moment,
+ * zwei Zahlen. Jetzt zaehlt jede Buehne aus derselben Quelle wie die Zeilen
+ * unter der Kurzfassung (timelineSheetRows) - laufende, kommende und
+ * ganztaegige Termine, einmal je Termin - und sagt es: „noch 6 Termine". Ist
+ * keiner mehr uebrig, entfaellt der Teil. Der Minutentakt baut neu, sobald ein
+ * Termin endet (todayFingerprint, `ended`).
+ */
+function todayEventsAhead(data, timeline, now = new Date()) {
+  return timelineSheetRows(data, timeline, now).filter((row) => row.kind === 'event').length;
+}
+
 /* Die Mahlzeit nennt ihre Zeit rechts (withRelativeWhen); die Unterzeile
  * traegt nur ihre Art, wie die Mahlzeit des Programms. */
 const timelineMealRow = (item) => ({ ...item.sheetRow, sub: item.title, timeLabel: item.timeLabel });
@@ -4788,17 +4796,14 @@ function timelineDetailRow(item) {
 }
 
 /* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
- * („9 Termine · 1 Aufgabe ueberfaellig"). Nur, was das Blatt selbst spricht:
- * Termine, wenn der Kalender im Blatt spricht (Kein-Echo-Regel), Ueberfaelliges,
- * wenn die Aufgaben es tun. Ohne beides steht keine Summe da - „0 Termine"
- * waere ein Satz ueber nichts. */
-function todaySummary(data, model, now = new Date()) {
+ * („noch 6 Termine · 1 Aufgabe ueberfaellig"). Nur, was das Blatt selbst
+ * spricht: Termine, wenn der Kalender im Blatt spricht (Kein-Echo-Regel),
+ * Ueberfaelliges, wenn die Aufgaben es tun. Ohne beides steht keine Summe da -
+ * „0 Termine" waere ein Satz ueber nichts. */
+function todaySummary(data, model, timeline = null, now = new Date()) {
   const parts = [];
-  // Breit traegt die Leiste den ganzen Tag, auch das Vergangene; darunter
-  // stehen nur die kommenden Termine als Zeilen, und der Kopf zaehlt, was
-  // man lesen kann (Critique 2026-10-26, Lauf 2, D1).
-  const events = model.includeCalendar ? model.eventCount ?? todayEventsForTimeline(data, now).count : 0;
-  if (events > 0) parts.push(t('dashboard.todaySummaryEvents', { count: events }));
+  const events = model.includeCalendar ? todayEventsAhead(data, timeline, now) : 0;
+  if (events > 0) parts.push(t('dashboard.todaySummaryEventsAhead', { count: events }));
   if (model.includeTasks) {
     const overdue = model.allRows
       .flatMap((row) => (row.kind === 'overdue' ? row.members ?? [] : [row]))
@@ -5454,7 +5459,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       <i data-lucide="eye-off" aria-hidden="true"></i>
     </button>` : '';
 
-  const summary = todaySummary(data, model, now);
+  const summary = todaySummary(data, model, timeline, now);
 
   /* DER KOPF STEHT IN DER KARTE (Entwurf): Siegel der Uebersicht, Titel, die
    * Summe des Tages - auf jeder Buehne. Im Anpassen-Modus steht er ueber der

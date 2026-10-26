@@ -28,7 +28,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { register } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import Database from 'better-sqlite3-multiple-ciphers';
 import express from 'express';
 
@@ -1112,14 +1112,14 @@ test('Heute-Blatt: die Zeitleiste zeigt den ganzen Tag je Person, die Summe nenn
   assert.match(timeline, /<span class="sr-only"> dashboard\.todayUntil\{(?:"|&quot;)time(?:"|&quot;):(?:"|&quot;)2026-09-24T13:00/, 'das Ende hoert der Screenreader (Befund 4)');
   // 10:00 auf der Achse 07-22.
   assert.match(timeline, /--tl-now:0\.2(?![\d])|--tl-now:0\.19999/);
-  assert.match(sheet, /today-cockpit__summary">dashboard\.todaySummaryEvents\{&quot;count&quot;:5\} · dashboard\.todaySummaryOverdue\{&quot;count&quot;:1\}</,
-    'fuenf Termine samt ganztaegigem, eine ueberfaellige Aufgabe');
+  assert.match(sheet, /today-cockpit__summary">dashboard\.todaySummaryEventsAhead\{&quot;count&quot;:4\} · dashboard\.todaySummaryOverdue\{&quot;count&quot;:1\}</,
+    'noch vier Termine samt laufendem und ganztaegigem (der Zahnarzt ist vorbei), eine ueberfaellige Aufgabe');
 }));
 
 test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel, auf dem Telefon nur die Kurzfassung', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   const withTile = dash.renderTodayCockpit(timelineDay(), [{ id: 'calendar', visible: true }]);
   assert.ok(!withTile.includes('today-timeline'), 'die Leiste waere das Echo der Kachel');
-  assert.ok(!withTile.includes('todaySummaryEvents'), 'und die Termine zaehlt die Kachel');
+  assert.ok(!withTile.includes('todaySummaryEventsAhead'), 'und die Termine zaehlt die Kachel');
   assert.match(withTile, /todaySummaryOverdue/, 'das Ueberfaellige spricht weiter, solange die Aufgaben im Blatt sprechen');
   global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
   const phone = dash.renderTodayCockpit(timelineDay(), []);
@@ -1268,7 +1268,7 @@ const busyAfternoon = () => ({
 });
 const reachableText = (html) => html.slice(html.indexOf('class="today-cockpit__rows'));
 const eventRowIds = (html) => [...html.matchAll(/data-object-kind="event" data-object-id="(\d+)"/g)].map((m) => Number(m[1]));
-const summaryEvents = (html) => Number(/todaySummaryEvents\{&quot;count&quot;:(\d+)\}/.exec(html)?.[1] ?? 0);
+const summaryEvents = (html) => Number(/todaySummaryEventsAhead\{&quot;count&quot;:(\d+)\}/.exec(html)?.[1] ?? 0);
 const onPhone = () => { global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query }); };
 
 for (const stage of ['compact', 'phone']) {
@@ -1308,11 +1308,12 @@ test('D1: die laufende eigene Schicht steht unter der breiten Buehne einmal als 
   assert.equal(reachableText(sheet).match(/data-object-kind="shift"/g)?.length, 1, 'aus der Leiste, nicht noch einmal aus dem Beitrag');
 }));
 
-test('D1: breit bleibt es - getimte Termine nur in der Leiste, der Kopf zaehlt den ganzen Tag', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+test('D1: breit bleibt es - getimte Termine nur in der Leiste, der Kopf zaehlt, was noch kommt (D5)', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
   const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'wide', viewer: TIMELINE_USERS[1], moreOpen: true });
   assert.equal(eventRowIds(reachableText(sheet)).length, 0, 'keine Terminzeile neben der Leiste');
   assert.match(sheet, /today-timeline__title">Filmabend</, 'der Filmabend steht in der Leiste');
-  assert.equal(summaryEvents(sheet), 5, 'samt dem beendeten Zahnarzt - die Leiste zeigt ihn');
+  assert.match(sheet, /today-timeline__title">Zahnarzt</, 'der beendete Zahnarzt steht im Bild');
+  assert.equal(summaryEvents(sheet), 4, 'aber nicht in der Zahl - sie sagt „noch"');
 }));
 
 test('D1: verstreicht die Zeit einer Mahlzeit, baut der Minutentakt neu', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
@@ -1805,3 +1806,64 @@ test('D3: breit bleibt „+N weitere" rechts im Fuss; die Zeile hat Zielhoehe un
   assert.match(hit, /min-block-size:\s*var\(--target-base\)/, 'das Bild ist mindestens ein 44px-Ziel');
   assert.match(cssRule('.today-timeline-peek__hit:focus-visible'), /outline-offset:\s*var\(--focus-ring-offset-inset\)/, 'sichtbarer Fokus innen');
 }));
+
+
+// DER KOPF ZAEHLT, WAS NOCH KOMMT - AUF JEDER BUEHNE (Ulas, 2026-10-26, D5).
+// Breit hiess es „5 Termine" samt Vergangenem, darunter „4 Termine": dieselbe
+// Familie, derselbe Moment, zwei Zahlen. Jetzt eine Quelle und ein Satz.
+const summaryOf = (html) => /today-cockpit__summary">([^<]*)</.exec(html)?.[1] ?? '';
+
+test('D5: wide, compact und phone sagen fuer denselben Tag dieselbe Zahl - die der erreichbaren Terminzeilen', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const viewer = TIMELINE_USERS[1];
+  const wide = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'wide', viewer, moreOpen: true });
+  const compact = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'compact', viewer, moreOpen: true });
+  onPhone();
+  const phone = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'phone', viewer, moreOpen: true });
+  assert.equal(/data-today-stage="([^"]+)"/.exec(phone)?.[1], 'phone', 'Vorbedingung: die Telefon-Buehne');
+  assert.equal(summaryEvents(wide), 4, 'Kita, Elternabend, Ausflug, Filmabend - der Zahnarzt ist vorbei');
+  assert.equal(summaryEvents(compact), summaryEvents(wide), 'compact zaehlt wie breit');
+  assert.equal(summaryEvents(phone), summaryEvents(wide), 'das Telefon zaehlt wie breit');
+  assert.equal(summaryEvents(compact), eventRowIds(reachableText(compact)).length, 'und die Zahl ist die der lesbaren Terminzeilen');
+}));
+
+test('D5: endet ein Termin, faellt er aus der Zahl, und der Minutentakt baut neu', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  // Der Fussball endet um 17:30 (15:30Z). Er steht nur in der Familienliste,
+  // also in keiner Zeile, die der Stempel ohnehin vergleicht.
+  const before = new Date('2026-09-24T15:29:00Z');
+  const after = new Date('2026-09-24T15:31:00Z');
+  for (const stage of ['wide', 'compact']) {
+    assert.equal(summaryEvents(dash.renderTodayCockpit(timelineDay(), [], false, { stage, now: before })), 3, `${stage}: Fussball laeuft noch und zaehlt`);
+    assert.equal(summaryEvents(dash.renderTodayCockpit(timelineDay(), [], false, { stage, now: after })), 2, `${stage}: Fussball ist vorbei`);
+  }
+  assert.notEqual(dash.todayFingerprint(timelineDay(), [], before), dash.todayFingerprint(timelineDay(), [], after),
+    'das Ende aendert den Stempel - sonst stuende die alte Zahl bis zum naechsten Anlass');
+}));
+
+test('D5: ist kein Termin mehr uebrig, entfaellt der Termin-Teil - das Ueberfaellige bleibt', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const day = { ...timelineDay(), upcomingEvents: timelineDay().upcomingEvents.filter((event) => !event.all_day) };
+  const late = new Date('2026-09-24T20:30:00Z'); // 22:30, der Filmabend endete um 22:00
+  for (const stage of ['wide', 'compact']) {
+    const sheet = dash.renderTodayCockpit(day, [], false, { stage, now: late });
+    assert.ok(!sheet.includes('todaySummaryEventsAhead'), `${stage}: kein „noch 0 Termine"`);
+    assert.equal(summaryOf(sheet), 'dashboard.todaySummaryOverdue{&quot;count&quot;:1}', `${stage}: nur das Ueberfaellige`);
+  }
+  // Das Ganztaegige ist bis Mitternacht nicht vorbei.
+  const withAllDay = dash.renderTodayCockpit(timelineDay(), [], false, { stage: 'wide', now: late });
+  assert.equal(summaryEvents(withAllDay), 1, 'der Ausflug zaehlt bis zum Tagesende');
+}));
+
+test('D5: „noch N Termine" steht mit allen Pluralformen in jeder Sprache, der alte Schluessel nirgends', () => {
+  const dir = new URL('../public/locales/', import.meta.url);
+  const extra = { cs: ['few', 'many'], pl: ['few', 'many'], ru: ['few', 'many'], uk: ['few', 'many'], ar: ['two', 'few', 'many'] };
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.equal(files.length, 27);
+  for (const name of files) {
+    const lang = name.replace(/\.json$/, '');
+    const dashboard = JSON.parse(readFileSync(new URL(name, dir), 'utf8')).dashboard ?? {};
+    for (const suffix of ['', '_one', ...(extra[lang] ?? []).map((form) => `_${form}`)]) {
+      const value = dashboard[`todaySummaryEventsAhead${suffix}`];
+      assert.ok(typeof value === 'string' && value.includes('{{count}}'), `${lang}: todaySummaryEventsAhead${suffix}`);
+    }
+    assert.ok(!Object.keys(dashboard).some((key) => /^todaySummaryEvents(_|$)/.test(key)), `${lang}: der alte Schluessel ist weg`);
+  }
+});
