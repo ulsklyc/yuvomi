@@ -50,7 +50,7 @@ import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './ca
 import { patchICSTodo } from '../utils/ics-patch.js';
 import {
   createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
-  isAccountWideRefusal,
+  isAccountWideRefusal, acceptsNewEntries,
 } from '../utils/caldav-client.js';
 import {
   ownUid, isOwnUidOfRow, ownUploadRowId, parseOwnUid, findObjectWithUid, inspectObjectAt,
@@ -862,6 +862,31 @@ export function recurrenceFollowupTarget(task) {
  * @param {number} listId
  * @param {number|null} [accountId] das Konto, das hochladen würde
  */
+/**
+ * Wie viele Einträge warten auf ihren Upload in diese Liste (#1840)? Für eine
+ * Aufgabenliste die Aufgaben mit ihr als Ziel, für eine Einkaufszuordnung die
+ * lokalen Artikel der zugeordneten Liste. Die Einstellungen nennen die Zahl
+ * neben einer Liste, die keine neuen Einträge annimmt.
+ */
+export function countWaitingTodoUploads(accountId, listUrl) {
+  const sel = db.get().prepare(`
+    SELECT target_module, target_list_id, enabled FROM caldav_reminder_selection
+     WHERE account_id = ? AND list_url = ?
+  `).get(accountId, listUrl);
+  if (!sel) return 0;
+  if (sel.target_module === 'shopping') {
+    if (!sel.enabled || !sel.target_list_id) return 0;
+    return db.get().prepare(`
+      SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local' AND list_id = ?
+    `).get(sel.target_list_id).n;
+  }
+  return db.get().prepare(`
+    SELECT COUNT(*) AS n FROM tasks
+     WHERE external_source = 'local' AND target_caldav_account_id = ?
+       AND target_caldav_list_url = ? AND parent_task_id IS NULL
+  `).get(accountId, listUrl).n;
+}
+
 export function pendingShoppingCreations(listId, accountId = null) {
   const rows = db.get().prepare(`
     SELECT * FROM shopping_items
@@ -1342,6 +1367,14 @@ function keepOwnUpload(module, uid, objectUrl) {
 }
 
 /** EINE Zeile je Liste, die in diesem Lauf abgelehnt hat - mit der Anzahl. */
+/** EINE Zeile je nur lesbarer Liste, in die etwas wartet (#1840). */
+function reportReadOnlyLists(readOnly, what) {
+  for (const [listUrl, waiting] of readOnly) {
+    log.warn(`Reminder list ${listUrl} is read-only for this account; `
+      + `${waiting} ${what} stay local until it accepts new entries.`);
+  }
+}
+
 function reportClosedLists(gate, what) {
   gate.report((listUrl, err, waiting) => log.warn(
     `Reminder list ${listUrl} is not accepting uploads (${err.message}); `
@@ -1363,6 +1396,7 @@ export async function processPendingCreations(client, accountId, module, listsBy
   if (rows.length === 0) return 0;
 
   const gate = createUploadGate();
+  const readOnly = new Map();
   let done = 0;
   for (const listed of rows) {
     // Frisch lesen, durch dieselbe Auswahl (#1881): die Liste stammt von vor
@@ -1404,6 +1438,14 @@ export async function processPendingCreations(client, accountId, module, listsBy
     // Aufgabe dieselbe Absage abholen.
     if (gate.isClosed(collection.url)) continue;
 
+    // Nimmt die Liste laut ihren Rechten keine neuen Einträge an (#1840),
+    // geht keine Anfrage hinaus, und das Ziel bleibt stehen: die Aufgabe
+    // wartet, die Einstellungen nennen sie neben der Liste.
+    if (!acceptsNewEntries(collection)) {
+      readOnly.set(collection.url, (readOnly.get(collection.url) || 0) + 1);
+      continue;
+    }
+
     try {
       // Das Ziel räumt die Buchung selbst ab, wenn die Aufgabe Spiegel wird
       // (`bookTodoUpload`) - nicht hier, nach dem await: dann stünde dort
@@ -1424,6 +1466,7 @@ export async function processPendingCreations(client, accountId, module, listsBy
       }
     }
   }
+  reportReadOnlyLists(readOnly, 'task(s)');
   reportClosedLists(gate, 'task(s)');
   return done;
 }
@@ -1451,11 +1494,18 @@ export async function processPendingCreations(client, accountId, module, listsBy
  */
 export async function processPendingShoppingCreations(client, accountId, targets, listsByUrl) {
   const gate = createUploadGate();
+  const readOnly = new Map();
   let done = 0;
   for (const { listUrl, targetListId } of targets) {
     if (!targetListId) continue;
     const collection = listsByUrl.get(listUrl);
     if (!collection) continue;
+    // Nur lesbar (#1840): die Artikel bleiben lokal und warten, siehe oben.
+    if (!acceptsNewEntries(collection)) {
+      const waiting = pendingShoppingCreations(targetListId, accountId).length;
+      if (waiting) readOnly.set(collection.url, waiting);
+      continue;
+    }
 
     for (const row of pendingShoppingCreations(targetListId, accountId)) {
       if (gate.isClosed(collection.url)) continue;
@@ -1476,6 +1526,7 @@ export async function processPendingShoppingCreations(client, accountId, targets
       }
     }
   }
+  reportReadOnlyLists(readOnly, 'shopping item(s)');
   reportClosedLists(gate, 'shopping item(s)');
   return done;
 }

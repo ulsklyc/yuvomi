@@ -42,6 +42,7 @@ describe('CalDAV Multi-Account Sync', () => {
         calendar_name   TEXT NOT NULL,
         calendar_color  TEXT,
         enabled         INTEGER NOT NULL DEFAULT 1,
+        writable        INTEGER,
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE,
         UNIQUE(account_id, calendar_url)
@@ -426,7 +427,8 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -602,7 +604,8 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -805,7 +808,8 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1063,7 +1067,8 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1268,7 +1273,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2223,7 +2229,8 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2402,7 +2409,8 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2510,7 +2518,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2738,7 +2747,8 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

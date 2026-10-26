@@ -31,7 +31,7 @@ import { rruleLine } from './recurrence.js';
 import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
+import { createCalDAVClient, createUploadGate, supportsComponent, acceptsNewEntries } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { normalizeCalColor, calendarDisplayName } from '../utils/calendar-meta.js';
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
@@ -60,6 +60,15 @@ function collectLocalOutboundEvents(database, id = null) {
       )
       AND (? IS NULL OR e.id = ?)
   `).all(id, id);
+}
+
+/**
+ * Der Kalender, in den lokale Termine hinaufgehen (#1840): der erste der
+ * Auflistung, der Termine führt (`VEVENT`) und neue annimmt. Ohne Angabe der
+ * Rechte zählt ein Kalender als beschreibbar, wie vorher. null: keiner.
+ */
+function icloudUploadTarget(calendars) {
+  return (calendars || []).find((cal) => supportsComponent(cal, 'VEVENT') && acceptsNewEntries(cal)) ?? null;
 }
 
 // --------------------------------------------------------
@@ -367,9 +376,14 @@ async function runSync({ makeClient } = {}) {
 
   // Alle Kalender synchen (inklusive Geburtstags-Kalender)
   const syncCalendars = calendars;
+  // Hinauf geht es in den ersten Kalender der Auflistung, der Termine führt
+  // und neue annimmt (#1840) - nicht blind in den ersten: ein nur lesbar
+  // geteilter oder eine Erinnerungsliste wiese jeden Upload ab. Sagt der
+  // Server nichts zu den Rechten, zählt der Kalender als beschreibbar.
+  const defaultCal = icloudUploadTarget(syncCalendars);
   // Will diese lokale Zeile weiter hinauf (#1882)? Gefragt wird NICHT, in
-  // welchen Kalender: hinauf geht es in den ersten der Auflistung, und die
-  // sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
+  // welchen Kalender: hinauf geht es in den ersten beschreibbaren der
+  // Auflistung, und die sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
   // das Objekt im früheren ersten erst dann ein Rest, wenn der Termin woanders
   // angekommen ist - vorher wäre sein Löschen der einzige Stand auf dem Server.
   const stillWantsUpload = (row) => collectLocalOutboundEvents(db.get(), row.id).length > 0;
@@ -433,11 +447,11 @@ async function runSync({ makeClient } = {}) {
           calendarUids.add(ev.uid);
           // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
           // nur ein Termin, den der Upload unten in GENAU diesen Kalender
-          // schicken würde (den ersten) - die UID kommt vom Server und weist
+          // schicken würde (`defaultCal`) - die UID kommt vom Server und weist
           // nichts aus.
           const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
             source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
-            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+            isWaitingHere: (eventId) => cal.url === defaultCal?.url
               && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
           });
 
@@ -624,10 +638,13 @@ async function runSync({ makeClient } = {}) {
   }
 
   // --------------------------------------------------------
-  // Outbound: lokal → iCloud (erster verfügbarer Kalender)
+  // Outbound: lokal → iCloud (erster beschreibbarer Kalender, `defaultCal`)
   // --------------------------------------------------------
-  const defaultCal = syncCalendars[0];
   const localEvents = collectLocalOutboundEvents(db.get());
+  if (!defaultCal && localEvents.length) {
+    log.warn(`No calendar in this iCloud account accepts new events; `
+      + `${localEvents.length} local event(s) stay local.`);
+  }
 
   // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
   const householdZone = householdTimeZone(db.get());
@@ -690,4 +707,4 @@ export { sync, flushOutbound, getStatus, saveCredentials, clearCredentials,
 // Nur fuer Tests: der ICS-Builder ist der einzige Weg, auf dem ein rein lokaler
 // Termin zum Anbieter kommt, und der Sync-Pfad drumherum ist zu gross, um ihn
 // dafuer nachzustellen.
-export const __test = { buildICS, collectLocalOutboundEvents };
+export const __test = { buildICS, collectLocalOutboundEvents, icloudUploadTarget };

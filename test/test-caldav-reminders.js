@@ -173,6 +173,7 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
                       CHECK(target_module IN ('tasks', 'shopping')),
         target_list_id INTEGER,
         enabled       INTEGER NOT NULL DEFAULT 0,
+        writable      INTEGER,
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE,
         UNIQUE(account_id, list_url)
       );
@@ -385,7 +386,16 @@ describe('Aufgabenlisten erscheinen ohne Knopfdruck (#617)', () => {
         target_module TEXT NOT NULL DEFAULT 'tasks',
         target_list_id INTEGER,
         enabled       INTEGER NOT NULL DEFAULT 0,
+        writable      INTEGER,
         UNIQUE(account_id, list_url)
+      );
+      -- Die gelesene Auswahl zaehlt die wartenden Uploads je Liste (#1840).
+      CREATE TABLE tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, external_source TEXT DEFAULT 'local',
+        target_caldav_account_id INTEGER, target_caldav_list_url TEXT, parent_task_id INTEGER
+      );
+      CREATE TABLE shopping_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, external_source TEXT DEFAULT 'local', list_id INTEGER
       );
       INSERT INTO caldav_accounts (name, caldav_url, username, password)
       VALUES ('Radicale', 'https://dav.example/', 'demo', 'pw');

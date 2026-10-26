@@ -51,7 +51,8 @@ async function listGoogleTargets() {
 }
 
 /**
- * CalDAV-Ziele: alle aktivierten Kalender je Konto, aus der DB (kein Netzzugriff).
+ * CalDAV-Ziele: alle aktivierten und beschreibbaren Kalender je Konto, aus der
+ * DB (kein Netzzugriff).
  *
  * Die Standard-Zuweisung haengt an der Kalender-URL, nicht am Konto
  * (`external_calendars.external_id`). Fuehren zwei Konten dieselbe URL, tragen
@@ -64,7 +65,9 @@ async function listCaldavTargets() {
     // Ein Konto mit defekter Auswahl darf die uebrigen nicht mitreissen.
     try {
       const calendars = await caldavSync.getCalendars(account.id);
-      for (const cal of calendars.filter((c) => c.enabled)) {
+      // Nur Kalender, die neue Termine annehmen (#1840): ein nur lesbar
+      // geteilter wiese jeden Upload ab. Ohne Angabe des Servers wie bisher.
+      for (const cal of calendars.filter((c) => c.enabled && c.writable !== false)) {
         targets.push({
           accountId: account.id,
           accountName: account.name,

@@ -56,7 +56,8 @@ function buildDb() {
     CREATE TABLE caldav_calendar_selection (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-      calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+      calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
     );
     CREATE TABLE external_calendars (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

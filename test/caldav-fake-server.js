@@ -21,6 +21,10 @@
  *   server.refuse({ method: 'PUT', drop: true, once: true, defer: (run) => { late = run; } })  // wird erst bei late() gespeichert
  *   server.refuse({ method: 'PROPFIND', path: '/cal/', status: 207, contentType: 'application/xml', body: ... })
  * `server.allowAll()` nimmt alle Regeln zurück.
+ *
+ * `addCollection(slug, { privileges: ['read'] })` nennt im PROPFIND die Rechte
+ * (`current-user-privilege-set`) und weist einen PUT ohne Schreibrecht mit 403
+ * ab - eine nur lesbar geteilte Collection (#1840).
  */
 
 import http from 'node:http';
@@ -79,7 +83,17 @@ export async function startFakeDavServer() {
       + '</c:supported-calendar-component-set>';
     return `<d:resourcetype><d:collection/>${type}</d:resourcetype>`
       + `<d:displayname>${xmlEscape(col.name)}</d:displayname>${comps}`
-      + '<d:supported-report-set><d:supported-report><d:report><c:calendar-multiget/></d:report></d:supported-report></d:supported-report-set>';
+      + '<d:supported-report-set><d:supported-report><d:report><c:calendar-multiget/></d:report></d:supported-report></d:supported-report-set>'
+      + privilegeProps(col);
+  }
+
+  // Rechte (#1840): nur, wenn der Test sie nennt - ohne Angabe schweigt der
+  // Server dazu, wie manche echten.
+  function privilegeProps(col) {
+    if (!Array.isArray(col.privileges)) return '';
+    return '<d:current-user-privilege-set>'
+      + col.privileges.map((name) => `<d:privilege><d:${name}/></d:privilege>`).join('')
+      + '</d:current-user-privilege-set>';
   }
 
   function objectResponse(collectionPath, filename, obj, dataTag) {
@@ -149,6 +163,10 @@ export async function startFakeDavServer() {
     if (req.method === 'PUT') {
       const { collection, filename } = locate(pathname);
       if (!collection || !filename) return plain(404);
+      if (Array.isArray(collection.privileges)
+          && !collection.privileges.some((name) => ['all', 'write', 'bind', 'write-content'].includes(name))) {
+        return plain(403);
+      }
       const existing = collection.objects.get(filename);
       if (req.headers['if-none-match'] === '*' && existing) return plain(412);
       if (req.headers['if-match'] && (!existing || existing.etag !== req.headers['if-match'])) return plain(412);
@@ -211,9 +229,9 @@ export async function startFakeDavServer() {
     origin,
     requests,
     /** Legt eine Collection an und gibt ihre absolute URL zurück. */
-    addCollection(slug, { name = slug, kind = 'calendar', components = ['VEVENT'] } = {}) {
+    addCollection(slug, { name = slug, kind = 'calendar', components = ['VEVENT'], privileges = null } = {}) {
       const path = `${homePath}${slug}/`;
-      collections.set(path, { name, kind, components, objects: new Map() });
+      collections.set(path, { name, kind, components, privileges, objects: new Map() });
       return `${origin}${path}`;
     },
     /** Legt ein Objekt direkt ab (als hätte es ein anderer Client geschrieben). */

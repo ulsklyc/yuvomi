@@ -22,7 +22,98 @@ export async function createCalDAVClient(account) {
     authMethod:         'Basic',
     defaultAccountType: 'caldav',
   });
-  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(client));
+  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(withWritePrivileges(client)));
+}
+
+/**
+ * Die Eigenschaften, die tsdav in `fetchCalendars` von sich aus erfragt. Wer
+ * `props` übergibt, ERSETZT diese Liste (tsdav 2.5.0, `fetchCalendars`), also
+ * steht sie hier vollständig, plus die Schreibrechte.
+ */
+const CALENDAR_LISTING_PROPS = {
+  'c:calendar-description': {},
+  'c:calendar-timezone': {},
+  'd:displayname': {},
+  'ca:calendar-color': {},
+  'cs:getctag': {},
+  'd:resourcetype': {},
+  'c:supported-calendar-component-set': {},
+  'd:sync-token': {},
+  'd:current-user-privilege-set': {},
+};
+
+/** Privilegien (RFC 3744 §3), die das Anlegen eines Objekts erlauben. */
+const CREATE_PRIVILEGES = new Set(['all', 'write', 'bind']);
+
+/**
+ * Nimmt diese Collection neue Einträge an (#1840)? Gelesen aus ihrem
+ * `current-user-privilege-set`, wie tsdav es geparst hat: ein Eintrag je
+ * `<privilege>`, dessen einziger Schlüssel der Name ist (camelCase, ohne
+ * Präfix). `write` und `all` sind Aggregate, die `bind` enthalten (§3.12);
+ * `write-content` allein erlaubt nur das Ändern bestehender Objekte.
+ *
+ * @returns {boolean|null} null: der Server nennt keine Rechte - die Collection
+ *          gilt dann als beschreibbar, wie vor #1840.
+ */
+export function collectionWritable(privilegeSet) {
+  if (!privilegeSet || typeof privilegeSet !== 'object') return null;
+  const entries = [privilegeSet.privilege].flat().filter((entry) => entry && typeof entry === 'object');
+  if (entries.length === 0) return null;
+  const names = entries.flatMap((entry) => Object.keys(entry))
+    .map((name) => name.replace(/^[\w-]+:/, '').replace(/[^a-z]/gi, '').toLowerCase());
+  return names.some((name) => CREATE_PRIVILEGES.has(name));
+}
+
+/**
+ * Die Kalenderliste nennt je Collection, ob sie neue Einträge annimmt
+ * (`writable`: true, false oder null für "sagt der Server nicht"). Eine Stelle
+ * für alle Aufrufer: Termine, Aufgabenlisten und die alte iCloud-Verbindung
+ * holen ihre Auflistung über diesen Client, und die Zielauswahl der Formulare
+ * liest das gespeicherte Ergebnis (#1840).
+ */
+export function withWritePrivileges(client) {
+  if (typeof client?.fetchCalendars !== 'function') return client;
+  const fetchCalendars = client.fetchCalendars.bind(client);
+  return Object.create(Object.getPrototypeOf(client), {
+    ...Object.getOwnPropertyDescriptors(client),
+    fetchCalendars: {
+      value: async (params = {}) => {
+        const calendars = await fetchCalendars({
+          props: CALENDAR_LISTING_PROPS,
+          ...params,
+          projectedProps: { ...(params?.projectedProps || {}), currentUserPrivilegeSet: true },
+        });
+        if (!Array.isArray(calendars)) return calendars;
+        return calendars.map((cal) => ({
+          ...cal,
+          writable: collectionWritable(cal?.projectedProps?.currentUserPrivilegeSet),
+        }));
+      },
+      writable: true, enumerable: true, configurable: true,
+    },
+  });
+}
+
+/**
+ * Ist die Collection als Ziel für neue Einträge zu gebrauchen? Unbekannt
+ * (null, undefined) heisst ja: ohne Angabe des Servers bleibt es, wie es war.
+ */
+export function acceptsNewEntries(cal) {
+  return cal?.writable !== false;
+}
+
+/** `writable` einer Auflistung als Wert der Spalte `writable` (1, 0, NULL). */
+export function writableColumn(cal) {
+  if (cal?.writable === true) return 1;
+  if (cal?.writable === false) return 0;
+  return null;
+}
+
+/** Die Spalte `writable` (1, 0, NULL) zurück als true, false oder null. */
+export function writableFromColumn(value) {
+  if (value === 1) return true;
+  if (value === 0) return false;
+  return null;
 }
 
 /**

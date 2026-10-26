@@ -162,11 +162,16 @@ export function caldavTargetOffered(database, target, event = null) {
     return { value: null, error: 'target_caldav_account_id: ein gespiegelter Termin wechselt den Kalender nur innerhalb seines Kontos.' };
   }
   const offered = database.prepare(`
-    SELECT 1 FROM caldav_calendar_selection
+    SELECT writable FROM caldav_calendar_selection
     WHERE account_id = ? AND calendar_url = ? AND enabled = 1
   `).get(target.accountId, target.calendarUrl);
   if (!offered) {
     return { value: null, error: 'target_caldav_calendar_url: kein eingeschalteter Kalender dieses Kontos.' };
+  }
+  // Ein nur lesbarer Kalender wird nicht angeboten (#1840) und auch nicht
+  // angenommen: jeder Upload dorthin wäre abgewiesen worden.
+  if (offered.writable === 0) {
+    return { value: null, error: 'target_caldav_calendar_url: this calendar does not accept new events.' };
   }
   return ok;
 }
