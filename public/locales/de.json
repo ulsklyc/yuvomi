@@ -373,6 +373,8 @@
         "customizeResetDone": "Deine Übersicht folgt wieder dem Haushalt.",
         "optionsFor": "Optionen für {{widget}}",
         "optionCalendarScope": "Welche Termine?",
+        "optionCalendarCalendars": "Welche Kalender?",
+        "optionCalendarCalendarsHint": "Ohne Auswahl zeigt die Kachel Termine aus allen Kalendern.",
         "optionCalendarAll": "Alle Termine",
         "optionCalendarLimit": "Wie viele Termine?",
         "optionCalendarLimitHint": "Gilt für die hohen Größen und macht die Kachel entsprechend höher. In „{{small}}“ zeigt sie nur die nächsten Termine, in „{{size}}“ die Woche.",

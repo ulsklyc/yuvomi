@@ -419,6 +419,8 @@
         "customizeResetDone": "Твій огляд знову слідує домогосподарству.",
         "optionsFor": "Параметри: {{widget}}",
         "optionCalendarScope": "Які події?",
+        "optionCalendarCalendars": "Які календарі?",
+        "optionCalendarCalendarsHint": "Без вибору плитка показує події з усіх календарів.",
         "optionCalendarAll": "Усі події",
         "optionCalendarLimit": "Скільки подій?",
         "optionCalendarLimitHint": "Діє для високих розмірів і робить картку відповідно вищою. У розмірі «{{small}}» вона показує лише найближчі події, у «{{size}}» - тиждень.",

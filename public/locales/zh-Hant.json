@@ -355,6 +355,8 @@
         "customizeResetDone": "你的概覽重新跟隨家庭。",
         "optionsFor": "{{widget}}選項",
         "optionCalendarScope": "顯示哪些日程？",
+        "optionCalendarCalendars": "顯示哪些行事曆？",
+        "optionCalendarCalendarsHint": "未選擇時，卡片會顯示所有行事曆中的行程。",
         "optionCalendarAll": "全部日程",
         "optionCalendarLimit": "顯示多少個日程？",
         "optionCalendarLimitHint": "適用於較高的尺寸，並相應加高卡片。在「{{small}}」尺寸下只顯示接下來的日程，在「{{size}}」尺寸下顯示一週。",

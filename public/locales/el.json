@@ -355,6 +355,8 @@
         "customizeResetDone": "Η επισκόπησή σου ακολουθεί ξανά το νοικοκυριό.",
         "optionsFor": "Επιλογές για {{widget}}",
         "optionCalendarScope": "Ποια ραντεβού;",
+        "optionCalendarCalendars": "Ποια ημερολόγια;",
+        "optionCalendarCalendarsHint": "Χωρίς επιλογή το πλακίδιο δείχνει ραντεβού από όλα τα ημερολόγια.",
         "optionCalendarAll": "Όλα τα ραντεβού",
         "optionCalendarLimit": "Πόσα ραντεβού;",
         "optionCalendarLimitHint": "Ισχύει για τα ψηλά μεγέθη και κάνει το πλακίδιο αντίστοιχα ψηλότερο. Στο «{{small}}» δείχνει μόνο τα επόμενα ραντεβού, στο «{{size}}» την εβδομάδα.",

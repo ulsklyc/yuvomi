@@ -451,6 +451,8 @@
         "customizeResetDone": "عادت لوحتك تتبع الأسرة.",
         "optionsFor": "خيارات {{widget}}",
         "optionCalendarScope": "أي المواعيد؟",
+        "optionCalendarCalendars": "أي تقويمات؟",
+        "optionCalendarCalendarsHint": "بدون تحديد تعرض البطاقة المواعيد من جميع التقويمات.",
         "optionCalendarAll": "كل المواعيد",
         "optionCalendarLimit": "كم عدد المواعيد؟",
         "optionCalendarLimitHint": "ينطبق على الأحجام الطويلة ويجعل البطاقة أطول بما يناسب. في «{{small}}» تعرض المواعيد التالية فقط، وفي «{{size}}» الأسبوع.",

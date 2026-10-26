@@ -355,6 +355,8 @@
         "customizeResetDone": "Jouw overzicht volgt het huishouden weer.",
         "optionsFor": "Opties voor {{widget}}",
         "optionCalendarScope": "Welke afspraken?",
+        "optionCalendarCalendars": "Welke agenda’s?",
+        "optionCalendarCalendarsHint": "Zonder selectie toont de tegel afspraken uit alle agenda’s.",
         "optionCalendarAll": "Alle afspraken",
         "optionCalendarLimit": "Hoeveel afspraken?",
         "optionCalendarLimitHint": "Geldt voor de hoge formaten en maakt de tegel navenant hoger. In ‘{{small}}’ toont de tegel alleen de eerstvolgende afspraken, in ‘{{size}}’ de week.",

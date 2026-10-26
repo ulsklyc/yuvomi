@@ -387,6 +387,8 @@
         "customizeResetDone": "Tvůj přehled se opět řídí domácností.",
         "optionsFor": "Možnosti: {{widget}}",
         "optionCalendarScope": "Které události?",
+        "optionCalendarCalendars": "Které kalendáře?",
+        "optionCalendarCalendarsHint": "Bez výběru dlaždice zobrazuje události ze všech kalendářů.",
         "optionCalendarAll": "Všechny události",
         "optionCalendarLimit": "Kolik událostí?",
         "optionCalendarLimitHint": "Platí pro vysoké velikosti a dlaždici odpovídajícím způsobem prodlouží. Ve velikosti „{{small}}“ zobrazuje jen nejbližší události, ve velikosti „{{size}}“ týden.",

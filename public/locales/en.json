@@ -355,6 +355,8 @@
         "customizeResetDone": "Your overview follows the household again.",
         "optionsFor": "Options for {{widget}}",
         "optionCalendarScope": "Which appointments?",
+        "optionCalendarCalendars": "Which calendars?",
+        "optionCalendarCalendarsHint": "With nothing selected the tile shows appointments from every calendar.",
         "optionCalendarAll": "All appointments",
         "optionCalendarLimit": "How many appointments?",
         "optionCalendarLimitHint": "Applies to the tall sizes and makes the tile taller to match. At “{{small}}” it shows only the next appointments, at “{{size}}” the week.",

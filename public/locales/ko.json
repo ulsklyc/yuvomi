@@ -373,6 +373,8 @@
         "customizeResetDone": "내 개요가 다시 가정을 따릅니다.",
         "optionsFor": "{{widget}} 옵션",
         "optionCalendarScope": "어떤 일정을 볼까요?",
+        "optionCalendarCalendars": "어떤 캘린더를 표시할까요?",
+        "optionCalendarCalendarsHint": "선택하지 않으면 타일에 모든 캘린더의 일정이 표시됩니다.",
         "optionCalendarAll": "모든 일정",
         "optionCalendarLimit": "일정을 몇 개 표시할까요?",
         "optionCalendarLimitHint": "세로로 긴 크기에 적용되며 그에 맞춰 타일이 길어집니다. ‘{{small}}’에서는 다음 일정만, ‘{{size}}’에서는 한 주를 보여 줍니다.",

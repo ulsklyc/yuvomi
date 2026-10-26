@@ -355,6 +355,8 @@
         "customizeResetDone": "Din översikt följer hushållet igen.",
         "optionsFor": "Alternativ för {{widget}}",
         "optionCalendarScope": "Vilka händelser?",
+        "optionCalendarCalendars": "Vilka kalendrar?",
+        "optionCalendarCalendarsHint": "Utan val visar rutan händelser från alla kalendrar.",
         "optionCalendarAll": "Alla händelser",
         "optionCalendarLimit": "Hur många händelser?",
         "optionCalendarLimitHint": "Gäller de höga storlekarna och gör rutan högre i motsvarande grad. I ”{{small}}” visar den bara de närmaste händelserna, i ”{{size}}” veckan.",

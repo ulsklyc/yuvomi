@@ -318,6 +318,8 @@
         "customizeResetDone": "Sua visão geral volta a seguir a casa.",
         "optionsFor": "Opções de {{widget}}",
         "optionCalendarScope": "Quais eventos?",
+        "optionCalendarCalendars": "Quais calendários?",
+        "optionCalendarCalendarsHint": "Sem seleção, o bloco mostra compromissos de todos os calendários.",
         "optionCalendarAll": "Todos os eventos",
         "optionCalendarLimit": "Quantos eventos?",
         "optionCalendarLimitHint": "Vale para os tamanhos altos e deixa o cartão mais alto de acordo. Em “{{small}}”, mostra só os próximos compromissos; em “{{size}}”, a semana.",

@@ -437,6 +437,8 @@
         "customizeResetDone": "Twój przegląd znów korzysta z układu domu.",
         "optionsFor": "Opcje: {{widget}}",
         "optionCalendarScope": "Które terminy?",
+        "optionCalendarCalendars": "Które kalendarze?",
+        "optionCalendarCalendarsHint": "Bez wyboru kafelek pokazuje wydarzenia ze wszystkich kalendarzy.",
         "optionCalendarAll": "Wszystkie terminy",
         "optionCalendarLimit": "Ile terminów?",
         "optionCalendarLimitHint": "Dotyczy wysokich rozmiarów i odpowiednio wydłuża kafel. W rozmiarze „{{small}}” pokazuje tylko najbliższe wydarzenia, w „{{size}}” tydzień.",

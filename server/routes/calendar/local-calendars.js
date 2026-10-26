@@ -14,6 +14,7 @@ import {
   validateCalendarName,
 } from '../../services/local-calendars.js';
 import { uploadsLocalEvents } from '../../services/apple-calendar.js';
+import { calendarSources } from '../../services/calendar-selection.js';
 import { createLogger } from '../../logger.js';
 import { feedUrl, getUserId, isAdminUser } from './helpers.js';
 
@@ -55,11 +56,19 @@ router.get('/calendars', (req, res) => {
     // hinauf. Die Rückfrage vor dem Löschen eines anderen Kalenders nennt das,
     // weil dessen Termine dorthin fallen. Ein Ja oder Nein, keine Zugangsdaten.
     const icloudUpload = uploadsLocalEvents();
-    res.json({ data: rows.map((row) => ({
-      ...serializeCalendar(req, row, feedUrl, { includeFeedToken: isAdminUser(req) }),
-      event_count: row.event_count ?? 0,
-      uploads_to_icloud: icloudUpload && !!row.is_default,
-    })) });
+    // DANEBEN ALLE WAEHLBAREN KALENDER (#2062): eigene, synchronisierte und
+    // Abos unter dem Schluessel des Kalendermoduls (`local:N`, `cal:N`,
+    // `sub:N`). Der Optionen-Dialog der Kalender-Kachel liest sie; dieselbe
+    // Liste prueft die Auswahl in `GET /dashboard`. Wie `area_modules` bei den
+    // Displays steht sie neben `data`, damit `data` die eigenen Kalender bleibt.
+    res.json({
+      data: rows.map((row) => ({
+        ...serializeCalendar(req, row, feedUrl, { includeFeedToken: isAdminUser(req) }),
+        event_count: row.event_count ?? 0,
+        uploads_to_icloud: icloudUpload && !!row.is_default,
+      })),
+      sources: calendarSources(db.get(), getUserId(req)),
+    });
   } catch (err) {
     log.error('GET /calendars', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });

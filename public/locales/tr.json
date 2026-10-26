@@ -355,6 +355,8 @@
         "customizeResetDone": "Genel bakışın yeniden haneyi izliyor.",
         "optionsFor": "{{widget}} seçenekleri",
         "optionCalendarScope": "Hangi randevular?",
+        "optionCalendarCalendars": "Hangi takvimler?",
+        "optionCalendarCalendarsHint": "Seçim yapılmazsa kutucuk tüm takvimlerdeki randevuları gösterir.",
         "optionCalendarAll": "Tüm randevular",
         "optionCalendarLimit": "Kaç randevu?",
         "optionCalendarLimitHint": "Uzun boyutlar için geçerlidir ve kartı buna göre uzatır. “{{small}}” boyutunda yalnızca sıradaki randevuları, “{{size}}” boyutunda haftayı gösterir.",

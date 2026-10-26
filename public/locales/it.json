@@ -355,6 +355,8 @@
         "customizeResetDone": "La tua panoramica segue di nuovo la famiglia.",
         "optionsFor": "Opzioni per {{widget}}",
         "optionCalendarScope": "Quali appuntamenti?",
+        "optionCalendarCalendars": "Quali calendari?",
+        "optionCalendarCalendarsHint": "Senza selezione il riquadro mostra gli appuntamenti di tutti i calendari.",
         "optionCalendarAll": "Tutti gli appuntamenti",
         "optionCalendarLimit": "Quanti appuntamenti?",
         "optionCalendarLimitHint": "Vale per le dimensioni alte e rende la scheda più alta di conseguenza. In «{{small}}» mostra solo i prossimi appuntamenti, in «{{size}}» la settimana.",

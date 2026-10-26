@@ -373,6 +373,8 @@
         "customizeResetDone": "نمای کلی تو دوباره از خانواده پیروی می‌کند.",
         "optionsFor": "گزینه‌های {{widget}}",
         "optionCalendarScope": "کدام قرارها؟",
+        "optionCalendarCalendars": "کدام تقویم‌ها؟",
+        "optionCalendarCalendarsHint": "بدون انتخاب، کاشی قرارهای همهٔ تقویم‌ها را نشان می‌دهد.",
         "optionCalendarAll": "همه قرارها",
         "optionCalendarLimit": "چند قرار؟",
         "optionCalendarLimitHint": "برای اندازه‌های بلند اعمال می‌شود و کارت را به همان نسبت بلندتر می‌کند. در «{{small}}» فقط قرارهای بعدی را نشان می‌دهد و در «{{size}}» هفته را.",

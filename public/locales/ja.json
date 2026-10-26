@@ -355,6 +355,8 @@
         "customizeResetDone": "あなたのダッシュボードは再び世帯に従います。",
         "optionsFor": "{{widget}}のオプション",
         "optionCalendarScope": "どの予定を表示しますか？",
+        "optionCalendarCalendars": "どのカレンダーを表示しますか？",
+        "optionCalendarCalendarsHint": "選択しない場合、タイルはすべてのカレンダーの予定を表示します。",
         "optionCalendarAll": "すべての予定",
         "optionCalendarLimit": "予定を何件表示しますか？",
         "optionCalendarLimitHint": "縦長のサイズに適用され、それに合わせてタイルが高くなります。「{{small}}」では次の予定だけを、「{{size}}」では週を表示します。",

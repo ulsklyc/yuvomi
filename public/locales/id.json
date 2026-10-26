@@ -373,6 +373,8 @@
         "customizeResetDone": "Ikhtisarmu mengikuti rumah tangga lagi.",
         "optionsFor": "Opsi untuk {{widget}}",
         "optionCalendarScope": "Acara yang mana?",
+        "optionCalendarCalendars": "Kalender mana?",
+        "optionCalendarCalendarsHint": "Tanpa pilihan, ubin menampilkan janji dari semua kalender.",
         "optionCalendarAll": "Semua acara",
         "optionCalendarLimit": "Berapa acara?",
         "optionCalendarLimitHint": "Berlaku untuk ukuran tinggi dan membuat kartu lebih tinggi sesuai pilihan. Pada “{{small}}” kartu hanya menampilkan janji berikutnya, pada “{{size}}” mingguan.",

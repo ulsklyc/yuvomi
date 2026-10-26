@@ -355,6 +355,8 @@
         "customizeResetDone": "Trang tổng quan của bạn lại theo gia đình.",
         "optionsFor": "Tùy chọn cho {{widget}}",
         "optionCalendarScope": "Những sự kiện nào?",
+        "optionCalendarCalendars": "Những lịch nào?",
+        "optionCalendarCalendarsHint": "Nếu không chọn, ô sẽ hiển thị cuộc hẹn từ tất cả các lịch.",
         "optionCalendarAll": "Tất cả sự kiện",
         "optionCalendarLimit": "Bao nhiêu sự kiện?",
         "optionCalendarLimitHint": "Áp dụng cho các kích thước cao và làm thẻ cao hơn tương ứng. Ở “{{small}}”, thẻ chỉ hiển thị các lịch hẹn sắp tới; ở “{{size}}”, cả tuần.",

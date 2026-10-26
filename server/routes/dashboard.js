@@ -10,6 +10,7 @@ import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
+import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -450,6 +451,29 @@ router.get('/', (req, res) => {
   // Allowlist, die der Browser mit dieser Route teilt. Alles andere - fehlend,
   // leer, `7`, `500`, `abc`, doppelt angegeben - ist die Vorgabe fuenf.
   const eventsLimit = clampEventLimit(req.query.events_limit);
+  /* WELCHE KALENDER DIE KACHEL ZEIGT (#2062, aus D#2037). `events_calendar`
+   * nennt Kalender-Schluessel (`local:N`, `cal:N`, `sub:N`, die des
+   * Kalendermoduls); ohne den Parameter bleibt alles, wie es war.
+   *
+   * DIE ACHSE DER ANDEREN KALENDER-OPTIONEN, nicht die der Einkaufs-Kachel:
+   * „nur meine" und die Geburtstage wirken auf die Termine der ganzen
+   * Uebersicht (Liste, Wochenstreifen, Heute-Blatt), und die Wand liest
+   * dieselbe Einstellung aus der Vorgabe des Haushalts. Eine Kalender-Auswahl,
+   * die nur die Liste traefe, liesse den Streifen derselben Kachel Termine
+   * zeigen, die die Liste verschweigt. Die Familienkarte bleibt ungefiltert:
+   * sie ist eine eigene Kachel und zeigt je Mitglied, was ansteht.
+   *
+   * GEPRUEFT WIRD GEGEN DEN KATALOG (services/calendar-selection.js), nicht nur
+   * die Form: ein Kalender, den es nicht mehr gibt, faellt aus der Auswahl, und
+   * bleibt keiner uebrig, gilt die Anfrage als ungefiltert - keine Auswahl
+   * heisst „alle", nie eine leere Kachel. Ohne Zugang zum Kalender laeuft
+   * keiner der Leser, die Auswahl bleibt also folgenlos. */
+  let eventCalendars = null;
+  try {
+    eventCalendars = resolveCalendarSelection(d, req.query.events_calendar, userId);
+  } catch (err) {
+    log.error('calendar selection error:', err.message);
+  }
 
   const now = new Date();
 
@@ -547,7 +571,7 @@ router.get('/', (req, res) => {
     // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience,
+      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
@@ -572,7 +596,7 @@ router.get('/', (req, res) => {
   if (allows('calendar')) try {
     result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
       userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience,
+      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) })
       .map(weekEventFields);
   } catch (err) {

@@ -530,6 +530,20 @@ export function normalizeShoppingListSelection(value) {
   return [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
 }
 
+/**
+ * Die gespeicherte Kalender-Auswahl der Kalender-Kachel als Schluessel (#2062):
+ * `local:N`, `cal:N` oder `sub:N` (die Schluessel des Kalendermoduls), ohne
+ * Doppelte. Was sonst im Layout steht, faellt weg - dieselbe Form, die die
+ * Route aus `?events_calendar=` liest (server/services/calendar-selection.js).
+ *
+ * @param {unknown} value `options.calendars`
+ * @returns {string[]}
+ */
+export function normalizeCalendarSelection(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((key) => typeof key === 'string' && /^(local|cal|sub):[1-9]\d{0,14}$/.test(key)))];
+}
+
 export function dashboardQuery(config) {
   const params = new URLSearchParams();
   const optionsOf = (id) => (Array.isArray(config) ? config.find((w) => w.id === id)?.options : null) ?? {};
@@ -542,6 +556,10 @@ export function dashboardQuery(config) {
   // ein gespeicherter Fremdwert ergibt hier dieselbe Anfrage wie gar keiner.
   const eventLimit = clampEventLimit(optionsOf('calendar').limit);
   if (eventLimit !== EVENT_LIMIT_DEFAULT) params.set('events_limit', String(eventLimit));
+  // Die Kalender-Auswahl (#2062) reist wie „nur meine": sie wirkt auf die
+  // Termine der ganzen Uebersicht, also auch auf die Wand, die dieselbe
+  // Einstellung liest. Keine Auswahl steht in keiner Anfrage.
+  for (const key of normalizeCalendarSelection(optionsOf('calendar').calendars)) params.append('events_calendar', key);
   for (const key of optionsOf('tasks').categories ?? []) params.append('tasks_category', key);
   for (const id of optionsOf('notes').categories ?? []) params.append('notes_category', String(id));
   // Die Listen-Auswahl der Einkaufs-Kachel (#1818). Sie reist wie jede andere

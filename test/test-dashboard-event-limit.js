@@ -386,11 +386,12 @@ async function openCalendarDialog(current, picked) {
   };
   globalThis.__openModal = (config) => {
     content = config.content;
-    config.onSave({ querySelector: field });
+    config.onSave({ querySelector: field, querySelectorAll: () => [] });
   };
   globalThis.__closeModal = () => true;
   try {
-    const result = dash.openWidgetOptions('calendar', current);
+    // Ohne Kalender-Katalog (#2062): die Stufe ist hier die Frage, nicht die Auswahl.
+    const result = dash.openWidgetOptions('calendar', current, { loadCalendars: async () => [] });
     // openWidgetOptions ist async: der Dialog steht erst nach einem Takt.
     await Promise.resolve();
     await Promise.resolve();

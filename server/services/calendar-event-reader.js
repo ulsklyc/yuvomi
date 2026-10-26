@@ -17,6 +17,7 @@ import {
   householdVisibleWhere, icsSubscriptionSharedWhere, icsSubscriptionVisibleWhere, visibilityWhere,
 } from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
+import { calendarSelectionSql } from './calendar-selection.js';
 import {
   householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey,
 } from '../utils/timezone.js';
@@ -220,9 +221,13 @@ function eventAudience(userId, household) {
 export function getUpcomingEvents(d, {
   userId = null, limit = 5, windowDays = 90, fromToday = false, assignedTo = null,
   includeBirthdays: wantsBirthdays = true, now = new Date(), keepEndedToday = 0, household = false,
+  calendars = null,
 } = {}) {
   const audience = eventAudience(userId, household);
   const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
+  // Die Kalender-Auswahl der Kachel (#2062) in SQL, also VOR Expansion und
+  // Deckel - dieselbe Lehre wie bei „nur meine" und den Geburtstagen unten.
+  const selection = calendarSelectionSql(calendars);
   const tz      = householdTimeZone(d);
   const nowDate = todayKey(d, now);
   // fromToday: ganztägige Sichtbarkeit heutiger Termine (Dashboard-Widget) -
@@ -285,9 +290,9 @@ export function getUpcomingEvents(d, {
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
-    AND ${audience.where}${birthdaySql}
+    AND ${audience.where}${birthdaySql}${selection.sql}
     ORDER BY e.start_datetime ASC
-  `).all(...singleParams, future, ...audience.params);
+  `).all(...singleParams, future, ...audience.params, ...selection.params);
 
   const startInstant = (event) => storedToInstantMs(
     event.all_day ? event.start_datetime.slice(0, 10) : event.start_datetime,
@@ -414,14 +419,17 @@ export function getUpcomingEvents(d, {
  * @param {number} opts.days     Anzahl Tage ab fromKey
  * @param {number|null} [opts.assignedTo]
  * @param {boolean} [opts.includeBirthdays=true]
+ * @param {string[]|null} [opts.calendars]  Kalender-Auswahl der Kachel (#2062), siehe calendar-selection.js
  * @param {number} [opts.limit=300]  Sicherung gegen einen entgleisten Import
  * @returns {object[]} aufgeloeste Zeilen, nach Beginn sortiert
  */
 export function getEventsOverlappingDays(d, {
   userId = null, fromKey, days, assignedTo = null, includeBirthdays: wantsBirthdays = true, limit = 300, household = false,
+  calendars = null,
 } = {}) {
   const audience = eventAudience(userId, household);
   const { includeBirthdays, birthdaySql } = birthdayFilter(d, wantsBirthdays);
+  const selection = calendarSelectionSql(calendars);
   const tz = householdTimeZone(d);
   const toKey = shiftDateKey(fromKey, days);          // exklusiv
   const windowStartMs = new Date(localToUTC(`${fromKey}T00:00:00`, tz)).getTime();
@@ -460,9 +468,9 @@ export function getEventsOverlappingDays(d, {
       OR
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
-    AND ${audience.where}${birthdaySql}
+    AND ${audience.where}${birthdaySql}${selection.sql}
     ORDER BY e.start_datetime ASC
-  `).all(sqlTo, sqlFrom, sqlTo, ...audience.params);
+  `).all(sqlTo, sqlFrom, sqlTo, ...audience.params, ...selection.params);
 
   const isAllDay = (event) => Boolean(event.all_day) || !String(event.start_datetime).includes('T');
   const overlaps = (event) => {

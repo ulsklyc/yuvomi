@@ -355,6 +355,8 @@
         "customizeResetDone": "आपका डैशबोर्ड फिर से घर का अनुसरण करता है।",
         "optionsFor": "{{widget}} के विकल्प",
         "optionCalendarScope": "कौन-से कार्यक्रम?",
+        "optionCalendarCalendars": "कौन से कैलेंडर?",
+        "optionCalendarCalendarsHint": "कुछ न चुनने पर टाइल सभी कैलेंडर की अपॉइंटमेंट दिखाती है।",
         "optionCalendarAll": "सभी कार्यक्रम",
         "optionCalendarLimit": "कितने कार्यक्रम?",
         "optionCalendarLimitHint": "यह लंबे आकारों पर लागू होता है और टाइल को उसी हिसाब से ऊँचा करता है। “{{small}}” में यह केवल अगली अपॉइंटमेंट दिखाती है, “{{size}}” में सप्ताह।",

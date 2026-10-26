@@ -355,6 +355,8 @@
         "customizeResetDone": "Tu panel vuelve a seguir al hogar.",
         "optionsFor": "Opciones de {{widget}}",
         "optionCalendarScope": "¿Qué citas?",
+        "optionCalendarCalendars": "¿Qué calendarios?",
+        "optionCalendarCalendarsHint": "Sin selección, el mosaico muestra citas de todos los calendarios.",
         "optionCalendarAll": "Todas las citas",
         "optionCalendarLimit": "¿Cuántas citas?",
         "optionCalendarLimitHint": "Se aplica a los tamaños altos y hace la tarjeta más alta en consecuencia. En «{{small}}» muestra solo las próximas citas; en «{{size}}», la semana.",

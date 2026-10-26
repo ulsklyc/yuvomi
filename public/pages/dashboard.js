@@ -45,6 +45,7 @@ import {
   COCKPIT_COVERED_WIDGETS,
   nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans, columnFillSpans,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
+  normalizeCalendarSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
 } from '/utils/dashboard-widgets.js';
 import { EVENT_LIMIT_STEPS, EVENT_LIMIT_DEFAULT, clampEventLimit } from '/utils/dashboard-event-limit.js';
@@ -5015,6 +5016,23 @@ async function loadShoppingLists(getLists = (path) => api.get(path)) {
   }
 }
 
+/**
+ * Die waehlbaren Kalender fuer den Optionen-Dialog der Kalender-Kachel (#2062):
+ * eigene, synchronisierte und Abos, unter dem Schluessel des Kalendermoduls.
+ * Sie stehen als `sources` neben den eigenen Kalendern von
+ * `/calendar/calendars`. Ohne Cache und mit `null` im Fehlerfall, wie die
+ * Einkaufslisten: ein Dialog ohne Katalog darf eine bestehende Auswahl nicht
+ * als "nichts gewaehlt" speichern.
+ */
+async function loadCalendarSources(getSources = (path) => api.get(path)) {
+  try {
+    const res = await getSources('/calendar/calendars');
+    return Array.isArray(res?.sources) ? res.sources : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadNoteCategories(getCategories = (path) => api.get(path)) {
   try {
     const res = await getCategories('/notes/categories');
@@ -5097,7 +5115,9 @@ async function openExtensionWidgetOptions(id, meta, current = {}) {
 }
 
 /** Der Optionen-Dialog eines Widgets. Aufloesen mit den neuen Optionen oder null. */
-async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategories, loadLists = loadShoppingLists } = {}) {
+async function openWidgetOptions(id, current = {}, {
+  loadNotes = loadNoteCategories, loadLists = loadShoppingLists, loadCalendars = loadCalendarSources,
+} = {}) {
   const extMeta = getExtensionWidgetMeta(id);
   if (extMeta?.optionsSchema) return openExtensionWidgetOptions(id, extMeta, current);
 
@@ -5121,6 +5141,14 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
   // Angehakt ist, was gespeichert UND noch da ist: eine geloeschte Liste hat
   // keine Zeile mehr und faellt mit dem naechsten Speichern aus der Auswahl.
   const pickedLists = new Set(normalizeShoppingListSelection(options.lists));
+  // Dieselbe Regel fuer die Kalender (#2062): angehakt ist, was gespeichert UND
+  // noch im Katalog ist; ein entfernter Kalender faellt mit dem Speichern weg.
+  const calendarChoices = id === 'calendar' ? await loadCalendars() : [];
+  if (calendarChoices === null) {
+    window.yuvomi?.showToast(t('dashboard.loadError'), 'danger');
+    return null;
+  }
+  const pickedCalendars = new Set(normalizeCalendarSelection(options.calendars));
 
   const body = id === 'calendar'
     ? `
@@ -5135,6 +5163,19 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
           <span>${t('calendar.assignedToMe')}</span>
         </label>
       </fieldset>
+      ${/* Erst ab zwei Kalendern eine Wahl: mit einem gaebe es nichts zu
+            waehlen, und die Gruppe waere eine Zeile, die nichts aendert. */ ''}
+      ${calendarChoices.length > 1 ? `
+      <fieldset class="form-group widget-options__group">
+        <legend class="form-label">${esc(t('dashboard.optionCalendarCalendars'))}</legend>
+        <p class="widget-options__hint">${esc(t('dashboard.optionCalendarCalendarsHint'))}</p>
+        ${calendarChoices.map((source) => `
+        <label class="widget-options__choice">
+          <input type="checkbox" name="cal-calendar" value="${esc(String(source.key))}"
+                 ${pickedCalendars.has(source.key) ? 'checked' : ''}>
+          <span>${esc(source.name)}</span>
+        </label>`).join('')}
+      </fieldset>` : ''}
       <fieldset class="form-group widget-options__group">
         <legend class="form-label">${t('calendar.filtersLayers')}</legend>
         <p class="widget-options__hint">${t('dashboard.optionCalendarBirthdaysHint')}</p>
@@ -5236,6 +5277,11 @@ async function openWidgetOptions(id, current = {}, { loadNotes = loadNoteCategor
             // Dialog nicht gibt, kommt so auch nicht ins Layout.
             const limit = clampEventLimit(panel.querySelector('input[name="cal-limit"]:checked')?.value);
             if (limit !== EVENT_LIMIT_DEFAULT) next.limit = limit;
+            // Keine Auswahl heisst „alle Kalender" und wird nicht gespeichert (#2062).
+            const calendars = normalizeCalendarSelection(
+              [...panel.querySelectorAll('input[name="cal-calendar"]:checked')].map((el) => el.value),
+            );
+            if (calendars.length) next.calendars = calendars;
           } else if (id === 'waste') {
             const picked = [...panel.querySelectorAll('input[name="waste-type"]:checked')].map((el) => Number(el.value));
             // Dieselbe Regel wie bei den Aufgaben-Kategorien: keine Auswahl
@@ -8765,4 +8811,7 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppin
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
+
+// Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
+Object.assign(__test, { loadCalendarSources });
 Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget, todayFingerprint });

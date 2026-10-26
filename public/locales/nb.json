@@ -355,6 +355,8 @@
         "customizeResetDone": "Oversikten din følger nå husholdningens standard.",
         "optionsFor": "Alternativer for {{widget}}",
         "optionCalendarScope": "Hvilke avtaler?",
+        "optionCalendarCalendars": "Hvilke kalendere?",
+        "optionCalendarCalendarsHint": "Uten valg viser flisen avtaler fra alle kalendere.",
         "optionCalendarAll": "Alle avtaler",
         "optionCalendarLimit": "Hvor mange avtaler?",
         "optionCalendarLimitHint": "Gjelder de høye størrelsene og gjør flisen tilsvarende høyere. I «{{small}}» viser den bare de neste avtalene, i «{{size}}» uken.",

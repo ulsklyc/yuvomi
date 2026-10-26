@@ -419,6 +419,8 @@
         "customizeResetDone": "Твой обзор снова следует дому.",
         "optionsFor": "Параметры: {{widget}}",
         "optionCalendarScope": "Какие события?",
+        "optionCalendarCalendars": "Какие календари?",
+        "optionCalendarCalendarsHint": "Без выбора плитка показывает события из всех календарей.",
         "optionCalendarAll": "Все события",
         "optionCalendarLimit": "Сколько событий?",
         "optionCalendarLimitHint": "Действует для высоких размеров и делает карточку соответственно выше. В размере «{{small}}» она показывает только ближайшие события, в «{{size}}» - неделю.",

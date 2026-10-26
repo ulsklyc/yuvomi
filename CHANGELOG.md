@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The Calendar tile can show only the calendars you choose** (#2062). Its options now list the
+  household's calendars - your own, synced ones and subscriptions - for a multi-select; with nothing
+  selected it shows every calendar, as before. The choice applies to the list, the week strip and
+  the "more" hint, and to the wall, which follows the same tile setting. Appointments that belong to
+  no calendar, such as birthdays, stay; birthdays keep their own switch. A calendar that is removed
+  later drops out of the choice by itself, and if none of the chosen ones is left the tile shows all
+  calendars again.
 - **A shopping item that jumps back to its old list now says why** (#1912). When a mirrored item is
   moved to another list and the CalDAV server keeps refusing it there, the new list is gone from the
   server, or the old list stays switched off for a week, the item goes back to the list it came from.

@@ -355,6 +355,8 @@
         "customizeResetDone": "Az áttekintésed újra a háztartást követi.",
         "optionsFor": "{{widget}} beállításai",
         "optionCalendarScope": "Mely események?",
+        "optionCalendarCalendars": "Mely naptárak?",
+        "optionCalendarCalendarsHint": "Kijelölés nélkül a csempe az összes naptár eseményeit mutatja.",
         "optionCalendarAll": "Minden esemény",
         "optionCalendarLimit": "Hány esemény?",
         "optionCalendarLimitHint": "A magas méretekre vonatkozik, és a csempét ennek megfelelően magasabbá teszi. „{{small}}” méretben csak a következő eseményeket mutatja, „{{size}}” méretben a hetet.",
