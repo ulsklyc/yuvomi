@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **A dialog sheet lightens its backdrop as you drag it, and sheets rise from the bottom edge** (#1801,
+  #1802). On a phone, pulling a dialog down now fades the dimmed, blurred page behind it with your
+  finger, like the "More" sheet already did; the sheet itself stays solid, and released early both
+  come back. Dialogs, the "More" sheet and search now rise over their full height from the bottom
+  edge on a damped spring that never swings past its place, instead of appearing 24px above it with
+  a fade. Closing by tap or Esc is unchanged. Browsers without CSS `linear()` easing (Chrome before
+  113, Safari before 17.2, Firefox before 112) keep the previous entrance, and with reduced motion
+  sheets still only fade. The sidebar's active pill glides on the same kind of spring, as far as
+  before but settling sooner.
 - **The preferences API answers in English** (#1695). `/api/v1/preferences` and its holiday routes
   still sent most refusals in German ("timezone_hint_dismissed muss true oder false sein.",
   "Interner Fehler"); every `error` there is now an English sentence, with the same status codes.

@@ -1347,7 +1347,10 @@ das Verhaeltnis haelt.
   kennt, als gedaempfte Feder (`@supports` in tokens.css): gleicher Gipfel (1,095), gleiche Dauer,
   aber in Ruhe ab 57 % statt 91 % der Zeit (Blatt-Einfahrt gemessen: Ueberschwinger 117 -> 67ms
   sichtbar, Gipfel bei +100 statt +162ms; Guard `test:motion` "Glasfeder D1"); die Sidebar-Pille bekommt die sanftere
-  Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
+  Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst - seit #1802 ebenso als
+  `linear()`-Feder (Daempfung 0,78, Gipfel 1,018 wie die Bezier, in Ruhe ab 59 statt 76 %). Die Blattfeder
+  `--ease-sheet` ist mit `linear()` kritisch gedaempft (kein Ueberschwinger, monoton), ohne bleibt sie
+  `--ease-glass`.
   Hoehenwechsel (Zeile oder Gruppe klappt ein/auf, `collapseOut`/`expandIn` in `utils/ux.js`,
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):
   `--ease-out` nahm dort 80 % der Hoehe in 60ms, die Nachbarn sprangen hinterher. **Ausklappen
@@ -1394,11 +1397,17 @@ das Verhaeltnis haelt.
   rutschte an die Polsterkante, die Titelkante sprang von Aufgabe zu Aufgabe um 12px (25 gegen
   13px). Guard: `test:mobile-chrome`.
 - **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
-  `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
-  `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei
-  Bewegungen fuer dieselbe Geste (Dialog 24px/Feder/300ms, Mehr-Blatt Vollhub 250ms, Suche
-  Vollhub). Der Vollhub ist entfallen, weil die Feder ihn nicht traegt: ueber die volle Hoehe
-  wirft sie das Blatt sichtbar ueber seine Ruhelage. Geschlossen sind Mehr-Blatt und Suche
+  `--sheet-in` (`--duration-xl` + `--ease-sheet`) und `--sheet-out` (`--duration-md` +
+  `--ease-out`). Vorher drei Bewegungen fuer dieselbe Geste (Dialog 24px/Feder/300ms, Mehr-Blatt
+  Vollhub 250ms, Suche Vollhub). **Seit #1802 steigt das Blatt ueber seine volle Hoehe** (`sheet-rise`,
+  `--sheet-rise` = eigene Hoehe plus Randabstand) ohne Blende, auf der kritisch gedaempften Blattfeder -
+  nur wo der Browser `linear()` kennt und ohne reduzierte Bewegung. Ohne `linear()` bleibt es beim kurzen
+  Hub `--sheet-lift` (24px) mit Blende auf der Back-Out-Bezier, die ueber die volle Hoehe sichtbar
+  ueberschwingen wuerde. Der Tipp-/Esc-Ausgang bleibt der kurze Hub mit Blende (Entscheidung 05.10.).
+  **Der Grund des Dialogs ist ein eigener Knoten** (`.modal-overlay__scrim`, #1801), nicht der Dialog
+  und nicht `::backdrop`: seine Deckkraft folgt beim Ziehen dem Finger (`--sheet-pull`), die Tafel
+  bleibt voll. Der Dialog selbst blendet nie - eine Deckkraft unter 1 am Vorfahren nahme dem Blur des
+  Grunds die Seite (Backdrop Root). Geschlossen sind Mehr-Blatt und Suche
   durchsichtig, nehmen keinen Zeiger und sind `inert`.
 - **Das Anlegen-Blatt in zwei Frames (R21 S8):** die FAB-Blaetter der Module oeffnen gestuft
   (`openModal({ staged: true })`): im Tipp stehen Dialog, Abdunklung und Kopf, die Tafel ist
