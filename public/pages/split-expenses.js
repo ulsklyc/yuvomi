@@ -1012,7 +1012,6 @@ function drawMain(main) {
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
-      ${renderTotalsSections(SectionTag)}
       <section class="split-section split-section--expenses">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
@@ -1020,6 +1019,7 @@ function drawMain(main) {
         </div>
         <div id="split-expense-list">${renderExpenses(archived || ro)}</div>
       </section>
+      ${renderTotalsSections(SectionTag)}
       <section class="split-section">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('budget.recurringLabel')}</${SectionTag}>
@@ -1221,8 +1221,12 @@ function renderCategoryTotals() {
 
 /**
  * Die beiden Summen stehen unter den Salden, in derselben Spalte (#1888,
- * #1941): Salden sagen, wer wem schuldet, die Summen, wie es dazu kam. Ohne
- * Ausgaben gibt es nichts zu summieren, und beide Abschnitte entfallen.
+ * #1941): Salden sagen, wer wem schuldet, die Summen, wie es dazu kam. Im
+ * DOM folgen sie der Ausgabenliste: zweispaltig setzt das Raster die Liste
+ * links fest, und die rechte Spalte fuellt sich in DOM-Folge (Salden, Summen,
+ * Wiederkehrend, Verlauf); gestapelt bleibt die erste Ausgabe direkt unter den
+ * Salden, wie seit R17 (sieben Summenzeilen davor kosteten mobil rund 600px).
+ * Ohne Ausgaben gibt es nichts zu summieren, und beide Abschnitte entfallen.
  */
 function renderTotalsSections(SectionTag) {
   const members = renderMemberTotals();

@@ -102,7 +102,7 @@ function hauptteil() {
   return html;
 }
 
-test('Die Summen stehen unter den Salden und vor der Liste - bei jedem Recht und im Archiv', () => {
+test('Die Summen folgen im DOM der Liste (rechte Spalte unter den Salden, gestapelt nach der Liste) - bei jedem Recht und im Archiv', () => {
   for (const modus of ['write', 'read']) {
     for (const archiviert of [false, true]) {
       const zurueck = gruppe({ groupStatus: archiviert ? 'archived' : 'active' });
@@ -113,7 +113,8 @@ test('Die Summen stehen unter den Salden und vor der Liste - bei jedem Recht und
         const person = html.indexOf('splitExpenses.totalsByMember');
         const kategorie = html.indexOf('splitExpenses.totalsByCategory');
         const liste = html.indexOf('split-section--expenses');
-        assert.ok(salden >= 0 && person > salden && kategorie > person && liste > kategorie, `${modus} archiv=${archiviert}`);
+        const wiederkehrend = html.indexOf('budget.recurringLabel');
+        assert.ok(salden >= 0 && liste > salden && person > liste && kategorie > person && wiederkehrend > kategorie, `${modus} archiv=${archiviert}`);
         assert.match(html, /id="split-category-filter"/, 'der Filter ist Lesen, keine Handlung');
       } finally { clearPermissions(); zurueck(); }
     }

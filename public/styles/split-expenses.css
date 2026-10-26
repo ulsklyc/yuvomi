@@ -430,8 +430,8 @@
  * #1647 drei (Salden, Wiederkehrend, Verlauf), seit #1888/#1941 bis zu fuenf
  * (dazu die Summen je Person und je Kategorie). Reichte die Spanne nicht ueber
  * alle, schoebe eine lange Ausgabenliste den Verlauf unter ihr Ende. Die Liste
- * heisst nach ihrer Rolle, nicht nach ihrer Stelle: die Summen stehen im DOM
- * vor ihr, damit sie schmal direkt unter den Salden folgen. */
+ * heisst nach ihrer Rolle, nicht nach ihrer Stelle; die rechte Spalte fuellt
+ * sich in DOM-Folge um sie herum. */
 .split-content-grid > .split-section--expenses {
   grid-column: 1;
   grid-row: 1 / span 5;
@@ -1040,7 +1040,7 @@ button.split-expense:hover {
   }
 
   .split-content-grid > .split-section,
-  .split-content-grid > .split-section:nth-child(2) {
+  .split-content-grid > .split-section--expenses {
     grid-column: auto;
     grid-row: auto;
   }
