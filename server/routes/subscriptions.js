@@ -368,6 +368,13 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
       db.get().prepare("UPDATE budget_entries SET visibility = 'private' WHERE id = ? AND visibility <> 'private'")
         .run(row.budget_entry_id);
     }
+    // Das Konto haengt an keinem Kurs (#1277): es geht SOFORT auf die Buchung.
+    // Sonst gaebe ein Verlaengern waehrend des Kursabrufs die Buchung mit dem
+    // alten Konto ab, und sie bliebe dort, waehrend die naechste das neue traegt.
+    if (row.budget_entry_id) {
+      db.get().prepare('UPDATE budget_entries SET account_id = ? WHERE id = ? AND account_id IS NOT ?')
+        .run(bookingAccountId(row), row.budget_entry_id, bookingAccountId(row));
+    }
     return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
   }
   writeLinkedBooking(row, budgetCur, amount);

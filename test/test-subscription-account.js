@@ -411,3 +411,55 @@ test('Seite: das gewaehlte Konto gibt es nicht mehr - der Dialog bleibt offen, d
   assert.deepEqual(options(field.html, 'subscription-account-id').map((o) => [o.value, o.selected]), [['', true], ['9', false]]);
   assert.equal(select.focused, 1);
 });
+
+// --- Nachtrag Review (Codex an #2312) ----------------------------------------
+
+test('Server: die Folgezahlungen eines Abos tragen sein Konto - auch unter dem Kontofilter der Liste und der Zusammenfassung', async () => {
+  const giro = await account('Giro');
+  const karte = await account('Karte');
+  await sub({ account_id: giro });
+  // Die naechste Zahlung ist am 2030-01-15, der Februar ist nur erwartet.
+  const all = await call('GET', '/?month=2030-02');
+  assert.equal(all.status, 200, JSON.stringify(all.body));
+  const expected = all.body.data.filter((e) => e.expected);
+  assert.equal(expected.length, 1, 'Vorbedingung: eine erwartete Zahlung im Februar');
+  assert.equal(expected[0].account_id, giro);
+  const onGiro = await call('GET', `/?month=2030-02&account_id=${giro}`);
+  assert.equal(onGiro.body.data.filter((e) => e.expected).length, 1, 'unter dem Konto steht sie');
+  const onKarte = await call('GET', `/?month=2030-02&account_id=${karte}`);
+  assert.equal(onKarte.body.data.filter((e) => e.expected).length, 0, 'unter einem anderen nicht');
+  const sumGiro = await call('GET', `/summary?month=2030-02&account_id=${giro}`);
+  assert.equal(sumGiro.status, 200, JSON.stringify(sumGiro.body));
+  assert.equal(sumGiro.body.data.pending.count, 1, 'die Zusammenfassung zaehlt sie unter dem Konto');
+  const sumKarte = await call('GET', `/summary?month=2030-02&account_id=${karte}`);
+  assert.equal(sumKarte.body.data.pending.count, 0);
+});
+
+test('Server: ein Kontowechsel waehrend des Kursabrufs - ein Verlaengern dazwischen gibt die Zahlung mit dem NEUEN Konto ab', async () => {
+  const giro = await account('Giro');
+  const karte = await account('Karte');
+  const answer = (base, list) => ({ rates: Object.fromEntries([[base, 1], ...list.map((c) => [c, 1])]), source: 'cache', fetchedAt: null });
+  subscriptions._setRatesForTest(async (base, list) => answer(base, list));
+  const created = await sub({ account_id: giro, currency: 'USD' });
+  const pending = [];
+  subscriptions._setRatesForTest(async (base, list) => {
+    await new Promise((release) => pending.push(release));
+    return answer(base, list);
+  });
+  try {
+    const put = call('PUT', `/subscriptions/${created.id}`, { account_id: karte });
+    for (let i = 0; i < 400 && pending.length < 1; i += 1) await new Promise((r) => setTimeout(r, 5));
+    assert.equal(pending.length, 1, 'Vorbedingung: der PUT wartet auf den Kurs');
+    const renew = call('POST', `/subscriptions/${created.id}/renew`);
+    for (let i = 0; i < 400 && pending.length < 2; i += 1) await new Promise((r) => setTimeout(r, 5));
+    subscriptions._setRatesForTest(async (base, list) => answer(base, list));
+    for (const release of pending) release();
+    const [p, r] = await Promise.all([put, renew]);
+    assert.equal(p.status, 200, JSON.stringify(p.body));
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(entry(created.budget_entry_id).account_id, karte, 'die bezahlte Buchung traegt das neue Konto');
+    assert.equal(entry(row(created.id).budget_entry_id).account_id, karte, 'die naechste auch');
+  } finally {
+    subscriptions._setRatesForTest(null);
+  }
+});
