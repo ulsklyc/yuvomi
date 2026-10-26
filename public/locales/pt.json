@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} deve a você",
         "debtOwes": "{{from}} deve a {{to}}",
         "balanced": "Quitado",
-        "balancedInGroup": "{{group}}: Quitado"
+        "balancedInGroup": "{{group}}: Quitado",
+        "totalsByMember": "Pago por pessoa",
+        "totalsByMemberHint": "O que cada um adiantou, com a própria parte por baixo",
+        "ownShare": "Parte própria: {{amount}}",
+        "paidLabel": "Pago",
+        "totalsByCategory": "Por categoria",
+        "categoryFilter": "Filtrar despesas por categoria",
+        "noExpensesInCategory": "Nenhuma despesa nesta categoria."
     },
     "wmo": {
         "0": "Céu limpo",

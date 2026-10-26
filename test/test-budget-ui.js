@@ -2686,8 +2686,8 @@ test('eingebettete Split-Ausgaben gliedern Gruppe und Karten eine Stufe tiefer',
     'die Karten stehen eingebettet unter dem Gruppennamen, also <h4>');
   assert.match(src, /<\$\{GroupTag\} class="split-group-name">/,
     'der Gruppenname muss über GroupTag gerendert werden');
-  assert.equal((src.match(/<\$\{SectionTag\} class="split-section-title u-section-title">/g) ?? []).length, 4,
-    'Salden, letzte Ausgaben, wiederkehrende Ausgaben (#1647) und Verlauf müssen über SectionTag gerendert werden');
+  assert.equal((src.match(/<\$\{SectionTag\} class="split-section-title u-section-title">/g) ?? []).length, 6,
+    'Salden, die Summen je Person und je Kategorie (#1888, #1941), letzte Ausgaben, wiederkehrende Ausgaben (#1647) und Verlauf müssen über SectionTag gerendert werden');
   // Fest geschriebene Ueberschriften nur im Kopf von render(), und dort je
   // Zweig genau passend: eingebettet die sr-only-<h2>, eigenstaendig die <h1>.
   const outsideHead = src.replace(/const head = embedded[\s\S]*?<\/header>`;/, '');
@@ -7627,7 +7627,7 @@ test('R22 D9: Konto, Abo und Ausgabe der Aufteilung beginnen mit derselben Lead-
   assert.match(read('../public/pages/budget.js'), /class="budget-account__icon budget-tile"/);
   assert.match(read('../public/pages/subscriptions.js'), /class="subscription-card__brand budget-tile"/);
   const split = read('../public/pages/split-expenses.js');
-  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 2, 'Ausgabe und Serie tragen den Ton ihrer Kategorie');
+  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 3, 'Ausgabe, Serie und Summe je Kategorie (#1941) tragen den Ton ihrer Kategorie');
   assert.equal((split.match(/class="split-group__avatar budget-tile"/g) ?? []).length, 2);
 });
 

@@ -4441,7 +4441,14 @@
         "debtOwesYou": "May utang sa iyo si {{name}}",
         "debtOwes": "{{from}} may utang kay {{to}}",
         "balanced": "Ayos na",
-        "balancedInGroup": "{{group}}: Ayos na"
+        "balancedInGroup": "{{group}}: Ayos na",
+        "totalsByMember": "Binayaran ng bawat isa",
+        "totalsByMemberHint": "Ang inabono, at sa ilalim ang sariling bahagi",
+        "ownShare": "Sariling bahagi: {{amount}}",
+        "paidLabel": "Binayaran",
+        "totalsByCategory": "Ayon sa kategorya",
+        "categoryFilter": "I-filter ang mga gastos ayon sa kategorya",
+        "noExpensesInCategory": "Walang gastos sa kategoryang ito."
     },
     "wmo": {
         "0": "Maaliwalas na langit",

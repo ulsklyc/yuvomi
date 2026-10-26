@@ -4681,7 +4681,14 @@
         "debtOwesYou": "{{name}} ma ci oddać",
         "debtOwes": "{{from}} jest winien {{to}}",
         "balanced": "Rozliczone",
-        "balancedInGroup": "{{group}}: Rozliczone"
+        "balancedInGroup": "{{group}}: Rozliczone",
+        "totalsByMember": "Zapłacono według osób",
+        "totalsByMemberHint": "Ile kto wyłożył, pod spodem jego własny udział",
+        "ownShare": "Własny udział: {{amount}}",
+        "paidLabel": "Zapłacono",
+        "totalsByCategory": "Według kategorii",
+        "categoryFilter": "Filtruj wydatki według kategorii",
+        "noExpensesInCategory": "Brak wydatków w tej kategorii."
     },
     "wmo": {
         "0": "Bezchmurnie",

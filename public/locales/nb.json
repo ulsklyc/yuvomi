@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} skylder deg",
         "debtOwes": "{{from}} skylder {{to}}",
         "balanced": "Gjort opp",
-        "balancedInGroup": "{{group}}: Gjort opp"
+        "balancedInGroup": "{{group}}: Gjort opp",
+        "totalsByMember": "Betalt per person",
+        "totalsByMemberHint": "Lagt ut, med egen andel under",
+        "ownShare": "Egen andel: {{amount}}",
+        "paidLabel": "Betalt",
+        "totalsByCategory": "Etter kategori",
+        "categoryFilter": "Filtrer utgifter etter kategori",
+        "noExpensesInCategory": "Ingen utgifter i denne kategorien."
     },
     "wmo": {
         "0": "Skyfri",

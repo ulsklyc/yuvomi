@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} 欠你",
         "debtOwes": "{{from}} 欠 {{to}}",
         "balanced": "已结清",
-        "balancedInGroup": "{{group}}：已结清"
+        "balancedInGroup": "{{group}}：已结清",
+        "totalsByMember": "每人已付",
+        "totalsByMemberHint": "各自垫付的金额，下方为自己的份额",
+        "ownShare": "自己的份额：{{amount}}",
+        "paidLabel": "已付",
+        "totalsByCategory": "按类别",
+        "categoryFilter": "按类别筛选支出",
+        "noExpensesInCategory": "此类别没有支出。"
     },
     "wmo": {
         "0": "晴天",

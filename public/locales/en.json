@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} owes you",
         "debtOwes": "{{from}} owes {{to}}",
         "balanced": "Settled up",
-        "balancedInGroup": "{{group}}: Settled up"
+        "balancedInGroup": "{{group}}: Settled up",
+        "totalsByMember": "Paid by each person",
+        "totalsByMemberHint": "Laid out, with each person's own share below",
+        "ownShare": "Own share: {{amount}}",
+        "paidLabel": "Paid",
+        "totalsByCategory": "By category",
+        "categoryFilter": "Filter expenses by category",
+        "noExpensesInCategory": "No expenses in this category."
     },
     "wmo": {
         "0": "Clear sky",

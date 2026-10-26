@@ -4802,7 +4802,14 @@
         "debtOwesYou": "{{name}} مدين لك",
         "debtOwes": "{{from}} مدين لـ {{to}}",
         "balanced": "متسوّى",
-        "balancedInGroup": "{{group}}: متسوّى"
+        "balancedInGroup": "{{group}}: متسوّى",
+        "totalsByMember": "المدفوع لكل شخص",
+        "totalsByMemberHint": "ما دفعه كل شخص، وتحته حصته الخاصة",
+        "ownShare": "الحصة الخاصة: {{amount}}",
+        "paidLabel": "المدفوع",
+        "totalsByCategory": "حسب الفئة",
+        "categoryFilter": "تصفية النفقات حسب الفئة",
+        "noExpensesInCategory": "لا توجد نفقات في هذه الفئة."
     },
     "wmo": {
         "0": "سماء صافية",

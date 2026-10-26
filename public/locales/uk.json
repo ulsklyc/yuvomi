@@ -4681,7 +4681,14 @@
         "debtOwesYou": "Борг вам: {{name}}",
         "debtOwes": "{{from}} винен {{to}}",
         "balanced": "Розраховано",
-        "balancedInGroup": "{{group}}: Розраховано"
+        "balancedInGroup": "{{group}}: Розраховано",
+        "totalsByMember": "Сплачено кожним",
+        "totalsByMemberHint": "Скільки вніс кожен, нижче його власна частка",
+        "ownShare": "Власна частка: {{amount}}",
+        "paidLabel": "Сплачено",
+        "totalsByCategory": "За категоріями",
+        "categoryFilter": "Фільтрувати витрати за категорією",
+        "noExpensesInCategory": "У цій категорії немає витрат."
     },
     "wmo": {
         "0": "Ясне небо",

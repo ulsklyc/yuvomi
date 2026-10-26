@@ -457,6 +457,11 @@ async function loadGroupData() {
     return;
   }
   const groupId = state.activeGroupId;
+  // Der Kategoriefilter (#1941) gehoert zur Gruppe, in der er gesetzt wurde:
+  // eine andere Gruppe beginnt mit allen Ausgaben, statt mit einer leeren
+  // Liste unter einer Kategorie, die es dort vielleicht nicht gibt.
+  const previousGroup = state.expensesKey ? Number(state.expensesKey.split('|')[0]) : null;
+  if (previousGroup != null && previousGroup !== groupId) state.category = '';
   // Dieselbe Gruppe: die geladene Tiefe bleibt. Eine andere: erste Seite.
   const sameGroup = state.activityGroupId === groupId && state.activity.length > 0;
   const activityRequest = sameGroup
@@ -1007,9 +1012,11 @@ function drawMain(main) {
         </div>
         <div id="split-balances">${renderBalances()}</div>
       </section>
-      <section class="split-section">
+      ${renderTotalsSections(SectionTag)}
+      <section class="split-section split-section--expenses">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
+          ${renderCategoryFilter()}
         </div>
         <div id="split-expense-list">${renderExpenses(archived || ro)}</div>
       </section>
@@ -1036,7 +1043,9 @@ function drawMain(main) {
   main.querySelector('#split-delete-group')?.addEventListener('click', () => deleteGroup(group.id));
   main.querySelector('#split-settle')?.addEventListener('click', () => openSettlementModal());
   const settleButton = main.querySelector('#split-settle');
-  if (settleButton) settleButton.disabled = state.expenses.length === 0;
+  // Gefiltert kann die Liste leer sein, obwohl die Gruppe Ausgaben hat.
+  if (settleButton) settleButton.disabled = state.expenses.length === 0 && !state.category;
+  main.querySelector('#split-category-filter')?.addEventListener('change', (e) => setCategoryFilter(e.target.value));
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
   main.querySelector('.split-activity')?.addEventListener('click', onActivityClick);
   main.querySelector('#split-expense-list')?.addEventListener('click', onExpenseListClick);
@@ -1125,6 +1134,117 @@ export function debtSentence(debt, userId = state.user?.id) {
   return t('splitExpenses.debtOwes', { from: debt.from_name, to: debt.to_name });
 }
 
+/** Der Name einer Kategorie in der Sprache der Oberflaeche (die zwoelf aus `/meta`). */
+function categoryLabel(category) {
+  return t(`splitExpenses.category.${category || 'general'}`);
+}
+
+/** Die Wahl der Kategorie in den Dialogen: die zwoelf der Route, vorbelegt mit `selected`. */
+function categoryOptions(selected = 'general') {
+  return (state.meta?.categories || [])
+    .map((c) => `<option value="${esc(c)}"${c === selected ? ' selected' : ''}>${esc(categoryLabel(c))}</option>`)
+    .join('');
+}
+
+/**
+ * Die Kategorien, die in der Gruppe vorkommen (#1941), in der Reihenfolge der
+ * Route. Quelle sind die Summen des Servers, nicht die geladene Seite der
+ * Liste - eine Kategorie weiter unten fehlte sonst im Filter.
+ */
+function groupCategories() {
+  const present = new Set((state.balances?.category_totals || []).map((row) => row.category));
+  return (state.meta?.categories || []).filter((c) => present.has(c));
+}
+
+/**
+ * DER FILTER IST EINE AUSWAHL NEBEN DEM LISTENTITEL (#1941): eine Zeile, ruhig,
+ * zwoelf Eintraege ohne Umbruch - eine Chipreihe braeche mobil auf drei Zeilen.
+ * Angeboten wird, was in der Gruppe vorkommt, dazu "Alle Kategorien". Mit nur
+ * einer Kategorie gibt es nichts zu filtern, und die Wahl entfaellt - ausser
+ * ein Filter steht schon: der bleibt waehlbar, damit er sich zuruecknehmen
+ * laesst. Lesen ist keine Handlung: die Wahl steht bei jedem Recht und im Archiv.
+ */
+function renderCategoryFilter() {
+  const present = groupCategories();
+  const active = state.category || '';
+  if (present.length < 2 && !active) return '';
+  const offered = active && !present.includes(active) ? [...present, active] : present;
+  return `<select class="form-input split-category-filter" id="split-category-filter" aria-label="${esc(t('splitExpenses.categoryFilter'))}">
+    <option value=""${active ? '' : ' selected'}>${esc(t('splitExpenses.allCategories'))}</option>
+    ${offered.map((c) => `<option value="${esc(c)}"${c === active ? ' selected' : ''}>${esc(categoryLabel(c))}</option>`).join('')}
+  </select>`;
+}
+
+/**
+ * Setzt den Kategoriefilter und laedt die Liste dazu vom Server - gefiltert
+ * wird dort, das Ergebnis ist also vollstaendig, wie weit die Liste auch
+ * geladen war. Neu gezeichnet wird nur die Liste: die Auswahl behaelt ihren
+ * Fokus.
+ */
+async function setCategoryFilter(category) {
+  state.category = (state.meta?.categories || []).includes(category) ? category : '';
+  await loadGroupData();
+  renderExpenseBox();
+}
+
+/**
+ * WAS JEDE PERSON BEZAHLT HAT, DARUNTER IHR EIGENER ANTEIL (#1888). Der Betrag
+ * rechts ist das Ausgelegte - die Zahl, auf die man waehrend einer Reise
+ * schaut; der Anteil steht als Metazeile darunter und nennt sich selbst. Je
+ * Person und Waehrung eine Zeile, ohne Umrechnung, ueber alle Ausgaben der
+ * Gruppe (der Server zaehlt, nicht die geladene Seite).
+ */
+function renderMemberTotals() {
+  const rows = state.balances?.member_totals || [];
+  if (!rows.length) return '';
+  return `<div class="row-carrier">${rows.map((row) => `
+    <div class="split-expense split-total">
+      <div class="split-expense__body">
+        <strong>${esc(row.display_name || '')}</strong>
+        <span>${esc(t('splitExpenses.ownShare', { amount: money(row.share, row.currency) }))}</span>
+      </div>
+      <div class="split-expense__amount"><span class="sr-only">${esc(t('splitExpenses.paidLabel'))} </span>${esc(money(row.paid, row.currency))}</div>
+    </div>`).join('')}</div>`;
+}
+
+/** Wohin das Geld ging (#1941): je Kategorie und Waehrung die Summe, die groesste zuerst. */
+function renderCategoryTotals() {
+  const rows = state.balances?.category_totals || [];
+  if (!rows.length) return '';
+  return `<div class="row-carrier">${rows.map((row) => `
+    <div class="split-expense split-total">
+      <div class="split-expense__icon budget-tile"${categoryTone(row.category)}><i data-lucide="${categoryIcon(row.category)}" aria-hidden="true"></i></div>
+      <div class="split-expense__body"><strong>${esc(categoryLabel(row.category))}</strong></div>
+      <div class="split-expense__amount">${esc(money(row.total, row.currency))}</div>
+    </div>`).join('')}</div>`;
+}
+
+/**
+ * Die beiden Summen stehen unter den Salden, in derselben Spalte (#1888,
+ * #1941): Salden sagen, wer wem schuldet, die Summen, wie es dazu kam. Ohne
+ * Ausgaben gibt es nichts zu summieren, und beide Abschnitte entfallen.
+ */
+function renderTotalsSections(SectionTag) {
+  const members = renderMemberTotals();
+  const categories = renderCategoryTotals();
+  return `${members ? `
+      <section class="split-section split-section--totals">
+        <div class="split-section-head">
+          <div class="split-section-head__lead">
+            <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.totalsByMember')}</${SectionTag}>
+            <span>${t('splitExpenses.totalsByMemberHint')}</span>
+          </div>
+        </div>
+        ${members}
+      </section>` : ''}${categories ? `
+      <section class="split-section split-section--totals">
+        <div class="split-section-head">
+          <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.totalsByCategory')}</${SectionTag}>
+        </div>
+        ${categories}
+      </section>` : ''}`;
+}
+
 function renderBalances() {
   const debts = state.balances.simplified_debts || [];
   if (!debts.length) return `<div class="split-muted">${t('splitExpenses.noBalances')}</div>`;
@@ -1140,7 +1260,8 @@ function renderBalances() {
 // die archivierte Gruppe. Er heisst jetzt nach dem, was er bewirkt - der
 // Aufrufer odert Archiv und Modulrecht hinein (renderMain).
 function renderExpenses(asList = false) {
-  if (!state.expenses.length) return `<div class="split-muted">${t('splitExpenses.noExpenses')}</div>`;
+  // Unter einem Filter sagt die leere Liste, dass der Filter der Grund ist (#1941).
+  if (!state.expenses.length) return `<div class="split-muted">${t(state.category ? 'splitExpenses.noExpensesInCategory' : 'splitExpenses.noExpenses')}</div>`;
   // "Mehr laden" (#2108) ist derselbe Knopf wie im Verlauf (#1309), mit
   // demselben Text: Lesen, keine Handlung, also bei jedem Recht und im Archiv.
   // Waehrend eine Seite unterwegs ist `aria-disabled` statt `disabled`, damit
@@ -2146,6 +2267,7 @@ function expenseReadSections(expense) {
     { icon: 'banknote', label: t('splitExpenses.amount'), value: money(expense.amount, expense.currency) },
     { icon: 'user', label: t('splitExpenses.paidBy'), value: expense.payer_name || '' },
     { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? dateText(expense.expense_date) : '' },
+    { icon: categoryIcon(expense.category), label: t('splitExpenses.categoryLabel'), value: categoryLabel(expense.category) },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
     { icon: 'users', label: t('splitExpenses.participants'), value: shares, multiline: true },
@@ -2223,12 +2345,15 @@ function openExpenseModal(expense = null, prefill = null) {
           <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (expense?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
           <label class="form-field"><span class="form-label">${t('splitExpenses.date')}</span><yuvomi-datepicker name="expense_date" type="date" value="${esc(expense?.expense_date || today)}"></yuvomi-datepicker></label>
         </div>
-        <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
-          ${methodOption('equal', t('splitExpenses.splitEqual'))}
-          ${methodOption('percentage', t('splitExpenses.splitPercentage'))}
-          ${methodOption('exact', t('splitExpenses.splitExact'))}
-          ${methodOption('shares', t('splitExpenses.splitShares'))}
-        </select></label>
+        <div class="split-form-row">
+          <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
+            ${methodOption('equal', t('splitExpenses.splitEqual'))}
+            ${methodOption('percentage', t('splitExpenses.splitPercentage'))}
+            ${methodOption('exact', t('splitExpenses.splitExact'))}
+            ${methodOption('shares', t('splitExpenses.splitShares'))}
+          </select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="category">${categoryOptions(expense?.category || 'general')}</select></label>
+        </div>
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
         <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
         <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(expense?.description || '')}</textarea></label>
@@ -2420,6 +2545,7 @@ function recurringReadSections(recurring) {
     { icon: 'repeat', label: t('budget.recurringIntervalLabel'), value: frequencyLabel(recurring.frequency) },
     { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : dateText(recurring.next_run_date) },
     { icon: 'circle-pause', label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
+    { icon: categoryIcon(recurring.category), label: t('splitExpenses.categoryLabel'), value: categoryLabel(recurring.category) },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
     { icon: 'users', label: t('splitExpenses.participants'), value: people, multiline: true },
@@ -2491,12 +2617,15 @@ function openRecurringModal(recurring = null) {
           </select></label>
         </div>
         <label class="form-field"><span class="form-label">${t('splitExpenses.recurring.nextDate')}</span><yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
-        <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
-          ${option('equal', t('splitExpenses.splitEqual'), method)}
-          ${option('percentage', t('splitExpenses.splitPercentage'), method)}
-          ${option('exact', t('splitExpenses.splitExact'), method)}
-          ${option('shares', t('splitExpenses.splitShares'), method)}
-        </select></label>
+        <div class="split-form-row">
+          <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
+            ${option('equal', t('splitExpenses.splitEqual'), method)}
+            ${option('percentage', t('splitExpenses.splitPercentage'), method)}
+            ${option('exact', t('splitExpenses.splitExact'), method)}
+            ${option('shares', t('splitExpenses.splitShares'), method)}
+          </select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="category">${categoryOptions(recurring?.category || 'general')}</select></label>
+        </div>
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
         <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
         <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
@@ -2612,6 +2741,7 @@ function readRecurringForm(form) {
     frequency: data.frequency,
     next_run_date: data.next_run_date,
     split_method: data.split_method || 'equal',
+    category: data.category || 'general',
     description: String(data.description ?? ''),
     participants,
     splits,
@@ -2641,7 +2771,7 @@ function changedRecurringFields(shown, now, recurring) {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const ids = (list) => (list || []).map(Number).sort((a, b) => a - b);
   const out = {};
-  for (const key of ['title', 'payer_id', 'frequency', 'next_run_date', 'description']) {
+  for (const key of ['title', 'payer_id', 'frequency', 'next_run_date', 'category', 'description']) {
     if (!same(shown[key], now[key])) out[key] = now[key];
   }
   if (!same(shown.amount, now.amount) || !same(shown.currency, now.currency)) {
@@ -2879,6 +3009,8 @@ export const __test = {
   renderActivity, onActivityClick, loadGroupData, loadMoreActivity, groupFromQuery,
   // Ausgabenliste seitenweise (#2108, test-split-activity-ui.js).
   onExpenseListClick, loadMoreExpenses,
+  // Summen und Kategorien (#1888, #1941, test-split-totals-ui.js).
+  renderMemberTotals, renderCategoryTotals, renderCategoryFilter, setCategoryFilter, readRecurringForm,
   // Betragseingabe (#1607): Formularpruefung und die beiden Speicherwege
   // (test-split-amount-input.js).
   validateSplitForm, updateGroupDefaults, openSettlementModal,

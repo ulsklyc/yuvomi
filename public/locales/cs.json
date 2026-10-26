@@ -4062,7 +4062,14 @@
         "debtOwesYou": "{{name}} vám dluží",
         "debtOwes": "{{from}} dluží {{to}}",
         "balanced": "Vyrovnáno",
-        "balancedInGroup": "{{group}}: Vyrovnáno"
+        "balancedInGroup": "{{group}}: Vyrovnáno",
+        "totalsByMember": "Zaplaceno podle osob",
+        "totalsByMemberHint": "Kolik kdo vyložil, pod tím jeho vlastní podíl",
+        "ownShare": "Vlastní podíl: {{amount}}",
+        "paidLabel": "Zaplaceno",
+        "totalsByCategory": "Podle kategorie",
+        "categoryFilter": "Filtrovat výdaje podle kategorie",
+        "noExpensesInCategory": "V této kategorii nejsou žádné výdaje."
     },
     "documents": {
         "title": "Dokumenty",

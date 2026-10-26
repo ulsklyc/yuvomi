@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} tartozik Önnek",
         "debtOwes": "{{from}} tartozik neki: {{to}}",
         "balanced": "Rendezve",
-        "balancedInGroup": "{{group}}: Rendezve"
+        "balancedInGroup": "{{group}}: Rendezve",
+        "totalsByMember": "Személyenként fizetve",
+        "totalsByMemberHint": "Amit kiki kifizetett, alatta a saját része",
+        "ownShare": "Saját rész: {{amount}}",
+        "paidLabel": "Fizetve",
+        "totalsByCategory": "Kategória szerint",
+        "categoryFilter": "Kiadások szűrése kategória szerint",
+        "noExpensesInCategory": "Ebben a kategóriában nincs kiadás."
     },
     "wmo": {
         "0": "Tiszta égbolt",

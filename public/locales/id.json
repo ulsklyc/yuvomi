@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} berutang kepada Anda",
         "debtOwes": "{{from}} berutang kepada {{to}}",
         "balanced": "Lunas",
-        "balancedInGroup": "{{group}}: Lunas"
+        "balancedInGroup": "{{group}}: Lunas",
+        "totalsByMember": "Dibayar per orang",
+        "totalsByMemberHint": "Yang ditalangi, dengan bagian sendiri di bawahnya",
+        "ownShare": "Bagian sendiri: {{amount}}",
+        "paidLabel": "Dibayar",
+        "totalsByCategory": "Menurut kategori",
+        "categoryFilter": "Saring pengeluaran menurut kategori",
+        "noExpensesInCategory": "Tidak ada pengeluaran dalam kategori ini."
     },
     "wmo": {
         "0": "Langit cerah",

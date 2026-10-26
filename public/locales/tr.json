@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} sana borçlu",
         "debtOwes": "{{from}}, {{to}} kişisine borçlu",
         "balanced": "Hesap kapalı",
-        "balancedInGroup": "{{group}}: Hesap kapalı"
+        "balancedInGroup": "{{group}}: Hesap kapalı",
+        "totalsByMember": "Kişi başına ödenen",
+        "totalsByMemberHint": "Ödenen tutar, altında kişinin kendi payı",
+        "ownShare": "Kendi payı: {{amount}}",
+        "paidLabel": "Ödenen",
+        "totalsByCategory": "Kategoriye göre",
+        "categoryFilter": "Harcamaları kategoriye göre filtrele",
+        "noExpensesInCategory": "Bu kategoride harcama yok."
     },
     "wmo": {
         "0": "Açık",

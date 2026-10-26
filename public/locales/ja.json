@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}}さんから受け取り",
         "debtOwes": "{{from}}さんから{{to}}さんへ支払い",
         "balanced": "精算済み",
-        "balancedInGroup": "{{group}}: 精算済み"
+        "balancedInGroup": "{{group}}: 精算済み",
+        "totalsByMember": "各自の支払額",
+        "totalsByMemberHint": "立て替えた額と、その下に自分の負担分",
+        "ownShare": "自分の負担分: {{amount}}",
+        "paidLabel": "支払額",
+        "totalsByCategory": "カテゴリ別",
+        "categoryFilter": "カテゴリで支出を絞り込む",
+        "noExpensesInCategory": "このカテゴリの支出はありません。"
     },
     "wmo": {
         "0": "快晴",

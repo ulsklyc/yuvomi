@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} is jou nog schuldig",
         "debtOwes": "{{from}} is schuldig aan {{to}}",
         "balanced": "Vereffend",
-        "balancedInGroup": "{{group}}: Vereffend"
+        "balancedInGroup": "{{group}}: Vereffend",
+        "totalsByMember": "Betaald per persoon",
+        "totalsByMemberHint": "Voorgeschoten, met daaronder het eigen aandeel",
+        "ownShare": "Eigen aandeel: {{amount}}",
+        "paidLabel": "Betaald",
+        "totalsByCategory": "Per categorie",
+        "categoryFilter": "Uitgaven filteren op categorie",
+        "noExpensesInCategory": "Geen uitgaven in deze categorie."
     },
     "wmo": {
         "0": "Heldere lucht",

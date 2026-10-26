@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} σου οφείλει",
         "debtOwes": "{{from}} οφείλει σε {{to}}",
         "balanced": "Τακτοποιημένο",
-        "balancedInGroup": "{{group}}: Τακτοποιημένο"
+        "balancedInGroup": "{{group}}: Τακτοποιημένο",
+        "totalsByMember": "Πληρωμές ανά άτομο",
+        "totalsByMemberHint": "Τι πλήρωσε ο καθένας, από κάτω το δικό του μερίδιο",
+        "ownShare": "Δικό μερίδιο: {{amount}}",
+        "paidLabel": "Πληρώθηκε",
+        "totalsByCategory": "Ανά κατηγορία",
+        "categoryFilter": "Φιλτράρισμα εξόδων ανά κατηγορία",
+        "noExpensesInCategory": "Δεν υπάρχουν έξοδα σε αυτή την κατηγορία."
     },
     "wmo": {
         "0": "Αίθριος καιρός",

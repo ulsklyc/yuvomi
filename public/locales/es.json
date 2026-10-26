@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} te debe",
         "debtOwes": "{{from}} debe a {{to}}",
         "balanced": "Saldado",
-        "balancedInGroup": "{{group}}: Saldado"
+        "balancedInGroup": "{{group}}: Saldado",
+        "totalsByMember": "Pagado por persona",
+        "totalsByMemberHint": "Lo adelantado, con la parte propia debajo",
+        "ownShare": "Parte propia: {{amount}}",
+        "paidLabel": "Pagado",
+        "totalsByCategory": "Por categoría",
+        "categoryFilter": "Filtrar gastos por categoría",
+        "noExpensesInCategory": "No hay gastos en esta categoría."
     },
     "wmo": {
         "0": "Cielo despejado",

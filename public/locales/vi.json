@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} nợ bạn",
         "debtOwes": "{{from}} nợ {{to}}",
         "balanced": "Đã thanh toán xong",
-        "balancedInGroup": "{{group}}: Đã thanh toán xong"
+        "balancedInGroup": "{{group}}: Đã thanh toán xong",
+        "totalsByMember": "Mỗi người đã trả",
+        "totalsByMemberHint": "Số tiền đã ứng, bên dưới là phần của chính mình",
+        "ownShare": "Phần của mình: {{amount}}",
+        "paidLabel": "Đã trả",
+        "totalsByCategory": "Theo danh mục",
+        "categoryFilter": "Lọc chi tiêu theo danh mục",
+        "noExpensesInCategory": "Không có chi tiêu nào trong danh mục này."
     },
     "wmo": {
         "0": "Trời quang",

@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} से आपको मिलना है",
         "debtOwes": "{{from}} को {{to}} को देना है",
         "balanced": "हिसाब बराबर",
-        "balancedInGroup": "{{group}}: हिसाब बराबर"
+        "balancedInGroup": "{{group}}: हिसाब बराबर",
+        "totalsByMember": "हर व्यक्ति ने कितना चुकाया",
+        "totalsByMemberHint": "चुकाई गई राशि, नीचे अपना हिस्सा",
+        "ownShare": "अपना हिस्सा: {{amount}}",
+        "paidLabel": "चुकाया",
+        "totalsByCategory": "श्रेणी के अनुसार",
+        "categoryFilter": "खर्चों को श्रेणी के अनुसार फ़िल्टर करें",
+        "noExpensesInCategory": "इस श्रेणी में कोई खर्च नहीं है।"
     },
     "wmo": {
         "0": "साफ आकाश",

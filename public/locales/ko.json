@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}}님에게 받을 금액",
         "debtOwes": "{{from}}님이 {{to}}님에게 줄 금액",
         "balanced": "정산 완료",
-        "balancedInGroup": "{{group}}: 정산 완료"
+        "balancedInGroup": "{{group}}: 정산 완료",
+        "totalsByMember": "사람별 결제액",
+        "totalsByMemberHint": "각자 낸 금액과 그 아래 본인 부담분",
+        "ownShare": "본인 부담분: {{amount}}",
+        "paidLabel": "결제액",
+        "totalsByCategory": "카테고리별",
+        "categoryFilter": "카테고리로 지출 필터링",
+        "noExpensesInCategory": "이 카테고리에는 지출이 없습니다."
     },
     "wmo": {
         "0": "맑음",

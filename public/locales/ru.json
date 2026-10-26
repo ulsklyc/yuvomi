@@ -4681,7 +4681,14 @@
         "debtOwesYou": "Долг вам: {{name}}",
         "debtOwes": "{{from}} должен {{to}}",
         "balanced": "Расчёты закрыты",
-        "balancedInGroup": "{{group}}: Расчёты закрыты"
+        "balancedInGroup": "{{group}}: Расчёты закрыты",
+        "totalsByMember": "Оплачено каждым",
+        "totalsByMemberHint": "Сколько внёс каждый, ниже его собственная доля",
+        "ownShare": "Собственная доля: {{amount}}",
+        "paidLabel": "Оплачено",
+        "totalsByCategory": "По категориям",
+        "categoryFilter": "Фильтровать расходы по категории",
+        "noExpensesInCategory": "В этой категории нет расходов."
     },
     "wmo": {
         "0": "Ясное небо",

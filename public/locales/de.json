@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} schuldet dir",
         "debtOwes": "{{from}} schuldet {{to}}",
         "balanced": "Ausgeglichen",
-        "balancedInGroup": "{{group}}: Ausgeglichen"
+        "balancedInGroup": "{{group}}: Ausgeglichen",
+        "totalsByMember": "Bezahlt je Person",
+        "totalsByMemberHint": "Ausgelegt, darunter der eigene Anteil",
+        "ownShare": "Eigener Anteil: {{amount}}",
+        "paidLabel": "Bezahlt",
+        "totalsByCategory": "Nach Kategorie",
+        "categoryFilter": "Ausgaben nach Kategorie filtern",
+        "noExpensesInCategory": "Keine Ausgaben in dieser Kategorie."
     },
     "wmo": {
         "0": "Klarer Himmel",

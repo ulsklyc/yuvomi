@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} är skyldig dig",
         "debtOwes": "{{from}} är skyldig {{to}}",
         "balanced": "Kvitt",
-        "balancedInGroup": "{{group}}: Kvitt"
+        "balancedInGroup": "{{group}}: Kvitt",
+        "totalsByMember": "Betalt per person",
+        "totalsByMemberHint": "Utlagt, med egen andel under",
+        "ownShare": "Egen andel: {{amount}}",
+        "paidLabel": "Betalt",
+        "totalsByCategory": "Per kategori",
+        "categoryFilter": "Filtrera utgifter efter kategori",
+        "noExpensesInCategory": "Inga utgifter i den här kategorin."
     },
     "wmo": {
         "0": "Klart",

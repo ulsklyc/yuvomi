@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} 欠你",
         "debtOwes": "{{from}} 欠 {{to}}",
         "balanced": "已結清",
-        "balancedInGroup": "{{group}}：已結清"
+        "balancedInGroup": "{{group}}：已結清",
+        "totalsByMember": "每人已付",
+        "totalsByMemberHint": "各自墊付的金額，下方為自己的份額",
+        "ownShare": "自己的份額：{{amount}}",
+        "paidLabel": "已付",
+        "totalsByCategory": "依類別",
+        "categoryFilter": "依類別篩選支出",
+        "noExpensesInCategory": "此類別沒有支出。"
     },
     "wmo": {
         "0": "晴天",

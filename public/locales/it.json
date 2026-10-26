@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} ti deve",
         "debtOwes": "{{from}} deve a {{to}}",
         "balanced": "Saldato",
-        "balancedInGroup": "{{group}}: Saldato"
+        "balancedInGroup": "{{group}}: Saldato",
+        "totalsByMember": "Pagato per persona",
+        "totalsByMemberHint": "Quanto anticipato, sotto la quota personale",
+        "ownShare": "Quota personale: {{amount}}",
+        "paidLabel": "Pagato",
+        "totalsByCategory": "Per categoria",
+        "categoryFilter": "Filtra le spese per categoria",
+        "noExpensesInCategory": "Nessuna spesa in questa categoria."
     },
     "wmo": {
         "0": "Cielo sereno",

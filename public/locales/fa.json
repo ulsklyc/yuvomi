@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} به شما بدهکار است",
         "debtOwes": "{{from}} به {{to}} بدهکار است",
         "balanced": "تسویه‌شده",
-        "balancedInGroup": "{{group}}: تسویه‌شده"
+        "balancedInGroup": "{{group}}: تسویه‌شده",
+        "totalsByMember": "پرداختی هر نفر",
+        "totalsByMemberHint": "مبلغ پرداخت‌شده، و زیر آن سهم خود فرد",
+        "ownShare": "سهم خود: {{amount}}",
+        "paidLabel": "پرداخت‌شده",
+        "totalsByCategory": "بر اساس دسته",
+        "categoryFilter": "فیلتر هزینه‌ها بر اساس دسته",
+        "noExpensesInCategory": "هیچ هزینه‌ای در این دسته نیست."
     },
     "wmo": {
         "0": "آسمان صاف",

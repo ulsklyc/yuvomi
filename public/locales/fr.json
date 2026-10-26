@@ -4441,7 +4441,14 @@
         "debtOwesYou": "{{name}} vous doit",
         "debtOwes": "{{from}} doit à {{to}}",
         "balanced": "Réglé",
-        "balancedInGroup": "{{group}} : Réglé"
+        "balancedInGroup": "{{group}} : Réglé",
+        "totalsByMember": "Payé par personne",
+        "totalsByMemberHint": "Montant avancé, avec la part de chacun en dessous",
+        "ownShare": "Part personnelle : {{amount}}",
+        "paidLabel": "Payé",
+        "totalsByCategory": "Par catégorie",
+        "categoryFilter": "Filtrer les dépenses par catégorie",
+        "noExpensesInCategory": "Aucune dépense dans cette catégorie."
     },
     "wmo": {
         "0": "Ciel dégagé",
