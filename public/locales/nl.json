@@ -403,6 +403,7 @@
         "todayUntil": "voor {{time}}",
         "todayMore": "+{{count}} meer vandaag",
         "todayLess": "Toon minder",
+        "todayShowDay": "Toon de hele dag",
         "todayMore_one": "+{{count}} meer vandaag",
         "todayOverdueCount": "{{count}} achterstallig",
         "todayOverdueCount_one": "{{count}} achterstallig",

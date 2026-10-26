@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in progress", and focus stays put when the sheet rebuilds or the window crosses 900px. Below it, "Also today" holds what has no place
   on the timeline in three cells, shopping last, and a footer line carries the closing sentence or
   "+N more". Under a sheet width of 900px - tablets, narrow windows, phones - the timeline is a compact
-  strip of bars, and every bar still ahead is a row below it, behind "+N more" if need be: each
+  strip of bars - only lanes with something still ahead, appointments at the same time on thin rows of their own instead of one merged bar - and tapping it unfolds the whole day like "+N more", which now sits as the last row instead of a footer of its own. Every bar still ahead is a row below it, behind "+N more" if need be: each
   appointment once, even when it is for two people, meals and your shift until their time has passed.
   The count in the header is the appointments you can read there. The next one comes first with
   "15:00 · in 2 hrs" or "in 25 min" in its module's colour. The timeline only appears when the Calendar tile is not on the overview, so

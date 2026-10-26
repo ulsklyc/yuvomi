@@ -403,6 +403,7 @@
         "todayUntil": "{{time}}前",
         "todayMore": "另有{{count}}项",
         "todayLess": "收起",
+        "todayShowDay": "显示全天",
         "todayMore_one": "另有{{count}}项",
         "todayOverdueCount": "已逾期 {{count}} 项",
         "todayOverdueCount_one": "已逾期 {{count}} 项",

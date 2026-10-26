@@ -403,6 +403,7 @@
         "todayUntil": "até às {{time}}",
         "todayMore": "+{{count}} mais hoje",
         "todayLess": "Mostrar menos",
+        "todayShowDay": "Mostrar o dia inteiro",
         "todayMore_one": "+{{count}} mais hoje",
         "todayOverdueCount": "{{count}} atrasadas",
         "todayOverdueCount_one": "{{count}} atrasada",

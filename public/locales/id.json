@@ -421,6 +421,7 @@
         "todayUntil": "sebelum {{time}}",
         "todayMore": "+{{count}} lagi hari ini",
         "todayLess": "Tampilkan lebih sedikit",
+        "todayShowDay": "Tampilkan sepanjang hari",
         "todayMore_one": "+{{count}} lagi hari ini",
         "todayOverdueCount": "{{count}} terlambat",
         "todayOverdueCount_one": "{{count}} terlambat",

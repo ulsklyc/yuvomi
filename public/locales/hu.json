@@ -403,6 +403,7 @@
         "todayUntil": "{{time}}-ig",
         "todayMore": "+{{count}} további ma",
         "todayLess": "Kevesebb megjelenítése",
+        "todayShowDay": "Az egész nap megjelenítése",
         "todayMore_one": "+{{count}} további ma",
         "todayOverdueCount": "{{count}} lejárt",
         "todayOverdueCount_one": "{{count}} lejárt",

@@ -421,6 +421,7 @@
         "todayUntil": "تا {{time}}",
         "todayMore": "+{{count}} مورد دیگر امروز",
         "todayLess": "نمایش کمتر",
+        "todayShowDay": "نمایش کل روز",
         "todayMore_one": "+{{count}} مورد دیگر امروز",
         "todayOverdueCount": "{{count}} معوق",
         "todayOverdueCount_one": "{{count}} معوق",

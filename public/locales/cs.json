@@ -437,6 +437,7 @@
         "todayUntil": "do {{time}}",
         "todayMore": "+{{count}} dalších dnes",
         "todayLess": "Zobrazit méně",
+        "todayShowDay": "Zobrazit celý den",
         "todayMore_one": "+{{count}} další dnes",
         "todayMore_few": "+{{count}} další dnes",
         "todayOverdueCount": "Po termínu: {{count}}",

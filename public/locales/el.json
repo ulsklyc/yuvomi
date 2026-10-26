@@ -403,6 +403,7 @@
         "todayUntil": "έως {{time}}",
         "todayMore": "+{{count}} ακόμη σήμερα",
         "todayLess": "Εμφάνιση λιγότερων",
+        "todayShowDay": "Εμφάνιση όλης της ημέρας",
         "todayMore_one": "+{{count}} ακόμη σήμερα",
         "todayOverdueCount": "{{count}} εκπρόθεσμες",
         "todayOverdueCount_one": "{{count}} εκπρόθεσμη",

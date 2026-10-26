@@ -471,6 +471,7 @@
         "todayUntil": "до {{time}}",
         "todayMore": "+{{count}} ще сьогодні",
         "todayLess": "Показати менше",
+        "todayShowDay": "Показати весь день",
         "todayMore_one": "+{{count}} ще сьогодні",
         "todayMore_few": "+{{count}} ще сьогодні",
         "todayMore_many": "+{{count}} ще сьогодні",

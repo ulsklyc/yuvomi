@@ -489,6 +489,7 @@
         "todayUntil": "do {{time}}",
         "todayMore": "+{{count}} więcej dzisiaj",
         "todayLess": "Pokaż mniej",
+        "todayShowDay": "Pokaż cały dzień",
         "todayMore_one": "+{{count}} więcej dzisiaj",
         "todayMore_few": "+{{count}} więcej dzisiaj",
         "todayMore_many": "+{{count}} więcej dzisiaj",

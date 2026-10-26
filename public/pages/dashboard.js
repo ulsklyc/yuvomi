@@ -4459,17 +4459,29 @@ function wireTodayOverdue(root) {
  * Der Aufklapp-Knopf des Ueberlaufs: schaltet die verdeckten Zeilen an Ort und
  * Stelle, ohne das Blatt neu zu zeichnen - so bleibt der Fokus auf dem Knopf,
  * und ein zweiter Tipp klappt wieder zu.
+ *
+ * Unter der breiten Buehne steuert auch das Bild ueber den Zeilen dieselbe
+ * Region (renderTodayPeek, `data-today-peek`): beide Knoepfe sagen
+ * denselben Zustand, und nur der Tipp aufs Bild fuehrt danach zur ersten
+ * kommenden Zeile. `+N weitere` behaelt den Fokus: das Aufgeklappte steht
+ * direkt ueber ihm, das Bild dagegen liegt ueber allen Zeilen.
  */
 function wireTodayMore(root) {
-  root.querySelectorAll('[data-today-more]').forEach((btn) => {
+  const toggles = [...root.querySelectorAll('[data-today-more]')];
+  toggles.forEach((btn) => {
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
-      const region = root.querySelector(`#${btn.getAttribute('aria-controls')}`);
+      const controls = btn.getAttribute('aria-controls');
+      const region = root.querySelector(`#${controls}`);
       toggleRegion(region, open);
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      const label = btn.querySelector('span');
-      if (label) label.textContent = open ? btn.dataset.lessLabel : btn.dataset.moreLabel;
+      for (const toggle of toggles) {
+        if (toggle !== btn && toggle.getAttribute('aria-controls') !== controls) continue;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const label = toggle.dataset.lessLabel ? toggle.querySelector('span') : null;
+        if (label) label.textContent = open ? toggle.dataset.lessLabel : toggle.dataset.moreLabel;
+      }
       todayMoreOpen = open;
+      if (open && btn.dataset.todayPeek != null) revealTodayPeekTarget(region, btn.dataset.peekTarget);
     });
   });
 }
@@ -4984,15 +4996,33 @@ function placeTodayTimelineFlag(timeline) {
 }
 
 /**
- * DIE KURZFASSUNG (Entwurf, mobil): je Spur ein 10px-Balken, ein 20px-Gesicht
+ * DIE KURZFASSUNG (Entwurf, mobil): je Spur ein 6px-Balken, ein 20px-Gesicht
  * statt des Namens, die Stunden in GLEICHEN Schritten (Critique 2026-10-26:
  * 07/11/15/19/22 las sich ungleich), der Jetzt-Strich. Sie ist Bild
- * (aria-hidden) - die Termine stehen darunter als Zeilen, denn ein 10px-Balken
- * traegt weder Text noch ein Tippziel. Gilt auf dem Telefon und unter 900px
- * Containerbreite.
+ * (aria-hidden) - die Termine stehen darunter als Zeilen, denn ein Balken
+ * traegt weder Text noch ein eigenes Tippziel. Gilt auf dem Telefon und unter
+ * 900px Containerbreite.
+ *
+ * MOBIL VERSCHENKT DAS BILD KEINEN PLATZ (Critique 2026-10-26, Lauf 2, D3).
+ * Gemessen 390x844: 148px hoch, gut ein Viertel der Karte, fuer fuenf Spuren,
+ * von denen einige nur noch Vergangenes trugen. Jetzt:
+ *   - NUR SPUREN MIT KOMMENDEM. Eine Spur, deren Tag durch ist, sagt nichts,
+ *     was die Zeilen darunter brauchen; in einer Spur mit Kommendem bleiben
+ *     die vergangenen Balken grau stehen - sie zeigen die Form des Tages.
+ *     Hat keine Spur mehr etwas vor sich, entfaellt das Bild ganz: dann
+ *     sprechen die Zeilen und die Coda.
+ *   - PACKREIHEN ALS TEILSPUREN. Die Kurzfassung las `item.row` aus packLane
+ *     nicht: Zahnarzt 11-12 und Team-Call 11:30-12:30 verschmolzen zu einem
+ *     Balken, der Elternsprechtag 09-11 lag unsichtbar im Schichtbalken.
+ *     Eine Fuge (2px Flaeche um den spaeteren Balken) haette nur die Kante
+ *     gezeigt - ein Termin, der ganz in einem anderen liegt, bliebe verdeckt.
+ *     Eine duenne Zeile je Reihe zeigt jeden Termin ganz; bis drei Reihen
+ *     passen neben das 20px-Gesicht, ohne die Spur zu erhoehen.
  */
 function renderTodayMiniTimeline(timeline, now = new Date()) {
   if (!timeline) return '';
+  const ahead = timeline.lanes.filter((lane) => lane.items.some((item) => item.state !== 'past'));
+  if (!ahead.length) return '';
   const span = timeline.end - timeline.start;
   const step = Math.ceil(span / 60 / 5) * 60;
   const marks = [];
@@ -5002,12 +5032,13 @@ function renderTodayMiniTimeline(timeline, now = new Date()) {
   const covered = (minute) => timeline.now != null && nowMinute != null && Math.abs(minute - nowMinute) < span / 12;
   const axis = marks.map((minute) => `<span${covered(minute) ? ' class="today-timeline__hour--covered"' : ''} style="--tl-at:${(minute - timeline.start) / span}">${esc(axisHourLabel(minute))}</span>`).join('');
   const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
-  const lanes = timeline.lanes.map((lane) => {
+  const lanes = ahead.map((lane) => {
     const face = lane.member
       ? renderAvatarStack([lane.member], { size: 20, maxVisible: 1 })
       : '<span class="today-timeline__everyone today-timeline__everyone--sm"><i data-lucide="users" class="icon-sm"></i></span>';
-    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--c:${timelineTone(item)}"></i>`).join('');
-    return `${solo ? '' : `<span class="today-timeline__face">${face}</span>`}<div class="today-timeline__bars">${bars}</div>`;
+    const rows = Math.max(1, lane.rows ?? 1);
+    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row ?? 0};--c:${timelineTone(item)}"></i>`).join('');
+    return `${solo ? '' : `<span class="today-timeline__face">${face}</span>`}<div class="today-timeline__bars" style="--tl-rows:${rows}">${bars}</div>`;
   }).join('');
   const nowMarker = timeline.now == null ? '' : `<div class="today-timeline__now"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
   return `
@@ -5017,6 +5048,69 @@ function renderTodayMiniTimeline(timeline, now = new Date()) {
       ${lanes}
       ${nowMarker}
     </div>`;
+}
+
+/**
+ * DAS GANZE BILD IST EIN TIPPZIEL (Critique 2026-10-26, Lauf 2, D3): die
+ * Kurzfassung hatte null Tippziele, und wer den Tag darin sah, musste den
+ * kleinen Link `+N weitere` darunter suchen. Gibt es Verdecktes, liegt
+ * ueber dem Bild EIN Knopf (oder Link, wenn `+N weitere` in eine Ansicht
+ * fuehrt) mit demselben Ziel wie `+N weitere`: dieselbe Region, dasselbe
+ * aria-expanded. Das Bild bleibt aria-hidden, der Knopf hat einen eigenen
+ * Namen (`Ganzen Tag zeigen`), den Inhalt tragen die Zeilen. Ohne
+ * Ueberlauf gibt es nichts zu oeffnen - dann ist das Bild nur Bild, ohne
+ * Fokusstopp.
+ *
+ * Als Geschwister ueber dem Bild und nicht als Huelle: ein <button> darf
+ * keine <div> enthalten, und ein Knopf in einer aria-hidden-Huelle waere ein
+ * Fokusstopp ohne Namen.
+ * @param {string} picture  renderTodayMiniTimeline
+ * @param {{ route?: string|null, open?: boolean, target?: string }} [peek]
+ *   route: Ziel von `+N weitere`; sonst klappt der Knopf die Region auf
+ */
+function renderTodayPeek(picture, peek = null) {
+  if (!picture) return '';
+  const label = esc(t('dashboard.todayShowDay'));
+  let hit = '';
+  if (peek?.route) {
+    hit = `<a href="${esc(peek.route)}" class="today-timeline-peek__hit" data-route="${esc(peek.route)}" aria-label="${label}"></a>`;
+  } else if (peek) {
+    hit = `<button type="button" class="today-timeline-peek__hit" id="today-cockpit-peek" data-today-more data-today-peek
+          aria-expanded="${peek.open ? 'true' : 'false'}" aria-controls="today-cockpit-more"${peek.target ? ` data-peek-target="${esc(peek.target)}"` : ''} aria-label="${label}"></button>`;
+  }
+  return `<div class="today-timeline-peek${hit ? ' today-timeline-peek--action' : ''}">${picture}${hit}</div>`;
+}
+
+/**
+ * Wohin der Knopf ueber dem Bild nach dem Aufklappen fuehrt: zur ersten
+ * kommenden Zeile unter den bisher verdeckten (Termin, Mahlzeit, Schicht mit
+ * Uhrzeit nach jetzt) - das, wonach man gefragt hat, als man den ganzen Tag
+ * sehen wollte. Sonst die erste verdeckte Zeile mit Objekt. `kind:id`.
+ */
+function todayPeekTarget(hidden, now) {
+  const nowKey = zonedTimeKey(now);
+  const upcoming = (row) => ['event', 'meal', 'shift'].includes(row?.kind)
+    && /^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02' && row.sortKey > nowKey;
+  const row = hidden.find((r) => upcoming(r) && r.objectId != null) ?? hidden.find((r) => r?.objectId != null);
+  return row ? `${row.kind}:${row.objectId}` : '';
+}
+
+/**
+ * Nach dem Aufklappen ueber das Bild: Fokus und Blick auf die Zielzeile
+ * (todayPeekTarget), sonst auf die erste Zeile der Region. `block: 'nearest'`
+ * mit dem scroll-padding des Scrollports (layout.css, --nav-tail): die Zeile
+ * landet ueber der Kapsel, nicht dahinter.
+ */
+function revealTodayPeekTarget(region, target) {
+  if (!region?.querySelector) return;
+  const [kind, id] = String(target ?? '').split(':');
+  const quote = (value) => (globalThis.CSS?.escape ? CSS.escape(value) : String(value).replace(/["\\]/g, '\\$&'));
+  const row = (kind && id ? region.querySelector(`[data-object-kind="${quote(kind)}"][data-object-id="${quote(id)}"]`) : null)
+    ?? region.querySelector('a[href], button');
+  if (!row) return;
+  row.focus?.({ preventScroll: true });
+  const still = globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  row.scrollIntoView?.({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
 }
 
 /** Aufgeklappt bleibt aufgeklappt, auch wenn der Minutentakt das Blatt neu zeichnet. */
@@ -5255,7 +5349,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   const wide = stage === 'wide';
   // Die Leiste nur, wenn der Kalender im Blatt spricht: neben einer sichtbaren
   // Termin-Kachel waere sie deren Echo. Unter der breiten Buehne ist sie die
-  // stumme Kurzfassung (10px-Balken, kein Text); dort bleiben die Termine Zeilen.
+  // stumme Kurzfassung (6px-Balken, kein Text); dort bleiben die Termine Zeilen.
   const timeline = todayDomainSpeaks(cfg, 'calendar')
     ? buildTodayTimeline(data, { now, viewer, includeMeals: todayDomainSpeaks(cfg, 'meals'), includeShifts: todayDomainSpeaks(cfg, 'schedule') })
     : null;
@@ -5279,7 +5373,10 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   const shopping = model.shopping ? { ...model.shopping, chevron: true } : null;
 
   const parts = [];
-  if (timeline) parts.push(wide ? renderTodayTimeline(timeline, now, timelineOpen) : renderTodayMiniTimeline(timeline, now));
+  // Die Kurzfassung steht vorn, ihr Knopf kennt aber erst unten das Ziel von
+  // „+N weitere" (renderTodayPeek) - sie wird dort eingesetzt.
+  const picture = timeline && !wide ? renderTodayMiniTimeline(timeline, now) : '';
+  if (timeline && wide) parts.push(renderTodayTimeline(timeline, now, timelineOpen));
 
   const listRows = [];
   if (state) listRows.push(renderTodayStateRow(state));
@@ -5304,9 +5401,19 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // DIE FUSSLEISTE: links die Coda, rechts „+N weitere" (Entwurf). Beide
   // zugleich gibt es nicht - neben verdeckten Zeilen waere „nichts mehr"
   // gelogen (codaAllowed).
+  //
+  // UNTER DER BREITEN BUEHNE IST „+N WEITERE" DIE LETZTE ZEILE (Critique
+  // 2026-10-26, Lauf 2, D3): gemessen 390x844 trug ein 71-75px hohes Fussband
+  // nur diesen einen Link. Jetzt steht er als schlanke Zeile im Raster der
+  // Zeilen (44px, Text an der Titelkante); die Coda behaelt ihren Fuss. Breit
+  // bleibt der Fuss, wie er ist: dort steht der Link rechts unter drei Zellen
+  // nebeneinander, eine Zeile im Raster gibt es nicht.
+  const moreRow = wide ? '' : ' today-cockpit__more--row';
   let more = '';
+  let peek = null;
   if (model.overflow > 0 && model.moreRoute) {
-    more = `<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link" data-route="${esc(model.moreRoute)}">
+    peek = { route: model.moreRoute };
+    more = `<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link${moreRow}" data-route="${esc(model.moreRoute)}">
           <span>${esc(t('dashboard.todayMore', { count: model.overflow }))}</span><i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
         </a>`;
   } else if (model.overflow > 0) {
@@ -5316,17 +5423,21 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     const hidden = (foldShopping ? [...model.hiddenRows, shopping] : model.hiddenRows).map((row) => withRelativeWhen(row, now));
     const moreText = t('dashboard.todayMore', { count: hidden.length });
     const lessText = t('dashboard.todayLess');
+    peek = { open: moreOpen, target: todayPeekTarget(hidden, now) };
     parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more${wide ? ' today-cockpit__rows--next' : ''}" id="today-cockpit-more"${wide ? ` style="--today-next-cols:${Math.min(PROGRAM_STRIP_CAP, hidden.length)}"` : ''}${moreOpen ? '' : ' hidden'}>${
       hidden.map((row) => renderTodayRow(row)).join('')}</div>`);
-    more = `<button type="button" class="today-cockpit__more today-cockpit__more--link" data-today-more
+    more = `<button type="button" class="today-cockpit__more today-cockpit__more--link${moreRow}" data-today-more
           aria-expanded="${moreOpen ? 'true' : 'false'}" aria-controls="today-cockpit-more"
           data-more-label="${esc(moreText)}" data-less-label="${esc(lessText)}">
           <span>${esc(moreOpen ? lessText : moreText)}</span><i data-lucide="chevron-down" class="icon-sm today-cockpit__more-icon" aria-hidden="true"></i>
         </button>`;
   }
-  if (model.coda || more) {
-    parts.push(`<div class="today-cockpit__foot">${model.coda ? `<span class="today-cockpit__coda">${esc(model.coda)}</span>` : ''}${more}</div>`);
+  if (!wide && more) parts.push(more);
+  const footMore = wide ? more : '';
+  if (model.coda || footMore) {
+    parts.push(`<div class="today-cockpit__foot">${model.coda ? `<span class="today-cockpit__coda">${esc(model.coda)}</span>` : ''}${footMore}</div>`);
   }
+  if (picture) parts.unshift(renderTodayPeek(picture, peek));
 
   // Deckt der Nutzer alle vier Domänen über Widgets ab, wäre das Cockpit leer —
   // dann entfällt der ganze Abschnitt statt einer leeren Kopfzeile. Im
@@ -9745,3 +9856,5 @@ Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleW
 // Test-Tor fuer die Zeitleiste (Critique 2026-10-26, Lauf 2): Verdrahtung,
 // Minutentakt, Fahne und der Fokus ueber den Buehnenwechsel.
 Object.assign(__test, { wireTodayTimeline, updateTodayTimelineNow, placeTodayTimelineFlag, todayFocusFallbacks });
+// D3 (Lauf 2): das Bild als Tippziel auf dem Telefon.
+Object.assign(__test, { renderTodayMiniTimeline, renderTodayPeek, todayPeekTarget, revealTodayPeekTarget });

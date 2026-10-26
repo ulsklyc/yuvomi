@@ -403,6 +403,7 @@
         "todayUntil": "entro le {{time}}",
         "todayMore": "+{{count}} altri oggi",
         "todayLess": "Mostra meno",
+        "todayShowDay": "Mostra tutta la giornata",
         "todayMore_one": "+{{count}} altro oggi",
         "todayOverdueCount": "{{count}} scadute",
         "todayOverdueCount_one": "{{count}} scaduta",

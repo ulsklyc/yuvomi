@@ -403,6 +403,7 @@
         "todayUntil": "en geç {{time}}",
         "todayMore": "+{{count}} tane daha bugün",
         "todayLess": "Daha az göster",
+        "todayShowDay": "Tüm günü göster",
         "todayMore_one": "+{{count}} tane daha bugün",
         "todayOverdueCount": "{{count}} gecikmiş",
         "todayOverdueCount_one": "{{count}} gecikmiş",

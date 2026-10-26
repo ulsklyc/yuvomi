@@ -403,6 +403,7 @@
         "todayUntil": "{{time}} तक",
         "todayMore": "+{{count}} और आज",
         "todayLess": "कम दिखाएं",
+        "todayShowDay": "पूरा दिन दिखाएं",
         "todayMore_one": "+{{count}} और आज",
         "todayOverdueCount": "{{count}} अतिदेय",
         "todayOverdueCount_one": "{{count}} अतिदेय",

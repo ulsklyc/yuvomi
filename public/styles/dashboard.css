@@ -3205,13 +3205,65 @@ svg.weather-forecast__icon {
 }
 
 /* DIE KURZFASSUNG AUF DEM TELEFON (renderTodayMiniTimeline): ein 20px-Gesicht
- * je Spur, ein 10px-Balken, fuenf Stunden an der Achse. Bild, kein Bedienteil. */
+ * je Spur, ein 6px-Balken je Packreihe, fuenf Stunden an der Achse. Bild,
+ * kein Bedienteil - das Tippziel liegt daneben (`.today-timeline-peek__hit`).
+ *
+ * DICHTER (Critique 2026-10-26, Lauf 2, D3): 148px fuer fuenf Spuren waren
+ * ein Viertel der Karte. Balken 10 -> 6px, Spurabstand 6 -> 4px, und nur noch
+ * Spuren mit Kommendem (dashboard.js): drei Spuren samt Achse ~90px. */
 .today-timeline--mini {
   --tl-label: calc(var(--space-6) + var(--space-1));
   --tl-pad-inline: var(--space-6);
   --tl-axis: var(--space-4);
-  row-gap: var(--space-1h);
+  --tl-bar: var(--space-1h);
+  --tl-bar-gap: var(--space-0h);
+  row-gap: var(--space-1);
   align-items: center;
+}
+
+/* DAS BILD ALS EIN TIPPZIEL (renderTodayPeek): gibt es Verdecktes, liegt ein
+ * Knopf ueber der ganzen Kurzfassung - mindestens Zielhoehe, die Luft zur
+ * Liste darunter gehoert mit zur Flaeche. Ohne Verdecktes ist die Huelle nur
+ * Abstand. Der Knopf ist leer und durchsichtig: zu sehen ist das Bild, zu
+ * hoeren sein Name. */
+.today-timeline-peek {
+  position: relative;
+  isolation: isolate;
+  padding-block-end: var(--space-3);
+}
+
+.today-timeline-peek--action {
+  display: grid;
+  align-content: center;
+  min-block-size: var(--target-base);
+}
+
+.today-timeline-peek__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.today-timeline-peek__hit:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+  background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), transparent);
+}
+
+@media (hover: hover) {
+  .today-timeline-peek__hit:hover {
+    background: color-mix(in srgb, var(--color-text-primary) var(--tint-state), transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-timeline-peek__hit {
+    transition: none;
+  }
 }
 
 .today-timeline--mini .today-timeline__axis {
@@ -3240,9 +3292,9 @@ svg.weather-forecast__icon {
   margin-inline-start: calc(var(--space-2h) / -2);
 }
 
-/* Unter der Kurzfassung beginnen die Zeilen mit einer Haarlinie. */
-.today-timeline--mini + .today-cockpit__rows {
-  margin-block-start: var(--space-3);
+/* Unter der Kurzfassung beginnen die Zeilen mit einer Haarlinie; den Abstand
+ * dazu traegt die Huelle (`.today-timeline-peek`), damit er Tippflaeche ist. */
+.today-timeline-peek + .today-cockpit__rows {
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -3261,18 +3313,23 @@ svg.weather-forecast__icon {
   block-size: var(--space-3);
 }
 
+/* JE PACKREIHE EINE TEILSPUR (Critique 2026-10-26, Lauf 2, D3): zwei
+ * Termine zur selben Zeit stehen uebereinander statt ineinander, mit 2px
+ * Fuge in der Farbe der Rinne - die Spur wird hoeher, nicht breiter. */
 .today-timeline__bars {
+  --tl-rows: 1;
   grid-column: 2;
   position: relative;
-  block-size: var(--space-2h);
-  border-radius: var(--radius-full);
+  block-size: calc(var(--tl-rows) * var(--tl-bar) + (var(--tl-rows) - 1) * var(--tl-bar-gap));
+  border-radius: var(--radius-xs);
   background: var(--color-surface-3);
 }
 
 .today-timeline__bar {
   position: absolute;
-  inset-block: 0;
+  inset-block-start: calc(var(--tl-row, 0) * (var(--tl-bar) + var(--tl-bar-gap)));
   inset-inline-start: calc(var(--tl-left) * 100%);
+  block-size: var(--tl-bar);
   inline-size: calc(var(--tl-width) * 100%);
   border-radius: var(--radius-full);
   background: var(--c);
@@ -3596,6 +3653,21 @@ button.today-cockpit__more--link {
 .today-cockpit__more[aria-expanded="true"] .today-cockpit__more-icon,
 .today-cockpit-card--group[aria-expanded="true"] .today-cockpit__more-icon {
   transform: rotate(180deg);
+}
+
+/* „+N WEITERE" ALS LETZTE ZEILE (Critique 2026-10-26, Lauf 2, D3): unter der
+ * breiten Buehne kein eigenes Fussband mehr, sondern eine schlanke Zeile im
+ * Raster der Zeilen - Text an der Titelkante, Chevron am Ende, Zielhoehe. */
+.today-cockpit__more--row {
+  display: grid;
+  grid-template-columns: calc(var(--target-sm) + var(--space-5) - var(--space-2)) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  min-height: var(--target-base);
+  padding: var(--space-2) var(--space-4);
+}
+
+.today-cockpit__more--row > span {
+  grid-column: 2;
 }
 
 /* DIE SAMMELZEILE DER UEBERFAELLIGEN (R14, dashboard.js groupOverdueRows).
@@ -6449,6 +6521,11 @@ button.today-cockpit__more--link {
 
   .today-cockpit__foot {
     padding-inline: var(--space-4);
+  }
+
+  /* Dieselbe Kante wie die Zeilen, die mobil mit 12px Polster stehen. */
+  .today-cockpit__more--row {
+    padding-inline: var(--space-3);
   }
 
   /* Die Inset-Grouped-Liste bleibt auch mobil einspaltig (Apple-Muster:

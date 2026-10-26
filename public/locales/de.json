@@ -421,6 +421,7 @@
         "todayUntil": "bis {{time}}",
         "todayMore": "+{{count}} weitere heute",
         "todayLess": "Weniger anzeigen",
+        "todayShowDay": "Ganzen Tag zeigen",
         "todayMore_one": "+{{count}} weiterer heute",
         "todayOverdueCount": "{{count}} überfällig",
         "todayOverdueCount_one": "{{count}} überfällig",

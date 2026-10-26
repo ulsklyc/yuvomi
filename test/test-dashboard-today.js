@@ -1611,3 +1611,197 @@ test('Lauf 2, P2: der Uebertrag von gestern nennt in der aufgeklappten Zeile sei
   assert.match(detail, /today-cockpit-card__time">dashboard\.todayUntil\{[^<]*11:00[^<]*\}</, 'er laeuft seit gestern: „bis 11:00"');
   assert.ok(!detail.includes(' - '), 'kein „bis 11:00 - 11:00"');
 }));
+
+// MOBIL VERSCHENKT KEINEN PLATZ FUER CONTENT (Critique 2026-10-26, Lauf 2, D3).
+// Gemessen 390x844: Kurzfassung 148px ohne ein Tippziel, „+N weitere" in einem
+// eigenen 71-75px-Fussband, Zahnarzt und Team-Call zu einem Balken
+// verschmolzen. Die Masse (6px, 44px, ~90-100px) prueft die Sichtpruefung;
+// hier stehen Markup, Verdrahtung und die Regeln, die es lesen.
+const miniOf = (html) => { const at = html.indexOf('<div class="today-timeline-peek'); return at < 0 ? '' : html.slice(at, html.indexOf('class="today-cockpit__rows', at)); };
+const lanesOfMini = (html) => [...miniOf(html).matchAll(/<div class="today-timeline__bars" style="--tl-rows:(\d+)">([\s\S]*?)<\/div>/g)]
+  .map((m) => ({ rows: Number(m[1]), bars: [...m[2].matchAll(/<i class="([^"]*)" style="([^"]*)"/g)].map((b) => ({ cls: b[1], style: b[2] })) }));
+
+const lateLanes = () => ({
+  upcomingEvents: [
+    // Alex: nur Vergangenes - die Spur faellt aus dem Bild.
+    ev(51, 'Zahnarzt', '2026-09-24T08:30', '2026-09-24T09:30', { assigned_users: [person(1)] }),
+    // Emma: Vergangenes und Kommendes - die Spur bleibt, der Vormittag grau.
+    ev(52, 'Schule', '2026-09-24T08:00', '2026-09-24T13:00', { assigned_users: [person(3)] }),
+    ev(53, 'Kita abholen', '2026-09-24T15:00', '2026-09-24T15:30', { assigned_users: [person(3)] }),
+    // Leo: zwei zur selben Zeit - zwei Teilspuren.
+    ev(54, 'Training', '2026-09-24T16:00', '2026-09-24T17:00', { assigned_users: [person(4)] }),
+    ev(55, 'Team-Call', '2026-09-24T16:30', '2026-09-24T17:30', { assigned_users: [person(4)] }),
+  ],
+  urgentTasks: [],
+  users: TIMELINE_USERS,
+});
+
+for (const stage of ['compact', 'phone']) {
+  test(`D3 (${stage}): die Kurzfassung zeigt nur Spuren mit Kommendem, Vergangenes darin grau`, inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+    if (stage === 'phone') onPhone();
+    const before = globalThis.__renderAvatarStack;
+    globalThis.__renderAvatarStack = (users) => `<span title="${users[0].display_name}"></span>`;
+    let sheet;
+    try { sheet = dash.renderTodayCockpit(lateLanes(), [], false, { stage }); } finally { globalThis.__renderAvatarStack = before; }
+    assert.match(sheet, /today-timeline--mini" aria-hidden="true"/, 'Vorbedingung: die Kurzfassung steht');
+    const mini = miniOf(sheet);
+    const faces = [...mini.matchAll(/title="([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(faces, ['Emma Johnson', 'Leo Johnson'], 'Alex hat heute nichts mehr vor sich - keine Spur');
+    const emma = lanesOfMini(sheet)[0];
+    assert.equal(emma.bars.length, 2, 'die Schule bleibt als Balken stehen');
+    assert.match(emma.bars[0].cls, /today-timeline__bar--past/, 'grau: sie ist vorbei');
+    assert.doesNotMatch(emma.bars[1].cls, /--past/, 'die Kita kommt noch');
+  }));
+}
+
+test('D3: ueberlappende Termine einer Spur stehen in Teilspuren (item.row), nicht ineinander', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  onPhone();
+  const sheet = dash.renderTodayCockpit(lateLanes(), [], false, { stage: 'phone' });
+  const [emma, leo] = lanesOfMini(sheet);
+  assert.equal(emma.rows, 1, 'Schule und Kita folgen aufeinander - eine Reihe');
+  assert.equal(leo.rows, 2, 'Training und Team-Call ueberlappen - zwei Reihen');
+  assert.deepEqual(leo.bars.map((b) => /--tl-row:(\d+)/.exec(b.style)?.[1]), ['0', '1'], 'jeder Balken in seiner Reihe');
+  // Das Stylesheet liest die Reihe: ohne diese Regel laegen beide wieder uebereinander.
+  const bar = cssRule('.today-timeline__bar');
+  assert.match(bar, /inset-block-start:\s*calc\(var\(--tl-row, 0\) \* \(var\(--tl-bar\) \+ var\(--tl-bar-gap\)\)\)/);
+  assert.match(cssRule('.today-timeline__bars'), /block-size:\s*calc\(var\(--tl-rows\) \* var\(--tl-bar\)/, 'die Spur waechst mit ihren Reihen');
+  assert.match(cssRule('.today-timeline--mini'), /--tl-bar:\s*var\(--space-1h\)/, '6px je Balken');
+}));
+
+test('D3: hat keine Spur mehr etwas vor sich, entfaellt die Kurzfassung - die Zeilen sprechen', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  onPhone();
+  const day = { upcomingEvents: [ev(51, 'Zahnarzt', '2026-09-24T08:30', '2026-09-24T09:30', { assigned_users: [person(1)] })], urgentTasks: [], users: TIMELINE_USERS };
+  const sheet = dash.renderTodayCockpit(day, [], false, { stage: 'phone' });
+  assert.ok(!sheet.includes('today-timeline'), 'kein Bild aus grauen Balken');
+  assert.ok(!sheet.includes('today-timeline-peek'), 'und keine leere Huelle');
+  assert.match(sheet, /today-cockpit-card--state/, 'die Zustandszeile spricht');
+  // Breit bleibt die Leiste: dort traegt sie den ganzen Tag.
+  const wide = dash.renderTodayCockpit(day, [], false, { stage: 'wide' });
+  assert.match(wide, /today-timeline__title">Zahnarzt</);
+}));
+
+test('D3: mit Verdecktem ist das ganze Bild EIN Tippziel auf dieselbe Region wie „+N weitere"', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const viewer = TIMELINE_USERS[1];
+  for (const moreOpen of [false, true]) {
+    const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'compact', viewer, moreOpen });
+    assert.match(sheet, /id="today-cockpit-more"/, 'Vorbedingung: die verdeckten Zeilen stehen zum Aufklappen da');
+    const hit = /<button type="button" class="today-timeline-peek__hit"([^>]*)><\/button>/.exec(sheet);
+    assert.ok(hit, 'ueber dem Bild liegt ein Knopf');
+    assert.match(hit[1], /data-today-more data-today-peek/, 'verdrahtet wie „+N weitere"');
+    assert.match(hit[1], /aria-controls="today-cockpit-more"/);
+    assert.match(hit[1], new RegExp(`aria-expanded="${moreOpen}"`), 'sagt denselben Zustand');
+    assert.match(hit[1], /aria-label="dashboard\.todayShowDay"/, 'eigener Name, der Inhalt steht in den Zeilen');
+    assert.match(hit[1], /data-peek-target="(?:event|meal):[^"]+"/, 'kennt die Zeile, zu der er danach fuehrt');
+    assert.match(sheet, /today-timeline-peek today-timeline-peek--action">\s*<div class="today-timeline today-timeline--mini" aria-hidden="true"/, 'das Bild bleibt Bild');
+    assert.ok(sheet.indexOf('today-timeline-peek__hit') < sheet.indexOf('class="today-cockpit__rows'), 'das Bild steht ueber den Zeilen');
+  }
+  // Fuehrt „+N weitere" in eine Ansicht, ist das Bild ein Link dorthin.
+  const linked = dash.renderTodayCockpit({ ...busyAfternoon(), todayMeals: [], myShiftsToday: [] }, [], false, { stage: 'compact', cap: 2 });
+  assert.match(linked, /<a href="\/calendar\?date=2026-09-24" class="today-timeline-peek__hit" data-route="\/calendar\?date=2026-09-24" aria-label="dashboard\.todayShowDay"><\/a>/);
+}));
+
+test('D3: ohne Verdecktes ist das Bild kein Tippziel - aria-hidden, kein Fokusstopp', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  onPhone();
+  const sheet = dash.renderTodayCockpit(lateLanes(), [], false, { stage: 'phone', cap: 8 });
+  assert.ok(!sheet.includes('today-cockpit__more'), 'Vorbedingung: alles steht, nichts ist verdeckt');
+  assert.match(sheet, /<div class="today-timeline-peek">\s*<div class="today-timeline today-timeline--mini" aria-hidden="true"/);
+  assert.ok(!sheet.includes('today-timeline-peek__hit'), 'kein Knopf ohne Ziel');
+}));
+
+test('D3: der Tipp aufs Bild klappt auf, beide Knoepfe sagen es, und der Fokus geht zur ersten kommenden verdeckten Zeile', () => {
+  const region = {
+    hidden: true,
+    query: [],
+    querySelector(sel) {
+      this.query.push(sel);
+      if (sel === '[data-object-kind="meal"][data-object-id="63"]') return target;
+      return sel === 'a[href], button' ? first : null;
+    },
+  };
+  const calls = [];
+  const target = { focus: (opts) => calls.push(['focus', opts]), scrollIntoView: (opts) => calls.push(['scroll', opts]) };
+  // Die erste Zeile der Region: Ersatzziel, falls die Zielzeile fehlt - und Falle fuer einen Fokussprung von „+N weitere".
+  const first = { focus: () => calls.push(['focus-first']), scrollIntoView: () => calls.push(['scroll-first']) };
+  const makeToggle = (attrs, dataset, label = null) => {
+    const handlers = {};
+    return {
+      attrs,
+      dataset,
+      label,
+      getAttribute: (name) => attrs[name] ?? null,
+      setAttribute: (name, value) => { attrs[name] = String(value); },
+      querySelector: (sel) => (sel === 'span' ? label : null),
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+      click() { handlers.click?.(); },
+    };
+  };
+  const peek = makeToggle({ 'aria-expanded': 'false', 'aria-controls': 'today-cockpit-more' }, { todayMore: '', todayPeek: '', peekTarget: 'meal:63' });
+  const more = makeToggle({ 'aria-expanded': 'false', 'aria-controls': 'today-cockpit-more' }, { todayMore: '', moreLabel: 'mehr', lessLabel: 'weniger' }, { textContent: 'mehr' });
+  const root = {
+    querySelectorAll: (sel) => (sel === '[data-today-more]' ? [peek, more] : []),
+    querySelector: (sel) => (sel === '#today-cockpit-more' ? region : null),
+  };
+  const prevWindow = global.window;
+  global.window = { matchMedia: () => ({ matches: false }) };
+  try {
+    dash.wireTodayMore(root);
+    peek.click();
+    assert.equal(region.hidden, false, 'die Region steht offen');
+    assert.equal(peek.attrs['aria-expanded'], 'true');
+    assert.equal(more.attrs['aria-expanded'], 'true', '„+N weitere" sagt denselben Zustand');
+    assert.equal(more.label.textContent, 'weniger', 'und heisst jetzt „Weniger anzeigen"');
+    assert.deepEqual(calls, [['focus', { preventScroll: true }], ['scroll', { block: 'nearest', behavior: 'smooth' }]],
+      'Fokus auf die Zielzeile, Blick dorthin - ueber der Kapsel (scroll-padding)');
+    calls.length = 0;
+    more.click();
+    assert.equal(region.hidden, true, '„+N weitere" klappt zu');
+    assert.equal(peek.attrs['aria-expanded'], 'false', 'das Bild sagt es mit');
+    more.click();
+    assert.equal(region.hidden, false);
+    assert.deepEqual(calls, [], '„+N weitere" behaelt den Fokus');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
+test('D3: das Ziel nach dem Aufklappen ist die erste kommende verdeckte Zeile', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const now = new Date();
+  const hidden = [
+    { kind: 'task', objectId: 7, sortKey: '00:00' },
+    { kind: 'event', objectId: 43, sortKey: '00:00' },
+    { kind: 'meal', objectId: 63, sortKey: '18:30' },
+    { kind: 'event', objectId: 45, sortKey: '20:00' },
+  ];
+  assert.equal(dash.todayPeekTarget(hidden, now), 'meal:63', 'das Abendessen um 18:30 - nicht die Aufgabe, nicht das Ganztaegige');
+  assert.equal(dash.todayPeekTarget(hidden.slice(0, 2), now), 'task:7', 'ohne Kommendes die erste verdeckte Zeile');
+}));
+
+for (const stage of ['compact', 'phone']) {
+  test(`D3 (${stage}): „+N weitere" ist die letzte Zeile der Liste statt eines Fussbands`, inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+    if (stage === 'phone') onPhone();
+    const viewer = TIMELINE_USERS[1];
+    const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage, viewer, cap: 2 });
+    const more = /<(a|button)\b[^>]*class="today-cockpit__more today-cockpit__more--link today-cockpit__more--row"/.exec(sheet);
+    assert.ok(more, '„+N weitere" steht als Zeile im Raster der Zeilen');
+    assert.ok(!sheet.includes('today-cockpit__foot'), 'kein Fussband, das nur den Link traegt');
+    assert.ok(sheet.indexOf(more[0]) > sheet.lastIndexOf('today-cockpit-card__value'), 'nach der letzten Zeile');
+    // Die Coda behaelt ihren Fuss.
+    const quiet = dash.renderTodayCockpit({ upcomingEvents: [ev(53, 'Kita abholen', '2026-09-24T15:00', '2026-09-24T15:30', { assigned_users: [person(3)] })], urgentTasks: [], users: TIMELINE_USERS }, [], false, { stage, cap: 8 });
+    assert.match(quiet, /<div class="today-cockpit__foot"><span class="today-cockpit__coda">[^<]+<\/span><\/div>/);
+  }));
+}
+
+test('D3: breit bleibt „+N weitere" rechts im Fuss; die Zeile hat Zielhoehe und die Titelkante', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const tasks = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, title: `T${i + 1}`, due_date: '2026-09-24',
+    due_time: `${String(15 + (i % 6)).padStart(2, '0')}:00`, status: 'open', assigned_users: [] }));
+  const sheet = dash.renderTodayCockpit({ urgentTasks: tasks, users: [] }, [], false, { stage: 'wide' });
+  assert.match(sheet, /<div class="today-cockpit__foot">\s*<a href="\/tasks\?due=today" class="today-cockpit__more today-cockpit__more--link" data-route=/, 'breit unveraendert im Fuss');
+  assert.ok(!sheet.includes('today-cockpit__more--row'));
+  const row = cssRule('.today-cockpit__more--row');
+  assert.match(row, /min-height:\s*var\(--target-base\)/, '44px Ziel');
+  assert.match(row, /grid-template-columns:\s*calc\(var\(--target-sm\) \+ var\(--space-5\) - var\(--space-2\)\) minmax\(0, 1fr\) auto/, 'dasselbe Raster wie die Zeilen');
+  assert.match(cssRule('.today-cockpit__more--row > span'), /grid-column:\s*2/, 'der Text an der Titelkante');
+  const hit = cssRule('.today-timeline-peek--action');
+  assert.match(hit, /min-block-size:\s*var\(--target-base\)/, 'das Bild ist mindestens ein 44px-Ziel');
+  assert.match(cssRule('.today-timeline-peek__hit:focus-visible'), /outline-offset:\s*var\(--focus-ring-offset-inset\)/, 'sichtbarer Fokus innen');
+}));

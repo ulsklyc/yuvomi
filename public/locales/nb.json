@@ -403,6 +403,7 @@
         "todayUntil": "innen {{time}}",
         "todayMore": "+{{count}} til i dag",
         "todayLess": "Vis mindre",
+        "todayShowDay": "Vis hele dagen",
         "todayMore_one": "+{{count}} til i dag",
         "todayOverdueCount": "{{count}} forfalt",
         "todayOverdueCount_one": "{{count}} forfalt",

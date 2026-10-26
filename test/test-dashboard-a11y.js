@@ -746,7 +746,9 @@ test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt al
   const withShop = renderTodayCockpit(shop, [], false, { now, moreOpen: false });
   assert.match(withShop, /dashboard\.todayShopping</, 'Reichweite: die Einkaufszeile steht im Blatt');
   const regionStart = withShop.indexOf('id="today-cockpit-more"');
-  const button = withShop.indexOf('data-today-more');
+  // Der Knopf am Ende der Liste - nicht das Bild ueber den Zeilen, das seit D3
+  // (Lauf 2) dieselbe Region steuert.
+  const button = withShop.indexOf('<button type="button" class="today-cockpit__more');
   const shopAt = withShop.indexOf('dashboard.todayShopping<');
   assert.ok(regionStart > 0 && regionStart < shopAt && shopAt < button,
     'auf dem Telefon steht der Einkauf hinter dem Knopf, nicht als eigene Zeile darunter');

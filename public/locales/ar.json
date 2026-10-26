@@ -505,6 +505,7 @@
         "todayUntil": "حتى {{time}}",
         "todayMore": "+{{count}} أخرى اليوم",
         "todayLess": "عرض أقل",
+        "todayShowDay": "عرض اليوم كاملًا",
         "todayMore_one": "+{{count}} أخرى اليوم",
         "todayMore_few": "+{{count}} أخرى اليوم",
         "todayMore_two": "+{{count}} أخرى اليوم",

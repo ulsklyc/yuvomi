@@ -403,6 +403,7 @@
         "todayUntil": "trước {{time}}",
         "todayMore": "+{{count}} mục nữa hôm nay",
         "todayLess": "Ẩn bớt",
+        "todayShowDay": "Hiện cả ngày",
         "todayMore_one": "+{{count}} mục nữa hôm nay",
         "todayOverdueCount": "{{count}} quá hạn",
         "todayOverdueCount_one": "{{count}} quá hạn",

@@ -421,6 +421,7 @@
         "todayUntil": "bago mag-{{time}}",
         "todayMore": "mga {{count}} pa ngayon",
         "todayLess": "Ipakita ang mas kaunti",
+        "todayShowDay": "Ipakita ang buong araw",
         "todayMore_one": "{{count}} pa ngayon",
         "todayOverdueCount": "{{count}} lampas na sa takdang araw",
         "todayOverdueCount_one": "{{count}} lampas na sa takdang araw",
