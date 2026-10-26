@@ -1583,6 +1583,18 @@ test('Lauf 2, P2: das Naechste und der gewaehlte Block sehen verschieden aus - K
   assert.match(cssRule('  .today-timeline__title', dashboardCss.indexOf('@container tl-slot (max-width: 5rem)')) ?? narrow.slice(0, 900), /text-overflow: clip;/, 'zweizeilig keine Ellipse je Zeile');
 });
 
+test('Re-Kritik D7: gestaucht zeigt ein Block nur seinen Ton, eine Mahlzeit nur ihren Punkt - keine Buchstabenreste, der Titel bleibt im Dokument', () => {
+  const tiny = dashboardCss.indexOf('@container tl-slot (max-width: 3rem)');
+  assert.ok(tiny > -1, 'eine Schwelle fuer gestauchte Bloecke');
+  const title = cssRule('  .today-timeline__title', tiny);
+  assert.match(title, /clip: rect\(0, 0, 0, 0\);/, 'der Titel geht aus dem Bild ...');
+  assert.ok(!/display: none|visibility: hidden/.test(title), '... aber nicht aus dem zugaenglichen Namen');
+  const pointCut = dashboardCss.indexOf('@container tl-slot (max-width: 5.5rem)');
+  assert.ok(pointCut > -1, 'eine eigene Schwelle fuer den Typ neben dem Punkt');
+  assert.match(cssRule('  .today-timeline__event--point .today-timeline__title', pointCut), /clip: rect\(0, 0, 0, 0\);/);
+  assert.match(cssRule('.today-timeline__slot--point'), /container: tl-slot \/ inline-size;/, 'der Punkt-Slot fragt seine Breite wie jeder Block');
+});
+
 test('Lauf 2, P2: der Fokus auf einem Block ueberlebt den Neuaufbau in seiner Spur und den Buehnenwechsel ueber Ersatzkandidaten', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   const prevCss = globalThis.CSS;
   globalThis.CSS = { escape: (v) => String(v) };

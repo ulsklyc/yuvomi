@@ -2994,14 +2994,43 @@ svg.weather-forecast__icon {
   }
 }
 
+/* GESTAUCHT SPRICHT NUR DER TON (Re-Kritik 2026-10-26, D7): vor dem Knie der
+ * gewichteten Achse wird ein Block 30px schmal, eine Mahlzeit hat keinen Platz
+ * fuer ihren Typ. Statt Buchstabenresten („Zał arz", „M..") bleibt die Flaeche
+ * bzw. der Punkt; der Titel bleibt im Dokument (zugaenglicher Name) und steht
+ * im title des Blocks. */
+@container tl-slot (max-width: 3rem) {
+  .today-timeline__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+@container tl-slot (max-width: 5.5rem) {
+  .today-timeline__event--point .today-timeline__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
 /* DIE MAHLZEIT IST EIN PUNKT, KEIN BLOCK (Critique 2026-10-26, Befund 3):
  * ihre Zeit ist die Nennzeit des Typs, keine eingetragene Dauer. Der Knopf
  * beginnt an der Zeit mit einem Punkt und traegt den Typ daneben, so breit
  * wie sein Text. */
 .today-timeline__slot--point {
-  /* Kein Groessen-Container: die Marke ist so breit wie ihr Text, hoechstens
-   * so breit wie die Spanne, die sie in der Spur belegt (TIMELINE_POINT_SPAN). */
-  container-type: normal;
+  /* Die Marke ist so breit wie ihr Text, hoechstens so breit wie die Spanne,
+   * die sie in der Spur belegt (TIMELINE_POINT_SPAN). Der Slot bleibt
+   * Groessen-Container - seine Breite steht fest -, damit gestaucht der Typ
+   * wegfallen kann (oben). */
+  container: tl-slot / inline-size;
 }
 
 .today-timeline__slot--point > .today-timeline__event {
