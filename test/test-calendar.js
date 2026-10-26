@@ -4966,7 +4966,8 @@ test('Baender: im Nachbarmonat toent das Band zurueck wie der Chip der Zelle, ni
 // keine, und ein `;` im String trennt keine Deklaration. Ohne das schluckte
 // eine einzige solche Klammer jede Deklaration dahinter, und der Guard sah
 // den Rest der Regel nicht mehr. Ein Zeilenende beendet einen offenen String
-// (so liest ihn auch der Browser), und eine ueberzaehlige `)` zaehlt nicht
+// (so liest ihn auch der Browser) - in CSS sind das \n, \r\n, \r und \f
+// (#1709) -, und eine ueberzaehlige `)` zaehlt nicht
 // ins Minus - sonst waere wieder alles dahinter "geschachtelt". In einem
 // `url(` ohne Anfuehrungszeichen ist bis zur `)` alles Adresse, auch ein
 // Anfuehrungszeichen: es oeffnet dort keinen String.
@@ -4992,7 +4993,7 @@ function splitTopLevel(text, isSeparator) {
       continue;
     }
     if (quote) {
-      if (ch === quote || ch === '\n') quote = '';
+      if (ch === quote || ch === '\n' || ch === '\r' || ch === '\f') quote = '';
       cur += ch;
       continue;
     }
@@ -5020,6 +5021,15 @@ function splitTopLevel(text, isSeparator) {
 }
 /** Werte einer Deklaration, an Leerraum ausserhalb von Klammern getrennt. */
 const cssWords = (value) => splitTopLevel(value, (ch) => /\s/.test(ch));
+/**
+ * Der Wert, wie er mit den Fallbacks aller var() darin aussieht:
+ * `var(--x, 0 1px 0 2px)` ist fuer cssWords() EIN Wort, greift der Fallback,
+ * sind es vier (#1709). Geschachtelte Fallbacks werden mit aufgeloest.
+ */
+const withVarFallbacks = (value) => cssWords(value).map((word) => {
+  const fallback = /^var\(\s*--[\w-]+\s*,([\s\S]*)\)$/i.exec(word);
+  return fallback ? withVarFallbacks(fallback[1]) : word;
+}).join(' ');
 /** `[{ prop, value, text }]` eines Regelrumpfs aus eachRule(), ohne `!important`. */
 function cssDeclarations(body) {
   return splitTopLevel(body, (ch) => ch === ';').flatMap((decl) => {
@@ -5038,7 +5048,7 @@ const BOX_SHORTHANDS = new Set([
 // Eigenschaften, deren WERT eine Seite nennen kann. justify-* steht bewusst
 // nicht hier: dort gibt es start/end, und left/right bedeutet etwas anderes.
 const SIDE_KEYWORD_PROPS = new Set([
-  'text-align', 'float', 'clear', 'transform-origin', 'background-position', 'object-position',
+  'text-align', 'float', 'clear', 'transform-origin', 'background-position', 'background-position-x', 'object-position',
 ]);
 /**
  * Die Deklarationen eines Regelrumpfs, die an einer physischen Seite haengen
@@ -5051,24 +5061,37 @@ function physicalSideDeclarations(body) {
     // Langformen: left, right, margin-left, border-right-color,
     // scroll-padding-left, border-top-left-radius ...
     if (/(?:^|-)(?:left|right)(?:-|$)/.test(prop)) return true;
+    // Kurzformen zaehlen so, wie sie dastehen, UND so, wie sie mit ihren
+    // var()-Fallbacks aussehen - jede der beiden Lesarten kann greifen.
+    const readings = [value, withVarFallbacks(value)];
     if (BOX_SHORTHANDS.has(prop)) {
-      const v = cssWords(value);
-      return v.length === 4 && v[1] !== v[3];
+      return readings.some((reading) => {
+        const v = cssWords(reading);
+        return v.length === 4 && v[1] !== v[3];
+      });
     }
     if (prop === 'border-radius') {
       // Ecken: oben-links, oben-rechts, unten-rechts, unten-links - je vor und
       // hinter dem `/` (waagrechte und senkrechte Halbachse). Gespiegelt
       // tauschen oben-links/oben-rechts und unten-links/unten-rechts.
-      return splitTopLevel(value, (ch) => ch === '/').some((half) => {
+      return readings.some((reading) => splitTopLevel(reading, (ch) => ch === '/').some((half) => {
         const [tl, tr = tl, br = tl, bl = tr] = cssWords(half);
         return tl !== tr || br !== bl;
-      });
+      }));
     }
     if (SIDE_KEYWORD_PROPS.has(prop)) {
       return splitTopLevel(value, (ch) => /[\s,]/.test(ch)).some((word) => /^(?:left|right)$/i.test(word));
     }
     return false;
   }).map(({ text }) => text);
+}
+
+// Die Kurzformen, die der Band-Test abfragt. Er liest sie ueber denselben
+// Leser wie der Guard ueber die ganze Datei - bis #1709 lief er ueber ein
+// eigenes `[^;]+`, das weder Strings noch Grossschreibung kannte.
+const BAND_SHORTHANDS = new Set(['margin', 'padding', 'inset', 'border-radius']);
+function lopsidedBoxDeclarations(body) {
+  return physicalSideDeclarations(body).filter((text) => BAND_SHORTHANDS.has(text.slice(0, text.indexOf(':'))));
 }
 
 test('RTL-Leser: eine Klammer in einem CSS-String oder hinter einem Backslash verdeckt keine Deklaration', () => {
@@ -5115,6 +5138,98 @@ test('RTL-Leser: eine Klammer in einem CSS-String oder hinter einem Backslash ve
     `Worte: ${JSON.stringify(cssWords('0 "a b" 0 \'c ) d\''))}`);
 });
 
+test('RTL-Leser: var()-Fallback, background-position-x und ein Zeilenende im String (#1709)', () => {
+  const seen = (body) => physicalSideDeclarations(body).join('; ');
+  const blind = [
+    // Ein Fallback ist ein Wert: greift er, setzt er links und rechts
+    // verschieden - auch wenn var() fuer cssWords() EIN Wort ist.
+    ['margin: var(--x, 0 1px 0 2px)', 'margin: var(--x, 0 1px 0 2px)'],
+    ['padding: 0 var(--x, 1px 0 2px)', 'padding: 0 var(--x, 1px 0 2px)'],
+    ['margin: var(--a, var(--b, 0 1px 0 2px))', 'margin: var(--a, var(--b, 0 1px 0 2px))'],
+    ['scroll-margin: var(--x,0 1px 0 2px)', 'scroll-margin: var(--x,0 1px 0 2px)'],
+    ['border-radius: var(--r, 1px 0)', 'border-radius: var(--r, 1px 0)'],
+    // Die Achsen-Langform nennt die Seite genauso wie die Kurzform.
+    ['background-position-x: left', 'background-position-x: left'],
+    ['background-position-x: right 4px', 'background-position-x: right 4px'],
+    // Ein Zeilenende beendet einen offenen String - in CSS sind das \n,
+    // \r\n, \r und \f, nicht nur \n.
+    ['content: "(\r; margin-left: 1px', 'margin-left: 1px'],
+    ['content: "(\f; margin-left: 1px', 'margin-left: 1px'],
+    ["content: '(\r; float: right", 'float: right'],
+  ];
+  const missed = blind.filter(([body, want]) => seen(body) !== want)
+    .map(([body, want]) => `${JSON.stringify(body)}: gesehen "${seen(body)}", erwartet "${want}"`);
+  const quiet = [
+    'margin: var(--x, 0 1px 0 1px)',
+    'margin: var(--x, 0 1px)',
+    'margin: var(--x)',
+    'padding: var(--x, 0) 1px',
+    'border-radius: var(--r, 4px)',
+    'border-radius: var(--r, 1px 1px 2px 2px)',
+    'background-position-x: center',
+    'background-position-y: top',
+    'content: "a\\\rb; margin-left: 1px"; color: red',
+  ];
+  const loud = quiet.filter((body) => seen(body) !== '').map((body) => `${JSON.stringify(body)}: faelschlich gemeldet "${seen(body)}"`);
+  assert(missed.length + loud.length === 0, [...missed, ...loud].join('\n    '));
+});
+
+test('Band-Leser: lopsidedBoxDeclarations() liest wie der Deklarationsleser (#1709)', () => {
+  // Der Band-Test fragt nur Kurzformen ab, liest sie aber mit demselben Leser
+  // wie der Guard ueber die ganze Datei: Strings, Gross-/Kleinschreibung und
+  // var()-Fallbacks gelten hier wie dort.
+  const odd = (body) => lopsidedBoxDeclarations(body).join('; ');
+  const blind = [
+    ['Margin: 0 1px 0 2px', 'margin: 0 1px 0 2px'],
+    ['color: red;padding: 0 1px 0 2px !important', 'padding: 0 1px 0 2px'],
+    ['content: "("; inset: 0 1px 0 2px', 'inset: 0 1px 0 2px'],
+    ['padding: var(--p, 0 1px 0 2px)', 'padding: var(--p, 0 1px 0 2px)'],
+    ['border-radius: 1px 0 / 0', 'border-radius: 1px 0 / 0'],
+  ];
+  const missed = blind.filter(([body, want]) => odd(body) !== want)
+    .map(([body, want]) => `${JSON.stringify(body)}: gesehen "${odd(body)}", erwartet "${want}"`);
+  const quiet = [
+    'content: "; margin: 0 1px 0 2px"; color: red',
+    "content: '; padding: 0 1px 0 2px'",
+    'margin: 0 1px 0 1px',
+    'margin-left: 1px',
+    'border-radius: 1px / 2px',
+    '--margin: 0 1px 0 2px',
+  ];
+  const loud = quiet.filter((body) => odd(body) !== '').map((body) => `${JSON.stringify(body)}: faelschlich gemeldet "${odd(body)}"`);
+  assert(missed.length + loud.length === 0, [...missed, ...loud].join('\n    '));
+});
+
+test('eachRule(): ein String schneidet keine Regel ab, und ein Kommentarzeichen im String ist keins (#1709)', () => {
+  // Der geteilte Scanner, nicht der Deklarationsleser: was eachRule() hier
+  // abschneidet, bekommt physicalSideDeclarations() nie zu sehen.
+  const sides = (css) => [...eachRule(css)]
+    .map((r) => `${r.at.length ? `${r.at.join(' ')} > ` : ''}${r.selector} => ${physicalSideDeclarations(r.body).join('; ')}`);
+  const cases = [
+    ['.a { content: "}"; margin-left: 1px }', ['.a => margin-left: 1px']],
+    [".a { content: '}'; margin-left: 1px }", ['.a => margin-left: 1px']],
+    ['.a { content: "\\"}"; margin-left: 1px }', ['.a => margin-left: 1px']],
+    ['.a { content: "{"; margin-left: 1px } .b { float: right }', ['.a => margin-left: 1px', '.b => float: right']],
+    ['.a { content: "/*"; margin-left: 1px; content: "*/" }', ['.a => margin-left: 1px']],
+    ['.a { content: "*/"; margin-left: 1px } /* } */ .b { float: right }', ['.a => margin-left: 1px', '.b => float: right']],
+    ['.a { background: url(a}b.png); margin-left: 1px }', ['.a => margin-left: 1px']],
+    ['.a[title="}"] { margin-left: 1px }', ['.a[title="}"] => margin-left: 1px']],
+    ['.a[title=";"] { margin-left: 1px }', ['.a[title=";"] => margin-left: 1px']],
+    ['@media (min-width: 1px) { .a { content: "}"; margin-left: 1px } .b { float: right } }',
+      ['@media (min-width: 1px) > .a => margin-left: 1px', '@media (min-width: 1px) > .b => float: right']],
+    // Ein Zeilenende beendet einen offenen String, die Klammer danach zaehlt.
+    ['.a { content: "x\n} .b { margin-left: 1px }', ['.a => ', '.b => margin-left: 1px']],
+    ['.a { content: "x\r} .b { margin-left: 1px }', ['.a => ', '.b => margin-left: 1px']],
+    // Was schon vorher galt, gilt weiter.
+    ['.a { /* } */ margin-left: 1px }', ['.a => margin-left: 1px']],
+    ['.a{} .b{} .c{} .d{}', ['.a => ', '.b => ', '.c => ', '.d => ']],
+    ['@keyframes k { from { left: 0 } } .a { float: left }', ['.a => float: left']],
+  ];
+  const wrong = cases.filter(([css, want]) => JSON.stringify(sides(css)) !== JSON.stringify(want))
+    .map(([css, want]) => `${JSON.stringify(css)}: ${JSON.stringify(sides(css))}, erwartet ${JSON.stringify(want)}`);
+  assert(wrong.length === 0, wrong.join('\n    '));
+});
+
 test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit der Schreibrichtung (#1467)', () => {
   // Das Raster kippt in RTL selbst: Spalte 1 steht rechts, `first` und
   // --band-out-start zaehlen vom Zeilenanfang. Was an einer SEITE des Bands
@@ -5137,20 +5252,6 @@ test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit 
   // physisch: `margin: 0 var(--band-me) 0 var(--band-ms)` setzt den Einzug in
   // RTL auf die falsche Seite. Drei Werte (`a b c`) sind seitengleich, weil
   // der mittlere Wert fuer links UND rechts gilt.
-  const lopsided = (body) => [...body.matchAll(/(?:^|[;{\s])(margin|padding|inset|border-radius)\s*:\s*([^;]+)/g)]
-    .filter(([, prop, raw]) => {
-      const value = raw.replace(/!important/, '').trim();
-      if (prop !== 'border-radius') {
-        const v = cssWords(value);
-        return v.length === 4 && v[1] !== v[3];
-      }
-      // Radius: gespiegelt tauschen oben-links/oben-rechts und unten-links/unten-rechts.
-      return value.split('/').some((half) => {
-        const [tl, tr = tl, br = tl, bl = tr] = cssWords(half);
-        return tl !== tr || br !== bl;
-      });
-    })
-    .map(([, prop, raw]) => `${prop}: ${raw.trim()}`);
 
   // (1) Offene Kante, Einzug und Rundung: nur logische Eigenschaften, in
   // jeder Regel dieser Klassen.
@@ -5158,7 +5259,7 @@ test('Baender in RTL: offene Kante, Chevron und Nachbarmonat-Toenung kippen mit 
     for (const r of withClass(cls)) {
       if (/\[dir=/.test(r.selector)) continue;
       assert(!physical.test(r.body), `${where(r)} haengt an einer physischen Seite: ${r.body}`);
-      const odd = lopsided(r.body);
+      const odd = lopsidedBoxDeclarations(r.body);
       assert(odd.length === 0, `${where(r)} setzt links und rechts verschieden: ${odd.join('; ')}`);
     }
   }
