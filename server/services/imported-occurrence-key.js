@@ -27,6 +27,16 @@ import {
 } from './calendar-events.js';
 import { hasExplicitZone, localToUTCOccurrence, shiftDateKey } from '../utils/timezone.js';
 
+/**
+ * Hoechstens so viele Pruefungen per Expansion (`healable`) je Serie und
+ * Lieferung (Security-Review zu #2300). Jede rollt die Serie ueber drei Tage
+ * aus, mit bis zu MAX_EXPANSION_ITERATIONS Schritten; ein fremder Feed mit
+ * tausenden EXDATEs haette die Arbeit sonst vervielfacht. Ist das Budget
+ * aufgebraucht, wird nicht mehr geheilt (fail closed): die alte Zeile bleibt
+ * und wirkt wie bisher, der naechste Empfang heilt weiter.
+ */
+export const HEAL_CHECK_BUDGET = 16;
+
 const RAW_DATE_TIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z?)$/i;
 
 /** Ganze Sekunde als `YYYY-MM-DDTHH:MM:SSZ`, oder null. */
@@ -108,9 +118,10 @@ export function occurrenceKeyFromRaw(raw, series, { householdZone = null, clock 
  * @param {object} database  better-sqlite3-Connection
  * @param {number} eventId   die gespeicherte Serie
  * @param {object} ev        Ergebnis von `normalizeRecurrenceOverrides` (`exdateRaws`, `exdates`)
+ * @param {{healCheckBudget?: number}} [options]  Budget der Pruefungen (Tests)
  * @returns {number}  geaenderte Zeilen (neu angelegt oder geheilt)
  */
-export function storeImportedExceptions(database, eventId, ev) {
+export function storeImportedExceptions(database, eventId, ev, { healCheckBudget = HEAL_CHECK_BUDGET } = {}) {
   const raws = Array.isArray(ev?.exdateRaws)
     ? ev.exdateRaws
     : (Array.isArray(ev?.exdates) ? ev.exdates.map((legacy) => ({ value: null, legacy })) : []);
@@ -136,9 +147,10 @@ export function storeImportedExceptions(database, eventId, ev) {
     'DELETE FROM calendar_event_exceptions WHERE event_id = ? AND exception_date = ?',
   );
   let changes = 0;
+  const budget = { left: healCheckBudget };
   for (const key of keys) changes += insert.run(eventId, key).changes;
   for (const { key, legacy } of pairs) {
-    if (key !== legacy && !keys.has(legacy) && healable(series, clock, householdZone, key, legacy)) {
+    if (key !== legacy && !keys.has(legacy) && healable(series, clock, householdZone, key, legacy, budget)) {
       changes += heal.run(eventId, legacy).changes;
     }
   }
@@ -155,12 +167,15 @@ export function storeImportedExceptions(database, eventId, ev) {
  * abgesagt der 12.11. mit demselben alten Tag). Fort darf sie deshalb nur, wenn
  * sie in der alten Lesart kein anderes Vorkommen der Serie trifft als das, das
  * jetzt unter `key` liegt - dann geht beim Loeschen nichts verloren. Sonst
- * bleibt sie stehen und wirkt wie bisher (Schritt 6 entscheidet).
+ * bleibt sie stehen und wirkt wie bisher (Schritt 6 entscheidet). Ebenso, wenn
+ * das Budget der Pruefungen (`HEAL_CHECK_BUDGET`) aufgebraucht ist.
  */
-function healable(series, clock, householdZone, key, legacy) {
+function healable(series, clock, householdZone, key, legacy, budget) {
   const own = new Set(clock.dayCandidatesOfKey(key));
   const others = clock.dayCandidatesOfKey(legacy).filter((day) => !own.has(day));
   for (const day of others) {
+    if (budget.left <= 0) return false;
+    budget.left -= 1;
     let hits;
     try {
       hits = expandRecurringEvents([series], shiftDateKey(day, -1), shiftDateKey(day, 1), null, {

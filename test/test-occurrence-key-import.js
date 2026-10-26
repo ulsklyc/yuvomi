@@ -39,6 +39,7 @@ const { getCountdowns } = await import('../server/services/countdowns.js');
 const { parseICS, normalizeRecurrenceOverrides, expandRRULE } = await import('../server/services/ics-parser.js');
 const { importToLocal } = await import('../server/services/ics-subscription.js');
 const caldavSync = await import('../server/services/caldav-sync.js');
+const { storeImportedExceptions } = await import('../server/services/imported-occurrence-key.js');
 const appleCalendar = await import('../server/services/apple-calendar.js');
 
 db.prepare("INSERT INTO users (id, username, display_name, password_hash, role) VALUES (1, 'admin', 'Admin', 'x', 'admin')").run();
@@ -295,3 +296,26 @@ function shiftDay(day, days) {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+// ── Budget des Heilens (Security-Review zu #2300) ─────────────────────────────
+
+test('Heilen: hoechstens das Budget an Pruefungen je Lieferung, danach bleibt die alte Zeile', () => {
+  // Woechentlich New York 19:30: jede Winter-Absage hat einen alten Tag, der
+  // geprueft werden muss (der UTC-Folgetag). Zehn Absagen, Budget drei.
+  setHousehold(NEW_YORK.zone);
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, tzid, recurrence_rule, created_by, external_source)
+    VALUES ('Serie', '2035-10-01T23:30:00Z', '2035-10-02T00:30:00Z', 0, 'America/New_York', 'FREQ=WEEKLY', 1, 'caldav')
+  `).run().lastInsertRowid);
+  const raws = [];
+  for (let week = 0; week < 10; week += 1) {
+    const day = shiftDay('2035-11-12', 7 * week);
+    const legacy = shiftDay(day, 1);
+    raws.push({ value: `${day.replaceAll('-', '')}T193000`, tzid: 'America/New_York', isDate: false, legacy });
+    db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(id, legacy);
+  }
+  storeImportedExceptions(db, id, { exdateRaws: raws }, { healCheckBudget: 3 });
+  const stored = exceptionsOf(id);
+  assert.equal(stored.filter((key) => key.length === 10).length, 7, 'sieben alte Zeilen bleiben');
+  assert.equal(stored.filter((key) => key.length > 10).length, 10, 'alle zehn exakten Schluessel stehen');
+});
