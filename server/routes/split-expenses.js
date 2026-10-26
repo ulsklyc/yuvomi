@@ -1170,6 +1170,10 @@ router.put('/expenses/:id', (req, res) => {
     const archived = archivedRefusal(existing.group_id);
     if (archived) return sendRefusal(res, archived);
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
+    // Die Kategorie (#1941) wie beim Bearbeiten einer Serie: ein Aufruf, der
+    // sie nicht nennt (oder `null` schickt), laesst sie stehen. Sonst setzte
+    // jedes PUT, das nur den Betrag korrigiert, sie still auf `general`.
+    if (req.body.category === undefined || req.body.category === null) parsed.category = existing.category;
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
     const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
@@ -1287,6 +1291,63 @@ router.post('/expenses/:id/comments', (req, res) => {
   }
 });
 
+/**
+ * Was jede Person in der Gruppe bezahlt hat und was davon ihr eigener Anteil
+ * ist (#1888), je Person und Waehrung, ueber ALLE aktiven Ausgaben - nicht
+ * ueber die geladene Seite der Liste.
+ *
+ * DIE WAEHRUNG DER SALDEN: gezaehlt wird in `converted_currency` und mit
+ * `converted_amount_minor`, denn nur dort stehen Anteile und Ledger. So ist
+ * bezahlt minus Anteil genau der Saldo vor allen Ausgleichen, und die Summen
+ * nennen keine Waehrung, die die Salden nicht kennen. Ausgleiche zaehlen
+ * nicht: eine Zahlung zwischen zwei Personen ist keine Ausgabe.
+ *
+ * Eine Zeile je Person und Waehrung, in der sie bezahlt ODER einen Anteil hat;
+ * wer in einer Waehrung weder das eine noch das andere hat, hat dort keine.
+ * Gaeste und Ehemalige zaehlen wie jede Person, die zahlt oder teilt.
+ */
+function groupMemberTotals(groupId) {
+  return db.get().prepare(`
+    SELECT t.currency, t.user_id, u.display_name,
+           SUM(t.paid_minor) AS paid_minor, SUM(t.share_minor) AS share_minor
+    FROM (
+      SELECT e.converted_currency AS currency, e.payer_id AS user_id,
+             e.converted_amount_minor AS paid_minor, 0 AS share_minor
+      FROM expenses e
+      WHERE e.group_id = @groupId AND e.status = 'active'
+      UNION ALL
+      SELECT s.currency, s.user_id, 0, s.amount_minor
+      FROM expense_splits s
+      JOIN expenses e ON e.id = s.expense_id
+      WHERE e.group_id = @groupId AND e.status = 'active'
+    ) t
+    LEFT JOIN users u ON u.id = t.user_id
+    GROUP BY t.currency, t.user_id
+    HAVING paid_minor != 0 OR share_minor != 0
+    ORDER BY t.currency ASC, ${memberOrderSql('u')}
+  `).all({ groupId }).map((row) => ({
+    ...row,
+    paid: minorToDecimal(row.paid_minor, row.currency),
+    share: minorToDecimal(row.share_minor, row.currency),
+  }));
+}
+
+/**
+ * Wohin das Geld der Gruppe ging (#1941): je Kategorie und Waehrung die Summe
+ * der aktiven Ausgaben, in derselben Waehrung wie die Summen je Person
+ * (`converted_currency`). Je Waehrung die groesste zuerst; eine Kategorie
+ * ohne Ausgaben hat keine Zeile.
+ */
+function groupCategoryTotals(groupId) {
+  return db.get().prepare(`
+    SELECT e.category, e.converted_currency AS currency, SUM(e.converted_amount_minor) AS total_minor
+    FROM expenses e
+    WHERE e.group_id = ? AND e.status = 'active'
+    GROUP BY e.converted_currency, e.category
+    ORDER BY currency ASC, total_minor DESC, e.category ASC
+  `).all(groupId).map((row) => ({ ...row, total: minorToDecimal(row.total_minor, row.currency) }));
+}
+
 router.get('/groups/:id/balances', (req, res) => {
   try {
     const groupId = Number(req.params.id);
@@ -1298,6 +1359,8 @@ router.get('/groups/:id/balances', (req, res) => {
       data: {
         balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
         simplified_debts: simplifyDebts(rows),
+        member_totals: groupMemberTotals(groupId),
+        category_totals: groupCategoryTotals(groupId),
       },
     });
   } catch (err) {

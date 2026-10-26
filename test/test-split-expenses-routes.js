@@ -2144,6 +2144,125 @@ test('archivierte Gruppe: Mitglied und Gast antworten 409 noch vor der Body-Prue
   assert.equal(gruppenStand(gid), vorher);
 });
 
+// --------------------------------------------------------------------------
+// Summen einer Gruppe (#1888 je Person, #1941 je Kategorie) und die Kategorie
+// beim Bearbeiten. Zwei Waehrungen, eine Fremdwaehrungs-Ausgabe (gezaehlt in
+// `converted_currency`, der Waehrung der Salden), eine geloeschte Ausgabe,
+// ein Ausgleich und mehr Ausgaben als eine Seite der Liste (30).
+// --------------------------------------------------------------------------
+const OWNER_A = { id: OWNER, role: 'member' };
+let SUM_GROUP;
+async function summen(viewer = OWNER_A) {
+  const r = await call('GET', `/groups/${SUM_GROUP}/balances`, { actor: viewer });
+  assert.equal(r.status, 200);
+  return r.body.data;
+}
+
+test('setup Summen: Gruppe mit zwei Waehrungen, geloeschter Ausgabe, Ausgleich und 31 Kleinbetraegen', async () => {
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Reise-Kasse', type: 'trip', default_currency: 'EUR' } });
+  SUM_GROUP = g.body.data.id;
+  await call('POST', `/groups/${SUM_GROUP}/members`, { actor: OWNER_A, body: { user_id: MGR, role: 'admin' } });
+  await call('POST', `/groups/${SUM_GROUP}/members`, { actor: OWNER_A, body: { user_id: MEM, role: 'guest' } });
+  const ausgabe = async (body) => {
+    const r = await call('POST', `/groups/${SUM_GROUP}/expenses`, { actor: OWNER_A, body: { split_method: 'equal', expense_date: '2026-07-01', ...body } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    return r.body.data.id;
+  };
+  await ausgabe({ title: 'Faehre', amount: '30.00', currency: 'EUR', category: 'travel', payer_id: OWNER, participants: [OWNER, MGR, MEM] });
+  await ausgabe({ title: 'Hotel', amount: '110.00', currency: 'USD', converted_amount: '100.00', converted_currency: 'EUR', category: 'travel', payer_id: MGR, participants: [OWNER, MGR] });
+  await ausgabe({ title: 'Migros', amount: '60.00', currency: 'CHF', category: 'groceries', payer_id: MGR, participants: [OWNER, MGR] });
+  await ausgabe({ title: 'Bergbahn', amount: '20.00', currency: 'CHF', category: 'travel', payer_id: OWNER, participants: [OWNER, MGR] });
+  const weg = await ausgabe({ title: 'Doppelt erfasst', amount: '50.00', currency: 'EUR', category: 'groceries', payer_id: MEM, participants: [OWNER, MGR, MEM] });
+  assert.equal((await call('DELETE', `/expenses/${weg}`, { actor: OWNER_A })).status, 200);
+  for (let i = 0; i < 31; i += 1) {
+    await ausgabe({ title: `Kaffee ${i}`, amount: '1.00', currency: 'EUR', category: 'groceries', payer_id: MEM, participants: [MEM] });
+  }
+  const s = await call('POST', `/groups/${SUM_GROUP}/settlements`, { actor: OWNER_A, body: { payer_id: MGR, payee_id: OWNER, amount: '5.00', currency: 'EUR' } });
+  assert.equal(s.status, 201, JSON.stringify(s.body));
+});
+
+test('#1888: je Person und Waehrung, was sie bezahlt hat und ihr eigener Anteil - vollstaendig ueber mehr als eine Seite', async () => {
+  const { member_totals: rows } = await summen();
+  assert.ok(Array.isArray(rows), 'member_totals fehlt in der Antwort');
+  const kurz = rows.map((r) => [r.currency, r.user_id, r.paid_minor, r.share_minor]);
+  assert.deepEqual(kurz, [
+    ['CHF', MGR, 6000, 4000],
+    ['CHF', OWNER, 2000, 4000],
+    ['EUR', MEM, 3100, 4100],
+    ['EUR', MGR, 10000, 6000],
+    ['EUR', OWNER, 3000, 6000],
+  ], 'Fremdwaehrung in converted_currency, geloeschte Ausgabe und Ausgleich zaehlen nicht, keine Zeile ohne Betrag');
+  const mgrEur = rows.find((r) => r.currency === 'EUR' && r.user_id === MGR);
+  assert.equal(mgrEur.paid, '100.00');
+  assert.equal(mgrEur.share, '60.00');
+  assert.equal(mgrEur.display_name, 'MGR');
+});
+
+test('#1888: bezahlt minus Anteil ist der Saldo vor allen Ausgleichen', async () => {
+  const { member_totals: rows } = await summen();
+  const vorAusgleich = new Map(db.prepare(`
+    SELECT currency || ':' || user_id AS k, SUM(amount_minor) AS net
+    FROM expense_ledger_entries
+    WHERE group_id = ? AND source_type IN ('expense', 'expense_reversal')
+    GROUP BY currency, user_id
+  `).all(SUM_GROUP).map((r) => [r.k, r.net]));
+  for (const r of rows) {
+    assert.equal(r.paid_minor - r.share_minor, vorAusgleich.get(`${r.currency}:${r.user_id}`) ?? 0, `${r.currency} ${r.user_id}`);
+  }
+});
+
+test('#1941: je Kategorie und Waehrung die Summe der aktiven Ausgaben, die groesste zuerst', async () => {
+  const { category_totals: rows } = await summen();
+  assert.ok(Array.isArray(rows), 'category_totals fehlt in der Antwort');
+  assert.deepEqual(rows.map((r) => [r.currency, r.category, r.total_minor, r.total]), [
+    ['CHF', 'groceries', 6000, '60.00'],
+    ['CHF', 'travel', 2000, '20.00'],
+    ['EUR', 'travel', 13000, '130.00'],
+    ['EUR', 'groceries', 3100, '31.00'],
+  ]);
+});
+
+test('#1941: wer das Modul nur lesen darf, bekommt dieselben Summen', async () => {
+  const lesend = await summen({ id: MEM, role: 'member', moduleAccess: { budget: 'read' } });
+  const voll = await summen();
+  assert.deepEqual(lesend.member_totals, voll.member_totals);
+  assert.deepEqual(lesend.category_totals, voll.category_totals);
+});
+
+test('#1941: eine Gruppe ohne Ausgaben hat keine Summen', async () => {
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Leer-Kasse', type: 'trip', default_currency: 'EUR' } });
+  const r = await call('GET', `/groups/${g.body.data.id}/balances`, { actor: OWNER_A });
+  assert.deepEqual(r.body.data.member_totals, []);
+  assert.deepEqual(r.body.data.category_totals, []);
+});
+
+test('#1941: der Kategoriefilter liefert ueber alle Seiten genau die Ausgaben der Kategorie', async () => {
+  const r = await call('GET', `/groups/${SUM_GROUP}/expenses?category=groceries&limit=100`, { actor: OWNER_A });
+  assert.equal(r.body.data.length, 32, 'Migros + 31 Kaffee, ohne die geloeschte');
+  assert.ok(r.body.data.every((e) => e.category === 'groceries'));
+});
+
+test('#1941: PUT ohne `category` laesst die Kategorie stehen, eine unbekannte faellt wie bisher auf general', async () => {
+  const created = await call('POST', `/groups/${SUM_GROUP}/expenses`, {
+    actor: OWNER_A,
+    body: { title: 'Zug', amount: '12.00', currency: 'EUR', category: 'travel', split_method: 'equal', payer_id: OWNER, participants: [OWNER, MGR], expense_date: '2026-07-02' },
+  });
+  assert.equal(created.body.data.category, 'travel');
+  const id = created.body.data.id;
+  const nurBetrag = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', split_method: 'equal' } });
+  assert.equal(nurBetrag.status, 200, JSON.stringify(nurBetrag.body));
+  assert.equal(nurBetrag.body.data.amount_minor, 1400);
+  assert.equal(nurBetrag.body.data.category, 'travel', 'ein PUT ohne Kategorie setzte sie auf general zurueck');
+  const mitNull = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', category: null } });
+  assert.equal(mitNull.body.data.category, 'travel', 'null heisst: nicht genannt');
+  const gewechselt = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', category: 'shopping' } });
+  assert.equal(gewechselt.body.data.category, 'shopping');
+  const unbekannt = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', category: 'casino' } });
+  assert.equal(unbekannt.status, 200);
+  assert.equal(unbekannt.body.data.category, 'general', 'unbekannt faellt wie beim Anlegen auf general');
+  assert.equal((await call('DELETE', `/expenses/${id}`, { actor: OWNER_A })).status, 200);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
