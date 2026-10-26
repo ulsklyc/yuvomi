@@ -3363,7 +3363,12 @@ Sonde 19 in `test:document-guards`.
 Kalender: Schichtplaene ueberlappen) steht als `.page-toolbar__status` in der Titelzeile, nie
 als eigene Kopfzeile: unter 1024px ein Zeichen in Zielgroesse, dessen Name der volle Satz ist;
 ein Tipp oeffnet ihn mit dem Weg ins Quellmodul (Blatt, ab 768px Popover am Zeichen,
-`openDetailView`). Ab 1024px steht der kurze Text daneben. Den Slot gibt es nur, solange es
+`openDetailView`). Ab 1024px steht der kurze Text daneben - solange er die eine Zeile nicht
+kostet: passt sie nur ohne ihn oder braeche ohne ihn die Titelzeile, steht auch dort nur das
+Zeichen (`page-toolbar--status-icon`, gemessen in `syncToolbarFit`; de 1280 mit Ueberlappung
+69px). Das versteckte `<h1>` der Variante steht als 1px-Element IN der Titelzeile, nicht
+absolut - absolut stand es in einem Kopf mit eigener Bar-Zeile zwischen den Zeilen und zaehlte
+fuer Sonde 19 als zweite Titelzeile (uk 1280). Den Slot gibt es nur, solange es
 etwas zu melden gibt. Gemessen 390px: Kalenderkopf mit Ueberlappung 117px wie ohne (vorher eine
 Zeile mehr), eingeklappt 65px; dort kuerzt das Zeitraum-Label wie neben einem aktiven Filter.
 

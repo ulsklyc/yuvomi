@@ -3214,13 +3214,33 @@ html.fab-steady .page-fab {
  * misst das Modul je Ansicht, damit auch alles dahinter stillsteht. Unter
  * 1024px gilt der Kopf der kompakten Klasse unveraendert (Large Title). */
 @media (min-width: 1024px) {
+  /* Im Fluss, nicht absolut (Sonde 19, uk bei 1280): absolut stand das <h1>
+   * in einem Kopf mit eigener Bar-Zeile mittig zwischen beiden Zeilen und
+   * zaehlte als zweite Zeile der Titelzeile. Als 1px-Element steht es in ihr;
+   * die negative Marge gibt die Luecke dahinter zurueck. */
   .page-toolbar--period-as-title:not(.page-toolbar--in-group) > .page-toolbar__title {
-    position: absolute;
+    flex: 0 0 1px;
     width: 1px;
     height: 1px;
+    margin-inline-end: calc(-1 * var(--page-toolbar-gap) - 1px);
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* DER STATUS ALS ZEICHEN, WENN SEIN WORT DIE ZEILE KOSTET (Sonde 19).
+   * Das Modul misst (calendar.js `syncToolbarFit`): passt die eine Zeile nur
+   * ohne das Wort, oder bricht ohne es die Titelzeile, steht nur das Zeichen
+   * in Zielgroesse - der Name bleibt der volle Satz, ein Klick oeffnet ihn. */
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar--status-icon > .page-toolbar__status .page-toolbar__status-text {
+    display: none;
   }
 
   .page-toolbar--period-as-title .page-toolbar__center .period-stepper__value {
@@ -3231,6 +3251,13 @@ html.fab-steady .page-fab {
 
   .page-toolbar--period-as-title .page-toolbar__center .period-stepper__reset {
     order: 2;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-md);
+    min-inline-size: var(--target-md);
   }
 }
 

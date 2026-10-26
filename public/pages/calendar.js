@@ -2589,6 +2589,9 @@ let toolbarFitObserver = null;
 // dem Bild, und die Rechnung darf nicht davon abhaengen, in welcher Form der
 // Kopf gerade steht (sonst pendelt sie).
 let calendarsBtnWidth = 0;
+// Breite des Ueberlappungs-Status MIT Wort, gemessen, solange es steht - aus
+// demselben Grund: die Rechnung darf nicht an der gezeigten Form haengen.
+let statusTextWidth = 0;
 
 /* DIE KOMPAKTE EINE ZEILE (Critique R21, D9: "Kalenderkopf bei 1280 einzeilig,
  * Suche als Icon-Knopf"). Bei 1280 fehlten der einen Zeile 153px (de): sie
@@ -2603,7 +2606,7 @@ function syncToolbarFit(bar) {
   if (!bar?.isConnected) return;
   const wide = window.matchMedia?.(ONE_ROW_MEDIA).matches;
   if (!wide) {
-    bar.classList.remove('cal-toolbar--one-row', 'cal-toolbar--compact');
+    bar.classList.remove('cal-toolbar--one-row', 'cal-toolbar--compact', 'page-toolbar--status-icon');
     return;
   }
   const cs = getComputedStyle(bar);
@@ -2622,11 +2625,27 @@ function syncToolbarFit(bar) {
   const toolsGap = parseFloat(getComputedStyle(bar.querySelector('.cal-toolbar__tools') ?? bar).columnGap) || 0;
   const barGap = parseFloat(getComputedStyle(bar.querySelector('.page-toolbar__bar') ?? bar).columnGap) || 0;
   const barRest = (views?.scrollWidth ?? 0) + barGap + toolsGap + (filter?.getBoundingClientRect().width ?? 0);
-  const rowNeed = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + gap * row.length + manageFold;
+  // DER STATUS GIBT SEIN WORT ZUERST AB (#1462, Sonde 19): gerechnet wird mit
+  // dem Wort; steht gerade nur das Zeichen, kommt die Differenz dazu.
+  const status = bar.querySelector('.page-toolbar__status-btn');
+  const iconWidth = statusIconWidth(bar);
+  const statusIcon = Boolean(status) && bar.classList.contains('page-toolbar--status-icon');
+  if (status && !statusIcon) statusTextWidth = status.getBoundingClientRect().width;
+  const statusSave = status ? Math.max(0, statusTextWidth - iconWidth) : 0;
+  const rowNeed = row.reduce((sum, c) => sum + c.getBoundingClientRect().width, 0) + gap * row.length + manageFold
+    + (statusIcon ? statusSave : 0);
   const full = rowNeed + barRest + SEARCH_MIN_PX <= inner;
   const compact = !full && rowNeed - manageFree + barRest + searchIconWidth(bar) <= inner;
-  bar.classList.toggle('cal-toolbar--one-row', full || compact);
-  bar.classList.toggle('cal-toolbar--compact', compact);
+  const compactIcon = !full && !compact && statusSave > 0
+    && rowNeed - statusSave - manageFree + barRest + searchIconWidth(bar) <= inner;
+  bar.classList.toggle('cal-toolbar--one-row', full || compact || compactIcon);
+  bar.classList.toggle('cal-toolbar--compact', compact || compactIcon);
+  bar.classList.toggle('page-toolbar--status-icon', compactIcon || (statusSave > 0 && !full && !compact && rowNeed > inner));
+}
+
+/** Breite der Zeichen-Form des Status (Zielgroesse am Zeiger, --target-md). */
+function statusIconWidth(bar) {
+  return parseFloat(getComputedStyle(bar).getPropertyValue?.('--target-md')) || 40;
 }
 
 /** Breite der Such-Icon-Form (die Zielgroesse der Shell, --target-base). */
