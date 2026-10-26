@@ -3939,6 +3939,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
