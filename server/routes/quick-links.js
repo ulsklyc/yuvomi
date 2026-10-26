@@ -203,7 +203,7 @@ router.get('/', (req, res) => {
     res.json({ data: listQuickLinksFor(actingUser(req), isAdminRequest(req)) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -255,7 +255,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: row });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -274,7 +274,7 @@ router.put('/order', (req, res) => {
   try {
     const me = actingUser(req);
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : null;
-    if (!ids) return res.status(400).json({ error: 'ids muss ein Array sein', code: 400 });
+    if (!ids) return res.status(400).json({ error: 'ids must be an array.', code: 400 });
 
     const visible = new Set(listQuickLinksFor(me).map((s) => s.id));
     const ordered = ids.filter((id) => visible.has(id));
@@ -287,7 +287,7 @@ router.put('/order', (req, res) => {
     res.json({ data: listQuickLinksFor(me, isAdminRequest(req)) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -303,9 +303,9 @@ router.put('/:id', (req, res) => {
     // Eine fremde private Kachel gibt es für diese Person nicht - 404 und nicht
     // 403, sonst verrät die Antwort ihre Existenz.
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
-      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404, reason: 'quick_links_link_not_found' });
+      return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
-    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
+    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const vName  = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_SHORT }) : { value: row.name, error: null };
     const vColor = req.body.color !== undefined ? color(req.body.color || null, 'Color') : { value: row.color, error: null };
@@ -335,7 +335,7 @@ router.put('/:id', (req, res) => {
     res.json({ data: db.get().prepare(`SELECT ${SELECT_COLUMNS} FROM quick_links q WHERE q.id = ?`).get(id) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -348,15 +348,15 @@ router.delete('/:id', (req, res) => {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
     if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
-      return res.status(404).json({ error: 'Schnellzugriff nicht gefunden', code: 404, reason: 'quick_links_link_not_found' });
+      return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
-    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'Keine Berechtigung', code: 403 });
+    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     db.get().prepare('DELETE FROM quick_links WHERE id = ?').run(id);
     res.status(204).end();
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

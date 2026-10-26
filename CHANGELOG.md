@@ -106,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused checklist tick (`stale`, `out_of_range`, `not_a_checklist_line`). Editing a note with a
   number as its text or title no longer fails with a server error; it is saved as text, as creating
   a note already did.
+- **The quick links API refuses in English** (#1695). `/api/v1/quick-links` still answered
+  "Schnellzugriff nicht gefunden", "Keine Berechtigung", "ids muss ein Array sein" and "Interner
+  Fehler"; every `error` there is English now, with the same status codes and reasons.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

@@ -31,6 +31,8 @@
  *        (erlaubt 0)`, und Bein 2 nennt jede Absage mit Satz der Route.
  *        Ebenso fuer die Notizen (notes.js): `notes.js: 14 (erlaubt 0)`, und
  *        Bein 2 nennt jede der 13 gefuehrten Absagen deutsch.
+ *        Ebenso fuer die Schnellzugriffe (quick-links.js): `quick-links.js: 10
+ *        (erlaubt 0)`, und Bein 2 nennt die fuenf deutschen Absagen.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -72,7 +74,6 @@ const GERMAN_LEFT = new Map([
   ['meals.js', 34],
   ['pantry.js', 5],
   ['push.js', 3],
-  ['quick-links.js', 10],
   ['recipes.js', 2],
   ['shopping.js', 17],
   ['tasks.js', 4],
@@ -448,5 +449,50 @@ test('keine Absage der Notizen traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     notesServer.close();
+  }
+});
+
+test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
+  const { default: quickLinksRouter } = await import('../server/routes/quick-links.js');
+  const who = { userId: ADMIN, role: 'admin' };
+  const qlApp = express();
+  qlApp.use(express.json());
+  qlApp.use((req, _res, next) => {
+    req.authUserId = who.userId;
+    req.authRole = who.role;
+    req.session = { userId: who.userId, role: who.role };
+    next();
+  });
+  qlApp.use('/quick-links', quickLinksRouter);
+  const qlServer = qlApp.listen(0, '127.0.0.1');
+  const qlUrl = await new Promise((r) => qlServer.on('listening', () => r(`http://127.0.0.1:${qlServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
+      Object.assign(who, as);
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${qlUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const shared = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('S','https://s.example/','all',?,0)").run(ADMIN).lastInsertRowid;
+    const member = { userId: MEMBER, role: 'member' };
+
+    await run('post-name', 'POST', '/quick-links', { url: 'https://a.example/' });
+    await run('post-url', 'POST', '/quick-links', { name: 'A' });
+    await run('post-color', 'POST', '/quick-links', { name: 'A', url: 'https://a.example/', color: 'red' });
+    await run('order-ids', 'PUT', '/quick-links/order', { ids: 'nope' });
+    await run('put-gone', 'PUT', '/quick-links/987654', { name: 'X' });
+    await run('put-foreign', 'PUT', `/quick-links/${shared}`, { name: 'X' }, member);
+    await run('put-url', 'PUT', `/quick-links/${shared}`, { url: 'javascript:alert(1)' });
+    await run('delete-gone', 'DELETE', '/quick-links/987654');
+    await run('delete-foreign', 'DELETE', `/quick-links/${shared}`, undefined, member);
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    qlServer.close();
   }
 });
