@@ -825,6 +825,12 @@
  * (`.chart__axis`), halbfett, damit sie sich vom Gitter abhebt. */
 .health-chart__series-label {
   font-weight: var(--font-weight-semibold);
+  /* Ein Rand in der Flaechenfarbe (#1798): im dichten Monat liegt der Name
+   * ueber den Balken der Vortage und bliebe sonst nur halb lesbar. */
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 /* Die zweite Achse einer Messart (der Puls unter dem Blutdruck) folgt direkt;
@@ -839,7 +845,9 @@
  * dunklen Thema unter 3:1. Schmaler als die Kurve breit, damit der Punkt
  * darauf als Mittel lesbar bleibt. */
 .health-chart__range {
-  stroke-width: 3;
+  /* In festen Pixeln: im 330px schmalen Blatt waere er sonst duenner als die Kurve. */
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
 }
 

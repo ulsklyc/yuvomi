@@ -2333,14 +2333,19 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
     for (const m of marks) perBucket.set(m.index, (perBucket.get(m.index) ?? 0) + 1);
     const seen = new Map();
     let last = null;
+    const drawn = [];
     const pieces = marks.map((m) => {
       let px = xOf(m);
+      const n = hourly ? 1 : perBucket.get(m.index);
+      const gap = Math.min(12, step / (n + 1));
       if (!hourly) {
-        const n = perBucket.get(m.index);
         const k = seen.get(m.index) ?? 0;
         seen.set(m.index, k + 1);
-        const gap = Math.min(8, step / (n + 1));
-        px = Math.min(right, Math.max(left, px + (k - (n - 1) / 2) * gap));
+        // Die Gruppe rueckt an den Plotkanten als Ganzes nach innen; einzeln
+        // geklemmt lagen die Balken des letzten Tages uebereinander.
+        const half = ((n - 1) / 2) * gap;
+        const center = Math.min(right - half, Math.max(left + half, px));
+        px = center + (k - (n - 1) / 2) * gap;
       }
       const sys = m[sysKey];
       const dia = m[diaKey];
@@ -2351,15 +2356,26 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
         return `<circle class="health-chart__bp-point" cx="${x1}" cy="${y(sys ?? dia).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(title)}</title></circle>`;
       }
       last = { x: x1, top: y(Math.max(sys, dia)).toFixed(1), bottom: y(Math.min(sys, dia)).toFixed(1) };
+      drawn.push({ index: m.index, x: px, top: y(Math.max(sys, dia)), bottom: y(Math.min(sys, dia)) });
       // Stehen mehrere Balken an einem Tag, werden sie schmaler statt sich zu beruehren.
-      const n = hourly ? 1 : perBucket.get(m.index);
-      const width = n > 1 ? Math.max(2, Math.min(6, Math.min(8, step / (n + 1)) - 2)) : 6;
+      const width = n > 1 ? Math.max(2, Math.min(6, gap / 2)) : 6;
       return `<line class="health-chart__bp" x1="${x1}" x2="${x1}" y1="${last.top}" y2="${last.bottom}" stroke="${color}" stroke-width="${width.toFixed(1)}"><title>${esc(title)}</title></line>`;
     });
     const chName = (idx) => t(metric.channelLabelKeys[idx]);
+    // Die Namen stehen am letzten Tag mit Balken, links von seiner Gruppe.
+    if (last && !hourly) {
+      const group = drawn.filter((b) => b.index === drawn[drawn.length - 1].index);
+      last = {
+        x: Math.min(...group.map((b) => b.x)).toFixed(1),
+        top: Math.min(...group.map((b) => b.top)).toFixed(1),
+        bottom: Math.max(...group.map((b) => b.bottom)).toFixed(1),
+      };
+    }
     const labels = last
-      ? `<text x="${last.x}" y="${last.top}" dy="-0.8em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(0))}</text>
-         <text x="${last.x}" y="${last.bottom}" dy="1.6em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(1))}</text>`
+      // Links neben den Enden des letzten Balkens, auf ihrer Hoehe: ueber oder
+      // unter ihm stiessen sie an Gitter und Plotkante.
+      ? `<text x="${last.x}" y="${last.top}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(0))}</text>
+         <text x="${last.x}" y="${last.bottom}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(1))}</text>`
       : '';
     seriesSvg = pieces.join('') + labels;
   } else {
