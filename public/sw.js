@@ -141,6 +141,7 @@ const APP_SHELL = [
   '/utils/digits.js',
   '/utils/day-label.js',
   '/utils/date-format.js',
+  '/utils/interval-date.js',
   '/utils/currency-codes.js',
   '/utils/calendar-delete.js',
   '/utils/document-expiry.js',

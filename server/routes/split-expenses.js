@@ -1717,6 +1717,36 @@ function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
   return { parsed, frequency, payerId, snapshot };
 }
 
+// Was mit den Terminen geschieht, die vor heute liegen: beim Fortsetzen die
+// waehrend der Pause faelligen, beim Anlegen und Verlegen die zwischen dem
+// gesetzten Datum und heute (#1748). `skip` heisst: ab dem ersten Termin, der
+// nicht vor heute liegt; `book`: der Lauf bucht sie nach.
+const MISSED_MODES = ['skip', 'book'];
+
+/**
+ * `missed` aus dem Aufruf, oder null, wenn er es nicht nennt. Beim Anlegen und
+ * Verlegen (#1748) laesst null das Datum stehen wie vor der Frage: der Lauf
+ * bucht dann je Lauf einen versaeumten Termin nach, und ein Client, der die
+ * Frage nicht kennt, verhaelt sich wie bisher.
+ */
+function parseMissed(body) {
+  const missed = body?.missed;
+  if (missed === undefined || missed === null) return null;
+  if (!MISSED_MODES.includes(missed)) throw new Refusal(400, 'missed must be "skip" or "book".', 'invalid_missed');
+  return missed;
+}
+
+/**
+ * Der Termin, auf dem eine angelegte oder verlegte Serie steht (#1748). Mit
+ * `skip` und einem Datum vor heute der erste Termin ab heute, gezaehlt mit der
+ * Rechnung des Laufs und dem Ankertag des gesetzten Datums - derselben, mit der
+ * der Dialog die Frage stellt (public/utils/interval-date.js). Sonst das Datum.
+ */
+function startingRunDate(date, frequency, anchorDay, missed) {
+  if (missed !== 'skip') return date;
+  return nextRunNotBefore(date, frequency, todayKey(db.get()), anchorDay).date;
+}
+
 /** Eine Serie samt Zugang: null, wenn es sie nicht gibt oder die Gruppe dem Aufrufer verschlossen ist. */
 function loadRecurring(id, req) {
   const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
@@ -1746,18 +1776,23 @@ router.post('/groups/:id/recurring', (req, res) => {
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const archived = archivedRefusal(groupId);
     if (archived) return sendRefusal(res, archived);
+    const missed = parseMissed(req.body);
     const { parsed, frequency, payerId, snapshot } = parseRecurringBody(req.body, groupId, group.default_currency, userId(req));
     // Der Ankertag (#1721): der Tag des ersten Termins ist der Tag, fuer den
     // die Serie gedacht ist. Der Lauf klemmt in kuerzeren Monaten aufs
     // Monatsende und hebt danach wieder auf diesen Tag (31 -> 28/29 -> 31).
     // Gesetzt wird er hier und beim Bearbeiten (PUT /recurring/:id), sobald
     // dort Datum oder Rhythmus wechseln; das Fortsetzen zaehlt nur weiter.
+    // Ein Datum vor heute fragt der Dialog wie das Fortsetzen (#1748): mit
+    // `missed: "skip"` steht die Serie auf ihrem ersten Termin ab heute, der
+    // Anker bleibt der Tag des eingegebenen Datums.
     const anchorDay = Number(parsed.expenseDate.slice(8, 10));
+    const nextRunDate = startingRunDate(parsed.expenseDate, frequency, anchorDay, missed);
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
         (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, userId(req));
+    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, userId(req));
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
@@ -1797,6 +1832,12 @@ router.post('/groups/:id/recurring', (req, res) => {
  * Serie am 31. steht im Februar auf dem 28., und ein Speichern, das nur den
  * Titel aendert, liesse sie sonst fuer immer auf dem 28. (#1721).
  *
+ * EIN GESETZTER TERMIN VOR HEUTE nimmt `missed` wie das Anlegen (#1748):
+ * `skip` stellt die Serie auf ihren ersten Termin ab heute, `book` und ein
+ * Aufruf ohne `missed` lassen das Datum stehen. Ohne Verlegung zaehlt `missed`
+ * nicht - ein faelliger Termin, den niemand angefasst hat, rueckt nicht still
+ * weiter.
+ *
  * `paused_at` bleibt: wer eine automatisch pausierte Serie repariert, setzt sie
  * danach selbst fort und entscheidet dabei ueber die versaeumten Termine.
  *
@@ -1809,6 +1850,7 @@ router.put('/recurring/:id', (req, res) => {
     const id = Number(req.params.id);
     const sent = req.body && typeof req.body === 'object' ? req.body : {};
     const given = (key) => sent[key] !== undefined;
+    const missed = parseMissed(sent);
     db.transaction(() => {
       const existing = loadRecurring(id, req);
       if (!existing) throw new Refusal(404, 'Recurring expense not found.');
@@ -1844,12 +1886,15 @@ router.put('/recurring/:id', (req, res) => {
         }
       }
       const anchorDay = dateMoved || frequency !== existing.frequency ? Number(parsed.expenseDate.slice(8, 10)) : existing.anchor_day;
+      // `missed` gilt nur fuer einen Termin, den der Aufruf SETZT: ein
+      // faelliger Termin, den niemand angefasst hat, rueckt nicht still weiter.
+      const nextRunDate = dateMoved ? startingRunDate(parsed.expenseDate, frequency, anchorDay, missed) : parsed.expenseDate;
       db.get().prepare(`
         UPDATE recurring_expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
             split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, existing.id);
       activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
     res.json({ data: recurringResponse(id, req) });
@@ -1886,10 +1931,6 @@ router.delete('/recurring/:id', (req, res) => {
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
-
-// Was beim Fortsetzen mit den Terminen geschieht, die waehrend der Pause
-// faellig gewesen waeren. `skip` ist die Vorgabe.
-const MISSED_MODES = ['skip', 'book'];
 
 router.post('/recurring/:id/pause', (req, res) => {
   try {
