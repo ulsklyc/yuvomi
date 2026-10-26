@@ -3344,6 +3344,29 @@ der Titel sich unter sein eigenes Siegel geschoben und die Lead-Zone waere um ei
 gewachsen. Gemessen ueber alle zehn Koepfe: Kopfhoehe und Lead-Zone sind mit und ohne Siegel
 identisch, es kostet also keine Zeile.
 
+**Variante: Zeitraum als Titel (#1797, Ulas 2026-10-26).** Wo der Titel eines Kopfs ein
+navigierbarer Zeitraum ist, ist ab 1024px der ZEITRAUM der sichtbare Titel - „Oktober 2026" im
+Inline-Schnitt der Titelrolle (22px fett), das Jahr in der Sekundaerfarbe, wie Apples Kalender
+ihn setzt; in einem Datum („21.10.2026") bleibt das Jahr Teil des Datums. Das `<h1>` mit dem
+Modulnamen bleibt die Seitenueberschrift und ist nur noch fuer Hilfstechnik da: per Clip
+versteckt, nie per `display`/`visibility`. Das Siegel bleibt der Absender und steht vor dem
+Zeitraum. Die Pfeile stehen direkt am Titel - VOR ihm, damit sie bei wechselnder Textbreite
+stillstehen -, „Heute" folgt als Kapsel. Was hinter dem Titel steht, steht ebenfalls still: das
+Modul misst je Ansicht, Sprache und Jahr die laengste Fassung (zwoelf Monate, sieben Wochentage)
+und gibt sie dem Titel als Mindestbreite (`--period-title-min`). Kennklasse
+`page-toolbar--period-as-title` (layout.css, Rolle in typography.css); unter 1024px gilt der
+Kopf der kompakten Klasse unveraendert (Large Title mit Modulnamen). Traeger: Kalender. Agenda-
+und Schichtplan-Koepfe koennen sie spaeter nehmen. Guard: `test:calendar` "#1797", Messung
+Sonde 19 in `test:document-guards`.
+
+**Der Status-Slot der Titelzeile (#1462).** Eine Meldung ueber die Daten der Seite (im
+Kalender: Schichtplaene ueberlappen) steht als `.page-toolbar__status` in der Titelzeile, nie
+als eigene Kopfzeile: unter 1024px ein Zeichen in Zielgroesse, dessen Name der volle Satz ist;
+ein Tipp oeffnet ihn mit dem Weg ins Quellmodul (Blatt, ab 768px Popover am Zeichen,
+`openDetailView`). Ab 1024px steht der kurze Text daneben. Den Slot gibt es nur, solange es
+etwas zu melden gibt. Gemessen 390px: Kalenderkopf mit Ueberlappung 117px wie ohne (vorher eine
+Zeile mehr), eingeklappt 65px; dort kuerzt das Zeitraum-Label wie neben einem aktiven Filter.
+
 **Die Kuechen-Leiste fuehrt ihren Absender selbst.** Nach der Leisten-Regel IST sie die
 Kopf-Navigation; ihr Siegel steht am Desktop vor dem Titel "Kueche". Mobil weichen Titel und
 Siegel gemeinsam (R9 M10, kitchen-tabs.css): die Bottom-Nav fuehrt dort Wort und Besteck als

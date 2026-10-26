@@ -94,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batches.
 
 ### Changed
+- **The calendar head names the period, not the module** (#1797, #1462). On a computer
+  "October 2026" (in the agenda its span) is now the title of the head, the year in grey, the
+  arrows right in front of it and "Today" behind it; the arrows no longer stand 300px apart, and
+  nothing behind the title moves when the month changes. "Calendar" stays the page heading for
+  screen readers. Overlapping shift schedules no longer add a row to the head on phones and
+  tablets: a warning sign sits in the title row, and tapping it shows every overlap with a link
+  to the schedule (on a computer the short text stays and opens the same list).
 - **A dialog sheet lightens its backdrop as you drag it, and sheets rise from the bottom edge** (#1801,
   #1802). On a phone, pulling a dialog down now fades the dimmed, blurred page behind it with your
   finger, like the "More" sheet already did; the sheet itself stays solid, and released early both
