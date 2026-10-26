@@ -738,7 +738,10 @@ test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt al
   assert.equal(model.overflow, 2, 'der Rest steht hinter "+N weitere"');
   // Termine plus Essen: keine Ansicht zeigt beides, also klappt die Fusszeile auf.
   // So bleiben die verdeckten Zeilen gemischt (Termine und Essen), und nur dann klappt der Einkauf mit.
-  const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'lunch', title: 'Pasta' }],
+  // Seit D1 (Critique 2026-10-26, Lauf 2) steht eine Mahlzeit nur als Zeile, solange ihre Zeit
+  // noch kommt: um 13:00 ist das Mittagessen vorbei. Der Snack rueckt als Naechstes nach vorn
+  // (nextFirst), das Abendessen bleibt verdeckt.
+  const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'snack', title: 'Obst' }, { id: 10, meal_type: 'dinner', title: 'Pasta' }],
     shoppingLists: [{ id: 1, name: 'Wocheneinkauf', open_count: 7 }] };
   const withShop = renderTodayCockpit(shop, [], false, { now, moreOpen: false });
   assert.match(withShop, /dashboard\.todayShopping</, 'Reichweite: die Einkaufszeile steht im Blatt');
@@ -747,7 +750,7 @@ test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt al
   const shopAt = withShop.indexOf('dashboard.todayShopping<');
   assert.ok(regionStart > 0 && regionStart < shopAt && shopAt < button,
     'auf dem Telefon steht der Einkauf hinter dem Knopf, nicht als eigene Zeile darunter');
-  assert.match(withShop, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):4\}/, 'und der Knopf zaehlt ihn mit (zwei Termine, Essen, Einkauf)');
+  assert.match(withShop, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):5\}/, 'und der Knopf zaehlt ihn mit (drei Termine, Abendessen, Einkauf)');
   const wall = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue() }, [], { cap: 8, groupOverdue: false });
   assert.equal(wall.rows.filter((r) => r.overdue).length, 5, 'die Wand bekommt ihre Zeilen, wenn sie es sagt');
 }));

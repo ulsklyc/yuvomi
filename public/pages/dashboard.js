@@ -4201,6 +4201,9 @@ function buildTodayCockpitModel(data, cfg = [], {
   groupOverdue = onPhoneStage(),
   isDisplay = false,
   timeline = null,
+  // Breit (false) verlassen die Eintraege der Leiste die Liste; darunter
+  // (true) SIND ihre kommenden Eintraege die Zeilen (timelineSheetRows).
+  timelineRows = false,
   viewer = dashboardViewer,
 } = {}) {
   const widgetShown = (id) => Array.isArray(cfg) && cfg.some((w) => w.id === id && w.visible);
@@ -4212,6 +4215,17 @@ function buildTodayCockpitModel(data, cfg = [], {
   const includeShopping = domainInCockpit('shopping');
 
   const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals, now, viewer });
+  // Unter der breiten Buehne kommen Termine, Mahlzeiten und die eigene
+  // Schicht aus der Leiste (timelineSheetRows), nicht aus `upcomingEvents`
+  // und der einen Mahlzeit des Programms. Ohne Kalender im Blatt gibt es
+  // keine Leiste und keinen Tausch.
+  const rowsFromTimeline = timelineRows && includeCalendar;
+  if (rowsFromTimeline) {
+    program.rows = [
+      ...program.rows.filter((row) => !TIMELINE_PROGRAM_KINDS.has(row.kind)),
+      ...timelineSheetRows(data, timeline, now),
+    ];
+  }
 
   // Die uebrigen Quellen des Blatts (Dosen, Freigaben, Abfuhr, Geburtstag,
   // Schicht, Erinnerungen, Haushaltshilfe) sprechen ueber den Beitrags-Vertrag
@@ -4227,9 +4241,11 @@ function buildTodayCockpitModel(data, cfg = [], {
   // einen Termin der Leiste bleibt so dessen Echo und keine eigene Zeile.
   // Seit der Critique (Befund 3) gilt das fuer alles, was die Leiste traegt:
   // Termin, ganztaegiger Termin, Mahlzeit, die eigene Schicht.
+  // Unter der breiten Buehne stehen die Eintraege der Leiste schon in
+  // `program.rows`; die Beitraege verlieren nur ihre Doppel (die Schicht).
   const inTimeline = timelineRowKeys(timeline);
   const notInTimeline = (row) => !inTimeline.has(`${row.kind}:${row.objectId}`);
-  const listed = inTimeline.size ? program.rows.filter(notInTimeline) : program.rows;
+  const listed = inTimeline.size && !rowsFromTimeline ? program.rows.filter(notInTimeline) : program.rows;
   const programRows = groupOverdue ? groupOverdueRows(listed) : listed;
   const sheet = composeTodaySheet([...programRows, ...(inTimeline.size ? contributed.rows.filter(notInTimeline) : contributed.rows)], { cap });
   const visibleRows = sheet.rows;
@@ -4360,7 +4376,10 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks };
+  // Die Termine, die das Blatt als Text erreicht (sichtbar und hinter „+N
+  // weitere"): unter der breiten Buehne zaehlt der Kopf genau sie (todaySummary).
+  const eventCount = rowsFromTimeline ? sheet.allRows.filter((row) => row.kind === 'event').length : null;
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks, eventCount };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
@@ -4614,6 +4633,10 @@ function todayMealsForTimeline(data) {
           tone: 'dinner',
           route: meal.id != null ? `/meals?open=${encodeURIComponent(String(meal.id))}` : '/meals',
           who: mealCookPerson(meal, data?.users),
+          // Dieselbe Stelle im Deckel wie die Mahlzeit des Programms
+          // (buildTodayProgram): eine Auskunft, die zuletzt weicht.
+          priority: 80,
+          open: false,
         },
       };
     });
@@ -4657,6 +4680,10 @@ function todayShiftsForTimeline(data, viewer) {
         tone: 'schedule',
         route: '/schedule',
         who: viewer,
+        // Wie die Schicht des Beitrags-Vertrags (utils/today-sheet.js): ein
+        // Rahmen des Tages, kein Auftrag.
+        priority: 50,
+        open: false,
       },
     }];
   });
@@ -4695,6 +4722,42 @@ function timelineRowKeys(timeline) {
   return new Set(items.map((item) => `${item.kind}:${item.id}`));
 }
 
+/* Die Arten, die das Programm selbst baut und die die Leiste ebenfalls traegt. */
+const TIMELINE_PROGRAM_KINDS = new Set(['event', 'meal']);
+
+/**
+ * DAS BILD UND DER TEXT ERZAEHLEN DENSELBEN TAG (Critique 2026-10-26, Lauf 2,
+ * D1). Unter der breiten Buehne ist die Leiste eine stumme Kurzfassung, und
+ * ihre Zeilen kamen aus `upcomingEvents` (Server-Deckel fuenf) plus EINER
+ * Mahlzeit: der Filmabend um 20:00 stand im Bild und nie als Text, das
+ * vergangene Mittagessen und die beendete Fruehschicht standen als Text, aber
+ * nicht mehr im Bild. Jetzt kommen die Zeilen aus demselben Modell wie die
+ * Balken: was dort nicht vorbei ist (`state !== 'past'`, eine Mahlzeit ist es,
+ * sobald ihre Zeit da war), ueber die Zeile, die auch der Block aufklappt.
+ * Ein Termin fuer zwei steht in zwei Spuren und EINMAL als Zeile. Das
+ * Ganztaegige bleibt Zeile - es hat keinen Balken, aber dieselbe Quelle.
+ */
+function timelineSheetRows(data, timeline, now = new Date()) {
+  const rows = [];
+  const seen = new Set();
+  const allDay = timeline?.allDay ?? todayEventsForTimeline(data, now).allDay;
+  for (const item of allDay) {
+    if (seen.has(item.key)) continue;
+    seen.add(item.key);
+    rows.push({ ...item.sheetRow });
+  }
+  for (const item of (timeline?.lanes ?? []).flatMap((lane) => lane.items)) {
+    if (item.state === 'past' || seen.has(item.key)) continue;
+    seen.add(item.key);
+    // Die Mahlzeit nennt ihre Zeit rechts (withRelativeWhen); die Unterzeile
+    // traegt in der Liste nur ihre Art, wie die Mahlzeit des Programms.
+    rows.push(item.kind === 'meal'
+      ? { ...item.sheetRow, sub: item.title, timeLabel: item.timeLabel }
+      : { ...item.sheetRow });
+  }
+  return rows;
+}
+
 /* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
  * („9 Termine · 1 Aufgabe ueberfaellig"). Nur, was das Blatt selbst spricht:
  * Termine, wenn der Kalender im Blatt spricht (Kein-Echo-Regel), Ueberfaelliges,
@@ -4702,7 +4765,10 @@ function timelineRowKeys(timeline) {
  * waere ein Satz ueber nichts. */
 function todaySummary(data, model, now = new Date()) {
   const parts = [];
-  const events = model.includeCalendar ? todayEventsForTimeline(data, now).count : 0;
+  // Breit traegt die Leiste den ganzen Tag, auch das Vergangene; darunter
+  // stehen nur die kommenden Termine als Zeilen, und der Kopf zaehlt, was
+  // man lesen kann (Critique 2026-10-26, Lauf 2, D1).
+  const events = model.includeCalendar ? model.eventCount ?? todayEventsForTimeline(data, now).count : 0;
   if (events > 0) parts.push(t('dashboard.todaySummaryEvents', { count: events }));
   if (model.includeTasks) {
     const overdue = model.allRows
@@ -5036,12 +5102,14 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   const timeline = todayDomainSpeaks(cfg, 'calendar')
     ? buildTodayTimeline(data, { now, viewer, includeMeals: todayDomainSpeaks(cfg, 'meals'), includeShifts: todayDomainSpeaks(cfg, 'schedule') })
     : null;
-  const listTimeline = wide ? timeline : null;
+  // Breit nimmt die Leiste ihre Eintraege aus der Liste; darunter speist sie
+  // die Zeilen (timelineSheetRows) - Bild und Text aus einem Modell.
+  const timelineOptions = { timeline, timelineRows: !wide };
   const stageCap = cap ? { cap } : phone ? {} : { cap: wide ? PROGRAM_STRIP_CAP : PROGRAM_COMPACT_CAP };
-  let model = buildTodayCockpitModel(data, cfg, { now, timeline: listTimeline, ...stageCap });
+  let model = buildTodayCockpitModel(data, cfg, { now, ...timelineOptions, ...stageCap });
   // Breit ist der Einkauf eine der drei Zellen - die letzte.
   if (wide && !cap && model.shopping && model.rows.length >= PROGRAM_STRIP_CAP) {
-    model = buildTodayCockpitModel(data, cfg, { now, timeline: listTimeline, cap: PROGRAM_STRIP_CAP - 1 });
+    model = buildTodayCockpitModel(data, cfg, { now, ...timelineOptions, cap: PROGRAM_STRIP_CAP - 1 });
   }
 
   // „Heute frei" unter einer Leiste voller beendeter Termine widerspraeche ihr:
@@ -9335,9 +9403,16 @@ function todayFingerprint(data, cfg, now = new Date()) {
     .flatMap((key) => (Array.isArray(data[key]) ? data[key] : []))
     .filter((event) => eventHasEnded(event, nowStamp))
     .map((event) => `${event.id}@${event.start_datetime}`);
+  // Und die Mahlzeit, deren Zeit da war, und die beendete eigene Schicht: unter
+  // der breiten Buehne verlassen sie die Zeilen (timelineSheetRows), ohne dass
+  // ein Termin endet.
+  const passed = (buildTodayTimeline(data, { now, includeMeals: true, includeShifts: true })?.lanes ?? [])
+    .flatMap((lane) => lane.items)
+    .filter((item) => item.kind !== 'event' && item.state === 'past')
+    .map((item) => item.key);
   return JSON.stringify([
     model.rows.map((row) => [row.kind, row.objectId ?? row.members?.map((m) => m.objectId), row.title, row.open, Boolean(row.overdue)]),
-    model.overflow, Boolean(model.coda), Boolean(model.state), ended,
+    model.overflow, Boolean(model.coda), Boolean(model.state), ended, [...new Set(passed)],
   ]);
 }
 

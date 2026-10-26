@@ -18,8 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hears "Emma: School, 08:00 until 13:00, in progress". Below it, "Also today" holds what has no place
   on the timeline in three cells, shopping last, and a footer line carries the closing sentence or
   "+N more". Under a sheet width of 900px - tablets, narrow windows, phones - the timeline is a compact
-  strip of bars and appointments stay rows, the next one first with "15:00 · in 2 hrs" or "in 25 min"
-  in its module's colour. The timeline only appears when the Calendar tile is not on the overview, so
+  strip of bars, and every bar still ahead is a row below it, behind "+N more" if need be: each
+  appointment once, even when it is for two people, meals and your shift until their time has passed.
+  The count in the header is the appointments you can read there. The next one comes first with
+  "15:00 · in 2 hrs" or "in 25 min" in its module's colour. The timeline only appears when the Calendar tile is not on the overview, so
   it never repeats it.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00

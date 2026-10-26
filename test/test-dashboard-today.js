@@ -1122,7 +1122,11 @@ test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel, auf dem Telefon nur
   // den Balken - die Termine bleiben Zeilen.
   assert.match(phone, /<div class="today-timeline today-timeline--mini" aria-hidden="true"/);
   assert.ok(!phone.includes('data-timeline-event'), 'kein Tippziel in einem 10px-Balken');
-  assert.match(phone, /today-cockpit-card__value">Filmabend</, 'der Termin steht als Zeile');
+  // Die Termine kommen aus dem Bild (D1): der Fussball steht nur in der
+  // Familienliste und ist um 10:00 das Naechste; Ausflug, Schule und Filmabend
+  // stehen hinter „+3 weitere" am Kalendertag.
+  assert.match(phone, /today-cockpit-card__value">Fussball</, 'der Termin steht als Zeile');
+  assert.match(phone, /<a href="\/calendar\?date=2026-09-24" class="today-cockpit__more[\s\S]*?dashboard\.todayMore\{&quot;count&quot;:3\}/);
 }));
 
 test('Heute-Blatt: ein Termin der Zeitleiste steht nicht noch einmal in der Liste - sein Block klappt die Zeile auf', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
@@ -1227,3 +1231,88 @@ test('Critique 2026-10-26: die eigene Schicht steht als Block in der eigenen Spu
   assert.match(sheet, /data-timeline-start="360"/);
 }));
 
+
+// BILD UND TEXT ERZAEHLEN DENSELBEN TAG (Critique 2026-10-26, Lauf 2, D1).
+// Gemessen um 14:30 auf compact und phone: die Haelfte der Balken der
+// Kurzfassung kam im Blatt nie als Text vor (Filmabend 20:00 nur in der
+// Familienliste, Snack, Abendessen), dafuer standen das vergangene
+// Mittagessen und die beendete Fruehschicht noch als Zeilen. Jetzt speisen
+// die kommenden Eintraege der Leiste die Zeilen.
+const THU_1430_BERLIN = '2026-09-24T12:30:00Z';
+const busyAfternoon = () => ({
+  upcomingEvents: [
+    ev(41, 'Kita abholen', '2026-09-24T15:00', '2026-09-24T15:30', { assigned_users: [person(3)] }),
+    ev(42, 'Elternabend', '2026-09-24T19:00', '2026-09-24T20:30', { assigned_users: [person(1), person(2)] }),
+    ev(43, 'Ausflug', '2026-09-24', '2026-09-24', { all_day: 1 }),
+  ],
+  familyEvents: [
+    // Beendet: steht im Bild als vergangener Balken, nicht als Zeile.
+    ev(44, 'Zahnarzt', '2026-09-24T08:30', '2026-09-24T09:30', { assigned_users: [person(1)] }),
+    ev(42, 'Elternabend', '2026-09-24T19:00', '2026-09-24T20:30', { assigned_users: [person(1), person(2)] }),
+    // Hinter dem Deckel der Kachel: nur die Familienliste kennt ihn.
+    ev(45, 'Filmabend', '2026-09-24T20:00', '2026-09-24T22:00', { assigned_users: [person(4)] }),
+  ],
+  todayMeals: [
+    { id: 61, meal_type: 'lunch', title: 'Linsensuppe' },
+    { id: 62, meal_type: 'snack', title: 'Apfelschnitze' },
+    { id: 63, meal_type: 'dinner', title: 'Ofengemuese' },
+  ],
+  myShiftsToday: [{ date_key: '2026-09-24', shift_type: { id: 7, name: 'Fruehschicht', short_code: 'F', start_time: '06:00', end_time: '14:00' } }],
+  urgentTasks: [],
+  users: TIMELINE_USERS,
+});
+const reachableText = (html) => html.slice(html.indexOf('class="today-cockpit__rows'));
+const eventRowIds = (html) => [...html.matchAll(/data-object-kind="event" data-object-id="(\d+)"/g)].map((m) => Number(m[1]));
+const summaryEvents = (html) => Number(/todaySummaryEvents\{&quot;count&quot;:(\d+)\}/.exec(html)?.[1] ?? 0);
+const onPhone = () => { global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query }); };
+
+for (const stage of ['compact', 'phone']) {
+  test(`D1 (${stage}): die Zeilen kommen aus der Leiste - Kommendes als Text, Vergangenes nicht`, inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+    if (stage === 'phone') onPhone();
+    const viewer = TIMELINE_USERS[1];
+    // Aufgeklappt, damit auch die Zeilen hinter „+N weitere" als Text dastehen.
+    const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage, viewer, moreOpen: true });
+    assert.equal(/data-today-stage="([^"]+)"/.exec(sheet)?.[1], stage, 'Vorbedingung: die Buehne');
+    assert.match(sheet, /today-timeline--mini" aria-hidden="true"/, 'Vorbedingung: die Kurzfassung steht');
+    const text = reachableText(sheet);
+    assert.match(text, /today-cockpit-card__value">Filmabend</, 'der Filmabend aus der Familienliste ist als Text erreichbar');
+    assert.match(text, /today-cockpit-card__value">Apfelschnitze</, 'der Snack um 15:30 steht als Zeile');
+    assert.match(text, /today-cockpit-card__value">Ofengemuese</, 'das Abendessen um 18:30 steht als Zeile');
+    assert.ok(!text.includes('Linsensuppe'), 'das Mittagessen um 12:30 ist vorbei');
+    assert.ok(!text.includes('data-object-kind="shift"'), 'die Fruehschicht endete um 14:00');
+    assert.ok(!text.includes('Zahnarzt'), 'der beendete Termin bleibt Bild');
+    assert.match(text, /today-cockpit-card__value">Ausflug</, 'das Ganztaegige bleibt Zeile');
+    const ids = eventRowIds(text);
+    assert.equal(ids.filter((id) => id === 42).length, 1, 'der Elternabend fuer zwei steht genau einmal als Zeile');
+    assert.deepEqual([...ids].sort(), [41, 42, 43, 45], 'genau die kommenden Termine des Tages');
+    assert.equal(summaryEvents(sheet), ids.length, 'der Kopf zaehlt die Termine, die man lesen kann');
+  }));
+}
+
+test('D1: steht der Rest am Kalendertag, zaehlt der Kopf sichtbare und verdeckte Termine wie „+N weitere"', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const day = { ...busyAfternoon(), todayMeals: [], myShiftsToday: [] };
+  const sheet = dash.renderTodayCockpit(day, [], false, { stage: 'compact', cap: 2 });
+  const more = /<a href="\/calendar\?date=2026-09-24" class="today-cockpit__more[\s\S]*?dashboard\.todayMore\{&quot;count&quot;:(\d+)\}/.exec(sheet);
+  assert.ok(more, 'Vorbedingung: nur Termine verdeckt - „+N weitere" fuehrt an den Kalendertag');
+  assert.equal(eventRowIds(reachableText(sheet)).length + Number(more[1]), summaryEvents(sheet));
+  assert.equal(summaryEvents(sheet), 4, 'Kita, Elternabend, Ausflug, Filmabend - ohne den beendeten Zahnarzt');
+}));
+
+test('D1: die laufende eigene Schicht steht unter der breiten Buehne einmal als Zeile', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'compact', viewer: TIMELINE_USERS[1], moreOpen: true });
+  assert.equal(reachableText(sheet).match(/data-object-kind="shift"/g)?.length, 1, 'aus der Leiste, nicht noch einmal aus dem Beitrag');
+}));
+
+test('D1: breit bleibt es - getimte Termine nur in der Leiste, der Kopf zaehlt den ganzen Tag', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(busyAfternoon(), [], false, { stage: 'wide', viewer: TIMELINE_USERS[1], moreOpen: true });
+  assert.equal(eventRowIds(reachableText(sheet)).length, 0, 'keine Terminzeile neben der Leiste');
+  assert.match(sheet, /today-timeline__title">Filmabend</, 'der Filmabend steht in der Leiste');
+  assert.equal(summaryEvents(sheet), 5, 'samt dem beendeten Zahnarzt - die Leiste zeigt ihn');
+}));
+
+test('D1: verstreicht die Zeit einer Mahlzeit, baut der Minutentakt neu', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const data = { upcomingEvents: [], familyEvents: [], todayMeals: [{ id: 63, meal_type: 'dinner', title: 'Ofengemuese' }] };
+  const before = dash.todayFingerprint(data, [], new Date('2026-09-24T16:29:00Z'));
+  const after = dash.todayFingerprint(data, [], new Date('2026-09-24T16:31:00Z'));
+  assert.notEqual(before, after, 'um 18:30 verlaesst das Abendessen die Zeilen der Kurzfassung');
+}));
