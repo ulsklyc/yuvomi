@@ -2735,7 +2735,7 @@ function periodTitleParts(text, year) {
 
 function setPeriodTitle(lbl, text) {
   const parts = periodTitleParts(text, state.cursor.slice(0, 4));
-  if (!parts) {
+  if (!parts || typeof lbl.replaceChildren !== 'function') {
     lbl.textContent = text;
     return;
   }
@@ -2764,6 +2764,8 @@ function periodTitleCandidates(year) {
 }
 
 function syncPeriodTitleWidth(lbl) {
+  // Ohne Layout (Testumgebung, verborgen) gibt es nichts zu messen.
+  if (!lbl.style) return;
   if (!window.matchMedia?.(ONE_ROW_MEDIA).matches || !lbl.isConnected) {
     lbl.style.removeProperty('--period-title-min');
     return;
