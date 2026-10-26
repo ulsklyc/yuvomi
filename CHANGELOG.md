@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A shared-expenses group shows what each person paid and where the money went** (#1888, #1941).
+  Below the balances, each person has one line per currency with what they paid at the till and,
+  under it, their own share - paid minus share is their balance before any payment between members.
+  Next to it, the group adds up its expenses per category and currency, largest first. Both count
+  every expense of the group, not only the ones the list has loaded, in the currency the balances
+  are kept in, without conversion; deleted expenses and payments between members do not count.
+  Expenses and recurring expenses now have a Category field, and a filter next to the expense list
+  shows one category at a time - it offers the categories the group uses, and an empty result says
+  the filter is why. Editing an expense without sending a category, through the app or `PUT
+  /api/v1/split-expenses/expenses/{id}`, now keeps its category instead of resetting it to
+  "General". For API clients the totals are `member_totals` and `category_totals` on `GET
+  /api/v1/split-expenses/groups/{id}/balances`; the OpenAPI description lists both.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
   as before unless you change it, on the household's clock and for this device only. Wall mode dims
