@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Tutar",
         "detailNextPaymentLabel": "Sonraki ödeme",
         "renewedNamed": "\"{{name}}\" ödendi - sonraki ödeme {{date}}.",
-        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı."
+        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı.",
+        "accountHint": "Bu aboneliğin her ödemesi bu hesaba işlenir. Tek bir ödemeyi bütçede değiştirebilirsin.",
+        "accountArchivedHint": "Bu hesap arşivlendi. Başka bir hesap seçene kadar abonelik hesapsız işlenir.",
+        "accountArchivedOption": "{{name}} (arşivlendi)",
+        "accountArchivedMeta": "{{name}} arşivlendi - hesapsız işlenir",
+        "visibilityHint_private": "Bu aboneliği ve ödemelerini yalnızca sen görürsün.",
+        "visibilityHint_shared": "Ev halkındaki herkes bu aboneliği ve ödemelerini görür.",
+        "errorAccountGone": "Seçilen hesap artık mevcut değil."
     },
     "health": {
         "fasting": {

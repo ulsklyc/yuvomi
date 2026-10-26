@@ -5060,7 +5060,14 @@
         "detailAmountLabel": "Kwota",
         "detailNextPaymentLabel": "Następna płatność",
         "renewedNamed": "„{{name}}” opłacone - następna płatność {{date}}.",
-        "completedNamed": "„{{name}}” opłacone i zakończone."
+        "completedNamed": "„{{name}}” opłacone i zakończone.",
+        "accountHint": "Każda płatność tej subskrypcji trafia na to konto. Pojedynczą płatność zmienisz w budżecie.",
+        "accountArchivedHint": "To konto jest zarchiwizowane. Subskrypcja księguje bez konta, dopóki nie wybierzesz innego.",
+        "accountArchivedOption": "{{name}} (zarchiwizowane)",
+        "accountArchivedMeta": "{{name}} zarchiwizowane - księguje bez konta",
+        "visibilityHint_private": "Tylko Ty widzisz tę subskrypcję i jej płatności.",
+        "visibilityHint_shared": "Całe gospodarstwo widzi tę subskrypcję i jej płatności.",
+        "errorAccountGone": "Wybrane konto już nie istnieje."
     },
     "health": {
         "fasting": {

@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Amount",
         "detailNextPaymentLabel": "Next payment",
         "renewedNamed": "“{{name}}” paid - next payment on {{date}}.",
-        "completedNamed": "“{{name}}” paid and completed."
+        "completedNamed": "“{{name}}” paid and completed.",
+        "accountHint": "Every payment of this subscription is booked to this account. Change a single payment in the budget.",
+        "accountArchivedHint": "This account is archived. The subscription books without an account until you choose another one.",
+        "accountArchivedOption": "{{name}} (archived)",
+        "accountArchivedMeta": "{{name}} archived - books without an account",
+        "visibilityHint_private": "Only you see this subscription and its payments.",
+        "visibilityHint_shared": "Everyone in the household sees this subscription and its payments.",
+        "errorAccountGone": "The selected account no longer exists."
     },
     "health": {
         "fasting": {

@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Bedrag",
         "detailNextPaymentLabel": "Volgende betaling",
         "renewedNamed": "‘{{name}}’ betaald - volgende betaling op {{date}}.",
-        "completedNamed": "‘{{name}}’ betaald en afgerond."
+        "completedNamed": "‘{{name}}’ betaald en afgerond.",
+        "accountHint": "Elke betaling van dit abonnement wordt op deze rekening geboekt. Een losse betaling wijzig je in het budget.",
+        "accountArchivedHint": "Deze rekening is gearchiveerd. Het abonnement boekt zonder rekening tot je een andere kiest.",
+        "accountArchivedOption": "{{name}} (gearchiveerd)",
+        "accountArchivedMeta": "{{name}} gearchiveerd - boekt zonder rekening",
+        "visibilityHint_private": "Alleen jij ziet dit abonnement en de betalingen ervan.",
+        "visibilityHint_shared": "Iedereen in het huishouden ziet dit abonnement en de betalingen ervan.",
+        "errorAccountGone": "De gekozen rekening bestaat niet meer."
     },
     "health": {
         "fasting": {

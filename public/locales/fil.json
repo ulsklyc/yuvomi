@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Halaga",
         "detailNextPaymentLabel": "Susunod na bayad",
         "renewedNamed": "Nabayaran ang \"{{name}}\" - susunod na bayad sa {{date}}.",
-        "completedNamed": "Nabayaran at natapos ang \"{{name}}\"."
+        "completedNamed": "Nabayaran at natapos ang \"{{name}}\".",
+        "accountHint": "Bawat bayad ng subscription na ito ay itinatala sa account na ito. Baguhin ang isang bayad sa budget.",
+        "accountArchivedHint": "Naka-archive ang account na ito. Itinatala ang subscription nang walang account hanggang pumili ka ng iba.",
+        "accountArchivedOption": "{{name}} (naka-archive)",
+        "accountArchivedMeta": "{{name}} naka-archive - itinatala nang walang account",
+        "visibilityHint_private": "Ikaw lang ang nakakakita ng subscription na ito at ng mga bayad nito.",
+        "visibilityHint_shared": "Nakikita ng lahat sa sambahayan ang subscription na ito at ang mga bayad nito.",
+        "errorAccountGone": "Wala na ang napiling account."
     },
     "health": {
         "fasting": {

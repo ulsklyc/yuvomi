@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Importo",
         "detailNextPaymentLabel": "Prossimo pagamento",
         "renewedNamed": "«{{name}}» pagato - prossimo pagamento il {{date}}.",
-        "completedNamed": "«{{name}}» pagato e concluso."
+        "completedNamed": "«{{name}}» pagato e concluso.",
+        "accountHint": "Ogni pagamento di questo abbonamento viene registrato su questo conto. Un singolo pagamento si modifica nel budget.",
+        "accountArchivedHint": "Questo conto è archiviato. L’abbonamento viene registrato senza conto finché non ne scegli un altro.",
+        "accountArchivedOption": "{{name}} (archiviato)",
+        "accountArchivedMeta": "{{name}} archiviato - registrato senza conto",
+        "visibilityHint_private": "Solo tu vedi questo abbonamento e i suoi pagamenti.",
+        "visibilityHint_shared": "Tutta la famiglia vede questo abbonamento e i suoi pagamenti.",
+        "errorAccountGone": "Il conto selezionato non esiste più."
     },
     "health": {
         "fasting": {

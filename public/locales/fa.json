@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "مبلغ",
         "detailNextPaymentLabel": "پرداخت بعدی",
         "renewedNamed": "«{{name}}» پرداخت شد - پرداخت بعدی در {{date}}.",
-        "completedNamed": "«{{name}}» پرداخت و پایان یافت."
+        "completedNamed": "«{{name}}» پرداخت و پایان یافت.",
+        "accountHint": "هر پرداخت این اشتراک در این حساب ثبت می‌شود. یک پرداخت تکی را در بودجه تغییر دهید.",
+        "accountArchivedHint": "این حساب بایگانی شده است. اشتراک تا زمانی که حساب دیگری انتخاب کنید بدون حساب ثبت می‌شود.",
+        "accountArchivedOption": "{{name}} (بایگانی‌شده)",
+        "accountArchivedMeta": "{{name}} بایگانی‌شده - بدون حساب ثبت می‌شود",
+        "visibilityHint_private": "فقط شما این اشتراک و پرداخت‌های آن را می‌بینید.",
+        "visibilityHint_shared": "همه اعضای خانوار این اشتراک و پرداخت‌های آن را می‌بینند.",
+        "errorAccountGone": "حساب انتخاب‌شده دیگر وجود ندارد."
     },
     "health": {
         "fasting": {

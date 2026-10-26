@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Beløp",
         "detailNextPaymentLabel": "Neste betaling",
         "renewedNamed": "«{{name}}» betalt - neste betaling {{date}}.",
-        "completedNamed": "«{{name}}» betalt og avsluttet."
+        "completedNamed": "«{{name}}» betalt og avsluttet.",
+        "accountHint": "Hver betaling for dette abonnementet bokføres på denne kontoen. En enkelt betaling endrer du i budsjettet.",
+        "accountArchivedHint": "Denne kontoen er arkivert. Abonnementet bokføres uten konto til du velger en annen.",
+        "accountArchivedOption": "{{name}} (arkivert)",
+        "accountArchivedMeta": "{{name}} arkivert - bokføres uten konto",
+        "visibilityHint_private": "Bare du ser dette abonnementet og betalingene.",
+        "visibilityHint_shared": "Alle i husholdningen ser dette abonnementet og betalingene.",
+        "errorAccountGone": "Den valgte kontoen finnes ikke lenger."
     },
     "health": {
         "fasting": {

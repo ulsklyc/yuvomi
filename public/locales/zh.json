@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "金额",
         "detailNextPaymentLabel": "下次付款",
         "renewedNamed": "“{{name}}”已付款 - 下次付款日 {{date}}。",
-        "completedNamed": "“{{name}}”已付款并结束。"
+        "completedNamed": "“{{name}}”已付款并结束。",
+        "accountHint": "此订阅的每笔付款都记入这个账户。单笔付款可在预算中修改。",
+        "accountArchivedHint": "这个账户已归档。在你选择其他账户之前，订阅将不带账户记账。",
+        "accountArchivedOption": "{{name}}（已归档）",
+        "accountArchivedMeta": "{{name}} 已归档 - 不带账户记账",
+        "visibilityHint_private": "只有你能看到这个订阅及其付款。",
+        "visibilityHint_shared": "家庭中的每个人都能看到这个订阅及其付款。",
+        "errorAccountGone": "所选账户已不存在。"
     },
     "health": {
         "fasting": {

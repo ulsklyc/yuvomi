@@ -360,6 +360,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'meals_selected_recipe_not_found',
     'subscriptions_subscription_not_found', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
     'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
+    'subscriptions_account_not_found',
     'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',

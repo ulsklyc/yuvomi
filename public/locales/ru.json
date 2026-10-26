@@ -5060,7 +5060,14 @@
         "detailAmountLabel": "Сумма",
         "detailNextPaymentLabel": "Следующий платеж",
         "renewedNamed": "«{{name}}» оплачено - следующий платёж {{date}}.",
-        "completedNamed": "«{{name}}» оплачено и завершено."
+        "completedNamed": "«{{name}}» оплачено и завершено.",
+        "accountHint": "Каждый платёж по этой подписке записывается на этот счёт. Отдельный платёж можно изменить в бюджете.",
+        "accountArchivedHint": "Этот счёт в архиве. Подписка записывается без счёта, пока вы не выберете другой.",
+        "accountArchivedOption": "{{name}} (в архиве)",
+        "accountArchivedMeta": "{{name}} в архиве - записывается без счёта",
+        "visibilityHint_private": "Эту подписку и её платежи видите только вы.",
+        "visibilityHint_shared": "Все в семье видят эту подписку и её платежи.",
+        "errorAccountGone": "Выбранного счёта больше нет."
     },
     "health": {
         "fasting": {

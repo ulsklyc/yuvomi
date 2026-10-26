@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Importe",
         "detailNextPaymentLabel": "Próximo pago",
         "renewedNamed": "«{{name}}» pagado - próximo pago el {{date}}.",
-        "completedNamed": "«{{name}}» pagado y finalizado."
+        "completedNamed": "«{{name}}» pagado y finalizado.",
+        "accountHint": "Cada pago de esta suscripción se registra en esta cuenta. Un pago concreto se cambia en el presupuesto.",
+        "accountArchivedHint": "Esta cuenta está archivada. La suscripción se registra sin cuenta hasta que elijas otra.",
+        "accountArchivedOption": "{{name}} (archivada)",
+        "accountArchivedMeta": "{{name}} archivada - se registra sin cuenta",
+        "visibilityHint_private": "Solo tú ves esta suscripción y sus pagos.",
+        "visibilityHint_shared": "Todo el hogar ve esta suscripción y sus pagos.",
+        "errorAccountGone": "La cuenta seleccionada ya no existe."
     },
     "health": {
         "fasting": {

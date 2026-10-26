@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Jumlah",
         "detailNextPaymentLabel": "Pembayaran berikutnya",
         "renewedNamed": "\"{{name}}\" dibayar - pembayaran berikutnya {{date}}.",
-        "completedNamed": "\"{{name}}\" dibayar dan selesai."
+        "completedNamed": "\"{{name}}\" dibayar dan selesai.",
+        "accountHint": "Setiap pembayaran langganan ini dicatat ke akun ini. Ubah satu pembayaran di anggaran.",
+        "accountArchivedHint": "Akun ini diarsipkan. Langganan dicatat tanpa akun sampai kamu memilih akun lain.",
+        "accountArchivedOption": "{{name}} (diarsipkan)",
+        "accountArchivedMeta": "{{name}} diarsipkan - dicatat tanpa akun",
+        "visibilityHint_private": "Hanya kamu yang melihat langganan ini dan pembayarannya.",
+        "visibilityHint_shared": "Semua orang di rumah tangga melihat langganan ini dan pembayarannya.",
+        "errorAccountGone": "Akun yang dipilih sudah tidak ada."
     },
     "health": {
         "fasting": {

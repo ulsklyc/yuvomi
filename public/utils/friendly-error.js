@@ -203,6 +203,7 @@ export const CASE_MESSAGES = new Map([
   // der Dialog bleibt offen und bietet die aktuellen an.
   ['subscriptions_selected_category_not_found', 'subscriptions.errorSelectedCategoryGone'],
   ['subscriptions_selected_payment_method_not_found', 'subscriptions.errorSelectedPaymentMethodGone'],
+  ['subscriptions_account_not_found', 'subscriptions.errorAccountGone'],
   ['subscriptions_category_exists', 'subscriptions.errorCategoryExists'],
   ['subscriptions_payment_method_exists', 'subscriptions.errorPaymentMethodExists'],
   // Eingaben, die der Abo-Dialog durchlaesst und erst der Server prueft.
@@ -498,6 +499,7 @@ export const GONE_REASONS = new Set([
   'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found',
   'subscriptions_selected_payment_method_not_found',
+  'subscriptions_account_not_found',
   'inventory_item_not_found',
   'inventory_tracked_date_not_found',
   'inventory_selected_location_not_found',

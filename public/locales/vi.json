@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Số tiền",
         "detailNextPaymentLabel": "Khoản thanh toán tiếp theo",
         "renewedNamed": "Đã thanh toán \"{{name}}\" - lần thanh toán tiếp theo vào {{date}}.",
-        "completedNamed": "Đã thanh toán và kết thúc \"{{name}}\"."
+        "completedNamed": "Đã thanh toán và kết thúc \"{{name}}\".",
+        "accountHint": "Mỗi khoản thanh toán của đăng ký này được ghi vào tài khoản này. Thay đổi một khoản thanh toán riêng trong ngân sách.",
+        "accountArchivedHint": "Tài khoản này đã được lưu trữ. Đăng ký được ghi không có tài khoản cho đến khi bạn chọn tài khoản khác.",
+        "accountArchivedOption": "{{name}} (đã lưu trữ)",
+        "accountArchivedMeta": "{{name}} đã lưu trữ - ghi không có tài khoản",
+        "visibilityHint_private": "Chỉ bạn thấy đăng ký này và các khoản thanh toán của nó.",
+        "visibilityHint_shared": "Mọi người trong hộ gia đình đều thấy đăng ký này và các khoản thanh toán của nó.",
+        "errorAccountGone": "Tài khoản đã chọn không còn tồn tại."
     },
     "health": {
         "fasting": {

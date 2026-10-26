@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Montant",
         "detailNextPaymentLabel": "Prochain paiement",
         "renewedNamed": "« {{name}} » payé - prochain paiement le {{date}}.",
-        "completedNamed": "« {{name}} » payé et terminé."
+        "completedNamed": "« {{name}} » payé et terminé.",
+        "accountHint": "Chaque paiement de cet abonnement est imputé sur ce compte. Un paiement isolé se modifie dans le budget.",
+        "accountArchivedHint": "Ce compte est archivé. L’abonnement est imputé sans compte jusqu’à ce que vous en choisissiez un autre.",
+        "accountArchivedOption": "{{name}} (archivé)",
+        "accountArchivedMeta": "{{name}} archivé - imputé sans compte",
+        "visibilityHint_private": "Vous seul voyez cet abonnement et ses paiements.",
+        "visibilityHint_shared": "Tout le foyer voit cet abonnement et ses paiements.",
+        "errorAccountGone": "Le compte choisi n’existe plus."
     },
     "health": {
         "fasting": {

@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "금액",
         "detailNextPaymentLabel": "다음 결제",
         "renewedNamed": "'{{name}}' 결제했습니다 - 다음 결제일은 {{date}}입니다.",
-        "completedNamed": "'{{name}}' 결제 후 종료했습니다."
+        "completedNamed": "'{{name}}' 결제 후 종료했습니다.",
+        "accountHint": "이 구독의 모든 결제는 이 계좌로 기록됩니다. 개별 결제는 예산에서 바꿀 수 있습니다.",
+        "accountArchivedHint": "이 계좌는 보관되었습니다. 다른 계좌를 고를 때까지 구독은 계좌 없이 기록됩니다.",
+        "accountArchivedOption": "{{name}} (보관됨)",
+        "accountArchivedMeta": "{{name}} 보관됨 - 계좌 없이 기록",
+        "visibilityHint_private": "이 구독과 결제 내역은 나만 볼 수 있습니다.",
+        "visibilityHint_shared": "가구의 모든 구성원이 이 구독과 결제 내역을 볼 수 있습니다.",
+        "errorAccountGone": "선택한 계좌가 더 이상 존재하지 않습니다."
     },
     "health": {
         "fasting": {

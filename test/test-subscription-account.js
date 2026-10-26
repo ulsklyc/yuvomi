@@ -272,12 +272,14 @@ test('Seite: Kontowahl - kein Konto und die aktiven; ein archiviertes nur, wenn 
   const fresh = opened(null);
   assert.deepEqual(options(fresh, 'subscription-account-id').map((o) => o.value), ['', '7']);
   assert.equal(selected(fresh, 'subscription-account-id'), '');
-  assert.ok(!fresh.includes('subscriptions.accountArchivedHint'));
+  // Der Archiv-Hinweis steht nur, wenn ein archiviertes gewaehlt ist (sonst verborgen, fuer den Wechsel).
+  const archivedHint = (html) => /id="subscription-account-id-archived"(?![^>]*hidden)[^>]*>subscriptions\.accountArchivedHint/.test(html);
+  assert.ok(!archivedHint(fresh));
 
   const stale = opened(abo({ account_id: 8, account_name: 'Altkonto', account_archived: true }));
   assert.deepEqual(options(stale, 'subscription-account-id').map((o) => o.value), ['', '7', '8']);
   assert.equal(selected(stale, 'subscription-account-id'), '8');
-  assert.ok(stale.includes('subscriptions.accountArchivedHint'), 'der Hinweis unter dem Feld');
+  assert.ok(archivedHint(stale), 'der Hinweis unter dem Feld');
   assert.match(stale, /aria-describedby="[^"]*subscription-account-id-hint/);
 
   assert.ok(!opened(null, { ...META, accounts: [] }).includes('id="subscription-account-id"'), 'ohne Konten kein Feld');
@@ -346,4 +348,66 @@ test('Seite: die Zeile sagt ruhig, dass ein archiviertes Konto ohne Konto bucht 
 test('Seite: der Fall "Konto gibt es nicht mehr" hat seinen Satz', () => {
   assert.equal(CASE_MESSAGES.get?.('subscriptions_account_not_found') ?? CASE_MESSAGES.subscriptions_account_not_found,
     'subscriptions.errorAccountGone');
+});
+
+test('Seite: das gewaehlte Konto gibt es nicht mehr - der Dialog bleibt offen, die Seite laedt einmal, die Wahl kommt aus dem frischen Stand auf "Kein Konto"', async () => {
+  const toasts = [];
+  const zuvorToast = globalThis.window.yuvomi.showToast;
+  globalThis.window.yuvomi.showToast = (text) => { toasts.push(text); return true; };
+  const field = { html: '', removed: false, insertAdjacentHTML(_w, html) { this.html += html; }, remove() { this.removed = true; } };
+  const select = { value: '7', focused: 0, addEventListener() {}, focus() { this.focused += 1; } };
+  const els = new Map();
+  const panel = {
+    insertAdjacentHTML() {}, querySelectorAll: () => [],
+    querySelector(sel) {
+      if (sel === '[data-subscription-account-field]') return field.removed ? null : field;
+      if (sel === '#subscription-account-id') return select;
+      if (sel === '#subscription-visibility') return null;
+      if (!els.has(sel)) {
+        els.set(sel, { value: ({ '#subscription-next-date': '2030-01-15', '#subscription-currency': 'EUR', '#subscription-end-type': 'never',
+          '#subscription-amount': '30', '#subscription-name': 'Gym', '#subscription-cycle': 'monthly', '#subscription-interval': '1',
+          '#subscription-reminder': '3' })[sel] ?? '', checked: false, disabled: false, files: [], dataset: {},
+        addEventListener() {}, focus() {}, querySelector: () => null });
+      }
+      return els.get(sel);
+    },
+  };
+  const gets = [];
+  let closed = 0;
+  const fresh = { ...structuredClone(META), accounts: [{ id: 9, name: 'Neu', archived: false }] };
+  globalThis.__apiStub = {
+    get: async (path) => {
+      gets.push(path);
+      if (path.endsWith('/meta')) return { data: structuredClone(fresh) };
+      if (path.endsWith('/settings')) return { data: { monthly_budget: 0, base_currency: 'EUR' } };
+      return { data: { subscriptions: [], summary: null, rates: null } };
+    },
+    put: async () => {
+      throw Object.assign(new Error('Server sentence.'), {
+        name: 'ApiError', status: 400, data: { error: 'Account not found.', code: 400, reason: 'subscriptions_account_not_found' },
+      });
+    },
+  };
+  globalThis.__closeModal = () => { closed += 1; return true; };
+  const container = { isConnected: true, querySelector: () => null, querySelectorAll: () => [] };
+  const s = page.state;
+  const zuvor = { meta: s.meta };
+  s.meta = structuredClone(META);
+  page.setContainerForTest(container);
+  try {
+    await page.saveSubscription(panel, abo({ account_id: 7 }));
+    for (let i = 0; i < 6; i += 1) await new Promise((r) => setImmediate(r));
+  } finally {
+    page.setContainerForTest(null);
+    Object.assign(s, zuvor);
+    delete globalThis.__apiStub;
+    delete globalThis.__closeModal;
+    globalThis.window.yuvomi.showToast = zuvorToast;
+  }
+  assert.deepEqual(toasts, ['subscriptions.errorAccountGone']);
+  assert.equal(closed, 0, 'der Dialog bleibt offen');
+  assert.equal(gets.filter((p) => p.endsWith('/meta')).length, 1, 'die Seite laedt einmal');
+  assert.ok(field.removed, 'das alte Feld ist ersetzt');
+  assert.deepEqual(options(field.html, 'subscription-account-id').map((o) => [o.value, o.selected]), [['', true], ['9', false]]);
+  assert.equal(select.focused, 1);
 });

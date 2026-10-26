@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Összeg",
         "detailNextPaymentLabel": "Következő fizetés",
         "renewedNamed": "„{{name}}” kifizetve - következő fizetés: {{date}}.",
-        "completedNamed": "„{{name}}” kifizetve és lezárva."
+        "completedNamed": "„{{name}}” kifizetve és lezárva.",
+        "accountHint": "Az előfizetés minden fizetése erre a számlára kerül. Egy-egy fizetést a költségvetésben módosíthatsz.",
+        "accountArchivedHint": "Ez a számla archivált. Az előfizetés számla nélkül könyvel, amíg másikat nem választasz.",
+        "accountArchivedOption": "{{name}} (archivált)",
+        "accountArchivedMeta": "{{name}} archivált - számla nélkül könyvel",
+        "visibilityHint_private": "Ezt az előfizetést és a fizetéseit csak te látod.",
+        "visibilityHint_shared": "A háztartás minden tagja látja ezt az előfizetést és a fizetéseit.",
+        "errorAccountGone": "A kiválasztott számla már nem létezik."
     },
     "health": {
         "fasting": {

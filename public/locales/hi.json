@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "राशि",
         "detailNextPaymentLabel": "अगला भुगतान",
         "renewedNamed": "\"{{name}}\" का भुगतान हुआ - अगला भुगतान {{date}} को।",
-        "completedNamed": "\"{{name}}\" का भुगतान हुआ और समाप्त।"
+        "completedNamed": "\"{{name}}\" का भुगतान हुआ और समाप्त।",
+        "accountHint": "इस सदस्यता का हर भुगतान इसी खाते में दर्ज होता है। किसी एक भुगतान को बजट में बदलें।",
+        "accountArchivedHint": "यह खाता संग्रहीत है। जब तक आप कोई दूसरा खाता नहीं चुनते, सदस्यता बिना खाते के दर्ज होती है।",
+        "accountArchivedOption": "{{name}} (संग्रहीत)",
+        "accountArchivedMeta": "{{name}} संग्रहीत - बिना खाते के दर्ज",
+        "visibilityHint_private": "यह सदस्यता और इसके भुगतान केवल आप देखते हैं।",
+        "visibilityHint_shared": "परिवार के सभी लोग यह सदस्यता और इसके भुगतान देखते हैं।",
+        "errorAccountGone": "चुना गया खाता अब मौजूद नहीं है।"
     },
     "health": {
         "fasting": {

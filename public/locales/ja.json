@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "金額",
         "detailNextPaymentLabel": "次回支払い",
         "renewedNamed": "「{{name}}」を支払いました - 次回の支払いは{{date}}です。",
-        "completedNamed": "「{{name}}」を支払い、終了しました。"
+        "completedNamed": "「{{name}}」を支払い、終了しました。",
+        "accountHint": "このサブスクリプションの支払いはすべてこの口座に記録されます。個別の支払いは予算で変更できます。",
+        "accountArchivedHint": "この口座はアーカイブ済みです。別の口座を選ぶまで、サブスクリプションは口座なしで記録されます。",
+        "accountArchivedOption": "{{name}}（アーカイブ済み）",
+        "accountArchivedMeta": "{{name}} はアーカイブ済み - 口座なしで記録",
+        "visibilityHint_private": "このサブスクリプションとその支払いはあなただけが見られます。",
+        "visibilityHint_shared": "世帯の全員がこのサブスクリプションとその支払いを見られます。",
+        "errorAccountGone": "選択した口座はもう存在しません。"
     },
     "health": {
         "fasting": {

@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Belopp",
         "detailNextPaymentLabel": "Nästa betalning",
         "renewedNamed": "”{{name}}” betald - nästa betalning {{date}}.",
-        "completedNamed": "”{{name}}” betald och avslutad."
+        "completedNamed": "”{{name}}” betald och avslutad.",
+        "accountHint": "Varje betalning för den här prenumerationen bokförs på det här kontot. En enskild betalning ändrar du i budgeten.",
+        "accountArchivedHint": "Det här kontot är arkiverat. Prenumerationen bokförs utan konto tills du väljer ett annat.",
+        "accountArchivedOption": "{{name}} (arkiverat)",
+        "accountArchivedMeta": "{{name}} arkiverat - bokförs utan konto",
+        "visibilityHint_private": "Bara du ser den här prenumerationen och dess betalningar.",
+        "visibilityHint_shared": "Alla i hushållet ser den här prenumerationen och dess betalningar.",
+        "errorAccountGone": "Det valda kontot finns inte längre."
     },
     "health": {
         "fasting": {

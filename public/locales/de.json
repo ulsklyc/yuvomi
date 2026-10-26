@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Betrag",
         "detailNextPaymentLabel": "Nächste Zahlung",
         "renewedNamed": "„{{name}}“ bezahlt - nächste Zahlung am {{date}}.",
-        "completedNamed": "„{{name}}“ bezahlt und abgeschlossen."
+        "completedNamed": "„{{name}}“ bezahlt und abgeschlossen.",
+        "accountHint": "Jede Zahlung des Abos wird auf dieses Konto gebucht. Eine einzelne Zahlung stellst du im Budget um.",
+        "accountArchivedHint": "Dieses Konto ist archiviert. Das Abo bucht ohne Konto, bis du ein anderes wählst.",
+        "accountArchivedOption": "{{name}} (archiviert)",
+        "accountArchivedMeta": "{{name}} archiviert - bucht ohne Konto",
+        "visibilityHint_private": "Nur du siehst dieses Abonnement und seine Zahlungen.",
+        "visibilityHint_shared": "Alle im Haushalt sehen dieses Abonnement und seine Zahlungen.",
+        "errorAccountGone": "Das gewählte Konto gibt es nicht mehr."
     },
     "health": {
         "fasting": {

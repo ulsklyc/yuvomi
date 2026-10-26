@@ -4804,7 +4804,14 @@
         "detailAmountLabel": "Valor",
         "detailNextPaymentLabel": "Próximo pagamento",
         "renewedNamed": "«{{name}}» pago - próximo pagamento a {{date}}.",
-        "completedNamed": "«{{name}}» pago e concluído."
+        "completedNamed": "«{{name}}» pago e concluído.",
+        "accountHint": "Cada pagamento desta assinatura é lançado nesta conta. Altera um pagamento específico no orçamento.",
+        "accountArchivedHint": "Esta conta está arquivada. A assinatura é lançada sem conta até escolheres outra.",
+        "accountArchivedOption": "{{name}} (arquivada)",
+        "accountArchivedMeta": "{{name}} arquivada - lançada sem conta",
+        "visibilityHint_private": "Só tu vês esta assinatura e os seus pagamentos.",
+        "visibilityHint_shared": "Todo o agregado vê esta assinatura e os seus pagamentos.",
+        "errorAccountGone": "A conta escolhida já não existe."
     },
     "health": {
         "fasting": {
