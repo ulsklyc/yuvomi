@@ -1370,6 +1370,48 @@ function taskForOthersOnly(task, viewer) {
   return people.length > 0 && !people.some((person) => person?.id === viewer.id);
 }
 
+/**
+ * Die Zeile eines Termins im Heute-Blatt - in der Liste und als aufgeklappte
+ * Zeile unter der Zeitleiste (renderTodayTimeline), damit beide dieselbe
+ * Anatomie tragen.
+ */
+function todayEventRow(event, span) {
+  // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
+  // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
+  // vor heute begann, steht oben bei den ganztaegigen.
+  const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
+  return {
+    kind: 'event',
+    objectId: event.id,
+    sortKey: time || '00:01',
+    timeLabel: overviewEventTime(event, span),
+    title: event.title,
+    // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+    // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+    // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+    // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+    sub: eventCalendarName(event) || t('dashboard.todayEvent'),
+    // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+    // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+    // Das Blatt nennt weiter den Beginn allein.
+    wallTimeEnd: wallEventEnd(event, span),
+    icon: 'calendar',
+    tone: 'event',
+    route: calendarEventRoute(event),
+    who: event.assigned_users?.[0] ?? null,
+    // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
+    // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
+    people: event.assigned_users ?? [],
+    // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
+    // Moduls; wer das eigene zeigt, fragt hasEventIcon().
+    eventIcon: event.icon ?? null,
+    // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
+    // des Tages, kein Auftrag - er haelt die Coda nicht auf.
+    priority: 40,
+    open: false,
+  };
+}
+
 function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date(), viewer = dashboardViewer } = {}) {
   const highlights = buildTodayHighlights(data);
   const todayKey = zonedDateKey(now);
@@ -1384,40 +1426,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       // Das Blatt verspricht, was heute NOCH ansteht (#1449): ein beendeter
       // Termin verlaesst es. Die Termin-Kachel behaelt ihn zurueckgetreten.
       if (eventHasEnded(event, nowStamp)) continue;
-      // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
-      // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
-      // vor heute begann, steht oben bei den ganztaegigen.
-      const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
-      rows.push({
-        kind: 'event',
-        objectId: event.id,
-        sortKey: time || '00:01',
-        timeLabel: overviewEventTime(event, span),
-        title: event.title,
-        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
-        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
-        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
-        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
-        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
-        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
-        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
-        // Das Blatt nennt weiter den Beginn allein.
-        wallTimeEnd: wallEventEnd(event, span),
-        icon: 'calendar',
-        tone: 'event',
-        route: calendarEventRoute(event),
-        who: event.assigned_users?.[0] ?? null,
-        // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
-        // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
-        people: event.assigned_users ?? [],
-        // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
-        // Moduls; wer das eigene zeigt, fragt hasEventIcon().
-        eventIcon: event.icon ?? null,
-        // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
-        // des Tages, kein Auftrag - er haelt die Coda nicht auf.
-        priority: 40,
-        open: false,
-      });
+      rows.push(todayEventRow(event, span));
     }
   }
 
@@ -3904,7 +3913,7 @@ function renderTodayRow(row, extraClass = '') {
   // Johnson Einverstaendnis fuer ...". Das Paar ist hier nur Bild; der Name
   // folgt als eigener Text hinter Titel und Modul - dieselbe Auskunft, in der
   // Reihenfolge, in der man eine Zeile liest.
-  const whoName = mark ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
+  const whoName = mark && !row.namesInSub ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
   const inner = `
       <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${programRowGlyph(row)}</span>${mark}</span>
       <span class="today-cockpit-card__body">
@@ -4163,18 +4172,28 @@ function todaySheetSpeaks(data, cfg, now = new Date()) {
   return speakingSourceIds(data, todaySheetContextFor(cfg, now));
 }
 
+/**
+ * Spricht eine Domaene im Heute-Blatt? Kein Echo: ist das Modul-Widget einer
+ * Domaene sichtbar, entfallen ihre Programm-Zeilen - jede Domaene hat genau
+ * eine Repraesentation (Cockpit ODER Widget), statt dieselbe Aufgabe/Termin
+ * doppelt zu zeigen. Die Zeitleiste fragt dieselbe Regel, bevor es das Modell
+ * gibt.
+ */
+function todayDomainSpeaks(cfg, module) {
+  const widgetShown = Array.isArray(cfg) && cfg.some((w) => w.id === module && w.visible);
+  return !window.yuvomi?.isModuleDisabled(module) && !widgetShown;
+}
+
 function buildTodayCockpitModel(data, cfg = [], {
   cap = onPhoneStage() ? phoneProgramCap() : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
   isDisplay = false,
+  timeline = null,
   viewer = dashboardViewer,
 } = {}) {
-  // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
-  // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
-  // Widget), statt dieselbe Aufgabe/Termin doppelt zu zeigen.
   const widgetShown = (id) => Array.isArray(cfg) && cfg.some((w) => w.id === id && w.visible);
-  const domainInCockpit = (module) => !window.yuvomi?.isModuleDisabled(module) && !widgetShown(module);
+  const domainInCockpit = (module) => todayDomainSpeaks(cfg, module);
 
   const includeTasks = domainInCockpit('tasks');
   const includeCalendar = domainInCockpit('calendar');
@@ -4190,7 +4209,16 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Wand fragen beide hier; die Wand reicht nur keine Kachel-Konfiguration mit.
   const sheetContext = todaySheetContextFor(cfg, now, program.rows, { isDisplay });
   const contributed = collectSourceRows(data, sheetContext);
-  const programRows = groupOverdue ? groupOverdueRows(program.rows) : program.rows;
+  // DER TERMIN STEHT EINMAL (Ulas, 2026-10-26). Traegt die Zeitleiste einen
+  // Termin als Block, verlaesst seine Zeile die Liste: der Block klappt sie
+  // unter der Leiste auf (renderTodayTimeline). Ganztaegiges hat keinen Block
+  // und bleibt. `existing` oben sieht weiter alle Zeilen - eine Erinnerung an
+  // einen Termin der Leiste bleibt so dessen Echo und keine eigene Zeile.
+  const inTimeline = new Set((timeline?.lanes ?? []).flatMap((lane) => lane.items.map((item) => item.id)));
+  const listed = inTimeline.size
+    ? program.rows.filter((row) => !(row.kind === 'event' && inTimeline.has(row.objectId)))
+    : program.rows;
+  const programRows = groupOverdue ? groupOverdueRows(listed) : listed;
   const sheet = composeTodaySheet([...programRows, ...contributed.rows], { cap });
   const visibleRows = sheet.rows;
   const overflow = sheet.overflow;
@@ -4260,7 +4288,9 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Schichtplan-Kachel mehr etwas behauptet.
   const scheduleWidgetVisible = !window.yuvomi?.isModuleDisabled('schedule') && widgetShown('schedule');
   let state = null;
-  if (!sheet.allRows.length && !scheduleWidgetVisible) {
+  // Steht in der Leiste noch etwas aus, ist der Tag weder frei noch durch.
+  const timelineAhead = (timeline?.lanes ?? []).some((lane) => lane.items.some((item) => item.state !== 'past'));
+  if (!sheet.allRows.length && !scheduleWidgetVisible && !timelineAhead) {
     // „Alles erledigt" sagt auch eine Quelle, deren Offenes heute geschafft
     // ist (alle Dosen genommen) - sonst hiesse derselbe Tag „Heute frei".
     const sayAllDone = (includeTasks && program.tasksDoneToday > 0) || contributed.settled;
@@ -4300,8 +4330,11 @@ function buildTodayCockpitModel(data, cfg = [], {
   // (`codaAllowed`): unter einer offenen Dosis, einer wartenden Freigabe oder
   // der Tonne am Morgen ist „nichts mehr" keine Entwarnung, sondern ein
   // Widerspruch zur Zeile darueber.
+  // Die Coda schliesst auch eine Leiste ab, deren Termine noch ausstehen und
+  // deren Zeilen deshalb nicht in der Liste stehen - sonst fiele unter einem
+  // Tag nur aus Terminen die Warnung vor der Morgen-Frist weg (Critique P3).
   let coda = null;
-  if (codaAllowed(sheet)) {
+  if (codaAllowed(sheet) || (timelineAhead && !sheet.allRows.length)) {
     const tomorrowKey = sheetContext.tomorrowKey;
     const tomorrowTask = includeTasks && program.nextDueTask?.due_date === tomorrowKey ? program.nextDueTask : null;
     coda = tomorrowTask
@@ -4463,10 +4496,33 @@ function todayEventsForTimeline(data, now = new Date()) {
         timeLabel: overviewEventTime(event, span),
         route: calendarEventRoute(event),
         color: resolveEventColor(event),
+        key: id,
+        sheetRow: timelineEventRow(event, span),
       });
     }
   }
   return { timed, count };
+}
+
+/**
+ * Die Zeile, die ein Block unter der Leiste aufklappt: dieselbe wie in der
+ * Liste, mit der Zuweisung. Das Siegel-Paar zeigt EIN Gesicht (whoMark); geht
+ * der Termin mehrere an, nennt die Unterzeile alle (#1828) - im Solo-Haushalt
+ * niemanden.
+ */
+function timelineEventRow(event, span) {
+  const row = todayEventRow(event, span);
+  const people = isSoloHousehold() ? [] : (event.assigned_users ?? []);
+  if (people.length > 1) {
+    // Bei geteiltem Nachnamen die Vornamen (R19), wie in den Spuren.
+    const surname = sharedSurname(people);
+    const given = (name) => (surname && name.endsWith(` ${surname}`) ? name.slice(0, -(surname.length + 1)) : name);
+    row.sub = `${row.sub} · ${people.map((person) => given(String(person.display_name ?? ''))).join(', ')}`;
+    // Die Unterzeile nennt schon alle - der Name hinter dem Avatar entfaellt,
+    // sonst hoerte der Screenreader die erste Person zweimal.
+    row.namesInSub = true;
+  }
+  return row;
 }
 
 /** Die Leiste als Modell - null, wenn heute kein Termin eine Uhrzeit hat. */
@@ -4509,15 +4565,17 @@ function todaySummary(data, model, now = new Date()) {
  *
  * NUR AUF DER BREITEN BUEHNE. Auf dem Telefon gehoert der erste Schirm den
  * Zeilen (R21, D5 „Uebersicht als Briefing"), und zehn unbeschriftete Balken
- * sagten dort weniger als eine Zeile. Unter 720px Containerbreite blendet
- * dashboard.css sie aus - dieselbe Schwelle, ab der die Zeilen zweispaltig
- * laufen.
+ * sagten dort weniger als eine Zeile; dort bleiben die Termine Zeilen.
  *
- * Jeder Block ist ein Link auf sein Vorkommen im Kalender, wie die Terminzeile
- * darunter; sein zugaenglicher Name ist Titel, Zeit und Zustand. Die Achse und
- * der Jetzt-Strich sind Bild.
+ * DER BLOCK KLAPPT SEINEN TERMIN AUF (Ulas, 2026-10-26), wie die Monatsansicht
+ * des Kalenders den Tag darunter: die Terminzeilen stehen nicht mehr in der
+ * Liste, ein Klick auf den Block zeigt seine Zeile - Siegel, Zuweisung,
+ * Kalender - unter der Leiste, ein zweiter klappt sie zu. Die Zeile selbst
+ * oeffnet das Termin-Blatt wie jede Zeile des Blatts. Ein Block ist deshalb
+ * ein Aufklapp-Knopf (aria-expanded), kein Link; sein zugaenglicher Name ist
+ * Titel, Zeit und Zustand. Achse und Jetzt-Strich sind Bild.
  */
-function renderTodayTimeline(timeline, now = new Date()) {
+function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   if (!timeline) return '';
   const span = timeline.end - timeline.start;
   const hours = timeline.hours.map((minute, index) => `<span class="today-timeline__hour${index % 2 ? ' today-timeline__hour--odd' : ''}" style="--tl-at:${(minute - timeline.start) / span}">${esc(hourGutterLabel(minute / 60))}</span>`).join('');
@@ -4536,10 +4594,11 @@ function renderTodayTimeline(timeline, now = new Date()) {
     const label = solo ? '' : `<span class="today-timeline__who" aria-hidden="true">${face}<span class="today-timeline__name">${esc(shortName(name))}</span></span>`;
     const items = lane.items.map((item) => `
           <li class="today-timeline__slot" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--ev-color:${esc(item.color)}">
-            <a href="${esc(item.route)}" class="today-timeline__event today-timeline__event--${item.state}" data-route="${esc(item.route)}" data-object-kind="event" data-object-id="${esc(String(item.id))}">
+            <button type="button" class="today-timeline__event today-timeline__event--${item.state}" data-timeline-event="${esc(item.key)}"
+                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail">
               <span class="today-timeline__title">${esc(item.title)}</span>
               <span class="today-timeline__time">${esc(item.timeLabel)}</span>${stateLabel[item.state] ? `<span class="sr-only">, ${esc(stateLabel[item.state])}</span>` : ''}
-            </a>
+            </button>
           </li>`).join('');
     return `
         <div class="today-timeline__lane" style="--tl-rows:${lane.rows}">
@@ -4550,13 +4609,47 @@ function renderTodayTimeline(timeline, now = new Date()) {
   const nowMarker = timeline.now == null ? '' : `
       <div class="today-timeline__past" aria-hidden="true"></div>
       <div class="today-timeline__now" aria-hidden="true"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
+  // Je Termin EINE Zeile, auch wenn er in zwei Spuren steht.
+  const details = new Map();
+  for (const item of timeline.lanes.flatMap((lane) => lane.items)) {
+    if (!details.has(item.key)) details.set(item.key, item.sheetRow);
+  }
+  const open = details.has(openKey) ? openKey : null;
+  const detail = `
+    <div class="today-timeline__detail" id="today-timeline-detail"${open ? '' : ' hidden'}>${
+      [...details].map(([key, row]) => `<div class="today-timeline__detail-row" data-timeline-detail="${esc(key)}"${key === open ? '' : ' hidden'}>${renderTodayRow(row)}</div>`).join('')
+    }</div>`;
   return `
     <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
          data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-hours:${timeline.hours.length}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
       <div class="today-timeline__axis" aria-hidden="true">${hours}</div>
       ${lanes}
       ${nowMarker}
-    </div>`;
+    </div>${detail}`;
+}
+
+/** Aufgeklappt bleibt aufgeklappt, auch wenn der Minutentakt das Blatt neu zeichnet. */
+let todayTimelineOpen = null;
+
+/**
+ * Ein Block klappt seine Zeile unter der Leiste auf, ein zweiter Klick auf
+ * denselben klappt sie zu, ein Klick auf einen anderen wechselt. An Ort und
+ * Stelle, ohne Neuzeichnen - der Fokus bleibt auf dem Block.
+ */
+function wireTodayTimeline(root) {
+  const region = root?.querySelector?.('#today-timeline-detail');
+  if (!region) return;
+  const buttons = [...root.querySelectorAll('[data-timeline-event]')];
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.timelineEvent;
+      const next = todayTimelineOpen === key ? null : key;
+      todayTimelineOpen = next;
+      for (const row of region.querySelectorAll('[data-timeline-detail]')) row.hidden = row.dataset.timelineDetail !== next;
+      region.hidden = next == null;
+      for (const other of buttons) other.setAttribute('aria-expanded', other.dataset.timelineEvent === next ? 'true' : 'false');
+    });
+  });
 }
 
 /**
@@ -4577,8 +4670,12 @@ function updateTodayTimelineNow(root, now = new Date()) {
   if (label) label.textContent = formatTime(now);
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, cap } = {}) {
-  const model = buildTodayCockpitModel(data, cfg, { now, ...(cap ? { cap } : {}) });
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, timelineOpen = todayTimelineOpen, cap } = {}) {
+  // Die Leiste nur auf der breiten Buehne und nur, wenn der Kalender im Blatt
+  // spricht: neben einer sichtbaren Termin-Kachel waere sie deren Echo. Sie
+  // entsteht VOR dem Modell, weil ihre Termine die Liste verlassen.
+  const timeline = todayDomainSpeaks(cfg, 'calendar') && !onPhoneStage() ? buildTodayTimeline(data, { now }) : null;
+  const model = buildTodayCockpitModel(data, cfg, { now, timeline, ...(cap ? { cap } : {}) });
 
   /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
    * Desktop ist das Blatt 1140px breit, und eine Zeile nutzte davon ~200px
@@ -4590,9 +4687,6 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
    * schmaler Buehne haben die Klassen keine Wirkung, das Blatt bleibt eine
    * Liste in unveraenderter Hoehe. */
   const listRows = [];
-  // Die Leiste nur auf der breiten Buehne und nur, wenn der Kalender im Blatt
-  // spricht: neben einer sichtbaren Termin-Kachel waere sie deren Echo.
-  const timeline = model.includeCalendar && !onPhoneStage() ? buildTodayTimeline(data, { now }) : null;
   // „Heute frei" unter einer Leiste voller beendeter Termine widerspraeche ihr:
   // der Tag war nicht frei, er ist durch.
   const state = model.state && timeline && model.state.icon === 'sparkles'
@@ -4618,7 +4712,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     : renderTodayRow(row, columnClass(index)))));
   const parts = [];
   const foldShopping = Boolean(model.shopping) && model.overflow > 0 && !model.moreRoute && onPhoneStage();
-  if (timeline) parts.push(renderTodayTimeline(timeline, now));
+  if (timeline) parts.push(renderTodayTimeline(timeline, now, timelineOpen));
   if (listRows.length) {
     parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
   }
@@ -7347,6 +7441,7 @@ async function openEventFromOverview(link, anchor, { container = null, rerender 
 function wireLinks(container, rerender, { editing = false, user = null } = {}) {
   wireTodayMore(container);
   wireTodayOverdue(container);
+  wireTodayTimeline(container);
   container.querySelectorAll('[data-route]').forEach((el) => {
     if (el.id === 'fab-main' || el.closest('#fab-actions')) return;
     if (editing && el.closest('.widget-wrapper--editing')) return;

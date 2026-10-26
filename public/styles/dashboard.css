@@ -2771,7 +2771,7 @@ svg.weather-forecast__icon {
   --tl-label: calc(var(--space-16) * 2);
   --tl-lane: var(--space-12);
   position: relative;
-  display: none;
+  display: grid;
   grid-template-columns: var(--tl-label) minmax(0, 1fr);
   padding: var(--tl-pad-top) var(--tl-pad-inline) var(--tl-pad-bottom);
 }
@@ -2868,6 +2868,13 @@ svg.weather-forecast__icon {
 
 .today-timeline__event {
   display: flex;
+  inline-size: 100%;
+  margin: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  appearance: none;
+  border: none;
   flex-direction: column;
   justify-content: center;
   gap: var(--space-0h);
@@ -3012,18 +3019,33 @@ svg.weather-forecast__icon {
   white-space: nowrap;
 }
 
-/* AB 720PX CONTAINERBREITE - dieselbe Schwelle, ab der die Zeilen zweispaltig
- * laufen. Darunter (Tablet hochkant, schmale Spalte neben offener Seitenleiste)
- * waere eine Stunde schmaler als ihre Beschriftung. */
-@container today-cockpit (min-width: 720px) {
-  .today-timeline {
-    display: grid;
-  }
+/* KEINE BREITEN-SCHWELLE MEHR. Seit die Termine die Liste verlassen, sobald
+ * die Leiste sie traegt, steht die Leiste ueberall ausser auf dem Telefon
+ * (renderTodayCockpit) - eine Schwelle hier liesse die Termine auf dem Tablet
+ * hochkant aus Leiste UND Liste fallen. Schmal tragen nur die geraden Stunden
+ * ihre Zahl (unten). Die Haarlinie trennt die Leiste von dem, was folgt. */
+.today-timeline ~ .today-cockpit__rows,
+.today-timeline ~ .today-cockpit-card,
+.today-timeline__detail {
+  border-top: 1px solid var(--color-border-subtle);
+}
 
-  .today-timeline + .today-cockpit__rows,
-  .today-timeline + .today-cockpit-card {
-    border-top: 1px solid var(--color-border-subtle);
-  }
+/* Die aufgeklappte Zeile steht als eigene Zeile des Blatts unter der Leiste:
+ * dieselbe Anatomie, derselbe Abstand wie die Liste. */
+.today-timeline__detail-row > .today-cockpit-card {
+  border-top: none;
+}
+
+/* Der gewaehlte Block hebt sich eine Sprosse und traegt einen Ring in seiner
+ * Farbe - der Zeiger auf die Zeile darunter. */
+.today-timeline__event[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface));
+  box-shadow: inset 0 0 0 1px var(--ev-color);
+}
+
+.today-timeline__event--past[aria-expanded="true"] {
+  background: var(--color-surface-elevated-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ev-color) var(--tint-hint), var(--color-surface-3));
 }
 
 /* Bis 1000px traegt jede zweite Stunde ihre Zahl - die Linie bleibt. */

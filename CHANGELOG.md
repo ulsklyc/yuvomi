@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Today at a glance shows the shape of the day on a wide screen.** Above the rows, a timeline
   from 07:00 to 22:00 (wider when an appointment starts earlier or ends later) gives everyone with an
   appointment today a lane, plus one for the whole household; appointments that are over step back to
-  grey, and a red line marks now, moving with the clock. Each block opens its appointment like the row
-  below. The heading adds the day in one line, for example "9 events · 1 task overdue". The timeline
-  appears from a sheet width of 720px and only when the Calendar tile is not on the overview, so it
-  never repeats the tile; on a phone the first screen stays with the rows. Under a timeline of finished
-  appointments, "Nothing else today" replaces "Free today".
+  grey, and a red line marks now, moving with the clock. Appointments with a time now stand only in
+  the timeline: a click on a block unfolds its row below - who it is for and which calendar - and the
+  row opens the appointment; the list keeps the tasks, all-day appointments and everything else, so
+  more of the day fits before "+N more". The heading adds the day in one line, for example "9 events ·
+  1 task overdue". The timeline appears whenever the Calendar tile is not on the overview, so it never
+  repeats the tile; on a phone the first screen stays with the rows and appointments stay rows there.
+  Under a timeline of finished appointments, "Nothing else today" replaces "Free today", and while one
+  is still ahead neither is said.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
   as before unless you change it, on the household's clock and for this device only. Wall mode dims

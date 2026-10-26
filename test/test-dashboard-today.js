@@ -980,12 +980,13 @@ test('R20: die Seite setzt den Betrachter, den das Heute-Blatt fragt', () => {
 // ungerader Zahl rechts unten eine leere Zelle, und die Einkaufszeile stand
 // hinter „+N weitere heute", als waere sie eine der verdeckten Zeilen.
 test('R22 D16: ungerade Zahl - die letzte Zeile spannt; der Einkauf steht vor dem Aufklapper', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
-  const events = Array.from({ length: 9 }, (_, i) => ev(i + 1, `T${i + 1}`,
-    `2026-09-24T${String(11 + i).padStart(2, '0')}:00`, `2026-09-24T${String(11 + i).padStart(2, '0')}:30`));
-  const sheet = dash.renderTodayCockpit({ upcomingEvents: events, urgentTasks: [], users: [], shoppingOpenCount: 3 }, [], false,
+  // Aufgaben mit Uhrzeit: Termine stehen auf der breiten Buehne in der Zeitleiste, nicht in der Liste.
+  const tasks = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, title: `T${i + 1}`, due_date: '2026-09-24',
+    due_time: `${String(11 + i).padStart(2, '0')}:00`, status: 'open', assigned_users: [] }));
+  const sheet = dash.renderTodayCockpit({ urgentTasks: tasks, users: [], shoppingOpenCount: 3 }, [], false,
     { now: new Date(), cap: 5, moreOpen: false });
   assert.match(sheet, /today-cockpit__rows--split" style="--today-rows-per-column:2"/, 'fuenf Zeilen: zwei je Spalte');
-  const classes = [...sheet.matchAll(/class="today-cockpit-card today-cockpit-card--event([^"]*)"/g)].slice(0, 5).map((m) => m[1].trim());
+  const classes = [...sheet.matchAll(/class="today-cockpit-card today-cockpit-card--task([^"]*)"/g)].slice(0, 5).map((m) => m[1].trim());
   assert.deepEqual(classes, ['', '', 'today-cockpit-card--col2 today-cockpit-card--col-start', 'today-cockpit-card--col2', 'today-cockpit-card--span'],
     'links zwei, rechts zwei, die fuenfte ueber die volle Breite');
   const shopping = sheet.indexOf('today-cockpit-card--shopping');
@@ -993,7 +994,7 @@ test('R22 D16: ungerade Zahl - die letzte Zeile spannt; der Einkauf steht vor de
   assert.ok(shopping > 0 && more > 0, 'Vorbedingung: Einkauf und „+N weitere heute" stehen im Blatt');
   assert.ok(shopping < more, 'der Einkauf schliesst das sichtbare Programm, der Weg zu den uebrigen das Blatt');
 
-  const even = dash.renderTodayCockpit({ upcomingEvents: events.slice(0, 4), urgentTasks: [], users: [] }, [], false, { now: new Date(), cap: 5 });
+  const even = dash.renderTodayCockpit({ urgentTasks: tasks.slice(0, 4), users: [] }, [], false, { now: new Date(), cap: 5 });
   assert.doesNotMatch(even, /today-cockpit-card--span/, 'gerade Zahl: nichts spannt');
 }));
 
@@ -1108,4 +1109,40 @@ test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel und keine auf dem Te
   global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
   const phone = dash.renderTodayCockpit(timelineDay(), []);
   assert.ok(!phone.includes('today-timeline'), 'der erste Schirm des Telefons gehoert den Zeilen (R21 D5)');
+}));
+
+test('Heute-Blatt: ein Termin der Zeitleiste steht nicht noch einmal in der Liste - sein Block klappt die Zeile auf', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const day = timelineDay();
+  day.upcomingEvents.push(ev(16, 'Elternabend', '2026-09-24T19:00', '2026-09-24T20:30', { assigned_users: [person(1), person(2)] }));
+  const sheet = dash.renderTodayCockpit(day, []);
+  const list = sheet.slice(sheet.indexOf('class="today-cockpit__rows'));
+  // In der Liste: das Ganztaegige (kein Block), die Aufgabe - kein Termin mit Uhrzeit.
+  assert.match(list, /today-cockpit-card__value">Ausflug</);
+  for (const title of ['Schule', 'Filmabend', 'Fussball', 'Elternabend']) {
+    assert.ok(!list.includes(`today-cockpit-card__value">${title}<`), `${title} steht nur in der Leiste`);
+  }
+  // Der Block ist ein Aufklapp-Knopf auf die Zeile darunter, zugeklappt bis zum Klick.
+  assert.match(sheet, /<button type="button" class="today-timeline__event today-timeline__event--next" data-timeline-event="14@2026-09-24T20:15"\s+aria-expanded="false" aria-controls="today-timeline-detail">/);
+  assert.match(sheet, /id="today-timeline-detail" hidden>/);
+  // Je Termin eine Zeile, auch wenn er in zwei Spuren steht; sie traegt die Zuweisung.
+  assert.equal(sheet.match(/data-timeline-detail="16@2026-09-24T19:00"/g)?.length, 1);
+  assert.match(sheet, /today-cockpit-card__sub">dashboard\.todayEvent · Alex Johnson, Linda Johnson</);
+  const detail16 = /data-timeline-detail="16@2026-09-24T19:00"[\s\S]*?<\/div>/.exec(sheet)[0];
+  assert.ok(!detail16.includes('class="sr-only">, '), 'die Unterzeile nennt alle - kein zweiter Name hinter dem Avatar');
+  // Aufgeklappt aus dem gemerkten Zustand: die Region und genau diese Zeile stehen.
+  const open = dash.renderTodayCockpit(day, [], false, { timelineOpen: '15@2026-09-24T16:00' });
+  assert.match(open, /id="today-timeline-detail">/);
+  assert.match(open, /data-timeline-detail="15@2026-09-24T16:00">/);
+  assert.match(open, /data-timeline-event="15@2026-09-24T16:00"\s+aria-expanded="true"/);
+  assert.match(open, /data-timeline-detail="14@2026-09-24T20:15" hidden>/);
+}));
+
+test('Heute-Blatt: steht in der Leiste noch etwas aus, ist der Tag nicht „frei"; auf dem Telefon bleiben die Termine Zeilen', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const onlyEvents = { upcomingEvents: [ev(14, 'Filmabend', '2026-09-24T20:15', '2026-09-24T22:00')], urgentTasks: [], users: TIMELINE_USERS };
+  const wide = dash.renderTodayCockpit(onlyEvents, []);
+  assert.ok(!wide.includes('today-cockpit-card--state'), 'der Filmabend steht noch aus - weder „frei" noch „nichts mehr"');
+  assert.match(wide, /today-timeline__title">Filmabend</);
+  global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
+  const phone = dash.renderTodayCockpit(onlyEvents, []);
+  assert.match(phone, /today-cockpit-card__value">Filmabend</, 'ohne Leiste bleibt der Termin eine Zeile');
 }));
