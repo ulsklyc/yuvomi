@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and its payments are seen only by you. For API clients `account_id` is new on
   `/api/v1/budget/subscriptions`, with `account_name` and `account_archived` in the answer;
   `/meta` adds `budget_mode` and `accounts`, and an unknown account answers `400` with reason
-  `subscriptions_account_not_found`.
+  `subscriptions_account_not_found` (migration 264).
 - **A recurring shared expense with a start date in the past asks before booking the gap**
   (#1748). Creating one, or moving its next date, to a day before today used to book one missed
   date per hour until it had caught up. The dialog now asks, as resuming does: start from the next
