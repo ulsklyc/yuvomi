@@ -9655,6 +9655,15 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
   }
   if (reportFieldErrors(fieldErrors)) return;
 
+  // Ein Anhang ueber der Grenze ist kein Fehlschlag des Speicherns, sondern
+  // eine Eingabe, die nicht durchgeht: Satz und Abbruch VOR jeder Rueckfrage
+  // und Anfrage. Im try geworfen, ueberschrieb ihn das allgemeine catch.
+  const attachmentFile = overlay.querySelector('#modal-attachment')?.files?.[0];
+  if (attachmentFile && attachmentFile.size > maxUploadBytes()) {
+    window.yuvomi?.showToast(t('calendar.attachmentTooLarge', { size: maxUploadMb() }), 'danger');
+    return;
+  }
+
   if (mode === 'edit'
       && requiresWholeSeriesConfirmation(event)
       && !await confirmLocalWholeSeriesEdit(event)) return;
@@ -9693,10 +9702,8 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
       saveBtn.textContent = mode === 'edit' ? t('common.save') : t('common.add');
       return;
     }
-    const attachmentFile = overlay.querySelector('#modal-attachment')?.files?.[0];
     let attachmentPayload = null;
     if (attachmentFile) {
-      if (attachmentFile.size > maxUploadBytes()) throw new Error(t('calendar.attachmentTooLarge', { size: maxUploadMb() }));
       attachmentPayload = {
         name: attachmentFile.name,
         mime: attachmentFile.type || 'application/octet-stream',
