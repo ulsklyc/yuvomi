@@ -902,3 +902,21 @@ test('#1522: steht der Haushalt in der Zone des Geraets, bleibt alles, wie es wa
     assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-09-17T07:00:00'] });
   });
 });
+
+// --------------------------------------------------------------------------
+// Ein zu grosser Anhang sagt seinen eigenen Satz (#2255). Dasselbe Formular
+// wie oben, dazu das Dateifeld: die Pruefung warf ihren Satz im try, und das
+// allgemeine catch zeigte stattdessen "Speichern fehlgeschlagen".
+// --------------------------------------------------------------------------
+
+test('#2255: a too large attachment says so and sends nothing', async () => {
+  const panel = openDialog();
+  const input = panel.append(new FakeEl('input', { id: 'modal-attachment' }));
+  input.files = [{ name: 'scan.pdf', type: 'application/pdf', size: 50 * 1024 * 1024 }];
+  toasts.length = 0;
+  const { calls } = await save(panel);
+  assert.deepEqual(toasts, [{ message: 'calendar.attachmentTooLarge{"size":5}', type: 'danger' }]);
+  assert.deepEqual(calls, [], 'no request leaves for a file the server would turn away');
+  const saveBtn = panel.querySelector('#modal-save');
+  assert.equal(saveBtn.disabled, false, 'the form stays usable');
+});

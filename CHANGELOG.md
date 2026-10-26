@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays open with your selection, offers the current folders with the top level chosen and shows a
   fresh preview, so one click uploads again. If only a folder inside the target went away, the
   target stays chosen and the preview creates that folder anew.
+- **A too large event attachment says so** (#2255). Saving an event with a file above the upload
+  limit showed only that the event could not be saved. The dialog now names the limit before
+  anything is sent and stays open with your entries.
 - **Saving, resetting or deleting an event speaks your language when something goes wrong** (#1909).
   These toasts showed the server's German text in every language. They now say the app's own
   sentence: an event someone else deleted in the meantime (the dialog closes and the calendar
