@@ -2557,6 +2557,7 @@ function renderToolbar() {
   // dort ansetzen, wo die alte stand, statt aufzuspringen.
   attachSegmentIndicator(bar.querySelector('.cal-toolbar__views'), { key: 'calendar-views' });
   watchToolbarFit(bar);
+  watchLabelFit(bar.querySelector('#cal-label'));
   builtToolbars.set(bar, html);
 }
 
@@ -2653,6 +2654,27 @@ function watchToolbarFit(bar) {
   });
   observer.observe(bar);
   toolbarFitObserver = { target: bar, observer };
+}
+
+/* DAS LABEL MISST NEU, WENN SEINE BOX SICH AENDERT, NICHT NUR DER KOPF (#1462).
+ * Eingeklappt rueckt der Zeitraum in Zeile 1 - die Breite des Kopfs bleibt,
+ * die des Labels nicht. Mit dem Ueberlappungszeichen in dieser Zeile hatte es
+ * bei 390px 109 statt 158px und kappte „26.10. - 25.11.2026" mit Ellipse,
+ * obwohl die kuerzere Fassung ohne Jahr passt (fitPeriodLabel). */
+let labelFitObserver = null;
+function watchLabelFit(lbl) {
+  if (!lbl || typeof ResizeObserver !== 'function') return;
+  if (labelFitObserver?.target === lbl) return;
+  labelFitObserver?.observer.disconnect();
+  let lastWidth = 0;
+  const observer = new ResizeObserver(() => {
+    const width = Math.round(lbl.clientWidth);
+    if (width === lastWidth) return;
+    if (lastWidth) updateLabel();
+    lastWidth = width;
+  });
+  observer.observe(lbl);
+  labelFitObserver = { target: lbl, observer };
 }
 
 /**

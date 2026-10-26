@@ -3165,7 +3165,8 @@ html.fab-steady .page-fab {
   min-width: 0;
 }
 
-.page-toolbar__status-btn {
+/* Am Slot gebunden: die Knopfhaut (`.btn--ghost`) setzt ihre eigene Tinte. */
+.page-toolbar__status > .page-toolbar__status-btn {
   gap: var(--space-1);
   color: var(--color-warning);
 }
@@ -3188,7 +3189,7 @@ html.fab-steady .page-fab {
     --page-status-lead: calc(var(--target-base) + var(--page-toolbar-gap));
   }
 
-  .page-toolbar__status-btn {
+  .page-toolbar__status > .page-toolbar__status-btn {
     inline-size: var(--target-base);
     min-inline-size: var(--target-base);
     block-size: var(--target-base);
