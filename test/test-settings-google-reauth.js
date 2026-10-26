@@ -171,6 +171,6 @@ test('#2019: scheitert nach dem 409 der Status-Abruf, kommt der Fehler als Toast
   await settle();
 
   assert.equal(replaced.length, 0, 'ohne frischen Status keine neue Karte');
-  assert.deepEqual(toasts.map((x) => x.message), ['Google sign-in expired - reconnect required.'],
-    'der ursprüngliche Fehler erscheint, statt still zu verschwinden');
+  assert.deepEqual(toasts.map((x) => x.message), ['settings.outlookReauthRequired'],
+    'die abgelaufene Anmeldung erscheint als Satz der App (#1695), statt still zu verschwinden');
 });

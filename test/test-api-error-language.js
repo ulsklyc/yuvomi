@@ -24,7 +24,9 @@
  *        GEGENPROBE (26.10.2026): gegen den Stand vor der Umstellung der
  *        Preferences rot - Bein 1 meldet `server/routes/preferences.js: 59
  *        (erlaubt 0)`, Bein 2 nennt jede gefuehrte Anfrage mit ihrem
- *        deutschen Wort.
+ *        deutschen Wort. Ebenso fuer die Google- und Outlook-Konten
+ *        (calendar/google.js, calendar/outlook.js): `google.js: 23`,
+ *        `outlook.js: 3`, und jede der 19 gefuehrten Anfragen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -48,10 +50,8 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
 const GERMAN_LEFT = new Map([
   ['calendar/apple.js', 6],
   ['calendar/feed.js', 5],
-  ['calendar/google.js', 23],
   ['calendar/helpers.js', 9],
   ['calendar/local-calendars.js', 7],
-  ['calendar/outlook.js', 3],
   ['calendar/read.js', 4],
   ['calendar/subscriptions.js', 24],
   ['contacts.js', 13],
@@ -154,9 +154,8 @@ test('der Leser findet die Saetze ueberhaupt', () => {
   let read = 0;
   for (const { url } of files) read += outboundLiterals(readFileSync(url, 'utf8')).length;
   assert.ok(read > 1500, `nur ${read} Saetze gelesen - der Leser greift nicht mehr`);
-  // Eine Datei aus einem Unterordner zaehlt mit (routes/calendar/).
-  assert.ok(germanByFile().has('calendar/google.js') || !GERMAN_LEFT.has('calendar/google.js'),
-    'Unterordner werden nicht gelesen');
+  // Die Unterordner (routes/calendar/, routes/health/ ...) zaehlen mit.
+  assert.ok(files.some(({ rel }) => rel === 'calendar/google.js'), 'Unterordner werden nicht gelesen');
 });
 
 // ── Bein 2: die umgestellten Module als Programm ─────────────────────────────
@@ -285,4 +284,62 @@ test('keine Absage der Preferences-Routen traegt deutschen Wortlaut', async () =
   holidays.__setFetchImpl(null);
 
   assertRefusedInEnglish(seen);
+});
+
+test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortlaut', async () => {
+  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
+  const calApp = express();
+  calApp.use(express.json({ limit: '10mb' }));
+  calApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  calApp.use('/calendar', calendarRouter);
+  const calServer = calApp.listen(0, '127.0.0.1');
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${calUrl}${route}`, { method, headers, body: payload, redirect: 'manual' });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const ext = '/calendar/external-calendars';
+    const backfill = `${ext}/default-assignee-backfill`;
+    const ok = { source: 'google', external_id: 'cal-1' };
+
+    await run('google-callback-code', 'GET', '/calendar/google/callback');
+    await run('google-calendar-id', 'PATCH', '/calendar/google/calendars', {});
+    await run('google-enabled', 'PATCH', '/calendar/google/calendars', { calendarId: 'c', enabled: 'yes' });
+    await run('google-readonly', 'PUT', '/calendar/google/readonly', { readonly: 'yes' });
+    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope' });
+    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ' });
+    await run('ext-assignee', 'PATCH', ext, { ...ok, default_assignee_user_id: 'abc' });
+    await run('ext-assignee-unknown', 'PATCH', ext, { ...ok, default_assignee_user_id: 987654 });
+    await run('ext-not-synced', 'PATCH', ext, { ...ok, default_assignee_user_id: null });
+    await run('backfill-cursor', 'GET', `${backfill}?moved_after=nope`);
+    await run('backfill-count', 'POST', backfill, {});
+    await run('backfill-token', 'POST', backfill, { expected_count: 0, expected_token: 'nope' });
+    await run('backfill-moves', 'POST', backfill, { expected_count: 0, moves: 'nope' });
+    await run('backfill-move-item', 'POST', backfill, { expected_count: 0, moves: [{ event_id: 'x' }] });
+    await run('backfill-moves-many', 'POST', backfill, {
+      expected_count: 0,
+      moves: Array.from({ length: movedCandidatesLimit.max + 1 }, (_, i) => ({ event_id: i + 1, from_user_id: 1, to_user_id: 1 })),
+    });
+    await run('backfill-changed', 'POST', backfill, { expected_count: 5 });
+    await run('outlook-callback-code', 'GET', '/calendar/outlook/callback');
+    await run('outlook-calendar-id', 'PATCH', '/calendar/outlook/accounts/1/calendars', {});
+    await run('outlook-enabled', 'PATCH', '/calendar/outlook/accounts/1/calendars', { calendarId: 'c', enabled: 'yes' });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    calServer.close();
+  }
 });

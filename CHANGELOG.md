@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API clients that compared the German text need to compare the new one. In the app nothing reads
   that text any more: a setting that cannot be saved now says so in your language instead of
   showing the server's sentence.
+- **The Google and Outlook calendar routes answer in English** (#1695). `/api/v1/calendar/google/*`,
+  `/api/v1/calendar/outlook/*` and the default-assignee routes under
+  `/api/v1/calendar/external-calendars` still refused in German ("calendarId fehlt oder ist
+  ungültig.", "Interner Fehler"); every `error` there is English now, with the same status codes.
+  The calendar sync settings no longer show that text: a failed Google or Outlook action says so in
+  your language, and an expired Google sign-in that cannot be reconnected on the spot says to
+  reconnect.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

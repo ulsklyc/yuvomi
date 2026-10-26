@@ -42,7 +42,7 @@ router.get('/outlook/callback', refuseWhileRestoring, async (req, res) => {
   try {
     const { code, error, state } = req.query;
     if (error) return res.redirect('/settings?sync_error=outlook');
-    if (!code)  return res.status(400).json({ error: 'Kein Code erhalten.', code: 400 });
+    if (!code)  return res.status(400).json({ error: 'No authorization code received.', code: 400 });
 
     // OAuth CSRF-Schutz: state-Parameter validieren
     if (!state || !req.session.outlookOAuthState || state !== req.session.outlookOAuthState) {
@@ -153,10 +153,10 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
     const accountId = parseInt(req.params.id, 10);
     const { calendarId, enabled } = req.body;
     if (!calendarId || typeof calendarId !== 'string') {
-      return res.status(400).json({ error: 'calendarId fehlt oder ist ungültig.', code: 400 });
+      return res.status(400).json({ error: 'calendarId is missing or invalid.', code: 400 });
     }
     if (typeof enabled !== 'boolean') {
-      return res.status(400).json({ error: 'enabled muss ein Boolean sein.', code: 400 });
+      return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
     }
     const result = outlookCalendar.setCalendarEnabled(accountId, calendarId, enabled);
     res.json({ data: result });
