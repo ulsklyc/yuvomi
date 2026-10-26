@@ -282,18 +282,15 @@
  *
  * Der Druckzustand steigt eine Sprosse der Toenungsskala statt den eigenen
  * Inhalt per opacity abzudunkeln. */
-/* MITTIG, NICHT OBEN UND NICHT AUSEINANDERGEZOGEN. Die Kachel fuellt ihre
- * Rasterzelle, und die ist auf dem Desktop rund 137px hoch bei ~70px Inhalt.
- * Oben ausgerichtet blieb das Label allein am Kartenrand haengen; mit einem
- * `margin-block-start:auto` am Wert klaffte dazwischen ein 60px-Loch. Zentriert
- * liest sich derselbe Block auf beiden Groessen als eine Einheit, und zwei
- * Kacheln nebeneinander zeigen ihre Werte weiter auf einer Linie, solange die
- * Labels gleich viele Zeilen brauchen. */
+/* DIE ANORDNUNG IN DER KACHEL STEHT IN dashboard.css (`.metric-tiles`, DW-P2-7):
+ * die Kacheln einer Reihe teilen dort per Subgrid ihre Kopf-, Wert- und
+ * Fusszeile, damit die Werte auch bei umbrechendem Modulnamen auf einer Linie
+ * stehen - das leistete das Zentrieren hier nur, solange alle Labels gleich
+ * viele Zeilen brauchten. */
 .metric-card--tile {
   text-decoration: none;
   color: var(--color-text-primary);
   gap: var(--space-1);
-  justify-content: center;
   transition: background-color var(--transition-fast), transform var(--duration-xs) var(--ease-out);
 }
 

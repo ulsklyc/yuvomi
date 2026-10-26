@@ -52,7 +52,10 @@
  * -------------------------------------------------------- */
 .dashboard__grid {
   display: grid;
-  gap: var(--space-4);
+  /* Die Rasterluecke als Wert, nicht nur als Deklaration: die Kennzahlreihe
+   * stellt ihre Kacheln mit derselben Luecke nebeneinander (DW-P2-7). */
+  --dashboard-grid-gap: var(--space-4);
+  gap: var(--dashboard-grid-gap);
   grid-template-columns: 1fr;
   /* IMMER DICHT, AUCH MIT EIGENER REIHENFOLGE UND IM BEARBEITEN-MODUS
    * (Critique 2026-09-23, Entscheidung Ulas) - und in jeder Breite mit mehr
@@ -157,12 +160,98 @@
 .metric-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-2h);
+  /* DIE LUECKE DES RASTERS, NICHT EINE EIGENE (DW-P2-7). Mit 10px standen die
+   * Kacheln enger beieinander als jede andere Karte auf dem Board und lasen
+   * als ein Block in einem zweiten Kartensystem. */
+  gap: var(--dashboard-grid-gap);
   /* `start` und nicht `stretch`: `stretch` verteilt ueberschuessige Hoehe auf
    * die Zeilen des Rasters, und bei einer einzigen Zeile heisst das, sie nimmt
    * alles. Zusammen mit dem `flex` darueber war das die zweite Haelfte der
    * 361px-Kachel. Die Reihe waechst auf ihren Inhalt, mehr will sie nicht. */
   align-content: start;
+  /* DIE REIHE IST DER CONTAINER `metric-grid` (DW-P2-7, R23 offen). Die
+   * Wertstufen der Kennzahlkarte (panel.css, Title 1 -> 2 -> 3) fragen genau
+   * diesen Namen; ohne ihn stand der Wert in jeder Breite auf 28px, und mobil
+   * lief "10 im Monat" 6px ueber die Kachel. Am Raster, nicht an der Karte:
+   * Containment an einem Grid-Item nimmt ihm seine Breite (panel.css). Was
+   * auch auf der Stufe nicht passt, verkleinert `fitMetricLeads()`. */
+  container: metric-grid / inline-size;
+}
+
+/* AUS DEMSELBEN MATERIAL WIE DIE WIDGETS (DW-P2-7, H7).
+ *
+ * Die Kacheln trugen das Material der Kennzahlkarte des Budgets - Radius 16,
+ * shadow-sm, Polster 12 - und standen damit als zweites Kartensystem mitten
+ * zwischen Widgets mit Radius 12 und shadow-md. Flaeche, Radius und Schatten
+ * kommen jetzt aus der EINEN Materialregel der Uebersicht (`.dashboard
+ * .widget`, unten), das Polster ist das des Widget-Koerpers.
+ *
+ * Und der Kopf spricht den Widget-Dialekt: Siegel, dann der Modulname in
+ * Label-Farbe und semibold - die Dichte-Stufe der Headline (15px), weil die
+ * Kachel ein halbes Widget ist und ihr Kopf neben dem 17px-Titel der
+ * Nachbarkarte eine Stufe zuruecktritt. Das Caption-Label (12/500 sekundaer)
+ * gehoert der Kennzahl einer Flaeche; hier nennt es den Absender.
+ *
+ * DIE KOEPFE TEILEN IHRE ZEILE (Subgrid): bricht ein Modulname um
+ * ("Gemeinsame / Ausgaben" auf dem Telefon), waechst die Kopfzeile fuer alle
+ * Kacheln der Reihe, und die Werte stehen weiter auf einer Linie - gemessen
+ * vorher 46 gegen 53px. Ohne Subgrid bleibt die Kachel eine Spalte. */
+.metric-tiles > .metric-card {
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  row-gap: var(--space-1);
+}
+
+@supports (grid-template-rows: subgrid) {
+  .metric-tiles {
+    /* Kopf, Wert, Fuss je Kachelzeile. Nur der Fuss darf wachsen - siehe
+     * das Zeilenminimum unten. */
+    grid-auto-rows: auto auto minmax(auto, 1fr);
+  }
+
+  /* Die Fussnote bleibt am Wert (Spurstart); ueberschuessige Hoehe liegt
+   * unten in der Kachel - der Inhalt steht oben wie in jedem Widget. */
+  .metric-tiles > .metric-card {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    align-items: start;
+  }
+}
+
+.metric-tiles .metric-card__label {
+  font-size: var(--type-secondary);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-primary);
+}
+
+/* Title 1 semibold wie die Leitzahl (R23, D12): die Kachel nennt EINE Zahl,
+ * und Fett war die Gewichtsstufe ueber dem Widget-Titel, nicht seine. */
+.metric-tiles .metric-card__value {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* EINE RASTERZEILE HOCH, NICHT 21PX DARUNTER (DW-P2-7, G1-P3-2). Ab 1024px
+ * ist jede Rasterzeile mindestens `--dashboard-row-min` hoch. Die Reihe
+ * (111px) stand oben in ihrer 132px-Zeile, und bis zur naechsten Kachel
+ * waren es 41 statt 20px. Ein Zeilenminimum nur fuer diese Zelle gibt es im
+ * Raster nicht - also fuellt die Reihe die Zeile, die sie ohnehin belegt,
+ * und waechst nie darueber hinaus (`align-self: start` am Wrapper bleibt). */
+@media (min-width: 1024px) {
+  /* Die REIHE haelt das Minimum: im Subgrid kommt die Hoehe der Kachel aus
+   * den Spuren der Reihe, und deren Fuss-Spur (`1fr`) nimmt den Rest auf.
+   * Selektor wie `min-height: 0` oben, damit die Kaskade nicht raet. */
+  .widget-wrapper > .metric-tiles {
+    min-block-size: var(--dashboard-row-min);
+  }
+
+  @supports not (grid-template-rows: subgrid) {
+    .metric-tiles > .metric-card {
+      min-block-size: var(--dashboard-row-min);
+    }
+  }
 }
 
 @media (min-width: 768px) {
@@ -202,8 +291,11 @@
      * vier gedraengte. Die auto-fill-Mechanik bleibt unangetastet: ab ~1700px
      * kommt die vierte Spalte von selbst zurueck, dann mit Platz fuer Text. */
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-    grid-auto-rows: minmax(132px, auto);
-    gap: var(--space-5);
+    /* Das Zeilenminimum als Wert: die Kennzahlreihe misst sich daran
+     * (`.metric-tiles > .metric-card`, DW-P2-7). */
+    --dashboard-row-min: 132px;
+    grid-auto-rows: minmax(var(--dashboard-row-min), auto);
+    --dashboard-grid-gap: var(--space-5);
   }
 
   .widget-size--2x1,
@@ -4635,8 +4727,12 @@ button.today-cockpit__more--link {
   background: var(--module-accent);
 }
 
+/* Die Kennzahlkachel steht in `:where()`: Material ja, aber mit der
+ * Spezifitaet von `.metric-card` - sonst schluege die Flaeche hier den
+ * Hover-Ton der Kachel (`.metric-card--tile:hover`, panel.css). */
 .dashboard .widget,
-.dashboard .widget-skeleton {
+.dashboard .widget-skeleton,
+.dashboard :where(.metric-tiles > .metric-card) {
   /* Geteiltes Kartenmaterial (Critique P2): eine spuerbare, aber weiche Elevation
    * (--shadow-md) hebt jede Kachel vom Grouped Background ab, statt als flaches
    * Rechteck zu liegen - dieselbe Tiefe wie die Wetterkarte, damit das Grid als

@@ -84,9 +84,11 @@ export function leadCardClass() {
   return 'metric-card--lead';
 }
 
-// Die Leitzahlen, die fitMetricLeads misst: die fuehrende Karte und die
-// Kurzzeile mit Leitzahl (utils/metric-glance.js).
-const LEAD_VALUES = '.metric-card--lead > .metric-card__value, .budget-glance--lead .budget-glance__value';
+// Die Werte, die fitMetricLeads misst: die fuehrende Karte, die Kurzzeile mit
+// Leitzahl (utils/metric-glance.js) und die Kennzahlkachel der Uebersicht
+// (`.metric-card--tile`, DW-P2-7) - sie fuellt sich per `auto-fit` selbst, und
+// die Breite der Reihe sagt dort nichts ueber die Breite der Kachel.
+const LEAD_VALUES = '.metric-card--lead > .metric-card__value, .budget-glance--lead .budget-glance__value, .metric-card--tile > .metric-card__value';
 const FIT_STEPS = 2;
 let fitObserver = null;
 

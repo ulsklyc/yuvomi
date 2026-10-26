@@ -68,6 +68,7 @@ import { emptyHintHTML } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
+import { fitMetricLeads } from '/utils/metric-card.js';
 import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
@@ -9140,6 +9141,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const grid = container.querySelector('#dashboard-widget-grid');
     if (!grid) return;
     applyRowFill(grid, { editing: isCustomizing });
+    // Nach der Packung stehen die Breiten fest: eine Kennzahlkachel, deren Wert
+    // auch auf der Stufe ihrer Reihe nicht passt, tritt eine Stufe zurueck
+    // (DW-P2-7). Der ResizeObserver darin misst bei jeder Breitenaenderung neu.
+    fitMetricLeads(grid);
     if (isCustomizing || typeof ResizeObserver !== 'function') return;
     let shape = `${gridColumnCount(grid)}:${grid.childElementCount}`;
     rowFillObserver = new ResizeObserver(() => {

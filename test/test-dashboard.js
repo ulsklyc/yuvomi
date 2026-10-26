@@ -3796,6 +3796,65 @@ test('Kennzahlreihe bezieht ihre Hoehe aus ihrem Inhalt, nicht von aussen', () =
     'die ZELLE der Kennzahlreihe muss auf ihren Inhalt schrumpfen - sonst steht die Reihe richtig und die Buehne darunter ist leer');
 });
 
+/* DW-P2-7 (Polish der Dashboard-Widgets, 2026-10-26; G1-Uebersicht-P2-2,
+ * P3-2, P3-3): die Kennzahlreihe stand als zweites Kartensystem im Raster -
+ * Radius 16, shadow-sm, Polster 12, Label 12/500 sekundaer, Wert 28/700,
+ * 10px Luecke. Mobil lief "10 im Monat" 6px ueber die Kachel, weil die Reihe
+ * kein `metric-grid`-Container war und die Wertstufen nie griffen; ab 1024px
+ * lagen 41 statt 20px bis zur naechsten Kachel (111px Reihe in einer
+ * 132px-Zeile). Gegen den Stand davor rot gelaufen (Dateikopie). */
+test('DW-P2-7: die Kennzahlreihe ist aus dem Material der Widgets und ein metric-grid', async () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const parts = (rule) => rule.selector.split(',').map((part) => part.trim().replace(/\s+/g, ' '));
+  const decl = (body, prop) => body.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`))?.[1].trim() ?? '';
+  const at = (selector, test = (a) => a.length === 0) => rules.filter((r) => test(r.at) && parts(r).includes(selector));
+  const has = (selector, prop, want, test) => at(selector, test).some((r) => want.test(decl(r.body, prop)));
+
+  // Die Reihe ist der Container, den die Wertstufen von panel.css fragen.
+  assert(has('.metric-tiles', 'container', /^metric-grid\s*\/\s*inline-size$/),
+    '.metric-tiles deklariert `container: metric-grid / inline-size` - sonst greifen die Wertstufen nie (mobil 6px Ueberlauf)');
+  // EINE Materialregel fuer Widgets und Kacheln - Flaeche, Radius, Schatten.
+  const material = rules.find((r) => r.at.length === 0 && parts(r).includes('.dashboard .widget') && /--shadow-md/.test(r.body));
+  assert(material, 'die Materialregel `.dashboard .widget` mit shadow-md muss es geben - sonst prueft dieser Guard nichts');
+  assert(parts(material).some((part) => /\.metric-tiles > \.metric-card/.test(part)),
+    `die Kennzahlkachel steht in DERSELBEN Materialregel wie die Widgets (gefunden: ${parts(material).join(' | ')})`);
+  assert(has('.metric-tiles > .metric-card', 'padding', /^var\(--space-4\)$/),
+    'Polster der Kachel = Polster des Widget-Koerpers (16px), nicht die 12px der Budget-Karte');
+  // Kopf im Widget-Dialekt, Wert semibold.
+  assert(has('.metric-tiles .metric-card__label', 'font-weight', /--font-weight-semibold/)
+    && has('.metric-tiles .metric-card__label', 'color', /--color-text-primary/)
+    && has('.metric-tiles .metric-card__label', 'font-size', /--type-secondary/),
+    'der Kachelkopf nennt den Absender wie ein Widget-Kopf: Label-Farbe, semibold, Headline-Dichtestufe');
+  assert(has('.metric-tiles .metric-card__value', 'font-weight', /--font-weight-semibold/),
+    'der Wert steht in Title 1 semibold wie die Leitzahl, nicht in 700');
+  // Gleicher Rhythmus: Luecke und Zeilenminimum kommen aus dem Raster.
+  assert(has('.metric-tiles', 'gap', /^var\(--dashboard-grid-gap\)$/) && has('.dashboard__grid', 'gap', /^var\(--dashboard-grid-gap\)$/),
+    'die Kacheln stehen mit der Rasterluecke nebeneinander, nicht mit eigenen 10px');
+  const wide = (a) => a.some((x) => /min-width:\s*1024px/.test(x));
+  assert(has('.dashboard__grid', 'grid-auto-rows', /^minmax\(var\(--dashboard-row-min\),\s*auto\)$/, wide),
+    'das Zeilenminimum des Rasters ist ein Wert (--dashboard-row-min), an dem sich die Reihe misst');
+  assert(has('.widget-wrapper > .metric-tiles', 'min-block-size', /^var\(--dashboard-row-min\)$/, wide),
+    'ab 1024px fuellt die Reihe genau ihre Rasterzeile - sonst liegen 41 statt 20px bis zur naechsten Kachel');
+
+  // Was auch auf der Stufe nicht passt, verkleinert fitMetricLeads - auch die Kachel.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} };
+  try {
+    const { fitMetricLeads } = await import('../public/utils/metric-card.js');
+    const asked = [];
+    fitMetricLeads({ querySelectorAll: (selector) => { asked.push(selector); return []; } });
+    assert(asked.length === 1 && asked[0].split(',').map((x) => x.trim()).includes('.metric-card--tile > .metric-card__value'),
+      `fitMetricLeads misst die Werte der Kennzahlkachel (gefragt: ${asked.join(' | ') || 'nichts'})`);
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'ResizeObserver', saved);
+    else delete globalThis.ResizeObserver;
+  }
+  const source = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  assert(/applyRowFill\(grid, \{ editing: isCustomizing \}\);[^}]*?fitMetricLeads\(grid\);/.test(source),
+    'die Uebersicht ruft fitMetricLeads nach der Packung ihres Rasters (wireRowFill)');
+});
+
 // --------------------------------------------------------
 // Wetterlage, Gangart und Temperaturband (#Wetter-Kur 2026-08-17)
 // --------------------------------------------------------

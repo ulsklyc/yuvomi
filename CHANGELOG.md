@@ -72,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **The number tiles on the overview are made like the other tiles.** They had the corners, shadow
+  and padding of the budget's cards and stood between the tiles as a second kind of card; now they
+  share the tiles' surface, corners and shadow, sit as far apart as the tiles around them, and lead
+  with the module's seal and name in the weight of a tile header. The number is semibold and steps
+  down with the width of the row, so "10 im Monat" no longer runs past the edge of its tile on a
+  phone, and one that still does not fit gets a size smaller. The numbers of a row stay on one line
+  when one module name wraps, and from 1024px the gap below the row is the grid's 20px instead of 41px.
 - **The preferences API answers in English** (#1695). `/api/v1/preferences` and its holiday routes
   still sent most refusals in German ("timezone_hint_dismissed muss true oder false sein.",
   "Interner Fehler"); every `error` there is now an English sentence, with the same status codes.

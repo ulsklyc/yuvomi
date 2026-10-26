@@ -4416,6 +4416,20 @@ ist GENAU EIN Element, und es traegt den Modulton zu 100 %. Die Kachelreihe
 (`metric-card--tile`) fuehrt dasselbe Siegel - zwei Siegel-Gesichter auf einem Board
 waeren zwei Wahrheiten.
 
+**Und die Kachelreihe ist aus demselben Material** (DW-P2-7, 2026-10-26). Sie trug das
+Material der Kennzahlkarte des Budgets (Radius 16, shadow-sm, Polster 12, Label 12/500
+sekundaer, Wert 28/700) und las mitten zwischen den Widgets als zweites Kartensystem. Jetzt:
+Flaeche, Radius 12 und shadow-md aus der einen Materialregel `.dashboard .widget`, Polster 16
+wie der Widget-Koerper, Luecke = Rasterluecke (`--dashboard-grid-gap`); der Kopf spricht den
+Widget-Dialekt (Siegel + Modulname in Label-Farbe, semibold, Headline-Dichtestufe 15px - eine
+Stufe unter dem 17px-Widget-Titel, weil die Kachel ein halbes Widget ist), der Wert Title 1
+semibold. Die Reihe ist der Container `metric-grid` (Wertstufen 28/22/20 nach ihrer Breite),
+`fitMetricLeads()` verkleinert, was auf der Stufe nicht passt, und per Subgrid teilen die
+Kacheln Kopf-, Wert- und Fusszeile - ein umbrechender Modulname verschiebt keinen Wert mehr.
+Ab 1024px fuellt die Reihe genau eine Rasterzeile (`--dashboard-row-min`), der Abstand zur
+naechsten Kachel ist die Rasterluecke (vorher 41 statt 20px). Das Caption-Label der
+Kennzahl-Regel unten gilt fuer die Kennzahl einer Flaeche; hier nennt das Label den Absender.
+
 **Hier stand `module-seal--vivid`, und die Klasse gibt es nicht mehr.** In Etappe 2 war sie
 die Ausnahme neben der 16-%-Toenung; Etappe 3 desselben Tages hat den Vollton zur Regel
 gemacht, er steht seither in der `.module-seal`-Basisregel, und die Variante ist mitsamt
