@@ -149,6 +149,11 @@ export const schemas = {
             url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
             local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
+            assignee_user_ids: {
+              type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 },
+              description: 'People for this run (#1940), household members only; not stored. Every new event of the run is assigned to them (the first one primary). An event the caller already imported with the same UID - in any local calendar - is not created again: the people are added to the ones already on it, nobody is removed and nothing else changes. Omit for the behaviour without people.',
+            },
+            assignee_user_id: { type: 'integer', minimum: 1, description: 'One person, the short form of `assignee_user_ids`.' },
           },
           oneOf: [{ required: ['ics'] }, { required: ['url'] }],
         },

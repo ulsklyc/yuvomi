@@ -18,7 +18,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('Apple');
 
 import * as db from '../db.js';
-import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, calendarDefaultAssignees, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -418,10 +418,8 @@ async function runSync({ makeClient } = {}) {
     const calColor = normalizeCalColor(cal.calendarColor) || APPLE_COLOR;
     const calName  = calendarDisplayName(cal.displayName, 'Apple Calendar');
     const calRefId = upsertExternalCalendar('apple', cal.url, calName, calColor);
-    // Standard-Zuweisung dieses Kalenders (#459) einmal auflösen, nicht pro Event.
-    const calDefaultAssignee = db.get()
-      .prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
-      .get(calRefId)?.default_assignee_user_id ?? null;
+    // Standard-Personen dieses Kalenders (#459, #1897) einmal auflösen, nicht pro Event.
+    const calDefaultAssignees = calendarDefaultAssignees(db.get(), calRefId);
 
     // --------------------------------------------------------
     // Inbound: iCloud → lokal
@@ -552,7 +550,7 @@ async function runSync({ makeClient } = {}) {
             reassignDefaultOnCalendarMove(db.get(), eventId, {
               fromCalRefId: existing.calendar_ref_id,
               toCalRefId: calRefId,
-              toDefaultUserId: calDefaultAssignee,
+              toDefaultUserIds: calDefaultAssignees,
             });
           } else {
             const inserted = db.get().prepare(`
@@ -575,7 +573,7 @@ async function runSync({ makeClient } = {}) {
                   WHERE external_calendar_id = ? AND external_source = 'apple' ORDER BY id LIMIT 1
                 `).get(ev.seriesUid)?.id ?? null
               : null;
-            assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignee);
+            assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignees);
           }
 
           // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,

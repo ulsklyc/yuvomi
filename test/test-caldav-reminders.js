@@ -177,6 +177,7 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE,
         UNIQUE(account_id, list_url)
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
       CREATE TABLE shopping_lists (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL
@@ -243,6 +244,7 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
         list_url TEXT NOT NULL, list_name TEXT NOT NULL,
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
     `);
     tmp.exec('PRAGMA foreign_keys = ON');
     tmp.prepare('INSERT INTO caldav_accounts (name) VALUES (?)').run('A');
@@ -389,6 +391,9 @@ describe('Aufgabenlisten erscheinen ohne Knopfdruck (#617)', () => {
         writable      INTEGER,
         UNIQUE(account_id, list_url)
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
+      -- Die gelesene Auswahl nennt die Standard-Personen je Liste (#1221).
+      CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT);
       -- Die gelesene Auswahl zaehlt die wartenden Uploads je Liste (#1840).
       CREATE TABLE tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT, external_source TEXT DEFAULT 'local',

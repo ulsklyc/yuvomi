@@ -8,7 +8,7 @@ import * as db from '../../db.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../middleware/validate.js';
 import { ICS_COLOR_RE, getUserId, isAdminUser } from './helpers.js';
-import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
 import { validateCalendarId } from '../../services/local-calendars.js';
 
 const log = createLogger('Calendar');
@@ -59,22 +59,16 @@ router.post('/subscriptions', async (req, res) => {
     // setzen - die erste, oft größte Ladung Termine kam also grundsätzlich ohne
     // Zuweisung herein (#730). Optional, damit bestehende Aufrufer unverändert
     // durchgehen.
-    const rawAssignee = req.body.default_assignee_user_id;
-    let defaultAssignee = null;
-    if (rawAssignee !== undefined && rawAssignee !== null && rawAssignee !== '') {
-      defaultAssignee = Number(rawAssignee);
-      if (!Number.isInteger(defaultAssignee))
-        return res.status(400).json({ error: 'default_assignee_user_id muss eine Zahl oder null sein.', code: 400 });
-      if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(defaultAssignee))
-        return res.status(400).json({ error: 'Unbekannte Nutzer-ID.', code: 400 });
-      // Zugewiesen werden nur Haushaltsmitglieder (#1207); ein neues Abo hat noch keinen Stand.
-      const strangers = newNonMembers([defaultAssignee]);
-      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    }
+    //
+    // Mehrere Personen (#1897): `default_assignee_user_ids`, oder die Altform
+    // `default_assignee_user_id` mit einer. Zugewiesen werden nur
+    // Haushaltsmitglieder (#1207); ein neues Abo hat noch keinen Stand.
+    const assignees = validateAssigneeIds(db.get(), req.body);
+    if (assignees.error) return res.status(400).json({ error: assignees.error, code: 400, reason: assignees.reason });
 
     const { sub, syncError } = await icsSubscription.create(getUserId(req), {
       name: name.trim(), url, color: colorVal, shared: shared ? 1 : 0,
-      default_assignee_user_id: defaultAssignee,
+      default_assignee_user_ids: assignees.present ? assignees.ids : [],
     });
     res.status(201).json({ data: sub, syncError: syncError || null });
   } catch (err) {
@@ -102,16 +96,12 @@ router.patch('/subscriptions/:id', (req, res) => {
       fields.color = req.body.color;
     }
     if (req.body.shared !== undefined) fields.shared = req.body.shared;
-    if (req.body.default_assignee_user_id !== undefined) {
-      const raw = req.body.default_assignee_user_id;
-      fields.default_assignee_user_id = (raw === null || raw === '') ? null : Number(raw);
-      // Neu nur Haushaltsmitglieder (#1207); die gespeicherte Zuweisung bleibt gueltig.
-      if (fields.default_assignee_user_id !== null) {
-        const stored = db.get().prepare('SELECT default_assignee_user_id AS a FROM ics_subscriptions WHERE id = ?').get(subId)?.a;
-        const strangers = newNonMembers([fields.default_assignee_user_id], { stored: stored == null ? [] : [stored] });
-        if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-      }
-    }
+    // Neu nur Haushaltsmitglieder (#1207); wer schon am Abo steht, bleibt gueltig.
+    const assignees = validateAssigneeIds(db.get(), req.body, {
+      stored: readDefaultAssignees(db.get(), 'subscription', subId),
+    });
+    if (assignees.error) return res.status(400).json({ error: assignees.error, code: 400, reason: assignees.reason });
+    if (assignees.present) fields.default_assignee_user_ids = assignees.ids;
 
     const updated = icsSubscription.update(getUserId(req), subId, fields, isAdmin);
     if (!updated) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
@@ -152,8 +142,7 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
     if (!isAdmin && sub.created_by !== getUserId(req))
       return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
     await icsSubscription.sync(subId);
-    const updated = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
-    res.json({ data: updated });
+    res.json({ data: icsSubscription.getOne(subId) });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Interner Fehler', code: 500 });
@@ -181,9 +170,16 @@ router.post('/import', async (req, res) => {
     }
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
     if (vLocalCalendar.error) return res.status(400).json({ error: vLocalCalendar.error, code: 400 });
+    // Personen fuer diesen Lauf (#1940): `assignee_user_ids`, oder eine in
+    // `assignee_user_id`. Nur Haushaltsmitglieder; gespeichert wird nichts.
+    const assignees = validateAssigneeIds(db.get(), req.body, {
+      listField: 'assignee_user_ids', singleField: 'assignee_user_id',
+    });
+    if (assignees.error) return res.status(400).json({ error: assignees.error, code: 400, reason: assignees.reason });
 
     const result = await icsSubscription.importToLocal(userId, {
       ics, url, color: vColorValue, localCalendarId: vLocalCalendar.value,
+      assigneeIds: assignees.present ? assignees.ids : [],
     });
     res.status(201).json({ data: result });
   } catch (err) {

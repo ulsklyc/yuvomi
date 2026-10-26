@@ -877,6 +877,12 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/crud.js: error.code', { sites: 1, at403: [['not_authorized', 'services/calendar-occurrence-overrides.js']],
     why: 'sendCalendarOccurrenceError: 403 nur bei not_authorized, sonst 400/404/409' }],
   ['routes/calendar/crud.js: eligibility.reason', { sites: 1, at403: [], why: 'feste 400' }],
+  // Personen einer Sync-Quelle (#1897, #1221, #1940): validateAssigneeIds
+  // (services/default-assignees.js) liefert den Grund, die Routen senden ihn an
+  // einer festen 400.
+  ['routes/calendar/google.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  ['routes/calendar/caldav.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],

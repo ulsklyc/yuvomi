@@ -14,7 +14,10 @@ import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { assignDefaultToEvent } from './sync-assignment.js';
+import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assignment.js';
+import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
+import { setEventAssignments } from '../routes/calendar/helpers.js';
+import { remindAtCompareKey } from '../utils/reminder-schedule.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
@@ -257,14 +260,15 @@ async function syncOne(sub) {
       }
       changedEvents += deleteStale.run(sub.id, JSON.stringify([...seenUids])).changes;
 
-      // #459: neu importierte Termine der Standard-Person zuweisen.
-      if (sub.default_assignee_user_id) {
+      // #459, #1897: neu importierte Termine den Standard-Personen zuweisen.
+      const defaultAssignees = readDefaultAssignees(db.get(), 'subscription', sub.id);
+      if (defaultAssignees.length) {
         for (const ev of flatEvents) {
           if (existingUids.has(ev.uid)) continue;
           const row = db.get().prepare(
             'SELECT id FROM calendar_events WHERE subscription_id = ? AND external_calendar_id = ?'
           ).get(sub.id, ev.uid);
-          if (row) assignDefaultToEvent(db.get(), row.id, sub.default_assignee_user_id);
+          if (row) assignDefaultToEvent(db.get(), row.id, defaultAssignees);
         }
       }
 
@@ -300,10 +304,26 @@ async function syncUntracked(subscriptionId) {
   }
 }
 
+/**
+ * Ein Abo, wie die API es zeigt: die Standard-Personen aus der Join-Tabelle
+ * (#1897). Die alte Spalte gilt nicht mehr und wird mit der primaeren Person
+ * ueberschrieben, damit ein Aufrufer der Altform nichts Veraltetes liest.
+ */
+function withAssignees(sub, ids = readDefaultAssignees(db.get(), 'subscription', sub.id)) {
+  return { ...sub, ...assigneeFields(ids) };
+}
+
+/** Ein Abo mit seinen Standard-Personen, oder undefined. */
+function getOne(subId) {
+  const sub = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
+  return sub ? withAssignees(sub) : undefined;
+}
+
 function getAll(userId) {
+  const sets = readAllDefaultAssignees(db.get(), 'subscription');
   return db.get().prepare(`
     SELECT * FROM ics_subscriptions WHERE shared = 1 OR created_by = ? ORDER BY name ASC
-  `).all(userId);
+  `).all(userId).map((sub) => withAssignees(sub, sets.get(Number(sub.id)) ?? []));
 }
 
 /**
@@ -360,9 +380,22 @@ function toLocalRRule(raw) {
  * expandiert); die Herkunfts-UID wird als external_calendar_id gespeichert, um
  * versehentliche Doppelimporte desselben Feeds zu überspringen.
  *
- * @returns {Promise<{ imported:number, skipped:number, total:number }>}
+ * PERSONEN FUER DEN LAUF (#1940). `assigneeIds` (geprueft von der Route,
+ * Haushaltsmitglieder) bekommt jeder neue Termin dieses Laufs. Ein Termin, den
+ * dieselbe Person schon importiert hat (gleiche UID), wird dann nicht bloss
+ * uebersprungen: die gewaehlten Personen kommen zu denen dazu, die schon daran
+ * stehen. So landet der Zahnarzttermin zweier Kinder aus zwei Links als EIN
+ * Termin mit beiden. Gesucht wird dann in jedem lokalen Kalender - die Frage
+ * ist "ist der Termin schon hier", nicht "in diesem Kalender". Nichts wird
+ * entfernt, nichts sonst am Termin geaendert. Ohne Personen bleibt alles wie
+ * bisher. Die Personen werden nicht gespeichert: ein Import hat keinen
+ * Kalender, der sie fuer spaeter tragen koennte.
+ *
+ * @returns {Promise<{ imported:number, skipped:number, assigned:number, total:number }>}
+ *   `assigned`: schon vorhandene Termine, die dabei eine Person dazubekamen
+ *   (sie zaehlen auch in `skipped`).
  */
-async function importToLocal(userId, { ics, url, color, localCalendarId = null } = {}) {
+async function importToLocal(userId, { ics, url, color, localCalendarId = null, assigneeIds = [] } = {}) {
   let rawEvents;
   if (typeof ics === 'string' && ics.trim()) {
     rawEvents = parseICS(ics);
@@ -401,14 +434,54 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null }
     LIMIT 1
   `);
 
+  // Mit Personen: der Termin derselben Person mit derselben UID, in jedem
+  // lokalen Kalender. Die aelteste Zeile, falls ein frueherer Lauf ohne Personen
+  // ihn in zwei Kalender gelegt hat.
+  const existingAnyCalendar = db.get().prepare(`
+    SELECT e.id, e.assigned_to FROM calendar_events e
+    WHERE e.created_by = ? AND e.subscription_id IS NULL AND e.external_calendar_id = ?
+    ORDER BY e.id LIMIT 1
+  `);
+  const assigneesOf = db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ? ORDER BY user_id');
+  const setPrimary = db.get().prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL');
+  const people = [...new Set((assigneeIds ?? []).map(Number))];
+  const nowKey = remindAtCompareKey(new Date());
+
+  // Die Personen zu einem schon vorhandenen Termin dazu. Ueber
+  // setEventAssignments(), die eine Schreibstelle der Zuweisung: sie gibt der
+  // neuen Person die Erinnerungen des Anlegers und gleicht die Freigabe eines
+  // Anhangs an - nur dazu, nie enger (#1358). Vergangene geerbte Erinnerungen
+  // gelten als verworfen wie beim Nachtragen (#1154).
+  // @returns {boolean} true, wenn mindestens eine Person dazukam
+  const addPeople = (eventId, primary) => {
+    const before = assigneesOf.all(eventId).map((r) => Number(r.user_id));
+    const added = people.filter((id) => !before.includes(id));
+    if (primary == null) setPrimary.run(people[0], eventId);
+    if (!added.length) return false;
+    setEventAssignments(db.get(), eventId, [...before, ...added], { grantAssigneesOnly: true });
+    settlePastInheritedReminders(db.get(), eventId, added, nowKey);
+    return true;
+  };
+
   let imported = 0;
   let skipped  = 0;
+  let assigned = 0;
   const total  = rawEvents.length;
 
   db.get().transaction(() => {
     for (const ev of rawEvents) {
       if (!ev.dtstart) { skipped++; continue; }
-      if (ev.uid && existsStmt.get(userId, ev.uid, localCalendarId ?? defaultCalendarId(db.get()))) { skipped++; continue; }
+      if (ev.uid && people.length) {
+        const existing = existingAnyCalendar.get(userId, ev.uid);
+        if (existing) {
+          skipped++;
+          if (addPeople(existing.id, existing.assigned_to)) assigned++;
+          continue;
+        }
+      } else if (ev.uid && existsStmt.get(userId, ev.uid, localCalendarId ?? defaultCalendarId(db.get()))) {
+        skipped++;
+        continue;
+      }
       try {
         const localRule = toLocalRRule(ev.rrule);
         const info = insert.run(
@@ -422,6 +495,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null }
         if (localRule && Array.isArray(ev.exdates) && ev.exdates.length) {
           storeImportedExceptions(db.get(), Number(info.lastInsertRowid), ev);
         }
+        if (people.length) assignDefaultToEvent(db.get(), Number(info.lastInsertRowid), people);
         imported++;
       } catch (err) {
         log.error(`Import UID ${ev.uid}: ${err.message}`);
@@ -430,23 +504,27 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null }
     }
   })();
 
-  log.info(`Imported ${imported}/${total} events for user ${userId} (${skipped} skipped).`);
-  return { imported, skipped, total };
+  log.info(`Imported ${imported}/${total} events for user ${userId} (${skipped} skipped, ${assigned} assigned).`);
+  return { imported, skipped, assigned, total };
 }
 
-async function create(userId, { name, url, color, shared, default_assignee_user_id = null }) {
+async function create(userId, { name, url, color, shared, default_assignee_user_ids = [] }) {
   const normalizedUrl = normalizeUrl(url);
   await checkSSRF(normalizedUrl);
   // Die Zuweisung steht VOR dem ersten syncOne() in der Zeile - danach gesetzt
   // hätte sie die eben eingelesenen Termine nicht mehr erreicht (#730).
-  const subId = db.get().prepare(
-    `INSERT INTO ics_subscriptions (name,url,color,shared,created_by,default_assignee_user_id)
-     VALUES (?,?,?,?,?,?)`
-  ).run(name, normalizedUrl, color, shared ? 1 : 0, userId, default_assignee_user_id).lastInsertRowid;
+  const subId = db.get().transaction(() => {
+    const id = Number(db.get().prepare(
+      `INSERT INTO ics_subscriptions (name,url,color,shared,created_by)
+       VALUES (?,?,?,?,?)`
+    ).run(name, normalizedUrl, color, shared ? 1 : 0, userId).lastInsertRowid);
+    writeDefaultAssignees(db.get(), 'subscription', id, default_assignee_user_ids);
+    return id;
+  })();
   const newSub = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
   let syncError = null;
   try { await syncOne(newSub); } catch (err) { syncError = err.message; }
-  return { sub: newSub, syncError };
+  return { sub: withAssignees(newSub), syncError };
 }
 
 function update(userId, subId, fields, isAdmin) {
@@ -456,12 +534,14 @@ function update(userId, subId, fields, isAdmin) {
   const name   = fields.name   !== undefined ? fields.name   : sub.name;
   const color  = fields.color  !== undefined ? fields.color  : sub.color;
   const shared = fields.shared !== undefined ? (fields.shared ? 1 : 0) : sub.shared;
-  const assignee = fields.default_assignee_user_id !== undefined
-    ? fields.default_assignee_user_id
-    : sub.default_assignee_user_id;
-  db.get().prepare(`UPDATE ics_subscriptions SET name = ?, color = ?, shared = ?, default_assignee_user_id = ? WHERE id = ?`)
-    .run(name, color, shared, assignee, subId);
-  return db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
+  db.get().transaction(() => {
+    db.get().prepare(`UPDATE ics_subscriptions SET name = ?, color = ?, shared = ? WHERE id = ?`)
+      .run(name, color, shared, subId);
+    if (fields.default_assignee_user_ids !== undefined) {
+      writeDefaultAssignees(db.get(), 'subscription', subId, fields.default_assignee_user_ids);
+    }
+  })();
+  return withAssignees(db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId));
 }
 
 function remove(userId, subId, isAdmin) {
@@ -472,4 +552,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, create, update, remove, importToLocal, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
+export { sync, getAll, getOne, create, update, remove, importToLocal, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
