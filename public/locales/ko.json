@@ -1235,7 +1235,8 @@
         "errorEventGone": "이 일정은 더 이상 없습니다.",
         "errorSelectedCalendarGone": "선택한 캘린더가 더 이상 없습니다.",
         "errorSeriesNoOccurrence": "이 반복 설정으로는 시작일부터 일정이 하나도 생기지 않습니다.",
-        "localCalendarUploadsHint": "이 캘린더의 일정은 Apple Calendar를 통해 iCloud에 업로드됩니다."
+        "localCalendarUploadsHint": "이 캘린더의 일정은 Apple Calendar를 통해 iCloud에 업로드됩니다.",
+        "overlapOpenSchedule": "근무표 열기"
     },
     "noteCategories": {
         "categories": "카테고리",

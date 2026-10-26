@@ -1217,7 +1217,8 @@
         "errorEventGone": "この予定はもう存在しません。",
         "errorSelectedCalendarGone": "選んだカレンダーはもう存在しません。",
         "errorSeriesNoOccurrence": "この繰り返しでは、開始日以降に予定が1件もありません。",
-        "localCalendarUploadsHint": "このカレンダーの予定は Apple Calendar を通じて iCloud にアップロードされます。"
+        "localCalendarUploadsHint": "このカレンダーの予定は Apple Calendar を通じて iCloud にアップロードされます。",
+        "overlapOpenSchedule": "シフト表を開く"
     },
     "noteCategories": {
         "categories": "カテゴリー",

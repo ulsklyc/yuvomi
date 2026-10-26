@@ -1217,7 +1217,8 @@
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所选的日历已不存在。",
         "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。",
-        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。"
+        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。",
+        "overlapOpenSchedule": "打开排班"
     },
     "noteCategories": {
         "categories": "分类",

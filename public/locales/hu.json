@@ -1217,7 +1217,8 @@
         "errorEventGone": "Ez az esemény már nem létezik.",
         "errorSelectedCalendarGone": "A kiválasztott naptár már nem létezik.",
         "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne.",
-        "localCalendarUploadsHint": "Az ebben a naptárban lévő események az Apple Calendaron keresztül feltöltődnek az iCloudba."
+        "localCalendarUploadsHint": "Az ebben a naptárban lévő események az Apple Calendaron keresztül feltöltődnek az iCloudba.",
+        "overlapOpenSchedule": "Műszakbeosztás megnyitása"
     },
     "noteCategories": {
         "categories": "Kategóriák",

@@ -1217,7 +1217,8 @@
         "errorEventGone": "Bu etkinlik artık yok.",
         "errorSelectedCalendarGone": "Seçilen takvim artık yok.",
         "errorSeriesNoOccurrence": "Bu tekrarla başlangıç tarihinden itibaren hiç etkinlik olmazdı.",
-        "localCalendarUploadsHint": "Bu takvimdeki etkinlikler Apple Calendar üzerinden iCloud’a yüklenir."
+        "localCalendarUploadsHint": "Bu takvimdeki etkinlikler Apple Calendar üzerinden iCloud’a yüklenir.",
+        "overlapOpenSchedule": "Vardiya planını aç"
     },
     "noteCategories": {
         "categories": "Kategoriler",

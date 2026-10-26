@@ -1217,7 +1217,8 @@
         "errorEventGone": "Deze afspraak bestaat niet meer.",
         "errorSelectedCalendarGone": "De gekozen agenda bestaat niet meer.",
         "errorSeriesNoOccurrence": "Met deze herhaling zou er vanaf de begindatum geen enkele afspraak zijn.",
-        "localCalendarUploadsHint": "Afspraken in deze agenda worden via Apple Calendar naar iCloud geüpload."
+        "localCalendarUploadsHint": "Afspraken in deze agenda worden via Apple Calendar naar iCloud geüpload.",
+        "overlapOpenSchedule": "Dienstrooster openen"
     },
     "noteCategories": {
         "categories": "Categorieën",

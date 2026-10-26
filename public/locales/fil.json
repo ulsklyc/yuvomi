@@ -1235,7 +1235,8 @@
         "errorEventGone": "Wala na ang pangyayaring ito.",
         "errorSelectedCalendarGone": "Wala na ang napiling kalendaryo.",
         "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula.",
-        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito."
+        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito.",
+        "overlapOpenSchedule": "Buksan ang iskedyul ng shift"
     },
     "noteCategories": {
         "categories": "Mga kategorya",

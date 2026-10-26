@@ -1217,7 +1217,8 @@
         "errorEventGone": "Este evento não existe mais.",
         "errorSelectedCalendarGone": "O calendário escolhido não existe mais.",
         "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início.",
-        "localCalendarUploadsHint": "Os eventos deste calendário são enviados para o iCloud pelo Apple Calendar."
+        "localCalendarUploadsHint": "Os eventos deste calendário são enviados para o iCloud pelo Apple Calendar.",
+        "overlapOpenSchedule": "Abrir turnos"
     },
     "noteCategories": {
         "categories": "Categorias",

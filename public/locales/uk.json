@@ -1369,7 +1369,8 @@
         "errorEventGone": "Цієї події більше немає.",
         "errorSelectedCalendarGone": "Вибраного календаря більше немає.",
         "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події.",
-        "localCalendarUploadsHint": "Події цього календаря завантажуються в iCloud через Apple Calendar."
+        "localCalendarUploadsHint": "Події цього календаря завантажуються в iCloud через Apple Calendar.",
+        "overlapOpenSchedule": "Відкрити графік змін"
     },
     "noteCategories": {
         "categories": "Категорії",

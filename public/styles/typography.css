@@ -98,6 +98,26 @@
   }
 }
 
+/* DER ZEITRAUM ALS TITEL (#1797, Shell-Variante `page-toolbar--period-as-title`,
+ * layout.css). Ab 1024px traegt der Zeitraum den Inline-Schnitt der
+ * Canonical-Page-Head-Rolle - er ist dort der sichtbare Titel, die groesste
+ * Schrift des Kopfs. Das Jahr steht in der Sekundaerfarbe, wie Apples
+ * Kalender „Oktober 2026" setzt; Ziffern tabellarisch, damit die gemessene
+ * Titelbreite fuer jeden Tag einer Ansicht gilt. */
+@media (min-width: 1024px) {
+  .page-toolbar--period-as-title .page-toolbar__period-title {
+    font-size: var(--type-toolbar-title);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__period-year {
+    color: var(--color-text-secondary);
+  }
+}
+
 /* DAS EINSTELLUNGS-BLATT MOBIL: EINE EBENE TIEFER, EINE GRAMMATIK (R14,
  * A8 P2-4). Unter 768px steht ueber dem Blatt die Zurueck-Leiste, der Titel
  * steht im Inhalt - bisher im Inline-Schnitt (22px), direkt ueber einem

@@ -3150,6 +3150,89 @@ html.fab-steady .page-fab {
   min-width: 0;
 }
 
+/* DER STATUS-SLOT DER TITELZEILE (#1462, Ulas 2026-10-26). Eine Meldung ueber
+ * die Daten der Seite (im Kalender: Schichtplaene ueberlappen) steht als
+ * Zeichen in der Titelzeile, nicht als eigene Kopfzeile: unter 1024px nur das
+ * Zeichen in Zielgroesse, sein Name ist der volle Satz und ein Tipp oeffnet
+ * ihn (Blatt oder Popover); ab 1024px mit kurzem Text daneben. Der Slot steht
+ * nur, solange es etwas zu melden gibt - ohne Meldung nimmt er keine Breite.
+ * Er oeffnet nie eine eigene Zeile (keine Reihenfolge, keine volle Basis;
+ * Guard test:calendar "#1462"). */
+.page-toolbar__status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.page-toolbar__status-btn {
+  gap: var(--space-1);
+  color: var(--color-warning);
+}
+
+/* Messfuehler der Titelbreite (calendar.js `syncPeriodTitleWidth`): dieselbe
+ * Schrift wie der Titel, ausser Fluss und unsichtbar. */
+.page-toolbar__period-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  inline-size: auto;
+  min-inline-size: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  /* Was das Zeichen der Titelzeile wegnimmt - fuer Koepfe, die ihre
+   * Titelbasis selbst rechnen (Kalender am Tablet). */
+  .page-toolbar:has(> .page-toolbar__status) {
+    --page-status-lead: calc(var(--target-base) + var(--page-toolbar-gap));
+  }
+
+  .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    block-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar__status-text {
+    display: none;
+  }
+}
+
+/* VARIANTE „ZEITRAUM ALS TITEL" (#1797, Ulas 2026-10-26; DESIGN.md Modulkopf).
+ * Wo der Titel eines Kopfs ein navigierbarer Zeitraum ist, ist ab 1024px der
+ * ZEITRAUM der sichtbare Titel („Oktober 2026", Titelrolle 22px fett, das Jahr
+ * in der Sekundaerfarbe - typography.css), wie in Apples Kalender. Das <h1>
+ * bleibt die Seitenueberschrift und nennt das Modul der Hilfstechnik: per Clip
+ * versteckt, nie per display/visibility (dann fiele es aus dem Baum). Das
+ * Siegel bleibt der Absender und steht vor dem Zeitraum. Die Pfeile stehen
+ * direkt am Titel - VOR ihm, damit sie bei wechselnder Textbreite stillstehen;
+ * „Heute" folgt als Kapsel. Die Mindestbreite des Titels (`--period-title-min`)
+ * misst das Modul je Ansicht, damit auch alles dahinter stillsteht. Unter
+ * 1024px gilt der Kopf der kompakten Klasse unveraendert (Large Title). */
+@media (min-width: 1024px) {
+  .page-toolbar--period-as-title:not(.page-toolbar--in-group) > .page-toolbar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__value {
+    order: 1;
+    min-inline-size: var(--period-title-min, auto);
+    text-align: start;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__reset {
+    order: 2;
+  }
+}
+
 /* AB 1024px GIBT DIE SUCHE NACH, NICHT DIE AKTIONEN (R23, D13; Critique G0
  * S-P2-1). Mit `min-width: 0` schrumpften bei 1024 beide - Suche und Slot -, und
  * der Slot schob seinen Primaerknopf 24px ueber die eigene Kante: "+ Aufgabe"

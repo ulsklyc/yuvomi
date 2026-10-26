@@ -1235,7 +1235,8 @@
         "errorEventGone": "این رویداد دیگر وجود ندارد.",
         "errorSelectedCalendarGone": "تقویم انتخاب‌شده دیگر وجود ندارد.",
         "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت.",
-        "localCalendarUploadsHint": "رویدادهای این تقویم از طریق Apple Calendar در iCloud بارگذاری می‌شوند."
+        "localCalendarUploadsHint": "رویدادهای این تقویم از طریق Apple Calendar در iCloud بارگذاری می‌شوند.",
+        "overlapOpenSchedule": "باز کردن برنامه شیفت"
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

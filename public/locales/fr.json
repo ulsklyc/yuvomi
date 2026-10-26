@@ -1217,7 +1217,8 @@
         "errorEventGone": "Cet événement n’existe plus.",
         "errorSelectedCalendarGone": "Le calendrier choisi n’existe plus.",
         "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début.",
-        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar."
+        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar.",
+        "overlapOpenSchedule": "Ouvrir le planning"
     },
     "noteCategories": {
         "categories": "Catégories",

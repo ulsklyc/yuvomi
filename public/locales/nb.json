@@ -1217,7 +1217,8 @@
         "errorEventGone": "Denne avtalen finnes ikke lenger.",
         "errorSelectedCalendarGone": "Den valgte kalenderen finnes ikke lenger.",
         "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen.",
-        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar."
+        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar.",
+        "overlapOpenSchedule": "Åpne planlegging"
     },
     "noteCategories": {
         "categories": "Kategorier",

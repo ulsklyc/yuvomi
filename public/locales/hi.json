@@ -1217,7 +1217,8 @@
         "errorEventGone": "यह घटना अब मौजूद नहीं है।",
         "errorSelectedCalendarGone": "चुना गया कैलेंडर अब मौजूद नहीं है।",
         "errorSeriesNoOccurrence": "इस दोहराव से शुरुआती तारीख से एक भी घटना नहीं बनेगी।",
-        "localCalendarUploadsHint": "इस कैलेंडर के इवेंट Apple Calendar के ज़रिए iCloud पर अपलोड होते हैं।"
+        "localCalendarUploadsHint": "इस कैलेंडर के इवेंट Apple Calendar के ज़रिए iCloud पर अपलोड होते हैं।",
+        "overlapOpenSchedule": "शिफ़्ट शेड्यूल खोलें"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",

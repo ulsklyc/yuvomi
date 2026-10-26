@@ -1387,7 +1387,8 @@
         "errorEventGone": "To wydarzenie już nie istnieje.",
         "errorSelectedCalendarGone": "Wybrany kalendarz już nie istnieje.",
         "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia.",
-        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar."
+        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar.",
+        "overlapOpenSchedule": "Otwórz grafik"
     },
     "noteCategories": {
         "categories": "Kategorie",

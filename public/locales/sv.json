@@ -1217,7 +1217,8 @@
         "errorEventGone": "Den här händelsen finns inte längre.",
         "errorSelectedCalendarGone": "Den valda kalendern finns inte längre.",
         "errorSeriesNoOccurrence": "Med den här upprepningen skulle det inte finnas en enda händelse från startdatumet.",
-        "localCalendarUploadsHint": "Händelser i den här kalendern laddas upp till iCloud via Apple Calendar."
+        "localCalendarUploadsHint": "Händelser i den här kalendern laddas upp till iCloud via Apple Calendar.",
+        "overlapOpenSchedule": "Öppna skiftschema"
     },
     "noteCategories": {
         "categories": "Kategorier",

@@ -6437,9 +6437,10 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
     'die Leiste haelt den Platz ihrer Bildlaufleiste - sonst rueckt der Mini-Monat, wenn „Als Naechstes" nachkommt (R19-Nachlese)');
   assert(rules.some((r) => /\.calendar-page\.app-page--list-detail/.test(r.selector) && /container-name:\s*module-surface cal-page/.test(r.body)),
     'in Agenda und Tag behaelt die Seite ihren Namen module-surface');
-  const label = rules.find((r) => r.selector.trim() === '.cal-toolbar__label' && r.at.some((a) => /min-width:\s*1024px/.test(a)));
-  assert(/font-weight:\s*var\(--font-weight-bold\)/.test(label?.body ?? '') && /font-size:\s*var\(--text-lg\)/.test(label?.body ?? ''),
-    'der Desktop-Zeitraum steht fett in 18px, nicht mehr leiser als Fliesstext-Gewicht');
+  // Seit #1797 ist der Desktop-Zeitraum der Titel selbst (Titelrolle 22px fett,
+  // typography.css) - geprueft im Test "#1797" unten, hier nur die Kennung.
+  assert(/className: 'cal-toolbar__label page-toolbar__period-title'/.test(readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8')),
+    'der Desktop-Zeitraum traegt die Titelrolle, nicht mehr leiser als der Modulname');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   // R20: nur die Suche steht ohne Leiste. Die Agenda behaelt sie - ohne „Als
   // Naechstes" (das IST die Agenda); vorher sprang der Inhalt beim
@@ -7181,12 +7182,12 @@ test('#1797: der Kalenderkopf traegt die Shell-Variante "Zeitraum als Titel", da
 
 test('#1797: das Jahr eines Zeitraum-Titels ist ein eigenes Wort, und nur dann', () => {
   const { periodTitleParts } = calendarHelpers;
-  assert.deepEqual(periodTitleParts('Oktober 2026', '2026'), { before: 'Oktober ', year: '2026', after: '' });
-  assert.deepEqual(periodTitleParts('KW 42 · Oktober 2026', '2026'), { before: 'KW 42 · Oktober ', year: '2026', after: '' });
-  assert.deepEqual(periodTitleParts('2026년 10월', '2026'), { before: '', year: '2026년', after: ' 10월' });
-  assert.deepEqual(periodTitleParts('2026年10月', '2026'), { before: '', year: '2026年', after: '10月' });
-  assert.equal(periodTitleParts('Mittwoch, 21.10.2026', '2026'), null, 'in einem Datum bleibt das Jahr Teil des Datums');
-  assert.equal(periodTitleParts('07.10. - 06.11.2026', '2026'), null);
+  assert(JSON.stringify(periodTitleParts('Oktober 2026', '2026')) === JSON.stringify({ before: 'Oktober ', year: '2026', after: '' }), `${JSON.stringify(periodTitleParts('Oktober 2026', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('KW 42 · Oktober 2026', '2026')) === JSON.stringify({ before: 'KW 42 · Oktober ', year: '2026', after: '' }), `${JSON.stringify(periodTitleParts('KW 42 · Oktober 2026', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('2026년 10월', '2026')) === JSON.stringify({ before: '', year: '2026년', after: ' 10월' }), `${JSON.stringify(periodTitleParts('2026년 10월', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('2026年10月', '2026')) === JSON.stringify({ before: '', year: '2026年', after: '10月' }), `${JSON.stringify(periodTitleParts('2026年10月', '2026'))}`);
+  assert(periodTitleParts('Mittwoch, 21.10.2026', '2026') === null, 'in einem Datum bleibt das Jahr Teil des Datums');
+  assert(periodTitleParts('07.10. - 06.11.2026', '2026') === null);
 });
 
 /* DIE UEBERLAPPUNG IST EIN STATUS-ZEICHEN IN DER TITELZEILE (#1462). Sie stand
@@ -7195,7 +7196,7 @@ test('#1797: das Jahr eines Zeitraum-Titels ist ein eigenes Wort, und nur dann',
  * Icon-Knopf, dessen Name der volle Satz ist, ab 1024px mit kurzem Text. */
 test('#1462: die Ueberlappungswarnung steht im Status-Slot der Titelzeile, nicht im Aktions-Slot', () => {
   const { scheduleStatusHtml, toolbarHtml } = calendarHelpers;
-  assert.equal(scheduleStatusHtml([]), '', 'ohne Ueberlappung kein Slot, also keine Breite');
+  assert(scheduleStatusHtml([]) === '', 'ohne Ueberlappung kein Slot, also keine Breite');
   const status = scheduleStatusHtml([{ date_key: '2026-10-21', user_id: 1 }]);
   const html = toolbarHtml({ statusHtml: status });
   const at = (needle) => html.indexOf(needle);

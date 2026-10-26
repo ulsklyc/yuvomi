@@ -1217,7 +1217,8 @@
         "errorEventGone": "Sự kiện này không còn tồn tại.",
         "errorSelectedCalendarGone": "Lịch đã chọn không còn tồn tại.",
         "errorSeriesNoOccurrence": "Với kiểu lặp lại này sẽ không có sự kiện nào từ ngày bắt đầu.",
-        "localCalendarUploadsHint": "Sự kiện trong lịch này được tải lên iCloud qua Apple Calendar."
+        "localCalendarUploadsHint": "Sự kiện trong lịch này được tải lên iCloud qua Apple Calendar.",
+        "overlapOpenSchedule": "Mở lịch làm việc"
     },
     "noteCategories": {
         "categories": "Danh mục",

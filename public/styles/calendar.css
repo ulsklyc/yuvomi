@@ -503,18 +503,14 @@
     flex: 0 0 auto;
   }
 
-  /* DER ZEITRAUM IST DER TITEL DER FLAECHE (Critique R19). Er stand in 16px/600
-   * und war damit leiser als „Kalender" (22px/700) daneben - in Apple Kalender
-   * und Fantastical ist „Oktober 2026" der Titel. Jetzt 18px fett - eine Stufe
-   * unter dem Modultitel, aber kein Fliesstext mehr. Die feste Breite waechst
-   * mit (11.75rem: „KW 42 · Oktober 2026" misst 186px), damit die Pfeile
-   * weiter stillstehen; Title 3 (20px) haette den Kopf bei 1440 zweizeilig
-   * gemacht (113 statt 69px, gemessen). */
+  /* DER ZEITRAUM IST DER TITEL DES KOPFS (#1797; vorher R19: 18px fett in
+   * einer festen 11.75rem-Box neben „Kalender" 22px). Seit der Shell-Variante
+   * „Zeitraum als Titel" (layout.css) traegt er die Titelrolle (typography.css)
+   * in seiner natuerlichen Breite, die Pfeile stehen direkt davor. Die feste
+   * Box hielt die Pfeile vom Zeitraum fern; stillstehen laesst sie jetzt die
+   * gemessene Mindestbreite je Ansicht (`syncPeriodTitleWidth`). */
   .cal-toolbar__label {
-    flex: 0 0 11.75rem;
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: var(--tracking-tight);
+    flex: 0 0 auto;
   }
 
   .cal-toolbar__views {
@@ -671,8 +667,9 @@
     display: contents;
   }
 
+  /* `--page-status-lead`: das Ueberlappungszeichen (#1462) steht mit in Zeile 1. */
   .page-toolbar.cal-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
-    flex: 1 1 calc(100% - var(--seal-head-lead) - var(--page-search-width) - var(--target-base) - 2 * var(--page-toolbar-gap));
+    flex: 1 1 calc(100% - var(--seal-head-lead) - var(--page-search-width) - var(--target-base) - 2 * var(--page-toolbar-gap) - var(--page-status-lead, 0px));
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -971,12 +968,12 @@
  * Klasse im Markup (calendar.js). Gemessen im Kalender: ausgeklappt 166 statt
  * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
 @media (max-width: 1023px) {
-  /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im
-   * schwebenden FAB (angedockt wird erst ab 1024px), und ohne
-   * Ueberlappungswarnung steht nichts mehr darin - der Slot brach trotzdem als
-   * hoehenlose Flex-Zeile um und kostete ihren Zeilenabstand (gemessen 8px in
-   * der Woche) oder verengte die Zeitraum-Zeile um seinen Gap. */
-  .cal-toolbar > .page-toolbar__actions:not(:has(.cal-toolbar__schedule-warning)) {
+  /* Der Aktions-Slot ist unter 1024px keine Zeile. „Neu" wohnt dort im
+   * schwebenden FAB (angedockt wird erst ab 1024px), „Kalender verwalten" im
+   * Filterblatt, und die Ueberlappungswarnung steht seit #1462 als Zeichen in
+   * der Titelzeile. Bis dahin hielt die Warnung den Slot offen: er brach als
+   * eigene Kopfzeile um (#1460: 166px Kopf, mit Warnung eine Zeile mehr). */
+  .cal-toolbar > .page-toolbar__actions {
     display: none;
   }
 }
@@ -3927,11 +3924,8 @@
   opacity: .85;
 }
 
+/* Form und Farbe gibt der Status-Slot der Shell (layout.css, #1462). */
 .cal-toolbar__schedule-warning {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-warning);
   font-size: var(--text-sm);
 }
 

@@ -1235,7 +1235,8 @@
         "errorEventGone": "Diesen Termin gibt es nicht mehr.",
         "errorSelectedCalendarGone": "Den gewählten Kalender gibt es nicht mehr.",
         "errorSeriesNoOccurrence": "Mit dieser Wiederholung gäbe es ab dem Startdatum keinen einzigen Termin.",
-        "localCalendarUploadsHint": "Termine in diesem Kalender werden über Apple Calendar zu iCloud hochgeladen."
+        "localCalendarUploadsHint": "Termine in diesem Kalender werden über Apple Calendar zu iCloud hochgeladen.",
+        "overlapOpenSchedule": "Schichtplan öffnen"
     },
     "noteCategories": {
         "categories": "Kategorien",

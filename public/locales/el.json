@@ -1217,7 +1217,8 @@
         "errorEventGone": "Αυτό το συμβάν δεν υπάρχει πια.",
         "errorSelectedCalendarGone": "Το επιλεγμένο ημερολόγιο δεν υπάρχει πια.",
         "errorSeriesNoOccurrence": "Με αυτή την επανάληψη δεν θα υπήρχε κανένα συμβάν από την ημερομηνία έναρξης.",
-        "localCalendarUploadsHint": "Τα συμβάντα αυτού του ημερολογίου ανεβαίνουν στο iCloud μέσω του Apple Calendar."
+        "localCalendarUploadsHint": "Τα συμβάντα αυτού του ημερολογίου ανεβαίνουν στο iCloud μέσω του Apple Calendar.",
+        "overlapOpenSchedule": "Άνοιγμα βαρδιών"
     },
     "noteCategories": {
         "categories": "Κατηγορίες",

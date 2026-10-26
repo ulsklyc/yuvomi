@@ -1294,7 +1294,8 @@
         "errorEventGone": "Tento termín už neexistuje.",
         "errorSelectedCalendarGone": "Vybraný kalendář už neexistuje.",
         "errorSeriesNoOccurrence": "S tímto opakováním by od data zahájení nebyl žádný termín.",
-        "localCalendarUploadsHint": "Události v tomto kalendáři se nahrávají do iCloudu přes Apple Calendar."
+        "localCalendarUploadsHint": "Události v tomto kalendáři se nahrávají do iCloudu přes Apple Calendar.",
+        "overlapOpenSchedule": "Otevřít rozpis směn"
     },
     "noteCategories": {
         "categories": "Kategorie",

@@ -1235,7 +1235,8 @@
         "errorEventGone": "Acara ini sudah tidak ada.",
         "errorSelectedCalendarGone": "Kalender yang dipilih sudah tidak ada.",
         "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai.",
-        "localCalendarUploadsHint": "Acara di kalender ini diunggah ke iCloud melalui Apple Calendar."
+        "localCalendarUploadsHint": "Acara di kalender ini diunggah ke iCloud melalui Apple Calendar.",
+        "overlapOpenSchedule": "Buka jadwal shift"
     },
     "noteCategories": {
         "categories": "Kategori",

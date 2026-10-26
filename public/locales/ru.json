@@ -1369,7 +1369,8 @@
         "errorEventGone": "Этого события больше нет.",
         "errorSelectedCalendarGone": "Выбранного календаря больше нет.",
         "errorSeriesNoOccurrence": "При таком повторе с даты начала не было бы ни одного события.",
-        "localCalendarUploadsHint": "События этого календаря загружаются в iCloud через Apple Calendar."
+        "localCalendarUploadsHint": "События этого календаря загружаются в iCloud через Apple Calendar.",
+        "overlapOpenSchedule": "Открыть график смен"
     },
     "noteCategories": {
         "categories": "Категории",

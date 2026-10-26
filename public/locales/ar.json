@@ -1446,7 +1446,8 @@
         "errorEventGone": "هذا الموعد لم يعد موجودًا.",
         "errorSelectedCalendarGone": "التقويم المختار لم يعد موجودًا.",
         "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية.",
-        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar."
+        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar.",
+        "overlapOpenSchedule": "فتح جدول المناوبات"
     },
     "noteCategories": {
         "categories": "الفئات",
