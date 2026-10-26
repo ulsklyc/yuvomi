@@ -1113,6 +1113,10 @@ test('R21 S5: die Uebersicht traegt 14 und 12 nur an Bedienelementen, Badges, Av
     ['.fab-action__label', 'Bedienelement'], ['.widget-restore-chip', 'Bedienelement'], ['.dashboard-customize-scope', 'Bedienelement'],
     ['.widget-restore__title', 'Anpassen-Ablage (Bedienflaeche)'], ['.dashboard-customize-footnote', 'Anpassen-Fussnote (Bedienflaeche)'],
     ['.quick-link-manage-row__host', 'Verwalten-Dialog (Formular)'], ['.quick-link-manage-row__locked', 'Verwalten-Dialog (Formular)'],
+    // Der Titel IM Block der Zeitleiste (Entwurf „Heute wichtig", 2026-10-26): ein
+    // Blocklabel wie am Kalenderblock (.week-event, Caption 1), kein Lesetext - der
+    // ganze Termin steht in der Zeile, die der Block aufklappt.
+    ['.today-timeline__title', 'Blocklabel der Zeitleiste'],
   ]);
   const css = readFileSync(new URL('dashboard.css', STYLES_DIR), 'utf8');
   const funde = [];

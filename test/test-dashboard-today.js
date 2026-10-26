@@ -976,46 +976,48 @@ test('R20: die Seite setzt den Betrachter, den das Heute-Blatt fragt', () => {
   assert.match(src, /buildTodayProgram\(data, \{ includeTasks, includeCalendar, includeMeals, now, viewer \}\)/);
 });
 
-// R22 D16 (Critique 2026-10-22, a1 P2): das zweispaltige Blatt liess bei
-// ungerader Zahl rechts unten eine leere Zelle, und die Einkaufszeile stand
-// hinter „+N weitere heute", als waere sie eine der verdeckten Zeilen.
-test('R22 D16: ungerade Zahl - die letzte Zeile spannt; der Einkauf steht vor dem Aufklapper', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+// „ALS NAECHSTES" (Entwurf „Heute wichtig", 2026-10-26; loest R22 D16 ab):
+// breit stehen die Zeilen nicht mehr in zwei Spalten, sondern als drei Zellen
+// nebeneinander - die letzte ist der Einkauf -, und „+N weitere" steht in der
+// Fussleiste hinter den Zellen. Der Einkauf steht weiter VOR dem Aufklapper.
+test('Entwurf „Heute wichtig": breit drei Zellen, der Einkauf zuletzt, „+N weitere" in der Fussleiste', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   // Aufgaben mit Uhrzeit: Termine stehen auf der breiten Buehne in der Zeitleiste, nicht in der Liste.
   const tasks = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, title: `T${i + 1}`, due_date: '2026-09-24',
     due_time: `${String(11 + i).padStart(2, '0')}:00`, status: 'open', assigned_users: [] }));
-  const sheet = dash.renderTodayCockpit({ urgentTasks: tasks, users: [], shoppingOpenCount: 3 }, [], false,
-    { now: new Date(), cap: 5, moreOpen: false });
-  assert.match(sheet, /today-cockpit__rows--split" style="--today-rows-per-column:2"/, 'fuenf Zeilen: zwei je Spalte');
-  const classes = [...sheet.matchAll(/class="today-cockpit-card today-cockpit-card--task([^"]*)"/g)].slice(0, 5).map((m) => m[1].trim());
-  assert.deepEqual(classes, ['', '', 'today-cockpit-card--col2 today-cockpit-card--col-start', 'today-cockpit-card--col2', 'today-cockpit-card--span'],
-    'links zwei, rechts zwei, die fuenfte ueber die volle Breite');
-  const shopping = sheet.indexOf('today-cockpit-card--shopping');
-  const more = sheet.indexOf('class="today-cockpit__more');
-  assert.ok(shopping > 0 && more > 0, 'Vorbedingung: Einkauf und „+N weitere heute" stehen im Blatt');
-  assert.ok(shopping < more, 'der Einkauf schliesst das sichtbare Programm, der Weg zu den uebrigen das Blatt');
+  const sheet = dash.renderTodayCockpit({ urgentTasks: tasks, users: [], shoppingOpenCount: 3 }, [], false, { now: new Date(), moreOpen: false });
+  const strip = /<div class="today-cockpit__rows today-cockpit__rows--next" style="--today-next-cols:(\d)">([\s\S]*?)<\/div>\s*<div class="today-cockpit__foot">/.exec(sheet);
+  assert.ok(strip, 'Vorbedingung: die Leiste „Als Naechstes" steht im Blatt, die Fussleiste folgt ihr');
+  assert.equal(strip[1], '3', 'drei Spalten');
+  const cells = [...strip[2].matchAll(/class="today-cockpit-card today-cockpit-card--(\w+)/g)].map((m) => m[1]);
+  assert.deepEqual(cells, ['task', 'task', 'shopping'], 'zwei Zeilen, der Einkauf als dritte Zelle');
+  assert.match(strip[2], /today-cockpit-card__chevron/, 'der Einkauf zeigt seinen Weg statt einer Zeit');
+  // Nur Aufgaben verdeckt: „+N weitere" fuehrt in die Aufgabenliste (todayMoreRoute).
+  assert.match(sheet, /<div class="today-cockpit__foot">\s*<a href="\/tasks\?due=today" class="today-cockpit__more/, '„+N weitere" steht in der Fussleiste');
+  assert.match(sheet, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):7\}/, 'und zaehlt, was nicht in die Zellen passt');
+  assert.ok(sheet.indexOf('today-cockpit-card--shopping') < sheet.indexOf('class="today-cockpit__more'), 'der Einkauf steht vor dem Weg zu den uebrigen (R22 D16)');
 
-  const even = dash.renderTodayCockpit({ urgentTasks: tasks.slice(0, 4), users: [] }, [], false, { now: new Date(), cap: 5 });
-  assert.doesNotMatch(even, /today-cockpit-card--span/, 'gerade Zahl: nichts spannt');
+  const two = dash.renderTodayCockpit({ urgentTasks: tasks.slice(0, 2), users: [] }, [], false, { now: new Date() });
+  assert.match(two, /today-cockpit__rows--next" style="--today-next-cols:2"/, 'zwei Zeilen fuellen zwei Spalten, keine leere dritte');
 }));
 
-test('R22 D16: die Spalte trennt, nicht die Zeile - eingerueckte Trenner je Spalte', async () => {
+test('Entwurf „Heute wichtig": die Zellen trennt eine senkrechte Haarlinie, die Leiste eine waagerechte', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
-  const rules = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))]
-    .filter((r) => r.at.some((a) => /today-cockpit \(min-width: 720px\)/.test(a)));
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))].filter((r) => !r.at.length);
   const body = (sel) => rules.find((r) => r.selector.trim() === sel)?.body ?? '';
-  assert.match(body('.today-cockpit__rows--split > .today-cockpit-card + .today-cockpit-card'), /border-top:\s*none/,
-    'keine Haarlinie ueber beide Spalten');
-  const inset = body('.today-cockpit__rows--split > .today-cockpit-card:not(:first-child):not(.today-cockpit-card--col-start)::before');
-  assert.match(inset, /inset-inline:\s*var\(--space-4\)/, 'der Trenner endet vor dem Spaltentrenner');
-  assert.match(body('.today-cockpit__rows--split > .today-cockpit-card--span'), /grid-column:\s*1 \/ -1/);
+  assert.match(body('.today-cockpit__rows.today-cockpit__rows--next'), /grid-template-columns:\s*repeat\(var\(--today-next-cols, 3\), minmax\(0, 1fr\)\)/);
+  assert.match(body('.today-cockpit__rows.today-cockpit__rows--next'), /border-top:\s*1px solid var\(--color-border-subtle\)/);
+  const cell = body('.today-cockpit__rows--next > .today-cockpit-card + .today-cockpit-card');
+  assert.match(cell, /border-top:\s*none/, 'keine waagerechte Linie zwischen den Zellen einer Reihe');
+  assert.match(cell, /border-inline-start:\s*1px solid var\(--color-border-subtle\)/, 'eine senkrechte zwischen ihnen');
+  assert.ok(!rules.some((r) => /today-cockpit__rows--split/.test(r.selector)), 'die zweispaltige Liste ist abgeloest');
 });
 
 // R23 (Critique G1 P2): die Titel des Blatts standen je Zeile 12px versetzt -
 // die erste Spalte war `auto`, und ein Siegel mit Avatar ist breiter als eines
 // allein. Mobil stand die erste Zeile bei y 226: Werkzeuge ueber dem Datum,
 // die Wetterzeile in einer eigenen Zeile, „Heute wichtig" darueber.
-test('R23: eine Titelkante im Blatt, mobil Wetter neben den Werkzeugen und keine sichtbare Blatt-Ueberschrift', async () => {
+test('R23: eine Titelkante im Blatt, mobil Wetter neben den Werkzeugen; die Blatt-Ueberschrift steht in der Karte', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
   const all = [...eachRule(readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8'))];
@@ -1026,10 +1028,11 @@ test('R23: eine Titelkante im Blatt, mobil Wetter neben den Werkzeugen und keine
   assert.match(columns, /var\(--target-sm\)\s*\+\s*var\(--space-5\)\s*-\s*var\(--space-2\)/, 'so breit wie das Paar aus Siegel und Avatar (.seal-pair)');
   const header = rules.filter((r) => r.selector.trim() === '.dashboard-overview__header' && /grid-template-areas/.test(r.body)).at(0);
   assert.match(header?.body ?? '', /"date\s+tools"\s*"weather\s+tools"\s*"title\s+title"/, 'mobil: Datum und Wetter in der Hoehe der Knoepfe, der Gruss darunter');
-  const hidden = all.find((r) => r.selector.trim() === '.today-cockpit:not(.today-cockpit--editing) > .today-cockpit__header');
-  assert.ok(hidden && hidden.at.some((a) => /max-width:\s*639px/.test(a)), 'nur am Telefon');
-  assert.match(hidden.body, /position:\s*absolute/);
-  assert.match(hidden.body, /clip:\s*rect\(0,\s*0,\s*0,\s*0\)/, 'die Ueberschrift bleibt im Dokument, nur nicht im Bild');
+  // Seit dem Entwurf „Heute wichtig" (2026-10-26) steht die Ueberschrift auch
+  // mobil in der Karte - kompakt, mit der Summe rechts. Keine Regel blendet sie aus.
+  assert.ok(!all.some((r) => /today-cockpit__header/.test(r.selector) && /clip:\s*rect/.test(r.body)), 'die Ueberschrift ist sichtbar');
+  const phoneHeader = all.find((r) => r.selector.trim() === '.today-cockpit__grid > .today-cockpit__header' && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.ok(phoneHeader, 'mobil hat der Kopf seine kompakte Fassung');
 });
 
 // R23 (Critique G1 P3): dieselbe Regel fuer die Eltern-Sicht - neben hohen
@@ -1101,14 +1104,18 @@ test('Heute-Blatt: die Zeitleiste zeigt den ganzen Tag je Person, die Summe nenn
     'fuenf Termine samt ganztaegigem, eine ueberfaellige Aufgabe');
 }));
 
-test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel und keine auf dem Telefon', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+test('Heute-Blatt: keine Zeitleiste neben der Termin-Kachel, auf dem Telefon nur die Kurzfassung', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   const withTile = dash.renderTodayCockpit(timelineDay(), [{ id: 'calendar', visible: true }]);
   assert.ok(!withTile.includes('today-timeline'), 'die Leiste waere das Echo der Kachel');
   assert.ok(!withTile.includes('todaySummaryEvents'), 'und die Termine zaehlt die Kachel');
   assert.match(withTile, /todaySummaryOverdue/, 'das Ueberfaellige spricht weiter, solange die Aufgaben im Blatt sprechen');
   global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
   const phone = dash.renderTodayCockpit(timelineDay(), []);
-  assert.ok(!phone.includes('today-timeline'), 'der erste Schirm des Telefons gehoert den Zeilen (R21 D5)');
+  // Mobil die Kurzfassung des Entwurfs: Bild, ohne Knoepfe und ohne Text in
+  // den Balken - die Termine bleiben Zeilen.
+  assert.match(phone, /<div class="today-timeline today-timeline--mini" aria-hidden="true"/);
+  assert.ok(!phone.includes('data-timeline-event'), 'kein Tippziel in einem 10px-Balken');
+  assert.match(phone, /today-cockpit-card__value">Filmabend</, 'der Termin steht als Zeile');
 }));
 
 test('Heute-Blatt: ein Termin der Zeitleiste steht nicht noch einmal in der Liste - sein Block klappt die Zeile auf', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
@@ -1145,4 +1152,39 @@ test('Heute-Blatt: steht in der Leiste noch etwas aus, ist der Tag nicht „frei
   global.window.matchMedia = (query) => ({ matches: /max-width:\s*639px/.test(query), media: query });
   const phone = dash.renderTodayCockpit(onlyEvents, []);
   assert.match(phone, /today-cockpit-card__value">Filmabend</, 'ohne Leiste bleibt der Termin eine Zeile');
+}));
+
+// DER ENTWURF „HEUTE WICHTIG" IM EINZELNEN (Ulas, 2026-10-26: „wie bei Claude
+// Design"). Kopf mit Siegel in der Karte, „in 25 Min" im Modulton, das
+// Naechste zuerst, die Mahlzeit als Block in „Alle", die Achse kurz („07").
+const THU_1805_BERLIN = '2026-09-24T16:05:00Z';
+
+test('Entwurf „Heute wichtig": der Kopf steht mit Siegel und Summe in der Karte, im Anpassen-Modus darueber', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(timelineDay(), []);
+  assert.match(sheet, /<div class="today-cockpit__grid">\s*<div class="today-cockpit__header">\s*<span class="module-seal today-cockpit__seal" aria-hidden="true"><i data-lucide="sun-moon"/);
+  const editing = dash.renderTodayCockpit(timelineDay(), [], true);
+  assert.match(editing, /today-cockpit--editing"[^>]*>\s*<div class="today-cockpit__header">/, 'im Anpassen-Modus steht er ueber der Karte - mobil klappt das Band dort auf ihn zusammen');
+  assert.match(editing, /data-glance-hide/);
+}));
+
+test('Entwurf „Heute wichtig": das Abendessen um 18:30 steht vorn, „in 25 Min" im Modulton, als Block in „Alle"', inBrowser(THU_1805_BERLIN, 'Europe/Berlin', () => {
+  const day = {
+    ...timelineDay(),
+    todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Lachs & Ofengemuese' }],
+    urgentTasks: [
+      { id: 21, title: 'Stromrechnung', due_date: '2026-09-22', status: 'open', assigned_users: [] },
+      { id: 22, title: 'Zettel', due_date: '2026-09-23', status: 'open', assigned_users: [] },
+      { id: 23, title: 'Formular', due_date: '2026-09-23', status: 'open', assigned_users: [] },
+    ],
+  };
+  const sheet = dash.renderTodayCockpit(day, []);
+  const strip = /today-cockpit__rows--next"[^>]*>([\s\S]*?)<\/div>\s*<div class="today-cockpit__rows--more|today-cockpit__rows--next"[^>]*>([\s\S]*)/.exec(sheet);
+  const cells = [...(strip[1] ?? strip[2]).matchAll(/today-cockpit-card__value">([^<]*)</g)].map((m) => m[1]);
+  assert.equal(cells[0], 'Lachs &amp; Ofengemuese', 'das Naechste zuerst, vor dem Ueberfaelligen - auch wenn der Deckel es verdeckt haette');
+  assert.match(sheet, /today-cockpit-card__time today-cockpit-card__time--soon">[^<]*25[^<]*</, '„in 25 Min" im Modulton');
+  assert.match(sheet, /data-timeline-event="meal-9"/, 'die Mahlzeit steht als Block in der Leiste');
+  assert.match(sheet, /--c:var\(--module-meals\)/, 'im Ton der Kueche');
+  assert.match(sheet, /--c:var\(--module-calendar\)/, 'Termine im Ton des Kalenders');
+  assert.match(sheet, /today-timeline__hour[^"]*" data-minute="420"[^>]*>07</, 'die Achse kurz: „07" statt „07:00"');
+  assert.match(sheet, /today-timeline__hour[^"]*--covered" data-minute="1080"/, 'die Stunde unter der Jetzt-Pille schweigt');
 }));

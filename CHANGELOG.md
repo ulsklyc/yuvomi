@@ -8,17 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Today at a glance shows the shape of the day on a wide screen.** Above the rows, a timeline
-  from 07:00 to 22:00 (wider when an appointment starts earlier or ends later) gives everyone with an
-  appointment today a lane, plus one for the whole household; appointments that are over step back to
-  grey, and a red line marks now, moving with the clock. Appointments with a time now stand only in
-  the timeline: a click on a block unfolds its row below - who it is for and which calendar - and the
-  row opens the appointment; the list keeps the tasks, all-day appointments and everything else, so
-  more of the day fits before "+N more". The heading adds the day in one line, for example "9 events ·
-  1 task overdue". The timeline appears whenever the Calendar tile is not on the overview, so it never
-  repeats the tile; on a phone the first screen stays with the rows and appointments stay rows there.
-  Under a timeline of finished appointments, "Nothing else today" replaces "Free today", and while one
-  is still ahead neither is said.
+- **Today at a glance shows the shape of the day.** The sheet is one card now: the overview's seal,
+  the title and the day in one line ("9 events · 1 task overdue"), then a timeline from 07 to 22
+  (wider when an appointment starts earlier or ends later) with a lane for the household and one for
+  everyone with an appointment today, planned meals at their usual time in the household lane, what is
+  over stepped back to grey and a violet line at now that moves with the clock. Below it, "Up next":
+  on a wide screen three cells side by side - the next appointment or meal first, with "in 25 min" in
+  its module's colour, then what is overdue or open, shopping last - and a footer with the closing
+  line or "+N more". Appointments with a time stand only in the timeline there: a click on a block
+  unfolds its row - who it is for and which calendar - and the row opens it. On a phone the timeline
+  is a compact strip of bars with faces above the rows, and appointments stay rows. The timeline only
+  appears when the Calendar tile is not on the overview, so it never repeats it. Under a timeline of
+  finished appointments "Nothing else today" replaces "Free today", and while one is still ahead
+  neither is said.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
   as before unless you change it, on the household's clock and for this device only. Wall mode dims
