@@ -3013,18 +3013,37 @@
   flex-shrink: 0;
 }
 
-.caldav-reminder-module {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Der Hinweis "nur lesbar" (#1840) steht unter Name UND Modulwahl, ueber die
-   volle Breite: in der Namensspalte haette er der Modulwahl mobil die Breite
-   genommen. */
-.caldav-reminder-item:has(> .caldav-reminder-note) {
+/* NAME UND MODULWAHL TEILEN SICH DIE ZEILE, OHNE SICH ZU QUETSCHEN (#2284).
+   Die Modulwahl trug `flex: 1; min-width: 0`, die Zeile brach nie um: ein
+   langer Listenname nahm sich die Breite, und die Auswahl schrumpfte am
+   Telefon auf 46px - ihr Pfeil, ohne Wert. Jetzt bricht die Zeile um, wo
+   beide nicht nebeneinander passen; entschieden wird am Platz, nicht an einer
+   Fensterbreite. Der Name rechnet mit der Feldbreite der Seite
+   (`--layout-field-max`) statt mit seiner Textlaenge und bricht in sich um;
+   die Auswahl schrumpft nie unter die Breite ihres Werts und fuellt allein
+   auf ihrer Zeile die ganze Breite. */
+.caldav-reminder-item {
   flex-wrap: wrap;
 }
 
+.caldav-reminder-item > .settings-setting-row {
+  flex: 999 1 var(--layout-field-max);
+  min-width: 0;
+}
+
+.caldav-reminder-item .settings-setting-row__label {
+  overflow-wrap: anywhere;
+}
+
+.caldav-reminder-module {
+  /* `.form-input` setzt die volle Breite; als Ausgangsmass zaehlt hier der Wert. */
+  inline-size: auto;
+  flex: 1 0 auto;
+  max-inline-size: 100%;
+}
+
+/* Der Hinweis "nur lesbar" (#1840) steht unter Name UND Modulwahl, ueber die
+   volle Breite. */
 .caldav-reminder-note {
   flex-basis: 100%;
   margin: 0;

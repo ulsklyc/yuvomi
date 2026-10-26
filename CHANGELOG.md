@@ -114,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A long reminder list name no longer squeezes the module picker in the sync settings** (#2284).
+  The picker keeps the width of its value; next to a long name on a phone it moves below the name,
+  and a long name wraps instead of running past the row.
 - **A read-only shared calendar or reminder list is no longer offered as a target** (#1840). The
   CalDAV sync now reads, for each calendar and list, whether your account may add entries to it.
   The target pickers for events and tasks offer only those that take new entries, and nothing is
