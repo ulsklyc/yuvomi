@@ -4522,6 +4522,7 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
   };
 
   let tasks = [5, 6];
+  let countdowns = [];
   let weather = { provider: 'open-meteo', city: 'Dortmund', units: 'metric', current: { temp: 21, icon: 'sun', desc: 'wmo.0' }, forecast: [] };
   const asked = [];
   const globals = {
@@ -4554,9 +4555,11 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
       get: async (path) => {
         asked.push(path);
         // Nur die Aufgabenkachel: sie traegt die Zeilen, um die es geht.
-        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }] } };
+        // Dazu der Countdown: seine Kachel steht nur, wenn es einen gibt
+        // (setCountdownAvailability) - der Abgleich muss das neu lesen.
+        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }, { id: 'countdown', visible: true, order: 1, size: '1x1' }] } };
         if (path.startsWith('/dashboard')) {
-          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [] };
+          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [], countdowns };
         }
         if (path.startsWith('/weather')) return { data: weather };
         return { data: null };
@@ -4576,6 +4579,7 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
     await render(container, { user: { id: 1, role: 'admin', display_name: 'Anna' }, signal: controller.signal });
     await settle();
     nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht mit Aufgabe 5');
+    nodeAssert.doesNotMatch(shellHtml, /data-widget-id="countdown"/, 'Reichweite: ohne Countdown keine Countdown-Kachel');
 
     const row = taskRows().find((el) => el.dataset.taskId === '5');
     const clicks = row?.listeners.get('click') ?? [];
@@ -4584,8 +4588,10 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
     await settle();
     nodeAssert.equal(typeof opened?.onChanged, 'function', 'Reichweite: das Blatt bekommt ein onChanged');
 
-    // Aufgabe 5 ist im Blatt erledigt: der Server nennt sie nicht mehr.
+    // Aufgabe 5 ist im Blatt erledigt: der Server nennt sie nicht mehr. Und
+    // Aufgabe 6 hat im Blatt einen Countdown bekommen (Review zu #2314).
     tasks = [6];
+    countdowns = [{ id: 6, source: 'task', title: 'Aufgabe 6', date: '2026-12-24', days_until: 59 }];
     log.length = 0;
     asked.length = 0;
     await opened.onChanged();
@@ -4602,6 +4608,8 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
     nodeAssert.ok(collapsed >= 0, 'die gehende Zeile schliesst per collapseRow');
     nodeAssert.ok(collapsed < redrawn, 'und zwar bevor die Flaeche ohne sie neu entsteht');
     nodeAssert.ok(!log.some(([kind, id]) => kind === 'collapseRow' && id === '6'), 'die bleibende Zeile schliesst nicht');
+    nodeAssert.match(shellHtml, /data-widget-id="countdown"/,
+      'ein im Blatt angelegter Countdown bringt seine Kachel mit - die Verfuegbarkeit kommt aus dem neuen Stand');
 
     // DW-P3-13: der 30-Minuten-Takt des Wetters. Dieselbe Antwort baut nichts
     // neu; eine neue genau einmal (Reichweite: der Takt zeichnet ueberhaupt).

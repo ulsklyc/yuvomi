@@ -8657,6 +8657,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
       fresh.pendingReminders = pendingReminders;
       const unchanged = before !== null && overviewSignature(fresh) === before;
       data = fresh;
+      // Wie der Aufbau: ob die Countdown-Kachel steht, sagt der neue Stand -
+      // ein im Blatt angelegter Countdown bringt sie mit (Review zu #2314).
+      setCountdownAvailability(data?.countdowns);
       markLoaded(requestDay);
       rememberOverview();
       if (unchanged) return;
