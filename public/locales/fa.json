@@ -4366,6 +4366,7 @@
             "missedBook": "ثبت موعدهای گذشته از {{date}}",
             "missedDetail": "از {{date}} تاکنون {{count}} موعد از دست رفته است.",
             "missedDetail_one": "از {{date}} تاکنون {{count}} موعد از دست رفته است.",
+            "failing": "ثبت ناموفق بود - هر ساعت دوباره تلاش می‌شود",
             "pastQuestion": "تاریخ در گذشته است",
             "pastSkip": "شروع از {{date}}",
             "pastDetail": "از {{date}} تاکنون {{count}} موعد سررسید می‌شد.",

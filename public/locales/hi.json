@@ -4366,6 +4366,7 @@
             "missedBook": "{{date}} से छूटी तारीखें दर्ज करें",
             "missedDetail": "{{date}} से {{count}} तारीखें छूट गई हैं।",
             "missedDetail_one": "{{date}} से {{count}} तारीख छूट गई है।",
+            "failing": "दर्ज करना विफल रहा - हर घंटे फिर से कोशिश की जा रही है",
             "pastQuestion": "तारीख बीत चुकी है",
             "pastSkip": "{{date}} से शुरू करें",
             "pastDetail": "{{date}} से {{count}} तारीखें देय हो चुकी होतीं।",

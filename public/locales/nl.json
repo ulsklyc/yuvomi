@@ -4366,6 +4366,7 @@
             "missedBook": "Naboeken vanaf {{date}}",
             "missedDetail": "Sinds {{date}} zijn {{count}} datums gemist.",
             "missedDetail_one": "Sinds {{date}} is {{count}} datum gemist.",
+            "failing": "Boeken mislukt - wordt elk uur opnieuw geprobeerd",
             "pastQuestion": "De datum ligt in het verleden",
             "pastSkip": "Beginnen op {{date}}",
             "pastDetail": "Sinds {{date}} zouden {{count}} datums verschuldigd zijn geweest.",

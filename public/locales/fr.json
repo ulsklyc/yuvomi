@@ -4366,6 +4366,7 @@
             "missedBook": "Rattraper depuis le {{date}}",
             "missedDetail": "{{count}} échéances ont été manquées depuis le {{date}}.",
             "missedDetail_one": "{{count}} échéance a été manquée depuis le {{date}}.",
+            "failing": "Échec de l’enregistrement - nouvel essai toutes les heures",
             "pastQuestion": "La date est dans le passé",
             "pastSkip": "Commencer le {{date}}",
             "pastDetail": "{{count}} échéances seraient tombées depuis le {{date}}.",

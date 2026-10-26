@@ -4366,6 +4366,7 @@
             "missedBook": "{{date}}以降の分を記帳",
             "missedDetail": "{{date}}以降、{{count}}回分が未記帳です。",
             "missedDetail_one": "{{date}}以降、{{count}}回分が未記帳です。",
+            "failing": "記帳に失敗しました - 1時間ごとに再試行します",
             "pastQuestion": "日付が過去です",
             "pastSkip": "{{date}}から開始",
             "pastDetail": "{{date}}以降、{{count}}回分の期日が過ぎています。",

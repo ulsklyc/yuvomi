@@ -3989,6 +3989,7 @@
             "missedDetail": "Od {{date}} bylo zmeškáno {{count}} termínů.",
             "missedDetail_one": "Od {{date}} byl zmeškán {{count}} termín.",
             "missedDetail_few": "Od {{date}} byly zmeškány {{count}} termíny.",
+            "failing": "Zaúčtování selhalo - opakuje se každou hodinu",
             "pastQuestion": "Datum je v minulosti",
             "pastSkip": "Začít od {{date}}",
             "pastDetail": "Od {{date}} by bylo splatných {{count}} termínů.",

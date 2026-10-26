@@ -4366,6 +4366,7 @@
             "missedBook": "Bukukan yang terlewat mulai {{date}}",
             "missedDetail": "{{count}} tanggal terlewat sejak {{date}}.",
             "missedDetail_one": "{{count}} tanggal terlewat sejak {{date}}.",
+            "failing": "Pembukuan gagal - dicoba lagi setiap jam",
             "pastQuestion": "Tanggalnya sudah lewat",
             "pastSkip": "Mulai dari {{date}}",
             "pastDetail": "{{count}} tanggal seharusnya sudah jatuh tempo sejak {{date}}.",

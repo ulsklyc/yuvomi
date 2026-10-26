@@ -4606,6 +4606,7 @@
             "missedDetail_one": "З {{date}} пропущено {{count}} дату.",
             "missedDetail_few": "З {{date}} пропущено {{count}} дати.",
             "missedDetail_many": "З {{date}} пропущено {{count}} дат.",
+            "failing": "Не вдалося провести - повтор щогодини",
             "pastQuestion": "Дата в минулому",
             "pastSkip": "Почати з {{date}}",
             "pastDetail": "З {{date}} настало б {{count}} дати.",

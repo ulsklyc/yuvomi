@@ -4366,6 +4366,7 @@
             "missedBook": "{{date}}부터 놓친 날짜 기록",
             "missedDetail": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
             "missedDetail_one": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
+            "failing": "기록 실패 - 매시간 다시 시도합니다",
             "pastQuestion": "날짜가 과거입니다",
             "pastSkip": "{{date}}부터 시작",
             "pastDetail": "{{date}} 이후 {{count}}회의 기한이 지났습니다.",

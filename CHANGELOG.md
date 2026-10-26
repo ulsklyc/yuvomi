@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
+  run cannot book a series for an unexpected reason, the series keeps running and is retried
+  every hour, as before - so a fault on our side never stops a household's rent - but its row,
+  read view and edit dialog now say "Booking failed - retrying every hour" instead of the error
+  living only in the server log. A booking, an edit or a pause for a known reason clears it. API
+  clients see `failed_at` on each recurring expense (migration 263).
 - **A recurring shared expense with a start date in the past asks before booking the gap**
   (#1748). Creating one, or moving its next date, to a day before today used to book one missed
   date per hour until it had caught up. The dialog now asks, as resuming does: start from the next

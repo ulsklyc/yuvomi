@@ -4366,6 +4366,7 @@
             "missedBook": "補記自 {{date}} 起的日期",
             "missedDetail": "自 {{date}} 起已錯過 {{count}} 個日期。",
             "missedDetail_one": "自 {{date}} 起已錯過 {{count}} 個日期。",
+            "failing": "記帳失敗 - 每小時重試一次",
             "pastQuestion": "日期已過",
             "pastSkip": "從 {{date}} 開始",
             "pastDetail": "自 {{date}} 起本應有 {{count}} 個到期日期。",

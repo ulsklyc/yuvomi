@@ -4366,6 +4366,7 @@
             "missedBook": "Ghi bù từ {{date}}",
             "missedDetail": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
             "missedDetail_one": "Đã bỏ lỡ {{count}} ngày kể từ {{date}}.",
+            "failing": "Ghi sổ thất bại - thử lại mỗi giờ",
             "pastQuestion": "Ngày đã qua",
             "pastSkip": "Bắt đầu từ {{date}}",
             "pastDetail": "Từ {{date}} đã có {{count}} ngày đến hạn.",

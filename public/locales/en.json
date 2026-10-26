@@ -4366,6 +4366,7 @@
             "missedBook": "Book missed dates from {{date}}",
             "missedDetail": "{{count}} dates have been missed since {{date}}.",
             "missedDetail_one": "{{count}} date has been missed since {{date}}.",
+            "failing": "Booking failed - retrying every hour",
             "pastQuestion": "The date is in the past",
             "pastSkip": "Start from {{date}}",
             "pastDetail": "{{count}} dates would have been due since {{date}}.",

@@ -4366,6 +4366,7 @@
             "missedBook": "Itala ang nalampasan mula {{date}}",
             "missedDetail": "{{count}} petsa ang nalampasan mula {{date}}.",
             "missedDetail_one": "{{count}} petsa ang nalampasan mula {{date}}.",
+            "failing": "Nabigo ang pagtala - sinusubukang muli bawat oras",
             "pastQuestion": "Nasa nakaraan ang petsa",
             "pastSkip": "Simulan mula {{date}}",
             "pastDetail": "{{count}} petsa sana ang dumating mula {{date}}.",

@@ -4366,6 +4366,7 @@
             "missedBook": "Bokfør tapte datoer fra {{date}}",
             "missedDetail": "{{count}} datoer er gått tapt siden {{date}}.",
             "missedDetail_one": "{{count}} dato er gått tapt siden {{date}}.",
+            "failing": "Bokføringen mislyktes - prøver igjen hver time",
             "pastQuestion": "Datoen er i fortiden",
             "pastSkip": "Start fra {{date}}",
             "pastDetail": "{{count}} datoer ville ha forfalt siden {{date}}.",

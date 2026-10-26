@@ -4727,6 +4727,7 @@
             "missedDetail_few": "فاتت {{count}} مواعيد منذ {{date}}.",
             "missedDetail_two": "فات موعدان ({{count}}) منذ {{date}}.",
             "missedDetail_many": "فات {{count}} موعدًا منذ {{date}}.",
+            "failing": "فشل التسجيل - تتم إعادة المحاولة كل ساعة",
             "pastQuestion": "التاريخ في الماضي",
             "pastSkip": "البدء من {{date}}",
             "pastDetail": "كان سيستحق {{count}} موعد منذ {{date}}.",

@@ -4366,6 +4366,7 @@
             "missedBook": "Ab {{date}} nachbuchen",
             "missedDetail": "Seit dem {{date}} wurden {{count}} Termine versäumt.",
             "missedDetail_one": "Seit dem {{date}} wurde {{count}} Termin versäumt.",
+            "failing": "Buchung fehlgeschlagen - wird stündlich neu versucht",
             "pastQuestion": "Das Datum liegt in der Vergangenheit",
             "pastSkip": "Ab {{date}} beginnen",
             "pastDetail": "Seit dem {{date}} wären {{count}} Termine fällig gewesen.",

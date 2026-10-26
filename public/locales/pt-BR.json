@@ -4366,6 +4366,7 @@
             "missedBook": "Lançar as datas perdidas desde {{date}}",
             "missedDetail": "{{count}} datas foram perdidas desde {{date}}.",
             "missedDetail_one": "{{count}} data foi perdida desde {{date}}.",
+            "failing": "Falha no lançamento - nova tentativa a cada hora",
             "pastQuestion": "A data está no passado",
             "pastSkip": "Começar em {{date}}",
             "pastDetail": "{{count}} datas teriam vencido desde {{date}}.",

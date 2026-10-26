@@ -4366,6 +4366,7 @@
             "missedBook": "{{date}} tarihinden itibaren kaçanları kaydet",
             "missedDetail": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
             "missedDetail_one": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "failing": "Kayıt başarısız - her saat yeniden deneniyor",
             "pastQuestion": "Tarih geçmişte",
             "pastSkip": "{{date}} tarihinden başla",
             "pastDetail": "{{date}} tarihinden beri {{count}} tarihin vadesi gelmiş olurdu.",

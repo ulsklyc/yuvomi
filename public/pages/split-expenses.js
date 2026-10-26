@@ -1373,6 +1373,11 @@ function renderRecurring(asList = false) {
     const reason = recurring.blocked_reason
       ? `<span class="split-recurring__reason">${esc(t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`))}</span>`
       : '';
+    // Unerwartet gescheitert (#1746): die Serie laeuft weiter, der Lauf
+    // versucht sie stuendlich - gesagt wird es hier, nicht nur im Serverlog.
+    const failing = recurringIsFailing(recurring)
+      ? `<span class="split-recurring__reason">${esc(t('splitExpenses.recurring.failing'))}</span>`
+      : '';
     const body = `
       <div class="split-expense__icon budget-tile"${categoryTone(recurring.category)}><i data-lucide="${categoryIcon(recurring.category)}" aria-hidden="true"></i></div>
       <div class="split-expense__body">
@@ -1380,6 +1385,7 @@ function renderRecurring(asList = false) {
         <span>${esc(frequencyLabel(recurring.frequency))}</span>
         ${when}
         ${reason}
+        ${failing}
       </div>
       <div class="split-expense__amount">${money(recurring.amount, recurring.currency)}</div>
     `;
@@ -2574,7 +2580,22 @@ function recurringStateText(recurring) {
   return [
     recurring.paused_at ? t('splitExpenses.recurring.paused') : '',
     recurring.blocked_reason ? t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`) : '',
+    recurringIsFailing(recurring) ? t('splitExpenses.recurring.failing') : '',
   ].filter(Boolean).join(' · ');
+}
+
+/**
+ * Ob der Lauf diese Serie unerwartet nicht buchen kann (#1746): `failed_at`
+ * vom Server, an einer Serie, die laeuft. Eine pausierte wird nicht neu
+ * versucht, also sagt sie es auch nicht.
+ */
+function recurringIsFailing(recurring) {
+  return Boolean(recurring.failed_at) && !recurring.paused_at;
+}
+
+/** Das Zeichen zum Zustand: Pause, oder ein Warnzeichen fuer eine scheiternde, laufende Serie. */
+function recurringStateIcon(recurring) {
+  return recurring.paused_at || !recurringIsFailing(recurring) ? 'circle-pause' : 'alert-triangle';
 }
 
 /**
@@ -2596,7 +2617,7 @@ function recurringReadSections(recurring) {
     { icon: 'user', label: t('splitExpenses.paidBy'), value: recurring.payer_name || '' },
     { icon: 'repeat', label: t('budget.recurringIntervalLabel'), value: frequencyLabel(recurring.frequency) },
     { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : dateText(recurring.next_run_date) },
-    { icon: 'circle-pause', label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
+    { icon: recurringStateIcon(recurring), label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
     { icon: categoryIcon(recurring.category), label: t('splitExpenses.categoryLabel'), value: categoryLabel(recurring.category) },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
@@ -2655,7 +2676,7 @@ function openRecurringModal(recurring = null) {
     title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
     content: `
       <form id="split-recurring-form" class="split-form" novalidate>
-        ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
+        ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="${recurringStateIcon(recurring)}" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
         <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>

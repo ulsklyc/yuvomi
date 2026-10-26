@@ -4366,6 +4366,7 @@
             "missedBook": "Bokför missade datum från {{date}}",
             "missedDetail": "{{count}} datum har missats sedan {{date}}.",
             "missedDetail_one": "{{count}} datum har missats sedan {{date}}.",
+            "failing": "Bokföringen misslyckades - försöker igen varje timme",
             "pastQuestion": "Datumet ligger i det förflutna",
             "pastSkip": "Börja från {{date}}",
             "pastDetail": "{{count}} datum skulle ha förfallit sedan {{date}}.",

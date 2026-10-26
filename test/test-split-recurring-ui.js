@@ -1067,3 +1067,40 @@ test('#1748 Faellt das Recht waehrend der Frage, sendet Speichern nichts', async
     assert.deepEqual(spur.gesendet, []);
   });
 });
+
+// --------------------------------------------------------------------------
+// #1746: eine Serie, die der Lauf unerwartet nicht buchen kann, laeuft weiter
+// (`failed_at` vom Server, die Serie bleibt unpausiert) und sagt es an der Zeile.
+// --------------------------------------------------------------------------
+test('#1746 Ein unerwarteter Fehlschlag steht an der Zeile, bei jedem Recht und im Archiv, samt Leseansicht und Dialog', async () => {
+  const scheitert = serie(70, { title: 'Wasser', failed_at: '2026-09-30T08:00:00Z' });
+  for (const lage of [{ modus: 'write' }, { modus: 'read' }, { modus: 'write', archiviert: true }]) {
+    await buehne({ ...lage, recurring: [scheitert, MIETE] }, () => {
+      const html = hauptteil();
+      const name = JSON.stringify(lage);
+      const zeilen = html.split('data-row-key=');
+      const wasser = zeilen.find((z) => z.startsWith('"recurring-70"'));
+      const miete = zeilen.find((z) => z.startsWith('"recurring-11"'));
+      assert.match(wasser, /<span>splitExpenses\.recurring\.nextDate: 2026-11-01<\/span>\s*<span class="split-recurring__reason">splitExpenses\.recurring\.failing<\/span>/, name);
+      assert.doesNotMatch(miete, /splitExpenses\.recurring\.failing/, `${name}: nur die Serie, die scheitert`);
+    });
+  }
+  await buehne({ recurring: [scheitert] }, (spur) => {
+    split.openRecurringModal(scheitert);
+    assert.match(spur.dialoge[0].content, /<span>splitExpenses\.recurring\.failing<\/span>/, 'der Dialog nennt den Zustand');
+  });
+  await buehne({ recurring: [scheitert], modus: 'read' }, (spur) => {
+    split.openRecurringModal(scheitert);
+    const zustand = spur.leseansichten[0].sections.flat?.() ?? spur.leseansichten[0];
+    assert.match(JSON.stringify(zustand), /splitExpenses\.recurring\.failing/, 'die Leseansicht nennt ihn');
+  });
+});
+
+test('#1746 Eine pausierte Serie nennt keinen Fehlschlag: sie wird nicht neu versucht', async () => {
+  const pausiert = serie(71, { title: 'Gas', paused_at: '2026-09-30T09:00:00Z', failed_at: '2026-09-30T08:00:00Z' });
+  await buehne({ recurring: [pausiert] }, (spur) => {
+    assert.doesNotMatch(hauptteil(), /splitExpenses\.recurring\.failing/);
+    split.openRecurringModal(pausiert);
+    assert.doesNotMatch(spur.dialoge[0].content, /splitExpenses\.recurring\.failing/);
+  });
+});

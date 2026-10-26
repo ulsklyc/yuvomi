@@ -4366,6 +4366,7 @@
             "missedBook": "Utólagos könyvelés ettől: {{date}}",
             "missedDetail": "{{date}} óta {{count}} időpont maradt ki.",
             "missedDetail_one": "{{date}} óta {{count}} időpont maradt ki.",
+            "failing": "A könyvelés sikertelen - óránként újrapróbálja",
             "pastQuestion": "A dátum a múltban van",
             "pastSkip": "Kezdés ettől: {{date}}",
             "pastDetail": "{{date}} óta {{count}} időpont lett volna esedékes.",

@@ -4366,6 +4366,7 @@
             "missedBook": "Registar as datas em falta desde {{date}}",
             "missedDetail": "{{count}} datas ficaram por registar desde {{date}}.",
             "missedDetail_one": "{{count}} data ficou por registar desde {{date}}.",
+            "failing": "Falha no registo - nova tentativa a cada hora",
             "pastQuestion": "A data está no passado",
             "pastSkip": "Começar a {{date}}",
             "pastDetail": "{{count}} datas teriam vencido desde {{date}}.",

@@ -4366,6 +4366,7 @@
             "missedBook": "Recupera dal {{date}}",
             "missedDetail": "Dal {{date}} sono state saltate {{count}} scadenze.",
             "missedDetail_one": "Dal {{date}} è stata saltata {{count}} scadenza.",
+            "failing": "Registrazione non riuscita - nuovo tentativo ogni ora",
             "pastQuestion": "La data è nel passato",
             "pastSkip": "Inizia dal {{date}}",
             "pastDetail": "Dal {{date}} sarebbero scadute {{count}} scadenze.",

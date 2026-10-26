@@ -4366,6 +4366,7 @@
             "missedBook": "Registrar desde el {{date}}",
             "missedDetail": "Desde el {{date}} se han pasado {{count}} fechas.",
             "missedDetail_one": "Desde el {{date}} se ha pasado {{count}} fecha.",
+            "failing": "Error al registrar - se reintenta cada hora",
             "pastQuestion": "La fecha está en el pasado",
             "pastSkip": "Empezar el {{date}}",
             "pastDetail": "Desde el {{date}} habrían vencido {{count}} fechas.",
