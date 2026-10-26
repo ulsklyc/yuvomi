@@ -881,7 +881,7 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const wire = dash.slice(dash.indexOf('function wireLinks('), dash.indexOf('function reorderWidgetConfig('));
   assert.match(wire, /const eventLink = editing \? null : eventLinkOf\(el\.dataset\.route\);/);
-  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, rerender, user \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
+  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, refresh, user \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
   assert.match(dash, /const \{ openEventById \} = await import\('\/pages\/calendar\.js'\);/, 'nachgeladen wie die Aufgabe');
   const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null \} = \{\}\)/);

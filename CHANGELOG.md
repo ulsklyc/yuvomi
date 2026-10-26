@@ -164,6 +164,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the quick-action button on a phone switched to Tasks and stopped there, because they still
   looked for the add button under the name it had before the add buttons were unified. Event, Note
   and Shopping were not affected.
+- **Finishing, editing or deleting from a sheet over the Overview leaves the Overview where it
+  was.** Completing a task, changing or deleting an event, or starting or ending a fast in a sheet
+  opened from the Overview rebuilt the whole page: the loading placeholders flashed, the page shrank
+  to the height of the screen and a computer scrolled back to the top. The Overview now updates in
+  place - the row that goes away closes, the scroll position and the focus stay - and the
+  half-hourly weather update only redraws it when the forecast changed.
 - **A long reminder list name no longer squeezes the module picker in the sync settings** (#2284).
   The picker keeps the width of its value; next to a long name on a phone it moves below the name,
   and a long name wraps instead of running past the row.
