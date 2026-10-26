@@ -2815,6 +2815,12 @@ svg.weather-forecast__icon {
   visibility: hidden;
 }
 
+/* Im gestauchten Teil vor dem Knie spricht nur jede k-te Stunde
+ * (timelineHourMarks): enger stuenden die Zahlen aneinander. */
+.today-timeline__hour--sparse {
+  visibility: hidden;
+}
+
 .today-timeline__lane {
   display: contents;
 }
@@ -2853,8 +2859,8 @@ svg.weather-forecast__icon {
   color: var(--color-text-secondary);
 }
 
-/* Die Spur: Haarlinie oben, eine feine Linie je Stunde. Ihre Hoehe ist eine
- * Reihe je gleichzeitigem Termin (packLane). */
+/* Die Spur: Haarlinie oben. Ihre Hoehe ist eine Reihe je gleichzeitigem
+ * Termin (packLane). */
 .today-timeline__track {
   grid-column: 2;
   position: relative;
@@ -2863,8 +2869,27 @@ svg.weather-forecast__icon {
   list-style: none;
   block-size: calc(var(--tl-rows, 1) * var(--tl-lane));
   border-top: 1px solid var(--color-border-subtle);
-  background-image: linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px);
-  background-size: calc(100% / var(--tl-hours, 15)) 100%;
+}
+
+/* EINE FEINE LINIE JE STUNDE, auf der gewichteten Achse (D7): vor dem Knie
+ * stehen die Linien enger - sie zeigen, dass die Vergangenheit gestaucht,
+ * nicht weggelassen ist. Ein Hintergrund in gleichen Schritten (frueher je
+ * Spur) kann das nicht; die Linien liegen als eigene Ebene unter den Spuren,
+ * von der Achse bis zum Ende der letzten. */
+.today-timeline__grid {
+  position: absolute;
+  inset-block: var(--tl-axis) 0;
+  inset-inline-start: calc(var(--tl-pad-inline) + var(--tl-label));
+  inline-size: calc(100% - 2 * var(--tl-pad-inline) - var(--tl-label));
+  pointer-events: none;
+}
+
+.today-timeline__grid > span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(var(--tl-at) * 100%);
+  inline-size: 1px;
+  background: var(--color-border-subtle);
 }
 
 .today-timeline__slot {

@@ -1149,7 +1149,7 @@ test('Heute-Blatt: ein Termin der Zeitleiste steht nicht noch einmal in der List
     assert.ok(!list.includes(`today-cockpit-card__value">${title}<`), `${title} steht nur in der Leiste`);
   }
   // Der Block ist ein Aufklapp-Knopf auf die Zeile darunter, zugeklappt bis zum Klick.
-  assert.match(sheet, /<button type="button" class="today-timeline__event today-timeline__event--next" data-timeline-event="14@2026-09-24T20:15" tabindex="-1"\s+aria-expanded="false" aria-controls="today-timeline-detail">/);
+  assert.match(sheet, /<button type="button" class="today-timeline__event today-timeline__event--next" data-timeline-event="14@2026-09-24T20:15" tabindex="-1"\s+aria-expanded="false" aria-controls="today-timeline-detail" title="Filmabend · [^"]*">/);
   assert.match(sheet, /id="today-timeline-detail" hidden>/);
   // Je Termin eine Zeile, auch wenn er in zwei Spuren steht; sie traegt die Zuweisung.
   assert.equal(sheet.match(/data-timeline-detail="16@2026-09-24T19:00"/g)?.length, 1);
@@ -2018,4 +2018,136 @@ test('D6: der Telefon-Fit rechnet die Ueberschrift mit, sobald der Deckel ueber 
   assert.match(measure, /section\.dataset\.programLead/);
   assert.match(measure, /\.today-cockpit__also--row/);
   assert.match(measure, /const geometry = \{[\s\S]*?\blead,\s*divider,\s*\};/);
+}));
+
+// DIE GEWICHTETE ACHSE (Ulas, 2026-10-26, D7). Gemessen bei 1440 (Spur 976px,
+// Achse 06-22): eine Stunde 61px, um 16:26 gehoerten gut 60 % der Achse dem
+// Vergangenen, das Kommende war abgeschnitten. Jetzt bis zum Knie (volle
+// Stunde von jetzt - 1 h) hoechstens ein Drittel, danach volle Breite; alle
+// Teile der Leiste lesen dieselbe Abbildung, die Kurzfassung bleibt linear.
+const { timelineScale: d7Scale, TIMELINE_PAST_SHARE: D7_SHARE } = await import('../public/utils/today-timeline.js');
+/** 16:30 auf der Achse 07-22 des rushHour-Tages: Knie 15:00. */
+const D7_AXIS = { start: 420, end: 1320, knee: 900 };
+const d7Close = (actual, expected, message) => assert.ok(Math.abs(Number(actual) - expected) < 1e-9, `${message}: ${actual} statt ${expected}`);
+const styleVar = (attrs, name) => new RegExp(`${name}:([^;"]+)`).exec(attrs)?.[1];
+
+test('D7: breit stehen Bloecke, Strich, Fahne, Stunden und Gitter auf derselben gewichteten Achse', inBrowser(THU_1630_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(rushHour(), [], false, { stage: 'wide' });
+  const timeline = timelineOf(sheet);
+  const scale = d7Scale(D7_AXIS);
+  const root = /<div class="today-timeline"[^>]*>/.exec(timeline)?.[0] ?? '';
+  assert.match(root, /data-timeline-knee="900"/, 'das Knie steht am Element - der Minutentakt liest es');
+  assert.ok(!/--tl-hours/.test(root), 'kein Hintergrund in gleichen Schritten mehr');
+  d7Close(styleVar(root, '--tl-now'), scale.x(990), 'der Jetzt-Strich');
+  d7Close(scale.x(900), D7_SHARE, 'Vorbedingung: das Vergangene bis 15:00 auf einem Drittel');
+  const slots = [...timeline.matchAll(/<li class="today-timeline__slot[^"]*" data-timeline-at="(\d+)" style="([^"]*)"/g)];
+  assert.ok(slots.length >= 5, 'Vorbedingung: die Bloecke des Tages');
+  for (const [, start, style] of slots) d7Close(styleVar(style, '--tl-left'), scale.x(Number(start)), `Block um ${start}`);
+  // Der Elternabend 19:00-20:30 in zwei Spuren: bei 976px Spur 139px statt 91px.
+  const parents = slots.filter(([, start]) => start === '1140');
+  assert.equal(parents.length, 2);
+  d7Close(styleVar(parents[0][2], '--tl-width'), scale.width(1140, 1230), 'Breite ueber dieselbe Abbildung');
+  assert.ok(scale.width(1140, 1230) * 976 > 135, 'das Kommende ist breiter als linear (91px)');
+  const flag = /<span class="today-timeline__flag"([^>]*)>/.exec(timeline)?.[1] ?? '';
+  const nextSlot = slots.find(([, start]) => flag.includes(`data-flag-at="${start}"`));
+  assert.ok(nextSlot, 'Vorbedingung: die Fahne gehoert zu einem Block');
+  assert.equal(styleVar(flag, '--tl-at'), styleVar(nextSlot[2], '--tl-left'), 'die Fahne ueber dem Blockanfang');
+  const hours = [...timeline.matchAll(/<span class="(today-timeline__hour[^"]*)" data-minute="(\d+)" style="--tl-at:([^"]+)">/g)];
+  assert.equal(hours.length, 15);
+  for (const [, , minute, x] of hours) d7Close(x, scale.x(Number(minute)), `Stunde ${minute}`);
+  const sparse = hours.filter(([, cls]) => cls.includes('--sparse')).map(([, , minute]) => Number(minute) / 60);
+  assert.deepEqual(sparse, [8, 10, 12, 14], 'vor dem Knie spricht jede zweite Stunde, vom Knie aus gezaehlt');
+  assert.ok(!hours.some(([cls, , minute]) => cls.includes('--covered') && Number(minute) === 1020), 'die 17 neben 16:30 spricht wieder');
+  const grid = /<div class="today-timeline__grid" aria-hidden="true">([\s\S]*?)<\/div>/.exec(timeline)?.[1] ?? '';
+  const lines = [...grid.matchAll(/--tl-at:([^"]+)"/g)].map((m) => Number(m[1]));
+  assert.deepEqual(lines, hours.map(([, , , x]) => Number(x)), 'eine Linie je Stunde, auch vor dem Knie');
+  // Und das Stylesheet zeichnet die Linien aus der Ebene, nicht aus einem Hintergrund in gleichen Schritten.
+  assert.ok(!/background-size:\s*calc\(100% \/ var\(--tl-hours/.test(dashboardCss));
+  const line = cssRule('.today-timeline__grid > span') ?? '';
+  assert.match(line, /inset-inline-start: calc\(var\(--tl-at\) \* 100%\)/);
+  assert.match(line, /inline-size: 1px;[\s\S]*background: var\(--color-border-subtle\)/, 'eine feine Linie in der Farbe der Haarlinie');
+  assert.match(cssRule('.today-timeline__grid') ?? '', /pointer-events: none/);
+  assert.match(cssRule('.today-timeline__hour--sparse') ?? '', /visibility: hidden/);
+}));
+
+test('D7: frueh am Tag bleibt die breite Achse linear - die Vergangenheit ist schmaler als ein Drittel', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const timeline = timelineOf(dash.renderTodayCockpit(timelineDay(), []));
+  assert.ok(!/data-timeline-knee/.test(timeline), 'um 10:00 auf 07-22 kein Knie');
+  assert.ok(!timeline.includes('today-timeline__hour--sparse'));
+  const slot = /data-timeline-at="1215" style="--tl-left:([^;]+);/.exec(timeline);
+  d7Close(slot?.[1], (1215 - 420) / 900, 'der Filmabend linear');
+}));
+
+test('D7: jeder Leistenblock traegt seinen vollen Titel samt Beginn als title, durch esc()', inBrowser(THU_1630_BERLIN, 'Europe/Berlin', () => {
+  const day = rushHour();
+  day.upcomingEvents.push(ev(56, 'Tom & "Jerry" <3', '2026-09-24T21:00', '2026-09-24T21:45'));
+  const timeline = timelineOf(dash.renderTodayCockpit(day, [], false, { stage: 'wide' }));
+  const buttons = [...timeline.matchAll(/<button type="button" class="today-timeline__event[^"]*"[^>]*>/g)].map((m) => m[0]);
+  assert.ok(buttons.length >= 7, 'Vorbedingung: Bloecke und Band');
+  assert.ok(buttons.every((button) => / title="[^"]+"/.test(button)), 'jeder Block hat einen title');
+  // formatTime reicht im Stub den Zeitstempel durch.
+  assert.ok(buttons.some((button) => button.includes('title="Elternabend · 2026-09-24T19:00"')), 'Titel und Beginn');
+  assert.ok(buttons.some((button) => button.includes('title="Tom &amp; &quot;Jerry&quot; &lt;3 · 2026-09-24T21:00"')), 'Nutzerdaten laufen durch esc()');
+  assert.ok(buttons.some((button) => button.includes('title="Sportfest"')), 'Ganztaegiges ohne Zeit');
+  assert.ok(!buttons.some((button) => /title="[^"]*2026-09-24T20:30/.test(button)), 'nur der Beginn, wie im ganzen Blatt (#1698)');
+  // Der zugaengliche Name bleibt der Inhalt des Knopfs.
+  assert.match(timeline, /<span class="sr-only">dashboard\.todayTimelineEveryone: <\/span><span class="today-timeline__title">Tom &amp; &quot;Jerry&quot; &lt;3<\/span>/);
+}));
+
+test('D7: die Kurzfassung bleibt linear, auch wenn die breite Leiste gestaucht waere', inBrowser(THU_1630_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(rushHour(), [], false, { stage: 'compact' });
+  const root = /<div class="today-timeline today-timeline--mini[^>]*>/.exec(sheet)?.[0] ?? '';
+  assert.ok(root, 'Vorbedingung: die Kurzfassung steht');
+  assert.ok(!root.includes('data-timeline-knee'), 'kein Knie - der Minutentakt rechnet linear');
+  d7Close(styleVar(root, '--tl-now'), (990 - 420) / 900, 'der Strich linear');
+  const timeline = dash.buildTodayTimeline(rushHour(), { includeMeals: true, includeShifts: true });
+  assert.equal(timeline.knee, 900, 'Vorbedingung: das Modell traegt ein Knie');
+  const bars = [...sheet.matchAll(/<i class="today-timeline__bar[^"]*" style="--tl-left:([^;]+);--tl-width:([^;]+);/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  const expected = timeline.lanes.filter((lane) => lane.items.some((item) => item.state !== 'past'))
+    .flatMap((lane) => lane.items).map((item) => [(item.start - 420) / 900, (item.end - item.start) / 900]);
+  assert.equal(bars.length, expected.length);
+  bars.forEach(([left, width], index) => {
+    d7Close(left, expected[index][0], `Balken ${index}`);
+    d7Close(width, expected[index][1], `Balken ${index} Breite`);
+  });
+}));
+
+test('D7: der Minutentakt fuehrt den Strich ueber das gezeichnete Knie, die Kurzfassung linear', () => {
+  const fake = (dataset) => {
+    const style = new Map();
+    const hours = [1020, 1080].map((minute) => {
+      const classes = new Set();
+      return { dataset: { minute: String(minute) }, classes, classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } };
+    });
+    const timeline = {
+      dataset,
+      style: { setProperty: (k, v) => style.set(k, v) },
+      querySelector: () => null,
+      querySelectorAll: (sel) => (sel === '.today-timeline__hour[data-minute]' ? hours : []),
+    };
+    return { root: { querySelector: (sel) => (sel === '.today-timeline' ? timeline : null) }, style, hours };
+  };
+  return inBrowser(THU_1630_BERLIN, 'Europe/Berlin', () => {
+    const wide = fake({ timelineStart: '420', timelineEnd: '1320', timelineKnee: '900' });
+    dash.updateTodayTimelineNow(wide.root, new Date('2026-09-24T14:45:00Z'));
+    d7Close(wide.style.get('--tl-now'), d7Scale(D7_AXIS).x(1005), 'um 16:45 auf der gewichteten Achse');
+    assert.deepEqual(wide.hours.map((h) => h.classes.has('today-timeline__hour--covered')), [true, false], 'die 17 unter der Pille, die 18 nicht');
+    // Baut die Uebersicht um 17:05 nicht neu (Anpassen-Modus), bleibt der Strich auf der gezeichneten Achse.
+    dash.updateTodayTimelineNow(wide.root, new Date('2026-09-24T15:05:00Z'));
+    d7Close(wide.style.get('--tl-now'), d7Scale(D7_AXIS).x(1025), 'das Knie des Markups, nicht das der Uhr');
+    const mini = fake({ timelineStart: '420', timelineEnd: '1320' });
+    dash.updateTodayTimelineNow(mini.root, new Date('2026-09-24T14:45:00Z'));
+    d7Close(mini.style.get('--tl-now'), (1005 - 420) / 900, 'ohne Knie linear');
+  })();
+});
+
+test('D7: das Knie springt nur zur vollen Stunde - dann baut der Minutentakt neu, dazwischen nicht', inBrowser(THU_1630_BERLIN, 'Europe/Berlin', () => {
+  const at = (clock) => dash.todayFingerprint(rushHour(), [], new Date(`2026-09-24T${clock}:00Z`));
+  assert.equal(at('14:05'), at('14:30'), 'zwischen 16:05 und 16:30 bleibt die Geometrie');
+  assert.equal(at('14:30'), at('14:59'), 'bis 16:59');
+  const before = JSON.parse(at('14:59'));
+  const after = JSON.parse(at('15:00'));
+  assert.notDeepEqual(after, before, 'um 17:00 rueckt das Knie auf 16:00');
+  assert.deepEqual(after.slice(0, -1), before.slice(0, -1), 'Vorbedingung: sonst aendert sich um 17:00 nichts');
+  assert.deepEqual([before.at(-1), after.at(-1)], [900, 960]);
 }));

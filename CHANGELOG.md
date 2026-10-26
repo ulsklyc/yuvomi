@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meals as a dot at their usual time - and all-day appointments as a band above it. What is over steps
   back to grey, a violet line marks now, and the next thing coming is raised with an edge in its
   module's colour and a flag above where it starts ("15:00 · in 2 hrs", counting down each minute),
-  readable even on a block too narrow for its time. A click on a block rings it and slides its row
+  readable even on a block too narrow for its time. The hours ahead get the width: what lies more
+  than an hour back is squeezed into at most a third of the timeline (every second hour labelled
+  there), so later titles are no longer cut off, and the layout only shifts on the hour. A block
+  shows its full title and start on hover. A click on a block rings it and slides its row
   open below - start and end, the full title, who it is for and which calendar - and the row opens it;
   the timeline is one tab stop, left and right move along, up and down switch lanes, and Esc folds
   the row and returns to the block you opened. A screen reader hears "Emma: School, 08:00 until 13:00,

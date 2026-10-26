@@ -77,7 +77,7 @@ import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { nextRewardGoal } from '/utils/reward-goal.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
-import { layoutTodayTimeline } from '/utils/today-timeline.js';
+import { layoutTodayTimeline, timelineScale, timelineHourCovered } from '/utils/today-timeline.js';
 import { hourGutterLabel } from '/utils/time-grid.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
@@ -4880,9 +4880,17 @@ const timelineTone = (item) => `var(--module-${TIMELINE_TONES[item.tone] ?? 'cal
  */
 function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   if (!timeline) return '';
-  const span = timeline.end - timeline.start;
   const nowMinute = householdMinuteOf(now);
-  const hours = timeline.hours.map((minute, index) => `<span class="today-timeline__hour${index % 2 ? ' today-timeline__hour--odd' : ''}${hourCovered(minute, nowMinute, timeline) ? ' today-timeline__hour--covered' : ''}" data-minute="${minute}" style="--tl-at:${(minute - timeline.start) / span}">${esc(axisHourLabel(minute))}</span>`).join('');
+  // Stunden, Gitter, Bloecke, Strich und Fahne stehen auf DERSELBEN gewichteten
+  // Achse (timelineScale, D7); im gestauchten Teil spricht nur jede k-te Stunde.
+  const hours = timeline.marks.map((mark) => {
+    const classes = ['today-timeline__hour'];
+    if (mark.odd) classes.push('today-timeline__hour--odd');
+    if (mark.sparse) classes.push('today-timeline__hour--sparse');
+    if (timeline.now != null && timelineHourCovered(timeline.scale, mark.minute, nowMinute)) classes.push('today-timeline__hour--covered');
+    return `<span class="${classes.join(' ')}" data-minute="${mark.minute}" style="--tl-at:${mark.at}">${esc(axisHourLabel(mark.minute))}</span>`;
+  }).join('');
+  const grid = `<div class="today-timeline__grid" aria-hidden="true">${timeline.marks.map((mark) => `<span style="--tl-at:${mark.at}"></span>`).join('')}</div>`;
   const stateLabel = { past: t('dashboard.todayTimelinePast'), now: t('dashboard.todayTimelineRunning') };
   const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
   // Der geteilte Nachname steht nicht in jeder Spur (R19): „Johnson" viermal
@@ -4916,8 +4924,14 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
     const classes = ['today-timeline__event', `today-timeline__event--${item.state ?? 'next'}`];
     if (next) classes.push('today-timeline__event--upnext');
     if (item.point) classes.push('today-timeline__event--point');
+    // DER VOLLE TITEL ALS TOOLTIP (D7): wo der Block ihn kuerzt, zeigt ihn der
+    // Zeiger samt Beginn - nur der Beginn, wie ueberall im Blatt (#1698); die
+    // Spanne nennt die aufgeklappte Zeile. Der zugaengliche Name bleibt der
+    // Inhalt des Knopfs.
+    const clock = allDay ? '' : item.timeLabel || '';
+    const tooltip = clock ? `${item.title} · ${clock}` : item.title;
     return `<button type="button" class="${classes.join(' ')}" data-timeline-event="${esc(item.key)}"${tabindex(item.key)}
-                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail">
+                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail" title="${esc(tooltip)}">
               <span class="sr-only">${esc(laneName)}: </span><span class="today-timeline__title">${esc(item.title)}</span>${
       visibleTime ? `<span class="today-timeline__time"><span class="sr-only">, </span>${esc(visibleTime)}</span>` : ''}${
       when ? `<span class="sr-only" data-timeline-when>, ${esc(spokenWhen(when, item.timeLabel))}</span>` : ''}${
@@ -4962,8 +4976,9 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
     }</div>`;
   return `${band}
     <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
-         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-hours:${timeline.hours.length}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
+         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}"${timeline.knee == null ? '' : ` data-timeline-knee="${timeline.knee}"`}${timeline.now == null ? '' : ` style="--tl-now:${timeline.now}"`}>
       <div class="today-timeline__axis" aria-hidden="true">${hours}${renderTimelineFlag(timeline, now)}</div>
+      ${grid}
       ${lanes}
       ${nowMarker}
     </div>${detail}`;
@@ -4985,11 +5000,6 @@ function laneNameFor(item, timeline, everyone) {
 function axisHourLabel(minute) {
   const full = hourGutterLabel(minute / 60);
   return full.replace(/^(\S+?)[:.]\D?[0０۰٠]{2}$/u, '$1');
-}
-
-/** Die Stunde, die die Jetzt-Pille verdeckt, schweigt (Entwurf: „18" fehlt neben 18:05). */
-function hourCovered(minute, nowMinute, timeline) {
-  return nowMinute != null && timeline.now != null && Math.abs(minute - nowMinute) < 35;
 }
 
 /** Was der zugaengliche Name des Naechsten sagt: „in 25 Min, 15:00" - unter einer Stunde mit der Uhrzeit dahinter. */
@@ -5071,26 +5081,30 @@ function renderTodayMiniTimeline(timeline, now = new Date()) {
   const ahead = timeline.lanes.filter((lane) => lane.items.some((item) => item.state !== 'past'));
   if (!ahead.length) return '';
   const span = timeline.end - timeline.start;
+  // LINEAR, NICHT GEWICHTET (D7): die Kurzfassung zeigt die Form des ganzen
+  // Tages in gleichen Schritten; die gestauchte Vergangenheit gilt nur der
+  // breiten Leiste, deren Bloecke Titel tragen.
+  const linear = timelineScale({ start: timeline.start, end: timeline.end });
   const step = Math.ceil(span / 60 / 5) * 60;
   const marks = [];
   for (let minute = timeline.start; minute <= timeline.end; minute += step) marks.push(minute);
   // Die Marke unter der Jetzt-Pille schweigt; schmal deckt die Pille mehr Zeit.
   const nowMinute = householdMinuteOf(now);
   const covered = (minute) => timeline.now != null && nowMinute != null && Math.abs(minute - nowMinute) < span / 12;
-  const axis = marks.map((minute) => `<span${covered(minute) ? ' class="today-timeline__hour--covered"' : ''} style="--tl-at:${(minute - timeline.start) / span}">${esc(axisHourLabel(minute))}</span>`).join('');
+  const axis = marks.map((minute) => `<span${covered(minute) ? ' class="today-timeline__hour--covered"' : ''} style="--tl-at:${linear.x(minute)}">${esc(axisHourLabel(minute))}</span>`).join('');
   const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
   const lanes = ahead.map((lane) => {
     const face = lane.member
       ? renderAvatarStack([lane.member], { size: 20, maxVisible: 1 })
       : '<span class="today-timeline__everyone today-timeline__everyone--sm"><i data-lucide="users" class="icon-sm"></i></span>';
     const rows = Math.max(1, lane.rows ?? 1);
-    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row ?? 0};--c:${timelineTone(item)}"></i>`).join('');
+    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${linear.x(item.start)};--tl-width:${linear.width(item.start, item.end)};--tl-row:${item.row ?? 0};--c:${timelineTone(item)}"></i>`).join('');
     return `${solo ? '' : `<span class="today-timeline__face">${face}</span>`}<div class="today-timeline__bars" style="--tl-rows:${rows}">${bars}</div>`;
   }).join('');
   const nowMarker = timeline.now == null ? '' : `<div class="today-timeline__now"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
   return `
     <div class="today-timeline today-timeline--mini${solo ? ' today-timeline--solo' : ''}" aria-hidden="true"
-         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-span:${span}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
+         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-span:${span}${timeline.now == null ? '' : `;--tl-now:${linear.x(nowMinute)}`}">
       <div class="today-timeline__axis">${axis}</div>
       ${lanes}
       ${nowMarker}
@@ -5304,9 +5318,14 @@ function updateTodayTimelineNow(root, now = new Date()) {
     placeTodayTimelineFlag(timeline);
     return;
   }
-  timeline.style.setProperty('--tl-now', String((minute - start) / (end - start)));
+  // Dasselbe Knie, mit dem die Leiste gezeichnet ist (data-timeline-knee):
+  // springt es zur vollen Stunde, baut der Fingerabdruck ohnehin neu. Die
+  // Kurzfassung traegt keins und bleibt linear.
+  const kneeAttr = timeline.dataset.timelineKnee;
+  const scale = timelineScale({ start, end, knee: kneeAttr == null || kneeAttr === '' ? null : Number(kneeAttr) });
+  timeline.style.setProperty('--tl-now', String(scale.x(minute)));
   for (const hour of timeline.querySelectorAll('.today-timeline__hour[data-minute]')) {
-    hour.classList.toggle('today-timeline__hour--covered', Math.abs(Number(hour.dataset.minute) - minute) < 35);
+    hour.classList.toggle('today-timeline__hour--covered', timelineHourCovered(scale, Number(hour.dataset.minute), minute));
   }
   const label = timeline.querySelector('.today-timeline__now-time');
   if (label) label.textContent = formatTime(now);
@@ -9797,6 +9816,10 @@ function todayFingerprint(data, cfg, now = new Date()) {
     model.rows.map((row) => [row.kind, row.objectId ?? row.members?.map((m) => m.objectId), row.title, row.open, Boolean(row.overdue)]),
     model.overflow, Boolean(model.coda), Boolean(model.state), ended, [...new Set(passed)],
     timeline?.nextKey ?? null, [...new Set(running)],
+    // DAS KNIE DER ACHSE (D7): es springt zur vollen Stunde, und mit ihm jede
+    // Lage der Leiste - dann baut die Uebersicht neu; dazwischen wandert nur
+    // der Strich (updateTodayTimelineNow).
+    timeline?.knee ?? null,
   ]);
 }
 
