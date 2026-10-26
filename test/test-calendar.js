@@ -5242,6 +5242,9 @@ test('eachRule(): ein String schneidet keine Regel ab, und ein Kommentarzeichen 
     ['.a { content: "/*"; margin-left: 1px; content: "*/" }', ['.a => margin-left: 1px']],
     ['.a { content: "*/"; margin-left: 1px } /* } */ .b { float: right }', ['.a => margin-left: 1px', '.b => float: right']],
     ['.a { background: url(a}b.png); margin-left: 1px }', ['.a => margin-left: 1px']],
+    // Wie viel Leerraum auch vor dem Anfuehrungszeichen steht: das url() ist quotiert.
+    [`.a { background: url(${' '.repeat(80)}"a)b.png"); margin-left: 1px } .b { float: right }`,
+      ['.a => margin-left: 1px', '.b => float: right']],
     ['.a[title="}"] { margin-left: 1px }', ['.a[title="}"] => margin-left: 1px']],
     ['.a[title=";"] { margin-left: 1px }', ['.a[title=";"] => margin-left: 1px']],
     // Ein maskiertes Anfuehrungszeichen ausserhalb eines Strings oeffnet keinen.

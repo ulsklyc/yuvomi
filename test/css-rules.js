@@ -55,6 +55,13 @@ const AT_RULES_WITH_RULES = /^@(?:media|supports|container|layer|scope)\b/;
  * naechste Zeichen mit (CRLF als eines); ein Zeilenende beendet den String
  * und gehoert nicht mehr dazu.
  */
+/** Index des ersten Zeichens ab `i`, das kein Leerraum ist. */
+function firstNonSpace(src, i) {
+  let j = i;
+  while (j < src.length && /\s/.test(src[j])) j += 1;
+  return j;
+}
+
 function literalEnd(src, i) {
   const ch = src[i];
   // Ein Backslash ausserhalb eines Strings maskiert das naechste Zeichen:
@@ -64,7 +71,7 @@ function literalEnd(src, i) {
   if (ch === '"' || ch === "'") {
     close = ch;
   } else if (ch === '(' && /(?:^|[^\w-])url$/i.test(src.slice(Math.max(0, i - 4), i))
-    && !/^\s*["']/.test(src.slice(i + 1, i + 64))) {
+    && !/["']/.test(src[firstNonSpace(src, i + 1)] ?? '')) {
     close = ')';
   } else {
     return -1;
