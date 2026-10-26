@@ -141,3 +141,56 @@ test('eine Album-Id, die keine UUID ist, wird verworfen statt weitergereicht', a
   // in den Body des Immich-Requests.
   assert.equal(__test.config().albumId, '');
 });
+
+// #1909: die Einstellungsseite sagt zu jedem Fall ihren eigenen Satz und liest
+// dafuer nur den `reason`, nie den englischen `error`.
+test('die abgewiesenen Eingaben beim Speichern nennen ihren Fall (#1909)', async () => {
+  const url = await call('PUT', '/config', { url: 'photos.example' });
+  assert.equal(url.status, 400);
+  assert.equal(url.body.reason, 'immich_url_invalid');
+  const album = await call('PUT', '/config', { albumId: 'alle-fotos' });
+  assert.equal(album.status, 400);
+  assert.equal(album.body.reason, 'immich_album_id_invalid');
+  const key = await call('PUT', '/config', { apiKey: 'x'.repeat(1001) });
+  assert.equal(key.status, 400);
+  assert.equal(key.body.reason, 'immich_api_key_invalid');
+});
+
+test('der Verbindungstest nennt, warum er scheitert (#1909)', async () => {
+  const unconfigured = await call('POST', '/test');
+  assert.equal(unconfigured.status, 400);
+  assert.equal(unconfigured.body.reason, 'immich_not_configured');
+
+  // Ein lokaler Schein-Immich, der der Reihe nach antwortet.
+  let status = 401;
+  const fake = (await import('node:http')).createServer((_req, res) => {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end('{"message":"Invalid API key"}');
+  });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const port = fake.address().port;
+  process.env.IMMICH_URL = `http://127.0.0.1:${port}`;
+  process.env.IMMICH_API_KEY = 'secret';
+  try {
+    const refused = await call('POST', '/test');
+    assert.equal(refused.status, 502);
+    assert.equal(refused.body.reason, 'immich_api_key_rejected');
+    status = 403;
+    assert.equal((await call('POST', '/test')).body.reason, 'immich_api_key_rejected');
+
+    status = 500;
+    const failed = await call('POST', '/test');
+    assert.equal(failed.status, 502);
+    assert.equal(failed.body.reason, 'immich_http_status');
+    assert.deepEqual(failed.body.params, { status: 500 });
+
+    await new Promise((r) => fake.close(r));
+    const unreachable = await call('POST', '/test');
+    assert.equal(unreachable.status, 502);
+    assert.equal(unreachable.body.reason, 'immich_unreachable');
+  } finally {
+    delete process.env.IMMICH_URL;
+    delete process.env.IMMICH_API_KEY;
+    if (fake.listening) await new Promise((r) => fake.close(r));
+  }
+});

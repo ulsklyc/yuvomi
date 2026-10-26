@@ -320,6 +320,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Termine speichern, zuruecksetzen, loeschen (#1909); die echte Antwort
     // misst test:calendar-routes.
     '../server/routes/calendar/crud.js',
+    // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909); die echte
+    // Antwort misst test:screensaver.
+    '../server/routes/screensaver.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -523,7 +526,8 @@ test('CASE_PARAMS: jeder Eintrag gehoert zu einem Fall, kein Name waehlt die Plu
   assert.ok(CASE_PARAMS.size >= 7);
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const server = ['../server/services/waste-import.js', '../server/services/waste-url-source.js', '../server/routes/waste/sources.js',
-    '../server/routes/health/cycle.js', '../server/routes/documents.js', '../server/routes/contacts.js'].map(read).join('\n');
+    '../server/routes/health/cycle.js', '../server/routes/documents.js', '../server/routes/contacts.js',
+    '../server/routes/screensaver.js'].map(read).join('\n');
   for (const [reason, names] of CASE_PARAMS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: Zahlen ohne Satz`);
     assert.ok(Array.isArray(names) && names.length > 0, reason);

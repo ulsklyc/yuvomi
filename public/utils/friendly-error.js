@@ -371,6 +371,18 @@ export const CASE_MESSAGES = new Map([
   // dieser Satz ist derselbe wie dort.
   ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
   ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
+  // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
+  // Eingaben, die der Server beim Speichern abweist, und was der
+  // Verbindungstest von Immich zurueckbekommt: ein abgelehnter API-Schluessel
+  // (401/403 von Immich), ein anderer Fehlerstatus (mit Zahl, CASE_PARAMS),
+  // keine Verbindung.
+  ['immich_url_invalid', 'settings.immichErrorUrlInvalid'],
+  ['immich_album_id_invalid', 'settings.immichErrorAlbumIdInvalid'],
+  ['immich_api_key_invalid', 'settings.immichErrorApiKeyInvalid'],
+  ['immich_not_configured', 'settings.immichErrorNotConfigured'],
+  ['immich_api_key_rejected', 'settings.immichErrorApiKeyRejected'],
+  ['immich_http_status', 'settings.immichErrorStatus'],
+  ['immich_unreachable', 'settings.immichErrorUnreachable'],
 ]);
 
 /**
@@ -410,6 +422,7 @@ export const CASE_PARAMS = new Map([
   ['contacts_address_part_too_long', ['limit']],
   ['recipe_providers_sync_http_status', ['status']],
   ['calendar_name_invalid', ['limit']],
+  ['immich_http_status', ['status']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;

@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { createInlineError, createRetryState, settingRowHtml } from '/settings/components.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 function toast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -76,7 +77,7 @@ function renderForm(container, cfg) {
       await save();
       toast(t('settings.immichSaved'), 'success');
     } catch (error) {
-      errorHost.replaceChildren(createInlineError(error.message || t('common.errorGeneric')));
+      errorHost.replaceChildren(createInlineError(errorSentence(error, 'settings.immichSaveFailed')));
     } finally {
       button.disabled = false;
     }
@@ -91,7 +92,7 @@ function renderForm(container, cfg) {
       await api.post('/screensaver/test', {});
       toast(t('settings.immichTestOk'), 'success');
     } catch (error) {
-      errorHost.replaceChildren(createInlineError(error.message || t('common.errorGeneric')));
+      errorHost.replaceChildren(createInlineError(errorSentence(error, 'settings.immichTestFailed')));
     } finally {
       button.disabled = false;
     }
@@ -104,9 +105,9 @@ function renderForm(container, cfg) {
     try {
       await save();
       const { preview } = await import('/components/photo-screensaver.js');
-      if (!await preview()) throw new Error(t('settings.immichPreviewUnavailable'));
+      if (!await preview()) errorHost.replaceChildren(createInlineError(t('settings.immichPreviewUnavailable')));
     } catch (error) {
-      errorHost.replaceChildren(createInlineError(error.message || t('common.errorGeneric')));
+      errorHost.replaceChildren(createInlineError(errorSentence(error, 'settings.immichPreviewUnavailable')));
     } finally {
       button.disabled = false;
     }
@@ -119,7 +120,7 @@ export async function render(container) {
     renderForm(container, response.data || {});
   } catch (error) {
     container.replaceChildren(createRetryState({
-      message: error.message || t('common.errorGeneric'),
+      message: loadErrorSentence(error) ?? t('common.errorGeneric'),
       onRetry: () => render(container),
     }));
   }

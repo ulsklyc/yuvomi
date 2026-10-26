@@ -50,6 +50,10 @@ async function immichFetch(url, options = {}) {
   }
 }
 
+// #1909: jeder Fall, den ein Admin beim Speichern oder Testen erreicht, traegt
+// einen `reason`; die Einstellungsseite sagt dazu ihren Satz
+// (utils/friendly-error.js, settings/pages/admin-immich.js). `error` bleibt
+// englisch fuer API-Clients und Logs.
 router.get('/config', requireAdmin, (_req, res) => {
   const cfg = config();
   res.json({ data: {
@@ -75,19 +79,21 @@ router.put('/config', requireAdmin, (req, res) => {
     while (end > 0 && raw[end - 1] === '/') end--;
     const url = raw.slice(0, end);
     if (url && (!/^https?:\/\//i.test(url) || url.length > 2048)) {
-      return res.status(400).json({ error: 'Invalid Immich URL.', code: 400 });
+      return res.status(400).json({ error: 'Invalid Immich URL.', code: 400, reason: 'immich_url_invalid' });
     }
     cfgSet('immich_url', url);
   }
   if (body.albumId !== undefined && !process.env.IMMICH_SCREENSAVER_ALBUM_ID) {
     const albumId = String(body.albumId).trim();
     if (albumId && !UUID_RE.test(albumId)) {
-      return res.status(400).json({ error: 'Invalid album ID.', code: 400 });
+      return res.status(400).json({ error: 'Invalid album ID.', code: 400, reason: 'immich_album_id_invalid' });
     }
     cfgSet('immich_screensaver_album_id', albumId);
   }
   if (typeof body.apiKey === 'string' && body.apiKey && !process.env.IMMICH_API_KEY) {
-    if (body.apiKey.length > 1000) return res.status(400).json({ error: 'Invalid API key.', code: 400 });
+    if (body.apiKey.length > 1000) {
+      return res.status(400).json({ error: 'Invalid API key.', code: 400, reason: 'immich_api_key_invalid' });
+    }
     cfgSet('immich_api_key', body.apiKey);
     if (!process.env.DB_ENCRYPTION_KEY) {
       log.warn('DB_ENCRYPTION_KEY is not set - the Immich API key is stored in an unencrypted database.');
@@ -101,19 +107,31 @@ router.put('/config', requireAdmin, (req, res) => {
 
 router.post('/test', requireAdmin, async (_req, res) => {
   const cfg = config();
-  if (!cfg.enabled) return res.status(400).json({ error: 'Immich is not configured.', code: 400 });
+  if (!cfg.enabled) {
+    return res.status(400).json({ error: 'Immich is not configured.', code: 400, reason: 'immich_not_configured' });
+  }
   try {
     const response = await immichFetch(immichUrl(cfg.baseUrl, '/search/random'), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': cfg.apiKey },
       body: JSON.stringify({ size: 1, type: 'IMAGE', ...(cfg.albumId ? { albumIds: [cfg.albumId] } : {}) }),
     });
-    if (!response.ok) return res.status(502).json({ error: `Immich returned ${response.status}.`, code: 502 });
+    if (response.status === 401 || response.status === 403) {
+      return res.status(502).json({ error: 'Immich refused the API key.', code: 502, reason: 'immich_api_key_rejected' });
+    }
+    if (!response.ok) {
+      return res.status(502).json({
+        error: `Immich returned ${response.status}.`,
+        code: 502,
+        reason: 'immich_http_status',
+        params: { status: response.status },
+      });
+    }
     const assets = await response.json();
     res.json({ data: { ok: true, photoCount: Array.isArray(assets) ? assets.length : 0 } });
   } catch (error) {
     log.warn('Immich connection test failed:', error.message);
-    res.status(502).json({ error: 'Could not connect to Immich.', code: 502 });
+    res.status(502).json({ error: 'Could not connect to Immich.', code: 502, reason: 'immich_unreachable' });
   }
 });
 

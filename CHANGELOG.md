@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A too large event attachment says so** (#2255). Saving an event with a file above the upload
   limit showed only that the event could not be saved. The dialog now names the limit before
   anything is sent and stays open with your entries.
+- **The Immich screensaver settings say what went wrong in your language** (#1909). Saving or
+  testing the Immich connection showed the server's English text, such as "Immich returned 401.".
+  The settings now say in your language whether the URL, album ID or API key was refused, whether
+  Immich rejects the key, answered with an error or cannot be reached, and what to check.
 - **Saving, resetting or deleting an event speaks your language when something goes wrong** (#1909).
   These toasts showed the server's German text in every language. They now say the app's own
   sentence: an event someone else deleted in the meantime (the dialog closes and the calendar

@@ -16,6 +16,9 @@ export function screensaverPaths() {
         admin: true,
         stateChanging: true,
         requestBody: jsonBody(null),
+        description: 'A rejected field answers 400 with a `reason` next to the `error` (#1909): '
+          + '`immich_url_invalid` (the URL does not start with http:// or https://, or is longer than 2048 characters), '
+          + '`immich_album_id_invalid` (the album ID is not a UUID), `immich_api_key_invalid` (the API key is longer than 1000 characters).',
       }),
     },
     '/api/v1/screensaver/test': {
@@ -26,7 +29,9 @@ export function screensaverPaths() {
         stateChanging: true,
         description: 'Calls the configured Immich server once and reports how many photos the album '
           + 'holds. Answers 502 if Immich cannot be reached, so a wrong URL or token shows up here '
-          + 'rather than as an empty screensaver.',
+          + 'rather than as an empty screensaver. Each failure carries a `reason` (#1909): '
+          + '`immich_not_configured` (400, URL or API key missing), `immich_api_key_rejected` (502, Immich answered 401 or 403), '
+          + '`immich_http_status` (502, any other error status, with `params.status`), `immich_unreachable` (502, no connection or timeout).',
       }),
     },
     '/api/v1/screensaver/photos': {
