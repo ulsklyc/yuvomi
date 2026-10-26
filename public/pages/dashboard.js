@@ -3973,6 +3973,8 @@ const PROGRAM_ROW_CAP_PHONE = 2;
 
 /** Zuletzt gemessene Zeilenzahl je Fensterhoehe (fitPhoneProgram). */
 let phoneProgramFit = null;
+/** Zuletzt gemessene Hoehe der Ueberschrift „Ausserdem heute" (D6). */
+let phoneDividerHeight = null;
 
 function phoneProgramCap() {
   const height = globalThis.window?.innerHeight;
@@ -3995,11 +3997,18 @@ function phoneProgramCap() {
  * 744 von 764), und die Einkaufszeile darunter stand bei 744-809 halb hinter der
  * Kapsel. Was ohne Ueberlauf unter den Zeilen bleibt, zaehlt jetzt mit; passt es
  * nicht, faltet die Einkaufszeile mit der letzten Zeile in "+N weitere". */
-function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0 }) {
+/* DIE UEBERSCHRIFT ZWISCHEN DEN TEILEN ZAEHLT MIT (D6). Steht nach den `lead`
+ * Zeilen der Leiste noch eine des Rests, traegt die Liste „Ausserdem heute"
+ * (`divider` hoch) - die Rechnung nimmt sie nur dann mit, wenn der Deckel
+ * ueber `lead` hinausreicht. */
+function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0, lead = 0, divider = 0 }) {
   if (!(rowHeight > 0) || !(total > 0)) return PROGRAM_ROW_CAP_PHONE;
   const room = fold - rowsTop;
-  if (total * rowHeight + rest <= room) return total;
-  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, Math.floor((room - trailing) / rowHeight)));
+  const dividerFor = (cap) => (lead > 0 && cap > lead ? divider : 0);
+  if (total * rowHeight + dividerFor(total) + rest <= room) return total;
+  let fit = Math.floor((room - trailing) / rowHeight);
+  if (dividerFor(fit)) fit = Math.max(lead, Math.floor((room - trailing - divider) / rowHeight));
+  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, fit));
 }
 
 /**
@@ -4035,9 +4044,17 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
   // ist es gemessen, sonst steckt die Einkaufszeile im Ueberlauf und zaehlt
   // als eine Zeile (gleiche Karte), die Coda mit ihrer Hoehe.
   const coda = section.querySelector('.today-cockpit__coda')?.getBoundingClientRect().height ?? 0;
+  // Die Ueberschrift „Ausserdem heute" (D6): gezeichnet ist sie gemessen,
+  // sonst gilt der zuletzt gemessene Wert, beim ersten Mal eine halbe Zeile.
+  const lead = Number(section.dataset.programLead) || 0;
+  const drawnAlso = section.querySelector('.today-cockpit__also--row:not(.today-cockpit__rows--more *)');
+  if (drawnAlso) phoneDividerHeight = drawnAlso.getBoundingClientRect().height;
+  const divider = lead ? phoneDividerHeight ?? rowHeight / 2 : 0;
+  // Bildet die Einkaufszeile den Rest allein, steht die Ueberschrift vor ihr.
+  const shoppingDivider = section.dataset.programShopping === '1' && lead >= total ? divider : 0;
   const rest = shown >= total
     ? trailing
-    : (section.dataset.programShopping === '1' ? rowHeight : 0) + coda;
+    : (section.dataset.programShopping === '1' ? rowHeight + shoppingDivider : 0) + coda;
   const geometry = {
     fold: foldViewport + scrollTop - gap,
     rowsTop: rowsRect.top + scrollTop,
@@ -4045,6 +4062,8 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
     trailing,
     total,
     rest,
+    lead,
+    divider,
   };
   // Ein leerer Tag hat eine Zustandszeile und nichts zu deckeln.
   if (!geometry.total) return null;
@@ -4246,8 +4265,16 @@ function buildTodayCockpitModel(data, cfg = [], {
   const inTimeline = timelineRowKeys(timeline);
   const notInTimeline = (row) => !inTimeline.has(`${row.kind}:${row.objectId}`);
   const listed = inTimeline.size && !rowsFromTimeline ? program.rows.filter(notInTimeline) : program.rows;
-  const programRows = groupOverdue ? groupOverdueRows(listed) : listed;
-  const sheet = composeTodaySheet([...programRows, ...(inTimeline.size ? contributed.rows.filter(notInTimeline) : contributed.rows)], { cap });
+  // ZWEI TEILE (D6, composeTodaySheet): unter der breiten Buehne fuehren die
+  // Eintraege der Leiste, der Rest steht unter „Ausserdem heute". Der erste
+  // Eintrag mit Uhrzeit - was gerade laeuft, sonst das Naechste - bleibt
+  // unter jedem Deckel sichtbar, auch wenn Ganztaegiges ihn fuellt.
+  const lead = rowsFromTimeline ? listed.filter((row) => row.timelineKey) : null;
+  const own = lead ? listed.filter((row) => !row.timelineKey) : listed;
+  const programRows = groupOverdue ? groupOverdueRows(own) : own;
+  const anchor = (lead ?? []).reduce((best, row) => (/^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02'
+    && (!best || row.sortKey < best.sortKey) ? row : best), null);
+  const sheet = composeTodaySheet([...programRows, ...(inTimeline.size ? contributed.rows.filter(notInTimeline) : contributed.rows)], { cap, lead, anchor });
   const visibleRows = sheet.rows;
   const overflow = sheet.overflow;
 
@@ -4376,7 +4403,10 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks };
+  // `lead`: wie viele Zeilen der Leiste es gibt und wie viele davon stehen
+  // (D6) - die verdeckten folgen in `hiddenRows` derselben Gliederung.
+  const leadPart = lead ? { shown: sheet.leadShown, total: lead.length } : null;
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks, lead: leadPart };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
@@ -4755,14 +4785,26 @@ function timelineSheetRows(data, timeline, now = new Date()) {
   for (const item of allDay) {
     if (seen.has(item.key)) continue;
     seen.add(item.key);
-    rows.push({ ...item.sheetRow });
+    rows.push({ ...item.sheetRow, timelineKey: item.key });
   }
   for (const item of (timeline?.lanes ?? []).flatMap((lane) => lane.items)) {
     if (item.state === 'past' || seen.has(item.key)) continue;
     seen.add(item.key);
-    rows.push(item.kind === 'meal' ? timelineMealRow(item) : { ...item.sheetRow });
+    const row = item.kind === 'meal' ? timelineMealRow(item) : { ...item.sheetRow };
+    rows.push({ ...(item.state === 'now' ? runningRow(row) : row), timelineKey: item.key });
   }
   return rows;
+}
+
+/* WAS LAEUFT, SAGT ES (Critique 2026-10-26, Lauf 2, D6). Ein laufender Termin
+ * stand mit seinem Beginn da („16:00") - um 16:30 eine Uhrzeit von gestern,
+ * neben „in 25 Min" darunter. Jetzt steht dort „laeuft gerade" im Ton des
+ * Moduls; Beginn und Ende nennt der Block und die Zeile dahinter. Der
+ * Uebertrag von gestern behaelt sein „bis 10:00" (kein Beginn heute), die
+ * Schicht ihre Spanne. */
+function runningRow(row) {
+  if (row.kind !== 'event' || !/^\d{2}:\d{2}$/.test(String(row.sortKey)) || row.sortKey <= '00:02') return row;
+  return { ...row, timeLabel: t('dashboard.todayTimelineRunning'), soon: true };
 }
 
 /**
@@ -5328,6 +5370,10 @@ function withRelativeWhen(row, now) {
  * hinter „+N weitere" bleibt dieselbe; ihr Ziel rechnet neu.
  */
 function nextFirst(model, now) {
+  // In zwei Teilen (D6) steht die Leiste schon chronologisch vorn, und der
+  // Deckel haelt ihr Naechstes (composeTodaySheet, anchor) - ein Vorziehen
+  // stellte es vor das Ganztaegige und das Laufende.
+  if (model.lead) return model;
   const nowKey = zonedTimeKey(now);
   const upcoming = (row) => ['event', 'meal'].includes(row?.kind)
     && /^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02' && row.sortKey > nowKey;
@@ -5389,6 +5435,17 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     ? renderTodayOverdueGroup(row, overdueOpen)
     : renderTodayRow(row))));
   const foldShopping = Boolean(shopping) && model.overflow > 0 && !model.moreRoute && !wide;
+  // „AUSSERDEM HEUTE" AUCH UNTER DER BREITEN BUEHNE (D6): zwischen den
+  // Eintraegen der Leiste und dem Rest, nur wenn beide Teile stehen - in der
+  // Liste, vor der Einkaufszeile (wenn sie allein den Rest bildet) oder in den
+  // aufgeklappten Zeilen, je nachdem, wo der Rest beginnt. Eine Ueberschrift,
+  // damit der Screenreader die Gliederung hoert und anspringen kann.
+  const lead = model.lead;
+  const leadShown = lead?.shown ?? 0;
+  const also = `<h3 class="today-cockpit__also today-cockpit__also--row">${esc(t('dashboard.todayAlsoTitle'))}</h3>`;
+  const alsoInRows = leadShown > 0 && rows.length > leadShown;
+  const alsoBeforeShopping = !alsoInRows && leadShown > 0 && Boolean(shopping) && !foldShopping;
+  if (alsoInRows) listRows.splice((state ? 1 : 0) + leadShown, 0, also);
   // Breit steht der Einkauf als letzte Zelle in der Leiste; darunter bleibt er
   // die Schlusszeile unter den Zeilen und klappt mit (R14).
   if (wide && shopping) listRows.push(renderTodayRow(shopping));
@@ -5401,7 +5458,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       ? `<div class="today-cockpit__rows today-cockpit__rows--next" style="--today-next-cols:${cols}">${listRows.join('')}</div>`
       : `<div class="today-cockpit__rows">${listRows.join('')}</div>`);
   }
-  if (!wide && shopping && !foldShopping) parts.push(renderTodayRow(shopping));
+  if (!wide && shopping && !foldShopping) parts.push(`${alsoBeforeShopping ? also : ''}${renderTodayRow(shopping)}`);
 
   // DIE FUSSLEISTE: links die Coda, rechts „+N weitere" (Entwurf). Beide
   // zugleich gibt es nicht - neben verdeckten Zeilen waere „nichts mehr"
@@ -5426,11 +5483,17 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     // hier, zugeklappt, und der Knopf darunter klappt sie auf. Auf dem Telefon
     // klappt die Einkaufszeile mit (R14).
     const hidden = (foldShopping ? [...model.hiddenRows, shopping] : model.hiddenRows).map((row) => withRelativeWhen(row, now));
+    // Die verdeckten Zeilen der Leiste stehen vorn (composeTodaySheet); folgt
+    // ihnen der Rest und hat ihn oben noch keine Ueberschrift eingeleitet,
+    // beginnt er hier.
+    const hiddenLead = lead ? lead.total - lead.shown : 0;
+    const alsoInMore = Boolean(lead?.total) && !alsoInRows && !alsoBeforeShopping && hidden.length > hiddenLead;
+    const hiddenRowsHtml = (list) => list.map((row, index) => `${alsoInMore && index === hiddenLead ? also : ''}${renderTodayRow(row)}`).join('');
     const moreText = t('dashboard.todayMore', { count: hidden.length });
     const lessText = t('dashboard.todayLess');
     peek = { open: moreOpen, target: todayPeekTarget(hidden, now) };
     parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more${wide ? ' today-cockpit__rows--next' : ''}" id="today-cockpit-more"${wide ? ` style="--today-next-cols:${Math.min(PROGRAM_STRIP_CAP, hidden.length)}"` : ''}${moreOpen ? '' : ' hidden'}>${
-      hidden.map((row) => renderTodayRow(row)).join('')}</div>`);
+      hiddenRowsHtml(hidden)}</div>`);
     more = `<button type="button" class="today-cockpit__more today-cockpit__more--link${moreRow}" data-today-more
           aria-expanded="${moreOpen ? 'true' : 'false'}" aria-controls="today-cockpit-more"
           data-more-label="${esc(moreText)}" data-less-label="${esc(lessText)}">
@@ -5479,7 +5542,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   // Zeilenzahl und Tagesumfang stehen am Blatt, damit `measurePhoneProgram`
   // nach dem Zeichnen nachrechnen kann, ohne das Modell ein zweites Mal zu bauen.
   const fit = phone && !editing
-    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}`
+    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}${lead?.total ? ` data-program-lead="${lead.total}"` : ''}`
     : '';
   return `
     <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title" data-today-stage="${stage}"${fit}>
@@ -9863,3 +9926,5 @@ Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleW
 Object.assign(__test, { wireTodayTimeline, updateTodayTimelineNow, placeTodayTimelineFlag, todayFocusFallbacks });
 // D3 (Lauf 2): das Bild als Tippziel auf dem Telefon.
 Object.assign(__test, { renderTodayMiniTimeline, renderTodayPeek, todayPeekTarget, revealTodayPeekTarget });
+// D6 (Lauf 2): die Gliederung unter der breiten Buehne gegen das Modell der Leiste.
+Object.assign(__test, { buildTodayTimeline });

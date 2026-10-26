@@ -453,7 +453,8 @@ const byPriority = (a, b) => (a.priority ?? 50) - (b.priority ?? 50);
  * Gezeigt wird danach wieder chronologisch - das Blatt ist ein Programm, keine
  * Rangliste.
  */
-export function composeTodaySheet(rows, { cap }) {
+export function composeTodaySheet(rows, { cap, lead = null, anchor = null }) {
+  if (lead) return composeLeadSheet(lead, rows, { cap, anchor });
   const sorted = [...rows].sort((a, b) => bySortKey(a, b) || byPriority(a, b));
   const openCount = sorted.filter((row) => row.open).length;
   if (sorted.length <= cap) return { rows: sorted, allRows: sorted, overflow: 0, openCount };
@@ -462,6 +463,35 @@ export function composeTodaySheet(rows, { cap }) {
     .slice(0, cap));
   const visible = sorted.filter((row) => keep.has(row));
   return { rows: visible, allRows: sorted, overflow: sorted.length - visible.length, openCount };
+}
+
+/* ZWEI TEILE, WIE DIE BREITE BUEHNE SIE ZEIGT (Critique 2026-10-26, Lauf 2,
+ * D6). Unter der Kurzfassung hielt der Deckel zuerst das Offene: gemessen bei
+ * 390x844 um 16:30 standen Abendessen, Sportfest und drei Aufgaben oben, der
+ * laufende Fussball, der Elternabend und der Filmabend erst hinter
+ * „+6 weitere" - unter einem Kopf, der „noch 4 Termine" sagte. Jetzt kommen
+ * zuerst die Eintraege der Leiste (`lead`), chronologisch, Ganztaegiges vorn;
+ * danach „Ausserdem heute" mit dem Rest in der bisherigen Ordnung. Der Deckel
+ * kuerzt ZUERST den Rest (dort gilt weiter: Offenes bleibt), dann die Leiste
+ * von hinten - `anchor` (der erste Eintrag mit Uhrzeit) bleibt dabei stehen,
+ * auch wenn Ganztaegiges davor den Deckel fuellt. `leadShown` sagt, wie
+ * viele der gezeigten Zeilen zur Leiste gehoeren; `allRows` steht in derselben
+ * Gliederung, die verdeckten Zeilen also auch. */
+function composeLeadSheet(lead, rows, { cap, anchor }) {
+  const first = [...lead].sort((a, b) => bySortKey(a, b) || byPriority(a, b));
+  const rest = [...rows].sort((a, b) => bySortKey(a, b) || byPriority(a, b));
+  const allRows = [...first, ...rest];
+  const openCount = allRows.filter((row) => row.open).length;
+  if (allRows.length <= cap) return { rows: allRows, allRows, overflow: 0, openCount, leadShown: first.length };
+  let shownLead = first.slice(0, cap);
+  if (anchor && first.includes(anchor) && !shownLead.includes(anchor)) {
+    shownLead = [...shownLead.slice(0, Math.max(0, cap - 1)), anchor];
+  }
+  const keep = new Set([...rest]
+    .sort((a, b) => (Number(Boolean(b.open)) - Number(Boolean(a.open))) || byPriority(a, b) || bySortKey(a, b))
+    .slice(0, Math.max(0, cap - shownLead.length)));
+  const visible = [...shownLead, ...rest.filter((row) => keep.has(row))];
+  return { rows: visible, allRows, overflow: allRows.length - visible.length, openCount, leadShown: shownLead.length };
 }
 
 /**

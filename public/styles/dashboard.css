@@ -3398,6 +3398,20 @@ svg.weather-forecast__icon {
   border-top: none;
 }
 
+/* UNTER DER BREITEN BUEHNE STEHT SIE IN DER LISTE (Critique 2026-10-26,
+ * Lauf 2, D6): zwischen den Eintraegen der Leiste und dem Rest, an der
+ * Vorderkante der Zeilen. Sie traegt die Haarlinie der Zeile darunter; ueber
+ * dem Text mehr Luft als darunter, dort steht schon das Polster der Zeile. */
+.today-cockpit__also--row {
+  margin: 0;
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+/* Beginnt der Rest erst in den aufgeklappten Zeilen, traegt deren Kante die Linie. */
+.today-cockpit__rows--more > .today-cockpit__also--row:first-child {
+  border-top: none;
+}
+
 /* „in 25 Min" spricht im Ton seines Moduls (Entwurf; Critique 2026-10-26,
  * Befund 5 - die Klasse stand im Markup, die Regel fehlte). */
 .today-cockpit-card__time--soon {
@@ -6524,7 +6538,8 @@ button.today-cockpit__more--link {
   }
 
   /* Dieselbe Kante wie die Zeilen, die mobil mit 12px Polster stehen. */
-  .today-cockpit__more--row {
+  .today-cockpit__more--row,
+  .today-cockpit__also--row {
     padding-inline: var(--space-3);
   }
 
