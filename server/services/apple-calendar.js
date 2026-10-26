@@ -37,6 +37,7 @@ import { normalizeCalColor, calendarDisplayName } from '../utils/calendar-meta.j
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
+import { storeImportedExceptions } from './imported-occurrence-key.js';
 
 const APPLE_COLOR = '#FC3C44';
 
@@ -579,11 +580,10 @@ async function runSync({ makeClient } = {}) {
 
           // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,
           // damit die Expansion diese Vorkommen überspringt (#489/#549). Additiv.
+          // Schluessel in Format A, die alte Zeile desselben Rohwerts heilt
+          // (#2000, #2034 Schritt 5).
           if (ev.rrule && Array.isArray(ev.exdates) && ev.exdates.length) {
-            const insEx = db.get().prepare(
-              'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
-            );
-            for (const exDate of ev.exdates) insEx.run(eventId, exDate);
+            storeImportedExceptions(db.get(), eventId, ev);
           }
         } catch (err) {
           log.error(`Upsert error for UID ${ev.uid}:`, err.message);
