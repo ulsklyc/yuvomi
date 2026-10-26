@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Déroulé de la journée",
         "todayTimelineEveryone": "Tous",
         "todayTimelinePast": "terminé",
-        "todayTimelineRunning": "en cours"
+        "todayTimelineRunning": "en cours",
+        "todayTimelineNext": "à suivre",
+        "todayAlsoTitle": "Aussi aujourd’hui"
     },
     "tasks": {
         "resetOrder": "Trier automatiquement",

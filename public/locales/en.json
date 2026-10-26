@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Today’s timeline",
         "todayTimelineEveryone": "Everyone",
         "todayTimelinePast": "over",
-        "todayTimelineRunning": "in progress"
+        "todayTimelineRunning": "in progress",
+        "todayTimelineNext": "up next",
+        "todayAlsoTitle": "Also today"
     },
     "tasks": {
         "resetOrder": "Sort automatically",

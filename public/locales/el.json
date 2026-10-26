@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Η μέρα σε χρονολόγιο",
         "todayTimelineEveryone": "Όλοι",
         "todayTimelinePast": "ολοκληρώθηκε",
-        "todayTimelineRunning": "σε εξέλιξη"
+        "todayTimelineRunning": "σε εξέλιξη",
+        "todayTimelineNext": "επόμενο",
+        "todayAlsoTitle": "Επίσης σήμερα"
     },
     "tasks": {
         "resetOrder": "Αυτόματη ταξινόμηση",

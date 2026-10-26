@@ -434,7 +434,9 @@
         "todayTimelineLabel": "आज की समयरेखा",
         "todayTimelineEveryone": "सभी",
         "todayTimelinePast": "समाप्त",
-        "todayTimelineRunning": "अभी चल रहा है"
+        "todayTimelineRunning": "अभी चल रहा है",
+        "todayTimelineNext": "अगला",
+        "todayAlsoTitle": "आज और भी"
     },
     "tasks": {
         "resetOrder": "अपने-आप क्रमबद्ध करें",

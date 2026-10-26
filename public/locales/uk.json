@@ -518,7 +518,9 @@
         "todayTimelineLabel": "Перебіг дня",
         "todayTimelineEveryone": "Усі",
         "todayTimelinePast": "завершено",
-        "todayTimelineRunning": "триває"
+        "todayTimelineRunning": "триває",
+        "todayTimelineNext": "далі",
+        "todayAlsoTitle": "Також сьогодні"
     },
     "tasks": {
         "resetOrder": "Сортувати автоматично",

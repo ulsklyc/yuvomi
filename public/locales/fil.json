@@ -452,7 +452,9 @@
         "todayTimelineLabel": "Takbo ng araw",
         "todayTimelineEveryone": "Lahat",
         "todayTimelinePast": "tapos na",
-        "todayTimelineRunning": "kasalukuyang nagaganap"
+        "todayTimelineRunning": "kasalukuyang nagaganap",
+        "todayTimelineNext": "susunod",
+        "todayAlsoTitle": "Ngayong araw din"
     },
     "tasks": {
         "resetOrder": "Awtomatikong ayusin",

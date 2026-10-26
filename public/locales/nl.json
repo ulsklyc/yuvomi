@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Verloop van de dag",
         "todayTimelineEveryone": "Iedereen",
         "todayTimelinePast": "afgelopen",
-        "todayTimelineRunning": "bezig"
+        "todayTimelineRunning": "bezig",
+        "todayTimelineNext": "hierna",
+        "todayAlsoTitle": "Verder vandaag"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

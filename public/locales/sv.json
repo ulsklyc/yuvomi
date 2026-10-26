@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Dagens förlopp",
         "todayTimelineEveryone": "Alla",
         "todayTimelinePast": "slut",
-        "todayTimelineRunning": "pågår"
+        "todayTimelineRunning": "pågår",
+        "todayTimelineNext": "härnäst",
+        "todayAlsoTitle": "Även i dag"
     },
     "tasks": {
         "resetOrder": "Sortera automatiskt",

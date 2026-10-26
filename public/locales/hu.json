@@ -434,7 +434,9 @@
         "todayTimelineLabel": "A nap menete",
         "todayTimelineEveryone": "Mindenki",
         "todayTimelinePast": "véget ért",
-        "todayTimelineRunning": "folyamatban"
+        "todayTimelineRunning": "folyamatban",
+        "todayTimelineNext": "következik",
+        "todayAlsoTitle": "Ma még"
     },
     "tasks": {
         "resetOrder": "Automatikus rendezés",

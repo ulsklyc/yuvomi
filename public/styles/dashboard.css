@@ -2774,7 +2774,9 @@ svg.weather-forecast__icon {
   --tl-pad-bottom: 0%;
   --tl-axis: calc(var(--space-5) + var(--space-0h));
   --tl-label: calc(var(--space-16) * 2 + var(--space-1));
-  --tl-lane: calc(var(--space-10) + var(--space-1h));
+  /* 48px Spur, damit der Block 40px hoch ist - die Zielgroesse der Maus
+   * (--target-md); auf Touch gilt die schmale Buehne mit Zeilen (todayStage). */
+  --tl-lane: var(--space-12);
   position: relative;
   display: grid;
   grid-template-columns: var(--tl-label) minmax(0, 1fr);
@@ -2939,6 +2941,9 @@ svg.weather-forecast__icon {
     padding-inline: var(--space-1h);
   }
 
+  /* Trennen nur an Silbengrenzen, nie mitten im Wort (Critique 2026-10-26:
+   * „Schul e", „Frü h…"): ein Wort, das auch getrennt nicht passt, endet in
+   * der Ellipse der zweiten Zeile. */
   .today-timeline__title {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -2946,7 +2951,9 @@ svg.weather-forecast__icon {
     line-clamp: 2;
     white-space: normal;
     hyphens: auto;
-    overflow-wrap: anywhere;
+    hyphenate-limit-chars: 6 3 3;
+    -webkit-hyphenate-limit-before: 3;
+    -webkit-hyphenate-limit-after: 3;
   }
 
   .today-timeline__time {
@@ -2957,6 +2964,93 @@ svg.weather-forecast__icon {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
   }
+}
+
+/* DIE MAHLZEIT IST EIN PUNKT, KEIN BLOCK (Critique 2026-10-26, Befund 3):
+ * ihre Zeit ist die Nennzeit des Typs, keine eingetragene Dauer. Der Knopf
+ * beginnt an der Zeit mit einem Punkt und traegt den Typ daneben, so breit
+ * wie sein Text. */
+.today-timeline__slot--point {
+  /* Kein Groessen-Container: die Marke ist so breit wie ihr Text, hoechstens
+   * so breit wie die Spanne, die sie in der Spur belegt (TIMELINE_POINT_SPAN). */
+  container-type: normal;
+}
+
+.today-timeline__slot--point > .today-timeline__event {
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+
+.today-timeline__event--point {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-1h);
+  padding-inline: var(--space-1h) var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.today-timeline__event--point::before {
+  content: '';
+  flex-shrink: 0;
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--c);
+}
+
+.today-timeline__event--point .today-timeline__time {
+  display: none;
+}
+
+/* DAS NAECHSTE SPRICHT IN DER LEISTE (Critique 2026-10-26, Befund 2): eine
+ * Sprosse hoeher, eine Kante in seinem Ton, und statt der Uhrzeit „in 2 Std."
+ * - Breit ist die Leiste die Antwort auf „was kommt als Naechstes". */
+.today-timeline__event--upnext {
+  background: color-mix(in srgb, var(--c) var(--tint-raised), var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) var(--tint-hint), transparent);
+}
+
+.today-timeline__event--upnext .today-timeline__time {
+  color: color-mix(in srgb, var(--c) var(--tint-ink), var(--color-text-primary));
+  font-weight: var(--font-weight-semibold);
+}
+
+/* DAS GANZTAEGIGE ALS BAND UEBER DER ACHSE (Critique 2026-10-26, Befund 3):
+ * es hat keinen Ort auf der Zeit, aber einen im Tag. Pillen im Ton des
+ * Moduls, jede klappt ihre Zeile auf wie ein Block. */
+/* Das Band steht VOR der Leiste, nicht in ihr: so darf es umbrechen, ohne
+ * dass Jetzt-Strich und Vergangenes (an der Achse gemessen) verrutschen. Es
+ * fluchtet mit der Namensspalte der Leiste. */
+.today-timeline__allday {
+  display: grid;
+  grid-template-columns: calc(var(--space-16) * 2 + var(--space-1)) minmax(0, 1fr);
+  padding-inline: var(--space-6);
+  align-items: center;
+  margin-block-end: var(--space-2);
+}
+
+.today-timeline__allday-label {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.today-timeline__allday-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1h);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-timeline__allday-list .today-timeline__event {
+  inline-size: auto;
+  block-size: auto;
+  min-block-size: var(--target-md);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-full);
 }
 
 /* VORBEI TRITT ZURUECK, ES VERSCHWINDET NICHT. Die Liste darunter verspricht,
@@ -3055,17 +3149,42 @@ svg.weather-forecast__icon {
  * je Spur, ein 10px-Balken, fuenf Stunden an der Achse. Bild, kein Bedienteil. */
 .today-timeline--mini {
   --tl-label: calc(var(--space-6) + var(--space-1));
-  --tl-pad-inline: var(--space-4);
+  --tl-pad-inline: var(--space-6);
   --tl-axis: var(--space-4);
   row-gap: var(--space-1h);
   align-items: center;
 }
 
 .today-timeline--mini .today-timeline__axis {
-  display: flex;
-  justify-content: space-between;
-  block-size: auto;
+  block-size: var(--space-4);
   margin-block-end: var(--space-0h);
+}
+
+/* Gleiche Schritte (renderTodayMiniTimeline): jede Marke an ihrer Zeit, die
+ * erste buendig links, die letzte buendig rechts. */
+.today-timeline--mini .today-timeline__axis > span {
+  position: absolute;
+  inset-inline-start: calc(var(--tl-at) * 100%);
+  transform: translateX(-50%);
+}
+
+.today-timeline--mini .today-timeline__axis > span:first-child {
+  transform: none;
+}
+
+.today-timeline--mini .today-timeline__axis > span:last-child {
+  transform: translateX(-100%);
+}
+
+.today-timeline__bar--point {
+  inline-size: var(--space-2h);
+  margin-inline-start: calc(var(--space-2h) / -2);
+}
+
+/* Unter der Kurzfassung beginnen die Zeilen mit einer Haarlinie. */
+.today-timeline--mini + .today-cockpit__rows {
+  margin-block-start: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .today-timeline__face {
@@ -3146,6 +3265,30 @@ svg.weather-forecast__icon {
   margin-block-start: 0;
 }
 
+/* „Ausserdem heute" (Critique 2026-10-26, Befund 2): die Ueberschrift des
+ * Streifens, sobald die Leiste das Naechste selbst nennt. Sie traegt die
+ * Haarlinie, die sonst der Streifen traegt. */
+.today-cockpit__also {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-6) 0;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.today-cockpit__also + .today-cockpit__rows--next {
+  margin-block-start: 0;
+  border-top: none;
+}
+
+/* „in 25 Min" spricht im Ton seines Moduls (Entwurf; Critique 2026-10-26,
+ * Befund 5 - die Klasse stand im Markup, die Regel fehlte). */
+.today-cockpit-card__time--soon {
+  color: color-mix(in srgb, var(--today-card-accent) var(--tint-ink), var(--color-text-primary));
+  font-weight: var(--font-weight-semibold);
+}
+
 /* DIE FUSSLEISTE: links die Coda, rechts „+N weitere" - eine Zeile. */
 .today-cockpit__foot {
   display: flex;
@@ -3162,7 +3305,10 @@ svg.weather-forecast__icon {
   border-top: none;
 }
 
+/* Rechts, so breit wie sein Text - auch der Aufklapp-Knopf, der sonst ueber
+ * die ganze Breite lief und sein Chevron 1100px vom Wort entfernt trug. */
 .today-cockpit__foot > .today-cockpit__more {
+  width: auto;
   margin-inline-start: auto;
 }
 
@@ -6238,9 +6384,8 @@ button.today-cockpit__more--link {
     white-space: nowrap;
   }
 
-  .today-timeline--mini + .today-cockpit__rows {
-    margin-block-start: var(--space-3);
-    border-top: 1px solid var(--color-border-subtle);
+  .today-timeline--mini {
+    --tl-pad-inline: var(--space-4);
   }
 
   .today-cockpit__foot {

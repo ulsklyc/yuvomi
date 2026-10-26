@@ -434,7 +434,9 @@
         "todayTimelineLabel": "今日時間軸",
         "todayTimelineEveryone": "所有人",
         "todayTimelinePast": "已結束",
-        "todayTimelineRunning": "進行中"
+        "todayTimelineRunning": "進行中",
+        "todayTimelineNext": "下一個",
+        "todayAlsoTitle": "今天還有"
     },
     "tasks": {
         "resetOrder": "自動排序",

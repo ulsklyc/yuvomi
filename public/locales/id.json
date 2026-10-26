@@ -452,7 +452,9 @@
         "todayTimelineLabel": "Linimasa hari ini",
         "todayTimelineEveryone": "Semua",
         "todayTimelinePast": "selesai",
-        "todayTimelineRunning": "sedang berlangsung"
+        "todayTimelineRunning": "sedang berlangsung",
+        "todayTimelineNext": "berikutnya",
+        "todayAlsoTitle": "Juga hari ini"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

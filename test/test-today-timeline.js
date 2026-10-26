@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timelineRange, packLane, laneKeysFor, timelineState, layoutTodayTimeline,
-  TIMELINE_MIN_START, TIMELINE_MIN_END, TIMELINE_MIN_DURATION,
+  TIMELINE_MIN_START, TIMELINE_MIN_END, TIMELINE_MIN_DURATION, TIMELINE_POINT_SPAN,
 } from '../public/utils/today-timeline.js';
 
 const at = (h, m = 0) => h * 60 + m;
@@ -100,4 +100,16 @@ test('ohne Dauer bekommt ein Termin eine halbe Stunde Flaeche; ausserhalb der Ac
 
 test('kein Termin mit Uhrzeit, keine Leiste', () => {
   assert.equal(layoutTodayTimeline([], { nowMinute: at(9), members }), null);
+});
+
+test('eine Punktmarke nimmt fuer Reihen ihre Beschriftung ein, „laeuft" aber nie', () => {
+  const layout = layoutTodayTimeline([
+    { id: 'abend', start: at(18, 30), end: at(18, 30), point: true, peopleIds: [] },
+    { id: 'film', start: at(19, 30), end: at(21), peopleIds: [] },
+  ], { nowMinute: at(18, 45), members });
+  const lane = layout.lanes[0];
+  assert.equal(lane.rows, 2, 'der Film beginnt, solange die Beschriftung des Abendessens noch steht - eigene Reihe');
+  const abend = lane.items.find((item) => item.id === 'abend');
+  assert.ok(Math.abs(abend.width - TIMELINE_POINT_SPAN / at(15)) < 1e-9);
+  assert.equal(abend.state, 'past', 'ein Punkt ist vorbei, sobald seine Zeit da war - er laeuft nicht');
 });

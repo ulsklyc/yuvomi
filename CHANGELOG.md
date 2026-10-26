@@ -9,18 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Today at a glance shows the shape of the day.** The sheet is one card now: the overview's seal,
-  the title and the day in one line ("9 events · 1 task overdue"), then a timeline from 07 to 22
-  (wider when an appointment starts earlier or ends later) with a lane for the household and one for
-  everyone with an appointment today, planned meals at their usual time in the household lane, what is
-  over stepped back to grey and a violet line at now that moves with the clock. Below it, "Up next":
-  on a wide screen three cells side by side - the next appointment or meal first, with "in 25 min" in
-  its module's colour, then what is overdue or open, shopping last - and a footer with the closing
-  line or "+N more". Appointments with a time stand only in the timeline there: a click on a block
-  unfolds its row - who it is for and which calendar - and the row opens it. On a phone the timeline
-  is a compact strip of bars with faces above the rows, and appointments stay rows. The timeline only
-  appears when the Calendar tile is not on the overview, so it never repeats it. Under a timeline of
-  finished appointments "Nothing else today" replaces "Free today", and while one is still ahead
-  neither is said.
+  the title and the day in one line ("9 events · 1 task overdue"), then a timeline with a lane for the
+  household and one for everyone with something timed today - appointments, your own shift, planned
+  meals as a dot at their usual time - and all-day appointments as a band above it. What is over steps
+  back to grey, a violet line marks now, and the next thing coming is raised and says "in 2 hrs". A
+  click on a block unfolds its row - who it is for and which calendar - and the row opens it; the
+  timeline is one tab stop, arrow keys move between blocks and Esc folds the row, and a screen reader
+  hears "Emma: School, 08:00 until 13:00, in progress". Below it, "Also today" holds what has no place
+  on the timeline in three cells, shopping last, and a footer line carries the closing sentence or
+  "+N more". Under a sheet width of 900px - tablets, narrow windows, phones - the timeline is a compact
+  strip of bars and appointments stay rows, the next one first with "15:00 · in 2 hrs" or "in 25 min"
+  in its module's colour. The timeline only appears when the Calendar tile is not on the overview, so
+  it never repeats it.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
   as before unless you change it, on the household's clock and for this device only. Wall mode dims

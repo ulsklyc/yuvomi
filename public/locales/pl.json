@@ -536,7 +536,9 @@
         "todayTimelineLabel": "Przebieg dnia",
         "todayTimelineEveryone": "Wszyscy",
         "todayTimelinePast": "zakończone",
-        "todayTimelineRunning": "w toku"
+        "todayTimelineRunning": "w toku",
+        "todayTimelineNext": "następne",
+        "todayAlsoTitle": "Dziś także"
     },
     "tasks": {
         "resetOrder": "Sortuj automatycznie",

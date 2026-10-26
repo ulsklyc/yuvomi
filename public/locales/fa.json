@@ -452,7 +452,9 @@
         "todayTimelineLabel": "روند امروز",
         "todayTimelineEveryone": "همه",
         "todayTimelinePast": "تمام‌شده",
-        "todayTimelineRunning": "در جریان"
+        "todayTimelineRunning": "در جریان",
+        "todayTimelineNext": "بعدی",
+        "todayAlsoTitle": "همچنین امروز"
     },
     "tasks": {
         "resetOrder": "مرتب‌سازی خودکار",

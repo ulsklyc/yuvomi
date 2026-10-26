@@ -12,10 +12,12 @@
  * des Tages, die Liste bleibt das Versprechen (#1449): Vergangenes tritt in
  * der Leiste zurueck, in der Liste steht es gar nicht.
  *
- * NUR TERMINE MIT UHRZEIT. Eine Aufgabe hat eine Frist und keine Dauer, die
- * Mahlzeit nur eine Sortierzeit, der Einkauf keine Zeit - ein Balken dafuer
- * waere eine erfundene Auskunft. Ganztaegiges hat keinen Ort auf der Achse und
- * steht in der Liste.
+ * NUR ECHTE ZEIT (Critique 2026-10-26, Befund 3). Termine mit Uhrzeit und
+ * die eigene Schicht sind Bloecke mit Dauer. Die Mahlzeit hat nur die
+ * Nennzeit ihres Typs - sie kommt als Punkt (`end === start`), ohne Dauer und
+ * ohne „laeuft gerade". Eine Aufgabe hat eine Frist, der Einkauf keine Zeit:
+ * ein Balken dafuer waere eine erfundene Auskunft. Ganztaegiges hat keinen Ort
+ * auf der Achse; es steht als Band darueber (dashboard.js), nicht hier.
  */
 
 /** Der Rahmen, den die Achse mindestens zeigt: 07 bis 22 Uhr. */
@@ -26,6 +28,13 @@ const DAY_END = 24 * 60;
 /* Ein Termin ohne Ende oder mit Ende gleich Beginn bekommt eine halbe Stunde
  * Flaeche: als Strich waere er weder zu lesen noch zu treffen. */
 export const TIMELINE_MIN_DURATION = 30;
+
+/* Eine Punktmarke (Mahlzeit) hat keine Dauer, aber ihr Typ steht daneben
+ * („Abendessen"). Fuer Lage und Reihen nimmt sie anderthalb Stunden ein -
+ * so viel Platz braucht ihre Beschriftung bei 1440px -, damit sie nicht unter
+ * den naechsten Block der Spur laeuft. Ihr Zustand rechnet weiter mit dem
+ * Punkt (`realEnd === start`). */
+export const TIMELINE_POINT_SPAN = 90;
 
 /**
  * Der Bereich der Achse in Minuten, auf volle Stunden: mindestens 07-22, und
@@ -109,7 +118,7 @@ export function layoutTodayTimeline(items, { nowMinute, members = [], solo = fal
     .map((item) => {
       const start = Math.max(0, Math.min(DAY_END, item.start));
       const rawEnd = Number.isFinite(item.end) ? Math.min(DAY_END, item.end) : start;
-      const end = Math.max(rawEnd, Math.min(DAY_END, start + TIMELINE_MIN_DURATION));
+      const end = Math.max(rawEnd, Math.min(DAY_END, start + (item.point ? TIMELINE_POINT_SPAN : TIMELINE_MIN_DURATION)));
       return { ...item, start, end, realEnd: Math.max(start, rawEnd) };
     })
     .sort((a, b) => a.start - b.start || a.end - b.end);

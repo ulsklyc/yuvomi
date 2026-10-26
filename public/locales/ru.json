@@ -518,7 +518,9 @@
         "todayTimelineLabel": "Ход дня",
         "todayTimelineEveryone": "Все",
         "todayTimelinePast": "завершено",
-        "todayTimelineRunning": "идёт сейчас"
+        "todayTimelineRunning": "идёт сейчас",
+        "todayTimelineNext": "далее",
+        "todayAlsoTitle": "Также сегодня"
     },
     "tasks": {
         "resetOrder": "Сортировать автоматически",

@@ -793,7 +793,11 @@ test('#1698: das Heute-Blatt nennt den Kalender - die Spanne bleibt der Wand', i
   assert.match(sheet, /today-cockpit-card__sub">Niklas Arbeitskalender</, 'das Blatt nennt den Kalender');
   assert.match(sheet, /today-cockpit-card__sub">dashboard\.todayEvent</, 'ohne Kalendernamen bleibt das Wort');
   assert.ok(sheet.includes('&lt;img src=x&gt;') && !sheet.includes('<img src=x>'), 'der Name ist Nutzereingabe und laeuft durch esc()');
-  assert.ok(!sheet.includes('2026-09-24T22:00'), 'kein Ende im Blatt: die Spanne bleibt der Wand vorbehalten');
+  // Seit der Critique 2026-10-26 (Befund 4, Ulas) nennt der zugaengliche Name
+  // eines Blocks auch das Ende; SICHTBAR bleibt es der Wand vorbehalten.
+  const visible = sheet.replace(/<span class="sr-only">[^<]*<\/span>/g, '');
+  assert.ok(!visible.includes('2026-09-24T22:00'), 'kein sichtbares Ende im Blatt: die Spanne bleibt der Wand vorbehalten');
+  assert.match(sheet, /<span class="sr-only">,? dashboard\.todayUntil\{(?:"|&quot;)time(?:"|&quot;):(?:"|&quot;)2026-09-24T22:00(?:"|&quot;)\}<\/span>/, 'der Screenreader hoert, bis wann');
   assert.ok(!sheet.includes('wall-row__time-end'));
 }));
 
@@ -1077,7 +1081,7 @@ const timelineDay = () => ({
   users: TIMELINE_USERS,
 });
 const { sharedSurname: realSharedSurname } = await import("../public/components/user-multi-select.js");
-const timelineOf = (html) => (/<div class="today-timeline[\s\S]*?<\/div>\s*<div class="today-cockpit__rows/.exec(html) || [''])[0];
+const timelineOf = (html) => (/<div class="today-timeline[\s\S]*?id="today-timeline-detail"/.exec(html) || [''])[0];
 
 test('Heute-Blatt: die Zeitleiste zeigt den ganzen Tag je Person, die Summe nennt ihn in einem Satz', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
   const before = globalThis.__sharedSurname;
@@ -1093,11 +1097,14 @@ test('Heute-Blatt: die Zeitleiste zeigt den ganzen Tag je Person, die Summe nenn
   assert.equal(timeline.match(/today-timeline__title">Schule</g)?.length, 1);
   assert.match(timeline, /today-timeline__title">Fussball</);
   // Vorbei tritt zurueck und sagt es, laufend sagt es auch; Ganztaegiges hat keinen Block.
-  assert.match(timeline, /today-timeline__event--past"[^>]*>\s*<span class="today-timeline__title">Zahnarzt<[\s\S]*?dashboard\.todayTimelinePast/);
-  assert.match(timeline, /today-timeline__event--now"[^>]*>\s*<span class="today-timeline__title">Schule</);
-  assert.ok(!timeline.includes('Ausflug'));
+  assert.match(timeline, /today-timeline__event--past"[^>]*>\s*<span class="sr-only">Alex: <\/span><span class="today-timeline__title">Zahnarzt<[\s\S]*?dashboard\.todayTimelinePast/);
+  assert.match(timeline, /today-timeline__event--now"[^>]*>\s*<span class="sr-only">Emma: <\/span><span class="today-timeline__title">Schule</);
+  // Ganztaegiges hat keinen Block auf der Achse, sondern steht im Band darueber (Critique, Befund 3).
+  assert.ok(!/today-timeline__slot[^>]*>\s*<button[^>]*>\s*<span class="sr-only">[^<]*<\/span><span class="today-timeline__title">Ausflug</.test(timeline));
+  assert.match(timeline, /today-timeline__allday[\s\S]*?today-timeline__title">Ausflug</);
   // Nur der Beginn (#1698), das Ende traegt die Breite.
-  assert.ok(!timeline.includes('2026-09-24T13:00'));
+  assert.ok(!timeline.replace(/<span class="sr-only">[^<]*<\/span>/g, '').includes('2026-09-24T13:00'), 'sichtbar nur der Beginn');
+  assert.match(timeline, /<span class="sr-only"> dashboard\.todayUntil\{(?:"|&quot;)time(?:"|&quot;):(?:"|&quot;)2026-09-24T13:00/, 'das Ende hoert der Screenreader (Befund 4)');
   // 10:00 auf der Achse 07-22.
   assert.match(timeline, /--tl-now:0\.2(?![\d])|--tl-now:0\.19999/);
   assert.match(sheet, /today-cockpit__summary">dashboard\.todaySummaryEvents\{&quot;count&quot;:5\} · dashboard\.todaySummaryOverdue\{&quot;count&quot;:1\}</,
@@ -1123,13 +1130,14 @@ test('Heute-Blatt: ein Termin der Zeitleiste steht nicht noch einmal in der List
   day.upcomingEvents.push(ev(16, 'Elternabend', '2026-09-24T19:00', '2026-09-24T20:30', { assigned_users: [person(1), person(2)] }));
   const sheet = dash.renderTodayCockpit(day, []);
   const list = sheet.slice(sheet.indexOf('class="today-cockpit__rows'));
-  // In der Liste: das Ganztaegige (kein Block), die Aufgabe - kein Termin mit Uhrzeit.
-  assert.match(list, /today-cockpit-card__value">Ausflug</);
-  for (const title of ['Schule', 'Filmabend', 'Fussball', 'Elternabend']) {
+  // Seit der Critique (Befund 3) steht auch das Ganztaegige in der Leiste - als
+  // Band ueber der Achse; die Liste traegt keinen dieser Termine mehr.
+  assert.match(sheet, /<div class="today-timeline__allday">[\s\S]*?today-timeline__title">Ausflug</);
+  for (const title of ['Ausflug', 'Schule', 'Filmabend', 'Fussball', 'Elternabend']) {
     assert.ok(!list.includes(`today-cockpit-card__value">${title}<`), `${title} steht nur in der Leiste`);
   }
   // Der Block ist ein Aufklapp-Knopf auf die Zeile darunter, zugeklappt bis zum Klick.
-  assert.match(sheet, /<button type="button" class="today-timeline__event today-timeline__event--next" data-timeline-event="14@2026-09-24T20:15"\s+aria-expanded="false" aria-controls="today-timeline-detail">/);
+  assert.match(sheet, /<button type="button" class="today-timeline__event today-timeline__event--next" data-timeline-event="14@2026-09-24T20:15" tabindex="-1"\s+aria-expanded="false" aria-controls="today-timeline-detail">/);
   assert.match(sheet, /id="today-timeline-detail" hidden>/);
   // Je Termin eine Zeile, auch wenn er in zwei Spuren steht; sie traegt die Zuweisung.
   assert.equal(sheet.match(/data-timeline-detail="16@2026-09-24T19:00"/g)?.length, 1);
@@ -1167,24 +1175,55 @@ test('Entwurf „Heute wichtig": der Kopf steht mit Siegel und Summe in der Kart
   assert.match(editing, /data-glance-hide/);
 }));
 
-test('Entwurf „Heute wichtig": das Abendessen um 18:30 steht vorn, „in 25 Min" im Modulton, als Block in „Alle"', inBrowser(THU_1805_BERLIN, 'Europe/Berlin', () => {
+test('Critique 2026-10-26: das Abendessen ist ein Punkt, als Naechstes markiert, und steht nicht noch einmal im Streifen', inBrowser(THU_1805_BERLIN, 'Europe/Berlin', () => {
   const day = {
     ...timelineDay(),
     todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Lachs & Ofengemuese' }],
-    urgentTasks: [
-      { id: 21, title: 'Stromrechnung', due_date: '2026-09-22', status: 'open', assigned_users: [] },
-      { id: 22, title: 'Zettel', due_date: '2026-09-23', status: 'open', assigned_users: [] },
-      { id: 23, title: 'Formular', due_date: '2026-09-23', status: 'open', assigned_users: [] },
-    ],
   };
   const sheet = dash.renderTodayCockpit(day, []);
-  const strip = /today-cockpit__rows--next"[^>]*>([\s\S]*?)<\/div>\s*<div class="today-cockpit__rows--more|today-cockpit__rows--next"[^>]*>([\s\S]*)/.exec(sheet);
-  const cells = [...(strip[1] ?? strip[2]).matchAll(/today-cockpit-card__value">([^<]*)</g)].map((m) => m[1]);
-  assert.equal(cells[0], 'Lachs &amp; Ofengemuese', 'das Naechste zuerst, vor dem Ueberfaelligen - auch wenn der Deckel es verdeckt haette');
-  assert.match(sheet, /today-cockpit-card__time today-cockpit-card__time--soon">[^<]*25[^<]*</, '„in 25 Min" im Modulton');
-  assert.match(sheet, /data-timeline-event="meal-9"/, 'die Mahlzeit steht als Block in der Leiste');
+  const meal = /<button type="button" class="([^"]*)" data-timeline-event="meal-9"([^>]*)>([\s\S]*?)<\/button>/.exec(sheet);
+  assert.ok(meal, 'die Mahlzeit steht in der Leiste');
+  assert.match(meal[1], /today-timeline__event--point/, 'als Punkt, ohne erfundene Dauer');
+  assert.match(meal[1], /today-timeline__event--upnext/, 'das Naechste spricht in der Leiste (Befund 2)');
+  assert.ok(!/today-timeline__event--now/.test(meal[1]), 'eine Mahlzeit „laeuft" nie');
+  assert.match(meal[2], /^\s*aria-expanded/, 'der eine Tab-Stopp der Leiste ist das Naechste (kein tabindex=-1)');
+  assert.match(meal[3], /dashboard\.todayTimelineNext/, 'der Screenreader hoert „als Naechstes"');
+  assert.equal((sheet.match(/data-timeline-event="[^"]*"(?! tabindex="-1")\s+aria-expanded/g) ?? []).length, 1, 'genau EIN Tab-Stopp in der Leiste');
+  assert.match(sheet, /<p class="today-cockpit__also">dashboard\.todayAlsoTitle<\/p>/, 'der Streifen heisst „Ausserdem heute"');
+  const list = sheet.slice(sheet.indexOf('class="today-cockpit__rows'));
+  assert.ok(!list.includes('Lachs'), 'die Mahlzeit steht nicht noch einmal im Streifen');
   assert.match(sheet, /--c:var\(--module-meals\)/, 'im Ton der Kueche');
   assert.match(sheet, /--c:var\(--module-calendar\)/, 'Termine im Ton des Kalenders');
   assert.match(sheet, /today-timeline__hour[^"]*" data-minute="420"[^>]*>07</, 'die Achse kurz: „07" statt „07:00"');
   assert.match(sheet, /today-timeline__hour[^"]*--covered" data-minute="1080"/, 'die Stunde unter der Jetzt-Pille schweigt');
+  assert.match(sheet, /<span class="sr-only">Emma(?: Johnson)?: <\/span><span class="today-timeline__title">Schule</, 'der Name nennt die Person (Befund 4)');
+
+  // Unter der breiten Buehne: Kurzfassung, und die Mahlzeit ist wieder die erste Zeile - „in 25 Min" im Modulton.
+  const compact = dash.renderTodayCockpit(day, [], false, { stage: 'compact' });
+  assert.match(compact, /today-timeline--mini" aria-hidden="true"/);
+  const first = /today-cockpit-card__value">([^<]*)</.exec(compact.slice(compact.indexOf('class="today-cockpit__rows')))?.[1];
+  assert.equal(first, 'Lachs &amp; Ofengemuese', 'das Naechste zuerst');
+  assert.match(compact, /today-cockpit-card__time today-cockpit-card__time--soon">[^<]*25[^<]*</, '„in 25 Min" im Modulton');
+  assert.match(compact, /today-cockpit-card__value">Filmabend<[\s\S]*?today-cockpit-card__time">[^<]*20:15 · [^<]*</, 'spaeter mit Uhrzeit davor: „20:15 · in 2 Std."');
+  assert.ok(!compact.includes('today-cockpit__also'), 'ohne Leiste keine Ueberschrift „Ausserdem heute"');
 }));
+
+test('Critique 2026-10-26: die eigene Schicht steht als Block in der eigenen Spur und nicht noch einmal in der Liste', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const day = {
+    ...timelineDay(),
+    myShiftsToday: [{ date_key: '2026-09-24', shift_type: { id: 7, name: 'Fruehschicht', short_code: 'F', start_time: '06:00', end_time: '14:00' } }],
+  };
+  const viewer = TIMELINE_USERS[1];
+  const sheet = dash.renderTodayCockpit(day, [], false, { viewer });
+  const lanes = [...sheet.matchAll(/today-timeline__name">([^<]*)<\/span><\/span>\s*<ul class="today-timeline__track" aria-label="[^"]*">([\s\S]*?)<\/ul>/g)];
+  const linda = lanes.find((m) => m[1].startsWith('Linda'));
+  assert.ok(linda, 'Linda bekommt eine Spur - durch ihre Schicht');
+  assert.match(linda[2], /data-timeline-event="shift-7"/);
+  assert.match(linda[2], /--c:var\(--module-schedule\)/, 'im Ton des Schichtplans');
+  assert.match(linda[2], /today-timeline__event--now/, 'sie laeuft um 10:00');
+  const list = sheet.slice(sheet.indexOf('class="today-cockpit__rows'));
+  assert.ok(!list.includes('today-cockpit-card--schedule'), 'die Schicht steht nicht noch einmal in der Liste');
+  // Die Achse beginnt mit der Schicht um 06:00.
+  assert.match(sheet, /data-timeline-start="360"/);
+}));
+

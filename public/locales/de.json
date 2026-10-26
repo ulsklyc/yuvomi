@@ -452,7 +452,9 @@
         "todayTimelineLabel": "Tagesverlauf",
         "todayTimelineEveryone": "Alle",
         "todayTimelinePast": "vorbei",
-        "todayTimelineRunning": "läuft gerade"
+        "todayTimelineRunning": "läuft gerade",
+        "todayTimelineNext": "als Nächstes",
+        "todayAlsoTitle": "Außerdem heute"
     },
     "tasks": {
         "resetOrder": "Automatisch sortieren",

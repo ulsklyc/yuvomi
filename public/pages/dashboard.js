@@ -4065,6 +4065,16 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
   return cap === shown ? null : cap;
 }
 
+/**
+ * Die erste Schaetzung der Buehne (todayStage) kannte das Blatt noch nicht:
+ * jetzt steht es, und ist es schmaler oder breiter als geschaetzt, zeichnet es
+ * sich im selben Task neu - bevor der Browser ein Bild davon malt.
+ */
+function refitTodayStage(shell, render) {
+  const drawn = shell?.querySelector?.('.today-cockpit')?.dataset.todayStage;
+  if (drawn && drawn !== todayStage()) replaceProgramSheet(shell, render());
+}
+
 /** Tauscht das Heute-Blatt gegen eine neu gezeichnete Fassung (gleicher Platz). */
 function replaceProgramSheet(shell, html) {
   shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', html);
@@ -4080,15 +4090,14 @@ function replaceProgramSheet(shell, html) {
  * Buehne zwischen Telefon und breit wechselt, baut die Uebersicht neu. */
 function createPhoneProgramFit(win, signal, rebuild) {
   let frame = 0;
-  let phone = onPhoneStage();
   win.addEventListener('resize', () => {
     if (frame) return;
     frame = win.requestAnimationFrame(() => {
       frame = 0;
-      const now = onPhoneStage();
-      const crossed = now !== phone;
-      phone = now;
-      rebuild(crossed);
+      // Die Buehne, fuer die das Blatt gezeichnet ist, gegen die gemessene:
+      // Telefon, schmal oder breit (todayStage).
+      const drawn = win.document?.querySelector?.('.today-cockpit')?.dataset?.todayStage;
+      rebuild(Boolean(drawn) && drawn !== todayStage());
     });
   }, { signal, passive: true });
   signal.addEventListener('abort', () => win.cancelAnimationFrame(frame), { once: true });
@@ -4216,12 +4225,13 @@ function buildTodayCockpitModel(data, cfg = [], {
   // unter der Leiste auf (renderTodayTimeline). Ganztaegiges hat keinen Block
   // und bleibt. `existing` oben sieht weiter alle Zeilen - eine Erinnerung an
   // einen Termin der Leiste bleibt so dessen Echo und keine eigene Zeile.
-  const inTimeline = new Set((timeline?.lanes ?? []).flatMap((lane) => lane.items.filter((item) => item.kind === 'event').map((item) => item.id)));
-  const listed = inTimeline.size
-    ? program.rows.filter((row) => !(row.kind === 'event' && inTimeline.has(row.objectId)))
-    : program.rows;
+  // Seit der Critique (Befund 3) gilt das fuer alles, was die Leiste traegt:
+  // Termin, ganztaegiger Termin, Mahlzeit, die eigene Schicht.
+  const inTimeline = timelineRowKeys(timeline);
+  const notInTimeline = (row) => !inTimeline.has(`${row.kind}:${row.objectId}`);
+  const listed = inTimeline.size ? program.rows.filter(notInTimeline) : program.rows;
   const programRows = groupOverdue ? groupOverdueRows(listed) : listed;
-  const sheet = composeTodaySheet([...programRows, ...contributed.rows], { cap });
+  const sheet = composeTodaySheet([...programRows, ...(inTimeline.size ? contributed.rows.filter(notInTimeline) : contributed.rows)], { cap });
   const visibleRows = sheet.rows;
   const overflow = sheet.overflow;
 
@@ -4451,25 +4461,49 @@ function householdMinuteOf(value) {
   return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
 }
 
+/** Minute des Tages aus einer Wanduhrzeit 'HH:MM' (Schicht, Nennzeit einer Mahlzeit). */
+function clockMinute(time) {
+  const match = /^(\d{2}):(\d{2})/.exec(String(time ?? ''));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/**
+ * Wann etwas dran ist, relativ zu jetzt (Critique 2026-10-26, Befund 5):
+ * unter einer Stunde „in 25 Min" - im Ton des Moduls -, spaeter mit der Uhrzeit
+ * davor („15:00 · in 2 Std."), denn eine gerundete Stunde allein verlangt
+ * Kopfrechnen. Ueber Intl.RelativeTimeFormat, damit jede Sprache ihre Kurzform
+ * hat. `null`, wenn es schon begonnen hat.
+ */
+function relativeWhen(minuteOfDay, now, clock = '') {
+  const nowMinute = householdMinuteOf(now);
+  if (nowMinute == null || minuteOfDay == null || minuteOfDay <= nowMinute) return null;
+  const delta = minuteOfDay - nowMinute;
+  const format = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always', style: 'short' });
+  if (delta < 60) return { label: format.format(delta, 'minute'), soon: true };
+  const relative = format.format(Math.round(delta / 60), 'hour');
+  return { label: clock ? `${clock} · ${relative}` : relative, soon: false };
+}
+
 /**
  * DIE TERMINE VON HEUTE, EINMAL (Entwurf „Heute wichtig", 2026-10-26).
  *
  * Aus BEIDEN Terminlisten der Antwort: `upcomingEvents` haelt die Kachel-
  * Liste samt ihrem Deckel von fuenf Kommenden, `familyEvents` je Mitglied die
  * heute beendeten und die naechsten (#1449). Erst zusammen tragen sie einen
- * vollen Tag - der Schultag eines Kindes stand sonst hinter dem Deckel der
- * Kachel. Doppelte fallen ueber denselben Schluessel wie serverseitig
+ * vollen Tag. Doppelte fallen ueber denselben Schluessel wie serverseitig
  * (`id@start`). Beendete bleiben hier stehen: die Leiste zeigt den Tag, die
  * Liste darunter nur, was noch kommt.
  *
- * @returns {{ timed: object[], count: number }}  `timed` fuer die Leiste
- *   (Minuten in der Haushaltszone), `count` alle Termine des Tages fuer die
- *   Summe im Kopf, ganztaegige eingeschlossen
+ * @returns {{ timed: object[], allDay: object[], count: number }}  `timed` fuer
+ *   die Achse (Minuten in der Haushaltszone), `allDay` fuer das Band ueber ihr,
+ *   `count` alle Termine des Tages fuer die Summe im Kopf
  */
 function todayEventsForTimeline(data, now = new Date()) {
   const todayKey = zonedDateKey(now);
+  const memberIds = (Array.isArray(data?.users) ? data.users : []).map((user) => user.id);
   const seen = new Set();
   const timed = [];
+  const allDay = [];
   let count = 0;
   for (const key of ['upcomingEvents', 'familyEvents']) {
     for (const event of Array.isArray(data?.[key]) ? data[key] : []) {
@@ -4479,44 +4513,57 @@ function todayEventsForTimeline(data, now = new Date()) {
       const span = overviewEventSpan(event, todayKey);
       if (span.day !== todayKey) continue;
       count += 1;
-      if (span.allDay) continue;
-      const start = span.carried ? 0 : householdMinuteOf(event.start_datetime);
-      if (start == null) continue;
-      const endRaw = String(event.end_datetime || '');
-      // Was ueber Mitternacht reicht, endet auf der Achse am Tagesende.
-      const end = endRaw.length > 10
-        ? (zonedDateKey(endRaw) > todayKey ? 24 * 60 : householdMinuteOf(endRaw))
-        : start;
-      timed.push({
+      const peopleIds = (event.assigned_users ?? []).map((user) => user.id);
+      const base = {
         id: event.id,
-        start,
-        end: end ?? start,
-        peopleIds: (event.assigned_users ?? []).map((user) => user.id),
+        peopleIds,
         title: event.title,
-        // Der Beginn allein, wie in der Terminzeile: das Ende bleibt der Wand
-        // vorbehalten (#1698), hier traegt es die Breite des Blocks.
-        timeLabel: overviewEventTime(event, span),
-        route: calendarEventRoute(event),
         kind: 'event',
         tone: 'calendar',
         key: id,
-        sheetRow: timelineEventRow(event, span),
+        sheetRow: timelineEventRow(event, span, memberIds),
+      };
+      if (span.allDay) {
+        allDay.push(base);
+        continue;
+      }
+      const start = span.carried ? 0 : householdMinuteOf(event.start_datetime);
+      if (start == null) continue;
+      const endRaw = String(event.end_datetime || '');
+      const endsToday = endRaw.length > 10 && zonedDateKey(endRaw) <= todayKey;
+      // Was ueber Mitternacht reicht, endet auf der Achse am Tagesende.
+      const end = endRaw.length > 10 ? (endsToday ? householdMinuteOf(endRaw) : 24 * 60) : start;
+      timed.push({
+        ...base,
+        start,
+        end: end ?? start,
+        // Sichtbar der Beginn allein, wie in der Terminzeile (#1698); das Ende
+        // traegt die Breite des Blocks und der zugaengliche Name (Befund 4).
+        timeLabel: overviewEventTime(event, span),
+        endLabel: endsToday && end > start ? formatTime(endRaw) : '',
       });
     }
   }
-  return { timed, count };
+  return { timed, allDay, count };
 }
 
 /**
  * Die Zeile, die ein Block unter der Leiste aufklappt: dieselbe wie in der
  * Liste, mit der Zuweisung. Das Siegel-Paar zeigt EIN Gesicht (whoMark); geht
  * der Termin mehrere an, nennt die Unterzeile alle (#1828) - im Solo-Haushalt
- * niemanden.
+ * niemanden. Gehoert er dem ganzen Haushalt (alle Mitglieder zugewiesen),
+ * steht kein einzelnes Gesicht am Siegel, sondern „Alle" in der Unterzeile:
+ * er steht in der Spur „Alle", und Alex' Avatar daran sagte etwas anderes
+ * (Critique 2026-10-26).
  */
-function timelineEventRow(event, span) {
+function timelineEventRow(event, span, memberIds = []) {
   const row = todayEventRow(event, span);
   const people = isSoloHousehold() ? [] : (event.assigned_users ?? []);
-  if (people.length > 1) {
+  const everyone = memberIds.length >= 2 && memberIds.every((id) => people.some((person) => person.id === id));
+  if (everyone) {
+    row.who = null;
+    row.sub = `${row.sub} · ${t('dashboard.todayTimelineEveryone')}`;
+  } else if (people.length > 1) {
     // Bei geteiltem Nachnamen die Vornamen (R19), wie in den Spuren.
     const surname = sharedSurname(people);
     const given = (name) => (surname && name.endsWith(` ${surname}`) ? name.slice(0, -(surname.length + 1)) : name);
@@ -4529,12 +4576,12 @@ function timelineEventRow(event, span) {
 }
 
 /**
- * DIE MAHLZEITEN DES TAGES AUF DER ACHSE (Entwurf: „Abendessen 18:30" in der
- * Spur „Alle"). Ihr Platz ist die Nennzeit des Typs, dieselbe, nach der das
- * Blatt sie schon sortiert (MEAL_SORT_TIME) - keine Uhrzeit, die jemand
- * eingetragen hat, deshalb steht sie als Typ („Abendessen") und eine Stunde
- * breit. Ein eigener Typ ohne Nennzeit hat keinen Platz. Der Block klappt die
- * Zeile der Mahlzeit auf, wie ein Termin die seine.
+ * DIE MAHLZEITEN ALS PUNKT, NICHT ALS BLOCK (Critique 2026-10-26, Befund 3,
+ * Ulas: „nur Echtes"). Ihr Platz ist die Nennzeit des Typs (MEAL_SORT_TIME),
+ * nach der das Blatt sie ohnehin sortiert - eine Uhrzeit, die niemand
+ * eingetragen hat. Eine erfundene Stunde Dauer und ein „laeuft gerade"
+ * behaupteten mehr; der Punkt sagt nur „um diese Zeit, ungefaehr". Er klappt
+ * die Zeile der Mahlzeit auf; in der Liste steht sie dann nicht noch einmal.
  */
 function todayMealsForTimeline(data) {
   const labels = MEAL_LABELS();
@@ -4542,15 +4589,17 @@ function todayMealsForTimeline(data) {
     .filter((meal) => MEAL_SORT_TIME[meal?.meal_type])
     .map((meal) => {
       const time = MEAL_SORT_TIME[meal.meal_type];
-      const start = Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+      const start = clockMinute(time);
       const label = labels[meal.meal_type] ?? t('dashboard.todayDinner');
       return {
         id: meal.id,
         start,
-        end: start + 60,
+        end: start,
+        point: true,
         peopleIds: [],
         title: label,
         timeLabel: formatTime(time),
+        endLabel: '',
         kind: 'meal',
         tone: 'meals',
         key: `meal-${meal.id}`,
@@ -4570,20 +4619,80 @@ function todayMealsForTimeline(data) {
     });
 }
 
-/** Die Leiste als Modell - null, wenn heute kein Termin eine Uhrzeit hat. */
-function buildTodayTimeline(data, { now = new Date(), includeMeals = false } = {}) {
-  const { timed } = todayEventsForTimeline(data, now);
+/**
+ * DIE EIGENE SCHICHT IN DER EIGENEN SPUR (Critique 2026-10-26, Befund 3). Die
+ * Schicht hat Beginn und Ende - echte Zeit, die bisher unter „+N weitere"
+ * steckte. Die Antwort traegt nur die EIGENE (`myShiftsToday`); die der
+ * anderen zeigt die Schichtplan-Kachel. Ohne Uhrzeit hat sie keinen Platz.
+ */
+function todayShiftsForTimeline(data, viewer) {
+  if (viewer?.id == null) return [];
+  return (Array.isArray(data?.myShiftsToday) ? data.myShiftsToday : []).flatMap((entry) => {
+    const type = entry.shift_type ?? {};
+    const start = clockMinute(type.start_time);
+    const endClock = clockMinute(type.end_time);
+    if (start == null || endClock == null) return [];
+    const end = entry.crosses_midnight || endClock <= start ? 24 * 60 : endClock;
+    const startTime = String(type.start_time).slice(0, 5);
+    const endTime = String(type.end_time).slice(0, 5);
+    return [{
+      id: type.id,
+      start,
+      end,
+      peopleIds: [viewer.id],
+      title: shiftTypeLabel(type),
+      timeLabel: formatTime(startTime),
+      endLabel: end < 24 * 60 ? formatTime(endTime) : '',
+      kind: 'shift',
+      tone: 'schedule',
+      key: `shift-${type.id}`,
+      sheetRow: {
+        kind: 'shift',
+        objectId: type.id ?? null,
+        sortKey: startTime,
+        timeLabel: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+        title: shiftTypeLabel(type),
+        sub: t('nav.schedule'),
+        icon: MODULE_ICON.schedule,
+        tone: 'schedule',
+        route: '/schedule',
+        who: viewer,
+      },
+    }];
+  });
+}
+
+/**
+ * Die Leiste als Modell - null, wenn heute nichts eine Uhrzeit hat. Traegt
+ * dazu das Band der ganztaegigen Termine (`allDay`) und den Schluessel des
+ * naechsten kommenden Eintrags (`nextKey`, Befund 2: „Als Naechstes" spricht
+ * in der Leiste, nicht als zweite Zeile daneben).
+ */
+function buildTodayTimeline(data, { now = new Date(), includeMeals = false, includeShifts = false, viewer = dashboardViewer } = {}) {
+  const { timed, allDay } = todayEventsForTimeline(data, now);
   if (includeMeals) timed.push(...todayMealsForTimeline(data));
+  if (includeShifts) timed.push(...todayShiftsForTimeline(data, viewer));
   const members = (Array.isArray(data?.users) ? data.users : []).map((user) => ({
     ...user,
     // renderAvatarStack liest `color`, die Mitgliederliste traegt `avatar_color`.
     color: user.color ?? user.avatar_color,
   }));
-  return layoutTodayTimeline(timed, {
+  const layout = layoutTodayTimeline(timed, {
     nowMinute: householdMinuteOf(now),
     members,
     solo: isSoloHousehold(),
   });
+  if (!layout) return null;
+  const upcoming = layout.lanes.flatMap((lane) => lane.items).filter((item) => item.state === 'next');
+  const next = upcoming.reduce((best, item) => (!best || item.start < best.start ? item : best), null);
+  return { ...layout, allDay, members, nextKey: next?.key ?? null };
+}
+
+/** Alles, was die Leiste traegt, als `art:id` - diese Zeilen verlassen die Liste. */
+function timelineRowKeys(timeline) {
+  if (!timeline) return new Set();
+  const items = [...timeline.lanes.flatMap((lane) => lane.items), ...(timeline.allDay ?? [])];
+  return new Set(items.map((item) => `${item.kind}:${item.id}`));
 }
 
 /* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
@@ -4604,22 +4713,28 @@ function todaySummary(data, model, now = new Date()) {
   return parts.join(' · ');
 }
 
+/** Der Ton eines Eintrags der Leiste: das Modul, aus dem er kommt. */
+const TIMELINE_TONES = { calendar: 'calendar', meals: 'meals', schedule: 'schedule' };
+const timelineTone = (item) => `var(--module-${TIMELINE_TONES[item.tone] ?? 'calendar'})`;
+
 /**
  * DIE ZEITLEISTE DES TAGES (Entwurf „Heute wichtig", 2026-10-26; Modell in
  * utils/today-timeline.js). Eine Spur fuer den Haushalt, eine je Person mit
- * einem Termin heute; Vergangenes tritt zurueck, ein Strich sagt „jetzt".
+ * etwas Gezeitetem heute; Vergangenes tritt zurueck, ein Strich sagt „jetzt",
+ * das Ganztaegige steht als Band ueber der Achse.
  *
- * NUR AUF DER BREITEN BUEHNE. Auf dem Telefon gehoert der erste Schirm den
- * Zeilen (R21, D5 „Uebersicht als Briefing"), und zehn unbeschriftete Balken
- * sagten dort weniger als eine Zeile; dort bleiben die Termine Zeilen.
+ * NUR AUF DER BREITEN BUEHNE (ab 900px Containerbreite, todayStage). Darunter
+ * - Telefon, Tablet hochkant, schmale Spalte - steht die Kurzfassung, und die
+ * Termine bleiben Zeilen: eine Stunde waere dort schmaler als ihr Titel
+ * (Critique 2026-10-26, Befund 1).
  *
- * DER BLOCK KLAPPT SEINEN TERMIN AUF (Ulas, 2026-10-26), wie die Monatsansicht
- * des Kalenders den Tag darunter: die Terminzeilen stehen nicht mehr in der
- * Liste, ein Klick auf den Block zeigt seine Zeile - Siegel, Zuweisung,
- * Kalender - unter der Leiste, ein zweiter klappt sie zu. Die Zeile selbst
- * oeffnet das Termin-Blatt wie jede Zeile des Blatts. Ein Block ist deshalb
- * ein Aufklapp-Knopf (aria-expanded), kein Link; sein zugaenglicher Name ist
- * Titel, Zeit und Zustand. Achse und Jetzt-Strich sind Bild.
+ * DER BLOCK KLAPPT SEINEN EINTRAG AUF (Ulas, 2026-10-26): seine Zeile -
+ * Siegel, Zuweisung, Kalender - steht unter der Leiste, ein zweiter Klick
+ * klappt sie zu, Esc auch. Die Zeile oeffnet das Objekt wie jede Zeile des
+ * Blatts. Die Leiste ist EIN Tab-Stopp (roving tabindex), Pfeiltasten wandern
+ * zwischen den Bloecken, Tab fuehrt weiter zur aufgeklappten Zeile (Befund 4).
+ * Der zugaengliche Name eines Blocks nennt Person, Titel, Beginn und Ende und
+ * den Zustand: „Emma: Schule, 08:00 bis 13:00, laeuft gerade".
  */
 function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   if (!timeline) return '';
@@ -4629,23 +4744,53 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   const stateLabel = { past: t('dashboard.todayTimelinePast'), now: t('dashboard.todayTimelineRunning') };
   const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
   // Der geteilte Nachname steht nicht in jeder Spur (R19): „Johnson" viermal
-  // unterscheidet niemanden und kuerzte jeden Namen auf „Alex Johns…". Der
-  // volle Name bleibt der zugaengliche Name der Spur.
+  // unterscheidet niemanden. Der volle Name bleibt der zugaengliche Name.
   const surname = sharedSurname(timeline.lanes.map((lane) => lane.member).filter(Boolean));
   const shortName = (full) => (surname && full.endsWith(` ${surname}`) ? full.slice(0, -(surname.length + 1)) : full);
+  const everyone = t('dashboard.todayTimelineEveryone');
+  // EIN Tab-Stopp: der aufgeklappte Eintrag, sonst der naechste, sonst der erste.
+  const allKeys = [...(timeline.allDay ?? []).map((item) => item.key), ...timeline.lanes.flatMap((lane) => lane.items.map((item) => item.key))];
+  const focusKey = [openKey, timeline.nextKey, allKeys[0]].find((key) => key && allKeys.includes(key));
+  let focusTaken = false;
+  const tabindex = (key) => {
+    if (focusTaken || key !== focusKey) return ' tabindex="-1"';
+    focusTaken = true;
+    return '';
+  };
+  const button = (item, laneName, { allDay = false } = {}) => {
+    const next = item.key === timeline.nextKey;
+    const when = next ? relativeWhen(item.start, now, item.timeLabel) : null;
+    const visibleTime = allDay ? '' : (when?.label ?? item.timeLabel);
+    // Nach „in 2 Std." setzt ein Komma ab, sonst laese es sich „in 2 Std. bis 16:00".
+    const until = item.endLabel ? `${next && when ? ',' : ''} ${t('dashboard.todayUntil', { time: item.endLabel })}` : '';
+    const state = next ? t('dashboard.todayTimelineNext') : stateLabel[item.state] ?? '';
+    const classes = ['today-timeline__event', `today-timeline__event--${item.state ?? 'next'}`];
+    if (next) classes.push('today-timeline__event--upnext');
+    if (item.point) classes.push('today-timeline__event--point');
+    return `<button type="button" class="${classes.join(' ')}" data-timeline-event="${esc(item.key)}"${tabindex(item.key)}
+                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail">
+              <span class="sr-only">${esc(laneName)}: </span><span class="today-timeline__title">${esc(item.title)}</span>${
+      visibleTime ? `<span class="today-timeline__time"><span class="sr-only">, </span>${esc(visibleTime)}</span>` : ''}${
+      next && when?.soon ? `<span class="sr-only">, ${esc(item.timeLabel)}</span>` : ''}${
+      until ? `<span class="sr-only">${esc(until)}</span>` : ''}${state ? `<span class="sr-only">, ${esc(state)}</span>` : ''}
+            </button>`;
+  };
+  const band = (timeline.allDay ?? []).length ? `
+      <div class="today-timeline__allday">
+        <span class="today-timeline__allday-label">${esc(t('dashboard.allDay'))}</span>
+        <ul class="today-timeline__allday-list" aria-label="${esc(t('dashboard.allDay'))}">${
+      timeline.allDay.map((item) => `<li style="--c:${timelineTone(item)}">${button({ ...item, state: 'next' }, laneNameFor(item, timeline, everyone), { allDay: true })}</li>`).join('')
+    }</ul>
+      </div>` : '';
   const lanes = timeline.lanes.map((lane) => {
-    const name = lane.member ? lane.member.display_name ?? '' : t('dashboard.todayTimelineEveryone');
+    const name = lane.member ? lane.member.display_name ?? '' : everyone;
     const face = lane.member
       ? renderAvatarStack([lane.member], { size: 28, maxVisible: 1 })
       : `<span class="today-timeline__everyone" aria-hidden="true"><i data-lucide="users" class="icon-sm"></i></span>`;
     const label = solo ? '' : `<span class="today-timeline__who" aria-hidden="true">${face}<span class="today-timeline__name">${esc(shortName(name))}</span></span>`;
     const items = lane.items.map((item) => `
-          <li class="today-timeline__slot" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--c:var(--module-${item.tone === 'meals' ? 'meals' : 'calendar'})">
-            <button type="button" class="today-timeline__event today-timeline__event--${item.state}" data-timeline-event="${esc(item.key)}"
-                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail">
-              <span class="today-timeline__title">${esc(item.title)}</span>
-              <span class="today-timeline__time">${esc(item.timeLabel)}</span>${stateLabel[item.state] ? `<span class="sr-only">, ${esc(stateLabel[item.state])}</span>` : ''}
-            </button>
+          <li class="today-timeline__slot${item.point ? ' today-timeline__slot--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--c:${timelineTone(item)}">
+            ${button(item, shortName(name))}
           </li>`).join('');
     return `
         <div class="today-timeline__lane" style="--tl-rows:${lane.rows}">
@@ -4656,9 +4801,9 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   const nowMarker = timeline.now == null ? '' : `
       <div class="today-timeline__past" aria-hidden="true"></div>
       <div class="today-timeline__now" aria-hidden="true"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
-  // Je Termin EINE Zeile, auch wenn er in zwei Spuren steht.
+  // Je Eintrag EINE Zeile, auch wenn er in zwei Spuren steht.
   const details = new Map();
-  for (const item of timeline.lanes.flatMap((lane) => lane.items)) {
+  for (const item of [...(timeline.allDay ?? []), ...timeline.lanes.flatMap((lane) => lane.items)]) {
     if (!details.has(item.key)) details.set(item.key, item.sheetRow);
   }
   const open = details.has(openKey) ? openKey : null;
@@ -4666,13 +4811,20 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
     <div class="today-timeline__detail" id="today-timeline-detail"${open ? '' : ' hidden'}>${
       [...details].map(([key, row]) => `<div class="today-timeline__detail-row" data-timeline-detail="${esc(key)}"${key === open ? '' : ' hidden'}>${renderTodayRow(row)}</div>`).join('')
     }</div>`;
-  return `
+  return `${band}
     <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
          data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-hours:${timeline.hours.length}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
       <div class="today-timeline__axis" aria-hidden="true">${hours}</div>
       ${lanes}
       ${nowMarker}
     </div>${detail}`;
+}
+
+/** Wessen ein ganztaegiger Termin ist - fuer den zugaenglichen Namen seines Bands. */
+function laneNameFor(item, timeline, everyone) {
+  const people = (timeline.members ?? []).filter((member) => item.peopleIds.includes(member.id));
+  if (!people.length || people.length === (timeline.members ?? []).length) return everyone;
+  return people.map((person) => person.display_name ?? '').join(', ');
 }
 
 /**
@@ -4692,24 +4844,29 @@ function hourCovered(minute, nowMinute, timeline) {
 }
 
 /**
- * DIE KURZFASSUNG AUF DEM TELEFON (Entwurf, mobil): je Spur ein 10px-Balken,
- * ein 20px-Gesicht statt des Namens, fuenf Stunden an der Achse, der
- * Jetzt-Strich. Sie ist Bild (aria-hidden) - die Termine stehen darunter als
- * Zeilen, denn ein 10px-Balken traegt weder Text noch ein Tippziel.
+ * DIE KURZFASSUNG (Entwurf, mobil): je Spur ein 10px-Balken, ein 20px-Gesicht
+ * statt des Namens, die Stunden in GLEICHEN Schritten (Critique 2026-10-26:
+ * 07/11/15/19/22 las sich ungleich), der Jetzt-Strich. Sie ist Bild
+ * (aria-hidden) - die Termine stehen darunter als Zeilen, denn ein 10px-Balken
+ * traegt weder Text noch ein Tippziel. Gilt auf dem Telefon und unter 900px
+ * Containerbreite.
  */
 function renderTodayMiniTimeline(timeline, now = new Date()) {
   if (!timeline) return '';
   const span = timeline.end - timeline.start;
+  const step = Math.ceil(span / 60 / 5) * 60;
   const marks = [];
-  for (let minute = timeline.start; minute < timeline.end - 120; minute += 240) marks.push(minute);
-  marks.push(timeline.end);
-  const axis = marks.map((minute) => `<span>${esc(axisHourLabel(minute))}</span>`).join('');
+  for (let minute = timeline.start; minute <= timeline.end; minute += step) marks.push(minute);
+  // Die Marke unter der Jetzt-Pille schweigt; schmal deckt die Pille mehr Zeit.
+  const nowMinute = householdMinuteOf(now);
+  const covered = (minute) => timeline.now != null && nowMinute != null && Math.abs(minute - nowMinute) < span / 12;
+  const axis = marks.map((minute) => `<span${covered(minute) ? ' class="today-timeline__hour--covered"' : ''} style="--tl-at:${(minute - timeline.start) / span}">${esc(axisHourLabel(minute))}</span>`).join('');
   const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
   const lanes = timeline.lanes.map((lane) => {
     const face = lane.member
       ? renderAvatarStack([lane.member], { size: 20, maxVisible: 1 })
       : '<span class="today-timeline__everyone today-timeline__everyone--sm"><i data-lucide="users" class="icon-sm"></i></span>';
-    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--c:var(--module-${item.tone === 'meals' ? 'meals' : 'calendar'})"></i>`).join('');
+    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--c:${timelineTone(item)}"></i>`).join('');
     return `${solo ? '' : `<span class="today-timeline__face">${face}</span>`}<div class="today-timeline__bars">${bars}</div>`;
   }).join('');
   const nowMarker = timeline.now == null ? '' : `<div class="today-timeline__now"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
@@ -4727,23 +4884,48 @@ let todayTimelineOpen = null;
 
 /**
  * Ein Block klappt seine Zeile unter der Leiste auf, ein zweiter Klick auf
- * denselben klappt sie zu, ein Klick auf einen anderen wechselt. An Ort und
- * Stelle, ohne Neuzeichnen - der Fokus bleibt auf dem Block.
+ * denselben klappt sie zu, ein Klick auf einen anderen wechselt; Esc klappt zu
+ * und gibt den Fokus an den Block zurueck. Die Leiste ist ein Tab-Stopp:
+ * Pfeiltasten, Pos1 und Ende wandern zwischen den Bloecken (roving tabindex).
+ * An Ort und Stelle, ohne Neuzeichnen.
  */
 function wireTodayTimeline(root) {
   const region = root?.querySelector?.('#today-timeline-detail');
   if (!region) return;
   const buttons = [...root.querySelectorAll('[data-timeline-event]')];
-  buttons.forEach((btn) => {
+  const setOpen = (next) => {
+    todayTimelineOpen = next;
+    for (const row of region.querySelectorAll('[data-timeline-detail]')) row.hidden = row.dataset.timelineDetail !== next;
+    region.hidden = next == null;
+    for (const other of buttons) other.setAttribute('aria-expanded', other.dataset.timelineEvent === next ? 'true' : 'false');
+  };
+  const focusButton = (btn) => {
+    if (!btn) return;
+    for (const other of buttons) other.setAttribute('tabindex', other === btn ? '0' : '-1');
+    btn.focus();
+  };
+  buttons.forEach((btn, index) => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.timelineEvent;
-      const next = todayTimelineOpen === key ? null : key;
-      todayTimelineOpen = next;
-      for (const row of region.querySelectorAll('[data-timeline-detail]')) row.hidden = row.dataset.timelineDetail !== next;
-      region.hidden = next == null;
-      for (const other of buttons) other.setAttribute('aria-expanded', other.dataset.timelineEvent === next ? 'true' : 'false');
+      setOpen(todayTimelineOpen === key ? null : key);
+    });
+    btn.addEventListener('keydown', (e) => {
+      const move = { ArrowRight: index + 1, ArrowDown: index + 1, ArrowLeft: index - 1, ArrowUp: index - 1, Home: 0, End: buttons.length - 1 }[e.key];
+      if (move != null) {
+        e.preventDefault();
+        focusButton(buttons[Math.max(0, Math.min(buttons.length - 1, move))]);
+      }
     });
   });
+  const close = (e) => {
+    if (e.key !== 'Escape' || todayTimelineOpen == null) return;
+    const owner = buttons.find((btn) => btn.dataset.timelineEvent === todayTimelineOpen);
+    e.preventDefault();
+    setOpen(null);
+    focusButton(owner);
+  };
+  region.addEventListener('keydown', close);
+  for (const btn of buttons) btn.addEventListener('keydown', close);
 }
 
 /**
@@ -4773,9 +4955,37 @@ function updateTodayTimelineNow(root, now = new Date()) {
  * Die Termine stehen dort in der Zeitleiste, nicht in der Liste. */
 const PROGRAM_STRIP_CAP = 3;
 
+/* Unter der breiten Buehne (Tablet, schmale Spalte) stehen die Zeilen
+ * untereinander, so viele wie der Entwurf mobil zeigt. */
+const PROGRAM_COMPACT_CAP = 4;
+
+/* DIE DREI BUEHNEN DES BLATTS (Critique 2026-10-26, Befund 1): `phone` (die
+ * Telefon-Buehne, dynamischer Deckel), `compact` (unter 900px Containerbreite:
+ * Kurzfassung plus Zeilen - dort waere eine Stunde schmaler als ihr Titel und
+ * ein Block auf Touch 35px breit) und `wide` (Leiste mit Bloecken). Gemessen
+ * wird das Blatt selbst, beim ersten Aufbau der Inhaltsbereich; ohne DOM
+ * (Tests) gilt `wide`. Wechselt die Buehne beim Groessenziehen, baut die
+ * Uebersicht neu (createPhoneProgramFit). */
+const TODAY_COMPACT_WIDTH = 900;
+let todayLastWidth = null;
+
+function todayStage() {
+  if (onPhoneStage()) return 'phone';
+  const doc = globalThis.document;
+  const sheet = doc?.querySelector?.('.today-cockpit');
+  const content = doc?.querySelector?.('.app-content');
+  const width = sheet?.clientWidth || (content?.clientWidth ? content.clientWidth - 2 * PAGE_PAD_ESTIMATE : 0) || todayLastWidth;
+  if (width) todayLastWidth = width;
+  return width && width < TODAY_COMPACT_WIDTH ? 'compact' : 'wide';
+}
+
+/* Das Seitenpolster des Inhaltsbereichs, nur fuer die erste Schaetzung, bevor
+ * es das Blatt gibt; danach misst todayStage das Blatt selbst. */
+const PAGE_PAD_ESTIMATE = 32;
+
 /**
  * Wann ein Termin oder eine Mahlzeit dran ist, relativ zu jetzt: „in 25 Min"
- * im Ton des Moduls (unter einer Stunde), „in 2 Std" sekundaer. Ueber
+ * im Ton des Moduls (unter einer Stunde), spaeter „15:00 · in 2 Std." (relativeWhen). Ueber
  * Intl.RelativeTimeFormat, damit jede Sprache ihre eigene Kurzform hat.
  * Aufgaben behalten ihr „bis 18:00" - eine Frist ist kein Beginn.
  */
@@ -4783,14 +4993,8 @@ function withRelativeWhen(row, now) {
   if (!row || !['event', 'meal'].includes(row.kind)) return row;
   const time = String(row.sortKey ?? '');
   if (!/^\d{2}:\d{2}$/.test(time) || time <= '00:02') return row;
-  const minuteOfRow = Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-  const nowMinute = householdMinuteOf(now);
-  if (nowMinute == null || minuteOfRow <= nowMinute) return row;
-  const delta = minuteOfRow - nowMinute;
-  const format = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always', style: 'short' });
-  return delta < 60
-    ? { ...row, timeLabel: format.format(delta, 'minute'), soon: true }
-    : { ...row, timeLabel: format.format(Math.round(delta / 60), 'hour') };
+  const when = relativeWhen(clockMinute(time), now, formatTime(time));
+  return when ? { ...row, timeLabel: when.label, soon: when.soon } : row;
 }
 
 /**
@@ -4823,18 +5027,20 @@ function nextFirst(model, now) {
   return { ...model, rows: [model.rows[visible], ...model.rows.slice(0, visible), ...model.rows.slice(visible + 1)] };
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, timelineOpen = todayTimelineOpen, cap } = {}) {
-  const phone = onPhoneStage();
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, timelineOpen = todayTimelineOpen, cap, stage = todayStage(), viewer = dashboardViewer } = {}) {
+  const phone = stage === 'phone';
+  const wide = stage === 'wide';
   // Die Leiste nur, wenn der Kalender im Blatt spricht: neben einer sichtbaren
-  // Termin-Kachel waere sie deren Echo. Auf dem Telefon ist sie die stumme
-  // Kurzfassung (10px-Balken, kein Text); dort bleiben die Termine Zeilen.
+  // Termin-Kachel waere sie deren Echo. Unter der breiten Buehne ist sie die
+  // stumme Kurzfassung (10px-Balken, kein Text); dort bleiben die Termine Zeilen.
   const timeline = todayDomainSpeaks(cfg, 'calendar')
-    ? buildTodayTimeline(data, { now, includeMeals: todayDomainSpeaks(cfg, 'meals') })
+    ? buildTodayTimeline(data, { now, viewer, includeMeals: todayDomainSpeaks(cfg, 'meals'), includeShifts: todayDomainSpeaks(cfg, 'schedule') })
     : null;
-  const listTimeline = phone ? null : timeline;
-  let model = buildTodayCockpitModel(data, cfg, { now, timeline: listTimeline, ...(cap ? { cap } : phone ? {} : { cap: PROGRAM_STRIP_CAP }) });
+  const listTimeline = wide ? timeline : null;
+  const stageCap = cap ? { cap } : phone ? {} : { cap: wide ? PROGRAM_STRIP_CAP : PROGRAM_COMPACT_CAP };
+  let model = buildTodayCockpitModel(data, cfg, { now, timeline: listTimeline, ...stageCap });
   // Breit ist der Einkauf eine der drei Zellen - die letzte.
-  if (!phone && !cap && model.shopping && model.rows.length >= PROGRAM_STRIP_CAP) {
+  if (wide && !cap && model.shopping && model.rows.length >= PROGRAM_STRIP_CAP) {
     model = buildTodayCockpitModel(data, cfg, { now, timeline: listTimeline, cap: PROGRAM_STRIP_CAP - 1 });
   }
 
@@ -4848,24 +5054,27 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
   const shopping = model.shopping ? { ...model.shopping, chevron: true } : null;
 
   const parts = [];
-  if (timeline) parts.push(phone ? renderTodayMiniTimeline(timeline, now) : renderTodayTimeline(timeline, now, timelineOpen));
+  if (timeline) parts.push(wide ? renderTodayTimeline(timeline, now, timelineOpen) : renderTodayMiniTimeline(timeline, now));
 
   const listRows = [];
   if (state) listRows.push(renderTodayStateRow(state));
   listRows.push(...rows.map((row) => (row.kind === 'overdue'
     ? renderTodayOverdueGroup(row, overdueOpen)
     : renderTodayRow(row))));
-  const foldShopping = Boolean(shopping) && model.overflow > 0 && !model.moreRoute && phone;
-  // Breit steht der Einkauf als letzte Zelle in der Leiste; auf dem Telefon
-  // bleibt er die Schlusszeile unter den Zeilen und klappt mit (R14).
-  if (!phone && shopping) listRows.push(renderTodayRow(shopping));
+  const foldShopping = Boolean(shopping) && model.overflow > 0 && !model.moreRoute && !wide;
+  // Breit steht der Einkauf als letzte Zelle in der Leiste; darunter bleibt er
+  // die Schlusszeile unter den Zeilen und klappt mit (R14).
+  if (wide && shopping) listRows.push(renderTodayRow(shopping));
   if (listRows.length) {
     const cols = Math.min(PROGRAM_STRIP_CAP, Math.max(1, listRows.length));
-    parts.push(phone
-      ? `<div class="today-cockpit__rows">${listRows.join('')}</div>`
-      : `<div class="today-cockpit__rows today-cockpit__rows--next" style="--today-next-cols:${cols}">${listRows.join('')}</div>`);
+    // „AUSSERDEM HEUTE" (Critique 2026-10-26, Befund 2): breit nennt die Leiste
+    // das Naechste selbst, der Streifen traegt den Rest des Tages - und sagt es.
+    if (wide && timeline && rows.length) parts.push(`<p class="today-cockpit__also">${esc(t('dashboard.todayAlsoTitle'))}</p>`);
+    parts.push(wide
+      ? `<div class="today-cockpit__rows today-cockpit__rows--next" style="--today-next-cols:${cols}">${listRows.join('')}</div>`
+      : `<div class="today-cockpit__rows">${listRows.join('')}</div>`);
   }
-  if (phone && shopping && !foldShopping) parts.push(renderTodayRow(shopping));
+  if (!wide && shopping && !foldShopping) parts.push(renderTodayRow(shopping));
 
   // DIE FUSSLEISTE: links die Coda, rechts „+N weitere" (Entwurf). Beide
   // zugleich gibt es nicht - neben verdeckten Zeilen waere „nichts mehr"
@@ -4882,7 +5091,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     const hidden = (foldShopping ? [...model.hiddenRows, shopping] : model.hiddenRows).map((row) => withRelativeWhen(row, now));
     const moreText = t('dashboard.todayMore', { count: hidden.length });
     const lessText = t('dashboard.todayLess');
-    parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more${phone ? '' : ' today-cockpit__rows--next'}" id="today-cockpit-more"${phone ? '' : ` style="--today-next-cols:${Math.min(PROGRAM_STRIP_CAP, hidden.length)}"`}${moreOpen ? '' : ' hidden'}>${
+    parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more${wide ? ' today-cockpit__rows--next' : ''}" id="today-cockpit-more"${wide ? ` style="--today-next-cols:${Math.min(PROGRAM_STRIP_CAP, hidden.length)}"` : ''}${moreOpen ? '' : ' hidden'}>${
       hidden.map((row) => renderTodayRow(row)).join('')}</div>`);
     more = `<button type="button" class="today-cockpit__more today-cockpit__more--link" data-today-more
           aria-expanded="${moreOpen ? 'true' : 'false'}" aria-controls="today-cockpit-more"
@@ -4932,7 +5141,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
     ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}`
     : '';
   return `
-    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
+    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title" data-today-stage="${stage}"${fit}>
       ${editing ? header : ''}
       <div class="today-cockpit__grid">
         ${editing ? '' : header}
@@ -8813,6 +9022,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
         if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
       }
+      refitTodayStage(shell, () => renderTodayCockpit(data, cfg, isCustomizing));
     }, { animate: fromSkeleton });
     wireLinks(container, rerender, { editing: isCustomizing, user });
     disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);

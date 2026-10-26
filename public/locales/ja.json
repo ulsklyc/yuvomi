@@ -434,7 +434,9 @@
         "todayTimelineLabel": "今日のタイムライン",
         "todayTimelineEveryone": "全員",
         "todayTimelinePast": "終了",
-        "todayTimelineRunning": "進行中"
+        "todayTimelineRunning": "進行中",
+        "todayTimelineNext": "次の予定",
+        "todayAlsoTitle": "今日のほかの予定"
     },
     "tasks": {
         "resetOrder": "自動で並べ替え",

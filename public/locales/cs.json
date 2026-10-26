@@ -478,7 +478,9 @@
         "todayTimelineLabel": "Průběh dne",
         "todayTimelineEveryone": "Všichni",
         "todayTimelinePast": "skončilo",
-        "todayTimelineRunning": "právě probíhá"
+        "todayTimelineRunning": "právě probíhá",
+        "todayTimelineNext": "jako další",
+        "todayAlsoTitle": "Dnes také"
     },
     "tasks": {
         "resetOrder": "Řadit automaticky",

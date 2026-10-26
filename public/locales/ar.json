@@ -560,7 +560,9 @@
         "todayTimelineLabel": "مخطط اليوم",
         "todayTimelineEveryone": "الجميع",
         "todayTimelinePast": "انتهى",
-        "todayTimelineRunning": "جارٍ الآن"
+        "todayTimelineRunning": "جارٍ الآن",
+        "todayTimelineNext": "التالي",
+        "todayAlsoTitle": "أيضًا اليوم"
     },
     "tasks": {
         "resetOrder": "الترتيب التلقائي",

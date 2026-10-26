@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Günün akışı",
         "todayTimelineEveryone": "Herkes",
         "todayTimelinePast": "bitti",
-        "todayTimelineRunning": "sürüyor"
+        "todayTimelineRunning": "sürüyor",
+        "todayTimelineNext": "sıradaki",
+        "todayAlsoTitle": "Bugün ayrıca"
     },
     "tasks": {
         "resetOrder": "Otomatik sırala",

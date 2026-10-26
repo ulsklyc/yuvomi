@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Dòng thời gian hôm nay",
         "todayTimelineEveryone": "Mọi người",
         "todayTimelinePast": "đã kết thúc",
-        "todayTimelineRunning": "đang diễn ra"
+        "todayTimelineRunning": "đang diễn ra",
+        "todayTimelineNext": "tiếp theo",
+        "todayAlsoTitle": "Hôm nay còn có"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

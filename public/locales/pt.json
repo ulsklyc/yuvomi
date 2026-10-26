@@ -434,7 +434,9 @@
         "todayTimelineLabel": "Cronologia do dia",
         "todayTimelineEveryone": "Todos",
         "todayTimelinePast": "terminado",
-        "todayTimelineRunning": "a decorrer"
+        "todayTimelineRunning": "a decorrer",
+        "todayTimelineNext": "a seguir",
+        "todayAlsoTitle": "Também hoje"
     },
     "tasks": {
         "resetOrder": "Ordenar automaticamente",
