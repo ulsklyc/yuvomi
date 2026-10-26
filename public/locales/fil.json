@@ -4030,7 +4030,8 @@
             "reasonNameTooLong": "Masyadong mahaba ang pangalan ng file o folder.",
             "reasonTooDeep": "Lampas ang path sa limang antas ng folder.",
             "reasonParentFailed": "Hindi magawa ang parent folder.",
-            "reasonRateLimited": "Masyadong maraming kahilingan ang natatanggap ng server. Subukang mag-upload muli mamaya."
+            "reasonRateLimited": "Masyadong maraming kahilingan ang natatanggap ng server. Subukang mag-upload muli mamaya.",
+            "folderGoneReplanned": "Nabura sa pansamantala ang isang folder ng upload na ito. Ipinapakita ng preview ang kasalukuyang estado - simulan muli ang upload."
         },
         "errorFolderGone": "Wala na ang folder na ito.",
         "errorSelectedFolderGone": "Wala na ang napiling folder.",

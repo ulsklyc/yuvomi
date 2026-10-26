@@ -607,3 +607,66 @@ test('reports cancelled and partial upload outcomes without success semantics', 
     tone: 'success',
   });
 });
+
+// #1995: "the chosen folder is gone" is one outcome of the whole upload, not a
+// failure per entry. The executor stops at the first such answer and names the
+// folder that vanished, so the dialog can reload and let the user start again.
+const folderGone = () => Object.assign(new Error('Parent folder not found.'), {
+  status: 400, data: { reason: 'documents_selected_folder_not_found' },
+});
+const isFolderGone = (error) => error?.data?.reason === 'documents_selected_folder_not_found';
+
+test('#1995: the target folder deleted before the first write stops the upload at once', async () => {
+  const plan = buildFolderUploadPlan([
+    file('House/Drawings/floor.pdf'),
+    file('House/notes.pdf'),
+  ], baseOptions);
+  const calls = [];
+  const result = await executeFolderUploadPlan(plan, {
+    createFolder: async ({ name, parentId }) => { calls.push(`folder:${name}:${parentId}`); throw folderGone(); },
+    uploadFile: async ({ originalName }) => { calls.push(`file:${originalName}`); return { id: 1 }; },
+    isFolderGone,
+  });
+  assert.deepEqual(calls, ['folder:House:10'], 'no further write after the first "gone" answer');
+  assert.equal(result.folderGone?.ref, 'id:10', 'the chosen target is the folder that vanished');
+  assert.equal(isFolderGone(result.folderGone?.error), true, 'the answer travels along for the page');
+  assert.deepEqual(result.failed, [], 'no failure per entry');
+  assert.equal(result.cancelled, false);
+});
+
+test('#1995: a merged folder deleted mid-way stops before the next file and names that folder', async () => {
+  const plan = buildFolderUploadPlan([
+    file('House/a.pdf'),
+    file('House/b.pdf'),
+    file('House/c.pdf'),
+  ], { ...baseOptions, folders: [...baseOptions.folders, { id: 11, name: 'House', parent_id: 10 }] });
+  const uploaded = [];
+  let deleted = false;
+  const result = await executeFolderUploadPlan(plan, {
+    createFolder: async () => { throw new Error('no folder to create'); },
+    uploadFile: async ({ originalName, folderId }) => {
+      if (deleted) throw folderGone();
+      uploaded.push(`${originalName}:${folderId}`);
+      deleted = true; // someone else deletes House right after the first file
+      return { id: 1 };
+    },
+    isFolderGone,
+  });
+  assert.deepEqual(uploaded, ['a.pdf:11']);
+  assert.equal(result.uploaded.length, 1, 'what went through before stays reported');
+  assert.equal(result.folderGone?.ref, 'id:11');
+  assert.deepEqual(result.failed, []);
+});
+
+test('#1995: without the predicate a "gone" answer stays a failure per entry, as before', async () => {
+  const plan = buildFolderUploadPlan([file('House/a.pdf')], baseOptions);
+  const result = await executeFolderUploadPlan(plan, {
+    createFolder: async () => { throw folderGone(); },
+    uploadFile: async () => ({ id: 1 }),
+  });
+  assert.equal(result.folderGone, undefined);
+  assert.deepEqual(result.failed.map(({ kind, reason }) => [kind, reason]), [
+    ['folder', 'Parent folder not found.'],
+    ['file', 'parent-failed'],
+  ]);
+});

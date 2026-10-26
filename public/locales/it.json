@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "Il nome di un file o di una cartella è troppo lungo.",
             "reasonTooDeep": "Il percorso supera il limite di cinque livelli di cartelle.",
             "reasonParentFailed": "Non è stato possibile creare la cartella superiore.",
-            "reasonRateLimited": "Il server sta ricevendo troppe richieste. Riprova il caricamento più tardi."
+            "reasonRateLimited": "Il server sta ricevendo troppe richieste. Riprova il caricamento più tardi.",
+            "folderGoneReplanned": "Nel frattempo una cartella di questo caricamento è stata eliminata. L’anteprima mostra lo stato attuale: avvia di nuovo il caricamento."
         },
         "errorFolderGone": "Questa cartella non esiste più.",
         "errorSelectedFolderGone": "La cartella scelta non esiste più.",

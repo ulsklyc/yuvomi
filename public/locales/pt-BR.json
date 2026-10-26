@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "O nome de um arquivo ou pasta é longo demais.",
             "reasonTooDeep": "O caminho excede o limite de cinco níveis de pastas.",
             "reasonParentFailed": "Não foi possível criar a pasta superior.",
-            "reasonRateLimited": "O servidor está recebendo pedidos demais. Tente carregar novamente mais tarde."
+            "reasonRateLimited": "O servidor está recebendo pedidos demais. Tente carregar novamente mais tarde.",
+            "folderGoneReplanned": "Uma pasta deste carregamento foi excluída nesse meio-tempo. A prévia mostra o estado atual - inicie o carregamento novamente."
         },
         "errorFolderGone": "Esta pasta não existe mais.",
         "errorSelectedFolderGone": "A pasta escolhida não existe mais.",

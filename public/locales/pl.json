@@ -4264,7 +4264,8 @@
             "reasonNameTooLong": "Nazwa pliku lub folderu jest za długa.",
             "reasonTooDeep": "Ścieżka przekracza limit pięciu poziomów folderów.",
             "reasonParentFailed": "Nie udało się utworzyć folderu nadrzędnego.",
-            "reasonRateLimited": "Serwer otrzymuje zbyt wiele żądań. Spróbuj przesłać ponownie później."
+            "reasonRateLimited": "Serwer otrzymuje zbyt wiele żądań. Spróbuj przesłać ponownie później.",
+            "folderGoneReplanned": "W międzyczasie usunięto folder tego przesyłania. Podgląd pokazuje aktualny stan - rozpocznij przesyłanie ponownie."
         },
         "errorFolderGone": "Ten folder już nie istnieje.",
         "errorSelectedFolderGone": "Wybrany folder już nie istnieje.",

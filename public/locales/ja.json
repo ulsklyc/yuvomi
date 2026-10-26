@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "ファイル名またはフォルダー名が長すぎます。",
             "reasonTooDeep": "パスがフォルダー5階層の上限を超えています。",
             "reasonParentFailed": "親フォルダーを作成できませんでした。",
-            "reasonRateLimited": "サーバーへのリクエストが多すぎます。しばらくしてからもう一度アップロードしてください。"
+            "reasonRateLimited": "サーバーへのリクエストが多すぎます。しばらくしてからもう一度アップロードしてください。",
+            "folderGoneReplanned": "このアップロードのフォルダーがその間に削除されました。プレビューに現在の状態が表示されています。アップロードをもう一度開始してください。"
         },
         "errorFolderGone": "このフォルダーはもう存在しません。",
         "errorSelectedFolderGone": "選択したフォルダーはもう存在しません。",

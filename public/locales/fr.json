@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "Le nom d’un fichier ou dossier est trop long.",
             "reasonTooDeep": "Le chemin dépasse la limite de cinq niveaux de dossiers.",
             "reasonParentFailed": "Le dossier parent n’a pas pu être créé.",
-            "reasonRateLimited": "Le serveur reçoit trop de requêtes. Réessayez l’importation plus tard."
+            "reasonRateLimited": "Le serveur reçoit trop de requêtes. Réessayez l’importation plus tard.",
+            "folderGoneReplanned": "Un dossier de cette importation a été supprimé entre-temps. L’aperçu montre l’état actuel - relancez l’importation."
         },
         "errorFolderGone": "Ce dossier n’existe plus.",
         "errorSelectedFolderGone": "Le dossier choisi n’existe plus.",

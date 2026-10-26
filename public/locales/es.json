@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "El nombre de un archivo o carpeta es demasiado largo.",
             "reasonTooDeep": "La ruta supera el límite de cinco niveles de carpetas.",
             "reasonParentFailed": "No se pudo crear la carpeta superior.",
-            "reasonRateLimited": "El servidor está recibiendo demasiadas solicitudes. Intenta cargar de nuevo más tarde."
+            "reasonRateLimited": "El servidor está recibiendo demasiadas solicitudes. Intenta cargar de nuevo más tarde.",
+            "folderGoneReplanned": "Mientras tanto se eliminó una carpeta de esta carga. La vista previa muestra el estado actual: vuelve a iniciar la carga."
         },
         "errorFolderGone": "Esta carpeta ya no existe.",
         "errorSelectedFolderGone": "La carpeta elegida ya no existe.",

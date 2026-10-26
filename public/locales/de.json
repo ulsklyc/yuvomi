@@ -4030,7 +4030,8 @@
             "reasonNameTooLong": "Ein Datei- oder Ordnername ist zu lang.",
             "reasonTooDeep": "Der Pfad überschreitet das Limit von fünf Ordnerebenen.",
             "reasonParentFailed": "Der übergeordnete Ordner konnte nicht erstellt werden.",
-            "reasonRateLimited": "Der Server erhält gerade zu viele Anfragen. Versuche den Upload später erneut."
+            "reasonRateLimited": "Der Server erhält gerade zu viele Anfragen. Versuche den Upload später erneut.",
+            "folderGoneReplanned": "Ein Ordner dieses Uploads wurde inzwischen gelöscht. Die Vorschau zeigt den aktuellen Stand - starte den Upload erneut."
         },
         "errorFolderGone": "Diesen Ordner gibt es nicht mehr.",
         "errorSelectedFolderGone": "Den gewählten Ordner gibt es nicht mehr.",

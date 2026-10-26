@@ -3966,7 +3966,8 @@
             "reasonNameTooLong": "檔名或資料夾名過長。",
             "reasonTooDeep": "路徑超過五層資料夾限制。",
             "reasonParentFailed": "無法建立上級資料夾。",
-            "reasonRateLimited": "伺服器當前收到的請求過多。請稍後重試上傳。"
+            "reasonRateLimited": "伺服器當前收到的請求過多。請稍後重試上傳。",
+            "folderGoneReplanned": "此上傳中的一個資料夾在此期間已被刪除。預覽顯示目前狀態，請重新開始上傳。"
         },
         "errorFolderGone": "此資料夾已不存在。",
         "errorSelectedFolderGone": "所選資料夾已不存在。",

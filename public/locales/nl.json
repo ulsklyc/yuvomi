@@ -4030,7 +4030,8 @@
             "reasonNameTooLong": "Een bestands- of mapnaam is te lang.",
             "reasonTooDeep": "Het pad overschrijdt de limiet van vijf mapniveaus.",
             "reasonParentFailed": "De bovenliggende map kon niet worden gemaakt.",
-            "reasonRateLimited": "De server ontvangt te veel verzoeken. Probeer de upload later opnieuw."
+            "reasonRateLimited": "De server ontvangt te veel verzoeken. Probeer de upload later opnieuw.",
+            "folderGoneReplanned": "Een map van deze upload is intussen verwijderd. Het voorbeeld toont de huidige stand - start de upload opnieuw."
         },
         "errorFolderGone": "Deze map bestaat niet meer.",
         "errorSelectedFolderGone": "De gekozen map bestaat niet meer.",

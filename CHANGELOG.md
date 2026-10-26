@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A folder upload whose folder was deleted meanwhile can start again from the dialog** (#1995).
+  When someone deleted the chosen folder while a folder upload ran, every entry failed on its own
+  and the dialog could only be closed. The upload now stops at the first such answer, the dialog
+  stays open with your selection, offers the current folders with the top level chosen and shows a
+  fresh preview, so one click uploads again. If only a folder inside the target went away, the
+  target stays chosen and the preview creates that folder anew.
 - **A too large receipt for a housekeeping visit says so** (#2258). Saving a visit with a receipt
   above the upload limit showed only that the visit could not be saved. The dialog now names the
   limit before anything is sent and stays open with your entries.
