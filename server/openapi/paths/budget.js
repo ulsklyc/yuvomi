@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, langParam, DOCUMENT_LINKS_READ_NOTE, withCaseReasons } from '../helpers.js';
 
 export function budgetPaths() {
-  return withCaseReasons({
+  return withCaseReasons('budget', CASE_REASONS, {
     '/api/v1/budget/transfers': {
       post: op({
         summary: 'Transfer money between two budget accounts', tag: 'Budget', stateChanging: true,
@@ -197,15 +197,3 @@ const CASE_REASONS = {
   },
   '/api/v1/budget/subscriptions/logo-search': { post: '`subscriptions_no_logo_found` (404, no supported logo was found)' },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi budget: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

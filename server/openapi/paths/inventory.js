@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE, withCaseReasons } from '../helpers.js';
 
 // R23 (D5): Kaufpreise folgen einem eigenen Recht.
 const PRICES_NOTE = 'Without the `inventory_view_prices` capability (new child accounts start without it) `purchase_price` and `currency` '
@@ -6,7 +6,7 @@ const PRICES_NOTE = 'Without the `inventory_view_prices` capability (new child a
   + 'Linked bookings follow the Budget rights as before.';
 
 export function inventoryPaths() {
-  return withCaseReasons({
+  return withCaseReasons('inventory', CASE_REASONS, {
     '/api/v1/inventory/locations': {
       get: op({ summary: 'List inventory locations (two-level tree)', tag: 'Inventory' }),
       post: op({ summary: 'Create a top-level inventory location', tag: 'Inventory', stateChanging: true, requestBody: jsonBody(null) }),
@@ -159,15 +159,3 @@ const CASE_REASONS = {
   '/api/v1/inventory/items/{id}/service-log': { post: NOT_OWNER },
   '/api/v1/inventory/items/{id}/service-log/{logId}': { put: NOT_OWNER, delete: NOT_OWNER },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi inventory: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

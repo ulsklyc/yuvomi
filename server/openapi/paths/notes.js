@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -27,7 +27,7 @@ const noContentResponse = (description, extra = {}) => ({
 });
 
 export function notesPaths() {
-  return withCaseReasons({
+  return withCaseReasons('notes', CASE_REASONS, {
     '/api/v1/notes': {
       get: op({ summary: 'List notes', tag: 'Notes', responses: schemaResponse('NoteListResponse') }),
       post: op({ summary: 'Create note', tag: 'Notes', stateChanging: true, requestBody: jsonBody('#/components/schemas/NoteCreateInput'), responses: schemaResponse('NoteResponse', 'Note created', 201, { 409: apiError('A selected category changed concurrently') }) }),
@@ -75,15 +75,3 @@ const CASE_REASONS = {
   '/api/v1/notes/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/notes/categories/{id}': { put: '`category_exists` (409, a category with this name already exists)' },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi notes: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

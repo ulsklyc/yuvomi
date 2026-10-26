@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 // Der Koch einer Mahlzeit (#1679). EINE Beschreibung fuer jede Stelle, die ihn
 // annimmt - anlegen, bearbeiten, apply-plan.
@@ -46,7 +46,7 @@ function mealBody({ required = [], create = false } = {}) {
 }
 
 export function mealsPaths() {
-  return withCaseReasons({
+  return withCaseReasons('meals', CASE_REASONS, {
     '/api/v1/meals': {
       get: op({
         summary: 'List meal plan entries',
@@ -197,15 +197,3 @@ const CASE_REASONS = {
   '/api/v1/meals/{id}': { put: SELECTED_RECIPE_GONE },
   '/api/v1/meals/apply-plan': { post: SELECTED_RECIPE_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi meals: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

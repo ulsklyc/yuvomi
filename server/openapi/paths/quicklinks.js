@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function quickLinksPaths() {
-  return withCaseReasons({
+  return withCaseReasons('quick-links', CASE_REASONS, {
     '/api/v1/quick-links': {
       get: op({
         summary: 'List quick links',
@@ -57,15 +57,3 @@ const CASE_REASONS = {
   },
   '/api/v1/quick-links/{id}': { put: LINK_GONE, delete: LINK_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi quick-links: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

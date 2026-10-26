@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, withCaseReasons } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -49,7 +49,7 @@ const DATETIME_INPUT = ' `start_datetime` and `end_datetime` take the forms of `
   + 'the offset was dropped and its digits kept as wall-clock time.';
 
 export function calendarPaths() {
-  return withCaseReasons({
+  return withCaseReasons('calendar', CASE_REASONS, {
     '/api/v1/calendar': {
       get: op({
         summary: 'List calendar events',
@@ -464,15 +464,3 @@ const CASE_REASONS = {
       + '`ambiguous_recurrence_id` (409, a date-only key matches two occurrences)',
   },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi calendar: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

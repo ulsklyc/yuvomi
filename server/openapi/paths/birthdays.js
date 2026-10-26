@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 // POST und PUT pruefen ihre Felder und antworten mit 400 (validateReminder()
 // und die Nachbarn in server/routes/birthdays.js); `op()` fuehrt ohne
@@ -14,7 +14,7 @@ function withBadRequest(status, description, extra = {}) {
 }
 
 export function birthdaysPaths() {
-  return withCaseReasons({
+  return withCaseReasons('birthdays', CASE_REASONS, {
     '/api/v1/birthdays': {
       get: op({ summary: 'List birthdays', tag: 'Birthdays' }),
       post: op({
@@ -108,15 +108,3 @@ const CASE_REASONS = {
   '/api/v1/birthdays': { post: CONTACT_LINK },
   '/api/v1/birthdays/{id}': { put: `${BIRTHDAY_GONE}, ${CONTACT_LINK}`, delete: BIRTHDAY_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi birthdays: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

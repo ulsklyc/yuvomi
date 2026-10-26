@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function recipeProvidersPaths() {
-  return withCaseReasons({
+  return withCaseReasons('recipe-providers', CASE_REASONS, {
     '/api/v1/recipe-providers/accounts': {
       get: op({
         summary: 'List recipe provider accounts',
@@ -151,15 +151,3 @@ const CASE_REASONS = {
   '/api/v1/recipe-providers/accounts/{id}/test': { post: ACCOUNT_GONE },
   '/api/v1/recipe-providers/accounts/{id}/sync': { post: ACCOUNT_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi recipe-providers: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

@@ -45,6 +45,29 @@ const DOCUMENT_LINK_REFUSAL = 'Linking a document needs access to the Documents 
   + 'Without it, any document id - a stored one, a visible one or one that does not exist - is refused with this same 403, before any '
   + 'visibility or deletion check. An empty list or leaving the field out is not a link and changes nothing.';
 
+/**
+ * Haengt an jede Operation in `caseReasons` den Satz, welche `reason`-Werte
+ * eine Absage dort traegt (#1909). EIN Helfer fuer alle Pfad-Dateien (#2002):
+ * vorher stand er als Kopie in jeder, und die naechste Scheibe haette die
+ * naechste angelegt. Dass jeder gesendete Grund an seiner Operation steht,
+ * haelt test:openapi-reasons gegen die echten Routen.
+ *
+ * `caseReasons` ist `{ '<pfad>': { '<methode>': '<Satz ueber die Gruende>' } }`.
+ * Eine Operation, die `paths` nicht kennt, ist ein Tippfehler im Pfad und
+ * bricht den Aufbau der Spec ab, statt still nichts zu dokumentieren.
+ */
+function withCaseReasons(module, caseReasons, paths) {
+  for (const [path, operations] of Object.entries(caseReasons)) {
+    for (const [method, reasons] of Object.entries(operations)) {
+      const operation = paths[path]?.[method];
+      if (!operation) throw new Error(`openapi ${module}: ${method} ${path} is not documented`);
+      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
+      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
+    }
+  }
+  return paths;
+}
+
 function jsonBody(schemaRef, description = 'JSON request body') {
   return {
     required: true,
@@ -161,5 +184,5 @@ function langParam({ fallback = 'default' } = {}) {
 
 export {
   authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam,
-  DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL, BUDGET_LINKS_READ_NOTE,
+  withCaseReasons, DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL, BUDGET_LINKS_READ_NOTE,
 };

@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function documentsPaths() {
-  return withCaseReasons({
+  return withCaseReasons('documents', CASE_REASONS, {
     '/api/v1/documents/meta/options': {
       get: op({
         summary: 'Get family document options',
@@ -564,15 +564,3 @@ const CASE_REASONS = {
     post: `\`dms_account_not_found\` (404), ${DOCUMENT_GONE}, \`dms_document_already_stored\` (400), \`documents_storage_failed\` (502, reading the document failed), \`dms_unreachable\` (502)`,
   },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi documents: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

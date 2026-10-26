@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function rewardsPaths() {
-  return withCaseReasons({
+  return withCaseReasons('rewards', CASE_REASONS, {
     '/api/v1/rewards/overview': {
       get: op({ summary: 'Reward overview (balances, catalog, pending count)', tag: 'Rewards', description: '`pendingCount` counts the open REWARD requests, as it always has. Open pocket money requests (#1734) are counted separately in `moneyPendingCount`, and only those the caller may read: all for an administrator, the own for a member, none for a paired display.' }),
     },
@@ -74,15 +74,3 @@ const CASE_REASONS = {
   '/api/v1/rewards/money/accounts/{userId}': { delete: '`rewards_money_account_not_found` (404, there is no account)' },
   '/api/v1/rewards/money/plans/{userId}': { delete: '`rewards_money_plan_not_found` (404, there is no plan)' },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi rewards: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

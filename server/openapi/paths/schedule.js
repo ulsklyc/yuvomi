@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, withCaseReasons } from '../helpers.js';
 
 /**
  * Schichtplan (#786).
@@ -9,7 +9,7 @@ import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
  * einen Eintrag je Tag und Mitglied.
  */
 export function schedulePaths() {
-  return withCaseReasons({
+  return withCaseReasons('schedule', CASE_REASONS, {
     '/api/v1/schedule/entries': {
       get: op({
         summary: 'Resolve schedule entries for a date range',
@@ -182,15 +182,3 @@ const CASE_REASONS = {
   '/api/v1/schedule/extras/fill': { post: `${SELECTED_TYPE_GONE}, ${TYPE_REQUIRED}` },
   '/api/v1/schedule/extras/{id}': { put: `${EXTRA_GONE}, ${SELECTED_TYPE_GONE}, ${TYPE_REQUIRED}`, delete: EXTRA_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi schedule: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}

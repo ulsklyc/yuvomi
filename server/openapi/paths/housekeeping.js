@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 const VISIT_CAPABILITY_NOTE = 'Each visit carries `can_edit` and `can_delete`: true when the caller may write to the Housekeeping module and the visit is either unpaid or the caller is an admin '
   + '(a paid visit is settled), `can_mark_paid`: true when the caller may write, may see amounts and the visit is unpaid, and `can_mark_unpaid`: true when the visit is paid and the caller is an admin. '
@@ -43,7 +43,7 @@ const LAST_COMPLETED_INPUT = '`last_completed` with `Z` or a numeric offset is r
   + 'kept, and a value without offset was read in the time zone of the server.';
 
 export function housekeepingPaths() {
-  return withCaseReasons({
+  return withCaseReasons('housekeeping', CASE_REASONS, {
     '/api/v1/housekeeping/dashboard': {
       get: op({ summary: 'Get housekeeping dashboard', tag: 'Housekeeping', description: RECEIPT_NOTE + AMOUNTS_NOTE + HOUSEHOLD_DAY_NOTE }),
     },
@@ -171,15 +171,3 @@ const CASE_REASONS = {
   '/api/v1/housekeeping/decay-tasks/{taskId}': { patch: TASK_GONE, delete: TASK_GONE },
   '/api/v1/housekeeping/decay-tasks/{taskId}/complete': { post: TASK_GONE },
 };
-
-function withCaseReasons(paths) {
-  for (const [path, operations] of Object.entries(CASE_REASONS)) {
-    for (const [method, reasons] of Object.entries(operations)) {
-      const operation = paths[path]?.[method];
-      if (!operation) throw new Error(`openapi housekeeping: ${method} ${path} is not documented`);
-      const note = `A refusal a user can reach carries a \`reason\` next to \`error\` (#1909): ${reasons}.`;
-      operation.description = operation.description ? `${operation.description}\n\n${note}` : note;
-    }
-  }
-  return paths;
-}
