@@ -29,7 +29,7 @@ import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { moduleAccentVar } from '/utils/module-accent.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 import { deleteErrorText, installErrorText } from '/settings/module-install-errors.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 /**
  * Blatt: Einstellungen -> Module -> Aktive Module (adminOnly)
@@ -598,7 +598,7 @@ async function renderActiveModules(container, user) {
     installInfo = info;
   } catch (error) {
     container.insertAdjacentHTML('beforeend',
-      `<p class="form-error" role="alert">${esc(error.message ?? t('common.errorGeneric'))}</p>`);
+      `<p class="form-error" role="alert">${esc(loadErrorSentence(error) ?? t('common.errorGeneric'))}</p>`);
     return;
   }
 

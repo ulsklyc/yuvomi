@@ -25,6 +25,7 @@ import { emptyStateHTML } from '/utils/empty-state.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 /** Die Sortable-Instanzen des Blatts: frei bei jedem Neuaufbau (`render`). */
 const navSortables = sortableSet();
@@ -666,7 +667,7 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
       await saveNavigationState(list, unrenderedOrderIds);
       window.yuvomi?.showToast(t(toastKey), 'success');
     } catch (error) {
-      window.yuvomi?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       await render(container, { user });
       return;
     } finally {
@@ -683,7 +684,7 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
     lock,
     notify: (ok, error) => {
       if (ok) window.yuvomi?.showToast(t('settings.modulesOrderSaved'), 'success');
-      else window.yuvomi?.showToast(error?.message ?? t('common.errorGeneric'), 'danger');
+      else window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     },
     afterSave: async () => {
       if (!lock.queued) return;
@@ -772,7 +773,7 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
       }
       window.yuvomi?.showToast(hideToastMessage(container, previousMobile), 'success');
     } catch (error) {
-      window.yuvomi?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       await render(container, { user });
     } finally {
       busy = false;
@@ -941,7 +942,7 @@ function bindMobileNavigationEvents(container, user) {
         await render(container, { user });
       } catch (error) {
         selects.forEach((select) => { select.disabled = false; });
-        window.yuvomi?.showToast(error.message ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       }
     });
   });
@@ -970,7 +971,7 @@ export async function render(container, { user }) {
   if (preferencesResult.status !== 'fulfilled' || !preferencesResult.value) {
     container.replaceChildren();
     container.appendChild(createRetryState({
-      message: preferencesResult.reason?.message ?? t('common.errorGeneric'),
+      message: loadErrorSentence(preferencesResult.reason) ?? t('common.errorGeneric'),
       onRetry: () => render(container, { user }),
     }));
     return;

@@ -5678,6 +5678,6 @@ test('#2166: Darstellung - Waehrung und Zone stehen kurz in der Auswahl, voll vo
   // Zuruecksetzen nach einem Fehler und wenn die Region die Waehrung setzt.
   const page = await readFile(new URL('../public/settings/pages/personal-appearance.js', import.meta.url), 'utf8');
   assert.match(page, /currencySelect\?\.addEventListener\('change', async \(\) => \{\s*if \(currencySelect\.disabled\) return;\s*(?:\/\/[^\n]*\n\s*)*syncCurrencyHint\(container\);/);
-  assert.match(page, /\} catch \(error\) \{\s*syncCurrencyHint\(container\);\s*showError\(errorElement, error\.message\);/);
+  assert.match(page, /\} catch \(error\) \{\s*syncCurrencyHint\(container\);\s*showError\(errorElement, errorSentence\(error, 'settings\.preferenceSaveFailed'\)\);/);
   assert.match(page, /if \(currencySelect\) currencySelect\.value = preset\.currency;\s*syncCurrencyHint\(container\);/);
 });

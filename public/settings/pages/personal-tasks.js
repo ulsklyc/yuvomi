@@ -4,6 +4,7 @@ import { esc } from '/utils/html.js';
 import { caldavTargetValue, SYNC_TARGET_LOCAL } from '/utils/sync-target.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { createRetryState, settingRowHtml } from '/settings/components.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Standardwerte, die nur für die eigenen neuen Aufgaben gelten (#695).
@@ -156,7 +157,7 @@ function bindEvents(container) {
       window.yuvomi?.showToast(t('settings.tasksDefaultsSaved'), 'success');
     } catch (error) {
       select.value = persisted;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       if (select.isConnected) select.disabled = false;
     }

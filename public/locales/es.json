@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Cambiar el orden de la familia",
         "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente.",
         "activeModulesHintMore": "Para ocultar un módulo solo para ti, ve a Módulos → Navegación.",
-        "permIntroMore": "Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre."
+        "permIntroMore": "Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre.",
+        "preferenceSaveFailed": "No se ha podido guardar el ajuste."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

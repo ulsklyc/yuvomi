@@ -683,7 +683,7 @@ router.get('/', (req, res) => {
     res.json({ data: req.authMethod === 'display' ? pickDisplayPreferences(data) : data });
   } catch (err) {
     log.error('GET /', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -732,7 +732,7 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!Array.isArray(schedule_hidden_templates)) {
-        return res.status(400).json({ error: 'schedule_hidden_templates muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'schedule_hidden_templates must be an array.', code: 400 });
       }
     }
 
@@ -743,17 +743,17 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (typeof timezone_hint_dismissed !== 'boolean') {
-        return res.status(400).json({ error: 'timezone_hint_dismissed muss true oder false sein.', code: 400 });
+        return res.status(400).json({ error: 'timezone_hint_dismissed must be true or false.', code: 400 });
       }
     }
 
     if (visible_meal_types !== undefined) {
       if (!Array.isArray(visible_meal_types)) {
-        return res.status(400).json({ error: 'visible_meal_types muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'visible_meal_types must be an array.', code: 400 });
       }
       const filtered = visible_meal_types.filter((t) => VALID_MEAL_TYPES.includes(t));
       if (filtered.length === 0) {
-        return res.status(400).json({ error: 'Mindestens ein Mahlzeit-Typ muss aktiv sein', code: 400 });
+        return res.status(400).json({ error: 'At least one meal type must be active.', code: 400 });
       }
       cfgSet('visible_meal_types', filtered.join(','));
     }
@@ -762,7 +762,7 @@ router.put('/', (req, res) => {
       if (meal_type_names === null) {
         cfgSet('meal_type_names', '');
       } else if (typeof meal_type_names !== 'object' || Array.isArray(meal_type_names)) {
-        return res.status(400).json({ error: 'meal_type_names muss ein Objekt sein', code: 400 });
+        return res.status(400).json({ error: 'meal_type_names must be an object.', code: 400 });
       } else {
         // Jeder gesendete Wert muss ein String sein - eine Zahl oder ein
         // verschachteltes Objekt waere ein Aufruffehler und soll nicht still
@@ -771,10 +771,10 @@ router.put('/', (req, res) => {
         // Fehler des Aufrufers, sondern nichts, was wir speichern.
         for (const [slot, value] of Object.entries(meal_type_names)) {
           if (value !== null && typeof value !== 'string') {
-            return res.status(400).json({ error: `meal_type_names.${slot} muss ein String sein`, code: 400 });
+            return res.status(400).json({ error: `meal_type_names.${slot} must be a string.`, code: 400 });
           }
           if (typeof value === 'string' && value.trim().length > MAX_MEAL_TYPE_NAME) {
-            return res.status(400).json({ error: `meal_type_names.${slot}: maximal ${MAX_MEAL_TYPE_NAME} Zeichen`, code: 400 });
+            return res.status(400).json({ error: `meal_type_names.${slot} may be at most ${MAX_MEAL_TYPE_NAME} characters long.`, code: 400 });
           }
         }
         // Ueber parseMealTypeNames normalisiert speichern (getrimmt, leere
@@ -788,14 +788,14 @@ router.put('/', (req, res) => {
 
     if (currency !== undefined) {
       if (!CURRENCY_CODES.includes(currency)) {
-        return res.status(400).json({ error: `Ungültige Währung. Erlaubt: ${CURRENCY_CODES.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `Invalid currency. Allowed: ${CURRENCY_CODES.join(', ')}`, code: 400 });
       }
       cfgSet('currency', currency);
     }
 
     if (date_format !== undefined) {
       if (!VALID_DATE_FORMATS.includes(date_format)) {
-        return res.status(400).json({ error: `Ungültiges Datumsformat. Erlaubt: ${VALID_DATE_FORMATS.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `Invalid date format. Allowed: ${VALID_DATE_FORMATS.join(', ')}`, code: 400 });
       }
       cfgSet('date_format', date_format);
     }
@@ -810,7 +810,7 @@ router.put('/', (req, res) => {
     // Wochenstart — haushaltweit, von jedem Mitglied änderbar (wie date/time_format).
     if (week_start !== undefined) {
       if (!VALID_WEEK_STARTS.includes(week_start)) {
-        return res.status(400).json({ error: `Ungültiger Wochenstart. Erlaubt: ${VALID_WEEK_STARTS.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `Invalid week start. Allowed: ${VALID_WEEK_STARTS.join(', ')}`, code: 400 });
       }
       cfgSet('week_start', week_start);
     }
@@ -821,7 +821,7 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!VALID_BUDGET_MODES.includes(budget_mode)) {
-        return res.status(400).json({ error: `Ungültiger Budget-Modus. Erlaubt: ${VALID_BUDGET_MODES.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `Invalid budget mode. Allowed: ${VALID_BUDGET_MODES.join(', ')}`, code: 400 });
       }
       cfgSet('budget_mode', budget_mode);
     }
@@ -840,7 +840,7 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (region !== null && !isValidRegionValue(region)) {
-        return res.status(400).json({ error: 'Ungültige Region.', code: 400 });
+        return res.status(400).json({ error: 'Invalid region.', code: 400 });
       }
       cfgSet('region', region ?? '');
     }
@@ -859,7 +859,7 @@ router.put('/', (req, res) => {
       }
       if (timezone !== null && timezone !== '' && !isValidTimeZone(timezone)) {
         return res.status(400).json({
-          error: 'Ungültige Zeitzone. Erwartet wird eine IANA-Zone wie "Europe/Berlin".', code: 400,
+          error: 'Invalid time zone. Expected an IANA zone such as "Europe/Berlin".', code: 400,
         });
       }
       // Mit der Zone wandert jede Serie, die zonenlose Ziffern neben einer
@@ -895,7 +895,7 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (language !== null && language !== '' && !isSupportedLocale(language)) {
-        return res.status(400).json({ error: `Ungültige Sprache. Erlaubt: ${VALID_LANGUAGES.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `Invalid language. Allowed: ${VALID_LANGUAGES.join(', ')}`, code: 400 });
       }
       if (language === null || language === '') cfgDelete('language');
       else cfgSet('language', language);
@@ -936,11 +936,11 @@ router.put('/', (req, res) => {
       if (dashboard_widgets === null) {
         cfgUserDelete('dashboard_widgets', req.authUserId);
       } else if (!Array.isArray(dashboard_widgets)) {
-        return res.status(400).json({ error: 'dashboard_widgets muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'dashboard_widgets must be an array.', code: 400 });
       } else {
         const normalized = normalizeWidgetConfig(dashboard_widgets);
         if (normalized === null) {
-          return res.status(400).json({ error: 'dashboard_widgets enthält ungültige Einträge', code: 400 });
+          return res.status(400).json({ error: 'dashboard_widgets contains invalid entries.', code: 400 });
         }
         cfgUserSet('dashboard_widgets', req.authUserId, JSON.stringify(normalized));
       }
@@ -950,7 +950,7 @@ router.put('/', (req, res) => {
       if (dashboard_today_glance === null) {
         cfgUserDelete('dashboard_today_glance', req.authUserId);
       } else if (typeof dashboard_today_glance !== 'boolean') {
-        return res.status(400).json({ error: 'dashboard_today_glance muss ein Boolean sein', code: 400 });
+        return res.status(400).json({ error: 'dashboard_today_glance must be a boolean.', code: 400 });
       } else {
         cfgUserSet('dashboard_today_glance', req.authUserId, dashboard_today_glance ? '1' : '0');
       }
@@ -973,11 +973,11 @@ router.put('/', (req, res) => {
       if (dashboard_widgets_default === null) {
         cfgDelete('dashboard_widgets_default');
       } else if (!Array.isArray(dashboard_widgets_default)) {
-        return res.status(400).json({ error: 'dashboard_widgets_default muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'dashboard_widgets_default must be an array.', code: 400 });
       } else {
         const normalized = normalizeWidgetConfig(dashboard_widgets_default);
         if (normalized === null) {
-          return res.status(400).json({ error: 'dashboard_widgets_default enthält ungültige Einträge', code: 400 });
+          return res.status(400).json({ error: 'dashboard_widgets_default contains invalid entries.', code: 400 });
         }
         cfgSet('dashboard_widgets_default', JSON.stringify(normalized));
       }
@@ -990,7 +990,7 @@ router.put('/', (req, res) => {
       if (dashboard_today_glance_default === null) {
         cfgDelete('dashboard_today_glance_default');
       } else if (typeof dashboard_today_glance_default !== 'boolean') {
-        return res.status(400).json({ error: 'dashboard_today_glance_default muss ein Boolean sein', code: 400 });
+        return res.status(400).json({ error: 'dashboard_today_glance_default must be a boolean.', code: 400 });
       } else {
         cfgSet('dashboard_today_glance_default', dashboard_today_glance_default ? '1' : '0');
       }
@@ -1001,7 +1001,7 @@ router.put('/', (req, res) => {
         return res.status(403).json({ error: 'Admin access required.', code: 403 });
       }
       if (!Array.isArray(disabled_modules)) {
-        return res.status(400).json({ error: 'disabled_modules muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'disabled_modules must be an array.', code: 400 });
       }
       const filtered = disabled_modules
         .filter((m) => typeof m === 'string' && TOGGLEABLE_MODULES.includes(m));
@@ -1020,7 +1020,7 @@ router.put('/', (req, res) => {
     // Haushalts-Schalter darueber.
     if (hidden_modules !== undefined) {
       if (!Array.isArray(hidden_modules)) {
-        return res.status(400).json({ error: 'hidden_modules muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'hidden_modules must be an array.', code: 400 });
       }
       const unique = [...new Set(
         hidden_modules.filter((m) => typeof m === 'string' && TOGGLEABLE_MODULES.includes(m)),
@@ -1030,7 +1030,7 @@ router.put('/', (req, res) => {
 
     if (module_order !== undefined) {
       if (!Array.isArray(module_order)) {
-        return res.status(400).json({ error: 'module_order muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'module_order must be an array.', code: 400 });
       }
       const unique = [...new Set(module_order.filter((id) => typeof id === 'string' && MODULE_ORDER_RE.test(id)))];
       cfgUserSet('module_order', req.authUserId, JSON.stringify(unique));
@@ -1038,7 +1038,7 @@ router.put('/', (req, res) => {
 
     if (mobile_nav_order !== undefined) {
       if (!Array.isArray(mobile_nav_order)) {
-        return res.status(400).json({ error: 'mobile_nav_order muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'mobile_nav_order must be an array.', code: 400 });
       }
       cfgUserSet(
         'mobile_nav_order',
@@ -1065,15 +1065,15 @@ router.put('/', (req, res) => {
     // Standard-Erinnerungen für neue Termine (#497, per-user).
     if (calendar_default_reminders !== undefined) {
       if (!Array.isArray(calendar_default_reminders)) {
-        return res.status(400).json({ error: 'calendar_default_reminders muss ein Array sein', code: 400 });
+        return res.status(400).json({ error: 'calendar_default_reminders must be an array.', code: 400 });
       }
       const nums = calendar_default_reminders.map(Number);
       if (nums.some((n) => !VALID_REMINDER_OFFSETS.includes(n))) {
-        return res.status(400).json({ error: `calendar_default_reminders: erlaubte Offsets (Minuten): ${VALID_REMINDER_OFFSETS.join(', ')}`, code: 400 });
+        return res.status(400).json({ error: `calendar_default_reminders: allowed offsets (minutes): ${VALID_REMINDER_OFFSETS.join(', ')}.`, code: 400 });
       }
       const unique = [...new Set(nums)].sort((a, b) => a - b);
       if (unique.length > MAX_DEFAULT_REMINDERS) {
-        return res.status(400).json({ error: `Maximal ${MAX_DEFAULT_REMINDERS} Standard-Erinnerungen.`, code: 400 });
+        return res.status(400).json({ error: `calendar_default_reminders may hold at most ${MAX_DEFAULT_REMINDERS} reminders.`, code: 400 });
       }
       cfgUserSet('calendar_default_reminders', req.authUserId, JSON.stringify(unique));
     }
@@ -1086,17 +1086,17 @@ router.put('/', (req, res) => {
     // Standard-Sync-Ziel für eigene neue Termine (#620, per-user).
     if (calendar_default_target !== undefined) {
       if (calendar_default_target !== null && typeof calendar_default_target !== 'string') {
-        return res.status(400).json({ error: 'calendar_default_target muss ein String sein', code: 400 });
+        return res.status(400).json({ error: 'calendar_default_target must be a string.', code: 400 });
       }
       const target = (calendar_default_target ?? '').trim();
       if (target.length > MAX_CALENDAR_TARGET_LENGTH) {
-        return res.status(400).json({ error: `calendar_default_target: maximal ${MAX_CALENDAR_TARGET_LENGTH} Zeichen`, code: 400 });
+        return res.status(400).json({ error: `calendar_default_target may be at most ${MAX_CALENDAR_TARGET_LENGTH} characters long.`, code: 400 });
       }
       // Leer = "Lokal speichern" und damit das ausdrückliche Abwählen eines
       // zuvor gesetzten Ziels. parseSyncTargetValue liefert dafür {kind:'local'},
       // also einen gültigen Wert, und null nur bei echtem Formfehler.
       if (parseSyncTargetValue(target) === null) {
-        return res.status(400).json({ error: 'calendar_default_target: erwartet "google:<id>", "caldav:<kontoId>|<url>" oder "outlook:<kontoId>|<kalenderId>"', code: 400 });
+        return res.status(400).json({ error: 'calendar_default_target: expected "google:<id>", "caldav:<accountId>|<url>" or "outlook:<accountId>|<calendarId>".', code: 400 });
       }
       cfgUserSet('calendar_default_target', req.authUserId, target);
     }
@@ -1108,15 +1108,15 @@ router.put('/', (req, res) => {
     // ohne dass der Grund an dieser Stelle sichtbar wäre.
     if (tasks_default_target !== undefined) {
       if (tasks_default_target !== null && typeof tasks_default_target !== 'string') {
-        return res.status(400).json({ error: 'tasks_default_target muss ein String sein', code: 400 });
+        return res.status(400).json({ error: 'tasks_default_target must be a string.', code: 400 });
       }
       const target = (tasks_default_target ?? '').trim();
       if (target.length > MAX_CALENDAR_TARGET_LENGTH) {
-        return res.status(400).json({ error: `tasks_default_target: maximal ${MAX_CALENDAR_TARGET_LENGTH} Zeichen`, code: 400 });
+        return res.status(400).json({ error: `tasks_default_target may be at most ${MAX_CALENDAR_TARGET_LENGTH} characters long.`, code: 400 });
       }
       const parsed = parseSyncTargetValue(target);
       if (parsed === null || parsed.kind === 'google') {
-        return res.status(400).json({ error: 'tasks_default_target: erwartet "caldav:<kontoId>|<url>"', code: 400 });
+        return res.status(400).json({ error: 'tasks_default_target: expected "caldav:<accountId>|<url>".', code: 400 });
       }
       cfgUserSet('tasks_default_target', req.authUserId, target);
     }
@@ -1223,7 +1223,7 @@ router.put('/', (req, res) => {
       }
       if (weather_provider !== undefined) {
         if (weather_provider !== null && !VALID_WEATHER_PROVIDERS.includes(weather_provider)) {
-          return res.status(400).json({ error: `Ungültiger Anbieter. Erlaubt: ${VALID_WEATHER_PROVIDERS.join(', ')}`, code: 400 });
+          return res.status(400).json({ error: `Invalid provider. Allowed: ${VALID_WEATHER_PROVIDERS.join(', ')}`, code: 400 });
         }
         if (weather_provider === null) cfgDelete('weather_provider');
         else cfgSet('weather_provider', weather_provider);
@@ -1236,7 +1236,7 @@ router.put('/', (req, res) => {
       } else if (weather_lat !== undefined) {
         const v = parseFloat(weather_lat);
         if (isNaN(v) || v < -90 || v > 90) {
-          return res.status(400).json({ error: 'Ungültiger Breitengrad (–90 bis 90).', code: 400 });
+          return res.status(400).json({ error: 'Invalid latitude (-90 to 90).', code: 400 });
         }
         cfgSet('weather_lat', String(v));
       }
@@ -1245,7 +1245,7 @@ router.put('/', (req, res) => {
       } else if (weather_lon !== undefined) {
         const v = parseFloat(weather_lon);
         if (isNaN(v) || v < -180 || v > 180) {
-          return res.status(400).json({ error: 'Ungültiger Längengrad (–180 bis 180).', code: 400 });
+          return res.status(400).json({ error: 'Invalid longitude (-180 to 180).', code: 400 });
         }
         cfgSet('weather_lon', String(v));
       }
@@ -1256,13 +1256,13 @@ router.put('/', (req, res) => {
       }
       if (weather_units !== undefined) {
         if (!VALID_WEATHER_UNITS.includes(weather_units)) {
-          return res.status(400).json({ error: `Ungültige Einheit. Erlaubt: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
+          return res.status(400).json({ error: `Invalid unit. Allowed: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
         }
         cfgSet('weather_units', weather_units);
       }
       if (weather_auto_locate !== undefined) {
         if (typeof weather_auto_locate !== 'boolean') {
-          return res.status(400).json({ error: 'weather_auto_locate muss ein Boolean sein.', code: 400 });
+          return res.status(400).json({ error: 'weather_auto_locate must be a boolean.', code: 400 });
         }
         cfgSet('weather_auto_locate', weather_auto_locate ? '1' : '0');
       }
@@ -1271,11 +1271,11 @@ router.put('/', (req, res) => {
     // Per-User-Wetter-Override — von jedem authentifizierten Nutzer schreibbar.
     if (weather_user !== undefined) {
       if (typeof weather_user !== 'object' || weather_user === null || Array.isArray(weather_user)) {
-        return res.status(400).json({ error: 'weather_user muss ein Objekt sein.', code: 400 });
+        return res.status(400).json({ error: 'weather_user must be an object.', code: 400 });
       }
       const uid = req.authUserId;
       if (!uid) {
-        return res.status(401).json({ error: 'Authentifizierung erforderlich.', code: 401 });
+        return res.status(401).json({ error: 'Not authenticated.', code: 401 });
       }
       const { lat, lon, city, units, auto_locate } = weather_user;
 
@@ -1284,7 +1284,7 @@ router.put('/', (req, res) => {
         else {
           const v = parseFloat(lat);
           if (isNaN(v) || v < -90 || v > 90) {
-            return res.status(400).json({ error: 'Ungültiger Breitengrad (–90 bis 90).', code: 400 });
+            return res.status(400).json({ error: 'Invalid latitude (-90 to 90).', code: 400 });
           }
           cfgUserSet('weather_lat', uid, String(v));
         }
@@ -1294,7 +1294,7 @@ router.put('/', (req, res) => {
         else {
           const v = parseFloat(lon);
           if (isNaN(v) || v < -180 || v > 180) {
-            return res.status(400).json({ error: 'Ungültiger Längengrad (–180 bis 180).', code: 400 });
+            return res.status(400).json({ error: 'Invalid longitude (-180 to 180).', code: 400 });
           }
           cfgUserSet('weather_lon', uid, String(v));
         }
@@ -1308,7 +1308,7 @@ router.put('/', (req, res) => {
         if (units === null) cfgDelete(userCfgKey('weather_units', uid));
         else {
           if (!VALID_WEATHER_UNITS.includes(units)) {
-            return res.status(400).json({ error: `Ungültige Einheit. Erlaubt: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
+            return res.status(400).json({ error: `Invalid unit. Allowed: ${VALID_WEATHER_UNITS.join(', ')}`, code: 400 });
           }
           cfgUserSet('weather_units', uid, units);
         }
@@ -1317,7 +1317,7 @@ router.put('/', (req, res) => {
         if (auto_locate === null) cfgDelete(userCfgKey('weather_auto_locate', uid));
         else {
           if (typeof auto_locate !== 'boolean') {
-            return res.status(400).json({ error: 'weather_user.auto_locate muss ein Boolean sein.', code: 400 });
+            return res.status(400).json({ error: 'weather_user.auto_locate must be a boolean.', code: 400 });
           }
           cfgUserSet('weather_auto_locate', uid, auto_locate ? '1' : '0');
         }
@@ -1339,7 +1339,7 @@ router.put('/', (req, res) => {
       }
       if (holiday_country !== undefined) {
         if (holiday_country !== null && !COUNTRY_ISO_RE.test(holiday_country)) {
-          return res.status(400).json({ error: 'Ungültiger Ländercode (2 Großbuchstaben, z. B. DE).', code: 400 });
+          return res.status(400).json({ error: 'Invalid country code (2 capital letters, e.g. DE).', code: 400 });
         }
         if (holiday_country === null) {
           cfgDelete('holiday_country');
@@ -1354,7 +1354,7 @@ router.put('/', (req, res) => {
       }
       if (holiday_subdivision !== undefined) {
         if (holiday_subdivision !== null && !SUBDIVISION_RE.test(holiday_subdivision)) {
-          return res.status(400).json({ error: 'Ungültiger Regionscode (z. B. DE-BY).', code: 400 });
+          return res.status(400).json({ error: 'Invalid region code (e.g. DE-BY).', code: 400 });
         }
         // Wird eine gespeicherte Subdivision entfernt, faellt ihre Schulferien-
         // Gruppe mit (CH-BE-VS gehoert zu CH-BE). War gar keine gespeichert, gehoert
@@ -1373,7 +1373,7 @@ router.put('/', (req, res) => {
       // Grammatik wie ein Regionscode. NULL/leer = keine Gruppe gewählt. (#434)
       if (holiday_group !== undefined) {
         if (holiday_group !== null && holiday_group !== '' && !SUBDIVISION_RE.test(holiday_group)) {
-          return res.status(400).json({ error: 'Ungültiger Gruppencode (z. B. CH-BE-VS).', code: 400 });
+          return res.status(400).json({ error: 'Invalid group code (e.g. CH-BE-VS).', code: 400 });
         }
         if (holiday_group === null || holiday_group === '') cfgDelete('holiday_group');
         else cfgSet('holiday_group', holiday_group);
@@ -1392,13 +1392,13 @@ router.put('/', (req, res) => {
       }
       if (holiday_public_color !== undefined) {
         if (!HEX_COLOR_RE.test(holiday_public_color)) {
-          return res.status(400).json({ error: 'holiday_public_color muss ein gültiger Hex-Farbwert sein (z. B. #FF3B30).', code: 400 });
+          return res.status(400).json({ error: 'holiday_public_color must be a valid hex color (e.g. #FF3B30).', code: 400 });
         }
         cfgSet('holiday_public_color', holiday_public_color);
       }
       if (holiday_school_color !== undefined) {
         if (!HEX_COLOR_RE.test(holiday_school_color)) {
-          return res.status(400).json({ error: 'holiday_school_color muss ein gültiger Hex-Farbwert sein (z. B. #34C759).', code: 400 });
+          return res.status(400).json({ error: 'holiday_school_color must be a valid hex color (e.g. #34C759).', code: 400 });
         }
         cfgSet('holiday_school_color', holiday_school_color);
       }
@@ -1495,7 +1495,7 @@ router.put('/', (req, res) => {
     res.json(payload);
   } catch (err) {
     log.error('PUT /', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   } finally {
     // Noch offen heisst: der Handler ist NICHT ueber das COMMIT gegangen - ein
     // Feld wurde abgelehnt oder etwas hat geworfen. Dann gilt nichts aus dieser
@@ -1540,7 +1540,7 @@ router.get('/holidays/countries', async (_req, res) => {
     res.json({ data: countries });
   } catch (err) {
     log.error('GET /holidays/countries', err);
-    res.status(502).json({ error: 'Fehler beim Abrufen der Länderliste.', code: 502 });
+    res.status(502).json({ error: 'The country list could not be loaded.', code: 502 });
   }
 });
 
@@ -1552,14 +1552,14 @@ router.get('/holidays/countries', async (_req, res) => {
 router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
   const { countryCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
   }
   try {
     const subdivisions = await holidays.getSubdivisions(countryCode, supportedLocaleFor(req.query.lang));
     res.json({ data: subdivisions });
   } catch (err) {
     log.error('GET /holidays/subdivisions/:countryCode', err);
-    res.status(502).json({ error: 'Fehler beim Abrufen der Regionsliste.', code: 502 });
+    res.status(502).json({ error: 'The region list could not be loaded.', code: 502 });
   }
 });
 
@@ -1570,14 +1570,14 @@ router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
 router.get('/holidays/groups/:countryCode', async (req, res) => {
   const { countryCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
   }
   try {
     const groups = await holidays.getGroups(countryCode, null);
     res.json({ data: groups });
   } catch (err) {
     log.error('GET /holidays/groups/:countryCode', err);
-    res.status(502).json({ error: 'Fehler beim Abrufen der Ferien-Gruppen.', code: 502 });
+    res.status(502).json({ error: 'The school holiday groups could not be loaded.', code: 502 });
   }
 });
 
@@ -1587,17 +1587,17 @@ router.get('/holidays/groups/:countryCode', async (req, res) => {
 router.get('/holidays/groups/:countryCode/:subdivisionCode', async (req, res) => {
   const { countryCode, subdivisionCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
   }
   if (!SUBDIVISION_RE.test(subdivisionCode)) {
-    return res.status(400).json({ error: 'Ungültiger Regionscode.', code: 400 });
+    return res.status(400).json({ error: 'Invalid region code.', code: 400 });
   }
   try {
     const groups = await holidays.getGroups(countryCode, subdivisionCode);
     res.json({ data: groups });
   } catch (err) {
     log.error('GET /holidays/groups/:countryCode/:subdivisionCode', err);
-    res.status(502).json({ error: 'Fehler beim Abrufen der Ferien-Gruppen.', code: 502 });
+    res.status(502).json({ error: 'The school holiday groups could not be loaded.', code: 502 });
   }
 });
 
@@ -1611,7 +1611,7 @@ router.post('/holidays/sync', async (req, res) => {
     res.json({ data: { last_sync: cfgGet('holiday_last_sync') ?? null } });
   } catch (err) {
     log.error('POST /holidays/sync', err);
-    res.status(502).json({ error: 'Fehler bei der Feiertags-Synchronisierung: ' + err.message, code: 502 });
+    res.status(502).json({ error: 'Holiday sync failed: ' + err.message, code: 502 });
   }
 });
 

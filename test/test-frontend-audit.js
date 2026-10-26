@@ -22231,6 +22231,20 @@ const ERROR_MESSAGE_CLEAN = [
   'pages/calendar.js',
   'settings/pages/admin-immich.js',
   'pages/dashboard.js',
+  // Die Preferences-Scheibe von #1695: der Server spricht dort Englisch, die
+  // Blaetter sagen ihren eigenen Satz (settings.preferenceSaveFailed).
+  'settings/components.js',
+  'settings/pages/admin-weather.js',
+  'settings/pages/modules-active.js',
+  'settings/pages/modules-calendar.js',
+  'settings/pages/modules-countdowns.js',
+  'settings/pages/modules-navigation.js',
+  'settings/pages/modules-options.js',
+  'settings/pages/personal-appearance.js',
+  'settings/pages/personal-calendar.js',
+  'settings/pages/personal-tasks.js',
+  'settings/pages/personal-weather.js',
+  'utils/household-zone-hint.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {

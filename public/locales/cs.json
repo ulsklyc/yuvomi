@@ -3494,7 +3494,8 @@
         "permCapabilityTasksReorder": "Měnit pořadí rodiny",
         "permChildRoleHint": "Nové dětské účty dostanou při vytvoření navíc vlastní počáteční oprávnění: {{list}}. Potom jsou uvedena u daného člena.",
         "activeModulesHintMore": "Skrýt modul jen u sebe můžeš v Moduly → Navigace.",
-        "permIntroMore": "Jednotliví členové se mohou od výchozího nastavení role lišit. Bez nastavení má každá role plný přístup; správci vždy."
+        "permIntroMore": "Jednotliví členové se mohou od výchozího nastavení role lišit. Bez nastavení má každá role plný přístup; správci vždy.",
+        "preferenceSaveFailed": "Nastavení se nepodařilo uložit."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

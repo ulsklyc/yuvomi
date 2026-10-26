@@ -10,6 +10,7 @@ import {
   reportMissingWeatherPlace,
   weatherLocationFieldsHtml,
 } from '/settings/weather-location.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Haushalts-Standardstandort für das Wetter-Widget. Lag bis zum IA-Umbau in
@@ -142,7 +143,7 @@ function bindWeatherEvents(container, user) {
       window.yuvomi?.showToast(t('settings.weatherSaved'), 'success');
       await render(container, { user });
     } catch (error) {
-      errorElement.textContent = error.message || t('common.errorGeneric');
+      errorElement.textContent = errorSentence(error, 'settings.preferenceSaveFailed');
       errorElement.hidden = false;
     }
   });
@@ -159,7 +160,7 @@ function bindWeatherEvents(container, user) {
       );
       await render(container, { user });
     } catch (error) {
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     }
   });
 

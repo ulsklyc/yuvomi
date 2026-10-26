@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **The preferences API answers in English** (#1695). `/api/v1/preferences` and its holiday routes
+  still sent most refusals in German ("timezone_hint_dismissed muss true oder false sein.",
+  "Interner Fehler"); every `error` there is now an English sentence, with the same status codes.
+  API clients that compared the German text need to compare the new one. In the app nothing reads
+  that text any more: a setting that cannot be saved now says so in your language instead of
+  showing the server's sentence.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

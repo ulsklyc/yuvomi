@@ -3616,7 +3616,8 @@
         "permCapabilityTasksReorder": "Zmieniać kolejność rodziny",
         "permChildRoleHint": "Nowe konta dzieci dostają przy tworzeniu także własne uprawnienia początkowe: {{list}}. Potem widnieją przy danym członku.",
         "activeModulesHintMore": "Aby ukryć moduł tylko u siebie, wejdź w Moduły → Nawigacja.",
-        "permIntroMore": "Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze."
+        "permIntroMore": "Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze.",
+        "preferenceSaveFailed": "Nie udało się zapisać ustawienia."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

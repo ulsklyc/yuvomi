@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Đổi thứ tự của gia đình",
         "permChildRoleHint": "Tài khoản trẻ em mới khi được tạo còn nhận quyền khởi đầu riêng: {{list}}. Sau đó các quyền này hiển thị ở thành viên đó.",
         "activeModulesHintMore": "Để chỉ ẩn với riêng bạn, vào Mô-đun → Điều hướng.",
-        "permIntroMore": "Từng thành viên có thể khác với mặc định của vai trò. Nếu không đặt gì, mỗi vai trò có toàn quyền truy cập; quản trị viên luôn luôn."
+        "permIntroMore": "Từng thành viên có thể khác với mặc định của vai trò. Nếu không đặt gì, mỗi vai trò có toàn quyền truy cập; quản trị viên luôn luôn.",
+        "preferenceSaveFailed": "Không thể lưu cài đặt."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

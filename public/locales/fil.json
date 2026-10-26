@@ -3406,7 +3406,8 @@
         "permCapabilityTasksReorder": "Baguhin ang pagkakasunod-sunod ng pamilya",
         "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon.",
         "activeModulesHintMore": "Para itago lang para sa iyo, pumunta sa Mga Modyul → Nabigasyon.",
-        "permIntroMore": "Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator."
+        "permIntroMore": "Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator.",
+        "preferenceSaveFailed": "Hindi ma-save ang setting."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

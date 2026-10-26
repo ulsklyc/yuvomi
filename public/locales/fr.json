@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Modifier l’ordre de la famille",
         "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné.",
         "activeModulesHintMore": "Pour masquer un module seulement pour toi, va dans Modules → Navigation.",
-        "permIntroMore": "Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours."
+        "permIntroMore": "Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours.",
+        "preferenceSaveFailed": "Le réglage n’a pas pu être enregistré."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

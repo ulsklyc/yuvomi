@@ -37,6 +37,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { germanIn, outboundLiterals } from './error-language.js';
 
 const dbmod = await import('../server/db.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
@@ -66,27 +67,8 @@ async function call(method, route, body) {
 }
 
 // ── Die eine Regel ────────────────────────────────────────────────────────────
-// Umlaute und ß, dazu die Woerter, aus denen die alten Saetze und Feldnamen
-// bestanden, und die naheliegenden Nachbarn. Wortgrenzen, damit "Type" nicht an
-// "Typ" haengen bleibt. "Name" und "Bank" sind in beiden Sprachen dasselbe Wort.
-const GERMAN = new RegExp(
-  '[äöüÄÖÜß]|\\b(?:'
-  + 'muss|müssen|darf|dürfen|sein|liegen|haben|zwischen|und|oder|nicht|ist|sind|kein|keine|als|'
-  + 'ungültig|ungueltig|gültig|gueltig|gefunden|erforderlich|fehlt|groesser|kleiner|höchstens|mindestens|'
-  + 'Zeichen|Betrag|Titel|Datum|Monat|Kategorie|Unterkategorie|Intervall|Anzahl|Wiederholung|'
-  + 'Konto|Kontotyp|Startsaldo|Kreditlimit|Farbe|Waehrung|Typ|Darlehen|Buchung|Eintrag|Serie'
-  + ')\\b',
-  'i',
-);
-
-/** Die Aufzaehlung erlaubter Werte ist Datenbestand, kein Wortlaut (siehe Kopf). */
-const withoutKeyList = (sentence) => sentence.replace(/must be one of: [^.]*\./g, 'must be one of: <keys>.');
-
-function germanIn(sentence) {
-  const m = withoutKeyList(sentence).match(GERMAN);
-  return m ? m[0] : null;
-}
-
+// Geteilt mit test:api-error-language (test/error-language.js), damit beide
+// Guards dasselbe "deutsch" meinen.
 test('die Regel selbst: sie erkennt die alten Saetze und laesst die neuen durch', () => {
   for (const old of [
     'month muss YYYY-MM sein',
@@ -246,24 +228,7 @@ test('keine Absage der Budget-Routen traegt deutschen Wortlaut', async () => {
 });
 
 // ── Bein 2: was die Dateien an Saetzen und Feldnamen hinausreichen ────────────
-// Gelesen werden nur Zeilen, an denen ein Satz die Datei Richtung Antwort
-// verlaesst: ein `error:`, ein `refusal(`, ein Aufruf eines geteilten
-// Validators (dessen zweites Argument als Feldname im Satz landet). Kommentare
-// bleiben deutsch und zaehlen nicht.
-const OUTBOUND = /\berror:|\brefusal\(|\b(?:str|num|oneOf|rrule|collectErrors|validateDate|validateMonth|validateColor)\(/;
-const LITERAL = /'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
-
-function outboundLiterals(source) {
-  const found = [];
-  source.split('\n').forEach((line, i) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return;
-    if (!OUTBOUND.test(line)) return;
-    for (const m of line.matchAll(LITERAL)) found.push({ line: i + 1, text: m[1] ?? m[2] });
-  });
-  return found;
-}
-
+// Der Leser (`outboundLiterals`) steht in test/error-language.js.
 test('kein Satz und kein Feldname, den die Budget-Routen hinausreichen, ist deutsch', () => {
   const dir = new URL('../server/routes/budget/', import.meta.url);
   const files = readdirSync(dir).filter((f) => f.endsWith('.js'));

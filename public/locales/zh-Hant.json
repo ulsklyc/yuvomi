@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "變更家庭排序",
         "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。",
         "activeModulesHintMore": "只想在自己這裡隱藏，請前往「模組 → 導航」。",
-        "permIntroMore": "各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。"
+        "permIntroMore": "各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。",
+        "preferenceSaveFailed": "無法儲存設定。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

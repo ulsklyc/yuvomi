@@ -3406,7 +3406,8 @@
         "permCapabilityTasksReorder": "Reihenfolge der Familie ändern",
         "permChildRoleHint": "Neue Kinderkonten bekommen beim Anlegen zusätzlich eigene Startrechte: {{list}}. Danach stehen sie beim jeweiligen Mitglied.",
         "activeModulesHintMore": "Wer ein Modul nur für sich aus der Navigation nehmen will, tut das unter Module → Navigation.",
-        "permIntroMore": "Einzelne Mitglieder können vom Rollen-Standard abweichen. Ohne Einstellung hat jede Rolle vollen Zugriff; Administratoren immer."
+        "permIntroMore": "Einzelne Mitglieder können vom Rollen-Standard abweichen. Ohne Einstellung hat jede Rolle vollen Zugriff; Administratoren immer.",
+        "preferenceSaveFailed": "Die Einstellung konnte nicht gespeichert werden."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

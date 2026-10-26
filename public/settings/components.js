@@ -3,6 +3,7 @@ import { moduleIconHTML } from '/nav-icons.js';
 import { esc } from '/utils/html.js';
 import { getReadableTextColor } from '/utils/color.js';
 import { formRowHtml } from '/utils/form-row.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 let settingRowIdCounter = 0;
 
@@ -183,7 +184,7 @@ export function bindInstantSwitch(input, { save, savedMessage, onRevert = () => 
     } catch (error) {
       input.checked = !value;
       onRevert(!value);
-      window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       if (input.isConnected) input.disabled = false;
     }

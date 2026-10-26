@@ -4,6 +4,7 @@ import { esc } from '/utils/html.js';
 import { buildSyncTargetOptions } from '/utils/sync-target.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Standardwerte, die nur für die eigenen neuen Termine gelten. `preferences.js`
@@ -158,7 +159,7 @@ function bindEvents(container) {
       window.yuvomi?.showToast(t('settings.calendarDefaultsSaved'), 'success');
     } catch (error) {
       assignMe.checked = !value; // Rollback
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       if (assignMe.isConnected) assignMe.disabled = false;
     }
@@ -186,7 +187,7 @@ function bindEvents(container) {
       } catch (error) {
         targetSelect.value = persistedTarget;
         syncOutlookHint();
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       } finally {
         if (targetSelect.isConnected) targetSelect.disabled = false;
       }
@@ -210,7 +211,7 @@ function bindEvents(container) {
       remindersBox.querySelectorAll('.js-default-reminder').forEach((el) => {
         setReminderChip(el, keep.has(Number(el.dataset.value)));
       });
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     }
   }, 500);
 

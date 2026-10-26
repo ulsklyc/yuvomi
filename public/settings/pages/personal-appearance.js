@@ -40,6 +40,7 @@ import {
   SHORT_NAME_LANGUAGES,
   numberLocaleFor,
 } from '/settings/region-presets.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Der Name jedes Segments ist sein sichtbares Wort - vorher trug es ein
 // abweichendes aria-label („Dunkles Design" zu „Dunkel"), und die Gruppe
@@ -728,8 +729,8 @@ function mountTimezoneMismatch(container, preferences, isAdmin) {
       if (result.adopted) window.yuvomi?.showToast(t('settings.timezoneSaved'), 'success');
     } : undefined,
     onError: (error) => {
-      if (errorElement) showError(errorElement, error?.message);
-      else window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+      if (errorElement) showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
+      else window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     },
   }));
 }
@@ -915,7 +916,7 @@ function bindEvents(container, user) {
       // Zurück auf den gespeicherten Wert: sonst zeigt die Seite eine
       // Datensprache an, die nie geschrieben wurde.
       dataLanguageSelect.value = persistedDataLanguage;
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       if (dataLanguageSelect.isConnected) dataLanguageSelect.disabled = false;
     }
@@ -943,7 +944,7 @@ function bindEvents(container, user) {
       }));
       window.yuvomi?.showToast(t('settings.timezoneSaved'), 'success');
     } catch (error) {
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       if (timezoneSelect.isConnected) timezoneSelect.disabled = false;
     }
@@ -1006,7 +1007,7 @@ function bindEvents(container, user) {
       await refreshDataLanguageOptions(container).catch(() => {});
       window.yuvomi?.showToast(t('settings.regionSaved'), 'success');
     } catch (error) {
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       if (regionSelect.isConnected) regionSelect.disabled = false;
       if (currencyDuringRegion?.isConnected) currencyDuringRegion.disabled = false;
@@ -1050,7 +1051,7 @@ function bindEvents(container, user) {
       window.yuvomi?.showToast(t('settings.currencySaved'), 'success');
     } catch (error) {
       syncCurrencyHint(container);
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     }
   });
 
@@ -1069,7 +1070,7 @@ function bindEvents(container, user) {
       applyNumberLocale(readFormatState(container));
       window.yuvomi?.showToast(t('settings.dateFormatSavedToast'), 'success');
     } catch (error) {
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       dateFormatSelect.disabled = false;
     }
@@ -1090,7 +1091,7 @@ function bindEvents(container, user) {
       applyNumberLocale(readFormatState(container));
       window.yuvomi?.showToast(t('settings.timeFormatSavedToast'), 'success');
     } catch (error) {
-      showError(errorElement, error.message);
+      showError(errorElement, errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       timeFormatSelect.disabled = false;
     }

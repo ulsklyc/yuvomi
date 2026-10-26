@@ -1,6 +1,7 @@
 import { t } from '/i18n.js';
 import { settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Modul-Schalter, die vor dem IA-Umbau je ein eigenes Blatt hatten: Budget,
@@ -175,7 +176,7 @@ function bindEvents(container) {
         window.yuvomi?.showToast(t(toggle.savedKey), 'success');
       } catch (error) {
         input.checked = !input.checked; // Rollback nur bei Save-Fehler
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       } finally {
         if (input.isConnected) input.disabled = false;
       }
@@ -195,7 +196,7 @@ function bindEvents(container) {
         window.yuvomi?.showToast(t('settings.scheduleTemplatesSaved'), 'success');
       } catch (error) {
         input.checked = !input.checked;
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
       } finally {
         templateInputs.forEach((el) => { if (el?.isConnected) el.disabled = false; });
       }

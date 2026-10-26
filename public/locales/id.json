@@ -3406,7 +3406,8 @@
         "permCapabilityTasksReorder": "Ubah urutan keluarga",
         "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu.",
         "activeModulesHintMore": "Untuk menyembunyikan hanya bagi dirimu, buka Modul → Navigasi.",
-        "permIntroMore": "Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu."
+        "permIntroMore": "Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu.",
+        "preferenceSaveFailed": "Pengaturan tidak dapat disimpan."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

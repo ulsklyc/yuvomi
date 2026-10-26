@@ -1,6 +1,7 @@
 import { t } from '/i18n.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { settingRowHtml } from '/settings/components.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Spiegelt MAX_COUNTDOWN_GRACE_DAYS in server/routes/preferences (#969).
 const MAX_COUNTDOWN_GRACE_DAYS = 90;
@@ -108,7 +109,7 @@ export function bindGraceDays(container, preferences) {
       window.yuvomi?.showToast(t('settings.countdownGraceDaysSaved'), 'success');
     } catch (error) {
       input.value = String(previous); // Rollback
-      showError(error.message || t('common.errorGeneric'));
+      showError(errorSentence(error, 'settings.preferenceSaveFailed'));
     } finally {
       saving = false;
       input.readOnly = false;

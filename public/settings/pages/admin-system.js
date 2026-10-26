@@ -8,6 +8,7 @@ import {
   createStatusSummary,
   settingRowHtml,
 } from '/settings/components.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -126,7 +127,7 @@ function bindAppNameEvents(container) {
       refreshBranding(value);
       window.yuvomi?.showToast(t('settings.appNameSavedToast'), 'success');
     } catch (error) {
-      errorElement.textContent = error.message || t('common.errorGeneric');
+      errorElement.textContent = errorSentence(error, 'settings.preferenceSaveFailed');
       errorElement.hidden = false;
     }
   };

@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Volgorde van het gezin wijzigen",
         "permChildRoleHint": "Nieuwe kinderaccounts krijgen bij het aanmaken ook eigen startrechten: {{list}}. Daarna staan ze bij het betreffende lid.",
         "activeModulesHintMore": "Wil je een module alleen voor jezelf verbergen, ga dan naar Modules → Navigatie.",
-        "permIntroMore": "Individuele leden kunnen afwijken van de standaard van de rol. Zonder instelling heeft elke rol volledige toegang; beheerders altijd."
+        "permIntroMore": "Individuele leden kunnen afwijken van de standaard van de rol. Zonder instelling heeft elke rol volledige toegang; beheerders altijd.",
+        "preferenceSaveFailed": "De instelling kon niet worden opgeslagen."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

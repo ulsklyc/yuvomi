@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Ändra familjens ordning",
         "permChildRoleHint": "Nya barnkonton får dessutom egna startbehörigheter när de skapas: {{list}}. Därefter står de hos respektive medlem.",
         "activeModulesHintMore": "Vill du dölja en modul bara för dig, gå till Moduler → Navigering.",
-        "permIntroMore": "Enskilda medlemmar kan avvika från rollens standard. Utan inställning har varje roll full åtkomst; administratörer alltid."
+        "permIntroMore": "Enskilda medlemmar kan avvika från rollens standard. Utan inställning har varje roll full åtkomst; administratörer alltid.",
+        "preferenceSaveFailed": "Inställningen kunde inte sparas."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

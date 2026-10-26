@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Modificare l’ordine della famiglia",
         "permChildRoleHint": "I nuovi account bambino ricevono inoltre, alla creazione, permessi iniziali propri: {{list}}. Poi compaiono presso il rispettivo membro.",
         "activeModulesHintMore": "Per nascondere un modulo solo per te, vai su Moduli → Navigazione.",
-        "permIntroMore": "Ogni membro può differire dal valore predefinito del ruolo. Senza impostazioni, ogni ruolo ha accesso completo; gli amministratori sempre."
+        "permIntroMore": "Ogni membro può differire dal valore predefinito del ruolo. Senza impostazioni, ogni ruolo ha accesso completo; gli amministratori sempre.",
+        "preferenceSaveFailed": "Impossibile salvare l’impostazione."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

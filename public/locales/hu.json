@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "A család sorrendjének módosítása",
         "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók.",
         "activeModulesHintMore": "Ha csak magadnál rejtenéd el, nézd meg a Modulok → Navigáció oldalt.",
-        "permIntroMore": "Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig."
+        "permIntroMore": "Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig.",
+        "preferenceSaveFailed": "A beállítás nem menthető."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

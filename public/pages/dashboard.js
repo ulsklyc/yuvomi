@@ -7472,6 +7472,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     user, t, api, wall: wallMode,
     before: container.querySelector('#dashboard-shell'),
     toast: (message, type) => window.yuvomi?.showToast(message, type),
+    sentence: (error) => errorSentence(error, 'settings.preferenceSaveFailed'),
   });
   // ERSTE SCHRITTE (R23 D14): nach dem Rundgang drei Wege - Familie, Module,
   // Region - an derselben Stelle wie der Zonen-Hinweis, vom ersten Bild an

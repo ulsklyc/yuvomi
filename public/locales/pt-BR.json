@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Alterar a ordem da família",
         "permChildRoleHint": "Contas infantis novas também recebem permissões iniciais próprias ao serem criadas: {{list}}. Depois elas aparecem no respectivo membro.",
         "activeModulesHintMore": "Para ocultar um módulo só para você, vá em Módulos → Navegação.",
-        "permIntroMore": "Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre."
+        "permIntroMore": "Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre.",
+        "preferenceSaveFailed": "Não foi possível salvar a configuração."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

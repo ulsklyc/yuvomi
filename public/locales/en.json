@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Change the family order",
         "permChildRoleHint": "New child accounts also get their own starting permissions when they are created: {{list}}. Afterwards they are listed with that member.",
         "activeModulesHintMore": "To take a module out of your own navigation only, go to Modules → Navigation.",
-        "permIntroMore": "Individual members can differ from the role default. With nothing set, every role has full access; administrators always do."
+        "permIntroMore": "Individual members can differ from the role default. With nothing set, every role has full access; administrators always do.",
+        "preferenceSaveFailed": "The setting could not be saved."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

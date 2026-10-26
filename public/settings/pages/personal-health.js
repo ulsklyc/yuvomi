@@ -5,6 +5,7 @@ import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 import { VITAL_METRICS } from '/utils/health-vitals.js';
 import { canUseFasting } from '/permissions.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Die Bereiche, deren Standard-Sichtbarkeit hier gewaehlt wird (#958).
@@ -165,7 +166,7 @@ function bindEvents(container) {
       window.yuvomi?.showToast(t('settings.healthCyclePersonalSaved'), 'success');
     } catch (error) {
       input.checked = !input.checked; // Rollback nur bei Save-Fehler
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       if (input.isConnected) input.disabled = false;
     }
@@ -182,7 +183,7 @@ function bindEvents(container) {
       window.yuvomi?.showToast(t('settings.healthPreventionNotifyCaregiversSaved'), 'success');
     } catch (error) {
       notifyInput.checked = !notifyInput.checked;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       if (notifyInput.isConnected) notifyInput.disabled = false;
     }

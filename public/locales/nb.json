@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Endre familiens rekkefølge",
         "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet.",
         "activeModulesHintMore": "For å fjerne en modul kun fra din egen navigasjon, gå til Moduler → Navigasjon.",
-        "permIntroMore": "Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang."
+        "permIntroMore": "Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang.",
+        "preferenceSaveFailed": "Innstillingen kunne ikke lagres."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

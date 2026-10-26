@@ -3388,7 +3388,8 @@
         "permCapabilityTasksReorder": "Ailenin sıralamasını değiştir",
         "permChildRoleHint": "Yeni çocuk hesapları oluşturulurken ayrıca kendi başlangıç izinlerini alır: {{list}}. Sonra bunlar ilgili üyede görünür.",
         "activeModulesHintMore": "Bir modülü yalnızca kendinde gizlemek için Modüller → Gezinme sayfasına git.",
-        "permIntroMore": "Bireysel üyeler rol varsayılanından farklı olabilir. Ayar yapılmazsa her rol tam erişime sahiptir; yöneticiler her zaman."
+        "permIntroMore": "Bireysel üyeler rol varsayılanından farklı olabilir. Ayar yapılmazsa her rol tam erişime sahiptir; yöneticiler her zaman.",
+        "preferenceSaveFailed": "Ayar kaydedilemedi."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

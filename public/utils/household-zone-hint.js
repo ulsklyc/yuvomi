@@ -324,10 +324,12 @@ export function zoneHintButtons(el) {
  * @param {{get:Function,put:Function}} deps.api
  * @param {boolean} [deps.wall]  Wandmodus: nie
  * @param {(message:string, type:string) => void} [deps.toast]
+ * @param {(error:unknown) => string} [deps.sentence]  Satz der App zu einem gescheiterten Speichern;
+ *   ohne ihn der allgemeine Satz der Einstellungen, nie der Text des Servers
  * @param {Node|null} [deps.before]  Kind von `host`, vor dem die Zeile steht
  * @returns {HTMLElement|null}
  */
-export function mountZonePrompt(host, { user, t, api, wall = false, toast, before = null } = {}) {
+export function mountZonePrompt(host, { user, t, api, wall = false, toast, sentence, before = null } = {}) {
   if (!host) return null;
   const mismatch = zonePrompt(_prefs, user, { wall });
   if (!mismatch) return null;
@@ -343,7 +345,7 @@ export function mountZonePrompt(host, { user, t, api, wall = false, toast, befor
       await keepZone({ api });
       el.remove();
     },
-    onError: (error) => toast?.(error?.message || t('common.errorGeneric'), 'danger'),
+    onError: (error) => toast?.(sentence ? sentence(error) : t('settings.preferenceSaveFailed'), 'danger'),
   });
   host.insertBefore(el, before ?? host.firstChild);
   return el;

@@ -3,6 +3,7 @@ import { t } from '/i18n.js';
 import { captureOpenContext, confirmModal, isModalContextCurrent } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Spiegelt MAX_POINTS in server/routes/tasks.js.
 const MAX_TASK_POINTS = 10000;
@@ -60,7 +61,7 @@ function bindEvents(container, preferences) {
       window.yuvomi?.showToast(t('settings.rewardsSaved'), 'success');
     } catch (error) {
       approvalToggle.checked = !approvalToggle.checked;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       approvalToggle.disabled = false;
     }
@@ -131,7 +132,7 @@ export function bindDefaultPoints(container, preferences) {
       window.yuvomi?.showToast(t('settings.rewardsDefaultPointsSaved'), 'success');
     } catch (error) {
       input.value = String(previous); // Rollback
-      showError(error.message || t('common.errorGeneric'));
+      showError(errorSentence(error, 'settings.preferenceSaveFailed'));
       return;
     } finally {
       saving = false;
