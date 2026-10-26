@@ -2259,20 +2259,26 @@ function openVisitEditModal(visit, content, { onDone } = {}) {
           ? null
           : (parseAmountInput(fields.daily_rate.value) ?? 0);
         const extras = parseAmountInput(fields.extras.value) ?? 0;
+        // Der zweite Riegel fuer den Beleg: ohne Schreibrecht auf die
+        // Dokumente wird nichts hochgeladen, auch wenn ein Feld aus einem
+        // aelteren Stand noch eine Datei traegt. Der Einsatz speichert dann
+        // mit der Verknuepfung, die er schon hat. Ebenso bei einem Beleg,
+        // den der Server nicht nennt (#1358): ihn ersetzen weist der Server
+        // mit 403 ab, das hochgeladene Dokument bliebe verwaist liegen.
+        const file = mayWritePath('/documents') && !receiptHiddenFromViewer(visit)
+          ? panel.querySelector('#housekeeping-receipt-file')?.files?.[0]
+          : null;
+        // Ein Beleg ueber der Grenze ist kein Fehlschlag des Speicherns,
+        // sondern eine Eingabe, die nicht durchgeht: Satz und Abbruch VOR
+        // jeder Anfrage (#2258). Im try geworfen, ueberschrieb ihn das catch.
+        if (file && file.size > maxUploadBytes()) {
+          window.yuvomi?.showToast(t('documents.fileTooLarge', { size: maxUploadMb() }), 'danger');
+          return;
+        }
         let receiptDocumentId = visit.receipt_document_id || null;
         const modalContext = captureModalContext();
         try {
-          // Der zweite Riegel fuer den Beleg: ohne Schreibrecht auf die
-          // Dokumente wird nichts hochgeladen, auch wenn ein Feld aus einem
-          // aelteren Stand noch eine Datei traegt. Der Einsatz speichert dann
-          // mit der Verknuepfung, die er schon hat. Ebenso bei einem Beleg,
-          // den der Server nicht nennt (#1358): ihn ersetzen weist der Server
-          // mit 403 ab, das hochgeladene Dokument bliebe verwaist liegen.
-          const file = mayWritePath('/documents') && !receiptHiddenFromViewer(visit)
-            ? panel.querySelector('#housekeeping-receipt-file')?.files?.[0]
-            : null;
           if (file) {
-            if (file.size > maxUploadBytes()) throw new Error(t('documents.fileTooLarge', { size: maxUploadMb() }));
             const receipt = await api.post('/documents', {
               name: t('housekeeping.receiptDocumentName', {
                 name: worker?.display_name || t('housekeeping.unnamedWorker'),

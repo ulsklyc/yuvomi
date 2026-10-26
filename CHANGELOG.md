@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A too large receipt for a housekeeping visit says so** (#2258). Saving a visit with a receipt
+  above the upload limit showed only that the visit could not be saved. The dialog now names the
+  limit before anything is sent and stays open with your entries.
 - **A too large event attachment says so** (#2255). Saving an event with a file above the upload
   limit showed only that the event could not be saved. The dialog now names the limit before
   anything is sent and stays open with your entries.

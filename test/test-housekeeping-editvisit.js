@@ -524,3 +524,50 @@ test('R23: Besuchsbericht mit Bearbeiten statt Abbrechen, Einchecken mit Namen, 
   const einsatz = Object.entries(de).filter(([, v]) => /Einsatz|Einsätze/.test(v)).map(([k]) => k);
   assert.deepEqual(einsatz, [], 'die Haushaltshilfe sagt "Besuch" (Reiter "Besuche"), nicht "Einsatz"');
 });
+
+// #2258: ein Beleg ueber der Upload-Grenze ist eine Eingabe, die nicht
+// durchgeht, kein Fehlschlag des Speicherns. Im try geworfen, ersetzte das
+// allgemeine catch den Satz durch `errorSentence(err)` - der Toast sagte nur,
+// dass nicht gespeichert wurde. Gefahren wird der echte Submit-Handler mit
+// einer Datei, die eine Bytes ueber der Grenze liegt.
+test('#2258 Beleg ueber der Upload-Grenze: der Toast nennt die Grenze, nichts geht raus, der Dialog bleibt offen', async () => {
+  const { maxUploadBytes, maxUploadMb } = await import('../public/utils/upload-limit.js');
+  const s = hk.state();
+  const zuvor = { workers: s.workers };
+  s.workers = [{ id: 7, display_name: 'Maria' }];
+  const geschrieben = [];
+  const geschlossen = [];
+  globalThis.__apiStub = {
+    get: async () => ({ data: [] }),
+    post: async (path) => { geschrieben.push(`POST ${path}`); return { data: { id: 1 } }; },
+    put: async (path) => { geschrieben.push(`PUT ${path}`); return { data: {} }; },
+  };
+  globalThis.__closeModal = (opts) => { geschlossen.push(opts); };
+  let opts = null;
+  const vorher = globalThis.__openModal;
+  globalThis.__openModal = (o) => { opts = o; };
+  try {
+    hk.openVisitEditModal(
+      { id: 24, worker_id: 7, can_edit: true, rate_type: 'daily', check_in: '2026-09-30T08:00:00.000Z', daily_rate: 40, extras: 0 },
+      HK_INHALT, { onDone() {} },
+    );
+    assert.ok(opts, 'der Dialog wurde geoeffnet');
+    let submit = null;
+    const form = { addEventListener: (type, fn) => { if (type === 'submit') submit = fn; } };
+    const fileInput = { files: [{ name: 'beleg.pdf', type: 'application/pdf', size: maxUploadBytes() + 1 }] };
+    opts.onSave({ querySelector: (sel) => ({ '#housekeeping-visit-form': form, '#housekeeping-receipt-file': fileInput })[sel] ?? null });
+    assert.equal(typeof submit, 'function', 'das Formular haengt seinen Submit-Handler an');
+    toastCalls.length = 0;
+    const elements = { date: { value: '2026-10-05' }, daily_rate: { value: '40', focus() {} }, extras: { value: '0', focus() {} } };
+    await submit({ preventDefault() {}, currentTarget: { elements, querySelector: () => null } });
+  } finally {
+    globalThis.__openModal = vorher;
+    delete globalThis.__apiStub;
+    delete globalThis.__closeModal;
+    Object.assign(s, zuvor);
+  }
+  assert.deepEqual(toastCalls.map(([msg, art]) => [msg, art]), [[`documents.fileTooLarge${JSON.stringify({ size: maxUploadMb() })}`, 'danger']],
+    'der Satz nennt die Grenze statt des allgemeinen Speicher-Satzes');
+  assert.deepEqual(geschrieben, [], 'weder Beleg noch Besuch werden geschickt');
+  assert.deepEqual(geschlossen, [], 'der Dialog bleibt offen mit der Eingabe');
+});
