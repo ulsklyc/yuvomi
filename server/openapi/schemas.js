@@ -11,6 +11,18 @@ const noteInputProperties = {
     ],
   },
   category_ids: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+  visibility: {
+    type: 'string',
+    enum: ['all', 'private'],
+    description: '`private`: only the creator sees the note, administrators included. Only the creator can change it.',
+  },
+  locked: {
+    oneOf: [
+      { type: 'integer', enum: [0, 1] },
+      { type: 'boolean' },
+    ],
+    description: 'Locked notes can only be changed by their creator and administrators - ticking checklist items included. Only they can set or lift the lock.',
+  },
 };
 
 // Die Erinnerungsfelder spiegeln `validateReminder()` in
@@ -215,6 +227,8 @@ export const schemas = {
             content: { type: 'string' },
             color: { type: 'string' },
             pinned: { type: 'integer', enum: [0, 1] },
+            visibility: { type: 'string', enum: ['all', 'private'] },
+            locked: { type: 'integer', enum: [0, 1] },
             created_by: { type: ['integer', 'null'] },
             creator_name: { type: ['string', 'null'] },
             categories: { type: 'array', items: { $ref: '#/components/schemas/NoteCategory' } },

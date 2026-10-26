@@ -120,7 +120,7 @@
     "test:calendar-occurrence-overrides": "node scripts/with-env.mjs TZ=UTC node --experimental-sqlite --test test/test-calendar-occurrence-overrides.js && node scripts/with-env.mjs TZ=America/Chicago node --experimental-sqlite --test test/test-calendar-occurrence-overrides.js",
     "test:ncb": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite test/test-notes-contacts-budget.js",
     "test:notes-reader": "node --test test/test-notes-reader.js",
-    "test:notes-routes": "node --experimental-sqlite --test test/test-notes-routes.js test/test-note-categories.js test/test-note-category-filter.js",
+    "test:notes-routes": "node --experimental-sqlite --test test/test-notes-routes.js test/test-note-categories.js test/test-note-category-filter.js test/test-notes-access.js",
     "test:notes-checklist": "node --experimental-sqlite --test test/test-notes-checklist.js",
     "test:tasks-checklist": "node --experimental-sqlite --test test/test-tasks-checklist.js",
     "test:markdown-toolbar": "node --loader ./test/test-browser-loader.mjs --test test/test-markdown-toolbar.js",
