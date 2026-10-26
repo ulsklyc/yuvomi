@@ -119,7 +119,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The event form says when an event will upload to iCloud** (#1927). With the legacy Apple
   Calendar connection set up, a quiet line under the calendar picker says that events in the chosen
   calendar are uploaded to iCloud, as soon as you pick the default calendar - also when you move an
-  event there from a calendar that stays local. Without the connection the form is unchanged.
+  event there from a calendar that stays local. A household with only the default calendar has no
+  picker; there the same line sits under the date and time, unless the event goes to a Google or
+  CalDAV calendar instead. Without the connection the form is unchanged.
 - **Deleting a CalDAV account no longer leaves events and tasks pointing at it** (#1885). An event
   or task created in Yuvomi and meant for that account's calendar or reminder list kept the deleted
   account as its target, and the event stood in no calendar at all. The target now goes with the

@@ -1190,7 +1190,8 @@ reports this as `uploads_to_icloud` on the default calendar (`uploadsLocalEvents
 `server/services/apple-calendar.js`, the same condition the sync run starts on), and the delete
 confirmation then names the upload. The event form names it too (#1927): while the chosen calendar
 uploads, a help line under the calendar picker says so, for a new event as for one moved there;
-there is no question on save. The upload goes into the first iCloud calendar that holds events and
+there is no question on save. With a single local calendar there is no picker, and the same line
+sits under the date and time block while the event stays local (no Google or CalDAV target). The upload goes into the first iCloud calendar that holds events and
 takes new ones (#1840), not blindly into the first one listed; without such a calendar local events
 stay local.
 ICS imports deduplicate within the selected calendar: importing the same UID into two local

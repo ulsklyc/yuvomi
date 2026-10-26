@@ -8637,10 +8637,27 @@ function localCalendarUploadsToIcloud(id) {
   return state.localCalendars.some((item) => Number(item.id) === Number(id) && item.uploads_to_icloud);
 }
 
+/**
+ * Bleibt der Termin ein lokaler (und geht damit mit dem Standardkalender zu
+ * iCloud)? Ein gespiegelter Termin oder einer mit Google- bzw. CalDAV-Ziel
+ * nicht; ein Outlook-Ziel ist ein Push daneben und aendert daran nichts.
+ */
+function landsInLocalCalendar(event) {
+  return (event?.external_source ?? 'local') === 'local'
+    && !event?.target_google_calendar_id && !event?.target_caldav_account_id;
+}
+
 function syncLocalCalendarUploadHint(panel) {
   const select = panel.querySelector('#event-local-calendar');
   const hint = panel.querySelector('#event-local-calendar-upload-hint');
-  if (!select || !hint) return;
+  if (!hint) return;
+  // Ohne Kalenderwahl (ein einziger lokaler Kalender) gilt der Standard; ein
+  // Google- oder CalDAV-Ziel nimmt den Termin aus dem lokalen Kalender.
+  if (!select) {
+    const target = panel.querySelector('#event-sync-target')?.value ?? '';
+    hint.hidden = /^(google|caldav):/.test(target) || !localCalendarUploadsToIcloud(defaultLocalCalendar()?.id);
+    return;
+  }
   const uploads = localCalendarUploadsToIcloud(select.value);
   hint.hidden = !uploads;
   // Ein verborgenes Ziel von aria-describedby liest der Screenreader trotzdem
@@ -8651,8 +8668,7 @@ function syncLocalCalendarUploadHint(panel) {
 
 function wireLocalCalendarUploadHint(panel) {
   const select = panel.querySelector('#event-local-calendar');
-  if (!select) return;
-  select.addEventListener('change', () => syncLocalCalendarUploadHint(panel));
+  select?.addEventListener('change', () => syncLocalCalendarUploadHint(panel));
   syncLocalCalendarUploadHint(panel);
 }
 
@@ -8962,6 +8978,8 @@ function wireEventForm(panel, { mode, event = null, reminder = null }) {
         localSelect.disabled = /^(google|caldav):/.test(syncTargetSelect.value);
         localSelect.closest('.form-group').hidden = localSelect.disabled;
       }
+      // Ohne Kalenderwahl haengt die iCloud-Zeile am Ziel (#1927).
+      if (!localSelect) syncLocalCalendarUploadHint(panel);
     };
 
     // DAS ZIEL FOLGT DER ZUWEISUNG (#1060) - nur beim Anlegen, und nur bis jemand
@@ -9466,6 +9484,8 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       <label class="form-label cal-when__label" for="modal-allday-end">${t('calendar.toLabel')}</label>
       <yuvomi-datepicker type="date" id="modal-allday-end" value="${esc(formatDateInput(endDate))}"></yuvomi-datepicker>
     </div>
+    ${state.localCalendars.length === 1 && (!isEdit || landsInLocalCalendar(event))
+      ? `<p class="form-hint" id="event-local-calendar-upload-hint" hidden>${t('calendar.localCalendarUploadsHint')}</p>` : ''}
 
     <div class="form-group">
       ${renderUserMultiSelect(withChosenPeople(state.users, isEdit ? event.assigned_users : []), selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
