@@ -2943,9 +2943,12 @@ svg.weather-forecast__icon {
 
   /* Trennen nur an Silbengrenzen, nie mitten im Wort (Critique 2026-10-26:
    * „Schul e", „Frü h…"): ein Wort, das auch getrennt nicht passt, endet in
-   * der Ellipse der zweiten Zeile. */
+   * der Ellipse der zweiten Zeile. Die Ellipse JE ZEILE (text-overflow) faellt
+   * weg - sie setzte „Ölwe…" in die erste Zeile und „sel" darunter (Lauf 2);
+   * einzeilige Titel breiter Bloecke behalten sie. */
   .today-timeline__title {
     display: -webkit-box;
+    text-overflow: clip;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -3003,17 +3006,55 @@ svg.weather-forecast__icon {
   display: none;
 }
 
-/* DAS NAECHSTE SPRICHT IN DER LEISTE (Critique 2026-10-26, Befund 2): eine
- * Sprosse hoeher, eine Kante in seinem Ton, und statt der Uhrzeit „in 2 Std."
- * - Breit ist die Leiste die Antwort auf „was kommt als Naechstes". */
+/* DAS NAECHSTE SPRICHT IN DER LEISTE (Critique 2026-10-26, Befund 2; Lauf 2,
+ * D2): eine Sprosse hoeher und am Anfang eine 2px-Kante in seinem Ton - der
+ * Mast unter der Fahne, die seine Zeit nennt. Vorher stand es nur eine Sprosse
+ * ueber dem Nachbarn (1,14:1) und sah aus wie der gewaehlte Block. Die Kante
+ * steht innen, der Ring der Auswahl aussen: beide zugleich bleiben lesbar. */
 .today-timeline__event--upnext {
   background: color-mix(in srgb, var(--c) var(--tint-raised), var(--color-surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) var(--tint-hint), transparent);
+  border-inline-start: 2px solid var(--c);
 }
 
-.today-timeline__event--upnext .today-timeline__time {
+/* Der Punkt (Mahlzeit) hat seinen Mast schon: den Punkt an der Zeit. */
+.today-timeline__event--point.today-timeline__event--upnext {
+  border-inline-start: none;
+}
+
+/* DIE FAHNE DES NAECHSTEN (renderTimelineFlag): in der Achse, Mass und Form
+ * der Jetzt-Pille, aber in der Toenungsleiter seines Moduls statt im Akzent -
+ * „jetzt" bleibt die lauteste Stelle der Leiste. Tinte --tint-ink auf
+ * --tint-raised: hell 6,14:1 (Kalender) und 5,39:1 (Essen), dunkel 5,10:1 und
+ * 5,04:1; die 1px-Kante (--tint-hint) hebt sie von der Flaeche ab.
+ *
+ * DIE LAGE: am Blockanfang (--tl-at), aber nie vor dem Ende der Jetzt-Pille
+ * (--tl-now plus deren halbe Breite, gemessen von placeTodayTimelineFlag) und
+ * nie ueber das Achsenende hinaus (--tl-flag-w). Stehen beide Grenzen gegen-
+ * einander, gewinnt die Pille: clamp() nimmt dann die untere. */
+.today-timeline__flag {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: calc(var(--tl-axis) / 2 - var(--space-1));
+  inset-inline-start: clamp(
+    calc(var(--tl-now, -10) * 100% + var(--tl-now-half, var(--space-6))),
+    calc(var(--tl-at) * 100%),
+    calc(100% - var(--tl-flag-w, 0px))
+  );
+  padding: var(--space-0h) var(--space-1h);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--c) var(--tint-raised), var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) var(--tint-hint), transparent);
   color: color-mix(in srgb, var(--c) var(--tint-ink), var(--color-text-primary));
+  font-size: var(--type-micro);
   font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+/* Die Stunde unter der Fahne schweigt wie die unter der Jetzt-Pille. */
+.today-timeline__hour--flagged {
+  visibility: hidden;
 }
 
 /* DAS GANZTAEGIGE ALS BAND UEBER DER ACHSE (Critique 2026-10-26, Befund 3):
@@ -3070,15 +3111,28 @@ svg.weather-forecast__icon {
   }
 }
 
-/* Der gewaehlte Block hebt sich eine Sprosse und traegt einen Ring in seinem
- * Ton - der Zeiger auf die Zeile darunter. */
+/* DER GEWAEHLTE BLOCK TRAEGT EINEN RING AUSSEN in seinem Ton, mit einer
+ * Fuge in der Flaechenfarbe - der Zeiger auf die Zeile darunter (Critique
+ * 2026-10-26, Lauf 2: er war dieselbe Optik wie das Naechste). Vergangenes
+ * bleibt grau und bekommt denselben Ring. Er hebt sich ueber die Nachbarn,
+ * deren Kante er sonst unterliefe. */
 .today-timeline__event[aria-expanded="true"] {
+  position: relative;
+  z-index: 2;
   background: color-mix(in srgb, var(--c) var(--tint-raised), var(--color-surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) var(--tint-hint), transparent);
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--c);
 }
 
 .today-timeline__event--past[aria-expanded="true"] {
   background: var(--color-surface-elevated-hover);
+}
+
+/* Gewaehlt UND fokussiert: der Fokusring liegt genau dort, wo der Ring der
+ * Auswahl laege. Die Auswahl rueckt deshalb an die Kante, der Fokusring
+ * umschliesst sie - zwei Ringe, zwei Farben, keiner verdeckt den anderen. */
+.today-timeline__event[aria-expanded="true"]:focus-visible {
+  z-index: 3;
+  box-shadow: 0 0 0 2px var(--c);
 }
 
 /* Das Vergangene und der Strich liegen ueber den Spuren, unter den Bloecken
@@ -3141,7 +3195,12 @@ svg.weather-forecast__icon {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* Die Zeit steht am Titel, nicht 1000px weiter am rechten Rand (Lauf 2):
+ * die Zeile steht allein unter der Leiste, ohne Nachbarn, deren Zeiten eine
+ * Spalte bilden. */
 .today-timeline__detail-row > .today-cockpit-card {
+  grid-template-columns: calc(var(--target-sm) + var(--space-5) - var(--space-2)) minmax(0, max-content) auto;
+  justify-content: start;
   border-top: none;
 }
 

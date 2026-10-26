@@ -794,9 +794,14 @@ test('#1698: das Heute-Blatt nennt den Kalender - die Spanne bleibt der Wand', i
   assert.match(sheet, /today-cockpit-card__sub">dashboard\.todayEvent</, 'ohne Kalendernamen bleibt das Wort');
   assert.ok(sheet.includes('&lt;img src=x&gt;') && !sheet.includes('<img src=x>'), 'der Name ist Nutzereingabe und laeuft durch esc()');
   // Seit der Critique 2026-10-26 (Befund 4, Ulas) nennt der zugaengliche Name
-  // eines Blocks auch das Ende; SICHTBAR bleibt es der Wand vorbehalten.
-  const visible = sheet.replace(/<span class="sr-only">[^<]*<\/span>/g, '');
+  // eines Blocks auch das Ende; SICHTBAR bleibt es in Block und Liste der Wand
+  // vorbehalten. Nur die aufgeklappte Zeile eines Blocks nennt die Spanne
+  // (Lauf 2) - sie steht allein und erklaert die Breite des Blocks.
+  const [, detail = ''] = /id="today-timeline-detail"[^>]*>([\s\S]*)$/.exec(sheet) ?? [];
+  const visible = sheet.replace(detail, '').replace(/<span class="sr-only">[^<]*<\/span>/g, '');
+  assert.ok(detail, 'Reichweite: die Leiste steht mit ihrer Detailregion');
   assert.ok(!visible.includes('2026-09-24T22:00'), 'kein sichtbares Ende im Blatt: die Spanne bleibt der Wand vorbehalten');
+  assert.match(detail, /today-cockpit-card__time">2026-09-24T14:00 - 2026-09-24T22:00</, 'die aufgeklappte Zeile nennt Beginn und Ende');
   assert.match(sheet, /<span class="sr-only">,? dashboard\.todayUntil\{(?:"|&quot;)time(?:"|&quot;):(?:"|&quot;)2026-09-24T22:00(?:"|&quot;)\}<\/span>/, 'der Screenreader hoert, bis wann');
   assert.ok(!sheet.includes('wall-row__time-end'));
 }));
@@ -1315,4 +1320,294 @@ test('D1: verstreicht die Zeit einer Mahlzeit, baut der Minutentakt neu', inBrow
   const before = dash.todayFingerprint(data, [], new Date('2026-09-24T16:29:00Z'));
   const after = dash.todayFingerprint(data, [], new Date('2026-09-24T16:31:00Z'));
   assert.notEqual(before, after, 'um 18:30 verlaesst das Abendessen die Zeilen der Kurzfassung');
+}));
+
+
+// DAS NAECHSTE SPRICHT, AUSWAHL, FOKUS, BEWEGUNG (Critique 2026-10-26, Lauf 2,
+// D2 und P2). Die Fahne, ihr Minutentakt und ihre Lage, die Verdrahtung der
+// Leiste gegen ein nachgebautes DOM, der Fokus ueber den Buehnenwechsel und
+// die Regeln des Stylesheets, die sich ohne Browser lesen lassen. Was nur das
+// Auge pruefen kann (Ringe, Kante, Fuge), prueft die Sichtpruefung.
+const dashboardCss = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+/** Der Rumpf der ERSTEN Regel, deren Selektorliste genau `selector` ist (ab `from`). */
+const cssRule = (selector, from = 0) => {
+  const at = dashboardCss.indexOf(`\n${selector} {`, from);
+  return at < 0 ? null : dashboardCss.slice(dashboardCss.indexOf('{', at) + 1, dashboardCss.indexOf('\n}', at));
+};
+
+test('Lauf 2, D2: das Naechste traegt eine Fahne in der Achse - nur es, aria-hidden, im Modulton, mit seiner Relativzeit', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const sheet = dash.renderTodayCockpit(timelineDay(), []);
+  const flags = [...sheet.matchAll(/<span class="today-timeline__flag"([^>]*)>([^<]*)<\/span>/g)];
+  assert.equal(flags.length, 1, 'genau eine Fahne');
+  const [, attrs, label] = flags[0];
+  assert.match(attrs, /aria-hidden="true"/, 'Bild - den Satz traegt der Block');
+  assert.match(attrs, /data-flag-at="960"/, 'am Fussball um 16:00, dem Naechsten');
+  assert.match(attrs, /--c:var\(--module-calendar\)/, 'im Ton des Kalenders, nicht im Akzent der Jetzt-Pille');
+  const slot = /<li class="today-timeline__slot" data-timeline-at="960" style="--tl-left:([^;]+);/.exec(sheet);
+  assert.ok(slot, 'Vorbedingung: der Fussball-Block steht in der Leiste');
+  assert.match(attrs, new RegExp(`--tl-at:${slot[1].replace('.', '\\.')};`), 'ueber dem Blockanfang');
+  // formatTime reicht im Stub den Zeitstempel durch.
+  assert.match(label, /^2026-09-24T16:00 · \S/, 'spaeter als eine Stunde: Uhrzeit, dann die Relativzeit');
+  const axis = /<div class="today-timeline__axis" aria-hidden="true">([\s\S]*?)<\/div>/.exec(sheet)[1];
+  assert.ok(axis.includes('today-timeline__flag'), 'in der Achse');
+  // EINE Quelle: der Block nennt seine Zeit nicht noch einmal sichtbar.
+  const block = /<button type="button" class="[^"]*today-timeline__event--upnext[^"]*"[^>]*>([\s\S]*?)<\/button>/.exec(sheet)[1];
+  assert.ok(!block.includes('today-timeline__time'), 'keine sichtbare Zeit im Block neben der Fahne');
+  assert.ok(block.includes(`<span class="sr-only" data-timeline-when>, ${label}</span>`), 'der zugaengliche Name behaelt sie - dieselbe Auskunft');
+  assert.match(block, /dashboard\.todayTimelineNext/);
+  // Ohne Kommendes keine Fahne.
+  const late = dash.renderTodayCockpit(timelineDay(), [], false, { now: new Date('2026-09-24T20:30:00Z') });
+  assert.ok(!late.includes('today-timeline__flag'), 'um 22:30 kommt nichts mehr');
+}));
+
+test('Lauf 2, D2: die Fahne weicht der Jetzt-Pille aus und bleibt in der Achse - das Stylesheet entscheidet, die Breiten sind gemessen', () => {
+  const rule = cssRule('.today-timeline__flag');
+  assert.ok(rule, 'die Fahne hat eine Regel');
+  const body = /inset-inline-start:\s*clamp\(([\s\S]*?)\);/.exec(rule)?.[1] ?? '';
+  // Die drei Argumente, getrennt an Kommas der obersten Klammerebene.
+  const clamp = ['', ''];
+  let depth = 0;
+  for (const ch of body) {
+    if (ch === ',' && depth === 0) { clamp.push(''); continue; }
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    clamp[clamp.length - 1] += ch;
+  }
+  assert.equal(clamp.length, 4, 'die Lage ist ein clamp() aus drei Teilen');
+  assert.match(clamp[1], /var\(--tl-now[,)][\s\S]*var\(--tl-now-half/, 'untere Grenze: hinter der Jetzt-Pille - sie gewinnt, wenn beide Grenzen kollidieren');
+  assert.match(clamp[2], /var\(--tl-at\)/, 'bevorzugt: der Blockanfang');
+  assert.match(clamp[3], /100% - var\(--tl-flag-w/, 'obere Grenze: endet spaetestens am Achsenende');
+  assert.match(rule, /color-mix\(in srgb, var\(--c\) var\(--tint-ink\), var\(--color-text-primary\)\)/, 'Tinte aus der Toenungsleiter');
+  assert.match(rule, /background: color-mix\(in srgb, var\(--c\) var\(--tint-raised\), var\(--color-surface\)\)/);
+  assert.match(cssRule('.today-timeline__hour--flagged') ?? '', /visibility: hidden/, 'die Stunde unter der Fahne schweigt');
+
+  // Die Messung dazu: halbe Pille plus Fuge, die eigene Breite, die verdeckten Stunden.
+  const style = new Map();
+  const rect = (left, width) => ({ left, right: left + width, width });
+  const hour = (minute, left) => {
+    const classes = new Set();
+    return { dataset: { minute: String(minute) }, classes, getBoundingClientRect: () => rect(left, 14), classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } };
+  };
+  const hours = [hour(900, 400), hour(960, 452), hour(1020, 505)];
+  const flag = { hidden: false, style: { setProperty: (k, v) => style.set(k, v) }, getBoundingClientRect: () => rect(455, 60) };
+  const timeline = {
+    querySelector: (sel) => ({ '[data-timeline-flag]': flag, '.today-timeline__now-time': { getBoundingClientRect: () => rect(380, 40) } })[sel] ?? null,
+    querySelectorAll: (sel) => (sel === '.today-timeline__hour[data-minute]' ? hours : []),
+  };
+  dash.placeTodayTimelineFlag(timeline);
+  assert.equal(style.get('--tl-now-half'), '24px', 'halbe Pille (20) plus Fuge (4)');
+  assert.equal(style.get('--tl-flag-w'), '60px');
+  assert.deepEqual(hours.map((h) => h.classes.has('today-timeline__hour--flagged')), [false, true, true], '15 bleibt, 16 und 17 liegen unter der Fahne');
+});
+
+test('Lauf 2, D2: der Minutentakt zaehlt die Fahne herunter - samt zugaenglichem Namen - und laesst sie schweigen, sobald es begonnen hat', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const style = new Map();
+  const flag = { hidden: false, textContent: '16:00 · in 6 Std.', dataset: { flagAt: '960', flagClock: '16:00' }, style: { setProperty: (k, v) => style.set(k, v) }, getBoundingClientRect: () => ({ left: 0, right: 60, width: 60 }) };
+  const spoken = [{ textContent: ', 16:00 · in 6 Std.' }, { textContent: ', 16:00 · in 6 Std.' }];
+  const timeline = {
+    dataset: { timelineStart: '420', timelineEnd: '1320' },
+    style: { setProperty: (k, v) => style.set(k, v) },
+    querySelector: (sel) => (sel === '[data-timeline-flag]' ? flag : null),
+    querySelectorAll: (sel) => (sel === '[data-timeline-when]' ? spoken : []),
+  };
+  const root = { querySelector: (sel) => (sel === '.today-timeline' ? timeline : null) };
+  dash.updateTodayTimelineNow(root, new Date('2026-09-24T13:35:00Z'));
+  assert.match(flag.textContent, /25/, 'um 15:35: „in 25 Min."');
+  assert.ok(!flag.textContent.includes('16:00'), 'unter einer Stunde ohne Uhrzeit');
+  assert.ok(spoken.every((s) => s.textContent === `, ${flag.textContent}, 16:00`), 'beide Bloecke (zwei Spuren) hoeren es mit der Uhrzeit dahinter');
+  assert.equal(flag.hidden, false);
+  dash.updateTodayTimelineNow(root, new Date('2026-09-24T14:01:00Z'));
+  assert.equal(flag.hidden, true, 'um 16:01 hat der Fussball begonnen');
+}));
+
+test('Lauf 2, D2: beginnt das Naechste, baut der Minutentakt neu - der Block laeuft, der naechste bekommt die Fahne', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const before = dash.todayFingerprint(timelineDay(), [], new Date('2026-09-24T13:59:00Z'));
+  const after = dash.todayFingerprint(timelineDay(), [], new Date('2026-09-24T14:01:00Z'));
+  assert.notEqual(before, after, 'um 16:00 beginnt der Fussball - es endet nichts, und doch ist es ein anderer Stand');
+  const sheet = dash.renderTodayCockpit(timelineDay(), [], false, { now: new Date('2026-09-24T14:01:00Z') });
+  assert.match(sheet, /<span class="today-timeline__flag"[^>]*data-flag-at="1215"/, 'die Fahne steht jetzt am Filmabend');
+}));
+
+/** Ein nachgebautes DOM der Leiste: Spuren (Listen) mit Bloecken, Detailzeilen je Schluessel. */
+function fakeTimeline(lanes) {
+  const log = { focused: null };
+  const buttons = [];
+  for (const [laneIndex, entries] of lanes.entries()) {
+    const lane = { lane: laneIndex };
+    for (const { key, at } of entries) {
+      const attrs = { 'aria-expanded': 'false', tabindex: '-1' };
+      const handlers = {};
+      const slot = at == null ? null : { dataset: { timelineAt: String(at) } };
+      const btn = {
+        name: `${laneIndex}:${key}`,
+        dataset: { timelineEvent: key },
+        attrs,
+        setAttribute: (n, v) => { attrs[n] = String(v); },
+        getAttribute: (n) => attrs[n] ?? null,
+        addEventListener: (type, fn) => { (handlers[type] ??= []).push(fn); },
+        closest: (sel) => (sel === 'ul' ? lane : sel === '[data-timeline-at]' ? slot : null),
+        focus: () => { log.focused = btn; },
+        fire: (type, key2) => {
+          const e = { key: key2, prevented: false, preventDefault() { e.prevented = true; } };
+          for (const fn of handlers[type] ?? []) fn(e);
+          return e;
+        },
+      };
+      buttons.push(btn);
+    }
+  }
+  const rows = [...new Set(buttons.map((b) => b.dataset.timelineEvent))]
+    .map((key) => ({ dataset: { timelineDetail: key }, hidden: true }));
+  const regionHandlers = {};
+  const region = {
+    hidden: true,
+    querySelectorAll: (sel) => (sel === '[data-timeline-detail]' ? rows : []),
+    addEventListener: (type, fn) => { (regionHandlers[type] ??= []).push(fn); },
+    fire: (type, key) => {
+      const e = { key, prevented: false, preventDefault() { e.prevented = true; } };
+      for (const fn of regionHandlers[type] ?? []) fn(e);
+      return e;
+    },
+  };
+  const root = {
+    querySelector: (sel) => (sel === '#today-timeline-detail' ? region : null),
+    querySelectorAll: (sel) => (sel === '[data-timeline-event]' ? buttons : []),
+  };
+  const find = (name) => buttons.find((b) => b.name === name);
+  return { root, region, rows, buttons, find, log };
+}
+
+test('Lauf 2, P2: Esc gibt den Fokus dem Block zurueck, der aufgeklappt hat - beim Termin fuer zwei in dessen Spur', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const { root, region, rows, find, log } = fakeTimeline([
+    [{ key: 'k1', at: 960 }],
+    [{ key: 'k1', at: 960 }, { key: 'k2', at: 1215 }],
+  ]);
+  dash.wireTodayTimeline(root);
+  find('1:k1').fire('click');
+  assert.equal(region.hidden, false, 'die Zeile steht');
+  assert.deepEqual(rows.map((r) => r.hidden), [false, true]);
+  assert.equal(find('0:k1').attrs['aria-expanded'], 'true', 'beide Bloecke des Termins sagen „aufgeklappt"');
+  const e = region.fire('keydown', 'Escape');
+  assert.ok(e.prevented);
+  assert.equal(log.focused, find('1:k1'), 'zurueck in die zweite Spur, nicht in die erste');
+  assert.equal(find('1:k1').attrs.tabindex, '0', 'und er ist der Tab-Stopp');
+  assert.equal(region.hidden, true, 'zugeklappt');
+}));
+
+test('Lauf 2, P2: hoch/runter wechseln die Spur zum naechstgelegenen Beginn, links/rechts bleiben in der Lesereihenfolge', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const { root, find, log } = fakeTimeline([
+    [{ key: 'ganztag' }],
+    [{ key: 'a', at: 480 }, { key: 'b', at: 960 }],
+    [{ key: 'c', at: 600 }, { key: 'd', at: 1000 }],
+  ]);
+  dash.wireTodayTimeline(root);
+  const press = (name, key) => { log.focused = null; return find(name).fire('keydown', key); };
+  assert.ok(press('1:b', 'ArrowDown').prevented);
+  assert.equal(log.focused?.name, '2:d', 'von 16:00 zu 16:40, nicht zu 10:00');
+  press('2:c', 'ArrowUp');
+  assert.equal(log.focused?.name, '1:a', 'von 10:00 zu 08:00 (zwei Stunden), nicht zu 16:00');
+  press('1:a', 'ArrowUp');
+  assert.equal(log.focused?.name, '0:ganztag', 'ueber der ersten Spur liegt das Band');
+  press('0:ganztag', 'ArrowDown');
+  assert.equal(log.focused?.name, '1:a', 'aus dem Band (ohne Beginn) in den ersten Block');
+  const edge = press('2:d', 'ArrowDown');
+  assert.ok(edge.prevented, 'die Seite scrollt nicht');
+  assert.equal(log.focused, null, 'unter der letzten Spur bleibt der Fokus');
+  press('1:b', 'ArrowRight');
+  assert.equal(log.focused?.name, '2:c', 'rechts: der naechste in Lesereihenfolge');
+  press('2:c', 'ArrowLeft');
+  assert.equal(log.focused?.name, '1:b');
+}));
+
+test('Lauf 2, P2: die Zeile gleitet auf und zu wie „+N weitere"; der Wechsel bei offener Zeile blendet nur die Zeile ueber', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const before = globalThis.__motionStub;
+  const moves = [];
+  globalThis.__motionStub = (name, host, arg) => moves.push([name, host?.dataset?.timelineDetail ?? (host ? 'region' : null), arg]);
+  try {
+    const { root, region, rows, find } = fakeTimeline([[{ key: 'k1', at: 960 }, { key: 'k2', at: 1215 }]]);
+    dash.wireTodayTimeline(root);
+    find('0:k1').fire('click');
+    assert.deepEqual(moves, [['toggleRegion', 'region', true]], 'auf: ueber toggleRegion, die Regel von „+N weitere"');
+    assert.equal(region.hidden, false);
+    moves.length = 0;
+    find('0:k2').fire('click');
+    assert.deepEqual(rows.map((r) => r.hidden), [true, false]);
+    assert.deepEqual(moves, [['swapContent', 'k2', {}], ['toggleRegion', 'region', true]],
+      'Wechsel: nur die neue Zeile blendet (swapContent), die Region bleibt offen - ein laufendes Zuklappen haelt an');
+    moves.length = 0;
+    find('0:k2').fire('click');
+    assert.deepEqual(moves, [['toggleRegion', 'region', false]], 'zu: ebenso');
+    assert.equal(region.hidden, true);
+  } finally {
+    globalThis.__motionStub = before;
+  }
+}));
+
+test('Lauf 2, P2: die aufgeklappte Zeile nennt Beginn - Ende; der Punkt nur seinen Beginn; die Zeit steht am Titel', inBrowser(THU_1805_BERLIN, 'Europe/Berlin', () => {
+  const day = { ...timelineDay(), todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Lachs' }] };
+  const sheet = dash.renderTodayCockpit(day, []);
+  const detail = (key) => new RegExp(`data-timeline-detail="${key}"[^>]*>([\\s\\S]*?)</(?:a|button)>`).exec(sheet)?.[1] ?? '';
+  assert.match(detail('14@2026-09-24T20:15'), /today-cockpit-card__time">2026-09-24T20:15 - 2026-09-24T22:00</, 'der Filmabend: 20:15 - 22:00');
+  assert.match(detail('14@2026-09-24T20:15'), /today-cockpit-card__value">Filmabend</, 'mit dem vollen Titel');
+  const meal = detail('meal-9');
+  assert.match(meal, /today-cockpit-card__time">18:30</, 'die Mahlzeit: nur ihre Zeit');
+  assert.ok(!meal.includes(' - '), 'kein Ende am Punkt');
+  assert.match(meal, /today-cockpit-card__sub">[^<·]+</, 'die Unterzeile traegt nur die Art, die Zeit steht rechts');
+  // Die Liste bleibt beim Beginn allein (#1698).
+  const compact = dash.renderTodayCockpit(day, [], false, { stage: 'compact' });
+  assert.ok(!/today-cockpit__rows[\s\S]*2026-09-24T20:15 - /.test(compact), 'die Zeile der Liste nennt keine Spanne');
+  const row = cssRule('.today-timeline__detail-row > .today-cockpit-card');
+  assert.match(row, /grid-template-columns:[^;]*minmax\(0, max-content\) auto;/, 'die Zeit folgt dem Titel');
+  assert.match(row, /justify-content: start;/);
+}));
+
+test('Lauf 2, P2: das Naechste und der gewaehlte Block sehen verschieden aus - Kante innen, Ring aussen, beide neben dem Fokusring', () => {
+  const upnext = cssRule('.today-timeline__event--upnext');
+  assert.match(upnext, /background: color-mix\(in srgb, var\(--c\) var\(--tint-raised\)/, 'eine Sprosse mehr Toenung');
+  assert.match(upnext, /border-inline-start: 2px solid var\(--c\)/, 'die Kante am Blockanfang');
+  const chosen = cssRule('.today-timeline__event[aria-expanded="true"]');
+  assert.ok(!/inset/.test(chosen), 'der Ring der Auswahl liegt aussen');
+  assert.match(chosen, /box-shadow: 0 0 0 2px var\(--color-surface\), 0 0 0 4px var\(--c\)/, 'mit Fuge, im Modulton');
+  assert.notEqual(upnext, chosen, 'nicht mehr dieselbe Optik');
+  const both = cssRule('.today-timeline__event[aria-expanded="true"]:focus-visible');
+  assert.match(both, /box-shadow: 0 0 0 2px var\(--c\)/, 'fokussiert rueckt die Auswahl an die Kante, der Fokusring umschliesst sie');
+  const narrow = dashboardCss.slice(dashboardCss.indexOf('@container tl-slot (max-width: 5rem)'));
+  assert.match(cssRule('  .today-timeline__title', dashboardCss.indexOf('@container tl-slot (max-width: 5rem)')) ?? narrow.slice(0, 900), /text-overflow: clip;/, 'zweizeilig keine Ellipse je Zeile');
+});
+
+test('Lauf 2, P2: der Fokus auf einem Block ueberlebt den Neuaufbau in seiner Spur und den Buehnenwechsel ueber Ersatzkandidaten', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const prevCss = globalThis.CSS;
+  globalThis.CSS = { escape: (v) => String(v) };
+  try {
+    const other = {};
+    const shell = { querySelectorAll: () => [other, btn] };
+    const attrs = { 'data-timeline-event': '16@2026-09-24T19:00' };
+    const detailRow = { dataset: { timelineDetail: '16@2026-09-24T19:00' }, querySelector: () => ({ getAttribute: () => '/calendar?open=16' }) };
+    const sheet = { querySelectorAll: (sel) => (sel === '[data-timeline-detail]' ? [detailRow] : []) };
+    var btn = {
+      id: '',
+      hasAttribute: (n) => n in attrs,
+      getAttribute: (n) => attrs[n] ?? null,
+      closest: (sel) => (sel === '#dashboard-shell' ? shell : sel === '.today-cockpit' ? sheet : null),
+    };
+    assert.deepEqual(dash.focusKeyOf(btn), { selector: '[data-timeline-event="16@2026-09-24T19:00"]', index: 1, preventScroll: true },
+      'der zweite Block des Termins fuer zwei - vorher kein Schluessel, der Fokus fiel auf <body>');
+    assert.deepEqual(dash.todayFocusFallbacks(btn), [
+      { selector: '.today-cockpit__rows [data-route="/calendar?open=16"]', index: 0, preventScroll: true },
+      '.today-timeline [data-timeline-event]:not([tabindex="-1"])',
+      '#today-cockpit-title',
+    ], 'schmal die Zeile mit demselben Ziel, dann der Tab-Stopp der Leiste, zuletzt der Kopf');
+    assert.deepEqual(dash.todayFocusFallbacks({ closest: () => null }), [], 'ausserhalb des Blatts keine');
+    assert.match(dash.renderTodayCockpit(timelineDay(), []), /<h2 id="today-cockpit-title" tabindex="-1">/, 'der Kopf nimmt den Fokus an');
+  } finally {
+    globalThis.CSS = prevCss;
+  }
+}));
+
+test('Lauf 2, P2: der Uebertrag von gestern nennt in der aufgeklappten Zeile sein „bis", keine Spanne', inBrowser(THU_10_BERLIN, 'Europe/Berlin', () => {
+  const day = { ...timelineDay(), upcomingEvents: [...timelineDay().upcomingEvents, ev(17, 'Nachtdienst', '2026-09-23T22:00', '2026-09-24T11:00')] };
+  const sheet = dash.renderTodayCockpit(day, []);
+  const detail = /data-timeline-detail="17@2026-09-23T22:00"[^>]*>([\s\S]*?)<\/a>/.exec(sheet)?.[1] ?? '';
+  assert.match(detail, /today-cockpit-card__time">dashboard\.todayUntil\{[^<]*11:00[^<]*\}</, 'er laeuft seit gestern: „bis 11:00"');
+  assert.ok(!detail.includes(' - '), 'kein „bis 11:00 - 11:00"');
 }));

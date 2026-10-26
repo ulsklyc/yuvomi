@@ -369,7 +369,8 @@ const STUBS = {
     export const expandIn = (el) => { globalThis.__expandIn?.(el); return Promise.resolve(); };
     // Token-Leser ohne Stylesheet: der Rueckfall ist der Wert (utils/flip.js).
     // Region auf-/zuklappen: ohne Layout bleibt nur der Zustand selbst (hidden).
-    export const toggleRegion = (region, open) => { if (region) region.hidden = !open; return Promise.resolve(); };
+    // Wer sehen will, DASS geklappt wird, setzt globalThis.__motionStub (wie swapContent).
+    export const toggleRegion = (region, open) => { globalThis.__motionStub?.('toggleRegion', region, open); if (region) region.hidden = !open; return Promise.resolve(); };
     // Ohne Layout kein Ladezustand am Knopf: nur die Arbeit selbst.
     export const withBusy = (_el, work) => work();
     // Balken wachsen lassen: ohne Layout nichts zu tun, der Endwert steht im Markup.

@@ -4552,14 +4552,19 @@ function todayEventsForTimeline(data, now = new Date()) {
       const endsToday = endRaw.length > 10 && zonedDateKey(endRaw) <= todayKey;
       // Was ueber Mitternacht reicht, endet auf der Achse am Tagesende.
       const end = endRaw.length > 10 ? (endsToday ? householdMinuteOf(endRaw) : 24 * 60) : start;
+      const timeLabel = overviewEventTime(event, span);
+      const endLabel = endsToday && end > start ? formatTime(endRaw) : '';
       timed.push({
         ...base,
         start,
         end: end ?? start,
         // Sichtbar der Beginn allein, wie in der Terminzeile (#1698); das Ende
         // traegt die Breite des Blocks und der zugaengliche Name (Befund 4).
-        timeLabel: overviewEventTime(event, span),
-        endLabel: endsToday && end > start ? formatTime(endRaw) : '',
+        timeLabel,
+        endLabel,
+        // Die aufgeklappte Zeile nennt Beginn UND Ende (timelineDetailRow) -
+        // ausser beim Uebertrag von gestern, der schon „bis 10:00" sagt.
+        rangeLabel: endLabel && !span.carried ? `${timeLabel} - ${endLabel}` : '',
       });
     }
   }
@@ -4749,13 +4754,25 @@ function timelineSheetRows(data, timeline, now = new Date()) {
   for (const item of (timeline?.lanes ?? []).flatMap((lane) => lane.items)) {
     if (item.state === 'past' || seen.has(item.key)) continue;
     seen.add(item.key);
-    // Die Mahlzeit nennt ihre Zeit rechts (withRelativeWhen); die Unterzeile
-    // traegt in der Liste nur ihre Art, wie die Mahlzeit des Programms.
-    rows.push(item.kind === 'meal'
-      ? { ...item.sheetRow, sub: item.title, timeLabel: item.timeLabel }
-      : { ...item.sheetRow });
+    rows.push(item.kind === 'meal' ? timelineMealRow(item) : { ...item.sheetRow });
   }
   return rows;
+}
+
+/* Die Mahlzeit nennt ihre Zeit rechts (withRelativeWhen); die Unterzeile
+ * traegt nur ihre Art, wie die Mahlzeit des Programms. */
+const timelineMealRow = (item) => ({ ...item.sheetRow, sub: item.title, timeLabel: item.timeLabel });
+
+/**
+ * DIE AUFGEKLAPPTE ZEILE NENNT DIE SPANNE (Critique 2026-10-26, Lauf 2). Der
+ * Block zeigt seine Dauer nur als Breite, die Zeile darunter jetzt in Worten:
+ * „15:00 - 16:00" und den vollen Titel, den ein schmaler Block abschneidet.
+ * Die Liste bleibt beim Beginn allein (#1698); ein Punkt (Mahlzeit) hat keine
+ * Dauer und nennt seinen Beginn, die Schicht traegt ihre Spanne schon.
+ */
+function timelineDetailRow(item) {
+  if (item.kind === 'meal') return timelineMealRow(item);
+  return item.rangeLabel ? { ...item.sheetRow, timeLabel: item.rangeLabel } : item.sheetRow;
 }
 
 /* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
@@ -4826,7 +4843,14 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   const button = (item, laneName, { allDay = false } = {}) => {
     const next = item.key === timeline.nextKey;
     const when = next ? relativeWhen(item.start, now, item.timeLabel) : null;
-    const visibleTime = allDay ? '' : (when?.label ?? item.timeLabel);
+    // EINE QUELLE FUER „WANN" (Critique 2026-10-26, Lauf 2, D2): das Naechste
+    // nennt seine Zeit in der Fahne ueber der Achse, nicht im Block - auch wo
+    // der Block breit genug waere. Zweimal „15:00 · in 2 Std." uebereinander
+    // waere dieselbe Auskunft doppelt, und nur die Fahne fuehrt der
+    // Minutentakt nach (updateTodayTimelineNow). Der Block traegt den Titel;
+    // der zugaengliche Name behaelt die Zeit (data-timeline-when, ebenfalls
+    // nachgefuehrt).
+    const visibleTime = allDay || when ? '' : item.timeLabel;
     // Nach „in 2 Std." setzt ein Komma ab, sonst laese es sich „in 2 Std. bis 16:00".
     const until = item.endLabel ? `${next && when ? ',' : ''} ${t('dashboard.todayUntil', { time: item.endLabel })}` : '';
     const state = next ? t('dashboard.todayTimelineNext') : stateLabel[item.state] ?? '';
@@ -4837,7 +4861,7 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
                     aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail">
               <span class="sr-only">${esc(laneName)}: </span><span class="today-timeline__title">${esc(item.title)}</span>${
       visibleTime ? `<span class="today-timeline__time"><span class="sr-only">, </span>${esc(visibleTime)}</span>` : ''}${
-      next && when?.soon ? `<span class="sr-only">, ${esc(item.timeLabel)}</span>` : ''}${
+      when ? `<span class="sr-only" data-timeline-when>, ${esc(spokenWhen(when, item.timeLabel))}</span>` : ''}${
       until ? `<span class="sr-only">${esc(until)}</span>` : ''}${state ? `<span class="sr-only">, ${esc(state)}</span>` : ''}
             </button>`;
   };
@@ -4855,7 +4879,7 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
       : `<span class="today-timeline__everyone" aria-hidden="true"><i data-lucide="users" class="icon-sm"></i></span>`;
     const label = solo ? '' : `<span class="today-timeline__who" aria-hidden="true">${face}<span class="today-timeline__name">${esc(shortName(name))}</span></span>`;
     const items = lane.items.map((item) => `
-          <li class="today-timeline__slot${item.point ? ' today-timeline__slot--point' : ''}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--c:${timelineTone(item)}">
+          <li class="today-timeline__slot${item.point ? ' today-timeline__slot--point' : ''}" data-timeline-at="${item.start}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--c:${timelineTone(item)}">
             ${button(item, shortName(name))}
           </li>`).join('');
     return `
@@ -4870,7 +4894,7 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   // Je Eintrag EINE Zeile, auch wenn er in zwei Spuren steht.
   const details = new Map();
   for (const item of [...(timeline.allDay ?? []), ...timeline.lanes.flatMap((lane) => lane.items)]) {
-    if (!details.has(item.key)) details.set(item.key, item.sheetRow);
+    if (!details.has(item.key)) details.set(item.key, timelineDetailRow(item));
   }
   const open = details.has(openKey) ? openKey : null;
   const detail = `
@@ -4880,7 +4904,7 @@ function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
   return `${band}
     <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
          data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-hours:${timeline.hours.length}${timeline.now == null ? '' : `;--tl-now:${timeline.now}`}">
-      <div class="today-timeline__axis" aria-hidden="true">${hours}</div>
+      <div class="today-timeline__axis" aria-hidden="true">${hours}${renderTimelineFlag(timeline, now)}</div>
       ${lanes}
       ${nowMarker}
     </div>${detail}`;
@@ -4907,6 +4931,56 @@ function axisHourLabel(minute) {
 /** Die Stunde, die die Jetzt-Pille verdeckt, schweigt (Entwurf: „18" fehlt neben 18:05). */
 function hourCovered(minute, nowMinute, timeline) {
   return nowMinute != null && timeline.now != null && Math.abs(minute - nowMinute) < 35;
+}
+
+/** Was der zugaengliche Name des Naechsten sagt: „in 25 Min, 15:00" - unter einer Stunde mit der Uhrzeit dahinter. */
+const spokenWhen = (when, clock) => (when.soon && clock ? `${when.label}, ${clock}` : when.label);
+
+/**
+ * DAS NAECHSTE SPRICHT, AUCH WENN SEIN BLOCK SCHMAL IST (Critique 2026-10-26,
+ * Lauf 2, D2). Bei 1440 war eine Stunde 59px breit - unter der Schwelle des
+ * Blocks (5rem) faellt seine Uhrzeit weg, und ausgerechnet beim Naechsten
+ * fehlte „15:00 · in 1 Std.". Die Fahne steht in der Achse ueber dem
+ * Blockanfang, geformt wie die Jetzt-Pille, aber im Ton des Moduls (--c):
+ * die Pille sagt „jetzt", die Fahne „das kommt". Sie ist Bild (aria-hidden),
+ * den Satz traegt der Block selbst („..., als Naechstes").
+ *
+ * Wo sie genau steht, entscheidet das Stylesheet (`.today-timeline__flag`):
+ * am Blockanfang, aber nie unter der Jetzt-Pille - die hat Vorrang und die
+ * Fahne weicht nach hinten aus - und nie ueber das Achsenende hinaus. Die
+ * Breiten dafuer misst placeTodayTimelineFlag.
+ */
+function renderTimelineFlag(timeline, now) {
+  const item = timeline.lanes.flatMap((lane) => lane.items).find((entry) => entry.key === timeline.nextKey);
+  const when = item ? relativeWhen(item.start, now, item.timeLabel) : null;
+  if (!when) return '';
+  return `<span class="today-timeline__flag" data-timeline-flag aria-hidden="true" data-flag-at="${item.start}" data-flag-clock="${esc(item.timeLabel)}" style="--tl-at:${item.left};--c:${timelineTone(item)}">${esc(when.label)}</span>`;
+}
+
+/* Abstand zwischen Fahne und dem, dem sie ausweicht (Jetzt-Pille, Stunde). */
+const TIMELINE_FLAG_GAP = 4;
+
+/**
+ * Misst, was das Stylesheet fuer die Lage der Fahne braucht: die halbe Breite
+ * der Jetzt-Pille (`--tl-now-half`, die Fahne beginnt erst dahinter) und die
+ * eigene Breite (`--tl-flag-w`, sie endet spaetestens am Achsenende). Die
+ * Stunden, die danach unter ihr liegen, schweigen wie die unter der Pille.
+ * Laeuft beim Verdrahten, im Minutentakt und wenn die Leiste ihre Breite
+ * aendert (ResizeObserver in wireTodayTimeline).
+ */
+function placeTodayTimelineFlag(timeline) {
+  const flag = timeline?.querySelector?.('[data-timeline-flag]');
+  if (!flag) return;
+  const pill = timeline.querySelector('.today-timeline__now-time');
+  const half = pill ? pill.getBoundingClientRect().width / 2 + TIMELINE_FLAG_GAP : 0;
+  flag.style.setProperty('--tl-now-half', `${half}px`);
+  flag.style.setProperty('--tl-flag-w', `${flag.getBoundingClientRect().width}px`);
+  const box = flag.getBoundingClientRect();
+  for (const hour of timeline.querySelectorAll('.today-timeline__hour[data-minute]')) {
+    const rect = hour.getBoundingClientRect();
+    const under = !flag.hidden && rect.right > box.left - TIMELINE_FLAG_GAP && rect.left < box.right + TIMELINE_FLAG_GAP;
+    hour.classList.toggle('today-timeline__hour--flagged', under);
+  }
 }
 
 /**
@@ -4948,35 +5022,91 @@ function renderTodayMiniTimeline(timeline, now = new Date()) {
 /** Aufgeklappt bleibt aufgeklappt, auch wenn der Minutentakt das Blatt neu zeichnet. */
 let todayTimelineOpen = null;
 
+/* Welcher Block die Zeile aufgeklappt hat, als Schluessel und Stelle unter den
+ * Bloecken mit diesem Schluessel: ein Termin fuer zwei steht in zwei Spuren,
+ * und Esc gibt den Fokus dem zurueck, der ihn geoeffnet hat - auch nach einem
+ * Neuaufbau im Minutentakt. */
+let todayTimelineOwner = null;
+
+/* Misst die Fahne nach, wenn die Leiste ihre Breite aendert; einer je Aufbau. */
+let todayFlagObserver = null;
+
 /**
  * Ein Block klappt seine Zeile unter der Leiste auf, ein zweiter Klick auf
  * denselben klappt sie zu, ein Klick auf einen anderen wechselt; Esc klappt zu
- * und gibt den Fokus an den Block zurueck. Die Leiste ist ein Tab-Stopp:
- * Pfeiltasten, Pos1 und Ende wandern zwischen den Bloecken (roving tabindex).
- * An Ort und Stelle, ohne Neuzeichnen.
+ * und gibt den Fokus an DEN Block zurueck, der sie geoeffnet hat. Die Leiste
+ * ist ein Tab-Stopp (roving tabindex): links/rechts, Pos1 und Ende wandern in
+ * der Lesereihenfolge, hoch/runter wechseln die Spur - zum Block der
+ * Nachbarspur, dessen Beginn dem eigenen am naechsten liegt (Critique
+ * 2026-10-26, Lauf 2: hoch/runter liefen wie links/rechts).
+ *
+ * DIE ZEILE GLEITET AUF WIE „+N WEITERE" (Critique 2026-10-26, Lauf 2): bis
+ * hierher schaltete nur `hidden`, und das Raster darunter sprang um 81px,
+ * waehrend „+N weitere" daneben 250ms glitt. Jetzt dieselbe Regel
+ * (toggleRegion: Hoehe per FLIP der Nachbarn, unter reduzierter Bewegung nur
+ * eine Blende). Wechselt die Auswahl bei offener Zeile, bleibt die Hoehe
+ * stehen und nur der Inhalt blendet ueber - mit dem Inhaltswechsel der App
+ * (swapContent), nicht mit einer eigenen Kurve.
  */
 function wireTodayTimeline(root) {
   const region = root?.querySelector?.('#today-timeline-detail');
   if (!region) return;
   const buttons = [...root.querySelectorAll('[data-timeline-event]')];
-  const setOpen = (next) => {
+  const keyOf = (btn) => btn.dataset.timelineEvent;
+  const sameKey = (key) => buttons.filter((btn) => keyOf(btn) === key);
+  // Die Spuren in Lesereihenfolge: das Band des Ganztaegigen, dann je Person.
+  const laneOf = (btn) => btn.closest('ul');
+  const lanes = [...new Set(buttons.map(laneOf))];
+  let owner = todayTimelineOwner?.key === todayTimelineOpen
+    ? sameKey(todayTimelineOpen)[todayTimelineOwner.nth] ?? null
+    : null;
+  const setOpen = (next, from = null) => {
+    const switching = todayTimelineOpen != null && next != null && !region.hidden;
     todayTimelineOpen = next;
-    for (const row of region.querySelectorAll('[data-timeline-detail]')) row.hidden = row.dataset.timelineDetail !== next;
-    region.hidden = next == null;
-    for (const other of buttons) other.setAttribute('aria-expanded', other.dataset.timelineEvent === next ? 'true' : 'false');
+    owner = next == null ? null : from;
+    todayTimelineOwner = owner ? { key: next, nth: sameKey(next).indexOf(owner) } : null;
+    for (const other of buttons) other.setAttribute('aria-expanded', keyOf(other) === next ? 'true' : 'false');
+    if (next == null) {
+      toggleRegion(region, false);
+      return;
+    }
+    const rows = [...region.querySelectorAll('[data-timeline-detail]')];
+    const showRow = () => {
+      for (const row of rows) row.hidden = row.dataset.timelineDetail !== next;
+    };
+    if (switching) swapContent(rows.find((row) => row.dataset.timelineDetail === next) ?? null, showRow);
+    else showRow();
+    // Auch beim Wechsel: ein Zuklappen, das gerade laeuft, haelt hier an.
+    toggleRegion(region, true);
   };
   const focusButton = (btn) => {
     if (!btn) return;
     for (const other of buttons) other.setAttribute('tabindex', other === btn ? '0' : '-1');
     btn.focus();
   };
+  // Der Block der Nachbarspur, dessen Beginn dem eigenen am naechsten liegt;
+  // im Band (ohne Beginn) der erste. Gleich nah gewinnt der fruehere.
+  const across = (btn, step) => {
+    const lane = lanes[lanes.indexOf(laneOf(btn)) + step];
+    if (!lane) return null;
+    const startOf = (other) => Number(other.closest('[data-timeline-at]')?.dataset.timelineAt ?? NaN);
+    const at = startOf(btn);
+    const distance = (other) => (Number.isFinite(at) && Number.isFinite(startOf(other)) ? Math.abs(startOf(other) - at) : 0);
+    return buttons.filter((other) => laneOf(other) === lane)
+      .reduce((best, other) => (!best || distance(other) < distance(best) ? other : best), null);
+  };
   buttons.forEach((btn, index) => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.timelineEvent;
-      setOpen(todayTimelineOpen === key ? null : key);
+      const key = keyOf(btn);
+      setOpen(todayTimelineOpen === key ? null : key, btn);
     });
     btn.addEventListener('keydown', (e) => {
-      const move = { ArrowRight: index + 1, ArrowDown: index + 1, ArrowLeft: index - 1, ArrowUp: index - 1, Home: 0, End: buttons.length - 1 }[e.key];
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusButton(across(btn, e.key === 'ArrowUp' ? -1 : 1));
+        return;
+      }
+      const move = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: buttons.length - 1 }[e.key];
       if (move != null) {
         e.preventDefault();
         focusButton(buttons[Math.max(0, Math.min(buttons.length - 1, move))]);
@@ -4985,34 +5115,61 @@ function wireTodayTimeline(root) {
   });
   const close = (e) => {
     if (e.key !== 'Escape' || todayTimelineOpen == null) return;
-    const owner = buttons.find((btn) => btn.dataset.timelineEvent === todayTimelineOpen);
+    const back = owner ?? sameKey(todayTimelineOpen)[0];
     e.preventDefault();
     setOpen(null);
-    focusButton(owner);
+    focusButton(back);
   };
   region.addEventListener('keydown', close);
   for (const btn of buttons) btn.addEventListener('keydown', close);
+  const timeline = root.querySelector('.today-timeline:not(.today-timeline--mini)');
+  todayFlagObserver?.disconnect();
+  todayFlagObserver = null;
+  if (timeline?.querySelector('[data-timeline-flag]')) {
+    placeTodayTimelineFlag(timeline);
+    if (typeof ResizeObserver === 'function') {
+      todayFlagObserver = new ResizeObserver(() => placeTodayTimelineFlag(timeline));
+      todayFlagObserver.observe(timeline);
+    }
+  }
 }
 
 /**
  * Der Jetzt-Strich wandert mit dem Minutentakt, ohne das Blatt neu zu bauen:
  * der Fingerabdruck des Tages (todayFingerprint) aendert sich erst, wenn ein
- * Termin endet - dann baut die Uebersicht ohnehin neu. Dazwischen setzt diese
- * Funktion nur die Lage und die Uhrzeit.
+ * Eintrag beginnt oder endet - dann baut die Uebersicht ohnehin neu.
+ * Dazwischen setzt diese Funktion nur die Lage und die Uhrzeit, und die Fahne
+ * des Naechsten zaehlt herunter („in 25 Min" -> „in 24 Min"), samt dem
+ * zugaenglichen Namen ihres Blocks. Hat er begonnen, schweigt sie, bis der
+ * Neuaufbau den naechsten nennt.
  */
 function updateTodayTimelineNow(root, now = new Date()) {
   const timeline = root?.querySelector?.('.today-timeline');
   if (!timeline) return;
+  const flag = timeline.querySelector('[data-timeline-flag]');
+  if (flag) {
+    const clock = flag.dataset.flagClock ?? '';
+    const when = relativeWhen(Number(flag.dataset.flagAt), now, clock);
+    flag.hidden = !when;
+    if (when) {
+      flag.textContent = when.label;
+      for (const spoken of timeline.querySelectorAll('[data-timeline-when]')) spoken.textContent = `, ${spokenWhen(when, clock)}`;
+    }
+  }
   const start = Number(timeline.dataset.timelineStart);
   const end = Number(timeline.dataset.timelineEnd);
   const minute = householdMinuteOf(now);
-  if (!(end > start) || minute == null || minute < start || minute > end) return;
+  if (!(end > start) || minute == null || minute < start || minute > end) {
+    placeTodayTimelineFlag(timeline);
+    return;
+  }
   timeline.style.setProperty('--tl-now', String((minute - start) / (end - start)));
   for (const hour of timeline.querySelectorAll('.today-timeline__hour[data-minute]')) {
     hour.classList.toggle('today-timeline__hour--covered', Math.abs(Number(hour.dataset.minute) - minute) < 35);
   }
   const label = timeline.querySelector('.today-timeline__now-time');
   if (label) label.textContent = formatTime(now);
+  placeTodayTimelineFlag(timeline);
 }
 
 /* „ALS NAECHSTES" (Entwurf „Heute wichtig", 2026-10-26): auf der breiten
@@ -5197,7 +5354,7 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       <div class="today-cockpit__header">
         <span class="module-seal today-cockpit__seal" aria-hidden="true">${moduleIconHTML('sun-moon')}</span>
         <div class="today-cockpit__heading">
-          <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
+          <h2 id="today-cockpit-title" tabindex="-1">${esc(t('dashboard.todayTitle'))}</h2>
           ${summary ? `<p class="today-cockpit__summary">${esc(summary)}</p>` : ''}
         </div>
         ${hideBtn}
@@ -5434,6 +5591,7 @@ const FOCUS_IDENTITY_ATTRS = [
 
 function focusKeyOf(el) {
   if (el.id) return `#${CSS.escape(el.id)}`;
+  if (el.hasAttribute('data-timeline-event')) return timelineFocusKeyOf(el);
   const attr = FOCUS_IDENTITY_ATTRS.find((a) => el.hasAttribute(a));
   if (!attr) return rowFocusKeyOf(el);
   const value = el.getAttribute(attr);
@@ -5477,6 +5635,44 @@ function rowFocusKeyOf(el) {
   const root = row.closest('#dashboard-shell') ?? row.ownerDocument;
   const index = Math.max(0, [...root.querySelectorAll(selector)].indexOf(el));
   return { selector, index, preventScroll: true };
+}
+
+/**
+ * EIN BLOCK DER ZEITLEISTE (Critique 2026-10-26, Lauf 2). Er hat weder Id noch
+ * Ziel, und nach jedem stillen Neuaufbau (Minutentakt, Beginn eines Termins)
+ * stand der Fokus auf <body>. Sein Schluessel ist der Eintrag und die Stelle
+ * unter den Bloecken desselben Eintrags - ein Termin fuer zwei steht in zwei
+ * Spuren, und der Fokus bleibt in der eigenen.
+ */
+function timelineFocusKeyOf(el) {
+  const selector = `[data-timeline-event="${CSS.escape(el.getAttribute('data-timeline-event'))}"]`;
+  const root = el.closest('#dashboard-shell') ?? el.ownerDocument;
+  const index = Math.max(0, [...(root?.querySelectorAll?.(selector) ?? [])].indexOf(el));
+  return { selector, index, preventScroll: true };
+}
+
+/**
+ * DER FOKUS UEBERLEBT DEN WECHSEL DER BUEHNE (Critique 2026-10-26, Lauf 2).
+ * Zieht man das Fenster ueber 900px Blattbreite, baut die Uebersicht neu
+ * (createPhoneProgramFit), und was eben fokussiert war, gibt es auf der neuen
+ * Buehne nicht: breit steht ein Termin als Block, schmal als Zeile. Danach
+ * stand der Fokus auf <body>. Die Ersatzkandidaten, wenn das Element selbst
+ * nicht wiederkommt: zum Block die Zeile mit demselben Ziel (die aufgeklappte
+ * Zeile des Blocks nennt es), dann der Tab-Stopp der Leiste, zuletzt der Kopf
+ * des Blatts.
+ * @returns {Array<string|object>} Kandidaten fuer restoreFocusAfterRebuild
+ */
+function todayFocusFallbacks(active) {
+  const sheet = active?.closest?.('.today-cockpit');
+  if (!sheet) return [];
+  const key = active.getAttribute?.('data-timeline-event');
+  const detail = key == null ? null : [...sheet.querySelectorAll('[data-timeline-detail]')].find((row) => row.dataset.timelineDetail === key);
+  const route = detail?.querySelector('[data-route]')?.getAttribute('data-route');
+  return [
+    ...(route ? [{ selector: `.today-cockpit__rows [data-route="${CSS.escape(route)}"]`, index: 0, preventScroll: true }] : []),
+    '.today-timeline [data-timeline-event]:not([tabindex="-1"])',
+    '#today-cockpit-title',
+  ];
 }
 
 /**
@@ -9047,6 +9243,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
+    const todayFallback = hadFocus ? todayFocusFallbacks(document.activeElement) : [];
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
     // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
     // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
@@ -9175,6 +9372,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn', '.dashboard-tools-btn'] : []),
       ...(takeWallFocusIntent('leave') ? ['#dashboard-wall-enter', '.dashboard-tools-btn'] : []),
+      ...todayFallback,
     ]);
     focusAfterRebuild = null;
     playTileFlip(shell, tileRectsBefore);
@@ -9406,13 +9604,20 @@ function todayFingerprint(data, cfg, now = new Date()) {
   // Und die Mahlzeit, deren Zeit da war, und die beendete eigene Schicht: unter
   // der breiten Buehne verlassen sie die Zeilen (timelineSheetRows), ohne dass
   // ein Termin endet.
-  const passed = (buildTodayTimeline(data, { now, includeMeals: true, includeShifts: true })?.lanes ?? [])
-    .flatMap((lane) => lane.items)
+  const timeline = buildTodayTimeline(data, { now, includeMeals: true, includeShifts: true });
+  const items = (timeline?.lanes ?? []).flatMap((lane) => lane.items);
+  const passed = items
     .filter((item) => item.kind !== 'event' && item.state === 'past')
     .map((item) => item.key);
+  // UND WAS BEGONNEN HAT (Critique 2026-10-26, Lauf 2): breit stehen die
+  // Termine in keiner Zeile, und ein Beginn aenderte nichts am Stempel - der
+  // Block hiess weiter „als Naechstes", seine Fahne zaehlte ins Leere, und der
+  // naechste kam erst dran, wenn irgendwo etwas endete.
+  const running = items.filter((item) => item.state === 'now').map((item) => item.key);
   return JSON.stringify([
     model.rows.map((row) => [row.kind, row.objectId ?? row.members?.map((m) => m.objectId), row.title, row.open, Boolean(row.overdue)]),
     model.overflow, Boolean(model.coda), Boolean(model.state), ended, [...new Set(passed)],
+    timeline?.nextKey ?? null, [...new Set(running)],
   ]);
 }
 
@@ -9536,3 +9741,7 @@ Object.assign(__test, { renderBudgetWidget });
 // Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
 Object.assign(__test, { loadCalendarSources });
 Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget, todayFingerprint });
+
+// Test-Tor fuer die Zeitleiste (Critique 2026-10-26, Lauf 2): Verdrahtung,
+// Minutentakt, Fahne und der Fokus ueber den Buehnenwechsel.
+Object.assign(__test, { wireTodayTimeline, updateTodayTimelineNow, placeTodayTimelineFlag, todayFocusFallbacks });
