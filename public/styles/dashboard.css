@@ -115,6 +115,69 @@
   min-height: 0;
 }
 
+/* KACHELN AUSSER SICHT RECHNET DER BROWSER ERST, WENN SIE KOMMEN (DW-P2-4,
+ * PLAN H9; Guide defer-rendering-heavy-content). Die Rueckkehr zur Uebersicht
+ * legte im Seitenwechsel jede Kachel aus, auch die zwanzig unter der Falz -
+ * gemessen 25 ms Layout bei 4x CPU am Telefon, wo das Heute-Blatt den ganzen
+ * ersten Schirm fuellt. Aufgeschoben wird ab der zweiten Kachelreihe (je
+ * Spaltenzahl), die erste steht in der Falz.
+ *
+ * Zulaessig, weil das Raster nicht nach Hoehe in Spalten verteilt (anders als
+ * die Notizen): Reihenfolge und Spannen stehen vor jeder Hoehe fest, und eine
+ * Platzhalterhoehe verschiebt keine Kachel in eine andere Spalte.
+ *
+ * DIE HOEHE KOMMT AUS DEM LETZTEN BILD (`--tile-block-size`, dashboard.js
+ * `rememberTileSizes`): `auto` merkt sich nur die Hoehe DIESES Knotens, und
+ * jeder Neuaufbau (Rueckkehr, stiller Abgleich) zeichnet neue. Ohne die
+ * mitgenommene Hoehe stuenden die Kacheln UEBER der Sicht beim
+ * wiederhergestellten Scrollstand mit dem Schaetzwert da, und der Inhalt
+ * rutschte unter dem Finger. Der Schaetzwert gilt nur beim allerersten Bild.
+ *
+ * Nicht im Anpassen-Modus: dort ragen Leisten und Menues ueber die Kachel.
+ * `overflow-clip-margin` laesst den Schatten der Karte (shadow-md dunkel:
+ * 4px + 14px) ueber die Kante, die die Paint-Containment sonst abschnitte. */
+@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
+  .dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper:nth-child(n+2) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto var(--tile-block-size, var(--dashboard-tile-estimate));
+    overflow-clip-margin: var(--space-5);
+  }
+
+  /* Die erste Reihe hat so viele Kacheln, wie das Raster Spalten hat. */
+  @media (min-width: 768px) {
+    .dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper:nth-child(2) {
+      content-visibility: visible;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper:nth-child(3) {
+      content-visibility: visible;
+    }
+  }
+}
+
+/* DIE KACHELWERTE ERBEN NICHT (DW-P2-4). Ein geerbter Wert, den
+ * `applyRowFill` nach dem Zeichnen an eine Kachel schreibt, verlangte den Stil
+ * jedes Knotens darin neu - gemessen 865 Elemente, 14-20 ms bei 4x CPU im
+ * Seitenwechsel. Gelesen werden sie nur an der Kachel selbst. */
+@property --widget-fill-span {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --widget-fill-rows {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 1;
+}
+
+.dashboard__grid {
+  /* Gemessen: Median der Kachelhoehen im Seed, 390 und 1440px. */
+  --dashboard-tile-estimate: 240px;
+}
+
 /* ── Kennzahlreihe: vier Sprungziele in der Hoehe einer Widget-Kopfzeile ──
  *
  * KEIN .widget DRUMHERUM. Die vier Kacheln sind selbst Karten; eine fuenfte
@@ -2123,6 +2186,44 @@ svg.weather-forecast__icon {
   margin-bottom: var(--space-2);
 }
 
+/* DER KOPF IM SKELETT (DW-P2-5, renderMastheadSkeleton): dieselben Klassen
+ * wie der echte Kopf, die Werkzeuge als Flaechen in der Groesse der Knoepfe
+ * (`.dashboard-icon-btn`: am Finger --target-base, am Zeiger ab 1024px
+ * --target-md). Mobil stehen zwei Knoepfe (Suche, Menue), breit drei. */
+.dashboard-skeleton-tool {
+  display: inline-block;
+  inline-size: var(--target-base);
+  block-size: var(--target-base);
+  border-radius: var(--radius-full);
+}
+
+.dashboard-skeleton-tool--pill {
+  inline-size: calc(var(--target-md) * 2);
+}
+
+@media (max-width: 767px) {
+  .dashboard-skeleton-tool--wide {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .dashboard-skeleton-tool {
+    inline-size: var(--target-md);
+    block-size: var(--target-md);
+  }
+
+  .dashboard-skeleton-tool--pill {
+    inline-size: calc(var(--target-md) * 2);
+  }
+}
+
+/* Die Skelett-Karte fuellt ihre Zelle wie das Widget (`.widget-wrapper >
+ * .widget`): eine hohe Kachel steht im Skelett so hoch, wie sie gleich ist. */
+.widget-wrapper > .widget-skeleton {
+  flex: 1;
+}
+
 /* --------------------------------------------------------
  * FAB Speed-Dial
  *
@@ -3916,6 +4017,47 @@ button.today-cockpit__more--link {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+
+/* DAS BLATT IM SKELETT (DW-P2-5, renderMastheadSkeleton). */
+/* Die gemerkte Hoehe des Bands (headHint): das Blatt nimmt, was die Kopfzeile
+ * uebrig laesst, und seine Zeilen enden an seiner Kante. Ohne Wert ist das
+ * Band so hoch wie seine Form. */
+.dashboard-masthead--skeleton {
+  block-size: var(--skeleton-head-size, auto);
+}
+
+/* Ohne gemerkte Hoehe (erster Besuch, nach dem Anmelden) fuellt das Blatt am
+ * Telefon den ersten Schirm bis zur Kapsel wie das echte (measurePhoneProgram):
+ * Fenster minus Kapselzone, Seitenpolster oben, der Abstand vor dem Falz und
+ * eine halbe Zeile - das Mittel aus "die letzte Zeile passt gerade noch" und
+ * "gerade nicht mehr". Gerechnet, nicht gemessen: ein Lesen kostete ein
+ * Layout der ganzen Shell vor dem ersten Bild. */
+@media (max-width: 639px) {
+  .dashboard-masthead--skeleton:not(.dashboard-masthead--slim) {
+    block-size: var(--skeleton-head-size, calc(var(--viewport-height) - var(--nav-bottom-height) - var(--space-4) - var(--space-2) - var(--space-8)));
+  }
+}
+
+.dashboard-masthead--skeleton > .today-cockpit {
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
+.today-cockpit--skeleton > .today-cockpit__grid {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  align-content: start;
+}
+
+.today-cockpit-card--skeleton {
+  cursor: default;
+}
+
+/* Siegel bleiben rund wie im echten Blatt (`.skeleton` traegt sonst die
+ * Ecke einer Textzeile). */
+.today-cockpit--skeleton .module-seal.skeleton {
+  border-radius: var(--radius-full);
+}
 
 /* Sehr schmale Container (iPhone-SE-Klasse): die Liste ist bereits einspaltig;
  * die Regel bleibt als bewusster, getesteter Fallback erhalten (Container-Query

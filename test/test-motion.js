@@ -2881,7 +2881,7 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
   // Seit DW-P1-2 kommt das Markup aus dashboardShellHtml() (der stille Abgleich
   // liest daraus voraus, welche Zeilen gehen) - gezeichnet wird es hier.
   assert.match(src, /const html = dashboardShellHtml\(cfg\);/);
-  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, html\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
+  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, html\);[\s\S]{0,1600}?\}, \{ animate: fromSkeleton \}\);/);
 });
 
 /* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der

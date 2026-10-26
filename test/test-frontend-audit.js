@@ -23620,6 +23620,40 @@ test('R21 S8: kein :has() vor einem Universalselektor oder ::placeholder (ganzer
   assert.deepEqual(bad, [], `Ganzer-Teilbaum-Rest hinter :has():\n${bad.join('\n')}`);
 });
 
+/*
+ * DW-P2-4 (PLAN H9): DIE KACHELN DER UEBERSICHT AB DER ZWEITEN REIHE RECHNET
+ * DER BROWSER ERST, WENN SIE KOMMEN. Die Rueckkehr zur Uebersicht legte im
+ * Seitenwechsel jede Kachel aus, auch die unter der Falz (am Telefon alle -
+ * das Heute-Blatt fuellt den ersten Schirm). Die erste Reihe bleibt sichtbar
+ * gerechnet (je Spaltenzahl), der Anpassen-Modus ganz (Leisten und Menues
+ * ragen ueber die Kachel). Die Platzhalterhoehe kommt aus dem letzten Bild
+ * (`--tile-block-size`, dashboard.js) - ohne sie stand nach dem Zurueck der
+ * wiederhergestellte Scrollstand gemessen 387px neben der Kachel von vorher.
+ * Und die Fuell-Werte der Packung erben nicht: ein geerbter Wert an der
+ * Kachel verlangte den Stil jedes Knotens darin neu.
+ */
+test('DW-P2-4: Uebersicht-Kacheln ausser Sicht aufgeschoben, Hoehe aus dem letzten Bild, Fuellwerte ohne Vererbung', () => {
+  const rules = [...eachRule(read('../public/styles/dashboard.css'))];
+  const sel = '.dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper';
+  const lazy = rules.find((r) => r.selector.trim() === `${sel}:nth-child(n+2)`
+    && r.at.some((at) => at.includes('@supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px)')));
+  assert.ok(lazy, 'keine aufgeschobene Kachel ab der zweiten unter @supports');
+  assert.match(lazy.body, /content-visibility:\s*auto/);
+  assert.match(lazy.body, /contain-intrinsic-size:\s*auto none auto var\(--tile-block-size, var\(--dashboard-tile-estimate\)\)/,
+    'die Hoehe aus dem letzten Bild, sonst der Schaetzwert');
+  assert.match(lazy.body, /overflow-clip-margin:\s*var\(--space-\d\)/, 'der Kartenschatten wuerde an der Kante abgeschnitten');
+  for (const [nth, media] of [[2, 'min-width: 768px'], [3, 'min-width: 1024px']]) {
+    const first = rules.find((r) => r.selector.trim() === `${sel}:nth-child(${nth})` && r.at.some((at) => at.includes(media)));
+    assert.match(first?.body ?? '', /content-visibility:\s*visible/, `die ${nth}. Kachel steht ab ${media} in der ersten Reihe`);
+  }
+  for (const prop of ['--widget-fill-span', '--widget-fill-rows']) {
+    const reg = rules.find((r) => r.selector.trim() === `@property ${prop}`);
+    assert.match(reg?.body ?? '', /inherits:\s*false/, `${prop} erbt nicht`);
+  }
+  const page = read('../public/pages/dashboard.js');
+  assert.match(page, /el\.style\.setProperty\('--tile-block-size', `\$\{px\}px`\)/, 'der Aufbau gibt die gemerkte Hoehe mit');
+});
+
 /**
  * R21 S8 (Critique a6 "lange Listen"): DIESELBE REGEL UEBER AUFGABEN HINAUS.
  * Die Agenda ist die laengste Liste der App (Seed: 26 Tage, ~800 Knoten unter

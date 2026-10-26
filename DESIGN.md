@@ -1212,7 +1212,9 @@ das Verhaeltnis haelt.
   Einkauf in der einen Spalte. Zeilenweise gilt es seit R22 (D4) erst ab der zwanzigsten Zeile
   (`:nth-child(n+20)`), und der Platzhalter ist die Content-Box der echten Zeile (Kontakte 48,
   Buchungen 45, Rezepte 64px) - mit "je Zeile" ab der ersten sprang die Liste beim Aufbau
-  (Kontakte CLS 0,098 -> 0). Immer unter `@supports` mit
+  (Kontakte CLS 0,098 -> 0). Die Kacheln der Uebersicht ab der zweiten Reihe ebenso (DW-P2-4);
+  ihr Platzhalter ist die Hoehe aus dem letzten Bild (`--tile-block-size`), weil jeder Neuaufbau
+  neue Knoten zeichnet und `auto` sich nur den Knoten merkt. Immer unter `@supports` mit
   `contain-intrinsic-size: auto none auto <gemessene Hoehe>` (sonst springt der Bildlaufbalken),
   und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
   Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
@@ -1442,7 +1444,11 @@ das Verhaeltnis haelt.
   erscheinen erst nach `--duration-sm` (kommt der Inhalt schneller, sieht man sie nie; die
   Kartenflaechen stehen sofort und halten das Layout), der Schimmer ist ein Band als `::after`,
   das per `transform` gleitet (vorher `background-position`: Paint je Frame). Die Uebersicht
-  blendet vom Skelett zum Inhalt ueber `swapContent`. `stagger` laeuft seit R19 ueber Web
+  blendet vom Skelett zum Inhalt ueber `swapContent`. Ihr Skelett hat die Zielform (DW-P2-5):
+  der Kopf in den Klassen des echten (Datum, Gruss, Werkzeuge), das Heute-Blatt mit Zeilen, die
+  Kacheln aus dem zuletzt GEZEICHNETEN Raster (`rememberGridHint`) samt Packung, und die Hoehe des
+  Kopfbands je Fenstergroesse aus dem letzten Bild (`headHint`) - das Raster beginnt dort, wo es
+  gleich steht. `stagger` laeuft seit R19 ueber Web
   Animations mit `delay` und `fill: backwards` statt ueber Timer und Inline-Werte.
   **Kein Sprung beim Aufbau (R22, D4):** was nach dem ersten Bild kommt, darf nichts
   Sichtbares verschieben - auch nicht nach einer Eingabe (Reiterwechsel), wo CLS den Sprung

@@ -72,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **The overview loads in its own shape and comes back sooner.** While it loads, the overview now
+  shows its header - date, greeting, buttons - and the "Today" sheet with its rows where they will
+  be, and the tiles in the order and widths you arranged; the quick-add button carries its plus from
+  the first frame. On the phone the tiles used to wait at the top of the screen and slide down
+  some 640px when the sheet arrived; now they start where they end up. Coming back to the overview
+  holds the screen for less time: tiles out of view are laid out when they come near, and the
+  page is laid out once instead of twice.
 - **The number tiles on the overview are made like the other tiles.** They had the corners, shadow
   and padding of the budget's cards and stood between the tiles as a second kind of card; now they
   share the tiles' surface, corners and shadow, sit as far apart as the tiles around them, and lead

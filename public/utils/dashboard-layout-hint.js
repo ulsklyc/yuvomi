@@ -105,9 +105,60 @@ export function layoutHintQuery(fallbackQuery) {
   return typeof query === 'string' && query.startsWith('/dashboard') ? query : fallbackQuery;
 }
 
+/* DIE HOEHE DES KOPFES (DW-P2-5). Das Raster beginnt unter Gruss und
+ * Heute-Blatt, und deren Hoehe haengt am Fenster (das Blatt fuellt am Telefon
+ * den ersten Schirm) und am Tag. Ohne sie stand das Skelett-Raster bei y 80
+ * und der Inhalt bei y 720 - die ganze Seite sprang beim Laden um. Gemerkt
+ * wird je Fenstergroesse die zuletzt gezeichnete Hoehe des Kopfbands und ob
+ * es ein Blatt trug; wenige Eintraege, der juengste gewinnt. Wie die
+ * Kachelformen eine Vorhersage: ein fremder oder kaputter Wert faellt still
+ * auf die Form des Skeletts zurueck. */
+const HEAD_HINT_KEY = 'yuvomi-dash-head-hint';
+const HEAD_HINT_MAX = 6;
+
+function readHeadHints() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(HEAD_HINT_KEY) ?? 'null');
+    return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Merkt die Hoehe des Kopfbands fuer eine Fenstergroesse.
+ * @param {string} viewport  z. B. "390x844"
+ * @param {number} px        Rahmenhoehe des Bands
+ * @param {boolean} sheet    ob es ein Heute-Blatt trug
+ */
+export function rememberHeadHint(viewport, px, sheet) {
+  if (!viewport || !(px > 0)) return;
+  try {
+    const hints = readHeadHints();
+    const next = { px: Math.round(px), sheet: Boolean(sheet) };
+    const prev = hints[viewport];
+    if (prev && prev.px === next.px && prev.sheet === next.sheet) return;
+    delete hints[viewport];
+    const kept = Object.entries(hints).slice(-(HEAD_HINT_MAX - 1));
+    localStorage.setItem(HEAD_HINT_KEY, JSON.stringify(Object.fromEntries([...kept, [viewport, next]])));
+  } catch { /* der Hinweis ist entbehrlich */ }
+}
+
+/**
+ * Die gemerkte Kopfhoehe fuer diese Fenstergroesse, sonst null. Nur eine
+ * ganze Zahl in Bildschirmgroesse wird zum Wert - er landet im Markup.
+ * @returns {{ px: number, sheet: boolean } | null}
+ */
+export function headHint(viewport) {
+  const hint = readHeadHints()[viewport];
+  if (!hint || !Number.isInteger(hint.px) || hint.px <= 0 || hint.px > 4000) return null;
+  return { px: hint.px, sheet: hint.sheet !== false };
+}
+
 /** Beim Abmelden: der naechste Nutzer an diesem Geraet hat sein eigenes Raster. */
 export function forgetLayoutHint() {
   try {
     localStorage.removeItem(LAYOUT_HINT_KEY);
+    localStorage.removeItem(HEAD_HINT_KEY);
   } catch { /* gesperrter Speicher: dann bleibt hoechstens ein Skelett falsch */ }
 }

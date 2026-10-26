@@ -3269,6 +3269,79 @@ test('rowFillSpans: eine hohe Kachel waechst nur, wo BEIDE ihrer Zeilen frei sin
   nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 2), kachel('b', 1, 2)], 3)], [['b', 2]]);
 });
 
+/* DW-P2-4: ERST LESEN, DANN SCHREIBEN. Die Kacheln sind Container; ein
+ * `getComputedStyle` nach dem ersten gesetzten Fuell-Attribut verlangte Stil
+ * und Layout der ganzen Flaeche noch einmal (gemessen 8 ms bei 4x CPU, mitten
+ * im Seitenwechsel). Ein frisches Raster wird ganz vorab gelesen; ein schon
+ * gefuelltes setzt erst zurueck und kommt zum selben Ergebnis. */
+test('DW-P2-4: applyRowFill liest alles, bevor es schreibt - und ein gefuelltes Raster fuellt gleich', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], weather: [2, 1], metrics: [2, 1], rewards: [1, 1], notes: [2, 1] };
+  const log = [];
+  const tile = (id) => {
+    const props = new Map();
+    const dataset = new Proxy({ widgetId: id }, {
+      set(target, key, value) { log.push('write'); target[key] = value; return true; },
+      deleteProperty(target, key) { log.push('write'); delete target[key]; return true; },
+    });
+    return { dataset, style: { setProperty: (k, v) => { log.push('write'); props.set(k, v); }, removeProperty: (k) => props.delete(k), props } };
+  };
+  const tiles = Object.keys(SPANS).map(tile);
+  const grid = { children: tiles };
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = (el) => {
+    log.push('read');
+    if (el === grid) return { gridTemplateColumns: '366px 366px 366px' };
+    const [cols, rows] = SPANS[el.dataset.widgetId];
+    const filled = 'rowFill' in el.dataset ? Number(el.style.props.get('--widget-fill-span')) : cols;
+    return { display: 'flex', alignSelf: el.dataset.widgetId === 'metrics' ? 'start' : 'stretch', gridColumnStart: 'auto', gridColumnEnd: `span ${filled}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  const filledOf = () => tiles.filter((t) => 'rowFill' in t.dataset || 'colFill' in t.dataset)
+    .map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span') ?? null, t.style.props.get('--widget-fill-rows') ?? null]);
+  try {
+    __test.applyRowFill(grid);
+    const firstWrite = log.indexOf('write');
+    nodeAssert.ok(firstWrite > 0, 'Vorbedingung: es wird gefuellt');
+    nodeAssert.equal(log.slice(firstWrite).filter((e) => e === 'read').length, 0, 'kein Lesen nach dem ersten Schreiben');
+    const once = filledOf();
+    // Neue Spaltenzahl (ResizeObserver): dasselbe Raster noch einmal.
+    __test.applyRowFill(grid);
+    nodeAssert.deepEqual(filledOf(), once, 'ein schon gefuelltes Raster liest die gewaehlten Spannen, nicht die gefuellten');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+/* DW-P2-4: DIE HOEHE JEDER KACHEL REIST MIT. Kacheln ausser Sicht stehen bis
+ * zum Rendern mit ihrem Platzhalter da (content-visibility); `auto` merkt sich
+ * die echte Hoehe nur am selben Knoten. Ohne die mitgenommene Hoehe stand nach
+ * dem Zurueck der wiederhergestellte Scrollstand gemessen 387px neben der
+ * Kachel von vorher (390x844, alle Widgets). */
+test('DW-P2-4: die gemeldete Hoehe einer Kachel steht beim naechsten Aufbau als Platzhalter an ihr', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const saved = { window: Object.getOwnPropertyDescriptor(globalThis, 'window'), RO: Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver') };
+  let callback = null;
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: { innerWidth: 390 } });
+  Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, writable: true, value: class { constructor(cb) { callback = cb; } observe() {} disconnect() {} } });
+  const wrapper = (id) => { const props = new Map(); return { dataset: { widgetId: id }, isConnected: true, style: { setProperty: (k, v) => props.set(k, v) }, props }; };
+  try {
+    const old = [wrapper('family'), wrapper('notes')];
+    __test.watchTileSizes({ querySelectorAll: () => old });
+    callback(old.map((target, i) => ({ target, borderBoxSize: [{ blockSize: [166.4, 406][i] }] })));
+    const fresh = [wrapper('family'), wrapper('notes'), wrapper('clock')];
+    __test.carryTileSizes({ querySelectorAll: () => fresh }, 390);
+    nodeAssert.deepEqual(fresh.map((w) => w.props.get('--tile-block-size') ?? null), ['166px', '406px', null]);
+    const other = [wrapper('family')];
+    __test.carryTileSizes({ querySelectorAll: () => other }, 1440);
+    nodeAssert.equal(other[0].props.size, 0, 'eine andere Fensterbreite hat ihre eigenen Hoehen');
+  } finally {
+    for (const [name, desc] of [['window', saved.window], ['ResizeObserver', saved.RO]]) {
+      if (desc) Object.defineProperty(globalThis, name, desc);
+      else delete globalThis[name];
+    }
+  }
+});
+
 test('rowFillSpans: das Wachstum wirft die Packung nicht um (Aequivalenz)', () => {
   // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
   // Neupackung mit den breiteren Spans muss jede Kachel an ihrer Stelle lassen
@@ -3326,14 +3399,17 @@ test('applyRowFill: waechst im Normalmodus, im Anpassen-Modus nimmt es alles zur
   }
 });
 
-test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es nach dem Anpassen-Draht', () => {
+test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es direkt nach dem Zeichnen', () => {
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-row-fill]');
   nodeAssert.ok(regel, 'keine Regel fuer [data-row-fill] in dashboard.css');
   nodeAssert.match(regel.body, /grid-column:\s*span var\(--widget-fill-span\)/);
   nodeAssert.ok(regel.at.some((a) => /min-width:\s*768px/.test(a)), 'nur ab zwei Spalten');
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
-  nodeAssert.match(src, /wireDashboardEditMode\(\);\s*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() nach dem Anpassen-Draht');
+  // Seit DW-P2-4 direkt nach dem Zeichnen: dort ist das Layout noch sauber,
+  // und die Packung liest, bevor eine Verdrahtung schreibt.
+  nodeAssert.match(src, /\}, \{ animate: fromSkeleton \}\);\s*(?:\/\/[^\n]*\n\s*)*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() direkt nach dem Zeichnen');
+  nodeAssert.equal(src.match(/\bwireRowFill\(\);/g)?.length, 1, 'genau ein Aufruf je Aufbau');
   nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill nimmt das Wachstum im Anpassen-Modus zurueck');
 });
 
@@ -3446,7 +3522,9 @@ test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
   // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml() - der stille Abgleich
   // liest daraus voraus, welche Zeilen gehen.
-  nodeAssert.match(src, /setHtml\(shell, html\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
+  // Seit DW-P2-4 stehen dazwischen nur die mitgenommenen Kachelhoehen und
+  // die Zeichen - gemessen wird das Blatt, wie man es sieht.
+  nodeAssert.match(src, /setHtml\(shell, html\);\s*carryTileSizes\(shell, viewportWidth\);\s*(?:\/\/[^\n]*\n\s*)*createPendingIcons\(shell\);\s*(?:\/\/[^\n]*\n\s*)*const fitted = measurePhoneProgram\(shell\);/,
     'rebuildDashboard misst direkt nach dem Zeichnen');
   nodeAssert.match(src, /renderTodayCockpit\(data, cfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
   nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
@@ -4688,6 +4766,81 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
     controller.abort();
     for (const handle of timeouts) clearTimeout(handle);
     for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+// --------------------------------------------------------
+// DW-P2-5: Das Skelett hat die Form der Seite
+// --------------------------------------------------------
+// Es zeichnete zwei Balken und gleich darunter das Raster - kein Gruss, kein
+// Heute-Blatt; am Telefon stand das Skelett-Raster bei y 80 und der Inhalt
+// bei y 720. Und seine Kacheln kamen aus der Anordnung, nicht aus dem, was das
+// Raster gezeichnet hat: eine Kachel ohne Inhalt oder mit abgeschaltetem
+// Modul stand im Skelett und verschob beim Laden alles dahinter.
+const beforeSkeletonForm = pendingTests.slice();
+test('DW-P2-5: das Skelett traegt Kopf und Heute-Blatt, seine Kacheln sind die gezeichneten', async () => {
+  await Promise.allSettled(beforeSkeletonForm);
+  const names = ['window', 'localStorage'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const store = new Map();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => { store.set(k, String(v)); },
+    removeItem: (k) => { store.delete(k); },
+  } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: {
+    innerWidth: 390, innerHeight: 844,
+    yuvomi: { isModuleDisabled: (mod) => mod === 'notes' },
+  } });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const hint = await import('../public/utils/dashboard-layout-hint.js');
+    const user = { display_name: 'Linda Johnson' };
+
+    // 1. Die Form: Kopfband mit Datum, Gruss und Werkzeugen, darunter das
+    //    Blatt mit Kopf und Zeilen - in den Klassen des echten Kopfs.
+    const skeleton = __test.renderDashboardSkeleton(user);
+    for (const cls of ['dashboard-masthead dashboard-masthead--skeleton', 'dashboard-overview__header', 'dashboard-overview__date',
+      'dashboard-overview__title', 'dashboard-overview__tools', 'today-cockpit today-cockpit--skeleton', 'today-cockpit__header', 'today-cockpit-card--skeleton']) {
+      nodeAssert.ok(skeleton.includes(cls), `das Skelett traegt ${cls}`);
+    }
+    nodeAssert.match(skeleton, /dashboard-masthead--skeleton[^>]*aria-hidden="true"/, 'die Platzhalter sprechen nicht');
+    nodeAssert.ok(skeleton.indexOf('dashboard-masthead--skeleton') < skeleton.indexOf('class="dashboard__grid"'), 'Kopf vor dem Raster');
+
+    // 2. Die gemerkte Hoehe des Bands steht am Band; ohne Blatt kein Blatt.
+    hint.rememberHeadHint('390x844', 692.4, true);
+    nodeAssert.deepEqual(hint.headHint('390x844'), { px: 692, sheet: true });
+    nodeAssert.match(__test.renderDashboardSkeleton(user, { head: hint.headHint('390x844') }), /--skeleton-head-size: 692px/);
+    const slim = __test.renderDashboardSkeleton(user, { head: { px: 120, sheet: false } });
+    nodeAssert.ok(!slim.includes('today-cockpit'), 'ein Band ohne Blatt zeichnet keins');
+    nodeAssert.ok(slim.includes('dashboard-masthead--slim'));
+    store.set('yuvomi-dash-head-hint', JSON.stringify({ '390x844': { px: '"><b>', sheet: true } }));
+    nodeAssert.equal(hint.headHint('390x844'), null, 'nur eine Zahl wird zum Wert');
+    hint.forgetLayoutHint();
+    nodeAssert.equal(store.has('yuvomi-dash-head-hint'), false, 'beim Abmelden geht auch die Kopfhoehe');
+
+    // 3. Die Kacheln des Skeletts sind die, die das Raster gezeichnet hat -
+    //    gemerkt ueber denselben Aufruf wie im Aufbau (rememberGridHint).
+    const cfg = [
+      { id: 'family', visible: true, order: 0, size: '1x2' },
+      { id: 'notes', visible: true, order: 1, size: '2x1' },     // Modul aus
+      { id: 'countdown', visible: true, order: 2, size: '1x1' }, // ohne Countdowns nicht verfuegbar
+      { id: 'calendar', visible: true, order: 3, size: '1x2', options: { limit: 12 } },
+      { id: 'clock', visible: true, order: 4, size: '1x1' },
+      { id: 'tasks', visible: false, order: 5, size: '1x1' },
+    ];
+    const drawn = [];
+    const grid = __test.renderDashboardLayout(cfg, { users: [{ id: 1 }, { id: 2 }], upcomingEvents: [], urgentTasks: [] }, null, 'EUR', { drawn });
+    __test.rememberGridHint(drawn, cfg);
+    const wrappers = (html) => [...html.matchAll(/<div class="widget-wrapper (widget-size--[0-9x]+)[^"]*"[^>]*?(data-list-rows="\d+")?[\s>]/g)].map((m) => `${m[1]} ${m[2] ?? ''}`.trim());
+    const drawnTiles = wrappers(grid);
+    nodeAssert.ok(drawnTiles.length >= 2 && drawnTiles.length < 5, `Vorbedingung: das Raster laesst Kacheln aus (${drawnTiles.join(', ')})`);
+    nodeAssert.deepEqual(wrappers(__test.renderDashboardSkeleton(user)), drawnTiles, 'Skelett = gezeichnetes Raster');
+  } finally {
     for (const name of names) {
       if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
       else delete globalThis[name];

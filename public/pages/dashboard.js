@@ -63,7 +63,7 @@ import { enterWallMode, exitWallMode, isWallActive, syncWallMode } from '/utils/
 import { mountZonePrompt } from '/utils/household-zone-hint.js';
 import { mountFirstSteps, startFirstSteps } from '/utils/first-steps.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
-import { rememberLayoutHint, layoutHintTiles, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
+import { rememberLayoutHint, layoutHintTiles, layoutHintQuery, rememberHeadHint, headHint } from '/utils/dashboard-layout-hint.js';
 import { emptyHintHTML } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
@@ -4097,6 +4097,88 @@ function refitTodayStage(shell, render) {
   if (drawn && drawn !== todayStage()) replaceProgramSheet(shell, render());
 }
 
+/**
+ * Ersetzt nur die Zeichen, die noch Platzhalter sind. `createIcons` auf der
+ * ganzen Flaeche ersetzte jedes fertige SVG ein zweites Mal - `data-lucide`
+ * bleibt am SVG (lucide-scope.js) -, und jeder Ersatz legte die Flaeche neu
+ * aus (DW-P2-4).
+ */
+function createPendingIcons(root) {
+  const lucide = globalThis.window?.lucide;
+  if (!lucide || !root?.querySelectorAll) return;
+  // Frisch gezeichnet (noch kein fertiges Zeichen darin): ein Lauf ueber alles.
+  if (!root.querySelector('svg[data-lucide]')) {
+    lucide.createIcons({ el: root });
+    return;
+  }
+  for (const node of root.querySelectorAll('[data-lucide]:not(svg)')) lucide.createIcons({ el: node });
+}
+
+/* DIE HOEHE JEDER KACHEL AUS DEM LETZTEN BILD (DW-P2-4, PLAN H9). Kacheln
+ * ausser Sicht rechnet der Browser erst, wenn sie kommen (`content-visibility`,
+ * dashboard.css), und bis dahin steht ihr Platzhalter. `auto` merkt sich die
+ * echte Hoehe nur am selben Knoten - jeder Neuaufbau zeichnet neue. Darum
+ * merkt sich die Seite die Hoehen selbst (je Fensterbreite und Kachel) und
+ * gibt sie dem naechsten Aufbau mit, bevor er zum ersten Mal ausgelegt wird.
+ * Gelesen wird nur, was der ResizeObserver nach dem Layout ohnehin meldet. */
+const tileBlockSizes = new Map();
+// Die Fensterbreite wird gelesen, solange das Layout sauber ist (vor dem
+// Zeichnen bzw. im Rueckruf nach dem Layout) - `innerWidth` mitten im Aufbau
+// verlangte ein Layout der halbfertigen Flaeche.
+const tileSizeKey = (width, id) => `${width}:${id}`;
+
+/**
+ * DAS SKELETT SAGT DAS RASTER VORAUS, DAS GEZEICHNET WURDE (DW-P2-5). Gemerkt
+ * wurden die sichtbaren Kacheln der Anordnung - auch die, die das Raster gar
+ * nicht zeichnet (Modul abgeschaltet oder ohne Recht, Renderer ohne Inhalt).
+ * Jede davon stand im Skelett als Kachel und verschob beim Laden alles
+ * dahinter. Jetzt lernt der Hinweis aus derselben Liste, die das Raster
+ * gezeichnet hat (`drawn` in renderDashboardLayout).
+ */
+function rememberGridHint(drawn, cfg) {
+  rememberLayoutHint(drawn, dashboardQuery(cfg), calendarListRowsOf);
+}
+
+/** Der Schluessel der Kopfhoehe (headHint): die Fenstergroesse. */
+function viewportKey() {
+  const win = globalThis.window;
+  return win ? `${win.innerWidth}x${win.innerHeight}` : '';
+}
+
+/** Merkt die gezeichnete Hoehe des Kopfbands fuer das naechste Skelett. */
+function watchHeadSize(shell) {
+  const band = shell?.querySelector?.(':scope > .dashboard-masthead');
+  if (!band || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver((entries) => {
+    const entry = entries[entries.length - 1];
+    const px = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height ?? 0;
+    if (px > 0 && band.isConnected) rememberHeadHint(viewportKey(), px, Boolean(band.querySelector('.today-cockpit')));
+  });
+  observer.observe(band);
+  return observer;
+}
+
+function carryTileSizes(shell, width) {
+  for (const el of shell.querySelectorAll('#dashboard-widget-grid > .widget-wrapper[data-widget-id]')) {
+    const px = tileBlockSizes.get(tileSizeKey(width, el.dataset.widgetId));
+    if (px) el.style.setProperty('--tile-block-size', `${px}px`);
+  }
+}
+
+function watchTileSizes(grid) {
+  if (!grid || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver((entries) => {
+    const width = globalThis.window?.innerWidth ?? 0;
+    for (const entry of entries) {
+      const id = entry.target.dataset?.widgetId;
+      const px = Math.round(entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height ?? 0);
+      if (id && px > 0 && entry.target.isConnected) tileBlockSizes.set(tileSizeKey(width, id), px);
+    }
+  });
+  for (const el of grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')) observer.observe(el);
+  return observer;
+}
+
 /** Tauscht das Heute-Blatt gegen eine neu gezeichnete Fassung (gleicher Platz). */
 function replaceProgramSheet(shell, html) {
   shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', html);
@@ -6604,7 +6686,7 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
-function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
+function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null } = {}) {
   const widgetById = {
     tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
@@ -6659,6 +6741,8 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
         html = renderWidgetError(w.id);
       }
       if (!html) return '';
+      // Was wirklich im Raster steht - die Vorhersage des Skeletts (rememberGridHint).
+      drawn?.push(w);
       return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
         ${editing ? renderWidgetCustomizeControls(w, index, arr.length) : ''}
@@ -6706,25 +6790,78 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
  * Er liegt in utils/dashboard-layout-hint.js, weil er seit #585 auch beim
  * Abmelden verworfen werden muss - die Begruendung steht dort. */
 
-function renderDashboardSkeleton() {
+function renderDashboardSkeleton(user = null, { head = null } = {}) {
   // Mit den Listenzeilen (#2087): eine hohe Kalenderkachel mit acht oder
   // zwoelf Terminen belegt schon im Skelett ihre drei oder vier Zeilen.
-  const defaults = buildDefaultWidgetConfig().filter((w) => w.visible);
+  const defaults = buildDefaultWidgetConfig().filter((w) => w.visible && isWidgetModuleEnabled(w.id));
   const hint = layoutHintTiles(defaults.map((w) => w.size));
   const tiles = hint.sizes
     .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${listRowsAttr(hint.listRows[i])}>${skeletonWidget(3)}</div>`)
     .join('');
   return `
-    <section class="dashboard-overview">
-      <div class="dashboard-overview__header">
-        <div>
-          <div class="skeleton skeleton-line skeleton-line--short"></div>
-          <div class="skeleton skeleton-line skeleton-line--medium"></div>
-        </div>
-      </div>
-    </section>
+    ${renderMastheadSkeleton(user, head)}
     <div class="dashboard__grid">${tiles}</div>
   `;
+}
+
+/* DAS SKELETT HAT DIE FORM DER SEITE, NICHT NUR DIE DER KACHELN (DW-P2-5,
+ * R22 D4 "Skelette in Zielform"). Es zeichnete zwei Balken und darunter
+ * gleich das Raster: kein Gruss, kein Heute-Blatt. Am Telefon stand das
+ * Raster bei y 80 und der Inhalt bei y 720, am Desktop 72 gegen 572 - die
+ * ganze Seite sprang beim Laden um, und die Rangordnung (Blatt, dann
+ * Kacheln) stand im Skelett auf dem Kopf.
+ *
+ * Jetzt traegt es dieselben Klassen wie der echte Kopf: Datumszeile,
+ * Gruss und Werkzeuge in ihren Zeilenboxen (Platzhaltertext in
+ * `.skeleton-text`, die Hoehe kommt aus Schrift und Zeilenhoehe), darunter
+ * das Blatt mit Kopf und Zeilen - so viele, wie zuletzt in den ersten Schirm
+ * passten. Wie hoch das Band zuletzt WIRKLICH war (das Blatt haengt am Tag),
+ * weiss `headHint` je Fenstergroesse; mit dem Wert steht das Raster dort, wo
+ * es gleich steht. Ohne Wert gilt die Form allein. */
+function renderMastheadSkeleton(user, head) {
+  // Platzhaltertext, schon maskiert: der Gruss kommt aus greeting() (maskiert den Namen).
+  const bar = (html) => `<span class="skeleton skeleton-text">${html}</span>`;
+  const sheet = head ? head.sheet : true;
+  // Am Telefon so viele Zeilen, wie das Blatt hoechstens zeigt: das Band
+  // endet an der gemerkten Hoehe bzw. am Falz (dashboard.css), und was
+  // darueber hinausgeht, schneidet die Karte ab - wie das echte Blatt fuellt
+  // es den ersten Schirm. Breit: Kopf, Zeitleiste und die naechsten Zeilen,
+  // gemessen im Seed etwa fuenf Zeilenhoehen.
+  const rows = onPhoneStage() ? PROGRAM_ROW_CAP + 2 : 5;
+  const row = `
+        <div class="today-cockpit-card today-cockpit-card--skeleton">
+          <span class="module-seal today-cockpit-card__icon skeleton"></span>
+          <span class="today-cockpit-card__body">
+            <strong class="today-cockpit-card__value">${bar(esc(t('dashboard.todayTitle')))}</strong>
+            <span class="today-cockpit-card__sub">${bar(esc(t('common.loading')))}</span>
+          </span>
+        </div>`;
+  const sheetHtml = sheet ? `
+      <div class="today-cockpit today-cockpit--skeleton">
+        <div class="today-cockpit__grid">
+          <div class="today-cockpit__header">
+            <span class="module-seal today-cockpit__seal skeleton"></span>
+            <div class="today-cockpit__heading"><h2>${bar(esc(t('dashboard.todayTitle')))}</h2></div>
+          </div>
+          <div class="today-cockpit__rows">${row.repeat(Math.max(1, rows))}</div>
+        </div>
+      </div>` : '';
+  const size = head ? ` style="--skeleton-head-size: ${head.px}px"` : '';
+  return `
+    <section class="dashboard-masthead dashboard-masthead--skeleton${sheet ? '' : ' dashboard-masthead--slim'}" aria-hidden="true"${size}>
+      <div class="dashboard-overview">
+        <div class="dashboard-overview__header">
+          <span class="dashboard-overview__date">${bar(esc(mastheadDateLabel()))}</span>
+          <div class="dashboard-overview__title">${bar(greeting(user?.display_name ?? ''))}</div>
+          <div class="dashboard-overview__tools">
+            <span class="skeleton dashboard-skeleton-tool"></span>
+            <span class="skeleton dashboard-skeleton-tool"></span>
+            <span class="skeleton dashboard-skeleton-tool dashboard-skeleton-tool--wide"></span>
+            ${onDesktopStage() ? '<span class="skeleton dashboard-skeleton-tool dashboard-skeleton-tool--pill"></span>' : ''}
+          </div>
+        </div>
+      </div>${sheetHtml}
+    </section>`;
 }
 
 // Distinkter Fehlerzustand: verhindert, dass ein Ladefehler wie ein ruhiger,
@@ -8489,6 +8626,29 @@ function gridHoleSuggestion(grid) {
 function applyRowFill(grid, { editing = false } = {}) {
   // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
   const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
+  /* ERST LESEN, DANN SCHREIBEN (DW-P2-4). Die Kacheln sind Container
+   * (`container: dashboard-widget`); ein `getComputedStyle` nach dem ersten
+   * gesetzten Fuell-Attribut verlangte darum Stil UND Layout der ganzen
+   * Flaeche noch einmal - gemessen 8 ms bei 4x CPU, mitten im Seitenwechsel.
+   * Ein frisch gezeichnetes Raster traegt noch keine Fuellung: dort wird
+   * alles vorab gelesen. Nur ein Raster, das schon gefuellt war (neue
+   * Spaltenzahl), muss erst zuruecksetzen, damit die Spannen die gewaehlten
+   * sind und nicht die gefuellten. */
+  const filled = tiles.some((el) => 'rowFill' in el.dataset || 'colFill' in el.dataset);
+  const read = () => {
+    const columns = editing ? 0 : gridColumnCount(grid);
+    if (columns < 2) return { columns, items: [] };
+    return {
+      columns,
+      items: tiles.map((el, index) => ({
+        id: el.dataset.widgetId || `#${index}`,
+        el,
+        ...gridSpans(el),
+        grow: getComputedStyle(el).alignSelf !== 'start',
+      })),
+    };
+  };
+  const early = filled ? null : read();
   for (const el of grid.children) {
     if ('rowFill' in el.dataset) {
       delete el.dataset.rowFill;
@@ -8500,9 +8660,8 @@ function applyRowFill(grid, { editing = false } = {}) {
     }
   }
   if (editing) return;
-  const columns = gridColumnCount(grid);
+  const { columns, items } = early ?? read();
   if (columns < 2) return;
-  const items = tiles.map((el, index) => ({ id: el.dataset.widgetId || `#${index}`, el, ...gridSpans(el) }));
   const grown = rowFillSpans(items, columns);
   for (const item of items) {
     const span = grown.get(item.id);
@@ -8517,7 +8676,6 @@ function applyRowFill(grid, { editing = false } = {}) {
   const widened = items.map((item) => ({
     ...item,
     cols: grown.get(item.id) ?? item.cols,
-    grow: getComputedStyle(item.el).alignSelf !== 'start',
   }));
   const taller = columnFillSpans(widened, columns);
   for (const item of widened) {
@@ -8602,15 +8760,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
     today: householdToday(),
   });
 
+  // Die zuletzt gezeichnete Hoehe des Kopfbands bei dieser Fenstergroesse.
+  const head = wallMode || memo ? null : headHint(viewportKey());
   setHtml(container, `
     <div class="dashboard app-page app-page--dashboard${wallMode ? ' dashboard--wall' : ''}" data-composition="dashboard">
       <h1 class="sr-only">${t('dashboard.title')}</h1>
       <div class="dashboard-shell" id="dashboard-shell">
-        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton()}
+        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton(user, { head })}
       </div>
     </div>
     ${wallMode ? '' : renderFab()}
   `);
+  if (!wallMode && !memo && globalThis.window?.matchMedia?.('(min-width: 768px)').matches) {
+    // Das Skelett-Raster packt wie das echte (applyRowFill): gleiche Spalten,
+    // gleiche Spannen. Erst ab zwei Spalten - einspaltig gibt es nichts zu
+    // fuellen, und das Lesen kostete am Telefon ein Layout der ganzen Shell
+    // vor dem ersten Bild (gemessen rund 50 ms bei 4x CPU).
+    const skeletonGrid = container.querySelector('#dashboard-shell > .dashboard__grid');
+    if (skeletonGrid) applyRowFill(skeletonGrid);
+  }
+  // Das Plus des Speed-Dials steht im ERSTEN Bild, nicht erst mit den Daten
+  // (DW-P2-5: eine violette Scheibe ohne Zeichen, solange das Skelett stand).
+  createPendingIcons(container.querySelector('#fab-group'));
 
   // Der Zonen-Hinweis fuer Bestandshaushalte (#1607): ein Admin, dessen Browser
   // in einer anderen Zone steht, als der Haushalt ohne eigene Einstellung
@@ -9169,11 +9340,24 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let rowFillObserver = null;
   signal.addEventListener('abort', () => rowFillObserver?.disconnect(), { once: true });
 
+  let tileSizeObserver = null;
+  let headSizeObserver = null;
+  signal.addEventListener('abort', () => { tileSizeObserver?.disconnect(); headSizeObserver?.disconnect(); }, { once: true });
+
   function wireRowFill() {
     rowFillObserver?.disconnect();
     rowFillObserver = null;
+    tileSizeObserver?.disconnect();
+    tileSizeObserver = null;
+    headSizeObserver?.disconnect();
+    headSizeObserver = null;
     const grid = container.querySelector('#dashboard-widget-grid');
     if (!grid) return;
+    if (!isCustomizing) {
+      rememberGridHint(drawnTiles, widgetConfig);
+      tileSizeObserver = watchTileSizes(grid);
+      headSizeObserver = watchHeadSize(container.querySelector('#dashboard-shell'));
+    }
     applyRowFill(grid, { editing: isCustomizing });
     // Nach der Packung stehen die Breiten fest: eine Kennzahlkachel, deren Wert
     // auch auf der Stufe ihrer Reihe nicht passt, tritt eine Stufe zurueck
@@ -9453,6 +9637,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let quietScrollTop = null;
   /** Das Markup der Flaeche aus dem aktuellen Stand - fuer den Aufbau und fuer
    *  den Blick voraus, welche Zeilen der stille Abgleich mitnimmt. */
+  // Die Kacheln des letzten Aufbaus, so wie sie im Raster stehen.
+  let drawnTiles = [];
   function dashboardShellHtml(cfg) {
     // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
     // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
@@ -9472,7 +9658,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
+      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []) })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
     `;
   }
@@ -9503,6 +9689,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
       return;
     }
     const html = dashboardShellHtml(cfg);
+    // Vor dem Zeichnen, solange nichts Neues auszulegen ist (carryTileSizes).
+    const viewportWidth = window.innerWidth;
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
@@ -9545,17 +9733,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
     quietScrollTop = null;
     swapContent(shell, () => {
       setHtml(shell, html);
+      carryTileSizes(shell, viewportWidth);
+      // DIE ZEICHEN VOR DEM ERSTEN MESSEN (DW-P2-4): kamen sie erst nach den
+      // Messungen, legte der Browser die Flaeche zweimal aus - einmal ohne,
+      // einmal mit rund 600 Zeichen-Knoten (gemessen 19 ms bei 4x CPU im
+      // Seitenwechsel). Und das Blatt misst so die Zeilen, die man sieht.
+      createPendingIcons(shell);
       // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
         replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        createPendingIcons(shell);
         // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
         const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
         if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
       }
       refitTodayStage(shell, () => renderTodayCockpit(data, cfg, isCustomizing));
     }, { animate: fromSkeleton });
+    // Die Packung liest, solange das Layout vom Zeichnen noch sauber ist -
+    // nach den Verdrahtungen darunter (Kategorie-Ueberlauf der Notizen)
+    // verlangte ihr Lesen ein zweites Layout des Rasters (DW-P2-4).
+    wireRowFill();
     // Was ein Blatt UEBER der Uebersicht aendert (Erledigen, Bearbeiten,
     // Loeschen, Fasten), gleicht still ab: kein Skelett, Scroll und Fokus
     // bleiben (refreshDashboardData). Das volle render() gehoert dem Aufbau.
@@ -9566,7 +9765,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
     container.querySelectorAll('[data-widget-retry]').forEach((btn) =>
       btn.addEventListener('click', rerender, { signal: signal }));
-    if (window.lucide) window.lucide.createIcons({ el: shell });
+    // Nur, was seit dem Zeichnen neu ist (ein neu gezeichnetes Blatt).
+    createPendingIcons(shell);
     // Vorschaubilder der Mahlzeitenkachel: Ruecksturz auf den Platzhalter per
     // Listener, weil ein `onerror` im Markup gegen die CSP liefe (#1059).
     wireRecipeThumbs(shell);
@@ -9627,7 +9827,6 @@ export async function render(container, { user, signal: routeSignal = null } = {
     container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
     container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
     wireDashboardEditMode();
-    wireRowFill();
     void mountExtensionWidgets(shell, cfg, user);
 
     /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
@@ -9999,7 +10198,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, wireNewMenu, initFab, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, wireNewMenu, initFab, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

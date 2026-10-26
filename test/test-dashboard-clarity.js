@@ -1602,7 +1602,7 @@ test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge d
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const render = src.slice(src.indexOf('export async function render('));
-  assert.match(render, /: memo \? '' : renderDashboardSkeleton\(\)/, 'mit gemerktem Stand steht wieder ein Skelett im ersten Bild');
+  assert.match(render, /: memo \? '' : renderDashboardSkeleton\(user, \{ head \}\)/, 'mit gemerktem Stand steht wieder ein Skelett im ersten Bild');
   assert.match(render, /= memo\s*\? \[memo\.data, memo\.weatherRes, \{ data: memo\.prefs \}, memo\.data\.pendingReminders\]\s*: await Promise\.all\(/,
     'der gemerkte Stand wird nicht ohne Anfrage gezeichnet');
   assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
