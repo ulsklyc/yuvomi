@@ -47,6 +47,52 @@ const settlementReversalResponse = {
   },
 };
 
+// Salden und Summen einer Gruppe (#1888, #1941). Betraege wie ueberall im
+// Modul doppelt: `*_minor` in der kleinsten Einheit, daneben die Dezimalzahl.
+const balancesResponse = {
+  type: 'object',
+  required: ['data'],
+  properties: {
+    data: {
+      type: 'object',
+      required: ['balances', 'simplified_debts', 'member_totals', 'category_totals'],
+      properties: {
+        balances: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Net balance per member and currency (`net_minor`, `net`); members at zero are left out.' },
+        simplified_debts: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'The fewest payments that settle the balances, per currency.' },
+        member_totals: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['currency', 'user_id', 'display_name', 'paid_minor', 'paid', 'share_minor', 'share'],
+            properties: {
+              currency: { type: 'string', description: 'ISO 4217 code, the `converted_currency` of the expenses.' },
+              user_id: { type: 'integer' },
+              display_name: { type: ['string', 'null'] },
+              paid_minor: { type: 'integer', minimum: 0, description: 'What the member paid, in the minor unit of `currency`.' },
+              paid: { type: 'string', description: 'Decimal amount, e.g. `120.00`.' },
+              share_minor: { type: 'integer', minimum: 0, description: 'The member\'s own share of the expenses, in the minor unit of `currency`.' },
+              share: { type: 'string', description: 'Decimal amount, e.g. `80.00`.' },
+            },
+          },
+        },
+        category_totals: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['category', 'currency', 'total_minor', 'total'],
+            properties: {
+              category: { type: 'string', description: 'One of the categories from `GET /api/v1/split-expenses/meta`.' },
+              currency: { type: 'string', description: 'ISO 4217 code, the `converted_currency` of the expenses.' },
+              total_minor: { type: 'integer', minimum: 1 },
+              total: { type: 'string', description: 'Decimal amount, e.g. `130.00`.' },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 // Eine Seite des Verlaufs (#1309). `offset` steht nur in der Antwort ohne
 // Cursor - dort, wo es auch in der Anfrage etwas bedeutet.
 const activityPageResponse = {
@@ -173,7 +219,18 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create expense in group (optional `attachment_document_ids`: receipts from the documents module, filtered by document visibility)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/groups/{id}/balances': {
-      get: op({ summary: 'Get group balances', tag: 'SplitExpenses', params: [idParam()] }),
+      get: op({
+        summary: 'Get group balances and totals',
+        tag: 'SplitExpenses',
+        description: 'Balances per member and currency, the payments that settle them, and two totals over all active expenses of the group (not one page of the expense list). `member_totals`: per member and currency, what the member paid (`paid`, the full amount of every expense with that member as payer) and the member\'s own share (`share`, the sum of that member\'s splits); a member with neither in a currency has no row there. `category_totals`: per category and currency, the sum of the expenses in that category, largest first within a currency; a category without expenses has no row. Both count in `converted_currency` with `converted_amount_minor` - the currency the splits and the ledger are kept in - so `paid` minus `share` is the member\'s balance before any settlement. Deleted expenses and settlements count in neither total, and there is no conversion between currencies.',
+        params: [idParam()],
+        responses: {
+          200: { description: 'Balances and totals', content: { 'application/json': { schema: balancesResponse } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: apiError('Group not found or not visible to the caller'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
     '/api/v1/split-expenses/groups/{id}/settlements': {
       post: op({ summary: 'Record settlement (optional `proof_document_id`: one payment proof, ignored when the document is not visible to the caller)', tag: 'SplitExpenses', params: [idParam()], description: AMOUNT_NOTE + ' The response carries `proof_document_id` only when the caller may read that document (access to the Documents module, for API tokens a `documents:read` scope, and the document\'s own visibility), else `null`.', stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
@@ -227,7 +284,7 @@ export function splitexpensesPaths() {
       post: op({ summary: 'Create recurring expense in group', description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${RECURRING_SPLIT_NOTE} ${RECURRING_ANCHOR_NOTE}`, tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/split-expenses/expenses/{id}': {
-      put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)', tag: 'SplitExpenses', params: [idParam()], description: `${AMOUNT_NOTE} ${EXACT_SPLIT_NOTE} Omit \`category\` (or send \`null\`) to keep the stored category; an unknown category is stored as \`general\`, as on creation. ${DOCUMENT_LINKS_READ_NOTE}`, stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null) }),
       delete: op({
         summary: 'Delete expense',
         tag: 'SplitExpenses',
