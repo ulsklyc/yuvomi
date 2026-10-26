@@ -809,7 +809,7 @@
         "itemAddedToast": "Naidagdag ang \"{{name}}\" sa \"{{category}}\".",
         "moveReturned": {
             "refused": "Bumalik ang \"{{item}}\" sa \"{{back}}\": hindi ito tinanggap ng server sa \"{{target}}\".",
-            "waited": "Bumalik ang \"{{item}}\" sa \"{{back}}\": mahigit isang linggo nang hindi nasi-sync ang listahang iyon, kaya hindi nakarating ang item sa \"{{target}}\"."
+            "waited": "Hindi nailipat ang \"{{item}}\" sa \"{{target}}\": mahigit isang linggo nang naka-off ang pag-sync ng \"{{back}}\". Lalabas ulit ang item sa \"{{back}}\" kapag binuksan ang listahang iyon."
         }
     },
     "meals": {

@@ -791,7 +791,7 @@
         "itemAddedToast": "«{{name}}» lagt til under «{{category}}».",
         "moveReturned": {
             "refused": "«{{item}}» er tilbake på «{{back}}»: serveren godtok den ikke i «{{target}}».",
-            "waited": "«{{item}}» er tilbake på «{{back}}»: den listen har ikke vært synkronisert på over en uke, så varen kom ikke fram til «{{target}}»."
+            "waited": "«{{item}}» ble ikke flyttet til «{{target}}»: synkroniseringen av «{{back}}» har vært slått av i over en uke. Varen dukker opp igjen på «{{back}}» når listen slås på."
         }
     },
     "meals": {

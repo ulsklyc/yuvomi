@@ -92,14 +92,11 @@ button.toast__reminder-text:focus-visible {
 
 /* EINE MELDUNG IST EIN SATZ, KEIN NAME (#1912). Die Zeile darunter traegt
  * sonst einen Titel und darf abschneiden; "Umzug zurueckgenommen" sagt Artikel,
- * beide Listen und den Grund, abgeschnitten nach dem ersten Wort waere die
- * Meldung nutzlos. Hoechstens vier Zeilen, dann Auslassung - die Namen kommen
- * vom Nutzer und koennen beliebig lang sein. */
+ * beide Listen und den Grund, abgeschnitten waere die Meldung nutzlos. Sie
+ * bricht deshalb ganz um, ohne Zeilengrenze: der laengste Satz (Frist, de)
+ * braucht im Desktop-Toast schon sieben Zeilen, und eine Grenze schnitte
+ * genau das Ende ab, das sagt, wann der Artikel wiederkommt. */
 .toast--sentence .toast__reminder-text span {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
   white-space: normal;
   overflow-wrap: anywhere;
 }

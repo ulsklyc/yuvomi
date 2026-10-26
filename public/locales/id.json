@@ -809,7 +809,7 @@
         "itemAddedToast": "\"{{name}}\" ditambahkan ke \"{{category}}\".",
         "moveReturned": {
             "refused": "\"{{item}}\" kembali ke \"{{back}}\": server tidak menerimanya di \"{{target}}\".",
-            "waited": "\"{{item}}\" kembali ke \"{{back}}\": daftar itu sudah lebih dari seminggu tidak disinkronkan, jadi item tidak sampai ke \"{{target}}\"."
+            "waited": "\"{{item}}\" tidak dipindahkan ke \"{{target}}\": sinkronisasi \"{{back}}\" sudah lebih dari seminggu nonaktif. Item akan muncul lagi di \"{{back}}\" setelah daftar itu diaktifkan."
         }
     },
     "meals": {

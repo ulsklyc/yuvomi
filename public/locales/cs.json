@@ -856,7 +856,7 @@
         "itemAddedToast": "„{{name}}“ přidáno do „{{category}}“.",
         "moveReturned": {
             "refused": "Položka „{{item}}“ je zpět v seznamu „{{back}}“: server ji v seznamu „{{target}}“ nepřijal.",
-            "waited": "Položka „{{item}}“ je zpět v seznamu „{{back}}“: tento seznam se už přes týden nesynchronizuje, proto se položka do seznamu „{{target}}“ nedostala."
+            "waited": "Položka „{{item}}“ nebyla přesunuta do seznamu „{{target}}“: synchronizace seznamu „{{back}}“ je přes týden vypnutá. Položka se v seznamu „{{back}}“ znovu objeví, jakmile ho zapnete."
         }
     },
     "meals": {

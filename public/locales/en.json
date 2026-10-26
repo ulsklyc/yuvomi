@@ -791,7 +791,7 @@
         "itemAddedToast": "\"{{name}}\" added under \"{{category}}\".",
         "moveReturned": {
             "refused": "\"{{item}}\" is back on \"{{back}}\": the server did not accept it in \"{{target}}\".",
-            "waited": "\"{{item}}\" is back on \"{{back}}\": that list has not been synced for over a week, so the item did not reach \"{{target}}\"."
+            "waited": "\"{{item}}\" was not moved to \"{{target}}\": syncing for \"{{back}}\" has been off for over a week. The item will show up on \"{{back}}\" again once that list is switched on."
         }
     },
     "meals": {

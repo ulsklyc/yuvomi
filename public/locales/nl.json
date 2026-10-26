@@ -791,7 +791,7 @@
         "itemAddedToast": "\"{{name}}\" toegevoegd onder \"{{category}}\".",
         "moveReturned": {
             "refused": "„{{item}}” staat weer op „{{back}}”: de server heeft het niet geaccepteerd in „{{target}}”.",
-            "waited": "„{{item}}” staat weer op „{{back}}”: die lijst wordt al meer dan een week niet gesynchroniseerd, dus het artikel is niet in „{{target}}” aangekomen."
+            "waited": "„{{item}}” is niet verplaatst naar „{{target}}”: de synchronisatie van „{{back}}” staat al meer dan een week uit. Het artikel verschijnt weer op „{{back}}” zodra die lijst wordt ingeschakeld."
         }
     },
     "meals": {

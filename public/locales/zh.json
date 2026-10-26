@@ -791,7 +791,7 @@
         "itemAddedToast": "已将“{{name}}”加入“{{category}}”。",
         "moveReturned": {
             "refused": "“{{item}}”已回到“{{back}}”：服务器不接受将它放入“{{target}}”。",
-            "waited": "“{{item}}”已回到“{{back}}”：此清单已超过一周未同步，因此项目未能移到“{{target}}”。"
+            "waited": "“{{item}}”未移到“{{target}}”：“{{back}}”的同步已关闭超过一周。开启该清单后，项目会重新出现在“{{back}}”。"
         }
     },
     "meals": {

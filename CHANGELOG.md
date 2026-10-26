@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moved to another list and the CalDAV server keeps refusing it there, the new list is gone from the
   server, or the old list stays switched off for a week, the item goes back to the list it came from.
   Until now only the sync log knew. The person who moved it now gets a notice at the bell, as a toast
-  and as a push, in one sentence: the item, the list it is back on, and that the new list did not take
-  it. Tapping it opens that list. Nobody else gets it, and household channels never do.
+  and as a push: the item, the list it is back on, and that the new list did not take it. After the
+  week-long wait it says instead that the item was not moved because syncing for the old list is
+  off, and that it shows up there again once that list is switched on. Tapping it opens that list.
+  Nobody else gets it, and household channels never do.
 - **Google Calendar explains its own setup instead of stopping at "Not configured"** (#2221). An admin
   whose server has no Google credentials yet used to see only "Not configured (missing .env
   variables)", twice. The Google card now names the variables that are still missing, shows the

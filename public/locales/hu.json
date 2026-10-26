@@ -791,7 +791,7 @@
         "itemAddedToast": "„{{name}}” hozzáadva ide: „{{category}}”.",
         "moveReturned": {
             "refused": "„{{item}}” visszakerült ide: „{{back}}”. A szerver nem fogadta el itt: „{{target}}”.",
-            "waited": "„{{item}}” visszakerült ide: „{{back}}”. Ez a lista több mint egy hete nincs szinkronizálva, ezért a tétel nem jutott el ide: „{{target}}”."
+            "waited": "„{{item}}” nem került át ide: „{{target}}”. A(z) „{{back}}” szinkronizálása több mint egy hete ki van kapcsolva. A tétel újra megjelenik itt: „{{back}}”, amint bekapcsolod a listát."
         }
     },
     "meals": {

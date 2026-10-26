@@ -809,7 +809,7 @@
         "itemAddedToast": "„{{name}}“ steht unter „{{category}}“.",
         "moveReturned": {
             "refused": "„{{item}}“ steht wieder auf „{{back}}“: Der Server hat den Artikel in „{{target}}“ nicht angenommen.",
-            "waited": "„{{item}}“ steht wieder auf „{{back}}“: Der Abgleich dieser Liste ist seit über einer Woche aus, deshalb kam der Artikel nicht in „{{target}}“ an."
+            "waited": "„{{item}}“ wurde nicht nach „{{target}}“ verschoben: Der Abgleich von „{{back}}“ ist seit über einer Woche aus. Der Artikel erscheint wieder auf „{{back}}“, sobald die Liste eingeschaltet wird."
         }
     },
     "meals": {

@@ -791,7 +791,7 @@
         "itemAddedToast": "«{{name}}» añadido en «{{category}}».",
         "moveReturned": {
             "refused": "«{{item}}» ha vuelto a «{{back}}»: el servidor no lo aceptó en «{{target}}».",
-            "waited": "«{{item}}» ha vuelto a «{{back}}»: esa lista lleva más de una semana sin sincronizarse, así que el artículo no llegó a «{{target}}»."
+            "waited": "«{{item}}» no se ha movido a «{{target}}»: la sincronización de «{{back}}» lleva más de una semana desactivada. El artículo volverá a aparecer en «{{back}}» en cuanto actives esa lista."
         }
     },
     "meals": {

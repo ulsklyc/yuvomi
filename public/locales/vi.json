@@ -791,7 +791,7 @@
         "itemAddedToast": "Đã thêm \"{{name}}\" vào \"{{category}}\".",
         "moveReturned": {
             "refused": "“{{item}}” đã trở lại “{{back}}”: máy chủ không chấp nhận mục này trong “{{target}}”.",
-            "waited": "“{{item}}” đã trở lại “{{back}}”: danh sách đó đã hơn một tuần không được đồng bộ, nên mục này không đến được “{{target}}”."
+            "waited": "“{{item}}” chưa được chuyển sang “{{target}}”: đồng bộ của “{{back}}” đã tắt hơn một tuần. Mục này sẽ xuất hiện lại trong “{{back}}” khi danh sách đó được bật."
         }
     },
     "meals": {

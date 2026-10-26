@@ -1329,6 +1329,15 @@ test('Die Frist ist um: die Meldung kommt mit ihrem eigenen Grund und bleibt, au
   assert.deepEqual([shown[0].move_notice.reason, shown[0].move_notice.back_list_name, shown[0].move_notice.target_list_name],
     ['waited', 'alt', 'neu']);
   assert.equal(shown[0].entity_title, 'Milch', 'der Name kommt aus der Meldung, nicht aus der Zeile');
+  // Der Satz sagt, dass nicht verschoben wurde, warum, und wann der Artikel
+  // wiederkommt - er verschwindet ja lokal mit der abgeschalteten Liste.
+  const { translate } = await import('../server/utils/i18n.js');
+  const params = { item: 'Milch', back: 'alt', target: 'neu' };
+  assert.equal(
+    translate('de', 'shopping.moveReturned.waited', params),
+    '„Milch“ wurde nicht nach „neu“ verschoben: Der Abgleich von „alt“ ist seit über einer Woche aus. Der Artikel erscheint wieder auf „alt“, sobald die Liste eingeschaltet wird.',
+  );
+  assert.match(translate('en', 'shopping.moveReturned.waited', params), /was not moved to "neu".*once that list is switched on/);
 });
 
 test('Unbekannt, wer verschoben hat (Umzug von vor dem Update): keine Meldung, der Artikel geht trotzdem zurueck', async () => {
