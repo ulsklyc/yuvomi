@@ -107,7 +107,7 @@ test('offline geht vor: ohne Netz ist auch eine 403 keine Absage', async () => {
 
 test('der Router reicht genau diese Funktion weiter und hat keine eigene', () => {
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-  assert.match(router, /import \{ friendlyError \} from '\/utils\/friendly-error\.js';/);
+  assert.match(router, /import \{ friendlyError, unhandledErrorSentence \} from '\/utils\/friendly-error\.js';/);
   assert.doesNotMatch(router, /function friendlyError\(/, 'router.js hat wieder eine eigene Zuordnung');
   const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.ok(sw.includes("'/utils/friendly-error.js'"), 'das Modul fehlt in der Shell-Liste des Service Workers');
@@ -574,4 +574,36 @@ test('errorSentence: der Satz der Stelle bekommt seine Werte, ein bekannter Fall
   assert.equal(errorSentence(unbekannt, 'common.errorCheckRolledBack'), 'common.errorCheckRolledBack', 'ohne Werte wie bisher');
   assert.equal(errorSentence(Object.assign(new Error('x'), { status: 0 }), 'common.errorCheckRolledBack', { name: 'Milch' }),
     'common.errorOfflineMutation', 'offline sagt seinen eigenen Satz');
+});
+
+// DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm
+// und unbehandelte Rejection im Router. Bis hierher fragten beide
+// friendlyError, und das reichte an jeder unbekannten Antwort (400, 409) den
+// Text des Servers durch, an einem Wurf im Code dessen englische Meldung
+// ("foo is not defined") - beides als Satz der Oberflaeche. Jetzt: bekannter
+// Fall, offline, 404, 5xx, Zeitueberschreitung und Netzfehler wie bisher,
+// alles andere der unerwartete Fehler. Die rohe Meldung bleibt in den Details.
+test('unhandledErrorSentence: dieselben Faelle wie friendlyError, nie der Text des Servers (#1909)', async () => {
+  const { unhandledErrorSentence } = await load();
+  const server = (status, extra = {}) => Object.assign(new Error('Server sentence.'), { status, data: { error: 'Server sentence.', ...extra } });
+  assert.equal(unhandledErrorSentence(server(409)), 'common.unexpectedError');
+  assert.equal(unhandledErrorSentence(server(400)), 'common.unexpectedError');
+  assert.equal(unhandledErrorSentence(server(422, { reason: 'unknown_reason' })), 'common.unexpectedError');
+  assert.equal(unhandledErrorSentence(new Error('Boom')), 'common.unexpectedError');
+  assert.equal(unhandledErrorSentence(new ReferenceError('foo is not defined')), 'common.unexpectedError');
+  assert.equal(unhandledErrorSentence(undefined), 'common.unexpectedError');
+  // Was friendlyError schon sicher wusste, sagt er weiter.
+  assert.equal(unhandledErrorSentence(server(403)), 'common.errorNoPermission');
+  assert.equal(unhandledErrorSentence(server(404, { reason: 'tasks_task_not_found' })), 'tasks.errorTaskGone');
+  assert.equal(unhandledErrorSentence(server(404)), 'common.errorNotFound');
+  assert.equal(unhandledErrorSentence(server(500)), 'common.errorServer');
+  assert.equal(unhandledErrorSentence(server(429)), 'common.errorRateLimited');
+  assert.equal(unhandledErrorSentence(server(503, { reason: 'restore_in_progress' })), 'common.errorRestoreInProgress');
+  assert.equal(unhandledErrorSentence({ status: 0 }), 'common.errorOfflineMutation');
+  assert.equal(unhandledErrorSentence({ name: 'TimeoutError' }), 'common.errorTimeout');
+  assert.equal(unhandledErrorSentence(new TypeError('x is not a function')), 'common.unexpectedError');
+  assert.notEqual(unhandledErrorSentence(new TypeError('Failed to fetch')), 'Failed to fetch');
+  setOnline(false);
+  assert.equal(unhandledErrorSentence(server(409)), 'common.errorOffline');
+  assert.equal(unhandledErrorSentence({ status: 0 }), 'common.errorOfflineMutation');
 });

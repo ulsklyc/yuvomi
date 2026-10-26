@@ -7177,9 +7177,10 @@ test('route failures expose a localized recoverable alert instead of raw technic
   // setAttribute hier. Geprueft wird deshalb die Variante - die Rolle selbst
   // haelt der Renderer-Guard weiter oben fest.
   // Seit der Re-Critique 2026-10-17 nimmt renderError den Seitennamen mit
-  // (Test darunter); die Ursache bleibt friendlyError(err).
+  // (Test darunter); die Ursache sagt seit #1909 unhandledErrorSentence(err),
+  // nie den Text des Servers.
   assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*emptyStateEl\(\{[\s\S]{0,1200}?variant:\s*'error'/);
-  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*const cause = friendlyError\(err\);[\s\S]*description:[^\n]*: cause,/);
+  assert.match(router, /function renderError\(container,\s*err[,)][\s\S]*const cause = unhandledErrorSentence\(err\);[\s\S]*description:[^\n]*: cause,/);
   assert.match(router, /state\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(friendly, /Failed to fetch\|NetworkError\|Load failed/i);
   assert.match(friendly, /return t\(['"]common\.errorServer['"]\)/);
@@ -22401,7 +22402,6 @@ function countFriendlyErrorCalls(source) {
 // Datei -> Zahl der Aufrufe von friendlyError. Nur senken.
 const FRIENDLY_ERROR_CALLERS = new Map([
   ['pages/meals.js', 3],
-  ['router.js', 2],   // Fehlerbildschirm und unbehandelte Rejection
 ]);
 
 test('der Zaehler fuer friendlyError sieht beide Wege und keine eigene Funktion (#1909)', () => {
@@ -22466,6 +22466,10 @@ test('friendlyError hat keinen neuen Aufrufer, die verbliebenen stehen als Zahl 
   // Das Budget ebenso (#1909): die Absagen ueber errorSentence, der Rest ueber loadErrorSentence.
   assert.equal(counts.has('pages/budget.js'), false, 'pages/budget.js ruft friendlyError() - das Budget zeigt nie den Text des Servers');
   assert.equal(FRIENDLY_ERROR_CALLERS.has('pages/budget.js'), false, 'pages/budget.js steht auf 0 und gehoert nicht in die Liste');
+  // Der Router ebenso (#1909): Fehlerbildschirm und unbehandelte Rejection sagen
+  // unhandledErrorSentence; window.yuvomi.friendlyError reicht er nur weiter.
+  assert.equal(counts.has('router.js'), false, 'router.js ruft friendlyError() - Fehlerbildschirm und Rejection zeigen nie den Text des Servers');
+  assert.equal(FRIENDLY_ERROR_CALLERS.has('router.js'), false, 'router.js steht auf 0 und gehoert nicht in die Liste');
 });
 
 /* ────────────────────────────────────────────────────────────────────────────

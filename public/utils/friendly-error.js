@@ -620,6 +620,25 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric', params =
 }
 
 /**
+ * DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm
+ * und unbehandelte Rejection im Router. Dieselben Faelle wie friendlyError -
+ * bekannter Fall, offline, 404, 5xx, Zeitueberschreitung, Netzfehler -, nur
+ * kommt an einer unbekannten Antwort (400, 409) oder einem Wurf im Code nie
+ * dessen Text heraus, sondern der unerwartete Fehler. Die rohe Meldung steht
+ * beim Fehlerbildschirm in den aufklappbaren Details.
+ *
+ * Offline-Mutation (status 0) zuerst: loadErrorSentence sagte dort "keine
+ * Verbindung", der Satz einer gescheiterten Aenderung ist der genauere.
+ *
+ * @param {unknown} err
+ * @returns {string} uebersetzter Satz
+ */
+export function unhandledErrorSentence(err) {
+  if (err?.status === 0) return errorSentence(err);
+  return loadErrorSentence(err) ?? errorSentence(err, 'common.unexpectedError');
+}
+
+/**
  * UEBERGANG (#1909): der Satz fuer Aufrufer, die noch nicht umgestellt sind.
  * Jeder wandert mit der Scheibe seines Moduls zu `errorSentence`; bis dahin
  * sagt er hier nicht weniger als vor #1909. Bekannter Fall -> sein Satz, sonst

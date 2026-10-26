@@ -1328,7 +1328,7 @@ test('der Sammelhandler im Router zeigt fuer einen Abbruch keinen Fehler-Toast',
   // Als PROGRAMM gefahren, nicht nur gelesen: der Rumpf laeuft mit Attrappen.
   const run = (reason) => {
     const seen = { toasts: 0, prevented: 0 };
-    const fn = new Function('e', 'isAbortError', 'showToast', 'friendlyError', 'console', handler);
+    const fn = new Function('e', 'isAbortError', 'showToast', 'unhandledErrorSentence', 'console', handler);
     fn({ reason, preventDefault: () => { seen.prevented += 1; } }, isAbortError, () => { seen.toasts += 1; }, (x) => String(x), { error() {} });
     return seen;
   };

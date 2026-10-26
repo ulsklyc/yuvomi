@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **The error screen and the toast for an unhandled error no longer show raw technical text** (#1909).
+  When a page failed to open or an action failed without its own message, the app could show the
+  server's text or an English code message such as "foo is not defined" as its sentence. Both now
+  say the app's own sentence in your language (offline, not found, server error, timeout, no
+  permission, or an unexpected error); the technical details stay in the collapsible section of the
+  error screen.
 - **A folder upload whose folder was deleted meanwhile can start again from the dialog** (#1995).
   When someone deleted the chosen folder while a folder upload ran, every entry failed on its own
   and the dialog could only be closed. The upload now stops at the first such answer, the dialog
