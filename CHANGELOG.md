@@ -93,6 +93,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **"New - Task" on the Overview opens the new-task form again.** The "+ New" button on a computer
+  and the quick-action button on a phone switched to Tasks and stopped there, because they still
+  looked for the add button under the name it had before the add buttons were unified. Event, Note
+  and Shopping were not affected.
 - **Deleting a CalDAV account no longer leaves events and tasks pointing at it** (#1885). An event
   or task created in Yuvomi and meant for that account's calendar or reminder list kept the deleted
   account as its target, and the event stood in no calendar at all. The target now goes with the
