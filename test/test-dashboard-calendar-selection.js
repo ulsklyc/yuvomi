@@ -213,6 +213,20 @@ test('ein ENTFERNTER Kalender faellt still aus der Auswahl; bleibt keiner, zeigt
   }
 });
 
+test('ein synchronisierter Kalender, dessen einziger Termin noch hochgeladen wird, ist waehlbar (Codex-Review zu PR #2268)', async () => {
+  // Ein neuer Google-Termin traegt `calendar_ref_id` erst nach dem Upload; bis
+  // dahin nennt nur `target_google_calendar_id` seinen Kalender.
+  const pending = Number(db.prepare("INSERT INTO external_calendars (source, external_id, name, color) VALUES ('google', 'neu@example', 'Neu', '#333333')").run().lastInsertRowid);
+  const id = addEvent('Neu 1', '10-30', '15', { source: 'google' });
+  db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'neu@example' WHERE id = ?").run(id);
+  try {
+    assert.ok((await getJson('/calendar/calendars')).sources.some((s) => s.key === `cal:${pending}`), 'im Katalog');
+    assert.deepEqual(titles(await getJson(query(`cal:${pending}`))), ['Neu 1', 'Ohne Kalender'], 'und die Auswahl haelt');
+  } finally {
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+  }
+});
+
 // --------------------------------------------------------------------------
 // 2. Der Katalog
 // --------------------------------------------------------------------------

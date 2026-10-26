@@ -14,12 +14,13 @@
 // WAS ES GIBT, SAGT EINE STELLE (`calendarSources`): der Katalog des
 // Optionen-Dialogs und die Pruefung der Auswahl in der Route lesen dieselbe
 // Liste. Ein synchronisierter Kalender zaehlt, solange er einen Termin traegt,
-// den die Person sehen darf - `external_calendars` wird beim Trennen eines
+// den die Person sehen darf (auch einen, der erst hochgeladen wird) - `external_calendars` wird beim Trennen eines
 // Kontos nie geleert, nur seine Termine verschwinden. So faellt ein entfernter
 // Kalender still aus der Auswahl, ob lokal geloescht, Abo entfernt oder Konto
 // getrennt.
 // --------------------------------------------------------
 
+import { SOURCE_CALENDAR_JOIN } from './calendar-events.js';
 import { localCalendarIdSql } from './local-calendars.js';
 import { visibilityWhere } from './visibility.js';
 
@@ -57,13 +58,17 @@ export function calendarSources(d, viewerId) {
     SELECT id, name, color FROM local_calendars
     ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
   `).all().map((row) => ({ key: `local:${row.id}`, name: row.name, color: row.color ?? null }));
+  // Ueber dieselbe Aufloesung wie die Leser (`SOURCE_CALENDAR_JOIN`), nicht
+  // nur ueber `calendar_ref_id`: ein neuer Termin fuer Google oder CalDAV traegt
+  // die Kennung erst nach dem Hochladen (Codex-Review zu PR #2268). Waere er
+  // der einzige des Kalenders, fehlte der Kalender sonst im Dialog, und eine
+  // gespeicherte Auswahl fiele weg, waehrend die Leser ihn laengst zuordnen.
   const synced = d.prepare(`
-    SELECT ec.id, ec.name, ec.color FROM external_calendars ec
-    WHERE EXISTS (
-      SELECT 1 FROM calendar_events e
-      WHERE e.calendar_ref_id = ec.id AND e.subscription_id IS NULL
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@viewer')}
-    )
+    SELECT DISTINCT src.id, src.name, src.color
+    FROM calendar_events e
+    ${SOURCE_CALENDAR_JOIN}
+    WHERE src.id IS NOT NULL AND e.subscription_id IS NULL
+      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@viewer')}
   `).all({ viewer: viewerId }).map((row) => ({ key: `cal:${row.id}`, name: row.name, color: row.color ?? null }));
   const subscriptions = d.prepare(`
     SELECT id, name, color FROM ics_subscriptions WHERE shared = 1 OR created_by = ?
