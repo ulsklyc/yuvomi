@@ -14,8 +14,13 @@
 /** Dieselben Woerter wie Aufgaben und Termine (DECISIONS 5), ohne "Nur Zugewiesene": Notizen haben keine. */
 export const NOTE_VISIBILITY_VALUES = Object.freeze(['all', 'private']);
 
-/** Ein eingehender Wert als Stufe, oder `null`, wenn er keine ist. */
+/**
+ * Ein eingehender Wert als Stufe, oder `null`, wenn er keine ist. `family` und
+ * `shared` sind die offene Stufe anderer Module und heissen hier `all`
+ * (DECISIONS 5: das Vokabular wird beim Lesen angeglichen, nicht abgewiesen).
+ */
 export function noteVisibilityValue(value) {
+  if (value === 'family' || value === 'shared') return 'all';
   return NOTE_VISIBILITY_VALUES.includes(value) ? value : null;
 }
 

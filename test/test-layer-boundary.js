@@ -123,6 +123,11 @@ const SHARED_ISOMORPHIC = new Set([
   // 409 abgewiesen - oder, schlimmer, eine Zeile ohne Kaestchen laesst sich
   // ueber die Route umschreiben. Reine Textfunktionen, kein DOM, kein Node.
   'public/utils/markdown-checklist.js',
+  // #1514, #1602: Wer eine Notiz sieht und wer sie aendert. Die Karte nimmt
+  // damit Nadel, Loeschen und Kaestchen weg, die Route weist damit ab - zwei
+  // Fassungen hiessen ein Kaestchen, das antippbar aussieht und mit 403
+  // zurueckspringt. Reine Funktionen ueber eine Notizzeile, kein DOM, kein Node.
+  'public/utils/note-access.js',
   // #785: Was ein Ordnerbaum bedeutet - was liegt unter einem Ordner, wo liegt
   // er selbst, und darf er dorthin. Die Seitenleiste zaehlt damit ihre
   // Dokumente je Ordner, die Route filtert damit ihre Abfrage. Zwei Fassungen

@@ -77,6 +77,10 @@ test('POST: visibility and locked are stored, invalid values are refused in Engl
   assert.equal(bad.status, 400);
   assert.match(bad.body.error, /visibility/);
   assert.equal((await call('POST', '/notes', { content: 'x', locked: 'yes' })).status, 400);
+  // Die offene Stufe anderer Module (DECISIONS 5) heisst hier `all`.
+  const family = await call('POST', '/notes', { content: 'x', visibility: 'family' });
+  assert.equal(family.status, 201);
+  assert.equal(family.body.data.visibility, 'all');
 });
 
 test('private note: absent for every other member in list, write paths, search and overview - admins too', async () => {
