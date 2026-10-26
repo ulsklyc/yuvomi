@@ -3018,6 +3018,18 @@
   min-width: 0;
 }
 
+/* Der Hinweis "nur lesbar" (#1840) steht unter Name UND Modulwahl, ueber die
+   volle Breite: in der Namensspalte haette er der Modulwahl mobil die Breite
+   genommen. */
+.caldav-reminder-item:has(> .caldav-reminder-note) {
+  flex-wrap: wrap;
+}
+
+.caldav-reminder-note {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .caldav-calendar-color {
   width: 12px;
   height: 12px;

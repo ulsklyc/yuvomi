@@ -151,10 +151,17 @@ function buildReminderRow(account, list) {
     : '';
   const row = createSettingRow({
     label: list.listName,
-    description: readOnlyNote,
     control: toggle,
   });
   wrapper.append(row, select);
+  if (readOnlyNote) {
+    const note = document.createElement('p');
+    note.className = 'caldav-calendar-source caldav-reminder-note';
+    note.id = `${toggle.id}-read-only`;
+    note.textContent = readOnlyNote;
+    toggle.setAttribute('aria-describedby', note.id);
+    wrapper.appendChild(note);
+  }
   return wrapper;
 }
 
