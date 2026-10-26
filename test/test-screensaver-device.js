@@ -18,6 +18,12 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+// The real Date, taken before anything else runs: page() mocks it, and the
+// tests registered above a top-level await may already have started by the
+// time a later line runs. The mock's constructor hands back a plain Date, so a
+// subclass of the mock would lose its getHours() (the night-hours cases below).
+const RealDate = Date;
+
 const prefs = await import('../public/utils/screensaver-idle.js');
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -600,11 +606,6 @@ test('without Immich the device sheet shows one row instead of three dead option
 
 const night = await import('../public/utils/night-hours.js');
 const { setDisplayTimeZone: setZone } = await import('../public/utils/timezone.js');
-
-// The real Date, taken while the module loads: page() mocks it later, and the
-// mock's constructor hands back a plain Date, so a subclass of the mock would
-// lose its getHours().
-const RealDate = Date;
 
 /** A `Date` whose `new Date()` is `iso` and whose DEVICE hour is always `deviceHour`. */
 function deviceClock(iso, deviceHour) {
