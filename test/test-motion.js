@@ -252,7 +252,7 @@ const MOTION_EXCEPTIONS = new Map([
   ['layout.css: .swipe-reveal', 'folgt dem Finger: die Deckkraft wird je Frame gesetzt, linear glaettet nur'],
   ['dashboard.css: .dashboard-icon-btn--hint', 'einmaliger Hinweis-Puls (3 Wiederholungen), nicht im Arbeitsfluss'],
   ['health.css: .cycle-ring__now', 'Hinweis-Puls am heutigen Tag (3 Wiederholungen), nicht im Arbeitsfluss'],
-  ['screensaver.css: .photo-screensaver img', 'Bildschirmschoner: langsame Ueberblendung zwischen Fotos, kein Bedienmoment'],
+  ['screensaver.css: .photo-screensaver img, .photo-screensaver p', 'Bildschirmschoner: langsame Ueberblendung zwischen Fotos und das Abdunkeln um 22:00 (#1901), kein Bedienmoment'],
 ]);
 
 function motionViolations() {
