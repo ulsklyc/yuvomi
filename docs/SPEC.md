@@ -1188,7 +1188,11 @@ connection is configured, an event that arrives in the default calendar uploads 
 next sync. Deleting a calendar is such a move for all of its events. `GET /calendar/calendars`
 reports this as `uploads_to_icloud` on the default calendar (`uploadsLocalEvents()` in
 `server/services/apple-calendar.js`, the same condition the sync run starts on), and the delete
-confirmation then names the upload.
+confirmation then names the upload. The event form names it too (#1927): while the chosen calendar
+uploads, a help line under the calendar picker says so, for a new event as for one moved there;
+there is no question on save. The upload goes into the first iCloud calendar that holds events and
+takes new ones (#1840), not blindly into the first one listed; without such a calendar local events
+stay local.
 ICS imports deduplicate within the selected calendar: importing the same UID into two local
 calendars intentionally creates one copy in each.
 With exactly one local calendar, event names, the destination picker, and inherited calendar
@@ -1431,6 +1435,7 @@ from it untouched.
 | calendar_name | TEXT | Display name from provider, NOT NULL |
 | calendar_color | TEXT | HEX color code from provider, nullable |
 | enabled | INTEGER | 0/1, controls sync for this calendar. **Opt-in since v2.10.0:** connecting an account stores every calendar it finds as unticked, and so does a calendar the server newly reports on a refresh — before that, an account with work, birthday and holiday calendars pushed all of them into the household on connect, and each one had to be emptied by hand afterwards. Refreshing the list (and changing the account's credentials) rebuilds these rows but **keeps the stored state per `calendar_url`**; until v2.8.1 both paths wrote everything back as enabled, so a deliberately unticked calendar returned to the sync unasked, along with its events on the next run (#732) |
+| writable | INTEGER | 1/0/NULL (migration 261, #1840): whether the account may add events to this calendar, read from `current-user-privilege-set` (`all`, `write` or `bind`) on every listing and sync run. NULL means the server does not say and counts as writable. A read-only calendar stays selectable for reading, is left out of `GET /calendar/sync-targets`, is refused as a new event target, and receives no upload; events that already name it keep their target, and the account settings show the calendar as read-only with the number waiting (`waitingUploads`) |
 | created_at | TEXT | ISO 8601 |
 | UNIQUE | | (account_id, calendar_url) |
 
@@ -1963,6 +1968,7 @@ A VTODO's `CATEGORIES` arrive as tags (#586): two-way for tasks (see [Task Tags]
 | target_module | TEXT | 'tasks' or 'shopping' (default 'tasks') |
 | target_list_id | INTEGER | FK → Shopping Lists (SET NULL on delete), nullable; auto-created when mapped to Shopping |
 | enabled | INTEGER | 0/1 (default 0 — reminders are opt-in), controls sync for this list |
+| writable | INTEGER | 1/0/NULL (migration 261, #1840), as on the calendar selection: a read-only list is still read, is left out of `GET /tasks/sync-targets`, is refused as a new task target, and nothing is uploaded to it (tasks or shopping items); what already waits keeps waiting and is counted in the reminder settings |
 | created_at | TEXT | ISO 8601 |
 | UNIQUE | | (account_id, list_url) |
 

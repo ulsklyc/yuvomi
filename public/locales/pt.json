@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Este calendário está a ser exportado. Só um administrador o pode eliminar.",
         "errorEventGone": "Este evento já não existe.",
         "errorSelectedCalendarGone": "O calendário escolhido já não existe.",
-        "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início."
+        "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início.",
+        "localCalendarUploadsHint": "Os eventos deste calendário são enviados para o iCloud através do Apple Calendar."
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "As novas contas de criança recebem também, ao serem criadas, permissões iniciais próprias: {{list}}. Depois aparecem no respetivo membro.",
         "activeModulesHintMore": "Para ocultar um módulo só para você, vá em Módulos → Navegação.",
         "permIntroMore": "Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre.",
-        "preferenceSaveFailed": "Não foi possível guardar a definição."
+        "preferenceSaveFailed": "Não foi possível guardar a definição.",
+        "caldavCalendarReadOnly": "Só de leitura: não é possível guardar novos eventos aqui",
+        "caldavCalendarReadOnlyWaiting_one": "Só de leitura: {{count}} evento à espera de envio para aqui não vai chegar",
+        "caldavCalendarReadOnlyWaiting": "Só de leitura: {{count}} eventos à espera de envio para aqui não vão chegar",
+        "reminderListReadOnly": "Só de leitura: não é possível guardar novas entradas aqui",
+        "reminderListReadOnlyWaiting_one": "Só de leitura: {{count}} entrada à espera de envio para aqui não vai chegar",
+        "reminderListReadOnlyWaiting": "Só de leitura: {{count}} entradas à espera de envio para aqui não vão chegar"
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

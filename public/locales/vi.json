@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Lịch này đang được xuất. Chỉ quản trị viên mới có thể xóa.",
         "errorEventGone": "Sự kiện này không còn tồn tại.",
         "errorSelectedCalendarGone": "Lịch đã chọn không còn tồn tại.",
-        "errorSeriesNoOccurrence": "Với kiểu lặp lại này sẽ không có sự kiện nào từ ngày bắt đầu."
+        "errorSeriesNoOccurrence": "Với kiểu lặp lại này sẽ không có sự kiện nào từ ngày bắt đầu.",
+        "localCalendarUploadsHint": "Sự kiện trong lịch này được tải lên iCloud qua Apple Calendar."
     },
     "noteCategories": {
         "categories": "Danh mục",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Tài khoản trẻ em mới khi được tạo còn nhận quyền khởi đầu riêng: {{list}}. Sau đó các quyền này hiển thị ở thành viên đó.",
         "activeModulesHintMore": "Để chỉ ẩn với riêng bạn, vào Mô-đun → Điều hướng.",
         "permIntroMore": "Từng thành viên có thể khác với mặc định của vai trò. Nếu không đặt gì, mỗi vai trò có toàn quyền truy cập; quản trị viên luôn luôn.",
-        "preferenceSaveFailed": "Không thể lưu cài đặt."
+        "preferenceSaveFailed": "Không thể lưu cài đặt.",
+        "caldavCalendarReadOnly": "Chỉ đọc: không thể lưu sự kiện mới tại đây",
+        "caldavCalendarReadOnlyWaiting_one": "Chỉ đọc: {{count}} sự kiện đang chờ tải lên đây sẽ không đến nơi",
+        "caldavCalendarReadOnlyWaiting": "Chỉ đọc: {{count}} sự kiện đang chờ tải lên đây sẽ không đến nơi",
+        "reminderListReadOnly": "Chỉ đọc: không thể lưu mục mới tại đây",
+        "reminderListReadOnlyWaiting_one": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi",
+        "reminderListReadOnlyWaiting": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

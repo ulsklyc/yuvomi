@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "यह कैलेंडर निर्यात हो रहा है। केवल एक व्यवस्थापक इसे हटा सकता है।",
         "errorEventGone": "यह घटना अब मौजूद नहीं है।",
         "errorSelectedCalendarGone": "चुना गया कैलेंडर अब मौजूद नहीं है।",
-        "errorSeriesNoOccurrence": "इस दोहराव से शुरुआती तारीख से एक भी घटना नहीं बनेगी।"
+        "errorSeriesNoOccurrence": "इस दोहराव से शुरुआती तारीख से एक भी घटना नहीं बनेगी।",
+        "localCalendarUploadsHint": "इस कैलेंडर के इवेंट Apple Calendar के ज़रिए iCloud पर अपलोड होते हैं।"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "नए बच्चों के खातों को बनते समय अपनी शुरुआती अनुमतियाँ भी मिलती हैं: {{list}}। इसके बाद वे उसी सदस्य के पास दिखती हैं।",
         "activeModulesHintMore": "केवल अपने लिए छिपाने के लिए मॉड्यूल → नेविगेशन पर जाएँ।",
         "permIntroMore": "अलग-अलग सदस्य भूमिका के डिफ़ॉल्ट से भिन्न हो सकते हैं। कुछ भी सेट न होने पर, हर भूमिका को पूर्ण पहुँच होती है; व्यवस्थापकों को हमेशा।",
-        "preferenceSaveFailed": "सेटिंग सहेजी नहीं जा सकी।"
+        "preferenceSaveFailed": "सेटिंग सहेजी नहीं जा सकी।",
+        "caldavCalendarReadOnly": "केवल पढ़ने के लिए: यहाँ नए इवेंट सहेजे नहीं जा सकते",
+        "caldavCalendarReadOnlyWaiting_one": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रहा {{count}} इवेंट नहीं पहुँचेगा",
+        "caldavCalendarReadOnlyWaiting": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रहे {{count}} इवेंट नहीं पहुँचेंगे",
+        "reminderListReadOnly": "केवल पढ़ने के लिए: यहाँ नई प्रविष्टियाँ सहेजी नहीं जा सकतीं",
+        "reminderListReadOnlyWaiting_one": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रही {{count}} प्रविष्टि नहीं पहुँचेगी",
+        "reminderListReadOnlyWaiting": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रही {{count}} प्रविष्टियाँ नहीं पहुँचेंगी"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

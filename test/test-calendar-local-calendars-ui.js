@@ -411,3 +411,40 @@ test('the three event delete paths: gone is done, any other failure says the app
     if (previous.undoStub === undefined) delete globalThis.__undoStub; else globalThis.__undoStub = previous.undoStub;
   }
 });
+
+// #1927: die Hilfezeile unter der Kalenderwahl nennt den iCloud-Upload, sobald
+// der gewaehlte Kalender hochlaedt - ohne Rueckfrage beim Speichern und ohne
+// Zeile, solange keiner hochlaedt.
+test('the event form names the iCloud upload under the calendar picker while the chosen calendar uploads', () => {
+  const before = calendar.localCalendarState.localCalendars;
+  const fakeSelect = () => {
+    const attrs = {};
+    return { value: '', setAttribute(name, value) { attrs[name] = value; }, removeAttribute(name) { delete attrs[name]; }, attrs };
+  };
+  try {
+    for (const uploads of [true, false, undefined]) {
+      calendar.localCalendarState.localCalendars = [
+        { id: 1, name: 'Yuvomi', is_default: true, uploads_to_icloud: uploads },
+        { id: 2, name: 'School', is_default: false, uploads_to_icloud: false },
+      ];
+      const html = calendar.buildEventModalContent({ mode: 'create', date: '2035-05-01' });
+      assert.match(html, /id="event-local-calendar-upload-hint" hidden>calendar\.localCalendarUploadsHint</,
+        'the line is part of the picker and starts hidden');
+
+      const select = fakeSelect();
+      const hint = { id: 'event-local-calendar-upload-hint', hidden: true };
+      const panel = { querySelector: (sel) => (sel === '#event-local-calendar' ? select
+        : sel === '#event-local-calendar-upload-hint' ? hint : null) };
+
+      select.value = '1';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, uploads !== true, `default calendar, uploads: ${uploads}`);
+      assert.equal(select.attrs['aria-describedby'], uploads === true ? hint.id : undefined);
+
+      select.value = '2';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, true, 'a calendar that stays local shows no line');
+      assert.equal(select.attrs['aria-describedby'], undefined);
+    }
+  } finally { calendar.localCalendarState.localCalendars = before; }
+});

@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Ez a naptár exportálva van. Csak egy rendszergazda törölheti.",
         "errorEventGone": "Ez az esemény már nem létezik.",
         "errorSelectedCalendarGone": "A kiválasztott naptár már nem létezik.",
-        "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne."
+        "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne.",
+        "localCalendarUploadsHint": "Az ebben a naptárban lévő események az Apple Calendaron keresztül feltöltődnek az iCloudba."
     },
     "noteCategories": {
         "categories": "Kategóriák",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók.",
         "activeModulesHintMore": "Ha csak magadnál rejtenéd el, nézd meg a Modulok → Navigáció oldalt.",
         "permIntroMore": "Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig.",
-        "preferenceSaveFailed": "A beállítás nem menthető."
+        "preferenceSaveFailed": "A beállítás nem menthető.",
+        "caldavCalendarReadOnly": "Csak olvasható: ide nem menthetők új események",
+        "caldavCalendarReadOnlyWaiting_one": "Csak olvasható: {{count}} ide feltöltésre váró esemény nem érkezik meg",
+        "caldavCalendarReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró esemény nem érkezik meg",
+        "reminderListReadOnly": "Csak olvasható: ide nem menthetők új bejegyzések",
+        "reminderListReadOnlyWaiting_one": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
+        "reminderListReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg"
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Ce calendrier est exporté. Seul un administrateur peut le supprimer.",
         "errorEventGone": "Cet événement n’existe plus.",
         "errorSelectedCalendarGone": "Le calendrier choisi n’existe plus.",
-        "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début."
+        "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début.",
+        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar."
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné.",
         "activeModulesHintMore": "Pour masquer un module seulement pour toi, va dans Modules → Navigation.",
         "permIntroMore": "Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours.",
-        "preferenceSaveFailed": "Le réglage n’a pas pu être enregistré."
+        "preferenceSaveFailed": "Le réglage n’a pas pu être enregistré.",
+        "caldavCalendarReadOnly": "Lecture seule : impossible d’enregistrer de nouveaux événements ici",
+        "caldavCalendarReadOnlyWaiting_one": "Lecture seule : {{count}} événement en attente d’envoi ici n’arrivera pas",
+        "caldavCalendarReadOnlyWaiting": "Lecture seule : {{count}} événements en attente d’envoi ici n’arriveront pas",
+        "reminderListReadOnly": "Lecture seule : impossible d’enregistrer de nouvelles entrées ici",
+        "reminderListReadOnlyWaiting_one": "Lecture seule : {{count}} entrée en attente d’envoi ici n’arrivera pas",
+        "reminderListReadOnlyWaiting": "Lecture seule : {{count}} entrées en attente d’envoi ici n’arriveront pas"
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

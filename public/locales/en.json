@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "This calendar is being exported. Only an admin can delete it.",
         "errorEventGone": "This event no longer exists.",
         "errorSelectedCalendarGone": "The chosen calendar no longer exists.",
-        "errorSeriesNoOccurrence": "With this repeat there would be no event at all from the start date."
+        "errorSeriesNoOccurrence": "With this repeat there would be no event at all from the start date.",
+        "localCalendarUploadsHint": "Events in this calendar are uploaded to iCloud through Apple Calendar."
     },
     "noteCategories": {
         "categories": "Categories",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "New child accounts also get their own starting permissions when they are created: {{list}}. Afterwards they are listed with that member.",
         "activeModulesHintMore": "To take a module out of your own navigation only, go to Modules → Navigation.",
         "permIntroMore": "Individual members can differ from the role default. With nothing set, every role has full access; administrators always do.",
-        "preferenceSaveFailed": "The setting could not be saved."
+        "preferenceSaveFailed": "The setting could not be saved.",
+        "caldavCalendarReadOnly": "Read-only: new events cannot be saved here",
+        "caldavCalendarReadOnlyWaiting_one": "Read-only: {{count}} event waiting to upload here will not arrive",
+        "caldavCalendarReadOnlyWaiting": "Read-only: {{count}} events waiting to upload here will not arrive",
+        "reminderListReadOnly": "Read-only: new entries cannot be saved here",
+        "reminderListReadOnlyWaiting_one": "Read-only: {{count}} entry waiting to upload here will not arrive",
+        "reminderListReadOnlyWaiting": "Read-only: {{count}} entries waiting to upload here will not arrive"
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

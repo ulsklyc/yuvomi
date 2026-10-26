@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Este calendario se está exportando. Solo un administrador puede eliminarlo.",
         "errorEventGone": "Este evento ya no existe.",
         "errorSelectedCalendarGone": "El calendario elegido ya no existe.",
-        "errorSeriesNoOccurrence": "Con esta repetición no habría ningún evento a partir de la fecha de inicio."
+        "errorSeriesNoOccurrence": "Con esta repetición no habría ningún evento a partir de la fecha de inicio.",
+        "localCalendarUploadsHint": "Los eventos de este calendario se suben a iCloud a través de Apple Calendar."
     },
     "noteCategories": {
         "categories": "Categorías",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente.",
         "activeModulesHintMore": "Para ocultar un módulo solo para ti, ve a Módulos → Navegación.",
         "permIntroMore": "Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre.",
-        "preferenceSaveFailed": "No se ha podido guardar el ajuste."
+        "preferenceSaveFailed": "No se ha podido guardar el ajuste.",
+        "caldavCalendarReadOnly": "Solo lectura: aquí no se pueden guardar eventos nuevos",
+        "caldavCalendarReadOnlyWaiting_one": "Solo lectura: {{count}} evento pendiente de subir aquí no llegará",
+        "caldavCalendarReadOnlyWaiting": "Solo lectura: {{count}} eventos pendientes de subir aquí no llegarán",
+        "reminderListReadOnly": "Solo lectura: aquí no se pueden guardar entradas nuevas",
+        "reminderListReadOnlyWaiting_one": "Solo lectura: {{count}} entrada pendiente de subir aquí no llegará",
+        "reminderListReadOnlyWaiting": "Solo lectura: {{count}} entradas pendientes de subir aquí no llegarán"
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

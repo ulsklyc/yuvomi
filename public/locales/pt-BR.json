@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Este calendário está sendo exportado. Só um administrador pode excluí-lo.",
         "errorEventGone": "Este evento não existe mais.",
         "errorSelectedCalendarGone": "O calendário escolhido não existe mais.",
-        "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início."
+        "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início.",
+        "localCalendarUploadsHint": "Os eventos deste calendário são enviados para o iCloud pelo Apple Calendar."
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Contas infantis novas também recebem permissões iniciais próprias ao serem criadas: {{list}}. Depois elas aparecem no respectivo membro.",
         "activeModulesHintMore": "Para ocultar um módulo só para você, vá em Módulos → Navegação.",
         "permIntroMore": "Cada membro pode divergir do padrão da função. Sem configuração, cada função tem acesso completo; os administradores sempre.",
-        "preferenceSaveFailed": "Não foi possível salvar a configuração."
+        "preferenceSaveFailed": "Não foi possível salvar a configuração.",
+        "caldavCalendarReadOnly": "Somente leitura: não é possível salvar novos eventos aqui",
+        "caldavCalendarReadOnlyWaiting_one": "Somente leitura: {{count}} evento aguardando envio para cá não vai chegar",
+        "caldavCalendarReadOnlyWaiting": "Somente leitura: {{count}} eventos aguardando envio para cá não vão chegar",
+        "reminderListReadOnly": "Somente leitura: não é possível salvar novas entradas aqui",
+        "reminderListReadOnlyWaiting_one": "Somente leitura: {{count}} entrada aguardando envio para cá não vai chegar",
+        "reminderListReadOnlyWaiting": "Somente leitura: {{count}} entradas aguardando envio para cá não vão chegar"
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

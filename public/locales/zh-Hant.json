@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "此日曆正在匯出。只有管理員可以刪除它。",
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所選的日曆已不存在。",
-        "errorSeriesNoOccurrence": "依此重複設定，從開始日期起不會有任何日程。"
+        "errorSeriesNoOccurrence": "依此重複設定，從開始日期起不會有任何日程。",
+        "localCalendarUploadsHint": "此行事曆中的活動會透過 Apple Calendar 上傳到 iCloud。"
     },
     "noteCategories": {
         "categories": "分類",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。",
         "activeModulesHintMore": "只想在自己這裡隱藏，請前往「模組 → 導航」。",
         "permIntroMore": "各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。",
-        "preferenceSaveFailed": "無法儲存設定。"
+        "preferenceSaveFailed": "無法儲存設定。",
+        "caldavCalendarReadOnly": "唯讀：無法在此儲存新活動",
+        "caldavCalendarReadOnlyWaiting_one": "唯讀：等待上傳到這裡的 {{count}} 個活動不會送達",
+        "caldavCalendarReadOnlyWaiting": "唯讀：等待上傳到這裡的 {{count}} 個活動不會送達",
+        "reminderListReadOnly": "唯讀：無法在此儲存新項目",
+        "reminderListReadOnlyWaiting_one": "唯讀：等待上傳到這裡的 {{count}} 個項目不會送達",
+        "reminderListReadOnlyWaiting": "唯讀：等待上傳到這裡的 {{count}} 個項目不會送達"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

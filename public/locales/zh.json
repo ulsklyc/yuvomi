@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "此日历正在导出。只有管理员可以删除它。",
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所选的日历已不存在。",
-        "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。"
+        "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。",
+        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。"
     },
     "noteCategories": {
         "categories": "分类",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "新的儿童账户在创建时还会获得自己的初始权限：{{list}}。之后会显示在该成员处。",
         "activeModulesHintMore": "只想在自己这里隐藏，请前往「模块 → 导航」。",
         "permIntroMore": "各个成员可以不同于角色的默认设置。若不设置，每个角色都拥有完全访问权限；管理员始终如此。",
-        "preferenceSaveFailed": "无法保存设置。"
+        "preferenceSaveFailed": "无法保存设置。",
+        "caldavCalendarReadOnly": "只读：无法在此保存新日程",
+        "caldavCalendarReadOnlyWaiting_one": "只读：等待上传到这里的 {{count}} 个日程不会送达",
+        "caldavCalendarReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个日程不会送达",
+        "reminderListReadOnly": "只读：无法在此保存新条目",
+        "reminderListReadOnlyWaiting_one": "只读：等待上传到这里的 {{count}} 个条目不会送达",
+        "reminderListReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个条目不会送达"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

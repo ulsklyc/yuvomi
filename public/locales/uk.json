@@ -1368,7 +1368,8 @@
         "errorDeleteFeedAdminOnly": "Цей календар експортується. Видалити його може лише адміністратор.",
         "errorEventGone": "Цієї події більше немає.",
         "errorSelectedCalendarGone": "Вибраного календаря більше немає.",
-        "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події."
+        "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події.",
+        "localCalendarUploadsHint": "Події цього календаря завантажуються в iCloud через Apple Calendar."
     },
     "noteCategories": {
         "categories": "Категорії",
@@ -3604,7 +3605,17 @@
         "permChildRoleHint": "Нові дитячі облікові записи під час створення також отримують власні стартові права: {{list}}. Потім вони вказані в цього учасника.",
         "activeModulesHintMore": "Щоб сховати модуль лише в себе, відкрий Модулі → Навігація.",
         "permIntroMore": "Окремі учасники можуть відрізнятися від типового значення ролі. Без налаштувань кожна роль має повний доступ; адміністратори - завжди.",
-        "preferenceSaveFailed": "Не вдалося зберегти налаштування."
+        "preferenceSaveFailed": "Не вдалося зберегти налаштування.",
+        "caldavCalendarReadOnly": "Лише читання: сюди не можна зберегти нові події",
+        "caldavCalendarReadOnlyWaiting_one": "Лише читання: {{count}} подія, що чекає на завантаження сюди, не дійде",
+        "caldavCalendarReadOnlyWaiting": "Лише читання: {{count}} подій, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnly": "Лише читання: сюди не можна зберегти нові записи",
+        "reminderListReadOnlyWaiting_one": "Лише читання: {{count}} запис, що чекає на завантаження сюди, не дійде",
+        "reminderListReadOnlyWaiting": "Лише читання: {{count}} записів, що чекають на завантаження сюди, не дійдуть",
+        "caldavCalendarReadOnlyWaiting_few": "Лише читання: {{count}} події, що чекають на завантаження сюди, не дійдуть",
+        "caldavCalendarReadOnlyWaiting_many": "Лише читання: {{count}} подій, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnlyWaiting_few": "Лише читання: {{count}} записи, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnlyWaiting_many": "Лише читання: {{count}} записів, що чекають на завантаження сюди, не дійдуть"
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

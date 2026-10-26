@@ -1234,7 +1234,8 @@
         "errorDeleteFeedAdminOnly": "Ine-export ang kalendaryong ito. Admin lang ang makakapag-delete nito.",
         "errorEventGone": "Wala na ang pangyayaring ito.",
         "errorSelectedCalendarGone": "Wala na ang napiling kalendaryo.",
-        "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula."
+        "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula.",
+        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito."
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -3412,7 +3413,13 @@
         "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon.",
         "activeModulesHintMore": "Para itago lang para sa iyo, pumunta sa Mga Modyul → Nabigasyon.",
         "permIntroMore": "Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator.",
-        "preferenceSaveFailed": "Hindi ma-save ang setting."
+        "preferenceSaveFailed": "Hindi ma-save ang setting.",
+        "caldavCalendarReadOnly": "Read-only: hindi maaaring mag-save ng bagong event dito",
+        "caldavCalendarReadOnlyWaiting_one": "Read-only: hindi darating ang {{count}} event na naghihintay ma-upload dito",
+        "caldavCalendarReadOnlyWaiting": "Read-only: hindi darating ang {{count}} event na naghihintay ma-upload dito",
+        "reminderListReadOnly": "Read-only: hindi maaaring mag-save ng bagong entry dito",
+        "reminderListReadOnlyWaiting_one": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
+        "reminderListReadOnlyWaiting": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito"
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

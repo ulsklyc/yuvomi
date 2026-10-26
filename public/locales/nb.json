@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Denne kalenderen eksporteres. Bare en administrator kan slette den.",
         "errorEventGone": "Denne avtalen finnes ikke lenger.",
         "errorSelectedCalendarGone": "Den valgte kalenderen finnes ikke lenger.",
-        "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen."
+        "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen.",
+        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet.",
         "activeModulesHintMore": "For å fjerne en modul kun fra din egen navigasjon, gå til Moduler → Navigasjon.",
         "permIntroMore": "Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang.",
-        "preferenceSaveFailed": "Innstillingen kunne ikke lagres."
+        "preferenceSaveFailed": "Innstillingen kunne ikke lagres.",
+        "caldavCalendarReadOnly": "Skrivebeskyttet: nye avtaler kan ikke lagres her",
+        "caldavCalendarReadOnlyWaiting_one": "Skrivebeskyttet: {{count}} avtale som venter på opplasting hit, kommer ikke frem",
+        "caldavCalendarReadOnlyWaiting": "Skrivebeskyttet: {{count}} avtaler som venter på opplasting hit, kommer ikke frem",
+        "reminderListReadOnly": "Skrivebeskyttet: nye oppføringer kan ikke lagres her",
+        "reminderListReadOnlyWaiting_one": "Skrivebeskyttet: {{count}} oppføring som venter på opplasting hit, kommer ikke frem",
+        "reminderListReadOnlyWaiting": "Skrivebeskyttet: {{count}} oppføringer som venter på opplasting hit, kommer ikke frem"
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

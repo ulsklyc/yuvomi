@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Questo calendario viene esportato. Solo un amministratore può eliminarlo.",
         "errorEventGone": "Questo evento non esiste più.",
         "errorSelectedCalendarGone": "Il calendario scelto non esiste più.",
-        "errorSeriesNoOccurrence": "Con questa ripetizione non ci sarebbe nessun evento a partire dalla data di inizio."
+        "errorSeriesNoOccurrence": "Con questa ripetizione non ci sarebbe nessun evento a partire dalla data di inizio.",
+        "localCalendarUploadsHint": "Gli eventi di questo calendario vengono caricati su iCloud tramite Apple Calendar."
     },
     "noteCategories": {
         "categories": "Categorie",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "I nuovi account bambino ricevono inoltre, alla creazione, permessi iniziali propri: {{list}}. Poi compaiono presso il rispettivo membro.",
         "activeModulesHintMore": "Per nascondere un modulo solo per te, vai su Moduli → Navigazione.",
         "permIntroMore": "Ogni membro può differire dal valore predefinito del ruolo. Senza impostazioni, ogni ruolo ha accesso completo; gli amministratori sempre.",
-        "preferenceSaveFailed": "Impossibile salvare l’impostazione."
+        "preferenceSaveFailed": "Impossibile salvare l’impostazione.",
+        "caldavCalendarReadOnly": "Sola lettura: qui non si possono salvare nuovi eventi",
+        "caldavCalendarReadOnlyWaiting_one": "Sola lettura: {{count}} evento in attesa di caricamento qui non arriverà",
+        "caldavCalendarReadOnlyWaiting": "Sola lettura: {{count}} eventi in attesa di caricamento qui non arriveranno",
+        "reminderListReadOnly": "Sola lettura: qui non si possono salvare nuove voci",
+        "reminderListReadOnlyWaiting_one": "Sola lettura: {{count}} voce in attesa di caricamento qui non arriverà",
+        "reminderListReadOnlyWaiting": "Sola lettura: {{count}} voci in attesa di caricamento qui non arriveranno"
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

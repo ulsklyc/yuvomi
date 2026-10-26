@@ -1234,7 +1234,8 @@
         "errorDeleteFeedAdminOnly": "Kalender ini sedang diekspor. Hanya admin yang dapat menghapusnya.",
         "errorEventGone": "Acara ini sudah tidak ada.",
         "errorSelectedCalendarGone": "Kalender yang dipilih sudah tidak ada.",
-        "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai."
+        "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai.",
+        "localCalendarUploadsHint": "Acara di kalender ini diunggah ke iCloud melalui Apple Calendar."
     },
     "noteCategories": {
         "categories": "Kategori",
@@ -3412,7 +3413,13 @@
         "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu.",
         "activeModulesHintMore": "Untuk menyembunyikan hanya bagi dirimu, buka Modul → Navigasi.",
         "permIntroMore": "Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu.",
-        "preferenceSaveFailed": "Pengaturan tidak dapat disimpan."
+        "preferenceSaveFailed": "Pengaturan tidak dapat disimpan.",
+        "caldavCalendarReadOnly": "Hanya baca: acara baru tidak dapat disimpan di sini",
+        "caldavCalendarReadOnlyWaiting_one": "Hanya baca: {{count}} acara yang menunggu diunggah ke sini tidak akan sampai",
+        "caldavCalendarReadOnlyWaiting": "Hanya baca: {{count}} acara yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListReadOnly": "Hanya baca: entri baru tidak dapat disimpan di sini",
+        "reminderListReadOnlyWaiting_one": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListReadOnlyWaiting": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai"
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

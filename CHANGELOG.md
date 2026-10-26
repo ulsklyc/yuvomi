@@ -85,6 +85,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A read-only shared calendar or reminder list is no longer offered as a target** (#1840). The
+  CalDAV sync now reads, for each calendar and list, whether your account may add entries to it.
+  The target pickers for events and tasks offer only those that take new entries, and nothing is
+  sent to one that does not - until now every upload there was refused and retried on every sync.
+  A read-only calendar or list can still be selected for reading. An event, task or shopping item
+  that already waits for one keeps its target, and the sync settings name the calendar or list as
+  read-only with the number of entries that will not arrive. The legacy Apple Calendar connection
+  uploads into the first iCloud calendar that takes new events instead of simply the first one.
+  Servers that do not report permissions behave as before.
+- **The event form says when an event will upload to iCloud** (#1927). With the legacy Apple
+  Calendar connection set up, a quiet line under the calendar picker says that events in the chosen
+  calendar are uploaded to iCloud, as soon as you pick the default calendar - also when you move an
+  event there from a calendar that stays local. Without the connection the form is unchanged.
 - **Deleting a CalDAV account no longer leaves events and tasks pointing at it** (#1885). An event
   or task created in Yuvomi and meant for that account's calendar or reminder list kept the deleted
   account as its target, and the event stood in no calendar at all. The target now goes with the

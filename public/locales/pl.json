@@ -1386,7 +1386,8 @@
         "errorDeleteFeedAdminOnly": "Ten kalendarz jest eksportowany. Usunąć go może tylko administrator.",
         "errorEventGone": "To wydarzenie już nie istnieje.",
         "errorSelectedCalendarGone": "Wybrany kalendarz już nie istnieje.",
-        "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia."
+        "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia.",
+        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -3622,7 +3623,17 @@
         "permChildRoleHint": "Nowe konta dzieci dostają przy tworzeniu także własne uprawnienia początkowe: {{list}}. Potem widnieją przy danym członku.",
         "activeModulesHintMore": "Aby ukryć moduł tylko u siebie, wejdź w Moduły → Nawigacja.",
         "permIntroMore": "Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze.",
-        "preferenceSaveFailed": "Nie udało się zapisać ustawienia."
+        "preferenceSaveFailed": "Nie udało się zapisać ustawienia.",
+        "caldavCalendarReadOnly": "Tylko do odczytu: nie można tu zapisać nowych wydarzeń",
+        "caldavCalendarReadOnlyWaiting_one": "Tylko do odczytu: {{count}} wydarzenie czekające na przesłanie tutaj nie dotrze",
+        "caldavCalendarReadOnlyWaiting": "Tylko do odczytu: {{count}} wydarzenia czekającego na przesłanie tutaj nie dotrze",
+        "reminderListReadOnly": "Tylko do odczytu: nie można tu zapisać nowych wpisów",
+        "reminderListReadOnlyWaiting_one": "Tylko do odczytu: {{count}} wpis czekający na przesłanie tutaj nie dotrze",
+        "reminderListReadOnlyWaiting": "Tylko do odczytu: {{count}} wpisu czekającego na przesłanie tutaj nie dotrze",
+        "caldavCalendarReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wydarzenia czekające na przesłanie tutaj nie dotrą",
+        "caldavCalendarReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wydarzeń czekających na przesłanie tutaj nie dotrze",
+        "reminderListReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wpisy czekające na przesłanie tutaj nie dotrą",
+        "reminderListReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wpisów czekających na przesłanie tutaj nie dotrze"
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

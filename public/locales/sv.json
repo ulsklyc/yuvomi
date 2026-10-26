@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Den här kalendern exporteras. Bara en administratör kan ta bort den.",
         "errorEventGone": "Den här händelsen finns inte längre.",
         "errorSelectedCalendarGone": "Den valda kalendern finns inte längre.",
-        "errorSeriesNoOccurrence": "Med den här upprepningen skulle det inte finnas en enda händelse från startdatumet."
+        "errorSeriesNoOccurrence": "Med den här upprepningen skulle det inte finnas en enda händelse från startdatumet.",
+        "localCalendarUploadsHint": "Händelser i den här kalendern laddas upp till iCloud via Apple Calendar."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Nya barnkonton får dessutom egna startbehörigheter när de skapas: {{list}}. Därefter står de hos respektive medlem.",
         "activeModulesHintMore": "Vill du dölja en modul bara för dig, gå till Moduler → Navigering.",
         "permIntroMore": "Enskilda medlemmar kan avvika från rollens standard. Utan inställning har varje roll full åtkomst; administratörer alltid.",
-        "preferenceSaveFailed": "Inställningen kunde inte sparas."
+        "preferenceSaveFailed": "Inställningen kunde inte sparas.",
+        "caldavCalendarReadOnly": "Skrivskyddad: nya händelser kan inte sparas här",
+        "caldavCalendarReadOnlyWaiting_one": "Skrivskyddad: {{count}} händelse som väntar på uppladdning hit kommer inte fram",
+        "caldavCalendarReadOnlyWaiting": "Skrivskyddad: {{count}} händelser som väntar på uppladdning hit kommer inte fram",
+        "reminderListReadOnly": "Skrivskyddad: nya poster kan inte sparas här",
+        "reminderListReadOnlyWaiting_one": "Skrivskyddad: {{count}} post som väntar på uppladdning hit kommer inte fram",
+        "reminderListReadOnlyWaiting": "Skrivskyddad: {{count}} poster som väntar på uppladdning hit kommer inte fram"
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

@@ -1216,7 +1216,8 @@
         "errorDeleteFeedAdminOnly": "Deze agenda wordt geëxporteerd. Alleen een beheerder kan hem verwijderen.",
         "errorEventGone": "Deze afspraak bestaat niet meer.",
         "errorSelectedCalendarGone": "De gekozen agenda bestaat niet meer.",
-        "errorSeriesNoOccurrence": "Met deze herhaling zou er vanaf de begindatum geen enkele afspraak zijn."
+        "errorSeriesNoOccurrence": "Met deze herhaling zou er vanaf de begindatum geen enkele afspraak zijn.",
+        "localCalendarUploadsHint": "Afspraken in deze agenda worden via Apple Calendar naar iCloud geüpload."
     },
     "noteCategories": {
         "categories": "Categorieën",
@@ -3394,7 +3395,13 @@
         "permChildRoleHint": "Nieuwe kinderaccounts krijgen bij het aanmaken ook eigen startrechten: {{list}}. Daarna staan ze bij het betreffende lid.",
         "activeModulesHintMore": "Wil je een module alleen voor jezelf verbergen, ga dan naar Modules → Navigatie.",
         "permIntroMore": "Individuele leden kunnen afwijken van de standaard van de rol. Zonder instelling heeft elke rol volledige toegang; beheerders altijd.",
-        "preferenceSaveFailed": "De instelling kon niet worden opgeslagen."
+        "preferenceSaveFailed": "De instelling kon niet worden opgeslagen.",
+        "caldavCalendarReadOnly": "Alleen-lezen: hier kunnen geen nieuwe afspraken worden opgeslagen",
+        "caldavCalendarReadOnlyWaiting_one": "Alleen-lezen: {{count}} afspraak die hierheen moet worden geüpload, komt niet aan",
+        "caldavCalendarReadOnlyWaiting": "Alleen-lezen: {{count}} afspraken die hierheen moeten worden geüpload, komen niet aan",
+        "reminderListReadOnly": "Alleen-lezen: hier kunnen geen nieuwe items worden opgeslagen",
+        "reminderListReadOnlyWaiting_one": "Alleen-lezen: {{count}} item dat hierheen moet worden geüpload, komt niet aan",
+        "reminderListReadOnlyWaiting": "Alleen-lezen: {{count}} items die hierheen moeten worden geüpload, komen niet aan"
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

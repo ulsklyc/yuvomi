@@ -231,7 +231,7 @@ export function calendarPaths() {
       get: op({
         summary: 'List selectable sync targets for the event editor',
         tag: 'Calendar',
-        description: 'Available to every authenticated user (#618). Returns `{ data: { google: [{ id, summary, defaultAssigneeUserId }], caldav: [{ accountId, accountName, calendarUrl, calendarName, defaultAssigneeUserId }], outlook: [{ accountId, accountName, calendarId, calendarName }] } }`, pre-filtered to enabled (and, for Google, writable) calendars. `defaultAssigneeUserId` is the default assignee set on that calendar (#459), or null; the event editor reads it backwards to pick the calendar of the person a new event is assigned to (#1060). Carries no credentials, server URLs, or usernames - account management stays admin-only. A provider that cannot be reached yields an empty list instead of failing the request.',
+        description: 'Available to every authenticated user (#618). Returns `{ data: { google: [{ id, summary, defaultAssigneeUserId }], caldav: [{ accountId, accountName, calendarUrl, calendarName, defaultAssigneeUserId }], outlook: [{ accountId, accountName, calendarId, calendarName }] } }`, pre-filtered to enabled and writable calendars (#1840: for CalDAV a calendar whose `current-user-privilege-set` grants neither `all`, `write` nor `bind` is left out; a server that does not report privileges counts as writable). POST/PUT /calendar refuse such a calendar as a new `target_caldav_calendar_url` with 400; an event whose stored target became read-only later can still be edited with that target unchanged, and waits locally. `defaultAssigneeUserId` is the default assignee set on that calendar (#459), or null; the event editor reads it backwards to pick the calendar of the person a new event is assigned to (#1060). Carries no credentials, server URLs, or usernames - account management stays admin-only. A provider that cannot be reached yields an empty list instead of failing the request.',
       }),
     },
     '/api/v1/calendar/caldav/accounts': {
@@ -251,7 +251,13 @@ export function calendarPaths() {
       delete: op({ summary: 'Delete CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
     },
     '/api/v1/calendar/caldav/accounts/{id}/calendars': {
-      get: op({ summary: 'List calendars for a CalDAV account', tag: 'Calendar', admin: true, params: [idParam()] }),
+      get: op({
+        summary: 'List calendars for a CalDAV account',
+        tag: 'Calendar',
+        admin: true,
+        description: 'Each calendar carries `writable` (#1840): true when it takes new events, false when it is shared read-only, null when the server does not say (treated as writable). The value is read from `current-user-privilege-set` on every listing and sync run. A read-only calendar can still be enabled for reading; it is not offered as a target, and nothing is uploaded to it. `waitingUploads` counts the local events that name the calendar as their target and have not been uploaded yet - for a read-only calendar these never arrive until they get another calendar. With `?refresh=true` the answer comes from the server and carries `writable` but no `waitingUploads`.',
+        params: [idParam()],
+      }),
       patch: op({ summary: 'Enable or disable a CalDAV calendar', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/calendar/caldav/sync': {
@@ -261,7 +267,13 @@ export function calendarPaths() {
       get: op({ summary: 'Get CalDAV event sync status', tag: 'Calendar' }),
     },
     '/api/v1/calendar/caldav/accounts/{id}/reminder-lists': {
-      get: op({ summary: 'List reminder lists for a CalDAV account', tag: 'Calendar', admin: true, params: [idParam()] }),
+      get: op({
+        summary: 'List reminder lists for a CalDAV account',
+        tag: 'Calendar',
+        admin: true,
+        description: 'Each list carries `writable` (#1840, same meaning as on the calendars of the account) and, when read from the database, `waitingUploads`: for a list mapped to tasks the local tasks that name it as their target, for a list mapped to shopping the local items of its shopping list. A read-only list is still read, is not offered in `GET /tasks/sync-targets`, and nothing is uploaded to it.',
+        params: [idParam()],
+      }),
       patch: op({ summary: 'Enable/disable a CalDAV reminder list and target module', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/calendar/caldav/reminders/sync': {

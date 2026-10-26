@@ -70,7 +70,7 @@ export function tasksPaths() {
       get: op({
         summary: 'List selectable CalDAV reminder lists for the task editor',
         tag: 'Tasks',
-        description: 'Available to every authenticated user (#695). Returns `{ data: { caldav: [{ accountId, accountName, listUrl, listName }] } }`, restricted to reminder lists the household has enabled **for tasks** - a list pointing at shopping is omitted, because a task sent there would come back as a shopping item. Carries no credentials or server URLs; account management stays admin-only. The identifier for `sync_target` on POST/PUT /tasks is `caldav:<accountId>|<listUrl>`.',
+        description: 'Available to every authenticated user (#695). Returns `{ data: { caldav: [{ accountId, accountName, listUrl, listName }] } }`, restricted to reminder lists the household has enabled **for tasks** - a list pointing at shopping is omitted, because a task sent there would come back as a shopping item - and that take new entries (#1840: a list shared read-only is omitted; one whose server does not report privileges stays). POST/PUT /tasks refuse a read-only list as a new `sync_target` with 400; a task whose stored target became read-only later keeps it and waits locally. Carries no credentials or server URLs; account management stays admin-only. The identifier for `sync_target` on POST/PUT /tasks is `caldav:<accountId>|<listUrl>`.',
       }),
     },
     '/api/v1/tasks/tags': {

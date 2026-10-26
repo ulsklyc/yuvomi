@@ -1234,7 +1234,8 @@
         "errorDeleteFeedAdminOnly": "Dieser Kalender wird exportiert. Nur ein Admin kann ihn löschen.",
         "errorEventGone": "Diesen Termin gibt es nicht mehr.",
         "errorSelectedCalendarGone": "Den gewählten Kalender gibt es nicht mehr.",
-        "errorSeriesNoOccurrence": "Mit dieser Wiederholung gäbe es ab dem Startdatum keinen einzigen Termin."
+        "errorSeriesNoOccurrence": "Mit dieser Wiederholung gäbe es ab dem Startdatum keinen einzigen Termin.",
+        "localCalendarUploadsHint": "Termine in diesem Kalender werden über Apple Calendar zu iCloud hochgeladen."
     },
     "noteCategories": {
         "categories": "Kategorien",
@@ -3412,7 +3413,13 @@
         "permChildRoleHint": "Neue Kinderkonten bekommen beim Anlegen zusätzlich eigene Startrechte: {{list}}. Danach stehen sie beim jeweiligen Mitglied.",
         "activeModulesHintMore": "Wer ein Modul nur für sich aus der Navigation nehmen will, tut das unter Module → Navigation.",
         "permIntroMore": "Einzelne Mitglieder können vom Rollen-Standard abweichen. Ohne Einstellung hat jede Rolle vollen Zugriff; Administratoren immer.",
-        "preferenceSaveFailed": "Die Einstellung konnte nicht gespeichert werden."
+        "preferenceSaveFailed": "Die Einstellung konnte nicht gespeichert werden.",
+        "caldavCalendarReadOnly": "Nur lesbar: neue Termine lassen sich hier nicht speichern",
+        "caldavCalendarReadOnlyWaiting_one": "Nur lesbar: {{count}} Termin, der hierher hochgeladen werden soll, kommt nicht an",
+        "caldavCalendarReadOnlyWaiting": "Nur lesbar: {{count}} Termine, die hierher hochgeladen werden sollen, kommen nicht an",
+        "reminderListReadOnly": "Nur lesbar: neue Einträge lassen sich hier nicht speichern",
+        "reminderListReadOnlyWaiting_one": "Nur lesbar: {{count}} Eintrag, der hierher hochgeladen werden soll, kommt nicht an",
+        "reminderListReadOnlyWaiting": "Nur lesbar: {{count}} Einträge, die hierher hochgeladen werden sollen, kommen nicht an"
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

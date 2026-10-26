@@ -141,8 +141,17 @@ function buildReminderRow(account, list) {
     });
   });
 
+  // Nur lesbar geteilt (#1840): die Liste wird gelesen, aber nicht als Ziel
+  // neuer Aufgaben angeboten; was schon auf den Upload hierher wartet, nennt
+  // die Zeile mit der Zahl.
+  const readOnlyNote = list.writable === false
+    ? (list.waitingUploads > 0
+      ? t('settings.reminderListReadOnlyWaiting', { count: list.waitingUploads })
+      : t('settings.reminderListReadOnly'))
+    : '';
   const row = createSettingRow({
     label: list.listName,
+    description: readOnlyNote,
     control: toggle,
   });
   wrapper.append(row, select);

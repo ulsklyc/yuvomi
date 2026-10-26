@@ -430,6 +430,18 @@ function buildCalendarList(account, calendars) {
     const name = document.createElement('span');
     name.className = 'caldav-calendar-name';
     name.textContent = cal.calendarName || cal.calendarUrl;
+    // Nur lesbar geteilt (#1840): lesen geht, als Ziel neuer Termine wird
+    // der Kalender nicht angeboten. Wartet schon etwas auf den Upload
+    // hierher, nennt die Zeile die Zahl - ein gespeichertes Ziel wird nicht
+    // still geleert.
+    if (cal.writable === false) {
+      const note = document.createElement('span');
+      note.className = 'caldav-calendar-source';
+      note.textContent = cal.waitingUploads > 0
+        ? t('settings.caldavCalendarReadOnlyWaiting', { count: cal.waitingUploads })
+        : t('settings.caldavCalendarReadOnly');
+      name.appendChild(note);
+    }
 
     label.append(checkbox, color, name);
     // VOR DEM HAKEN, NICHT NACH DEM SYNC: Das Feld stand früher erst da, wenn

@@ -1445,7 +1445,8 @@
         "errorDeleteFeedAdminOnly": "يتم تصدير هذا التقويم. يمكن للمسؤول فقط حذفه.",
         "errorEventGone": "هذا الموعد لم يعد موجودًا.",
         "errorSelectedCalendarGone": "التقويم المختار لم يعد موجودًا.",
-        "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية."
+        "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية.",
+        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar."
     },
     "noteCategories": {
         "categories": "الفئات",
@@ -3710,7 +3711,19 @@
         "permChildRoleHint": "تحصل حسابات الأطفال الجديدة عند إنشائها أيضًا على أذونات بدء خاصة: {{list}}. بعد ذلك تظهر لدى العضو نفسه.",
         "activeModulesHintMore": "لإخفاء وحدة من تنقلك أنت فقط، اذهب إلى الوحدات ← التنقل.",
         "permIntroMore": "يمكن أن يختلف الأعضاء الأفراد عن الإعداد الافتراضي للدور. بدون أي إعداد، يتمتع كل دور بوصول كامل؛ والمشرفون دائمًا.",
-        "preferenceSaveFailed": "تعذّر حفظ الإعداد."
+        "preferenceSaveFailed": "تعذّر حفظ الإعداد.",
+        "caldavCalendarReadOnly": "للقراءة فقط: لا يمكن حفظ أحداث جديدة هنا",
+        "caldavCalendarReadOnlyWaiting_one": "للقراءة فقط: لن يصل حدث واحد ({{count}}) بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting": "للقراءة فقط: لن يصل {{count}} حدث بانتظار الرفع إلى هنا",
+        "reminderListReadOnly": "للقراءة فقط: لا يمكن حفظ إدخالات جديدة هنا",
+        "reminderListReadOnlyWaiting_one": "للقراءة فقط: لن يصل إدخال واحد ({{count}}) بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting": "للقراءة فقط: لن يصل {{count}} إدخال بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_two": "للقراءة فقط: لن يصل حدثان ({{count}}) بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_few": "للقراءة فقط: لن تصل {{count}} أحداث بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} حدثًا بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_two": "للقراءة فقط: لن يصل إدخالان ({{count}}) بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_few": "للقراءة فقط: لن تصل {{count}} إدخالات بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} إدخالًا بانتظار الرفع إلى هنا"
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

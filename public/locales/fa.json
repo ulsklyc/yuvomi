@@ -1234,7 +1234,8 @@
         "errorDeleteFeedAdminOnly": "این تقویم در حال خروجی گرفتن است. فقط مدیر می‌تواند آن را حذف کند.",
         "errorEventGone": "این رویداد دیگر وجود ندارد.",
         "errorSelectedCalendarGone": "تقویم انتخاب‌شده دیگر وجود ندارد.",
-        "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت."
+        "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت.",
+        "localCalendarUploadsHint": "رویدادهای این تقویم از طریق Apple Calendar در iCloud بارگذاری می‌شوند."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",
@@ -3412,7 +3413,13 @@
         "permChildRoleHint": "حساب‌های جدید کودک هنگام ساخت، دسترسی‌های آغازین خودشان را هم می‌گیرند: {{list}}. پس از آن نزد همان عضو نمایش داده می‌شوند.",
         "activeModulesHintMore": "برای پنهان کردن فقط برای خودت به ماژول‌ها ← ناوبری برو.",
         "permIntroMore": "هر عضو می‌تواند با پیش‌فرض نقش متفاوت باشد. بدون تنظیم، هر نقش دسترسی کامل دارد؛ مدیران همیشه.",
-        "preferenceSaveFailed": "تنظیم ذخیره نشد."
+        "preferenceSaveFailed": "تنظیم ذخیره نشد.",
+        "caldavCalendarReadOnly": "فقط خواندنی: نمی‌توان رویداد تازه‌ای را اینجا ذخیره کرد",
+        "caldavCalendarReadOnlyWaiting_one": "فقط خواندنی: {{count}} رویداد در انتظار بارگذاری به اینجا نمی‌رسد",
+        "caldavCalendarReadOnlyWaiting": "فقط خواندنی: {{count}} رویداد در انتظار بارگذاری به اینجا نمی‌رسند",
+        "reminderListReadOnly": "فقط خواندنی: نمی‌توان مورد تازه‌ای را اینجا ذخیره کرد",
+        "reminderListReadOnlyWaiting_one": "فقط خواندنی: {{count}} مورد در انتظار بارگذاری به اینجا نمی‌رسد",
+        "reminderListReadOnlyWaiting": "فقط خواندنی: {{count}} مورد در انتظار بارگذاری به اینجا نمی‌رسند"
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

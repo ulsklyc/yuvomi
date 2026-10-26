@@ -1234,7 +1234,8 @@
         "errorDeleteFeedAdminOnly": "이 캘린더는 내보내는 중입니다. 관리자만 삭제할 수 있습니다.",
         "errorEventGone": "이 일정은 더 이상 없습니다.",
         "errorSelectedCalendarGone": "선택한 캘린더가 더 이상 없습니다.",
-        "errorSeriesNoOccurrence": "이 반복 설정으로는 시작일부터 일정이 하나도 생기지 않습니다."
+        "errorSeriesNoOccurrence": "이 반복 설정으로는 시작일부터 일정이 하나도 생기지 않습니다.",
+        "localCalendarUploadsHint": "이 캘린더의 일정은 Apple Calendar를 통해 iCloud에 업로드됩니다."
     },
     "noteCategories": {
         "categories": "카테고리",
@@ -3412,7 +3413,13 @@
         "permChildRoleHint": "새 자녀 계정은 만들 때 자체 시작 권한도 받습니다: {{list}}. 이후에는 해당 구성원에게 표시됩니다.",
         "activeModulesHintMore": "내 화면에서만 숨기려면 모듈 → 내비게이션으로 가세요.",
         "permIntroMore": "개별 구성원은 역할 기본값과 다르게 설정할 수 있습니다. 설정하지 않으면 모든 역할이 전체 접근 권한을 가지며 관리자는 항상 전체 접근 권한을 가집니다.",
-        "preferenceSaveFailed": "설정을 저장할 수 없습니다."
+        "preferenceSaveFailed": "설정을 저장할 수 없습니다.",
+        "caldavCalendarReadOnly": "읽기 전용: 여기에는 새 일정을 저장할 수 없습니다",
+        "caldavCalendarReadOnlyWaiting_one": "읽기 전용: 여기로 업로드를 기다리는 일정 {{count}}개는 도착하지 않습니다",
+        "caldavCalendarReadOnlyWaiting": "읽기 전용: 여기로 업로드를 기다리는 일정 {{count}}개는 도착하지 않습니다",
+        "reminderListReadOnly": "읽기 전용: 여기에는 새 항목을 저장할 수 없습니다",
+        "reminderListReadOnlyWaiting_one": "읽기 전용: 여기로 업로드를 기다리는 항목 {{count}}개는 도착하지 않습니다",
+        "reminderListReadOnlyWaiting": "읽기 전용: 여기로 업로드를 기다리는 항목 {{count}}개는 도착하지 않습니다"
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
