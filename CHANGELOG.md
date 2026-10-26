@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A recurring shared expense with a start date in the past asks before booking the gap**
+  (#1748). Creating one, or moving its next date, to a day before today used to book one missed
+  date per hour until it had caught up. The dialog now asks, as resuming does: start from the next
+  date (the default) or book the missed dates. API clients send `missed: "skip"` or `"book"` on
+  `POST` and `PUT`; without it the date stays as before.
 - **A note can be private, and a note can be locked to its author** (#1514, #1602). The note
   editor has Visibility - "All family members" or "Only me" - and "Lock editing", next to colour
   and pin. A private note is gone for everybody else, administrators included: from Notes, the

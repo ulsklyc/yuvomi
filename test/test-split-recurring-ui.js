@@ -23,8 +23,13 @@
  *        test-split-amount-input.js); gesendet wird ueber `globalThis.__apiStub`.
  * Ausfuehren: npm run test:split-recurring-ui
  */
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
+
+// "Heute" steht fest (#1748): der Dialog fragt bei einem Termin vor heute, und
+// die Termine der Faelle unten (Oktober/November 2026) sollen nicht mit dem
+// Kalender in die Vergangenheit rutschen. Nur `Date`, Timer laufen echt.
+mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-01T10:00:00Z') });
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -36,7 +41,7 @@ const miniDomAbraeumen = installMiniDom();
 const { setPermissions, clearPermissions } = await import('../public/permissions.js');
 const { __test: split } = await import('../public/pages/split-expenses.js');
 
-test.after(() => miniDomAbraeumen());
+test.after(() => { miniDomAbraeumen(); mock.timers.reset(); });
 
 const serie = (id, extra = {}) => ({
   id, group_id: 2, title: `Serie ${id}`, description: '', amount_minor: 90000, amount: '900.00', currency: 'EUR',
@@ -92,7 +97,7 @@ async function buehne({ recurring = [MIETE, STROM, FREMD], modus = 'write', arch
     // dem gezeichneten Markup, und `auswahl` sagt, welcher Ausgang genommen wird
     // ('skip' | 'book' = dieser Knopf, 'abbrechen' = der Abbrechen-Knopf,
     // 'schliessen' = X/Escape/Overlay ueber onClose). Ohne `auswahl` bleibt sie offen.
-    if (opts.title !== 'splitExpenses.recurring.missedQuestion') { spur.dialoge.push(opts); return; }
+    if (!['splitExpenses.recurring.missedQuestion', 'splitExpenses.recurring.pastQuestion'].includes(opts.title)) { spur.dialoge.push(opts); return; }
     const entschaerft = (text) => text.replace(/&quot;/g, '"');
     const knoepfe = [...opts.content.matchAll(/<button type="button" class="([^"]*)" data-resume="(\w+)">([^<]*)<\/button>/g)]
       .map(([, klasse, wert, text]) => ({ klasse, wert, text: entschaerft(text) }));
@@ -938,4 +943,127 @@ test('#1997: Serie anlegen und aendern - eine spaete Antwort schliesst nur den e
       });
     }
   }
+});
+
+// --------------------------------------------------------------------------
+// #1748: ein Termin vor heute fragt, bevor die Luecke gebucht wird. "Heute" ist
+// oben auf den 01.10.2026 gestellt.
+// --------------------------------------------------------------------------
+const neueSerie = (setze, datum, rhythmus = 'monthly') => {
+  setze('title', 'Miete'); setze('amount', '900'); setze('frequency', rhythmus); setze('next_run_date', datum);
+};
+
+test('#1748 Neue Serie mit Datum vor heute: EINE Frage mit Zahl und Daten, "ab dem naechsten Termin" ist der Hauptknopf', async () => {
+  await buehne({ auswahl: 'skip' }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    neueSerie(setze, '2026-07-20');
+    await panel.feuere('submit');
+    assert.equal(spur.fragen.length, 1);
+    const [frage] = spur.fragen;
+    assert.equal(frage.titel, 'splitExpenses.recurring.pastQuestion');
+    assert.equal(frage.pointerDeadTime, true);
+    // 20.07., 20.08., 20.09. liegen vor dem 01.10.; der naechste ist der 20.10.
+    assert.match(frage.satz, /^splitExpenses\.recurring\.pastDetail\{"count":3,"date":"[^"]+"\}$/, 'die Zahl geht als Zahl an t()');
+    assert.deepEqual(frage.knoepfe.map((k) => [k.klasse, k.wert]), [['btn btn--primary', 'skip'], ['btn btn--secondary', 'book']]);
+    assert.match(frage.knoepfe[0].text, /^splitExpenses\.recurring\.pastSkip/);
+    assert.match(frage.knoepfe[1].text, /^splitExpenses\.recurring\.missedBook/);
+    assert.ok(frage.abbrechen);
+    assert.equal(spur.gesendet.length, 1);
+    assert.equal(spur.gesendet[0][2].missed, 'skip');
+    assert.equal(spur.gesendet[0][2].next_run_date, '2026-07-20', 'das Datum geht, wie eingegeben; der Server stellt weiter');
+    assert.equal(spur.geschlossen, 2, 'Frage und Dialog sind zu');
+  });
+});
+
+test('#1748 Die Frage nennt die Daten, die der Server rechnet: geklemmt auf den Monatsletzten', async () => {
+  const gezeigteDaten = [];
+  await buehne({ auswahl: 'skip' }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    neueSerie(setze, '2026-08-31');
+    await panel.feuere('submit');
+    gezeigteDaten.push(spur.fragen[0].satz, spur.fragen[0].knoepfe[0].text, spur.fragen[0].knoepfe[1].text);
+  });
+  const { dateText } = await import('../public/utils/date-format.js');
+  assert.ok(gezeigteDaten[0].includes(JSON.stringify(dateText('2026-08-31'))), 'seit dem eingegebenen Datum');
+  assert.ok(gezeigteDaten[1].includes(JSON.stringify(dateText('2026-10-31'))), 'ab dem 31.10. - 30.09. war versaeumt, der Anker hebt wieder auf den 31.');
+  assert.ok(gezeigteDaten[2].includes(JSON.stringify(dateText('2026-08-31'))), 'nachbuchen ab dem eingegebenen Datum');
+});
+
+test('#1748 Nachbuchen sendet book; Abbrechen und Schliessen senden nichts und lassen den Dialog offen', async () => {
+  await buehne({ auswahl: 'book' }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    neueSerie(setze, '2026-09-01', 'weekly');
+    await panel.feuere('submit');
+    assert.equal(spur.gesendet[0][2].missed, 'book');
+  });
+  for (const wie of ['abbrechen', 'schliessen']) {
+    await buehne({ auswahl: wie }, async (spur) => {
+      const { panel, setze } = offenerDialog(spur, null);
+      neueSerie(setze, '2026-09-01');
+      await panel.feuere('submit');
+      assert.equal(spur.fragen.length, 1, wie);
+      assert.deepEqual(spur.gesendet, [], wie);
+      assert.equal(spur.geschlossen, 1, `${wie}: nur die Frage ist zu, das Formular bleibt`);
+      // Danach laesst sich wieder speichern (der Riegel ist frei).
+      setze('next_run_date', '2026-10-05');
+      await panel.feuere('submit');
+      assert.equal(spur.gesendet.length, 1, wie);
+      assert.equal(spur.gesendet[0][2].missed, undefined, 'ein Termin nach heute fragt nicht und sendet kein missed');
+    });
+  }
+});
+
+test('#1748 Ohne versaeumten Termin keine Frage: heute, spaeter, oder woechentlich ab vor wenigen Tagen', async () => {
+  for (const [datum, rhythmus] of [['2026-10-01', 'monthly'], ['2026-12-01', 'yearly']]) {
+    await buehne({}, async (spur) => {
+      const { panel, setze } = offenerDialog(spur, null);
+      neueSerie(setze, datum, rhythmus);
+      await panel.feuere('submit');
+      assert.deepEqual(spur.fragen, [], datum);
+      assert.equal(spur.gesendet.length, 1, datum);
+      assert.equal('missed' in spur.gesendet[0][2], false, datum);
+    });
+  }
+});
+
+test('#1748 Bearbeiten: nur ein VERLEGTER Termin fragt; der Koerper traegt missed', async () => {
+  await buehne({ auswahl: 'skip' }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, MIETE);
+    setze('next_run_date', '2026-06-01');
+    await panel.feuere('submit');
+    assert.equal(spur.fragen.length, 1);
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/11', { next_run_date: '2026-06-01', missed: 'skip' }]]);
+  });
+  // Eine schon faellige Serie, an der nur der Titel geaendert wird: keine Frage.
+  const faellig = serie(60, { next_run_date: '2026-09-01' });
+  await buehne({ recurring: [faellig] }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, faellig);
+    setze('title', 'Neu');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.fragen, []);
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/60', { title: 'Neu' }]]);
+  });
+  // Eine pausierte Serie: das Fortsetzen fragt spaeter selbst.
+  const pausiert = serie(61, { paused_at: '2026-09-01T00:00:00Z' });
+  await buehne({ recurring: [pausiert] }, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, pausiert);
+    setze('next_run_date', '2026-06-01');
+    await panel.feuere('submit');
+    assert.deepEqual(spur.fragen, []);
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/61', { next_run_date: '2026-06-01' }]]);
+  });
+});
+
+test('#1748 Faellt das Recht waehrend der Frage, sendet Speichern nichts', async () => {
+  await buehne({}, async (spur) => {
+    const { panel, setze } = offenerDialog(spur, null);
+    neueSerie(setze, '2026-07-20');
+    const gesendet = panel.feuere('submit');
+    await new Promise((r) => { setImmediate(r); });
+    assert.equal(spur.fragen.length, 1);
+    split.state.groupStatus = 'archived';
+    spur.fragen[0].antworte('skip');
+    await gesendet;
+    assert.deepEqual(spur.gesendet, []);
+  });
 });

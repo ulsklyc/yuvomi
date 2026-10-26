@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
 import { openDetailView } from '/components/detail-view.js';
 import { t, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
@@ -22,6 +22,7 @@ import { formatMoney, amountPlaceholder, toDecimalString, amountInputProblem, am
 // Der Satz zu einem Grund: derselbe Baustein wie in jedem Betragsfeld (D1).
 import { amountProblemText } from '/utils/amount-field.js';
 import { todayKey } from '/utils/date.js';
+import { nextRunNotBefore } from '/utils/interval-date.js';
 import { zonedDateKey } from '/utils/timezone.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -1444,6 +1445,22 @@ let _recurringToggleBusy = false;
  * null - die Serie bleibt dann pausiert.
  */
 function recurringResumeChoice(recurring) {
+  return recurringMissedChoice({
+    title: t('splitExpenses.recurring.missedQuestion'),
+    detail: t('splitExpenses.recurring.missedDetail', { count: recurring.missed_count, date: dateText(recurring.next_run_date) }),
+    skipLabel: t('splitExpenses.recurring.missedSkip', { date: dateText(recurring.resume_date) }),
+    from: recurring.next_run_date,
+  });
+}
+
+/**
+ * Der Dialog hinter beiden Fragen nach versaeumten Terminen: beim Fortsetzen
+ * (`recurringResumeChoice`) und beim Anlegen oder Verlegen auf ein Datum vor
+ * heute (`recurringPastDateChoice`, #1748). Gleich gebaut, damit dieselbe
+ * Entscheidung gleich aussieht: der Satz, "ab dem naechsten Termin" als
+ * Hauptknopf (die Vorgabe `missed: skip`), "ab `from` nachbuchen", Abbrechen.
+ */
+function recurringMissedChoice({ title, detail, skipLabel, from }) {
   return new Promise((resolve) => {
     let resolved = false;
     const finish = (value) => {
@@ -1452,17 +1469,16 @@ function recurringResumeChoice(recurring) {
       closeModal({ force: true });
       resolve(value);
     };
-    const detail = t('splitExpenses.recurring.missedDetail', { count: recurring.missed_count, date: dateText(recurring.next_run_date) });
     openSharedModal({
       pointerDeadTime: true,
-      title: t('splitExpenses.recurring.missedQuestion'),
+      title,
       size: 'sm',
       content: `
         <p class="modal-confirm__detail" id="split-resume-detail">${esc(detail)}</p>
         <div class="modal-actions modal-actions--stack">
           <div class="modal-actions modal-actions--stack split-resume-choices" role="group" aria-labelledby="split-resume-detail">
-            <button type="button" class="btn btn--primary" data-resume="skip">${esc(t('splitExpenses.recurring.missedSkip', { date: dateText(recurring.resume_date) }))}</button>
-            <button type="button" class="btn btn--secondary" data-resume="book">${esc(t('splitExpenses.recurring.missedBook', { date: dateText(recurring.next_run_date) }))}</button>
+            <button type="button" class="btn btn--primary" data-resume="skip">${esc(skipLabel)}</button>
+            <button type="button" class="btn btn--secondary" data-resume="book">${esc(t('splitExpenses.recurring.missedBook', { date: dateText(from) }))}</button>
           </div>
           <button type="button" class="btn btn--secondary" id="split-resume-cancel">${esc(t('common.cancel'))}</button>
         </div>`,
@@ -1475,6 +1491,38 @@ function recurringResumeChoice(recurring) {
       },
     });
   });
+}
+
+/**
+ * DIE FRAGE BEIM ANLEGEN UND VERLEGEN (#1748). Ein Termin vor heute buchte
+ * frueher still nach: der stuendliche Lauf holte je Lauf einen versaeumten
+ * Termin auf, eine Serie mit Start im Januar 2024 wurde einen Tag lang
+ * stuendlich zur Ausgabe. Jetzt fragt der Dialog wie beim Fortsetzen.
+ *
+ * Gefragt wird nur, wenn der Aufruf den Termin SENDET (neu angelegt oder
+ * verlegt), die Serie nicht pausiert ist (das Fortsetzen fragt dann selbst)
+ * und vor heute wirklich ein Termin liegt. Zahl und naechster Termin kommen aus
+ * `nextRunNotBefore`, derselben Datei, mit der der Server bei `missed: skip`
+ * weiterstellt, mit dem Ankertag des eingegebenen Datums wie dort.
+ *
+ * Loest zu undefined (keine Frage), 'skip' | 'book' oder null (abgebrochen:
+ * der Dialog bleibt offen, nichts wird gesendet). Die Frage steht ueber dem
+ * Formular (`askOverModal`), das danach mit seiner Eingabe zurueckkommt.
+ */
+async function recurringPastDateChoice(now, payload, recurring) {
+  if (recurring && (payload.next_run_date === undefined || recurring.paused_at)) return undefined;
+  const date = String(now.next_run_date || '');
+  const today = todayKey();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(date < today)) return undefined;
+  const next = nextRunNotBefore(date, now.frequency, today, Number(date.slice(8, 10)));
+  if (!next.skipped) return undefined;
+  const answer = await askOverModal(() => recurringMissedChoice({
+    title: t('splitExpenses.recurring.pastQuestion'),
+    detail: t('splitExpenses.recurring.pastDetail', { count: next.skipped, date: dateText(date) }),
+    skipLabel: t('splitExpenses.recurring.pastSkip', { date: dateText(next.date) }),
+    from: date,
+  }));
+  return answer === 'skip' || answer === 'book' ? answer : null;
 }
 
 /**
@@ -2701,13 +2749,25 @@ function openRecurringModal(recurring = null) {
           return;
         }
         const payload = isEdit ? changedRecurringFields(shown, now, recurring) : now;
+        // Ein Termin vor heute fragt, bevor die Luecke gebucht wird (#1748).
+        // Der Riegel steht auch waehrend der Frage; danach wird Recht und
+        // Archiv neu gefragt wie beim Loeschen.
+        busy = true;
+        let missed;
+        try {
+          missed = await recurringPastDateChoice(now, payload, isEdit ? recurring : null);
+        } finally {
+          busy = false;
+        }
+        if (missed === null || !mayStillAct()) return;
+        const sent = missed ? { ...payload, missed } : payload;
         const dialog = captureModalContext();
         busy = true;
         try {
           // Nichts geaendert: kein Aufruf, kein Verlaufseintrag "bearbeitet".
           if (isEdit && Object.keys(payload).length === 0) { /* nur schliessen */ }
-          else if (isEdit) await api.put(`/split-expenses/recurring/${recurring.id}`, payload);
-          else await api.post(`/split-expenses/groups/${state.activeGroupId}/recurring`, payload);
+          else if (isEdit) await api.put(`/split-expenses/recurring/${recurring.id}`, sent);
+          else await api.post(`/split-expenses/groups/${state.activeGroupId}/recurring`, sent);
         } catch (err) {
           // Der Termin liegt nicht nach der letzten Buchung (der Server haelt
           // einen gebuchten Tag fest): der Satz dazu steht am Datumsfeld, der
