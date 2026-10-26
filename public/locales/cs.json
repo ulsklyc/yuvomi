@@ -4295,7 +4295,8 @@
             "reasonNameTooLong": "Název souboru nebo složky je příliš dlouhý.",
             "reasonTooDeep": "Cesta překračuje limit pěti úrovní složek.",
             "reasonParentFailed": "Nadřazenou složku se nepodařilo vytvořit.",
-            "reasonRateLimited": "Server nyní přijímá příliš mnoho požadavků. Zkuste nahrávání později znovu."
+            "reasonRateLimited": "Server nyní přijímá příliš mnoho požadavků. Zkuste nahrávání později znovu.",
+            "folderGoneReplanned": "Jedna ze složek tohoto nahrávání byla mezitím smazána. Náhled ukazuje aktuální stav - spusťte nahrávání znovu."
         },
         "errorFolderGone": "Tato složka už neexistuje.",
         "errorSelectedFolderGone": "Vybraná složka už neexistuje.",

@@ -3962,7 +3962,8 @@
             "reasonNameTooLong": "文件名或文件夹名过长。",
             "reasonTooDeep": "路径超过五层文件夹限制。",
             "reasonParentFailed": "无法创建上级文件夹。",
-            "reasonRateLimited": "服务器当前收到的请求过多。请稍后重试上传。"
+            "reasonRateLimited": "服务器当前收到的请求过多。请稍后重试上传。",
+            "folderGoneReplanned": "此上传中的一个文件夹在此期间已被删除。预览显示当前状态，请重新开始上传。"
         },
         "errorFolderGone": "此文件夹已不存在。",
         "errorSelectedFolderGone": "所选文件夹已不存在。",

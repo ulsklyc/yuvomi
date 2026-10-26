@@ -4026,7 +4026,8 @@
             "reasonNameTooLong": "Egy fájl- vagy mappanév túl hosszú.",
             "reasonTooDeep": "Az elérési út meghaladja az öt mappaszint korlátját.",
             "reasonParentFailed": "A szülőmappát nem sikerült létrehozni.",
-            "reasonRateLimited": "A szerver túl sok kérést kap. Próbáld meg később újra a feltöltést."
+            "reasonRateLimited": "A szerver túl sok kérést kap. Próbáld meg később újra a feltöltést.",
+            "folderGoneReplanned": "A feltöltés egyik mappáját időközben törölték. Az előnézet a jelenlegi állapotot mutatja - indítsd újra a feltöltést."
         },
         "errorFolderGone": "Ez a mappa már nem létezik.",
         "errorSelectedFolderGone": "A kiválasztott mappa már nem létezik.",

@@ -3962,7 +3962,8 @@
             "reasonNameTooLong": "Ett fil- eller mappnamn är för långt.",
             "reasonTooDeep": "Sökvägen överskrider gränsen på fem mappnivåer.",
             "reasonParentFailed": "Den överordnade mappen kunde inte skapas.",
-            "reasonRateLimited": "Servern tar emot för många förfrågningar. Försök ladda upp igen senare."
+            "reasonRateLimited": "Servern tar emot för många förfrågningar. Försök ladda upp igen senare.",
+            "folderGoneReplanned": "En mapp i den här uppladdningen raderades under tiden. Förhandsvisningen visar aktuellt läge - starta uppladdningen igen."
         },
         "errorFolderGone": "Den här mappen finns inte längre.",
         "errorSelectedFolderGone": "Den valda mappen finns inte längre.",

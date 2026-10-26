@@ -3962,7 +3962,8 @@
             "reasonNameTooLong": "Bir dosya veya klasör adı çok uzun.",
             "reasonTooDeep": "Yol beş klasör düzeyi sınırını aşıyor.",
             "reasonParentFailed": "Üst klasör oluşturulamadı.",
-            "reasonRateLimited": "Sunucu çok fazla istek alıyor. Yüklemeyi daha sonra tekrar deneyin."
+            "reasonRateLimited": "Sunucu çok fazla istek alıyor. Yüklemeyi daha sonra tekrar deneyin.",
+            "folderGoneReplanned": "Bu yüklemeye ait bir klasör bu arada silindi. Önizleme güncel durumu gösteriyor - yüklemeyi yeniden başlatın."
         },
         "errorFolderGone": "Bu klasör artık yok.",
         "errorSelectedFolderGone": "Seçilen klasör artık yok.",

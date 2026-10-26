@@ -4026,7 +4026,8 @@
             "reasonNameTooLong": "Fil- eller mappenavnet er for langt.",
             "reasonTooDeep": "Stien overstiger grensen på fem mappenivåer.",
             "reasonParentFailed": "Overordnet mappe kunne ikke opprettes.",
-            "reasonRateLimited": "Serveren mottar for mange forespørsler. Prøv opplastingen på nytt senere."
+            "reasonRateLimited": "Serveren mottar for mange forespørsler. Prøv opplastingen på nytt senere.",
+            "folderGoneReplanned": "En mappe i denne opplastingen ble slettet i mellomtiden. Forhåndsvisningen viser gjeldende tilstand - start opplastingen på nytt."
         },
         "errorFolderGone": "Denne mappen finnes ikke lenger.",
         "errorSelectedFolderGone": "Den valgte mappen finnes ikke lenger.",

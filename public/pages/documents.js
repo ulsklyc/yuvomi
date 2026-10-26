@@ -3349,6 +3349,61 @@ function renderFolderUploadResult(panel, plan, result) {
     </div>`);
 }
 
+/** Die Optionen der Ordnerauswahl im Dokument-Dialog, in der Reihenfolge beim Oeffnen. */
+function documentFolderOptionsHtml(goneId = '') {
+  return state.folders.filter((folder) => String(folder.id) !== goneId)
+    .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join('');
+}
+
+/** Die Plan-Referenz des gewaehlten Ziels, wie buildFolderUploadPlan sie vergibt. */
+function folderUploadTargetRef(form) {
+  const id = form ? folderUploadTargetId(form) : null;
+  return id === null ? 'root' : `id:${id}`;
+}
+
+/**
+ * Ein Ordner des Uploads ist waehrenddessen verschwunden (#1995): der Upload
+ * hat angehalten, der Plan ist veraltet. Ist es das gewaehlte Ziel, bekommt
+ * die Auswahl die aktuellen Ordner, steht auf der obersten Ebene und traegt
+ * den Fokus - wie im Dokument- und im Ordner-Dialog. Verschwand nur ein Ordner
+ * darin, bleibt das Ziel gewaehlt und die Auswahl kommt frisch. In beiden
+ * Faellen plant die Vorschau gegen den frischen Stand neu (schon Hochgeladenes
+ * steht dort als Konflikt), und derselbe Dialog startet neu.
+ *
+ * @returns {Promise<boolean>} ob das gewaehlte Ziel selbst verschwunden ist
+ */
+async function offerFolderUploadRetry(panel, gone, owner) {
+  const upload = panel._folderUpload;
+  const form = panel.querySelector('#document-form');
+  const select = form?.querySelector('#document-folder');
+  setFolderUploadControlsDisabled(panel, false);
+  const targetGone = gone.ref === folderUploadTargetRef(form);
+  if (targetGone) {
+    await offerCurrentFolders(select, 'documents.noFolder', documentFolderOptionsHtml, owner);
+  } else if (stillShown(owner)) {
+    const chosen = String(select?.value ?? '');
+    try {
+      await Promise.all([loadFolders(), loadDocuments()]);
+    } catch (err) {
+      console.warn('[Documents] folder reload failed:', err);
+    }
+    if (stillShown(owner)) renderAll();
+    if (select) {
+      select.replaceChildren();
+      select.insertAdjacentHTML('beforeend', `<option value="">${esc(t('documents.noFolder'))}</option>${documentFolderOptionsHtml()}`);
+      select.value = chosen;
+    }
+  }
+  if (!stillShown(owner)) return targetGone;
+  try {
+    upload.documents = await loadUploadConflictDocuments();
+  } catch (err) {
+    console.warn('[Documents] conflict reload failed:', err);
+  }
+  renderFolderUploadPreview(panel);
+  return targetGone;
+}
+
 async function saveFolderUpload(panel, payload) {
   const upload = panel._folderUpload;
   if (!upload?.ready) throw new PageProblem(t('common.unknownError'));
@@ -3387,9 +3442,17 @@ async function saveFolderUpload(panel, payload) {
         updateFolderUploadProgress(panel, event, completed, total);
       },
       shouldCancel: () => upload.cancelled,
+      isFolderGone: isSelectedFolderGone,
     });
   } finally {
     upload.running = false;
+  }
+
+  if (result.folderGone) {
+    const targetGone = await offerFolderUploadRetry(panel, result.folderGone, owner);
+    throw new PageProblem(targetGone
+      ? t('documents.errorSelectedFolderGone')
+      : t('documents.folderUpload.folderGoneReplanned'));
   }
 
   upload.completed = true;
@@ -3520,8 +3583,7 @@ async function saveDocument(event, doc, panel) {
     if (isSelectedFolderGone(err)) {
       // Dieselbe Reihenfolge wie beim Oeffnen (openDocumentModal): die Liste.
       await offerCurrentFolders(form.querySelector('#document-folder'), 'documents.noFolder',
-        (goneId) => state.folders.filter((folder) => String(folder.id) !== goneId)
-          .map((folder) => `<option value="${folder.id}">${esc(folder.name)}</option>`).join(''), owner);
+        documentFolderOptionsHtml, owner);
     }
   } finally {
     submit.disabled = panel._folderUpload?.completed === true;

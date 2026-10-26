@@ -4026,7 +4026,8 @@
             "reasonNameTooLong": "파일 또는 폴더 이름이 너무 깁니다.",
             "reasonTooDeep": "경로가 폴더 5단계 제한을 초과합니다.",
             "reasonParentFailed": "상위 폴더를 만들 수 없습니다.",
-            "reasonRateLimited": "서버에 요청이 너무 많습니다. 나중에 다시 업로드하세요."
+            "reasonRateLimited": "서버에 요청이 너무 많습니다. 나중에 다시 업로드하세요.",
+            "folderGoneReplanned": "그 사이에 이 업로드의 폴더가 삭제되었습니다. 미리보기에 현재 상태가 표시됩니다. 업로드를 다시 시작하세요."
         },
         "errorFolderGone": "이 폴더는 더 이상 존재하지 않습니다.",
         "errorSelectedFolderGone": "선택한 폴더가 더 이상 존재하지 않습니다.",

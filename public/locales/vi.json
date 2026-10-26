@@ -4026,7 +4026,8 @@
             "reasonNameTooLong": "Tên tệp hoặc thư mục quá dài.",
             "reasonTooDeep": "Đường dẫn vượt quá giới hạn năm cấp thư mục.",
             "reasonParentFailed": "Không thể tạo thư mục cha.",
-            "reasonRateLimited": "Máy chủ đang nhận quá nhiều yêu cầu. Hãy thử tải lên lại sau."
+            "reasonRateLimited": "Máy chủ đang nhận quá nhiều yêu cầu. Hãy thử tải lên lại sau.",
+            "folderGoneReplanned": "Trong lúc đó, một thư mục của lần tải lên này đã bị xóa. Bản xem trước hiển thị trạng thái hiện tại - hãy bắt đầu tải lên lại."
         },
         "errorFolderGone": "Thư mục này không còn tồn tại.",
         "errorSelectedFolderGone": "Thư mục đã chọn không còn tồn tại.",

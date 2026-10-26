@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A folder upload whose folder was deleted meanwhile can start again from the dialog** (#1995).
+  When someone deleted the chosen folder while a folder upload ran, every entry failed on its own
+  and the dialog could only be closed. The upload now stops at the first such answer, the dialog
+  stays open with your selection, offers the current folders with the top level chosen and shows a
+  fresh preview, so one click uploads again. If only a folder inside the target went away, the
+  target stays chosen and the preview creates that folder anew.
 - **Saving, resetting or deleting an event speaks your language when something goes wrong** (#1909).
   These toasts showed the server's German text in every language. They now say the app's own
   sentence: an event someone else deleted in the meantime (the dialog closes and the calendar

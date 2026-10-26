@@ -353,6 +353,13 @@ export async function runRateLimitedOperation(operation, {
  *
  * Callbacks are injected so the planner remains usable in Node tests and the
  * Documents page remains the only owner of API and FileReader details.
+ *
+ * `isFolderGone(error)` names the answer "this folder no longer exists"
+ * (#1995). That is one outcome of the whole upload, not a failure per entry:
+ * the plan is stale from then on, so the executor stops at the first such
+ * answer and reports `folderGone: { ref, error }`, where `ref` is the plan
+ * reference of the folder that vanished (`id:<n>` for the chosen target or a
+ * merged folder, `plan:<key>` for one this upload created).
  */
 export async function executeFolderUploadPlan(plan, {
   createFolder,
@@ -361,6 +368,7 @@ export async function executeFolderUploadPlan(plan, {
   shouldCancel = () => false,
   waitForRetry = cancellableRetryWait,
   maxRateLimitRetries = 3,
+  isFolderGone = () => false,
 } = {}) {
   const retryOptions = {
     maxRetries: Math.max(0, Math.floor(Number(maxRateLimitRetries) || 0)),
@@ -412,6 +420,10 @@ export async function executeFolderUploadPlan(plan, {
         result.cancelled = true;
         return result;
       }
+      if (isFolderGone(error)) {
+        result.folderGone = { ref: folder.parentRef, error };
+        return result;
+      }
       failedRefs.add(folder.targetRef);
       const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));
       // `error` mit, damit die Seite den Satz der App sagt (#1909): `reason`
@@ -452,6 +464,10 @@ export async function executeFolderUploadPlan(plan, {
     } catch (error) {
       if (error === RATE_LIMIT_CANCELLED) {
         result.cancelled = true;
+        return result;
+      }
+      if (isFolderGone(error)) {
+        result.folderGone = { ref: item.targetRef, error };
         return result;
       }
       const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));

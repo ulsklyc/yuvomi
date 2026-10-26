@@ -4026,7 +4026,8 @@
             "reasonNameTooLong": "A file or folder name is too long.",
             "reasonTooDeep": "The path exceeds the five-level folder limit.",
             "reasonParentFailed": "Its parent folder could not be created.",
-            "reasonRateLimited": "The server is receiving too many requests. Try the upload again later."
+            "reasonRateLimited": "The server is receiving too many requests. Try the upload again later.",
+            "folderGoneReplanned": "A folder of this upload was deleted in the meantime. The preview shows the current state - start the upload again."
         },
         "errorFolderGone": "This folder no longer exists.",
         "errorSelectedFolderGone": "The chosen folder no longer exists.",

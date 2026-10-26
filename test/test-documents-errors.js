@@ -1223,3 +1223,94 @@ test('Seite: Hochladen ohne Datei - der Fehler steht an der Ablage, Fokus und Bl
     assert.equal(posted, 0, 'nichts wird hochgeladen');
   }
 });
+
+// --- Ordner hochladen, und der Ordner verschwindet waehrenddessen (#1995) ---
+//
+// "Den Ordner gibt es nicht mehr" ist EIN Ausgang des ganzen Uploads, kein
+// Fehler je Eintrag: der Upload haelt bei der ersten solchen Antwort an, die
+// Ordner kommen frisch, die Vorschau plant neu, und derselbe Dialog laesst
+// neu starten. Vorher lief jeder Eintrag einzeln in den Fehler, `completed`
+// sperrte den Knopf, und es blieb nur Schliessen und von vorn.
+
+const pdf = (path) => ({ name: path.split('/').at(-1), size: 64, type: 'application/pdf', webkitRelativePath: path });
+
+function ordnerDialog(files, ziel) {
+  const form = formular({ '#document-folder': ziel, '#document-folder-input': files });
+  const panel = formular();
+  const eigen = panel.querySelector.bind(panel);
+  panel.querySelector = (selector) => (selector === '#document-form' ? form : eigen(selector));
+  panel._folderUpload = {
+    files, documents: [], timestamp: '2026-10-26 10-00', folderDefault: 'merge', fileDefault: 'skip',
+    folderOverrides: {}, plan: null, ready: true, running: false, cancelled: false, completed: false,
+  };
+  return { form, panel };
+}
+
+async function ordnerHochladen({ files, ziel, ordner, ordnerDanach, post }) {
+  const { form, panel } = ordnerDialog(files, ziel);
+  const frueher = globalThis.FileReader;
+  globalThis.FileReader = class { readAsDataURL() { this.result = PDF; this.onload(); } };
+  try {
+    const result = await mitSeite({ folders: ordner.map((f) => ({ ...f })), allowedMimeTypes: ['application/pdf'] }, () => mit({
+      get: (path) => (path === '/documents/folders' ? { data: ordnerDanach } : { data: [] }),
+      post,
+    }, () => page.saveDocument({ target: form, preventDefault() {} }, null, panel)));
+    return { ...result, form, panel, error: form.querySelector('#document-error') };
+  } finally {
+    globalThis.FileReader = frueher;
+  }
+}
+
+test('Seite: Ordner hochladen, der gewaehlte Zielordner ist weg - Halt beim ersten "gibt es nicht mehr", Auswahl auf oberster Ebene mit Fokus, neu startbar (#1995)', async () => {
+  const { calls, closed, gets, form, panel, error } = await ordnerHochladen({
+    files: [pdf('Haus/Plaene/grundriss.pdf'), pdf('Haus/notizen.pdf')],
+    ziel: '3',
+    ordner: FOLDERS,
+    ordnerDanach: [FOLDERS[1]],
+    post: async () => { throw fehler(400, 'documents_selected_folder_not_found'); },
+  });
+  const posts = calls.filter(([verb]) => verb === 'POST').map(([, path]) => path);
+  assert.deepEqual(posts, ['/documents/folders'], 'nach der ersten "gibt es nicht mehr"-Antwort geht nichts mehr raus');
+  assert.deepEqual(closed, [], 'der Dialog bleibt offen');
+  assert.deepEqual(toasts, [], 'kein "mit Fehlern abgeschlossen"');
+  assert.equal(error.textContent, 'documents.errorSelectedFolderGone');
+  assert.equal(error.hidden, false);
+  const select = form.querySelector('#document-folder');
+  assert.equal(select.value, '', 'die Auswahl steht auf der obersten Ebene');
+  assert.equal(select.focused, 1, 'und traegt den Fokus');
+  assert.match(select.html ?? '', /Auto/);
+  assert.doesNotMatch(select.html ?? '', /Wohnung/);
+  assert.ok(gets.includes('/documents/folders'), `Ordner frisch: ${gets.join(', ')}`);
+  assert.ok(gets.includes('/documents?status=archived'), `Konfliktliste frisch: ${gets.join(', ')}`);
+  assert.equal(panel._folderUpload.completed, false, 'der Upload ist nicht abgeschlossen');
+  assert.equal(panel.querySelector('#document-submit').disabled, false, 'der Knopf startet neu');
+  assert.equal(panel._folderUpload.plan.folders[0].parentRef, 'root', 'die Vorschau plant gegen die neue Wahl');
+  assertNoServerText(error.textContent);
+});
+
+test('Seite: Ordner hochladen, ein Ordner IM Ziel verschwindet - das Ziel bleibt gewaehlt, die Vorschau plant neu (#1995)', async () => {
+  const haus = { id: 7, name: 'Haus', parent_id: 3 };
+  let erste = true;
+  const { calls, closed, form, panel, error } = await ordnerHochladen({
+    files: [pdf('Haus/a.pdf'), pdf('Haus/b.pdf'), pdf('Haus/c.pdf')],
+    ziel: '3',
+    ordner: [...FOLDERS, haus],
+    ordnerDanach: FOLDERS,
+    post: async (path) => {
+      if (path === '/documents' && erste) { erste = false; return { data: { id: 50 } }; }
+      throw fehler(400, 'documents_selected_folder_not_found');
+    },
+  });
+  const posts = calls.filter(([verb]) => verb === 'POST').map(([, path]) => path);
+  assert.deepEqual(posts, ['/documents', '/documents'], 'Halt nach der ersten "gibt es nicht mehr"-Antwort');
+  assert.deepEqual(closed, []);
+  assert.deepEqual(toasts, []);
+  assert.equal(error.textContent, 'documents.folderUpload.folderGoneReplanned');
+  const select = form.querySelector('#document-folder');
+  assert.equal(select.value, '3', 'das gewaehlte Ziel gibt es noch und bleibt');
+  assert.match(select.html ?? '', /Wohnung/);
+  assert.equal(panel._folderUpload.completed, false);
+  assert.equal(panel.querySelector('#document-submit').disabled, false);
+  assert.equal(panel._folderUpload.plan.folders[0].action, 'create', 'Haus wird neu angelegt statt in den verschwundenen Ordner');
+  assertNoServerText(error.textContent);
+});
