@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **Deleting a CalDAV account no longer leaves events and tasks pointing at it** (#1885). An event
+  or task created in Yuvomi and meant for that account's calendar or reminder list kept the deleted
+  account as its target, and the event stood in no calendar at all. The target now goes with the
+  account: the entry stays in Yuvomi, is never sent, and the event is back in your default calendar.
 - **A task that fails to open from the Overview says why in your language** (#1909). When a
   task tapped on an Overview tile could not be opened, the toast showed the server's text or an
   English code message. It now says the app's own sentence (offline, not found, no permission, or

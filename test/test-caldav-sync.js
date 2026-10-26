@@ -2528,7 +2528,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         external_calendar_id TEXT, external_source TEXT NOT NULL DEFAULT 'local',
         calendar_ref_id INTEGER, created_by INTEGER,
         user_modified INTEGER NOT NULL DEFAULT 0,
-        target_caldav_calendar_url TEXT,
+        -- deleteAccount() räumt auch das Upload-Ziel ab (#1885).
+        target_caldav_account_id INTEGER, target_caldav_calendar_url TEXT,
         -- deleteAccount() nimmt den Zeilen, die bleiben, ihre Ausgangsmarker.
         outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0,
         outbound_move_to TEXT
@@ -2561,7 +2562,9 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         external_source TEXT NOT NULL DEFAULT 'local', external_uid TEXT,
         external_account_id INTEGER, external_object_url TEXT,
-        outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0
+        outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0,
+        -- Upload-Ziel lokaler Aufgaben (Migration 136), abgeräumt seit #1885
+        target_caldav_account_id INTEGER, target_caldav_list_url TEXT
       );
       CREATE TABLE shopping_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

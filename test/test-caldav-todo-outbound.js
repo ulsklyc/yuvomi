@@ -499,6 +499,21 @@ test('Das Löschen eines Kontos entkoppelt seine gespiegelten Zeilen', () => {
   }
 });
 
+test('Das Löschen eines Kontos räumt das Upload-Ziel lokaler Aufgaben ab (#1885)', () => {
+  const accountId = reset();
+  const task = insertTask({ source: 'local', uid: null, objectUrl: null });
+  db.prepare('UPDATE tasks SET target_caldav_account_id = ?, target_caldav_list_url = ? WHERE id = ?')
+    .run(accountId, LIST_URL, task.id);
+
+  deleteAccount(accountId);
+
+  const row = reloadTask(task.id);
+  assert.ok(row, 'die Aufgabe ging mit dem Konto verloren');
+  assert.strictEqual(row.external_source, 'local');
+  assert.strictEqual(row.target_caldav_account_id, null, 'das Ziel zeigt auf ein gelöschtes Konto');
+  assert.strictEqual(row.target_caldav_list_url, null, 'die Listenadresse des gelöschten Kontos steht noch');
+});
+
 test('Eine entkoppelte Aufgabe lässt sich löschen, ohne am Fremdschlüssel zu scheitern', () => {
   const accountId = reset();
   const task = insertTask({ accountId });

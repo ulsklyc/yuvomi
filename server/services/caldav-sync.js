@@ -668,6 +668,15 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     db.get().prepare(
       "DELETE FROM calendar_pending_deletions WHERE source = 'caldav' AND caldav_account_id = ?"
     ).run(accountId);
+    // Das Upload-Ziel (`target_caldav_account_id`) trägt keinen Fremdschlüssel
+    // und zeigte sonst ins Leere (#1885). Ein lokaler Termin ohne Ziel bleibt
+    // lokal, wird nie gesendet und steht wieder im lokalen Standardkalender -
+    // mit Ziel stand er in keinem.
+    db.get().prepare(`
+      UPDATE calendar_events
+      SET target_caldav_account_id = NULL, target_caldav_calendar_url = NULL
+      WHERE target_caldav_account_id = ?
+    `).run(accountId);
     // Ebenso die Notizen nie gebuchter Uploads (#1882).
     dropUploadAttemptsOf({ source: 'caldav', accountId });
     const rows = detachAccountRows(accountId);

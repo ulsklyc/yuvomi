@@ -1078,3 +1078,24 @@ test('Umzug abgelehnt, und für das Objekt steht schon der Auftrag eines ANDEREN
   assert.equal(lines.filter((l) => l.level === 'warn' && /another account/.test(l.text)).length, 1, 'der Fall wurde nicht gemeldet');
   assert.deepEqual(accounts.a.dav.seen('DELETE').map(describe), ['DELETE /cal/family/shared.ics (user-a)'], 'der Auftrag des anderen Kontos wurde angestossen');
 });
+
+test('das Zielkonto eines lokalen Termins wird gelöscht: das Ziel fällt mit, der Termin bleibt lokal (#1885)', async () => {
+  const { localCalendarIdSql } = await import('../server/services/local-calendars.js');
+  const accounts = twoAccounts();
+  const id = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, target_caldav_account_id, target_caldav_calendar_url)
+    VALUES ('Soll zu A', '2035-03-10T10:00', '2035-03-10T11:00', 0, ?, ?, ?)
+  `).run(userId, accounts.a.accountId, accounts.a.url).lastInsertRowid);
+
+  caldavSync.deleteAccount(accounts.a.accountId);
+
+  assert.equal(row(id).title, 'Soll zu A', 'der Termin ging mit dem Konto verloren');
+  assert.equal(row(id).external_source, 'local');
+  assert.equal(row(id).target_caldav_account_id, null, 'das Ziel zeigt auf ein gelöschtes Konto');
+  assert.equal(row(id).target_caldav_calendar_url, null, 'die Kalenderadresse des gelöschten Kontos steht noch');
+  // Ohne Ziel gehört der Termin wieder in den lokalen Standardkalender, statt
+  // in keinem Kalender zu stehen.
+  const membership = db.prepare(`SELECT ${localCalendarIdSql()} AS id FROM calendar_events e WHERE e.id = ?`).get(id).id;
+  assert.equal(membership, db.prepare('SELECT id FROM local_calendars WHERE is_default = 1').get().id);
+});

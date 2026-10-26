@@ -279,6 +279,14 @@ export function detachAccountRows(accountId) {
        WHERE external_source = 'caldav' AND external_account_id = ?
     `).run(accountId).changes;
   }
+  // Das Upload-Ziel lokaler Aufgaben trägt ebenso keinen Fremdschlüssel
+  // (#1885). Ohne Ziel bleibt die Aufgabe lokal und wird nie gesendet - wie
+  // jede Zeile ohne Konto. Einkaufsposten tragen kein eigenes Ziel: sie erben
+  // es von der Listenzuordnung, und die fällt per CASCADE mit dem Konto.
+  db.get().prepare(`
+    UPDATE tasks SET target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE target_caldav_account_id = ?
+  `).run(accountId);
   return detached;
 }
 
