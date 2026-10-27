@@ -439,10 +439,12 @@
  * rechnet es nach der Packung aus und setzt es als Darstellung, nicht als
  * Groesse: gespeichert bleibt, was der Nutzer gewaehlt hat.
  *
- * Nach rechts waechst nur, was Breite in Inhalt umsetzt (das Wetter zeigt mehr
- * Tage, `rowFillSpans`); nach unten nur in ein Loch, unter dem noch eine Kachel
- * steht (`columnFillSpans`) - ein Spaltenende ist kein Loch. Nur ab zwei
- * Spalten - einspaltig gibt es keinen Rest. */
+ * Nach rechts waechst zuerst, was Breite in Inhalt umsetzt (das Wetter zeigt
+ * mehr Tage, `rowFillSpans`); nach unten in ein Loch, unter dem noch eine
+ * Kachel steht (`columnFillSpans`). Ein Spaltenende bis zu einem Kachelabstand
+ * laeuft ruhig aus; ein laengeres ist ein Loch (F9) und nimmt eine Kachel
+ * daneben in die Breite oder die letzte der Spalte in die Hoehe
+ * (`fillGridSpans`). Nur ab zwei Spalten - einspaltig gibt es keinen Rest. */
 @media (min-width: 768px) {
   .dashboard__grid > [data-row-fill] {
     grid-column: span var(--widget-fill-span);
@@ -453,9 +455,11 @@
   }
 
   /* GLEICH FRUEH, WENIGER LOCH (`packGrid`): passt eine breite Kachel an zwei
-   * Stellen gleich frueh, nimmt sie die mit dem kleineren Loch darueber - CSS
-   * `dense` naehme immer die linke. Die Spalte setzt `applyRowFill`, die Zeile
-   * sucht das Raster wie jede andere selbst. */
+   * Stellen fast gleich frueh (hoechstens ein Kachelabstand), nimmt sie die mit
+   * dem kleineren Loch darueber - CSS `dense` naehme immer die frueheste. Auch
+   * wer zum Fuellen in die Breite waechst, bekommt seine Spalte fest (nach
+   * links gewachsen beginnt er dort). Die Spalte setzt `applyRowFill`, die
+   * Zeile sucht das Raster wie jede andere selbst. */
   .dashboard__grid > [data-col-lock] {
     grid-column: var(--tile-col) / span var(--tile-span-cols);
   }
@@ -4708,32 +4712,25 @@ button.today-cockpit__more--link {
     }
   }
 
-  /* DER GEIST: was eine Kachel nur bekommt, um ein Loch zu schliessen
-   * (`applyRowFill`, `--tile-ghost-rows`/`--tile-ghost-cols`), steht hier als
-   * leerer Schlitz - dieselbe gestrichelte Form wie der Platz beim Ziehen
-   * (`.sortable-ghost`, layout.css). So sieht man, welche Hoehe Inhalt ist und
-   * welche Platz. */
-  .dashboard__grid--editing > .widget-wrapper:is([data-ghost-block], [data-ghost-inline])::after {
+  /* DER GEIST: die Hoehe, die eine Kachel nur bekommt, um ein Loch zu
+   * schliessen (`applyRowFill`, `--tile-ghost-rows`), steht hier als leerer
+   * Schlitz unter dem Inhalt - dieselbe gestrichelte Form wie der Platz beim
+   * Ziehen (`.sortable-ghost`, layout.css). So sieht man, welche Hoehe Inhalt
+   * ist und welche Platz. Fuer Breite gibt es keinen Geist (F9): eine
+   * verbreiterte Kachel laesst ihren Inhalt ueber die ganze Breite laufen, ein
+   * Schlitz an ihrem Rand laege ueber Zeilen, Kennzahlen und Notizen. */
+  .dashboard__grid--editing > .widget-wrapper[data-ghost-block]::after {
     content: '';
     position: absolute;
     inset-block-end: var(--space-1h);
-    inset-inline-end: var(--space-1h);
+    inset-inline: var(--space-1h);
     z-index: 1;
+    block-size: calc(var(--tile-ghost-rows) * var(--dashboard-row-unit) - var(--space-1h));
     border-radius: var(--radius-sm);
     background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
     outline: var(--space-px) dashed var(--module-accent, var(--color-accent));
     outline-offset: calc(var(--space-px) * -1);
     pointer-events: none;
-  }
-
-  .dashboard__grid--editing > .widget-wrapper[data-ghost-block]::after {
-    inset-inline-start: var(--space-1h);
-    block-size: calc(var(--tile-ghost-rows) * var(--dashboard-row-unit) - var(--space-1h));
-  }
-
-  .dashboard__grid--editing > .widget-wrapper[data-ghost-inline]::after {
-    inset-block-start: var(--space-1h);
-    inline-size: calc((100% - var(--space-3)) * var(--tile-ghost-cols));
   }
 }
 

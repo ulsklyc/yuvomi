@@ -3195,30 +3195,46 @@ test('packGrid: eine hohe Kachel belegt beide Zeilen, eine zu breite wird an der
   assert(widgets.gridHoleCount(cells) === 2, 'neben family, ueber weather: ein Loch aus zwei Zellen');
 });
 
-/* U1 b: GLEICH FRUEH, WENIGER LOCH. Der Demo-Haushalt bei 1440px (drei
- * Spalten): `dense` setzte die Kennzahlen links unter die Familie, und weil
- * das Wetter rechts davon frueher endete, fuellte die Familie 195px Leere.
- * Gleich frueh steht die Reihe auch rechts - dort ohne Loch. */
-test('U1 b: packGrid - eine breite Kachel nimmt unter gleich fruehen Stellen die mit dem kleineren Loch', () => {
+/* U1 b, F9: FAST GLEICH FRUEH, WENIGER LOCH. Der Demo-Haushalt bei 1440px
+ * (drei Spalten): die Familie endet 2 Spuren (8px) tiefer als die
+ * Geburtstage. `dense` - und die erste Fassung dieser Regel (nur exakt gleich
+ * frueh) - setzte das Wetter darum in Spalte 2-3, jede weitere breite Kachel
+ * folgte ihm, und Spalte 1 blieb unter der Familie 536px leer. Bis zu einem
+ * Kachelabstand spaeter gilt als gleich frueh: das Wetter beginnt links unter
+ * der Familie, darueber bleiben 2 Spuren statt 98. */
+test('U1 b, F9: packGrid - eine breite Kachel nimmt unter fast gleich fruehen Stellen die mit dem kleineren Loch', () => {
   const items = [kachel('family', 1, 100), kachel('birthdays', 1, 98), kachel('weather', 2, 50), kachel('metrics', 2, 35)];
+  const at = (cells, id) => { for (let r = 0; r < cells.length; r += 1) { const c = cells[r].indexOf(id); if (c >= 0) return [r, c]; } return null; };
   const cells = widgets.packGrid(items, 3);
-  const at = (id) => { for (let r = 0; r < cells.length; r += 1) { const c = cells[r].indexOf(id); if (c >= 0) return [r, c]; } return null; };
-  nodeAssert.deepEqual(at('weather'), [98, 1], 'das Wetter steht so frueh wie moeglich (unter den Geburtstagen)');
-  nodeAssert.deepEqual(at('metrics'), [148, 1], 'die Kennzahlen gleich frueh rechts - links stuende ein Loch unter der Familie');
+  nodeAssert.equal(widgets.GRID_END_SLACK, 5, 'gleich frueh heisst hoechstens ein Kachelabstand (5 Spuren, 20px)');
+  nodeAssert.deepEqual(at(cells, 'weather'), [100, 0], 'das Wetter beginnt 8px spaeter links - nicht 8px frueher rechts');
+  nodeAssert.deepEqual(at(cells, 'metrics'), [150, 0], 'die Kennzahlen folgen ihm, Spalte 1 bleibt im Raster');
+  // Ohne Spielraum waere es die frueheste Stelle - genau der Befund F9.
+  nodeAssert.deepEqual(at(widgets.packGrid(items, 3, { slack: 0 }), 'weather'), [98, 1]);
+  // Viel spaeter ist nicht gleich frueh: dann gewinnt die frueheste.
+  const tief = [kachel('family', 1, 100), kachel('birthdays', 1, 60), kachel('weather', 2, 50)];
+  nodeAssert.deepEqual(at(widgets.packGrid(tief, 3), 'weather'), [60, 1]);
   // Mit fester Spalte rechnet packGrid wie CSS mit `grid-column-start`.
-  const locked = widgets.packGrid(items.map((it) => (it.id === 'metrics' ? { ...it, col: 0 } : it)), 3);
-  nodeAssert.equal(locked[148][0], 'metrics', 'eine feste Spalte gilt');
-  nodeAssert.deepEqual([...widgets.wideTileColumns(items, 3)], [['weather', 1], ['metrics', 1]]);
+  const locked = widgets.packGrid(items.map((it) => (it.id === 'metrics' ? { ...it, col: 1 } : it)), 3);
+  nodeAssert.equal(locked[150][1], 'metrics', 'eine feste Spalte gilt');
+  nodeAssert.deepEqual([...widgets.wideTileColumns(items, 3)], [['weather', 0], ['metrics', 0]]);
 });
 
-/* EIN LOCH IST EIN LOCH, WENN DARUNTER NOCH ETWAS STEHT (U1 b). Seit die
- * Kacheln so hoch sind wie ihr Inhalt, enden die Spalten verschieden tief;
- * das Ende einer Spalte ist kein Loch. */
-test('U1 b: gridHoleCount zaehlt Zellen, unter denen noch eine Kachel steht - kein Spaltenende', () => {
-  const ragged = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4)], 2);
-  nodeAssert.equal(widgets.gridHoleCount(ragged), 0, 'b endet frueher als a: ein Spaltenende');
+/* EIN LOCH IST, WAS LEER STEHT (U1 b, F9). Seit die Kacheln so hoch sind wie
+ * ihr Inhalt, enden die Spalten verschieden tief. U1 b zaehlte das Ende einer
+ * Spalte nie - und meldete "0 Loecher", waehrend im Demo-Haushalt eine ganze
+ * Spalte 536px leer stand. Jetzt ist nur ein ausgefranster Rand bis zu einem
+ * Kachelabstand kein Loch. */
+test('F9: gridHoleCount zaehlt das Loch mitten im Raster und ein Spaltenende laenger als ein Kachelabstand', () => {
   const enclosed = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4), kachel('c', 2, 3)], 2);
   nodeAssert.equal(widgets.gridHoleCount(enclosed), 6, 'unter b und ueber c: sechs Zellen Loch');
+  const fringe = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 5)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(fringe), 0, 'b endet 5 Spuren frueher: ein Rand, kein Loch');
+  const ragged = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(ragged), 6, 'b endet 6 Spuren frueher: ein Loch');
+  const emptyColumn = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 10)], 3);
+  nodeAssert.equal(widgets.gridHoleCount(emptyColumn), 10, 'eine leere Spalte neben vollen ist ein Loch');
+  nodeAssert.equal(widgets.gridHoleCount(ragged, { slack: Infinity }), 0, 'nur mitten im Raster (der Lueckenhinweis)');
 });
 
 const presets4 = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
@@ -3260,6 +3276,24 @@ function positions(cells) {
   return pos;
 }
 
+/** Bleibt jede Kachel, wo sie stand? Ihre Zeile ist dieselbe, und jede Zelle,
+ *  die sie vor dem Fuellen belegte, belegt sie danach noch (gewachsen ist sie
+ *  nach rechts, unten oder - seit F9 - links). */
+function stays(before, after) {
+  const top = (cells) => Object.fromEntries(Object.entries(positions(cells)).map(([id, [r]]) => [id, r]));
+  return JSON.stringify(top(before)) === JSON.stringify(top(after))
+    && before.every((row, r) => row.every((id, c) => !id || after[r]?.[c] === id));
+}
+
+/** Das freie Ende jeder Spalte in Spuren - unabhaengig von gridHoleCount gemessen. */
+function columnEnds(cells) {
+  return (cells[0] ?? []).map((_, c) => {
+    let r = cells.length - 1;
+    while (r >= 0 && !cells[r][c]) r -= 1;
+    return cells.length - 1 - r;
+  });
+}
+
 /** Gemessene Spuren (Inhalt + 5 Spuren Abstand) im Demo-Haushalt, 2026-10-27. */
 const span = ([id, cols, rows]) => ({ id, cols, rows: rows + 5, wide: id === 'weather', grow: id !== 'metrics' });
 const DEMO_SEED = [['family', 1, 95], ['birthdays', 1, 93], ['weather', 2, 45], ['metrics', 2, 30], ['rewards', 1, 62], ['notes', 2, 51]].map(span);
@@ -3279,13 +3313,14 @@ test('U1 b: rowFillSpans - nach rechts waechst nur, was Breite in Inhalt umsetzt
   nodeAssert.equal(widgets.rowFillSpans(items, 1).size, 0, 'einspaltig gibt es keinen Rest');
 });
 
-test('U1 b: rowFillSpans holes - schmal nur in ein echtes Loch, breit auch in den Rest der Zeile', () => {
+test('U1 b, F9: rowFillSpans holes - schmal und breit in ein Loch, auch in ein leeres Spaltenende', () => {
   // 1024px im Demo-Haushalt: Belohnungen (schmal) unten links, rechts daneben
   // frei, darunter die Notizen ueber beide Spalten - ein Loch.
   const loch = [kachel('rewards', 1, 62), kachel('notes', 2, 51)];
   nodeAssert.deepEqual([...widgets.rowFillSpans(loch, 2, { holes: true })], [['rewards', 2]]);
-  // Steht darunter nichts, ist es ein Spaltenende: die schmale Kachel bleibt schmal.
-  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 3, { holes: true })], []);
+  // Steht darunter nichts, ist es ein Spaltenende - seit F9 ein Loch, wenn es
+  // laenger ist als ein Kachelabstand: auch die schmale Kachel waechst hinein.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 3, { holes: true })], [['b', 2]]);
   // Drei breite Kacheln in drei Spalten liessen eine ganze Spalte leer.
   nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 2, 10), kachel('b', 2, 10), kachel('c', 2, 10)], 3, { holes: true })],
     [['a', 3], ['b', 3], ['c', 3]]);
@@ -3309,10 +3344,52 @@ test('U1 b: fillGridSpans - kein Loch im Demo-Haushalt (Erwachsene, Kind, alle K
       const before = widgets.packGrid(items, cols);
       const after = widgets.packGrid(filled, cols);
       nodeAssert.equal(widgets.gridHoleCount(after), 0, `${name}, ${cols} Spalten: Loch`);
-      nodeAssert.deepEqual(positions(after), positions(before), `${name}, ${cols} Spalten: keine Kachel wechselt den Platz`);
+      nodeAssert.ok(stays(before, after), `${name}, ${cols} Spalten: keine Kachel wechselt den Platz`);
       nodeAssert.ok(after.length <= before.length, `${name}, ${cols} Spalten: das Raster wird nicht hoeher`);
     }
   }
+});
+
+/* F9 (selbst eingebaut in p9, gemessen 2026-10-27): Demo-Haushalt bei 1440 und
+ * 1920px, drei Spalten. Das Wetter setzte sich 8px frueher in Spalte 2-3,
+ * Kennzahlen und Notizen folgten, und Spalte 1 blieb unter der Familie von
+ * 1020 bis 1556px leer (536 x 372px); im Kinderkonto unter den Belohnungen
+ * 588px. Gemessen wird das Spaltenende hier selbst, nicht mit gridHoleCount -
+ * die Funktion, die das Loch uebersah, darf nicht ihre eigene Zeugin sein. */
+test('F9: im Demo-Haushalt bleibt keine Spalte leer - das Wetter steht bei drei Spalten ueber die ganze Breite', () => {
+  const slack = widgets.GRID_END_SLACK ?? 5;
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND], ['alle', DEMO_ALLE]]) {
+    for (const cols of [2, 3, 4]) {
+      const filled = widgets.fillGridSpans(items, cols);
+      const ends = columnEnds(widgets.packGrid(filled, cols));
+      nodeAssert.ok(Math.max(...ends) <= slack, `${name}, ${cols} Spalten: Spaltenende ${JSON.stringify(ends)} Spuren`);
+    }
+  }
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND]]) {
+    const weather = widgets.fillGridSpans(items, 3).find((it) => it.id === 'weather');
+    nodeAssert.deepEqual([weather.col ?? null, weather.cols], [0, 3], `${name}: das Wetter ab Spalte 1 ueber alle drei`);
+  }
+});
+
+/* Dieselbe Frage an 3000 Zufallsraster (2-3 Spalten, 3-17 Kacheln, 100-580px
+ * hoch, ein Drittel breit): vor F9 liessen 65 % ein Loch oder ein leeres
+ * Spaltenende stehen. Was bleibt, liegt unter einem Teil einer breiten Kachel,
+ * die links und rechts von hoeheren eingefasst ist - dort passt kein Rechteck. */
+test('F9: von 3000 Zufallsrastern behalten weniger als 5 % ein Loch oder ein leeres Spaltenende', () => {
+  const slack = widgets.GRID_END_SLACK ?? 5;
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  let bad = 0;
+  for (let trial = 0; trial < 3000; trial += 1) {
+    const cols = 2 + Math.floor(rnd() * 2);
+    const items = Array.from({ length: 3 + Math.floor(rnd() * 15) }, (_, i) => ({
+      id: `t${i}`, cols: rnd() < 0.35 ? 2 : 1, rows: 25 + Math.floor(rnd() * 120), grow: true,
+    }));
+    const after = widgets.packGrid(widgets.fillGridSpans(items, cols), cols);
+    const enclosed = after.some((row, r) => row.some((id, c) => !id && after.slice(r + 1).some((below) => below[c])));
+    if (enclosed || Math.max(...columnEnds(after)) > slack) bad += 1;
+  }
+  nodeAssert.ok(bad / 3000 < 0.05, `${(100 * bad / 3000).toFixed(1)} % der Raster mit Loch`);
 });
 
 test('U1 b: fillGridSpans - das Wachsen wirft die Packung nie um (Aequivalenz, 500 zufaellige Raster)', () => {
@@ -3327,7 +3404,7 @@ test('U1 b: fillGridSpans - das Wachsen wirft die Packung nie um (Aequivalenz, 5
     }));
     const before = widgets.packGrid(items, cols);
     const after = widgets.packGrid(widgets.fillGridSpans(items, cols), cols);
-    nodeAssert.deepEqual(positions(after), positions(before), `Positionen verschoben (Versuch ${trial})`);
+    nodeAssert.ok(stays(before, after), `Positionen verschoben (Versuch ${trial})`);
     nodeAssert.ok(after.length <= before.length, `das Raster wird hoeher (Versuch ${trial})`);
   }
 });
@@ -3399,16 +3476,41 @@ test('U1 b: applyRowFill fuellt im Normal- und im Anpassen-Modus gleich - dort s
   try {
     __test.applyRowFill(grid);
     const normal = filledOf(tiles);
-    // Der Demo-Haushalt, drei Spalten: die Breiten stehen rechts (gleich frueh,
-    // weniger Loch), unter "Belohnungen" fuellt die Kachel das Loch ueber dem Wetter.
-    nodeAssert.deepEqual(normal.find(([id]) => id === 'weather')?.[3], '2', 'das Wetter steht in Spalte 2');
+    // Der Demo-Haushalt, drei Spalten (F9): das Wetter beginnt in Spalte 1 und
+    // zeigt ueber alle drei Tage, Kennzahlen und Notizen schliessen den Rest
+    // ihrer Zeile, "Belohnungen" fuellt das Loch ueber dem Wetter.
+    nodeAssert.deepEqual(normal.find(([id]) => id === 'weather'), ['weather', '3', null, '1'], 'das Wetter ab Spalte 1 ueber alle drei');
+    nodeAssert.deepEqual(normal.find(([id]) => id === 'notes'), ['notes', '3', null, '1']);
     nodeAssert.ok(normal.some(([id, , rows]) => id === 'rewards' && Number(rows) > GRID_SEED.rewards[1]), 'Belohnungen schliesst das Loch');
     nodeAssert.equal(tiles.filter((t) => 'ghostBlock' in t.dataset).length, 0, 'ausserhalb des Anpassens kein Geist');
     __test.applyRowFill(grid, { editing: true });
     nodeAssert.deepEqual(filledOf(tiles), normal, 'im Anpassen-Modus dasselbe Raster');
-    const ghost = tiles.find((t) => 'ghostBlock' in t.dataset);
-    nodeAssert.equal(ghost?.dataset.widgetId, 'rewards');
+    const ghost = tiles.find((t) => t.dataset.widgetId === 'rewards');
+    nodeAssert.ok('ghostBlock' in ghost.dataset, 'die Fuellhoehe der Belohnungen steht als Geist');
     nodeAssert.equal(Number(ghost.style.props.get('--tile-ghost-rows')), Number(normal.find(([id]) => id === 'rewards')[2]) - GRID_SEED.rewards[1]);
+    // F9: kein Geist fuer Breite - Kennzahlen und Notizen laufen ueber die ganze Breite.
+    nodeAssert.ok(tiles.every((t) => !('ghostInline' in t.dataset) && !t.style.props.has('--tile-ghost-cols')), 'kein Breiten-Geist ueber dem Inhalt');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+/* F9 im Kinderkonto (drei Spalten): die Belohnungen enden 164px vor Familie
+ * und Geburtstagen, Wetter und Notizen standen rechts, Spalte 1 blieb darunter
+ * 588px leer. Jetzt wachsen beide nach links - ihre Spalte beginnt dort, und
+ * die Belohnungen schliessen das Loch darueber (im Anpassen-Modus als Geist). */
+test('F9: applyRowFill - wer nach links waechst, beginnt dort', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { grid, tiles, style } = stubGrid(Object.fromEntries(DEMO_KIND.map((it) => [it.id, [it.cols, it.rows]])));
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid, { editing: true });
+    const filled = filledOf(tiles);
+    nodeAssert.deepEqual(filled.find(([id]) => id === 'weather'), ['weather', '3', null, '1']);
+    nodeAssert.deepEqual(filled.find(([id]) => id === 'notes'), ['notes', '3', null, '1']);
+    const rewards = tiles.find((t) => t.dataset.widgetId === 'rewards');
+    nodeAssert.ok('ghostBlock' in rewards.dataset, 'die Belohnungen schliessen das Loch ueber dem Wetter');
   } finally {
     globalThis.getComputedStyle = vorher;
   }

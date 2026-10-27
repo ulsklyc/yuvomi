@@ -290,26 +290,35 @@ export function normalizeDashboardConfig(input) {
  * Aufrufer, gelesen aus dem gerenderten Stylesheet - die Zuordnung Groesse →
  * Span steht damit weiter nur in dashboard.css. */
 
+/* Was am Ende einer Spalte frei bleiben darf, bevor es ein Loch ist (F9):
+ * hoechstens ein Kachelabstand (`--tile-gap-rows` ab 1024px, 20px). Dieselbe
+ * Spanne macht zwei Stellen einer breiten Kachel "gleich frueh" (`packGrid`). */
+export const GRID_END_SLACK = 5;
+
 /**
  * Belegung eines dicht gepackten Rasters.
  *
- * GLEICH FRUEH, WENIGER LOCH (U1 b). Seit die Kacheln so hoch sind wie ihr
- * Inhalt, enden die Spalten verschieden tief, und eine breite Kachel passt oft
- * an zwei Stellen gleich frueh. `dense` naehme die linke - auch wenn darueber
- * dann ein Loch bleibt, das eine Nachbarin mit Hoehe ohne Inhalt fuellen muss
- * (gemessen 1440px im Demo-Haushalt: "Familie" 195px leer). Hier nimmt eine
- * breite Kachel unter den gleich fruehen Stellen die mit dem kleinsten Loch
- * ueber sich, bei Gleichstand die linke. Die Rangfolge bleibt die
- * Reihenfolge, frueher wird keine Kachel - nur die Spalte ist eine andere.
- * Weil CSS das nicht kann, setzt `applyRowFill` die Spalte breiter Kacheln
- * fest (`col`, `--tile-col`); mit fester Spalte rechnet diese Funktion wie
- * CSS: erste passende Zeile in genau dieser Spalte.
+ * GLEICH FRUEH, WENIGER LOCH (U1 b, F9). Seit die Kacheln so hoch sind wie
+ * ihr Inhalt, enden die Spalten verschieden tief, und eine breite Kachel passt
+ * oft an zwei Stellen fast gleich frueh. `dense` naehme die frueheste - auch
+ * wenn sie nur 8px frueher ist und darueber ein Loch bleibt, das eine
+ * Nachbarin mit Hoehe ohne Inhalt fuellen muss. Gemessen im Demo-Haushalt bei
+ * 1440px: das Wetter setzte sich 8px frueher in Spalte 2-3, jede weitere
+ * breite Kachel folgte ihm, und Spalte 1 blieb unter der Familie 536px leer.
+ * Hier nimmt eine breite Kachel unter den Stellen, die hoechstens `slack`
+ * Spuren spaeter sind als die frueheste, die mit dem kleinsten Loch ueber
+ * sich; bei Gleichstand die fruehere, dann die linke. Die Rangfolge bleibt die
+ * Reihenfolge - keine spaetere Kachel rueckt vor, eine breite wird hoechstens
+ * einen Kachelabstand spaeter. Weil CSS das nicht kann, setzt `applyRowFill`
+ * die Spalte breiter Kacheln fest (`col`, `--tile-col`); mit fester Spalte
+ * rechnet diese Funktion wie CSS: erste passende Zeile in genau dieser Spalte.
  *
  * @param {{ id: string, cols: number, rows: number, col?: number }[]} items in Rangfolge
  * @param {number} columns Spaltenzahl des Rasters
+ * @param {{ slack?: number }} [options] Spuren, die "gleich frueh" sind
  * @returns {(string|null)[][]} Zeilen x Spalten, belegt mit der Widget-Id
  */
-export function packGrid(items, columns) {
+export function packGrid(items, columns, { slack = GRID_END_SLACK } = {}) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   const cells = [];
   const row = (r) => (cells[r] ??= Array(cols).fill(null));
@@ -339,17 +348,24 @@ export function packGrid(items, columns) {
     const w = Math.min(Math.max(1, item.cols | 0), cols);
     const h = Math.max(1, item.rows | 0);
     const locked = Number.isInteger(item.col) && item.col >= 0 && item.col + w <= cols ? item.col : null;
-    let place = null;
+    const spots = [];
     for (let c = locked ?? 0; c + w <= cols; c += 1) {
       const start = Math.min(...firstFree.slice(c, c + w));
-      const r = fitFrom(start, c, w, h);
-      const hole = w > 1 && locked === null
-        ? Array.from({ length: w }, (_, k) => r - bottomAbove(c + k, r)).reduce((a, b) => a + b, 0)
-        : 0;
-      // Frueher gewinnt; gleich frueh: die breite Kachel mit dem kleineren
-      // Loch darueber, sonst die linke (wie `dense`).
-      if (!place || r < place.r || (r === place.r && hole < place.hole)) place = { r, c, hole };
+      spots.push({ r: fitFrom(start, c, w, h), c });
       if (locked !== null) break;
+    }
+    let place = spots[0];
+    if (w > 1 && locked === null) {
+      // Fast gleich frueh: das kleinste Loch darueber, dann frueher, dann links.
+      const earliest = Math.min(...spots.map((s) => s.r));
+      for (const s of spots) {
+        s.hole = s.r > earliest + slack ? Infinity
+          : Array.from({ length: w }, (_, k) => s.r - bottomAbove(s.c + k, s.r)).reduce((a, b) => a + b, 0);
+      }
+      place = spots.reduce((best, s) => (s.hole < best.hole || (s.hole === best.hole && s.r < best.r) ? s : best));
+    } else {
+      // Wie `dense`: frueher gewinnt, gleich frueh die linke.
+      place = spots.reduce((best, s) => (s.r < best.r ? s : best));
     }
     for (let a = place.r; a < place.r + h; a += 1) for (let b = place.c; b < place.c + w; b += 1) row(a)[b] = item.id;
     for (let b = 0; b < cols; b += 1) while (cells[firstFree[b]]?.[b]) firstFree[b] += 1;
@@ -376,26 +392,32 @@ export function wideTileColumns(items, columns) {
 }
 
 /**
- * Leere Zellen, unter denen in derselben Spalte noch eine Kachel steht - ein
- * Loch MITTEN in der Flaeche. Was unter der letzten Kachel einer Spalte frei
- * bleibt, ist kein Loch: dort endet die Spalte ruhig (DW-P1-3, U1 b).
+ * Toter Platz im Raster, in Zellen: jede leere Zelle, unter der in derselben
+ * Spalte noch eine Kachel steht (ein Loch MITTEN in der Flaeche), UND das
+ * freie Ende einer Spalte bis zur Unterkante des Rasters, sobald es laenger
+ * ist als `slack` Spuren (F9).
  *
- * Seit die Hoehe aus dem Inhalt kommt, enden die Spalten verschieden tief; die
- * alte Regel ("leer vor der letzten Zeile") hielt jedes kuerzere Spaltenende
- * fuer ein Loch und liess es von der Kachel darueber auffuellen - genau die
- * gestreckte Leere, die U1 abgeschafft hat. Fuer das alte Raster aus ganzen
- * Zeilen ist das Ergebnis dasselbe, solange die letzte Zeile die einzige ist,
- * die auslaeuft.
+ * U1 b zaehlte das Spaltenende nie mit - ein kuerzeres Spaltenende sollte
+ * ruhig auslaufen duerfen, statt die Kachel darueber zu strecken. Gemessen
+ * meldete die Funktion so "0 Loecher", waehrend im Demo-Haushalt bei 1440px
+ * eine ganze Spalte unter der Familie 536px leer stand, neben drei Kacheln.
+ * Eine leere Spalte neben einer vollen ist ein Loch, wo auch immer sie endet;
+ * nur ein ausgefranster Rand bis zu einem Kachelabstand ist keins.
+ * `slack: Infinity` zaehlt nur das Loch mitten in der Flaeche (der
+ * Lueckenhinweis, `suggestGridHoleFill`, schlaegt nur dafuer etwas vor).
  */
-export function gridHoleCount(cells) {
+export function gridHoleCount(cells, { slack = GRID_END_SLACK } = {}) {
   let holes = 0;
   const width = cells[0]?.length ?? 0;
   for (let c = 0; c < width; c += 1) {
     let below = false;
+    let end = 0;
     for (let r = cells.length - 1; r >= 0; r -= 1) {
       if (cells[r][c]) below = true;
       else if (below) holes += 1;
+      else end += 1;
     }
+    if (end > slack) holes += end;
   }
   return holes;
 }
@@ -412,7 +434,8 @@ export function gridHoleCount(cells) {
  */
 export function suggestGridHoleFill(items, columns, candidatesFor) {
   const base = packGrid(items, columns);
-  if (!gridHoleCount(base)) return null;
+  const enclosed = (cells) => gridHoleCount(cells, { slack: Infinity });
+  if (!enclosed(base)) return null;
   // Zuerst die NACHBARN des Lochs - die Kachel darueber kann nach unten, die
   // links daneben nach rechts wachsen -, dann der Rest. Ein Vorschlag, der eine
   // Kachel am anderen Ende des Rasters umbaut, schliesst das Loch zwar auch,
@@ -440,7 +463,7 @@ export function suggestGridHoleFill(items, columns, candidatesFor) {
   for (const { i, cand } of tries) {
     const next = items.map((it, j) => (j === i ? { ...it, ...cand } : it));
     const cells = packGrid(next, columns);
-    if (gridHoleCount(cells) === 0 && cells.length <= base.length) {
+    if (enclosed(cells) === 0 && cells.length <= base.length) {
       return { id: items[i].id, size: cand.size };
     }
   }
@@ -476,12 +499,18 @@ export function suggestGridHoleFill(items, columns, candidatesFor) {
  * DER LETZTE AUSWEG (`holes: true`): bleibt nach dem Wachsen nach unten ein
  * Loch, das keine Kachel darueber erreicht - es liegt unter einem Teil einer
  * breiten Kachel, gemessen 1024px neben "Belohnungen" (246px, darunter die
- * Notizen) -, waechst die Kachel LINKS daneben hinein, auch ohne Mehrinhalt.
- * Eine schmale Kachel nur in Zellen, unter denen noch eine Kachel steht (ein
- * Spaltenende neben ihr ist kein Loch); eine breite auch in den Rest ihrer
- * Zeile, wenn die Spalte daneben dort endet - drei breite Kacheln in drei
- * Spalten liessen sonst eine ganze Spalte leer. Ein Loch im Raster liest als
- * kaputt, eine breitere Karte nicht.
+ * Notizen) -, waechst eine Kachel daneben hinein, auch ohne Mehrinhalt. Das
+ * gilt seit F9 auch fuer ein Spaltenende: eine leere Spalte neben vollen ist
+ * ein Loch (`gridHoleCount`), schmal wie breit - drei breite Kacheln in drei
+ * Spalten liessen sonst eine ganze Spalte leer, und im Demo-Haushalt stand
+ * Spalte 1 bei 1440px unter der Familie 536px leer. Ein Loch im Raster liest
+ * als kaputt, eine breitere Karte nicht.
+ *
+ * AUCH NACH LINKS (F9, `left: true`, nur `fillGridSpans` im letzten Ausweg):
+ * liegt das Loch LINKS neben einer Kachel (im Kinderkonto bei 1440px unter den
+ * Belohnungen, rechts daneben Wetter und Notizen), waechst sie dorthin; ihre
+ * Startspalte setzen `fillGridSpans`/`applyRowFill` dann fest. Nur nach rechts
+ * blieb dort 588px leer.
  *
  * @param {{ id: string, cols: number, rows: number, wide?: boolean }[]} items in Rangfolge
  * @param {number} columns Spaltenzahl des Rasters
@@ -489,36 +518,39 @@ export function suggestGridHoleFill(items, columns, candidatesFor) {
  * @returns {Map<string, number>} Id -> neue Spaltenbreite, nur fuer Kacheln, die wachsen
  */
 export function rowFillSpans(items, columns, { holes = false } = {}) {
+  return new Map([...acrossFill(items, columns, { holes })].map(([id, span]) => [id, span.cols]));
+}
+
+/** Das Wachsen in die Breite, nach rechts und (`left`) nach links:
+ *  Id -> { col, cols } (neue Startspalte, neue Breite). */
+function acrossFill(items, columns, { holes = false, left = false } = {}) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   const grown = new Map();
   if (cols < 2) return grown;
   const cells = packGrid(items, cols);
-  const enclosed = (r, c) => {
-    for (let below = r + 1; below < cells.length; below += 1) if (cells[below][c]) return true;
-    return false;
-  };
   for (const item of items) {
     if (!holes && item.wide !== true) continue;
     // Die Stelle der Kachel: ihre erste Zelle in Lesereihenfolge.
     let top = -1;
-    let left = -1;
+    let start = -1;
     for (let r = 0; r < cells.length && top < 0; r += 1) {
       const c = cells[r].indexOf(item.id);
-      if (c >= 0) { top = r; left = c; }
+      if (c >= 0) { top = r; start = c; }
     }
     if (top < 0) continue;
     const w = Math.min(Math.max(1, item.cols | 0), cols);
     const h = Math.max(1, item.rows | 0);
-    let end = left + w;
+    let first = start;
+    let end = start + w;
+    // Frei in ALLEN Zeilen der Kachel - mehr fragt das Wachsen in die Breite nicht.
     const columnFree = (c) => {
       for (let r = top; r < top + h; r += 1) if (!cells[r] || cells[r][c]) return false;
-      return !holes || w >= 2 || enclosed(top + h - 1, c);
+      return true;
     };
-    while (end < cols && columnFree(end)) {
-      for (let r = top; r < top + h; r += 1) cells[r][end] = item.id;
-      end += 1;
-    }
-    if (end > left + w) grown.set(item.id, end - left);
+    const take = (c) => { for (let r = top; r < top + h; r += 1) cells[r][c] = item.id; };
+    while (end < cols && columnFree(end)) { take(end); end += 1; }
+    while (left && first > 0 && columnFree(first - 1)) { first -= 1; take(first); }
+    if (end - first > w) grown.set(item.id, { col: first, cols: end - first });
   }
   return grown;
 }
@@ -550,7 +582,7 @@ export function rowFillSpans(items, columns, { holes = false } = {}) {
  * @param {number} columns
  * @returns {Map<string, number>} Id -> neue Zeilenzahl, nur fuer Kacheln, die wachsen
  */
-export function columnFillSpans(items, columns) {
+export function columnFillSpans(items, columns, { ends = null } = {}) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   const grown = new Map();
   if (cols < 2) return grown;
@@ -573,9 +605,13 @@ export function columnFillSpans(items, columns) {
     };
     while (end < cells.length && rowFree(end)) end += 1;
     // NUR EIN ECHTES LOCH (U1 b): darunter steht noch eine Kachel. Laeuft die
-    // freie Strecke bis ans Ende des Rasters, endet die Spalte dort ruhig -
-    // wer sie fuellte, setzte Hoehe ohne Inhalt in die Kachel.
-    if (end >= cells.length || end === own) continue;
+    // freie Strecke bis ans Ende des Rasters, endet die Spalte dort - ruhig,
+    // solange es ein ausgefranster Rand ist. Erst als letzter Ausweg
+    // (`ends`, F9) waechst die letzte Kachel einer Spalte, deren freies Ende
+    // laenger ist als `ends` Spuren, bis an die Unterkante: eine leere Spalte
+    // neben vollen liest als kaputt, eine hoehere Karte nicht.
+    if (end === own) continue;
+    if (end >= cells.length && (ends === null || end - own <= ends)) continue;
     for (let r = own; r < end; r += 1) for (let c = left; c < left + w; c += 1) cells[r][c] = item.id;
     grown.set(item.id, end - top);
   }
@@ -583,39 +619,64 @@ export function columnFillSpans(items, columns) {
 }
 
 /**
- * DAS GANZE FUELLEN IN EINER RECHNUNG (U1 b) - fuer `applyRowFill` und die
- * Tests dieselbe. Nach der dichten Packung (`packGrid`, breite Kacheln mit
- * fester Spalte, `wideTileColumns`):
+ * DAS GANZE FUELLEN IN EINER RECHNUNG (U1 b, F9) - fuer `applyRowFill` und
+ * die Tests dieselbe. Nach der dichten Packung (`packGrid`, breite Kacheln
+ * mit fester Spalte, `wideTileColumns`):
  *   1. das Wetter waechst in den Platz daneben (`rowFillSpans`, `wide`) und
  *      zeigt dort mehr Tage;
  *   2. ein Loch unter einer Kachel fuellt die Kachel darueber
  *      (`columnFillSpans`);
- *   3. was dann noch Loch ist, nimmt die Kachel links daneben in die Breite
- *      (`rowFillSpans`, `holes`), danach noch einmal 2. - hoechstens drei
- *      Runden, solange sich etwas tut.
+ *   3. was dann noch Loch ist, nimmt eine Kachel daneben in die Breite -
+ *      erst nach rechts, dann nach links (`holes`, `left`) -, danach noch
+ *      einmal 2.; hoechstens drei Runden, solange sich etwas tut;
+ *   4. ein Spaltenende, das laenger ist als `slack` Spuren, nimmt die letzte
+ *      Kachel der Spalte (`columnFillSpans`, `ends`).
+ * Bleibt danach ein Loch, das ohne Schritt 1 nicht bliebe, gilt die Rechnung
+ * ohne ihn.
  * Jede Kachel bleibt dabei, wo sie steht (gewachsen wird nur in Zellen, die
- * nach der vollen Packung leer sind); gespeichert wird nichts.
+ * nach der vollen Packung leer sind); wer in die Breite waechst, bekommt seine
+ * Startspalte fest (`col`), damit CSS sie nicht anders setzt. Gespeichert wird
+ * nichts.
  *
  * @param {{ id: string, cols: number, rows: number, wide?: boolean, grow?: boolean }[]} items in Rangfolge
  * @param {number} columns
+ * @param {{ slack?: number }} [options]
  * @returns {{ id: string, cols: number, rows: number, col?: number }[]} je Kachel die gezeichnete Spanne
  */
-export function fillGridSpans(items, columns) {
+export function fillGridSpans(items, columns, { slack = GRID_END_SLACK } = {}) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   if (cols < 2) return items.map((item) => ({ ...item }));
   const locks = wideTileColumns(items, cols);
-  let spans = items.map((item) => (locks.has(item.id) ? { ...item, col: locks.get(item.id) } : { ...item }));
-  const widen = (grown) => { spans = spans.map((item) => ({ ...item, cols: grown.get(item.id) ?? item.cols })); };
+  const start = items.map((item) => (locks.has(item.id) ? { ...item, col: locks.get(item.id) } : { ...item }));
+  const filled = fillFrom(start, cols, slack, true);
+  // Nimmt das Wetter mit seinen Tagen eine Zelle, ohne die ein Loch darunter
+  // nicht mehr zu schliessen ist (gemessen mit allen Kacheln bei vier
+  // Spalten: 100px unter dem Wetter, darunter die Schnellzugriffe), bleibt es
+  // so breit, wie es gewaehlt ist - ein Loch wiegt schwerer als ein Tag mehr.
+  if (!gridHoleCount(packGrid(filled, cols), { slack })) return filled;
+  const narrow = fillFrom(start, cols, slack, false);
+  return gridHoleCount(packGrid(narrow, cols), { slack }) < gridHoleCount(packGrid(filled, cols), { slack }) ? narrow : filled;
+}
+
+function fillFrom(start, cols, slack, wideFirst) {
+  let spans = start;
+  const widen = (grown) => {
+    spans = spans.map((item) => {
+      const span = grown.get(item.id);
+      return span ? { ...item, cols: span.cols, col: span.col } : item;
+    });
+  };
   const deepen = (grown) => { spans = spans.map((item) => ({ ...item, rows: grown.get(item.id) ?? item.rows })); };
-  widen(rowFillSpans(spans, cols));
+  if (wideFirst) widen(acrossFill(spans, cols));
   deepen(columnFillSpans(spans, cols));
   for (let round = 0; round < 3; round += 1) {
-    const across = rowFillSpans(spans, cols, { holes: true });
+    const across = acrossFill(spans, cols, { holes: true, left: true });
     widen(across);
     const down = columnFillSpans(spans, cols);
     deepen(down);
     if (!across.size && !down.size) break;
   }
+  deepen(columnFillSpans(spans, cols, { ends: slack }));
   return spans;
 }
 

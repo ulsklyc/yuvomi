@@ -9280,7 +9280,10 @@ const FILL_WIDE_WIDGETS = new Set(['weather']);
  *   - rechts neben dem Wetter waechst das Wetter hinein (`rowFillSpans`,
  *     nur `wide`) und zeigt dort mehr Tage;
  *   - ein Loch, unter dem noch eine Kachel steht, fuellt die Kachel darueber
- *     (`columnFillSpans`) - ein Spaltenende ist kein Loch und bleibt frei.
+ *     (`columnFillSpans`);
+ *   - ein Spaltenende, laenger als ein Kachelabstand, ist auch ein Loch (F9):
+ *     eine Kachel daneben waechst in die Breite, sonst die letzte der Spalte
+ *     in die Hoehe. Ein kuerzeres laeuft ruhig aus.
  * Beides ist Darstellung (`data-row-fill`/`data-col-fill`), gespeichert bleibt
  * die gewaehlte Groesse.
  *
@@ -9337,8 +9340,6 @@ function applyRowFill(grid, { editing = false, columns: knownColumns = null } = 
     if ('rowFill' in el.dataset) {
       delete el.dataset.rowFill;
       el.style.removeProperty('--widget-fill-span');
-      el.style.removeProperty('--tile-ghost-cols');
-      delete el.dataset.ghostInline;
     }
     if ('colFill' in el.dataset) {
       delete el.dataset.colFill;
@@ -9352,7 +9353,8 @@ function applyRowFill(grid, { editing = false, columns: knownColumns = null } = 
   // Packen und Fuellen: eine reine Rechnung (fillGridSpans, utils/dashboard-widgets.js).
   const items = read0;
   const spans = fillGridSpans(items, columns);
-  // Die Spalte breiter Kacheln steht fest: gleich frueh, weniger Loch (packGrid).
+  // Die Spalte breiter und gewachsener Kacheln steht fest: gleich frueh,
+  // weniger Loch (packGrid), und wer nach links waechst, beginnt dort (F9).
   spans.forEach((item, i) => {
     if (item.col === undefined) return;
     items[i].el.dataset.colLock = '';
@@ -9364,11 +9366,8 @@ function applyRowFill(grid, { editing = false, columns: knownColumns = null } = 
     if (item.cols !== own.cols) {
       item.el.dataset.rowFill = '';
       item.el.style.setProperty('--widget-fill-span', String(item.cols));
-      // Nur die Breite aus Schritt 3 ist Platz ohne Inhalt - das Wetter zeigt darin Tage.
-      if (editing && !own.wide) {
-        item.el.dataset.ghostInline = '';
-        item.el.style.setProperty('--tile-ghost-cols', `${item.cols - own.cols} / ${item.cols}`);
-      }
+      // Kein Geist fuer Breite (F9): der Inhalt laeuft ueber die ganze Breite,
+      // ein Schlitz am Rand laege ueber ihm.
     }
     if (item.rows !== own.rows) {
       item.el.dataset.colFill = '';

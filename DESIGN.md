@@ -2704,21 +2704,29 @@ Kacheln traegt der Rahmen (Aussenabstand unten, `--tile-gap-rows` Spuren). Vorhe
 Kachel so viele 132px-Zeilen, wie ihre Groesse sagte, und eine Zeile war so hoch wie ihre hoechste
 Kachel: gemessen mit allen Kacheln 19 % (1440px) bzw. 27 % (1920px) der Kachelflaeche leer.
 
-**Das Raster hat im Normalmodus kein Loch - und keine Kachel Hoehe ohne Inhalt.** Gepackt wird
-dicht wie bisher (`packGrid`), mit EINER Abweichung: passt eine breite Kachel an zwei Stellen gleich
-frueh, nimmt sie die mit dem kleineren Loch darueber und behaelt diese Spalte (`--tile-col`). Was
-danach frei ist (`fillGridSpans`): rechts neben dem Wetter waechst das Wetter hinein und zeigt mehr
-Tage - keine andere Kachel wird breiter, nur weil Platz ist (DW-P2-6); ein Loch, unter dem noch eine
-Kachel steht, fuellt die Kachel darueber; was dann noch Loch ist, die Kachel links daneben. Das Ende
-einer Spalte ist kein Loch: Spalten enden verschieden tief. Alles ist Darstellung
-(`data-row-fill`/`data-col-fill`), gespeichert bleibt die gewaehlte Groesse. Gemessen nachher (Seed,
-Kind, alle Kacheln; 768-1920px): 0 Loecher, Hoehe ohne Inhalt 1-9 % statt 9-29 % der Kachelflaeche
-(`test:dashboard`, "U1 b").
+**Das Raster hat im Normalmodus kein Loch und keine leere Spalte - und keine Kachel Hoehe ohne
+Inhalt, die kein Loch schliesst.** Gepackt wird dicht wie bisher (`packGrid`), mit EINER Abweichung:
+passt eine breite Kachel an mehreren Stellen fast gleich frueh (hoechstens ein Kachelabstand,
+`GRID_END_SLACK`, 20px), nimmt sie die mit dem kleinsten Loch darueber und behaelt diese Spalte
+(`--tile-col`). Was danach frei ist (`fillGridSpans`): rechts neben dem Wetter waechst zuerst das
+Wetter hinein und zeigt mehr Tage - keine Kachel wird breiter, nur weil Platz ist (DW-P2-6); ein
+Loch, unter dem noch eine Kachel steht, fuellt die Kachel darueber; was dann noch Loch ist, eine
+Kachel daneben in die Breite, nach rechts oder links. Ein Spaltenende bis zu einem Kachelabstand
+laeuft ruhig aus; ein laengeres ist ein Loch (F9): eine leere Spalte neben vollen liest als kaputt.
+Es nimmt eine Kachel daneben in die Breite, sonst die letzte Kachel der Spalte in die Hoehe. Alles
+ist Darstellung (`data-row-fill`/`data-col-fill`/`data-col-lock`), gespeichert bleibt die gewaehlte
+Groesse. Der Befund dazu (F9, p9): das Wetter setzte sich 8px frueher in Spalte 2-3, Kennzahlen
+und Notizen folgten, und Spalte 1 stand im Demo-Haushalt bei 1440px unter der Familie 536px leer,
+im Kinderkonto 588px; die alte Loch-Zaehlung sah das Spaltenende nicht. Gemessen nachher (Seed,
+Kind, alle Kacheln; 768-1920px, hell und dunkel): 0 Loecher, kein Spaltenende ueber 8px, das
+Wetter bei drei Spalten ueber die ganze Breite (`test:dashboard`, "U1 b", "F9").
 
 **Anpassen zeigt das Raster, das danach steht** (DW-P2-9). Der Rahmen hat im Anpassen-Modus genau
 die Flaeche seiner Daten (`contain: size`), die Leiste schwebt mit dem Namen der Kachel ueber deren
-Kopf, die Kante des Rasters liegt ausserhalb (outline statt Polster). Was eine Kachel nur zum Fuellen
-bekommt, steht dort als gestrichelter Schlitz (Geist, dieselbe Form wie der Platz beim Ziehen).
+Kopf, die Kante des Rasters liegt ausserhalb (outline statt Polster). Die Hoehe, die eine Kachel nur
+zum Fuellen bekommt, steht dort als gestrichelter Schlitz unter dem Inhalt (Geist, dieselbe Form wie
+der Platz beim Ziehen). Fuer Breite gibt es keinen Geist: eine verbreiterte Kachel laesst ihren
+Inhalt ueber die ganze Breite laufen, ein Schlitz an ihrem Rand laege ueber Zeilen und Kennzahlen.
 Gemessen: Kachelrahmen im Anpassen-Modus = Normalmodus +-1px. Eine Geste packt und fuellt neu, ohne
 die Seite neu zu bauen; ein stiller Abgleich, der die Spanne einer Kachel aendert, laesst die Kacheln
 gleiten (FLIP, `--ease-out`; unter reduzierter Bewegung blenden sie).

@@ -1031,10 +1031,11 @@ repository or in the app, curated or not, is.
 
 **From tablet width up, every tile on the overview takes the height of what it shows: the rows
 its data gives, at most as many as its chosen size allows, plus its header and padding; an empty
-tile is one line. The grid packs densely in fine tracks, and only a real hole - empty space with a
-tile below it - is closed by a neighbour; the end of a column is not a hole** (DW-P1-3, critique of
-the overview widgets 2026-10-26, decided by Ulas on 2026-10-26 as option b, written down
-2026-10-27; this revises R10 L9 and R21 D5).
+tile is one line. The grid packs densely in fine tracks, and only a hole is closed by a
+neighbour: empty space with a tile below it, or the end of a column that stops more than one tile
+gap short of the others** (DW-P1-3, critique of the overview widgets 2026-10-26, decided by Ulas on
+2026-10-26 as option b, written down 2026-10-27; this revises R10 L9 and R21 D5; the column end
+added after F9 on 2026-10-27).
 
 The grid had been closed against holes twice before: R10 L9 let a tile grow into the rest of its
 row, R21 D5 into the cell below it ("no hole - right, then down"). Both stretched a tile to the size
@@ -1056,17 +1057,26 @@ it before the data arrives.
   `TILE_PARTS` for tiles that are not lists) and writes `data-span-rows`; `dashboard.css` turns
   `--tile-rows` into the span. A row in a tile has one fixed height from tablet width up, so its
   title stays on one line there.
-- `fillGridSpans`: dense packing with one deviation (a wide tile that fits in two places equally
-  early takes the one with the smaller hole above it, `packGrid`, and keeps that column), then the
-  weather grows into free width, a hole is filled from above, and what is still a hole from the
-  left. Customize shows the same grid, the filled space as a dashed slot.
-- `npm run test:dashboard` ("U1 b") holds the equivalence with the data rows, the measurements
-  against `dashboard.css`, no hole in the demo household at two, three and four columns, and that
-  filling never moves a tile.
+- `fillGridSpans`: dense packing with one deviation (a wide tile that fits in several places
+  almost equally early - at most one tile gap, `GRID_END_SLACK` - takes the one with the smallest
+  hole above it, `packGrid`, and keeps that column), then the weather grows into free width, a hole
+  is filled from above, what is still a hole by a neighbour growing sideways (right or left), and a
+  column end longer than one tile gap by its last tile growing down. Customize shows the same grid,
+  filled height as a dashed slot; filled width has no slot, because the content runs across it.
+- Why the column end counts (F9, found 2026-10-27 in the first build): with only "a tile below it"
+  as a hole, the weather took a place 8px earlier in columns 2-3, every later wide tile followed it,
+  and column 1 stood empty for 536px beside three tiles in the demo household at 1440px (588px for
+  a child). The hole count reported zero. `gridHoleCount` now counts a column end beyond one tile
+  gap.
+- `npm run test:dashboard` ("U1 b", "F9") holds the equivalence with the data rows, the measurements
+  against `dashboard.css`, no hole and no empty column end in the demo household at two, three and
+  four columns, fewer than 5 % of 3000 random grids with a hole, and that filling never moves a
+  tile.
 
 ### What counts as undoing it
 
-A tile that gets height its content does not have in the normal grid - stretching rows to their
-tallest tile, a fixed height per size, filling the end of a column. A tile whose height is measured
+A tile that gets height its content does not have in the normal grid when no hole needs it -
+stretching rows to their tallest tile, a fixed height per size, filling a column end that stops
+within one tile gap of the others. A column left empty beside full ones. A tile whose height is measured
 after drawing instead of taken from its data. And a tile on the overview that does not report its
 height.
