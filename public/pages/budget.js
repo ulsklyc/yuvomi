@@ -4112,7 +4112,8 @@ function renderLoanCard(loan) {
 function renderTrend(current, prev, prevLabel) {
   // Auf die Waehrung gerundet (Critique R19, roundToCurrency): die feste
   // Schwelle 0,005 kannte nur Waehrungen mit zwei Nachkommastellen.
-  const delta = roundToCurrency(current - prev, state.currency);
+  // Der Vergleich steht in derselben Waehrung wie die Karte darueber (#2302).
+  const delta = roundToCurrency(current - prev, viewCurrency());
   if (delta === 0) {
     return trendMarkup({
       delta: 0, text: esc(t('budget.trendNeutral', { month: prevLabel })), icon: false,
@@ -4121,7 +4122,7 @@ function renderTrend(current, prev, prevLabel) {
   // Rolle `flow`: eine Veränderung gegenüber dem Vormonat trägt immer ein
   // Vorzeichen, aus demselben Zahlformat wie die Buchungen selbst. Den Pfeil
   // setzt utils/metric-card.js; ohne `betterWhen` bleibt die Farbe neutral.
-  const deltaText = amountByRole(delta, 'flow').text;
+  const deltaText = amountByRole(delta, 'flow', { currency: viewCurrency() }).text;
   return trendMarkup({
     delta,
     text: esc(t('budget.trendDelta', { amount: deltaText, month: prevLabel })),
@@ -6375,7 +6376,7 @@ export const __test = {
   // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.
   bindEntryAccountCurrency,
   // #2302: im Kontofilter steht die Uebersicht in der Waehrung des Kontos.
-  viewCurrency, transferSummaryHtml, entryRows,
+  viewCurrency, transferSummaryHtml, entryRows, renderTrend,
   monthNavHtml,
   // #1775: das Datum eines neuen Eintrags folgt dem gezeigten Zeitraum.
   newEntryDefaultDate,

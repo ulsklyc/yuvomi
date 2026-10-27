@@ -189,3 +189,9 @@ test('Filter: jede Karte der Bilanz rechnet in der Waehrung der Uebersicht', asy
   assert.ok(calls.length >= 5, `Bilanzbetraege gefunden: ${calls.length}`);
   for (const call of calls) assert.match(call, /currency: viewCurrency\(\)/, call);
 });
+
+test('Filter: die Vergleichszeile unter einer Karte steht in derselben Waehrung', () => {
+  const trend = withState({ accountFilterId: 3 }, () => budgetUi.renderTrend(1100, 1000, 'Mai'));
+  assert.ok(trend.includes(currencySymbol('USD')), trend);
+  assert.ok(!trend.includes(currencySymbol('EUR')));
+});
