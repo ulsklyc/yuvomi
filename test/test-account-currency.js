@@ -280,3 +280,18 @@ test('Rate: ein unveraenderter Betrag bleibt bei geaendertem Kurs-Cache dieselbe
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(db.prepare('SELECT amount FROM budget_loan_payments WHERE budget_entry_id = ?').get(entryId).amount, 100);
 });
+
+test('Projektion: eine auf ein Euro-Konto gestellte Zahlung verschiebt die Folgezahlungen des USD-Kontos nicht', async () => {
+  const usd = await account('Chase', 'USD');
+  const giro = await account('Giro', null);
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('USD', 'EUR', 1.1, '2026-10-27T00:00:00Z')`).run();
+  const created = await sub({ account_id: usd, next_payment_date: '2030-01-15' });
+  const moved = await call('PUT', `/${created.budget_entry_id}`, { account_id: giro, amount: -30 });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  const { entries } = expectedSubscriptionEntries(db, {
+    from: '2030-02-01', to: '2030-02-28', accountId: usd, today: '2030-01-10',
+  });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].amount, -33, 'USD 33 wie die Vorgabe, nicht die 30 EUR der umgestellten Zahlung');
+});

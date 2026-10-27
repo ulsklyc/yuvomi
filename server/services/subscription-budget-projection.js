@@ -42,6 +42,7 @@
 import { addBillingCycle, convertAmount, parseDateKey, BILLING_CYCLES, END_TYPES } from './subscriptions.js';
 import { dateKey } from '../utils/interval-date.js';
 import { todayKey } from '../utils/timezone.js';
+import { cachedRate } from './subscription-rates.js';
 
 /** Kategorie jeder Abo-Buchung im Budget (Migration v104, syncBudgetExpense). */
 export const SUBSCRIPTION_BUDGET_CATEGORY = 'subscriptions';
@@ -311,6 +312,7 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
            b.owner_id, b.visibility, b.amount AS booked_amount,
            CASE WHEN acc.archived = 0 THEN sub.account_id END AS account_id,
            CASE WHEN acc.archived = 0 THEN acc.currency END AS account_currency,
+           b.account_id AS booked_account_id, bacc.currency AS booked_account_currency,
            COALESCE(c.budget_subcategory_key, '') AS subcategory,
            u.display_name AS creator_name
     FROM budget_subscriptions sub
@@ -318,6 +320,7 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
     LEFT JOIN subscription_categories c ON c.id = sub.category_id
     LEFT JOIN users u ON u.id = sub.created_by
     LEFT JOIN budget_accounts acc ON acc.id = sub.account_id
+    LEFT JOIN budget_accounts bacc ON bacc.id = b.account_id
     WHERE sub.enabled = 1 AND sub.completed_at IS NULL AND sub.next_payment_date < ?${f.clause}
       ${accountId != null ? 'AND sub.account_id = ? AND acc.archived = 0' : ''}
   `).all(to, ...f.params, ...(accountId != null ? [accountId] : []));
@@ -341,7 +344,19 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
     // Die Buchung steht in der Waehrung ihres Kontos (#2302), ohne Konto in
     // der Budget-Waehrung - dieselbe Regel wie bookingCurrency im Schreibpfad.
     const target = subscription.account_currency || currency;
-    const source = subscription.currency === target ? subscription.amount : subscription.booked_amount;
+    // Die gebuchte Zeile kann fuer diese eine Zahlung auf einem anderen Konto
+    // stehen (#1277) und damit in einer anderen Waehrung (Codex zu #2302): ihr
+    // Betrag gilt nur, wenn sie in der Waehrung der Vorgabe steht. Sonst
+    // rechnet der Kurs-Cache um, und ohne Kurs gibt es keine Zahl.
+    const bookedCurrency = subscription.booked_account_id != null
+      ? (subscription.booked_account_currency || currency) : currency;
+    let source;
+    if (subscription.currency === target) source = subscription.amount;
+    else if (bookedCurrency === target) source = subscription.booked_amount;
+    else {
+      const rate = cachedRate(subscription.currency, target);
+      source = rate == null ? null : Math.round(Number(subscription.amount) * rate * 100) / 100;
+    }
     if (source == null || !Number.isFinite(Number(source))) continue;
     const amount = -Math.abs(Number(source));
     const title = subscriptionBudgetTitle(subscription, target);
