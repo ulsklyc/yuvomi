@@ -34,6 +34,7 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { inspectObjectAt } from '../utils/own-uid.js';
+import { isAccountWideRefusal } from '../utils/caldav-client.js';
 
 const log = createLogger('CalDAV-Upload-Notes');
 
@@ -234,10 +235,21 @@ function attemptById(id) {
  *        der UID des Uploads liegt: `false` lässt Objekt und Notiz stehen (der
  *        Aufrufer hat selbst entschieden, was mit der Notiz geschieht). Wirft
  *        sie, wird nichts entfernt und die Notiz bleibt.
+ * @param {object} [p.stop]  Stoppsignal des Durchgangs (`createRefusalStop`,
+ *        #2135): was es sperrt, wird weder gelesen noch gelöscht, und eine
+ *        kontoweite Absage beim Lesen oder Löschen löst es aus
  * @param {string} p.label  für das Log
  * @returns {Promise<number>} entfernte Objekte
+ *
+ * EINE VORÜBERGEHENDE ABSAGE LÄSST DIE NOTIZ AUCH NACH DER FRIST STEHEN
+ * (#2135): 401, 429, 5xx oder das Netz (`isAccountWideRefusal` ohne 403) sagen
+ * nichts darüber, ob das Objekt bleiben muss - fiele die Notiz, verdeckte der
+ * Abruf es nicht mehr (`isUnbookedOwnUpload`), und der Rest käme als Eintrag
+ * herein. Ein 403 zählt dagegen wie eine Absage am Objekt: eine nur lesbare
+ * Collection wird durch Warten nicht beschreibbar, und genau für diesen Fall
+ * gibt es die Frist (dieselbe Linie wie bei den Mitnahmen, #2137).
  */
-export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, beforeRemove = null, label }) {
+export async function removeLeftoverUploads(client, { source, accountId = null, kinds, stateOf, inScope = null, keepWhileRefused = null, beforeRemove = null, stop = null, label }) {
   let attempts;
   try {
     attempts = uploadAttemptsOf({ source, accountId, kinds });
@@ -251,11 +263,14 @@ export async function removeLeftoverUploads(client, { source, accountId = null, 
     if (first === 'waiting') continue;
     if (first === 'mirrored') { dropUploadAttempt(listed.id); continue; }
     if (inScope && !inScope(listed.collection_url)) continue;
+    // Das Konto (oder diese Collection) hat in diesem Durchgang schon abgelehnt.
+    if (stop?.blocks(listed.collection_url)) continue;
 
     let found;
     try {
       found = await inspectObjectAt(client, listed.collection_url, listed.object_url, listed.uid);
     } catch (err) {
+      if (stop && isAccountWideRefusal(err)) stop.trip(err, listed.collection_url);
       log.warn(`[${label}] Could not read ${listed.object_url} (${err.message}); the leftover of an unconfirmed upload stays noted.`);
       continue;
     }
@@ -290,12 +305,17 @@ export async function removeLeftoverUploads(client, { source, accountId = null, 
       if (!allowed || !still || stateOf(still) !== 'leftover') continue;
     }
 
+    // Nach den awaits davor: eine andere Phase kann das Konto gesperrt haben.
+    if (stop?.blocks(attempt.collection_url)) continue;
+
     try {
       await client.deleteCalendarObject({ calendarObject: { url: attempt.object_url, etag: found.own.etag } });
     } catch (err) {
       const status = err?.status;
       if (status !== 404 && status !== 410) {
-        if (isExpired(attempt, Date.now()) && !(keepWhileRefused && keepWhileRefused(attempt))) {
+        if (stop && isAccountWideRefusal(err)) stop.trip(err, attempt.collection_url);
+        const passing = isAccountWideRefusal(err) && status !== 403;
+        if (!passing && isExpired(attempt, Date.now()) && !(keepWhileRefused && keepWhileRefused(attempt))) {
           log.error(`[${label}] Giving up on removing ${attempt.uid}, the leftover of an unconfirmed upload: ${err.message}`);
           dropUploadAttempt(attempt.id);
         } else {

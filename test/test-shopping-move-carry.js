@@ -975,7 +975,10 @@ test('Hin und gleich zurueck, das Entfernen am alten Platz steht noch aus: am En
 
 test('Zurueck, solange der Server am neuen Platz nichts entfernen laesst: das Objekt dort wird mit dem heutigen Stand ueberschrieben, nicht blind uebernommen', async () => {
   const { a, b, item } = await mirroredItem();
-  dav.refuse({ method: 'DELETE', status: 503 });
+  // Eine Absage am Objekt (423, gesperrt), keine kontoweite: nach einem 503
+  // schickte der Sofortversuch des Zurueckziehens gar nichts mehr an das
+  // Konto (#2135), und der Fall waere nicht nachgestellt.
+  dav.refuse({ method: 'DELETE', status: 423 });
   await patch(item.id, { list_id: b.listId });
   // Eine andere App aendert den Artikel an seinem neuen Platz; der Abruf holt es herein.
   dav.putObject(b.url, FILE, original({ summary: 'Milch 1,5%' }));

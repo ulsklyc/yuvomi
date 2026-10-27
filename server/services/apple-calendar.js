@@ -615,18 +615,20 @@ async function runSync({ makeClient } = {}) {
   // zum Objekt für Bestandstermine erst aus dessen Abruf bekannt wird; der
   // Inbound überspringt dafür alles, was hier noch aussteht.
   // --------------------------------------------------------
+  // Ein Stoppsignal für jede schreibende Phase (#1863, #2135): Aufräumen,
+  // Löschen, Ändern und Uploads. Nach der ersten kontoweiten Absage geht in
+  // diesem Lauf nichts mehr an das Konto.
+  const stop = outbound.createRefusalStop();
   try {
     // Die Reste nie bestätigter Uploads entfernen (#1882).
     await outbound.releaseLeftoverUploads(client, {
-      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls,
+      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls, stop,
     });
     // iCloud kennt keine Auswahl, also keinen abgewählten Kalender. Was es
     // gibt, ist der Kalender, den die Auflistung nicht mehr nennt: sein
     // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
     // nicht leer befunden.
     outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
-    // Ein Stoppsignal für Löschen und Ändern (#1863).
-    const stop = outbound.createRefusalStop();
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls, { stop });
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl, { stop });
@@ -650,7 +652,7 @@ async function runSync({ makeClient } = {}) {
   // Lehnt der Kalender ab (nur lesbar, Konto voll), träfe jeder weitere Termin
   // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
   // Zeile mit der Anzahl statt einer je Termin.
-  const uploadGate = createUploadGate();
+  const uploadGate = createUploadGate(stop);
   for (const listed of localEvents) {
     if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
     // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und jeder

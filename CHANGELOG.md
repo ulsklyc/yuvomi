@@ -182,6 +182,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A CalDAV or iCloud server that says "too many requests" or "unavailable" gets a rest for the
+  rest of the run** (#2135). Since #2133 a sync stopped sending deletions and changes to an
+  account after such an answer, but the same run still cleaned up leftovers of unconfirmed uploads
+  and uploaded new events, tasks and shopping items to it. Now nothing more goes to that account
+  until the next run, in the full sync and in the attempt right after an edit; a calendar or list
+  that is only read-only for you still holds up nothing else. A leftover past its one-day grace is
+  no longer given up on such an answer either, so it cannot come back as an entry.
 - **An occurrence cancelled in a subscribed or synced calendar stays cancelled after a clock
   change** (#2000). For a series with its own time zone, an occurrence the provider cancelled or
   moved could stay visible once its UTC day and its local day fell apart: a New York series at

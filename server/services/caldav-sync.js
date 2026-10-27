@@ -1557,6 +1557,11 @@ async function runSync({ createClient } = {}) {
         }
       }
 
+      // Ein Stoppsignal für jede schreibende Phase dieses Kontos (#1863,
+      // #2135): Aufräumen, Löschen, Ändern und Uploads. Nach der ersten
+      // kontoweiten Absage geht in diesem Lauf nichts mehr an das Konto.
+      const stop = outbound.createRefusalStop();
+
       // Ausgehende Löschungen und Änderungen (#593). Nach dem Inbound, weil der
       // Weg zum Objekt für Bestandstermine erst aus dessen Abruf bekannt wird;
       // der Inbound überspringt dafür alles, was hier noch aussteht.
@@ -1566,10 +1571,8 @@ async function runSync({ createClient } = {}) {
         // Die Reste nie bestätigter Uploads entfernen (#1882), in den
         // Kalendern, die dieser Lauf abgerufen hat.
         await outbound.releaseLeftoverUploads(client, {
-          source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls,
+          source: 'caldav', accountId: account.id, calendarUrls: ownCalendarUrls, stop,
         });
-        // Ein Stoppsignal für Löschen und Ändern dieses Kontos (#1863).
-        const stop = outbound.createRefusalStop();
         await processPendingDeletions(client, 'caldav', objectIndex, ownCalendarUrls, {
           accountId: account.id, complete: fetchedEveryCalendar, outcome: deletions,
           isSelected: selectionOf(account.id), stop,
@@ -1590,7 +1593,7 @@ async function runSync({ createClient } = {}) {
       // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
       const householdZone = householdTimeZone(db.get());
 
-      const uploadGate = createUploadGate();
+      const uploadGate = createUploadGate(stop);
       const readOnlyWaiting = new Map();
       for (const listed of localEvents) {
         // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und

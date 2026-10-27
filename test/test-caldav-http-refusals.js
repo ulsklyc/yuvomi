@@ -47,6 +47,7 @@ const {
 } = await import('../server/utils/caldav-client.js');
 const {
   classifyOutboundError, outboundFailureAction, davFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion, queueEventDeletion,
+  eventUidFor,
 } = await import('../server/services/calendar-outbound.js');
 const todoOutbound   = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync  = await import('../server/services/caldav-reminders-sync.js');
@@ -68,7 +69,7 @@ function reset() {
     'calendar_pending_deletions', 'calendar_events', 'external_calendars',
     'caldav_calendar_selection', 'caldav_todo_pending_deletions', 'tasks',
     'shopping_items', 'shopping_lists', 'caldav_reminder_selection', 'caldav_accounts',
-    'carddav_addressbook_selection', 'carddav_accounts',
+    'carddav_addressbook_selection', 'carddav_accounts', 'caldav_upload_attempts',
   ]) db.prepare(`DELETE FROM ${table}`).run();
   appleCalendar.clearCredentials();
   dav.reset();
@@ -1900,6 +1901,189 @@ test('Stoppsignal: ein 403 sperrt nur seinen Kalender, ein anderer Kalender dess
   assert.equal(event(id).outbound_dirty, 0, 'der 403 eines anderen Kalenders hielt die Änderung auf');
   assert.deepEqual(eventTombstones().map((t) => [t.event_external_id, t.attempts]), [['ro-1@test', 0], ['ro-2@test', 0]]);
 });
+
+// Stoppsignal über ALLE Phasen eines Durchgangs (#2135): das Signal galt nur
+// Löschen und Ändern. Das Aufräumen alter Upload-Reste davor und die Uploads
+// danach fragten es nicht und schickten demselben Konto, das gerade "429"
+// oder "503" gesagt hatte, je Phase wieder etwas. Gezählt werden ALLE
+// Anfragen nach der ersten kontoweiten Absage, nicht nur die schreibenden.
+
+/** Anfragen, die nach der ersten Absage mit diesem Status noch ankamen. */
+function requestsAfterFirst(status) {
+  const first = dav.requests.findIndex((r) => r.status === status);
+  assert.ok(first >= 0, `der Server hat nichts mit ${status} beantwortet - der Fall ist nicht nachgestellt`);
+  return dav.requests.slice(first + 1).map((r) => `${r.method} ${r.path}`);
+}
+
+/** Der Rest eines nie bestätigten Uploads: Objekt auf dem Server, Notiz hier, Zeile fort. */
+function leftoverUpload({ source = 'caldav', kind, uid, rowId, collectionUrl, data, expired = false }) {
+  const { url } = dav.putObject(collectionUrl, `${uid}.ics`, data);
+  db.prepare(`
+    INSERT INTO caldav_upload_attempts (source, account_id, kind, row_id, collection_url, uid, object_url, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(source, source === 'caldav' ? accountId : null, kind, rowId, collectionUrl, uid, url,
+    expired ? '2020-01-01T00:00:00Z' : new Date().toISOString());
+  return { uid, url };
+}
+
+const leftoverEvent = (cal, rowId = 9001, opts = {}) => {
+  const uid = eventUidFor(rowId);
+  return leftoverUpload({ kind: 'event', uid, rowId, collectionUrl: cal.url, data: vevent(uid, 'Rest'), ...opts });
+};
+const leftoverTask = (listUrl, rowId = 9002) => {
+  const uid = todoOutbound.todoUidFor('tasks', rowId);
+  return leftoverUpload({ kind: 'task', uid, rowId, collectionUrl: listUrl, data: vtodo(uid, 'Rest') });
+};
+const uploadNotes = () => db.prepare('SELECT * FROM caldav_upload_attempts').all();
+
+test('Stoppsignal über alle Phasen, Termine im Sync-Lauf: Rest, Löschen und Uploads - nach dem 429 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const cal = calendar();
+  leftoverEvent(cal);
+  pendingEventDeletion(cal);
+  const ids = [localEvent(cal.url, 'Eins'), localEvent(cal.url, 'Zwei')];
+
+  refuseWrites({ status: 429 });
+  await caldavSync.sync();
+  assert.deepEqual(requestsAfterFirst(429), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+  assert.deepEqual(eventTombstones().map((t) => t.attempts), [0]);
+  for (const id of ids) assert.equal(event(id).external_source, 'local');
+
+  // Der nächste Lauf fängt neu an: alles geht hinaus.
+  dav.allowAll();
+  await caldavSync.sync();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(eventTombstones().length, 0);
+  for (const id of ids) assert.equal(event(id).external_source, 'caldav');
+});
+
+test('Stoppsignal über alle Phasen, iCloud: Rest, Löschen und Uploads - nach dem 503 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const url = dav.addCollection('icloud', { name: 'iCloud' });
+  dav.putObject(url, 'neighbour.ics', vevent('apple-neighbour@test', 'Nachbar'));
+  appleCalendar.saveCredentials(dav.url, 'u', 'p');
+  try {
+    leftoverUpload({ source: 'apple', kind: 'event', uid: eventUidFor(9001), rowId: 9001, collectionUrl: url, data: vevent(eventUidFor(9001), 'Rest') });
+    const gone = dav.putObject(url, 'gone.ics', vevent('apple-gone@test', 'Gelöscht'));
+    queueDeletion({ source: 'apple', calendarExternalId: url, eventExternalId: 'apple-gone@test', objectUrl: gone.url });
+    for (const title of ['Eins', 'Zwei']) {
+      db.prepare(`
+        INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, created_by, external_source)
+        VALUES (?, '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local')
+      `).run(title);
+    }
+
+    refuseWrites({ status: 503 });
+    await appleCalendar.sync();
+    assert.deepEqual(requestsAfterFirst(503), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+    assert.equal(writesSent(), 1);
+    assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+    assert.equal(eventTombstones().length, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE external_source = 'local'").get().n, 2);
+  } finally {
+    appleCalendar.clearCredentials();
+  }
+});
+
+/** Aufgaben- und Einkaufsliste mit allem, was ein Durchgang schreiben kann. */
+function todoWorkInEveryPhase() {
+  const list = taskList();
+  const { listId } = shoppingList();
+  leftoverTask(list);
+  pendingTaskDeletion(list);
+  const tasks = [localTask(list, 'Eins'), localTask(list, 'Zwei')];
+  db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, 'Milch');
+  return { list, tasks };
+}
+
+test('Stoppsignal über alle Phasen, Erinnerungen im Sync-Lauf: Löschen, Rest und Uploads - nach dem 429 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const { tasks } = todoWorkInEveryPhase();
+
+  refuseWrites({ status: 429 });
+  await remindersSync.sync();
+  assert.deepEqual(requestsAfterFirst(429), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+  assert.deepEqual(todoTombstones().map((t) => t.attempts), [0]);
+  for (const id of tasks) assert.equal(task(id).external_source, 'local');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local'").get().n, 1);
+
+  dav.allowAll();
+  await remindersSync.sync();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(todoTombstones().length, 0);
+  for (const id of tasks) assert.equal(task(id).external_source, 'caldav');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local'").get().n, 0);
+});
+
+test('Stoppsignal über alle Phasen, Erinnerungen im Sofortversuch: nach dem ersten 503 keine Anfrage mehr, auch kein Abruf (#2135)', async () => {
+  reset();
+  const { tasks } = todoWorkInEveryPhase();
+
+  refuseWrites({ status: 503 });
+  await todoOutbound.flushOutbound();
+  assert.deepEqual(requestsAfterFirst(503), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1);
+  assert.deepEqual(todoTombstones().map((t) => t.attempts), [0]);
+  for (const id of tasks) assert.equal(task(id).external_source, 'local');
+
+  dav.allowAll();
+  await todoOutbound.flushOutbound();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(todoTombstones().length, 0);
+  for (const id of tasks) assert.equal(task(id).external_source, 'caldav');
+});
+
+test('Stoppsignal über alle Phasen: ein 403 auf einer Liste lässt die Uploads in eine andere Liste desselben Kontos hinaus (#2135)', async () => {
+  reset();
+  const shared = taskList();
+  const own = dav.addCollection('own', { name: 'Eigen', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Eigen', 'tasks', 1)
+  `).run(accountId, own);
+  pendingTaskDeletion(shared);
+  const id = localTask(own, 'Eigen');
+
+  const onShared = (req) => req.path.startsWith(new URL(shared).pathname);
+  dav.refuse({ method: 'DELETE', status: 403, when: onShared });
+  dav.refuse({ method: 'PUT', status: 403, when: onShared });
+  for (const run of [() => todoOutbound.flushOutbound(), () => remindersSync.sync()]) {
+    await run();
+    assert.equal(task(id).external_source, 'caldav', 'der 403 einer anderen Liste hielt den Upload auf');
+  }
+  assert.equal(todoTombstones().length, 1);
+});
+
+for (const status of [429, 503]) {
+  test(`Rest eines Uploads nach der Frist, DELETE ${status}: die Notiz bleibt, das Objekt kommt nicht als Termin herein (#2135)`, async () => {
+    reset();
+    const cal = calendar();
+    const { uid } = leftoverEvent(cal, 9001, { expired: true });
+
+    dav.allowAll();
+    dav.refuse({ method: 'DELETE', status });
+    await caldavSync.sync();
+    assertRefused('DELETE', status);
+    assert.equal(uploadNotes().length, 1, 'eine kontoweite Absage hat die Notiz nach der Frist fallen lassen');
+
+    // Der Lauf danach: die Notiz verdeckt das Objekt weiter.
+    await caldavSync.sync();
+    assert.equal(
+      db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = ?').get(uid).n, 0,
+      'der Rest kam als Termin herein'
+    );
+
+    dav.allowAll();
+    await caldavSync.sync();
+    assert.equal(uploadNotes().length, 0);
+    assert.equal(dav.getObject(cal.url, `${uid}.ics`), null);
+  });
+}
 
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────
 
