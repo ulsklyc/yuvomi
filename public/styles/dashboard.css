@@ -298,6 +298,36 @@
   color: var(--color-text-primary);
 }
 
+/* AB 768px HAT DIE REIHE EINE HOEHE (U15, Ulas 2026-10-27; Review p11). Dort
+ * ist jede Kachel so hoch, wie ihr Modell sagt (`contentSpanRows`), und die
+ * Kennzahlreihe rechnet eine Kachelzeile von 119px je Reihe. Zwei Dinge
+ * hielten sich nicht daran:
+ *   - die Spaltenzahl kam aus der Breite (`auto-fit` oben): eine 684px breite
+ *     Reihe (1320px-Fenster, drei Rasterspalten) stand in drei Spalten und
+ *     zwei Kachelreihen, 308 statt 120px;
+ *   - bei vier Kacheln (156-190px) brachen "Gemeinsame Ausgaben" und
+ *     "Du schuldest Alex Johnson · +1" um, jede Kachel 150 statt 119px.
+ * Im Anpassen-Modus (`contain: size`) war beides abgeschnitten, ausserhalb
+ * zogen die Spuren die Nachbarn mit. Jetzt kommt die Spaltenzahl aus
+ * derselben Rechnung wie die Hoehe (`--metric-cols`, renderMetricTiles), und
+ * Modulname und Notiz stehen in EINER Zeile - dieselbe Regel wie fuer die
+ * Kachelzeilen (U13): die Kachel ist eine Vorschau, das Siegel nennt das
+ * Modul, der Tipp fuehrt hin, und der Link traegt den vollen Text als Namen.
+ * Die Zahl selbst verkleinert weiter `fitMetricLeads()`. Unter 768px rechnet
+ * niemand Spuren: dort bleibt die Spaltenzahl der Breite, und Texte brechen. */
+@media (min-width: 768px) {
+  .metric-tiles {
+    grid-template-columns: repeat(var(--metric-cols), minmax(0, 1fr));
+  }
+
+  .metric-tiles .metric-card__label,
+  .metric-tiles .metric-card__note {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* DIE KENNZAHLREIHE IST SO HOCH WIE IHRE KACHELN (DW-P2-7, U1 b). Hier stand
  * ein Zeilenminimum (`--dashboard-row-min`, 132px), damit die Reihe genau eine
  * Rasterzeile fuellte statt 21px darunter zu enden. Seit die Kacheln so hoch

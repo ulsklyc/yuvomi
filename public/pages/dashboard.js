@@ -3323,9 +3323,16 @@ function selectMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
 function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set(), size = '2x1') {
   const tiles = selectMetricTiles(data, currency, shown, sheetSpeaks);
   if (!tiles.length) return '';
-  // Keine Karte, kein Kopf: vier Kacheln je Reihe breit, zwei schmal (U1 b).
+  /* Keine Karte, kein Kopf: vier Kacheln je Reihe breit, zwei schmal (U1 b).
+   * SPALTEN UND HOEHE AUS EINER REGEL (U15, Review p11): das Stylesheet legte
+   * Spalten nach Breite an (auto-fit, 160px) - eine 684px breite Reihe stand
+   * in drei Spalten und zwei Kachelreihen, 308 statt 120px, im Anpassen-Modus
+   * abgeschnitten. Jetzt bekommt es die Spaltenzahl von hier (`--metric-cols`,
+   * dashboard.css ab 768px), und Name und Notiz stehen dort in einer Zeile:
+   * die Kachel ist 119px hoch, wie breit sie auch ist. */
+  const metricColumns = (s) => Math.min(tiles.length, tileColumns(s) >= 2 ? 4 : 2);
   const span = tileSpanAttrs((s) => {
-    const rows = Math.ceil(tiles.length / (tileColumns(s) >= 2 ? 4 : 2));
+    const rows = Math.ceil(tiles.length / metricColumns(s));
     return { bare: true, body: rows * TILE_PARTS.metricCard + (rows - 1) * TILE_PARTS.metricGap };
   }, size);
   // Die Reihe war das einzige Widget ohne Ueberschrift: per H-Taste sprang man
@@ -3335,7 +3342,7 @@ function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
   // nur Kopfhoehe. Sie steht VOR der Reihe, nicht in ihr: `.metric-tiles` ist
   // selbst das Raster der Kacheln.
   return `<h3 class="sr-only">${esc(t('dashboard.metrics'))}</h3>
-    <div class="metric-tiles"${span}>${tiles.map(renderMetricTile).join('')}</div>`;
+    <div class="metric-tiles"${span} style="--metric-cols: ${metricColumns(size)}">${tiles.map(renderMetricTile).join('')}</div>`;
 }
 
 // --------------------------------------------------------

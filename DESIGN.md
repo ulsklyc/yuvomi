@@ -2700,7 +2700,14 @@ Browser dasselbe Raster, und Skelett und Layout-Hinweis kennen dieselbe Spanne. 
 hat eine Zeile ab 768px eine HOEHE (54px, Name und Metazeile je einzeilig; benannte Ausnahme der
 Titelregel R19) und die Kacheln ohne Zeilen eine Hoehe je Groesse und Datenlage (`TILE_PARTS`):
 Notizen schmal eine, breit drei Spalten mit genau zwei Vorschauzeilen, Schnellzugriffe drei bzw.
-sechs je Reihe, das Fasten schmal mit untereinander stehenden Knoepfen. Den Abstand zwischen zwei
+sechs je Reihe, das Fasten schmal mit untereinander stehenden Knoepfen. Dieselbe Ausnahme traegt
+die Kennzahlreihe (U15, Ulas 2026-10-27): ab 768px stehen Modulname und Notiz jeder Kachel in einer
+Zeile mit Ellipse (der Link nennt den vollen Text), und die Spaltenzahl kommt aus derselben Rechnung
+wie die Hoehe (`--metric-cols`: breit alle Kacheln in einer Reihe, schmal zwei) statt aus der
+Breite - vorher stand eine 684px breite Reihe in drei Spalten und zwei Kachelreihen (308 statt
+120px), und vier Kacheln brachen ihre Texte um (150 statt 119px), beides im Anpassen-Modus
+abgeschnitten. Die Zahl tritt weiter per `fitMetricLeads` zurueck, auch wenn sie nur ins Polster
+liefe; unter 768px bleibt `auto-fit`, und Texte brechen. Den Abstand zwischen zwei
 Kacheln traegt der Rahmen (Aussenabstand unten, `--tile-gap-rows` Spuren). Vorher belegte eine
 Kachel so viele 132px-Zeilen, wie ihre Groesse sagte, und eine Zeile war so hoch wie ihre hoechste
 Kachel: gemessen mit allen Kacheln 19 % (1440px) bzw. 27 % (1920px) der Kachelflaeche leer.

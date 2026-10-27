@@ -85,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   weather tile is the first to grow into free width, where it shows more days. A 1920px screen now
   has three wider columns instead of four narrow ones, so appointment details are no longer cut off.
   Titles in the tiles' rows stay on one line from tablet width up; the full title is one tap away.
+  The same goes for the module name and the note under each key figure: up to four figures share
+  one row at any width, instead of wrapping into a second row that Customize cut off.
 - **A tile stretched to close a gap shows more of its list.** When a list tile on the overview gets
   extra height to close a gap beside taller neighbours, it fills it with entries it already has
   but did not show at its size - more tasks, appointments, birthdays, countdowns, expiring food,
@@ -177,6 +179,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A key figure no longer runs to the edge of its card.** A figure that only ran into the card's
+  padding kept its full size - on an overview tile it stood 3px from the edge; it now steps down a
+  size like one that overflows the card, on the overview and in the modules alike.
 - **"New - Task" on the Overview opens the new-task form again.** The "+ New" button on a computer
   and the quick-action button on a phone switched to Tasks and stopped there, because they still
   looked for the add button under the name it had before the add buttons were unified. Event, Note

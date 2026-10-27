@@ -831,6 +831,60 @@ test('Budget 1x2 gestreckt: die Hoehe, die sie zum Fuellen bekommt, zeigt zuerst
   assert.equal(m.shown, m.loaded, `Gestreckt zeigt die Kachel ${m.shown} von ${m.loaded} geladenen Kategorien`);
 });
 
+/* U15 (Review p11): DIE KENNZAHLREIHE IST SO HOCH, WIE IHR MODELL SAGT. Vier
+ * Kennzahlen neben einer schmalen Kachel. Vorher (gemessen): bei 1330px stand
+ * die 684-697px breite Reihe in drei Spalten und zwei Kachelreihen (308 statt
+ * 120px), und von 768 bis 1440px brachen "Gemeinsame Ausgaben" und die Notiz
+ * um (150 statt 119px) - im Anpassen-Modus fehlte die Notizzeile bzw. die
+ * zweite Kachelreihe. */
+const METRICS_FOUR = [
+  { id: 'metrics', size: '2x1' },
+  { id: 'calendar', size: '1x1' },
+];
+
+async function metricRow(page) {
+  return page.evaluate(() => {
+    const wrapper = document.querySelector('#dashboard-widget-grid > .widget-wrapper[data-widget-id="metrics"]');
+    const row = wrapper?.querySelector(':scope > .metric-tiles');
+    if (!row) return null;
+    const box = wrapper.getBoundingClientRect();
+    const cards = [...row.querySelectorAll(':scope > .metric-card')].map((c) => c.getBoundingClientRect());
+    const notes = [...row.querySelectorAll('.metric-card__note')].map((n) => n.getBoundingClientRect());
+    return {
+      cards: cards.length,
+      width: Math.round(row.getBoundingClientRect().width),
+      cardRows: new Set(cards.map((r) => Math.round(r.top))).size,
+      height: Math.round(box.height),
+      modelled: Number(wrapper.dataset.spanRows) * 4,
+      // Was unter der Unterkante des Rahmens liegt, ist abgeschnitten (Anpassen) oder schiebt Spuren (Normal).
+      below: Math.round(Math.max(...cards.map((r) => r.bottom), ...notes.map((r) => r.bottom)) - box.bottom),
+    };
+  });
+}
+
+for (const width of [768, 1024, 1330, 1440]) {
+  test(`Kennzahlreihe ${width}px: vier Kennzahlen stehen in einer Reihe und in der Hoehe ihres Modells, auch im Anpassen-Modus (U15)`, async () => {
+    const page = await openPage(harness, { device: 'desktop' });
+    await page.setViewport({ width, height: 900, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
+    await saveLayout(page, METRICS_FOUR);
+    await gotoRoute(page, '/');
+    await freeze(page);
+    const view = await metricRow(page);
+    await enterEditMode(page);
+    const edit = await metricRow(page);
+    await page.close();
+    assert.ok(view && view.cards === 4, `Reichweite: ${view?.cards} Kennzahlen statt vier`);
+    if (width === 1330) assert.ok(view.width < 700, `Reichweite: die Reihe ist ${view.width}px breit - der Fall "drei Spalten" braucht unter 700`);
+    for (const [mode, m] of [['Ansicht', view], ['Anpassen', edit]]) {
+      assert.equal(m.cardRows, 1, `${mode}: ${m.cardRows} Kachelreihen`);
+      // Nie hoeher als das Modell; kuerzer hoechstens um die eine Stufe, die
+      // fitMetricLeads einer zu breiten Zahl nimmt (Title 1 -> 2, 34 -> 27px).
+      assert.ok(m.height <= m.modelled + 1 && m.height >= m.modelled - 8, `${mode}: Rahmen ${m.height}px, Modell ${m.modelled}px`);
+      assert.ok(m.below <= 1, `${mode}: ${m.below}px der Kacheln liegen unter dem Rahmen`);
+    }
+  });
+}
+
 test('Raster: ohne Loch schweigt der Hinweis', async () => {
   const page = await openGridPage();
   await saveLayout(page, REORDERED);

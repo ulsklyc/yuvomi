@@ -5764,6 +5764,84 @@ test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe 
 });
 
 // --------------------------------------------------------
+// U15 (Review p11, Ulas 2026-10-27): DIE KENNZAHLREIHE HAT EINE REGEL FUER
+// SPALTEN UND HOEHE. Das Modell rechnete vier Kacheln je Reihe breit und zwei
+// schmal, das Stylesheet legte Spalten nach Breite an (auto-fit, 160px): eine
+// 684px breite Reihe (1320px-Fenster, drei Rasterspalten) stand in drei
+// Spalten und zwei Kachelreihen, 308 statt 120px. Und bei vier Kacheln brachen
+// Modulname und Notiz um (150 statt 119px) - im Anpassen-Modus abgeschnitten.
+// Jetzt sagt die Reihe dem Stylesheet ihre Spaltenzahl (`--metric-cols`, aus
+// derselben Funktion wie die Hoehe), und Name und Notiz stehen ab 768px in
+// einer Zeile (wie U13 fuer Kachelzeilen).
+// --------------------------------------------------------
+test('U15: Kennzahlreihe - Spalten und Hoehe aus einer Regel, Name und Notiz ab 768px einzeilig', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const data = {
+    birthdays: [{ days_until: 3, name: 'Anna', kind: 'birthday' }],
+    pinnedNotes: [{ id: 1, pinned: 1 }], pinnedNotesCount: 1,
+    health: { hasMeds: true, dosesTotal: 3, dosesTaken: 1, nextDose: null },
+    rewards: { view: 'approver', pending: 2, standings: [] },
+  };
+  const variants = [
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount'],
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount', 'health'],
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount', 'health', 'rewards'],
+  ];
+  const card = Math.ceil(119 / widgets.TILE_GEOMETRY.unit);
+  for (const keys of variants) {
+    const subset = Object.fromEntries(keys.map((key) => [key, data[key]]));
+    const keep = keys.filter((key) => key !== 'pinnedNotesCount');
+    for (const size of ['1x1', '1x2', '2x1', '2x2']) {
+      const html = __test.renderMetricTiles(subset, 'EUR', new Set(), new Set(), size);
+      const n = (html.match(/class="metric-card metric-card--tile/g) ?? []).length;
+      nodeAssert.equal(n, keep.length, `Reichweite: ${keep.length} Kacheln (${size})`);
+      const cols = Number(/class="metric-tiles"[^>]*style="--metric-cols: (\d+)"/.exec(html)?.[1]);
+      const expected = Math.min(n, Number(size[0]) >= 2 ? 4 : 2);
+      nodeAssert.equal(cols, expected, `${size}, ${n} Kacheln: das Stylesheet bekommt die Spaltenzahl des Modells`);
+      const rows = Math.ceil(n / cols);
+      const span = Number(/class="metric-tiles"[^>]*data-span-rows="(\d+)"/.exec(html)?.[1]);
+      nodeAssert.equal(span, Math.ceil((rows * 119 + (rows - 1) * 20) / widgets.TILE_GEOMETRY.unit),
+        `${size}, ${n} Kacheln: die Hoehe sind genau ${rows} Kachelreihen`);
+      if (rows === 1) nodeAssert.equal(span, card);
+    }
+  }
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const wide = [...eachRule(css)].filter((rule) => rule.at.some((a) => /min-width:\s*768px/.test(a)));
+  const columns = wide.find((rule) => rule.selector.trim() === '.metric-tiles');
+  nodeAssert.match(columns?.body ?? '', /grid-template-columns:\s*repeat\(var\(--metric-cols\),\s*minmax\(0,\s*1fr\)\)/,
+    'ab 768px stehen so viele Spalten, wie das Modell rechnet - nicht so viele, wie die Breite hergibt');
+  for (const part of ['.metric-card__label', '.metric-card__note']) {
+    const rule = wide.find((r) => r.selector.split(',').map((s) => s.trim()).includes(`.metric-tiles ${part}`));
+    nodeAssert.ok(rule && /white-space:\s*nowrap/.test(rule.body) && /text-overflow:\s*ellipsis/.test(rule.body) && /overflow:\s*hidden/.test(rule.body),
+      `${part}: ab 768px einzeilig mit Ellipse`);
+  }
+  // Unter 768px rechnet niemand Spuren: dort bleibt auto-fit, und Texte brechen.
+  const base = [...eachRule(css)].find((rule) => !rule.at.length && rule.selector.trim() === '.metric-tiles');
+  nodeAssert.match(base.body, /repeat\(auto-fit,\s*minmax\(160px,\s*1fr\)\)/, 'mobil bleibt die Spaltenzahl der Breite');
+  // Die Zahl passt weiter per fitMetricLeads - auch wenn sie nur ins Polster
+  // der Kachel laeuft (gemessen "-196,14 €" 10px vor der Kante in 158px): die
+  // Karte selbst laeuft dann nicht ueber, die Box der Zahl schon.
+  const { fitMetricLeads } = await import('../public/utils/metric-card.js');
+  const savedObserver = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+  let callback = null;
+  globalThis.ResizeObserver = class { constructor(cb) { callback = cb; } observe() {} unobserve() {} };
+  try {
+    const value = {
+      attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
+      closest: () => box, clientWidth: 124,
+      get scrollWidth() { return [130, 118, 110][Number(this.attrs['data-fit'] ?? 0)]; },
+    };
+    const box = { isConnected: true, clientWidth: 156, scrollWidth: 156, querySelector: () => value };
+    fitMetricLeads({ querySelectorAll: () => [value] });
+    callback([{ target: box }]);
+    nodeAssert.equal(value.attrs['data-fit'], '1', 'eine Zahl, die ins Polster laeuft, tritt eine Stufe zurueck');
+  } finally {
+    if (savedObserver) Object.defineProperty(globalThis, 'ResizeObserver', savedObserver); else delete globalThis.ResizeObserver;
+  }
+});
+
+// --------------------------------------------------------
 // Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
 // `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
 // aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf
