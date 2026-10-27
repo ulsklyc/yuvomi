@@ -3748,7 +3748,8 @@
         "banner": "Hors ligne - reconnexion…",
         "staleData": "Hors ligne - état : {{time}}",
         "pageTitle": "Tu es hors ligne",
-        "pageDescription": "Cette page a besoin d’une connexion. Dès que ton appareil est de nouveau en ligne, elle se charge toute seule."
+        "pageDescription": "Cette page a besoin d’une connexion. Dès que ton appareil est de nouveau en ligne, elle se charge toute seule.",
+        "snapshot": "Pas de connexion au serveur - données enregistrées, lecture seule"
     },
     "emptyHint": {
         "recipes": "Une recette va directement au plan de repas ou sur la liste de courses.",

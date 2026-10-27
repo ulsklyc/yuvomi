@@ -3748,7 +3748,8 @@
         "banner": "Offline - återansluter…",
         "staleData": "Offline - senast uppdaterad: {{time}}",
         "pageTitle": "Du är offline",
-        "pageDescription": "Den här sidan behöver en anslutning. Så fort enheten är online igen laddas den av sig själv."
+        "pageDescription": "Den här sidan behöver en anslutning. Så fort enheten är online igen laddas den av sig själv.",
+        "snapshot": "Ingen anslutning till servern - sparade data, endast läsning"
     },
     "emptyHint": {
         "recipes": "Ett recept går direkt till måltidsplanen eller till inköpslistan.",

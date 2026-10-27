@@ -44,7 +44,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
   'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
-  'armScreensaver', 'showSessionUnreachable', 'forgetSessionState',
+  'armScreensaver', 'showSessionUnreachable', 'forgetSessionState', 'holdOfflineSession',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
   'syncWallMode', 'applyModuleAccentForRoute', 'updateThemeColorForRoute', 'updateBranding',
@@ -206,7 +206,7 @@ export function createNavigate(state, deps) {
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
     auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
-    armScreensaver, showSessionUnreachable, forgetSessionState,
+    armScreensaver, showSessionUnreachable, forgetSessionState, holdOfflineSession,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
     focusMainContentAfterNavigation, showToast, t,
@@ -456,13 +456,22 @@ export function createNavigate(state, deps) {
           // antwortet ihm mit seinem Konto.
           armScreensaver();
           await syncPreferencesOnce();
-          startThirdPartyModulePolling();
-          // currentUser kann während des await oben auf null gesetzt worden sein
-          // (auth:expired bei 401 von /preferences), daher Guard gegen null.
-          if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
-            loadReminderStyles();
-            initReminders();
-            initPush();
+          // KALTSTART OHNE VERBINDUNG (#2293). Der Service Worker antwortete mit
+          // dem Abzug der letzten Sitzung (sw.js API_SNAPSHOTS): die Seite zeigt
+          // den gespeicherten Stand, aber NIEMAND hat die Sitzung geprueft. Der
+          // Router sagt das an und prueft nach, sobald der Server antwortet;
+          // Erinnerungen, Push und Modulabfrage starten erst dann.
+          if (result?.offlineSnapshot === true) {
+            if (state.currentUser) holdOfflineSession();
+          } else {
+            startThirdPartyModulePolling();
+            // currentUser kann während des await oben auf null gesetzt worden sein
+            // (auth:expired bei 401 von /preferences), daher Guard gegen null.
+            if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
+              loadReminderStyles();
+              initReminders();
+              initPush();
+            }
           }
         } catch (err) {
           state.currentPath = null; // Reset damit navigate('/login') nicht geblockt wird

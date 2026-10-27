@@ -3968,7 +3968,8 @@
         "banner": "Offline - przywracanie połączenia…",
         "staleData": "Offline - stan z: {{time}}",
         "pageTitle": "Jesteś offline",
-        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama."
+        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama.",
+        "snapshot": "Brak połączenia z serwerem - zapisane dane, tylko do odczytu"
     },
     "emptyHint": {
         "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby oznaczyć jako ukończone, w prawo, aby wyświetlić.",

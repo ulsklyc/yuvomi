@@ -3748,7 +3748,8 @@
         "banner": "Offline - Verbindung wird wiederhergestellt…",
         "staleData": "Offline - Stand: {{time}}",
         "pageTitle": "Du bist offline",
-        "pageDescription": "Diese Seite braucht eine Verbindung. Sobald dein Gerät wieder online ist, lädt sie von selbst."
+        "pageDescription": "Diese Seite braucht eine Verbindung. Sobald dein Gerät wieder online ist, lädt sie von selbst.",
+        "snapshot": "Keine Verbindung zum Server - gespeicherter Stand, nur lesen"
     },
     "emptyHint": {
         "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Ansehen.",

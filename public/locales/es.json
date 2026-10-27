@@ -3748,7 +3748,8 @@
         "banner": "Sin conexión - reconectando…",
         "staleData": "Sin conexión: datos del {{time}}",
         "pageTitle": "Estás sin conexión",
-        "pageDescription": "Esta página necesita conexión. En cuanto tu dispositivo vuelva a estar en línea, se cargará sola."
+        "pageDescription": "Esta página necesita conexión. En cuanto tu dispositivo vuelva a estar en línea, se cargará sola.",
+        "snapshot": "Sin conexión con el servidor - datos guardados, solo lectura"
     },
     "emptyHint": {
         "recipes": "Una receta pasa directamente al plan de comidas o a la lista de la compra.",

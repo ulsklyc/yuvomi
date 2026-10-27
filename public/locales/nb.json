@@ -3748,7 +3748,8 @@
         "banner": "Uten nett - kobler til på nytt…",
         "staleData": "Uten nett - per: {{time}}",
         "pageTitle": "Du er frakoblet",
-        "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv."
+        "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv.",
+        "snapshot": "Ingen forbindelse til serveren - lagrede data, kun lesing"
     },
     "shortcuts": {
         "search": "Åpne søk",

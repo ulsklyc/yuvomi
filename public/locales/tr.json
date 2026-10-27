@@ -3748,7 +3748,8 @@
         "banner": "Çevrimdışı - yeniden bağlanılıyor…",
         "staleData": "Çevrimdışı - son güncelleme: {{time}}",
         "pageTitle": "Çevrimdışısın",
-        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir."
+        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir.",
+        "snapshot": "Sunucuya bağlantı yok - kayıtlı veriler, salt okunur"
     },
     "emptyHint": {
         "recipes": "Bir tarif doğrudan öğün planına ya da alışveriş listesine gider.",

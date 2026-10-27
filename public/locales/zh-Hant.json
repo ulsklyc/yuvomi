@@ -3748,7 +3748,8 @@
         "banner": "離線 - 正在重新連線…",
         "staleData": "離線 - 資料截至：{{time}}",
         "pageTitle": "你已離線",
-        "pageDescription": "此頁面需要網路連線。裝置恢復連線後會自動載入。"
+        "pageDescription": "此頁面需要網路連線。裝置恢復連線後會自動載入。",
+        "snapshot": "無法連線到伺服器 - 已儲存的資料，唯讀"
     },
     "emptyHint": {
         "recipes": "食譜可以直接進入用餐計劃或購物清單。",

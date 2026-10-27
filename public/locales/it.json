@@ -3748,7 +3748,8 @@
         "banner": "Offline - riconnessione in corso…",
         "staleData": "Offline - aggiornato al: {{time}}",
         "pageTitle": "Sei offline",
-        "pageDescription": "Questa pagina ha bisogno di una connessione. Appena il dispositivo torna online, si carica da sola."
+        "pageDescription": "Questa pagina ha bisogno di una connessione. Appena il dispositivo torna online, si carica da sola.",
+        "snapshot": "Nessuna connessione al server - dati salvati, sola lettura"
     },
     "emptyHint": {
         "recipes": "Una ricetta va direttamente nel piano dei pasti o nella lista della spesa.",

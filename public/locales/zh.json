@@ -3748,7 +3748,8 @@
         "banner": "离线 - 正在重新连接…",
         "staleData": "离线 - 数据截至：{{time}}",
         "pageTitle": "你已离线",
-        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。"
+        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。",
+        "snapshot": "无法连接到服务器 - 已保存的数据，只读"
     },
     "emptyHint": {
         "recipes": "食谱可以直接进入用餐计划或购物清单。",

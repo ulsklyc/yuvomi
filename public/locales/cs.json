@@ -3695,7 +3695,8 @@
         "banner": "Offline - obnovování připojení…",
         "staleData": "Offline - stav: {{time}}",
         "pageTitle": "Jsi offline",
-        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama."
+        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama.",
+        "snapshot": "Bez připojení k serveru - uložený stav, jen pro čtení"
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",

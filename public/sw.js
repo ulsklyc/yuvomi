@@ -13,6 +13,8 @@
  *        bei SW-Update geleert
  *   API: Network-First für eine Read-only-GET-Whitelist (Kalender, Tasks, …)
  *        → offline letzter Stand sichtbar; Mutationen/Auth immer direkt ans Netz.
+ *        Ausnahme: reduzierte Abzuege von /auth/me und /preferences fuer den
+ *        Kaltstart ohne Verbindung (API_SNAPSHOTS, #2293).
  *        Cache wird bei Logout/Session-Ende geleert (CLEAR_API_CACHE-Message).
  *
  * Nach SW-Update: alle Requests gehen einmalig cache-bypassed ans Netz
@@ -40,6 +42,68 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard', '/people'];
 // Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
 const API_CACHE_EXCLUDE = ['/shopping/versions'];
+
+// KALTSTART OHNE VERBINDUNG (#2293). Ohne Sitzung zeigt der Router keine
+// Seite, und `/auth/me` stand nie im Cache: eine geschlossene App, offline
+// geoeffnet, landete deshalb beim "Server nicht erreichbar" statt auf den
+// gespeicherten Listen. Zwei Antworten liegen deshalb als ABZUG im API-Cache,
+// genau gleich lang wie die Listen (ein Loeschpfad: Abmelden, Sitzungsende,
+// Update) und nur mit dem, was die Shell zum Zeichnen braucht:
+//   /auth/me      Konto ohne Kontaktdaten, Rechte, Haushalt - NIE das
+//                 CSRF-Token und keine Kopfzeile der Antwort (kein Set-Cookie).
+//                 Nur fuer normale Sitzungen: Wanddisplay und Split-Gast
+//                 behalten ihr Verhalten, ihr Abzug wird geloescht.
+//   /preferences  Modulreihenfolge, abgeschaltete Module, Zone und Formate.
+// Der Abzug traegt `offlineSnapshot: true`. Er wird nur bei einem Netzfehler
+// ausgeliefert (Network-First), und der Router liest daran, dass die Sitzung
+// NICHT geprueft ist. Eine 401 loescht ihn.
+const SESSION_SNAPSHOT_SCOPES = ['family'];
+const SESSION_SNAPSHOT_USER_FIELDS = [
+  'id', 'username', 'display_name', 'avatar_color', 'avatar_data', 'role', 'family_role',
+  'access_scope', 'onboarding_version', 'changelog_seen_version', 'changelog_seen_latest',
+  'sort_order', 'is_household_member',
+];
+const SESSION_SNAPSHOT_FIELDS = ['permissions', 'householdSize', 'initialsRoster', 'othersCanRead'];
+const PREFERENCES_SNAPSHOT_FIELDS = [
+  'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
+  'timezone', 'date_format', 'time_format', 'region', 'currency', 'app_name',
+];
+
+function pickFields(source, fields) {
+  const out = {};
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) out[field] = source[field];
+  }
+  return out;
+}
+
+function reduceSessionSnapshot(body) {
+  const user = body && typeof body.user === 'object' ? body.user : null;
+  if (!user || !SESSION_SNAPSHOT_SCOPES.includes(user.access_scope)) return null;
+  return {
+    user: pickFields(user, SESSION_SNAPSHOT_USER_FIELDS),
+    ...pickFields(body, SESSION_SNAPSHOT_FIELDS),
+    offlineSnapshot: true,
+  };
+}
+
+function reducePreferencesSnapshot(body) {
+  const data = body && typeof body.data === 'object' && body.data ? body.data : null;
+  if (!data) return null;
+  return { data: pickFields(data, PREFERENCES_SNAPSHOT_FIELDS), offlineSnapshot: true };
+}
+
+const API_SNAPSHOTS = {
+  '/auth/me': reduceSessionSnapshot,
+  '/preferences': reducePreferencesSnapshot,
+};
+
+/** Der Abzug-Reduzierer zu einem API-Pfad (exakter Pfad, keine Unterpfade), sonst null. */
+function apiSnapshotReducer(pathname) {
+  if (!pathname.startsWith('/api/v1/')) return null;
+  const rest = pathname.slice('/api/v1'.length);
+  return Object.prototype.hasOwnProperty.call(API_SNAPSHOTS, rest) ? API_SNAPSHOTS[rest] : null;
+}
 
 // App-Shell: sofort benötigt für ersten Render
 const APP_SHELL = [
@@ -216,6 +280,7 @@ const APP_SHELL = [
   '/utils/note-category-name.js',
   '/utils/note-category-overflow.js',
   '/utils/note-category-picker.js',
+  '/utils/offline-session.js',
   '/utils/overlay-history.js',
   '/utils/overlay-host.js',
   '/utils/dialog-surface.js',
@@ -557,13 +622,16 @@ self.addEventListener('fetch', (event) => {
   // API-Requests: nur GET-Whitelist read-only offline-cachen. Alles andere
   // (Mutationen, /auth/*, Nicht-Whitelist) unangetastet ans Netz durchreichen.
   if (url.pathname.startsWith('/api/')) {
-    if (request.method === 'GET' && isCacheableApiGet(url.pathname)) {
+    const snapshotReducer = request.method === 'GET' ? apiSnapshotReducer(url.pathname) : null;
+    if (request.method === 'GET' && (snapshotReducer || isCacheableApiGet(url.pathname))) {
       event.respondWith(
         (_bypassInitDone ? Promise.resolve() : _bypassInit).then(() => {
           // Im Bypass-Fenster (nach SW-Update) API-Requests nicht anfassen:
           // frisch ans Netz, weder aus Cache bedienen noch hineinschreiben.
           if (Date.now() < bypassCacheUntil) return fetch(request);
-          return networkFirstApi(request, event);
+          return snapshotReducer
+            ? networkFirstSnapshot(request, snapshotReducer)
+            : networkFirstApi(request, event);
         })
       );
     }
@@ -893,6 +961,43 @@ function isMutableAppResource(pathname) {
     || pathname === '/index.html'
     || pathname === '/manifest.json'
     || /\.(css|js|json|html)$/i.test(pathname);
+}
+
+// --------------------------------------------------------
+// Strategie: Network-First fuer die Abzuege (#2293, API_SNAPSHOTS oben)
+// Erfolg → nur der reduzierte Abzug in API_CACHE, die Netzantwort unveraendert
+//          an die Seite. Kein Abzug (Display, Split-Gast) oder 401 → Eintrag weg.
+// Netzfehler → Abzug, sonst 503-JSON {error:'offline'} wie networkFirstApi.
+// --------------------------------------------------------
+async function networkFirstSnapshot(request, reduce) {
+  let response;
+  try {
+    response = await fetch(request);
+  } catch {
+    const cached = await caches.open(API_CACHE).then((cache) => cache.match(request)).catch(() => null);
+    if (cached) return cached;
+    return new Response(JSON.stringify({ error: 'offline' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+  try {
+    const cache = await caches.open(API_CACHE);
+    if (response.ok && response.type === 'basic') {
+      const snapshot = reduce(await response.clone().json());
+      if (snapshot) {
+        await cache.put(request, new Response(JSON.stringify(snapshot), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'x-cached-at': String(Date.now()) },
+        }));
+      } else {
+        await cache.delete(request);
+      }
+    } else if (response.status === 401) {
+      await cache.delete(request);
+    }
+  } catch { /* Speicher voll oder kein JSON: die Antwort geht trotzdem raus */ }
+  return response;
 }
 
 // Prüft, ob ein API-Pfad (inkl. /api/v1-Prefix) zur Read-only-Offline-Whitelist

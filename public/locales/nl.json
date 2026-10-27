@@ -3748,7 +3748,8 @@
         "banner": "Offline - opnieuw verbinden…",
         "staleData": "Offline - stand: {{time}}",
         "pageTitle": "Je bent offline",
-        "pageDescription": "Deze pagina heeft een verbinding nodig. Zodra je apparaat weer online is, laadt ze vanzelf."
+        "pageDescription": "Deze pagina heeft een verbinding nodig. Zodra je apparaat weer online is, laadt ze vanzelf.",
+        "snapshot": "Geen verbinding met de server - opgeslagen gegevens, alleen-lezen"
     },
     "shortcuts": {
         "search": "Zoeken openen",

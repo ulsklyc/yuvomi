@@ -3748,7 +3748,8 @@
         "banner": "Ngoại tuyến - đang kết nối lại…",
         "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}",
         "pageTitle": "Bạn đang ngoại tuyến",
-        "pageDescription": "Trang này cần kết nối. Ngay khi thiết bị trực tuyến trở lại, trang sẽ tự tải."
+        "pageDescription": "Trang này cần kết nối. Ngay khi thiết bị trực tuyến trở lại, trang sẽ tự tải.",
+        "snapshot": "Không có kết nối tới máy chủ - dữ liệu đã lưu, chỉ đọc"
     },
     "shortcuts": {
         "search": "Mở tìm kiếm",

@@ -20,6 +20,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import { renderServiceWorkerSource } from '../server/utils/service-worker.js';
+import { createNavigateHarness, HARNESS_ROUTES } from './router-navigate-harness.js';
+import { createOfflineSession } from '../public/utils/offline-session.js';
 
 const TEST_BUILD_REVISION = 'sw-api-cache-test';
 const SRC = renderServiceWorkerSource(
@@ -83,6 +85,7 @@ class MockCache {
   constructor() { this.store = new Map(); }
   async put(req, res) { this.store.set(keyOf(req), res); }
   async match(req) { return this.store.get(keyOf(req)) || undefined; }
+  async delete(req) { return this.store.delete(keyOf(req)); }
   async addAll() { /* no-op für Tests */ }
 }
 
@@ -309,7 +312,9 @@ test('Mutationen werden nie gecacht und nicht angefasst', async () => {
 
 test('Nicht-Whitelist- und /auth/*-GETs werden durchgereicht', async () => {
   const env = loadSw();
-  for (const path of ['/auth/me', '/auth/users', '/budget', '/preferences', '/documents/meta/options']) {
+  // `/auth/me` und `/preferences` selbst gehen als Abzug in den Cache (#2293,
+  // eigene Tests unten), ihre Unterpfade nie.
+  for (const path of ['/auth/users', '/auth/me/sessions', '/auth/2fa', '/budget', '/preferences/countries', '/documents/meta/options']) {
     const req = new MockRequest(apiUrl(path), { method: 'GET' });
     const { responded } = dispatchFetch(env, req);
     assert.equal(responded, false, `${path} darf nicht gecacht werden`);
@@ -407,4 +412,243 @@ test('im Bypass-Fenster (nach SW-Update) wird die API nicht gecacht', async () =
   const cache = name ? await env.caches.open(name) : null;
   const cached = cache ? await cache.match(req) : undefined;
   assert.equal(cached, undefined, 'im Bypass-Fenster darf nichts gecacht werden');
+});
+
+// --------------------------------------------------------
+// Kaltstart ohne Verbindung (#2293): Abzuege von /auth/me und /preferences
+// --------------------------------------------------------
+const ME_BODY = {
+  user: {
+    id: 7, username: 'ana', display_name: 'Ana', avatar_color: '#123456', avatar_data: null,
+    role: 'member', family_role: 'parent', access_scope: 'family',
+    onboarding_version: 3, changelog_seen_version: '2.81.0', changelog_seen_latest: '2.81.0',
+    email: 'ana@example.test', phone: '+49 123', birth_date: '1990-01-01', created_at: '2026-01-01',
+  },
+  permissions: { tasks: 'write' },
+  householdSize: 3,
+  initialsRoster: [{ id: 7, name: 'Ana' }],
+  othersCanRead: { tasks: true },
+  gravatarAvailable: true,
+  gravatarHost: 'gravatar.example',
+  csrfToken: 'geheimes-csrf-token',
+};
+
+function meResponse(body = ME_BODY, status = 200) {
+  return new MockResponse(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Set-Cookie': 'csrf-token=geheimes-csrf-token', 'x-csrf-token': 'geheimes-csrf-token' },
+  });
+}
+
+test('offline Kaltstart: /auth/me kommt als reduzierter Abzug, ohne CSRF, Kontaktdaten und Kopfzeilen', async () => {
+  const env = loadSw({ fetchImpl: async () => meResponse() });
+  const req = new MockRequest(apiUrl('/auth/me'), { method: 'GET' });
+
+  const online = dispatchFetch(env, req);
+  assert.ok(online.responded, '/auth/me muss vom Service Worker beantwortet werden');
+  const fresh = await online.result;
+  assert.equal((await fresh.json()).csrfToken, 'geheimes-csrf-token', 'online geht die Netzantwort unveraendert an die Seite');
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const offline = await dispatchFetch(env, req).result;
+  assert.equal(offline.status, 200);
+  const body = await offline.json();
+  assert.equal(body.offlineSnapshot, true, 'der Abzug sagt, dass die Sitzung nicht geprueft ist');
+  assert.equal(body.user.id, 7);
+  assert.equal(body.user.access_scope, 'family');
+  assert.deepEqual(body.permissions, { tasks: 'write' });
+  assert.equal(body.householdSize, 3);
+  const raw = JSON.stringify(body);
+  assert.ok(!raw.includes('geheimes-csrf-token'), 'kein CSRF-Token im Abzug');
+  for (const field of ['email', 'phone', 'birth_date']) {
+    assert.equal(field in body.user, false, `${field} gehoert nicht in den Abzug`);
+  }
+  assert.equal(offline.headers.get('set-cookie'), null, 'keine Cookie-Kopfzeile im Abzug');
+  assert.equal(offline.headers.get('x-csrf-token'), null, 'keine CSRF-Kopfzeile im Abzug');
+});
+
+for (const scope of ['display', 'split_guest']) {
+  test(`kein Abzug fuer ${scope}: ein vorhandener wird geloescht, offline bleibt es bei 503`, async () => {
+    const env = loadSw({ fetchImpl: async () => meResponse() });
+    const req = new MockRequest(apiUrl('/auth/me'), { method: 'GET' });
+    await dispatchFetch(env, req).result;
+    env.setFetch(async () => meResponse({ ...ME_BODY, user: { ...ME_BODY.user, access_scope: scope } }));
+    await dispatchFetch(env, req).result;
+
+    env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+    const res = await dispatchFetch(env, req).result;
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: 'offline' });
+  });
+}
+
+test('eine 401 auf /auth/me loescht den Abzug', async () => {
+  const env = loadSw({ fetchImpl: async () => meResponse() });
+  const req = new MockRequest(apiUrl('/auth/me'), { method: 'GET' });
+  await dispatchFetch(env, req).result;
+  env.setFetch(async () => meResponse({ error: 'Not authenticated' }, 401));
+  const denied = await dispatchFetch(env, req).result;
+  assert.equal(denied.status, 401, 'die 401 geht unveraendert an die Seite');
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const res = await dispatchFetch(env, req).result;
+  assert.equal(res.status, 503, 'nach der 401 gibt es keinen Abzug mehr');
+});
+
+test('/preferences kommt offline als Abzug mit Modulen, Reihenfolge und Zone', async () => {
+  const prefs = {
+    data: {
+      disabled_modules: ['budget'], hidden_modules: [], module_order: ['shopping', 'tasks'], mobile_nav_order: ['shopping'],
+      timezone: 'Europe/Berlin', date_format: 'dd.mm.yyyy', time_format: '24h',
+      weather_location: 'Musterstadt', dashboard_widgets: ['weather'],
+    },
+  };
+  const env = loadSw({ fetchImpl: async () => new MockResponse(JSON.stringify(prefs), { status: 200 }) });
+  const req = new MockRequest(apiUrl('/preferences'), { method: 'GET' });
+  await dispatchFetch(env, req).result;
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const body = await (await dispatchFetch(env, req).result).json();
+  assert.equal(body.offlineSnapshot, true);
+  assert.deepEqual(body.data.disabled_modules, ['budget']);
+  assert.deepEqual(body.data.module_order, ['shopping', 'tasks']);
+  assert.equal(body.data.timezone, 'Europe/Berlin');
+  assert.equal('weather_location' in body.data, false, 'nur die Felder der Shell');
+});
+
+test('CLEAR_API_CACHE nimmt den Sitzungsabzug mit', async () => {
+  const env = loadSw({ fetchImpl: async () => meResponse() });
+  const req = new MockRequest(apiUrl('/auth/me'), { method: 'GET' });
+  await dispatchFetch(env, req).result;
+  await dispatchMessage(env, { type: 'CLEAR_API_CACHE' });
+
+  env.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const res = await dispatchFetch(env, req).result;
+  assert.equal(res.status, 503);
+});
+
+// --------------------------------------------------------
+// Abmelden ohne steuernden Service Worker (#2293)
+// --------------------------------------------------------
+// clearApiCache() schickte bisher NUR eine Nachricht an den steuernden Worker.
+// Ohne Controller (harter Reload, Worker im Wechsel, Erstbesuch) blieb der
+// API-Cache samt Sitzungsabzug liegen - am geteilten Tablett las die naechste
+// Person offline den Stand der vorigen. Die Seite loescht ihn deshalb selbst.
+test('clearApiCache leert den API-Cache auch ohne steuernden Service Worker', async () => {
+  const storage = new MockCacheStorage();
+  await storage.open('yuvomi-api-2.81.0-x');
+  await storage.open('oikos-api-1.0.0');
+  await storage.open('yuvomi-shell-2.81.0-x');
+  const before = { caches: globalThis.caches, nav: Object.getOwnPropertyDescriptor(globalThis, 'navigator') };
+  globalThis.caches = storage;
+  Object.defineProperty(globalThis, 'navigator', { value: { serviceWorker: { controller: null, addEventListener() {} } }, configurable: true, writable: true });
+  globalThis.window ??= { addEventListener() {} };
+  globalThis.document ??= { addEventListener() {} };
+  try {
+    const { clearApiCache } = await import(`../public/sw-register.js?logout=${Date.now()}`);
+    await clearApiCache({ timeoutMs: 50 });
+    assert.deepEqual((await storage.keys()).sort(), ['yuvomi-shell-2.81.0-x'], 'nur die API-Caches gehen, die Shell bleibt');
+  } finally {
+    globalThis.caches = before.caches;
+    if (before.nav) Object.defineProperty(globalThis, 'navigator', before.nav);
+  }
+});
+
+// --------------------------------------------------------
+// Der Fall des Issues (#2293), von vorne bis hinten: der echte Service Worker
+// und die echte navigate() zusammen. Die App war online offen, wurde
+// geschlossen und startet jetzt ohne Netz.
+// --------------------------------------------------------
+/** Ein Abruf der Seite: geht durch den Worker, wenn er antwortet, sonst ans Netz. */
+async function pageGet(env, path, network) {
+  const req = new MockRequest(apiUrl(path), { method: 'GET' });
+  const { responded, result } = dispatchFetch(env, req);
+  const res = responded ? await result : await network(req);
+  const body = await res.json();
+  if (!res.ok) throw Object.assign(new Error(body.error || 'Fehler'), { status: res.status, data: body });
+  return body;
+}
+
+test('Kaltstart ohne Netz mit gefuelltem Cache zeigt die Einkaufsliste, nicht "nicht erreichbar"', async () => {
+  const online = async (req) => {
+    if (req.url.endsWith('/auth/me')) return meResponse();
+    return new MockResponse(JSON.stringify({ data: [{ id: 1, name: 'Milch' }] }), { status: 200 });
+  };
+  const sw = loadSw({ fetchImpl: online });
+  // Online: die Shell fragt die Sitzung, die Liste wird angesehen.
+  await pageGet(sw, '/auth/me', online);
+  await pageGet(sw, '/shopping', online);
+
+  // App zu, Netz weg, App auf.
+  const down = async () => { throw new TypeError('Failed to fetch'); };
+  sw.setFetch(down);
+  const routes = [...HARNESS_ROUTES, { path: '/shopping', requiresAuth: true, module: 'shopping' }];
+  const { navigate, log, env } = createNavigateHarness({ routes, me: () => pageGet(sw, '/auth/me', down) });
+  await navigate('/shopping');
+
+  assert.deepEqual(log.unreachable, [], 'kein "Server nicht erreichbar"');
+  assert.deepEqual(log.rendered, ['/shopping'], 'die Einkaufsliste wird gezeichnet');
+  assert.equal(env.currentUser?.id, 7);
+  assert.equal(log.offlineSessions.length, 1, 'der Router weiss, dass die Sitzung ungeprueft ist');
+  assert.equal(log.reminders + log.push, 0, 'Erinnerungen und Push warten auf die gepruefte Sitzung');
+  const list = await pageGet(sw, '/shopping', down);
+  assert.deepEqual(list.data, [{ id: 1, name: 'Milch' }], 'die Liste kommt aus dem Cache');
+});
+
+test('Kaltstart ohne Netz und ohne Abzug bleibt beim Zustand "nicht erreichbar"', async () => {
+  const down = async () => { throw new TypeError('Failed to fetch'); };
+  const sw = loadSw({ fetchImpl: down });
+  const routes = [...HARNESS_ROUTES, { path: '/shopping', requiresAuth: true, module: 'shopping' }];
+  const { navigate, log } = createNavigateHarness({ routes, me: () => pageGet(sw, '/auth/me', down) });
+  await navigate('/shopping');
+  assert.equal(log.unreachable.length, 1);
+  assert.deepEqual(log.rendered, []);
+});
+
+// --------------------------------------------------------
+// Die ungepruefte Sitzung (utils/offline-session.js): wann sie endet
+// --------------------------------------------------------
+function offlineSessionWith(answers) {
+  const win = new EventTarget();
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  const seen = { changes: [], verified: [] };
+  const session = createOfflineSession({
+    window: win,
+    document: doc,
+    verify: async () => {
+      const next = answers.shift();
+      if (next instanceof Error) throw next;
+      return next;
+    },
+    onVerified: (result) => { seen.verified.push(result); },
+    onChange: (active) => { seen.changes.push(active); },
+    intervalMs: 60 * 60 * 1000,
+  });
+  return { session, win, doc, seen };
+}
+
+test('ungepruefte Sitzung: bleibt bei Netzfehler und erneutem Abzug, endet mit der echten Antwort', async () => {
+  const { session, win, seen } = offlineSessionWith([
+    new TypeError('Failed to fetch'),
+    { user: { id: 7 }, offlineSnapshot: true },
+    { user: { id: 7 } },
+  ]);
+  session.start();
+  assert.deepEqual(seen.changes, [true]);
+  await session.check();
+  await session.check();
+  assert.equal(session.isActive(), true, 'Netzfehler und Abzug lassen sie ungeprueft');
+  win.dispatchEvent(new Event('online'));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(session.isActive(), false);
+  assert.deepEqual(seen.verified, [{ user: { id: 7 } }]);
+  assert.deepEqual(seen.changes, [true, false]);
+});
+
+test('ungepruefte Sitzung: eine 401 beendet sie ohne Freigabe', async () => {
+  const { session, seen } = offlineSessionWith([Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 })]);
+  session.start();
+  await session.check();
+  assert.equal(session.isActive(), false);
+  assert.deepEqual(seen.verified, [], 'die Abmeldung macht auth:expired, nicht onVerified');
 });

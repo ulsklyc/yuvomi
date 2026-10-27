@@ -3748,7 +3748,8 @@
         "banner": "Offline - reconectando…",
         "staleData": "Offline - dados de: {{time}}",
         "pageTitle": "Você está offline",
-        "pageDescription": "Esta página precisa de conexão. Assim que seu dispositivo voltar a ficar online, ela carrega sozinha."
+        "pageDescription": "Esta página precisa de conexão. Assim que seu dispositivo voltar a ficar online, ela carrega sozinha.",
+        "snapshot": "Sem conexão com o servidor - dados salvos, somente leitura"
     },
     "emptyHint": {
         "recipes": "Uma receita vai diretamente para o plano de refeições ou para a lista de compras.",

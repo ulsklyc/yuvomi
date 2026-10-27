@@ -3748,7 +3748,8 @@
         "banner": "Offline - muling kumokonekta…",
         "staleData": "Offline - noong: {{time}}",
         "pageTitle": "Offline ka",
-        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load."
+        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load.",
+        "snapshot": "Walang koneksyon sa server - naka-save na data, pagbasa lang"
     },
     "emptyHint": {
         "tasks": "I-tap ang + para gawin ang iyong unang gawain. I-swipe pakaliwa ang isang card para tapusin, pakanan para tingnan.",

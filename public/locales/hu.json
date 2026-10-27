@@ -3748,7 +3748,8 @@
         "banner": "Offline - újracsatlakozás…",
         "staleData": "Offline - állapot: {{time}}",
         "pageTitle": "Offline vagy",
-        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik."
+        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik.",
+        "snapshot": "Nincs kapcsolat a szerverrel - mentett állapot, csak olvasható"
     },
     "shortcuts": {
         "search": "Keresés megnyitása",

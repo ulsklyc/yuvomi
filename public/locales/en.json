@@ -3748,7 +3748,8 @@
         "banner": "Offline - reconnecting…",
         "staleData": "Offline - as of: {{time}}",
         "pageTitle": "You are offline",
-        "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself."
+        "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself.",
+        "snapshot": "No connection to the server - saved data, read-only"
     },
     "shortcuts": {
         "search": "Open search",

@@ -3748,7 +3748,8 @@
         "banner": "Offline - memulihkan koneksi…",
         "staleData": "Offline - per: {{time}}",
         "pageTitle": "Kamu sedang offline",
-        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya."
+        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya.",
+        "snapshot": "Tidak ada koneksi ke server - data tersimpan, hanya baca"
     },
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",
