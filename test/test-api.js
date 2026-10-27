@@ -776,7 +776,7 @@ const EXPLAINED_REFUSALS = [
   ['routes/calendar/sync-targets.js', 'Write access to the calendar is required.', 'cross_module_access'],
   // Der Satz steht in der Fehlerklasse; die Antwort baut `sendDocumentLinkRefusal`.
   ['services/document-links.js', 'err.message, code: 403', 'cross_module_access'],
-  ['routes/contacts.js', 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', 'family_member_contact'],
+  ['routes/contacts.js', 'A household member cannot be deleted from the contact list.', 'family_member_contact'],
   ['routes/contacts.js', 'can change the email addresses of a household member.', 'contact_email_protected'],
   ['routes/documents.js', 'Not authorized to delete every document in this folder.', 'FOLDER_DOCUMENTS_NOT_MANAGEABLE'],
 ];

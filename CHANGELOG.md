@@ -194,6 +194,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   English now and names the request field (`odometer`, `category`, `interval_months` ...), with the
   same status codes. The OpenAPI description now lists `inventory_item_not_found` (404) at the
   history and service log routes, where they already sent it.
+- **The contacts API refuses in English and names its reasons in the API description** (#1695,
+  #2267). `/api/v1/contacts` still answered "Interner Fehler", "Familienmitglieder können nicht aus
+  der Kontaktliste gelöscht werden." and sentences with German field names ("Telefon may be at most
+  100 characters long.", "Geburtstag must be in YYYY-MM-DD format."); every `error` there is English
+  now and names the request field (`phone`, `birthday`, `firstName` ...), with the same status codes
+  and reasons. The OpenAPI description now lists `category_exists`, `category_in_use`,
+  `category_last`, `contact_email_protected` and `family_member_contact` at the contact routes, and
+  `contacts_contact_not_found` at the vCard download, where they already sent them.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

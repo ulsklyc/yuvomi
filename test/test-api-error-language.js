@@ -37,6 +37,9 @@
  *        service-log.js 6): Bein 2 nennt 20 deutsche Absagen, darunter
  *        Feldnamen, die Bein 1 nicht liest (`idParam(..., 'Buchung-ID')`,
  *        `date(..., 'Datum')`, ein Satz aus einem `return` im Helfer).
+ *        Ebenso fuer die Kontakte (contacts.js): `contacts.js: 13 (erlaubt 0)`,
+ *        und Bein 2 nennt 12 deutsche Absagen - elf davon Feldnamen, die
+ *        Bein 1 nicht liest (`limitedStr(..., 'Telefon')`, `date(..., 'Geburtstag')`).
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -57,13 +60,14 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
  * Deutsche Stellen je Routen-Datei, Stand 26.10.2026. NUR SENKEN: wer ein
  * Modul umstellt, streicht seine Zeile - der Test verlangt es.
  */
+// meals.js und recipes.js stiegen mit den Kontakt-Feldnamen der Regel (Notizen,
+// Geburtstag ...): dieselben Stellen, jetzt gesehen, keine neuen.
 const GERMAN_LEFT = new Map([
   ['calendar/apple.js', 6],
   ['calendar/feed.js', 5],
   ['calendar/helpers.js', 9],
   ['calendar/read.js', 4],
   ['calendar/subscriptions.js', 22],
-  ['contacts.js', 13],
   ['health/activities.js', 2],
   ['health/caregivers.js', 4],
   ['health/cycle.js', 3],
@@ -72,10 +76,10 @@ const GERMAN_LEFT = new Map([
   ['health/medications.js', 12],
   ['health/nutrition.js', 1],
   ['health/vitals.js', 2],
-  ['meals.js', 34],
+  ['meals.js', 37],
   ['pantry.js', 5],
   ['push.js', 3],
-  ['recipes.js', 2],
+  ['recipes.js', 4],
   ['shopping.js', 17],
   ['tasks.js', 4],
   ['weather.js', 2],
@@ -115,6 +119,8 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'calendar_default_target: maximal 300 Zeichen',
     'Unbekannte Nutzer-ID.',
     'target_google_calendar_id: zu lang.',
+    'Telefon is too long.',
+    'Geburtstag must be a valid date.',
   ]) assert.ok(germanIn(old), `nicht erkannt: ${old}`);
   for (const fine of [
     'Internal server error.',
@@ -124,6 +130,7 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'Admin access required.',
     'Invalid country code (2 capital letters, e.g. DE).',
     'calendar_default_target may be at most 300 characters long.',
+    'phone may be at most 50 characters long.',
   ]) assert.equal(germanIn(fine), null, `faelschlich erkannt: ${fine}`);
 });
 
@@ -571,5 +578,58 @@ test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     invServer.close();
+  }
+});
+
+test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
+  const { default: contactsRouter } = await import('../server/routes/contacts.js');
+  const cApp = express();
+  cApp.use(express.json());
+  cApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  cApp.use('/contacts', contactsRouter);
+  const cServer = cApp.listen(0, '127.0.0.1');
+  const cUrl = await new Promise((r) => cServer.on('listening', () => r(`http://127.0.0.1:${cServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${cUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const family = db.prepare("INSERT INTO contacts (name, family_user_id) VALUES ('Member', ?)").run(MEMBER).lastInsertRowid;
+    const long = 'x'.repeat(20000);
+
+    await run('post-name', 'POST', '/contacts', {});
+    await run('post-first-name', 'POST', '/contacts', { firstName: long });
+    await run('post-last-name', 'POST', '/contacts', { name: 'A', lastName: long });
+    await run('post-middle-name', 'POST', '/contacts', { name: 'A', middleName: long });
+    await run('post-name-prefix', 'POST', '/contacts', { name: 'A', namePrefix: long });
+    await run('post-name-suffix', 'POST', '/contacts', { name: 'A', nameSuffix: long });
+    await run('post-phone', 'POST', '/contacts', { name: 'A', phone: long });
+    await run('post-email', 'POST', '/contacts', { name: 'A', email: long });
+    await run('post-address', 'POST', '/contacts', { name: 'A', address: long });
+    await run('post-notes', 'POST', '/contacts', { name: 'A', notes: long });
+    await run('post-birthday', 'POST', '/contacts', { name: 'A', birthday: 'nope' });
+    await run('post-category', 'POST', '/contacts', { name: 'A', category: 'nope' });
+    await run('put-birthday', 'PUT', `/contacts/${family}`, { birthday: 'nope' });
+    await run('put-phone', 'PUT', `/contacts/${family}`, { phone: long });
+    await run('put-gone', 'PUT', '/contacts/987654', { name: 'X' });
+    await run('delete-family', 'DELETE', `/contacts/${family}`);
+    await run('delete-gone', 'DELETE', '/contacts/987654');
+    await run('category-name', 'POST', '/contacts/categories', {});
+    await run('category-rename', 'PUT', '/contacts/categories/nope', { name: 'X' });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    cServer.close();
   }
 });
