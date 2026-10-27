@@ -5558,6 +5558,7 @@ const BUDGET_REFUSALS = new Map([
   ['loan_payment_amount_exceeds', [null, 'budget.amountExceedsLoanRemaining']],
   ['loan_payment_date_invalid', [null, 'calendar.invalidDate']],
   ['loan_payment_installment_invalid', [null, BUDGET_FAILED]],
+  ['loan_payment_rate_unavailable', ['#bm-amount', 'budget.loanPaymentRateUnavailable']],
 ]);
 
 /**

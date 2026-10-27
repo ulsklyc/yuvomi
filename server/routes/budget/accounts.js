@@ -7,6 +7,7 @@ import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
+import { resyncSubscriptionBookings } from '../subscriptions.js';
 import {
   budgetFilter, listAccounts, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
@@ -84,13 +85,18 @@ router.post('/accounts', (req, res) => {
   }
 });
 
+/** Die Abos mit diesem Konto als Vorgabe - ihre wartende Buchung folgt ihm. */
+function subscriptionsOn(accountId) {
+  return db.get().prepare('SELECT id FROM budget_subscriptions WHERE account_id = ?').all(accountId).map((r) => r.id);
+}
+
 /**
  * PUT /api/v1/budget/accounts/:id
  * Konto aktualisieren (Name, Typ, Startsaldo, Währung, Farbe, Archiv-Status,
  * bei Kreditkarten zusätzlich Bank und Kreditlimit).
  * Response: { data: Account }
  */
-router.put('/accounts/:id', (req, res) => {
+router.put('/accounts/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const existing = db.get().prepare('SELECT * FROM budget_accounts WHERE id = ?').get(id);
@@ -160,6 +166,10 @@ router.put('/accounts/:id', (req, res) => {
                      WHERE account_id = ? AND budget_entry_id IS NOT NULL)`)
         .run(archived ? null : id, id);
     }
+    // Mit dem Konto wechselt die Waehrung ihrer Buchung (#2302).
+    if (Boolean(archived) !== Boolean(existing.archived) || currency !== existing.currency) {
+      await resyncSubscriptionBookings(subscriptionsOn(id));
+    }
 
     const account = listAccounts(true, budgetFilter(req, 'e', { scoped: false })).find((a) => a.id === id);
     res.json({ data: account });
@@ -177,7 +187,7 @@ router.put('/accounts/:id', (req, res) => {
  * (ACCOUNT_SHELL, helpers.js) - die Antwort ist dieselbe 204.
  * Response: 204 No Content
  */
-router.delete('/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const filter = budgetFilter(req, 'e', { scoped: false });
@@ -191,6 +201,7 @@ router.delete('/accounts/:id', (req, res) => {
       return refuse(res, [refusal('account_has_transfers', 'This account has linked transfers. Archive it instead.')], 409);
     }
 
+    const affected = subscriptionsOn(id);
     const tx = db.get().transaction(() => {
       // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben
       // bestehen - aber nur die, die der Aufrufer sieht: ueber fremde private
@@ -219,6 +230,7 @@ router.delete('/accounts/:id', (req, res) => {
       }
     });
     tx();
+    await resyncSubscriptionBookings(affected);
 
     res.status(204).end();
   } catch (err) {

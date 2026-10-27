@@ -2041,6 +2041,7 @@
         "saveFailed": "Nie udało się zapisać. Sprawdź wprowadzone dane.",
         "loanAlreadyPaid": "Ta pożyczka jest już w całości spłacona.",
         "loanInstallmentAlreadyPaid": "Ta rata jest już zapłacona.",
+        "loanPaymentRateUnavailable": "Kurs wymiany dla waluty konta jest nieznany. Wybierz inne konto dla pożyczki albo żadne.",
         "amountExceedsLoanRemaining": "Kwota jest wyższa niż pozostała część pożyczki",
         "responsibleNotMember": "Odpowiedzialni mogą być tylko członkowie gospodarstwa domowego.",
         "seriesStartTooEarly": "Dzień rozpoczęcia nie może przypadać w miesiącu przed pierwszym wpisem serii",

@@ -1859,6 +1859,7 @@
         "saveFailed": "L’enregistrement a échoué. Veuillez vérifier les informations saisies.",
         "loanAlreadyPaid": "Ce prêt est déjà entièrement remboursé.",
         "loanInstallmentAlreadyPaid": "Cette échéance est déjà payée.",
+        "loanPaymentRateUnavailable": "Aucun taux de change n'est connu pour la devise du compte. Choisissez un autre compte pour le prêt, ou aucun.",
         "amountExceedsLoanRemaining": "Le montant dépasse ce qu’il reste du prêt",
         "responsibleNotMember": "Seuls les membres du foyer peuvent être responsables.",
         "seriesStartTooEarly": "Le jour de début ne peut pas se situer dans un mois antérieur à la première écriture de la série",

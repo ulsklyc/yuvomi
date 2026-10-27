@@ -1859,6 +1859,7 @@
         "saveFailed": "Dette kunne ikke lagres. Vennligst kontroller opplysningene.",
         "loanAlreadyPaid": "Dette lånet er allerede betalt i sin helhet.",
         "loanInstallmentAlreadyPaid": "Dette avdraget er allerede betalt.",
+        "loanPaymentRateUnavailable": "Ingen valutakurs er kjent for kontoens valuta. Velg en annen konto for lånet, eller ingen.",
         "amountExceedsLoanRemaining": "Beløpet er høyere enn det som gjenstår av lånet",
         "responsibleNotMember": "Bare medlemmer av husstanden kan være ansvarlige.",
         "seriesStartTooEarly": "Startdagen kan ikke ligge i en måned før seriens første oppføring",

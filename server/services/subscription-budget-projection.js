@@ -310,6 +310,7 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
            sub.occurrence_count, sub.occurrences_done, sub.created_by,
            b.owner_id, b.visibility, b.amount AS booked_amount,
            CASE WHEN acc.archived = 0 THEN sub.account_id END AS account_id,
+           CASE WHEN acc.archived = 0 THEN acc.currency END AS account_currency,
            COALESCE(c.budget_subcategory_key, '') AS subcategory,
            u.display_name AS creator_name
     FROM budget_subscriptions sub
@@ -337,10 +338,13 @@ export function expectedSubscriptionEntries(database, { from, to, filter, accoun
     if (!dates.length) continue;
     // Beide Spalten sind NOT NULL, die des Abos per CHECK nie negativ; was
     // trotzdem keine Zahl ist, ergibt keine Zahlung - auch keine von 0.
-    const source = subscription.currency === currency ? subscription.amount : subscription.booked_amount;
+    // Die Buchung steht in der Waehrung ihres Kontos (#2302), ohne Konto in
+    // der Budget-Waehrung - dieselbe Regel wie bookingCurrency im Schreibpfad.
+    const target = subscription.account_currency || currency;
+    const source = subscription.currency === target ? subscription.amount : subscription.booked_amount;
     if (source == null || !Number.isFinite(Number(source))) continue;
     const amount = -Math.abs(Number(source));
-    const title = subscriptionBudgetTitle(subscription, currency);
+    const title = subscriptionBudgetTitle(subscription, target);
     for (const date of dates) {
       entries.push({
         id: null,

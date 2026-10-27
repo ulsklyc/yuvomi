@@ -2106,6 +2106,7 @@
         "saveFailed": "تعذّر الحفظ. يرجى التحقق من البيانات.",
         "loanAlreadyPaid": "هذا القرض مدفوع بالكامل بالفعل.",
         "loanInstallmentAlreadyPaid": "هذا القسط مدفوع بالفعل.",
+        "loanPaymentRateUnavailable": "لا يوجد سعر صرف معروف لعملة الحساب. اختر حسابًا آخر للقرض أو بلا حساب.",
         "amountExceedsLoanRemaining": "المبلغ أكبر من المتبقي من القرض",
         "responsibleNotMember": "لا يمكن أن يكون المسؤول إلا من أفراد المنزل.",
         "seriesStartTooEarly": "لا يمكن أن يقع يوم البدء في شهر يسبق أول دفعة في السلسلة",

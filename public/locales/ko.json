@@ -1877,6 +1877,7 @@
         "saveFailed": "저장하지 못했습니다. 입력 내용을 확인해 주세요.",
         "loanAlreadyPaid": "이 대출은 이미 모두 상환되었습니다.",
         "loanInstallmentAlreadyPaid": "이 회차는 이미 상환되었습니다.",
+        "loanPaymentRateUnavailable": "계좌 통화의 환율을 알 수 없습니다. 대출에 다른 계좌를 선택하거나 계좌 없이 두세요.",
         "amountExceedsLoanRemaining": "금액이 대출의 미상환 금액보다 큽니다",
         "responsibleNotMember": "가구 구성원만 담당이 될 수 있습니다.",
         "seriesStartTooEarly": "시작일은 시리즈의 첫 항목보다 앞선 달에 둘 수 없습니다",

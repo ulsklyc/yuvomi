@@ -1942,6 +1942,7 @@
         "saveFailed": "Uložení se nezdařilo. Zkontrolujte prosím údaje.",
         "loanAlreadyPaid": "Tato půjčka je již zcela splacena.",
         "loanInstallmentAlreadyPaid": "Tato splátka je již zaplacena.",
+        "loanPaymentRateUnavailable": "Pro měnu účtu není znám směnný kurz. U půjčky zvolte jiný účet, nebo žádný.",
         "amountExceedsLoanRemaining": "Částka je vyšší než zbývající část půjčky",
         "responsibleNotMember": "Odpovídat mohou jen členové domácnosti.",
         "seriesStartTooEarly": "První den nemůže ležet v měsíci před prvním záznamem série",

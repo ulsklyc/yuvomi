@@ -21,7 +21,7 @@ import {
   generateRecurringInstances, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
   normalizeIntervalCount, effectiveMonthly, occurrencesPerYear,
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency,
-  entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
+  entryWithLoanMeta, refreshLoanStatus, loanEntryRate, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
   replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
   refusal, refusals, refuse,
@@ -1004,10 +1004,16 @@ router.put('/:id', (req, res) => {
     // Die Rate selbst bleibt vorzeichenlos: budget_loan_payments.amount trägt einen
     // CHECK(amount > 0) und wird gegen die Restschuld gerechnet.
     const linkedSign = linkedPayment ? bookingFor(linkedLoan?.direction).sign : 1;
-    const linkedPaymentAmount = linkedPayment && amount !== undefined
-      ? Math.abs(fromBudgetAmount(amount, linkedLoan))
+    // Die Buchung steht in der Waehrung ihres Kontos (#2302), der Kurs zur
+    // Rate haengt also am Konto, auf dem sie nach dem Request steht.
+    const linkedRate = linkedPayment && amount !== undefined
+      ? loanEntryRate(linkedLoan, req.body.account_id !== undefined ? (parseInt(req.body.account_id, 10) || null) : entry.account_id)
       : null;
+    const linkedPaymentAmount = linkedRate ? Math.abs(cents(Number(amount || 0) / linkedRate)) : null;
     if (linkedPayment && amount !== undefined) {
+      if (linkedRate == null) {
+        return refuse(res, [refusal('loan_payment_rate_unavailable', 'No exchange rate is known for the account currency.')], 409);
+      }
       if (!(linkedPaymentAmount > 0)) {
         return refuse(res, [refusal('entry_amount_invalid', 'Amount must be greater than zero.')]);
       }

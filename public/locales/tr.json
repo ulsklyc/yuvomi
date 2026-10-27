@@ -1859,6 +1859,7 @@
         "saveFailed": "Kaydedilemedi. Lütfen bilgileri kontrol edin.",
         "loanAlreadyPaid": "Bu borcun tamamı zaten ödendi.",
         "loanInstallmentAlreadyPaid": "Bu taksit zaten ödendi.",
+        "loanPaymentRateUnavailable": "Hesabın para birimi için bilinen bir döviz kuru yok. Kredi için başka bir hesap seçin ya da hiçbirini.",
         "amountExceedsLoanRemaining": "Tutar, borcun kalan kısmından fazla",
         "responsibleNotMember": "Yalnızca hane üyeleri sorumlu olabilir.",
         "seriesStartTooEarly": "Başlangıç günü, serinin ilk kaydından önceki bir ayda olamaz",

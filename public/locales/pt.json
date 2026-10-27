@@ -1859,6 +1859,7 @@
         "saveFailed": "Não foi possível guardar. Verifique os dados.",
         "loanAlreadyPaid": "Este empréstimo já está totalmente pago.",
         "loanInstallmentAlreadyPaid": "Esta parcela já está paga.",
+        "loanPaymentRateUnavailable": "Não é conhecida nenhuma taxa de câmbio para a moeda da conta. Escolha outra conta no empréstimo, ou nenhuma.",
         "amountExceedsLoanRemaining": "O valor é superior ao restante do empréstimo",
         "responsibleNotMember": "Só membros do agregado familiar podem ser responsáveis.",
         "seriesStartTooEarly": "O dia de início não pode ficar num mês anterior ao primeiro lançamento da série",

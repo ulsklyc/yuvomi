@@ -1859,6 +1859,7 @@
         "saveFailed": "Dit kon niet worden opgeslagen. Controleer de gegevens.",
         "loanAlreadyPaid": "Deze lening is al volledig betaald.",
         "loanInstallmentAlreadyPaid": "Deze termijn is al betaald.",
+        "loanPaymentRateUnavailable": "Er is geen wisselkoers bekend voor de valuta van de rekening. Kies een andere rekening bij de lening, of geen.",
         "amountExceedsLoanRemaining": "Het bedrag is hoger dan wat er nog van de lening openstaat",
         "responsibleNotMember": "Alleen leden van het huishouden kunnen verantwoordelijk zijn.",
         "seriesStartTooEarly": "De startdag kan niet in een maand vóór de eerste boeking van de reeks liggen",

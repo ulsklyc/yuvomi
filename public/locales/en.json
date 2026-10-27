@@ -1859,6 +1859,7 @@
         "saveFailed": "This could not be saved. Please check your entries.",
         "loanAlreadyPaid": "This loan is already paid in full.",
         "loanInstallmentAlreadyPaid": "This installment is already paid.",
+        "loanPaymentRateUnavailable": "No exchange rate is known for the account's currency. Choose another account on the loan, or none.",
         "amountExceedsLoanRemaining": "The amount is higher than what is left of the loan",
         "responsibleNotMember": "Only members of the household can be responsible.",
         "seriesStartTooEarly": "The start day cannot lie in a month before the first entry of the series",

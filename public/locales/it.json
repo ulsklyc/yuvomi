@@ -1859,6 +1859,7 @@
         "saveFailed": "Impossibile salvare. Controlla i dati inseriti.",
         "loanAlreadyPaid": "Questo prestito è già stato pagato per intero.",
         "loanInstallmentAlreadyPaid": "Questa rata è già stata pagata.",
+        "loanPaymentRateUnavailable": "Nessun tasso di cambio noto per la valuta del conto. Scegli un altro conto per il prestito, o nessuno.",
         "amountExceedsLoanRemaining": "L'importo è superiore a quanto resta del prestito",
         "responsibleNotMember": "Solo i membri della famiglia possono essere responsabili.",
         "seriesStartTooEarly": "Il giorno di inizio non può cadere in un mese precedente alla prima registrazione della serie",

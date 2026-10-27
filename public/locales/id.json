@@ -1877,6 +1877,7 @@
         "saveFailed": "Tidak dapat disimpan. Periksa kembali data yang diisi.",
         "loanAlreadyPaid": "Pinjaman ini sudah lunas.",
         "loanInstallmentAlreadyPaid": "Cicilan ini sudah dibayar.",
+        "loanPaymentRateUnavailable": "Kurs untuk mata uang akun ini tidak diketahui. Pilih akun lain pada pinjaman, atau tanpa akun.",
         "amountExceedsLoanRemaining": "Jumlahnya lebih besar daripada sisa pinjaman",
         "responsibleNotMember": "Hanya anggota rumah tangga yang dapat menjadi penanggung jawab.",
         "seriesStartTooEarly": "Hari mulai tidak boleh berada di bulan sebelum entri pertama seri",

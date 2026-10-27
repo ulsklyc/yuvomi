@@ -23,7 +23,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
 import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { budgetFilter, listAccounts, validateAccountRef } from './budget/helpers.js';
+import { budgetFilter, budgetAccountCurrency, listAccounts, validateAccountRef } from './budget/helpers.js';
 
 const log = createLogger('Subscriptions');
 const router = express.Router();
@@ -249,6 +249,17 @@ function budgetCurrency() {
   return subscriptionBudgetCurrency(db.get());
 }
 
+/**
+ * Die Waehrung der Buchung (#2302): die ihres Kontos, ohne Konto die
+ * Budget-Waehrung. Eine Buchung auf einem Konto in Fremdwaehrung steht in
+ * dessen Waehrung wie jede andere dort; das Abo rechnet mit demselben
+ * Kurs-Cache in sie um wie bisher in die Budget-Waehrung.
+ */
+function bookingCurrency(row) {
+  const accountId = bookingAccountId(row);
+  return accountId != null ? budgetAccountCurrency(accountId) : budgetCurrency();
+}
+
 // Betrag und Titel der Buchung rechnet services/subscription-budget-projection.js:
 // die gebuchte Zeile hier und die erwarteten Zeilen der Folgemonate (#1844)
 // muessen dasselbe sagen, also gibt es die Rechnung einmal.
@@ -353,7 +364,7 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
     }
     return { row: loadSubscription(id) };
   }
-  const budgetCur = budgetCurrency();
+  const budgetCur = bookingCurrency(row);
   const amount = bookingAmount(row, budgetCur, fetched);
   if (amount === undefined) {
     // Bis der Kurs da ist, wird die Buchung nur ENGER, nie weiter: steht das
@@ -403,6 +414,23 @@ async function syncBudgetExpense(id, fetched = null) {
 }
 
 /**
+ * Rechnet die wartenden Buchungen der Abos `ids` neu (#2302). Archivieren,
+ * Loeschen oder eine neue Waehrung eines Kontos aendern die Waehrung der
+ * Buchung; ohne diesen Schritt stuende ihr Betrag bis zum naechsten Schreiben
+ * des Abos in der alten. Fehler bleiben hier: das Konto ist schon geschrieben,
+ * und das naechste Schreiben des Abos holt es nach.
+ */
+export async function resyncSubscriptionBookings(ids) {
+  for (const id of ids) {
+    try {
+      await syncBudgetExpense(id);
+    } catch (err) {
+      if (!(err instanceof SubscriptionGoneError)) log.warn(`Booking of subscription ${id} not rewritten: ${err.message}`);
+    }
+  }
+}
+
+/**
  * Verlaengern, synchron: Datum und Zaehler vorruecken (oder bei der letzten
  * Zahlung abschliessen), die bezahlte Buchung auf den Stand des Abos bringen
  * und abkoppeln, und - ausser beim Abschluss - die naechste anlegen und
@@ -442,7 +470,7 @@ const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.g
   // Buchung wie auf main - abgekoppelt bliebe sie als Waise liegen.
   if (!current.enabled) return { paid: null };
   database.prepare('UPDATE budget_subscriptions SET budget_entry_id = NULL WHERE id = ?').run(current.id);
-  const budgetCur = budgetCurrency();
+  const budgetCur = bookingCurrency(current);
   const amount = bookingAmount(current, budgetCur, null);
   const linked = current.budget_entry_id
     ? database.prepare('SELECT id, amount FROM budget_entries WHERE id = ?').get(current.budget_entry_id)

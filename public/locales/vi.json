@@ -1859,6 +1859,7 @@
         "saveFailed": "Không thể lưu. Vui lòng kiểm tra lại thông tin.",
         "loanAlreadyPaid": "Khoản vay này đã được trả hết.",
         "loanInstallmentAlreadyPaid": "Kỳ hạn này đã được trả.",
+        "loanPaymentRateUnavailable": "Chưa có tỷ giá cho đơn vị tiền của tài khoản. Hãy chọn tài khoản khác cho khoản vay, hoặc không chọn.",
         "amountExceedsLoanRemaining": "Số tiền lớn hơn phần còn lại của khoản vay",
         "responsibleNotMember": "Chỉ thành viên trong hộ gia đình mới có thể là người phụ trách.",
         "seriesStartTooEarly": "Ngày bắt đầu không thể nằm trong tháng trước mục đầu tiên của chuỗi",

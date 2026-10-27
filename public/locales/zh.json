@@ -1859,6 +1859,7 @@
         "saveFailed": "未能保存。请检查填写的内容。",
         "loanAlreadyPaid": "这笔借款已全部还清。",
         "loanInstallmentAlreadyPaid": "这一期已支付。",
+        "loanPaymentRateUnavailable": "该账户币种没有已知汇率。请为贷款选择其他账户，或不选账户。",
         "amountExceedsLoanRemaining": "金额超过借款的剩余金额",
         "responsibleNotMember": "只有家庭成员才能担任负责人。",
         "seriesStartTooEarly": "开始日不能早于系列第一条条目所在的月份",

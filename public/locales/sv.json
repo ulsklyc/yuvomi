@@ -1859,6 +1859,7 @@
         "saveFailed": "Det gick inte att spara. Kontrollera uppgifterna.",
         "loanAlreadyPaid": "Det här lånet är redan helt betalt.",
         "loanInstallmentAlreadyPaid": "Den här delbetalningen är redan betald.",
+        "loanPaymentRateUnavailable": "Ingen växelkurs är känd för kontots valuta. Välj ett annat konto för lånet, eller inget.",
         "amountExceedsLoanRemaining": "Beloppet är högre än det som återstår av lånet",
         "responsibleNotMember": "Bara medlemmar i hushållet kan vara ansvariga.",
         "seriesStartTooEarly": "Startdagen kan inte ligga i en månad före seriens första post",

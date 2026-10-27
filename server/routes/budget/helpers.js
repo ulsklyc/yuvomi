@@ -15,6 +15,7 @@ import {
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
+import { cachedRate } from '../../services/subscription-rates.js';
 import { DEFAULT_LOCALE, resolveHouseholdLocale, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
 import { MAX_INTERVAL_COUNT } from '../../../public/utils/budget-recurrence.js';
@@ -889,9 +890,22 @@ export function toBudgetAmount(amount, loan) {
   return cents(Number(amount || 0) * loanRate(loan));
 }
 
-/** Gegenrichtung zu toBudgetAmount: Budget-Betrag zurück in die Darlehenswährung (#582). */
-export function fromBudgetAmount(amount, loan) {
-  return cents(Number(amount || 0) / loanRate(loan));
+/**
+ * Kurs von der Darlehenswaehrung in die Waehrung der Buchung einer Rate
+ * (#2302): eine Buchung steht in der Waehrung ihres Kontos, ohne Konto in der
+ * Budget-Waehrung. Traegt das Konto die Darlehenswaehrung, bucht die Rate
+ * ohne Umrechnung; traegt es die Budget-Waehrung, gilt der feste Kurs des
+ * Darlehens (#582). Eine dritte Waehrung geht ueber den festen Kurs bis zur
+ * Budget-Waehrung und von dort ueber den Kurs-Cache - null, wenn der keinen
+ * kennt: dann gibt es keine richtige Zahl, und der Aufrufer lehnt ab.
+ */
+export function loanEntryRate(loan, accountId) {
+  const base = budgetCurrency();
+  const target = accountId != null ? budgetAccountCurrency(accountId) : base;
+  if (target === (loan?.currency || base)) return 1;
+  if (target === base) return loanRate(loan);
+  const onward = cachedRate(base, target);
+  return onward == null ? null : loanRate(loan) * onward;
 }
 
 // --------------------------------------------------------

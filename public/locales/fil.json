@@ -1877,6 +1877,7 @@
         "saveFailed": "Hindi ito na-save. Pakisuri ang mga inilagay.",
         "loanAlreadyPaid": "Bayad na nang buo ang utang na ito.",
         "loanInstallmentAlreadyPaid": "Bayad na ang hulog na ito.",
+        "loanPaymentRateUnavailable": "Walang kilalang palitan para sa currency ng account. Pumili ng ibang account sa utang, o wala.",
         "amountExceedsLoanRemaining": "Mas malaki ang halaga kaysa sa natitira sa utang",
         "responsibleNotMember": "Mga miyembro lamang ng sambahayan ang maaaring maging responsable.",
         "seriesStartTooEarly": "Hindi maaaring nasa buwan bago ang unang entry ng serye ang araw ng simula",

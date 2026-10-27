@@ -1877,6 +1877,7 @@
         "saveFailed": "Das konnte nicht gespeichert werden. Bitte prüfe die Angaben.",
         "loanAlreadyPaid": "Dieses Darlehen ist bereits vollständig bezahlt.",
         "loanInstallmentAlreadyPaid": "Diese Rate ist bereits bezahlt.",
+        "loanPaymentRateUnavailable": "Für die Währung des Kontos ist kein Wechselkurs bekannt. Wähle am Darlehen ein anderes Konto oder keins.",
         "amountExceedsLoanRemaining": "Der Betrag ist höher als der offene Rest des Darlehens",
         "responsibleNotMember": "Zuständig können nur Mitglieder des Haushalts sein.",
         "seriesStartTooEarly": "Der Starttag kann nicht in einem Monat vor der ersten Buchung der Serie liegen",

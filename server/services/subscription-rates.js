@@ -77,4 +77,22 @@ async function getRates(baseCurrency, currencies, { refresh = false } = {}) {
   return { ...cached, source: cached.fetchedAt ? 'stale-cache' : 'unavailable' };
 }
 
-export { getRates };
+/**
+ * 1 `from` in `to` aus dem Kurs-Cache, oder null - synchron, ohne Abruf.
+ * Fuer Schreibpfade, die kein await vor ihren DB-Calls haben duerfen (#2302:
+ * eine Darlehensrate auf ein Konto in dritter Waehrung). Der Cache haelt je
+ * Basis die Kurse ihrer Gegenwaehrungen (1 quote = rate base); eine Zeile in
+ * der Gegenrichtung gilt umgekehrt.
+ */
+function cachedRate(from, to) {
+  if (from === to) return 1;
+  const read = db.get().prepare(
+    'SELECT rate FROM subscription_exchange_rates WHERE base_currency = ? AND quote_currency = ?',
+  );
+  const direct = Number(read.get(to, from)?.rate);
+  if (direct > 0) return direct;
+  const inverse = Number(read.get(from, to)?.rate);
+  return inverse > 0 ? 1 / inverse : null;
+}
+
+export { getRates, cachedRate };

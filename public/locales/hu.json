@@ -1859,6 +1859,7 @@
         "saveFailed": "A mentés nem sikerült. Kérjük, ellenőrizze az adatokat.",
         "loanAlreadyPaid": "Ez a hitel már teljesen ki van fizetve.",
         "loanInstallmentAlreadyPaid": "Ez a részlet már ki van fizetve.",
+        "loanPaymentRateUnavailable": "A számla pénznemére nem ismert árfolyam. Válasszon másik számlát a kölcsönhöz, vagy egyet sem.",
         "amountExceedsLoanRemaining": "Az összeg nagyobb, mint a hitel fennmaradó része",
         "responsibleNotMember": "Felelős csak a háztartás tagja lehet.",
         "seriesStartTooEarly": "A kezdőnap nem eshet a sorozat első tételét megelőző hónapra",

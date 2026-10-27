@@ -1859,6 +1859,7 @@
         "saveFailed": "未能儲存。請檢查填寫的內容。",
         "loanAlreadyPaid": "這筆借款已全部還清。",
         "loanInstallmentAlreadyPaid": "這一期已支付。",
+        "loanPaymentRateUnavailable": "帳戶幣別沒有已知的匯率。請為貸款選擇其他帳戶，或不選帳戶。",
         "amountExceedsLoanRemaining": "金額超過借款的剩餘金額",
         "responsibleNotMember": "只有家庭成員才能擔任負責人。",
         "seriesStartTooEarly": "開始日不能早於系列第一筆條目所在的月份",

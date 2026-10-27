@@ -1859,6 +1859,7 @@
         "saveFailed": "保存できませんでした。入力内容を確認してください。",
         "loanAlreadyPaid": "この貸付はすでに完済されています。",
         "loanInstallmentAlreadyPaid": "この回はすでに支払い済みです。",
+        "loanPaymentRateUnavailable": "口座の通貨の為替レートが不明です。ローンに別の口座を選ぶか、口座なしにしてください。",
         "amountExceedsLoanRemaining": "金額が貸付の残額を超えています",
         "responsibleNotMember": "担当にできるのは世帯のメンバーだけです。",
         "seriesStartTooEarly": "開始日をシリーズの最初の項目より前の月にすることはできません",
