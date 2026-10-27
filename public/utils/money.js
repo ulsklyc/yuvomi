@@ -36,7 +36,37 @@ export const MONEY_ROLES = ['flow', 'total', 'balance', 'plain'];
  * und keine Farbe im Spiel sind (Achsenbeschriftung, Tooltip, CSV).
  */
 export function formatMoney(amount, currency) {
-  return getNumberFormat({ style: 'currency', currency }).format(Number(amount) || 0);
+  return getNumberFormat({ style: 'currency', currency: usableCurrency(currency) }).format(Number(amount) || 0);
+}
+
+/*
+ * EIN UNBRAUCHBARER CODE LEGT KEINE SEITE LAHM (#2302). `Intl.NumberFormat`
+ * wirft bei einem Code, der kein ISO-Code sein kann ("XYZ1"); bis #2302
+ * nahm ein Budget-Konto solche Codes als freien Text an, und eine einzige
+ * Zeile im Bestand brachte die ganze Budget-Seite zum Stehen. Ein solcher
+ * Code faellt hier auf die Haushaltswaehrung zurueck, die die Seite beim
+ * Laden meldet (setFallbackCurrency).
+ */
+let fallbackCurrency = 'EUR';
+const usable = new Map();
+
+/** Die Haushaltswaehrung als Rueckfall fuer unbrauchbare Codes. */
+export function setFallbackCurrency(currency) {
+  if (currency && usableCurrency(currency) === currency) fallbackCurrency = currency;
+}
+
+/** `currency`, wenn Intl damit formatieren kann, sonst die Haushaltswaehrung. */
+export function usableCurrency(currency) {
+  const key = String(currency ?? '');
+  if (!usable.has(key)) {
+    try {
+      getNumberFormat({ style: 'currency', currency: key });
+      usable.set(key, true);
+    } catch {
+      usable.set(key, false);
+    }
+  }
+  return usable.get(key) ? currency : fallbackCurrency;
 }
 
 /**
@@ -48,7 +78,7 @@ export function formatMoney(amount, currency) {
  */
 export function currencySymbol(currency) {
   try {
-    const part = getNumberFormat({ style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency');
+    const part = getNumberFormat({ style: 'currency', currency: usableCurrency(currency) }).formatToParts(0).find((p) => p.type === 'currency');
     return part?.value || String(currency ?? '');
   } catch {
     return String(currency ?? '');
@@ -67,7 +97,7 @@ export function currencySymbol(currency) {
  */
 export function formatMoneyAxis(amount, currency) {
   return getNumberFormat({
-    style: 'currency', currency, maximumFractionDigits: 0, minimumFractionDigits: 0,
+    style: 'currency', currency: usableCurrency(currency), maximumFractionDigits: 0, minimumFractionDigits: 0,
   }).format(Number(amount) || 0);
 }
 
@@ -564,7 +594,7 @@ export function formatSignedAmount(amount, { currency, role, tone, block } = {})
     : 'auto';
 
   const magnitude = (role === 'total' || role === 'plain') ? Math.abs(value) : value;
-  const text = getNumberFormat({ style: 'currency', currency, signDisplay }).format(magnitude);
+  const text = getNumberFormat({ style: 'currency', currency: usableCurrency(currency), signDisplay }).format(magnitude);
 
   const resolvedTone = resolveTone(value, role, tone);
   return { text, tone: resolvedTone, className: block ? `${block}--${resolvedTone}` : '' };

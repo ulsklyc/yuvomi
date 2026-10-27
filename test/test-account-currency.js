@@ -218,3 +218,21 @@ test('Rate: ein geaenderter Betrag der Buchung geht ueber denselben Kurs zurueck
   const payment = db.prepare('SELECT amount FROM budget_loan_payments WHERE budget_entry_id = ?').get(entryId);
   assert.equal(payment.amount, 50, '50 USD auf dem USD-Konto sind 50 USD Rate, nicht 55,56');
 });
+
+// Security-Befund zu #2302: die Kontowaehrung war freier Text bis 8 Zeichen.
+test('Konto: nur unterstuetzte ISO-Codes, leer heisst Budget-Waehrung', async () => {
+  const bad = await call('POST', '/accounts', { name: 'X', type: 'checking', starting_balance: 0, currency: 'XYZ1' });
+  assert.equal(bad.status, 400, JSON.stringify(bad.body));
+  assert.equal(bad.body.reason, 'account_currency_invalid');
+  const lower = await account('Chase', 'usd');
+  assert.equal(db.prepare('SELECT currency FROM budget_accounts WHERE id = ?').get(lower).currency, 'USD');
+  const put = await call('PUT', `/accounts/${lower}`, { currency: 'XYZ1' });
+  assert.equal(put.status, 400);
+  assert.equal(put.body.reason, 'account_currency_invalid');
+  await call('PUT', `/accounts/${lower}`, { currency: '' });
+  assert.equal(db.prepare('SELECT currency FROM budget_accounts WHERE id = ?').get(lower).currency, null);
+  // Ein Bestandswert aus der Zeit davor haelt ein Bearbeiten nicht auf.
+  db.prepare("UPDATE budget_accounts SET currency = 'XYZ1' WHERE id = ?").run(lower);
+  const rename = await call('PUT', `/accounts/${lower}`, { name: 'Chase 2', currency: 'XYZ1' });
+  assert.equal(rename.status, 200, JSON.stringify(rename.body));
+});

@@ -62,10 +62,10 @@ export function budgetPaths() {
     },
     '/api/v1/budget/accounts': {
       get: op({ summary: 'List accounts with starting and running balance, net worth, and available limit on credit cards', tag: 'Budget' }),
-      post: op({ summary: 'Create account (name, type, starting balance; credit cards also take credit_bank and credit_limit)', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create account (name, type, starting balance; credit cards also take credit_bank and credit_limit)', tag: 'Budget', stateChanging: true, requestBody: jsonBody(null) , description: '`currency` is one of the supported ISO 4217 codes (case is ignored) or empty/`null` for the budget currency; anything else is refused with 400 and `reason: account_currency_invalid`.' }),
     },
     '/api/v1/budget/accounts/{id}': {
-      put: op({ summary: 'Update account (credit cards also take credit_bank and credit_limit)', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Update account (credit cards also take credit_bank and credit_limit)', tag: 'Budget', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) , description: '`currency` is one of the supported ISO 4217 codes (case is ignored) or empty/`null` for the budget currency; anything else is refused with 400 and `reason: account_currency_invalid`. An unchanged stored code is accepted as sent.' }),
       delete: op({ summary: 'Delete account without linked transfers (ordinary entries are kept, account_id cleared)', tag: 'Budget', description: 'Returns 409 with reason account_has_transfers while linked transfers reference this account. Entries the caller cannot see (private entries of other members in personal mode) keep the account: it then stays for them as an archived account, while the caller gets the same 204 and no longer sees it. Archive it with PUT instead.', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/budget/loans': {

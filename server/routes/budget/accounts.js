@@ -8,6 +8,7 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
 import { resyncSubscriptionBookings } from '../subscriptions.js';
+import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {
   budgetFilter, listAccounts, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
@@ -64,7 +65,8 @@ router.post('/accounts', (req, res) => {
       return refuse(res, [refusal('account_credit_limit_invalid', 'Credit limit must not be negative.')]);
     }
 
-    const currency = req.body.currency ? str(req.body.currency, 'Currency', { max: 8 }).value : null;
+    const currency = accountCurrencyInput(req.body.currency);
+    if (currency === undefined) return refuse(res, [CURRENCY_REFUSAL()]);
     const color    = vColor.value;
 
     const result = db.get().prepare(`
@@ -84,6 +86,22 @@ router.post('/accounts', (req, res) => {
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });
+
+/**
+ * Die Waehrung eines Kontos: ein Code aus CURRENCY_CODES, leer heisst
+ * Budget-Waehrung (null), undefined heisst ungueltig. Bis #2302 stand hier ein
+ * freier Text bis 8 Zeichen; ein Code wie "XYZ1" brachte `Intl.NumberFormat`
+ * im Browser zum Werfen, und die Budget-Seite renderte fuer den ganzen
+ * Haushalt nicht mehr. Ein unveraendert mitgeschickter Bestandswert bleibt
+ * stehen - ein Bearbeiten des Namens scheitert nicht an ihm.
+ */
+function accountCurrencyInput(value, current = null) {
+  if (value === null || value === '' || value === undefined) return null;
+  if (current != null && value === current) return current;
+  const code = String(value).trim().toUpperCase();
+  return CURRENCY_CODES.includes(code) ? code : undefined;
+}
+const CURRENCY_REFUSAL = () => refusal('account_currency_invalid', 'Currency must be a supported ISO 4217 code.');
 
 /** Die Abos mit diesem Konto als Vorgabe - ihre wartende Buchung folgt ihm. */
 function subscriptionsOn(accountId) {
@@ -115,8 +133,9 @@ router.put('/accounts/:id', async (req, res) => {
     if (errors.length) return refuse(res, errors);
 
     const currency = req.body.currency !== undefined
-      ? (req.body.currency ? str(req.body.currency, 'Currency', { max: 8 }).value : null)
+      ? accountCurrencyInput(req.body.currency, existing.currency)
       : existing.currency;
+    if (currency === undefined) return refuse(res, [CURRENCY_REFUSAL()]);
     const color = req.body.color !== undefined
       ? validateColor(req.body.color, 'Color', { allowTokens: true }).value
       : existing.color;

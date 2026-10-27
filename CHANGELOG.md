@@ -401,6 +401,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks that each of them opens the dialog.
 
 ### Security
+- **An account's currency must be a real currency code** (#2302). The budget API stored any text up
+  to eight characters as an account currency, and a code like "XYZ1" stopped the whole budget page
+  from rendering for everyone in the household. Accounts now take only the supported ISO 4217
+  codes, and the app shows an unusable stored code in the household currency instead of failing.
 - **The Docker image runs on Node.js 24.22.1, which fixes CVE-2026-111497** (#2286). The Brotli
   decoder built into Node.js could write past its buffer on a crafted compressed stream, which can
   crash the server or, in the worst case, run code. The image was pinned to an earlier Node.js 24

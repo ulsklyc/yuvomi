@@ -33,7 +33,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput, setFallbackCurrency } from '/utils/money.js';
 import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
@@ -930,6 +930,7 @@ export async function render(container, { user }) {
         loadBudgetMeta(),
       ]);
       state.currency = prefsRes.data?.currency ?? 'EUR';
+      setFallbackCurrency(state.currency);
       state.budgetMode = prefsRes.data?.budget_mode === 'personal' ? 'personal' : 'shared';
       state.members = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.users ?? []);
     } catch (_) { /* Fallback auf EUR */ }
@@ -5545,6 +5546,7 @@ const BUDGET_REFUSALS = new Map([
   ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
   ['account_has_transfers', [null, 'budget.accountHasTransfers']],
   ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
+  ['account_currency_invalid', [null, 'budget.loanCurrencyInvalid']],
   // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
   ['category_name_invalid', [null, 'common.nameRequired']],
   ['subcategory_name_invalid', [null, 'common.nameRequired']],
