@@ -5906,6 +5906,38 @@ test('Review p11 (B5): der Fasten-Knopf ist im Anpassen-Modus gesperrt und schre
 });
 
 // --------------------------------------------------------
+// Review p11 (B6): DAS DREHEN SIEHT DEN BUEHNENWECHSEL AUCH OHNE HEUTE-BLATT.
+// createPhoneProgramFit las die gezeichnete Buehne nur am Blatt; ist es
+// abgewaehlt, blieben die am Telefon gezeichneten Kacheln nach 390 -> 800px
+// ohne Spannen (gemessen Notizen 1x2 546 statt 612px, Listen kurz).
+// --------------------------------------------------------
+test('Review p11 (B6): das Raster nennt seine Buehne, und ein Wechsel baut neu - auch ohne Heute-Blatt', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const run = (tileStage) => {
+    const listeners = {};
+    const frames = [];
+    const grid = { dataset: { tileStage } };
+    const win = {
+      addEventListener: (type, fn) => { listeners[type] = fn; },
+      requestAnimationFrame: (fn) => { frames.push(fn); return frames.length; },
+      cancelAnimationFrame: () => {},
+      document: { querySelector: (sel) => (sel === '#dashboard-widget-grid' ? grid : null) },
+    };
+    const calls = [];
+    __test.createPhoneProgramFit(win, new AbortController().signal, (crossed) => calls.push(crossed));
+    listeners.resize();
+    frames[0]();
+    return calls;
+  };
+  // Ohne matchMedia ist hier die breite Buehne (onPhoneStage).
+  nodeAssert.deepEqual(run('phone'), [true], 'am Telefon gezeichnet, jetzt breit: neu bauen');
+  nodeAssert.deepEqual(run('wide'), [false], 'dieselbe Buehne: nur nachmessen');
+  // Das Raster traegt die Buehne, fuer die es gezeichnet ist.
+  const html = __test.renderDashboardLayout([{ id: 'clock', visible: true, order: 0, size: '1x1' }], {}, null, 'EUR');
+  nodeAssert.match(html, /id="dashboard-widget-grid"[^>]*data-tile-stage="wide"/);
+});
+
+// --------------------------------------------------------
 // Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
 // `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
 // aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf

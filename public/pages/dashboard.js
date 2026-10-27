@@ -4575,7 +4575,14 @@ function createPhoneProgramFit(win, signal, rebuild) {
       // Die Buehne, fuer die das Blatt gezeichnet ist, gegen die gemessene:
       // Telefon, schmal oder breit (todayStage).
       const drawn = win.document?.querySelector?.('.today-cockpit')?.dataset?.todayStage;
-      rebuild(Boolean(drawn) && drawn !== todayStage());
+      /* UND DIE DER KACHELN, OHNE DAS BLATT (Review p11, B6). Das Blatt ist
+       * abwaehlbar; ohne es sah das Drehen vom Telefon zur breiten Buehne
+       * keinen Wechsel, und die Kacheln blieben ohne Spannen (tileSpanAttrs
+       * rechnet am Telefon nichts) - gemessen 390 -> 800px: Notizen 1x2
+       * 546px hoch, nach Daten 612, und die Listen kurz wie am Telefon. */
+      const tiles = win.document?.querySelector?.('#dashboard-widget-grid')?.dataset?.tileStage;
+      const tilesCrossed = Boolean(tiles) && tiles !== (onPhoneStage() ? 'phone' : 'wide');
+      rebuild((Boolean(drawn) && drawn !== todayStage()) || tilesCrossed);
     });
   }, { signal, passive: true });
   signal.addEventListener('abort', () => win.cancelAnimationFrame(frame), { once: true });
@@ -7473,7 +7480,10 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
    * gebraucht wird sie nur als Gliederungsebene. Das Wort ist dasselbe, das die
    * Anpassen-Leiste benutzt („Widgets anpassen", „Ausgeblendete Widgets"). */
   const heading = `<h2 class="sr-only" id="dashboard-widgets-title">${esc(t('dashboard.widgetsHeading'))}</h2>`;
+  // Fuer welche Buehne die Kacheln gezeichnet sind (createPhoneProgramFit):
+  // am Telefon ohne Spannen und mit kurzen Listen, breit mit beidem.
   const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid"
+                    data-tile-stage="${onPhoneStage() ? 'phone' : 'wide'}"
                     role="region" aria-labelledby="dashboard-widgets-title">${gridInner}</div>`;
   // Im Bearbeiten-Modus steht die Wieder-Einblenden-Leiste UEBER dem Raster
   // (R14, A7 P2-2), wie die Widget-Galerie in iOS: mobil lag der Vorrat mit 14
