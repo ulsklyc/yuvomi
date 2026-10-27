@@ -302,6 +302,30 @@ function assignListDefault(d, taskId, userIds) {
   for (const userId of userIds) ins.run(taskId, userId);
 }
 
+/**
+ * Die Zeile, die zu dieser UID gehört - über ALLE Konten (#1906, wie
+ * `rowForUid` bei Terminen, #1879). Dieselbe UID aus zwei Konten ist EINE
+ * Zeile, und das Konto, das sie zuerst geliefert hat, besitzt sie:
+ *   - eigene Zeile: wird aktualisiert;
+ *   - Zeile eines anderen Kontos: bleibt unberührt, und es entsteht keine
+ *     zweite (`{ foreign: true }`);
+ *   - Zeile ohne Konto (ihr Konto wurde gelöscht, #1885): wird übernommen.
+ * @returns {{row: object|null, foreign: boolean}}
+ */
+function rowForTodoUid(d, table, columns, uid, accountId) {
+  const rows = d.prepare(
+    `SELECT id, external_account_id, ${columns} FROM ${table}
+      WHERE external_uid = ? AND external_source = 'caldav' ORDER BY id`
+  ).all(uid);
+  const own = rows.find((r) => r.external_account_id === accountId);
+  if (own) return { row: own, foreign: false };
+  if (rows.some((r) => r.external_account_id != null)) return { row: null, foreign: true };
+  const free = rows[0];
+  if (!free) return { row: null, foreign: false };
+  d.prepare(`UPDATE ${table} SET external_account_id = ? WHERE id = ? AND external_account_id IS NULL`).run(accountId, free.id);
+  return { row: free, foreign: false };
+}
+
 // Die Objekt-URL (obj.url des Abrufs) wandert bei jedem Upsert mit: ohne sie ist
 // ein gespiegelter Eintrag für spätere Änderungen und Löschungen unerreichbar
 // (#617). COALESCE, weil ein Abruf ohne URL den gespeicherten Wert nicht
@@ -314,9 +338,9 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
   // Zeile gehört nicht dazu: er wird zusammen mit seinem Erledigungseintrag in
   // applySyncedCompletions geschrieben (#1836, siehe unten).
   return d.transaction(() => {
-    const existing = d.prepare(
-      `SELECT id, priority, status FROM tasks WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
-    ).get(todo.uid, accountId);
+    const { row: existing, foreign } = rowForTodoUid(d, 'tasks', 'priority, status', todo.uid, accountId);
+    // Ein anderes Konto führt die Aufgabe schon (#1906): nichts anlegen, nichts ändern.
+    if (foreign) return null;
 
     const priority = mapVtodoPriority(todo.priority, existing?.priority);
     const status   = mapVtodoStatus(todo, existing?.status);
@@ -519,9 +543,11 @@ function upsertShoppingItem(sel, todo, accountId, objectUrl = null) {
   const listId    = ensureShoppingList(sel);
   const isChecked = todo.completed ? 1 : 0;
 
-  const existing = db.get().prepare(
-    `SELECT id, outbound_move FROM shopping_items WHERE external_uid = ? AND external_source = 'caldav' AND external_account_id = ?`
-  ).get(todo.uid, accountId);
+  // Über alle Konten (#1906): die Liste des Kontos, das den Artikel zuerst
+  // geliefert hat, gilt - auch wenn ein zweites dieselbe Server-Liste einer
+  // anderen lokalen Liste zuordnet.
+  const { row: existing, foreign } = rowForTodoUid(db.get(), 'shopping_items', 'outbound_move', todo.uid, accountId);
+  if (foreign) return;
 
   // DER ARTIKEL IST HIER UMGEZOGEN, SEIN OBJEKT NOCH NICHT (#1700). Der Abruf
   // liest es am alten Platz und stellte die Zeile sonst dorthin zurück - der
@@ -935,6 +961,9 @@ async function runSync({ createClient: makeClient } = {}) {
                   completions: completionTransitions,
                   defaultAssignees: listAssignees.get(sel.id),
                 });
+                // Die Aufgabe gehört einem anderen Konto (#1906): dessen
+                // Abruf verdrahtet ihre Hierarchie.
+                if (taskId == null) { totalItems++; continue; }
                 taskRelations.set(todo.uid, {
                   taskId,
                   parentUid: todo.parentUid || null,

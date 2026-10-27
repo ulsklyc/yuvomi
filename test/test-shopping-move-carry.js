@@ -879,7 +879,8 @@ test('Zwei Konten fuehren DIESELBE Server-Liste, je auf eine eigene Einkaufslist
   dav.putObject(a.url, FILE, original());
   await remindersSync.sync();
   const mine = rowsOf().find((x) => x.external_account_id === account1);
-  assert.equal(rowsOf().length, 2, 'jedes Konto spiegelt das Objekt in seine Liste');
+  // Eine Zeile je UID (#1906): das erste Konto besitzt sie, auf seiner Liste.
+  assert.equal(rowsOf().length, 1, 'jedes Konto hat das Objekt in eine eigene Zeile gespiegelt');
 
   await patch(mine.id, { list_id: other });
   await remindersSync.sync();
@@ -889,7 +890,7 @@ test('Zwei Konten fuehren DIESELBE Server-Liste, je auf eine eigene Einkaufslist
   assert.equal(dav.seen('PUT').length, 0);
   assert.equal(row(mine.id).outbound_move, 0);
   assert.deepEqual(notes(), []);
-  assert.equal(rowsOf().length, 2);
+  assert.equal(rowsOf().length, 1);
 });
 
 // ── Der Nutzer handelt, waehrend der Umzug unterwegs ist ────────────────────────

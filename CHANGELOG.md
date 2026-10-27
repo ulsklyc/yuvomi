@@ -195,6 +195,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **A shared reminder list connected through two CalDAV accounts shows each task and shopping
+  item once** (#1906). When two family members each connected their own account to the same
+  list, every task and item stood in Yuvomi twice. Now the account that brings an entry in first
+  owns it, and the other account neither adds, changes nor removes it, as for events since
+  #1879. Entries that are already double are merged on update (migration 268): the older one
+  stays and takes over the comments, documents and assignees of the other; the other's
+  completions are dropped, since they mirror the same tick. Deleting a CalDAV account now leaves
+  its tasks and shopping items synced without an account, and the next account that has them
+  takes them over instead of adding them again (#1885).
 - **A CalDAV or iCloud server that says "too many requests" or "unavailable" gets a rest for the
   rest of the run** (#2135). Since #2133 a sync stopped sending deletions and changes to an
   account after such an answer, but the same run still cleaned up leftovers of unconfirmed uploads

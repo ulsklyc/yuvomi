@@ -1631,6 +1631,16 @@ belongs to in `caldav_account_id`, and so does its pending deletion. The rules:
   again by UID on the next fetch; its pending deletions are dropped in the same step, because they
   name objects of the old server.
 
+**The same for tasks and shopping items (migration v268, #1906, #1885).** A task or shopping item
+with the same UID from two CalDAV accounts is one row, owned by the account that delivered it
+first (`external_account_id`); the other account neither creates, changes nor prunes it. A shopping
+item stays on the local list of the owning account's mapping. A row whose account is deleted loses
+its account (trigger `trg_caldav_accounts_release_rows`, which also clears the upload targets of
+tasks and events), stays mirrored, and the next account that delivers its UID takes it over.
+Migration v268 merged rows that were already double: the oldest row stayed and took over the
+comments, documents and assignees of the others (duplicates skipped), their subtasks and series
+links; their completions and tags were dropped.
+
 Apple and Google keep one connection each and are unaffected: their rows and pending deletions
 leave the column `NULL`, and the shared functions filter by source only, as before.
 

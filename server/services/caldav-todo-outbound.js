@@ -254,22 +254,22 @@ function isMirrored(row) {
 
 /**
  * Löst die gespiegelten Zeilen eines Kontos von ihm ab - zu rufen, bevor das
- * Konto verschwindet. Was hier steht, sind Nutzerdaten und bleibt; nur die
- * Verbindung zum Server geht. Danach ist es eine gewöhnliche Aufgabe bzw. ein
- * gewöhnlicher Einkaufsposten: kein Tombstone, kein Push, und der Prune-Lauf
- * eines anderen Kontos fasst sie nicht an.
+ * Konto verschwindet. Dieselbe Regel wie bei Terminen (#1885, #1906): die
+ * Zeile bleibt Spiegel ihrer UID, verliert nur ihr Konto, und das nächste
+ * Konto, das die UID liefert, übernimmt sie - statt dass es neben ihr eine
+ * zweite anlegt. Kein Tombstone und kein Push ohne Konto, und der Prune-Lauf
+ * eines anderen Kontos fasst sie nicht an. Der Trigger
+ * `trg_caldav_accounts_release_rows` (v268) tut dasselbe für jeden anderen
+ * Weg, auf dem ein Konto verschwindet.
  *
- * @returns {number} Anzahl entkoppelter Zeilen
+ * @returns {number} Anzahl abgelöster Zeilen
  */
 export function detachAccountRows(accountId) {
   let detached = 0;
   for (const def of Object.values(MODULES)) {
     detached += db.get().prepare(`
       UPDATE ${def.table}
-         SET external_source     = 'local',
-             external_uid        = NULL,
-             external_account_id = NULL,
-             external_object_url = NULL,${def.table === 'shopping_items' ? `
+         SET external_account_id = NULL,${def.table === 'shopping_items' ? `
              outbound_move          = 0,
              outbound_move_attempts = 0,
              outbound_move_since    = NULL,
