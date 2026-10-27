@@ -4567,7 +4567,9 @@ test('Wand-Modus: render() reicht screensaver_enabled bis zum Knopf, der Klick r
 // gehende Zeile ist vorher per collapseRow geschlossen.
 register(`data:text/javascript,${encodeURIComponent(`
   export async function resolve(spec, ctx, next) {
-    if (spec === '/pages/tasks.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openTaskById = (id, opts) => globalThis.__openTaskById?.(id, opts);') };
+    if (spec === '/pages/tasks.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openTaskById = (id, opts) => globalThis.__openTaskById?.(id, opts); export const openNewTask = (opts) => globalThis.__openNewSheet?.("/tasks", opts);') };
+    if (spec === '/pages/calendar.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewEvent = (opts) => globalThis.__openNewSheet?.("/calendar", opts);') };
+    if (spec === '/pages/notes.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewNote = (opts) => globalThis.__openNewSheet?.("/notes", opts);') };
     return next(spec, ctx);
   }`)}`);
 const beforeQuietRefresh = pendingTests.slice();
@@ -4770,6 +4772,258 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
       if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
       else delete globalThis[name];
     }
+  }
+});
+
+// --------------------------------------------------------
+// U2 (DW p5b): "+ Neu" legt an, ohne die Uebersicht zu verlassen
+// --------------------------------------------------------
+// Pille und Speed-Dial wechselten ins Modul und klickten dort dessen FAB: die
+// Uebersicht war weg, und nach dem Speichern stand man in der Liste. Jetzt
+// oeffnen Aufgabe, Termin und Notiz das Formular ihres Moduls ueber der
+// Uebersicht; nach dem Speichern gleicht sie still ab (kein render(), kein
+// Skelett), und die neue Zeile zieht in ihrer Kachel ein. Einkauf hat kein
+// Blatt (sein FAB oeffnet die Eingabezeile ueber der Liste) und bleibt der
+// Weg ins Modul. Gemessen an der echten Seite: Klicks auf die Menuepunkte der
+// Pille und die Ziele des Speed-Dials, die Module sind Stubs.
+const beforeNewSheet = pendingTests.slice();
+test('U2: "+ Neu" oeffnet das Anlegen-Blatt ueber der Uebersicht - kein navigate, danach stiller Abgleich mit der neuen Zeile', async () => {
+  await Promise.allSettled(beforeNewSheet);
+  const names = ['window', 'document', 'localStorage', 'location', 'history', 'MutationObserver', 'setTimeout', 'setInterval', 'CSS', 'ResizeObserver', '__apiStub', '__openNewSheet', '__expandIn'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const realSetTimeout = globalThis.setTimeout;
+  const realSetInterval = globalThis.setInterval;
+  const timeouts = [];
+  const intervals = [];
+  const log = [];
+  const makeNode = (attrs = new Map()) => {
+    const listeners = new Map();
+    return {
+      dataset: {}, style: {}, hidden: false, listeners,
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener() {},
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute: (name) => attrs.get(name) ?? null,
+      removeAttribute(name) { attrs.delete(name); },
+      hasAttribute: (name) => attrs.has(name),
+      toggleAttribute() {},
+      querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+      append() {}, appendChild() {}, prepend() {}, before() {}, remove() {},
+      contains: () => false, focus() {},
+      getClientRects: () => [{}],
+      getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    };
+  };
+  let shellHtml = '';
+  let rows = new Map();
+  const shell = makeNode();
+  const taskRows = () => [...shellHtml.matchAll(/class="task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+    if (!rows.has(id)) {
+      const row = makeNode(new Map([['data-task-id', id]]));
+      row.dataset.taskId = id;
+      row.closest = (selector) => {
+        if (selector.includes('data-widget-id')) return { dataset: { widgetId: 'tasks' } };
+        if (selector === '#dashboard-shell') return shell;
+        return row;
+      };
+      rows.set(id, row);
+    }
+    return rows.get(id);
+  });
+  Object.assign(shell, {
+    replaceChildren() { shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; log.push(['shell', /widget-skeleton/.test(html) ? 'skeleton' : 'content']); },
+    querySelectorAll: (selector) => (/data-task-id/.test(selector) ? taskRows() : []),
+  });
+  const container = Object.assign(makeNode(), {
+    replaceChildren() { log.push(['container']); shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; },
+    querySelector: (selector) => (selector === '#dashboard-shell' ? shell : null),
+    querySelectorAll: (selector) => (/task-item\[data-task-id\]/.test(selector) ? taskRows() : []),
+  });
+  const inertDoc = () => {
+    let html = '';
+    return {
+      body: { insertAdjacentHTML(_position, markup) { html += markup; } },
+      querySelector: (selector) => {
+        const id = /\[data-task-id="(\d+)"\]/.exec(selector)?.[1];
+        return id && html.includes(`data-task-id="${id}"`) ? {} : null;
+      },
+    };
+  };
+  // Der Speed-Dial lebt in der Shell-Layer; findPageFab findet ihn per Id.
+  const routes = ['/tasks', '/calendar', '/shopping', '/notes'];
+  const dialItems = routes.map((route) => Object.assign(makeNode(), { dataset: { route } }));
+  const fabActions = Object.assign(makeNode(), { querySelectorAll: (sel) => (sel === '[data-route]' ? dialItems : []) });
+  const fabGroup = Object.assign(makeNode(), { querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
+  const fabMain = Object.assign(makeNode(), {
+    id: 'fab-main',
+    closest: (sel) => (sel === '.page-fab-group' ? fabGroup : null),
+    focus() { log.push(['focus', 'fab-main']); },
+  });
+  const pageFabs = new Map([['fab-main', fabMain]]);
+  for (const id of ['fab-new-task', 'fab-new-event', 'fab-new-item', 'fab-new-note']) {
+    pageFabs.set(id, Object.assign(makeNode(), { click() { log.push(['click', id]); } }));
+  }
+
+  let tasks = [5];
+  const visited = [];
+  const opened = [];
+  const user = { id: 1, role: 'admin', display_name: 'Anna' };
+  const globals = {
+    window: Object.assign(makeNode(), {
+      yuvomi: { showToast() {}, isModuleDisabled: () => false, replacePageFab() {}, navigate: async (route) => { visited.push(route); log.push(['navigate', route]); } },
+      requestAnimationFrame: () => 0, cancelAnimationFrame() {},
+      innerWidth: 390, innerHeight: 844,
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    }),
+    document: Object.assign(makeNode(), {
+      documentElement: makeNode(), body: makeNode(), hidden: false, activeElement: null,
+      createElement: () => makeNode(),
+      getElementById: (id) => pageFabs.get(id) ?? null,
+      implementation: { createHTMLDocument: () => inertDoc() },
+    }),
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    location: { pathname: '/', search: '', hash: '', href: 'http://overview.test/' },
+    history: { state: null, pushState() {}, replaceState() {}, back() {}, go() {} },
+    MutationObserver: class { observe() {} disconnect() {} },
+    ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
+    setTimeout: (...args) => { const handle = realSetTimeout(...args); timeouts.push(handle); return handle; },
+    setInterval: (...args) => { const handle = realSetInterval(...args); intervals.push(handle); return handle; },
+    CSS: { escape: (value) => String(value), supports: () => false },
+    __apiStub: {
+      get: async (path) => {
+        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }] } };
+        if (path.startsWith('/dashboard')) {
+          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [], countdowns: [] };
+        }
+        return { data: null };
+      },
+    },
+    __openNewSheet: async (route, opts) => {
+      log.push(['sheet', route]);
+      opened.push({ route, opts });
+      if (route === '/notes' && globalThis.__sheetFails) throw new Error('offline');
+    },
+    __expandIn: (el) => { log.push(['expandIn', el?.dataset?.taskId ?? null]); },
+  };
+  for (const [name, value] of Object.entries(globals)) {
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const controller = new AbortController();
+  try {
+    const { render } = await import('../public/pages/dashboard.js');
+    await render(container, { user, signal: controller.signal });
+    await settle();
+    nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht');
+
+    // 1. Pille: der Menuepunkt im Seiten-Container (nicht der Griff der Popover-Mechanik).
+    const pillClick = (container.listeners.get('click') ?? []).find((fn) => fn.name !== 'onItemClick');
+    nodeAssert.equal(typeof pillClick, 'function', 'Reichweite: die Pille ist verdrahtet');
+    for (const route of routes) {
+      const item = { dataset: { newRoute: route }, closest: () => null };
+      await pillClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
+    }
+    await settle();
+    nodeAssert.deepEqual(opened.map((o) => o.route), ['/tasks', '/calendar', '/notes'],
+      'Pille: Aufgabe, Termin und Notiz oeffnen ihr Blatt ueber der Uebersicht');
+    nodeAssert.deepEqual(visited, ['/shopping'], 'Pille: kein navigate beim Anlegen - nur Einkauf wechselt ins Modul');
+    nodeAssert.ok(log.some(([kind, id]) => kind === 'click' && id === 'fab-new-item'), 'Einkauf: dort oeffnet sein FAB die Eingabezeile');
+    for (const { route, opts } of opened) {
+      nodeAssert.equal(opts.user, user, `${route}: das Blatt kennt den angemeldeten Menschen`);
+      nodeAssert.equal(opts.signal?.aborted, false, `${route}: das Blatt bekommt das Signal der Seite (geliehenes Seitenblatt)`);
+      nodeAssert.equal(typeof opts.onChanged, 'function', `${route}: das Blatt bekommt ein onChanged`);
+    }
+    const firstSheet = log.findIndex(([kind]) => kind === 'sheet');
+    nodeAssert.ok(firstSheet > 0 && log[firstSheet - 1][0] === 'focus', 'der Fokus steht vor dem Oeffnen auf "+ Neu" - Abbrechen fuehrt dorthin zurueck');
+
+    // 2. Speed-Dial: dieselben Wege.
+    opened.length = 0;
+    visited.length = 0;
+    for (const el of dialItems) {
+      const go = el.listeners.get('click')?.[0];
+      nodeAssert.equal(typeof go, 'function', `Speed-Dial: ${el.dataset.route} ist verdrahtet`);
+      await go();
+    }
+    await settle();
+    nodeAssert.deepEqual(opened.map((o) => o.route), ['/tasks', '/calendar', '/notes'], 'Speed-Dial: dieselben drei Blaetter');
+    nodeAssert.deepEqual(visited, ['/shopping'], 'Speed-Dial: kein navigate beim Anlegen');
+
+    // 3. Ein Blatt, das nicht laedt, verschliesst das Anlegen nicht: der Weg ins Modul.
+    visited.length = 0;
+    globalThis.__sheetFails = true;
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await pillClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? { dataset: { newRoute: '/notes' }, closest: () => null } : null) } });
+      await settle();
+    } finally {
+      console.error = origError;
+      delete globalThis.__sheetFails;
+    }
+    nodeAssert.deepEqual(visited, ['/notes'], 'scheitert das Blatt, fuehrt der Tipp ins Modul');
+    nodeAssert.ok(log.some(([kind, id]) => kind === 'click' && id === 'fab-new-note'), 'und oeffnet dort das Anlegen');
+
+    // 4. Gespeichert: der stille Abgleich, kein render(), kein Skelett, die neue Zeile zieht ein.
+    const { opts } = opened[0];
+    tasks = [5, 7];
+    log.length = 0;
+    await opts.onChanged();
+    await settle();
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'container'), [], 'kein Schreiben in den Container - das waere das volle render() mit Skelett');
+    nodeAssert.deepEqual(log.filter(([, what]) => what === 'skeleton'), [], 'kein Skelett nach dem Anlegen');
+    nodeAssert.match(shellHtml, /data-task-id="7"/, 'die neue Aufgabe steht in ihrer Kachel');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'expandIn'), [['expandIn', '7']], 'nur die neue Zeile zieht ein, die bleibende nicht');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'navigate'), [], 'und niemand hat navigiert');
+  } finally {
+    controller.abort();
+    for (const handle of timeouts) clearTimeout(handle);
+    for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+const beforeArriving = pendingTests.slice();
+test('U2: rowsArriving - neu sind Kachelzeilen, die vorher fehlten; das Heute-Blatt passt sich nur ein, und mehr als drei sind ein neuer Stand', async () => {
+  await Promise.allSettled(beforeArriving);
+  const savedCss = Object.getOwnPropertyDescriptor(globalThis, 'CSS');
+  Object.defineProperty(globalThis, 'CSS', { value: { escape: (v) => String(v) }, configurable: true, writable: true });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const fakeShell = (spec) => {
+      const shell = {};
+      const rowsOf = spec.map(([id, inTile]) => {
+        const attrs = new Map([['data-task-id', String(id)]]);
+        const row = {
+          dataset: { taskId: String(id) }, hidden: false,
+          getAttribute: (n) => attrs.get(n) ?? null, hasAttribute: (n) => attrs.has(n),
+          getClientRects: () => [{}], contains: () => false,
+        };
+        row.closest = (sel) => {
+          if (sel.includes('data-widget-id')) return inTile ? { dataset: { widgetId: 'tasks' } } : null;
+          if (sel === '#dashboard-shell') return shell;
+          return row;
+        };
+        return row;
+      });
+      shell.querySelectorAll = () => rowsOf;
+      return shell;
+    };
+    const known = __test.shownRowKeys(fakeShell([[1, true], [2, true], [9, false]]));
+    nodeAssert.equal(known.size, 2, 'das Heute-Blatt zaehlt nicht mit');
+    const arriving = __test.rowsArriving(fakeShell([[1, true], [2, true], [3, true], [9, false], [10, false]]), known);
+    nodeAssert.deepEqual(arriving.map((r) => r.dataset.taskId), ['3'], 'neu ist die Kachelzeile 3 - die nachgerueckte Zeile 10 im Heute-Blatt nicht');
+    const many = __test.rowsArriving(fakeShell([[1, true], [3, true], [4, true], [5, true], [6, true]]), known);
+    nodeAssert.deepEqual(many, [], 'vier neue Zeilen sind ein neuer Stand, kein Ankommen');
+    nodeAssert.deepEqual(__test.rowsArriving(fakeShell([[3, true]]), new Set()), [], 'ohne Vorher kein Ankommen (erster Aufbau)');
+  } finally {
+    if (savedCss) Object.defineProperty(globalThis, 'CSS', savedCss);
+    else delete globalThis.CSS;
   }
 });
 

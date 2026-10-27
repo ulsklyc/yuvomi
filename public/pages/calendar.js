@@ -66,6 +66,7 @@ import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import { googleTargetValue, caldavTargetValue, outlookTargetValue, assigneeSyncTarget } from '/utils/sync-target.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { findPageFab } from '/utils/fab.js';
+import { lendPageStyle } from '/utils/component-style.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { nowFields, todayKey, wallTimeToInstantMs, zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { dayHeading, dayHeadingLabel } from '/utils/day-label.js';
@@ -7714,6 +7715,30 @@ export async function openEventById(id, { date = null, anchor = null, user = nul
   }
   _away = away;
   await openEventDetail(ev, anchor, { formReady: away?.ready });
+}
+
+/**
+ * EIN NEUER TERMIN UEBER EINER FREMDEN SEITE (DW, Ulas U2). "+ Neu > Termin"
+ * auf der Uebersicht wechselte hierher und klickte den FAB - die Uebersicht
+ * war weg, und nach dem Speichern stand man im Kalender. Jetzt geht dasselbe
+ * Formular wie am FAB ueber der aufrufenden Seite auf (der Weg von
+ * openEventById fuers Bearbeiten), und nach dem Speichern meldet es sich bei
+ * ihr (`onChanged`, notifyAwayChanged) statt eine Ansicht neu zu zeichnen,
+ * die nicht steht.
+ *
+ * Das Formular wird aus dem Zustand gebaut (Mitglieder, eigene Kalender,
+ * Praeferenzen), also wartet es auf loadAwayFormContext - und auf calendar.css
+ * (Farbwahl, Erinnerungszeilen), geliehen fuer die Lebenszeit der Seite
+ * darunter (`signal`, lendPageStyle). Der Tag ist heute im Haushalt: Ansicht
+ * und Cursor, nach denen der FAB hier waehlt (newEventDate), stehen nicht.
+ * Scheitert das Laden, wirft der Aufruf - der Aufrufer nimmt den Weg ins Modul.
+ * @param {{ user?: object|null, onChanged?: () => (void|Promise<void>), signal?: AbortSignal|null }} [options]
+ */
+export async function openNewEvent({ user = null, onChanged = null, signal = null } = {}) {
+  if (readOnly()) return;
+  await Promise.all([loadAwayFormContext(user), lendPageStyle('/styles/calendar.css', signal)]);
+  _away = { onChanged, onRemoving: null, ready: Promise.resolve() };
+  openEventModal({ mode: 'create', date: todayKey() });
 }
 
 /**

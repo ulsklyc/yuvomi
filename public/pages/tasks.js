@@ -2375,7 +2375,7 @@ function wireReminderAfterDue(panel) {
   }
 }
 
-function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
+function openTaskModal({ task = null, users = [], reminder = null, onChanged } = {}, container) {
   // Der letzte Riegel vor dem Formular - hinter FAB, Kopfknopf und
   // Leerzustands-CTA, die alle hierher fuehren.
   if (readOnly()) return;
@@ -2391,7 +2391,9 @@ function openTaskModal({ task = null, users = [], reminder = null } = {}, contai
     size: 'lg',
     // Eine neue Aufgabe startet weiterhin mit dem Fokus im Titelfeld - hier ist
     // Tippen die Absicht.
-    onSave(panel) { wireTaskForm(panel, { task, container }); },
+    // `onChanged` nur ueber einer fremden Seite (openNewTask): ohne ihn gilt
+    // der Default von wireTaskForm, die Liste dieser Seite.
+    onSave(panel) { wireTaskForm(panel, { task, container, onChanged }); },
   });
 }
 
@@ -6262,6 +6264,60 @@ function ensureTaskStyles() {
 }
 
 /**
+ * Was Ansicht und Formular brauchen, wenn diese Seite nie stand (#918):
+ * Mitglieder, Kategorien und Tags einmal holen, dazu den angemeldeten
+ * Menschen. Ohne sie blieben @-Erwaehnungen unaufgeloest, die Kategoriezeile
+ * zeigte ihren internen Schluessel und das Formular haette keine Auswahl
+ * anzubieten. Geteilt von openTaskById und openNewTask.
+ *
+ * `meta` kommt OHNE `data`-Huelle: /tasks/meta/options antwortet mit den
+ * Feldern direkt (server/routes/tasks.js), anders als die uebrigen Routen
+ * dieses Moduls. Ein `meta.data?.users` daneben laese still `undefined`.
+ */
+async function ensureAwayMeta(user) {
+  if (!state.users.length || !state.categories.length) {
+    try {
+      const { data: meta = {}, fromCache } = await api.getWithSource('/tasks/meta/options');
+      const alleStale = fromCache === true;
+      state.metaStale = { users: alleStale, categories: alleStale, tags: alleStale };
+      state.users         = meta.users      ?? state.users;
+      state.categories    = meta.categories ?? state.categories;
+      state.allTags       = meta.tags       ?? state.allTags;
+      state.defaultPoints = Number(meta.default_points) || state.defaultPoints;
+    } catch { /* Ansicht steht auch ohne - nur weniger aufgeloest, siehe die Aufrufer. */ }
+  }
+  if (user) {
+    state.currentUserId = user.id ?? null;
+    state.isAdmin       = user.role === 'admin';
+  }
+}
+
+/**
+ * EINE NEUE AUFGABE ANLEGEN, OHNE AUF DIESER SEITE ZU STEHEN (DW, Ulas U2).
+ * "+ Neu > Aufgabe" auf der Uebersicht wechselte hierher und klickte den FAB:
+ * die Uebersicht war weg, und nach dem Speichern stand man in der Liste statt
+ * dort, wo man angefangen hatte. Jetzt geht dasselbe Formular ueber der
+ * aufrufenden Seite auf (wie openTaskById fuers Lesen), und nach dem Speichern
+ * frischt `onChanged` genau diese Seite auf.
+ *
+ * Kein `container`: die aufrufende Seite haelt keine Aufgabenliste, in die
+ * revealCreatedTask die neue Zeile einziehen liesse - mit der Uebersicht als
+ * Container suchte es dort eine Zeile und zeichnete womoeglich die Liste
+ * hinein.
+ *
+ * OHNE KATEGORIEN KEIN FORMULAR (wie in openTaskById): die Auswahl kaeme leer,
+ * und das Speichern liefe in einen Fehler. Dann wirft der Aufruf, und der
+ * Aufrufer nimmt den Weg ins Modul.
+ * @param {{user?: object|null, onChanged?: () => (void|Promise<void>)}} [opts]
+ */
+export async function openNewTask({ user = null, onChanged = () => {} } = {}) {
+  if (readOnly()) return;
+  await Promise.all([ensureTaskStyles(), ensureAwayMeta(user)]);
+  if (!state.categories.length) throw new Error(t('tasks.loadError'));
+  openTaskModal({ users: state.users, onChanged }, null);
+}
+
+/**
  * Eine Aufgabe oeffnen, ohne auf dieser Seite zu stehen (#918).
  *
  * Der Einstieg fuer die Uebersicht, die vier Kalenderansichten, das
@@ -6296,30 +6352,7 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
     ensureTaskStyles(),
   ]);
   if (!task) throw new Error(t('tasks.loadError'));
-
-  // Mitglieder, Kategorien und Tags einmal holen, wenn diese Seite noch nie
-  // stand. Ohne sie blieben @-Erwaehnungen unaufgeloest, die Kategoriezeile
-  // zeigte ihren internen Schluessel und das Bearbeiten-Formular haette keine
-  // Auswahl anzubieten.
-  //
-  // `meta` kommt OHNE `data`-Huelle: /tasks/meta/options antwortet mit den
-  // Feldern direkt (server/routes/tasks.js), anders als die uebrigen Routen
-  // dieses Moduls. Ein `meta.data?.users` daneben laese still `undefined`.
-  if (!state.users.length || !state.categories.length) {
-    try {
-      const { data: meta = {}, fromCache } = await api.getWithSource('/tasks/meta/options');
-      const alleStale = fromCache === true;
-      state.metaStale = { users: alleStale, categories: alleStale, tags: alleStale };
-      state.users         = meta.users      ?? state.users;
-      state.categories    = meta.categories ?? state.categories;
-      state.allTags       = meta.tags       ?? state.allTags;
-      state.defaultPoints = Number(meta.default_points) || state.defaultPoints;
-    } catch { /* Ansicht steht auch ohne - nur weniger aufgeloest, siehe unten. */ }
-  }
-  if (user) {
-    state.currentUserId = user.id ?? null;
-    state.isAdmin       = user.role === 'admin';
-  }
+  await ensureAwayMeta(user);
 
   // OHNE KATEGORIEN KEIN FORMULAR. Die Auswahl wird aus `state.categories`
   // gebaut; blieb der Aufruf oben ohne Antwort, stuende dort ein leeres

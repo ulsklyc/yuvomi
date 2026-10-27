@@ -830,8 +830,9 @@ test('R14: am Desktop traegt die Uebersicht "+ Neu" als angedockte Pille mit dem
   assert.equal(__test.renderFab(), '', 'kein schwebender Speed-Dial daneben');
   const editing = renderDashboardOverview({ display_name: 'Linda' }, true, null, {});
   assert.doesNotMatch(editing, /id="fab-main"/, 'im Anpassen-Modus gibt es kein Anlegen');
-  assert.match(dashboardSource, /function wireNewMenu\(container, signal\)/);
-  assert.match(dashboardSource, /wireNewMenu\(container, signal\)/);
+  // Seit U2 reist der Gastgeber mit (user, refresh): das Blatt geht ueber der Uebersicht auf.
+  assert.match(dashboardSource, /function wireNewMenu\(container, signal, host = \{\}\)/);
+  assert.match(dashboardSource, /wireNewMenu\(container, signal, \{ user, refresh: refreshAfterSheet \}\)/);
 }));
 
 test('R14: auf dem Telefon bleibt der Speed-Dial in der Kapsel', () => withStage(true, () => {

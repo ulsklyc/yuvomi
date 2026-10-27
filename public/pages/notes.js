@@ -19,6 +19,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, pageToolsActionEl, installPopoverMenus } from '/utils/popover-menu.js';
 import { findPageFab } from '/utils/fab.js';
+import { lendPageStyle } from '/utils/component-style.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { AVATAR_FALLBACK_COLOR } from '/utils/color.js';
@@ -80,6 +81,14 @@ let state = {
   filterCategoryIds: [],
 };
 let _container = null;
+
+/** Steht die Notizenseite gerade im Dokument? Sonst ist der Editor ueber einer fremden Seite offen (openNewNote). */
+function hostedHere() {
+  return Boolean(_container?.isConnected);
+}
+
+/** Wer nach dem Speichern ueber einer fremden Seite auffrischt (openNewNote). */
+let _awayChanged = null;
 /** Das Suchfeld (wirePageSearch) - der Leerzustand einer leeren Suche leert es. */
 let _search = null;
 
@@ -428,6 +437,8 @@ function renderNotesAndFilters({ motion = false } = {}) {
  * Button-Chips wie Dokumente/Aufgaben (Tastatur + aria-pressed).
  */
 function renderFilters() {
+  // Ueber einer fremden Seite gibt es keine Reihe (openNewNote).
+  if (!hostedHere()) return;
   const row = _container.querySelector('#notes-filters');
   if (!row) return;
 
@@ -548,6 +559,7 @@ const NOTE_CARD = '.note-card[data-id]';
  * Filter und Suche zeichnen ohne Bewegung neu - dort wechselt die Frage,
  * nicht die Liste. */
 function renderGrid({ motion = false } = {}) {
+  if (!hostedHere()) return;
   const grid = _container.querySelector('#notes-grid');
   if (!grid) return;
   if (motion) {
@@ -907,6 +919,32 @@ function openNoteReadModal(note) {
       window.lucide?.createIcons({ el: panel });
     },
   });
+}
+
+/**
+ * EINE NEUE NOTIZ UEBER EINER FREMDEN SEITE (DW, Ulas U2). "+ Neu > Notiz"
+ * auf der Uebersicht wechselte hierher und klickte den FAB; jetzt geht
+ * derselbe Editor ueber der aufrufenden Seite auf, und nach dem Speichern
+ * frischt `onChanged` sie auf (angepinnt steht die Notiz dort in ihrer
+ * Kachel). Der Editor braucht die Kategorien des Haushalts und notes.css
+ * (Schreibflaeche, Farbwahl) - geliehen fuer die Lebenszeit der Seite
+ * darunter (`signal`, lendPageStyle). Scheitert das Laden, wirft der Aufruf,
+ * und der Aufrufer nimmt den Weg ins Modul.
+ * @param {{ user?: object|null, onChanged?: () => (void|Promise<void>), signal?: AbortSignal|null }} [options]
+ */
+export async function openNewNote({ user = null, onChanged = null, signal = null } = {}) {
+  if (readOnly()) return;
+  const [categoriesRes] = await Promise.all([api.get('/notes/categories'), lendPageStyle('/styles/notes.css', signal)]);
+  state.categories = categoriesRes?.data || [];
+  state.canManageHousehold = !!categoriesRes?.meta?.can_manage_household;
+  if (user) state.user = user;
+  _awayChanged = onChanged;
+  openNoteModal({ mode: 'create' });
+}
+
+async function notifyAwayChanged() {
+  if (hostedHere() || !_awayChanged) return;
+  try { await _awayChanged(); } catch (err) { console.warn('[Notes] Seite unter dem Editor nicht aufgefrischt:', err); }
 }
 
 function openNoteModal({ mode, note = null }) {
@@ -1493,6 +1531,8 @@ function openNoteModal({ mode, note = null }) {
           closeSavedEditorWhenActive();
           renderNotesAndFilters({ motion: true });
           window.yuvomi?.showToast(mode === 'create' ? t('notes.createdToast') : t('notes.savedToast'), 'success');
+          // Ueber einer fremden Seite frischt diese sich auf (openNewNote).
+          if (!hostedHere()) await notifyAwayChanged();
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
           // Die Notiz gibt es nicht mehr (#1909): nichts mehr zu speichern -

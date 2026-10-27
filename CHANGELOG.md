@@ -72,6 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **"+ New" on the overview adds a task, an appointment or a note right where you are.** The
+  form opens over the overview - the same one as in the module - instead of switching to the
+  module first, and after saving the overview stays where you scrolled it: no loading placeholders,
+  and the new entry slides into its tile. Cancel or Esc returns focus to "+ New". A shopping item
+  still opens the shopping list, where items are typed into the line above the list.
 - **Tiles on the overview are dragged like every list in the app, by finger too.** In Customize,
   each tile now has a grip at the end of its bar: hold it and drag, with the mouse or on a phone or
   tablet. The tile you hold stays fully visible and lifted, the place it will land is an empty

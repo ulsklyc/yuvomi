@@ -1746,43 +1746,72 @@ test('DW-P1-1: jedes "+ Neu"-Ziel nennt eine Id, die seine Zielseite traegt', as
   }
 });
 
-test('DW-P1-1: Pille und Speed-Dial klicken nach dem Wechsel den Knopf der Zielseite', async () => {
+test('DW-P1-1 + U2: ohne Blatt ueber der Uebersicht wechseln Pille und Speed-Dial ins Modul und klicken dort den Knopf', async () => {
   const targets = __test.FAB_NEW_BTN;
   assert.ok(targets, 'FAB_NEW_BTN ist nicht erreichbar');
   // Die Zielseiten tragen die Knoepfe, die ihr Markup traegt (vorige Probe).
   const real = ['fab-new-task', 'fab-new-event', 'fab-new-item', 'fab-new-note'];
-  await withNewTargets(async ({ visited, clicked, pageIds }) => {
-    real.forEach((id) => pageIds.add(id));
-    // Pille (Desktop): Klick auf einen Menuepunkt im Seiten-Container.
-    const container = stubEl();
-    __test.wireNewMenu(container, new AbortController().signal);
-    const onClick = container.listeners.find((l) => l.type === 'click' && !l.opts?.capture)?.fn;
-    assert.ok(onClick, 'wireNewMenu haengt keinen Klick an den Container');
-    for (const route of Object.keys(targets)) {
-      const item = stubEl({ dataset: { newRoute: route } });
-      await onClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
-    }
-    assert.deepEqual(visited, Object.keys(targets));
-    assert.deepEqual(clicked, real, 'Pille: jedes Ziel oeffnet sein Anlegen-Blatt');
+  // Seit U2 oeffnen Aufgabe, Termin und Notiz ihr Blatt ueber der Uebersicht
+  // (test:dashboard). Der Weg ins Modul bleibt fuer Einkauf - und fuer jedes
+  // Ziel, dessen Blatt nicht laedt: hier scheitern alle Blaetter.
+  const sheets = __test.NEW_SHEETS;
+  const original = { ...sheets };
+  for (const route of Object.keys(sheets)) sheets[route] = async () => { throw new Error('offline'); };
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    await withNewTargets(async ({ visited, clicked, pageIds }) => {
+      real.forEach((id) => pageIds.add(id));
+      // Pille (Desktop): Klick auf einen Menuepunkt im Seiten-Container.
+      const container = stubEl();
+      __test.wireNewMenu(container, new AbortController().signal);
+      const onClick = container.listeners.find((l) => l.type === 'click' && !l.opts?.capture)?.fn;
+      assert.ok(onClick, 'wireNewMenu haengt keinen Klick an den Container');
+      for (const route of Object.keys(targets)) {
+        const item = stubEl({ dataset: { newRoute: route } });
+        await onClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
+      }
+      assert.deepEqual(visited, Object.keys(targets));
+      assert.deepEqual(clicked, real, 'Pille: jedes Ziel oeffnet sein Anlegen-Blatt');
 
-    // Speed-Dial (Telefon): der Knopf lebt in der Shell-Layer, findPageFab findet ihn.
-    visited.length = 0;
-    clicked.length = 0;
-    const items = Object.keys(targets).map((route) => stubEl({ dataset: { route } }));
-    const fabActions = stubEl({ querySelectorAll: (sel) => (sel === '[data-route]' ? items : []) });
-    const group = stubEl({ querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
-    const fabMain = stubEl({ closest: (sel) => (sel === '.page-fab-group' ? group : null) });
-    const getById = globalThis.document.getElementById;
-    globalThis.document.getElementById = (id) => (id === 'fab-main' ? fabMain : getById(id));
-    __test.initFab(new AbortController().signal);
-    for (const el of items) {
-      const go = el.listeners.find((l) => l.type === 'click')?.fn;
-      assert.ok(go, `Speed-Dial: ${el.dataset.route} ist nicht verdrahtet`);
-      await go();
-      // `go` wartet auf den Wechsel und klickt dann - einen Takt Luft fuer den Klick.
-      await new Promise((r) => setImmediate(r));
-    }
-    assert.deepEqual(visited, Object.keys(targets));
-    assert.deepEqual(clicked, real, 'Speed-Dial: jedes Ziel oeffnet sein Anlegen-Blatt');
+      // Speed-Dial (Telefon): der Knopf lebt in der Shell-Layer, findPageFab findet ihn.
+      visited.length = 0;
+      clicked.length = 0;
+      const items = Object.keys(targets).map((route) => stubEl({ dataset: { route } }));
+      const fabActions = stubEl({ querySelectorAll: (sel) => (sel === '[data-route]' ? items : []) });
+      const group = stubEl({ querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
+      const fabMain = stubEl({ closest: (sel) => (sel === '.page-fab-group' ? group : null) });
+      const getById = globalThis.document.getElementById;
+      globalThis.document.getElementById = (id) => (id === 'fab-main' ? fabMain : getById(id));
+      __test.initFab(new AbortController().signal);
+      for (const el of items) {
+        const go = el.listeners.find((l) => l.type === 'click')?.fn;
+        assert.ok(go, `Speed-Dial: ${el.dataset.route} ist nicht verdrahtet`);
+        await go();
+        // `go` wartet auf den Wechsel und klickt dann - einen Takt Luft fuer den Klick.
+        await new Promise((r) => setImmediate(r));
+      }
+      assert.deepEqual(visited, Object.keys(targets));
+      assert.deepEqual(clicked, real, 'Speed-Dial: jedes Ziel oeffnet sein Anlegen-Blatt');
+    });
+  } finally {
+    console.error = origError;
+    Object.assign(sheets, original);
+  }
+});
+
+test('U2: jedes Blatt ueber der Uebersicht ruft eine Anlegen-Funktion, die sein Modul exportiert', async () => {
+  const { readFileSync } = await import('node:fs');
+  const sheets = __test.NEW_SHEETS;
+  assert.ok(sheets, 'NEW_SHEETS ist nicht erreichbar');
+  await withNewTargets(async () => {
+    const offered = __test.FAB_ACTIONS().map((a) => a.route);
+    for (const route of Object.keys(sheets)) assert.ok(offered.includes(route), `${route}: ein Blatt fuer ein Ziel, das "+ Neu" nicht anbietet`);
   });
+  for (const [route, open] of Object.entries(sheets)) {
+    const m = /import\('([^']+)'\)\)\.(\w+)\(/.exec(String(open));
+    assert.ok(m, `${route}: das Blatt laedt sein Modul nicht beim Tipp nach`);
+    const src = readFileSync(new URL(`../public${m[1]}`, import.meta.url), 'utf8');
+    assert.match(src, new RegExp(`export async function ${m[2]}\\(`), `${m[1]} exportiert ${m[2]} nicht - "+ Neu" fiele still ins Modul zurueck`);
+  }
 });

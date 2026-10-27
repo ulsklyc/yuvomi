@@ -36,7 +36,7 @@ import { setLeaveGuard } from '/utils/leave-guard.js';
 import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
 import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
-import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
+import { toggleRegion, durationToken, easingToken, expandIn } from '/utils/ux.js';
 import { swapContent, SWAP_FROM_OPACITY } from '/utils/content-swap.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
 import { findSettingsLeaf } from '/settings/registry.js';
@@ -5938,6 +5938,51 @@ function rowFocusKeyOf(el) {
 /** Zeilen, die EIN Objekt nennen: Aufgabe, Termin, Notiz, Geburtstag. */
 const OBJECT_ROW_SELECTOR = '[data-task-id], [data-object-id], [data-route*="?open="]';
 
+/** Die sichtbaren Objektzeilen der Flaeche, je die aeusserste. */
+function shownObjectRows(shell) {
+  const hits = [...(shell?.querySelectorAll?.(OBJECT_ROW_SELECTOR) ?? [])];
+  return hits
+    .filter((el) => !hits.some((other) => other !== el && other.contains(el)))
+    .filter((el) => !el.hidden && el.getClientRects?.().length !== 0);
+}
+
+/**
+ * Die sichtbaren Objektzeilen der Kacheln, ohne das Heute-Blatt: das passt
+ * seine Zeilen nach jedem Aufbau neu ein (am Telefon auf den ersten Schirm,
+ * breit als Zeitleiste) - was dort nach dem Abgleich neu steht, ist meist
+ * nur nachgerueckt, nicht angekommen.
+ */
+function shownTileRows(shell) {
+  return shownObjectRows(shell).filter((row) => row.closest('.widget-wrapper[data-widget-id]'));
+}
+
+/** Die Schluessel (rowFocusKeyOf) der sichtbaren Kachelzeilen - fuer rowsArriving. */
+function shownRowKeys(shell) {
+  return new Set(shownTileRows(shell).map((row) => rowFocusKeyOf(row)?.selector).filter(Boolean));
+}
+
+/**
+ * Welche Kachelzeilen nach einem stillen Neuaufbau neu dazukamen (U2): die
+ * eben ueber der Uebersicht angelegte Aufgabe, der Termin, die angepinnte
+ * Notiz. Sie ziehen ein wie im Modul (`expandIn`, list-motion: "die
+ * eingefuegte klappt ein") - das Gegenstueck zu rowsLeaving. Hoechstens drei:
+ * mehr ist kein Ankommen, sondern ein neuer Stand (ein neuer Tag, ein anderes
+ * Geraet), und der steht still da wie bisher.
+ *
+ * @param {Element} shell      die Flaeche nach dem Neuaufbau
+ * @param {Set<string>} known  shownRowKeys(shell) davor
+ * @returns {Element[]}
+ */
+function rowsArriving(shell, known) {
+  if (!known?.size) return [];
+  const fresh = shownTileRows(shell).filter((row) => {
+    const key = rowFocusKeyOf(row)?.selector;
+    return Boolean(key) && !known.has(key);
+  });
+  return fresh.length <= ROWS_ARRIVING_MAX ? fresh : [];
+}
+const ROWS_ARRIVING_MAX = 3;
+
 /**
  * Welche sichtbaren Objektzeilen der Flaeche das naechste Markup nicht mehr
  * nennt (DW-P1-2) - die schliessen per `collapseRow`, bevor neu gezeichnet
@@ -5953,10 +5998,7 @@ const OBJECT_ROW_SELECTOR = '[data-task-id], [data-object-id], [data-route*="?op
  */
 function rowsLeaving(shell, nextHtml, doc = typeof document === 'undefined' ? null : document) {
   if (!shell?.querySelectorAll || typeof doc?.implementation?.createHTMLDocument !== 'function') return [];
-  const hits = [...shell.querySelectorAll(OBJECT_ROW_SELECTOR)];
-  const rows = hits
-    .filter((el) => !hits.some((other) => other !== el && other.contains(el)))
-    .filter((el) => !el.hidden && el.getClientRects?.().length !== 0);
+  const rows = shownObjectRows(shell);
   if (!rows.length) return [];
   const next = doc.implementation.createHTMLDocument('');
   next.body.insertAdjacentHTML('afterbegin', nextHtml);
@@ -8431,25 +8473,51 @@ function renderNewPill() {
         </div>`;
 }
 
-/** Die Menuepunkte der Pille: dieselben Wege wie der Speed-Dial (FAB_NEW_BTN). */
-function wireNewMenu(container, signal) {
+/** Die Menuepunkte der Pille: dieselben Wege wie der Speed-Dial (openNewTarget). */
+function wireNewMenu(container, signal, host = {}) {
   installPopoverMenus(container);
   container.addEventListener('click', async (event) => {
     const item = event.target.closest?.('[data-new-route]');
     if (!item) return;
     item.closest('[popover]')?.hidePopover?.();
-    await openNewTarget(item.dataset.newRoute);
+    await openNewTarget(item.dataset.newRoute, { ...host, signal });
   }, { signal });
 }
 
 /**
- * DER ANLEGEN-KNOPF DER ZIELSEITE, ALS ID. Pille und Speed-Dial wechseln ins
- * Modul und klicken dort seinen FAB. Bis DW-P1-1 stand hier ein Selektor je
- * Ziel, und `'#btn-new-task'` ueberlebte die Umbenennung in `fab-new-task`
- * (#1483): "+ Neu > Aufgabe" landete wortlos in der Liste. Eine Id fuer
- * `findPageFab()` statt eines Selektors - der FAB lebt nach `adoptPageFab()`
- * in der Shell-Layer, und dort sucht ihn nur diese eine Stelle. Dass jede Id
- * im Markup ihrer Zielseite steht, haelt `test:dashboard-clarity`.
+ * DAS ANLEGEN-BLATT DES MODULS UEBER DER UEBERSICHT (DW, Ulas U2), wie das
+ * Lesen seit R22 D3 (openTaskFromOverview, openEventFromOverview). Pille und
+ * Speed-Dial wechselten ins Modul und klickten dort dessen FAB: die
+ * Uebersicht war weg, und nach dem Speichern stand man in der Liste statt
+ * dort, wo man angefangen hatte. Jetzt geht dasselbe Formular wie am FAB des
+ * Moduls ueber ihr auf, und nach dem Speichern gleicht sie still ab
+ * (`refresh` = refreshDashboardData, DW-P1-2): die neue Zeile steht in ihrer
+ * Kachel, ohne Skelett und ohne Sprung.
+ *
+ * Nachgeladen beim Tipp, nicht mitgeladen: jedes Modul zieht sein Formular mit
+ * sich, und dessen Gewicht gehoert nicht in den Start der Startseite
+ * (test:startup-preload).
+ *
+ * EINKAUF BLEIBT DER WEG INS MODUL. Sein FAB oeffnet kein Formular, sondern
+ * die Eingabezeile ueber der Liste, in die sie schreibt (shopping.js,
+ * syncQuickAddDisclosure: "KEIN BOTTOM-SHEET"); ein Blatt dafuer gibt es nicht.
+ */
+const NEW_SHEETS = {
+  '/tasks':    async (opts) => (await import('/pages/tasks.js')).openNewTask(opts),
+  '/calendar': async (opts) => (await import('/pages/calendar.js')).openNewEvent(opts),
+  '/notes':    async (opts) => (await import('/pages/notes.js')).openNewNote(opts),
+};
+
+/**
+ * DER ANLEGEN-KNOPF DER ZIELSEITE, ALS ID - fuer Einkauf, und fuer jedes
+ * andere Ziel der Weg, wenn sein Blatt nicht laedt: ein Fehler soll das
+ * Anlegen nicht verschliessen (wie openEventFromOverview). Bis DW-P1-1 stand
+ * hier ein Selektor je Ziel, und `'#btn-new-task'` ueberlebte die Umbenennung
+ * in `fab-new-task` (#1483): "+ Neu > Aufgabe" landete wortlos in der Liste.
+ * Eine Id fuer `findPageFab()` statt eines Selektors - der FAB lebt nach
+ * `adoptPageFab()` in der Shell-Layer, und dort sucht ihn nur diese eine
+ * Stelle. Dass jede Id im Markup ihrer Zielseite steht, haelt
+ * `test:dashboard-clarity`.
  */
 const FAB_NEW_BTN = {
   '/tasks':    'fab-new-task',
@@ -8458,8 +8526,29 @@ const FAB_NEW_BTN = {
   '/notes':    'fab-new-note',
 };
 
-/** Ins Modul wechseln und sein Anlegen-Blatt oeffnen - der eine Weg fuer Pille und Speed-Dial. */
-async function openNewTarget(route) {
+/**
+ * Das Anlegen-Blatt eines Ziels oeffnen - der eine Weg fuer Pille und
+ * Speed-Dial. Ueber der Uebersicht, wo das Modul eins hat (NEW_SHEETS), sonst
+ * im Modul.
+ *
+ * DER FOKUS STEHT VORHER AUF "+ NEU". Das Blatt gibt ihn beim Schliessen an
+ * das Element zurueck, das ihn beim Oeffnen hielt - das waere der Menuepunkt,
+ * den Popover bzw. Speed-Dial gerade versteckt haben, und der Fokus fiele auf
+ * das Dokument. Abbrechen fuehrt so an den Knopf zurueck, von dem man kam.
+ * @param {string} route
+ * @param {{ user?: object|null, refresh?: () => Promise<void>, signal?: AbortSignal|null }} [host]
+ */
+async function openNewTarget(route, { user = null, refresh = null, signal = null } = {}) {
+  const sheet = NEW_SHEETS[route];
+  if (sheet) {
+    findPageFab('fab-main')?.focus({ preventScroll: true });
+    try {
+      await sheet({ user, onChanged: refresh ?? (() => {}), signal });
+      return;
+    } catch (err) {
+      console.error('[Dashboard] Anlegen-Blatt konnte nicht geöffnet werden:', err);
+    }
+  }
   await window.yuvomi.navigate(route);
   const id = FAB_NEW_BTN[route];
   if (id) findPageFab(id)?.click();
@@ -8522,7 +8611,7 @@ function setCustomizeFabHidden(hidden) {
   fab.hidden = hidden;
 }
 
-function initFab(signal) {
+function initFab(signal, host = {}) {
   const fabMain     = findPageFab('fab-main');
   const fabGroup    = fabMain?.closest('.page-fab-group');
   const fabActions  = fabGroup?.querySelector('#fab-actions');
@@ -8556,7 +8645,7 @@ function initFab(signal) {
   fabActions.querySelectorAll('[data-route]').forEach((el) => {
     const go = async () => {
       toggleFab(false);
-      await openNewTarget(el.dataset.route);
+      await openNewTarget(el.dataset.route, { ...host, signal });
     };
     el.addEventListener('click', go);
     el.addEventListener('keydown', (e) => {
@@ -10330,8 +10419,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // test-frontend-audit.js).
     findPageFab('fab-main')?.closest('.page-fab-group')?.remove();
   } else {
-    initFab(signal);
-    wireNewMenu(container, signal);
+    // "+ Neu" legt ueber der Uebersicht an und gleicht danach still ab (U2).
+    initFab(signal, { user, refresh: refreshAfterSheet });
+    wireNewMenu(container, signal, { user, refresh: refreshAfterSheet });
   }
 
   // SELBSTHEILUNG STATT RETRY-KNOPF. Am Wandtablet drueckt niemand auf
@@ -10442,7 +10532,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // eigene Aufbau den neuen Stand schon gezeichnet.
       if (signal.aborted || isCustomizing) return;
       quietScrollTop = scrollTop;
+      const known = shownRowKeys(container.querySelector('#dashboard-shell'));
       rebuildDashboard(widgetConfig);
+      rowsArriving(container.querySelector('#dashboard-shell'), known).forEach((row) => expandIn(row));
     } catch { /* Hintergrund-Refresh: bewusst still */ }
     finally {
       refreshInFlight = null;
@@ -10659,7 +10751,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, wireNewMenu, initFab, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
