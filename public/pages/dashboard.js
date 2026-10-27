@@ -9297,19 +9297,33 @@ function gridSpans(el) {
 /* Die Spuren einer Groesse: die Breite aus dem Stylesheet (Klasse kurz
  * tauschen, lesen, zurueck), die Hoehe aus den Daten der Kachel
  * (`data-span-sizes`, U1 b) - plus der Abstand, den der Rahmen traegt
- * (`--tile-gap-rows`, steckt in der gelesenen Spanne). */
+ * (`--tile-gap-rows`, steckt in der gelesenen Spanne).
+ *
+ * GELESEN WIRD DIE GEWAEHLTE SPANNE, NICHT DIE GEFUELLTE. Seit der
+ * Anpassen-Modus fuellt wie die Ansicht (DW-P2-9), traegt eine Kachel dort
+ * schon die Spanne, mit der sie ein Loch schliesst (`data-col-fill`,
+ * `data-row-fill`, `data-col-lock`). Gelesen mit ihr, sah der Hinweis das Loch
+ * nie, das er beseitigen soll: gemessen 1440px, die Uhr zwischen Geburtstagen
+ * und Aufgaben stand mit 202px Geist ueber den Notizen, und kein Hinweis. Die
+ * Fuellung geht fuer die Probe mit der Klasse weg und kommt mit ihr zurueck. */
+const FILL_ATTRIBUTES = ['data-col-fill', 'data-row-fill', 'data-col-lock'];
+
 function spansForSize(el, size) {
   const current = [...el.classList].find((c) => c.startsWith('widget-size--'));
   const probe = widgetSizeClass(size);
   const own = Number(el.dataset?.spanRows);
   const content = spanRowsForSize(el, size);
   const withContent = (spans) => (content && own ? { ...spans, rows: spans.rows - own + content } : spans);
-  if (!current || current === probe) return withContent(gridSpans(el));
-  el.classList.replace(current, probe);
+  const fills = FILL_ATTRIBUTES.filter((name) => el.hasAttribute(name));
+  const swap = current && current !== probe;
+  if (!swap && !fills.length) return withContent(gridSpans(el));
+  for (const name of fills) el.removeAttribute(name);
+  if (swap) el.classList.replace(current, probe);
   try {
     return withContent(gridSpans(el));
   } finally {
-    el.classList.replace(probe, current);
+    if (swap) el.classList.replace(probe, current);
+    for (const name of fills) el.setAttribute(name, '');
   }
 }
 
@@ -11284,7 +11298,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, gridHoleSuggestion, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

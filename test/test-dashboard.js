@@ -3517,6 +3517,77 @@ test('F9: applyRowFill - wer nach links waechst, beginnt dort', async () => {
   }
 });
 
+/* DER LUECKENHINWEIS LIEST DIE GEWAEHLTEN GROESSEN, NICHT DIE GEFUELLTEN (p10).
+ * Seit p9 fuellt der Anpassen-Modus wie die Ansicht, und `gridHoleSuggestion`
+ * las die Spannen danach - mit der Fuellung, die das Loch schon schloss. Der
+ * Hinweis schwieg so bei jedem Loch, das eine Kachel darueber schliesst:
+ * gemessen 1440px, Geburtstage 1x2, Uhr, Aufgaben 1x2, Notizen breit - die Uhr
+ * stand mit 202px Geist ueber den Notizen, und kein Hinweis
+ * (test:dashboard-surface-browser). Die Attrappe liest Spannen wie das
+ * Stylesheet: Breite aus der Groessenklasse, ueberstimmt von `data-row-fill`
+ * und `data-col-lock`; Hoehe aus den Daten plus Abstand, ueberstimmt von
+ * `data-col-fill`. */
+test('p10: der Lueckenhinweis sieht das Loch, das die Fuellung im Anpassen-Modus schliesst', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.gridHoleSuggestion, 'function', 'gridHoleSuggestion fehlt im __test-Export');
+  const GAP = 5;
+  const sizes = {
+    birthdays: { '1x1': 66, '2x1': 66, '1x2': 93, '2x2': 93 },
+    clock: { '1x1': 41, '2x1': 42, '1x2': 47, '2x2': 48 },
+    tasks: { '1x1': 66, '2x1': 66, '1x2': 93, '2x2': 93 },
+    notes: { '1x1': 102, '2x1': 51, '1x2': 153, '2x2': 77 },
+  };
+  const chosen = { birthdays: '1x2', clock: '1x1', tasks: '1x2', notes: '2x1' };
+  const attr = (name) => name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const tiles = Object.entries(chosen).map(([id, size]) => {
+    const props = new Map();
+    const classes = new Set(['widget-wrapper', `widget-size--${size}`]);
+    const dataset = {
+      widgetId: id,
+      spanRows: String(sizes[id][size]),
+      spanSizes: Object.entries(sizes[id]).map(([s, r]) => `${s}:${r}`).join(','),
+    };
+    return {
+      dataset,
+      classList: Object.assign(classes, {
+        replace(a, b) { if (!classes.has(a)) return false; classes.delete(a); classes.add(b); return true; },
+        [Symbol.iterator]: () => [...Set.prototype.values.call(classes)][Symbol.iterator](),
+      }),
+      hasAttribute: (name) => attr(name) in dataset,
+      removeAttribute: (name) => { delete dataset[attr(name)]; },
+      setAttribute: (name, value) => { dataset[attr(name)] = String(value); },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props },
+    };
+  });
+  const grid = {
+    children: tiles,
+    querySelectorAll: (sel) => (sel.includes('.widget-wrapper') ? tiles : []),
+  };
+  const style = (el) => {
+    if (el === grid) return { gridTemplateColumns: '372px 372px 372px' };
+    const size = [...el.classList].find((c) => c.startsWith('widget-size--')).slice('widget-size--'.length);
+    let cols = size.startsWith('2') ? 2 : 1;
+    if ('colLock' in el.dataset) cols = Number(el.style.props.get('--tile-span-cols'));
+    if ('rowFill' in el.dataset) cols = Number(el.style.props.get('--widget-fill-span'));
+    const rows = 'colFill' in el.dataset ? Number(el.style.props.get('--widget-fill-rows')) : Number(el.dataset.spanRows) + GAP;
+    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid, { editing: true });
+    const clock = tiles.find((t) => t.dataset.widgetId === 'clock');
+    nodeAssert.ok('colFill' in clock.dataset && 'ghostBlock' in clock.dataset, 'Vorbedingung: die Uhr schliesst das Loch, im Anpassen-Modus als Geist');
+    nodeAssert.deepEqual(__test.gridHoleSuggestion(grid), { id: 'birthdays', size: '2x1' }, 'der Hinweis schlaegt die Groesse vor, nach der kein Loch entsteht');
+    nodeAssert.ok('colFill' in clock.dataset && 'ghostBlock' in clock.dataset, 'die Probe nimmt die Fuellung zurueck, wie sie war');
+    nodeAssert.equal([...clock.classList].filter((c) => c.startsWith('widget-size--')).join(), 'widget-size--1x1', 'und die Groessenklasse');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
 test('das Fuellen ist verdrahtet: CSS liest Spannen und Spalte, der Aufbau ruft es direkt nach dem Zeichnen, eine Geste ohne Auslegung', () => {
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
   const regel = (sel) => [...eachRule(css)].find((r) => r.selector.trim() === sel);
