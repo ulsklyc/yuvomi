@@ -7688,15 +7688,28 @@ function renderEventDetail(ev, reminders = []) {
  * Ein Vorkommen einer Serie kommt aus dem Tag (`date`), wie beim Deep-Link
  * des Kalenders (findDeepLinkedOccurrence): ohne es zeigte das Blatt den
  * Serienstart.
+ *
+ * DAS FORMULAR BRAUCHT SEIN SEITENBLATT (DW p7, Nachtrag zu U2). Farbwahl,
+ * Symbolwahl, Anhang und die Abstaende der Datumszeilen stehen in
+ * calendar.css, und der Router laedt es nur fuer die Kalenderseite: ueber
+ * der Uebersicht stand "Farbe" ohne einen einzigen Farbknopf (0px hoch).
+ * Geliehen wird es wie beim Anlegen (openNewEvent) fuer die Lebenszeit der
+ * Seite darunter (`signal`, lendPageStyle) - neben dem Oeffnen her, die
+ * Leseansicht wartet nicht darauf, das Formular schon (`ready`).
  * @param {string|number} id
  * @param {{ date?: string|null, anchor?: HTMLElement|null, user?: object|null,
  *           onChanged?: () => (void|Promise<void>),
- *           onRemoving?: (scope: object, removing: boolean) => void }} [options]
+ *           onRemoving?: (scope: object, removing: boolean) => void,
+ *           signal?: AbortSignal|null }} [options]
  */
-export async function openEventById(id, { date = null, anchor = null, user = null, onChanged = null, onRemoving = null } = {}) {
+export async function openEventById(id, { date = null, anchor = null, user = null, onChanged = null, onRemoving = null, signal = null } = {}) {
   // Steht die Kalenderseite, gehoert der Zustand ihr; sonst holt das Blatt
   // ihn selbst, und zwar sofort - parallel zum Termin.
-  const away = hostedHere() ? null : { onChanged, onRemoving, ready: loadAwayFormContext(user).catch(() => {}) };
+  const away = hostedHere() ? null : {
+    onChanged,
+    onRemoving,
+    ready: Promise.all([loadAwayFormContext(user), lendPageStyle('/styles/calendar.css', signal)]).catch(() => {}),
+  };
   const res = await api.get(`/calendar/${encodeURIComponent(String(id))}`);
   if (!res?.data) throw new Error(t('calendar.loadError'));
   const base = localizeBirthdayEvent(res.data);

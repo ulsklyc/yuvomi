@@ -117,7 +117,10 @@ test('renderWasteWidget: ohne Typen zeigt es den Erststart-Leerzustand mit CTA n
   const html = renderWasteWidget({ items: [], needsRefresh: false }, '1x2');
   assert.match(html, /waste\.emptyTypesTitle/, 'Leertitel fehlt');
   assert.match(html, /data-route="\/waste"/, 'die CTA muss ins Modul fuehren');
-  assert.match(html, /waste\.addType/, 'die CTA-Beschriftung fehlt');
+  // Seit DW p7 das Verb der ruhigen Zeile; das Objekt nennt der Satz daneben,
+  // auf den die Aktion per aria-describedby verweist.
+  assert.match(html, /common\.add/, 'die CTA-Beschriftung fehlt');
+  assert.match(html, /aria-describedby="widget-empty-waste"/, 'die Aktion nennt per Verweis ihr Objekt');
 });
 
 test('renderWasteWidget: undefined items (Slice noch nicht geladen) faellt auf denselben Leerzustand zurueck', () => {

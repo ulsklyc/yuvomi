@@ -121,7 +121,9 @@ test('jedes Widget-Siegel nennt einen Modulton, den tokens.css kennt (R18)', asy
   for (const [text, id] of calls) {
     const route = text.match(/'(\/[^']*)'/)?.[1];
     const constant = text.match(/\b([A-Z_]+_ROUTE)\b/)?.[1];
-    const seal = text.match(/,\s*'([a-z-]+)'\)$/)?.[1] ?? null;
+    // Die benannte Herkunft ist das letzte Argument - oder das vor dem
+    // Optionsobjekt (`{ action }`, die Endzone des Wetter-Kopfes, DW-P3-3).
+    const seal = text.match(/,\s*'([a-z-]+)'(?:,\s*\{[^{}]*\})?\)$/)?.[1] ?? null;
     if (constant) viaConstant += 1;
     const href = route ?? (constant ? constants[constant] : null);
     if (constant) assert.ok(href, `${constant} ist aufloesbar`);
@@ -891,10 +893,10 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const wire = dash.slice(dash.indexOf('function wireLinks('), dash.indexOf('function reorderWidgetConfig('));
   assert.match(wire, /const eventLink = editing \? null : eventLinkOf\(el\.dataset\.route\);/);
-  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, refresh, user \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
+  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, refresh, user, signal \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
   assert.match(dash, /const \{ openEventById \} = await import\('\/pages\/calendar\.js'\);/, 'nachgeladen wie die Aufgabe');
   const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null \} = \{\}\)/);
+  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null, signal = null \} = \{\}\)/);
 
   const { buildTodayProgram } = __test;
   // Jede Tageszeit belegt: selectTodayMeal waehlt nach der Uhr, gefunden wird immer id 16.
@@ -1023,4 +1025,175 @@ test('R22 D16: die Optionen einer ausgeblendeten Kachel stehen am Chip, in einem
     'das Menue nennt beide Handlungen mit Wort');
   const clock = tray.slice(tray.indexOf('data-widget-show="clock"') - 200, tray.indexOf('data-widget-show="clock"'));
   assert.doesNotMatch(clock, /--split/, 'ohne Optionen bleibt es ein einfacher Chip');
+});
+
+// --------------------------------------------------------------------------
+// DW-P3-2: DIE FEHLERKACHEL HAT DEN KOPF JEDER KACHEL. Sie baute ihren eigenen
+// (`<span class="widget__title">` + nackte Glyphe): kein Siegel, keine h3 - in
+// der Ueberschriften-Navigation fehlte genau die Kachel, die gerade kaputt ist.
+// --------------------------------------------------------------------------
+test('DW-P3-2: die Fehlerkachel traegt eine h3 mit Siegel ihres Moduls und die ruhige Zeile mit Wiederholen', () => {
+  for (const [id, slug] of [['tasks', 'tasks'], ['schedule', 'schedule'], ['nutrition', 'health'], ['weather', 'dashboard'], ['family', 'contacts']]) {
+    const html = __test.renderWidgetError(id);
+    assert.match(html, /<h3 class="widget__title">/, `${id}: der Kopf ist eine Ueberschrift`);
+    assert.match(html, new RegExp(`<span class="module-seal module-seal--sm" style="--seal-accent: var\\(--module-${slug}, var\\(--color-accent\\)\\)"`),
+      `${id}: das Vollton-Siegel nennt die Herkunft (${slug})`);
+    assert.doesNotMatch(html, /widget__title-icon|<span class="widget__title"/, `${id}: kein eigener Kopf-Dialekt`);
+    assert.match(html, /role="alert"/, `${id}: der Fehler wird angesagt`);
+    // Die Zeile: Satz, dann EIN Knopf, der auf den Satz verweist.
+    assert.match(html, new RegExp(`class="card-empty-row widget__empty"[\\s\\S]*id="widget-empty-${id}"[\\s\\S]*data-widget-retry="${id}"`));
+    assert.match(html, new RegExp(`aria-describedby="widget-empty-${id}"[^>]*data-widget-retry="${id}"|data-widget-retry="${id}"[^>]*aria-describedby="widget-empty-${id}"`),
+      `${id}: "Erneut versuchen" nennt, was nicht geladen wurde`);
+  }
+});
+
+// --------------------------------------------------------------------------
+// U7 (Ulas, WCAG 2.5.7): AM ZEIGER UMORDNEN OHNE ZIEHEN. Hoch/Runter stehen nur
+// am Finger (DW-P2-3); wer die Maus fuehrt und nicht ziehen kann, hatte nur die
+// Pfeiltasten am Griff. Jetzt traegt JEDE Kachel ein Menue (ihr Optionen-
+// Knopf als Ausloeser) mit "Nach vorn" und "Nach hinten" - am Rand gesperrt,
+// wie "nach oben" an der ersten Kategorie (Menue-Kanon, layout.css).
+// --------------------------------------------------------------------------
+test('U7: jede Kachel hat ein Menue mit Nach vorn / Nach hinten - Eintraege mit Namen, am Rand gesperrt', () => {
+  const entries = (html) => [...html.matchAll(/<button type="button" role="menuitem"( disabled)?\s+class="popover-menu__item"\s+data-action="([^"]+)"([^>]*)>\s*<i[^>]*><\/i>\s*<span>([^<]*)<\/span>/g)]
+    .map(([, disabled, action, attrs, label]) => `${action}${/data-widget-move="(up|down)"/.exec(attrs)?.[1] ? `:${/data-widget-move="(up|down)"/.exec(attrs)[1]}` : ''}=${label}${disabled ? ' (gesperrt)' : ''}`);
+  for (const id of ['birthdays', 'calendar']) {
+    const w = { id, size: '1x1', visible: true };
+    const first = __test.renderWidgetCustomizeControls(w, 0, 3);
+    const mid = __test.renderWidgetCustomizeControls(w, 1, 3);
+    const last = __test.renderWidgetCustomizeControls(w, 2, 3);
+    const trigger = mid.match(/<button type="button" class="widget-edit-controls__options popover-menu__trigger"\s+popovertarget="([^"]+)" aria-haspopup="menu" aria-expanded="false"\s+aria-label="([^"]+)"/);
+    assert.ok(trigger, `${id}: der Optionen-Knopf oeffnet ein Menue`);
+    assert.equal(trigger[1], `widget-tile-menu-${id}`);
+    assert.match(trigger[2], new RegExp(`common\\.moreActionsNamed.*${id === 'birthdays' ? 'nav.birthdays' : 'nav.calendar'}|common\\.moreActionsNamed`), `${id}: der Knopf nennt seine Kachel`);
+    const options = id === 'calendar' ? ['widget-options=dashboard.optionsFor'] : [];
+    const expected = (up, down) => [`widget-move:up=dashboard.customizeMoveForward${up ? ' (gesperrt)' : ''}`, `widget-move:down=dashboard.customizeMoveBack${down ? ' (gesperrt)' : ''}`];
+    assert.deepEqual(entries(mid).map((e) => e.replace(/\{.*$/, '')), [...expected(false, false), ...options], `${id}: mitten in der Reihe`);
+    assert.deepEqual(entries(first).map((e) => e.replace(/\{.*$/, '')).slice(0, 2), expected(true, false), `${id}: an erster Stelle geht es nicht weiter nach vorn`);
+    assert.deepEqual(entries(last).map((e) => e.replace(/\{.*$/, '')).slice(0, 2), expected(false, true), `${id}: an letzter Stelle nicht weiter nach hinten`);
+    assert.match(mid, /data-widget-move="down" data-widget-id="[^"]+"/, 'der Eintrag traegt seine Kachel - derselbe Handler wie Hoch/Runter');
+  }
+  // Am Finger stehen Hoch/Runter schon in der Leiste: ein Menue, das nur sie
+  // wiederholte, faellt dort weg - eines mit Optionen bleibt.
+  assert.match(__test.renderWidgetCustomizeControls({ id: 'birthdays', size: '1x1' }, 1, 3), /widget-edit-controls__menu widget-edit-controls__menu--move-only/);
+  assert.doesNotMatch(__test.renderWidgetCustomizeControls({ id: 'calendar', size: '1x1' }, 1, 3), /widget-edit-controls__menu--move-only/);
+});
+
+test('U7: die Sperre der Menue-Eintraege folgt dem Platz - auch im noch nicht geoeffneten Menue', () => {
+  const btn = (dir) => ({ dataset: { widgetMove: dir }, disabled: false });
+  const live = [btn('up'), btn('down')];
+  const inTemplate = [btn('up'), btn('down')];
+  const controls = {
+    querySelectorAll(sel) {
+      if (sel === '[data-widget-move]') return live;
+      if (sel === '.popover-menu > template') return [{ content: { querySelectorAll: (s) => (s === '[data-widget-move]' ? inTemplate : []) } }];
+      return [];
+    },
+    querySelector: () => null,
+  };
+  const wrapper = { querySelector: (sel) => (sel === ':scope > [data-widget-controls]' ? controls : null) };
+  __test.syncCustomizeControls(wrapper, { id: 'birthdays', size: '1x1' }, 0, 3);
+  assert.deepEqual([...live, ...inTemplate].map((b) => b.disabled), [true, false, true, false], 'erste Stelle: nach vorn gesperrt, auch im Template');
+  __test.syncCustomizeControls(wrapper, { id: 'birthdays', size: '1x1' }, 2, 3);
+  assert.deepEqual([...live, ...inTemplate].map((b) => b.disabled), [false, true, false, true], 'letzte Stelle: nach hinten gesperrt');
+});
+
+test('U7: ein Eintrag aus dem Menue ordnet ueber denselben Weg wie Hoch/Runter um, und der Fokus bleibt am Optionen-Knopf', () => {
+  const wiring = dashboardSource.slice(dashboardSource.indexOf('function wireDashboardEditMode() {'));
+  const click = wiring.slice(wiring.indexOf("shell.addEventListener('click', (event) => {"));
+  assert.match(click.slice(0, 700), /if \(btn\.matches\('\.popover-menu \[data-widget-move\]'\)\) moveFromMenu\(btn\);\s*else if \(btn\.matches\('\[data-widget-move\]'\)\) move\(btn\);/,
+    'der Menue-Eintrag hat seinen eigenen Weg (Fokus), vor dem Knopf');
+  const fromMenu = wiring.slice(wiring.indexOf('const moveFromMenu = (item) => {'), wiring.indexOf('\n    };\n', wiring.indexOf('const moveFromMenu = (item) => {')));
+  assert.match(fromMenu, /menu\?\.hidePopover\?\.\(\);/, 'das Menue schliesst');
+  assert.match(fromMenu, /trigger\?\.focus\(\{ preventScroll: true \}\);[\s\S]*moveWidget\(item\.dataset\.widgetId, item\.dataset\.widgetMove\)/,
+    'der Fokus geht VOR dem Umhaengen an den Ausloeser - arrangeChildren gibt ihn dann zurueck');
+  const moveWidget = wiring.slice(wiring.indexOf('const moveWidget = '), wiring.indexOf('\n    };\n', wiring.indexOf('const moveWidget = ')));
+  assert.match(moveWidget, /placeWidget\(/, 'moveWidget legt ueber placeWidget (Patch + Ansage "Platz n von m")');
+});
+
+// --------------------------------------------------------------------------
+// DW p7, Nachtrag p5b: TERMIN BEARBEITEN UEBER DER UEBERSICHT. Das Formular
+// traegt Regeln aus calendar.css (Farbwahl, Symbolwahl, Anhang); der Router
+// laedt das Blatt nur fuer die Kalenderseite. Ueber der Uebersicht stand
+// "Farbe" ohne einen Farbknopf (0px hoch, gemessen 390/1440).
+// --------------------------------------------------------------------------
+test('DW p7: openEventById leiht calendar.css fuer sein Formular - mit dem Signal der Seite darunter', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const makeLink = () => {
+    const listeners = {};
+    return {
+      rel: '', href: '', dataset: {}, isConnected: false, sheet: null,
+      getAttribute(name) { return this[name] ?? null; },
+      addEventListener(type, fn) { listeners[type] = fn; },
+      fire(type) { listeners[type]?.(); },
+      remove() { head.splice(head.indexOf(this), 1); this.isConnected = false; },
+    };
+  };
+  const fakeDoc = {
+    head: { appendChild(el) { head.push(el); el.isConnected = true; return el; } },
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    createElement: () => makeLink(),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  let opened = null;
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/calendar/7') return { data: { id: 7, title: 'Sportfest', start_datetime: '2026-10-23', end_datetime: '2026-10-23', all_day: 1, assigned_users: [], external_source: 'local' } };
+      return { data: [] };
+    },
+  };
+  globalThis.__openDetailView = (opts) => { opened = opts; };
+  const page = new AbortController();
+  try {
+    const { openEventById } = await import('../public/pages/calendar.js');
+    await openEventById(7, { date: '2026-10-23', user: { id: 1, role: 'admin' }, onChanged: () => {}, signal: page.signal });
+    assert.ok(opened, 'das Blatt geht auf');
+    const lent = head.filter((el) => el.href === '/styles/calendar.css');
+    assert.equal(lent.length, 1, 'calendar.css haengt am Ende von <head>, einmal');
+    let ready = false;
+    void Promise.resolve(opened.edit?.ready).then(() => { ready = true; });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(ready, false, 'das Formular wartet auf das Blatt - die Farbwahl stuende sonst ohne Regeln da');
+    lent[0].fire('load');
+    await opened.edit.ready;
+    page.abort();
+    assert.equal(lent[0].isConnected, false, 'die Uebersicht geht, ihr geliehenes Blatt mit');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
+// DW-P2-11: EINE LEERZEILE. Naehrwerte, Entsorgung und Schnellzugriffe sagten
+// "noch nichts" in drei Formen (Glyphe + Caption + Akzent-Textknopf, der je
+// nach Breite rechts stand oder unter den Satz brach). Jetzt die ruhige Zeile
+// der App (`cardEmptyRowHtml`, utils/empty-state.js): Satz, dann EIN
+// sekundaerer Knopf am Ende, der auf den Satz verweist.
+// --------------------------------------------------------------------------
+test('DW-P2-11: die leeren Kacheln sprechen die eine ruhige Zeile - Satz, Aktion am Ende, kein Glyphen-Dialekt', () => {
+  const rows = {
+    waste: __test.renderWasteWidget({ items: [] }, '1x1'),
+    quicklinks: __test.renderQuickLinks([]),
+    shopping: __test.renderShoppingLists([]),
+  };
+  for (const [id, html] of Object.entries(rows)) {
+    const row = html.match(/<div class="card-empty-row widget__empty">\s*<span class="card-empty-row__text" id="([^"]+)">[^<]+<\/span>\s*<button type="button" class="btn btn--secondary btn--sm card-empty-row__action"([^>]*)>/);
+    assert.ok(row, `${id}: die ruhige Zeile mit der Aktion am Ende`);
+    assert.match(row[2], new RegExp(`aria-describedby="${row[1]}"`), `${id}: die Aktion verweist auf den Satz, der ihr Objekt nennt`);
+    assert.doesNotMatch(html, /empty-state__icon|widget__empty-cta/, `${id}: keine Glyphe, kein Akzent-Textknopf`);
+  }
+  // Ohne Aktion: nur der Satz, ohne Verweis.
+  const pantry = __test.renderPantryWidget({ items: [] }, '1x1');
+  assert.match(pantry, /<div class="card-empty-row widget__empty">\s*<span class="card-empty-row__text">/);
 });

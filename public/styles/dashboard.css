@@ -639,60 +639,21 @@
   overflow: visible;
 }
 
+/* Der Traeger der ruhigen Zeile in einer Kachel (`.card-empty-row`, layout.css;
+ * DW-P2-11): hier steht nur noch das Polster der Kachel. Die Zeile selbst -
+ * Satz in Subheadline, Aktion am Ende, kein Umbruch der Aktion - gehoert dem
+ * geteilten Baustein; die eigene Fassung hier (Caption, Glyphe 60 %,
+ * `flex-wrap: wrap`) war der dritte Dialekt. */
 .widget__empty {
   padding: var(--space-3) var(--space-4);
-  color: var(--color-text-tertiary);
-  font-size: var(--type-caption);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.widget__empty .empty-state__icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  color: var(--color-text-tertiary);
-  opacity: 0.6;
 }
 
 /* Fehlerkachel eines einzelnen Widgets: dezent danger-getönter Rahmen, damit
  * „kaputt" auf einen Blick von „leer" unterscheidbar ist, ohne zu schreien.
- * Der Retry rutscht ans Zeilenende wie die Empty-State-CTA. */
+ * Kopf und Zeile sind die jeder Kachel (DW-P3-2): `widgetHeader` und die ruhige
+ * Zeile mit dem Wiederholen am Ende. */
 .widget--error {
   border-color: color-mix(in srgb, var(--color-danger) var(--tint-hint), var(--color-border));
-}
-
-.widget__retry {
-  margin-inline-start: auto;
-}
-
-/* Aktivierungs-CTA im Empty-State: dezente Akzent-Affordance am Zeilenende,
-   trägt die Modulfarbe (--widget-accent). Touch-sicher via min-height. */
-.widget__empty-cta {
-  margin-inline-start: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--target-base);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-full);
-  color: var(--widget-accent, var(--color-accent));
-  font-size: var(--type-secondary);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.widget__empty-cta:hover {
-  background-color: color-mix(in srgb, var(--widget-accent, var(--color-accent)) var(--tint-state), transparent);
-}
-
-.widget__empty-cta svg {
-  width: 15px;
-  height: 15px;
 }
 
 /* KEIN HOVER-LIFT AUF DER KARTE (Critique R1, A10). Ein Widget hob sich beim
@@ -722,8 +683,10 @@
   border-bottom: none;
 }
 
-.task-item:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .task-item:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 .task-item__priority {
@@ -853,8 +816,10 @@
   border-bottom: none;
 }
 
-.event-item:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .event-item:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 /* Kalenderfarbe als Dot statt Seitenstreifen — gleiches Vokabular wie die
@@ -967,8 +932,10 @@
   transition: background-color var(--transition-fast);
 }
 
-.week-strip__day:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .week-strip__day:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 .week-strip__day:focus-visible {
@@ -1087,22 +1054,32 @@
   gap: var(--space-2);
 }
 
+/* DER SLOT IST EINE MULDE IN DER KARTE, NEUTRAL IN HELL UND DUNKEL (DW-P2-8).
+ * Ein gefuellter Slot trug eine Waschung aus `--module-accent` (glass.css) -
+ * auf der Uebersicht ist das ihr eigener violetter Akzent, also stand die
+ * Kuechen-Kachel violett gewaschen unter einem orangefarbenen Siegel: "Den Ton
+ * setzt die Karte, nicht die Seite", und Farbe gehoert in den Vollton eines
+ * kleinen Elements, nicht in die Beimischung einer Flaeche (DESIGN.md). Den
+ * Ton traegt die Glyphe des Mahlzeit-Typs; die Flaeche ist die Mulde
+ * (`--color-fill-well`) wie die Notizzettel daneben, ohne eigene Kante. */
 .meal-slot {
   min-width: 0;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  border: none;
+  background-color: var(--color-fill-well);
   cursor: pointer;
   touch-action: pan-y pinch-zoom;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background-color var(--transition-fast);
   text-align: left;
 }
 
-.meal-slot:hover {
-  border-color: color-mix(in srgb, var(--slot-color, var(--color-accent)) var(--tint-hint), var(--color-border-strong));
-  background-color: color-mix(in srgb, var(--slot-color, var(--color-accent)) var(--tint-state), var(--color-surface-3));
-  box-shadow: var(--shadow-xs);
+/* Die Antwort steht dort, wo die Flaeche steht (wie `.dashboard .note-item`,
+ * glass.css): eine Mulde hebt sich nicht per Schatten aus sich heraus. */
+@media (hover: hover) {
+  .meal-slot:hover {
+    background-color: color-mix(in srgb, var(--slot-color, var(--color-accent)) var(--tint-state), var(--color-fill-well));
+  }
 }
 
 /* AUSNAHME vom Fokusring-Token: der Slot trägt die Farbe seines Mahlzeit-Typs,
@@ -1212,8 +1189,10 @@
   margin-inline: calc(var(--space-4) * -1);
 }
 
-.shopping-widget-list:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .shopping-widget-list:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 .shopping-widget-list + .shopping-widget-list {
@@ -1245,13 +1224,20 @@
   margin-bottom: var(--space-2);
 }
 
+/* DIE BALKEN DER UEBERSICHT STEHEN, SIE WACHSEN NICHT (DW-P3-10). Einkauf,
+ * Budget-Anteil und -Ziel, Belohnung, Dosen und der Zyklusring trugen eine
+ * `transition` (bis zu 400ms, `--transition-slow`), die nie lief: der Endwert
+ * steht inline im Markup, und die Flaeche wird neu gezeichnet, nie
+ * fortgeschrieben - die gebaute Bewegung, die nie zu sehen ist (ux.js,
+ * `growBars`). `growBars` haette sie belebt, aber mit einem erzwungenen Layout
+ * im Aufbau, also genau im Rueckkehr-Fenster, das p3 gekuerzt hat; die
+ * Uebersicht ORIENTIERT, sie inszeniert keine Zahlen. Darum gestrichen. */
 .shopping-widget-list__bar {
   height: 100%;
   background-color: var(--color-success);
   border-radius: var(--radius-full);
   transform-origin: left;
   transform: scaleX(var(--progress-scale, 0));
-  transition: transform var(--transition-base);
 }
 
 .shopping-widget-list__items {
@@ -1290,9 +1276,12 @@
   flex-shrink: 0;
 }
 
+/* "Nichts offen" einer gewaehlten Liste (#1818): ein Zustand der Liste, leise,
+ * aber aufrecht - die Kursive stand neben `.widget-list-more` als zweite Form
+ * fuer eine Fussnote (DW-P3-4). Der Rest einer Liste ("+17 weitere") ist
+ * seither die geteilte Fussnote selbst (`listMoreLine`). */
 .shopping-widget-item--more {
   color: var(--color-text-tertiary);
-  font-style: italic;
 }
 
 /* --------------------------------------------------------
@@ -1518,7 +1507,8 @@
  * prefers-contrast auf 0) und trägt den Ton der LAGE, nicht den der App.
  *
  * Zwei Stufen, zwei Rollen: der Kern tönt als Objekt (--tint-surface), das
- * auslaufende Feld untergreift fremden Inhalt (--tint-wash).
+ * auslaufende Feld untergreift fremden Inhalt (--tint-wash). Auf der
+ * Kohle-Buehne halb so stark (`--weather-glow-strength`, tokens.css, DW-P3-8).
  *
  * ER HÄNGT AN DER GLYPHE SELBST, und der erste Anlauf hing daneben. Er saß an
  * `__main` und rechnete sich von dessen Inline-Ende zur Glyphe zurück - was
@@ -1529,9 +1519,8 @@
  * und die Zentrierung ist eine Zeile statt einer Rechnung.
  *
  * Die Hülle muss existieren, weil ein SVG- oder <img>-Element keine
- * Pseudo-Elemente hat. Sie trägt auch die Marge für den Aktualisieren-Knopf,
- * die vorher an der Glyphe stand: das Licht ragt über beide Kanten hinaus und
- * darf den Abstand nicht mitverschieben.
+ * Pseudo-Elemente hat. (Die Marge, die sie fuer den absolut gesetzten
+ * Aktualisieren-Knopf trug, ist mit DW-P3-3 entfallen: der Knopf steht im Kopf.)
  *
  * `isolation: isolate` ist die Bedingung für `z-index: -1`. Ohne sie fiele das
  * Licht aus dem Widget heraus und läge hinter der Kartenfläche, also
@@ -1542,12 +1531,6 @@
   isolation: isolate;
   display: flex;
   flex-shrink: 0;
-  /* Freiraum für den absolut positionierten Refresh-Button in der Ecke
-   * (top/right --space-2, 28px breit): ohne die Marge schoben sich die
-   * Sonnenstrahlen der Glyphe unter den Button (Finish-Verdict
-   * Fundament-Phase, Neubefund a - mobil sichtbar, gilt aber in jeder
-   * Widget-Breite, weil beide rechtsbündig ankern). */
-  margin-inline-end: var(--space-6);
 }
 
 .weather-widget__glyph::before {
@@ -1588,49 +1571,29 @@
   95%           { transform: translate(-50%, -50%); opacity: calc(var(--weather-glow-opacity) * 0.55); }
 }
 
-.weather-widget__refresh {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: var(--color-fill-well);
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  /* UEBER DEM KOPF, nicht darunter. Hier stand `z-index: 1`, und
-   * `.widget__header` traegt seit dem Kopf-Umbau `z-index: 2` ueber die volle
-   * Kartenbreite: der Knopf war zu sehen und nicht zu treffen - an seinem
-   * Zentrum lieferte elementFromPoint den Kopf (Critique 2026-09-23, gemessen
-   * 390 und 1440). Sonde 4 misst verdeckte Ziele bewusst nicht und blieb gruen;
-   * test-dashboard-a11y-browser.js prueft genau diesen Fall. */
-  z-index: 3;
-  transition: background var(--transition-fast);
+/* DER AKTUALISIEREN-KNOPF IST EIN KOPF-ICON-KNOPF DER SHELL (DW-P3-3):
+ * `btn btn--secondary btn--icon` in der Endzone des Widget-Kopfes, wo die
+ * anderen Kacheln ihren "Alle"-Link tragen. Hier stand ein grauer Eigenbau-
+ * Kreis (28/34px Well), absolut in die Kartenecke gesetzt und per `z-index: 3`
+ * ueber den Kopf gehoben, damit er ueberhaupt zu treffen war; die Glyphe
+ * darunter hielt ihm eine eigene Marge frei.
+ *
+ * Er misst wie die Kopfknoepfe der Uebersicht (Zeiger 40, Finger 48), und er
+ * waechst den Kopf NICHT: die Titelzeile ist das Mass des Kopfes
+ * (`--target-sm`, `.widget__title`), der Knopf greift mit negativer Marge in
+ * das Kopfpolster - wie die Trefferflaeche des "Alle"-Links. */
+.widget__header > .weather-widget__refresh {
+  flex: 0 0 auto;
+  margin-block: calc((var(--target-sm) - var(--target-base)) / 2);
+  margin-inline-end: calc(-1 * var(--space-1));
 }
 
-/* Kompakte Optik im 2x1-Widget beibehalten, aber die Trefferfläche
-   unsichtbar auf das 44px-Minimum ausdehnen. */
-.weather-widget__refresh::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--target-base);
-  height: var(--target-base);
-  transform: translate(-50%, -50%);
-}
-
-.weather-widget__refresh:hover {
-  background: var(--color-surface-hover);
-}
-
-.weather-widget__refresh:disabled {
-  opacity: 0.5;
-  cursor: default;
+@media (min-width: 1024px) and (hover: hover) {
+  .widget__header > .weather-widget__refresh {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+    margin-block: calc((var(--target-sm) - var(--target-md)) / 2);
+  }
 }
 
 .weather-widget__inner {
@@ -2253,7 +2216,11 @@ svg.weather-forecast__icon {
   opacity: 0;
   pointer-events: none;
   transform: translateY(8px);
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  /* AUSTRITT KUERZER ALS EINTRITT (DW-P3-11, DESIGN.md Motion): die Regel des
+   * geschlossenen Zustands fuehrt den Weg HINEIN in ihn, also das Schliessen -
+   * `--duration-xs` wie das Backdrop dahinter. Das Oeffnen steht an
+   * `.fab-actions--visible`. Bis hier liefen beide Wege 250ms. */
+  transition: opacity var(--duration-xs) var(--ease-out), transform var(--duration-xs) var(--ease-out);
 }
 
 /* Plus wird zum X. Der Zustand steht schon im `aria-expanded`, das der
@@ -2341,6 +2308,7 @@ svg.weather-forecast__icon {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+  transition: opacity var(--transition-base), transform var(--transition-base);
 }
 
 .fab-action {
@@ -2385,9 +2353,14 @@ svg.weather-forecast__icon {
   transition: background-color var(--transition-fast);
 }
 
-.fab-action:hover .fab-action__btn,
 .fab-action:focus-visible .fab-action__btn {
   background-color: var(--color-accent-light);
+}
+
+@media (hover: hover) {
+  .fab-action:hover .fab-action__btn {
+    background-color: var(--color-accent-light);
+  }
 }
 
 @media (pointer: coarse) {
@@ -2476,9 +2449,11 @@ svg.weather-forecast__icon {
 
 /* Der Chip liegt im Ruhezustand auf --color-surface-elevated und braucht
  * deshalb die Stufe ueber DIESER Flaeche, nicht die ueber --color-surface. */
-.widget-restore-chip:hover {
-  background: var(--color-surface-elevated-hover);
-  border-color: var(--color-accent);
+@media (hover: hover) {
+  .widget-restore-chip:hover {
+    background: var(--color-surface-elevated-hover);
+    border-color: var(--color-accent);
+  }
 }
 
 .widget-restore-chip:focus-visible {
@@ -2538,10 +2513,16 @@ svg.weather-forecast__icon {
   height: var(--space-4);
 }
 
-.widget-restore-chip__more:hover,
 .widget-restore-chip__more[aria-expanded="true"] {
   background: var(--color-surface-elevated-hover);
   border-color: var(--color-accent);
+}
+
+@media (hover: hover) {
+  .widget-restore-chip__more:hover {
+    background: var(--color-surface-elevated-hover);
+    border-color: var(--color-accent);
+  }
 }
 
 .widget-restore-chip__more:focus-visible {
@@ -4671,6 +4652,22 @@ button.today-cockpit__more--link {
   cursor: pointer;
 }
 
+/* DAS MENUE DER KACHEL (U7): Nach vorn, Nach hinten und - wo vorhanden - die
+ * Optionen. Sein Ausloeser ist der Kreis `.widget-edit-controls__options`.
+ * Am Finger stehen Hoch und Runter schon in der Leiste; ein Menue, das nur sie
+ * wiederholte, waere ein zweiter Weg zur selben Handlung und kostete der
+ * Telefonzeile 48px Name - dort steht es nur, wo es Optionen traegt. */
+.widget-edit-controls__menu {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+@media (pointer: coarse) {
+  .widget-edit-controls__menu--move-only {
+    display: none;
+  }
+}
+
 /* Hoch/Runter: am Zeiger tragen Griff und Pfeiltasten das Umordnen, daher
    standardmaessig aus; am Finger stehen sie neben dem Griff - Ziehen ist nie
    der einzige Weg (WCAG 2.5.7, utils/sortable.js). */
@@ -4695,9 +4692,11 @@ button.today-cockpit__more--link {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.widget-edit-controls__move-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
+@media (hover: hover) {
+  .widget-edit-controls__move-btn:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
 }
 
 .widget-edit-controls__move-btn:disabled {
@@ -5163,24 +5162,27 @@ button.today-cockpit__more--link {
   }
 }
 
-.dashboard .task-item:hover,
-.dashboard .event-item:hover,
-.dashboard .meal-slot:hover,
-.dashboard .shopping-widget-list:hover {
-  /* Konsistent mit task/event: Hover gibt Feedback OHNE Lesbarkeit zu senken.
-   * Farbige Zettel vertragen keinen Flächen-Tint → sanfter Schatten-Lift statt
-   * des früheren opacity:0.8-Dimmens. */
-  transform: none;
-  opacity: 1;
-  box-shadow: var(--shadow-sm);
+@media (hover: hover) {
+  .dashboard .task-item:hover,
+  .dashboard .event-item:hover,
+  .dashboard .shopping-widget-list:hover {
+    /* Konsistent mit task/event: Hover gibt Feedback OHNE Lesbarkeit zu senken.
+     * Farbige Zettel vertragen keinen Flächen-Tint → sanfter Schatten-Lift statt
+     * des früheren opacity:0.8-Dimmens. */
+    transform: none;
+    opacity: 1;
+    box-shadow: var(--shadow-sm);
+  }
 }
 
 /* Die Notiz ist hier seit 2026-08-10 ein Inset-Well (glass.css) und damit
  * VERTIEFT - ein Schatten-Lift beim Hover würde sie aus ihrer eigenen Mulde
  * heben. Ihre Hover-Antwort steht deshalb dort, wo auch ihre Fläche steht. */
-.dashboard .note-item:hover {
-  transform: none;
-  opacity: 1;
+@media (hover: hover) {
+  .dashboard .note-item:hover {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 /* Hier stand der zweite, spezifischere Verlauf des Wetter-Widgets
@@ -5189,18 +5191,6 @@ button.today-cockpit__more--link {
  * Schlagschatten und der Glas-Refresh-Knopf entfallen: auf einer opaken Karte
  * braucht ein Icon keinen Schatten, um zu sitzen. Die Basisregel oben trägt
  * das Widget jetzt allein. */
-/* Die border-radius-Zeile ist mit Runde 6 Phase 3 entfallen: sie ueberschrieb
- * die Kapsel der Basisregel (dashboard.css:894) 1455 Zeilen spaeter mit 0-2-0.
- * Der Kommentar direkt darueber warnt vor genau dieser Spezifitaetsfalle und
- * hat die Regel unter sich nicht geschuetzt - ein Kommentar ist Dokumentation,
- * kein Guard. Diese Regel braucht nur Position und Groesse. */
-.dashboard .weather-widget__refresh {
-  top: var(--space-3);
-  right: var(--space-3);
-  width: 34px;
-  height: 34px;
-}
-
 .birthday-widget-item {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
@@ -5331,8 +5321,10 @@ button.today-cockpit__more--link {
  * aus - dieselbe Antwort, die `.list-row:hover` app-weit gibt. Eine eigene
  * Mischung stand hier im ersten Anlauf und waere eine 38. Prozentstufe
  * gewesen, wo ein benanntes Token existiert. */
-.dashboard .countdown-item:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .dashboard .countdown-item:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5808,7 +5800,6 @@ button.today-cockpit__more--link {
   background: var(--module-budget);
   transform: scaleX(var(--share-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
 }
 
 /* EIN BALKEN WAECHST AUS DEM ZEILENANFANG, UND DER LIEGT IN `ar`/`fa` RECHTS.
@@ -5821,9 +5812,6 @@ button.today-cockpit__more--link {
   transform-origin: right center;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .budget-widget__share-saved { transition: none; }
-}
 
 .budget-widget__balance--positive {
   color: var(--color-success);
@@ -5891,14 +5879,10 @@ button.today-cockpit__more--link {
   border-radius: var(--radius-full);
   transform: scaleX(var(--goal-scale, 0));
   transform-origin: left center;
-  transition: transform var(--transition-slow);
 }
 .budget-widget__goal-fill--positive { background-color: var(--color-success); }
 .budget-widget__goal-fill--neutral  { background-color: var(--module-budget); }
 .budget-widget__goal-fill--negative { background-color: var(--color-danger); }
-@media (prefers-reduced-motion: reduce) {
-  .budget-widget__goal-fill { transition: none; }
-}
 
 .budget-widget__flow {
   display: flex;
@@ -6049,16 +6033,12 @@ button.today-cockpit__more--link {
   background: var(--widget-accent);
   transform-origin: left center;
   transform: scaleX(var(--rewards-progress, 0));
-  transition: transform var(--transition-slow);
 }
 
 [dir="rtl"] .rewards-goal__fill {
   transform-origin: right center;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rewards-goal__fill { transition: none; }
-}
 
 .rewards-goal__label {
   margin: 0;
@@ -6268,8 +6248,10 @@ button.today-cockpit__more--link {
 /* Der Ruhezustand ist bereits eine erhoehte Flaeche (--color-fill-well =
  * --color-surface-3), der Hover nimmt deshalb die Stufe ueber DIESER, nicht die
  * ueber der Grundflaeche - sonst faellt er im Dark auf seine eigene Farbe. */
-.rewards-widget__footer:hover {
-  background: var(--color-surface-elevated-hover);
+@media (hover: hover) {
+  .rewards-widget__footer:hover {
+    background: var(--color-surface-elevated-hover);
+  }
 }
 
 .rewards-widget__footer svg {
@@ -6302,8 +6284,10 @@ button.today-cockpit__more--link {
   transition: background-color var(--transition-fast);
 }
 
-.schedule-widget-row:hover {
-  background-color: var(--color-surface-2);
+@media (hover: hover) {
+  .schedule-widget-row:hover {
+    background-color: var(--color-surface-2);
+  }
 }
 
 .schedule-widget-row__avatar {
@@ -6390,8 +6374,10 @@ button.today-cockpit__more--link {
   transition: background-color var(--transition-fast);
 }
 
-.waste-widget-row:hover {
-  background-color: var(--color-surface-2);
+@media (hover: hover) {
+  .waste-widget-row:hover {
+    background-color: var(--color-surface-2);
+  }
 }
 
 .waste-widget-row__dot {
@@ -6500,8 +6486,10 @@ button.today-cockpit__more--link {
 }
 
 /* Das benannte Token, kein Schatten - dieselbe Antwort wie .countdown-item. */
-.dashboard .pantry-widget-row:hover {
-  background-color: var(--color-surface-hover);
+@media (hover: hover) {
+  .dashboard .pantry-widget-row:hover {
+    background-color: var(--color-surface-hover);
+  }
 }
 
 @media (pointer: coarse) {
@@ -6612,7 +6600,6 @@ button.today-cockpit__more--link {
   background: var(--module-health);
   transform-origin: left center;
   transform: scaleX(var(--dose-scale, 0));
-  transition: transform var(--transition-base);
 }
 
 .health-widget__bar-fill--done {
@@ -6693,9 +6680,6 @@ button.today-cockpit__more--link {
   stroke: color-mix(in oklab, var(--color-border) 75%, transparent);
 }
 
-.cycle-widget__ring-arc {
-  transition: stroke-dasharray var(--transition-base);
-}
 
 .cycle-widget__ring-num {
   fill: var(--color-text-primary);
@@ -6742,12 +6726,6 @@ button.today-cockpit__more--link {
 .cycle-widget__date {
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cycle-widget__ring-arc,
-  .health-widget__bar-fill,
-  .shopping-widget-list__bar { transition: none; }
 }
 
 .health-widget__none {
@@ -7936,12 +7914,19 @@ button.today-cockpit__more--link {
   flex-shrink: 0;
 }
 
-.wall__foot-btn:hover,
 .wall__foot-btn:focus-visible,
 .wall[data-wall-awake] .wall__foot-btn {
   border-color: var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-primary);
+}
+
+@media (hover: hover) {
+  .wall__foot-btn:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+  }
 }
 
 .wall__foot-btn:focus-visible {
@@ -8069,12 +8054,19 @@ button.today-cockpit__more--link {
   transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
-.wall__timer-preset:hover,
 .wall__timer-preset:focus-visible,
 .wall[data-wall-awake] .wall__timer-preset {
   border-color: var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-primary);
+}
+
+@media (hover: hover) {
+  .wall__timer-preset:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+  }
 }
 
 .wall__timer-preset:focus-visible {
@@ -8517,19 +8509,21 @@ button.today-cockpit__more--link {
 }
 
 .widget--fasting { container-type: inline-size; }
-.widget--fasting .fasting-widget { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-4); padding: var(--space-4); }
-.fasting-widget .fasting-dial { width: min(100%, 14rem); margin: 0 auto; }
-.fasting-widget .fasting-dial__content { display: grid; gap: var(--space-2); }
-.fasting-widget__controls { display: grid; justify-items: center; gap: var(--space-3); min-width: 0; }
+/* Ring NEBEN dem Satz (DW-P3-5): hoechstens 120px - die Viewbox des Rings
+ * (components/fasting-dial.js) -, in jeder Kachelgroesse. Ohne Stundenmarken
+ * und Zusatztage: bei dieser Groesse waeren sie 6px-Schrift, und Tag und Uhr
+ * stehen ohnehin als Text daneben. */
+.widget--fasting .fasting-widget { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-4) var(--space-4); }
+.fasting-widget .fasting-dial { width: min(30cqi, var(--fasting-widget-dial)); margin: 0; }
+.fasting-widget .fasting-dial :is(.fasting-dial__landmarks, .fasting-dial__extra) { display: none; }
+.fasting-widget__controls { display: grid; justify-items: start; align-content: center; gap: var(--space-3); min-width: 0; }
+.fasting-widget__status { display: grid; gap: var(--space-1); min-width: 0; }
 .fasting-widget__timer { font-size: var(--text-2xl); line-height: var(--line-height-tight); font-weight: var(--font-weight-bold); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .fasting-widget__meta { color: var(--color-text-secondary); }
 .fasting-widget__remaining { font-variant-numeric: tabular-nums; }
-.fasting-widget__actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); }
-@container (min-width: 380px) {
-  .widget--fasting .fasting-widget { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .fasting-widget__controls { justify-items: start; }
-  .fasting-widget__actions { justify-content: start; }
-}
+.fasting-widget__actions { display: flex; justify-content: start; flex-wrap: wrap; gap: var(--space-2); }
+.fasting-widget__error { grid-column: 1 / -1; margin: 0; }
+.fasting-widget__error:empty { display: none; }
 
 /* Naehrwerte-Kachel (#1326). Dieselbe Rasterzeile wie im Tab: Beschriftung -
  * Balken - Zahl, damit die Balken aller Zeilen an derselben Kante beginnen.

@@ -1158,9 +1158,11 @@ test('jede Bewegung des Wetter-Widgets steht unter einer Bewegungs-Bedingung', (
   // Die Ausnahme oben gilt nur, solange sie fluechtig IST: die Klasse wird um
   // die Anfrage herum gesetzt und wieder entfernt. Bliebe sie stehen, waere
   // aus der Rueckmeldung eine Dauerbewegung ohne Ausschalter geworden.
-  assert.match(page, /classList\.add\('weather-widget__refresh--spinning'\)/,
+  // Seit DW-P3-3 die Statusdrehung der Knoepfe (`.btn--loading`): die Klasse
+  // `weather-widget__refresh--spinning` hatte keine Regel, der Kringel drehte nie.
+  assert.match(page, /classList\.add\('btn--loading'\)/,
     'der Ladekringel muss beim Anstossen gesetzt werden');
-  assert.match(page, /classList\.remove\('weather-widget__refresh--spinning'\)/,
+  assert.match(page, /classList\.remove\('btn--loading'\)/,
     'der Ladekringel muss wieder entfernt werden - sonst ist er keine Rueckmeldung, sondern Dauerbewegung');
 });
 
@@ -11343,10 +11345,11 @@ test('dashboard and task progress bars animate with transforms instead of widths
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
 
-  assert.match(
-    dashboardCss,
-    /\.shopping-widget-list__bar\s*\{[\s\S]*transform-origin:\s*left[\s\S]*transform:\s*scaleX\(var\(--progress-scale,\s*0\)\)[\s\S]*transition:\s*transform/,
-  );
+  // Die Breite kommt ueber transform. Eine Transition traegt der Balken der
+  // Uebersicht seit DW-P3-10 nicht mehr: sie lief nie (Endwert im Markup,
+  // Neuzeichnen statt Fortschreiben) - test:motion "DW-P3-10".
+  assert.match(cssRuleBody(dashboardCss, '.shopping-widget-list__bar'),
+    /transform-origin:\s*left[\s\S]*transform:\s*scaleX\(var\(--progress-scale,\s*0\)\)/);
   assert.doesNotMatch(cssRuleBody(dashboardCss, '.shopping-widget-list__bar'), /transition:\s*width/);
   assert.match(dashboardPage, /style="--progress-scale:\$\{progress\s*\/\s*100\}"/);
   assert.doesNotMatch(dashboardPage, /shopping-widget-list__bar" style="width:/);
@@ -23098,6 +23101,45 @@ test('Esc in Combobox und Logo-Picker des Abo-Formulars schliesst nur das Widget
  * Parameter nicht. Fuenf Stellen im Anpassen-Modus und in der Fehlerkachel
  * setzten ihn roh ins Markup, zwei Zeilen darueber stand er in `esc()`.
  */
+/* DW-P3-15: auf Touch klebt `:hover` nach dem Tipp an der Kachelzeile, bis
+ * woanders getippt wird. In dashboard.css standen 20 Hover-Regeln ausserhalb
+ * von `@media (hover: hover)` (a2, gemessen) - die Uebersicht ist die Seite,
+ * die am Telefon am meisten angetippt wird. Jetzt keine. (Der app-weite
+ * Ratchet in test:motion zaehlt nur; hier gilt fuer EIN Blatt: null.) */
+test('DW-P3-15: dashboard.css traegt kein :hover ausserhalb von @media (hover: hover)', () => {
+  const stray = [];
+  let seen = 0;
+  for (const rule of eachRule(read('../public/styles/dashboard.css'))) {
+    if (!/:hover/.test(rule.selector)) continue;
+    seen += 1;
+    if (!rule.at.some((at) => /\(hover:\s*hover\)/.test(at))) stray.push(rule.selector.replace(/\s+/g, ' ').trim());
+  }
+  assert.ok(seen >= 20, `Reichweite: nur ${seen} Hover-Regeln gesehen`);
+  assert.deepEqual(stray, [], `Hover ohne (hover: hover) - auf Touch klebt er:\n${stray.join('\n')}`);
+});
+
+/* DW-P2-11: die ruhige Zeile eines leeren Abschnitts ist EIN Baustein
+ * (`.card-empty-row`, layout.css) - die Aktion bricht nie unter den Satz, der
+ * Satz gibt nach. Die Uebersicht traegt keinen eigenen Zeilen-Dialekt mehr. */
+test('DW-P2-11: die ruhige Zeile haelt die Aktion am Ende, und die Uebersicht hat keine zweite Fassung', () => {
+  const layout = read('../public/styles/layout.css');
+  const rule = (css, sel) => [...eachRule(css)].filter((r) => !r.at.length && r.selector.trim() === sel).map((r) => r.body).join(';');
+  assert.match(rule(layout, '.card-empty-row'), /display:\s*flex/);
+  assert.doesNotMatch(rule(layout, '.card-empty-row'), /flex-wrap:\s*wrap/, 'die Aktion bricht nicht unter den Satz');
+  assert.match(rule(layout, '.card-empty-row__text'), /flex:\s*1 1 auto[\s\S]*min-inline-size:\s*0/, 'der Satz gibt nach');
+  assert.match(rule(layout, '.card-empty-row__action'), /flex:\s*none[\s\S]*white-space:\s*nowrap/, 'der Knopf behaelt seine Breite');
+  const dash = read('../public/styles/dashboard.css');
+  for (const r of eachRule(dash)) {
+    if (!/\.widget__empty\b/.test(r.selector)) continue;
+    assert.doesNotMatch(r.body, /display|flex|font-size|color/, `dashboard.css ${r.selector.trim()}: der Traeger hat nur sein Polster`);
+  }
+  assert.doesNotMatch(dash, /\.widget__empty-cta|\.widget__retry/, 'die eigenen Leerzustands-Knoepfe sind weg');
+  const page = read('../public/pages/dashboard.js');
+  assert.doesNotMatch(page, /class="widget__empty"/, 'jede leere Kachel geht ueber widgetEmptyHtml/cardEmptyRowHtml');
+  assert.match(read('../public/pages/health.js'), /import \{[^}]*cardEmptyRowHtml[^}]*\} from '\/utils\/empty-state\.js';/, 'die Gesundheit nimmt dieselbe Zeile');
+  assert.doesNotMatch(read('../public/pages/health.js'), /function cardEmptyRowHtml\(/, 'keine zweite Fassung in health.js');
+});
+
 test('Dashboard: der Kachelname steht im Markup immer in esc()', () => {
   const lines = read('../public/pages/dashboard.js').split('\n');
   const offenders = [];

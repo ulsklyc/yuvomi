@@ -4568,7 +4568,7 @@ test('Wand-Modus: render() reicht screensaver_enabled bis zum Knopf, der Klick r
 register(`data:text/javascript,${encodeURIComponent(`
   export async function resolve(spec, ctx, next) {
     if (spec === '/pages/tasks.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openTaskById = (id, opts) => globalThis.__openTaskById?.(id, opts); export const openNewTask = (opts) => globalThis.__openNewSheet?.("/tasks", opts);') };
-    if (spec === '/pages/calendar.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewEvent = (opts) => globalThis.__openNewSheet?.("/calendar", opts);') };
+    if (spec === '/pages/calendar.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewEvent = (opts) => globalThis.__openNewSheet?.("/calendar", opts); export const openEventById = (id, opts) => globalThis.__openEventById?.(id, opts);') };
     if (spec === '/pages/notes.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewNote = (opts) => globalThis.__openNewSheet?.("/notes", opts);') };
     return next(spec, ctx);
   }`)}`);
@@ -5134,6 +5134,15 @@ test('DW-P2-1: eine Anpassen-Geste ruft rebuildDashboard nicht, sie haengt Knote
     nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
     nodeAssert.match(wiring.slice(at, wiring.indexOf('\n    };\n', at)), /placeWidget\(/, `${gesture} legt nicht ueber placeWidget`);
   }
+  // U7: "Nach vorn"/"Nach hinten" aus dem Menue der Kachel nehmen denselben Weg
+  // (moveWidget -> placeWidget -> patchCustomize), nie einen eigenen Umbau.
+  {
+    const at = wiring.indexOf('const moveFromMenu = ');
+    nodeAssert.ok(at > -1, 'U7: der Weg aus dem Menue der Kachel fehlt');
+    const body = wiring.slice(at, wiring.indexOf('\n    };\n', at));
+    nodeAssert.match(body, /moveWidget\(item\.dataset\.widgetId, item\.dataset\.widgetMove\)/, 'U7: Nach vorn/hinten legt ueber moveWidget/placeWidget');
+    nodeAssert.doesNotMatch(body, /reorderWidgetConfig|rebuildDashboard|patchCustomize/, 'U7: kein zweiter Umordnen-Weg neben placeWidget');
+  }
   nodeAssert.match(hint, /patchCustomize\(/, 'der Lueckenhinweis patcht nicht');
   nodeAssert.doesNotMatch(patch, /rebuildDashboard\(|setHtml\(/, 'der Patch zeichnet die Flaeche doch neu');
   const order = ['captureTileRects(shell)', 'arrangeChildren(grid, nodes)', 'measureTileFlip(shell, before)', 'planGridHint(grid)', 'startTileFlip(flip)']
@@ -5179,6 +5188,47 @@ test('DW-P2-1: eine Anpassen-Geste ruft rebuildDashboard nicht, sie haengt Knote
   nodeAssert.equal(__test.tileDrawKey({ id: 'x', size: '1x1', order: 3 }), __test.tileDrawKey({ id: 'x', size: '1x1', order: 0 }));
   nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '2x1' }));
   nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '1x1', options: { limit: 12 } }));
+});
+
+// --------------------------------------------------------
+// DW p7 (Nachtrag p5b): ein Termin, der ueber der Uebersicht bearbeitet wird,
+// leiht calendar.css fuer die Lebenszeit der Uebersicht. Dafuer muss ihr
+// Signal bis zum Blatt reichen - am echten Weg: die Zeile in wireLinks.
+// --------------------------------------------------------
+const beforeEventSignal = pendingTests.slice();
+test('DW p7: eine Terminzeile reicht das Signal der Uebersicht an openEventById (calendar.css fuer das Formular)', async () => {
+  await Promise.allSettled(beforeEventSignal);
+  const names = ['window', '__openEventById'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const listeners = new Map();
+  const row = {
+    tagName: 'DIV', id: '', dataset: { route: '/calendar?open=7&date=2026-10-23' },
+    closest: () => null,
+    addEventListener(type, fn) { listeners.set(type, fn); },
+  };
+  const container = { querySelectorAll: (sel) => (sel === '[data-route]' ? [row] : []), querySelector: () => null, addEventListener() {} };
+  let got = null;
+  Object.defineProperty(globalThis, 'window', { value: { yuvomi: { navigate() {}, showToast() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, '__openEventById', { value: async (id, opts) => { got = { id, opts }; }, configurable: true, writable: true });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const page = new AbortController();
+    __test.wireLinks(container, () => {}, { user: { id: 1 }, signal: page.signal });
+    nodeAssert.equal(typeof listeners.get('click'), 'function', 'Reichweite: die Terminzeile ist verdrahtet');
+    await listeners.get('click')();
+    nodeAssert.equal(got?.id, '7', 'der Termin oeffnet ueber der Uebersicht');
+    nodeAssert.equal(got?.opts?.signal, page.signal, 'mit dem Signal der Uebersicht - daran haengt das geliehene calendar.css');
+  } finally {
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+  // Und render() reicht es an beiden Aufrufen herein (Flaeche und Heute-Blatt).
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const calls = [...src.matchAll(/wireLinks\((?:sheet|container), refreshAfterSheet, \{[^}]*\}\)/g)].map((m) => m[0]);
+  nodeAssert.equal(calls.length, 2, `Reichweite: zwei Aufrufe in render() (${calls.length})`);
+  for (const call of calls) nodeAssert.match(call, /\bsignal\b/, `${call}: ohne Signal leiht das Blatt kein calendar.css`);
 });
 
 await Promise.all(pendingTests);

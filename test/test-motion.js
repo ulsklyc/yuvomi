@@ -2154,7 +2154,7 @@ const SHARED_PRESSABLE = [
   ['.more-item', 'own'],
 ];
 /** Hoechststand der `:hover`-Regeln ausserhalb von `@media (hover: hover)`. Nur senken. */
-const UNGUARDED_HOVER_MAX = 228;
+const UNGUARDED_HOVER_MAX = 206;
 
 function hoverRules() {
   const out = [];
@@ -2210,6 +2210,49 @@ test('R18: der Press-Baustein - vorhandene Zustandsflaeche, hinein 80ms, nie unt
   assert.ok(ms('--duration-2xs') < ms('--duration-sm'), 'Druck schneller als Loslassen');
   // Keine Bewegung: reduzierte Bewegung braucht keinen eigenen Zweig.
   assert.doesNotMatch(press.body, /transform|scale|translate/);
+});
+
+// DW-P3-11: der Speed-Dial schloss so langsam, wie er aufging (250 ms beide
+// Wege, gemessen) - DESIGN.md Motion: "Austritt ist kuerzer". Die Regel des
+// geschlossenen Zustands fuehrt das Schliessen, die des offenen das Oeffnen.
+test('DW-P3-11: der Speed-Dial der Uebersicht schliesst schneller, als er aufgeht', () => {
+  const rules = [...eachRule(css('dashboard.css'))].filter((r) => !r.at.length);
+  const body = (sel) => rules.filter((r) => selectorList(r.selector).includes(sel)).map((r) => r.body).join(';');
+  const tokens = css('tokens.css');
+  const ms = (decl) => {
+    const name = /var\((--(?:duration|transition)-[\w-]+)\)/.exec(decl ?? '')?.[1];
+    assert.ok(name, `keine Token-Dauer in "${decl}"`);
+    const value = tokens.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1].trim();
+    if (/^\d+ms$/.test(value)) return Number.parseInt(value, 10);
+    const inner = /var\((--duration-[\w-]+)\)/.exec(value)?.[1];
+    return Number.parseInt(tokens.match(new RegExp(`${inner}:\\s*(\\d+)ms`))?.[1], 10);
+  };
+  const exit = /transition:\s*([^;]+)/.exec(body('.fab-actions'))?.[1];
+  const enter = /transition:\s*([^;]+)/.exec(body('.fab-actions--visible'))?.[1];
+  assert.ok(exit && enter, 'beide Zustaende tragen ihre Transition');
+  assert.ok(ms(exit) <= 150, `der Austritt dauert ${ms(exit)}ms (Ziel <= 150)`);
+  assert.ok(ms(exit) < ms(enter), `Austritt ${ms(exit)}ms ist nicht kuerzer als Eintritt ${ms(enter)}ms`);
+  assert.match(exit, /var\(--ease-out\)/, 'ohne Ueberschwinger');
+});
+
+// DW-P3-10: sechs Balken der Uebersicht trugen eine Transition, die nie lief -
+// der Endwert steht im Markup, die Flaeche wird neu gezeichnet (ux.js,
+// growBars: "eine gebaute Bewegung, die nie zu sehen ist"). Ein Balken der
+// Uebersicht bewegt sich nur, wenn dashboard.js ihn ueber growBars waechst.
+test('DW-P3-10: kein Balken der Uebersicht traegt eine Transition, die nie laeuft', () => {
+  const page = publicSource('pages/dashboard.js');
+  const grows = /growBars\(/.test(page);
+  const bars = ['.shopping-widget-list__bar', '.budget-widget__share-saved', '.budget-widget__goal-fill', '.rewards-goal__fill', '.health-widget__bar-fill', '.cycle-widget__ring-arc', '.nutrition-widget__fill'];
+  const stray = [];
+  let seen = 0;
+  for (const rule of eachRule(css('dashboard.css'))) {
+    const hit = selectorList(rule.selector).some((sel) => bars.some((bar) => sel.trim().endsWith(bar)));
+    if (!hit) continue;
+    seen += 1;
+    if (/(?:^|;)\s*transition(?:-property)?\s*:/.test(rule.body) && !/transition\s*:\s*none/.test(rule.body)) stray.push(rule.selector.trim());
+  }
+  assert.ok(seen >= 6, `Reichweite: nur ${seen} Balken-Regeln gesehen`);
+  if (!grows) assert.deepEqual(stray, [], `tote Transition an einem Balken ohne growBars:\n${stray.join('\n')}`);
 });
 
 test('R18: die Zahl der ungeschuetzten :hover-Regeln steigt nicht (Ratchet)', () => {

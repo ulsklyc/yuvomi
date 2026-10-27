@@ -9644,6 +9644,47 @@ textarea::placeholder {
   font-size: var(--type-caption);
 }
 
+/* EINE RUHIGE ZEILE STATT LEERER KACHELN (R21 D6, R22 D12, DW p7):
+ * `cardEmptyRowHtml` (utils/empty-state.js). Ein leerer Abschnitt in einer
+ * Karte ist ein Satz und hoechstens eine Aktion - die Gesundheit und die
+ * Kacheln der Uebersicht sprechen dieselbe Zeile.
+ *
+ * DIE AKTION STEHT IMMER AM ZEILENENDE. Hier stand `flex-wrap: wrap`, und auf
+ * der Uebersicht brach "Abfallart anlegen" am Telefon und bei 1440 unter den
+ * Satz (gemessen: Entsorgung 104-108px statt einer Zeile). Jetzt gibt der
+ * SATZ nach: er schrumpft und bricht in sich um, der Knopf behaelt seine
+ * Breite. */
+.card-empty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-block-size: var(--target-base);
+}
+
+.card-empty-row__text {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+  text-wrap: pretty;
+}
+
+.card-empty-row__action {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* DIESELBE ZEILE AUF EIGENER FLAECHE (R22, D12): wo sie nicht in einer
+ * Karte steht ("Heute faellig" im Medikamentenbereich, eine leere Woche der
+ * Aktivitaet), traegt sie die Flaeche einer Karte selbst. */
+.card-empty-row--surface {
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
 /* --------------------------------------------------------
  * Responsive Grid (Utility)
  * -------------------------------------------------------- */

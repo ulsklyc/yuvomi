@@ -69,7 +69,7 @@ import { hoistPlan, applyHoistPlan } from '/utils/health-hoist.js';
 import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
-import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, emptyHintHTML, mountLoadError, cardEmptyRowHtml } from '/utils/empty-state.js';
 import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
@@ -117,8 +117,9 @@ function mountAreaLoadError(area, name, onRetry) {
  *     `.empty-state`-Komposition (utils/empty-state.js).
  *   KARTE (ein Abschnitt in einem Bereich mit Inhalt): `cardEmptyRowHtml` -
  *     die ruhige Zeile mit dem Satz und, wo es etwas zu erfassen gibt, der
- *     Erfassen-Aktion (`.health-overview__empty-row`, seit R21 D6 der
- *     Vitalwerte-Karte der Uebersicht).
+ *     Erfassen-Aktion (seit R21 D6 der Vitalwerte-Karte der Uebersicht; seit
+ *     DW p7 geteilt in utils/empty-state.js, `.card-empty-row` - die Kacheln
+ *     der Uebersicht sprechen dieselbe Zeile).
  *
  * Die Aktion ist ein Knopf mit `data-action`; der Bereich verdrahtet ihn nach
  * dem Einhaengen (emptyStateHTML ist eine Zeichenkette).
@@ -137,18 +138,6 @@ function areaEmptyHtml(route, { action = null, className = '' } = {}) {
   });
 }
 
-function cardEmptyRowHtml(text, { action = null, className = '' } = {}) {
-  const button = action
-    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="${esc(action.id)}">
-        <i data-lucide="plus" aria-hidden="true"></i>${esc(action.label)}
-      </button>`
-    : '';
-  return `
-    <div class="health-overview__empty-row${className ? ` ${esc(className)}` : ''}">
-      <span class="health-overview__empty-text">${esc(text)}</span>
-      ${button}
-    </div>`;
-}
 
 // Sichtbarkeit des Zyklus-Tabs. Zwei Schalter greifen ineinander: der Haushalt
 // erlaubt ihn (Settings → Module → Gesundheit, Admin), und jede Person kann ihn
@@ -3197,7 +3186,7 @@ function dueTodayMarkup() {
   const due = computeDueDoses(allSchedules(), { from: today, to: today });
   if (!due.length) {
     // Ein Abschnitt in einem Bereich mit Inhalt: die ruhige Zeile (R22, D12).
-    return cardEmptyRowHtml(t('health.meds.dueToday.empty'), { className: 'health-overview__empty-row--surface' });
+    return cardEmptyRowHtml(t('health.meds.dueToday.empty'), { className: 'card-empty-row--surface' });
   }
   const rows = due.map((dose) => {
     const med = meds.list.find((m) => m.id === dose.medicationId);
@@ -5298,7 +5287,7 @@ function renderActivityShell() {
     ${/* EINE LEERE WOCHE IST EINE KARTE OHNE INHALT (R22, D12): die ruhige
          Zeile mit der Erfassen-Aktion statt eines grauen Satzes im Diagramm. */ ''}
     ${totals.count === 0
-      ? cardEmptyRowHtml(t('health.activity.noData'), { action: canAdd ? { id: 'activity-add', label: t('health.activity.addShort') } : null, className: 'health-overview__empty-row--surface' })
+      ? cardEmptyRowHtml(t('health.activity.noData'), { action: canAdd ? { id: 'activity-add', label: t('health.activity.addShort') } : null, className: 'card-empty-row--surface' })
       : `<div class="health-activity__chart">${activityChartMarkup(summary)}</div>`}
     ${totals.count === 0 ? '' : `<div class="health-activity__log">${activityLogMarkup(weekRows)}</div>`}
   `);
@@ -7261,15 +7250,9 @@ function overviewVitalsMarkup() {
 /** Die ruhige Zeile, wenn noch nichts gemessen ist - mit dem Weg zum Erfassen. */
 function overviewVitalsEmptyMarkup() {
   const action = canEditFor(overview.personId, overview.meId)
-    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="ov-add-vital">
-        <i data-lucide="plus" aria-hidden="true"></i>${esc(t('health.vitals.addShort'))}
-      </button>`
-    : '';
-  return `
-    <div class="health-overview__empty-row">
-      <span class="health-overview__empty-text">${esc(t('health.vitals.emptyTitle'))}</span>
-      ${action}
-    </div>`;
+    ? { id: 'ov-add-vital', label: t('health.vitals.addShort') }
+    : null;
+  return cardEmptyRowHtml(t('health.vitals.emptyTitle'), { action });
 }
 
 /**

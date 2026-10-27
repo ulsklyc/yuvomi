@@ -532,8 +532,12 @@ test('Lader: der Dialog holt die Listen von /shopping, und ein Fehler loescht di
   // Der Aufrufer nimmt `null` als "nichts aendern" - sonst wuerde er `undefined` speichern.
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
-  const wiring = src.slice(src.indexOf("container.querySelectorAll('[data-widget-options]')"));
-  assert.match(wiring.slice(0, 600), /const next = await openWidgetOptions\(id, current\);\n\s+if \(next === null\) return;/);
+  // Seit DW-P2-1 (p4) ein Handler am Zuhoerer der Flaeche (`editOptions`); der
+  // alte Anker `container.querySelectorAll('[data-widget-options]')` gibt es
+  // nicht mehr, und dieser Guard las seither ins Leere (rot seit p4, DW p7).
+  const at = src.indexOf('const editOptions = async (btn) => {');
+  assert.ok(at > -1, 'editOptions nicht gefunden - die Signatur greift nicht mehr');
+  assert.match(src.slice(at, at + 1200), /const next = await openWidgetOptions\(id, current\);\n\s+if \(next === null\b[^\n]*\) return;/);
 });
 
 test('Dialog: scheitert der Katalog, geht er nicht auf und die Auswahl bleibt', async () => {

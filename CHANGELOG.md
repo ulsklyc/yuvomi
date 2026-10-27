@@ -107,6 +107,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "10 im Monat" no longer runs past the edge of its tile on a phone, and one that still does not
   fit gets a size smaller. The numbers of a row stay on one line
   when one module name wraps, and from 1024px the gap below the row is the grid's 20px instead of 41px.
+- **The overview's tiles speak one language, down to their empty and error states.** A tile with
+  nothing in it says so in one quiet line with its one action at the end - "No waste types yet ·
+  Add" - and the action no longer drops below the sentence on a phone or in a narrow tile; the same
+  line as in Health. A tile that could not load has the header of every other tile, with its seal
+  and as a heading for screen readers, and "Try again" at the end of its line. The weather's refresh
+  button sits in the tile header like the other header buttons and now visibly spins while it
+  loads. The fasting tile shows a small ring beside its sentence instead of a large dial around it,
+  and "Start fasting" is no longer a second filled button next to "+ New". Planned meals sit on a
+  neutral surface in light and dark, with the colour left to each meal's icon, "+17 more" in a
+  shopping list reads like every other "more" line, the weather's glow behind the icon is softer
+  in dark mode, hover highlights only appear with a mouse instead of sticking after a tap, and the
+  "+ New" menu on a phone closes faster than it opens. In Customize, each tile's "..." menu offers
+  "Move forward" and "Move back", so tiles can be rearranged with a mouse without dragging.
 - **The preferences API answers in English** (#1695). `/api/v1/preferences` and its holiday routes
   still sent most refusals in German ("timezone_hint_dismissed muss true oder false sein.",
   "Interner Fehler"); every `error` there is now an English sentence, with the same status codes.
@@ -182,6 +195,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rename field now has the same 80-character limit as the create field), an order that changed in
   the meantime (the current order is shown), and a calendar only an admin may delete because it is
   exported. The API keeps its `error` text, now in English, and adds a `reason` for each case.
+- **Editing an appointment from the overview shows the whole form again.** The colour choice,
+  the icon picker, the attachment and the spacing of the date rows were missing their styles when
+  the form opened over the overview instead of in the calendar - "Colour" stood there without a
+  single colour to pick.
 - **A CalDAV rate limit or outage no longer sends a moved shopping item back (#2137).** When a
   target reminder list responds with 429 or 5xx while a shopping item is being moved there, the move
   now waits instead of counting as a failure, so five such answers no longer return the item to

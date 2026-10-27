@@ -1846,7 +1846,7 @@
  * von 48, und zwar freistehend (nächstes Zielzentrum 161px, die Spacing-Ausnahme
  * greift also nicht).
  *
- * Warum nicht die Trefferfläche per ::before dehnen wie .weather-widget__refresh:
+ * Warum nicht die Trefferfläche per ::before dehnen wie .widget__link:
  * das geht hier technisch nicht. `<input type="color">` ist ein replaced element
  * und rendert keine Pseudo-Elemente. Die Wahl bestand also gar nicht - und sie
  * wäre auch inhaltlich falsch gewesen: bei einem Farbfeld IST die sichtbare

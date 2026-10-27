@@ -289,9 +289,11 @@ test('Groessen: die Kachel entscheidet, wie viel davon steht', () => {
 test('Leerzustand: ein Kind bekommt keinen Knopf, den es nicht benutzen darf', () => {
   const kid = renderRewardsWidget({ view: 'self', me: 7, standings: [], catalog: [] }, '1x1');
   assert.match(kid, /dashboard\.noRewards/);
-  assert.doesNotMatch(kid, /rewards\.addReward/, 'Praemien anlegen ist Elternsache');
+  // Seit DW p7 traegt die Aktion der ruhigen Zeile nur das Verb ("Hinzufuegen"),
+  // der Satz daneben nennt das Objekt - erkannt wird sie an ihrem Ziel.
+  assert.doesNotMatch(kid, /card-empty-row__action/, 'Praemien anlegen ist Elternsache');
   const parent = renderRewardsWidget({ view: 'approver', me: 1, standings: [], catalog: [] }, '1x1');
-  assert.match(parent, /rewards\.addReward/);
+  assert.match(parent, /<button type="button" class="btn btn--secondary btn--sm card-empty-row__action"[^>]*data-route="\/rewards"/);
 });
 
 test('Kennzahlkachel: das Kind sieht den eigenen Stand, niemand einen Spitzenreiter', () => {

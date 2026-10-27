@@ -64,7 +64,7 @@ import { mountZonePrompt } from '/utils/household-zone-hint.js';
 import { mountFirstSteps, startFirstSteps } from '/utils/first-steps.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
 import { rememberLayoutHint, layoutHintTiles, layoutHintQuery, rememberHeadHint, headHint } from '/utils/dashboard-layout-hint.js';
-import { emptyHintHTML } from '/utils/empty-state.js';
+import { emptyHintHTML, cardEmptyRowHtml } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
@@ -1151,7 +1151,7 @@ function formatPoints(value) {
  * weil kein Kopf ihn je fragte. Notizen trug hier weiter `pin`, waehrend die
  * Leiste daneben `sticky-note` zeichnete. Wer die Id uebergibt, kann diese
  * Abweichung gar nicht mehr schreiben. */
-function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = null) {
+function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = null, { action = '' } = {}) {
   const icon = widgetIcon(widgetId);
   // Ein eigenes Link-Label spricht auch im aria-Label mit eigener Stimme:
   // „Alle: Familienmitglieder" für einen „Verwalten"-Link wäre eine Lüge.
@@ -1221,19 +1221,30 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
         ${badge}
       </h3>
       ${countText}
-      ${link}
+      ${link}${action}
     </div>
   `;
 }
 
-// Dezente Aktivierungs-Affordance für Empty-States: verlinkt in den Modul-Flow,
-// damit ein Erststart-Nutzer nicht in einer beschreibenden Sackgasse landet.
-// Nutzt dasselbe [data-route]-System wie widget__link (wireLinks verkabelt es).
-function emptyStateCta(route, label) {
-  return `<button type="button" class="widget__empty-cta" data-route="${route}">
-    <i data-lucide="plus" aria-hidden="true"></i>
-    <span>${label}</span>
-  </button>`;
+/* DER LEERZUSTAND EINER KACHEL IST DIE RUHIGE ZEILE DER APP (DW-P2-11; R22
+ * D12, `cardEmptyRowHtml` aus utils/empty-state.js). Bis hierher trug jede
+ * leere Kachel eine Glyphe mit 60 % Deckkraft, einen Satz in Caption und einen
+ * Akzent-Textknopf, der bei knapper Breite UNTER den Satz brach - Entsorgung
+ * und Schnellzugriffe am Telefon, die Entsorgung auch bei 1440 und 1920. Das
+ * Siegel im Kopf nennt die Kachel schon; die Zeile sagt nur noch, was fehlt,
+ * und bietet am Ende den einen Weg dahin. `.widget__empty` bleibt die Klasse
+ * des Traegers (Polster der Kachel, Sonden der Browser-Suiten). */
+function widgetEmptyHtml(text, action = null, widgetId = '') {
+  return cardEmptyRowHtml(text, { action, className: 'widget__empty', id: action && widgetId ? `widget-empty-${widgetId}` : '' });
+}
+
+// Die Aktion einer leeren Kachel fuehrt in den Modul-Flow - dasselbe
+// [data-route]-System wie widget__link (wireLinks verkabelt es). Ihr Wort ist
+// das VERB ("Hinzufuegen"), wo der Satz das Objekt schon nennt ("Noch keine
+// Abfallarten"): "Ersten Schnellzugriff anlegen" nahm am Telefon 240px und liess
+// dem Satz 80. Den Bezug fuer den Screenreader stellt `aria-describedby` her.
+function emptyRouteAction(route, label) {
+  return { label, attrs: { 'data-route': route } };
 }
 
 function buildTodayHighlights(data) {
@@ -1560,10 +1571,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   if (!tasks.length) {
     return `<div class="widget widget--tasks">
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
-      <div class="widget__empty">
-        <i data-lucide="check-circle" class="empty-state__icon" style="color:var(--color-success)" aria-hidden="true"></i>
-        <div>${t('dashboard.allDone')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.allDone'))}
     </div>`;
   }
 
@@ -1644,10 +1652,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   if (!events.length) {
     return `<div class="widget widget--calendar">
       ${widgetHeader('calendar', t('nav.calendar'), 0, '/calendar')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-check" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noEvents')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noEvents'))}
     </div>`;
   }
 
@@ -1924,10 +1929,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   if (!birthdays.length) {
     return `<div class="widget widget--birthdays">
       ${widgetHeader('birthdays', t('nav.birthdays'), 0, '/birthdays')}
-      <div class="widget__empty">
-        <i data-lucide="cake" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noBirthdays')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noBirthdays'))}
     </div>`;
   }
 
@@ -2126,10 +2128,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
   if (!notes.length) {
     return `<div class="widget widget--notes">
       ${widgetHeader('notes', t('nav.notes'), 0, '/notes')}
-      <div class="widget__empty">
-        <i data-lucide="sticky-note" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noPinnedNotes')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noPinnedNotes'))}
     </div>`;
   }
 
@@ -2260,14 +2259,7 @@ function renderQuickLinks(items) {
     // Hinweis der anderen Kacheln, sondern der Weg selbst.
     return `<div class="widget widget--quicklinks">
       ${header}
-      <div class="widget__empty">
-        <i data-lucide="compass" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('quickLinks.emptyTitle')}</div>
-        <button type="button" class="widget__empty-cta" data-quick-links-manage>
-          <i data-lucide="plus" aria-hidden="true"></i>
-          <span>${esc(t('quickLinks.addFirst'))}</span>
-        </button>
-      </div>
+      ${widgetEmptyHtml(t('quickLinks.emptyTitle'), { label: t('common.add'), attrs: { 'data-quick-links-manage': '' } }, 'quicklinks')}
     </div>`;
   }
 
@@ -2628,11 +2620,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
   if (!hasData) {
     return `<div class="widget widget--budget">
       ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
-      <div class="widget__empty">
-        <i data-lucide="wallet" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noBudgetData')}</div>
-        ${emptyStateCta(BUDGET_MONTH_ROUTE, t('budget.addEntryLabel'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noBudgetData'), emptyRouteAction(BUDGET_MONTH_ROUTE, t('common.add')), 'budget')}
     </div>`;
   }
 
@@ -3230,14 +3218,10 @@ function renderRewardsWidget(rewards, size) {
     // in eine Seite fuehrt, auf der es nichts anlegen darf, waere die leere
     // Zusage aus #700.
     const cta = r.view === 'approver' && navModuleAccess('rewards') === 'write'
-      ? emptyStateCta('/rewards', t('rewards.addReward')) : '';
+      ? emptyRouteAction('/rewards', t('common.add')) : null;
     return `<div class="widget widget--rewards">
       ${header}
-      <div class="widget__empty">
-        <i data-lucide="award" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noRewards')}</div>
-        ${cta}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noRewards'), cta, 'rewards')}
     </div>`;
   }
 
@@ -3262,11 +3246,7 @@ function renderHealthWidget(health) {
   if (!health?.hasMeds) {
     return `<div class="widget widget--health">
       ${widgetHeader('health', t('nav.health'), null, '/health')}
-      <div class="widget__empty">
-        <i data-lucide="heart-pulse" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.healthNoMeds')}</div>
-        ${emptyStateCta('/health', t('health.meds.add'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.healthNoMeds'), emptyRouteAction('/health', t('common.add')), 'health')}
     </div>`;
   }
 
@@ -3354,11 +3334,7 @@ function renderCycleWidget(cycle) {
   if (!prediction.hasData) {
     return `<div class="widget widget--cycle">
       ${widgetHeader('cycle', t('health.cycle.title'), null, '/health/cycle')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-heart" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('health.cycle.emptyTitle')}</div>
-        ${emptyStateCta('/health/cycle', t('health.cycle.add'))}
-      </div>
+      ${widgetEmptyHtml(t('health.cycle.emptyTitle'), emptyRouteAction('/health/cycle', t('health.cycle.add')), 'cycle')}
     </div>`;
   }
 
@@ -3406,23 +3382,34 @@ function renderCycleWidget(cycle) {
   </div>`;
 }
 
+/* DAS ZIFFERBLATT BEGLEITET DEN SATZ, ES TRAEGT IHN NICHT (DW-P3-5). Der Ring
+ * der Gesundheitsseite stand hier in ganzer Groesse (224px) und trug Satz und
+ * Uhr in seiner Mitte - am Telefon 374px Kachel fuer "Bereit fuer deinen
+ * naechsten Fastenstart", und daneben ein zweiter GEFUELLTER Primaerknopf
+ * neben "+ Neu". Jetzt ein kleiner Ring (hoechstens 120px, ohne Stundenmarken)
+ * NEBEN dem Satz, wie ein Ring in den Health-Widgets; Uhr und Tag stehen als
+ * Text daneben, und "Fasten starten/beenden" ist sekundaer: der eine gefuellte
+ * Knopf des Schirms ist das Anlegen. Die Selektoren der Uhr (`data-fasting-*`)
+ * gelten fuer die ganze Kachel, nicht nur fuer den Ring. */
 function renderFastingWidget(fasting) {
   if (!fasting) throw new Error('fasting widget slice failed to load');
   const active = fasting.active;
   const writable = moduleAccess('health') === 'write';
   return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
     <div class="fasting-widget">
-      <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content">
-        <span class="fasting-widget__meta" data-fasting-clock-label></span>
-        <strong class="fasting-widget__timer" data-fasting-timer>00:00:00</strong>
-        <span class="fasting-widget__meta" data-fasting-days></span>
-      </div></div>
-      <div class="fasting-widget__controls">${fastingClockSwitchHtml()}
+      <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div></div>
+      <div class="fasting-widget__controls">
+        <div class="fasting-widget__status">
+          <span class="fasting-widget__meta" data-fasting-clock-label></span>
+          <strong class="fasting-widget__timer" data-fasting-timer>00:00:00</strong>
+          <span class="fasting-widget__meta" data-fasting-days></span>
+        </div>
+        ${fastingClockSwitchHtml()}
         ${active ? '<span class="fasting-widget__remaining" data-fasting-remaining></span>' : ''}
         <p class="sr-only" role="status" aria-live="polite" data-fasting-announcement></p>
-        <div class="fasting-widget__actions">${writable ? `<button type="button" class="btn btn--primary btn--sm" data-fasting-widget-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}<a href="/health/fasting#history" class="btn btn--secondary btn--sm">${esc(t('health.fasting.history'))}</a></div>
+        <div class="fasting-widget__actions">${writable ? `<button type="button" class="btn btn--secondary btn--sm" data-fasting-widget-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}<a href="/health/fasting#history" class="btn btn--ghost btn--sm">${esc(t('health.fasting.history'))}</a></div>
       </div>
-      <p class="form-hint" role="alert" data-fasting-widget-error></p>
+      <p class="form-hint fasting-widget__error" role="alert" data-fasting-widget-error></p>
     </div></div>`;
 }
 
@@ -3471,11 +3458,7 @@ function renderNutritionWidget(nutrition) {
   if (!target) {
     return `<div class="widget widget--nutrition">
       ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
-      <div class="widget__empty">
-        <i data-lucide="salad" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.nutritionNoTarget')}</div>
-        ${writable ? emptyStateCta('/health/nutrition', t('health.nutrition.targetSet')) : ''}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.nutritionNoTarget'), writable ? emptyRouteAction('/health/nutrition', t('health.nutrition.targetSet')) : null, 'nutrition')}
     </div>`;
   }
 
@@ -3502,7 +3485,7 @@ function renderNutritionWidget(nutrition) {
 
   const body = rows.length
     ? `<ul class="nutrition-widget__rows">${rows.join('')}</ul>`
-    : `<div class="widget__empty"><div>${t('dashboard.nutritionNoTarget')}</div></div>`;
+    : cardEmptyRowHtml(t('dashboard.nutritionNoTarget'));
 
   return `<div class="widget widget--nutrition">
     ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
@@ -3552,18 +3535,14 @@ function renderScheduleWidget(schedule, users, size) {
   if (!hasTypes) {
     return `<div class="widget widget--schedule">
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-clock" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.scheduleEmpty')}</div>
-        ${emptyStateCta('/schedule', t('schedule.createShiftType'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.scheduleEmpty'), emptyRouteAction('/schedule', t('common.add')), 'schedule')}
     </div>`;
   }
 
   if (!entries.length) {
     return `<div class="widget widget--schedule">
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule/patterns')}
-      <div class="widget__body"><p class="u-meta schedule-widget-empty">${esc(t('schedule.empty'))}</p></div>
+      ${widgetEmptyHtml(t('schedule.empty'))}
     </div>`;
   }
 
@@ -3663,10 +3642,7 @@ function renderPantryWidget(pantry, size) {
   if (!items.length) {
     return `<div class="widget widget--pantry">
       ${widgetHeader('pantry', title, null, '/pantry')}
-      <div class="widget__empty">
-        <i data-lucide="archive" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${esc(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}
     </div>`;
   }
 
@@ -3725,11 +3701,7 @@ function renderWasteWidget(waste, size) {
   if (!items.length) {
     return `<div class="widget widget--waste">
       ${widgetHeader('waste', t('nav.waste'), null, '/waste')}
-      <div class="widget__empty">
-        <i data-lucide="trash-2" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('waste.emptyTypesTitle')}</div>
-        ${emptyStateCta('/waste', t('waste.addType'))}
-      </div>
+      ${widgetEmptyHtml(t('waste.emptyTypesTitle'), emptyRouteAction('/waste', t('common.add')), 'waste')}
     </div>`;
   }
 
@@ -3816,11 +3788,7 @@ function renderHousekeepingWidget(hk, currency) {
   if (!hk?.configured) {
     return `<div class="widget widget--housekeeping">
       ${widgetHeader('housekeeping', t('nav.housekeeping'), null, '/housekeeping')}
-      <div class="widget__empty">
-        <i data-lucide="paintbrush" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.housekeepingNone')}</div>
-        ${emptyStateCta('/housekeeping', t('housekeeping.addTask'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.housekeepingNone'), emptyRouteAction('/housekeeping', t('common.add')), 'housekeeping')}
     </div>`;
   }
 
@@ -6326,7 +6294,11 @@ function visibilityKey(cfg, glanceVisible) {
 function syncCustomizeControls(wrapper, w, index, total) {
   const controls = wrapper.querySelector(':scope > [data-widget-controls]');
   if (!controls) return null;
-  for (const btn of controls.querySelectorAll('[data-widget-move]')) {
+  const moves = [
+    ...controls.querySelectorAll('[data-widget-move]'),
+    ...[...controls.querySelectorAll('.popover-menu > template')].flatMap((tpl) => [...tpl.content.querySelectorAll('[data-widget-move]')]),
+  ];
+  for (const btn of moves) {
     const off = btn.dataset.widgetMove === 'up' ? index === 0 : index === total - 1;
     if (btn.disabled !== off) btn.disabled = off;
   }
@@ -6817,12 +6789,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
           </button>
         </div>
         ${renderWidgetSizeMenu(w.id, activeSize)}
-        ${widgetHasOptions(w.id) ? `
-        <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
-                aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
-                title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
-          <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-        </button>` : ''}
+        ${renderWidgetTileMenu(w, index, total)}
         <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
           <i data-lucide="eye-off" aria-hidden="true"></i>
         </button>
@@ -6833,6 +6800,40 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
       </div>
     </div>
   `;
+}
+
+/* DAS OPTIONEN-MENUE DER KACHEL, AN JEDER KACHEL (U7, WCAG 2.5.7). Am Zeiger
+ * ordnete man eine Kachel nur per Ziehen am Griff oder per Pfeiltaste um -
+ * Hoch und Runter stehen nur am Finger (DW-P2-3). Wer die Maus fuehrt, aber
+ * nicht ziehen kann, hatte keinen Weg. Jetzt steht an jeder Kachel EIN Menue
+ * mit "Nach vorn" und "Nach hinten" (ein Platz in der Lesereihenfolge, wie
+ * Hoch/Runter) und, wo die Kachel welche hat, ihren Optionen - der Regler-Knopf,
+ * der dafuer allein stand, ist sein Ausloeser (dieselbe Form wie das Menue am
+ * Chip der Ablage, R22 D16). Am Rand ist der Eintrag gesperrt, nicht weg (Kanon
+ * des Menues, layout.css: "nach oben" an der ersten Kategorie). Die Eintraege
+ * entstehen erst beim Oeffnen (`defer`); `syncCustomizeControls` haelt ihre
+ * Sperre auch im ungeoeffneten Menue richtig. */
+function renderWidgetTileMenu(w, index = 0, total = 1) {
+  const label = widgetLabel(w.id);
+  const hasOptions = widgetHasOptions(w.id);
+  const items = [
+    { action: 'widget-move', icon: 'chevron-up', label: t('dashboard.customizeMoveForward'), disabled: index === 0,
+      attrs: { 'data-widget-move': 'up', 'data-widget-id': w.id } },
+    { action: 'widget-move', icon: 'chevron-down', label: t('dashboard.customizeMoveBack'), disabled: index === total - 1,
+      attrs: { 'data-widget-move': 'down', 'data-widget-id': w.id } },
+    ...(hasOptions ? [
+      { separator: true },
+      { action: 'widget-options', icon: 'sliders-horizontal', label: t('dashboard.optionsFor', { widget: label }), attrs: { 'data-widget-options': w.id } },
+    ] : []),
+  ];
+  return `<div class="widget-edit-controls__menu${hasOptions ? '' : ' widget-edit-controls__menu--move-only'}">${popoverMenuHtml({
+    id: `widget-tile-menu-${w.id}`,
+    label: t('common.moreActionsNamed', { name: label }),
+    icon: 'ellipsis',
+    triggerClass: 'widget-edit-controls__options',
+    defer: true,
+    items,
+  })}</div>`;
 }
 
 /* EIN GROESSEN-MENUE MIT NUR WIRKSAMEN GROESSEN (R9 M7, A7 P1-2).
@@ -6986,7 +6987,7 @@ function renderWidgetBody(w, renderers) {
   try {
     if (isExtensionWidget(w.id)) {
       return `<div class="widget extension-widget-mount" data-extension-widget-mount="1">
-            <div class="widget__empty">${esc(t('common.loading'))}</div>
+            ${widgetEmptyHtml(t('common.loading'))}
           </div>`;
     }
     return renderers[w.id](w.size, w.options);
@@ -7158,25 +7159,23 @@ function renderDashboardError(status = null) {
   `;
 }
 
-// Inline-Fehlerkachel für ein einzelnes Widget (siehe Fehler-Isolation in
-// renderDashboardLayout). Nutzt die vorhandene .widget/.widget__empty-Grammatik,
-// damit sie sich ruhig einreiht statt wie ein Systemfehler zu schreien.
+/* DIE FEHLERKACHEL SPRICHT DEN KOPF DER ANDEREN (DW-P3-2). Sie baute ihren
+ * eigenen: ein `<span>` als Titel und eine nackte Glyphe - kein Siegel, keine
+ * Ueberschrift. Der dritte Kopf-Dialekt der Uebersicht, und am Screenreader
+ * fehlte genau diese Kachel in der Ueberschriften-Navigation. Jetzt derselbe
+ * `widgetHeader` (h3, Vollton-Siegel ihres Moduls, ohne Link: wohin sie
+ * fuehrt, weiss sie im Fehlerfall nicht sicher), darunter die ruhige Zeile mit
+ * dem Wiederholen am Ende. Der Rand in Danger-Toenung bleibt das Zeichen
+ * "kaputt, nicht leer" (siehe Fehler-Isolation in renderDashboardLayout). */
+function widgetErrorSeal(id) {
+  return MODULE_FOR_WIDGET[id] ?? (id === 'family' ? 'contacts' : 'dashboard');
+}
+
 function renderWidgetError(id) {
+  const title = esc(widgetLabel(id));
   return `<div class="widget widget--error" role="alert">
-    <div class="widget__header">
-      <span class="widget__title">
-        <i data-lucide="${widgetIcon(id)}" class="widget__title-icon" aria-hidden="true"></i>
-        ${esc(widgetLabel(id))}
-      </span>
-    </div>
-    <div class="widget__empty">
-      <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
-      <div>${t('dashboard.widgetError')}</div>
-      <button type="button" class="btn btn--secondary widget__retry" data-widget-retry="${esc(id)}">
-        <i data-lucide="refresh-cw" aria-hidden="true"></i>
-        ${t('common.retry')}
-      </button>
-    </div>
+    ${widgetHeader(id, title, null, null, null, widgetErrorSeal(id))}
+    ${widgetEmptyHtml(t('dashboard.widgetError'), { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-widget-retry': id } }, id)}
   </div>`;
 }
 
@@ -7203,11 +7202,7 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
   if (!lists.length) {
     return `<div class="widget widget--shopping">
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
-      <div class="widget__empty">
-        <i data-lucide="shopping-cart" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noShoppingLists')}</div>
-        ${emptyStateCta('/shopping', t('shopping.newListButton'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noShoppingLists'), emptyRouteAction('/shopping', t('common.add')), 'shopping')}
     </div>`;
   }
 
@@ -7258,7 +7253,7 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
         </div>
         <div class="shopping-widget-list__items">
           ${itemsHtml}
-          ${moreCount > 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${t('dashboard.shoppingMore', { count: moreCount })}</div>` : ''}
+          ${listMoreLine('dashboard.shoppingMore', moreCount)}
           ${/* Eine AUSGEWAEHLTE Liste steht auch ohne Offenes da (#1818): die
                 Zeile bleibt der Weg zu ihr und sagt, warum sie leer ist. */ ''}
           ${list.open_count === 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${esc(t('dashboard.shoppingListNothingOpen'))}</div>` : ''}
@@ -7519,6 +7514,18 @@ function weatherSpanModel(forecast) {
   };
 }
 
+/* DER AKTUALISIEREN-KNOPF STEHT IN DER ENDZONE DES KOPFES (DW-P3-3), wo jede
+ * andere Kachel ihren "Alle"-Link traegt - als Kopf-Icon-Knopf der Shell
+ * (`btn btn--secondary btn--icon`: Ring, Druckbild, Zeiger 40/Finger 48), nicht
+ * mehr als grauer Eigenbau-Kreis, der absolut ueber der Karte schwebte und dafuer
+ * dem Kopf per z-index das Treffen abringen musste. */
+function weatherRefreshButton() {
+  return `<button type="button" class="btn btn--secondary btn--icon weather-widget__refresh" id="weather-refresh-btn"
+            aria-label="${esc(t('dashboard.weatherRefresh'))}" title="${esc(t('dashboard.weatherRefreshTitle'))}">
+        <i data-lucide="refresh-cw" aria-hidden="true"></i>
+      </button>`;
+}
+
 function renderWeatherWidget(weather) {
   if (!weather) return '';
 
@@ -7557,10 +7564,7 @@ function renderWeatherWidget(weather) {
 
   return `
     <div class="widget widget--weather weather-widget" id="weather-widget"${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
-      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
-      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
-        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
-      </button>
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
       <div class="weather-widget__inner">
         <div class="weather-widget__main">
           <div class="weather-widget__left">
@@ -7588,14 +7592,8 @@ function renderWeatherWidget(weather) {
 function renderWeatherUnavailable() {
   return `
     <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget">
-      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
-      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
-        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
-      </button>
-      <div class="widget__empty">
-        <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.weatherUnavailable')}</div>
-      </div>
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
+      ${widgetEmptyHtml(t('dashboard.weatherUnavailable'))}
     </div>`;
 }
 
@@ -8745,7 +8743,7 @@ export function eventRowRemovedBy(link, scope) {
  * Scheitert das Laden, fuehrt die Zeile wie bisher in den Kalender - ein
  * Fehler soll den Weg nicht verschliessen.
  */
-async function openEventFromOverview(link, anchor, { container = null, refresh = null, user = null } = {}) {
+async function openEventFromOverview(link, anchor, { container = null, refresh = null, user = null, signal = null } = {}) {
   const onRemoving = (scope, removing) => {
     container?.querySelectorAll('[data-route]').forEach((row) => {
       if (eventRowRemovedBy(eventLinkOf(row.dataset.route), scope)) row.hidden = removing;
@@ -8753,7 +8751,9 @@ async function openEventFromOverview(link, anchor, { container = null, refresh =
   };
   try {
     const { openEventById } = await import('/pages/calendar.js');
-    await openEventById(link.id, { date: link.date, anchor, user, onChanged: refresh, onRemoving });
+    // `signal` ist die Lebenszeit der Uebersicht: so lange leiht das Blatt
+    // calendar.css fuer sein Formular (Farbwahl, Erinnerungszeilen).
+    await openEventById(link.id, { date: link.date, anchor, user, onChanged: refresh, onRemoving, signal });
   } catch (err) {
     console.error('[Dashboard] Termin konnte nicht geöffnet werden:', err);
     const params = new URLSearchParams({ open: link.id });
@@ -8766,7 +8766,7 @@ async function openEventFromOverview(link, anchor, { container = null, refresh =
 // Navigations-Links verdrahten
 // --------------------------------------------------------
 
-function wireLinks(container, refresh, { editing = false, user = null } = {}) {
+function wireLinks(container, refresh, { editing = false, user = null, signal = null } = {}) {
   wireTodayMore(container);
   wireTodayOverdue(container);
   wireTodayTimeline(container);
@@ -8791,7 +8791,7 @@ function wireLinks(container, refresh, { editing = false, user = null } = {}) {
     // Mittelklick auf einen Link behalten unten ihren neuen Tab.
     const eventLink = editing ? null : eventLinkOf(el.dataset.route);
     const go = eventLink
-      ? () => openEventFromOverview(eventLink, el, { container, refresh, user })
+      ? () => openEventFromOverview(eventLink, el, { container, refresh, user, signal })
       : () => window.yuvomi.navigate(el.dataset.route);
     if (el.tagName === 'A') {
       el.addEventListener('click', (e) => {
@@ -9888,7 +9888,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // 4x CPU 15-18 ms je Runde, bis zu drei Runden je Geste).
     // Das neue Blatt zuerst: seine Zeitleiste setzt ihre Fahne nach gemessener
     // Lage (placeTodayTimelineFlag) und schreibt nur an der Fahne.
-    if (sheet) wireLinks(sheet, refreshAfterSheet, { editing: true, user });
+    if (sheet) wireLinks(sheet, refreshAfterSheet, { editing: true, user, signal });
     // Ging der Knopf mit der Geste, geht der Fokus zum Nachfolger (`focus`).
     const successor = active?.isConnected ? null : focusTarget(container, focus);
     const flip = measureTileFlip(shell, before);
@@ -9999,6 +9999,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
 
     const editOptions = async (btn) => {
       const id = btn.dataset.widgetOptions;
+      // Aus einem Menue (Kachel, Chip der Ablage): der Dialog gibt den Fokus
+      // dem zurueck, der ihn beim Oeffnen hielt - das soll der Ausloeser sein,
+      // nicht der Eintrag im geschlossenen Menue.
+      const menu = btn.closest('.popover-menu');
+      if (menu) {
+        menu.hidePopover?.();
+        shell.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus({ preventScroll: true });
+      }
       const current = widgetConfig.find((w) => w.id === id)?.options ?? {};
       const next = await openWidgetOptions(id, current);
       if (next === null || signal.aborted || !isCustomizing) return;
@@ -10106,12 +10114,27 @@ export async function render(container, { user, signal: routeSignal = null } = {
       (sameDir ?? anyMove)?.focus();
     };
 
+    // AUS DEM MENUE DER KACHEL (U7): das Menue schliesst, der Fokus bleibt an
+    // seinem Ausloeser - der wandert mit der Kachel (arrangeChildren haengt
+    // sie um und gibt den Fokus zurueck), wie der Griff bei den Pfeiltasten.
+    // Gesagt wird der neue Platz wie bei Hoch/Runter (placeWidget).
+    const moveFromMenu = (item) => {
+      const menu = item.closest('.popover-menu');
+      menu?.hidePopover?.();
+      const trigger = menu ? shell.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`) : null;
+      trigger?.focus({ preventScroll: true });
+      if (moveWidget(item.dataset.widgetId, item.dataset.widgetMove) && trigger && document.activeElement !== trigger) {
+        trigger.focus({ preventScroll: true });
+      }
+    };
+
     // EIN Zuhoerer fuer alle Knoepfe der Leisten und der Ablage: die Knoepfe
     // kommen und gehen mit den Gesten, die Flaeche bleibt.
     shell.addEventListener('click', (event) => {
       const btn = event.target?.closest?.('[data-widget-move], [data-widget-size-preset], [data-widget-options], [data-widget-hide], [data-widget-show], [data-glance-hide], [data-glance-show]');
       if (!btn || !shell.contains(btn) || btn.disabled) return;
-      if (btn.matches('[data-widget-move]')) move(btn);
+      if (btn.matches('.popover-menu [data-widget-move]')) moveFromMenu(btn);
+      else if (btn.matches('[data-widget-move]')) move(btn);
       else if (btn.matches('[data-widget-size-preset]')) resize(btn);
       else if (btn.matches('[data-widget-options]')) void editOptions(btn);
       else if (btn.matches('[data-widget-hide]')) hide(btn);
@@ -10309,7 +10332,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Loeschen, Fasten), gleicht still ab: kein Skelett, Scroll und Fokus
     // bleiben (refreshDashboardData). Das volle render() gehoert dem Aufbau.
     // Ohne Argumente: was ein Blatt seinem `onChanged` mitgibt, ist keine Option.
-    wireLinks(container, refreshAfterSheet, { editing: isCustomizing, user });
+    wireLinks(container, refreshAfterSheet, { editing: isCustomizing, user, signal });
     disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal);
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
     // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
@@ -10751,7 +10774,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
@@ -10763,7 +10786,10 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
   if (!refreshBtn) return;
   const doWeatherRefresh = async () => {
     refreshBtn.disabled = true;
-    refreshBtn.classList.add('weather-widget__refresh--spinning');
+    // Die Statusdrehung der Knoepfe (`.btn--loading`, layout.css): die Klasse
+    // `--spinning`, die hier stand, hatte keine einzige Regel - der Kringel
+    // drehte nie (DW-P3-3, mit dem Knopf aus der Shell).
+    refreshBtn.classList.add('btn--loading');
     try {
       const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
       if (signal.aborted) return;
@@ -10791,7 +10817,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
       // Immer aufräumen, damit der Button nach jedem Ausgang wieder bedienbar
       // ist (bei Erfolg wird das Widget ohnehin frisch gerendert).
       refreshBtn.disabled = false;
-      refreshBtn.classList.remove('weather-widget__refresh--spinning');
+      refreshBtn.classList.remove('btn--loading');
     }
   };
   refreshBtn.addEventListener('click', doWeatherRefresh, { signal: signal });

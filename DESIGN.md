@@ -1887,7 +1887,7 @@ Schlaf +30 Min. und ..."), ohne Vorwert der letzte Wert, ohne Messung kein Satz.
 und Betrag, nie eine Bewertung - die Zahl gehoert der Person, das Urteil ihrer Aerztin. Mobil zieht er
 mit "Heute faellig" vor die Bereichsliste. **Was nicht gemessen ist, bekommt keine
 Kachel:** keine grauen Felder mit "-" (ein Kind ohne Messung hatte neun, 145.200px² am Laptop), sondern
-EINE ruhige Zeile "Noch keine Messwerte" mit der Erfassen-Aktion (`.health-overview__empty-row`); die
+EINE ruhige Zeile "Noch keine Messwerte" mit der Erfassen-Aktion (`.card-empty-row`, seit DW p7 geteilt); die
 Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte". **Die Kurven sind
 ablesbar:** Mindestspanne je Messart (`minSpan` in utils/health-vitals.js, z. B. Blutzucker 40 mg/dL -
 drei Werte zwischen 88 und 90 standen vorher auf einer 0,5er-Achse), die Einheit am obersten
@@ -1900,7 +1900,11 @@ Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
 zeigt `areaEmptyHtml`: Glyphe des Bereichs, Titel, Satz und die Anlege-Aktion (sekundaer -
 FAB bzw. Kopf-Pille tragen dasselbe Verb violett); ein leerer ABSCHNITT in einem Bereich mit
 Inhalt ist die ruhige Zeile `cardEmptyRowHtml` (Satz + Erfassen, wo es etwas zu erfassen gibt;
-ausserhalb einer Karte mit eigener Flaeche `--surface`). Nie ein nackter grauer Satz, nie eine
+ausserhalb einer Karte mit eigener Flaeche `--surface`). Seit DW p7 steht sie in
+utils/empty-state.js (`.card-empty-row`, layout.css) und traegt auch die leeren Kacheln der
+Uebersicht: die Aktion bleibt am Zeilenende und bricht nie unter den Satz, der Satz gibt nach;
+wo der Satz das Objekt nennt, traegt die Aktion nur das Verb ("Hinzufuegen") und verweist per
+`aria-describedby` auf ihn. Nie ein nackter grauer Satz, nie eine
 Auswahl ohne Auswahl ("Waehle einen Befund" ohne Befund). Wo der Inhalt die Hauptaktion traegt
 (Zyklus: "Periode gestartet"), entfaellt die Kopf-Aktion; Nachtragen steht am Verlauf und im
 Leerzustand. **Das Fasten seit R23 D14 umgekehrt:** der FAB bzw. die Kopf-Pille heisst „Fasten
@@ -4466,6 +4470,16 @@ Inhalt wie den naechsten Abfalltermin; der Zaehler-Badge ist neutral); das Siege
 auf, also bekaemen alle Widgets dieselbe Farbe - ausgerechnet in dem Raster, in dem siebzehn
 Module nebeneinanderstehen.
 
+**Und eine Flaeche IN der Karte ist neutral** (DW p7). Die Mahlzeiten-Slots wurden mit
+`--module-accent` gewaschen - auf der Uebersicht deren eigenes Violett, unter einem orangefarbenen
+Siegel. Sie sind jetzt eine Mulde (`--color-fill-well`, ohne Kante) wie die Notizzettel daneben,
+den Ton traegt die Glyphe des Mahlzeit-Typs. Ebenso **EIN gefuellter Knopf je Schirm**: das ist
+das Anlegen (FAB bzw. Kopf-Pille, im Anpassen-Modus "Fertig"); "Fasten starten" in der Kachel ist
+sekundaer, und ihr Ring begleitet den Satz (hoechstens `--fasting-widget-dial`, 120px, ohne
+Stundenmarken) statt ihn in einer 224px-Scheibe zu tragen. Die Balken der Kacheln stehen, sie
+wachsen nicht: ihre Transitions liefen nie (Endwert im Markup) und sind gestrichen (DW-P3-10).
+Hover nur unter `@media (hover: hover)` (DW-P3-15, Guard `test:frontend-audit`).
+
 **`--seal-base` braucht der Kopf nicht mehr - und niemand sonst.** Die Mischgrund-Falle
 („Der Traeger entscheidet, welches Gesicht es zeigt") gehoerte zum getoenten Gesicht auf dem
 Band-Grund; der Vollton kennt keine Mischung, sein Ton IST die Flaeche (AA an der
@@ -4583,7 +4597,14 @@ Spannenbalken sind Farbe und Form, keine Bewegung. Guard-Ebene: Signatur (jede R
 eine Wetterflaeche animiert, muss unter einer Bewegungs-Bedingung stehen) - er fand
 denselben Befund im Bestand, den Ladekringel des Aktualisieren-Knopfs, und der bleibt als
 BENANNTE Ausnahme: eine Aktivitaetsanzeige muss auch unter reduzierter Bewegung erkennbar
-sein, und die Zusicherung belegt, dass sie fluechtig ist.
+sein, und die Zusicherung belegt, dass sie fluechtig ist. **Seit DW p7 (DW-P3-3)** ist der
+Knopf ein Kopf-Icon-Knopf der Shell (`btn btn--secondary btn--icon`) in der Endzone des
+Widget-Kopfes (`widgetHeader(..., { action })`), wo andere Kacheln "Alle" tragen - vorher ein
+grauer Well-Kreis, absolut in der Kartenecke und per z-index ueber den Kopf gehoben. Er waechst
+den Kopf nicht (negative Marge ins Kopfpolster), und sein Kringel ist die Statusdrehung der
+Knoepfe (`.btn--loading`) - die Klasse `--spinning` davor hatte keine Regel. Der Lichthauch
+hinter der Glyphe hat auf der Kohle-Buehne die halbe Staerke (`--weather-glow-strength`,
+DW-P3-8): die aufgehellten Lagen standen dort als grauer Fleck neben der Wolke.
 
 **DIE SPANNE DER WOCHE** macht aus der Verlaufszeile eine Auskunft. Unter jedem Wochentag
 standen zwei nackte Zahlen ohne Beziehung zueinander - welcher Tag der waermste ist, war
@@ -4693,6 +4714,15 @@ ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
 Luecke daneben, am Ende der schmale, zeilenhohe Griff; die Ziele bleiben 48px. Die Liste ist dort
 selbst das Zeichen des Modus, die gestrichelte Rasterkante faellt weg. Vorher vier umrandete
 Kreise je Zeile.
+
+**Jede Kachel hat ein Menue** (U7, WCAG 2.5.7). Am Zeiger stehen Hoch und Runter nicht in
+der Leiste; damit niemand ziehen muss, traegt jede Kachel im Anpassen-Modus ein Menue (der Kreis
+`.widget-edit-controls__options`, `popoverMenuHtml` mit `defer`) mit "Nach vorn" und "Nach
+hinten" - ein Platz in der Lesereihenfolge, ueber `placeWidget` wie Hoch/Runter, Ansage "Platz n
+von m", der Fokus bleibt am Ausloeser - und, wo vorhanden, den Optionen der Kachel. Am Rand ist
+der Eintrag gesperrt (Menue-Kanon), `syncCustomizeControls` haelt die Sperre auch im noch nicht
+geoeffneten Menue. Am Finger, wo Hoch/Runter in der Leiste stehen, faellt ein Menue ohne
+Optionen weg.
 
 **Die Kacheln ziehen nach N3** (DW-P2-3, DW-P2-9). Jede Kachelleiste endet im Griff
 (`[data-widget-drag-handle]`), an dem `makeSortable` zieht - per Maus und per Finger (Halten

@@ -1033,7 +1033,7 @@ test('R21 D6: ohne Messung keine grauen Wells, sondern eine ruhige Zeile mit Erf
   await inUebersicht(() => {
     const html = health.overviewVitalsMarkup();
     assert.doesNotMatch(html, /metric-card__value--empty|metric-card/, 'keine Kachel ohne Wert');
-    assert.match(html, /health-overview__empty-row/);
+    assert.match(html, /card-empty-row/, 'die geteilte ruhige Zeile (utils/empty-state.js)');
     assert.match(html, /health\.vitals\.emptyTitle/);
     assert.match(html, /data-action="ov-add-vital"/, 'mit Schreibrecht der Weg zum Erfassen');
   }, []);
