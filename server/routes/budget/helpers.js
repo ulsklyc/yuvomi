@@ -899,11 +899,14 @@ export function toBudgetAmount(amount, loan) {
  * Budget-Waehrung und von dort ueber den Kurs-Cache - null, wenn der keinen
  * kennt: dann gibt es keine richtige Zahl, und der Aufrufer lehnt ab.
  */
-export function loanEntryRate(loan, accountId) {
+export function loanEntryRate(loan, accountId, { bookedRate = null } = {}) {
   const base = budgetCurrency();
   const target = accountId != null ? budgetAccountCurrency(accountId) : base;
   if (target === (loan?.currency || base)) return 1;
   if (target === base) return loanRate(loan);
+  // Eine schon gebuchte Rate behaelt ihren Kurs: der Cache aendert sich, die
+  // Buchung nicht (Codex zu #2302).
+  if (bookedRate > 0 && Number.isFinite(bookedRate)) return bookedRate;
   const onward = cachedRate(base, target);
   return onward == null ? null : loanRate(loan) * onward;
 }

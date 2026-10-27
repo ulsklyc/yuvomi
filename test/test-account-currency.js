@@ -236,3 +236,47 @@ test('Konto: nur unterstuetzte ISO-Codes, leer heisst Budget-Waehrung', async ()
   const rename = await call('PUT', `/accounts/${lower}`, { name: 'Chase 2', currency: 'XYZ1' });
   assert.equal(rename.status, 200, JSON.stringify(rename.body));
 });
+
+// Review-Runde (Codex zu #2331)
+test('Abo: ohne Kurs zur Kontowaehrung entsteht keine Buchung mit dem unveraenderten Betrag', async () => {
+  const sek = await account('Stockholm', 'SEK');
+  const created = await sub({ account_id: sek });
+  const booked = created.budget_entry_id ? entry(created.budget_entry_id) : null;
+  assert.ok(!booked || booked.amount !== -30, `30 EUR sind nicht 30 SEK: ${JSON.stringify(booked)}`);
+});
+
+test('Abo: ohne Kurs laesst ein Kontowechsel die gebuchte Umrechnung stehen', async () => {
+  const usd = await account('Chase', 'USD');
+  const created = await sub({ account_id: usd });
+  assert.equal(entry(created.budget_entry_id).amount, -33);
+  const r = await call('PUT', `/accounts/${usd}`, { currency: 'SEK' });
+  assert.equal(r.status, 200);
+  assert.equal(entry(created.budget_entry_id).amount, -33, 'kein Kurs EUR->SEK: der Betrag wird nicht still zu 30');
+});
+
+test('Verlaengern: eine auf ein anderes Konto gestellte Zahlung behaelt dessen Waehrung', async () => {
+  const usd = await account('Chase', 'USD');
+  const giro = await account('Giro', null);
+  const created = await sub({ account_id: usd });
+  const moved = await call('PUT', `/${created.budget_entry_id}`, { account_id: giro, amount: -30 });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  const r = await call('POST', `/subscriptions/${created.id}/renew`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const paid = entry(created.budget_entry_id);
+  assert.equal(paid.account_id, giro);
+  assert.equal(paid.amount, -30, 'auf dem Euro-Konto 30 EUR, nicht 33');
+});
+
+test('Rate: ein unveraenderter Betrag bleibt bei geaendertem Kurs-Cache dieselbe Rate', async () => {
+  const usd = await account('Chase', 'USD');
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('USD', 'EUR', 1.1, '2026-10-27T00:00:00Z')`).run();
+  const id = await loan({ account_id: usd });
+  const paid = await call('POST', `/loans/${id}/payments`, { installment_number: 1, amount: 100, paid_date: '2026-05-15' });
+  const entryId = paid.body.data.payment.budget_entry_id;
+  db.prepare("UPDATE subscription_exchange_rates SET rate = 1.2 WHERE base_currency = 'USD' AND quote_currency = 'EUR'").run();
+  const amount = entry(entryId).amount;
+  const r = await call('PUT', `/${entryId}`, { amount, title: 'Rate' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(db.prepare('SELECT amount FROM budget_loan_payments WHERE budget_entry_id = ?').get(entryId).amount, 100);
+});

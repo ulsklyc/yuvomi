@@ -1004,10 +1004,17 @@ router.put('/:id', (req, res) => {
     // Die Rate selbst bleibt vorzeichenlos: budget_loan_payments.amount trägt einen
     // CHECK(amount > 0) und wird gegen die Restschuld gerechnet.
     const linkedSign = linkedPayment ? bookingFor(linkedLoan?.direction).sign : 1;
-    // Die Buchung steht in der Waehrung ihres Kontos (#2302), der Kurs zur
-    // Rate haengt also am Konto, auf dem sie nach dem Request steht.
+    // Die Buchung steht in der Waehrung ihres Kontos (#2302). Fuehrt der Weg
+    // ueber den Kurs-Cache (dritte Waehrung) und bleibt das Konto, gilt der
+    // Kurs der Buchung selbst - Betrag der Buchung durch Betrag der Rate -,
+    // nicht der heutige Cache (Codex zu #2302): sonst verschoebe ein
+    // unveraendert gespeicherter Betrag die Restschuld.
+    const linkedAccount = req.body.account_id !== undefined ? (parseInt(req.body.account_id, 10) || null) : entry.account_id;
+    const bookedRate = linkedAccount === entry.account_id
+      ? Math.abs(Number(entry.amount)) / Number(linkedPayment?.amount)
+      : null;
     const linkedRate = linkedPayment && amount !== undefined
-      ? loanEntryRate(linkedLoan, req.body.account_id !== undefined ? (parseInt(req.body.account_id, 10) || null) : entry.account_id)
+      ? loanEntryRate(linkedLoan, linkedAccount, { bookedRate })
       : null;
     const linkedPaymentAmount = linkedRate ? Math.abs(cents(Number(amount || 0) / linkedRate)) : null;
     if (linkedPayment && amount !== undefined) {

@@ -309,11 +309,23 @@ async function fetchBookingRates(currency, budgetCur) {
   return { currency, budgetCurrency: budgetCur, rates: result.rates };
 }
 
-/** Betrag der Buchung aus einer Zeile, oder undefined, wenn der Kurs nicht zur Zeile passt. */
+/**
+ * Betrag der Buchung aus einer Zeile; undefined, wenn der Kurs nicht zur
+ * Zeile passt, null, wenn es fuer das Paar keinen Kurs gibt. KEIN KURS, KEIN
+ * BETRAG (Codex zu #2302): ein fehlender Kurs buchte den Betrag des Abos
+ * unveraendert, und auf einem Konto in Fremdwaehrung wurden aus 30 EUR still
+ * 30 USD. Ohne Kurs zur Kontowaehrung bleibt eine Buchung, wie sie ist, und
+ * eine neue entsteht erst mit dem Kurs.
+ */
 function bookingAmount(row, budgetCur, fetched) {
   if (row.currency === budgetCur) return subscriptionBudgetAmount(row, budgetCur, {});
   if (!fetched || fetched.currency !== row.currency || fetched.budgetCurrency !== budgetCur) return undefined;
-  return subscriptionBudgetAmount(row, budgetCur, fetched.rates);
+  // Die Budget-Waehrung behaelt ihren Rueckfall auf den Betrag des Abos: ohne
+  // FIXER_API_KEY gibt es dort oft gar keinen Kurs, und ein Abo in Fremdwaehrung
+  // buchte sonst nie. Fuer die Waehrung eines Kontos gibt es ihn nicht.
+  if (budgetCur === budgetCurrency()) return subscriptionBudgetAmount(row, budgetCur, fetched.rates);
+  const converted = convertAmount(row.amount, row.currency, budgetCur, fetched.rates);
+  return converted == null ? null : Math.abs(converted);
 }
 
 /**
@@ -387,6 +399,18 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
         .run(bookingAccountId(row), row.budget_entry_id, bookingAccountId(row));
     }
     return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
+  }
+  if (amount === null) {
+    if (row.budget_entry_id) {
+      if (row.visibility === 'private') {
+        db.get().prepare("UPDATE budget_entries SET visibility = 'private' WHERE id = ? AND visibility <> 'private'")
+          .run(row.budget_entry_id);
+      }
+      db.get().prepare('UPDATE budget_entries SET account_id = ? WHERE id = ? AND account_id IS NOT ?')
+        .run(bookingAccountId(row), row.budget_entry_id, bookingAccountId(row));
+    }
+    log.warn(`Booking of subscription ${id} left as it is: no exchange rate from ${row.currency} to ${budgetCur}.`);
+    return { row: loadSubscription(id) };
   }
   writeLinkedBooking(row, budgetCur, amount);
   return { row: loadSubscription(id) };
@@ -473,9 +497,16 @@ const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.g
   const budgetCur = bookingCurrency(current);
   const amount = bookingAmount(current, budgetCur, null);
   const linked = current.budget_entry_id
-    ? database.prepare('SELECT id, amount FROM budget_entries WHERE id = ?').get(current.budget_entry_id)
+    ? database.prepare('SELECT id, amount, account_id FROM budget_entries WHERE id = ?').get(current.budget_entry_id)
     : null;
   const known = amount ?? (linked ? Math.abs(Number(linked.amount)) : subscriptionBudgetAmount(current, budgetCur, {}));
+  // Die bezahlte Buchung kann fuer diese eine Zahlung auf ein anderes Konto
+  // gestellt sein (#1277); ihr Betrag steht in DESSEN Waehrung (Codex zu
+  // #2302), nicht in der der Vorgabe.
+  const paidCur = linked
+    ? (linked.account_id != null ? budgetAccountCurrency(linked.account_id) : budgetCurrency())
+    : budgetCur;
+  const paidAmount = linked ? bookingAmount(current, paidCur, null) : undefined;
   if (linked) {
     // Die bezahlte Buchung: Betrag, Titel und Tag nach dem Stand des Abos am
     // bezahlten Tag, dann abgekoppelt. Eigentuemer und Sichtbarkeit bleiben,
@@ -489,12 +520,13 @@ const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.g
       SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?
       WHERE id = ?
     `).run(
-      subscriptionBudgetTitle(current, budgetCur), -known, current.budget_subcategory_key || '', current.next_payment_date,
+      subscriptionBudgetTitle(current, paidCur), -(paidAmount ?? Math.abs(Number(linked.amount))),
+      current.budget_subcategory_key || '', current.next_payment_date,
       linked.id,
     );
   }
   if (!completed) writeLinkedBooking({ ...current, next_payment_date: nextDate, budget_entry_id: null }, budgetCur, known);
-  return { paid: linked && amount === undefined ? { id: linked.id, budgetCurrency: budgetCur } : null };
+  return { paid: linked && paidAmount === undefined ? { id: linked.id, budgetCurrency: paidCur } : null };
 })();
 
 function validatePayload(body, { partial = false } = {}) {
@@ -1083,8 +1115,10 @@ router.post('/:id/renew', async (req, res) => {
         // Die bezahlte Buchung gehoert jetzt nur noch diesem Request: ihr Betrag
         // kommt aus dem Schnappschuss `current`, dem Stand im Moment der Zahlung.
         fetched = await fetchBookingRates(current.currency, paid.budgetCurrency);
-        db.get().prepare('UPDATE budget_entries SET amount = ? WHERE id = ?')
-          .run(-bookingAmount(current, paid.budgetCurrency, fetched), paid.id);
+        const paidAmount = bookingAmount(current, paid.budgetCurrency, fetched);
+        if (paidAmount != null) {
+          db.get().prepare('UPDATE budget_entries SET amount = ? WHERE id = ?').run(-paidAmount, paid.id);
+        }
       }
       row = await syncBudgetExpense(id, fetched);
     } catch (err) {
