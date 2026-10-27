@@ -5764,6 +5764,44 @@ test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe 
 });
 
 // --------------------------------------------------------
+// Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
+// `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
+// aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf
+// Notizen in 1x2 sprangen von 145 auf 177 Spuren, nur weil sie Kategorien
+// trugen (~128px leer unter der letzten Karte).
+// --------------------------------------------------------
+test('Review p11: die Notizkachel rechnet Kategorien nur in den Groessen ein, in denen dashboard.css sie zeigt', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const hidden = new Set();
+  for (const rule of eachRule(css)) {
+    if (rule.at.length || !/display:\s*none/.test(rule.body)) continue;
+    for (const selector of rule.selector.split(',')) {
+      const size = /^\.widget-size--(\d+x\d+) \.note-item__categories$/.exec(selector.trim())?.[1];
+      if (size) hidden.add(size);
+    }
+  }
+  nodeAssert.ok(hidden.has('1x2') && hidden.has('2x1') && !hidden.has('2x2'), `Reichweite: die Regel steht (${[...hidden]})`);
+  const notes = (categories) => Array.from({ length: 5 }, (_, i) => ({
+    id: i + 1, title: `N${i}`, content: 'x', categories: categories ? [{ id: 1, name: 'Haus', scope: 'family' }] : [],
+  }));
+  for (let cols = 1; cols <= 4; cols += 1) {
+    for (let rows = 1; rows <= 4; rows += 1) {
+      const size = `${cols}x${rows}`;
+      const plain = __test.tileSpanOf(__test.renderPinnedNotes(notes(false), size, 5));
+      const tagged = __test.tileSpanOf(__test.renderPinnedNotes(notes(true), size, 5));
+      if (hidden.has(size)) {
+        // `sizes` nennt auch die anderen Groessen (2x2 zeigt Kategorien) - verglichen
+        // wird die Spanne dieser Groesse und ihre Fuellstufen.
+        nodeAssert.deepEqual([tagged.rows, tagged.steps], [plain.rows, plain.steps], `${size}: Kategorien stehen nicht, also keine Hoehe dafuer`);
+      } else {
+        nodeAssert.ok(tagged.rows > plain.rows, `${size}: Kategorien stehen und brauchen ihre Zeile (${tagged.rows} / ${plain.rows})`);
+      }
+    }
+  }
+});
+
+// --------------------------------------------------------
 // Review p11: SCHEITERT EIN ANLEGEN-BLATT, NACHDEM DIE UEBERSICHT GEGANGEN IST,
 // bleibt man, wo man jetzt steht. Der Ausweichweg ins Modul (openNewTarget)
 // riss einen sonst von der neuen Seite weg. Dass das Blatt selbst nicht mehr

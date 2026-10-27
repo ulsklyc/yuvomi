@@ -2388,14 +2388,18 @@ function renderPinnedNotes(allNotes, size, total = null) {
   const notes = allNotes.slice(0, cap + fill);
   /* Notizkarten in Reihen (U1 b): schmal eine Spalte, breit drei (dashboard.css
    * "MIT SPALTEN"), jede Reihe so hoch wie ihre hoechste Karte - Titel und
-   * Kategorien sind Daten, die Vorschau steht in genau zwei Zeilen. */
+   * Kategorien sind Daten, die Vorschau steht in genau zwei Zeilen.
+   * KATEGORIEN NUR, WO SIE STEHEN (Review p11): dashboard.css blendet sie in
+   * jeder einspaltigen und jeder einzeiligen Groesse aus; mitgezaehlt standen
+   * fuenf Notizen in 1x2 auf 177 statt 145 Spuren, rund 128px leer. */
   const notesTotal = listTotal(total, allNotes.length);
   const span = tileSpanAttrs((s, k = 0) => {
     const shown = allNotes.slice(0, listRowCap(s) + k);
     if (!shown.length) return { items: 0 };
     const cols = tileColumns(s) >= 2 ? 3 : 1;
+    const categoryRow = tileColumns(s) >= 2 && isTallSize(s) ? TILE_PARTS.noteCategories : 0;
     const card = (n) => TILE_PARTS.noteCard + (n.title ? TILE_PARTS.noteTitle : 0) + TILE_PARTS.noteContent
-      + ((n.categories || []).length ? TILE_PARTS.noteCategories : 0);
+      + ((n.categories || []).length ? categoryRow : 0);
     let body = TILE_PARTS.notesPad;
     for (let i = 0; i < shown.length; i += cols) {
       body += Math.max(...shown.slice(i, i + cols).map(card)) + (i ? TILE_PARTS.notesGap : 0);
