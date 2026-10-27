@@ -472,7 +472,8 @@ test('R9 M7: einspaltig bietet die Kachel EIN Groessen-Menue mit nur den wirksam
 
   assert.match(dashboardSource, /'data-widget-size-preset', 'data-widget-size-menu'/, 'der Menue-Knopf ist eine Fokus-Identitaet');
   assert.match(dashboardSource, /installPopoverMenus\(container\)/, 'Position, Pfeiltasten und Schliessen kommen vom geteilten Menue');
-  const handler = dashboardSource.slice(dashboardSource.indexOf("grid.querySelectorAll('[data-widget-size-preset]')"));
+  // Seit DW-P2-1 ein Handler am Zuhoerer der Flaeche (wireDashboardEditMode).
+  const handler = dashboardSource.slice(dashboardSource.indexOf('const resize = (btn) => {'));
   assert.match(handler.slice(0, 900), /menu\.hidePopover\?\.\(\);\s*grid\.querySelector\(`\[popovertarget=/, 'nach der Wahl gehoert der Fokus dem Menue-Knopf');
 
   const rules = [...eachRule(css)];

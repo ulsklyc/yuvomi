@@ -4692,6 +4692,18 @@ ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
 `--color-fill-well` mit Haarlinie, Groesse, Optionen und Ausblenden stehen ohne Ring daneben;
 die Ziele bleiben 48px. Vorher vier umrandete Kreise je Zeile.
 
+**Eine Anpassen-Geste aendert nur die Kachel, die sie trifft** (DW-P2-1, DW-P2-2, DW-P3-9,
+DW-P3-12). Verschieben, Groesse, Optionen, Aus und Ein patchen die Flaeche an Ort und Stelle
+(`patchCustomize`): die Kacheln werden umgehaengt (`moveBefore()`, ohne die Methode
+`insertBefore` und der Fokus zurueck), nur ein geaenderter Koerper wird neu gezeichnet, die
+Ablage bekommt oder verliert genau ihren Chip; Heute-Blatt und Kennzahlreihe rechnen nur bei
+geaenderter Sichtbarkeit (Kein-Echo). Die Nachbarn gleiten per FLIP auf `--ease-out` +
+`--duration-lg` wie das Raster beim Betreten - keine Feder (sie schoss 35/53px uebers Ziel);
+unter reduzierter Bewegung blendet, was sich bewegt haette, 0,4 -> 1 in `--duration-sm`.
+Ablage, Chips und Kachelleisten blenden per `@starting-style` in `--duration-md` ein. Der
+Lueckenhinweis schreibt erst nach dem naechsten Bild, das Raster gleitet dann an seine neue
+Oberkante. Neu gebaut wird nur beim Moduswechsel (Betreten, Speichern, Abbrechen).
+
 ### FAB (Signature Component)
 Getoente Glas-Kapsel: der App-Akzent mit 78 % Deckung
 (`color-mix(in srgb, var(--color-accent) 78%, transparent)`) ueber

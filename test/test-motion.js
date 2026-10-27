@@ -35,6 +35,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 
 import { eachRule } from './css-rules.js';
+import { withoutCommentsKeepingLines } from './source-text.js';
 
 const stylesDir = new URL('../public/styles/', import.meta.url);
 const indexHtml = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
@@ -3187,5 +3188,47 @@ test('R23: Lade-Schimmer und Wisch-Hinweis lesen ihre Zeiten aus Tokens', () => 
   }
   for (const name of ['--shimmer-period', '--hint-nudge', '--hint-delay']) {
     assert.match(css('tokens.css'), new RegExp(`${name}:\\s*\\d*\\.?\\d+m?s;`), `${name} fehlt in tokens.css`);
+  }
+});
+
+// DW-P2-2 (PLAN p4): die Kacheln der Uebersicht liefen beim Ordnen auf der
+// Glasfeder (`motionTiming` las --ease-glass) und schossen 35/53 px uebers
+// Ziel. Die Feder gehoert dem Glas, das man greift - auf der Uebersicht nur
+// dem Eintritt eines Blatts (--sheet-in, sheet.css); Inhalt, der sich ordnet,
+// laeuft auf --ease-out. Gelesen wird der CODE, nicht die Kommentare, die
+// den Befund erzaehlen.
+test('DW-P2-2: dashboard.js liest keine Glasfeder - ausser dem Blatt-Eintritt', () => {
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const code = withoutCommentsKeepingLines(src);
+  const offenders = code.split('\n')
+    .map((line, i) => ({ line, at: i + 1 }))
+    .filter(({ line }) => /--ease-glass|--transition-glass/.test(line));
+  assert.deepEqual(offenders.map(({ at, line }) => `dashboard.js:${at}: ${line.trim()}`), [],
+    'Feder auf Inhalt - die Kacheln gleiten auf --ease-out (playTileFlip, playGridShift)');
+  // Und die Kacheln lesen ihre Kurve tatsaechlich aus --ease-out.
+  // Abgespielt wird in startTileFlip (playTileFlip = messen + abspielen).
+  const at = code.indexOf('function startTileFlip(');
+  assert.ok(at > -1, 'startTileFlip nicht gefunden');
+  const flip = code.slice(at, code.indexOf('\n}\n', at));
+  assert.match(flip, /easingToken\('--ease-out'/, 'die Kacheln lesen --ease-out');
+  assert.match(flip, /durationToken\('--duration-lg'/, 'die Kacheln laufen --duration-lg wie das Raster');
+  assert.match(flip, /durationToken\('--duration-sm'/, 'unter reduzierter Bewegung blendet es in --duration-sm');
+});
+
+// DW-P3-12: Ablage und Kachelleisten standen beim Betreten des Anpassen-Modus
+// im ersten Frame, waehrend das Raster glitt. Sie blenden per @starting-style
+// ein - nur Deckkraft, Dauer und Kurve aus Tokens.
+test('DW-P3-12: Ablage, Chips und Kachelleisten blenden per @starting-style ein', () => {
+  const rules = [...eachRule(css('dashboard.css'))];
+  // eachRule liest in @starting-style nicht hinein (wie die Guards darueber:
+  // per Block). Je Block die Selektorliste seiner Regel mit opacity: 0.
+  const starting = [...css('dashboard.css').matchAll(/@starting-style\s*\{\s*([^{}]+)\{([^}]*)\}/g)]
+    .filter((m) => /opacity:\s*0\s*;/.test(m[2]))
+    .map((m) => m[1].split(',').map((sel) => sel.trim()));
+  for (const sel of ['.widget-restore', '.widget-restore-chip-group', '.widget-restore__chips > .widget-restore-chip', '.widget-edit-controls']) {
+    assert.ok(starting.some((list) => list.includes(sel)), `${sel}: kein @starting-style mit opacity 0`);
+    const timed = rules.find((r) => !r.at.length && r.selector.split(',').map((s) => s.trim()).includes(sel)
+      && /transition[^;]*opacity var\(--duration-md\) var\(--ease-out\)/.test(r.body));
+    assert.ok(timed, `${sel}: blendet nicht in --duration-md auf --ease-out`);
   }
 });

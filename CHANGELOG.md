@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **Arranging the overview changes only the tile you touch.** In Customize, moving a tile,
+  changing its size or options, hiding it or bringing it back no longer redraws the whole overview:
+  the tile changes in place and responds noticeably faster, its neighbours glide to their new
+  places without overshooting, and the button you pressed keeps the focus. With reduced motion the
+  tiles that moved fade in where they land instead of jumping. When Customize opens, the shelf of
+  hidden tiles and the bar on each tile fade in instead of standing there in the first frame.
 - **The overview loads in its own shape and comes back sooner.** While it loads, the overview now
   shows its header - date, greeting, buttons - and the "Today" sheet with its rows where they will
   be, and the tiles in the order and widths you arranged; the quick-add button carries its plus from

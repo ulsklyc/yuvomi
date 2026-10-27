@@ -2132,8 +2132,10 @@ test('die Widget-Optionen sind auch am ausgeblendeten Widget erreichbar (#814)',
     'die Ablage bietet keine Optionen an - am ausgeblendeten Widget waeren sie unerreichbar');
 
   // Und sie werden auch verdrahtet: die Ablage liegt AUSSERHALB des Grids, ein
-  // `grid.querySelectorAll` faende sie nicht.
-  assert.match(source, /container\.querySelectorAll\('\[data-widget-options\]'\)/,
+  // Zuhoerer am Raster erreichte sie nicht. Seit DW-P2-1 haengt EIN Zuhoerer
+  // an der Flaeche (`shell`), die Raster UND Ablage traegt - die Knoepfe
+  // kommen und gehen mit den Gesten.
+  assert.match(source, /shell\.addEventListener\('click', \(event\) => \{\s*const btn = event\.target\?\.closest\?\.\('[^']*\[data-widget-options\]/,
     'die Optionen-Knoepfe der Ablage bekommen keinen Listener');
 });
 

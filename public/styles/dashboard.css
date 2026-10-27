@@ -4545,6 +4545,36 @@ button.today-cockpit__more--link {
   box-shadow: var(--shadow-xs);
 }
 
+/* DIE LEISTEN KOMMEN, STATT DAZUSTEHEN (DW-P3-12). Beim Betreten des
+ * Anpassen-Modus glitt das Raster an seine neue Lage (playGridShift), waehrend
+ * Ablage und Kachelleisten im ersten Frame schon standen - der Modus sprang
+ * halb. Jetzt blenden sie ein, ebenso ein Chip, der mit einem Ausblenden in die
+ * Ablage kommt, und die Leiste einer wieder eingeblendeten Kachel. Nur
+ * Deckkraft, darum auch unter reduzierter Bewegung; ohne `@starting-style`
+ * stehen sie wie bisher. */
+.widget-restore,
+.widget-restore-chip-group,
+.widget-edit-controls {
+  transition: opacity var(--duration-md) var(--ease-out);
+}
+
+/* Der Kopfband-Chip ist ein blanker Knopf: seine eigenen Uebergaenge bleiben. */
+.widget-restore__chips > .widget-restore-chip {
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--duration-md) var(--ease-out);
+}
+
+@starting-style {
+  .widget-restore,
+  .widget-restore-chip-group,
+  .widget-restore__chips > .widget-restore-chip,
+  .widget-edit-controls {
+    opacity: 0;
+  }
+}
+
 .widget-edit-controls__handle,
 /* Der Optionen-Knopf (#814) traegt dieselbe Form wie das Ausblenden daneben:
  * beide sind Einzelaktionen am Rand der Leiste, und eine zweite Formsprache

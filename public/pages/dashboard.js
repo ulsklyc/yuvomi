@@ -37,7 +37,7 @@ import { openModal, closeModal, confirmModal, refocusAfterRender } from '/compon
 import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
-import { swapContent } from '/utils/content-swap.js';
+import { swapContent, SWAP_FROM_OPACITY } from '/utils/content-swap.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
 import { findSettingsLeaf } from '/settings/registry.js';
 import {
@@ -6049,25 +6049,36 @@ function announceDashboard(message) {
 
 /* DIE KACHELN GLEITEN, STATT ZU SPRINGEN (FLIP, Critique 2026-09-26).
  *
- * Jede Anpassen-Geste baut die Flaeche per setHtml neu; bis hierher sprang das
+ * Eine Anpassen-Geste aendert die Lage von Kacheln; bis hierher sprang das
  * Raster dabei in einem Frame auf den neuen Stand - wer eine Kachel eine Stelle
- * hoch schob oder breiter machte, musste sie danach suchen. Jetzt: vor dem
- * Neuaufbau die Lage jeder Kachel merken (First), danach die neue messen (Last),
+ * hoch schob oder breiter machte, musste sie danach suchen. Jetzt: vor der
+ * Aenderung die Lage jeder Kachel merken (First), danach die neue messen (Last),
  * die Kachel per transform auf die alte Stelle zuruecksetzen (Invert) und per
  * Web Animations nach Hause laufen lassen (Play). Die Identitaet traegt die
- * Widget-Id - die Elemente selbst ueberleben den Neuaufbau nicht.
+ * Widget-Id; seit DW-P2-1 ueberleben die Knoten die Geste ohnehin
+ * (patchCustomize), aber ein Neuaufbau ersetzt sie weiter.
  *
  * Eine Kachel, die waechst, deckt ihre neue Flaeche per clip-path von der alten
  * Groesse aus auf; eine, die schrumpft, kann nicht ueber ihren Rand hinaus
  * zeigen und blendet ihren umgebrochenen Inhalt kurz auf. Eine wieder
- * eingeblendete Kachel kommt ohne Vorlage und blendet ein. Die Kachel ist ein
- * Glas-Element: Dauer und Kurve aus den Token (`--duration-lg`, `--ease-glass`).
- * Unter reduzierter Bewegung bleibt es beim Sprung.
+ * eingeblendete Kachel kommt ohne Vorlage und blendet ein.
+ *
+ * DIE KURVE IST `--ease-out`, NICHT DIE GLASFEDER (DW-P2-2). Die Kachel lief
+ * auf `--ease-glass` und schoss dabei 9 % ueber ihr Ziel (gemessen 35 px beim
+ * Verschieben, 53 px beim Aus-/Einblenden) - eine Feder gehoert dem Glas, das
+ * man greift (Blatt-Eintritt, Schalter), nicht dem Inhalt, der sich ordnet.
+ * Dauer `--duration-lg` wie das Raster beim Betreten (playGridShift).
+ *
+ * UNTER REDUZIERTER BEWEGUNG BLENDET, WAS SICH BEWEGT HAETTE (DW-P3-9): kein
+ * Weg, aber auch kein stummer Sprung - 0,4 -> 1 in `--duration-sm`, das Muster
+ * von swapContent. So sieht man, WELCHE Kacheln die Geste getroffen hat.
  *
  * Gemessen wird in Viewport-Koordinaten: scrollt der Fokus-Nachfolger die Seite
  * mit, ist genau das der Weg, den das Auge gesehen hat. Laeuft noch eine
- * Animation, liefert getBoundingClientRect ihre momentane Lage mit - die
- * naechste Geste setzt dort an, wo die Kachel gerade IST. */
+ * Animation, liefert die Vorher-Messung ihre momentane Lage - die naechste
+ * Geste setzt dort an, wo die Kachel gerade IST; die laufende wird vor der
+ * Nachher-Messung beendet, sonst laege ihr Versatz im Ziel. Erst alles lesen,
+ * dann alles schreiben: eine Auslegung fuer das ganze Raster. */
 const DASHBOARD_TILE_SELECTOR = '#dashboard-widget-grid > .widget-wrapper[data-widget-id]';
 
 function captureTileRects(root) {
@@ -6081,17 +6092,6 @@ function captureTileRects(root) {
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function motionTiming() {
-  const styles = typeof document !== 'undefined' && typeof getComputedStyle === 'function'
-    ? getComputedStyle(document.documentElement) : null;
-  const raw = styles?.getPropertyValue('--duration-lg').trim() ?? '';
-  const ms = /ms$/.test(raw) ? parseFloat(raw) : /s$/.test(raw) ? parseFloat(raw) * 1000 : NaN;
-  return {
-    duration: Number.isFinite(ms) ? ms : 250,
-    easing: styles?.getPropertyValue('--ease-glass').trim() || 'ease-out',
-  };
 }
 
 /**
@@ -6114,40 +6114,192 @@ function playGridShift(root, topBefore, options = {}) {
   ], { duration: durationToken('--duration-lg', 250), easing: easingToken('--ease-out', 'ease-out') });
 }
 
+// Die laufende Gleitbewegung je Kachel - die naechste Geste beendet sie.
+const tileFlips = new WeakMap();
+
 function playTileFlip(root, before, options = {}) {
+  return startTileFlip(measureTileFlip(root, before, options));
+}
+
+/**
+ * Der lesende Teil des Gleitens: alte gegen neue Lage je Kachel. Getrennt vom
+ * Abspielen, damit ein Aufrufer (patchCustomize) weitere Lesungen an DIESELBE
+ * Auslegung haengen kann, bevor die Animationen den Stil wieder anfassen.
+ */
+function measureTileFlip(root, before, options = {}) {
   const reduced = options.reduced ?? prefersReducedMotion();
-  if (!before || reduced) return [];
-  const timing = { ...motionTiming(), ...options.timing };
-  const played = [];
-  root.querySelectorAll(DASHBOARD_TILE_SELECTOR).forEach((tile) => {
-    if (typeof tile.animate !== 'function') return;
+  if (!before) return null;
+  const tiles = [...root.querySelectorAll(DASHBOARD_TILE_SELECTOR)].filter((tile) => typeof tile.animate === 'function');
+  // Nur eine LAUFENDE beenden: ein cancel() auf einer fertigen verlangte
+  // trotzdem eine neue Stilrechnung, bevor gemessen werden kann.
+  for (const tile of tiles) {
+    const running = tileFlips.get(tile);
+    if (running && running.playState !== 'finished' && running.playState !== 'idle') running.cancel?.();
+  }
+  const plans = [];
+  for (const tile of tiles) {
     const from = before.get(tile.dataset.widgetId);
     if (!from) {
-      played.push(tile.animate([
-        { opacity: 0, transform: 'scale(0.96)' },
-        { opacity: 1, transform: 'none' },
-      ], timing));
-      return;
+      plans.push({ tile, enter: true });
+      continue;
     }
     const to = tile.getBoundingClientRect();
     const dx = from.left - to.left;
     const dy = from.top - to.top;
     const dw = to.width - from.width;
     const dh = to.height - from.height;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1 && Math.abs(dh) < 1) return;
-    const first = { transform: `translate(${dx}px, ${dy}px)` };
-    const last = { transform: 'none' };
-    if (dw >= 1 || dh >= 1) {
-      const radius = typeof getComputedStyle === 'function' ? getComputedStyle(tile).borderTopLeftRadius || '0px' : '0px';
-      first.clipPath = `inset(0px ${Math.max(0, dw)}px ${Math.max(0, dh)}px 0px round ${radius})`;
-      last.clipPath = `inset(0px 0px 0px 0px round ${radius})`;
-    } else if (dw <= -1 || dh <= -1) {
-      first.opacity = 0.6;
-      last.opacity = 1;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1 && Math.abs(dh) < 1) continue;
+    const radius = !reduced && (dw >= 1 || dh >= 1) && typeof getComputedStyle === 'function'
+      ? getComputedStyle(tile).borderTopLeftRadius || '0px' : '0px';
+    plans.push({ tile, dx, dy, dw, dh, radius });
+  }
+  return { reduced, plans };
+}
+
+/** Der schreibende Teil: jede Kachel laeuft von der gemessenen Lage nach Hause. */
+function startTileFlip(measured) {
+  if (!measured) return [];
+  const { reduced, plans } = measured;
+  const timing = {
+    duration: reduced ? durationToken('--duration-sm', 150) : durationToken('--duration-lg', 250),
+    easing: easingToken('--ease-out', 'ease-out'),
+  };
+  return plans.map(({ tile, enter, dx, dy, dw, dh, radius }) => {
+    let keyframes;
+    if (reduced) {
+      keyframes = [{ opacity: SWAP_FROM_OPACITY }, { opacity: 1 }];
+    } else if (enter) {
+      keyframes = [{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'none' }];
+    } else {
+      const first = { transform: `translate(${dx}px, ${dy}px)` };
+      const last = { transform: 'none' };
+      if (dw >= 1 || dh >= 1) {
+        first.clipPath = `inset(0px ${Math.max(0, dw)}px ${Math.max(0, dh)}px 0px round ${radius})`;
+        last.clipPath = `inset(0px 0px 0px 0px round ${radius})`;
+      } else if (dw <= -1 || dh <= -1) {
+        first.opacity = 0.6;
+        last.opacity = 1;
+      }
+      keyframes = [first, last];
     }
-    played.push(tile.animate([first, last], timing));
+    const anim = tile.animate(keyframes, timing);
+    tileFlips.set(tile, anim);
+    return anim;
   });
-  return played;
+}
+
+/* EINE GESTE HAENGT KNOTEN UM, STATT SIE NEU ZU BAUEN (DW-P2-1).
+ *
+ * `moveBefore()` verschiebt einen Knoten, ohne ihn aus dem Baum zu nehmen:
+ * Fokus, laufende Animationen und offene Popover bleiben. Ohne die Methode
+ * (Safari) bleibt das klassische Entfernen-und-Einfuegen - den Fokus holt
+ * patchCustomize danach zurueck. Ein Knoten, der noch nicht im Dokument
+ * haengt (eine neu eingeblendete Kachel), geht immer den klassischen Weg:
+ * moveBefore nimmt ihn nicht an. */
+function placeBefore(parent, node, ref) {
+  if (node.isConnected && typeof parent.moveBefore === 'function') {
+    try {
+      parent.moveBefore(node, ref);
+      return;
+    } catch { /* anderer Wurzelbaum - dann der klassische Weg */ }
+  }
+  parent.insertBefore(node, ref);
+}
+
+/**
+ * Bringt die Kinder von `parent` in die Folge `nodes`: was fehlt, geht; was
+ * schon an seinem Platz steht, wird nicht angefasst. Ein Tausch zweier
+ * Nachbarn ist so EINE Bewegung, keine zweiundzwanzig.
+ */
+function arrangeChildren(parent, nodes) {
+  const keep = new Set(nodes);
+  for (const child of [...parent.children]) if (!keep.has(child)) child.remove();
+  nodes.forEach((node, index) => {
+    const at = parent.children[index] ?? null;
+    if (at !== node) placeBefore(parent, node, at);
+  });
+}
+
+/** Der erste bedienbare Kandidat (Selektoren in Reihenfolge) - nur gelesen, nicht fokussiert. */
+function focusTarget(root, candidates) {
+  for (const selector of candidates ?? []) {
+    const el = selector ? root.querySelector(selector) : null;
+    if (el && !el.disabled && el.getClientRects?.().length !== 0) return el;
+  }
+  return null;
+}
+
+/** Wie weit `scrollIntoView({ block: 'nearest' })` die Ansicht schoebe - ohne zu schieben. */
+function nearestScrollDelta(rect, view) {
+  if (rect.top < view.top) return rect.top - view.top;
+  if (rect.bottom > view.bottom) return Math.min(rect.bottom - view.bottom, rect.top - view.top);
+  return 0;
+}
+
+/** Elemente aus Markup, im Dokument der Seite geparst (nicht im Dokument eines <template>). */
+function elementsFromHtml(html) {
+  const holder = document.createElement('div');
+  holder.insertAdjacentHTML('afterbegin', html);
+  return [...holder.children];
+}
+
+/** Was eine Kachel neu zeichnen laesst: Groesse und Optionen. */
+function tileDrawKey(w) {
+  return `${w?.size}|${JSON.stringify(w?.options ?? null)}`;
+}
+
+/**
+ * Was das Heute-Blatt und die Kennzahlreihe neu rechnen laesst: welche Kacheln
+ * sichtbar sind, ihre Optionen und das Kopfband - nicht Reihenfolge oder
+ * Groesse. Ein Verschieben rechnet so keines von beiden (Kein-Echo-Regel).
+ */
+function visibilityKey(cfg, glanceVisible) {
+  return [...cfg].map((w) => `${w.id}:${w.visible ? 1 : 0}:${JSON.stringify(w.options ?? null)}`).sort().join('|') + `|${glanceVisible ? 1 : 0}`;
+}
+
+/**
+ * Die Leiste einer Kachel folgt der Geste AN ORT UND STELLE: Hoch/Runter am
+ * Rand gesperrt, die aktive Groesse gedrueckt. Neu gezeichnet waere der
+ * Knopf, den man gerade gedrueckt hat, ein anderer - und der Fokus fort.
+ * Nur das mobile Groessen-Menue wechselt ganz, wenn sich die Breite geaendert
+ * hat (es bietet die Hoehen bei gleicher Breite an, renderWidgetSizeMenu) -
+ * die Breite waehlt man am Desktop, wo dieses Menue nicht steht.
+ * @returns {Element|null} das neu gezeichnete Menue (fuer seine Zeichen)
+ */
+function syncCustomizeControls(wrapper, w, index, total) {
+  const controls = wrapper.querySelector(':scope > [data-widget-controls]');
+  if (!controls) return null;
+  for (const btn of controls.querySelectorAll('[data-widget-move]')) {
+    const off = btn.dataset.widgetMove === 'up' ? index === 0 : index === total - 1;
+    if (btn.disabled !== off) btn.disabled = off;
+  }
+  const active = nearestPreset(w.size);
+  for (const btn of controls.querySelectorAll('.widget-edit-controls__size > [data-widget-size-preset]')) {
+    const on = btn.dataset.widgetSizePreset === active;
+    btn.classList.toggle('widget-size-btn--active', on);
+    if (btn.getAttribute('aria-pressed') !== String(on)) btn.setAttribute('aria-pressed', String(on));
+  }
+  const menu = controls.querySelector('.widget-edit-controls__size-menu');
+  if (!menu) return null;
+  const items = [...menu.querySelectorAll('[data-widget-size-preset]')];
+  if (!items.some((item) => item.dataset.widgetSizePreset === active)) {
+    const [next] = elementsFromHtml(renderWidgetSizeMenu(w.id, active));
+    menu.replaceWith(next);
+    return next;
+  }
+  for (const item of items) {
+    const on = item.dataset.widgetSizePreset === active;
+    if (item.getAttribute('aria-checked') === String(on)) continue;
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  }
+  const mini = menu.querySelector('.widget-edit-controls__size-trigger > .widget-size-mini');
+  if (mini && mini.dataset.size !== active) {
+    mini.replaceChildren();
+    mini.insertAdjacentHTML('afterbegin', renderSizeMiniGridCells(active));
+    mini.dataset.size = active;
+  }
+  return null;
 }
 
 function widgetSizeClass(size) {
@@ -6155,7 +6307,8 @@ function widgetSizeClass(size) {
 }
 
 function renderSizeMiniGrid(size) {
-  return `<span class="widget-size-mini" aria-hidden="true">${renderSizeMiniGridCells(size)}</span>`;
+  // `data-size`: woran syncCustomizeControls erkennt, ob die Form noch stimmt.
+  return `<span class="widget-size-mini" aria-hidden="true" data-size="${esc(size)}">${renderSizeMiniGridCells(size)}</span>`;
 }
 
 function renderSizeMiniGridCells(size) {
@@ -6686,8 +6839,12 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
-function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null } = {}) {
-  const widgetById = {
+/* DIE KACHELN EINZELN ZEICHENBAR (DW-P2-1). Das Raster zeichnet sie alle, eine
+ * Anpassen-Geste nur die, die sie aendert (patchCustomize in render()) - aus
+ * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
+ * zeichnen: die Renderer je Widget, der Koerper einer Kachel, ihr Rahmen. */
+function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
+  return {
     tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
@@ -6723,31 +6880,50 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       cfg.filter((w) => w.visible && w.id !== 'metrics' && isWidgetModuleEnabled(w.id)).map((w) => w.id),
     ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg)),
   };
+}
 
-  const tiles = cfg
-    .filter((w) => w.visible && isWidgetModuleEnabled(w.id) && (widgetById[w.id] || isExtensionWidget(w.id)))
-    .map((w, index, arr) => {
-      let html;
-      try {
-        if (isExtensionWidget(w.id)) {
-          html = `<div class="widget extension-widget-mount" data-extension-widget-mount="1">
+/** Steht die Kachel im Raster? (Sichtbar, Modul an, ein Renderer da.) */
+function dashboardTileListed(w, renderers) {
+  return Boolean(w.visible && isWidgetModuleEnabled(w.id) && (renderers[w.id] || isExtensionWidget(w.id)));
+}
+
+/** Der Koerper einer Kachel; leer heisst: keine Kachel (der Renderer hat nichts). */
+function renderWidgetBody(w, renderers) {
+  try {
+    if (isExtensionWidget(w.id)) {
+      return `<div class="widget extension-widget-mount" data-extension-widget-mount="1">
             <div class="widget__empty">${esc(t('common.loading'))}</div>
           </div>`;
-        } else {
-          html = widgetById[w.id](w.size, w.options);
-        }
-      } catch (err) {
-        console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);
-        html = renderWidgetError(w.id);
-      }
+    }
+    return renderers[w.id](w.size, w.options);
+  } catch (err) {
+    console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);
+    return renderWidgetError(w.id);
+  }
+}
+
+/** Der Rahmen um den Koerper: Groesse, Id, im Anpassen-Modus die Leiste. */
+function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1 } = {}) {
+  return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
+                   data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
+        ${editing ? renderWidgetCustomizeControls(w, index, total) : ''}
+        ${html}
+      </div>`;
+}
+
+function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null, bodies = null } = {}) {
+  const widgetById = dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes, glanceHidden, familyManage });
+
+  const tiles = cfg
+    .filter((w) => dashboardTileListed(w, widgetById))
+    .map((w, index, arr) => {
+      const html = renderWidgetBody(w, widgetById);
       if (!html) return '';
       // Was wirklich im Raster steht - die Vorhersage des Skeletts (rememberGridHint).
       drawn?.push(w);
-      return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
-                   data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
-        ${editing ? renderWidgetCustomizeControls(w, index, arr.length) : ''}
-        ${html}
-      </div>`;
+      // Und was die naechste Geste nicht neu zeichnen muss (patchCustomize).
+      bodies?.set(w.id, html);
+      return renderWidgetWrapper(w, html, { editing, index, total: arr.length });
     })
     .join('');
 
@@ -8598,17 +8774,36 @@ function gridColumnCount(grid) {
   return getComputedStyle(grid).gridTemplateColumns.split(' ').filter((v) => v && v !== 'none').length;
 }
 
+/* DIE SPANNEN EINER GROESSE STEHEN IM STYLESHEET, NICHT IN DER KACHEL (DW-P2-1).
+ * Um zu wissen, welche Groesse ein Loch schliesst, probiert der Hinweis jede
+ * Groesse an jeder Kachel aus (spansForSize: Klasse tauschen, lesen, zurueck) -
+ * bei 22 Kacheln 66 Proben, und jede legte das Raster zur Auslegung frei: nach
+ * jeder Anpassen-Geste ein zweites volles Layout (gemessen 4x CPU ~25 ms).
+ * Was eine Probe misst, haengt nur an der Groessenklasse, der Listenstufe
+ * (`data-list-rows`) und den Spuren des Rasters - darum gilt sie je Spurbild,
+ * und nach der ersten Runde misst eine Geste nichts mehr nach. */
+const tileSpanMemo = new Map();
+function memoSpans(el, size, tracks) {
+  const key = `${tracks}|${size}|${el.getAttribute('data-list-rows') ?? ''}`;
+  let spans = tileSpanMemo.get(key);
+  if (!spans) {
+    spans = spansForSize(el, size);
+    if (tileSpanMemo.size > 200) tileSpanMemo.clear();
+    tileSpanMemo.set(key, spans);
+  }
+  return spans;
+}
+
 function gridHoleSuggestion(grid) {
-  const columns = gridColumnCount(grid);
+  const tracks = getComputedStyle(grid).gridTemplateColumns;
+  const columns = tracks.split(' ').filter((v) => v && v !== 'none').length;
   if (columns < 2) return null;
-  const items = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')].map((el) => ({
-    id: el.dataset.widgetId,
-    el,
-    size: [...el.classList].find((c) => c.startsWith('widget-size--'))?.slice('widget-size--'.length) ?? '1x1',
-    ...gridSpans(el),
-  }));
+  const items = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')].map((el) => {
+    const size = [...el.classList].find((c) => c.startsWith('widget-size--'))?.slice('widget-size--'.length) ?? '1x1';
+    return { id: el.dataset.widgetId, el, size, ...memoSpans(el, size, tracks) };
+  });
   return suggestGridHoleFill(items, columns,
-    (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...spansForSize(item.el, p.value) })));
+    (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...memoSpans(item.el, p.value, tracks) })));
 }
 
 /**
@@ -9374,25 +9569,279 @@ export async function render(container, { user, signal: routeSignal = null } = {
     rowFillObserver.observe(grid);
   }
 
-  function syncGridHint(grid) {
-    container.querySelector('.dashboard-grid-hint')?.remove();
+  /* DER LUECKENHINWEIS IN ZWEI SCHRITTEN (DW-P2-1): erst lesen, ob sich der
+   * Vorschlag aendert (planGridHint - liest nur, was das Gleiten ohnehin
+   * auslegen liess), dann schreiben (applyGridHint). Eine Geste schreibt ihn
+   * erst nach dem naechsten Bild: ein neuer oder anderer Hinweis veraendert
+   * die Hoehe ueber dem Raster, und im selben Task kostete das eine zweite
+   * Auslegung der ganzen Flaeche (gemessen 4x CPU ~20 ms je Geste). Das
+   * Raster gleitet dann an seine neue Oberkante (playGridShift). */
+  function planGridHint(grid) {
     const suggestion = gridHoleSuggestion(grid);
-    if (!suggestion) return;
+    const apply = container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]');
+    if (!suggestion) return apply ? { suggestion: null } : null;
+    if (apply?.dataset.widgetId === suggestion.id && apply.dataset.size === suggestion.size) return null;
+    return { suggestion };
+  }
+
+  function applyGridHint(grid, plan) {
+    if (!plan) return;
+    const { suggestion } = plan;
+    const shown = container.querySelector('.dashboard-grid-hint');
+    if (!suggestion) {
+      shown?.remove();
+      return;
+    }
+    const apply = shown?.querySelector('[data-grid-hint-apply]');
+    if (apply) {
+      // Ein anderer Vorschlag wechselt nur seine Worte im selben Knoten.
+      const [next] = elementsFromHtml(renderGridHint(suggestion));
+      const text = shown.querySelector('.dashboard-grid-hint__text');
+      if (text) text.textContent = next.querySelector('.dashboard-grid-hint__text')?.textContent ?? '';
+      apply.dataset.widgetId = suggestion.id;
+      apply.dataset.size = suggestion.size;
+      return;
+    }
     // VOR dem Raster, nicht dahinter: das Loch steht oft oben, und ein Hinweis
     // unter zwanzig Kacheln waere einer, den man erst nach dem Scrollen findet.
     grid.insertAdjacentHTML('beforebegin', renderGridHint(suggestion));
-    container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]')?.addEventListener('click', () => {
-      widgetConfig = updateWidgetConfig(widgetConfig, suggestion.id, { size: suggestion.size });
-      rebuildDashboard(widgetConfig);
+    container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]')?.addEventListener('click', (event) => {
+      // Der Vorschlag steht am Knopf: er wechselt mit den Gesten (oben).
+      const { widgetId: id, size } = event.currentTarget.dataset;
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { size });
+      patchCustomize();
+      // Der Hinweis geht nach dem naechsten Bild; der Fokus geht schon jetzt
+      // zur Groesse, die er gesetzt hat.
+      const tile = `.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`;
+      restoreFocusAfterRebuild(container, [`${tile} [data-widget-size-preset="${CSS.escape(size)}"]`, `${tile} [data-widget-hide]`]);
     });
   }
+
+  function syncGridHint(grid) {
+    applyGridHint(grid, planGridHint(grid));
+  }
+
+  // Der juengste nachgereichte Hinweis gewinnt - eine schnelle zweite Geste
+  // ueberholt den der ersten.
+  let pendingHint = 0;
+  function applyGridHintAfterPaint(grid, plan) {
+    const token = ++pendingHint;
+    if (!plan) return;
+    requestAnimationFrame(() => setTimeout(() => {
+      if (token !== pendingHint || signal.aborted || !isCustomizing || !grid.isConnected) return;
+      const shell = container.querySelector('#dashboard-shell');
+      const top = grid.getBoundingClientRect().top;
+      // Der Vorschlag kann inzwischen ein anderer sein (Spalten, Fenster).
+      applyGridHint(grid, planGridHint(grid));
+      if (shell) playGridShift(shell, top);
+    }, 0));
+  }
+
+  /* DIE GESTE AENDERT, WAS SIE AENDERT (DW-P2-1).
+   *
+   * Bis hierher baute jede Anpassen-Geste die ganze Uebersicht neu: Kopf,
+   * Heute-Blatt, zweiundzwanzig Kacheln, alle Zeichen, alle Messungen - fuer
+   * EINE geaenderte Kachel. Gemessen bei 4x CPU 120-240 ms je Tipp, davon bis
+   * 170 ms erzwungenes Layout. Jetzt folgt die Flaeche dem neuen Stand an Ort
+   * und Stelle:
+   *   - Verschieben haengt die vorhandenen Kacheln um (arrangeChildren,
+   *     `moveBefore` wo vorhanden - der gedrueckte Knopf behaelt den Fokus);
+   *   - Groesse und Optionen tauschen die Klasse und zeichnen nur den Koerper
+   *     dieser einen Kachel, wenn sein Markup sich ueberhaupt aendert;
+   *   - Aus nimmt die Kachel heraus, Ein setzt sie an ihren Platz, und die
+   *     Ablage bekommt bzw. verliert genau ihren Chip;
+   *   - was von der Sichtbarkeit abhaengt, faellt mit: die Kennzahlreihe
+   *     (sie schweigt fuer sichtbare Domaenen), das Heute-Blatt (Kein-Echo) und
+   *     die Wetterzeile im Kopf - jeweils nur, wenn das neue Markup ein anderes ist.
+   * Die Leisten folgen per syncCustomizeControls, die Nachbarn gleiten
+   * (playTileFlip). Im Anpassen-Modus waechst nichts in den Zeilenrest
+   * (applyRowFill), und der Layout-Hinweis lernt erst beim Speichern - dort
+   * baut die Seite ohnehin neu, im Normalmodus.
+   * `focus`: wohin der Fokus geht, wenn sein Knopf mit der Geste gegangen ist. */
+  function patchCustomize({ focus = [] } = {}) {
+    if (signal.aborted || !isCustomizing || wallMode || loadFailed) return;
+    const shell = container.querySelector('#dashboard-shell');
+    const grid = shell?.querySelector('#dashboard-widget-grid');
+    if (!grid) return;
+    const before = captureTileRects(shell);
+    // Geht der gedrueckte Knopf mit der Geste (Aus, Ein), wechselt der Fokus
+    // VOR dem Umbau zum Nachfolger, wenn es ihn schon gibt (der Nachbar): ein
+    // fokussiertes Element zu entfernen zwang den Browser mitten im Umbau zu
+    // einer Stilrechnung der ganzen Flaeche (gemessen 4x CPU ~24 ms). Der
+    // Nachbar ruecht an den Platz des gegangenen - die Ansicht bleibt stehen.
+    const early = focus.length ? focusTarget(container, focus) : null;
+    if (early && early !== document.activeElement) early.focus({ preventScroll: true });
+    const active = document.activeElement;
+    const cfg = widgetConfig;
+    // Kein Echo: das Heute-Blatt spricht fuer die Domaenen ohne Kachel - und
+    // nur eine geaenderte Sichtbarkeit (oder Option) aendert, was es sagt.
+    // Gezeichnet VOR dem ersten Schreiben: es liest die Breite seiner Buehne
+    // (todayStage), und mitten im Umbau verlangte das eine Auslegung der
+    // halbfertigen Flaeche.
+    const visibility = visibilityKey(cfg, glanceVisible);
+    const visibilityChanged = visibility !== drawnVisibility;
+    drawnVisibility = visibility;
+    const cockpitHtml = visibilityChanged ? renderTodayCockpit(data, cfg, true) : drawnCockpit;
+    const renderers = dashboardTileRenderers(cfg, data, weather, currency, {
+      visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user),
+    });
+    const previous = new Map(drawnTiles.map((w) => [w.id, w]));
+    const present = new Map([...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')]
+      .map((el) => [el.dataset.widgetId, el]));
+    const listed = [];
+    const nodes = [];
+    // Was neues Markup bekam - es braucht Zeichen und seine Verdrahtung.
+    const fresh = [];
+    for (const w of cfg) {
+      if (!dashboardTileListed(w, renderers)) continue;
+      const old = present.get(w.id);
+      // Die Kennzahlreihe liest die Sichtbarkeit der anderen (renderMetricTiles).
+      const redraw = !old || tileDrawKey(previous.get(w.id)) !== tileDrawKey(w) || (w.id === 'metrics' && visibilityChanged);
+      const body = redraw ? renderWidgetBody(w, renderers) : drawnBodies.get(w.id);
+      if (!body) continue;
+      listed.push(w);
+      if (!old) {
+        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true }));
+        nodes.push(el);
+        fresh.push(el);
+      } else {
+        if (redraw) {
+          old.classList.remove(...[...old.classList].filter((name) => name.startsWith('widget-size--')));
+          old.classList.add(widgetSizeClass(w.size));
+          const rows = calendarListRowsOf(w);
+          if (rows == null) old.removeAttribute('data-list-rows');
+          else old.setAttribute('data-list-rows', String(rows));
+          if (body !== drawnBodies.get(w.id)) {
+            for (const child of [...old.children]) if (!child.matches('[data-widget-controls]')) child.remove();
+            old.append(...elementsFromHtml(body));
+            fresh.push(old);
+          }
+        }
+        nodes.push(old);
+      }
+      drawnBodies.set(w.id, body);
+    }
+    drawnTiles = listed;
+    arrangeChildren(grid, nodes);
+    if (!nodes.length) grid.insertAdjacentHTML('afterbegin', emptyHintHTML(t('dashboard.allWidgetsHidden'), { icon: 'layout-dashboard' }));
+    nodes.forEach((el, index) => {
+      const menu = syncCustomizeControls(el, listed[index], index, nodes.length);
+      if (menu) fresh.push(menu);
+    });
+
+    // Die Ablage: genau der Chip, der kommt oder geht.
+    const trayHtml = renderHiddenWidgetsTray(cfg, !glanceVisible);
+    const tray = shell.querySelector('.widget-restore');
+    if (!trayHtml) {
+      tray?.remove();
+    } else if (!tray) {
+      const [el] = elementsFromHtml(trayHtml);
+      grid.before(el);
+      fresh.push(el);
+    } else {
+      const chipKey = (el) => (el.matches('[data-glance-show]') ? '' : el.querySelector(':scope > [data-widget-show]')?.dataset.widgetShow);
+      const list = tray.querySelector('.widget-restore__chips');
+      const have = new Map([...list.children].map((el) => [chipKey(el), el]));
+      const [next] = elementsFromHtml(trayHtml);
+      arrangeChildren(list, [...next.querySelector('.widget-restore__chips').children].map((el) => {
+        const kept = have.get(chipKey(el));
+        if (kept) return kept;
+        fresh.push(el);
+        return el;
+      }));
+    }
+
+    // Ohne Nachmessen: die Buehne las das Blatt oben am sauberen Layout, und
+    // eine Kachel aendert sie nicht; die Zeilenzahl am Telefon (measurePhoneProgram)
+    // zaehlt im Anpassen-Modus nicht - dort ist das Blatt auf seinen Kopf
+    // zusammengeklappt. Das Speichern baut ohnehin neu und misst.
+    let sheet = null;
+    if (cockpitHtml !== drawnCockpit) {
+      drawnCockpit = cockpitHtml;
+      replaceProgramSheet(shell, cockpitHtml);
+      sheet = shell.querySelector('.today-cockpit');
+      createPendingIcons(sheet);
+    }
+    // Die Wetterzeile im Kopf schweigt, solange die Karte im Raster steht.
+    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    shell.querySelector('.dashboard-overview__weather')?.classList.toggle('dashboard-overview__weather--card', weatherCardShown);
+
+    for (const el of fresh) createPendingIcons(el);
+    wireFreshTiles(shell, fresh.filter((el) => el.matches('.widget-wrapper')));
+    // Ab hier wird gelesen, alles an EINER Auslegung des neuen Stands, und erst
+    // danach geschrieben. Jede Animation und jeder Fokuswechsel vor einer
+    // Lesung verlangte eine neue Stilrechnung der ganzen Flaeche (gemessen
+    // 4x CPU 15-18 ms je Runde, bis zu drei Runden je Geste).
+    // Das neue Blatt zuerst: seine Zeitleiste setzt ihre Fahne nach gemessener
+    // Lage (placeTodayTimelineFlag) und schreibt nur an der Fahne.
+    if (sheet) wireLinks(sheet, refreshAfterSheet, { editing: true, user });
+    // Ging der Knopf mit der Geste, geht der Fokus zum Nachfolger (`focus`).
+    const successor = active?.isConnected ? null : focusTarget(container, focus);
+    const flip = measureTileFlip(shell, before);
+    // Der Lueckenhinweis wird hier nur gelesen; geschrieben nach dem naechsten Bild.
+    const hintPlan = planGridHint(grid);
+    // Der Nachfolger steht meist daneben: nur so weit scrollen, wie er es
+    // braucht (wie `block: 'nearest'`) - `focus()` allein holte ihn in die
+    // Mitte, und die ganze Seite sprang unter dem Finger weg.
+    const scroller = successor ? shell.closest('.app-content') : null;
+    const scrollBy = scroller ? nearestScrollDelta(successor.getBoundingClientRect(), scroller.getBoundingClientRect()) : 0;
+    // Schreiben. Blieb der Knopf, bleibt der Fokus dort (ohne moveBefore nahm
+    // das Umhaengen ihn mit).
+    if (active?.isConnected) {
+      if (document.activeElement !== active && active !== document.body) active.focus({ preventScroll: true });
+    } else {
+      successor?.focus({ preventScroll: true });
+      if (scrollBy) scroller.scrollTop += scrollBy;
+    }
+    startTileFlip(flip);
+    applyGridHintAfterPaint(grid, hintPlan);
+  }
+
+  /** Was eine neu gezeichnete Kachel ausser Markup braucht (wie im Neuaufbau). */
+  function wireFreshTiles(shell, wrappers) {
+    if (!wrappers.length) return;
+    const ids = new Set(wrappers.map((el) => el.dataset.widgetId));
+    for (const el of wrappers) {
+      wireRecipeThumbs(el);
+      fitMetricLeads(el);
+      if (isExtensionWidget(el.dataset.widgetId)) void mountExtensionWidgets(el, widgetConfig, user);
+    }
+    if (ids.has('fasting')) {
+      disposeFastingClock();
+      disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal);
+    }
+    if (ids.has('notes')) {
+      disposeNoteCategories();
+      disposeNoteCategories = wireNoteCategoryOverflow(
+        shell,
+        (count) => getNumberFormat().format(count),
+        (count) => t('noteCategories.moreAction', { count }),
+      );
+    }
+    if (ids.has('weather')) {
+      wireWeatherRefresh(container, (updatedWeather) => {
+        weather = updatedWeather;
+        rebuildDashboard(widgetConfig);
+      }, signal);
+    }
+  }
+
+  // Die Verdrahtung des Anpassen-Modus haengt an Raster und Flaeche, die eine
+  // Geste ueberleben (patchCustomize): einmal je Aufbau, nicht je Knopf.
+  let editWiring = null;
+  signal.addEventListener('abort', () => editWiring?.abort(), { once: true });
 
   function wireDashboardEditMode() {
     gridHintObserver?.disconnect();
     gridHintObserver = null;
+    editWiring?.abort();
+    editWiring = null;
     if (!isCustomizing) return;
+    const shell = container.querySelector('#dashboard-shell');
     const grid = container.querySelector('#dashboard-widget-grid');
-    if (!grid) return;
+    if (!shell || !grid) return;
+    editWiring = new AbortController();
+    const wired = { signal: editWiring.signal };
     // Groessen-Menue (R9 M7): Position, Pfeiltasten, Schliessen - einmal an der
     // stabilen Seitenwurzel, idempotent ueber sein data-Attribut.
     installPopoverMenus(container);
@@ -9427,91 +9876,93 @@ export async function render(container, { user, signal: routeSignal = null } = {
       return currentDrop;
     };
 
-    grid.querySelectorAll('.widget-wrapper[data-widget-id]').forEach((wrapper) => {
-      wrapper.addEventListener('dragstart', (event) => {
-        draggedId = wrapper.dataset.widgetId;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', draggedId);
-        wrapper.classList.add('widget-wrapper--dragging');
-      });
-      wrapper.addEventListener('dragend', () => {
-        draggedId = '';
-        wrapper.classList.remove('widget-wrapper--dragging');
-        currentDrop = null;
-        clearDropHint();
-      });
-    });
+    const tileOf = (event) => {
+      const wrapper = event.target?.closest?.('.widget-wrapper[data-widget-id]');
+      return wrapper?.parentElement === grid ? wrapper : null;
+    };
+
+    grid.addEventListener('dragstart', (event) => {
+      const wrapper = tileOf(event);
+      if (!wrapper) return;
+      draggedId = wrapper.dataset.widgetId;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', draggedId);
+      wrapper.classList.add('widget-wrapper--dragging');
+    }, wired);
+    grid.addEventListener('dragend', (event) => {
+      draggedId = '';
+      tileOf(event)?.classList.remove('widget-wrapper--dragging');
+      currentDrop = null;
+      clearDropHint();
+    }, wired);
 
     grid.addEventListener('dragover', (event) => {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
       updateDropHint(event);
-    });
+    }, wired);
 
     grid.addEventListener('dragleave', (event) => {
       if (!grid.contains(event.relatedTarget)) {
         currentDrop = null;
         clearDropHint();
       }
-    });
+    }, wired);
 
     grid.addEventListener('drop', (event) => {
       event.preventDefault();
       const fromId = event.dataTransfer.getData('text/plain') || draggedId;
       const drop = currentDrop || updateDropHint(event);
+      clearDropHint();
       if (fromId && drop) {
         widgetConfig = reorderWidgetConfig(widgetConfig, fromId, drop.id, drop.placement);
-        rebuildDashboard(widgetConfig);
+        patchCustomize();
       }
-    });
+    }, wired);
 
-    grid.querySelectorAll('[data-widget-size-preset]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const size = btn.dataset.widgetSizePreset;
-        if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
-        // Aus dem Groessen-Menue (R9 M7): der Fokus gehoert danach dem Knopf,
-        // der das Menue oeffnete - der Eintrag steht nach dem Neuaufbau in
-        // einem geschlossenen Panel und naehme ihn nicht an.
-        const menu = btn.closest('.popover-menu');
-        if (menu) {
-          menu.hidePopover?.();
-          grid.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus();
-        }
-        widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
-        // Der Fokus bleibt auf demselben Knopf (rebuildDashboard traegt ihn
-        // hinueber), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
-        // was sich geaendert hat: die Kachel ist gewachsen, nicht der Knopf.
-        rebuildDashboard(widgetConfig);
-        const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === size);
-        announceDashboard(t('dashboard.customizeSizeDone', {
-          widget: widgetLabel(btn.dataset.widgetId),
-          size: preset ? t(preset.labelKey) : size,
-        }));
-      });
-    });
+    const resize = (btn) => {
+      const size = btn.dataset.widgetSizePreset;
+      if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
+      // Aus dem Groessen-Menue (R9 M7): der Fokus gehoert danach dem Knopf,
+      // der das Menue oeffnete - der Eintrag steht in einem geschlossenen
+      // Panel und naehme ihn nicht an.
+      const menu = btn.closest('.popover-menu');
+      if (menu) {
+        menu.hidePopover?.();
+        grid.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus();
+      }
+      widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
+      // Der Fokus bleibt auf demselben Knopf (die Leiste wird nicht neu
+      // gezeichnet), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
+      // was sich geaendert hat: die Kachel ist gewachsen, nicht der Knopf.
+      patchCustomize();
+      const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === size);
+      announceDashboard(t('dashboard.customizeSizeDone', {
+        widget: widgetLabel(btn.dataset.widgetId),
+        size: preset ? t(preset.labelKey) : size,
+      }));
+    };
 
-    container.querySelectorAll('[data-widget-options]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.widgetOptions;
-        const current = widgetConfig.find((w) => w.id === id)?.options ?? {};
-        const next = await openWidgetOptions(id, current);
-        if (next === null) return;
-        // Ein leeres Optionsobjekt wird zu „keine Optionen": so bleibt der
-        // gespeicherte Stand identisch mit dem eines Layouts, das den Dialog
-        // nie gesehen hat.
-        widgetConfig = updateWidgetConfig(widgetConfig, id,
-          Object.keys(next).length ? { options: next } : { options: undefined });
-        rebuildDashboard(widgetConfig);
-      });
-    });
+    const editOptions = async (btn) => {
+      const id = btn.dataset.widgetOptions;
+      const current = widgetConfig.find((w) => w.id === id)?.options ?? {};
+      const next = await openWidgetOptions(id, current);
+      if (next === null || signal.aborted || !isCustomizing) return;
+      // Ein leeres Optionsobjekt wird zu „keine Optionen": so bleibt der
+      // gespeicherte Stand identisch mit dem eines Layouts, das den Dialog
+      // nie gesehen hat.
+      widgetConfig = updateWidgetConfig(widgetConfig, id,
+        Object.keys(next).length ? { options: next } : { options: undefined });
+      patchCustomize();
+    };
 
     /* WER AUSBLENDET, VERLIERT SEINEN KNOPF - UND DARF DESHALB NICHT DEN FOKUS
-     * VERLIEREN. Der Neuaufbau ersetzt das ganze Raster; der gedrueckte Knopf
-     * ist danach fort, und der Fokus fiel bis hierher auf <body> zurueck: wer
-     * per Tastatur drei Kacheln ausblenden wollte, stand nach der ersten wieder
-     * am Seitenanfang. Er geht deshalb zum gleichen Knopf der Nachbarkachel
-     * (so laesst sich eine Reihe nacheinander abraeumen), und wo es keine gibt,
-     * zum Chip, der sie zurueckholt. Beim Einblenden spiegelbildlich. */
+     * VERLIEREN. Die Kachel geht samt Knopf, und der Fokus fiel bis hierher auf
+     * <body> zurueck: wer per Tastatur drei Kacheln ausblenden wollte, stand
+     * nach der ersten wieder am Seitenanfang. Er geht deshalb zum gleichen
+     * Knopf der Nachbarkachel (so laesst sich eine Reihe nacheinander
+     * abraeumen), und wo es keine gibt, zum Chip, der sie zurueckholt. Beim
+     * Einblenden spiegelbildlich. */
     const neighbourIds = (el, selector, attr) => {
       const next = el?.nextElementSibling?.closest(selector) ? el.nextElementSibling : null;
       const prev = el?.previousElementSibling?.closest(selector) ? el.previousElementSibling : null;
@@ -9519,51 +9970,40 @@ export async function render(container, { user, signal: routeSignal = null } = {
         .filter(Boolean);
     };
 
-    grid.querySelectorAll('[data-widget-hide]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetHide;
-        const wrapper = btn.closest('.widget-wrapper');
-        focusAfterRebuild = [
-          ...neighbourIds(wrapper, '.widget-wrapper', 'data-widget-id')
-            .map((n) => `.widget-wrapper[data-widget-id="${CSS.escape(n)}"] [data-widget-hide]`),
-          `[data-widget-show="${CSS.escape(id)}"]`,
-        ];
-        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: false });
-        rebuildDashboard(widgetConfig);
-        announceDashboard(t('dashboard.customizeHiddenDone', { widget: widgetLabel(id) }));
-      });
-    });
+    const hide = (btn) => {
+      const id = btn.dataset.widgetHide;
+      const wrapper = btn.closest('.widget-wrapper');
+      const focus = [
+        ...neighbourIds(wrapper, '.widget-wrapper', 'data-widget-id')
+          .map((n) => `.widget-wrapper[data-widget-id="${CSS.escape(n)}"] [data-widget-hide]`),
+        `[data-widget-show="${CSS.escape(id)}"]`,
+      ];
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: false });
+      patchCustomize({ focus });
+      announceDashboard(t('dashboard.customizeHiddenDone', { widget: widgetLabel(id) }));
+    };
 
-    // Wieder-Einblenden aus der Tray-Leiste (außerhalb des Grids, daher container-
-    // weit gesucht): der Gegenpart zum Ausblenden, macht den Inline-Editor komplett.
-    container.querySelectorAll('[data-widget-show]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetShow;
-        focusAfterRebuild = [
-          ...neighbourIds(btn.closest('.widget-restore-chip-group') ?? btn, '.widget-restore-chip-group, [data-glance-show]', 'data-widget-show')
-            .map((n) => `[data-widget-show="${CSS.escape(n)}"]`),
-          `.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-hide]`,
-        ];
-        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: true });
-        rebuildDashboard(widgetConfig);
-        announceDashboard(t('dashboard.customizeShownDone', { widget: widgetLabel(id) }));
-      });
-    });
+    // Wieder-Einblenden aus der Ablage (ausserhalb des Rasters): der Gegenpart
+    // zum Ausblenden, macht den Inline-Editor komplett.
+    const show = (btn) => {
+      const id = btn.dataset.widgetShow;
+      const focus = [
+        ...neighbourIds(btn.closest('.widget-restore-chip-group') ?? btn, '.widget-restore-chip-group, [data-glance-show]', 'data-widget-show')
+          .map((n) => `[data-widget-show="${CSS.escape(n)}"]`),
+        `.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-hide]`,
+      ];
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: true });
+      patchCustomize({ focus });
+      announceDashboard(t('dashboard.customizeShownDone', { widget: widgetLabel(id) }));
+    };
 
-    // Kopfband: beide Knoepfe sitzen ausserhalb des Grids (der eine im Masthead,
-    // der andere in der Tray-Leiste), deshalb container-weit gesucht.
-    container.querySelector('[data-glance-hide]')?.addEventListener('click', () => {
-      glanceVisible = false;
-      focusAfterRebuild = ['[data-glance-show]'];
-      rebuildDashboard(widgetConfig);
-      announceDashboard(t('dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
-    });
-    container.querySelector('[data-glance-show]')?.addEventListener('click', () => {
-      glanceVisible = true;
-      focusAfterRebuild = ['[data-glance-hide]'];
-      rebuildDashboard(widgetConfig);
-      announceDashboard(t('dashboard.customizeShownDone', { widget: t('dashboard.todayTitle') }));
-    });
+    // Kopfband: beide Knoepfe sitzen ausserhalb des Rasters (der eine im
+    // Heute-Blatt, der andere in der Ablage).
+    const glance = (visible) => {
+      glanceVisible = visible;
+      patchCustomize({ focus: [visible ? '[data-glance-hide]' : '[data-glance-show]'] });
+      announceDashboard(t(visible ? 'dashboard.customizeShownDone' : 'dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
+    };
 
     // Reorder ohne HTML5-DnD (das feuert nicht per Finger und ist nicht per
     // Tastatur bedienbar). Ein Pfad für drei Auslöser: Touch-Up/Down-Buttons,
@@ -9575,10 +10015,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
       const siblingId = sibling?.dataset?.widgetId;
       if (!id || !siblingId) return false;
       widgetConfig = reorderWidgetConfig(widgetConfig, id, siblingId, dir === 'up' ? 'before' : 'after');
-      rebuildDashboard(widgetConfig);
+      patchCustomize();
       // Der Fokus folgt der Kachel (die Aufrufer unten), aber wohin sie
       // gerutscht ist, sieht nur, wer hinsieht: gesagt wird der neue Platz.
-      const order = [...container.querySelectorAll('#dashboard-widget-grid > .widget-wrapper[data-widget-id]')]
+      const order = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')]
         .map((w) => w.dataset.widgetId);
       announceDashboard(t('dashboard.customizeMovedTo', {
         widget: widgetLabel(id), position: order.indexOf(id) + 1, total: order.length,
@@ -9586,34 +10026,44 @@ export async function render(container, { user, signal: routeSignal = null } = {
       return true;
     };
 
-    grid.querySelectorAll('[data-widget-move]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetId;
-        const dir = btn.dataset.widgetMove;
-        if (!moveWidget(id, dir)) return;
-        // Fokus dem bewegten Widget nachführen (Tastatur-Kontinuität): gleiche
-        // Richtung, sonst die noch aktive Gegenrichtung.
-        const movedWrapper = container.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
-        const sameDir = movedWrapper?.querySelector(`[data-widget-move="${dir}"]:not([disabled])`);
-        const anyMove = movedWrapper?.querySelector('[data-widget-move]:not([disabled])');
-        (sameDir ?? anyMove)?.focus();
-      });
-    });
+    const move = (btn) => {
+      const id = btn.dataset.widgetId;
+      const dir = btn.dataset.widgetMove;
+      if (!moveWidget(id, dir)) return;
+      // Am Rand ist der gedrueckte Knopf jetzt gesperrt: der Fokus geht zur
+      // Gegenrichtung derselben Kachel (Tastatur-Kontinuitaet).
+      if (!btn.disabled && document.activeElement === btn) return;
+      const movedWrapper = grid.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
+      const sameDir = movedWrapper?.querySelector(`[data-widget-move="${dir}"]:not([disabled])`);
+      const anyMove = movedWrapper?.querySelector('[data-widget-move]:not([disabled])');
+      (sameDir ?? anyMove)?.focus();
+    };
+
+    // EIN Zuhoerer fuer alle Knoepfe der Leisten und der Ablage: die Knoepfe
+    // kommen und gehen mit den Gesten, die Flaeche bleibt.
+    shell.addEventListener('click', (event) => {
+      const btn = event.target?.closest?.('[data-widget-move], [data-widget-size-preset], [data-widget-options], [data-widget-hide], [data-widget-show], [data-glance-hide], [data-glance-show]');
+      if (!btn || !shell.contains(btn) || btn.disabled) return;
+      if (btn.matches('[data-widget-move]')) move(btn);
+      else if (btn.matches('[data-widget-size-preset]')) resize(btn);
+      else if (btn.matches('[data-widget-options]')) void editOptions(btn);
+      else if (btn.matches('[data-widget-hide]')) hide(btn);
+      else if (btn.matches('[data-widget-show]')) show(btn);
+      else glance(btn.matches('[data-glance-show]'));
+    }, wired);
 
     // Desktop-Tastatur: der Grip ist ein fokussierbarer Button — Pfeil hoch/runter
     // ordnet um. Schließt die Inline-Reorder-Lücke für Tastatur-Nutzer, ohne die
     // schmale Edit-Leiste mit zusätzlichen Buttons zu überladen (Drag bleibt Maus).
-    grid.querySelectorAll('[data-widget-drag-handle]').forEach((handle) => {
-      handle.addEventListener('keydown', (event) => {
-        const dir = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : null;
-        if (!dir) return;
-        event.preventDefault();
-        const id = handle.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
-        if (moveWidget(id, dir)) {
-          container.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-drag-handle]`)?.focus();
-        }
-      });
-    });
+    grid.addEventListener('keydown', (event) => {
+      const handle = event.target?.closest?.('[data-widget-drag-handle]');
+      if (!handle) return;
+      const dir = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : null;
+      if (!dir) return;
+      event.preventDefault();
+      const id = handle.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
+      if (moveWidget(id, dir) && document.activeElement !== handle) handle.focus({ preventScroll: true });
+    }, wired);
   }
 
   let disposeNoteCategories = () => {};
@@ -9639,6 +10089,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
    *  den Blick voraus, welche Zeilen der stille Abgleich mitnimmt. */
   // Die Kacheln des letzten Aufbaus, so wie sie im Raster stehen.
   let drawnTiles = [];
+  // Und ihr Markup samt dem des Heute-Blatts: was eine Anpassen-Geste davon
+  // unveraendert laesst, zeichnet sie nicht neu (patchCustomize).
+  let drawnBodies = new Map();
+  let drawnCockpit = '';
+  let drawnVisibility = '';
   function dashboardShellHtml(cfg) {
     // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
     // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
@@ -9647,6 +10102,8 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
     // großes leeres Rechteck zu zeigen (Critique R3 P1).
     const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
+    drawnCockpit = cockpitHtml;
+    drawnVisibility = visibilityKey(cfg, glanceVisible);
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
@@ -9658,7 +10115,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []) })}
+      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()) })}
       ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
     `;
   }
@@ -9696,9 +10153,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const todayFallback = hadFocus ? todayFocusFallbacks(document.activeElement) : [];
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
-    // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
-    // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
-    // da waere jede Bewegung nur Unruhe.
+    // Nur ein Neuaufbau IM Anpassen-Modus gleitet (playTileFlip; die Gesten
+    // selbst patchen, patchCustomize): beim Betreten und Verlassen wachsen und
+    // schwinden die Bearbeiten-Leisten aller Kacheln, da waere jede Bewegung
+    // nur Unruhe.
     const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
     // BETRETEN UND VERLASSEN: das Raster gleitet ALS GANZES an seine neue Lage
     // (R16, Bewegung). Der Gruss bricht um, die Ablage schiebt sich davor - das
@@ -9829,10 +10287,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     wireDashboardEditMode();
     void mountExtensionWidgets(shell, cfg, user);
 
-    /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
-     * Flaeche neu - und bis hierher fiel der Fokus danach auf <body>: wer per
-     * Tastatur „Anpassen" drueckte, eine Groesse waehlte oder speicherte, stand
-     * wieder am Seitenanfang. Reihenfolge der Kandidaten: dasselbe Element
+    /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Ein Moduswechsel baut die Flaeche neu
+     * (die Gesten darin patchen seit DW-P2-1 und behalten ihre Knoten) - und
+     * bis hierher fiel der Fokus danach auf <body>: wer per Tastatur
+     * „Anpassen" drueckte oder speicherte, stand wieder am Seitenanfang. Reihenfolge der Kandidaten: dasselbe Element
      * (gleiche Id bzw. gleiches data-Attribut), dann das, was die Geste selbst
      * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
      * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
@@ -10198,7 +10656,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, wireNewMenu, initFab, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, wireNewMenu, initFab, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

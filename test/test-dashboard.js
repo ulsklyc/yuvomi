@@ -4848,6 +4848,78 @@ test('DW-P2-5: das Skelett traegt Kopf und Heute-Blatt, seine Kacheln sind die g
   }
 });
 
+// DW-P2-1 (PLAN p4): jede Anpassen-Geste baute die ganze Uebersicht neu -
+// gemessen bei 4x CPU 120-240 ms je Tipp. Jetzt patcht sie die betroffene
+// Kachel; der Neuaufbau gehoert dem Moduswechsel (Betreten, Speichern,
+// Abbrechen) und dem Laden.
+test('DW-P2-1: eine Anpassen-Geste ruft rebuildDashboard nicht, sie haengt Knoten um', async () => {
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const bodyOf = (head) => {
+    const start = src.indexOf(head);
+    nodeAssert.ok(start > -1, `${head} nicht gefunden - die Signatur greift nicht mehr`);
+    const end = src.indexOf('\n  }\n', start);
+    return src.slice(start, end);
+  };
+  const wiring = bodyOf('  function wireDashboardEditMode() {');
+  const hint = bodyOf('  function applyGridHint(grid, plan) {');
+  const patch = bodyOf('  function patchCustomize(');
+  for (const [name, body] of [['wireDashboardEditMode', wiring], ['applyGridHint', hint]]) {
+    nodeAssert.doesNotMatch(body, /rebuildDashboard\(/, `${name}: eine Geste baut die Uebersicht neu`);
+  }
+  // Jede Geste geht ueber den Patch: Ziehen, Groesse, Optionen, Aus, Ein,
+  // Kopfband, Verschieben (Knopf und Pfeiltaste ueber moveWidget), Lueckenhinweis.
+  for (const gesture of ['const resize = ', 'const editOptions = ', 'const hide = ', 'const show = ', 'const glance = ', 'const moveWidget = ', "grid.addEventListener('drop'"]) {
+    const at = wiring.indexOf(gesture);
+    nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
+    nodeAssert.match(wiring.slice(at, at + 1600), /patchCustomize\(/, `${gesture} patcht nicht`);
+  }
+  nodeAssert.match(hint, /patchCustomize\(/, 'der Lueckenhinweis patcht nicht');
+  nodeAssert.doesNotMatch(patch, /rebuildDashboard\(|setHtml\(/, 'der Patch zeichnet die Flaeche doch neu');
+  const order = ['captureTileRects(shell)', 'arrangeChildren(grid, nodes)', 'measureTileFlip(shell, before)', 'planGridHint(grid)', 'startTileFlip(flip)']
+    .map((call) => patch.indexOf(call));
+  nodeAssert.ok(order.every((at, i) => at > -1 && (i === 0 || at > order[i - 1])),
+    `erst messen, dann umhaengen, dann alles lesen, dann gleiten (${order.join(', ')})`);
+
+  // Umhaengen statt neu bauen: nur, was nicht an seinem Platz steht, wandert -
+  // per moveBefore, wenn der Knoten schon im Dokument haengt.
+  const { __test } = await import('../public/pages/dashboard.js');
+  const calls = [];
+  const parent = { children: [] };
+  const node = (id, connected = true) => ({
+    id,
+    isConnected: connected,
+    remove() { parent.children.splice(parent.children.indexOf(this), 1); calls.push(`remove ${id}`); },
+  });
+  const put = (kind) => (n, ref) => {
+    const from = parent.children.indexOf(n);
+    if (from > -1) parent.children.splice(from, 1);
+    parent.children.splice(ref ? parent.children.indexOf(ref) : parent.children.length, 0, n);
+    n.isConnected = true;
+    calls.push(`${kind} ${n.id}`);
+  };
+  parent.moveBefore = put('move');
+  parent.insertBefore = put('insert');
+  const [a, b, c, gone] = ['a', 'b', 'c', 'gone'].map((id) => node(id));
+  parent.children.push(a, b, c, gone);
+  __test.arrangeChildren(parent, [b, a, c]);
+  nodeAssert.deepEqual(parent.children.map((n) => n.id), ['b', 'a', 'c']);
+  nodeAssert.deepEqual(calls, ['remove gone', 'move b'], 'ein Tausch ist EINE Bewegung, die gegangene Kachel geht');
+  calls.length = 0;
+  const fresh = node('fresh', false);
+  __test.arrangeChildren(parent, [b, fresh, a, c]);
+  nodeAssert.deepEqual(parent.children.map((n) => n.id), ['b', 'fresh', 'a', 'c']);
+  nodeAssert.deepEqual(calls, ['insert fresh'], 'ein neuer Knoten haengt nicht im Dokument: klassisch eingefuegt');
+  calls.length = 0;
+  delete parent.moveBefore;
+  __test.arrangeChildren(parent, [fresh, b, a, c]);
+  nodeAssert.deepEqual(calls, ['insert fresh'], 'ohne moveBefore (Safari) der klassische Weg');
+
+  // Was eine Kachel neu zeichnen laesst: Groesse oder Optionen, nicht die Reihenfolge.
+  nodeAssert.equal(__test.tileDrawKey({ id: 'x', size: '1x1', order: 3 }), __test.tileDrawKey({ id: 'x', size: '1x1', order: 0 }));
+  nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '2x1' }));
+  nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '1x1', options: { limit: 12 } }));
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

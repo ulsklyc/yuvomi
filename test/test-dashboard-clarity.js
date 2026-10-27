@@ -904,23 +904,36 @@ test('FLIP: jede Kachel laeuft von ihrer alten Lage in die neue, statt zu spring
     flipTile('shown', box(0, 400, 100, 100)),
   ];
   const root = { querySelectorAll: (sel) => (sel === '#dashboard-widget-grid > .widget-wrapper[data-widget-id]' ? tiles : []) };
-  const timing = { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' };
-  const played = __test.playTileFlip(root, before, { reduced: false, timing });
+  const played = __test.playTileFlip(root, before, { reduced: false });
   const [moved, grown, shrunk, still, shown] = tiles;
 
   assert.equal(played.length, 4, 'die ruhende Kachel bewegt sich nicht');
   assert.deepEqual(moved.calls[0].keyframes.map((k) => k.transform), ['translate(-100px, 0px)', 'none']);
-  assert.equal(moved.calls[0].timing.duration, 250);
+  // DW-P2-2: `--ease-out` + `--duration-lg` wie das Raster (playGridShift), nicht
+  // die Glasfeder - sie schoss 35/53 px uebers Ziel. Im Test ohne Stylesheet
+  // gelten die Rueckfaelle der Tokens.
+  for (const tile of [moved, grown, shrunk, shown]) {
+    assert.deepEqual(tile.calls[0].timing, { duration: 250, easing: 'ease-out' }, 'Dauer und Kurve aus --duration-lg / --ease-out');
+  }
   assert.match(grown.calls[0].keyframes[0].clipPath, /^inset\(0px 100px 0px 0px/, 'wer waechst, deckt seine neue Flaeche von der alten Groesse aus auf');
   assert.match(grown.calls[0].keyframes[1].clipPath, /^inset\(0px 0px 0px 0px/);
   assert.equal(shrunk.calls[0].keyframes[0].opacity, 0.6, 'wer schrumpft, blendet den umgebrochenen Inhalt auf');
   assert.equal(still.calls.length, 0);
   assert.equal(shown.calls[0].keyframes[0].opacity, 0, 'eine wieder eingeblendete Kachel hat keine Vorlage und blendet ein');
 
-  // Reduzierte Bewegung: es bleibt beim Sprung - und ohne Vorher-Messung auch.
+  // DW-P3-9: unter reduzierter Bewegung kein Weg, aber auch kein stummer
+  // Sprung - was sich bewegt haette, blendet 0,4 -> 1 in --duration-sm
+  // (das Muster von swapContent). Die ruhende Kachel bleibt ruhig.
   for (const t of tiles) t.calls = [];
-  assert.deepEqual(__test.playTileFlip(root, before, { reduced: true, timing }), []);
-  assert.deepEqual(__test.playTileFlip(root, null, { reduced: false, timing }), []);
+  const reduced = __test.playTileFlip(root, before, { reduced: true });
+  assert.equal(reduced.length, 4);
+  for (const tile of [moved, grown, shrunk, shown]) {
+    assert.deepEqual(tile.calls[0].keyframes, [{ opacity: 0.4 }, { opacity: 1 }], 'nur Deckkraft, kein transform, kein clip-path');
+    assert.deepEqual(tile.calls[0].timing, { duration: 150, easing: 'ease-out' });
+  }
+  assert.equal(still.calls.length, 0);
+  for (const t of tiles) t.calls = [];
+  assert.deepEqual(__test.playTileFlip(root, null, { reduced: false }), [], 'ohne Vorher-Messung kein Gleiten');
   assert.ok(tiles.every((t) => t.calls.length === 0));
 });
 
