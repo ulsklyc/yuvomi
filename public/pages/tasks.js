@@ -6314,10 +6314,19 @@ async function ensureAwayMeta(user) {
  */
 export async function openNewTask({ user = null, onChanged = () => {}, signal = null } = {}) {
   if (readOnly() || signal?.aborted) return;
-  await Promise.all([ensureTaskStyles(), ensureAwayMeta(user)]);
+  // DAS STANDARDZIEL KOMMT MIT (Review p11, B7). Bis U2 lief "+ Neu > Aufgabe"
+  // ueber die Aufgabenseite, deren render() die Praeferenzen las; ohne sie
+  // stand das Formular auf "Nur lokal", und die Aufgabe kam nie in der
+  // eingestellten CalDAV-Liste an. Scheitert die Anfrage, bleibt der Stand.
+  const [,, prefs] = await Promise.all([
+    ensureTaskStyles(),
+    ensureAwayMeta(user),
+    api.get('/preferences').catch(() => null),
+  ]);
   // DIE SEITE DARUNTER IST GEGANGEN, waehrend geladen wurde (Review p11): das
   // Formular ginge sonst ueber der neuen Seite auf, mit `onChanged` der alten.
   if (signal?.aborted) return;
+  if (prefs) state.defaultSyncTarget = prefs.data?.tasks_default_target || '';
   if (!state.categories.length) throw new Error(t('tasks.loadError'));
   openTaskModal({ users: state.users, onChanged }, null);
 }

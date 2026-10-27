@@ -1290,6 +1290,57 @@ test('DW p11: verlaesst man die Uebersicht, waehrend ein Anlegen-Blatt laedt, ge
 });
 
 // --------------------------------------------------------------------------
+// Review p11 (B7): DIE NEUE AUFGABE UEBER DER UEBERSICHT KENNT DAS
+// STANDARDZIEL. Bis U2 wechselte "+ Neu > Aufgabe" auf die Aufgabenseite,
+// deren render() die Praeferenzen las; das Blatt ueber der Uebersicht holte
+// nur Mitglieder und Kategorien, und das Formular stand auf "Nur lokal" -
+// die Aufgabe kam nie in der eingestellten CalDAV-Liste an. Der Termin holt
+// seine Praeferenzen schon (loadAwayFormContext), die Notiz hat kein Ziel.
+// --------------------------------------------------------------------------
+test('Review p11 (B7): openNewTask uebernimmt tasks_default_target, ohne dass die Aufgabenseite stand', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const fakeDoc = {
+    head: { appendChild(el) { head.push(el); setImmediate(() => el.onload?.()); return el; } },
+    styleSheets: [],
+    querySelectorAll: () => [], querySelector: () => null, getElementById: () => null,
+    createElement: () => ({ rel: '', href: '', dataset: {}, addEventListener() {} }),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  const target = 'caldav:3|https://dav.example/lists/family/';
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/tasks/meta/options') return { users: [{ id: 1, display_name: 'Linda' }], categories: [{ key: 'household', label: 'Haushalt' }], tags: [] };
+      if (path === '/preferences') return { data: { tasks_default_target: target } };
+      return { data: [] };
+    },
+  };
+  globalThis.__openModal = () => {};
+  // tasks.js zieht Custom Elements mit.
+  const customGlobals = { HTMLElement: class {}, customElements: { define() {}, get() {} } };
+  const missingGlobals = Object.keys(customGlobals).filter((name) => !(name in globalThis));
+  for (const name of missingGlobals) globalThis[name] = customGlobals[name];
+  try {
+    const { openNewTask, __test: tasks } = await import('../public/pages/tasks.js');
+    tasks.state.defaultSyncTarget = '';
+    await openNewTask({ user: { id: 1, role: 'admin' }, onChanged: () => {}, signal: new AbortController().signal });
+    assert.equal(tasks.state.defaultSyncTarget, target, 'das Formular waehlt das eingestellte Ziel vor (wireSyncTarget liest state.defaultSyncTarget)');
+  } finally {
+    for (const name of missingGlobals) delete globalThis[name];
+    delete globalThis.__apiStub;
+    delete globalThis.__openModal;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
 // DW-P2-11: EINE LEERZEILE. Naehrwerte, Entsorgung und Schnellzugriffe sagten
 // "noch nichts" in drei Formen (Glyphe + Caption + Akzent-Textknopf, der je
 // nach Breite rechts stand oder unter den Satz brach). Jetzt die ruhige Zeile
