@@ -108,7 +108,7 @@ class MockCacheStorage {
 }
 
 /** Lädt sw.js in eine frische Sandbox und liefert Handles für Listener + Caches. */
-function loadSw({ fetchImpl } = {}) {
+function loadSw({ fetchImpl, withSession = false } = {}) {
   const cacheStorage = new MockCacheStorage();
   const ctl = { fetchImpl: fetchImpl || (async () => new MockResponse('{}', { status: 200 })) };
   const listeners = {};
@@ -129,6 +129,13 @@ function loadSw({ fetchImpl } = {}) {
   sandbox.globalThis = sandbox;
   const context = createContext(sandbox);
   runInContext(SRC, context);
+  // Eine angemeldete Sitzung mit gueltigem Ablauf (#2293): ohne sie legt der
+  // Worker keine Liste ab und liefert keine aus.
+  if (withSession) {
+    const marker = new MockCache();
+    marker.store.set(runInContext('SESSION_EXPIRY_KEY', context), new MockResponse(JSON.stringify({ expiresAt: Date.now() + 24 * 60 * 60 * 1000 })));
+    cacheStorage.caches.set(runInContext('API_CACHE', context), marker);
+  }
   return {
     listeners, caches: cacheStorage,
     evaluate: (code) => runInContext(code, context),
@@ -168,7 +175,7 @@ async function apiCacheName(env) {
 // --------------------------------------------------------
 
 test('Network-First cacht GET-Whitelist mit x-cached-at-Header', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: [{ id: 1 }] }), { status: 200 }),
   });
   const req = new MockRequest(apiUrl('/calendar?from=2026-06-01&to=2026-06-30'), { method: 'GET' });
@@ -189,7 +196,7 @@ test('Network-First cacht GET-Whitelist mit x-cached-at-Header', async () => {
 });
 
 test('offline → Cache-Fallback liefert den letzten Stand', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: 'frisch' }), { status: 200 }),
   });
   const req = new MockRequest(apiUrl('/tasks'), { method: 'GET' });
@@ -220,7 +227,7 @@ test('offline ohne Cache → 503 mit {error:"offline"}', async () => {
 // /people/:id/avatar statt der Data-URL (server/routes/people.js). Offline
 // zeigt die gecachte Zeile ihr Bild nur, wenn es im selben Cache liegt.
 test('Profilbilder (/people/:id/avatar) gehen in den API-Cache und kommen offline zurueck', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse('BILD', { status: 200 }),
   });
   const req = new MockRequest(apiUrl('/people/2/avatar?v=4012'), { method: 'GET' });
@@ -241,7 +248,7 @@ test('Profilbilder (/people/:id/avatar) gehen in den API-Cache und kommen offlin
 test('eine gecachte Liste holt die Profilbilder ihrer Zeilen mit in den Cache', async () => {
   const key = 'ab'.repeat(16);
   const seen = [];
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async (req) => {
       const url = typeof req === 'string' ? req : req.url;
       seen.push(url);
@@ -276,7 +283,7 @@ test('nur Bildfelder holen ein Bild mit, eingetippter Text nie', async () => {
   const key = 'cd'.repeat(16);
   const typed = Array.from({ length: 5 }, (_, i) => `/api/v1/people/${10 + i}/avatar?v=${'e'.repeat(32)}`);
   const seen = [];
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async (req) => {
       const url = typeof req === 'string' ? req : req.url;
       seen.push(url);
@@ -336,13 +343,14 @@ test('Dokumentdateien gehen nie in einen Cache des Service Workers', async () =>
 });
 
 test('die Laufnummern-Abfrage /shopping/versions wird durchgereicht, /shopping/:id/items daneben gecacht', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: [{ list_id: 1, version: 3 }] }), { status: 200 }),
   });
   const versions = new MockRequest(apiUrl('/shopping/versions'), { method: 'GET' });
   const { responded } = dispatchFetch(env, versions);
   assert.equal(responded, false, 'die Abfrage im Takt darf nicht in den API-Cache');
-  assert.equal(await apiCacheName(env), undefined, 'kein API-Cache durch die Laufnummern-Abfrage');
+  // Der Cache steht schon (Sitzungsablauf, #2293): gemessen wird, dass die
+  // Laufnummern NICHT darin landen (unten).
 
   const items = new MockRequest(apiUrl('/shopping/1/items'), { method: 'GET' });
   const itemsFetch = dispatchFetch(env, items);
@@ -354,7 +362,7 @@ test('die Laufnummern-Abfrage /shopping/versions wird durchgereicht, /shopping/:
 });
 
 test('CLEAR_API_CACHE leert den API-Cache (Nutzerwechsel-Leak-Schutz)', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: 'geheim' }), { status: 200 }),
   });
   const req = new MockRequest(apiUrl('/contacts'), { method: 'GET' });
@@ -368,7 +376,7 @@ test('CLEAR_API_CACHE leert den API-Cache (Nutzerwechsel-Leak-Schutz)', async ()
 });
 
 test('CLEAR_API_CACHE ignoriert fremde Nachrichten', async () => {
-  const env = loadSw({
+  const env = loadSw({ withSession: true,
     fetchImpl: async () => new MockResponse(JSON.stringify({ data: 1 }), { status: 200 }),
   });
   await (dispatchFetch(env, new MockRequest(apiUrl('/dashboard'), { method: 'GET' })).result);
@@ -504,7 +512,7 @@ test('/preferences kommt offline als Abzug mit Modulen, Reihenfolge und Zone', a
       weather_location: 'Musterstadt', dashboard_widgets: ['weather'],
     },
   };
-  const env = loadSw({ fetchImpl: async () => new MockResponse(JSON.stringify(prefs), { status: 200 }) });
+  const env = loadSw({ withSession: true, fetchImpl: async () => new MockResponse(JSON.stringify(prefs), { status: 200 }) });
   const req = new MockRequest(apiUrl('/preferences'), { method: 'GET' });
   await dispatchFetch(env, req).result;
 
@@ -701,4 +709,52 @@ test('ohne Ablauf vom Server legt der Worker keinen Sitzungsabzug an', async () 
   sw.setFetch(async () => { throw new TypeError('Failed to fetch'); });
   const res = await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
   assert.equal(res.status, 503);
+});
+
+// --------------------------------------------------------
+// Fail-closed (#2293, zweiter Security-Befund): ohne gueltigen Ablauf kein
+// gespeicherter Stand - auch nicht fuer Listen von vor diesem Update.
+// --------------------------------------------------------
+async function putRaw(env, path, body) {
+  const name = env.evaluate('API_CACHE');
+  const cache = await env.caches.open(name);
+  await cache.put(path.startsWith('http') ? path : apiUrl(path), new MockResponse(body, { status: 200, headers: { 'x-cached-at': '1' } }));
+}
+
+for (const [label, marker] of [
+  ['ohne Marker (Bestand von vor dem Update)', null],
+  ['mit unlesbarem Marker', 'kein json'],
+  ['mit ungueltigem Ablauf', JSON.stringify({ expiresAt: 'morgen' })],
+]) {
+  test(`offline ${label}: keine Liste, der API-Cache wird geloescht`, async () => {
+    const env = loadSw({ fetchImpl: async () => { throw new TypeError('Failed to fetch'); } });
+    await putRaw(env, '/shopping', JSON.stringify({ data: [{ id: 1 }] }));
+    if (marker !== null) await putRaw(env, env.evaluate('SESSION_EXPIRY_KEY'), marker);
+    const res = await dispatchFetch(env, new MockRequest(apiUrl('/shopping'), { method: 'GET' })).result;
+    assert.equal(res.status, 503);
+    assert.equal(await apiCacheName(env), undefined);
+  });
+}
+
+test('meldet der Server keinen Ablauf mehr, geht der ganze API-Cache, nicht nur der Marker', async () => {
+  const online = async (req) => {
+    if (req.url.endsWith('/auth/me')) return meResponse();
+    return new MockResponse(JSON.stringify({ data: [{ id: 1 }] }), { status: 200 });
+  };
+  const sw = loadSw({ fetchImpl: online });
+  await pageGet(sw, '/auth/me', online);
+  await pageGet(sw, '/shopping', online);
+  const { sessionExpiresAt, ...withoutExpiry } = ME_BODY;
+  assert.ok(sessionExpiresAt);
+  sw.setFetch(async () => meResponse(withoutExpiry));
+  await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
+  assert.equal(await apiCacheName(sw), undefined);
+});
+
+test('ohne gueltigen Marker legt der Worker keine Liste ab', async () => {
+  const env = loadSw({ fetchImpl: async () => new MockResponse(JSON.stringify({ data: [] }), { status: 200 }) });
+  await dispatchFetch(env, new MockRequest(apiUrl('/shopping'), { method: 'GET' })).result;
+  const name = await apiCacheName(env);
+  const stored = name ? await (await env.caches.open(name)).match(apiUrl('/shopping')) : undefined;
+  assert.equal(stored, undefined);
 });

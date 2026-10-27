@@ -119,33 +119,44 @@ const SESSION_EXPIRY_KEY = `${self.location.origin}/api/v1/__offline/session-exp
 
 async function rememberSessionExpiry(cache, body) {
   const expiresAt = sessionExpiryOf(body);
-  if (expiresAt === null) {
-    await cache.delete(SESSION_EXPIRY_KEY);
-    return;
+  // Kein Ablauf vom Server: keine Grenze, also kein gespeicherter Stand -
+  // der ganze API-Cache geht, nicht nur der Marker (fail-closed).
+  if (expiresAt === null || expiresAt <= Date.now()) {
+    await caches.delete(API_CACHE);
+    return false;
   }
   await cache.put(SESSION_EXPIRY_KEY, new Response(JSON.stringify({ expiresAt }), {
     status: 200,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   }));
+  return true;
 }
 
-/**
- * Ist die Sitzung, der der API-Cache gehoert, abgelaufen? Dann ist er jetzt
- * geloescht, und der Aufrufer liefert nichts aus ihm.
- */
-async function dropApiCacheIfSessionExpired() {
+/** Steht im API-Cache ein lesbarer, noch nicht abgelaufener Sitzungsablauf? */
+async function hasValidSessionExpiry() {
   try {
     if (!(await caches.has(API_CACHE))) return false;
-    const cache = await caches.open(API_CACHE);
-    const marker = await cache.match(SESSION_EXPIRY_KEY);
+    const marker = await (await caches.open(API_CACHE)).match(SESSION_EXPIRY_KEY);
     if (!marker) return false;
     const { expiresAt } = await marker.json();
-    if (Number.isFinite(expiresAt) && expiresAt > Date.now()) return false;
-    await caches.delete(API_CACHE);
-    return true;
+    return Number.isFinite(expiresAt) && expiresAt > Date.now();
   } catch {
     return false;
   }
+}
+
+/**
+ * FAIL-CLOSED: der API-Cache wird nur ausgeliefert, solange ein lesbarer
+ * Sitzungsablauf in ihm steht und noch nicht erreicht ist. Fehlt der Marker
+ * (Listen von vor diesem Update), ist er unlesbar, ungueltig oder vorbei, ist
+ * der Cache jetzt geloescht, und der Aufrufer liefert nichts aus ihm. Folge
+ * fuer Bestandsgeraete: einmal kein Offline-Stand bis zum naechsten Abruf mit
+ * Verbindung.
+ */
+async function dropApiCacheIfSessionExpired() {
+  if (await hasValidSessionExpiry()) return false;
+  await caches.delete(API_CACHE).catch(() => false);
+  return true;
 }
 
 /** Der gespeicherte Stand zu einem Abruf - ohne den Cache dafuer neu anzulegen. */
@@ -927,7 +938,7 @@ async function precacheAvatars(baseUrl, text) {
   let body;
   try { body = JSON.parse(text); } catch { return; }
   const paths = [...avatarPathsIn(body)];
-  if (!paths.length) return;
+  if (!paths.length || !(await hasValidSessionExpiry())) return;
   const cache = await caches.open(API_CACHE);
   await Promise.all(paths.map(async (path) => {
     const url = new URL(path, baseUrl).href;
@@ -950,8 +961,10 @@ async function precacheAvatars(baseUrl, text) {
 async function networkFirstApi(request, event) {
   try {
     const response = await fetch(request);
-    // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen.
-    if (response.ok && response.type === 'basic') {
+    // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen - und nur
+    // neben einem gueltigen Sitzungsablauf (#2293): ohne ihn entstuende ein
+    // Eintrag, den der Offline-Pfad ohnehin nie mehr ausliefert.
+    if (response.ok && response.type === 'basic' && await hasValidSessionExpiry()) {
       const cache   = await caches.open(API_CACHE);
       const cloned  = response.clone();
       const headers = new Headers(cloned.headers);
@@ -1045,8 +1058,11 @@ async function networkFirstSnapshot(request, reduce) {
     const cache = await caches.open(API_CACHE);
     if (response.ok && response.type === 'basic') {
       const body = await response.clone().json();
-      if (reduce === reduceSessionSnapshot) await rememberSessionExpiry(cache, body);
-      const snapshot = reduce(body);
+      // `/auth/me` schreibt den Ablauf; jeder andere Abzug nur neben einem gueltigen.
+      const allowed = reduce === reduceSessionSnapshot
+        ? await rememberSessionExpiry(cache, body)
+        : await hasValidSessionExpiry();
+      const snapshot = allowed ? reduce(body) : null;
       if (snapshot) {
         await cache.put(request, new Response(JSON.stringify(snapshot), {
           status: 200,

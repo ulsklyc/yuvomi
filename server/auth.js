@@ -2822,8 +2822,12 @@ router.get('/me', requireAuth, (req, res) => {
       // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
       // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
       // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
-      // diesen Wert legt er keinen an.
-      sessionExpiresAt: req.session.cookie?.expires instanceof Date ? req.session.cookie.expires.getTime() : null,
+      // diesen Wert legt er keinen an. Nur fuer eine Anmeldesitzung: ein
+      // Wanddisplay laeuft auf seinem eigenen Cookie, und das `req.session`
+      // daneben ist eine leere Huelle, deren Ablauf nichts bedeutet.
+      sessionExpiresAt: req.authMethod === 'session' && req.session.cookie?.expires instanceof Date
+        ? req.session.cookie.expires.getTime()
+        : null,
     });
   } catch (err) {
     log.error('/me error:', err);

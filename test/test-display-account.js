@@ -373,6 +373,9 @@ test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
   // Mitglied auch.
   const me = await asDisplay(displayToken)('GET', '/auth/me');
   assert.equal(me.status, 200);
+  // Kein Sitzungsablauf fuer ein Display (#2293): es hat keine Anmeldesitzung,
+  // und ohne Ablauf legt der Service Worker keinen Offline-Stand an.
+  assert.equal(me.body.sessionExpiresAt, null, 'ein Display meldet keinen Sitzungsablauf');
   const modules = me.body.permissions.modules;
 
   for (const key of ['calendar', 'tasks', 'rewards']) {
