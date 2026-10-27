@@ -154,7 +154,8 @@ const lent = new Map();
  * verliert ueber der Uebersicht gegen dieselben Regeln wie im Modul.
  *
  * Steht das Blatt schon (die Seite des Moduls selbst, oder ein zweites
- * Oeffnen), wird nichts geladen. Ein Fehler loest ebenfalls auf.
+ * Oeffnen), wird nichts geladen. Ein Fehler loest ebenfalls auf und nimmt den
+ * Link wieder heraus, damit das naechste Oeffnen neu laedt.
  * @param {string} href  z. B. '/styles/calendar.css'
  * @param {AbortSignal|null} [signal]
  * @returns {Promise<void>}
@@ -170,7 +171,13 @@ export function lendPageStyle(href, signal = null) {
   const entry = { link, ready: null };
   entry.ready = new Promise((resolve) => {
     link.addEventListener('load', () => resolve(), { once: true });
-    link.addEventListener('error', () => resolve(), { once: true });
+    // Gescheitert: raus damit, wie bei ensureStyle - sonst hielte der tote
+    // Link jedes weitere Oeffnen auf diesem Versprechen fest.
+    link.addEventListener('error', () => {
+      link.remove();
+      if (lent.get(href) === entry) lent.delete(href);
+      resolve();
+    }, { once: true });
   });
   document.head.appendChild(link);
   lent.set(href, entry);

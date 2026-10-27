@@ -373,6 +373,24 @@ test('lendPageStyle: am Ende von <head>, einmal je Blatt, geht mit dem Signal de
     doc.children.push(own);
     await lendPageStyle('/styles/notes.css', new AbortController().signal);
     assert.equal(doc.children.filter((c) => c.href === '/styles/notes.css').length, 1);
+
+    // Ein gescheitertes Blatt (Netz kurz weg) geht wieder raus, wie bei
+    // ensureStyle: sonst haelt der tote Link jedes weitere Oeffnen auf dem
+    // alten Versprechen fest, und das Formular bleibt bis zum Seitenwechsel
+    // ohne seine Regeln (Codex-Review #2344).
+    const stay = new AbortController();
+    const failed = lendPageStyle('/styles/calendar.css', stay.signal);
+    const broken = doc.children.find((c) => c.href === '/styles/calendar.css');
+    broken.fire('error');
+    await failed;
+    assert.equal(broken.isConnected, false, 'der kaputte Link bleibt im Dokument');
+    const retry = lendPageStyle('/styles/calendar.css', stay.signal);
+    assert.notEqual(retry, failed, 'das naechste Oeffnen bekommt das alte, schon aufgeloeste Versprechen');
+    const fresh = doc.children.filter((c) => c.href === '/styles/calendar.css');
+    assert.equal(fresh.length, 1, 'genau ein neuer Versuch');
+    assert.notEqual(fresh[0], broken);
+    fresh[0].fire('load');
+    await retry;
   } finally {
     delete globalThis.document;
   }
