@@ -6668,6 +6668,16 @@ function tileDrawKey(w) {
   return `${w?.size}|${JSON.stringify(w?.options ?? null)}`;
 }
 
+/* EINE ERWEITERUNG ZEICHNET IHRE KACHEL SELBST (Review p11, B4). Ihr Koerper
+ * ist bei jeder Groesse und jeder Option derselbe Platzhalter, den erst
+ * mountExtensionWidgets mit { size, options } fuellt - der Vergleich des
+ * Markups sah darum nie eine Aenderung, und die Kachel zeigte nach einer
+ * Geste im Anpassen-Modus den alten Inhalt in der neuen Groesse. Gerufen nur,
+ * wenn sich Groesse oder Optionen geaendert haben (`tileDrawKey`). */
+function tileBodyChanged(w, body, drawn) {
+  return body !== drawn || isExtensionWidget(w?.id);
+}
+
 /**
  * Was das Heute-Blatt und die Kennzahlreihe neu rechnen laesst: welche Kacheln
  * sichtbar sind, ihre Optionen und das Kopfband - nicht Reihenfolge oder
@@ -10348,7 +10358,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         if (redraw) {
           old.classList.remove(...[...old.classList].filter((name) => name.startsWith('widget-size--')));
           old.classList.add(widgetSizeClass(w.size));
-          if (body !== drawnBodies.get(w.id)) {
+          if (tileBodyChanged(w, body, drawnBodies.get(w.id))) {
             // Der Koerper bringt seine Hoehe mit (U1 b): andere Groesse, andere Zeilenzahl.
             setTileSpan(old, body);
             for (const child of [...old.children]) if (!child.matches('[data-widget-controls]')) child.remove();
@@ -11388,6 +11398,8 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppin
 Object.assign(__test, { renderBudgetWidget });
 // Review p11: der Weg zum Anlegen-Blatt, wenn die Seite waehrenddessen geht.
 Object.assign(__test, { openNewTarget });
+// Review p11 (B4): wann eine Kachel im Anpassen-Modus neu gezeichnet und verdrahtet wird.
+Object.assign(__test, { tileBodyChanged });
 
 // Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
 Object.assign(__test, { loadCalendarSources });

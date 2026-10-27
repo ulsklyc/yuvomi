@@ -5842,6 +5842,32 @@ test('U15: Kennzahlreihe - Spalten und Hoehe aus einer Regel, Name und Notiz ab 
 });
 
 // --------------------------------------------------------
+// Review p11 (B4): EINE ERWEITERUNGS-KACHEL WIRD NACH EINER GESTE NEU
+// EINGEHAENGT. Ihr Koerper ist in jeder Groesse derselbe Platzhalter; der
+// Markup-Vergleich in patchCustomize sah nie eine Aenderung, und die Kachel
+// zeigte im Browser nach 1x1 -> 2x1 weiter "size=1x1" (zwei statt drei
+// renderWidget-Aufrufe). Eine Kernkachel mit gleichem Markup bleibt stehen.
+// --------------------------------------------------------
+test('Review p11 (B4): eine Erweiterungs-Kachel wird nach Groesse oder Option neu eingehaengt, auch bei gleichem Platzhalter', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const placeholder = '<div class="widget extension-widget-mount" data-extension-widget-mount="1"></div>';
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'demo:hello', size: '2x1' }, placeholder, placeholder), true,
+    'Erweiterung: gleicher Platzhalter, trotzdem neu - erst mountExtensionWidgets kennt Groesse und Optionen');
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'clock', size: '2x1' }, '<div>a</div>', '<div>a</div>'), false,
+    'Kernkachel mit gleichem Markup: nichts neu zu zeichnen');
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'clock', size: '2x1' }, '<div>b</div>', '<div>a</div>'), true);
+  // Der echte Aufrufer: patchCustomize entscheidet damit, ob die Kachel neu
+  // gezeichnet und ueber wireFreshTiles (mountExtensionWidgets) verdrahtet wird.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const patch = src.slice(src.indexOf('  function patchCustomize('), src.indexOf('  function wireFreshTiles('));
+  nodeAssert.match(patch, /if \(tileBodyChanged\(w, body, drawnBodies\.get\(w\.id\)\)\) \{[\s\S]{0,400}fresh\.push\(old\);/,
+    'patchCustomize zeichnet neu und gibt die Kachel an wireFreshTiles');
+  nodeAssert.match(patch, /wireFreshTiles\(shell, fresh\.filter/);
+  const wire = src.slice(src.indexOf('  function wireFreshTiles('), src.indexOf('\n  }\n', src.indexOf('  function wireFreshTiles(')));
+  nodeAssert.match(wire, /isExtensionWidget\(el\.dataset\.widgetId\)\) void mountExtensionWidgets\(el, widgetConfig, user\)/);
+});
+
+// --------------------------------------------------------
 // Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
 // `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
 // aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf
