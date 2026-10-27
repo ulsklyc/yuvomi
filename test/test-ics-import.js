@@ -326,9 +326,11 @@ test('#513: COUNT+EXDATE import stays finite (10 instances, 9 visible, none afte
   assert.ok(master, 'imported as a single series master');
   assert.equal(master.recurrence_rule, 'FREQ=WEEKLY;COUNT=10', 'COUNT preserved on import');
 
-  // EXDATE 25.11. wurde als Instanz-Ausnahme gespeichert.
+  // Die Serie behaelt ihre Zone (#2306), die EXDATE 25.11. liegt unter ihrem
+  // Originalstart (Format A, #2000): 17:00 Wien im Winter ist 16:00Z.
+  assert.equal(master.tzid, 'Europe/Vienna', 'TZID of DTSTART kept on import');
   const exceptions = loadEventExceptions(db, [master.id]);
-  assert.deepEqual([...(exceptions.get(master.id) ?? [])], ['2024-11-25']);
+  assert.deepEqual([...(exceptions.get(master.id) ?? [])], ['2024-11-25T16:00:00Z']);
 
   // Expansion über ein weites Fenster: genau 9 sichtbare Vorkommen, keins nach 02.12.
   const expanded = expandRecurringEvents([master], '2024-01-01', '2025-12-31', exceptions);
@@ -337,6 +339,8 @@ test('#513: COUNT+EXDATE import stays finite (10 instances, 9 visible, none afte
     '2024-09-30', '2024-10-07', '2024-10-14', '2024-10-21', '2024-10-28',
     '2024-11-04', '2024-11-11', '2024-11-18', '2024-12-02',
   ], 'exactly nine occurrences, 25.11. excluded, none after 02.12.');
+  // Nach der Umstellung (27.10.) bleibt es 17:00 Wiener Zeit, nicht 16:00.
+  assert.equal(expanded.find((e) => e.start_datetime.startsWith('2024-11-04')).start_datetime, '2024-11-04T16:00:00Z');
 });
 
 test('#513: COUNT counts excluded occurrences (EXDATE does not shift the limit)', () => {

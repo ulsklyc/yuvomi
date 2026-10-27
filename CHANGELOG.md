@@ -200,6 +200,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so next to a freshly generated code. It now shows the two steps and the full address up front,
   so an admin who opens the page first - or whose instance signs in through OIDC only - knows
   where the tablet goes.
+- **A recurring event from a one-time calendar import keeps its time zone** (#2306). An imported
+  weekly appointment at 17:00 in Vienna moved to 16:00 after the clocks changed, and an occurrence
+  the file had cancelled after the change could show up again or take its neighbour with it. The
+  import now keeps the time zone of the series, as calendar subscriptions, CalDAV and iCloud do,
+  so the time stays put and the cancelled occurrence is gone on its own day. Events imported
+  before stay as they are.
 - **A shared reminder list connected through two CalDAV accounts shows each task and shopping
   item once** (#1906). When two family members each connected their own account to the same
   list, every task and item stood in Yuvomi twice. Now the account that brings an entry in first

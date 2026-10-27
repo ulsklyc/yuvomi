@@ -23,6 +23,7 @@ import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup, Blocked
 import { safeRequest } from '../utils/http.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
 import { storeImportedExceptions } from './imported-occurrence-key.js';
+import { isValidTimeZone } from '../utils/timezone.js';
 
 const log = createLogger('ICS');
 
@@ -424,8 +425,8 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day, location,
        color, external_calendar_id, external_source, subscription_id,
-       recurrence_rule, user_modified, created_by, local_calendar_id, series_authored)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, 0, ?, ?, 1)
+       recurrence_rule, tzid, user_modified, created_by, local_calendar_id, series_authored)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, 0, ?, ?, 1)
   `);
   const existsStmt = db.get().prepare(`
     SELECT 1 FROM calendar_events e
@@ -491,10 +492,17 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
       }
       try {
         const localRule = toLocalRRule(ev.rrule);
+        // Die Zone des DTSTART bleibt an der Serie (#2306), wie bei CalDAV und
+        // iCloud: ohne sie liefen die Vorkommen nach einer Umstellung auf der
+        // UTC-Uhr des Starts weiter, und eine Absage traf den Nachbartag.
+        // Nur an einer Serie - ein Einzeltermin hat keine Vorkommen zu halten -
+        // und nur eine IANA-Zone: einen fremden Namen (Windows-Zonen) kennt
+        // die Expansion nicht, der Start bleibt dann wie bisher ohne Zone.
+        const tzid = localRule && !ev.allDay && isValidTimeZone(ev.tzid) ? ev.tzid : null;
         const info = insert.run(
           ev.summary, ev.description, ev.dtstart, ev.dtend,
           ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor,
-          ev.uid || null, localRule, userId, localCalendarId,
+          ev.uid || null, localRule, tzid, userId, localCalendarId,
         );
         // EXDATE nur übernehmen, wenn die Serie erhalten blieb (localRule != null).
         // Schluessel in Format A, wo die Uhr der Zeile das Vorkommen kennt
