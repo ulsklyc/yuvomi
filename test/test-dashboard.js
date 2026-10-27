@@ -5868,6 +5868,44 @@ test('Review p11 (B4): eine Erweiterungs-Kachel wird nach Groesse oder Option ne
 });
 
 // --------------------------------------------------------
+// Review p11 (B5): IM ANPASSEN-MODUS STARTET DIE FASTEN-KACHEL NICHTS. Der
+// Knopf schrieb weiter, der stille Abgleich schweigt dort: im Browser fastete
+// der Server, die Kachel bot weiter "Fasten starten" an, auch nach
+// "Abbrechen". Wie jeder Kachelinhalt im Anpassen-Modus (wireLinks) steht er
+// dort still - gesperrt, ohne Handler; ausserhalb bleibt er verdrahtet.
+// --------------------------------------------------------
+test('Review p11 (B5): der Fasten-Knopf ist im Anpassen-Modus gesperrt und schreibt nichts', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const make = () => {
+    const listeners = [];
+    const button = { disabled: false, addEventListener: (type, fn) => listeners.push([type, fn]) };
+    const root = {
+      isConnected: false,
+      querySelector: (sel) => (sel === '[data-fasting-widget-action]' ? button : null),
+      querySelectorAll: () => [],
+    };
+    return { button, listeners, container: { querySelector: (sel) => (sel === '.fasting-widget' ? root : null) } };
+  };
+  // Ohne `refresh`: die Uhr haengt sich dann nicht an das Dokument (Attrappe).
+  const signal = new AbortController().signal;
+  const editing = make();
+  const disposeEditing = __test.wireFastingWidget(editing.container, null, { active: null }, signal, { editing: true });
+  nodeAssert.equal(editing.button.disabled, true, 'Anpassen: der Knopf ist gesperrt');
+  nodeAssert.equal(editing.listeners.length, 0, 'Anpassen: kein Handler, der schreiben koennte');
+  const normal = make();
+  const disposeNormal = __test.wireFastingWidget(normal.container, null, { active: null }, signal);
+  nodeAssert.equal(normal.button.disabled, false);
+  nodeAssert.deepEqual(normal.listeners.map(([type]) => type), ['click'], 'ausserhalb startet der Knopf');
+  disposeEditing?.();
+  disposeNormal?.();
+  // Beide Aufrufer reichen den Modus durch: der Aufbau und die Geste im Anpassen-Modus.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const calls = src.match(/wireFastingWidget\(container, refreshAfterSheet, data\.fasting, signal(?:, \{ editing: isCustomizing \})?\)/g) ?? [];
+  nodeAssert.equal(calls.length, 2, 'Reichweite: zwei Aufrufer');
+  nodeAssert.ok(calls.every((call) => call.includes('editing: isCustomizing')), `jeder Aufrufer nennt den Modus: ${calls.join(' | ')}`);
+});
+
+// --------------------------------------------------------
 // Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
 // `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
 // aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf

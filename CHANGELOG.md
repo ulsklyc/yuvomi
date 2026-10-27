@@ -179,6 +179,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **Customizing the overview no longer starts or ends a fast.** Like every other tile content
+  there, the fasting tile's start and finish button now rests while you arrange tiles; before,
+  it started a fast that the tile did not show until you left the overview.
 - **A key figure no longer runs to the edge of its card.** A figure that only ran into the card's
   padding kept its full size - on an overview tile it stood 3px from the edge; it now steps down a
   size like one that overflows the card, on the overview and in the modules alike.

@@ -3790,10 +3790,20 @@ function renderFastingWidget(fasting, size = '2x1') {
 
 // `refresh` ist der stille Abgleich der Seite: Starten und Beenden lassen die
 // Uebersicht stehen (DW-P1-2), statt sie ueber das Skelett neu aufzubauen.
-function wireFastingWidget(container, refresh, fasting, signal) {
+//
+// IM ANPASSEN-MODUS STARTET UND BEENDET DIE KACHEL NICHTS (Review p11, B5) -
+// wie jeder andere Kachelinhalt dort (wireLinks: "dort zieht man Kacheln, man
+// bearbeitet ihren Inhalt nicht"). Der Knopf war der eine, der weiter schrieb:
+// der Server fastete, aber der stille Abgleich schweigt waehrend des
+// Anpassens, und die Kachel bot nach "Starten" weiter "Fasten starten" an -
+// auch nach "Abbrechen", das aus den alten Daten neu baut. Er steht dort
+// gesperrt; die Uhr laeuft weiter.
+function wireFastingWidget(container, refresh, fasting, signal, { editing = false } = {}) {
   const root = container.querySelector('.fasting-widget');
   if (!root || !fasting) return () => {};
-  root.querySelector('[data-fasting-widget-action]')?.addEventListener('click', async (event) => {
+  const action = root.querySelector('[data-fasting-widget-action]');
+  if (editing && action) action.disabled = true;
+  if (!editing) action?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     try {
@@ -10462,7 +10472,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
     if (ids.has('fasting')) {
       disposeFastingClock();
-      disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal);
+      disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal, { editing: isCustomizing });
     }
     if (ids.has('notes')) {
       disposeNoteCategories();
@@ -10880,7 +10890,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // bleiben (refreshDashboardData). Das volle render() gehoert dem Aufbau.
     // Ohne Argumente: was ein Blatt seinem `onChanged` mitgibt, ist keine Option.
     wireLinks(container, refreshAfterSheet, { editing: isCustomizing, user, signal });
-    disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal);
+    disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal, { editing: isCustomizing });
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
     // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
     container.querySelectorAll('[data-widget-retry]').forEach((btn) =>
@@ -11400,6 +11410,8 @@ Object.assign(__test, { renderBudgetWidget });
 Object.assign(__test, { openNewTarget });
 // Review p11 (B4): wann eine Kachel im Anpassen-Modus neu gezeichnet und verdrahtet wird.
 Object.assign(__test, { tileBodyChanged });
+// Review p11 (B5): die Fasten-Kachel im Anpassen-Modus.
+Object.assign(__test, { wireFastingWidget });
 
 // Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
 Object.assign(__test, { loadCalendarSources });
